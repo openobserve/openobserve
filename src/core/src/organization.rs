@@ -662,6 +662,7 @@ pub async fn create_org(
                         org.identifier
                     );
                 }
+                crate::alerts::alert_calibration::ensure_org_config(&org.identifier).await;
             }
             // Best-effort — the compiled-in fallback (design §4.4) covers the
             // race if this fails or the backfill hasn't run yet; never block
@@ -779,6 +780,8 @@ pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::
     match db::organization::save_org(org).await {
         Ok(_) => {
             save_org_tuples(&org.identifier).await;
+            #[cfg(feature = "enterprise")]
+            crate::alerts::alert_calibration::ensure_org_config(&org.identifier).await;
             #[cfg(feature = "cloud")]
             enqueue_cloud_event(CloudEvent {
                 org_id: org.identifier.clone(),
@@ -916,6 +919,7 @@ pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
     match db::organization::delete_org(org_id).await {
         Ok(_) => {
             delete_org_tuples(org_id).await;
+            crate::ingestion::rejections::clear_rejections(org_id).await;
             #[cfg(feature = "cloud")]
             if let Some(org) = org_snapshot {
                 enqueue_cloud_event(CloudEvent {

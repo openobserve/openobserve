@@ -33,16 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
       </span>
 
-      <!-- Tab List -->
-      <TabList
-        v-if="showTabs && selectedTabId !== null"
-        class="mt-2"
-        :dashboardData="dashboardData"
-        :viewOnly="viewOnly"
-        @refresh="refreshDashboard"
-      />
-
-      <!-- Below the tabs: these scope the ACTIVE tab, and above them the strip both read as page chrome and shifted the tab bar as its height changed per tab. -->
+      <!-- Global variables sit above the tab bar: they apply dashboard-wide, not to the active tab. -->
       <VariablesValueSelector
         v-if="globalVariables.length > 0 || dashboardData?.variables?.showDynamicFilters"
         :scope="'global'"
@@ -53,6 +44,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :initialVariableValues="initialVariableValues"
         class="global-variables-selector"
         data-test="global-variables-selector"
+      />
+
+      <!-- Tab List -->
+      <TabList
+        v-if="showTabs && selectedTabId !== null"
+        class="mt-2"
+        :dashboardData="dashboardData"
+        :viewOnly="viewOnly"
+        :layoutMode="layoutMode"
+        @refresh="refreshDashboard"
+        @layoutChange="$emit('layoutChange')"
       />
 
       <!-- Tab-scoped Variables (for active tab, if using manager) -->
@@ -91,6 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @onDeletePanel="onDeletePanel"
             @onViewPanel="onViewPanel"
             :viewOnly="viewOnly"
+            :layoutMode="layoutMode"
             :data="panels[0] || {}"
             :dashboardId="dashboardData.dashboardId"
             :folderId="folderId"
@@ -130,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="panels.length > 0"
           ref="gridStackContainer"
           class="grid-stack m-0.5 bg-transparent"
-          :class="{ 'grid-interacting': isGridInteracting }"
+          :class="{ 'grid-interacting': isGridInteracting, 'layout-editing': isLayoutEditing }"
         >
           <div
             v-for="item in panels"
@@ -145,7 +148,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="grid-stack-item gridBackground rounded-default border-border-default! bg-transparent!"
             :class="{ 'panel-section-header': isSectionHeader(item) }"
           >
-            <div class="grid-stack-item-content">
+            <div
+              class="grid-stack-item-content"
+              :class="
+                isLayoutEditing && !isSectionHeader(item)
+                  ? 'outline-accent outline-1 -outline-offset-1 outline-dashed'
+                  : ''
+              "
+            >
               <!-- A section heading LABELS the panels below it — it is a layout element,
                    not a panel. Rendering it through PanelContainer gave it the full card
                    treatment (outer border, title bar with its own bottom rule, and an empty
@@ -155,12 +165,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <h2
                 v-if="isSectionHeader(item)"
                 class="flex h-full items-end"
-                :title="item.title"
                 :data-test="`dashboard-section-header-${item.id}`"
               >
                 <!-- truncate has to sit on an inline child: on the flex parent the text
                      is an anonymous flex item and never picks up the ellipsis. -->
-                <span class="truncate">{{ item.title }}</span>
+                <OTruncatedText>{{ item.title }}</OTruncatedText>
               </h2>
               <!-- Off-screen panels render this lightweight placeholder; the
                    real panel mounts only when it comes near the viewport.
@@ -183,6 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @onDeletePanel="onDeletePanel"
                   @onViewPanel="onViewPanel"
                   :viewOnly="viewOnly"
+                  :layoutMode="layoutMode"
                   :data="item"
                   :dashboardId="dashboardData.dashboardId"
                   :folderId="folderId"
@@ -195,6 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   :variablesData="getMergedVariablesForPanel(item.id)"
                   :currentVariablesData="getLiveVariablesForPanel(item.id)"
+                  :isTimeRangeWaiting="isPanelTimeWaiting(item)"
                   :width="getPanelLayout(item, 'w')"
                   :height="getPanelLayout(item, 'h')"
                   :forceLoad="forceLoad"
@@ -232,17 +243,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`dashboard-panel-${item.id}-time-picker`"
                       >
                         <DateTimePickerDashboard
-                          :modelValue="panelTimeValues[item.id]"
-                          :auto-apply-dashboard="false"
+                          :modelValue="getPanelPickedTime(item.id) ?? panelTimeValues[item.id]"
+                          :auto-apply-dashboard="true"
                           size="sm"
                           class="panel-time-picker-widget"
-                          @update:modelValue="(val) => onPanelTimeApply(item.id, val)"
+                          @update:modelValue="(val) => getPanelTimeGate(item.id).onPick(val)"
+                          @show="getPanelTimeGate(item.id).onShow()"
+                          @hide="getPanelTimeGate(item.id).onHide()"
+                          @timezone-change="getPanelTimeGate(item.id).flush()"
                           :data-test="`panel-time-picker-${item.id}`"
-                          :ref="
-                            (el) => {
-                              if (el) panelDateTimePickerRefs.set(item.id, el);
-                            }
-                          "
+                          :ref="(picker) => setPanelTimePicker(item.id, picker)"
                         />
                       </div>
 
@@ -289,6 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selectedDateForViewPanel="viewPanelSelectedDate"
             :initialVariableValues="getMergedVariablesForPanel(viewPanelId)"
             :searchType="searchType"
+            :viewOnly="!!viewOnly"
             @close-panel="() => (showViewPanel = false)"
             @update:initial-variable-values="updateInitialVariableValues"
           />
@@ -299,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <NoPanel
           @update:Panel="addPanelData"
           :view-only="viewOnly"
-          :hide-add-action="hideAddPanel"
+          :hide-add-action="hideAddPanel || isLayoutEditing"
         />
       </div>
     </div>
@@ -311,6 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   computed,
   defineComponent,
+  effectScope,
   onActivated,
   onMounted,
   onUnmounted,
@@ -321,9 +333,11 @@ import {
   nextTick,
   reactive,
   inject,
+  type PropType,
+  type Ref,
 } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import PanelContainer from "../../components/dashboards/PanelContainer.vue";
 import DateTimePickerDashboard from "../../components/DateTimePickerDashboard.vue";
@@ -334,17 +348,26 @@ import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
 import TabList from "@/components/dashboards/tabs/TabList.vue";
 import useNotifications from "@/composables/useNotifications";
-import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
+import { useDashboardSaveConflict } from "@/composables/dashboard/useDashboardSaveConflict";
+import { getVariableKey, useVariablesManager } from "@/composables/dashboard/useVariablesManager";
+import {
+  useDashboardTimeGate,
+  type DashboardTimeGate,
+} from "@/composables/dashboard/useDashboardTimeGate";
 import { useLoading } from "@/composables/useLoading";
 import { GridStack } from "gridstack";
 import {
+  arePickerValuesEqual,
   convertTimeObjToPickerFormat,
   resolvePanelTimeValue,
+  toPickerSavedDate,
 } from "@/utils/dashboard/panelTimeUtils";
 import "gridstack/dist/gridstack.min.css";
 import { panelDownloadRegistry, panelCsvRegistry } from "@/utils/panelDownloadRegistry";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ViewPanel from "@/components/dashboards/viewPanel/ViewPanel.vue";
+import type { LayoutMode } from "@/components/dashboards/layoutMode";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 export default defineComponent({
   name: "RenderDashboardCharts",
@@ -361,6 +384,7 @@ export default defineComponent({
     "searchRequestTraceIds",
     "variablesManagerReady",
     "sendToAiChat",
+    "layoutChange",
   ],
   props: {
     viewOnly: {},
@@ -422,6 +446,11 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
+    /** "live" drags and saves at once; "view" locks the layout; "edit" unlocks it and emits layoutChange instead of saving. */
+    layoutMode: {
+      type: String as PropType<LayoutMode>,
+      default: "live",
+    },
   },
 
   components: {
@@ -432,6 +461,7 @@ export default defineComponent({
     ViewPanel,
     TabList,
     ODialog,
+    OTruncatedText,
   },
   setup(props: any, { emit }) {
     const { t } = useI18nTyped();
@@ -441,6 +471,7 @@ export default defineComponent({
     const gridStackContainer = ref(null);
     // True while a panel is being dragged or resized — drives the grid backdrop.
     const isGridInteracting = ref(false);
+    const isLayoutEditing = computed(() => props.layoutMode === "edit");
 
     // Initialize GridStack instance
     // (not with ref: https://github.com/gridstack/gridstack.js/issues/2115)
@@ -535,6 +566,11 @@ export default defineComponent({
 
     // Provide to child components (VariablesValueSelector, etc.)
     provide("variablesManager", variablesManager);
+
+    const dashboardAutoRun = inject<Ref<boolean>>("dashboardAutoRun", ref(false));
+    watch(dashboardAutoRun, (on) => variablesManager.setLiveMode(on === true), {
+      immediate: true,
+    });
 
     // Computed properties for filtered variables by scope
     // Per-tab narrowing of a global variable (`curatedTabs`) is applied by
@@ -649,11 +685,8 @@ export default defineComponent({
       }
     });
 
-    const {
-      showPositiveNotification,
-      showErrorNotification,
-      showConfictErrorNotificationWithRefreshBtn,
-    } = useNotifications();
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
+    const saveConflict = useDashboardSaveConflict();
     const refreshDashboard = (onlyIfRequired = false) => {
       emit("refresh", onlyIfRequired);
     };
@@ -714,6 +747,13 @@ export default defineComponent({
         };
       },
     );
+
+    // Auto Run applies without the time change that drops per-panel refresh snapshots above.
+    variablesManager.onAutoCommit(() => {
+      if (!variablesManager.isLiveMode.value) return;
+      const { __global, ...panelSnapshots } = currentVariablesDataRef.value;
+      if (Object.keys(panelSnapshots).length) currentVariablesDataRef.value = { __global };
+    });
 
     watch(
       () => currentVariablesDataRef.value,
@@ -808,7 +848,8 @@ export default defineComponent({
     provide("hoveredSeriesState", hoveredSeriesState);
 
     // save the dashboard value
-    const saveDashboardData = useLoading(async () => {
+    // `change` names the edit in the conflict dialog when the caller is not a layout move.
+    const saveDashboardData = useLoading(async (change?: I18nText) => {
       try {
         await updateDashboard(
           store,
@@ -819,29 +860,34 @@ export default defineComponent({
         );
 
         showPositiveNotification(t("dashboard.renderDashboardCharts.dashboardUpdatedSuccessfully"));
+        return true;
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              t("dashboard.renderDashboardCharts.dashboardUpdateFailed"),
-            t,
-          );
-        } else {
-          showErrorNotification(
-            error?.message ?? t("dashboard.renderDashboardCharts.dashboardUpdateFailed"),
-            {
-              timeout: 2000,
-            },
-          );
+        if (saveConflict.isConflict(error)) {
+          // No refresh, in any layout mode: the layout I just made stays on screen (and edit mode keeps its draft) while the dialog is open.
+          void saveConflict.openConflict({
+            dashboardId: props.dashboardData.dashboardId,
+            folderId: (route.query.folder as string) ?? "default",
+            mine: props.dashboardData,
+            change: change ?? t("dashboard.saveConflict.change.movedPanels"),
+          });
+          return false;
         }
+        showErrorNotification(
+          error?.message ?? t("dashboard.renderDashboardCharts.dashboardUpdateFailed"),
+          {
+            timeout: 2000,
+          },
+        );
 
-        // refresh dashboard
-        refreshDashboard();
-      } finally {
-        /* no cleanup needed */
+        // A reload swaps the dashboard object and ends the edit session, so edit mode keeps the draft for a retry.
+        if (props.layoutMode !== "edit") refreshDashboard();
+        return false;
       }
     });
+
+    const isGridStatic = computed(
+      () => !!props.viewOnly || saveDashboardData.isLoading.value || props.layoutMode === "view",
+    );
 
     //add panel
     const addPanelData = () => {
@@ -881,6 +927,8 @@ export default defineComponent({
             props.viewOnly || saveDashboardData.isLoading.value || props.simplifiedPanelView, // Disable resize in view-only
           disableDrag:
             props.viewOnly || saveDashboardData.isLoading.value || props.simplifiedPanelView, // Disable drag in view-only
+          // The layout lock goes through staticGrid, not disableDrag: setStatic(false) cannot lift disableDrag.
+          staticGrid: isGridStatic.value,
           acceptWidgets: false, // Don't accept external widgets
           removable: false, // Don't allow removal by dragging out
           animate: false, // Disable animations for better performance
@@ -907,7 +955,11 @@ export default defineComponent({
 
         if (items && items.length > 0) {
           updatePanelLayouts(items); // Update panel layout data
-          saveDashboardData.execute(); // Save changes to backend
+          if (props.layoutMode === "edit") {
+            emit("layoutChange");
+          } else if (props.layoutMode === "live") {
+            saveDashboardData.execute(); // Save changes to backend
+          }
         }
       });
 
@@ -953,6 +1005,30 @@ export default defineComponent({
         }
       });
     };
+
+    const syncGridToLayout = () => {
+      const grid = gridStackInstance;
+      if (!grid) return;
+      const items = panels.value
+        .filter((panel) => grid.engine?.nodes?.some((node) => node.id === panel.id))
+        .map((panel) => ({
+          id: panel.id,
+          x: getPanelLayout(panel, "x"),
+          y: getPanelLayout(panel, "y"),
+          w: getPanelLayout(panel, "w"),
+          h: getPanelLayout(panel, "h"),
+        }));
+      gridStackUpdateInProgress = true;
+      try {
+        grid.load(items, false);
+        // Collisions may have pushed neighbours; the data must match what is on screen.
+        updatePanelLayouts(grid.engine?.nodes ?? []);
+      } finally {
+        gridStackUpdateInProgress = false;
+      }
+      window.dispatchEvent(new Event("resize"));
+    };
+
     // Optimized GridStack refresh function
     const refreshGridStack = async () => {
       if (!gridStackContainer.value) {
@@ -1148,20 +1224,23 @@ export default defineComponent({
       }
     };
 
-    // disable resize and drag for view only mode and when saving dashboard
-    // do it based on watcher on viewOnly and saveDashboardData.isLoading
+    // setStatic only toggles drag/resize, so locking or unlocking the layout never re-renders a chart.
     watch(
-      () => props.viewOnly || saveDashboardData.isLoading.value,
-      async (newValue) => {
-        if (gridStackInstance) {
-          gridStackInstance.setStatic(newValue === true);
-        }
+      isGridStatic,
+      (isStatic) => {
+        gridStackInstance?.setStatic(isStatic);
+      },
+      { immediate: true },
+    );
 
-        // If switching from viewOnly (print mode) to interactive, force a refresh
-        if (newValue === false) {
-          await nextTick();
-          await refreshGridStack();
-        }
+    watch(
+      () => [props.viewOnly, saveDashboardData.isLoading.value],
+      async ([viewOnly, saving], previous) => {
+        if (viewOnly || saving) return;
+        // The mount build must use makeWidget like every later rebuild, or overlapping layouts resolve differently.
+        if (props.layoutMode !== "live" && previous && !previous[0]) return;
+        await nextTick();
+        await refreshGridStack();
       },
       { immediate: true },
     );
@@ -1185,6 +1264,22 @@ export default defineComponent({
           await nextTick();
           await refreshGridStack();
         }
+      },
+    );
+
+    watch(
+      () => ({
+        tabId: selectedTabId.value,
+        ids: panels.value
+          .map((panel: any) => panel.id)
+          .sort()
+          .join(","),
+      }),
+      async (next, previous) => {
+        // A panel joining a built grid never becomes a widget; tab switches and empty grids refresh above.
+        if (!previous?.ids || next.ids === previous.ids || next.tabId !== previous.tabId) return;
+        await nextTick();
+        await refreshGridStack();
       },
     );
 
@@ -1309,31 +1404,25 @@ export default defineComponent({
           ...Object.values(newData.panels).flat(),
         ];
 
-        let shouldAutoCommit = false;
+        const firstLoadedKeys: string[] = [];
 
         for (const variable of allVariables) {
           // Only check query_values variables that just finished loading
           if (variable.type !== "query_values") continue;
           if (!variable.isVariablePartialLoaded) continue;
 
-          // Find this variable in committed state
+          // Not committed yet, or committed before it ever loaded → first load
           const committedVar = findInCommitted(variable);
-
-          if (!committedVar) {
-            // Variable doesn't exist in committed state → first load
-            shouldAutoCommit = true;
-            break;
-          } else if (committedVar.isVariablePartialLoaded === false) {
-            // Variable exists but was never loaded → first load
-            shouldAutoCommit = true;
-            break;
+          if (!committedVar || committedVar.isVariablePartialLoaded === false) {
+            firstLoadedKeys.push(
+              getVariableKey(variable.name, variable.scope, variable.tabId, variable.panelId),
+            );
           }
-          // else: committedVar.isVariablePartialLoaded === true → reload → no commit
         }
 
-        if (shouldAutoCommit) {
-          // Auto-commit so panels see the new values
-          variablesManager.commitAll();
+        if (firstLoadedKeys.length) {
+          // Waits for their dependents so a first load reaches panels in one commit.
+          variablesManager.commitWhenSettled(firstLoadedKeys);
         }
       },
       { deep: true },
@@ -1434,37 +1523,16 @@ export default defineComponent({
       }
     };
 
-    // Track which panels are currently being synced to prevent infinite loops
-    const panelsSyncingDateTime = ref(new Set<string>());
-
+    // A panel's waiting range is applied here: by its own refresh, the dashboard Refresh, or Auto Run.
     const syncPanelDateTimePickerState = (panelId: string) => {
-      const pickerRef = panelDateTimePickerRefs.get(panelId);
+      const gate = panelTimeGates.get(panelId);
+      if (!gate) return;
 
-      if (!pickerRef?.dateTimePicker) {
-        return;
-      }
+      gate.apply();
 
-      // Mark this panel as currently syncing
-      panelsSyncingDateTime.value.add(panelId);
-
-      try {
-        // Call refresh() to commit uncommitted changes
-        pickerRef.refresh();
-
-        // Get the committed value
-        const innerDateTimePicker = pickerRef.dateTimePicker;
-        const currentDateTime = innerDateTimePicker.getConsumableDateTime();
-
-        if (currentDateTime) {
-          if (!arePickerValuesEqual(panelTimeValues.value[panelId], currentDateTime)) {
-            panelTimeValues.value[panelId] = currentDateTime;
-          }
-        }
-      } finally {
-        // Unmark after a short delay to allow events to settle
-        setTimeout(() => {
-          panelsSyncingDateTime.value.delete(panelId);
-        }, 100);
+      const appliedTime = gate.applied.value;
+      if (appliedTime && !arePickerValuesEqual(panelTimeValues.value[panelId], appliedTime)) {
+        panelTimeValues.value[panelId] = appliedTime;
       }
     };
 
@@ -1529,6 +1597,7 @@ export default defineComponent({
 
     // Exposed methods for parent components to interact with variables manager
     const commitAllVariables = () => {
+      variablesManager.cancelPendingCommit();
       variablesManager.commitAll();
     };
 
@@ -1541,22 +1610,50 @@ export default defineComponent({
     };
 
     // ===== Panel Time Configuration (NEW FEATURE) =====
-    // Panel time values for all panels (map: panelId -> time value)
+    // The applied time of every panel that has its own picker (map: panelId -> time value)
     const panelTimeValues = ref<Record<string, any>>({});
 
-    // Store refs to panel datetime picker components using a Map (not reactive)
-    const panelDateTimePickerRefs = new Map<string, any>();
+    // Gates outlive a picker remount, so a range still waiting survives a tab switch.
+    const panelTimeGates = new Map<string, DashboardTimeGate>();
+    const panelTimeGateScope = effectScope(true);
+    onBeforeUnmount(() => panelTimeGateScope.stop());
+
+    const panelTimePickers = new Map<string, any>();
+    const setPanelTimePicker = (panelId: string, picker: any) => {
+      if (picker) panelTimePickers.set(panelId, picker);
+      else panelTimePickers.delete(panelId);
+    };
+
+    const getPanelTimeGate = (panelId: string) => {
+      let gate = panelTimeGates.get(panelId);
+      if (!gate) {
+        gate = panelTimeGateScope.run(() =>
+          useDashboardTimeGate({
+            isAutoRunOn: () => dashboardAutoRun.value === true,
+            onAutoApply: () => refreshPanelRequest(panelId, false),
+            showInPicker: (value) =>
+              panelTimePickers
+                .get(panelId)
+                ?.setSavedDate(toPickerSavedDate(value, store.state.timezone)),
+          }),
+        );
+        panelTimeGates.set(panelId, gate);
+      }
+      return gate;
+    };
+
+    const getPanelPickedTime = (panelId: string) => getPanelTimeGate(panelId).picked.value;
 
     // panelDownloadRegistry is a module-level singleton (see utils/panelDownloadRegistry.ts).
     // PanelContainer instances register themselves on mount; no provide/inject needed.
-
-    // Track panels that are initializing (to prevent spurious change events)
-    const panelsInitializing = ref<Set<string>>(new Set());
 
     // Check if a specific panel has time enabled
     const hasPanelTime = (panel: any) => {
       return !!panel?.config?.panel_time_enabled;
     };
+
+    const isPanelTimeWaiting = (panel: any) =>
+      hasPanelTime(panel) && getPanelTimeGate(panel.id).needsRefresh.value;
 
     // Computed property to get the correct time for view panel
     // Returns panel-specific time if available, otherwise returns global time
@@ -1576,25 +1673,6 @@ export default defineComponent({
       return props.selectedDateForViewPanel;
     });
 
-    // Semantic equality for picker values — used in both initializePanelTimes and onPanelTimeApply.
-    // DateTimePickerDashboard normalizes values (adds startTime/endTime, may drop "type"),
-    // so we compare semantically: for relative, only compare the period string.
-    const arePickerValuesEqual = (v1: any, v2: any) => {
-      if (!v1 || !v2) return v1 === v2;
-
-      const type1 = v1.valueType || v1.type;
-      const type2 = v2.valueType || v2.type;
-      if (type1 !== type2) return false;
-
-      // For relative: only the period matters (startTime/endTime are computed & change over time)
-      if (type1 === "relative") {
-        return v1.relativeTimePeriod === v2.relativeTimePeriod;
-      }
-
-      // For absolute: compare start and end times
-      return v1.startTime === v2.startTime && v1.endTime === v2.endTime;
-    };
-
     // Initialize panel time values for panels with panel-level time enabled
     const initializePanelTimes = () => {
       panels.value?.forEach((panel: any) => {
@@ -1602,8 +1680,7 @@ export default defineComponent({
         if (hasPanelTime(panel)) {
           const panelId = panel.id;
 
-          // Mark this panel as initializing to prevent change events
-          panelsInitializing.value.add(panelId);
+          getPanelTimeGate(panelId);
 
           // When panel has no custom time (panel_time_range is null) and no URL panel params,
           // use local convertGlobalTimeToPickerFormat which preserves relative/absolute type
@@ -1626,9 +1703,6 @@ export default defineComponent({
           if (pickerValue && !arePickerValuesEqual(panelTimeValues.value[panelId], pickerValue)) {
             panelTimeValues.value[panelId] = pickerValue;
           }
-
-          // Cleanup initialization flag
-          setTimeout(() => panelsInitializing.value.delete(panelId), 500);
         }
       });
     };
@@ -1665,34 +1739,6 @@ export default defineComponent({
         valueType: "relative",
         relativeTimePeriod: "15m",
       };
-    };
-
-    // Handle Apply button click on panel time picker
-    const onPanelTimeApply = async (panelId: string, newValue?: any) => {
-      // Guard against infinite recursion during state synchronization
-      if (panelsSyncingDateTime.value.has(panelId)) {
-        return;
-      }
-
-      // Guard against firing during initialization (when initializePanelTimes sets values)
-      // This prevents null-config panels from creating spurious URL params
-      if (panelsInitializing.value.has(panelId)) {
-        return;
-      }
-
-      // Skip when DateTime.vue emits its current value on mount (open-picker cascade).
-      // We use :modelValue (not v-model) so panelTimeValues is NOT auto-written before
-      // this handler runs — enabling a true before/after equality check here.
-      if (newValue && arePickerValuesEqual(panelTimeValues.value[panelId], newValue)) {
-        return;
-      }
-
-      if (newValue) {
-        panelTimeValues.value[panelId] = newValue;
-      }
-
-      // Use the local helper which handles state syncing, URL update and variable freeze for this panel
-      await refreshPanelRequest(panelId, false);
     };
 
     // Update URL with panel time params
@@ -1813,7 +1859,9 @@ export default defineComponent({
       currentVariablesDataRef,
       resetGridLayout,
       refreshGridStack,
+      syncGridToLayout,
       isGridInteracting,
+      isLayoutEditing,
       // New scoped variables properties
       variablesManager,
       globalVariables,
@@ -1829,8 +1877,10 @@ export default defineComponent({
       // Panel time configuration (NEW)
       panelTimeValues,
       hasPanelTime,
-      onPanelTimeApply,
-      panelDateTimePickerRefs,
+      getPanelTimeGate,
+      getPanelPickedTime,
+      isPanelTimeWaiting,
+      setPanelTimePicker,
       viewPanelSelectedDate,
     };
   },
@@ -1921,7 +1971,7 @@ export default defineComponent({
 }
 
 /* GridStack theme overrides */
-.displayDiv :deep(.grid-stack .grid-stack-item .drag-allow) {
+.displayDiv :deep(.grid-stack:not(.grid-stack-static) .grid-stack-item .drag-allow) {
   cursor: move;
 }
 
@@ -2005,6 +2055,19 @@ export default defineComponent({
   right: 0.125rem;
   cursor: se-resize;
   transform: rotate(0deg) !important;
+}
+
+.displayDiv
+  :deep(.grid-stack.layout-editing .grid-stack-item > .ui-resizable-handle.ui-resizable-se) {
+  background-color: var(--color-accent);
+  -webkit-mask-size: 0.75rem 0.75rem;
+  mask-size: 0.75rem 0.75rem;
+}
+
+/* GridStack hides the handle until hover (ui-resizable-autohide); while editing every panel shows it. */
+.displayDiv
+  :deep(.grid-stack.layout-editing .grid-stack-item.ui-resizable-autohide > .ui-resizable-handle) {
+  display: block;
 }
 
 /* Ensure proper box-sizing */

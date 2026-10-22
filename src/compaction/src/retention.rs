@@ -26,7 +26,10 @@ use config::{
             TimeRange,
         },
     },
-    utils::time::{BASE_TIME, HourFormat, day_micros, get_ymdh_from_micros, hour_micros},
+    utils::{
+        parquet::parse_file_key_columns,
+        time::{BASE_TIME, HourFormat, day_micros, get_ymdh_from_micros, hour_micros},
+    },
 };
 use db;
 use infra::{
@@ -36,6 +39,8 @@ use infra::{
 };
 use itertools::Itertools;
 use search_service::{file_list, file_list_dump::generate_dump_stream_name};
+
+use crate::bloom::compact::bloom_files_deleted;
 
 pub(crate) async fn generate_jobs() -> Result<(), anyhow::Error> {
     let cfg = get_config();
@@ -427,6 +432,9 @@ fn generate_local_stream_dirs(
         PathBuf::from(format!(
             "{data_stream_dir}files/{org_id}/index/{stream_name}_{stream_type}"
         )),
+        PathBuf::from(format!(
+            "{data_stream_dir}files/{org_id}/bloom/{stream_name}_{stream_type}"
+        )),
     ];
     if stream_type == StreamType::Metrics {
         dirs.push(PathBuf::from(format!(
@@ -593,16 +601,30 @@ pub async fn delete_from_file_list(
     files.sort_unstable_by(|a, b| a.key.cmp(&b.key));
 
     // write file list to storage
-    write_file_list(org_id, &files).await?;
+    write_file_list(org_id, stream_type, stream_name, &files).await?;
 
     Ok(())
 }
 
 // write file list to db, all the files should be deleted
-async fn write_file_list(org_id: &str, files: &[FileKey]) -> Result<(), anyhow::Error> {
+async fn write_file_list(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    files: &[FileKey],
+) -> Result<(), anyhow::Error> {
     let cfg = get_config();
+    let keep_deleted = cfg
+        .compact
+        .file_list_deleted_mode
+        .eq(&FileListBookKeepMode::Deleted.to_string());
     // the db layer splits each batch by date itself, so a batch may span many hours
     for events in files.chunks(cfg.compact.file_list_deleted_batch_size.max(1)) {
+        let del_items = if keep_deleted {
+            deleted_items(org_id, stream_type, stream_name, events)?
+        } else {
+            Vec::new()
+        };
         // set to db, retry 5 times
         let mut success = false;
         let created_at = Utc::now().timestamp_micros();
@@ -632,29 +654,13 @@ async fn write_file_list(org_id: &str, files: &[FileKey]) -> Result<(), anyhow::
                 continue;
             }
             // store to file_list_deleted table, pending delete
-            if cfg
-                .compact
-                .file_list_deleted_mode
-                .eq(&FileListBookKeepMode::Deleted.to_string())
-            {
-                let del_items = events
-                    .iter()
-                    .map(|v| FileListDeleted {
-                        id: 0,
-                        account: v.account.clone(),
-                        file: v.key.clone(),
-                        index_file: v.meta.index_size > 0,
-                        mindex_file: v.meta.mindex_size > 0,
-                        flattened: v.meta.flattened,
-                    })
-                    .collect::<Vec<_>>();
-                if let Err(e) =
+            if keep_deleted
+                && let Err(e) =
                     infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
-                {
-                    log::error!("[COMPACTOR] batch_add_deleted to db failed, retrying: {e}");
-                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                    continue;
-                }
+            {
+                log::error!("[COMPACTOR] batch_add_deleted to db failed, retrying: {e}");
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                continue;
             }
             success = true;
             break;
@@ -664,6 +670,33 @@ async fn write_file_list(org_id: &str, files: &[FileKey]) -> Result<(), anyhow::
         }
     }
     Ok(())
+}
+
+// retention drops whole hours, so no surviving file can reference the `.bf` of a deleted file
+fn deleted_items(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    files: &[FileKey],
+) -> Result<Vec<FileListDeleted>, anyhow::Error> {
+    let mut bloom_hours = Vec::with_capacity(files.len());
+    for file in files.iter().filter(|file| file.meta.bloom_ver > 0) {
+        let (_, date_key, _) = parse_file_key_columns(&file.key)?;
+        bloom_hours.push((date_key, file.meta.bloom_ver));
+    }
+    let bloom_items = bloom_files_deleted(org_id, stream_type, stream_name, bloom_hours);
+    let mut del_items = Vec::with_capacity(files.len() + bloom_items.len());
+    del_items.extend(files.iter().map(|v| FileListDeleted {
+        id: 0,
+        account: v.account.clone(),
+        file: v.key.clone(),
+        index_file: v.meta.index_size > 0,
+        mindex_file: v.meta.mindex_size > 0,
+        flattened: v.meta.flattened,
+    }));
+    del_items.extend(bloom_items);
+
+    Ok(del_items)
 }
 
 fn generate_local_dirs(
@@ -680,16 +713,24 @@ fn generate_local_dirs(
         stream_type,
         stream_name,
     );
+    // a range that starts or ends inside a day goes by hour, so the day's other hours stay
+    let whole_days =
+        date_start.num_seconds_from_midnight() == 0 && date_end.num_seconds_from_midnight() == 0;
+    let (step, format) = if whole_days {
+        (Duration::days(1), "%Y/%m/%d")
+    } else {
+        (Duration::hours(1), "%Y/%m/%d/%H")
+    };
     let mut dirs_to_delete = Vec::new();
     while date_start < date_end {
-        let date = date_start.format("%Y/%m/%d").to_string();
+        let date = date_start.format(format).to_string();
         for stream_dir in &stream_dirs {
-            let day_path = stream_dir.join(&date);
-            if day_path.exists() {
-                dirs_to_delete.push(day_path);
+            let path = stream_dir.join(&date);
+            if path.exists() {
+                dirs_to_delete.push(path);
             }
         }
-        date_start += Duration::days(1); // Move to the next day
+        date_start += step;
     }
 
     dirs_to_delete
@@ -739,7 +780,7 @@ async fn handle_delete_by_date_done(
 
 #[cfg(test)]
 mod tests {
-    use config::utils::time::parse_str_to_timestamp_micros;
+    use config::{meta::stream::FileMeta, utils::time::parse_str_to_timestamp_micros};
     use itertools::Itertools;
 
     use super::*;
@@ -825,6 +866,7 @@ mod tests {
             vec![
                 PathBuf::from("/data/files/org/metrics/cpu"),
                 PathBuf::from("/data/files/org/index/cpu_metrics"),
+                PathBuf::from("/data/files/org/bloom/cpu_metrics"),
                 PathBuf::from("/data/files/org/mindex/cpu"),
             ]
         );
@@ -833,6 +875,46 @@ mod tests {
             vec![
                 PathBuf::from("/data/files/org/logs/app"),
                 PathBuf::from("/data/files/org/index/app_logs"),
+                PathBuf::from("/data/files/org/bloom/app_logs"),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_deleted_items_add_one_bloom_file_per_hour_and_version() {
+        let file = |hour: &str, name: &str, bloom_ver: i64| {
+            FileKey::new(
+                0,
+                String::new(),
+                format!("files/org/logs/app/2026/08/19/{hour}/{name}.parquet"),
+                FileMeta {
+                    bloom_ver,
+                    ..Default::default()
+                },
+                true,
+            )
+        };
+        let files = [
+            file("07", "a", 7),
+            file("07", "b", 7),
+            file("07", "c", 9),
+            file("08", "d", 7),
+            file("08", "e", 0),
+        ];
+
+        let deleted = deleted_items("org", StreamType::Logs, "app", &files).unwrap();
+
+        assert_eq!(
+            deleted.iter().map(|item| item.file.as_str()).collect_vec(),
+            [
+                "files/org/logs/app/2026/08/19/07/a.parquet",
+                "files/org/logs/app/2026/08/19/07/b.parquet",
+                "files/org/logs/app/2026/08/19/07/c.parquet",
+                "files/org/logs/app/2026/08/19/08/d.parquet",
+                "files/org/logs/app/2026/08/19/08/e.parquet",
+                "files/org/bloom/app_logs/2026/08/19/07/7.bf",
+                "files/org/bloom/app_logs/2026/08/19/07/9.bf",
+                "files/org/bloom/app_logs/2026/08/19/08/7.bf",
             ]
         );
     }
@@ -1222,6 +1304,114 @@ mod tests {
             now,
         );
         assert!(dirs.is_empty());
+    }
+
+    /// Creates the given hour directories under a new logs stream, returning its name and dir.
+    fn local_stream_with_hours(prefix: &str, hours: &[&str]) -> (String, PathBuf) {
+        let stream = format!("{prefix}_{}", config::utils::time::now_micros());
+        let stream_dir = PathBuf::from(format!(
+            "{}files/org/logs/{stream}",
+            get_config().common.data_stream_dir
+        ));
+        for hour in hours {
+            std::fs::create_dir_all(stream_dir.join(hour)).unwrap();
+        }
+        (stream, stream_dir)
+    }
+
+    #[test]
+    fn test_generate_local_dirs_keeps_hours_outside_the_range() {
+        let (stream, stream_dir) = local_stream_with_hours(
+            "keeps_hours",
+            &[
+                "2026/09/30/21",
+                "2026/09/30/23",
+                "2026/10/01/01",
+                "2026/10/01/03",
+                "2026/10/02/01",
+            ],
+        );
+        let dt = |s: &str| DateTime::parse_from_rfc3339(s).unwrap().with_timezone(&Utc);
+        let dirs =
+            |start, end| generate_local_dirs("org", StreamType::Logs, &stream, dt(start), dt(end));
+        let partly = dirs("2026-10-01T02:00:00Z", "2026-10-01T04:00:00Z");
+        let across_midnight = dirs("2026-09-30T22:00:00Z", "2026-10-01T02:00:00Z");
+        let ending_at_midnight = dirs("2026-09-30T22:00:00Z", "2026-10-01T00:00:00Z");
+        let with_a_whole_day = dirs("2026-09-30T22:00:00Z", "2026-10-02T02:00:00Z");
+        let ending_mid_day = dirs("2026-10-01T00:00:00Z", "2026-10-02T02:00:00Z");
+        let whole_days = dirs("2026-09-30T00:00:00Z", "2026-10-02T00:00:00Z");
+        std::fs::remove_dir_all(&stream_dir).unwrap();
+
+        let paths = |rel: &[&str]| rel.iter().map(|p| stream_dir.join(p)).collect::<Vec<_>>();
+        assert_eq!(partly, paths(&["2026/10/01/03"]));
+        assert_eq!(across_midnight, paths(&["2026/09/30/23", "2026/10/01/01"]));
+        assert_eq!(ending_at_midnight, paths(&["2026/09/30/23"]));
+        assert_eq!(
+            with_a_whole_day,
+            paths(&[
+                "2026/09/30/23",
+                "2026/10/01/01",
+                "2026/10/01/03",
+                "2026/10/02/01"
+            ])
+        );
+        assert_eq!(
+            ending_mid_day,
+            paths(&["2026/10/01/01", "2026/10/01/03", "2026/10/02/01"])
+        );
+        assert_eq!(whole_days, paths(&["2026/09/30", "2026/10/01"]));
+    }
+
+    #[test]
+    fn test_generate_local_dirs_takes_whole_days_only_when_both_ends_are_at_midnight() {
+        let (stream, stream_dir) = local_stream_with_hours(
+            "whole_days",
+            &[
+                "1970/01/01/00",
+                "1970/01/02/05",
+                "1970/01/03/00",
+                "2026/10/05/00",
+                "2026/10/05/01",
+                "2026/10/05/23",
+                "2026/10/06/00",
+                "2026/10/06/01",
+                "2026/10/06/02",
+            ],
+        );
+        let dt = |s: &str| DateTime::parse_from_rfc3339(s).unwrap().with_timezone(&Utc);
+        let dirs = |start, end| generate_local_dirs("org", StreamType::Logs, &stream, start, end);
+        let one_hour = dirs(dt("2026-10-06T01:00:00Z"), dt("2026-10-06T02:00:00Z"));
+        let no_whole_day = dirs(dt("2026-10-05T01:00:00Z"), dt("2026-10-06T02:00:00Z"));
+        let from_midnight = dirs(dt("2026-10-05T00:00:00Z"), dt("2026-10-06T02:00:00Z"));
+        // delete_by_date starts the 1970-01-01 job 1 ms after midnight
+        let first_days = dirs(
+            dt("1970-01-01T00:00:00Z") + Duration::try_milliseconds(1).unwrap(),
+            dt("1970-01-03T00:00:00Z"),
+        );
+        std::fs::remove_dir_all(&stream_dir).unwrap();
+
+        let paths = |rel: &[&str]| rel.iter().map(|p| stream_dir.join(p)).collect::<Vec<_>>();
+        assert_eq!(one_hour, paths(&["2026/10/06/01"]));
+        assert_eq!(
+            no_whole_day,
+            paths(&[
+                "2026/10/05/01",
+                "2026/10/05/23",
+                "2026/10/06/00",
+                "2026/10/06/01"
+            ])
+        );
+        assert_eq!(
+            from_midnight,
+            paths(&[
+                "2026/10/05/00",
+                "2026/10/05/01",
+                "2026/10/05/23",
+                "2026/10/06/00",
+                "2026/10/06/01"
+            ])
+        );
+        assert_eq!(first_days, paths(&["1970/01/01", "1970/01/02"]));
     }
 
     /// Verify deletion ranges are non-overlapping and in order.

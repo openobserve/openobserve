@@ -34,6 +34,7 @@ const i18n = createI18n({
 
 const mockRows = [
   {
+    row_key: "org1/trace-1",
     trace_id: "trace-1",
     user_id: "user1@example.com",
     org_id: "org1",
@@ -45,6 +46,7 @@ const mockRows = [
     stream_type: "logs",
   },
   {
+    row_key: "org2/trace-2",
     trace_id: "trace-2",
     user_id: "user2@example.com",
     org_id: "org2",
@@ -410,7 +412,7 @@ describe("RunningQueriesList.vue", () => {
     });
 
     it("should emit update:selectedRows with matched rows", () => {
-      wrapper.vm.handleSelectedIdsUpdate(["trace-1"]);
+      wrapper.vm.handleSelectedIdsUpdate(["org1/trace-1"]);
 
       expect(wrapper.emitted("update:selectedRows")).toBeTruthy();
       expect(wrapper.emitted("update:selectedRows")[0]).toEqual([[mockRows[0]]]);

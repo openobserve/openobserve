@@ -48,13 +48,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Operation names run long (SQL, URLs); the default header title never shrinks, so it never ellipsises. -->
           <template #title>
-            <span
-              data-test="trace-details-operation-name"
-              class="block truncate"
-              :title="traceTree[0]?.operationName"
-            >
+            <OTruncatedText data-test="trace-details-operation-name" class="block">
               {{ traceTree[0]?.operationName || t("traces.loadingTrace") }}
-            </span>
+            </OTruncatedText>
           </template>
 
           <template #subtitle>
@@ -172,18 +168,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip side="bottom" :content="t('onlineEvals.manualEvaluation.titles.trace')" />
             </OButton>
 
-            <TraceAnnotateMenu
-              v-if="canAnnotate"
-              ref-type="trace"
-              :ref-id="effectiveTraceId"
-              :ref-trace-start-time="traceEvaluationRange.startTime"
-              :source-stream="effectiveStreamName"
-              compact
-              data-test="trace-details-annotate-trace-btn"
-            />
+            <template v-if="canAnnotateContext">
+              <TraceAnnotateMenu
+                v-if="queuesAccess.allowed"
+                ref-type="trace"
+                :ref-id="effectiveTraceId"
+                :ref-trace-start-time="traceEvaluationRange.startTime"
+                :source-stream="effectiveStreamName"
+                compact
+                data-test="trace-details-annotate-trace-btn"
+              />
+              <!-- TraceAnnotateMenu has no disabled affordance of its own, so a
+                   locked edition gets a stand-in button that opens the
+                   upgrade dialog instead. -->
+              <OButton
+                v-else
+                variant="outline"
+                size="icon-xs"
+                :aria-label="t('aiObservability.traceActions.annotate.button')"
+                data-test="trace-details-annotate-trace-btn"
+                @click="openUpgradeDialog"
+              >
+                <OIcon name="fact-check" size="sm" />
+                <template #icon-right
+                  ><OIcon name="lock" size="xs" class="text-warning-600"
+                /></template>
+              </OButton>
+            </template>
 
             <OButton
-              v-if="canAnnotate"
+              v-if="canAnnotateContext"
               data-test="trace-details-dataset-trace-btn"
               variant="outline"
               size="icon-xs"
@@ -191,7 +205,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="openTraceDataset"
             >
               <OIcon name="table-chart" size="sm" />
-              <OTooltip side="bottom" :content="t('aiObservability.traceActions.dataset.button')" />
+              <template v-if="!queuesAccess.allowed" #icon-right>
+                <OIcon name="lock" size="xs" class="text-warning-600" />
+              </template>
+              <OTooltip
+                v-if="queuesAccess.allowed"
+                side="bottom"
+                :content="t('aiObservability.traceActions.dataset.button')"
+              />
             </OButton>
 
             <!-- Share button -->
@@ -242,14 +263,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <div class="flex w-full min-w-0 items-center gap-2.5!">
               <!-- Operation Name -->
-              <div
+              <OTruncatedText
+                as="div"
                 data-test="trace-details-operation-name"
-                class="text-text-heading max-w-96! min-w-0 truncate text-base leading-tight font-semibold"
-                :title="traceTree[0]?.operationName"
+                class="text-text-heading max-w-96! text-base leading-tight font-semibold"
               >
                 {{ traceTree[0]?.operationName || t("traces.loadingTrace") }}
-                <OTooltip :content="traceTree[0]?.operationName" />
-              </div>
+              </OTruncatedText>
 
               <!-- Service, Timestamp, and Trace ID -->
               <div
@@ -567,6 +587,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ]"
           ref="parentContainer"
         >
+          <OBanner
+            v-if="isPartialTrace"
+            variant="warning"
+            dense
+            class="mx-2 mb-1 shrink-0"
+            data-test="trace-details-partial-banner"
+          >
+            {{ t("traces.traceDetails.partial") }}
+          </OBanner>
+          <OBanner
+            v-if="hasMoreSpans"
+            variant="warning"
+            dense
+            inline-actions
+            class="mx-2 mb-1 shrink-0"
+            data-test="trace-details-truncated-banner"
+          >
+            {{ t("traces.traceDetails.truncated", { count: loadedSpanCount }, loadedSpanCount) }}
+            <template #actions>
+              <OButton
+                data-test="trace-details-load-more-btn"
+                variant="outline"
+                size="sm"
+                :loading="isLoadingMoreSpans"
+                @click="loadMoreSpans"
+              >
+                {{ t("traces.traceDetails.loadMore", { size: spanPageSize }, spanPageSize) }}
+              </OButton>
+            </template>
+          </OBanner>
           <div class="box-border flex min-h-0 flex-1 flex-col overflow-hidden">
             <!-- Waterfall View - show for waterfall tab, or when no LLM spans -->
             <div v-if="activeTab === 'waterfall'" class="bg-card-glass-bg! flex h-full">
@@ -922,22 +972,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :session-id="manualEvaluationTarget.sessionId"
       @update:open="updateManualEvaluationOpen"
     />
+
+    <div
+      class="sr-only"
+      aria-live="polite"
+      aria-atomic="true"
+      data-test="trace-details-span-nav-live"
+    >
+      {{ spanNavAnnouncement }}
+    </div>
   </div>
 </template>
 
 <script lang="ts">
+import { announceInto } from "@/utils/announceInto";
 import {
   defineComponent,
   ref,
   type PropType,
   onMounted,
   onUnmounted,
+  onBeforeUnmount,
   watch,
   defineAsyncComponent,
   onBeforeMount,
   nextTick,
   computed,
   provide,
+  toRef,
 } from "vue";
 import { cloneDeep } from "lodash-es";
 import ShareButton from "@/components/common/ShareButton.vue";
@@ -985,22 +1047,25 @@ import {
   type TreeNode as EngineTreeNode,
 } from "@/utils/traces/treeVisualizationEngine";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
-import { spanWindowUs } from "@/utils/rum/traceWindow";
+import { spanWindowUs, waterfallAxisSpans } from "@/utils/rum/traceWindow";
 import useResizer from "@/composables/useResizer";
 import useSmartBack from "@/composables/useSmartBack";
 import { copyToClipboard } from "@/utils/clipboard";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import useStreams from "@/composables/useStreams";
-import useRumSpanBuilder from "@/composables/rum/useRumSpanBuilder";
+import useRumSpanBuilder, { hasDanglingParent } from "@/composables/rum/useRumSpanBuilder";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
 import useNotifications from "@/composables/useNotifications";
 import { parseUsageDetails, parseCostDetails, hasTracePreview, isLLMTrace } from "@/utils/llmUtils";
 import { formatTimestamp, useTraceProcessing } from "@/composables/traces/useTraceProcessing";
+import { spanTimeBounds } from "./threadView.utils";
 import {
   computeCriticalPathForRoots,
   toCriticalPathNode,
@@ -1009,16 +1074,19 @@ import {
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { ancestorChain, nextVisibleSpan } from "@/utils/rowNavigation";
 import {
   TRACE_SERVICE_DETECTION_KEY,
   useSpanServiceDetection,
@@ -1226,6 +1294,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    shortcutsActive: {
+      type: Boolean,
+      default: true,
+    },
   },
   components: {
     ShareButton,
@@ -1239,6 +1311,7 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OButton,
+    OBanner,
     ODrawer,
     OIcon,
     ThreadView,
@@ -1248,6 +1321,7 @@ export default defineComponent({
     CodeQueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     OSpinner,
     OTooltip,
+    OTruncatedText,
     OSearchInput,
     OSelect,
     OSwitch,
@@ -1658,11 +1732,10 @@ export default defineComponent({
       if (!spans || spans.length === 0) return null;
 
       try {
-        // Calculate trace duration from spans
-        const startTimes = spans.map((s: any) => s.start_time);
-        const endTimes = spans.map((s: any) => s.end_time);
-        const minStart = Math.min(...startTimes);
-        const maxEnd = Math.max(...endTimes);
+        const bounds = spanTimeBounds(spans);
+        if (!bounds) return null;
+        const minStart = bounds.startNs;
+        const maxEnd = bounds.endNs;
         const durationMs = (maxEnd - minStart) / 1000000; // Convert from nanoseconds to milliseconds
 
         return {
@@ -1707,24 +1780,18 @@ export default defineComponent({
     const traceStartTime = computed(() => {
       const spans = effectiveSpanList.value;
       if (!spans || spans.length === 0) return 0;
-      return Math.min(...spans.map((span: any) => span.start_time));
+      return spanTimeBounds(spans)?.startNs ?? 0;
     });
 
     const traceEvaluationRange = computed(() => {
-      const spans = effectiveSpanList.value ?? [];
-      const starts = spans
-        .map((span: any) => Number(span.start_time))
-        .filter((value: number) => Number.isFinite(value) && value >= 0);
-      const ends = spans
-        .map((span: any) => Number(span.end_time))
-        .filter((value: number) => Number.isFinite(value) && value >= 0);
-      if (starts.length > 0 && ends.length > 0) {
+      const bounds = spanTimeBounds(effectiveSpanList.value ?? []);
+      if (bounds) {
         // Raw nanosecond timestamps exceed JavaScript's exact integer range.
         // A one-microsecond guard on each side prevents rounding from excluding
         // the boundary spans while keeping the worker window trace-specific.
         return {
-          startTime: Math.max(0, Math.floor(Math.min(...starts) / 1_000) - 1),
-          endTime: Math.ceil(Math.max(...ends) / 1_000) + 1,
+          startTime: Math.max(0, Math.floor(bounds.startNs / 1_000) - 1),
+          endTime: Math.ceil(bounds.endNs / 1_000) + 1,
         };
       }
       return {
@@ -1797,13 +1864,14 @@ export default defineComponent({
     };
 
     // ── Annotate / Dataset (Phase 2.5 Annotate) ──
-    // Same enterprise gate as manual evaluation minus the online-eval flag:
-    // queuing a trace for human review does not require the eval engine.
-    const canAnnotate = computed(() => {
+    // The non-edition half of the old combined gate — same conditions minus
+    // the online-eval flag, since queuing a trace for human review doesn't
+    // require the eval engine. Drives the header buttons' VISIBILITY so a
+    // locked edition still shows them, just disabled.
+    const canAnnotateContext = computed(() => {
       const range = traceEvaluationRange.value;
       return (
         props.mode === "standalone" &&
-        (config.isEnterprise === "true" || config.isCloud === "true") &&
         Boolean(effectiveOrgIdentifier.value) &&
         Boolean(effectiveStreamName.value) &&
         Boolean(effectiveTraceId.value) &&
@@ -1811,6 +1879,14 @@ export default defineComponent({
         range.startTime > 0
       );
     });
+    // Annotating a trace is the same capability as queuing it into AI
+    // Observability's review Queues, so it shares that gate.
+    const queuesAccess = useLockedAffordance("queues");
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+    // Fully resolved — used wherever the OLD hide-entirely boolean fed a
+    // downstream prop (e.g. the sidebar's own annotate buttons), which must
+    // stay hidden rather than render unlocked-looking controls it can't lock itself.
+    const canAnnotate = computed(() => canAnnotateContext.value && queuesAccess.value.allowed);
 
     const datasetOpen = ref(false);
     const datasetTarget = ref<DatasetTarget | null>(null);
@@ -1866,6 +1942,10 @@ export default defineComponent({
     };
 
     const openTraceDataset = () => {
+      if (!queuesAccess.value.allowed) {
+        openUpgradeDialog();
+        return;
+      }
       datasetTarget.value = traceTarget();
       datasetOpen.value = true;
     };
@@ -2105,6 +2185,7 @@ export default defineComponent({
     };
 
     const resetTraceDetails = () => {
+      resetPaging();
       searchObj.data.traceDetails.showSpanDetails = false;
       searchObj.data.traceDetails.selectedSpanId = "";
       // Selection is being cleared — cancel any live scroll targeting it.
@@ -2345,18 +2426,107 @@ export default defineComponent({
       t,
     );
 
+    // Keyset paging of the details endpoint: native and RUM spans are kept apart and merged per page.
+    const hasMoreSpans = ref(false);
+    const isPartialTrace = ref(false);
+    const isLoadingMoreSpans = ref(false);
+    const loadedSpanCount = ref(0);
+    const spanPageSize = ref(0);
+    let nextAfter: { start_time: string; span_id: string } | null = null;
+    // Bumped by every load and reset, so a late page for an earlier trace is dropped.
+    let loadGeneration = 0;
+    // The span list is shared state, so a page still in flight must not land after this view goes.
+    onBeforeUnmount(() => {
+      loadGeneration++;
+    });
+    let pagedTrace: any = null;
+    let nativeSpans: any[] = [];
+    let rumSpans: any[] = [];
+    let firstPageSpanIds = new Set<string>();
+    let rumEnrichmentRan = false;
+
+    const resetPaging = () => {
+      loadGeneration++;
+      pagedTrace = null;
+      nativeSpans = [];
+      rumSpans = [];
+      firstPageSpanIds = new Set();
+      rumEnrichmentRan = false;
+      nextAfter = null;
+      hasMoreSpans.value = false;
+      isPartialTrace.value = false;
+      isLoadingMoreSpans.value = false;
+      loadedSpanCount.value = 0;
+      spanPageSize.value = 0;
+    };
+
+    const appendSpanPage = (page: any) => {
+      const seen = new Set(nativeSpans.map((span) => span.span_id));
+      for (const span of page.hits ?? []) {
+        if (span.span_id && seen.has(span.span_id)) continue;
+        seen.add(span.span_id);
+        nativeSpans.push(span);
+      }
+      loadedSpanCount.value = nativeSpans.length;
+      hasMoreSpans.value = page.has_more === true;
+      nextAfter = page.next_after ?? null;
+      if (page.is_partial) isPartialTrace.value = true;
+      if (!spanPageSize.value) spanPageSize.value = page.hits?.length ?? 0;
+    };
+
+    // Retried after each page while a dangling parent has found no RUM spans; false when superseded.
+    const enrichWithRum = async (traceId: string, generation: number) => {
+      if (rumEnrichmentRan || !hasDanglingParent(nativeSpans)) return true;
+      const { tracedResources, viewEvents, actionEvents, allViewEvents } =
+        await fetchRumEventsForTrace(traceId, nativeSpans);
+      if (generation !== loadGeneration) return false;
+      const found = formatRumEventsAsSpans(
+        tracedResources,
+        viewEvents,
+        actionEvents,
+        allViewEvents,
+      );
+      if (found.length) {
+        rumSpans = found;
+        rumEnrichmentRan = true;
+      }
+      return true;
+    };
+
+    // RUM wins over a first-page span with its id; a later page's native span replaces the synthetic one.
+    const mergeSpanList = () => {
+      const nativeIds = new Set(nativeSpans.map((span) => span.span_id));
+      const keptRum = rumSpans.filter(
+        (span: any) => !nativeIds.has(span.span_id) || firstPageSpanIds.has(span.span_id),
+      );
+      const keptRumIds = new Set(keptRum.map((span: any) => span.span_id));
+      // spanList is never[] in useTraces state; widen container to accept spans.
+      (searchObj.data.traceDetails as { spanList: unknown[] }).spanList = [
+        ...keptRum,
+        ...nativeSpans.filter((span) => !keptRumIds.has(span.span_id)),
+      ];
+    };
+
+    const fetchSpanPage = (trace: any, after: { start_time: string; span_id: string } | null) =>
+      searchService.get_trace_details({
+        org_identifier: effectiveOrgIdentifier.value,
+        stream_name: trace.stream,
+        trace_id: trace.trace_id,
+        start_time: trace.from,
+        end_time: trace.to,
+        hint_ts: trace.from + Math.floor((trace.to - trace.from) / 2),
+        ...(after ? { after_start_time: after.start_time, after_span_id: after.span_id } : {}),
+      });
+
     const getTraceDetails = async (data: any) => {
+      resetPaging();
+      const generation = loadGeneration;
+      pagedTrace = data;
       try {
         searchObj.data.traceDetails.isLoadingTraceDetails = true;
         searchObj.data.traceDetails.spanList = [];
-        const traceRes = await searchService.get_trace_details({
-          org_identifier: effectiveOrgIdentifier.value,
-          stream_name: data.stream,
-          trace_id: data.trace_id,
-          start_time: data.from,
-          end_time: data.to,
-          hint_ts: data.from + Math.floor((data.to - data.from) / 2),
-        });
+        const traceRes = await fetchSpanPage(data, null);
+        if (generation !== loadGeneration) return;
         if (!traceRes.data?.hits?.length) {
           showTraceDetailsError();
           return;
@@ -2367,32 +2537,46 @@ export default defineComponent({
         if (effectiveStart !== data.from || effectiveEnd !== data.to) {
           updateUrlQueryParams({ from: effectiveStart, to: effectiveEnd });
         }
-        const traceSpans = traceRes.data.hits;
-        const rumData = await fetchRumEventsForTrace(data.trace_id, traceSpans);
-        const { tracedResources, viewEvents, actionEvents, allViewEvents } = rumData;
-        const rumSpans = formatRumEventsAsSpans(
-          tracedResources,
-          viewEvents,
-          actionEvents,
-          allViewEvents,
-        );
-        // RUM spans take priority over trace spans with the same span_id
-        const rumSpanIds = new Set(rumSpans.map((s: any) => s.span_id));
-        const deduplicatedTraceSpans = traceSpans.filter((s: any) => !rumSpanIds.has(s.span_id));
-        // spanList is never[] in useTraces state; widen container to accept spans.
-        (searchObj.data.traceDetails as { spanList: unknown[] }).spanList = [
-          ...rumSpans,
-          ...deduplicatedTraceSpans,
-        ];
+        firstPageSpanIds = new Set(traceRes.data.hits.map((span: any) => span.span_id));
+        appendSpanPage(traceRes.data);
+        if (!(await enrichWithRum(data.trace_id, generation))) return;
+        mergeSpanList();
         updateSelectedTrace(data.trace_id, spanList.value);
         updateServiceColors();
         buildTracesTree();
         analytics.track("trace_details_loaded", { mode: props.mode });
       } catch (error) {
+        if (generation !== loadGeneration) return;
         console.error("Error fetching trace details:", error);
         showTraceDetailsError();
       } finally {
-        searchObj.data.traceDetails.isLoadingTraceDetails = false;
+        if (generation === loadGeneration) {
+          searchObj.data.traceDetails.isLoadingTraceDetails = false;
+        }
+      }
+    };
+
+    const loadMoreSpans = async () => {
+      const trace = pagedTrace;
+      const after = nextAfter;
+      if (!trace || !after || isLoadingMoreSpans.value) return;
+      const generation = loadGeneration;
+      isLoadingMoreSpans.value = true;
+      try {
+        const traceRes = await fetchSpanPage(trace, after);
+        if (generation !== loadGeneration || pagedTrace?.trace_id !== trace.trace_id) return;
+        appendSpanPage(traceRes.data ?? {});
+        if (!(await enrichWithRum(trace.trace_id, generation))) return;
+        mergeSpanList();
+        updateSelectedTrace(trace.trace_id, spanList.value);
+        updateServiceColors();
+        buildTracesTree();
+      } catch (error) {
+        if (generation !== loadGeneration) return;
+        console.error("Error loading more trace spans:", error);
+        showErrorNotification(t("traces.traceDetails.loadMoreFailed"));
+      } finally {
+        if (generation === loadGeneration) isLoadingMoreSpans.value = false;
       }
     };
 
@@ -2454,7 +2638,11 @@ export default defineComponent({
       const tics: { value: number; label: I18nText; left: string }[] = [];
       baseTracePosition.value["durationMs"] = timeRange.value.end;
       baseTracePosition.value["durationUs"] = timeRange.value.end * 1000;
+      // Axis start, not the root's: a RUM view root can begin minutes earlier.
       baseTracePosition.value["startTimeUs"] =
+        traceTree.value[0].axisStartUs + timeRange.value.start * 1000;
+      // Span start offsets in the sidebar stay relative to the trace's root.
+      baseTracePosition.value["traceStartUs"] =
         traceTree.value[0].startTimeUs + timeRange.value.start * 1000;
       const quarterMs = (timeRange.value.end - timeRange.value.start) / 4;
       let time = timeRange.value.start;
@@ -2545,6 +2733,10 @@ export default defineComponent({
       // In updateChart method, we are using start and end time to set the time range of trace
       traceTree.value[0].lowestStartTime = convertTimeFromNsToUs(lowestStartTime);
       traceTree.value[0].highestEndTime = convertTimeFromNsToUs(highestEndTime);
+      // The waterfall axis fits trace participants only, never RUM context spans.
+      const axisWindow = spanWindowUs(waterfallAxisSpans(spanList.value));
+      traceTree.value[0].axisStartUs = axisWindow?.start ?? traceTree.value[0].lowestStartTime;
+      traceTree.value[0].axisEndUs = axisWindow?.end ?? traceTree.value[0].highestEndTime;
       traceTree.value[0].style.color = getOrSetServiceColor(traceTree.value[0].resolvedIdentity);
 
       assignCriticalSections(Object.values(formattedSpanMap));
@@ -2593,36 +2785,50 @@ export default defineComponent({
     }
 
     let index = 0;
-    const addSpansPositions = (span: any, depth: number) => {
-      if (!span.index) index = 0;
-      span.depth = depth;
-      spanPositionList.value.push(
-        Object.assign(span, {
-          style: {
-            color: span.style.color,
-            backgroundColor: span.style.backgroundColor,
-            top: index * spanDimensions.height + "px",
-            left: spanDimensions.gap * depth + "px",
-          },
-          hasChildSpans: !!span.spans.length,
-          currentIndex: index,
-        }),
-      );
-      if (collapseMapping.value[span.spanId]) {
-        if (span.spans.length) {
-          span.spans.forEach((childSpan: any) => {
-            index = index + 1;
-            childSpan.totalSpans = addSpansPositions(childSpan, depth + 1);
-          });
-          span.totalSpans = span.spans.reduce(
-            (acc: number, span: any) =>
-              acc + ((span?.spans?.length || 0) + (span?.totalSpans || 0)),
-            0,
-          );
+    // Pre-order rows, post-order totals; an explicit stack, so trace depth never bounds the call stack.
+    const addSpansPositions = (root: any, rootDepth: number) => {
+      const stack: { span: any; depth: number; next: number }[] = [];
+      const enter = (span: any, depth: number) => {
+        if (!span.index) index = 0;
+        span.depth = depth;
+        spanPositionList.value.push(
+          Object.assign(span, {
+            style: {
+              color: span.style.color,
+              backgroundColor: span.style.backgroundColor,
+              top: index * spanDimensions.height + "px",
+              left: spanDimensions.gap * depth + "px",
+            },
+            hasChildSpans: !!span.spans.length,
+            currentIndex: index,
+          }),
+        );
+        stack.push({ span, depth, next: 0 });
+      };
+      enter(root, rootDepth);
+      while (stack.length) {
+        const frame = stack[stack.length - 1];
+        const { span } = frame;
+        const expanded = collapseMapping.value[span.spanId];
+        if (expanded && frame.next < span.spans.length) {
+          index = index + 1;
+          enter(span.spans[frame.next++], frame.depth + 1);
+          continue;
         }
-        return (span?.spans?.length || 0) + (span?.totalSpans || 0);
-      } else {
-        return 0;
+        stack.pop();
+        let visible = 0;
+        if (expanded) {
+          if (span.spans.length) {
+            span.totalSpans = span.spans.reduce(
+              (acc: number, span: any) =>
+                acc + ((span?.spans?.length || 0) + (span?.totalSpans || 0)),
+              0,
+            );
+          }
+          visible = (span?.spans?.length || 0) + (span?.totalSpans || 0);
+        }
+        // A child's total is what its own walk returned, as the recursive form assigned it.
+        if (stack.length) span.totalSpans = visible;
       }
     };
 
@@ -2643,51 +2849,45 @@ export default defineComponent({
       const serviceTree: any[] = [];
       let maxDepth = 0;
       let maxHeight: number[] = [0];
-      const getService = (
-        span: any,
-        currentColumn: any[],
-        serviceName: string,
-        depth: number,
-        height: number,
-      ) => {
-        maxHeight[depth] = maxHeight[depth] === undefined ? 1 : maxHeight[depth] + 1;
-        const serviceIdentity = span.resolvedIdentity || span.serviceName || "unknown";
-        if (serviceName !== serviceIdentity) {
-          const children: any[] = [];
-          currentColumn.push({
-            name: `${serviceIdentity} \n (${span.durationMs}ms)`,
-            parent: serviceName,
-            duration: span.durationMs,
-            children: children,
-            itemStyle: {
-              color: getOrSetServiceColor(span.resolvedIdentity),
-            },
-            emphasis: {
-              disabled: true,
-            },
-          });
-          if (span.spans && span.spans.length) {
-            span.spans.forEach((_span: any) =>
-              getService(_span, children, serviceIdentity, depth + 1, height),
-            );
-          } else {
-            if (maxDepth < depth) maxDepth = depth;
+      // Pre-order with an explicit stack, so trace depth never bounds the call stack.
+      const getService = (root: any, rootColumn: any[]) => {
+        const stack: [any, any[], string, number][] = [[root, rootColumn, "", 1]];
+        while (stack.length) {
+          const [span, currentColumn, serviceName, depth] = stack.pop()!;
+          maxHeight[depth] = maxHeight[depth] === undefined ? 1 : maxHeight[depth] + 1;
+          const serviceIdentity = span.resolvedIdentity || span.serviceName || "unknown";
+          let column = currentColumn;
+          let parentName = serviceName;
+          if (serviceName !== serviceIdentity) {
+            column = [];
+            parentName = serviceIdentity;
+            currentColumn.push({
+              name: `${serviceIdentity} \n (${span.durationMs}ms)`,
+              parent: serviceName,
+              duration: span.durationMs,
+              children: column,
+              itemStyle: {
+                color: getOrSetServiceColor(span.resolvedIdentity),
+              },
+              emphasis: {
+                disabled: true,
+              },
+            });
           }
-          return;
-        }
-        if (span.spans && span.spans.length) {
-          span.spans.forEach((span: any) =>
-            getService(span, currentColumn, serviceName, depth + 1, height),
-          );
-        } else {
-          if (maxDepth < depth) maxDepth = depth;
+          if (span.spans && span.spans.length) {
+            for (let i = span.spans.length - 1; i >= 0; i--) {
+              stack.push([span.spans[i], column, parentName, depth + 1]);
+            }
+          } else if (maxDepth < depth) {
+            maxDepth = depth;
+          }
         }
       };
 
       // Handle multiple root nodes - process each root span to ensure
       // all root services appear in the service map
       traceTree.value.forEach((span: any) => {
-        getService(span, serviceTree, "", 1, 1);
+        getService(span, serviceTree);
       });
 
       // Build consolidated patterns for pattern view
@@ -2696,8 +2896,9 @@ export default defineComponent({
       // console.log('[DEBUG] consolidatedPatterns keys:', Array.from(consolidatedPatterns.value?.keys() || []));
       // Pattern consolidation completed successfully
 
+      // serviceTree is built fresh above, so it is passed as is: a deep clone recurses once per tree level.
       traceServiceMap.value = convertTraceServiceMapData(
-        cloneDeep(serviceTree),
+        serviceTree,
         maxDepth,
         true, // Enable multi-root handling for trace service maps
       );
@@ -2818,7 +3019,7 @@ export default defineComponent({
       for (let i = spanPositionList.value.length - 1; i > -1; i--) {
         const absoluteStartTime =
           spanPositionList.value[i].startTimeUs -
-          convertTimeFromNsToUs(traceTree.value[0].lowestStartTime * 1000);
+          convertTimeFromNsToUs(traceTree.value[0].axisStartUs * 1000);
 
         const x1 = Number((absoluteStartTime + spanPositionList.value[i].durationMs).toFixed(4));
 
@@ -2845,11 +3046,11 @@ export default defineComponent({
         newStart = 0;
         // Safety check to ensure trace chart data exists
         if (
-          traceTree.value[0].highestEndTime > 0 &&
-          traceTree.value[0].lowestStartTime > 0 &&
-          traceTree.value[0].highestEndTime > traceTree.value[0].lowestStartTime
+          traceTree.value[0].axisEndUs > 0 &&
+          traceTree.value[0].axisStartUs > 0 &&
+          traceTree.value[0].axisEndUs > traceTree.value[0].axisStartUs
         ) {
-          newEnd = (traceTree.value[0].highestEndTime - traceTree.value[0].lowestStartTime) / 1000;
+          newEnd = (traceTree.value[0].axisEndUs - traceTree.value[0].axisStartUs) / 1000;
         } else {
           newEnd = 0;
         }
@@ -3162,27 +3363,49 @@ export default defineComponent({
     };
 
     // ── Keyboard shortcuts — span navigation ─────────────────────────────
-    const nextSpanHandler = () => {
+    const spanNavAnnouncement = ref("");
+    const announceSpanNav = (message: string) => announceInto(spanNavAnnouncement, message);
+    const spanAncestors = (spanId: string): string[] =>
+      ancestorChain(
+        spanId,
+        (id) => spanMap.value[id]?.reference_parent_span_id,
+        spanList.value?.length ?? 0,
+      );
+    const stepSpan = (direction: 1 | -1) => {
       if (isInputFocused()) return;
-      const list = spanList.value;
-      if (!list?.length) return;
-      const idx = list.findIndex((s: any) => s.span_id === selectedSpanId.value);
-      if (idx < list.length - 1) updateSelectedSpan(list[idx + 1].span_id);
-    };
-    const prevSpanHandler = () => {
-      if (isInputFocused()) return;
-      const list = spanList.value;
-      if (!list?.length) return;
-      const idx = list.findIndex((s: any) => s.span_id === selectedSpanId.value);
-      if (idx > 0) updateSelectedSpan(list[idx - 1].span_id);
+      const visible: string[] = spanPositionList.value.map((s: any) => s.spanId);
+      const current = selectedSpanId.value || null;
+      const next = nextVisibleSpan(visible, current, spanAncestors, direction);
+      if (next) {
+        updateSelectedSpan(next);
+        const row = spanPositionList.value.find((s: any) => s.spanId === next);
+        announceSpanNav(
+          t("traces.spanNav.position", {
+            index: visible.indexOf(next) + 1,
+            count: visible.length,
+            name: row?.operationName ?? "",
+          }),
+        );
+        return;
+      }
+      const hasAnchor =
+        current !== null &&
+        (visible.includes(current) || spanAncestors(current).some((id) => visible.includes(id)));
+      if (hasAnchor) {
+        announceSpanNav(
+          t(direction === 1 ? "traces.spanNav.lastSpan" : "traces.spanNav.firstSpan"),
+        );
+      }
     };
 
-    useShortcuts([
-      // `traceNextSpan` registers j + ↓, `tracePrevSpan` registers k + ↑
-      // (both bindings live in the registry under `keys`).
-      { id: "traceNextSpan", handler: nextSpanHandler },
-      { id: "tracePrevSpan", handler: prevSpanHandler },
-    ]);
+    useShortcuts(
+      [
+        { id: "traceNextSpan", handler: () => stepSpan(1) },
+        { id: "tracePrevSpan", handler: () => stepSpan(-1) },
+      ],
+      undefined,
+      { active: toRef(props, "shortcutsActive") },
+    );
     return {
       router,
       t,
@@ -3218,6 +3441,8 @@ export default defineComponent({
       closeSidebar,
       toggleSpanCollapse,
       spanPositionList,
+      spanNavAnnouncement,
+      stepSpan,
       spanDimensions,
       splitterModel,
       ChartData,
@@ -3324,6 +3549,9 @@ export default defineComponent({
       manualEvaluationOpen,
       manualEvaluationTarget,
       canAnnotate,
+      canAnnotateContext,
+      queuesAccess,
+      openUpgradeDialog,
       traceEvaluationRange,
       datasetOpen,
       datasetTarget,
@@ -3334,6 +3562,13 @@ export default defineComponent({
       openSpanEvaluation,
       updateManualEvaluationOpen,
       formatTimestamp,
+      // Keyset paging
+      hasMoreSpans,
+      isPartialTrace,
+      isLoadingMoreSpans,
+      loadedSpanCount,
+      spanPageSize,
+      loadMoreSpans,
       // FlameGraph data
       flatSpans,
       traceMetadata,

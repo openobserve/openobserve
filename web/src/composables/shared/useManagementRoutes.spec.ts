@@ -18,6 +18,7 @@ import useManagementRoutes from "./useManagementRoutes";
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
 import enLocale from "@/locales/languages/en-US.json";
+import store from "@/stores";
 
 /** Every `meta.titleKey` in a route tree, children included. */
 const collectTitleKeys = (routes: any[]): string[] =>
@@ -35,6 +36,10 @@ vi.mock("@/aws-exports", () => ({
     isEnterprise: "false",
     isCloud: "false",
   },
+}));
+
+vi.mock("@/stores", () => ({
+  default: { state: { zoConfig: {} as Record<string, unknown> } },
 }));
 
 // Mock the routeGuard function
@@ -77,9 +82,11 @@ describe("useManagementRoutes", () => {
       expect(Array.isArray(routes)).toBe(true);
     });
 
-    it("should return exactly one main route when no enterprise/cloud config", () => {
+    // Settings + the shared locked-feature redirect target + the Enterprise
+    // Features page (all always registered — see the tests below).
+    it("should return exactly three top-level routes", () => {
       const routes = useManagementRoutes();
-      expect(routes).toHaveLength(1);
+      expect(routes).toHaveLength(3);
     });
 
     it("should return routes with settings as the main route", () => {
@@ -188,16 +195,59 @@ describe("useManagementRoutes", () => {
       });
     });
 
-    it("should NOT have llmProviders route in OSS builds", () => {
+    // Always registered now (nav + direct URL stay reachable); its
+    // beforeEnter redirects to the shared locked page in OSS instead of
+    // letting navigation reach the real page — see `withFeatureGate` /
+    // utils/enterpriseFeatures.ts.
+    it("should have llmProviders route in OSS builds too, and redirect when locked", () => {
       const llmRoute = routes[0].children.find((child: any) => child.name === "llmProviders");
-      expect(llmRoute).toBeUndefined();
+      expect(llmRoute).toBeDefined();
+      const mockNext = vi.fn();
+      llmRoute.beforeEnter({ query: {} }, {}, mockNext);
+      expect(mockNext).toHaveBeenCalledWith({
+        name: "enterpriseFeatureLocked",
+        query: { feature: "llmProviders" },
+      });
     });
 
-    it("should NOT have genAiAgentMapping route in OSS builds", () => {
+    it("should have genAiAgentMapping route in OSS builds too, and redirect when locked", () => {
       const genAiRoute = routes[0].children.find(
         (child: any) => child.name === "genAiAgentMapping",
       );
-      expect(genAiRoute).toBeUndefined();
+      expect(genAiRoute).toBeDefined();
+      const mockNext = vi.fn();
+      genAiRoute.beforeEnter({ query: {} }, {}, mockNext);
+      expect(mockNext).toHaveBeenCalledWith({
+        name: "enterpriseFeatureLocked",
+        query: { feature: "genAiAgentMapping" },
+      });
+    });
+
+    it("AC-1.10 registers slack in OSS builds and sends it to General, never the locked page", () => {
+      const slackRoute = routes[0].children.find((child: any) => child.name === "slack");
+      expect(slackRoute).toBeDefined();
+      expect(slackRoute.path).toBe("slack");
+      const mockNext = vi.fn();
+      slackRoute.beforeEnter({ query: { org_identifier: "default" } }, {}, mockNext);
+      expect(mockNext).toHaveBeenCalledWith({
+        name: "general",
+        query: { org_identifier: "default" },
+      });
+    });
+
+    it("should have an enterpriseFeatureLocked route registered", () => {
+      const lockedRoute = routes.find((r: any) => r.name === "enterpriseFeatureLocked");
+      expect(lockedRoute).toBeDefined();
+      expect(lockedRoute.path).toBe("enterprise-locked");
+      expect(lockedRoute.component).toBeDefined();
+    });
+
+    it("should have an enterpriseFeatures route registered", () => {
+      const featuresRoute = routes.find((r: any) => r.name === "enterpriseFeatures");
+      expect(featuresRoute).toBeDefined();
+      expect(featuresRoute.path).toBe("enterprise-features");
+      expect(featuresRoute.component).toBeDefined();
+      expect(typeof featuresRoute.beforeEnter).toBe("function");
     });
 
     it("should have beforeEnter hook for general route", () => {
@@ -259,15 +309,21 @@ describe("useManagementRoutes", () => {
       expect(actualPaths).toEqual(expectedPaths);
     });
 
-    it("should NOT have modelPricing route in OSS builds", () => {
+    it("should have modelPricing route in OSS builds too, and redirect when locked", () => {
       const modelPricingRoute = routes[0].children.find(
         (child: any) => child.name === "modelPricing",
       );
-      expect(modelPricingRoute).toBeUndefined();
+      expect(modelPricingRoute).toBeDefined();
+      const mockNext = vi.fn();
+      modelPricingRoute.beforeEnter({ query: {} }, {}, mockNext);
+      expect(mockNext).toHaveBeenCalledWith({
+        name: "enterpriseFeatureLocked",
+        query: { feature: "modelPricing" },
+      });
       const modelPricingEditor = routes[0].children.find(
         (child: any) => child.name === "modelPricingEditor",
       );
-      expect(modelPricingEditor).toBeUndefined();
+      expect(modelPricingEditor).toBeDefined();
     });
 
     it("should have unique names for each named base child route", () => {
@@ -369,13 +425,19 @@ describe("useManagementRoutes", () => {
     it("should have correct meta properties for cipherKeys route", () => {
       const routes = useManagementRoutes();
       const cipherRoute = routes[0].children.find((child: any) => child.name === "cipherKeys");
-      expect(cipherRoute.meta).toEqual({ keepAlive: true, titleKey: "settings.cipherKeys" });
+      expect(cipherRoute.meta).toEqual({
+        keepAlive: true,
+        titleKey: "settings.cipherKeys",
+      });
     });
 
     it("should have correct meta properties for nodes route", () => {
       const routes = useManagementRoutes();
       const nodesRoute = routes[0].children.find((child: any) => child.name === "nodes");
-      expect(nodesRoute.meta).toEqual({ keepAlive: true, titleKey: "settings.nodes" });
+      expect(nodesRoute.meta).toEqual({
+        keepAlive: true,
+        titleKey: "settings.nodes",
+      });
     });
 
     it("should have correct meta properties for domainManagement route", () => {
@@ -392,7 +454,10 @@ describe("useManagementRoutes", () => {
     it("should have correct meta properties for regexPatterns route", () => {
       const routes = useManagementRoutes();
       const regexRoute = routes[0].children.find((child: any) => child.name === "regexPatterns");
-      expect(regexRoute.meta).toEqual({ keepAlive: true, titleKey: "routeTitles.regexPatterns" });
+      expect(regexRoute.meta).toEqual({
+        keepAlive: true,
+        titleKey: "routeTitles.regexPatterns",
+      });
     });
 
     it("should have correct meta properties for pipelineDestinations route", () => {
@@ -400,7 +465,9 @@ describe("useManagementRoutes", () => {
       const pipelineRoute = routes[0].children.find(
         (child: any) => child.name === "pipelineDestinations",
       );
-      expect(pipelineRoute.meta).toEqual({ titleKey: "pipeline_destinations.header" });
+      expect(pipelineRoute.meta).toEqual({
+        titleKey: "pipeline_destinations.header",
+      });
     });
 
     it("should have syntheticsLocations route when enterprise", () => {
@@ -519,9 +586,16 @@ describe("useManagementRoutes", () => {
       });
     });
 
-    it("should have exactly 20 children routes when enterprise is enabled", () => {
+    it("should have exactly 25 children routes when enterprise is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(21); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 11 enterprise (incl. passwordPolicy)
+      expect(routes[0].children).toHaveLength(25); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + slack + 14 enterprise (incl. passwordPolicy, announcements + editor, telephonySettings)
+    });
+
+    it("should have the announcement banner list and editor routes when enterprise", () => {
+      const names = useManagementRoutes()[0].children.map((child: any) => child.name);
+      expect(names).toEqual(
+        expect.arrayContaining(["announcementBanners", "announcementBannerEditor"]),
+      );
     });
   });
 
@@ -585,9 +659,9 @@ describe("useManagementRoutes", () => {
       expect(orgMgmtRoute.component).toBeDefined();
     });
 
-    it("should have exactly 10 children routes when cloud is enabled", () => {
+    it("should have exactly 12 children routes when cloud is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(11); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 1 cloud
+      expect(routes[0].children).toHaveLength(12); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + slack + 1 cloud
     });
   });
 
@@ -602,9 +676,9 @@ describe("useManagementRoutes", () => {
       expect(routes[0].children.length).toBeGreaterThan(10);
     });
 
-    it("should have exactly 22 children routes when both enterprise and cloud are enabled", () => {
+    it("should have exactly 26 children routes when both enterprise and cloud are enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(22); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 11 enterprise (incl. passwordPolicy) + 1 cloud
+      expect(routes[0].children).toHaveLength(26); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + slack + 14 enterprise (incl. passwordPolicy, announcements + editor, telephonySettings) + 1 cloud
     });
 
     it("should have all enterprise routes when both are enabled", () => {
@@ -710,9 +784,29 @@ describe("useManagementRoutes", () => {
       expect(findRoute(useManagementRoutes())).toBeDefined();
     });
 
-    it("is absent in an OSS build, where the API does not exist", () => {
+    // Registered (redirects to the locked page) rather than absent now, so
+    // the route exists and shows why instead of 404ing — see
+    // utils/enterpriseFeatures.ts.
+    it("is registered, and redirects to the locked page, in an OSS build", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
+
+      const route = findRoute(useManagementRoutes());
+      expect(route).toBeDefined();
+      const mockNext = vi.fn();
+      route.beforeEnter({ query: {} }, {}, mockNext);
+      expect(mockNext).toHaveBeenCalledWith({
+        name: "enterpriseFeatureLocked",
+        query: { feature: "passwordPolicy" },
+      });
+    });
+
+    // This whole batch is self-hosted-only — Cloud never gets it, not even
+    // locked: a cloud customer can't "upgrade" into managing a password policy
+    // the way a self-hosted admin would.
+    it("is absent in a pure cloud build (no enterprise flag)", () => {
+      config.isEnterprise = "false";
+      config.isCloud = "true";
 
       expect(findRoute(useManagementRoutes())).toBeUndefined();
     });
@@ -732,68 +826,106 @@ describe("useManagementRoutes", () => {
     });
   });
 
+  describe("telephonySettings route", () => {
+    const children = () => useManagementRoutes()[0].children;
+    const findRoute = () => children().find((child: any) => child.name === "telephonySettings");
+
+    it("is an enterprise route beside pipeline destinations that lazy-loads the page", () => {
+      config.isEnterprise = "true";
+      const names = children().map((child: any) => child.name);
+      expect(names.indexOf("telephonySettings")).toBe(names.indexOf("pipelineDestinations") + 1);
+      expect(findRoute().path).toBe("telephony");
+      expect(findRoute().meta).toEqual({ titleKey: "telephony.title" });
+      expect(typeof findRoute().component).toBe("function");
+    });
+
+    it("is registered in an OSS build but sends the reader to the locked-feature page", () => {
+      config.isEnterprise = "false";
+      config.isCloud = "false";
+      const next = vi.fn();
+      findRoute().beforeEnter({ query: {}, fullPath: "/settings/telephony" }, {}, next);
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "enterpriseFeatureLocked" }),
+      );
+      expect(vi.mocked(routeGuard)).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [false, true],
+      [true, false],
+      [undefined, false],
+    ])("with oncall_enabled %s, redirects home: %s", (enabled, redirected) => {
+      config.isEnterprise = "true";
+      store.state.zoConfig = { oncall_enabled: enabled };
+      const next = vi.fn();
+      findRoute().beforeEnter({}, {}, next);
+      expect(next.mock.calls.some(([to]) => to === "/")).toBe(redirected);
+      expect(vi.mocked(routeGuard).mock.calls.length).toBe(redirected ? 0 : 1);
+    });
+  });
+
   describe("Edge Cases and Error Handling", () => {
     it("should handle isEnterprise as string 'false'", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // syntheticsLocations ships in OSS; passwordPolicy is enterprise-only; model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
+      expect(routes[0].children).toHaveLength(23); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + slack + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud
     });
 
     it("should handle isCloud as string 'false'", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // syntheticsLocations ships in OSS; passwordPolicy is enterprise-only; model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
+      expect(routes[0].children).toHaveLength(23); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + slack + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud
     });
 
     it("should handle isEnterprise as undefined", () => {
       (config as any).isEnterprise = undefined;
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // syntheticsLocations ships in OSS; passwordPolicy is enterprise-only; model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
+      expect(routes[0].children).toHaveLength(23); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + slack + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud
     });
 
     it("should handle isCloud as undefined", () => {
       config.isEnterprise = "false";
       (config as any).isCloud = undefined;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // syntheticsLocations ships in OSS; passwordPolicy is enterprise-only; model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
+      expect(routes[0].children).toHaveLength(23); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + slack + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud
     });
 
     it("should handle both config values as undefined", () => {
       (config as any).isEnterprise = undefined;
       (config as any).isCloud = undefined;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // syntheticsLocations ships in OSS; passwordPolicy is enterprise-only; model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
+      expect(routes[0].children).toHaveLength(23); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + slack + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud
     });
 
     it("should handle isEnterprise as non-string truthy value", () => {
       (config as any).isEnterprise = true;
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // syntheticsLocations ships in OSS; passwordPolicy is enterprise-only; model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present, since config comparison is strict "true"
+      expect(routes[0].children).toHaveLength(23); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + slack + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud, since config comparison is strict
     });
 
     it("should handle isCloud as non-string truthy value", () => {
       config.isEnterprise = "false";
       (config as any).isCloud = true;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // syntheticsLocations ships in OSS; passwordPolicy is enterprise-only; model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present, since config comparison is strict "true"
+      expect(routes[0].children).toHaveLength(23); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + slack + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud, since config comparison is strict
     });
 
     it("should handle empty string for isEnterprise", () => {
       config.isEnterprise = "";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // syntheticsLocations ships in OSS; passwordPolicy is enterprise-only; model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
+      expect(routes[0].children).toHaveLength(23); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + slack + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud
     });
 
     it("should handle empty string for isCloud", () => {
       config.isEnterprise = "false";
       config.isCloud = "";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // syntheticsLocations ships in OSS; passwordPolicy is enterprise-only; model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
+      expect(routes[0].children).toHaveLength(23); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + slack + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud
     });
 
     it("should return the same structure on multiple calls", () => {

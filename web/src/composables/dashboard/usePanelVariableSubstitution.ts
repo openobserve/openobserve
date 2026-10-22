@@ -185,11 +185,17 @@ export const usePanelVariableSubstitution = ({
     return true;
   };
 
+  // No value queries as SELECT_ALL (formatPanelVariableValue), so [], null and [ALL] run the same SQL.
+  const asQueriedMultiValue = (value: any) => {
+    if (Array.isArray(value)) return value.length > 0 ? value : [SELECT_ALL_VALUE];
+    return [value ?? SELECT_ALL_VALUE];
+  };
+
   const isAllRegularVariablesValuesSameWith = (newDependentVariablesData: any) =>
     newDependentVariablesData.every((it: any) => {
       const oldValue = currentDependentVariablesData.find((it2: any) => it2.name == it.name);
       return it.multiSelect
-        ? areArraysEqual(it.value, oldValue?.value)
+        ? areArraysEqual(asQueriedMultiValue(it.value), asQueriedMultiValue(oldValue?.value))
         : it.value == oldValue?.value && oldValue?.value != "";
     });
 

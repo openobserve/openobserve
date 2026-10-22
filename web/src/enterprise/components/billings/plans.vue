@@ -15,8 +15,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-default overflow-auto px-4 pt-3" style="min-height: inherit">
+  <div class="rounded-default min-h-[inherit] overflow-auto px-4 pt-3">
     <!-- Page title is supplied by the parent Billing.vue OPageHeader; no local title here. -->
+    <TrialPeriod v-if="!isChildOrg" class="mb-3" currentPage="billing"></TrialPeriod>
+    <!-- AI Credits card: shown to child orgs too, whose AI use draws on the same credits -->
+    <div
+      v-if="aiUsage"
+      class="bg-card-glass-bg border-card-glass-border rounded-default dark:bg-surface-base dark:border-border-default mb-3 flex w-full flex-col gap-2 border px-4 py-2.5 text-left shadow-none transition-shadow duration-200 hover:shadow-sm"
+    >
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <img alt="" :src="aiIcon" class="size-5 opacity-80" />
+        <div class="text-text-heading text-sm leading-5 font-semibold">
+          {{ t("billing.aiCredits") }}
+        </div>
+        <OTag type="aiMode" :value="aiUsage.mode" class="w-fit" />
+        <OProgressBar
+          :value="aiUsageRatio"
+          size="sm"
+          :variant="aiUsageVariant"
+          class="min-w-24 flex-1 max-md:order-last max-md:basis-full"
+        />
+        <div class="text-text-heading ms-auto text-sm leading-5 font-semibold">
+          {{ aiUsage.credits_used }} / {{ aiUsage.credits_limit }}
+          {{ t("billing.aiFreeUsedLabel") }}
+        </div>
+      </div>
+      <div class="text-text-secondary flex flex-wrap gap-x-3 text-xs">
+        <span>{{ t("billing.aiFreeOneTime") }}</span>
+        <span v-if="aiUsage.used_by_feature" data-test="billing-ai-used-by-feature">
+          {{
+            t("billing.aiUsedByFeature", {
+              chat: aiUsage.used_by_feature.chat,
+              incident: aiUsage.used_by_feature.incident,
+              reanalysis: aiUsage.used_by_feature.incident_reanalysis,
+            })
+          }}
+        </span>
+      </div>
+      <div v-if="aiUsage.mode === 'exhausted'" class="text-status-error-text text-compact">
+        {{
+          aiUsage.requires_additional_credits
+            ? t("billing.aiContractExhaustedMessage")
+            : aiUsage.payer_org_id
+              ? t("billing.aiPayerSubscribeMessage", { payer: aiUsage.payer_org_id })
+              : t("billing.aiExhaustedMessage")
+        }}
+        <OButton
+          v-if="aiUsage.requires_additional_credits"
+          variant="ghost"
+          size="sm"
+          class="ms-1"
+          data-test="billing-ai-contact-sales"
+          @click="contactSales"
+        >
+          {{ t("billing.contactLabel") }}
+        </OButton>
+      </div>
+      <PaidAiUsageControl
+        :mode="aiUsage.mode"
+        class="border-border-default border-t pt-2"
+        @change="fetchAiUsage"
+      />
+    </div>
     <!-- Managed billing empty state for child orgs -->
     <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
     <div
@@ -81,113 +141,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </div>
     <template v-else>
-      <TrialPeriod class="mb-3" currentPage="billing"></TrialPeriod>
-      <!-- AI Credits card -->
-      <div v-if="aiUsage" class="mb-4 grid w-full grid-cols-1 gap-4">
-        <div
-          class="bg-card-glass-bg border-card-glass-border rounded-default dark:bg-surface-base dark:border-border-default border p-4 shadow-none transition-shadow duration-200 hover:shadow-sm"
-        >
-          <div
-            class="rounded-default flex min-h-full flex-col justify-between text-center transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
-          >
-            <div class="flex flex-col justify-between">
-              <div class="flex items-center justify-between">
-                <div class="text-text-heading text-left text-base leading-5 font-medium">
-                  {{ t("billing.aiCredits") }}
-                </div>
-                <div class="opacity-80">
-                  <img :src="aiIcon" />
-                </div>
-              </div>
-              <OTag type="aiMode" :value="aiUsage.mode" class="mt-2" style="width: fit-content" />
-            </div>
-            <div class="mt-3 mb-2">
-              <OProgressBar
-                :value="aiUsageRatio"
-                size="sm"
-                :variant="
-                  aiUsageRatio >= 1 ? 'danger' : aiUsageRatio >= 0.9 ? 'warning' : 'default'
-                "
-              />
-            </div>
-            <div class="text-text-body flex items-end text-left text-2xl leading-7 font-semibold">
-              {{ aiUsage.credits_used }} / {{ aiUsage.credits_limit }}
-              {{ t("billing.creditsUsedLabel") }}
-            </div>
-            <div
-              v-if="aiUsage.mode === 'exhausted'"
-              class="text-status-error-text mt-2"
-              style="font-size: var(--text-compact)"
-            >
-              {{
-                t(
-                  aiUsage.requires_additional_credits
-                    ? "billing.aiContractExhaustedMessage"
-                    : "billing.aiExhaustedMessage",
-                )
-              }}
-            </div>
-            <div
-              v-if="aiUsage.mode === 'consent_required'"
-              class="text-status-warning-text mt-2 text-left"
-              style="font-size: var(--text-compact)"
-            >
-              <span>{{ t("paidUsage.consentRequiredMessage") }}</span>
-              <OButton
-                variant="ghost"
-                size="sm"
-                class="ms-1"
-                data-test="billing-open-paid-usage-settings"
-                @click="
-                  $router.push({
-                    name: 'paidUsage',
-                    query: { org_identifier: store.state.selectedOrganization.identifier },
-                  })
-                "
-              >
-                {{ t("paidUsage.managePaidUsage") }}
-              </OButton>
-            </div>
-            <div
-              v-else-if="aiUsage.mode === 'pay_as_you_go'"
-              class="text-info mt-2"
-              style="font-size: var(--text-compact)"
-            >
-              {{
-                paidOverageStatus?.payer
-                  ? t("paidUsage.payerBillingCycle")
-                  : t("paidUsage.organizationBillingCycle")
-              }}
-            </div>
-          </div>
-        </div>
-      </div>
       <div
         v-if="
           store.state.selectedOrganization.hasOwnProperty('note') &&
           store.state.selectedOrganization.note
         "
-        class="text-status-error-text flex items-center justify-start gap-2 ps-6 pb-4 text-xl font-semibold"
+        class="text-status-error-text flex items-center justify-start gap-2 pb-3 text-sm font-semibold"
       >
-        <OIcon name="warning" size="sm" class="pt-2" />
+        <OIcon name="warning" size="sm" />
         >{{ store.state.selectedOrganization.note }}
       </div>
       <div v-if="loading" class="text-center text-xl font-medium font-semibold">
         <OSpinner size="md" class="mx-auto mt-3 block text-center" />
       </div>
-      <div v-else class="mt-3 grid grid-cols-2 gap-3 max-lg:grid-cols-1">
+      <div v-else class="grid grid-cols-2 gap-x-3 max-lg:grid-cols-1 max-lg:gap-y-3">
         <ProPlan
           :planType="planType"
           :billingProvider="billingProvider"
           :subscriptionType="subscriptionType"
           :features="proPlanFeatures"
+          :pricingOptions="proPlanPricingOptions"
+          :additionalInfo="proPlanAdditionalInfo"
           :pricingError="pricingError"
+          @retry-pricing="fetchPricingData"
+          @contact-sales="contactSalesForAnnual"
           @update:proSubscription="onLoadSubscription(config.paidPlan)"
           @update:cancelSubscription="onUnsubscribe"
         ></ProPlan>
         <EnterprisePlan
           :features="enterprisePlanFeatures"
+          :price="enterprisePlanPrice"
           :pricingError="pricingError"
+          @retry-pricing="fetchPricingData"
         ></EnterprisePlan>
       </div>
     </template>
@@ -201,9 +186,9 @@ import EnterprisePlan from "./enterprisePlan.vue";
 import ProPlan from "./proPlan.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import BillingService from "@/services/billings";
-import paidOverage from "@/services/paidOverage";
-import type { PaidOverageStatus } from "@/services/paidOverage";
+import BillingService, { type AiUsage } from "@/services/billings";
+import PaidAiUsageControl from "./PaidAiUsageControl.vue";
+import analytics from "@/services/product_analytics";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useLocalOrganization, getImageURL } from "@/utils/zincutils";
@@ -214,6 +199,14 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+
+function isStripeCheckoutReferrer(referrer: string): boolean {
+  try {
+    return new URL(referrer).hostname === "checkout.stripe.com";
+  } catch {
+    return false;
+  }
+}
 
 export default defineComponent({
   name: "plans",
@@ -226,14 +219,21 @@ export default defineComponent({
     OIcon,
     OTag,
     OButton,
+    PaidAiUsageControl,
   },
 
   emits: ["update:proSubscription"],
   async mounted() {
+    // Stripe sends the user back here after checkout; the referrer is the only trace of that return.
+    if (isStripeCheckoutReferrer(document.referrer)) {
+      analytics.track("billing_checkout_returned", { plan: config.paidPlan });
+    }
     this.loading = true;
     this.fetchMembership();
-    await Promise.all([this.loadSubscription(), this.fetchPricingData()]);
+    // Credits and pricing load independently: neither may hold back the other or the plans.
     this.fetchAiUsage();
+    this.fetchPricingData();
+    await this.loadSubscription();
   },
   methods: {
     goToOrgGroup() {
@@ -257,19 +257,24 @@ export default defineComponent({
     async fetchAiUsage() {
       try {
         const orgId = this.store.state.selectedOrganization.identifier;
-        const [usageResponse, consentResponse] = await Promise.all([
-          BillingService.get_ai_usage(orgId),
-          paidOverage.get(orgId),
-        ]);
-        this.aiUsage = usageResponse.data;
-        this.paidOverageStatus = consentResponse.data;
+        this.aiUsage = (await BillingService.get_ai_usage(orgId)).data;
       } catch {
-        // AI usage or consent status is not available.
+        // AI usage is not available.
       }
     },
+    contactSales() {
+      window.open(siteURL.contactSales, "_blank");
+    },
+    contactSalesForAnnual() {
+      analytics.track("billing_contact_sales_clicked", { plan: "annual-contract" });
+      this.contactSales();
+    },
     async fetchPricingData() {
+      this.pricingError = false;
       try {
-        const response = await fetch(siteURL.pricingJsonUrl);
+        const response = await fetch(siteURL.pricingJsonUrl, {
+          signal: AbortSignal.timeout(10000),
+        });
         const json = await response.json();
         const cloudPlans = json?.data?.[0]?.cloud ?? [];
         const mapFeatures = (jsonFeatures: any[]) =>
@@ -285,24 +290,31 @@ export default defineComponent({
           cloudPlans.find((p: any) => p.title?.toLowerCase().includes("enterprise")) ??
           cloudPlans[1];
 
-        const proFeatures = payAsYouGo?.features ? mapFeatures(payAsYouGo.features) : [];
-        const entFeatures = enterprise?.features ? mapFeatures(enterprise.features) : [];
+        const pricingOptions = Array.isArray(payAsYouGo?.pricingOptions)
+          ? payAsYouGo.pricingOptions.map((o: any) => ({
+              label: o.label ?? "",
+              price: o.price ?? "",
+              period: o.period ?? "",
+              note: o.note ?? "",
+              badge: o.badge ?? "",
+            }))
+          : [];
+        // Production JSON already has a plan price, so only pricingOptions opts into the price block.
+        const hasPriceBlock = pricingOptions.length > 0;
+        const proFeatures = payAsYouGo?.features ?? [];
 
-        const diff = proFeatures.length - entFeatures.length + 3;
-        const paddedEntFeatures =
-          diff > 0
-            ? [
-                ...entFeatures,
-                ...Array.from({ length: diff }, () => ({
-                  name: "",
-                  price: "",
-                  is_parent: false,
-                })),
-              ]
-            : entFeatures;
-
-        this.proPlanFeatures = proFeatures;
-        this.enterprisePlanFeatures = paddedEntFeatures;
+        this.proPlanFeatures = mapFeatures(
+          hasPriceBlock ? proFeatures.filter((f: any) => !f.inPriceBlock) : proFeatures,
+        );
+        this.enterprisePlanFeatures = mapFeatures(enterprise?.features ?? []);
+        this.proPlanPricingOptions = pricingOptions;
+        // The footnote explains an asterisked feature price, which the tiles replace.
+        this.proPlanAdditionalInfo = hasPriceBlock ? "" : (payAsYouGo?.additionalInfo ?? "");
+        // Both cards show a price block or neither, so their feature lists stay aligned.
+        this.enterprisePlanPrice =
+          hasPriceBlock && enterprise?.price
+            ? { price: enterprise.price, note: enterprise.priceNote ?? "" }
+            : null;
       } catch {
         this.pricingError = true;
       }
@@ -318,7 +330,8 @@ export default defineComponent({
             this.proLoading = false;
             toast({
               variant: "error",
-              message: e.message,
+              // The server explains what to fix; axios's own text is only the status code.
+              message: e.response?.data?.message ?? e.message,
               timeout: 5000,
             });
           });
@@ -328,9 +341,10 @@ export default defineComponent({
             window.location.href = res.data.url;
           })
           .catch((e) => {
+            this.proLoading = false;
             toast({
               variant: "error",
-              message: e.message,
+              message: e.response?.data?.message ?? e.message,
               timeout: 5000,
             });
           });
@@ -379,21 +393,6 @@ export default defineComponent({
             useLocalOrganization(localOrg.value);
             this.store.dispatch("setSelectedOrganization", localOrg.value);
           }
-        } else if (this.billingProvider === "" || this.billingProvider === "stripe") {
-          // Only show subscribe prompt for Stripe orgs without subscription
-          toast({
-            variant: "warning",
-            message: this.t("toastMessages.billings.pleaseSubscribeToOneOfThe"),
-            timeout: 5000,
-          });
-
-          // Redirect to plans page only when there's no valid subscription
-          this.$router.push({
-            name: "plans",
-            query: {
-              org_identifier: this.store.state.selectedOrganization.identifier,
-            },
-          });
         }
 
         this.loading = false;
@@ -426,8 +425,7 @@ export default defineComponent({
     const currentPlanDetail = ref();
     const billingProvider = ref("");
     const subscriptionType = ref("");
-    const aiUsage = ref<any>(null);
-    const paidOverageStatus = ref<PaidOverageStatus | null>(null);
+    const aiUsage = ref<AiUsage | null>(null);
     const aiIcon = computed(() =>
       isDark.value
         ? getImageURL("images/common/ai_icon_dark.svg")
@@ -437,8 +435,18 @@ export default defineComponent({
       if (!aiUsage.value || !aiUsage.value.credits_limit) return 0;
       return Math.min(aiUsage.value.credits_used / aiUsage.value.credits_limit, 1);
     });
+    // A full bar is healthy once paid usage carries on; only a blocked org is in danger.
+    const aiUsageVariant = computed(() => {
+      const mode = aiUsage.value?.mode;
+      if (mode === "exhausted") return "danger";
+      if (mode === "consent_required") return "warning";
+      return mode === "free" && aiUsageRatio.value >= 0.8 ? "warning" : "default";
+    });
     const proPlanFeatures: any = ref([]);
     const enterprisePlanFeatures: any = ref([]);
+    const proPlanPricingOptions: any = ref([]);
+    const proPlanAdditionalInfo = ref("");
+    const enterprisePlanPrice = ref<{ price: string; note: string } | null>(null);
     const pricingError = ref(false);
     const membership = ref<any>(null);
     const isChildOrg = computed(() => membership.value != null);
@@ -473,11 +481,14 @@ export default defineComponent({
       billingProvider,
       subscriptionType,
       aiUsage,
-      paidOverageStatus,
       aiIcon,
       aiUsageRatio,
+      aiUsageVariant,
       proPlanFeatures,
       enterprisePlanFeatures,
+      proPlanPricingOptions,
+      proPlanAdditionalInfo,
+      enterprisePlanPrice,
       pricingError,
       membership,
       isChildOrg,

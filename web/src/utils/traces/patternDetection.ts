@@ -87,7 +87,11 @@ export function buildPatternConsolidatedTree(traceTree: any[]): Map<string, Call
     relationships: CallPath[] = [],
     services: Map<string, { spans: any[]; totalDuration: number; errorCount: number }> = new Map(),
   ): void => {
-    spans.forEach((span) => {
+    // Pre-order with an explicit stack, so trace depth never bounds the call stack.
+    const stack: [any, string][] = [];
+    for (let i = spans.length - 1; i >= 0; i--) stack.push([spans[i], parentService]);
+    while (stack.length) {
+      const [span, parent] = stack.pop()!;
       const serviceName = span.resolvedIdentity || span.serviceName || "unknown";
       const duration = span.durationMs || 0;
       const isError = isSpanError(span);
@@ -104,20 +108,18 @@ export function buildPatternConsolidatedTree(traceTree: any[]): Map<string, Call
       allDurations.push(duration);
 
       // If this span has a parent service and is a different service, record the relationship
-      if (parentService && parentService !== serviceName) {
+      if (parent && parent !== serviceName) {
         relationships.push({
-          services: [parentService, serviceName],
+          services: [parent, serviceName],
           leafSpan: span,
           duration,
           isError,
         });
       }
 
-      // Recursively process child spans — mutates the same collectors in place
-      if (span.spans && span.spans.length > 0) {
-        extractServicesAndRelationships(span.spans, serviceName, relationships, services);
-      }
-    });
+      const children = span.spans ?? [];
+      for (let i = children.length - 1; i >= 0; i--) stack.push([children[i], serviceName]);
+    }
   };
 
   // Extract services and relationships from all root spans (single pass)
@@ -177,8 +179,8 @@ export function buildPatternConsolidatedTree(traceTree: any[]): Map<string, Call
     pattern.metrics = {
       count: pattern.instances.length,
       avg: calculateAverage(durations),
-      min: Math.min(...durations),
-      max: Math.max(...durations),
+      min: durations.reduce((m, d) => Math.min(m, d), Infinity),
+      max: durations.reduce((m, d) => Math.max(m, d), -Infinity),
       p75: calculatePercentile(durations, 75),
       p95: calculatePercentile(durations, 95),
       p99: calculatePercentile(durations, 99),
@@ -214,8 +216,8 @@ export function buildPatternConsolidatedTree(traceTree: any[]): Map<string, Call
       metrics: {
         count: serviceInfo.spans.length,
         avg: calculateAverage(durations),
-        min: durations.length > 0 ? Math.min(...durations) : 0,
-        max: durations.length > 0 ? Math.max(...durations) : 0,
+        min: durations.length > 0 ? durations.reduce((m, d) => Math.min(m, d), Infinity) : 0,
+        max: durations.length > 0 ? durations.reduce((m, d) => Math.max(m, d), -Infinity) : 0,
         p75: calculatePercentile(durations, 75),
         p95: calculatePercentile(durations, 95),
         p99: calculatePercentile(durations, 99),

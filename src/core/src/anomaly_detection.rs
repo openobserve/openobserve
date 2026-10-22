@@ -14,6 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #[cfg(feature = "enterprise")]
+mod partitioned_search;
+
+#[cfg(feature = "enterprise")]
 use std::{
     collections::HashMap,
     sync::{LazyLock, RwLock},
@@ -74,11 +77,11 @@ const TIMESTAMP_COLUMNS: [&str; 5] = [
 
 /// Bounds staleness after an edit on nodes the update-path invalidation cannot reach.
 #[cfg(feature = "enterprise")]
-const VALUE_COLUMN_TTL: Duration = Duration::from_secs(60);
+const QUERY_METADATA_TTL: Duration = Duration::from_secs(60);
 
 /// Keyed `(org_id, anomaly_id)` so per-tick detection stops PK-reading the meta primary.
 #[cfg(feature = "enterprise")]
-static VALUE_COLUMN_CACHE: LazyLock<RwLock<ValueColumnCache>> =
+static QUERY_METADATA_CACHE: LazyLock<RwLock<QueryMetadataCache>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
 /// Lowercased aggregations the trainer's `DetectionFunction` can deserialize. A name
@@ -139,10 +142,14 @@ const ALERT_DIRECTIONS: [&str; 3] = ["both", "above", "below"];
 /// Each window bucket is re-fetched as look-back on every run, so the window is capped in time.
 const MAX_ALERT_WINDOW_SECONDS: i64 = 86_400;
 
+/// Longest destination response body kept in the alert-history error column.
 #[cfg(feature = "enterprise")]
-type ValueColumnCache = HashMap<(String, String), (Option<String>, Instant)>;
+const REJECTION_BODY_MAX_CHARS: usize = 512;
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[cfg(feature = "enterprise")]
+type QueryMetadataCache = HashMap<(String, String), (partitioned_search::QueryMetadata, Instant)>;
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateAnomalyConfigRequest {
     pub name: String,
     pub description: Option<String>,
@@ -227,7 +234,7 @@ where
     serde::Deserialize::deserialize(deserializer).map(Some)
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct UpdateAnomalyConfigRequest {
     pub name: Option<String>,
     pub description: Option<String>,
@@ -632,14 +639,7 @@ pub async fn create_config(
     org_id: &str,
     mut req: CreateAnomalyConfigRequest,
 ) -> Result<serde_json::Value> {
-    req.filters = normalize_request_filters(req.filters).map_err(validation_error)?;
-    validate_config_request(&req).map_err(validation_error)?;
-
-    // Feature 2 (PT-7): same normalization the alerts path uses, so a tag
-    // means the same thing on both. Kept typed, not stringified, so the API
-    // layer can downcast it to a 400.
-    let normalized_tags =
-        config::meta::alerts::tags::normalize_tags(&req.tags).map_err(anyhow::Error::new)?;
+    let normalized_tags = checked_create_body(&mut req)?;
 
     let db = get_orm_client_rw().await;
 
@@ -647,14 +647,8 @@ pub async fn create_config(
     let now_us = Utc::now().timestamp_micros();
 
     // Resolve the folder name to the FK (folders.id PK), consistent with the alerts table.
-    let folder_name = req
-        .folder_id
-        .as_deref()
-        .filter(|s| !s.is_empty())
-        .unwrap_or("default");
-    let folder_pk = resolve_folder_pk(org_id, folder_name)
-        .await
-        .ok_or_else(|| anyhow::anyhow!("Folder '{}' not found", folder_name))?;
+    let folder_name = create_folder_name(&req);
+    let folder_pk = folder_pk(org_id, folder_name).await?;
 
     let resolved_threshold = clamped_threshold(req.percentile.unwrap_or(DEFAULT_PERCENTILE));
 
@@ -819,6 +813,33 @@ pub async fn create_config(
     Ok(val)
 }
 
+/// Runs [`create_config`]'s checks on a copy without writing, so a caller can answer them first.
+pub async fn check_create_config(org_id: &str, req: &CreateAnomalyConfigRequest) -> Result<()> {
+    let mut req = req.clone();
+    checked_create_body(&mut req)?;
+    folder_pk(org_id, create_folder_name(&req))
+        .await
+        .map(|_| ())
+}
+
+/// Runs [`update_config`]'s checks on a copy without writing, so a caller can answer them first.
+pub async fn check_update_config(
+    org_id: &str,
+    anomaly_id: &str,
+    req: &UpdateAnomalyConfigRequest,
+) -> Result<()> {
+    let existing = config_to_update(get_orm_client_rw().await, org_id, anomaly_id).await?;
+    let mut req = req.clone();
+    checked_update_body(&mut req, &existing)?;
+    if let Some(folder) = req.folder_id.as_deref() {
+        folder_pk(org_id, folder).await?;
+    }
+    if let Some(tags) = req.tags.as_deref() {
+        config::meta::alerts::tags::normalize_tags(tags).map_err(anyhow::Error::new)?;
+    }
+    Ok(())
+}
+
 /// Update an existing anomaly detection configuration
 pub async fn update_config(
     org_id: &str,
@@ -829,38 +850,13 @@ pub async fn update_config(
 
     // Fetch existing config — into_active_model() on a DB-fetched model sets the PK as
     // Unchanged, which is required for SeaORM to generate UPDATE … WHERE anomaly_id = ?
-    let existing = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
-        .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?
-        .ok_or_else(|| anyhow::anyhow!("Config not found"))?;
-
-    // Normalized before the gates, as create does: `{}` and `null` persist as `[]`, so a gate
-    // comparing the raw value would read them as a change and re-litigate a grandfathered row
-    // over an edit that leaves the stored filters exactly as they were. Kept after the fetch
-    // so a request against a missing config still answers 404 rather than 400.
-    req.filters = normalize_request_filters(req.filters).map_err(validation_error)?;
+    let existing = config_to_update(db, org_id, anomaly_id).await?;
+    checked_update_body(&mut req, &existing)?;
 
     let previous = existing.clone();
     // Only a field that could plausibly fix a failure clears the backoff, so that a bulk
     // folder move or tag edit cannot reset the counter on dozens of configs at once.
     let mut retryable_change = false;
-
-    validated_intervals(&req, &existing).map_err(validation_error)?;
-    validated_detection_window(&req, &existing).map_err(validation_error)?;
-    validated_detection_function(&req, &existing).map_err(validation_error)?;
-    validated_custom_sql(&req, &existing).map_err(validation_error)?;
-    validated_denominator(&req, &existing).map_err(validation_error)?;
-    validated_budget_update(
-        req.percentile,
-        req.alert_budget_per_day,
-        existing.alert_budget_per_day,
-        existing.threshold,
-    )
-    .map_err(validation_error)?;
-    if let Some(days) = req.retrain_interval_days {
-        validate_retrain_interval_days(days).map_err(validation_error)?;
-    }
-    validated_band_settings(&req, &existing).map_err(validation_error)?;
 
     let mut active_model = existing.into_active_model();
 
@@ -996,10 +992,7 @@ pub async fn update_config(
         ));
     }
     if let Some(folder_id_str) = req.folder_id {
-        let pk = resolve_folder_pk(org_id, &folder_id_str)
-            .await
-            .ok_or_else(|| anyhow::anyhow!("Folder '{}' not found", folder_id_str))?;
-        active_model.folder_id = Set(pk);
+        active_model.folder_id = Set(folder_pk(org_id, &folder_id_str).await?);
     }
     if let Some(owner) = req.owner {
         active_model.owner = Set(Some(owner));
@@ -1038,7 +1031,7 @@ pub async fn update_config(
     o2_enterprise::enterprise::anomaly_detection::cache::invalidate_config(&updated.anomaly_id)
         .await;
     #[cfg(feature = "enterprise")]
-    invalidate_value_column_cache(org_id, anomaly_id);
+    invalidate_query_metadata_cache(org_id, anomaly_id);
 
     // Broadcast config update to all super cluster regions.
     #[cfg(feature = "enterprise")]
@@ -1427,6 +1420,7 @@ pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_js
                     error: Some(e.to_string()),
                     success_response: None,
                     gate_passed: false,
+                    downtime_id: None,
                     start_us,
                     end_us,
                 };
@@ -1438,11 +1432,12 @@ pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_js
         if !outcome.claim_lost && !outcome.ineligible {
             let record = AnomalyRunRecord {
                 status: anomaly_run_status(&outcome),
-                error: None,
+                error: outcome.notify_error.clone(),
                 success_response: Some(
                     serde_json::json!({ "anomalies_found": outcome.anomaly_count }).to_string(),
                 ),
                 gate_passed: outcome.gate_passed,
+                downtime_id: outcome.suppressed_by.clone(),
                 start_us,
                 end_us,
             };
@@ -1474,6 +1469,8 @@ pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_js
             "message": message,
             "claim_lost": outcome.claim_lost,
             "ineligible": outcome.ineligible,
+            "notify_failed": outcome.notify_failed,
+            "notify_error": outcome.notify_error,
             "anomaly_id": anomaly_id,
             "anomalies_found": result.anomaly_count,
             "points_scored": result.data_points_processed,
@@ -1903,6 +1900,65 @@ fn validation_error(e: anyhow::Error) -> anyhow::Error {
         return e;
     }
     anyhow::anyhow!("validation error: {e}")
+}
+
+/// Normalizes and validates a create body; returns its normalized tags.
+fn checked_create_body(req: &mut CreateAnomalyConfigRequest) -> Result<Vec<String>> {
+    req.filters = normalize_request_filters(req.filters.take()).map_err(validation_error)?;
+    validate_config_request(req).map_err(validation_error)?;
+
+    // Feature 2 (PT-7): normalized as the alerts path does, kept typed so the API answers 400.
+    config::meta::alerts::tags::normalize_tags(&req.tags).map_err(anyhow::Error::new)
+}
+
+fn create_folder_name(req: &CreateAnomalyConfigRequest) -> &str {
+    req.folder_id
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .unwrap_or("default")
+}
+
+async fn folder_pk(org_id: &str, folder_name: &str) -> Result<String> {
+    resolve_folder_pk(org_id, folder_name)
+        .await
+        .ok_or_else(|| anyhow::anyhow!("Folder '{}' not found", folder_name))
+}
+
+async fn config_to_update(
+    db: &sea_orm::DatabaseConnection,
+    org_id: &str,
+    anomaly_id: &str,
+) -> Result<infra::table::entity::anomaly_detection_config::Model> {
+    anomaly_config_table::get_by_id(db, org_id, anomaly_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .ok_or_else(|| anyhow::anyhow!("Config not found"))
+}
+
+/// The update's gates, run against the stored config before anything is written.
+fn checked_update_body(
+    req: &mut UpdateAnomalyConfigRequest,
+    existing: &infra::table::entity::anomaly_detection_config::Model,
+) -> Result<()> {
+    // Before the gates so `{}` and `null` read as the stored `[]`; after the fetch so 404 wins.
+    req.filters = normalize_request_filters(req.filters.take()).map_err(validation_error)?;
+
+    validated_intervals(req, existing).map_err(validation_error)?;
+    validated_detection_window(req, existing).map_err(validation_error)?;
+    validated_detection_function(req, existing).map_err(validation_error)?;
+    validated_custom_sql(req, existing).map_err(validation_error)?;
+    validated_denominator(req, existing).map_err(validation_error)?;
+    validated_budget_update(
+        req.percentile,
+        req.alert_budget_per_day,
+        existing.alert_budget_per_day,
+        existing.threshold,
+    )
+    .map_err(validation_error)?;
+    if let Some(days) = req.retrain_interval_days {
+        validate_retrain_interval_days(days).map_err(validation_error)?;
+    }
+    validated_band_settings(req, existing).map_err(validation_error)
 }
 
 /// Only `enabled` gates training: `alert_enabled` gates dispatch and `status` gates nothing.
@@ -2644,11 +2700,61 @@ pub async fn execute_anomaly_query(
         end_time
     );
 
-    let search_req = config::meta::search::Request {
+    // Resolved here rather than threaded through the enterprise query-executor boundary,
+    // whose registered Fn signature is fixed and shared by every anomaly query path.
+    let metadata = resolve_query_metadata(org_id, anomaly_id).await;
+    let trace_id = config::ider::generate_trace_id();
+    let window = (start_time, end_time);
+    match partitioned_search::supported_grid(metadata.as_ref(), query_sql, stream_type, window) {
+        Ok(grid) => {
+            partitioned_search::execute_supported(
+                org_id,
+                query_sql,
+                window,
+                anomaly_id,
+                stream_type,
+                &trace_id,
+                grid,
+            )
+            .await
+        }
+        Err(reason) => {
+            partitioned_search::log_fallback(org_id, anomaly_id, &reason);
+            let value_column = metadata.and_then(|m| m.value_column);
+            let search_req = anomaly_search_request(query_sql, start_time, end_time, 10000);
+            let parsed_stream_type = StreamType::from(stream_type);
+            let search_result =
+                search::search(&trace_id, org_id, parsed_stream_type, None, &search_req)
+                    .await
+                    .map_err(|e| {
+                        anyhow::anyhow!("[anomaly_detection {}] search failed: {}", anomaly_id, e)
+                    })?;
+
+            log::info!(
+                "[anomaly_detection {}] search returned {} hits (total={})",
+                anomaly_id,
+                search_result.hits.len(),
+                search_result.total
+            );
+
+            parse_search_results_to_timeseries(&search_result, anomaly_id, value_column.as_deref())
+        }
+    }
+}
+
+/// The direct anomaly search request every path shares; only the window and size vary.
+#[cfg(feature = "enterprise")]
+fn anomaly_search_request(
+    query_sql: &str,
+    start_time: i64,
+    end_time: i64,
+    size: i64,
+) -> config::meta::search::Request {
+    config::meta::search::Request {
         query: config::meta::search::Query {
             sql: query_sql.to_string(),
             from: 0,
-            size: 10000,
+            size,
             start_time,
             end_time,
             track_total_hits: false,
@@ -2667,40 +2773,21 @@ pub async fn execute_anomaly_query(
         clear_cache: false,
         local_mode: None,
         agent_options: None,
-    };
-
-    let parsed_stream_type = StreamType::from(stream_type);
-    let trace_id = config::ider::generate_trace_id();
-    let search_result = search::search(&trace_id, org_id, parsed_stream_type, None, &search_req)
-        .await
-        .map_err(|e| anyhow::anyhow!("[anomaly_detection {}] search failed: {}", anomaly_id, e))?;
-
-    log::info!(
-        "[anomaly_detection {}] search returned {} hits (total={})",
-        anomaly_id,
-        search_result.hits.len(),
-        search_result.total
-    );
-
-    // Resolved here rather than threaded through the enterprise query-executor boundary,
-    // whose registered Fn signature is fixed and shared by every anomaly query path.
-    let value_column = resolve_value_column(org_id, anomaly_id).await;
-
-    let data_points =
-        parse_search_results_to_timeseries(&search_result, anomaly_id, value_column.as_deref())?;
-
-    Ok(data_points)
+    }
 }
 
-/// The config-declared value column; degrades to `None` (legacy fallback) on lookup failure.
+/// The config snapshot one run reads; `None` on lookup failure keeps the legacy fallback.
 #[cfg(feature = "enterprise")]
-async fn resolve_value_column(org_id: &str, anomaly_id: &str) -> Option<String> {
+async fn resolve_query_metadata(
+    org_id: &str,
+    anomaly_id: &str,
+) -> Option<partitioned_search::QueryMetadata> {
     let key = (org_id.to_string(), anomaly_id.to_string());
-    if let Ok(cache) = VALUE_COLUMN_CACHE.read()
-        && let Some((column, cached_at)) = cache.get(&key)
-        && cached_at.elapsed() < VALUE_COLUMN_TTL
+    if let Ok(cache) = QUERY_METADATA_CACHE.read()
+        && let Some((metadata, cached_at)) = cache.get(&key)
+        && cached_at.elapsed() < QUERY_METADATA_TTL
     {
-        return column.clone();
+        return Some(metadata.clone());
     }
 
     let db = get_orm_client_ro().await;
@@ -2709,22 +2796,22 @@ async fn resolve_value_column(org_id: &str, anomaly_id: &str) -> Option<String> 
         .await
         .inspect_err(|e| {
             log::warn!(
-                "[anomaly_detection {anomaly_id}] could not load config for value column: {e}"
+                "[anomaly_detection {anomaly_id}] could not load config for query metadata: {e}"
             )
         })
         .ok()??;
 
-    let column = declared_value_column(&model.query_mode, &model.detection_function);
-    if let Ok(mut cache) = VALUE_COLUMN_CACHE.write() {
-        cache.insert(key, (column.clone(), Instant::now()));
+    let metadata = partitioned_search::QueryMetadata::from_model(&model);
+    if let Ok(mut cache) = QUERY_METADATA_CACHE.write() {
+        cache.insert(key, (metadata.clone(), Instant::now()));
     }
-    column
+    Some(metadata)
 }
 
 /// Update-path hook; only bounds staleness on the serving node, the TTL covers the rest.
 #[cfg(feature = "enterprise")]
-fn invalidate_value_column_cache(org_id: &str, anomaly_id: &str) {
-    if let Ok(mut cache) = VALUE_COLUMN_CACHE.write() {
+fn invalidate_query_metadata_cache(org_id: &str, anomaly_id: &str) {
+    if let Ok(mut cache) = QUERY_METADATA_CACHE.write() {
         cache.remove(&(org_id.to_string(), anomaly_id.to_string()));
     }
 }
@@ -2864,41 +2951,40 @@ fn parse_search_results_to_timeseries(
 #[cfg(feature = "enterprise")]
 fn extract_timestamp_from_hit(hit: &serde_json::Value) -> Result<i64> {
     // Try different timestamp field names
-    for field_name in &TIMESTAMP_COLUMNS {
-        if let Some(ts_value) = hit.get(field_name) {
-            // Numeric microseconds
-            if let Some(ts_num) = ts_value.as_i64() {
-                return Ok(ts_num);
-            }
-            if let Some(ts_str) = ts_value.as_str() {
-                // RFC3339 with timezone: "2026-02-20T13:15:00Z" or "2026-02-20T13:15:00+00:00"
-                if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(ts_str) {
-                    return Ok(dt.timestamp_micros());
-                }
-                // Naive datetime without timezone (OpenObserve histogram output):
-                // "2026-02-20T13:15:00" — treat as UTC.
-                //
-                // TODO(timezone): OpenObserve histogram() always outputs UTC (origin
-                // hardcoded to "2001-01-01T00:00:00", no timezone field in SearchQuery
-                // proto). Arrow JSON serializer emits Timestamp(Microsecond, None) as
-                // ISO 8601 strings without a "Z" or "+00:00" suffix, so we parse as
-                // NaiveDateTime and attach UTC. If OpenObserve ever adds per-query
-                // timezone support, update this to use the configured timezone.
-                if let Ok(ndt) = chrono::NaiveDateTime::parse_from_str(ts_str, "%Y-%m-%dT%H:%M:%S")
-                {
-                    return Ok(ndt.and_utc().timestamp_micros());
-                }
-                // With fractional seconds: "2026-02-20T13:15:00.000"
-                if let Ok(ndt) =
-                    chrono::NaiveDateTime::parse_from_str(ts_str, "%Y-%m-%dT%H:%M:%S%.f")
-                {
-                    return Ok(ndt.and_utc().timestamp_micros());
-                }
-            }
-        }
-    }
+    TIMESTAMP_COLUMNS
+        .iter()
+        .find_map(|field_name| hit.get(field_name).and_then(timestamp_from_value))
+        .ok_or_else(|| anyhow::anyhow!("No timestamp field found in search result"))
+}
 
-    anyhow::bail!("No timestamp field found in search result")
+/// One timestamp cell as microseconds, or `None` when it is not a recognised format.
+#[cfg(feature = "enterprise")]
+fn timestamp_from_value(ts_value: &serde_json::Value) -> Option<i64> {
+    // Numeric microseconds
+    if let Some(ts_num) = ts_value.as_i64() {
+        return Some(ts_num);
+    }
+    let ts_str = ts_value.as_str()?;
+    // RFC3339 with timezone: "2026-02-20T13:15:00Z" or "2026-02-20T13:15:00+00:00"
+    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(ts_str) {
+        return Some(dt.timestamp_micros());
+    }
+    // Naive datetime without timezone (OpenObserve histogram output):
+    // "2026-02-20T13:15:00" — treat as UTC.
+    //
+    // TODO(timezone): OpenObserve histogram() always outputs UTC (origin
+    // hardcoded to "2001-01-01T00:00:00", no timezone field in SearchQuery
+    // proto). Arrow JSON serializer emits Timestamp(Microsecond, None) as
+    // ISO 8601 strings without a "Z" or "+00:00" suffix, so we parse as
+    // NaiveDateTime and attach UTC. If OpenObserve ever adds per-query
+    // timezone support, update this to use the configured timezone.
+    if let Ok(ndt) = chrono::NaiveDateTime::parse_from_str(ts_str, "%Y-%m-%dT%H:%M:%S") {
+        return Some(ndt.and_utc().timestamp_micros());
+    }
+    // With fractional seconds: "2026-02-20T13:15:00.000"
+    chrono::NaiveDateTime::parse_from_str(ts_str, "%Y-%m-%dT%H:%M:%S%.f")
+        .ok()
+        .map(|ndt| ndt.and_utc().timestamp_micros())
 }
 
 /// A declared `value_column` is authoritative: a missing one errors, never legacy-falls-back.
@@ -3116,11 +3202,58 @@ fn anomaly_alert_payload(
 
 /// Send an anomaly alert (or recovery message) to the configured destination.
 ///
+/// The downtime check the anomaly scheduler asks before it sends, registered next to the sender.
+#[cfg(feature = "enterprise")]
+pub fn downtime_is_muted(
+    org_id: &str,
+    anomaly_id: &str,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = Option<String>> + Send>> {
+    let (org_id, anomaly_id) = (org_id.to_string(), anomaly_id.to_string());
+    Box::pin(async move { muted_by_downtime(&org_id, &anomaly_id).await })
+}
+
+/// `custom_sql` equalities, then plain `=` filters, then `key:value` tags, on the Anomaly target.
+#[cfg(feature = "enterprise")]
+async fn muted_by_downtime(org_id: &str, anomaly_id: &str) -> Option<String> {
+    if !crate::alerts::downtimes::any_for(
+        org_id,
+        config::meta::downtimes::TargetModule::AnomalyDetections,
+    ) {
+        return None;
+    }
+    let row = anomaly_config_table::get_by_id(get_orm_client_rw().await, org_id, anomaly_id)
+        .await
+        .ok()
+        .flatten()?;
+    let folder_id = pk_to_name(Some(&row.folder_id)).await;
+    let tags: Vec<String> = row
+        .tags
+        .and_then(|tags| serde_json::from_value(tags).ok())
+        .unwrap_or_default();
+    let semantic_groups = crate::db::system_settings::get_semantic_field_groups(org_id).await;
+    let dims = o2_enterprise::enterprise::downtimes::scope::anomaly_dimensions(
+        crate::alerts::downtimes::anomaly_sql(&row.query_mode, row.custom_sql.as_deref()),
+        crate::alerts::downtimes::anomaly_filters(&row.query_mode, row.filters.as_ref()),
+        &tags,
+        &semantic_groups,
+    );
+    crate::alerts::downtimes::active_for_anomaly(
+        org_id,
+        anomaly_id,
+        &folder_id,
+        &dims,
+        config::utils::time::now_micros(),
+    )
+    .map(|downtime| downtime.id)
+}
+
 /// Called by the enterprise scheduler when anomalies are detected and alert_enabled=true.
 /// Looks up the destination by name and POSTs a JSON payload to its webhook URL.
 /// Non-HTTP destinations (email, SNS) are skipped with a warning — a known, parked gap
-/// that recovery messages inherit. Returns `Ok(true)` only when the webhook was actually
-/// sent; a skip returns `Ok(false)` so the caller never arms a cooldown on nothing.
+/// that recovery messages inherit. Returns `Ok(true)` only when the webhook accepted the
+/// send (2xx); a skip returns `Ok(false)` and a non-2xx answer is a `DestinationRejected`
+/// error, so the caller never arms a cooldown, or records a run as delivered, on a send
+/// nobody actually received, and the history row can name the rejection.
 #[cfg(feature = "enterprise")]
 pub async fn send_anomaly_alert(
     destination_id: String,
@@ -3161,10 +3294,13 @@ pub async fn send_anomaly_alert(
     let payload = anomaly_alert_payload(&ctx, &message, &link);
 
     // SSRF protection: validate the URL (incl. DNS) before sending and build the
-    // client through `build_safe_client` so redirects + connect-time resolution
+    // client through `build_safe_destination_client` so redirects + connect-time resolution
     // are re-validated.
     if let Err(e) =
-        common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(&endpoint.url).await
+        common::utils::ssrf_guard::SsrfGuard::validate_destination_url_with_config_async(
+            &endpoint.url,
+        )
+        .await
     {
         return Err(anyhow::anyhow!("Webhook URL blocked by SSRF guard: {e}"));
     }
@@ -3173,7 +3309,7 @@ pub async fn send_anomaly_alert(
     } else {
         reqwest::Client::builder()
     };
-    let client = common::utils::ssrf_guard::build_safe_client(builder)?;
+    let client = common::utils::ssrf_guard::build_safe_destination_client(builder)?;
 
     let mut req = client.post(&endpoint.url);
 
@@ -3192,6 +3328,26 @@ pub async fn send_anomaly_alert(
         .await?;
 
     let status = resp.status();
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        log::warn!(
+            "[anomaly_detection {}] destination '{}' rejected the alert: status={}, body={}",
+            anomaly_id,
+            destination_id,
+            status,
+            body
+        );
+        // The body lands in the alert-history error column, so a long HTML error page is cut.
+        let body = body.chars().take(REJECTION_BODY_MAX_CHARS).collect();
+        return Err(
+            o2_enterprise::enterprise::anomaly_detection::query_executor::DestinationRejected {
+                status: status.as_u16(),
+                body,
+            }
+            .into(),
+        );
+    }
+
     log::info!(
         "[anomaly_detection {}] alert sent to '{}': status={}",
         anomaly_id,
@@ -3771,13 +3927,6 @@ mod tests {
     fn test_extract_value_from_hit_value_field_f64() {
         let hit = serde_json::json!({"value": 3.25});
         assert!((extract_value_from_hit(&hit, None).unwrap() - 3.25).abs() < f64::EPSILON);
-    }
-
-    #[cfg(feature = "enterprise")]
-    #[test]
-    fn test_extract_value_from_hit_count_field_integer() {
-        let hit = serde_json::json!({"count": 42});
-        assert!((extract_value_from_hit(&hit, None).unwrap() - 42.0).abs() < f64::EPSILON);
     }
 
     #[cfg(feature = "enterprise")]

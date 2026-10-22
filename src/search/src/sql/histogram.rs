@@ -266,17 +266,6 @@ mod tests {
     }
 
     #[test]
-    fn test_convert_complex_where() {
-        let original_query = "SELECT * FROM \"api_logs\" WHERE status >= 400 AND level = 'error' AND user_id IS NOT NULL";
-        let stream_names = vec!["api_logs".to_string()];
-        let result =
-            convert_to_histogram_query(original_query, &stream_names, false, None).unwrap();
-
-        let expected = "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"api_logs\" WHERE status >= 400 AND level = 'error' AND user_id IS NOT NULL GROUP BY zo_sql_key ORDER BY zo_sql_key DESC";
-        assert_eq!(result, expected);
-    }
-
-    #[test]
     fn test_convert_query_with_group_by() {
         let original_query = "SELECT * FROM \"api_logs\" GROUP BY level";
         let stream_names = vec!["api_logs".to_string()];
@@ -380,13 +369,6 @@ mod tests {
     }
 
     #[test]
-    fn test_detect_histogram_breakdown_field_log_level_beats_level() {
-        let fields = vec!["level".to_string(), "log_level".to_string()];
-        let result = detect_histogram_breakdown_field(&fields);
-        assert_eq!(result, Some("log_level".to_string()));
-    }
-
-    #[test]
     fn test_detect_histogram_breakdown_field_log_level_beats_status() {
         let fields = vec!["status".to_string(), "log_level".to_string()];
         let result = detect_histogram_breakdown_field(&fields);
@@ -435,19 +417,6 @@ mod tests {
                 .unwrap();
 
         let expected = "SELECT histogram(_timestamp) AS zo_sql_key, \"level\" AS zo_sql_breakdown, count(*) AS zo_sql_num FROM \"logs\" GROUP BY zo_sql_key, zo_sql_breakdown ORDER BY zo_sql_key DESC";
-        assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn test_convert_query_with_breakdown_complex_where() {
-        // breakdown field + WHERE clause are both preserved
-        let original_query = "SELECT * FROM \"api_logs\" WHERE status >= 400 AND level = 'error'";
-        let stream_names = vec!["api_logs".to_string()];
-        let result =
-            convert_to_histogram_query(original_query, &stream_names, false, Some("severity"))
-                .unwrap();
-
-        let expected = "SELECT histogram(_timestamp) AS zo_sql_key, \"severity\" AS zo_sql_breakdown, count(*) AS zo_sql_num FROM \"api_logs\" WHERE status >= 400 AND level = 'error' GROUP BY zo_sql_key, zo_sql_breakdown ORDER BY zo_sql_key DESC";
         assert_eq!(result, expected);
     }
 

@@ -32,7 +32,9 @@ import {
   validateSql,
   locateIdentifier,
   rangesFromServerError,
+  locateNotACondition,
   type SqlErrorRange,
+  queryErrorCodeFromText,
 } from "./sqlDiagnostics";
 import { Parser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import basicSelect from "../../../../tests/test-data/query-agent/queries/basic_select.json";
@@ -845,6 +847,91 @@ describe("rangesFromServerError — semantic errors", () => {
   });
 });
 
+describe("rangesFromServerError — bare operand in a logical operation (20008)", () => {
+  const DETAIL =
+    "type_coercion\ncaused by\nError during planning: Cannot infer common argument type for logical boolean operation Utf8 AND Boolean";
+  const squiggled = async (query: string, errorDetail: string, sqlMode = false) => {
+    const ranges = await rangesFromServerError({
+      code: 20008,
+      message: "Search SQL execute error",
+      errorDetail,
+      sqlMode,
+      query,
+      streamName: "default",
+    });
+    return ranges.map((r) => ({
+      text: query.split("\n")[r.startLine - 1].slice(r.column! - 1, r.endColumn! - 1),
+      error: String(r.error),
+    }));
+  };
+
+  it("squiggles the text field left of AND with the exact DataFusion string", async () => {
+    const out = await squiggled("body and contains('Ashish K', 'Ashi')", DETAIL);
+    expect(out).toEqual([
+      {
+        text: "body",
+        error:
+          "`body` is text, not a condition. Compare it: `body = '…'` or `str_match(body, '…')`",
+      },
+    ]);
+  });
+
+  it("squiggles the right operand of OR when that side is the non-boolean one", async () => {
+    const out = await squiggled(
+      "SELECT * FROM t WHERE level = 'x' OR\n  code",
+      "Cannot infer common argument type for logical boolean operation Boolean OR Int64",
+      true,
+    );
+    expect(out).toEqual([
+      { text: "code", error: "`code` is not a condition. Compare it, e.g. `code = …`" },
+    ]);
+  });
+
+  it("squiggles the whole qualified name", async () => {
+    const out = await squiggled(
+      "SELECT * FROM t WHERE t.body AND level = 'x'",
+      "logical boolean operation Utf8 AND Boolean",
+      true,
+    );
+    expect(out.map((o) => o.text)).toEqual(["t.body"]);
+  });
+
+  it("with the column types known, picks the operand whose type the error names", () => {
+    const types: Record<string, string> = { flag: "Boolean", body: "Utf8" };
+    const detail = "logical boolean operation Boolean AND Utf8";
+    const query = "a = 1 AND flag AND body";
+    expect(locateNotACondition(detail, query, (f) => types[f])?.field).toBe("body");
+    expect(
+      locateNotACondition(detail, query, null)?.field,
+      "without types, the first bare operand",
+    ).toBe("flag");
+  });
+
+  it("looks only at the operator the error names", () => {
+    const detail = "logical boolean operation Boolean AND Utf8";
+    expect(locateNotACondition(detail, "(flag OR active) AND message", null)?.field).toBe(
+      "message",
+    );
+  });
+
+  it("never blames a column the schema says is Boolean, and gives no marker when nothing else fits", () => {
+    const types: Record<string, string> = { enabled: "Boolean", healthy: "Boolean", body: "Utf8" };
+    const detail = "logical boolean operation Boolean OR Utf8";
+    expect(
+      locateNotACondition(detail, "enabled AND healthy OR lower(body)", (f) => types[f]),
+    ).toBeNull();
+    expect(locateNotACondition(detail, "enabled OR healthy OR body", (f) => types[f])?.field).toBe(
+      "body",
+    );
+  });
+
+  it("skips BETWEEN bounds, calls and comparisons, and returns null when nothing is bare", () => {
+    const query = "a BETWEEN lo AND hi AND contains(body, 'x') AND level = 'y'";
+    expect(locateNotACondition(DETAIL, query)).toBeNull();
+    expect(locateNotACondition("Search SQL execute error", "body and x = 1")).toBeNull();
+  });
+});
+
 // ─── Suite: rangesFromServerError — no false positives ───────────────────────
 
 describe("rangesFromServerError — non-locatable errors produce no squiggle", () => {
@@ -900,5 +987,24 @@ describe("rangesFromServerError — syntax errors", () => {
       query: "SELECT * FROM t WHERE x = ",
     });
     expect(ranges.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("queryErrorCodeFromText (logs search stream, item 1)", () => {
+  it("maps the server's query-error messages back to their codes", () => {
+    expect(queryErrorCodeFromText('Error# SQL error: ParserError("Expected: an expression")')).toBe(
+      20001,
+    );
+    expect(queryErrorCodeFromText("Search SQL not valid")).toBe(20001);
+    expect(queryErrorCodeFromText('Search field not found: No field named "x"')).toBe(20004);
+    expect(queryErrorCodeFromText("Search function not defined: foo")).toBe(20005);
+    expect(queryErrorCodeFromText("Search field has no compatible data type: x")).toBe(20007);
+    expect(queryErrorCodeFromText("Search SQL execute error Error during planning")).toBe(20008);
+  });
+
+  it("returns null for errors that are not about the query", () => {
+    expect(queryErrorCodeFromText("Search query timed out")).toBeNull();
+    expect(queryErrorCodeFromText("Ratelimit exceeded")).toBeNull();
+    expect(queryErrorCodeFromText("")).toBeNull();
   });
 });

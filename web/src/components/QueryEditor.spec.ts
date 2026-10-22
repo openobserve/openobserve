@@ -66,6 +66,7 @@ const codeQueryEditorStub = {
     "debounceTime",
     "showAutoComplete",
     "editorId",
+    "valuesTimeRange",
   ],
   emits: [
     "update:query",
@@ -443,6 +444,26 @@ describe("QueryEditor", () => {
 
       expect(mockSaveToHistory).toHaveBeenCalled();
     });
+
+    it("records a refused generation's notice, not the unchanged query, as the answer", async () => {
+      wrapper = mountQueryEditor();
+      const notice = "Your organization has used all of its AI credits.";
+      (wrapper.vm as any).editorRef = {
+        getValue: vi.fn(() => "SELECT * FROM old_query"),
+        handleGenerateSQL: vi.fn().mockResolvedValue(undefined),
+        refusalNotice: notice,
+      };
+
+      (wrapper.vm as any).aiInputText = "list all logs";
+      await (wrapper.vm as any).handleAIGenerate();
+      await flushPromises();
+
+      const saved = mockSaveToHistory.mock.calls.at(-1)![0] as Array<{
+        role: string;
+        content: string;
+      }>;
+      expect(saved.at(-1)).toEqual({ role: "assistant", content: notice });
+    });
   });
 
   describe("when query becomes null/undefined (PromQL -> SQL switch)", () => {
@@ -544,6 +565,19 @@ describe("QueryEditor", () => {
       // Assert — called with the actual new value
       expect(mockSetValue).toHaveBeenCalledOnce();
       expect(mockSetValue).toHaveBeenCalledWith("SELECT 2");
+    });
+  });
+
+  describe("values time range", () => {
+    it("forwards the range to the code editor", () => {
+      const range = { startTime: 1, endTime: 2 };
+      wrapper = mountQueryEditor({ valuesTimeRange: range });
+      expect(wrapper.findComponent(codeQueryEditorStub).props("valuesTimeRange")).toEqual(range);
+    });
+
+    it("forwards null when no range is given", () => {
+      wrapper = mountQueryEditor();
+      expect(wrapper.findComponent(codeQueryEditorStub).props("valuesTimeRange")).toBeNull();
     });
   });
 });

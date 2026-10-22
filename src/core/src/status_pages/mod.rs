@@ -598,7 +598,7 @@ pub async fn verify_unlock_cookie(cookie: &str, slug: &str, pw_version: &str) ->
     }
     let expected = unlock_mac(key, slug, pw_version, exp);
     // Constant-time compare.
-    constant_time_eq(mac.as_bytes(), expected.as_bytes())
+    config::utils::str::constant_time_eq(mac.as_bytes(), expected.as_bytes())
 }
 
 /// Short stable version tag of a password hash — folded into the cookie MAC so
@@ -634,17 +634,6 @@ fn hex_encode(bytes: &[u8]) -> String {
         let _ = write!(s, "{b:02x}");
     }
     s
-}
-
-fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
-    if a.len() != b.len() {
-        return false;
-    }
-    let mut diff = 0u8;
-    for (x, y) in a.iter().zip(b.iter()) {
-        diff |= x ^ y;
-    }
-    diff == 0
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -786,13 +775,6 @@ mod tests {
         assert_ne!(good, unlock_mac(key, "slug1", "v2", 1000)); // pw_version
         assert_ne!(good, unlock_mac(key, "slug1", "v1", 1001)); // exp
         assert_ne!(good, unlock_mac(b"other-key", "slug1", "v1", 1000)); // key
-    }
-
-    #[test]
-    fn constant_time_eq_matches_only_equal() {
-        assert!(constant_time_eq(b"abc", b"abc"));
-        assert!(!constant_time_eq(b"abc", b"abd"));
-        assert!(!constant_time_eq(b"abc", b"ab"));
     }
 
     #[test]

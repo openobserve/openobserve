@@ -337,14 +337,11 @@ describe("useTraces", () => {
       expect(searchObj.config.splitterModel).toBe(20);
     });
 
-    it("config.refreshTimes is a 4x3-or-less matrix of objects with label/value", () => {
+    it("has no refresh-interval state: the traces page never rendered that control", () => {
       const { searchObj } = useTraces();
-      expect(Array.isArray(searchObj.config.refreshTimes)).toBe(true);
-      const firstRow = searchObj.config.refreshTimes[0];
-      expect(firstRow[0]).toMatchObject({
-        label: expect.any(String),
-        value: expect.any(Number),
-      });
+      expect(searchObj.config).not.toHaveProperty("refreshTimes");
+      expect(searchObj.meta).not.toHaveProperty("refreshInterval");
+      expect(searchObj.meta).not.toHaveProperty("refreshIntervalLabel");
     });
 
     it("meta.resultGrid default sortBy is start_time", () => {

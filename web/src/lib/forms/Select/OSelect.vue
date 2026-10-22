@@ -17,7 +17,7 @@ import OSelectItem from "./OSelectItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { useIsTruncated } from "@/lib/overlay/Tooltip/useIsTruncated";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import {
   ListboxFilter,
   ListboxItem,
@@ -42,6 +42,7 @@ import {
   inject,
   nextTick,
   onBeforeUnmount,
+  onMounted,
   provide,
   ref,
   useAttrs,
@@ -51,6 +52,7 @@ import {
   watchEffect,
 } from "vue";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { mergeDescribedBy, splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
 import {
   O_DROPDOWN_NESTED_KEY,
   setActiveOverlay,
@@ -91,6 +93,8 @@ type NormalizedOption = {
   expandable?: boolean;
   /** Reka string key of the expandable option this one is nested under. */
   parentKey?: string;
+  /** Extra lowercase text the search matches besides the label, e.g. a zone's legacy names. */
+  searchText?: string;
 };
 
 const DEFAULT_OPTION_LABEL = "label";
@@ -110,6 +114,7 @@ const props = withDefaults(defineProps<SelectProps>(), {
   searchDebounce: 0,
   hideSelected: false,
   collapsibleGroups: false,
+  pinSelectedInGroups: false,
   creatable: false,
   labelKey: DEFAULT_OPTION_LABEL,
   valueKey: DEFAULT_OPTION_VALUE,
@@ -130,11 +135,19 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 
 // Forward tabindex to the real trigger; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
-const wrapperAttrs = computed(() => {
-  const { tabindex, ...rest } = $attrs;
-  void tabindex;
-  return rest;
-});
+const split = computed(() => splitControlAttrs($attrs));
+const wrapperAttrs = computed(() => split.value.wrapperAttrs);
+const controlAttrs = computed(() => split.value.controlAttrs);
+
+const insideLabelName = computed(() =>
+  props.labelPosition === "inside" && props.label ? props.label : undefined,
+);
+onMounted(() =>
+  warnIfUnlabelled(
+    "OSelect",
+    Boolean(props.label || $attrs["aria-label"] || $attrs["aria-labelledby"]),
+  ),
+);
 
 const emit = defineEmits<SelectEmits>();
 const slots = useSlots();
@@ -143,6 +156,17 @@ defineSlots<SelectSlots>();
 
 const _fallbackId = useId();
 const inputId = computed(() => props.id ?? _fallbackId);
+const errorId = computed(() => `${inputId.value}-error`);
+const labelId = computed(() => `${inputId.value}-label`);
+// The popover trigger keeps Reka's own id, so `<label for>` cannot reach it.
+const outsideLabelId = computed(() =>
+  props.label &&
+  props.labelPosition !== "inside" &&
+  !$attrs["aria-label"] &&
+  !$attrs["aria-labelledby"]
+    ? labelId.value
+    : undefined,
+);
 
 // Dev-time warning: slot-based options with multiple/searchable require listbox
 // mode, but listboxModeEnabled requires options prop. Guide the developer early.
@@ -233,6 +257,8 @@ function normalizeOption(input: unknown): NormalizedOption | null {
     parentKey: isPrimitiveSelectValue(option["parentValue"])
       ? toRekaString(option["parentValue"])
       : undefined,
+    searchText:
+      typeof option["searchText"] === "string" ? option["searchText"].toLowerCase() : undefined,
   };
 }
 
@@ -271,6 +297,9 @@ const resolvedSearchPlaceholder = computed(
   () => props.searchPlaceholder ?? t("common.searchEllipsis"),
 );
 
+const matchesTerm = (opt: NormalizedOption, term: string) =>
+  opt.label.toLowerCase().includes(term) || !!opt.searchText?.includes(term);
+
 const baseFilteredOptions = computed(() => {
   if (!inputEnabled.value) return normalizedOptions.value;
   const term = searchTerm.value.trim().toLowerCase();
@@ -289,13 +318,24 @@ const baseFilteredOptions = computed(() => {
   if (!term) {
     // In multi-select mode, float previously-selected items to the top so users
     // can immediately see and manage their current choices on re-open.
-    // Only applies when there is a non-empty pin set and no headers in the list
-    // (headers imply grouped options where reordering would break visual grouping).
-    if (props.multiple && pinnedSelected.value.size > 0 && !options.some((o) => o.header)) {
+    // Grouped lists keep their order unless `pinSelectedInGroups` is set; then
+    // items float within their own group (a header and the items under it; a
+    // flat list is one group), so no item leaves its group. sort() is stable.
+    if (
+      props.multiple &&
+      pinnedSelected.value.size > 0 &&
+      (props.pinSelectedInGroups || !options.some((o) => o.header))
+    ) {
       const pinned = pinnedSelected.value;
-      const top = options.filter((o) => pinned.has(toRekaString(o.value)));
-      const rest = options.filter((o) => !pinned.has(toRekaString(o.value)));
-      return [...top, ...rest];
+      let group = 0;
+      return options
+        .map((o) => ({
+          o,
+          group: o.header ? ++group : group,
+          rank: o.header ? 0 : pinned.has(toRekaString(o.value)) ? 1 : 2,
+        }))
+        .sort((a, b) => a.group - b.group || a.rank - b.rank)
+        .map(({ o }) => o);
     }
     return options;
   }
@@ -308,14 +348,14 @@ const baseFilteredOptions = computed(() => {
       // Include the header only if at least one subsequent non-header item matches
       let j = i + 1;
       while (j < options.length && !options[j].header) {
-        if (options[j].label.toLowerCase().includes(term)) {
+        if (matchesTerm(options[j], term)) {
           result.push(opt);
           break;
         }
         j++;
       }
     } else {
-      if (opt.label.toLowerCase().includes(term)) {
+      if (matchesTerm(opt, term)) {
         result.push(opt);
       }
     }
@@ -456,9 +496,6 @@ const triggerDisplayLabel = computed(() => {
   return selectedLabels.value[0] ?? "";
 });
 
-const triggerLabelRef = ref<HTMLElement | null>(null);
-const { isTruncated: isTriggerLabelTruncated } = useIsTruncated(triggerLabelRef);
-
 watch(searchTerm, (value) => {
   if (!inputEnabled.value) return;
   if ((props.searchDebounce ?? 0) > 0) {
@@ -490,6 +527,7 @@ const effectiveError = computed(() => {
   return props.errorMessage || " ";
 });
 const hasError = computed(() => !!effectiveError.value);
+const errorDescribedBy = computed(() => (effectiveError.value?.trim() ? errorId.value : undefined));
 
 const stringValue = computed(() =>
   !Array.isArray(props.modelValue) && props.modelValue !== undefined
@@ -691,6 +729,17 @@ function handleTriggerKeydown(e: KeyboardEvent) {
   if (inputEnabled.value) searchTerm.value = searchTerm.value + e.key;
 }
 
+const searchFilterRef = ref<{ $el: HTMLInputElement } | null>(null);
+
+// Reka's open auto-focus selects the search text, so the next keystroke would overwrite the seeded character.
+function handlePopoverOpenAutoFocus(e: Event) {
+  const input = searchFilterRef.value?.$el;
+  if (!inputEnabled.value || !input) return;
+  e.preventDefault();
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+}
+
 // ── Virtual scroll (listbox mode) ─────────────────────────────────────────
 // Items are virtualised whenever the listbox has more than 50 entries, keeping
 // DOM nodes minimal even for 20 000+ option datasets.
@@ -867,6 +916,7 @@ function getPaletteGradient(colors: string[]): string {
 
 // Aligned with OInput and OButton sm: h-[2.125rem] ≈ 30px at the 14px html base.
 const heightClasses: Record<NonNullable<SelectProps["size"]>, string> = {
+  xs: "h-7 text-xs",
   sm: "h-[2.125rem] text-sm",
   md: "h-[2.125rem] text-sm",
 };
@@ -969,6 +1019,12 @@ function handleViewportScroll(event: Event) {
     selectOpen.value = false;
   }
 }
+
+// Type-ahead, label clicks, focus(), Escape and picks set popoverOpen directly and Reka never reports them.
+watch(popoverOpen, (open, wasOpen) => {
+  if (open && !wasOpen) emit("open");
+  else if (!open && wasOpen) emit("close");
+});
 
 watch(isOpen, (open) => {
   if (typeof window === "undefined") return;
@@ -1113,6 +1169,13 @@ const overflowSelectedCount = computed(() =>
 // squeezes the content area — it does not shift the chevron position when the
 // clear button toggles into view.
 const isInlineAppearance = computed(() => props.appearance === "inline");
+const triggerTextTone = computed(() =>
+  props.disabled
+    ? "text-select-disabled-text"
+    : hasSelection.value
+      ? "text-select-text"
+      : "text-select-placeholder",
+);
 
 /**
  * Inline-appearance trigger chrome. Deliberately contributes NOTHING to the
@@ -1166,6 +1229,7 @@ const fieldWidthClass = computed(() => {
     <!-- Label -->
     <label
       v-if="(label || $slots.tooltip) && labelPosition !== 'inside'"
+      :id="labelId"
       :for="inputId"
       :class="[
         'o-input-label text-compact flex items-center gap-1 leading-tight',
@@ -1187,10 +1251,7 @@ const fieldWidthClass = computed(() => {
     </label>
 
     <template v-if="listboxModeEnabled">
-      <PopoverRoot
-        v-model:open="popoverOpen"
-        @update:open="(v) => (v ? emit('open') : emit('close'))"
-      >
+      <PopoverRoot v-model:open="popoverOpen">
         <div ref="triggerWrapperRef" class="relative flex items-center">
           <PopoverTrigger
             type="button"
@@ -1201,6 +1262,10 @@ const fieldWidthClass = computed(() => {
             role="combobox"
             :aria-expanded="popoverOpen"
             :aria-invalid="hasError || undefined"
+            :aria-label="insideLabelName"
+            :aria-labelledby="outsideLabelId"
+            v-bind="controlAttrs"
+            :aria-describedby="mergeDescribedBy(errorDescribedBy, controlAttrs)"
             @keydown="handleTriggerKeydown"
             :data-test="parentDataTest ? `${parentDataTest}-trigger` : undefined"
             :data-test-selected-value="
@@ -1272,13 +1337,12 @@ const fieldWidthClass = computed(() => {
                       :label="String(labelText ?? '')"
                       :value="selectedValues[idx]"
                     >
-                      <span
+                      <OTruncatedText
                         :key="`${idx}-${String(labelText ?? '')}`"
-                        class="rounded-default bg-select-item-selected-bg text-select-item-selected-text inline-flex max-w-40 shrink-0 items-center truncate px-2 py-0.5 text-xs leading-none"
+                        class="rounded-default bg-select-item-selected-bg text-select-item-selected-text inline-block max-w-40 shrink-0 px-2 py-0.5 text-xs leading-none"
                       >
                         {{ labelText }}
-                      </span>
-                      <OTooltip :content="raw(String(labelText ?? ''))" />
+                      </OTruncatedText>
                     </slot>
                     <span
                       v-if="overflowSelectedCount > 0"
@@ -1291,7 +1355,6 @@ const fieldWidthClass = computed(() => {
                 </template>
                 <template v-else>
                   <span
-                    ref="triggerLabelRef"
                     :class="[
                       'text-start',
                       // An inline trigger is a word in a sentence: it grows to fit
@@ -1308,11 +1371,7 @@ const fieldWidthClass = computed(() => {
                   >
                     {{ hasSelection ? triggerDisplayLabel : placeholder }}
                   </span>
-                  <OTooltip
-                    v-if="hasSelection"
-                    :content="raw(triggerDisplayLabel)"
-                    :disabled="!isTriggerLabelTruncated"
-                  />
+                  <OTooltip v-if="hasSelection" overflow-only />
                 </template>
               </slot>
             </div>
@@ -1392,6 +1451,7 @@ const fieldWidthClass = computed(() => {
             :disable-outside-pointer-events="false"
             :hide-when-detached="true"
             :data-test="parentDataTest ? `${parentDataTest}-popover` : undefined"
+            @open-auto-focus="handlePopoverOpenAutoFocus"
             :class="[
               'z-10001 min-w-(--reka-popover-trigger-width)',
               'flex flex-col overflow-hidden',
@@ -1420,6 +1480,7 @@ const fieldWidthClass = computed(() => {
               >
                 <ListboxFilter
                   v-if="inputEnabled"
+                  ref="searchFilterRef"
                   v-model="searchTerm"
                   auto-focus
                   :data-test="parentDataTest ? `${parentDataTest}-search` : undefined"
@@ -1433,16 +1494,10 @@ const fieldWidthClass = computed(() => {
                   @keydown="handleDropdownKeydown"
                 />
 
-                <!--
-                Select-all master row. Indeterminate (dash) when only some
-                options are checked, full check when all are. Toggles the
-                whole selection. Rendered as a plain button so it sits
-                outside the listbox's keyboard navigation while remaining
-                focusable.
-              -->
+                <!-- Select-all row: outside the listbox keyboard navigation but still focusable. -->
                 <div
                   v-if="selectAll && multiple && selectableOptions.length > 0"
-                  role="button"
+                  role="checkbox"
                   tabindex="0"
                   :aria-label="t('components.select.toggleAllOptions')"
                   :aria-checked="allSelected ? 'true' : partiallySelected ? 'mixed' : 'false'"
@@ -1580,7 +1635,7 @@ const fieldWidthClass = computed(() => {
                         @mousedown.prevent
                         @click.stop="toggleExpanded(filteredOptions[vRow.index].value)"
                       >
-                        <span class="truncate">{{ filteredOptions[vRow.index].label }}</span>
+                        <OTruncatedText>{{ filteredOptions[vRow.index].label }}</OTruncatedText>
                         <OIcon
                           name="chevron-right"
                           size="sm"
@@ -1684,9 +1739,9 @@ const fieldWidthClass = computed(() => {
                               filteredOptions[vRow.index].label
                             }}</span>
                             <span class="text-select-placeholder mx-1 shrink-0">–</span>
-                            <span class="text-text-secondary truncate text-xs">{{
+                            <OTruncatedText class="text-text-secondary text-xs">{{
                               filteredOptions[vRow.index].subLabel
-                            }}</span>
+                            }}</OTruncatedText>
                           </template>
 
                           <!-- Rich item: label + optional badge + optional subLabel + optional color palette swatch.
@@ -1705,13 +1760,9 @@ const fieldWidthClass = computed(() => {
                                      sub-label under it. With no sub-label there is
                                      nothing to separate from, and every option in
                                      the list reading bold emphasises nothing. -->
-                                <span
-                                  class="truncate"
+                                <OTruncatedText
                                   :class="filteredOptions[vRow.index].subLabel ? 'font-medium' : ''"
-                                  :title="
-                                    optionTooltip ? filteredOptions[vRow.index].label : undefined
-                                  "
-                                  >{{ filteredOptions[vRow.index].label }}</span
+                                  >{{ filteredOptions[vRow.index].label }}</OTruncatedText
                                 >
                                 <span
                                   v-if="filteredOptions[vRow.index].badge"
@@ -1733,10 +1784,11 @@ const fieldWidthClass = computed(() => {
                                   >{{ filteredOptions[vRow.index].badge }}</span
                                 >
                               </span>
-                              <span
+                              <OTruncatedText
                                 v-if="filteredOptions[vRow.index].subLabel"
-                                class="text-text-secondary line-clamp-2 w-full text-xs leading-snug whitespace-normal"
-                                >{{ filteredOptions[vRow.index].subLabel }}</span
+                                :lines="2"
+                                class="text-text-secondary w-full text-xs leading-snug whitespace-normal"
+                                >{{ filteredOptions[vRow.index].subLabel }}</OTruncatedText
                               >
                               <div
                                 v-if="filteredOptions[vRow.index].colorPalette?.length"
@@ -1768,9 +1820,7 @@ const fieldWidthClass = computed(() => {
                               class="shrink-0"
                             />
                             <span v-else-if="iconKey" class="size-4 shrink-0" />
-                            <span class="truncate" :title="filteredOptions[vRow.index].label">{{
-                              filteredOptions[vRow.index].label
-                            }}</span>
+                            <OTruncatedText>{{ filteredOptions[vRow.index].label }}</OTruncatedText>
                           </template>
                         </ListboxItem>
                       </div>
@@ -1857,6 +1907,10 @@ const fieldWidthClass = computed(() => {
         <SelectTrigger
           :id="inputId"
           :tabindex="inputTabindex"
+          :aria-invalid="hasError || undefined"
+          :aria-label="insideLabelName"
+          v-bind="controlAttrs"
+          :aria-describedby="mergeDescribedBy(errorDescribedBy, controlAttrs)"
           :data-test="parentDataTest ? `${parentDataTest}-trigger` : undefined"
           :class="
             isInlineAppearance
@@ -1895,20 +1949,26 @@ const fieldWidthClass = computed(() => {
             "
           >
             <SelectValue
+              v-if="isInlineAppearance"
               :placeholder="placeholder"
-              :class="[
-                'text-start',
-                isInlineAppearance ? 'whitespace-nowrap' : 'flex-1 truncate text-sm',
-                labelPosition === 'inside' && label ? 'text-xs leading-4' : '',
-                disabled
-                  ? 'text-select-disabled-text'
-                  : hasSelection
-                    ? 'text-select-text'
-                    : 'text-select-placeholder',
-              ]"
+              :class="['text-start whitespace-nowrap', triggerTextTone]"
             >
               <slot name="trigger" :value="modelValue" />
             </SelectValue>
+            <!-- reka's SelectValue is pointer-events:none, so the wrapper is what cuts and takes the hover. -->
+            <OTruncatedText
+              v-else
+              :class="[
+                'flex-1 text-start text-sm',
+                labelPosition === 'inside' && label ? 'text-xs leading-4' : '',
+                triggerTextTone,
+              ]"
+              :tooltip="hasSelection && !$slots.trigger ? undefined : false"
+            >
+              <SelectValue :placeholder="placeholder">
+                <slot name="trigger" :value="modelValue" />
+              </SelectValue>
+            </OTruncatedText>
           </div>
         </SelectTrigger>
 
@@ -2056,6 +2116,7 @@ const fieldWidthClass = computed(() => {
     <!-- Error message -->
     <span
       v-if="effectiveError && effectiveError.trim()"
+      :id="errorId"
       :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
       class="text-select-error-text text-xs leading-none"
       role="alert"

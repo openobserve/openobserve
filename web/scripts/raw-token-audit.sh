@@ -4,7 +4,7 @@ cd /Users/ktx/Documents/KTX-Projects/openobserve/web || exit 1
 
 # Common exclusions: tests, specs, mocks, vendored assets, token definition files
 EXC=(--glob '!**/*.spec.ts' --glob '!**/*.spec.js' --glob '!src/test/**' --glob '!**/__mocks__/**'
-     --glob '!src/assets/dashboard/echarts.min.js' --glob '!**/*.json' --glob '!**/*.md')
+     --glob '!**/*.json' --glob '!**/*.md')
 # Token definition files are the legitimate home of raw values
 TOKENDEF=(--glob '!src/lib/styles/tokens/**')
 

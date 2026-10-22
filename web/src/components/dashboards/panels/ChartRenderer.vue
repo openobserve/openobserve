@@ -18,7 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     data-test="chart-renderer"
     ref="chartRef"
-    id="chart1"
+    :id="chartId"
+    :role="label ? 'img' : undefined"
+    :aria-label="label || undefined"
     class="chart-container h-full w-full"
     @mouseover="
       () => {
@@ -73,6 +75,7 @@ import { throttle } from "lodash-es";
 import {
   defineComponent,
   ref,
+  useId,
   onMounted,
   watch,
   onUnmounted,
@@ -80,7 +83,9 @@ import {
   onActivated,
   onDeactivated,
   inject,
+  type PropType,
 } from "vue";
+import type { I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useTheme } from "@/composables/useTheme";
@@ -111,10 +116,22 @@ import {
   MarkLineComponent,
   MarkAreaComponent,
   GraphicComponent,
+  AriaComponent,
 } from "echarts/components";
 import { LabelLayout, UniversalTransition } from "echarts/features";
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
 import { withChartFont } from "@/utils/fonts";
+import {
+  indexesNearX,
+  isLineStrokeEvent,
+  lineSeriesAtPoint,
+  lineStrokeEventsPatch,
+  nearestIndexByX,
+  withLineStrokeEvents,
+  type LineStrokeEvent,
+  type LineSeriesPixels,
+  type PixelPoint,
+} from "@/utils/dashboard/lineSeriesAtPoint";
 
 echarts.use([
   TitleComponent,
@@ -129,6 +146,7 @@ echarts.use([
   MarkLineComponent,
   MarkAreaComponent,
   GraphicComponent,
+  AriaComponent,
   BarChart,
   LineChart,
   CustomChart,
@@ -147,6 +165,35 @@ echarts.use([
 
 // Right-click reads a y-axis value, so only cartesian series types can answer it
 const CONTEXT_MENU_SERIES_TYPES = ["bar", "line", "scatter"];
+
+interface LineSeriesOption {
+  type?: string;
+  name?: string;
+  stack?: string;
+  step?: string | boolean;
+  smooth?: boolean | number;
+  connectNulls?: boolean;
+  data?: unknown;
+}
+
+interface ChartOptionLike {
+  series?: unknown;
+  legend?: unknown;
+}
+
+// A line datum is `[x, y]`, `{ value: [x, y] }`, or a bare y on a category axis.
+const datumValue = (datum: unknown, dataIndex: number): (string | number)[] => {
+  if (Array.isArray(datum)) return datum;
+  const inner = (datum as { value?: unknown } | null)?.value;
+  if (Array.isArray(inner)) return inner;
+  return [dataIndex, (inner ?? datum) as string | number];
+};
+
+/** A datum the line does not draw: missing, or with no finite y (PromQL sends "NaN" samples). */
+const isGap = (datum: unknown): boolean => {
+  const y = datum === null || datum === undefined ? null : datumValue(datum, 0)[1];
+  return y === null || y === undefined || y === "" || !Number.isFinite(Number(y));
+};
 
 export default defineComponent({
   name: "ChartRenderer",
@@ -176,9 +223,20 @@ export default defineComponent({
       type: String,
       default: "100%",
     },
+    /** Accessible name of the chart, normally the panel title. */
+    label: {
+      type: String as unknown as PropType<I18nText | undefined>,
+      default: undefined,
+    },
+    /** Name the line under a right-click that hit no symbol, so the alert can tell which query was meant. */
+    findLineOnContextMenu: {
+      type: Boolean,
+      default: false,
+    },
   },
   setup(props: any, { emit }) {
     const chartRef: any = ref(null);
+    const chartId = `chart-${useId()}`;
     let chart: any;
     const store = useStore();
     const { isDark } = useTheme();
@@ -292,6 +350,13 @@ export default defineComponent({
         });
       }
 
+      // A series left out of the legend has no entry to toggle, so it follows the series it overlays.
+      for (const series of props.data?.options?.series ?? []) {
+        if (series?._legendFollows !== undefined) {
+          params.selected[series.name] = params.selected[series._legendFollows] !== false;
+        }
+      }
+
       // get legend
       const legendOption = chart?.getOption()?.legend[0];
 
@@ -317,8 +382,67 @@ export default defineComponent({
       });
     };
 
+    const chartOptions = (options: Record<string, unknown>) =>
+      withChartFont(
+        withLineStrokeEvents(
+          { aria: { enabled: !props.label }, ...options },
+          props.findLineOnContextMenu,
+        ),
+      );
+
+    // The data point nearest the cursor along x, for a right-click on a line's stroke between points.
+    const nearestDataIndex = (seriesIndex: number, data: unknown[], cursorX: number) => {
+      const xAt = (dataIndex: number) => {
+        if (isGap(data[dataIndex])) return null;
+        const pixel = chart?.convertToPixel(
+          { seriesIndex },
+          datumValue(data[dataIndex], dataIndex),
+        );
+        return Array.isArray(pixel) && Number.isFinite(pixel[0]) ? Number(pixel[0]) : null;
+      };
+      return nearestIndexByX(data.length, cursorX, xAt);
+    };
+
+    // The stroke has no data point of its own, so the threshold is read at the cursor.
+    const handleLineStrokeContextMenu = (params: LineStrokeEvent) => {
+      const event = params.event?.event;
+      const series = (chart?.getOption()?.series as LineSeriesOption[] | undefined)?.[
+        params.seriesIndex
+      ];
+      const data = Array.isArray(series?.data) ? series.data : [];
+      const cursorX = Number(params.event?.offsetX);
+      const dataIndex = nearestDataIndex(params.seriesIndex, data, cursorX);
+      // The series' own grid, so a trellis subplot reads its own axis.
+      const point = chart?.convertFromPixel({ seriesIndex: params.seriesIndex }, [
+        cursorX,
+        params.event?.offsetY,
+      ]);
+      // A stacked line is drawn at the stack total, so its own value is read at the nearest point instead.
+      const value = series?.stack
+        ? dataIndex === undefined
+          ? NaN
+          : Number(datumValue(data[dataIndex], dataIndex)[1])
+        : Array.isArray(point)
+          ? Number(point[1])
+          : NaN;
+      if (!event || !Number.isFinite(value)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      emit("domcontextmenu", {
+        x: event.clientX,
+        y: event.clientY,
+        value,
+        seriesIndex: params.seriesIndex,
+        dataIndex,
+      });
+    };
+
     // Handle ECharts contextmenu event when clicking on data points
     const handleContextMenu = (params: any) => {
+      if (isLineStrokeEvent(params)) {
+        handleLineStrokeContextMenu(params);
+        return;
+      }
       // Get chart type from the first series
       const chartType = chart?.getOption()?.series?.[0]?.type;
 
@@ -374,7 +498,59 @@ export default defineComponent({
           x: event.clientX,
           y: event.clientY,
           value: Number(dataPointValue),
+          seriesIndex: params.seriesIndex,
+          dataIndex: params.dataIndex,
         });
+      }
+    };
+
+    const linePixels = (cursor: PixelPoint, option: ChartOptionLike): LineSeriesPixels[] => {
+      const series = (Array.isArray(option.series) ? option.series : []) as LineSeriesOption[];
+      // Off-stroke clicks only: a stacked, step, smooth or null-bridging line is not straight segments between neighbours.
+      if (
+        series.some(
+          (entry) =>
+            entry?.type === "line" &&
+            (entry.stack || entry.step || entry.smooth || entry.connectNulls),
+        )
+      )
+        return [];
+      const legends = (Array.isArray(option.legend) ? option.legend : []) as {
+        selected?: Record<string, boolean>;
+      }[];
+      const legendOff = (name: string | undefined) =>
+        name !== undefined && legends.some((legend) => legend?.selected?.[name] === false);
+      return series.flatMap((entry, seriesIndex) => {
+        const data = entry?.data;
+        if (entry?.type !== "line" || !Array.isArray(data) || legendOff(entry.name)) return [];
+        const pixelOf = (value: (string | number)[]) => {
+          const pixel = chart?.convertToPixel({ seriesIndex }, value);
+          return Array.isArray(pixel) && pixel.every(Number.isFinite)
+            ? (pixel as PixelPoint)
+            : null;
+        };
+        // A merged x-axis leaves bare nulls whose x is unknown, so the search steps over them.
+        const xAt = (dataIndex: number) =>
+          isGap(data[dataIndex])
+            ? null
+            : (pixelOf(datumValue(data[dataIndex], dataIndex))?.[0] ?? null);
+        const nearby = indexesNearX(data.length, cursor[0], xAt);
+        if (!nearby) return [];
+        const points: (PixelPoint | null)[] = [];
+        for (let dataIndex = nearby[0]; dataIndex <= nearby[1]; dataIndex++) {
+          const datum = data[dataIndex];
+          points.push(isGap(datum) ? null : pixelOf(datumValue(datum, dataIndex)));
+        }
+        return [{ seriesIndex, offset: nearby[0], points }];
+      });
+    };
+
+    // The series lookup only refines the menu; a failure must not cost the user the menu itself.
+    const lineSeriesHit = (pixelPoint: PixelPoint, option: ChartOptionLike) => {
+      try {
+        return lineSeriesAtPoint(pixelPoint, linePixels(pixelPoint, option));
+      } catch {
+        return null;
       }
     };
 
@@ -383,7 +559,8 @@ export default defineComponent({
     const handleNativeContextMenu = async (event: MouseEvent) => {
       // Get chart type from the first series
       await nextTick();
-      const chartType = chart?.getOption()?.series?.[0]?.type;
+      const option = chart?.getOption();
+      const chartType = option?.series?.[0]?.type;
 
       if (!chartType || !CONTEXT_MENU_SERIES_TYPES.includes(chartType)) {
         return;
@@ -411,10 +588,20 @@ export default defineComponent({
 
           // Emit domcontextmenu event for alert creation
           if (yAxisValue !== null && yAxisValue !== undefined && !isNaN(Number(yAxisValue))) {
+            // A click just off a straight line still names it; a click on any stroke arrives as a line-stroke event.
+            const hit = props.findLineOnContextMenu
+              ? lineSeriesHit(pixelPoint as PixelPoint, option ?? {})
+              : null;
+            // A trellis subplot past the first has its own axis, so a named line is read on it.
+            const ownPoint = hit
+              ? chart.convertFromPixel({ seriesIndex: hit.seriesIndex }, pixelPoint)
+              : null;
+            const ownValue = Array.isArray(ownPoint) ? Number(ownPoint[1]) : NaN;
             emit("domcontextmenu", {
               x: event.clientX,
               y: event.clientY,
-              value: Number(yAxisValue),
+              value: Number.isFinite(ownValue) ? ownValue : Number(yAxisValue),
+              ...(hit ?? {}),
             });
           }
         }
@@ -425,10 +612,12 @@ export default defineComponent({
 
     const chartInitialSetUp = () => {
       chart?.on("mousemove", (params: any) => {
+        if (isLineStrokeEvent(params)) return;
         emit("mousemove", params);
         mouseHoverEffectFn(params);
       });
       chart?.on("mouseout", (params: any) => {
+        if (isLineStrokeEvent(params)) return;
         emit("mouseout", params);
         mouseOutEffectFn();
       });
@@ -488,10 +677,12 @@ export default defineComponent({
         }
       });
       chart?.on("click", function (params: any) {
+        if (isLineStrokeEvent(params)) return;
         emit("click", params);
       });
 
       chart?.on("mouseover", function (params: any) {
+        if (isLineStrokeEvent(params)) return;
         emit("mouseover", params);
       });
 
@@ -604,7 +795,7 @@ export default defineComponent({
           // Use notMerge flag from data prop if available, otherwise default to true
           const notMerge = props.data?.notMerge !== undefined ? props.data.notMerge : true;
           const lazyUpdate = props.data?.lazyUpdate !== undefined ? props.data.lazyUpdate : true;
-          chart?.setOption(withChartFont(options), { lazyUpdate, notMerge });
+          chart?.setOption(chartOptions(options), { lazyUpdate, notMerge });
           chart?.setOption({ animation: true }, { lazyUpdate: true });
         } catch (e: any) {
           emit("error", {
@@ -640,7 +831,7 @@ export default defineComponent({
           chart = echarts.init(chartRef.value, theme, {
             renderer: props.renderType,
           });
-          chart?.setOption(withChartFont(props?.data?.options || {}), {
+          chart?.setOption(chartOptions(props?.data?.options || {}), {
             lazyUpdate: true,
             notMerge: true,
           });
@@ -699,7 +890,7 @@ export default defineComponent({
           }
           observeContainerResize();
         }
-        chart?.setOption(withChartFont(props?.data?.options || {}), {
+        chart?.setOption(chartOptions(props?.data?.options || {}), {
           lazyUpdate: true,
           notMerge: true,
         });
@@ -789,7 +980,7 @@ export default defineComponent({
             renderer: props.renderType,
           });
         }
-        chart?.setOption(withChartFont(props?.data?.options || {}), {
+        chart?.setOption(chartOptions(props?.data?.options || {}), {
           lazyUpdate: true,
           notMerge: true,
         });
@@ -816,6 +1007,20 @@ export default defineComponent({
     });
 
     watch(
+      () => props.findLineOnContextMenu,
+      (on) => {
+        try {
+          // Merge only the switch, so zoom and other interactive state survive the flip.
+          chart?.setOption(lineStrokeEventsPatch(chart.getOption()?.series, on), {
+            lazyUpdate: true,
+          });
+        } catch (error) {
+          console.error("Error during setOption", error);
+        }
+      },
+    );
+
+    watch(
       () => props.height,
       async () => {
         try {
@@ -835,7 +1040,7 @@ export default defineComponent({
           await nextTick();
           chart?.resize();
           try {
-            chart?.setOption(withChartFont(props?.data?.options || {}), {
+            chart?.setOption(chartOptions(props?.data?.options || {}), {
               lazyUpdate: true,
               notMerge: true,
             });
@@ -864,6 +1069,7 @@ export default defineComponent({
     );
     return {
       chartRef,
+      chartId,
       hoveredSeriesState,
       handleNativeContextMenu,
       get chart() {

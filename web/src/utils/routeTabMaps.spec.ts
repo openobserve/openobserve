@@ -461,8 +461,8 @@ describe("ROUTE_TAB_MAPS", () => {
       expect(Object.keys(ROUTE_TAB_MAPS.others)).toHaveLength(4);
     });
 
-    it("recommended has 10 entries", () => {
-      expect(Object.keys(ROUTE_TAB_MAPS.recommended)).toHaveLength(10);
+    it("recommended has 11 entries", () => {
+      expect(Object.keys(ROUTE_TAB_MAPS.recommended)).toHaveLength(11);
     });
 
     it("security has 7 entries", () => {
@@ -481,8 +481,8 @@ describe("ROUTE_TAB_MAPS", () => {
       expect(Object.keys(ROUTE_TAB_MAPS.ingestLogs)).toHaveLength(12);
     });
 
-    it("billings has 5 entries", () => {
-      expect(Object.keys(ROUTE_TAB_MAPS.billings)).toHaveLength(5);
+    it("billings has 4 entries", () => {
+      expect(Object.keys(ROUTE_TAB_MAPS.billings)).toHaveLength(4);
     });
 
     it("iam has 9 entries", () => {

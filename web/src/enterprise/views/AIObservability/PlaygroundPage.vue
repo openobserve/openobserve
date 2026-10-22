@@ -43,8 +43,10 @@
         >
           <!-- min-w-0 is what lets truncate win against the item's own w-full. -->
           <span class="flex min-w-0 flex-1 flex-col">
-            <span class="truncate">{{ raw(entry.summary) }}</span>
-            <span class="text-text-secondary text-2xs truncate">{{ raw(draftMeta(entry)) }}</span>
+            <OTruncatedText>{{ raw(entry.summary) }}</OTruncatedText>
+            <OTruncatedText class="text-text-secondary text-2xs">{{
+              raw(draftMeta(entry))
+            }}</OTruncatedText>
           </span>
         </ODropdownItem>
       </ODropdown>
@@ -370,6 +372,7 @@ import { takePromptPlaygroundHandoff } from "@/views/AIObservability/promptPlayg
 import { aiExperimentCreateRoute } from "./experimentRoutes";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { useHorizontalOverflow } from "@/composables/useHorizontalOverflow";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 defineOptions({ name: "AIPlaygroundPage" });
 
@@ -1376,8 +1379,7 @@ function draftContext(current: PlaygroundDraft): string {
     messages.find((message) => message.role === "user" && message.content.trim()) ??
     messages.find((message) => message.content.trim());
   if (!prompt) return "";
-  const text = prompt.content.replace(/\s+/g, " ").trim();
-  return text.length > 40 ? `${text.slice(0, 40)}\u2026` : text;
+  return prompt.content.replace(/\s+/g, " ").trim();
 }
 
 // ── the live session (this browser only) ──────────────────────────

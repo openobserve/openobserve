@@ -157,9 +157,9 @@
             class="flex min-w-0 items-center gap-2"
             :data-test="`ai-experiment-row-${experiment.id}`"
           >
-            <span class="text-text-heading min-w-0 truncate font-medium">{{
+            <OTruncatedText class="text-text-heading font-medium">{{
               experiment.name
-            }}</span>
+            }}</OTruncatedText>
             <OTag v-if="isBaseline(experiment)" size="sm" variant="blue-soft">
               {{ t("aiObservability.experiments.baseline") }}
             </OTag>
@@ -190,9 +190,9 @@
               >
                 {{ statusVariant(row.status, "eval").label }}
               </OTag>
-              <span v-if="visibleStatusReason(row)" class="text-text-secondary truncate text-xs">
+              <OTruncatedText v-if="visibleStatusReason(row)" class="text-text-secondary text-xs">
                 {{ raw(visibleStatusReason(row)) }}
-              </span>
+              </OTruncatedText>
             </template>
           </div>
         </template>
@@ -248,6 +248,7 @@
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
+                  :aria-label="t('common.moreActions')"
                   icon-left="more-vert"
                   variant="ghost"
                   size="icon-xs-sq"
@@ -321,6 +322,7 @@ import {
   aiExperimentDetailRoute,
 } from "@/enterprise/views/AIObservability/experimentRoutes";
 import { canCloneInForm } from "./ExperimentForm.schema";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 const props = withDefaults(
   defineProps<{

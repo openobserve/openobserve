@@ -313,6 +313,15 @@ describe("resolveTokens", () => {
     expect(dark.has("--color-ink")).toBe(false);
   });
 
+  it("keeps a baseline selector listed alongside a [data-*] scope", () => {
+    const { light, dark } = resolveTokens([
+      ':root,\n[data-banner-theme="light"] { --color-ink: #111111; }',
+      ".dark { --color-ink: #eeeeee; }",
+    ]);
+    expect(light.get("--color-ink")).toBe("#111111");
+    expect(dark.get("--color-ink")).toBe("#eeeeee");
+  });
+
   it("leaves a dark-scoped [data-*] variant block out of the dark theme", () => {
     const { dark } = resolveTokens([
       ".dark { --x: red; }",
@@ -380,8 +389,8 @@ describe("the real token sheets", () => {
   });
 
   describe.each([
-    ["light", 1037, 1025],
-    ["dark", 1038, 1026],
+    ["light", 1066, 1054],
+    ["dark", 1067, 1055],
   ] as const)("%s theme", (theme, total, resolved) => {
     const scope = THEMES[theme];
     const names = colorTokens(scope);

@@ -21,7 +21,10 @@
 use std::collections::HashMap;
 
 use config::{
-    meta::gen_ai::GenAiAgentMappingConfig,
+    meta::{
+        gen_ai::GenAiAgentMappingConfig,
+        model_pricing::{ModelPricingDefinition, PricingContext},
+    },
     utils::{json, time::parse_timestamp_micro_from_value},
 };
 use db::model_pricing::CachedModelPricing;
@@ -119,6 +122,7 @@ impl OtelIngestionProcessor {
     /// it is used to select the most-recently-applicable pricing definition via `valid_from`
     /// and the time-of-day tier via `utc_windows`. Zero means unknown: no time restriction.
     /// In production always call `get_org_pricing_entries` to populate this slice.
+    #[cfg(test)]
     pub fn process_span_with_pricing(
         &self,
         span_attributes: &mut HashMap<String, json::Value>,
@@ -164,8 +168,13 @@ impl OtelIngestionProcessor {
             .retain(|key, _| !self.input_output_extractor.is_input_output_attribute(key));
 
         // Phase 2: Compute derived values — token counts, cost estimates, defaults.
-        let (usage, cost) =
-            self.compute_usage_and_cost(&extracted, org_pricing_entries, span_start_nanos);
+        let (usage, cost) = self.compute_usage_and_cost(
+            &extracted,
+            span_attributes,
+            resource_attributes,
+            org_pricing_entries,
+            span_start_nanos,
+        );
 
         // Phase 3: Write enriched attributes back to the span.
         self.emit_enriched_attributes(span_attributes, &extracted, &usage, &cost);
@@ -255,6 +264,8 @@ impl OtelIngestionProcessor {
     fn compute_usage_and_cost(
         &self,
         extracted: &SpanExtractions,
+        span_attributes: &HashMap<String, json::Value>,
+        resource_attributes: &HashMap<String, json::Value>,
         org_pricing_entries: &[CachedModelPricing],
         span_start_nanos: u64,
     ) -> (HashMap<String, i64>, HashMap<String, f64>) {
@@ -267,13 +278,6 @@ impl OtelIngestionProcessor {
             // than as 1970-01-01, which would land every such span in a time-of-day tier.
             let span_ts_micros = (span_start_nanos != 0)
                 .then(|| i64::try_from(span_start_nanos / 1_000).unwrap_or(i64::MAX));
-            let matched_pricing = extracted.model_name.as_ref().and_then(|mn| {
-                crate::db::model_pricing::find_pricing_sync_at(
-                    org_pricing_entries,
-                    mn,
-                    span_ts_micros,
-                )
-            });
             let tokenizer_key: &str = extracted.model_name.as_deref().unwrap_or("");
 
             if let Some(v) = &extracted.input
@@ -301,35 +305,47 @@ impl OtelIngestionProcessor {
 
             let (billable_usage, tier_usage) = build_pricing_usage(&usage, input_includes_cache);
 
-            if cost.is_empty() {
-                if let Some(pricing_def) = matched_pricing {
-                    let result =
-                        crate::db::model_pricing::calculate_cost_from_definition_with_tier_usage(
+            // Resolve only for spans without a client-reported cost; the lookup runs regexes.
+            if cost.is_empty()
+                && let Some(resolved) = extracted.model_name.as_ref().and_then(|mn| {
+                    pricing::resolve_pricing(org_pricing_entries, mn, span_ts_micros)
+                })
+            {
+                match resolved.pricing {
+                    pricing::ResolvedPricing::Definition(pricing_def) => {
+                        let ctx = pricing_context(
                             &pricing_def,
-                            &billable_usage,
-                            &tier_usage,
-                            span_ts_micros,
+                            span_attributes,
+                            resource_attributes,
+                            &extracted.model_params,
                         );
-                    if !result.cost.is_empty() {
-                        log::debug!(
-                            "[model_pricing] model='{}' pattern='{}' tier='{}' total_cost={:.8}",
-                            extracted.model_name.as_deref().unwrap_or(""),
-                            pricing_def.match_pattern,
-                            result.tier_name,
-                            result.cost.get("total").copied().unwrap_or(0.0),
-                        );
-                        cost = result.cost;
-                        add_cache_derived_costs(&mut cost, &tier_usage, &result.prices);
+                        let result =
+                            crate::db::model_pricing::calculate_cost_from_definition_with_tier_usage(
+                                &pricing_def,
+                                &billable_usage,
+                                &tier_usage,
+                                span_ts_micros,
+                                &ctx,
+                            );
+                        if !result.cost.is_empty() {
+                            log::debug!(
+                                "[model_pricing] model='{}' pattern='{}' match={:?} tier='{}' total_cost={:.8}",
+                                extracted.model_name.as_deref().unwrap_or(""),
+                                pricing_def.match_pattern,
+                                resolved.match_kind,
+                                result.tier_name,
+                                result.cost.get("total").copied().unwrap_or(0.0),
+                            );
+                            cost = result.cost;
+                            add_cache_derived_costs(&mut cost, &tier_usage, &result.prices);
+                        }
                     }
-                } else if let Some(ref model_name) = extracted.model_name {
-                    let input_tokens = billable_usage.get("input").cloned().unwrap_or_default();
-                    let output_tokens = billable_usage.get("output").cloned().unwrap_or_default();
-                    if let Some((input_cost, output_cost, total_cost)) = pricing::calculate_cost(
-                        model_name,
-                        input_tokens,
-                        output_tokens,
-                        span_ts_micros,
-                    ) {
+                    pricing::ResolvedPricing::Compiled(model_pricing) => {
+                        let input_tokens = billable_usage.get("input").cloned().unwrap_or_default();
+                        let output_tokens =
+                            billable_usage.get("output").cloned().unwrap_or_default();
+                        let (input_cost, output_cost, total_cost) =
+                            model_pricing.cost(input_tokens, output_tokens, span_ts_micros);
                         cost.insert("input".to_string(), input_cost);
                         cost.insert("output".to_string(), output_cost);
                         cost.insert("total".to_string(), total_cost);
@@ -683,6 +699,54 @@ impl OtelIngestionProcessor {
             span_start_nanos,
         );
     }
+}
+
+/// Context of the attributes rules read: raw, `resource.` resource, `param.` model parameters.
+pub fn pricing_context(
+    definition: &ModelPricingDefinition,
+    span_attributes: &HashMap<String, json::Value>,
+    resource_attributes: &HashMap<String, json::Value>,
+    model_params: &HashMap<String, String>,
+) -> PricingContext {
+    let mut ctx = PricingContext::known();
+    let keys = definition.rule_attribute_keys();
+    if !keys.is_empty() {
+        ctx.extend_json("", span_attributes, Some(&keys));
+        ctx.extend_json_mapped(
+            "resource.",
+            resource_attributes,
+            Some(&keys),
+            original_resource_key,
+        );
+        ctx.extend_strings("param.", model_params, Some(&keys));
+    }
+    ctx
+}
+
+/// Test-endpoint context; with no scope it lacks Vercel AI SDK-only `param.*` keys.
+pub fn pricing_context_for_test_endpoint(
+    definition: &ModelPricingDefinition,
+    attributes: &HashMap<String, json::Value>,
+) -> PricingContext {
+    let model_params = ParametersExtractor.extract(attributes, "");
+    pricing_context(definition, attributes, &HashMap::new(), &model_params)
+}
+
+// Inverts `traces::resource_attribute_key`, which stores raw `name` and `attr_name` alike.
+fn original_resource_key(key: &str) -> &str {
+    let Some(raw) = key.strip_prefix("service_") else {
+        return key;
+    };
+    match raw.strip_prefix("attr_") {
+        Some(inner) if is_reserved_resource_key(inner) => inner,
+        _ => raw,
+    }
+}
+
+fn is_reserved_resource_key(raw: &str) -> bool {
+    let stored = format!("{}_{raw}", crate::traces::SERVICE);
+    crate::traces::RESERVED_SPAN_FIELDS
+        .contains(&config::utils::flatten::format_label_name_cow(&stored).as_ref())
 }
 
 fn build_pricing_usage(
@@ -1593,6 +1657,8 @@ mod tests {
                         ("output".to_string(), 0.00002),
                     ]),
                     utc_windows: Vec::new(),
+                    rules: Vec::new(),
+                    priority: 0,
                 }],
                 ..Default::default()
             },
@@ -1667,6 +1733,8 @@ mod tests {
                         ("cache_creation_input_tokens".to_string(), 0.0000005),
                     ]),
                     utc_windows: Vec::new(),
+                    rules: Vec::new(),
+                    priority: 0,
                 }],
                 ..Default::default()
             },
@@ -1779,6 +1847,8 @@ mod tests {
                         ("cache_read_input_tokens".to_string(), 0.0000001),
                     ]),
                     utc_windows: Vec::new(),
+                    rules: Vec::new(),
+                    priority: 0,
                 }],
                 ..Default::default()
             },
@@ -1856,6 +1926,8 @@ mod tests {
                         ),
                     ]),
                     utc_windows: Vec::new(),
+                    rules: Vec::new(),
+                    priority: 0,
                 }],
                 ..Default::default()
             },
@@ -1951,6 +2023,8 @@ mod tests {
                         ("output".to_string(), 0.000002), // $2/1M
                     ]),
                     utc_windows: Vec::new(),
+                    rules: Vec::new(),
+                    priority: 0,
                 }],
                 ..Default::default()
             },
@@ -1980,5 +2054,142 @@ mod tests {
         assert!((input_cost - 1.0).abs() < 1e-10);
         // 1M * $0.000002 = $2.00 (not $10.00 from built-in)
         assert!((output_cost - 2.0).abs() < 1e-10);
+    }
+
+    /// Input cost of a 1000-token "svc-tier-model" span under a Standard/Flex/EU definition.
+    fn service_tier_input_cost(
+        extra_attrs: &[(&str, &str)],
+        resource_attrs: &[(&str, &str)],
+    ) -> f64 {
+        use config::meta::model_pricing::{PricingTierDefinition, RuleOp, TierRule};
+
+        let processor = OtelIngestionProcessor::new();
+        let mut span_attrs = HashMap::new();
+        span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        span_attrs.insert(
+            "gen_ai.request.model".to_string(),
+            json::json!("svc-tier-model"),
+        );
+        span_attrs.insert("gen_ai.usage.input_tokens".to_string(), json::json!(1000));
+        span_attrs.insert("gen_ai.usage.output_tokens".to_string(), json::json!(0));
+        for (k, v) in extra_attrs {
+            span_attrs.insert(k.to_string(), json::json!(v));
+        }
+        let resource_attrs: HashMap<String, json::Value> = resource_attrs
+            .iter()
+            .map(|(k, v)| (k.to_string(), json::json!(v)))
+            .collect();
+
+        let tier =
+            |name: &str, per_token: f64, keys: &[&str], values: &[&str]| PricingTierDefinition {
+                name: name.to_string(),
+                prices: HashMap::from([("input".to_string(), per_token)]),
+                rules: if keys.is_empty() {
+                    Vec::new()
+                } else {
+                    vec![TierRule::new(keys, RuleOp::In, values, None)]
+                },
+                ..Default::default()
+            };
+        let service_tier_keys = [
+            "openai.response.service_tier",
+            "openai.request.service_tier",
+            "param.service_tier",
+        ];
+        let pricing_entries = vec![CachedModelPricing {
+            definition: ModelPricingDefinition {
+                name: "Svc Tier Model".to_string(),
+                match_pattern: "(?i)^svc-tier-model".to_string(),
+                enabled: true,
+                tiers: vec![
+                    tier("Standard", 0.000002, &[], &[]),
+                    tier("Flex", 0.000001, &service_tier_keys, &["flex"]),
+                    tier("EU", 0.000003, &["resource.cloud.region"], &["eu-west-1"]),
+                ],
+                ..Default::default()
+            },
+            compiled_regex: regex::Regex::new("(?i)^svc-tier-model").unwrap(),
+        }];
+
+        processor.process_span_with_pricing(
+            &mut span_attrs,
+            &resource_attrs,
+            None,
+            &[],
+            &pricing_entries,
+            0,
+        );
+        span_attrs
+            .get(GenAiExtensions::USAGE_COST_INPUT)
+            .and_then(|v| v.as_f64())
+            .unwrap()
+    }
+
+    #[test]
+    fn test_original_resource_key_inverts_ingestion_keys() {
+        for raw in [
+            "cloud.region",
+            "attr_x",
+            "attr_cloud.region",
+            "name",
+            "Name",
+        ] {
+            let stored = crate::traces::resource_attribute_key(raw.to_string());
+            assert_eq!(original_resource_key(&stored), raw, "stored as {stored}");
+        }
+        assert_eq!(original_resource_key("service.name"), "service.name");
+        assert_eq!(original_resource_key("service_attr_name"), "name");
+    }
+
+    #[test]
+    fn test_pricing_context_reads_resource_attr_prefixed_key() {
+        use config::meta::model_pricing::{PricingTierDefinition, RuleOp, TierRule};
+        let definition = ModelPricingDefinition {
+            tiers: vec![PricingTierDefinition {
+                rules: vec![TierRule::new(
+                    &["resource.attr_x"],
+                    RuleOp::In,
+                    &["v"],
+                    None,
+                )],
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let resource = HashMap::from([("service_attr_x".to_string(), json::json!("v"))]);
+        let ctx = pricing_context(&definition, &HashMap::new(), &resource, &HashMap::new());
+        assert_eq!(ctx.get("resource.attr_x"), Some("v"));
+        assert_eq!(ctx.get("resource.x"), None);
+    }
+
+    #[test]
+    fn test_process_span_attribute_rule_pricing() {
+        let close = |a: f64, b: f64| (a - b).abs() < 1e-12;
+        assert!(close(service_tier_input_cost(&[], &[]), 0.002));
+        assert!(close(
+            service_tier_input_cost(&[("openai.request.service_tier", "flex")], &[]),
+            0.001
+        ));
+        // gen_ai.request.* attributes also reach rules as extracted `param.*` entries.
+        assert!(close(
+            service_tier_input_cost(&[("gen_ai.request.service_tier", "flex")], &[]),
+            0.001
+        ));
+        // The response tier is listed first in the rule keys, so it overrides the request.
+        assert!(close(
+            service_tier_input_cost(
+                &[
+                    ("openai.request.service_tier", "flex"),
+                    ("openai.response.service_tier", "default"),
+                ],
+                &[]
+            ),
+            0.002
+        ));
+        // Ingestion keys resource attributes `service_<key>`; rules read `resource.<key>`.
+        assert!(close(
+            service_tier_input_cost(&[], &[("service_cloud.region", "eu-west-1")]),
+            0.003
+        ));
     }
 }

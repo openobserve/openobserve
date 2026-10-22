@@ -30,6 +30,8 @@ pub const M_REQUEST_TOTAL: &str = "traces_service_graph_request_total";
 pub const M_REQUEST_FAILED_TOTAL: &str = "traces_service_graph_request_failed_total";
 pub const M_CLIENT_SECONDS: &str = "traces_service_graph_request_client_seconds";
 pub const M_SERVER_SECONDS: &str = "traces_service_graph_request_server_seconds";
+/// Node-labelled, so it cannot share `M_REQUEST_FAILED_TOTAL`, whose rows the read sums as edges.
+pub const M_SERVER_FAILED_TOTAL: &str = "traces_service_graph_request_server_failed_total";
 pub const M_UNRESOLVED_TOTAL: &str = "traces_service_graph_unresolved_total";
 pub const M_AGENT_INSTANCES: &str = "traces_service_graph_agent_instances";
 pub const LABEL_TRACE_STREAM: &str = "trace_stream";
@@ -200,7 +202,16 @@ fn render_sample(stream: &str, sample: &Sample, out: &mut Vec<Value>) {
                 histogram(M_CLIENT_SECONDS, ts, c, &labels, out);
             }
         }
-        SeriesKey::Node { .. } => histogram(M_SERVER_SECONDS, ts, c, &labels, out),
+        SeriesKey::Node { .. } => {
+            histogram(M_SERVER_SECONDS, ts, c, &labels, out);
+            out.push(record(
+                M_SERVER_FAILED_TOTAL,
+                "counter",
+                ts,
+                c.errors as f64,
+                &labels,
+            ));
+        }
         SeriesKey::Unresolved { .. } => out.push(record(
             M_UNRESOLVED_TOTAL,
             "counter",
@@ -372,11 +383,19 @@ mod tests {
         assert_eq!(named(&records, M_REQUEST_TOTAL)[0]["client_type"], "user");
 
         let records = render("t", &batch(SeriesKey::node("svc")));
-        assert_eq!(records.len(), 21);
+        assert_eq!(records.len(), 22);
         let buckets = named(&records, &format!("{M_SERVER_SECONDS}_bucket"));
         assert_eq!(buckets.len(), 18);
         assert_eq!(buckets[0]["server"], "svc");
         assert!(buckets[0].get("client").is_none());
+        let failed = named(&records, M_SERVER_FAILED_TOTAL);
+        assert_eq!(failed.len(), 1);
+        assert_eq!(failed[0]["__type__"], "counter");
+        assert_eq!(failed[0]["value"], 2.0);
+        assert_eq!(failed[0]["server"], "svc");
+        assert_eq!(failed[0]["trace_stream"], "t");
+        assert!(failed[0].get("client").is_none());
+        assert!(named(&records, M_REQUEST_FAILED_TOTAL).is_empty());
 
         let records = render("t", &batch(SeriesKey::unresolved("svc", "ip_only")));
         assert_eq!(records.len(), 2);

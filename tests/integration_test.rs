@@ -60,7 +60,9 @@ mod tests {
     use infra::schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST};
     use ingestion_common::IngestionResponse;
     use openobserve::migration;
-    use openobserve_api_grpc::handler::grpc::{auth::check_auth, flight::FlightServiceImpl};
+    use openobserve_api_grpc::handler::grpc::{
+        auth::check_internal_auth, flight::FlightServiceImpl,
+    };
     use openobserve_api_http::handler::http::router::{
         basic_routes, config_routes, service_routes,
     };
@@ -79,8 +81,174 @@ mod tests {
     use transform::enrichment::ENRICHMENT_TABLES;
 
     static START: Once = Once::new();
+    // A sub-test that calls `setup()` after `tear_down` fails fast instead of using deleted state.
+    static TORN_DOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+    /// The e2e's own data dir, ports, config file and Postgres database, removed by `tear_down`.
+    struct Sandbox {
+        dir: tempfile::TempDir,
+        postgres: Option<OwnDatabase>,
+    }
+
+    impl Sandbox {
+        /// Runs before the first `get_config`, which reads the env this sets exactly once.
+        async fn create() -> Self {
+            let dir = tempfile::Builder::new()
+                .prefix("o2-e2e-")
+                .tempdir()
+                .expect("e2e temp dir");
+            let config_file = dir.path().join("e2e.env");
+            fs::write(&config_file, "").expect("e2e config file");
+            config::config_path_manager::set_config_file_path(config_file)
+                .expect("e2e config file path");
+            // The enterprise config also loads a `.env` from the working directory.
+            env::set_current_dir(dir.path()).expect("enter the e2e temp dir");
+            let postgres = OwnDatabase::create().await;
+            let [grpc_port, http_port] = free_ports();
+            unsafe {
+                env::set_var("ZO_DATA_DIR", format!("{}/data/", dir.path().display()));
+                for derived in [
+                    "ZO_DATA_WAL_DIR",
+                    "ZO_DATA_STREAM_DIR",
+                    "ZO_DATA_DB_DIR",
+                    "ZO_DATA_CACHE_DIR",
+                    "ZO_DATA_TMP_DIR",
+                ] {
+                    env::remove_var(derived);
+                }
+                env::set_var("ZO_GRPC_ADDR", "127.0.0.1");
+                env::set_var("ZO_GRPC_PORT", grpc_port.to_string());
+                env::set_var("ZO_HTTP_ADDR", "127.0.0.1");
+                env::set_var("ZO_HTTP_PORT", http_port.to_string());
+            }
+            Self { dir, postgres }
+        }
+
+        /// Panics unless the config that every pool connects from names this database.
+        fn assert_config_uses_it(&self) {
+            let Some(postgres) = &self.postgres else {
+                return;
+            };
+            let cfg = get_config();
+            let dsn = url::Url::parse(&cfg.common.meta_postgres_dsn).expect("e2e DSN is a URL");
+            assert_eq!(dsn.path(), format!("/{}", postgres.name));
+            assert!(cfg.common.meta_postgres_ro_dsn.is_empty());
+            assert!(cfg.common.meta_ddl_dsn.is_empty());
+        }
+
+        async fn tear_down(self) {
+            log::info!("Tear Down Invoked");
+            TORN_DOWN.store(true, std::sync::atomic::Ordering::SeqCst);
+            let data = self.dir.path().join("data");
+            // The WAL push job can still be moving the last ingests' files while the dir goes.
+            let mut result = fs::remove_dir_all(&data);
+            for _ in 0..20 {
+                if result.is_ok() {
+                    break;
+                }
+                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                result = fs::remove_dir_all(&data);
+            }
+            result.expect("Delete local dir failed");
+            if let Some(postgres) = self.postgres {
+                postgres.drop_database().await;
+            }
+        }
+    }
+
+    /// A database made from the CI DSN, so the e2e never writes into the one the unit tests share.
+    struct OwnDatabase {
+        admin_dsn: String,
+        name: String,
+        dropped: bool,
+    }
+
+    impl OwnDatabase {
+        async fn create() -> Option<Self> {
+            use sqlx::Connection;
+
+            if env::var("ZO_META_STORE").ok()?.as_str() != "postgres" {
+                return None;
+            }
+            let admin_dsn = env::var("ZO_META_POSTGRES_DSN")
+                .ok()
+                .filter(|dsn| !dsn.is_empty())
+                .expect("the Postgres e2e makes its own database from ZO_META_POSTGRES_DSN");
+            let name = format!(
+                "o2_e2e_{}_{}",
+                std::process::id(),
+                Utc::now().timestamp_micros()
+            );
+            let mut conn = sqlx::PgConnection::connect(&admin_dsn)
+                .await
+                .expect("connect to the CI Postgres");
+            sqlx::query(&format!("CREATE DATABASE {name}"))
+                .execute(&mut conn)
+                .await
+                .expect("create the e2e database");
+            let mut dsn = url::Url::parse(&admin_dsn).expect("ZO_META_POSTGRES_DSN is a URL");
+            dsn.set_path(&format!("/{name}"));
+            unsafe {
+                env::set_var("ZO_META_POSTGRES_DSN", dsn.as_str());
+                env::remove_var("ZO_META_POSTGRES_RO_DSN");
+                env::remove_var("ZO_META_DDL_DSN");
+            }
+            Some(Self {
+                admin_dsn,
+                name,
+                dropped: false,
+            })
+        }
+
+        async fn drop_database(mut self) {
+            Self::drop_named(&self.admin_dsn, &self.name)
+                .await
+                .expect("drop the e2e database");
+            self.dropped = true;
+        }
+
+        async fn drop_named(admin_dsn: &str, name: &str) -> Result<(), sqlx::Error> {
+            use sqlx::Connection;
+
+            let mut conn = sqlx::PgConnection::connect(admin_dsn).await?;
+            // FORCE ends the pools this process still holds on the database.
+            sqlx::query(&format!("DROP DATABASE IF EXISTS {name} WITH (FORCE)"))
+                .execute(&mut conn)
+                .await?;
+            Ok(())
+        }
+    }
+
+    impl Drop for OwnDatabase {
+        /// Also runs on unwind; on a new thread because no runtime starts inside the test's.
+        fn drop(&mut self) {
+            if self.dropped {
+                return;
+            }
+            let (admin_dsn, name) = (self.admin_dsn.clone(), self.name.clone());
+            let dropped = std::thread::spawn(move || {
+                tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .map_err(|e| e.to_string())?
+                    .block_on(Self::drop_named(&admin_dsn, &name))
+                    .map_err(|e| e.to_string())
+            })
+            .join();
+            if !matches!(dropped, Ok(Ok(()))) {
+                eprintln!(
+                    "the e2e database {} was not dropped: {dropped:?}",
+                    self.name
+                );
+            }
+        }
+    }
 
     fn setup() -> (&'static str, &'static str) {
+        assert!(
+            !TORN_DOWN.load(std::sync::atomic::Ordering::SeqCst),
+            "a sub-test ran after tear_down removed the e2e's data dir and database"
+        );
         START.call_once(|| unsafe {
             env::set_var("ZO_ROOT_USER_EMAIL", "root@example.com");
             env::set_var("ZO_ROOT_USER_PASSWORD", "Complexpass#123");
@@ -93,6 +261,8 @@ mod tests {
             env::set_var("ZO_PRINT_KEY_SQL", "true");
             env::set_var("ZO_SMTP_ENABLED", "true");
             env::set_var("ZO_CREATE_ORG_THROUGH_INGESTION", "true");
+            env::set_var("ZO_SKIP_SSRF_CHECKS", "true");
+            env::set_var("O2_ORG_DELETION_GRACE_PERIOD_DAYS", "0");
 
             env_logger::init_from_env(
                 env_logger::Env::new().default_filter_or(&get_config().log.level),
@@ -185,7 +355,7 @@ mod tests {
 
         log::info!("starting gRPC server at {}", gaddr);
         tonic::transport::Server::builder()
-            .layer(tonic::service::InterceptorLayer::new(check_auth))
+            .layer(tonic::service::InterceptorLayer::new(check_internal_auth))
             .add_service(search_svc)
             .add_service(flight_svc)
             .serve(gaddr)
@@ -194,9 +364,11 @@ mod tests {
         Ok(())
     }
 
-    async fn e2e_100_tear_down() {
-        log::info!("Tear Down Invoked");
-        fs::remove_dir_all("./data").expect("Delete local dir failed");
+    /// Ports free now; both listeners stay open until both are picked, so they differ.
+    fn free_ports() -> [u16; 2] {
+        let listeners = [(); 2]
+            .map(|_| std::net::TcpListener::bind("127.0.0.1:0").expect("bind an ephemeral port"));
+        listeners.map(|l| l.local_addr().expect("ephemeral port").port())
     }
 
     /// Helper function to flush memtable to ensure proper test isolation
@@ -287,13 +459,10 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-    #[ignore]
     async fn e2e_test() {
-        // make sure data dir is deleted before we run integration tests
-        fs::remove_dir_all("./data")
-            .unwrap_or_else(|e| log::info!("Error deleting local dir: {}", e));
-
+        let sandbox = Sandbox::create().await;
         setup();
+        sandbox.assert_config_uses_it();
 
         // start gRPC server
         tokio::task::spawn(async move {
@@ -315,6 +484,18 @@ mod tests {
         // db migration steps, since it's separated out
         infra::table::migrate().await.unwrap();
         infra::init().await.unwrap();
+        #[cfg(feature = "enterprise")]
+        let master_key = Some(
+            o2_enterprise::enterprise::common::config::get_config()
+                .encryption
+                .master_key
+                .clone(),
+        );
+        #[cfg(not(feature = "enterprise"))]
+        let master_key: Option<String> = None;
+        infra::table::cipher::boot(master_key.as_deref())
+            .await
+            .unwrap();
         openobserve_core::bootstrap::init().await.unwrap();
         // ingester init
         ingester::init().await.unwrap();
@@ -468,18 +649,103 @@ mod tests {
         test_backfill_job_delete_by_pipeline().await;
         test_backfill_job_enable_disable().await;
 
+        // Own fn: inline spawns widen e2e_test's frame and overflow the debug stack.
+        e2e_org_deletion().await;
+
         // others
         e2e_health_check().await;
         e2e_config().await;
-        e2e_100_tear_down().await;
 
         // clear
         e2e_delete_stream().await;
+        sandbox.tear_down().await;
+    }
+
+    async fn e2e_org_deletion() {
+        // org deletion: each runs in its own task so one red test does not hide the others
+        let mut failed = Vec::new();
+        if tokio::spawn(e2e_meta_prefix_reads_are_org_exact())
+            .await
+            .is_err()
+        {
+            failed.push("e2e_meta_prefix_reads_are_org_exact");
+        }
+        if tokio::spawn(e2e_org_setting_writers_do_not_lose_updates())
+            .await
+            .is_err()
+        {
+            failed.push("e2e_org_setting_writers_do_not_lose_updates");
+        }
+        assert!(failed.is_empty(), "org deletion e2e failed: {failed:?}");
+    }
+
+    fn run_suffix() -> String {
+        (Utc::now().timestamp_micros() % 1_000_000_000).to_string()
+    }
+
+    async fn e2e_meta_prefix_reads_are_org_exact() {
+        setup();
+        let db = infra::db::get_db().await;
+        let suffix = run_suffix();
+        let orgs = ["a_b", "aXb", "a-b", "A_B"].map(|o| format!("{o}{suffix}"));
+        for org in &orgs {
+            db.put(
+                &format!("/organization/savedviews/{org}/v1"),
+                "{}".into(),
+                false,
+                None,
+            )
+            .await
+            .unwrap();
+        }
+        let target = format!("/organization/savedviews/{}/", orgs[0]);
+        let keys = db.list_keys(&target).await.unwrap();
+        assert_eq!(keys.len(), 1, "{keys:?}");
+        assert_eq!(db.count(&target).await.unwrap(), 1);
+        db.delete(&target, true, false, None).await.unwrap();
+        for org in &orgs[1..] {
+            let keys = db
+                .list_keys(&format!("/organization/savedviews/{org}/"))
+                .await
+                .unwrap();
+            assert_eq!(keys.len(), 1, "{org} lost its view: {keys:?}");
+        }
+    }
+
+    async fn e2e_org_setting_writers_do_not_lose_updates() {
+        setup();
+        let org = format!("orgsetw{}", run_suffix());
+        let writers: Vec<_> = (0..16)
+            .map(|i| {
+                let org = org.clone();
+                tokio::spawn(async move {
+                    db::organization::update_org_setting(&org, move |s| {
+                        s.cross_links.push(config::meta::stream::CrossLink {
+                            name: format!("link{i}"),
+                            url: "https://example.com".to_string(),
+                            fields: vec![],
+                        });
+                        true
+                    })
+                    .await
+                    .unwrap()
+                })
+            })
+            .collect();
+        for writer in writers {
+            assert!(writer.await.unwrap());
+        }
+        let stored = db::organization::get_org_setting(&org).await.unwrap();
+        assert_eq!(
+            stored.cross_links.len(),
+            16,
+            "concurrent settings writes were lost"
+        );
     }
 
     async fn e2e_1_post_bulk() {
         let auth = setup();
-        let path = "./tests/input.json";
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/input.json");
         let body_str = fs::read_to_string(path).expect("Read file failed");
         let app = init_test_router();
         let headers = auth_headers(auth);
@@ -1010,7 +1276,7 @@ mod tests {
         let auth = setup();
         let body_str = r#"{
                                 "email": "nonadmin@example.com",
-                                "new_password": "Newpass12!",
+                                "new_password": "Newpass12!Abcde",
                                 "change_password": true
                             }"#;
         let app = init_test_router();
@@ -1297,7 +1563,7 @@ mod tests {
 
     async fn e2e_post_trace() {
         let auth = setup();
-        let path = "./tests/trace_input.json";
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/trace_input.json");
         let body_str = fs::read_to_string(path).expect("Read file failed");
 
         // app
@@ -1353,19 +1619,39 @@ mod tests {
             value: f64::NAN,
             timestamp: Utc::now().timestamp_micros(),
         });
-        let loc_exemp: Vec<prometheus_rpc::Exemplar> = vec![];
+        let exemplar = |trace_id: &str| prometheus_rpc::Exemplar {
+            labels: vec![
+                prometheus_rpc::Label {
+                    name: "trace_id".to_string(),
+                    value: trace_id.to_string(),
+                },
+                prometheus_rpc::Label {
+                    name: "span_id".to_string(),
+                    value: "def".to_string(),
+                },
+            ],
+            value: 1.0,
+            timestamp: Utc::now().timestamp_millis(),
+        };
         let loc_hist: Vec<prometheus_rpc::Histogram> = vec![];
 
         let ts = prometheus_rpc::TimeSeries {
-            labels: loc_label,
+            labels: loc_label.clone(),
             samples: loc_samples,
-            exemplars: loc_exemp,
+            exemplars: vec![exemplar("with-sample")],
             histograms: loc_hist,
+        };
+        // Prometheus sends an exemplar as a series entry of its own, without the sample
+        let exemplar_only = prometheus_rpc::TimeSeries {
+            labels: loc_label,
+            samples: vec![],
+            exemplars: vec![exemplar("exemplar-only")],
+            histograms: vec![],
         };
 
         let metadata: Vec<prometheus_rpc::MetricMetadata> = vec![];
         let wr_req: prometheus_rpc::WriteRequest = prometheus_rpc::WriteRequest {
-            timeseries: vec![ts],
+            timeseries: vec![ts, exemplar_only],
             metadata,
         };
         let mut out = BytesMut::with_capacity(wr_req.encoded_len());
@@ -2277,13 +2563,8 @@ mod tests {
         let trigger = trigger.unwrap();
         assert!(trigger.next_run_at > now && trigger.retries == 0);
 
-        let res = db::alerts::alert::delete_by_name(
-            "e2e",
-            config::meta::stream::StreamType::Logs,
-            "olympics_schema",
-            "test_alert_wrong_sql",
-        )
-        .await;
+        let res =
+            db::alerts::alert::delete_by_id(infra::db::get_orm_client_rw().await, "e2e", id).await;
         assert!(res.is_ok());
     }
 

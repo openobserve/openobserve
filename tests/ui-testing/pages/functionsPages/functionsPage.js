@@ -384,6 +384,11 @@ class FunctionsPage {
     await expect(this.jsOption).not.toBeVisible();
   }
 
+  async expectJsRadioLocked() {
+    await expect(this.jsOption).toBeVisible();
+    await expect(this.jsOption.locator('[data-test="function-transform-type-js-lock"]')).toBeVisible();
+  }
+
   // ==================== Complex Workflows ====================
 
   /**

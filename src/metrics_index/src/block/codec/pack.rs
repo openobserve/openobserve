@@ -17,6 +17,8 @@
 
 use anyhow::{Context, Result, ensure};
 
+use crate::block::compact::{get_u64, take};
+
 const CHUNK: usize = 64;
 const SPARSE: u8 = 0x80;
 
@@ -113,18 +115,6 @@ pub(super) fn get_sparse(
         left -= chunk;
     }
     Ok(())
-}
-
-pub(super) fn take<'a>(body: &'a [u8], pos: &mut usize, len: usize) -> Result<&'a [u8]> {
-    let data = body
-        .get(*pos..pos.saturating_add(len))
-        .context("truncated sample block")?;
-    *pos += len;
-    Ok(data)
-}
-
-pub(super) fn get_u64(body: &[u8], pos: &mut usize) -> Result<u64> {
-    Ok(u64::from_le_bytes(take(body, pos, 8)?.try_into()?))
 }
 
 fn put_chunk(chunk: &[u64], out: &mut Vec<u8>) {

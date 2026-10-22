@@ -292,19 +292,20 @@ describe("convertPanelData", () => {
       };
       const emptyData = [];
 
-      await expect(
-        convertPanelData(
-          panelSchema,
-          emptyData,
-          mockStore,
-          mockChartPanelRef,
-          mockHoveredSeriesState,
-          mockResultMetaData,
-          mockMetadata,
-          mockChartPanelStyle,
-          mockAnnotations,
-        ),
-      ).rejects.toThrow("No data found");
+      const result = await convertPanelData(
+        panelSchema,
+        emptyData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations,
+      );
+
+      // No rows is an empty state, not an error; the renderer shows "No Data"
+      expect(result).toEqual({});
     });
 
     it("should handle custom chart type with invalid JavaScript result", async () => {
@@ -385,19 +386,20 @@ describe("convertPanelData", () => {
       };
       const emptyData = [];
 
-      await expect(
-        convertPanelData(
-          panelSchema,
-          emptyData,
-          mockStore,
-          mockChartPanelRef,
-          mockHoveredSeriesState,
-          mockResultMetaData,
-          mockMetadata,
-          mockChartPanelStyle,
-          mockAnnotations,
-        ),
-      ).rejects.toThrow("No data found");
+      const result = await convertPanelData(
+        panelSchema,
+        emptyData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations,
+      );
+
+      // No rows is an empty state, not an error; the renderer shows "No Data"
+      expect(result).toEqual({});
     });
 
     it("should handle custom chart with missing queries", async () => {

@@ -17,6 +17,7 @@ import { toZonedTime } from "date-fns-tz";
 import { PromQLResponse, ProcessedPromQLData, AggregationFunction } from "./types";
 import { buildPromqlSeriesNames } from "./legendBuilder";
 import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
+import { legendFallbackOf } from "@/utils/dashboard/promql/formula";
 
 /**
  * Preprocess PromQL responses into a common format for chart converters
@@ -54,7 +55,7 @@ export async function processPromQLData(
         .map((metric: any) => metric?.metric)
         .filter(Boolean),
       template: panelSchema.queries?.[queryIndexOf(index)]?.config?.promql_legend,
-      fallback: panelSchema.queries?.[queryIndexOf(index)]?.config?.promql_legend_fallback,
+      fallback: legendFallbackOf(panelSchema.queries, queryIndexOf(index)),
     })),
     getCachedSemanticGroups(store?.state?.selectedOrganization?.identifier ?? "") ?? [],
   );
@@ -100,6 +101,7 @@ export async function processPromQLData(
       timestamps: formattedTimestamps,
       series,
       queryIndex: queryIndexOf(index),
+      seriesRole: shift.nameSuffixes?.[index] ? "shifted" : "primary",
       queryConfig: panelSchema.queries[queryIndexOf(index)]?.config || {},
     });
   });

@@ -1,0 +1,32 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import store from "@/stores";
+import { routeGuard } from "@/utils/zincutils";
+import { featureLockedPath, featureState } from "@/utils/featureGate";
+
+/** Redirects home only on an explicit `oncall_enabled: false`, since a cold load has not read /config yet. */
+export const oncallRouteGuard = (to: any, from: any, next: any) => {
+  // Checked before the flag: a locked license also reports `oncall_enabled` false.
+  if (featureState(store.state.zoConfig?.features, "oncall") === "locked") {
+    next({ path: featureLockedPath("oncall"), query: { org_identifier: to.query.org_identifier } });
+    return;
+  }
+  if (store.state.zoConfig?.oncall_enabled === false) {
+    next("/");
+    return;
+  }
+  routeGuard(to, from, next);
+};

@@ -15,6 +15,7 @@ const OSS: ShortcutCapabilities = {
   modelPricingEnabled: false,
   rbacEnabled: false,
   aiEnabled: false,
+  downtimesEnabled: false,
 };
 const ENTERPRISE: ShortcutCapabilities = {
   isEnterprise: true,
@@ -25,6 +26,7 @@ const ENTERPRISE: ShortcutCapabilities = {
   modelPricingEnabled: true,
   rbacEnabled: true,
   aiEnabled: true,
+  downtimesEnabled: true,
 };
 const CLOUD: ShortcutCapabilities = {
   isEnterprise: false,
@@ -35,6 +37,7 @@ const CLOUD: ShortcutCapabilities = {
   modelPricingEnabled: true,
   rbacEnabled: true,
   aiEnabled: true,
+  downtimesEnabled: true,
 };
 
 /** Mirrors ShortcutCheatsheet: a page shows unless its gate rejects the caps. */
@@ -67,6 +70,7 @@ const GATED_IN_OSS = [
   "shortcuts.pages.searchSchedulers",
   "shortcuts.pages.alertSources",
   "shortcuts.pages.alertIncidents",
+  "shortcuts.pages.downtimes",
   "shortcuts.pages.pipelineDestinations",
   "shortcuts.pages.iamRoles",
   "shortcuts.pages.iamGroups",
@@ -175,6 +179,16 @@ describe("shortcut cheatsheet OSS gating", () => {
     expect(pages.has("shortcuts.pages.modelPricing")).toBe(false);
   });
 
+  it("hides Downtimes on enterprise and cloud while downtimes_enabled is off", () => {
+    expect(
+      visiblePages({ ...ENTERPRISE, downtimesEnabled: false }).has("shortcuts.pages.downtimes"),
+    ).toBe(false);
+    expect(
+      visiblePages({ ...CLOUD, downtimesEnabled: false }).has("shortcuts.pages.downtimes"),
+    ).toBe(false);
+    expect(visiblePages(ENTERPRISE).has("shortcuts.pages.downtimes")).toBe(true);
+  });
+
   it("gates IAM Roles/Groups behind rbac_enabled on enterprise/cloud", () => {
     const entNoRbac: ShortcutCapabilities = { ...ENTERPRISE, rbacEnabled: false };
     const pages = visiblePages(entNoRbac);
@@ -226,5 +240,44 @@ describe("synthetics journey search shortcut", () => {
 
     expect(synthetics).toBeDefined();
     expect(synthetics?.pages).toContain("shortcuts.pages.syntheticsJourney");
+  });
+});
+
+describe("row navigation entries (item 4a)", () => {
+  const entry = (id: string) =>
+    SHORTCUT_REGISTRY.flatMap((g) => g.shortcuts).find((e) => e.id === id);
+  const groupOf = (id: string) =>
+    SHORTCUT_REGISTRY.find((g) => g.shortcuts.some((e) => e.id === id));
+
+  it("keeps every id unique across the registry", () => {
+    const ids = SHORTCUT_REGISTRY.flatMap((g) => g.shortcuts.map((e) => e.id));
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("binds J/K in the logs and traces scopes", () => {
+    expect(getShortcutDef("logsNextRow")).toMatchObject({ key: "j", scope: "logs" });
+    expect(getShortcutDef("logsPrevRow")).toMatchObject({ key: "k", scope: "logs" });
+    expect(getShortcutDef("tracesNextRow")).toMatchObject({ key: "j", scope: "traces" });
+    expect(getShortcutDef("tracesPrevRow")).toMatchObject({ key: "k", scope: "traces" });
+  });
+
+  it("keeps the display-only rows keyless and unregisterable", () => {
+    for (const id of ["logsRowFocusMove", "logsRowOpen", "logsDetailClose", "tracesRowOpen"]) {
+      const e = entry(id);
+      expect(e?.display).toBeTruthy();
+      expect(e?.key ?? e?.keys ?? e?.keyForMac ?? e?.keyForWindows).toBeUndefined();
+      expect(getShortcutDef(id)).toBeUndefined();
+    }
+    expect(groupOf("logsRowOpen")?.scope).toBe("logs");
+    expect(groupOf("tracesRowOpen")?.scope).toBe("traces");
+  });
+
+  it("describes trace-detail J/K as visible-span steps", () => {
+    expect(getShortcutDef("traceNextSpan")?.descriptionKey).toBe(
+      "shortcuts.actions.traceNextVisibleSpan",
+    );
+    expect(getShortcutDef("tracePrevSpan")?.descriptionKey).toBe(
+      "shortcuts.actions.tracePrevVisibleSpan",
+    );
   });
 });

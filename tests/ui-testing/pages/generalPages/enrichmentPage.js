@@ -23,11 +23,9 @@ class EnrichmentPage {
         // ────────────────────────────────────────────────────────────────────
         // Add / Update enrichment table form locators (AddEnrichmentTable.vue)
         // ────────────────────────────────────────────────────────────────────
-        this.addPage = page.locator('[data-test="add-enrichment-table-page"]');
-        this.addTitle = page.locator('[data-test="add-enrichment-table-title"]');
-        this.addBackBtn = page.locator('[data-test="add-enrichment-table-back-btn"]');
-        this.addCancelBtn = page.locator('[data-test="add-enrichment-table-cancel-btn"]');
-        this.addSaveBtn = page.locator('[data-test="add-enrichment-table-save-btn"]');
+        this.addPage = page.locator('[data-test="add-enrichment-table-dialog"]');
+        this.addCancelBtn = page.locator('[data-test="add-enrichment-table-dialog"] [data-test="o-dialog-secondary-btn"]');
+        this.addSaveBtn = page.locator('[data-test="add-enrichment-table-dialog"] [data-test="o-dialog-primary-btn"]');
         this.nameField = page.locator('[data-test="add-enrichment-table-name-field"]');
         // OOptionGroup root + per-option data-test forwarded by OOptionGroup
         this.sourceGroup = page.locator('[data-test="add-enrichment-table-source"]');
@@ -78,6 +76,8 @@ class EnrichmentPage {
         // ────────────────────────────────────────────────────────────────────
         this.vrlEditor = '[data-test="logs-vrl-function-editor"]';
         this.refreshButton = '[data-test="logs-search-bar-refresh-btn"]';
+        // While a search runs the same data-test is the Cancel button, so idle is keyed on the Run title.
+        this.idleRunQueryButton = page.locator('[data-test="logs-search-bar-refresh-btn"][title="Run query"]');
         this.showQueryToggleBtn = '[data-test="logs-search-bar-show-query-toggle-btn"]';
         this.functionsBtn = '[data-test="logs-search-functions-btn"]';
 
@@ -564,28 +564,17 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.page.waitForLoadState('domcontentloaded');
     }
 
-    async applyQueryMultipleClicks() {
-        // Click run query button multiple times to ensure it registers (VRL test specific).
-        // NOTE: Do NOT use `{ force: true }` — OButton's @click handler does not
-        // fire on a forced click (Reka Primitive expects a real bubble path).
-        // Key the final click to a _search response so we don't sit in a
-        // 10s networkidle wait for cross-domain background requests.
-        const refreshButton = this.page.locator(this.refreshButton);
-        await refreshButton.waitFor({ state: 'visible' });
-
-        for (let i = 0; i < 4; i++) {
-            if (i === 3) {
-                const searchResp = this.page.waitForResponse(
-                    (resp) => /\/api\/.*\/_search/.test(resp.url()),
-                    { timeout: 30000 }
-                ).catch(() => null);
-                await refreshButton.click();
-                await searchResp;
-            } else {
-                await refreshButton.click();
-                await this.page.waitForLoadState('domcontentloaded');
-            }
-        }
+    async runQueryWhenIdle() {
+        // Do NOT use `{ force: true }`: OButton's @click handler does not fire on a forced click.
+        await expect(this.idleRunQueryButton).toBeVisible({ timeout: 30000 });
+        await expect(this.idleRunQueryButton).toBeEnabled({ timeout: 15000 });
+        const searchResp = this.page.waitForResponse(
+            (resp) => /\/api\/.*\/_search/.test(resp.url()),
+            { timeout: 30000 }
+        );
+        await this.idleRunQueryButton.click();
+        await searchResp;
+        await expect(this.idleRunQueryButton).toBeVisible({ timeout: 30000 });
     }
 
     async verifyNoQueryWarning() {
@@ -597,21 +586,8 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     async expandFirstLogRow() {
-        // Additional run query clicks to ensure VRL enrichment is fully processed.
-        // NOTE: Do NOT use `{ force: true }` — see applyQueryMultipleClicks().
-        // Key each click to a _search response so we don't burn 10s networkidle
-        // timeouts per iteration.
-        const refreshButton = this.page.locator(this.refreshButton);
-        if (await refreshButton.isVisible()) {
-            for (let i = 0; i < 3; i++) {
-                const searchResp = this.page.waitForResponse(
-                    (resp) => /\/api\/.*\/_search/.test(resp.url()),
-                    { timeout: 15000 }
-                ).catch(() => null);
-                await refreshButton.click();
-                await searchResp;
-            }
-        }
+        // Re-run once the previous search settles; clicking mid-search hits Cancel and empties the grid.
+        await this.runQueryWhenIdle();
 
         // Wait for timestamp column to be visible and stable
         await this.timestampColumn.first().waitFor({ state: 'visible', timeout: 30000 });
@@ -826,8 +802,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         // Wait for VRL editor to be fully ready for processing
         await this.waitForVRLEditorReady();
 
-        // Apply query with multiple clicks for VRL test reliability
-        await this.applyQueryMultipleClicks();
+        await this.runQueryWhenIdle();
 
         // Wait for query results to load — either the timestamp column appears
         // (success) or the error-details button appears (failure).
@@ -844,7 +819,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
             testLogger.warn('Error detected after first VRL query attempt, waiting 5s and retrying');
 
             // Retry the query — the backend may need a moment to index the new table
-            await this.applyQueryMultipleClicks();
+            await this.runQueryWhenIdle();
             await Promise.race([
                 timestampCol.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),
                 errorDetailsBtn.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),
@@ -1062,16 +1037,16 @@ abc, err = get_enrichment_table_record("${fileName}", {
             throw new Error(`Edit button for table "${tableName}" not visible — URL job may still be processing.`);
         }
         await editBtn.click();
-        // Edit form mounts immediately — wait for the add/update page wrapper
+        // Edit form mounts immediately — wait for the add/update dialog
         await this.addPage.waitFor({ state: 'visible', timeout: 10000 });
         testLogger.debug('Edit button clicked');
     }
 
     async verifyUpdateMode() {
         testLogger.debug('Verifying update mode form is visible');
-        // Wait for the update form: the add-enrichment-table-page mounts both
-        // for "Add" and "Update" — title differs but page data-test does not.
-        // Use the page locator + name field as ready signals.
+        // Wait for the update form: the add-enrichment-table-dialog mounts both
+        // for "Add" and "Update" — title differs but dialog data-test does not.
+        // Use the dialog locator + name field as ready signals.
         await this.addPage.waitFor({ state: 'visible', timeout: 30000 });
         // Verify the name field is present (always rendered in both modes)
         await this.nameField.waitFor({ state: 'visible', timeout: 10000 });
@@ -1245,7 +1220,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         const urlWrapper = this.page.locator('[data-test="add-enrichment-table-url"]');
         await urlWrapper.waitFor({ state: 'visible', timeout: 10000 });
 
-        // Snapshot the entire add-enrichment-table-page subtree for diagnostics
+        // Snapshot the entire add-enrichment-table-dialog subtree for diagnostics
         // — the error may be rendered in a parent container if Vue's reactivity
         // routes through a slot/template.
         await expect.poll(async () => {

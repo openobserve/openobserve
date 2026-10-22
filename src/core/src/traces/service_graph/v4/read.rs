@@ -36,7 +36,7 @@ use super::{
     },
     writer::{
         LABEL_TRACE_STREAM, M_AGENT_INSTANCES, M_CLIENT_SECONDS, M_REQUEST_FAILED_TOTAL,
-        M_REQUEST_TOTAL, M_SERVER_SECONDS, M_UNRESOLVED_TOTAL,
+        M_REQUEST_TOTAL, M_SERVER_FAILED_TOTAL, M_SERVER_SECONDS, M_UNRESOLVED_TOTAL,
     },
 };
 
@@ -52,14 +52,15 @@ const IDX_FAILED: usize = 1;
 const IDX_CLIENT_Q: usize = 2;
 const IDX_SERVER_Q: usize = 5;
 const IDX_SERVER_COUNT: usize = 8;
-const IDX_UNRESOLVED: usize = 9;
-const IDX_PROCESSED: usize = 10;
-const IDX_INSTANCES: usize = 11;
-const IDX_BASELINE_Q: usize = 12;
-const IDX_ORG_INBOUND: usize = 15;
-const IDX_ORG_SERVER_COUNT: usize = 16;
-const PLAN_LEN_UNFILTERED: usize = 15;
-const PLAN_LEN_FILTERED: usize = 17;
+const IDX_SERVER_FAILED: usize = 9;
+const IDX_UNRESOLVED: usize = 10;
+const IDX_PROCESSED: usize = 11;
+const IDX_INSTANCES: usize = 12;
+const IDX_BASELINE_Q: usize = 13;
+const IDX_ORG_INBOUND: usize = 16;
+const IDX_ORG_SERVER_COUNT: usize = 17;
+const PLAN_LEN_UNFILTERED: usize = 16;
+const PLAN_LEN_FILTERED: usize = 18;
 const PLAN_NAMES: [&str; PLAN_LEN_FILTERED] = [
     "requests",
     "failed",
@@ -70,6 +71,7 @@ const PLAN_NAMES: [&str; PLAN_LEN_FILTERED] = [
     "server_p95",
     "server_p99",
     "server_count",
+    "server_failed",
     "unresolved",
     "processed",
     "instances",
@@ -183,7 +185,7 @@ pub async fn instant(
     let trace_id = config::ider::generate_trace_id();
     let resp =
         promql_service::search::search(&trace_id, org, &req, "", 0, is_super_cluster).await?;
-    match resp {
+    match resp.value {
         Value::Vector(v) => Ok(v),
         Value::Instant(i) => Ok(vec![i]),
         Value::None => Ok(vec![]),
@@ -222,11 +224,14 @@ where
     F: Fn(String, i64) -> Fut,
     Fut: Future<Output = Result<Vec<InstantValue>, anyhow::Error>>,
 {
-    // Range selectors are left-open; one extra second keeps the rollup sample sitting at `start`.
-    let range_secs = ((end - start) / 1_000_000).max(1) + 1;
-    let plan = plan_queries(filter, range_secs, start, end).map_err(anyhow::Error::msg)?;
+    // Range selectors are left-open; +1ms keeps the `start` sample, not a baseline 1ms before it.
+    let range_ms = ((end - start) / 1_000).max(1_000) + 1;
+    let plan = plan_queries(filter, range_ms, start, end).map_err(anyhow::Error::msg)?;
     let (results, degraded) = settle_plan(run_plan(&plan, run).await)?;
-    let (input, mut meta) = assemble(results, filter.agent_env.as_deref())?;
+    let (mut input, mut meta) = assemble(results, filter.agent_env.as_deref())?;
+    if degraded.iter().any(|d| d == PLAN_NAMES[IDX_SERVER_FAILED]) {
+        input.nodes.iter_mut().for_each(|n| n.errors_server = None);
+    }
     meta.degraded = degraded;
     Ok((input, meta))
 }
@@ -269,7 +274,7 @@ fn settle_plan(
 /// Query text and evaluation time in the fixed order `assemble` consumes.
 fn plan_queries(
     filter: &ReadFilter,
-    range_secs: i64,
+    range_ms: i64,
     start: i64,
     end: i64,
 ) -> Result<Vec<(String, i64)>, String> {
@@ -277,18 +282,19 @@ fn plan_queries(
     let n = &filter.node_matcher()?;
     let by_env = filter.agent_env.is_some();
     let mut plan = Vec::with_capacity(PLAN_LEN_FILTERED);
-    plan.push((q_requests(e, by_env, range_secs), end));
-    plan.push((q_failed(e, by_env, range_secs), end));
-    plan.extend(QUANTILES.map(|q| (q_client_quantile(q, e, by_env, range_secs), end)));
-    plan.extend(QUANTILES.map(|q| (q_server_quantile(q, n, range_secs), end)));
-    plan.push((q_server_count(n, range_secs), end));
-    plan.push((q_unresolved(n, range_secs), end));
+    plan.push((q_requests(e, by_env, range_ms), end));
+    plan.push((q_failed(e, by_env, range_ms), end));
+    plan.extend(QUANTILES.map(|q| (q_client_quantile(q, e, by_env, range_ms), end)));
+    plan.extend(QUANTILES.map(|q| (q_server_quantile(q, n, range_ms), end)));
+    plan.push((q_server_count(n, range_ms), end));
+    plan.push((q_server_failed(n, range_ms), end));
+    plan.push((q_unresolved(n, range_ms), end));
     plan.push((q_processed(n), end));
-    plan.push((q_instances(e, by_env, range_secs), end));
-    plan.extend(QUANTILES.map(|q| (q_client_quantile(q, e, by_env, range_secs), start)));
+    plan.push((q_instances(e, by_env, range_ms), end));
+    plan.extend(QUANTILES.map(|q| (q_client_quantile(q, e, by_env, range_ms), start)));
     if !filter.is_empty() {
-        plan.push((q_org_inbound(range_secs), end));
-        plan.push((q_org_server_count(range_secs), end));
+        plan.push((q_org_inbound(range_ms), end));
+        plan.push((q_org_server_count(range_ms), end));
     }
     Ok(plan)
 }
@@ -370,47 +376,54 @@ fn edge_by(by_env: bool) -> &'static str {
 }
 
 /// Grouped by `trace_stream` too so the per-stream split can pick a node's stream.
-fn q_requests(edge_matcher: &str, by_env: bool, range_secs: i64) -> String {
+fn q_requests(edge_matcher: &str, by_env: bool, range_ms: i64) -> String {
     format!(
-        "sum by ({}, {LABEL_TRACE_STREAM}) (increase({}[{range_secs}s]))",
+        "sum by ({}, {LABEL_TRACE_STREAM}) (increase({}[{range_ms}ms]))",
         edge_by(by_env),
         selector(M_REQUEST_TOTAL, edge_matcher)
     )
 }
 
-fn q_failed(edge_matcher: &str, by_env: bool, range_secs: i64) -> String {
+fn q_failed(edge_matcher: &str, by_env: bool, range_ms: i64) -> String {
     format!(
-        "sum by ({}) (increase({}[{range_secs}s]))",
+        "sum by ({}) (increase({}[{range_ms}ms]))",
         edge_by(by_env),
         selector(M_REQUEST_FAILED_TOTAL, edge_matcher)
     )
 }
 
-fn q_client_quantile(q: f64, edge_matcher: &str, by_env: bool, range_secs: i64) -> String {
+fn q_client_quantile(q: f64, edge_matcher: &str, by_env: bool, range_ms: i64) -> String {
     format!(
-        "histogram_quantile({q}, sum by (le, {}) (rate({}[{range_secs}s])))",
+        "histogram_quantile({q}, sum by (le, {}) (rate({}[{range_ms}ms])))",
         edge_by(by_env),
         selector(&format!("{M_CLIENT_SECONDS}_bucket"), edge_matcher)
     )
 }
 
-fn q_server_quantile(q: f64, node_matcher: &str, range_secs: i64) -> String {
+fn q_server_quantile(q: f64, node_matcher: &str, range_ms: i64) -> String {
     format!(
-        "histogram_quantile({q}, sum by (le, server) (rate({}[{range_secs}s])))",
+        "histogram_quantile({q}, sum by (le, server) (rate({}[{range_ms}ms])))",
         selector(&format!("{M_SERVER_SECONDS}_bucket"), node_matcher)
     )
 }
 
-fn q_server_count(node_matcher: &str, range_secs: i64) -> String {
+fn q_server_count(node_matcher: &str, range_ms: i64) -> String {
     format!(
-        "sum by (server, {LABEL_TRACE_STREAM}) (increase({}[{range_secs}s]))",
+        "sum by (server, {LABEL_TRACE_STREAM}) (increase({}[{range_ms}ms]))",
         selector(&format!("{M_SERVER_SECONDS}_count"), node_matcher)
     )
 }
 
-fn q_unresolved(node_matcher: &str, range_secs: i64) -> String {
+fn q_server_failed(node_matcher: &str, range_ms: i64) -> String {
     format!(
-        "sum by (reason) (increase({}[{range_secs}s]))",
+        "sum by (server) (increase({}[{range_ms}ms]))",
+        selector(M_SERVER_FAILED_TOTAL, node_matcher)
+    )
+}
+
+fn q_unresolved(node_matcher: &str, range_ms: i64) -> String {
+    format!(
+        "sum by (reason) (increase({}[{range_ms}ms]))",
         selector(M_UNRESOLVED_TOTAL, node_matcher)
     )
 }
@@ -423,25 +436,25 @@ fn q_processed(node_matcher: &str) -> String {
 }
 
 /// The gauge's `server` is the agent of the Q4 edge it rides on.
-fn q_instances(edge_matcher: &str, by_env: bool, range_secs: i64) -> String {
+fn q_instances(edge_matcher: &str, by_env: bool, range_ms: i64) -> String {
     let by = if by_env {
         "server, agent_env"
     } else {
         "server"
     };
     format!(
-        "sum by ({by}) (max_over_time({}[{range_secs}s]))",
+        "sum by ({by}) (max_over_time({}[{range_ms}ms]))",
         selector(M_AGENT_INSTANCES, edge_matcher)
     )
 }
 
 /// Grouped, not matched: the writer omits an empty `connection_type` and `=""` skips null rows.
-fn q_org_inbound(range_secs: i64) -> String {
-    format!("sum by (server, connection_type) (increase({M_REQUEST_TOTAL}[{range_secs}s]))")
+fn q_org_inbound(range_ms: i64) -> String {
+    format!("sum by (server, connection_type) (increase({M_REQUEST_TOTAL}[{range_ms}ms]))")
 }
 
-fn q_org_server_count(range_secs: i64) -> String {
-    format!("sum by (server) (increase({M_SERVER_SECONDS}_count[{range_secs}s]))")
+fn q_org_server_count(range_ms: i64) -> String {
+    format!("sum by (server) (increase({M_SERVER_SECONDS}_count[{range_ms}ms]))")
 }
 
 fn edge_rows(rows: &[InstantValue]) -> Vec<(EdgeIdentity, f64)> {
@@ -617,6 +630,12 @@ fn assemble_nodes(results: &[Vec<InstantValue>]) -> Vec<MetricNode> {
         n.requests_server += count(v);
         add_stream(&mut n.streams, stream, count(v));
     }
+    // Written with every node sample, so a missing series predates the counter.
+    for (server, v) in label_rows(&results[IDX_SERVER_FAILED], "server") {
+        if let Some(n) = nodes.get_mut(&server) {
+            *n.errors_server.get_or_insert(0.0) += count(v);
+        }
+    }
     for (i, pick) in NODE_QUANTILE_SLOTS.into_iter().enumerate() {
         for (server, v) in label_rows(&results[IDX_SERVER_Q + i], "server") {
             if let Some(n) = nodes.get_mut(&server) {
@@ -718,6 +737,18 @@ mod tests {
 
     impl RequestTotalProvider {
         fn new(with_env_column: bool, series: &[(&str, Option<&str>)]) -> Self {
+            let samples: Vec<(i64, f64)> = (0..10)
+                .map(|step| (BASE + step * 20 * SECOND, (step * 3) as f64))
+                .collect();
+            Self::with_samples(with_env_column, series, &samples)
+        }
+
+        /// Every series gets the same `(timestamp, value)` samples.
+        fn with_samples(
+            with_env_column: bool,
+            series: &[(&str, Option<&str>)],
+            samples: &[(i64, f64)],
+        ) -> Self {
             let mut fields = vec![
                 Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
                 Field::new(HASH_LABEL, DataType::UInt64, false),
@@ -731,21 +762,21 @@ mod tests {
                 fields.push(Field::new("agent_env", DataType::Utf8, true));
             }
             let schema = Arc::new(Schema::new(fields));
-            let rows: Vec<(usize, i64)> = (0..series.len())
-                .flat_map(|i| (0..10).map(move |step| (i, step)))
+            let rows: Vec<(usize, (i64, f64))> = (0..series.len())
+                .flat_map(|i| samples.iter().map(move |s| (i, *s)))
                 .collect();
             let text = |f: &dyn Fn(usize) -> Option<String>| -> ArrayRef {
                 Arc::new(StringArray::from_iter(rows.iter().map(|(i, _)| f(*i))))
             };
             let mut columns: Vec<ArrayRef> = vec![
                 Arc::new(Int64Array::from_iter_values(
-                    rows.iter().map(|(_, step)| BASE + step * 20 * SECOND),
+                    rows.iter().map(|(_, (ts, _))| *ts),
                 )),
                 Arc::new(UInt64Array::from_iter_values(
                     rows.iter().map(|(i, _)| *i as u64 + 1),
                 )),
                 Arc::new(Float64Array::from_iter_values(
-                    rows.iter().map(|(_, step)| (step * 3) as f64),
+                    rows.iter().map(|(_, (_, v))| *v),
                 )),
                 text(&|_| Some(M_REQUEST_TOTAL.to_string())),
                 text(&|i| Some(series[i].0.to_string())),
@@ -867,7 +898,7 @@ mod tests {
         agent_env: &str,
     ) -> (usize, TopologyInput) {
         let f = filter(None, Some(agent_env));
-        let query = q_requests(&f.edge_matcher().unwrap(), true, 60);
+        let query = q_requests(&f.edge_matcher().unwrap(), true, 60_000);
         let rows = engine_rows(provider, &query).await;
         let raw = rows.len();
         let mut r = empty_results(PLAN_LEN_FILTERED);
@@ -928,116 +959,116 @@ mod tests {
     #[test]
     fn test_builders_without_matcher() {
         assert_eq!(
-            q_requests("", false, 60),
-            "sum by (client, client_type, server, connection_type, trace_stream) (increase(traces_service_graph_request_total[60s]))"
+            q_requests("", false, 60_000),
+            "sum by (client, client_type, server, connection_type, trace_stream) (increase(traces_service_graph_request_total[60000ms]))"
         );
         assert_eq!(
-            q_failed("", false, 60),
-            "sum by (client, client_type, server, connection_type) (increase(traces_service_graph_request_failed_total[60s]))"
+            q_failed("", false, 60_000),
+            "sum by (client, client_type, server, connection_type) (increase(traces_service_graph_request_failed_total[60000ms]))"
         );
         assert_eq!(
-            q_client_quantile(0.5, "", false, 60),
-            "histogram_quantile(0.5, sum by (le, client, client_type, server, connection_type) (rate(traces_service_graph_request_client_seconds_bucket[60s])))"
+            q_client_quantile(0.5, "", false, 60_000),
+            "histogram_quantile(0.5, sum by (le, client, client_type, server, connection_type) (rate(traces_service_graph_request_client_seconds_bucket[60000ms])))"
         );
         assert_eq!(
-            q_server_quantile(0.99, "", 60),
-            "histogram_quantile(0.99, sum by (le, server) (rate(traces_service_graph_request_server_seconds_bucket[60s])))"
+            q_server_quantile(0.99, "", 60_000),
+            "histogram_quantile(0.99, sum by (le, server) (rate(traces_service_graph_request_server_seconds_bucket[60000ms])))"
         );
         assert_eq!(
-            q_server_count("", 60),
-            "sum by (server, trace_stream) (increase(traces_service_graph_request_server_seconds_count[60s]))"
+            q_server_count("", 60_000),
+            "sum by (server, trace_stream) (increase(traces_service_graph_request_server_seconds_count[60000ms]))"
         );
         assert_eq!(
-            q_unresolved("", 60),
-            "sum by (reason) (increase(traces_service_graph_unresolved_total[60s]))"
+            q_unresolved("", 60_000),
+            "sum by (reason) (increase(traces_service_graph_unresolved_total[60000ms]))"
         );
         assert_eq!(
             q_processed(""),
             "max(traces_service_graph_processed_timestamp)"
         );
         assert_eq!(
-            q_instances("", false, 60),
-            "sum by (server) (max_over_time(traces_service_graph_agent_instances[60s]))"
+            q_instances("", false, 60_000),
+            "sum by (server) (max_over_time(traces_service_graph_agent_instances[60000ms]))"
         );
         assert_eq!(
-            q_org_inbound(60),
-            "sum by (server, connection_type) (increase(traces_service_graph_request_total[60s]))"
+            q_org_inbound(60_000),
+            "sum by (server, connection_type) (increase(traces_service_graph_request_total[60000ms]))"
         );
         assert_eq!(
-            q_org_server_count(60),
-            "sum by (server) (increase(traces_service_graph_request_server_seconds_count[60s]))"
+            q_org_server_count(60_000),
+            "sum by (server) (increase(traces_service_graph_request_server_seconds_count[60000ms]))"
         );
     }
 
     #[test]
     fn test_builders_with_trace_stream_matcher() {
         assert_eq!(
-            q_requests(M, false, 3600),
-            "sum by (client, client_type, server, connection_type, trace_stream) (increase(traces_service_graph_request_total{trace_stream=\"default\"}[3600s]))"
+            q_requests(M, false, 3_600_000),
+            "sum by (client, client_type, server, connection_type, trace_stream) (increase(traces_service_graph_request_total{trace_stream=\"default\"}[3600000ms]))"
         );
         assert_eq!(
-            q_failed(M, false, 3600),
-            "sum by (client, client_type, server, connection_type) (increase(traces_service_graph_request_failed_total{trace_stream=\"default\"}[3600s]))"
+            q_failed(M, false, 3_600_000),
+            "sum by (client, client_type, server, connection_type) (increase(traces_service_graph_request_failed_total{trace_stream=\"default\"}[3600000ms]))"
         );
         assert_eq!(
-            q_client_quantile(0.95, M, false, 3600),
-            "histogram_quantile(0.95, sum by (le, client, client_type, server, connection_type) (rate(traces_service_graph_request_client_seconds_bucket{trace_stream=\"default\"}[3600s])))"
+            q_client_quantile(0.95, M, false, 3_600_000),
+            "histogram_quantile(0.95, sum by (le, client, client_type, server, connection_type) (rate(traces_service_graph_request_client_seconds_bucket{trace_stream=\"default\"}[3600000ms])))"
         );
         assert_eq!(
-            q_server_quantile(0.5, M, 3600),
-            "histogram_quantile(0.5, sum by (le, server) (rate(traces_service_graph_request_server_seconds_bucket{trace_stream=\"default\"}[3600s])))"
+            q_server_quantile(0.5, M, 3_600_000),
+            "histogram_quantile(0.5, sum by (le, server) (rate(traces_service_graph_request_server_seconds_bucket{trace_stream=\"default\"}[3600000ms])))"
         );
         assert_eq!(
-            q_server_count(M, 3600),
-            "sum by (server, trace_stream) (increase(traces_service_graph_request_server_seconds_count{trace_stream=\"default\"}[3600s]))"
+            q_server_count(M, 3_600_000),
+            "sum by (server, trace_stream) (increase(traces_service_graph_request_server_seconds_count{trace_stream=\"default\"}[3600000ms]))"
         );
         assert_eq!(
-            q_unresolved(M, 3600),
-            "sum by (reason) (increase(traces_service_graph_unresolved_total{trace_stream=\"default\"}[3600s]))"
+            q_unresolved(M, 3_600_000),
+            "sum by (reason) (increase(traces_service_graph_unresolved_total{trace_stream=\"default\"}[3600000ms]))"
         );
         assert_eq!(
             q_processed(M),
             "max(traces_service_graph_processed_timestamp{trace_stream=\"default\"})"
         );
         assert_eq!(
-            q_instances(M, false, 3600),
-            "sum by (server) (max_over_time(traces_service_graph_agent_instances{trace_stream=\"default\"}[3600s]))"
+            q_instances(M, false, 3_600_000),
+            "sum by (server) (max_over_time(traces_service_graph_agent_instances{trace_stream=\"default\"}[3600000ms]))"
         );
     }
 
     #[test]
     fn test_edge_builders_with_agent_env_and_both_matchers() {
         assert_eq!(
-            q_requests(ENV, true, 60),
-            "sum by (client, client_type, server, connection_type, agent_env, trace_stream) (increase(traces_service_graph_request_total{agent_env=\"prod\"}[60s]))"
+            q_requests(ENV, true, 60_000),
+            "sum by (client, client_type, server, connection_type, agent_env, trace_stream) (increase(traces_service_graph_request_total{agent_env=\"prod\"}[60000ms]))"
         );
         assert_eq!(
-            q_failed(ENV, true, 60),
-            "sum by (client, client_type, server, connection_type, agent_env) (increase(traces_service_graph_request_failed_total{agent_env=\"prod\"}[60s]))"
+            q_failed(ENV, true, 60_000),
+            "sum by (client, client_type, server, connection_type, agent_env) (increase(traces_service_graph_request_failed_total{agent_env=\"prod\"}[60000ms]))"
         );
         assert_eq!(
-            q_client_quantile(0.99, ENV, true, 60),
-            "histogram_quantile(0.99, sum by (le, client, client_type, server, connection_type, agent_env) (rate(traces_service_graph_request_client_seconds_bucket{agent_env=\"prod\"}[60s])))"
+            q_client_quantile(0.99, ENV, true, 60_000),
+            "histogram_quantile(0.99, sum by (le, client, client_type, server, connection_type, agent_env) (rate(traces_service_graph_request_client_seconds_bucket{agent_env=\"prod\"}[60000ms])))"
         );
         assert_eq!(
-            q_instances(ENV, true, 60),
-            "sum by (server, agent_env) (max_over_time(traces_service_graph_agent_instances{agent_env=\"prod\"}[60s]))"
+            q_instances(ENV, true, 60_000),
+            "sum by (server, agent_env) (max_over_time(traces_service_graph_agent_instances{agent_env=\"prod\"}[60000ms]))"
         );
         assert_eq!(
-            q_requests(BOTH, true, 60),
-            "sum by (client, client_type, server, connection_type, agent_env, trace_stream) (increase(traces_service_graph_request_total{trace_stream=\"default\",agent_env=\"prod\"}[60s]))"
+            q_requests(BOTH, true, 60_000),
+            "sum by (client, client_type, server, connection_type, agent_env, trace_stream) (increase(traces_service_graph_request_total{trace_stream=\"default\",agent_env=\"prod\"}[60000ms]))"
         );
         assert_eq!(
-            q_failed(BOTH, true, 60),
-            "sum by (client, client_type, server, connection_type, agent_env) (increase(traces_service_graph_request_failed_total{trace_stream=\"default\",agent_env=\"prod\"}[60s]))"
+            q_failed(BOTH, true, 60_000),
+            "sum by (client, client_type, server, connection_type, agent_env) (increase(traces_service_graph_request_failed_total{trace_stream=\"default\",agent_env=\"prod\"}[60000ms]))"
         );
         assert_eq!(
-            q_client_quantile(0.5, BOTH, true, 60),
-            "histogram_quantile(0.5, sum by (le, client, client_type, server, connection_type, agent_env) (rate(traces_service_graph_request_client_seconds_bucket{trace_stream=\"default\",agent_env=\"prod\"}[60s])))"
+            q_client_quantile(0.5, BOTH, true, 60_000),
+            "histogram_quantile(0.5, sum by (le, client, client_type, server, connection_type, agent_env) (rate(traces_service_graph_request_client_seconds_bucket{trace_stream=\"default\",agent_env=\"prod\"}[60000ms])))"
         );
         assert_eq!(
-            q_instances(BOTH, true, 60),
-            "sum by (server, agent_env) (max_over_time(traces_service_graph_agent_instances{trace_stream=\"default\",agent_env=\"prod\"}[60s]))"
+            q_instances(BOTH, true, 60_000),
+            "sum by (server, agent_env) (max_over_time(traces_service_graph_agent_instances{trace_stream=\"default\",agent_env=\"prod\"}[60000ms]))"
         );
     }
 
@@ -1146,7 +1177,8 @@ mod tests {
 
     #[test]
     fn test_plan_queries_count_and_times() {
-        let plan = plan_queries(&ReadFilter::default(), 60, 1_000_000_000, 1_060_000_000).unwrap();
+        let plan =
+            plan_queries(&ReadFilter::default(), 60_000, 1_000_000_000, 1_060_000_000).unwrap();
         assert_eq!(plan.len(), PLAN_LEN_UNFILTERED);
         assert!(
             plan[..IDX_BASELINE_Q]
@@ -1158,31 +1190,36 @@ mod tests {
                 .iter()
                 .all(|(_, at)| *at == 1_000_000_000)
         );
-        assert_eq!(plan[IDX_REQUESTS].0, q_requests("", false, 60));
+        assert_eq!(plan[IDX_REQUESTS].0, q_requests("", false, 60_000));
         assert_eq!(plan[IDX_PROCESSED].0, q_processed(""));
-        assert_eq!(plan[IDX_INSTANCES].0, q_instances("", false, 60));
+        assert_eq!(plan[IDX_INSTANCES].0, q_instances("", false, 60_000));
         assert_eq!(
             plan[IDX_BASELINE_Q].0,
-            q_client_quantile(0.5, "", false, 60)
+            q_client_quantile(0.5, "", false, 60_000)
         );
         assert_eq!(
             plan[IDX_BASELINE_Q + 2].0,
-            q_client_quantile(0.99, "", false, 60)
+            q_client_quantile(0.99, "", false, 60_000)
         );
 
         let both = filter(Some("default"), Some("prod"));
-        let plan = plan_queries(&both, 60, 1_000_000_000, 1_060_000_000).unwrap();
+        let plan = plan_queries(&both, 60_000, 1_000_000_000, 1_060_000_000).unwrap();
         assert_eq!(plan.len(), PLAN_LEN_FILTERED);
-        assert_eq!(plan[IDX_SERVER_Q].0, q_server_quantile(0.5, M, 60));
-        assert_eq!(plan[IDX_SERVER_COUNT].0, q_server_count(M, 60));
-        assert_eq!(plan[IDX_UNRESOLVED].0, q_unresolved(M, 60));
-        assert_eq!(plan[IDX_INSTANCES].0, q_instances(BOTH, true, 60));
+        assert_eq!(plan[IDX_SERVER_Q].0, q_server_quantile(0.5, M, 60_000));
+        assert_eq!(plan[IDX_SERVER_COUNT].0, q_server_count(M, 60_000));
+        assert_eq!(plan[IDX_SERVER_FAILED].0, q_server_failed(M, 60_000));
+        assert_eq!(
+            q_server_failed("", 60_000),
+            "sum by (server) (increase(traces_service_graph_request_server_failed_total[60000ms]))"
+        );
+        assert_eq!(plan[IDX_UNRESOLVED].0, q_unresolved(M, 60_000));
+        assert_eq!(plan[IDX_INSTANCES].0, q_instances(BOTH, true, 60_000));
         assert_eq!(
             plan[IDX_BASELINE_Q + 1].0,
-            q_client_quantile(0.95, BOTH, true, 60)
+            q_client_quantile(0.95, BOTH, true, 60_000)
         );
-        assert_eq!(plan[IDX_ORG_INBOUND].0, q_org_inbound(60));
-        assert_eq!(plan[IDX_ORG_SERVER_COUNT].0, q_org_server_count(60));
+        assert_eq!(plan[IDX_ORG_INBOUND].0, q_org_inbound(60_000));
+        assert_eq!(plan[IDX_ORG_SERVER_COUNT].0, q_org_server_count(60_000));
         assert!(!plan[IDX_ORG_SERVER_COUNT].0.contains("trace_stream"));
     }
 
@@ -1192,7 +1229,7 @@ mod tests {
             filter(None, Some("prod")),
             filter(Some("default"), Some("prod")),
         ] {
-            let plan = plan_queries(&f, 60, 1_000_000_000, 1_060_000_000).unwrap();
+            let plan = plan_queries(&f, 60_000, 1_000_000_000, 1_060_000_000).unwrap();
             for (idx, (query, _)) in plan.iter().enumerate() {
                 assert_eq!(
                     IDX_EDGE_FAMILY.contains(&idx),
@@ -1204,12 +1241,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fetch_issues_15_unfiltered_and_17_filtered() {
+    async fn test_fetch_issues_16_unfiltered_and_18_filtered() {
         let (queries, input) = issued(&ReadFilter::default()).await;
-        assert_eq!(queries.len(), 15);
+        assert_eq!(queries.len(), 16);
         assert!(input.node_only_services);
         assert!(queries.iter().all(|(q, _)| !q.contains('{')));
-        assert!(queries.iter().all(|(q, _)| !q.contains("[60s]")));
+        assert!(queries.iter().all(|(q, _)| !q.contains("[60000ms]")));
         assert_eq!(
             queries
                 .iter()
@@ -1217,26 +1254,26 @@ mod tests {
                 .count(),
             3
         );
-        assert!(queries.contains(&(q_requests("", false, 61), 1_060_000_000)));
+        assert!(queries.contains(&(q_requests("", false, 60_001), 1_060_000_000)));
 
         let (queries, input) = issued(&filter(Some("default"), None)).await;
-        assert_eq!(queries.len(), 17);
+        assert_eq!(queries.len(), 18);
         assert!(input.node_only_services);
-        assert!(queries.contains(&(q_server_count(M, 61), 1_060_000_000)));
-        assert!(queries.contains(&(q_org_server_count(61), 1_060_000_000)));
+        assert!(queries.contains(&(q_server_count(M, 60_001), 1_060_000_000)));
+        assert!(queries.contains(&(q_org_server_count(60_001), 1_060_000_000)));
 
         let (queries, input) = issued(&filter(None, Some("prod"))).await;
-        assert_eq!(queries.len(), 17);
+        assert_eq!(queries.len(), 18);
         assert!(!input.node_only_services);
-        assert!(queries.contains(&(q_requests(ENV, true, 61), 1_060_000_000)));
-        assert!(queries.contains(&(q_server_count("", 61), 1_060_000_000)));
-        assert!(queries.contains(&(q_org_inbound(61), 1_060_000_000)));
-        assert!(queries.contains(&(q_client_quantile(0.5, ENV, true, 61), 1_000_000_000)));
+        assert!(queries.contains(&(q_requests(ENV, true, 60_001), 1_060_000_000)));
+        assert!(queries.contains(&(q_server_count("", 60_001), 1_060_000_000)));
+        assert!(queries.contains(&(q_org_inbound(60_001), 1_060_000_000)));
+        assert!(queries.contains(&(q_client_quantile(0.5, ENV, true, 60_001), 1_000_000_000)));
 
         let (queries, input) = issued(&filter(Some("default"), Some("prod"))).await;
-        assert_eq!(queries.len(), 17);
+        assert_eq!(queries.len(), 18);
         assert!(!input.node_only_services);
-        assert!(queries.contains(&(q_instances(BOTH, true, 61), 1_060_000_000)));
+        assert!(queries.contains(&(q_instances(BOTH, true, 60_001), 1_060_000_000)));
         assert!(queries.contains(&(q_processed(M), 1_060_000_000)));
 
         assert!(
@@ -1250,15 +1287,15 @@ mod tests {
 
     #[test]
     fn test_assemble_rejects_wrong_length() {
-        assert!(assemble(empty_results(14), None).is_err());
-        assert!(assemble(empty_results(16), None).is_err());
-        let (input, meta) = assemble(empty_results(15), Some("prod")).unwrap();
+        assert!(assemble(empty_results(15), None).is_err());
+        assert!(assemble(empty_results(17), None).is_err());
+        let (input, meta) = assemble(empty_results(16), Some("prod")).unwrap();
         assert_eq!(input, TopologyInput::default());
         assert_eq!(meta.source, "v4");
         assert_eq!(meta.processed_up_to, None);
         assert_eq!(meta.unresolved, UnresolvedCounts::default());
         assert!(
-            assemble(empty_results(17), None)
+            assemble(empty_results(18), None)
                 .unwrap()
                 .0
                 .node_only_services
@@ -1267,7 +1304,7 @@ mod tests {
 
     #[test]
     fn test_assemble_edges_nodes_and_meta() {
-        let mut r = empty_results(15);
+        let mut r = empty_results(PLAN_LEN_UNFILTERED);
         r[IDX_REQUESTS] = vec![
             edge("a", "b", "", 100.0),
             edge("b", "db1", "database", 40.0),
@@ -1289,6 +1326,10 @@ mod tests {
             row(&[("server", "nope")], 1.0),
         ];
         r[IDX_SERVER_Q + 2] = vec![row(&[("server", "b")], f64::NAN)];
+        r[IDX_SERVER_FAILED] = vec![
+            row(&[("server", "b")], 4.0),
+            row(&[("server", "nope")], 1.0),
+        ];
         r[IDX_UNRESOLVED] = vec![
             row(&[("reason", "no_peer")], 3.4),
             row(&[("reason", "ip_only")], 1.0),
@@ -1342,7 +1383,9 @@ mod tests {
         assert_eq!(input.nodes[0].p50_ns, Some(2_000_000));
         assert_eq!(input.nodes[0].p95_ns, None);
         assert_eq!(input.nodes[0].p99_ns, None);
+        assert_eq!(input.nodes[0].errors_server, Some(4.0));
         assert_eq!(input.nodes[1].server, "lonely");
+        assert_eq!(input.nodes[1].errors_server, None);
 
         let key = (
             "a".to_string(),
@@ -1430,6 +1473,26 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_range_keeps_start_sample_but_not_the_restart_baseline_before_it() {
+        let start = BASE + 60 * SECOND;
+        let samples = [
+            (start - super::super::state::BASELINE_OFFSET_MICROS, 0.0),
+            (start, 2.0),
+            (BASE + 120 * SECOND, 8.0),
+            (BASE + 180 * SECOND, 10.0),
+        ];
+        let provider = RequestTotalProvider::with_samples(false, &[("svc", None)], &samples);
+        let range_ms = (BASE + 180 * SECOND - start) / 1_000 + 1;
+        let rows = engine_rows(provider, &q_requests("", false, range_ms)).await;
+        assert_eq!(rows.len(), 1);
+        assert!(
+            (rows[0].sample.value - 8.0).abs() < 0.01,
+            "{}",
+            rows[0].sample.value
+        );
+    }
+
+    #[tokio::test]
     async fn test_env_filter_through_engine_when_schema_lacks_agent_env() {
         let provider = RequestTotalProvider::new(false, &[("svc", None), ("agent", None)]);
         let (raw, input) = assemble_requests_via_engine(provider, "prod").await;
@@ -1464,7 +1527,7 @@ mod tests {
 
     #[test]
     fn test_assemble_sums_per_stream_split_into_one_identity() {
-        let mut r = empty_results(15);
+        let mut r = empty_results(PLAN_LEN_UNFILTERED);
         r[IDX_REQUESTS] = vec![
             edge_in("a", "b", "zeta", 30.0),
             edge_in("a", "b", "alpha", 70.0),
@@ -1497,7 +1560,7 @@ mod tests {
 
     #[test]
     fn test_assemble_cross_stream_case_unfiltered() {
-        let mut r = empty_results(15);
+        let mut r = empty_results(PLAN_LEN_UNFILTERED);
         r[IDX_REQUESTS] = vec![edge_in("A", "B", "X", 100.0)];
         r[IDX_SERVER_COUNT] = vec![row(&[("server", "B"), ("trace_stream", "Y")], 100.0)];
         let (input, _) = assemble(r, None).unwrap();
@@ -1511,7 +1574,7 @@ mod tests {
             row(&[("server", "B")], 100.0),
             row(&[("server", "B"), ("connection_type", "database")], 30.0),
         ];
-        let mut r = empty_results(17);
+        let mut r = empty_results(PLAN_LEN_FILTERED);
         r[IDX_REQUESTS] = vec![edge_in("A", "B", "X", 100.0)];
         r[IDX_ORG_INBOUND] = org_inbound.clone();
         r[IDX_ORG_SERVER_COUNT] = vec![row(&[("server", "B")], 100.0)];
@@ -1521,7 +1584,7 @@ mod tests {
         assert_eq!(input.org_inbound["B"], 100.0);
         assert_eq!(input.org_requests_server["B"] - input.org_inbound["B"], 0.0);
 
-        let mut r = empty_results(17);
+        let mut r = empty_results(PLAN_LEN_FILTERED);
         r[IDX_SERVER_COUNT] = vec![row(&[("server", "B"), ("trace_stream", "Y")], 100.0)];
         r[IDX_ORG_INBOUND] = org_inbound;
         r[IDX_ORG_SERVER_COUNT] = vec![row(&[("server", "B")], 100.0)];
@@ -1554,6 +1617,37 @@ mod tests {
         let ok = run_plan(&plan, |_, _| async move { Ok(vec![row(&[], 1.0)]) }).await;
         assert_eq!(ok.len(), 4);
         assert_eq!(ok[3].as_ref().unwrap()[0].sample.value, 1.0);
+    }
+
+    #[tokio::test]
+    async fn test_node_errors_are_unknown_when_the_error_query_fails_or_has_no_series() {
+        let read = |failed: Result<Option<f64>, ()>| async move {
+            fetch_topology_with(&ReadFilter::default(), 0, 60_000_000, |q, _| async move {
+                if q.contains(M_SERVER_FAILED_TOTAL) {
+                    return match failed {
+                        Err(()) => Err(anyhow::anyhow!("boom")),
+                        Ok(v) => Ok(v
+                            .map(|v| vec![row(&[("server", "b")], v)])
+                            .unwrap_or_default()),
+                    };
+                }
+                if q.starts_with("sum by (server, trace_stream)") {
+                    return Ok(vec![row(&[("server", "b"), ("trace_stream", "t")], 10.0)]);
+                }
+                Ok(vec![])
+            })
+            .await
+            .unwrap()
+        };
+        let (input, meta) = read(Err(())).await;
+        assert_eq!(meta.degraded, vec!["server_failed"]);
+        assert_eq!(input.nodes[0].requests_server, 10.0);
+        assert_eq!(input.nodes[0].errors_server, None);
+        let (input, meta) = read(Ok(None)).await;
+        assert!(meta.degraded.is_empty());
+        assert_eq!(input.nodes[0].errors_server, None);
+        let (input, _) = read(Ok(Some(0.0))).await;
+        assert_eq!(input.nodes[0].errors_server, Some(0.0));
     }
 
     #[test]

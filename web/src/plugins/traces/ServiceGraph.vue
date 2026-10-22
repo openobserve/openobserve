@@ -325,7 +325,7 @@
                 v-if="selectedNode"
                 :selected-node="selectedNode"
                 :graph-data="graphData"
-                :time-range="searchObj.data.datetime"
+                :time-range="sidePanelTimeRange"
                 :visible="showSidePanel"
                 :stream-filter="selectedStreamFilter"
                 :container-el="graphContainerRef"
@@ -539,6 +539,22 @@ export default defineComponent({
     // Node side panel state
     const selectedNode = ref<any>(null);
     const showSidePanel = ref(false);
+    // Stored relative start/end go stale, so the panel resolves "now" when it opens or the range changes.
+    const sidePanelTimeRange = ref(getEffectiveTimeRange(searchObj.data.datetime));
+    watch(
+      () => [
+        selectedNode.value,
+        searchObj.data.datetime.type,
+        searchObj.data.datetime.relativeTimePeriod,
+        searchObj.data.datetime.startTime,
+        searchObj.data.datetime.endTime,
+      ],
+      () => {
+        if (selectedNode.value) {
+          sidePanelTimeRange.value = getEffectiveTimeRange(searchObj.data.datetime);
+        }
+      },
+    );
 
     const chartRendererRef = ref<any>(null);
     const graphContainerRef = ref<HTMLElement | null>(null);
@@ -1946,6 +1962,7 @@ export default defineComponent({
       // Node side panel
       selectedNode,
       showSidePanel,
+      sidePanelTimeRange,
       handleNodeClick,
       handleCloseSidePanel,
     };

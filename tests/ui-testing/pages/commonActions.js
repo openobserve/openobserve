@@ -21,6 +21,7 @@ export const NAV_GROUP_TILE = {
     // The group root, not its inner tile: hover is handled on the root, and this
     // selector does not move if the group's parentLink ever changes.
     reliability: '[data-test="nav-group-reliability"]',
+    experience: '[data-test="nav-group-experience"]',
 };
 
 // route `name` of each child within its group (matches navGroups.ts).
@@ -36,6 +37,8 @@ export const NAV_FLYOUT_CHILD = {
     // the way you reach them is.
     destinations: { group: 'reliability', name: 'alertDestinations' },
     templates: { group: 'reliability', name: 'alertTemplates' },
+    // Synthetics is feature-gated, so the Experience tile itself lands on RUM.
+    synthetics: { group: 'experience', name: 'synthetics' },
 };
 
 /**

@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-name="{ row }">
             <div class="flex min-w-0 items-center gap-2">
-              <span class="truncate font-medium">{{ row.name }}</span>
+              <OTruncatedText class="font-medium">{{ row.name }}</OTruncatedText>
               <OTag v-if="row.is_default" variant="primary-soft" size="xs" shape="rounded">
                 {{ t("synthetics.tokens.default") }}
               </OTag>
@@ -280,6 +280,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -320,6 +321,7 @@ export default defineComponent({
     OIcon,
     OSearchInput,
     OTooltip,
+    OTruncatedText,
     ORefreshButton,
     ODialog,
     OForm,
@@ -397,7 +399,7 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: 240,
-        meta: { align: "left" },
+        meta: { align: "left", cellOverflowTooltip: false },
       },
       {
         id: "status",

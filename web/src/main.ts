@@ -36,6 +36,8 @@ import { buildVersionChecker } from "./utils/buildVersionChecker";
 import { queryClient, setMutationNotifier } from "./composables/query/queryClient";
 import { shouldPropagateTracing } from "./utils/rum/tracingOrigin";
 import { isIgnoredNoise } from "./utils/rum/ignoredNoisePatterns";
+import { scrubAuthParams } from "./utils/rum/scrubAuthParams";
+import { isExtensionOnlyError } from "./utils/rum/extensionFrames";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { bootstrapTheme } from "@/utils/themeManager";
 import { raw } from "@/types/i18n";
@@ -92,6 +94,9 @@ interface ConfigResponse {
     };
   };
 }
+
+// Only the three dot-separated parts make a token, so a bare eyJ inside a word (surveyJsonBtn) is kept.
+const JWT_PATTERN = /eyJ[\w-]*\.[\w-]+\.[\w-]*/g;
 
 const getConfig = async () => {
   // Seeds the shared bootstrap `/config` query — Login and the version checker
@@ -156,6 +161,12 @@ const getConfig = async () => {
             ]
           : [],
         beforeSend: (event) => {
+          event.view.url = scrubAuthParams(event.view.url) ?? event.view.url;
+          event.view.referrer = scrubAuthParams(event.view.referrer);
+          if (event.type === "error" && isExtensionOnlyError(event.error?.stack)) return false;
+          if (event.type === "action" && event.action.target?.name) {
+            event.action.target.name = event.action.target.name.replace(JWT_PATTERN, "");
+          }
           // Filter out specific errors before sending to RUM
           if (event.type === "error") {
             const errorMessage = event.error?.message || "";
@@ -194,6 +205,7 @@ const getConfig = async () => {
         insecureHTTP: options.insecureHTTP,
         apiVersion: options.apiVersion,
         beforeSend: (log) => {
+          if (log.view?.url) log.view.url = scrubAuthParams(log.view.url) ?? log.view.url;
           // Filter out specific logs before sending
           const logMessage = log.message || "";
 
@@ -244,7 +256,6 @@ function showNewVersionNotification() {
         window.location.reload();
       },
     },
-    position: "top-center",
   });
 }
 
@@ -303,6 +314,13 @@ router.onError(async (error) => {
     if (isStale) {
       showNewVersionNotification();
     }
+  }
+});
+
+// router.onError only sees route chunks; lazy components (e.g. the alert dialog) fail through Vite's preload hook.
+window.addEventListener("vite:preloadError", async (event) => {
+  if (await buildVersionChecker.isStaleChunkError(event.payload)) {
+    showNewVersionNotification();
   }
 });
 

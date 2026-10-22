@@ -17,7 +17,6 @@ use std::sync::LazyLock as Lazy;
 
 use anyhow::Result;
 use config::{
-    get_config,
     meta::{
         self_reporting::usage::{self},
         stream::StreamType,
@@ -46,20 +45,12 @@ static INITIALIZED_ORGS: Lazy<DashSet<String>> = Lazy::new(DashSet::new);
 /// * `org_id` - The organization ID to initialize the usage stream for
 ///
 /// # Behavior
-/// - Only applies when ZO_USAGE_REPORT_TO_OWN_ORG is enabled
 /// - Uses lock-free per-org tracking to ensure initialization happens only once per restart
 /// - Auto-generates field list from UsageData struct via reflection
 /// - Creates schema directly without ingesting sample data
 /// - Does NOT manipulate defined_schema_fields (no UDS filtering for system streams)
 /// - Never blocks ingestion even if initialization fails
 pub async fn ensure_usage_stream_initialized(org_id: &str) -> Result<()> {
-    let cfg = get_config();
-
-    // Only initialize when usage_report_to_own_org is enabled
-    if !cfg.common.usage_report_to_own_org {
-        return Ok(());
-    }
-
     // Atomically check-and-insert: insert() returns true only if the value was newly inserted.
     // This prevents race conditions where multiple threads could pass a contains() check
     // and all attempt initialization simultaneously.

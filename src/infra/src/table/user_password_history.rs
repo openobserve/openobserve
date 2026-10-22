@@ -98,15 +98,22 @@ pub async fn prune(email: &str, retain: u64) -> Result<u64, errors::Error> {
     Ok(result.rows_affected)
 }
 
-/// Called when a user is deleted. The schema declares `ON DELETE CASCADE`, but SQLite ships with
-/// `PRAGMA foreign_keys` off, so the cleanup cannot be left to the database.
 pub async fn delete_all_for_user(email: &str) -> Result<u64, errors::Error> {
-    let client = get_orm_client_rw().await;
-    let result = Entity::delete_many()
-        .filter(email_eq(email))
-        .exec(client)
+    delete_all_for_users_on(get_orm_client_rw().await, &[email.to_string()])
         .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// Runs in the user delete's transaction, since the cascade fires only where FKs are enforced.
+pub(crate) async fn delete_all_for_users_on<C: ConnectionTrait>(
+    client: &C,
+    emails: &[String],
+) -> Result<u64, DbErr> {
+    let lowered: Vec<String> = emails.iter().map(|e| e.to_lowercase()).collect();
+    let result = Entity::delete_many()
+        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).is_in(lowered))
+        .exec(client)
+        .await?;
 
     Ok(result.rows_affected)
 }

@@ -13,9 +13,9 @@
     <!-- Team names are free text and can run long; truncate so it never
          crowds the actions on the right. -->
     <template #title>
-      <span class="min-w-0 truncate" data-test="oncall-team-detail-title">{{
+      <OTruncatedText class="block" data-test="oncall-team-detail-title">{{
         team ? raw(team.name) : t("oncall.teamDetail")
-      }}</span>
+      }}</OTruncatedText>
     </template>
 
     <!-- Whether a page would reach anybody is the team's headline fact, so it
@@ -307,13 +307,14 @@
               @changed="onCoversChanged"
             />
 
+            <!-- Stored rotations always pass validation, so the first is the one the server's preset rewrites. -->
             <OnCallSchedulePresets
               v-model:open="presetsOpen"
               :team-id="teamId"
               :members="members"
               :timezone="team?.timezone ?? 'UTC'"
               :viewer-timezone="store.state.timezone"
-              :rotation-count="schedule?.rotations?.length ?? 0"
+              :primary-rotation-name="schedule?.rotations?.[0]?.name ?? ''"
               @applied="onScheduleSaved"
             />
 
@@ -438,6 +439,7 @@ import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";

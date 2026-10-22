@@ -67,6 +67,15 @@ vi.mock("@/utils/rum/overview.json", () => ({
 }));
 
 describe("AppPerformance.vue", () => {
+  const refreshButton = () =>
+    wrapper
+      .findAllComponents({ name: "OButton" })
+      .find((b) => b.attributes("data-test") === "rum-performance-refresh")!;
+  const refreshTooltip = () =>
+    wrapper
+      .findAllComponents({ name: "OTooltip" })
+      .find((tip) => tip.find('[data-test="rum-performance-refresh"]').exists())!;
+
   let wrapper: VueWrapper<any>;
   let store: any;
   let router: any;
@@ -157,17 +166,18 @@ describe("AppPerformance.vue", () => {
         plugins: [store, router, i18n],
         stubs: {
           OButton: {
+            name: "OButton",
             template: '<button v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
             props: ["variant", "size", "disabled"],
           },
-          OTabs: {
-            template: '<div class="o-tabs-stub" v-bind="$attrs"><slot /></div>',
-            props: ["modelValue", "align", "dense"],
+          OToggleGroup: {
+            template: '<div class="o-toggle-group-stub" v-bind="$attrs"><slot /></div>',
+            props: ["modelValue", "mobileDropdown"],
             emits: ["update:modelValue"],
           },
-          OTab: {
-            template: '<div class="o-tab-stub" v-bind="$attrs"><slot /></div>',
-            props: ["name", "label"],
+          OToggleGroupItem: {
+            template: '<div class="o-toggle-group-item-stub" v-bind="$attrs"><slot /></div>',
+            props: ["value", "iconLeft", "size"],
           },
           AutoRefreshInterval: {
             template: '<div data-test="auto-refresh-interval"><slot /></div>',
@@ -203,21 +213,45 @@ describe("AppPerformance.vue", () => {
 
   describe("Component Rendering", () => {
     it("should render the component with correct structure", () => {
-      expect(wrapper.find('[data-test="rum-performance-title"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="date-time-picker"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="auto-refresh-interval"]').exists()).toBe(true);
-      expect(wrapper.find(".o-tabs-stub").exists()).toBe(true);
+      expect(wrapper.find(".o-toggle-group-stub").exists()).toBe(true);
       expect(wrapper.find('[data-test="router-view"]').exists()).toBe(true);
     });
 
-    it("should display the correct title", () => {
-      const title = wrapper.find('[data-test="rum-performance-title"]');
-      expect(title.text()).toBe("Performance Summary");
+    it("renders no page header of its own", () => {
+      expect(wrapper.find('[data-test="rum-performance-title"]').exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("Performance Summary");
+    });
+
+    it("puts the tab toggle and the time and refresh controls on one toolbar row", () => {
+      const toolbar = wrapper.find('[data-test="rum-performance-toolbar"]');
+      expect(toolbar.find('[data-test="rum-performance-tabs"]').exists()).toBe(true);
+      expect(toolbar.find('[data-test="date-time-picker"]').exists()).toBe(true);
+      expect(toolbar.find('[data-test="rum-performance-refresh"]').exists()).toBe(true);
+      expect(toolbar.find('[data-test="rum-performance-share-link-btn"]').exists()).toBe(true);
+    });
+
+    it("renders one toggle item per tab, in order", () => {
+      const items = wrapper.findAll(".o-toggle-group-item-stub");
+      expect(items.map((i) => i.attributes("data-test"))).toEqual([
+        "rum-performance-tab-overview",
+        "rum-performance-tab-web_vitals",
+        "rum-performance-tab-errors",
+        "rum-performance-tab-api",
+      ]);
     });
 
     it("should render refresh button", () => {
       const refreshBtn = wrapper.find('[data-test="rum-performance-refresh"]');
       expect(refreshBtn.exists()).toBe(true);
+    });
+
+    it("shows Refresh as a labelled primary button while nothing waits", () => {
+      const refreshBtn = refreshButton();
+      expect(refreshBtn.props("variant")).toBe("primary");
+      expect(refreshBtn.text()).toContain("dashboard.refresh");
+      expect(refreshTooltip().props("disabled")).toBe(true);
     });
 
     it("shares a URL carrying the active tab and its time range", () => {
@@ -319,8 +353,8 @@ describe("AppPerformance.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             AutoRefreshInterval: { template: "<div></div>" },
-            OTabs: { template: "<div></div>" },
-            OTab: { template: "<div></div>" },
+            OToggleGroup: { template: "<div></div>" },
+            OToggleGroupItem: { template: "<div></div>" },
             OButton: { template: "<button></button>" },
             DateTimePickerDashboard: { template: "<div></div>" },
             "router-view": { template: "<div></div>" },
@@ -374,8 +408,8 @@ describe("AppPerformance.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             AutoRefreshInterval: { template: "<div></div>" },
-            OTabs: { template: "<div></div>" },
-            OTab: { template: "<div></div>" },
+            OToggleGroup: { template: "<div></div>" },
+            OToggleGroupItem: { template: "<div></div>" },
             OButton: { template: "<button></button>" },
             DateTimePickerDashboard: { template: "<div></div>" },
             "router-view": { template: "<div></div>" },
@@ -538,9 +572,8 @@ describe("AppPerformance.vue", () => {
       expect(autoRefresh.exists()).toBe(true);
     });
 
-    it("should pass correct props to OTabs", () => {
-      const oTabs = wrapper.find(".o-tabs-stub");
-      expect(oTabs.exists()).toBe(true);
+    it("should render the tab toggle group", () => {
+      expect(wrapper.find(".o-toggle-group-stub").exists()).toBe(true);
     });
   });
 
@@ -595,6 +628,43 @@ describe("AppPerformance.vue", () => {
 
     it("should access zoConfig from store", () => {
       expect(wrapper.vm.store.state.zoConfig.min_auto_refresh_interval).toBe(5);
+    });
+  });
+
+  describe("Auto Run", () => {
+    afterEach(() => {
+      localStorage.removeItem("oo_toggle_auto_run");
+    });
+
+    it("hides the Auto Run menu when the server flag is off", () => {
+      expect(wrapper.vm.isAutoRunAvailable).toBe(false);
+      expect(wrapper.find('[data-test="rum-performance-refresh-options-btn"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("offers the Auto Run menu and drops the apply-changes state when it is on", async () => {
+      store.state.zoConfig.auto_query_enabled = true;
+      wrapper.vm.onVariablesManagerReady({ hasUncommittedChanges: true });
+      await nextTick();
+
+      expect(wrapper.vm.isAutoRunOn).toBe(true);
+      expect(wrapper.vm.isVariablesChanged).toBe(false);
+      expect(wrapper.find('[data-test="rum-performance-refresh-options-btn"]').exists()).toBe(true);
+    });
+
+    it("keeps the apply-changes state when Auto Run is turned off", async () => {
+      store.state.zoConfig.auto_query_enabled = true;
+      wrapper.vm.onVariablesManagerReady({ hasUncommittedChanges: true });
+      wrapper.vm.toggleAutoRun();
+      await nextTick();
+
+      expect(localStorage.getItem("oo_toggle_auto_run")).toBe("false");
+
+      expect(wrapper.vm.isAutoRunOn).toBe(false);
+      expect(wrapper.vm.isVariablesChanged).toBe(true);
+      expect(refreshButton().props("variant")).toBe("warning");
+      expect(refreshTooltip().props("disabled")).toBe(false);
     });
   });
 });

@@ -16,6 +16,35 @@ export default class DashboardactionPage {
     this.panelSaveBtn = page.locator('[data-test="dashboard-panel-save"]');
     this.applyDashboard = page.locator('[data-test="dashboard-apply"]');
     this.addPanelBtn = page.locator('[data-test="dashboard-panel-add"]');
+    this.layoutEditBtn = page.locator('[data-test="dashboard-edit-btn"]');
+    this.layoutEditSaveBtn = page.locator('[data-test="dashboard-edit-save-btn"]');
+    this.layoutEditDiscardBtn = page.locator('[data-test="dashboard-edit-discard-btn"]');
+    this.layoutEditUndoBtn = page.locator('[data-test="dashboard-edit-undo-btn"]');
+    this.layoutEditRedoBtn = page.locator('[data-test="dashboard-edit-redo-btn"]');
+    this.layoutEditChangesCount = page.locator('[data-test="dashboard-edit-changes-count"]');
+    this.layoutEditBadge = page.locator('[data-test="dashboard-edit-badge"]');
+    this.layoutDiscardDialog = page.locator('[data-test="dashboard-edit-discard-dialog"]');
+    this.layoutDiscardConfirmBtn = page.locator(
+      '[data-test="dashboard-edit-discard-dialog"] [data-test="o-dialog-primary-btn"]'
+    );
+    this.layoutDiscardCancelBtn = page.locator(
+      '[data-test="dashboard-edit-discard-dialog"] [data-test="o-dialog-secondary-btn"]'
+    );
+    this.layoutSettingsHeightInput = page.locator('[data-test="panel-layout-settings-height-input-field"]');
+    this.layoutSettingsApplyBtn = page.locator(
+      '[data-test="panel-layout-settings-drawer"] [data-test="o-dialog-primary-btn"]'
+    );
+    this.panelDragGrip = page.locator('[data-test="dashboard-panel-drag"]');
+    this.lockedGrid = page.locator(".grid-stack.grid-stack-static");
+    this.editingGrid = page.locator(".grid-stack.layout-editing");
+    this.panelMenuEditPanel = page.locator('[data-test="dashboard-edit-panel"]');
+    this.panelMenuEditLayout = page.locator('[data-test="dashboard-edit-layout"]');
+    this.panelMenuDuplicate = page.locator('[data-test="dashboard-duplicate-panel"]');
+    this.panelMenuDelete = page.locator('[data-test="dashboard-delete-panel"]');
+    this.shareBtn = page.locator('[data-test="dashboard-share-btn"]');
+    this.settingsBtn = page.locator('[data-test="dashboard-setting-btn"]');
+    this.addTabBtn = page.locator('[data-test="dashboard-tab-add-btn"]');
+    this.dashboardBackBtn = page.locator('[data-test="dashboard-back-btn"]');
     this.dashboardTable = page.locator('[data-test="dashboard-panel-table"]');
     this.chartRenderer = page.locator('[data-test="dashboard-panel-table"], [data-test="chart-renderer"]');
     this.chartRendererCanvas = page.locator('[data-test="chart-renderer"]');
@@ -302,6 +331,17 @@ export default class DashboardactionPage {
     }, { timeout: 30000 });
   }
 
+  // The apply button stays enabled for ~100ms after the click, so waitForChartToRender alone can pass before the query starts and the table later resets to empty.
+  async applyAndWaitForPromQLQuery() {
+    const promqlResponse = this.page.waitForResponse(
+      (res) => res.url().includes("/prometheus/api/v1/query_range"),
+      { timeout: 30000 }
+    );
+    await this.applyDashboardBtn();
+    await (await promqlResponse).finished();
+    await this.waitForChartToRender();
+  }
+
   //Dashboard panel actions(Edit, Layout, Duplicate, Inspector, Move, Delete)
 
   // Returns the per-panel edit dropdown locator (data-test keyed by panel name)
@@ -324,10 +364,91 @@ export default class DashboardactionPage {
     const actionTestId = actionDataTestIds[action];
     if (!actionTestId) throw new Error(`Unknown action: ${action}`);
 
+    // The panel menu offers "Edit layout" only in layout edit mode, and only that item there.
+    if (action === "Layout") await this.enterLayoutEdit();
+
     await this.page
       .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
       .click();
     await this.page.locator(`[data-test="${actionTestId}"]`).click();
+  }
+
+  async enterLayoutEdit() {
+    await this.layoutEditBtn.waitFor({ state: "visible" });
+    await this.layoutEditBtn.click();
+    await this.layoutEditSaveBtn.waitFor({ state: "visible" });
+  }
+
+  async saveLayoutEdit() {
+    await this.layoutEditSaveBtn.click();
+    await this.layoutEditSaveBtn.waitFor({ state: "hidden" });
+  }
+
+  async discardLayoutEdit() {
+    await this.layoutEditDiscardBtn.click();
+    const confirm = this.page.locator(
+      '[data-test="dashboard-edit-discard-dialog"] [data-test="o-dialog-primary-btn"]'
+    );
+    await Promise.race([
+      confirm.waitFor({ state: "visible" }),
+      this.layoutEditSaveBtn.waitFor({ state: "hidden" }),
+    ]).catch(() => {});
+    if (await confirm.isVisible()) await confirm.click();
+    await this.layoutEditSaveBtn.waitFor({ state: "hidden" });
+  }
+
+  getTabRenameBtn(tabId) {
+    return this.page.locator(`[data-test="dashboard-tab-${tabId}-rename-btn"]`);
+  }
+
+  async openPanelMenu(panelName) {
+    const dropdown = this.getEditPanelDropdown(panelName);
+    await dropdown.waitFor({ state: "visible", timeout: 30000 });
+    await dropdown.click();
+  }
+
+  async closePanelMenu() {
+    await this.page.keyboard.press("Escape");
+  }
+
+  // Already in layout edit mode: the dialog's Apply only adds a draft step, it never saves.
+  async applyPanelHeight(panelName, height) {
+    await this.openPanelMenu(panelName);
+    await this.panelMenuEditLayout.click();
+    await this.layoutSettingsHeightInput.waitFor({ state: "visible" });
+    await this.layoutSettingsHeightInput.fill(String(height));
+    await this.layoutSettingsApplyBtn.click();
+    await this.layoutSettingsHeightInput.waitFor({ state: "hidden" });
+  }
+
+  async undoLayoutEdit() {
+    await this.layoutEditUndoBtn.click();
+  }
+
+  async redoLayoutEdit() {
+    await this.layoutEditRedoBtn.click();
+  }
+
+  async requestLayoutDiscard() {
+    await this.layoutEditDiscardBtn.click();
+  }
+
+  async confirmLayoutDiscard() {
+    await this.layoutDiscardConfirmBtn.click();
+    await this.layoutDiscardDialog.waitFor({ state: "hidden" });
+  }
+
+  async cancelLayoutDiscard() {
+    await this.layoutDiscardCancelBtn.click();
+    await this.layoutDiscardDialog.waitFor({ state: "hidden" });
+  }
+
+  async clickDashboardBack() {
+    await this.dashboardBackBtn.click();
+  }
+
+  async pressLayoutShortcut(combo) {
+    await this.page.keyboard.press(combo);
   }
 
   /**

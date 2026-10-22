@@ -161,6 +161,38 @@ export const BADGE_GROUPS = {
     },
   },
 
+  // One chip per downtime target, plus the shared condition. The caller always supplies the label.
+  downtimeTarget: {
+    mode: "icon",
+    shape: "pill",
+    values: {
+      condition: { variant: "primary-soft", icon: "tune" },
+      alerts: { variant: "default-soft", icon: "shield-alert-outline" },
+      anomalydetections: { variant: "default-soft", icon: "query-stats" },
+      synthetics: { variant: "default-soft", icon: "radar" },
+      slos: { variant: "default-soft", icon: "target" },
+    },
+  },
+
+  // Downtime lifecycle. Active is amber, not green: notifications are off while it runs.
+  downtimeStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      scheduled: { variant: "blue-soft", labelKey: "components.badge.downtimeStatus.scheduled" },
+      active: { variant: "warning-soft", labelKey: "components.badge.downtimeStatus.active" },
+      ended: { variant: "default-soft", labelKey: "components.badge.downtimeStatus.ended" },
+      cancelled: {
+        variant: "default-outline",
+        labelKey: "components.badge.downtimeStatus.cancelled",
+      },
+      endedearly: {
+        variant: "default-soft",
+        labelKey: "components.badge.downtimeStatus.endedEarly",
+      },
+    },
+  },
+
   // Alert PRIORITY (Feature 2, PT-3) — how much humans care about this alert,
   // set at configuration time.
   //
@@ -282,6 +314,12 @@ export const BADGE_GROUPS = {
       warning: { variant: "amber-soft", labelKey: "components.badge.logLevel.warn" },
       error: { variant: "error-soft", labelKey: "common.error" },
       fatal: { variant: "purple-soft", labelKey: "components.badge.logLevel.fatal" },
+      emergency: { variant: "purple-soft", labelKey: "components.badge.logLevel.emergency" },
+      alert: { variant: "error-soft", labelKey: "components.badge.logLevel.alert" },
+      critical: { variant: "error-soft", labelKey: "components.badge.logLevel.critical" },
+      notice: { variant: "success-soft", labelKey: "components.badge.logLevel.notice" },
+      ok: { variant: "success-soft", labelKey: "components.badge.logLevel.ok" },
+      unknown: { variant: "default-soft", labelKey: "components.badge.logLevel.unknown" },
     },
   },
 
@@ -362,8 +400,19 @@ export const BADGE_GROUPS = {
       active: { variant: "success-soft" },
       draft: { variant: "default-soft" },
       paused: { variant: "warning-soft" },
-      degraded: { variant: "orange-soft" },
       archived: { variant: "default-soft" },
+    },
+  },
+
+  // No labelKeys: EvalJobList always passes the translated `label`.
+  evalJobHealth: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      healthy: { variant: "success-soft" },
+      degraded: { variant: "orange-soft" },
+      waitingforcredentials: { variant: "error-soft" },
+      norecentruns: { variant: "default-soft" },
     },
   },
 
@@ -1523,6 +1572,26 @@ export const BADGE_GROUPS = {
     fallback: { variant: "default-soft", icon: "help-outline" },
   },
 
+  // Report run outcome — dot. "Sent" names the email, not the job; overdue/never/paused are list-only.
+  reportRunStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      succeeded: { variant: "success-soft", labelKey: "components.badge.reportRunStatus.sent" },
+      partial: { variant: "success-soft", labelKey: "components.badge.reportRunStatus.partial" },
+      cached: { variant: "blue-soft", labelKey: "components.badge.reportRunStatus.cached" },
+      error: { variant: "error-soft", labelKey: "components.badge.reportRunStatus.failed" },
+      skipped: { variant: "warning-soft", labelKey: "components.badge.reportRunStatus.skipped" },
+      overdue: { variant: "warning-soft", labelKey: "components.badge.reportRunStatus.overdue" },
+      unrecorded: {
+        variant: "default-soft",
+        labelKey: "components.badge.reportRunStatus.unrecorded",
+      },
+      paused: { variant: "default-soft", labelKey: "components.badge.reportRunStatus.paused" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
   // Recent-event result (overview) — plain. Failed/Firing run hot (red), Error
   // is the milder amber.
   eventStatus: {
@@ -1867,6 +1936,20 @@ export const BADGE_GROUPS = {
       beta: { variant: "primary-soft", label: raw("BETA") },
       ha: { variant: "primary-soft", label: raw("HA") },
       comingsoon: { variant: "default-soft", labelKey: "components.badge.featureFlag.comingsoon" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+  slackInstallStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      healthy: { variant: "success-soft", labelKey: "components.badge.slackInstallStatus.healthy" },
+      degraded: {
+        variant: "warning-soft",
+        labelKey: "components.badge.slackInstallStatus.degraded",
+      },
+      pending: { variant: "blue-soft", labelKey: "components.badge.slackInstallStatus.pending" },
+      revoked: { variant: "error-soft", labelKey: "components.badge.slackInstallStatus.revoked" },
     },
     fallback: { variant: "default-soft" },
   },

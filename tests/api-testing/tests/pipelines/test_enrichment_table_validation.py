@@ -35,8 +35,12 @@ def _delete_table(session, base_url, name):
     )
 
 
-def _wait_for_lookup(session, base_url, vrl, events):
-    """Poll the function-test endpoint until the table backs the lookup."""
+def _poll_function_test(session, base_url, vrl, events, accept):
+    """Poll the function-test endpoint until `accept(resp)`, then return that response.
+
+    Returns the last response on timeout so the caller's assertion reports the
+    real failure rather than a timeout with no detail.
+    """
     deadline = time.time() + TABLE_READY_TIMEOUT
     last = None
     while time.time() < deadline:
@@ -45,12 +49,35 @@ def _wait_for_lookup(session, base_url, vrl, events):
             json={"function": vrl, "events": events},
             timeout=60,
         )
-        if last.status_code == 200:
-            results = last.json().get("results", [])
-            if results and all(r.get("event", {}).get("label") for r in results):
-                return last
+        if accept(last):
+            return last
         time.sleep(3)
     return last
+
+
+def _labels_applied(resp):
+    """Every event carries its label, so the table is actually backing the lookup."""
+    if resp.status_code != 200:
+        return False
+    results = resp.json().get("results", [])
+    return bool(results) and all(r.get("event", {}).get("label") for r in results)
+
+
+def _control_event_labelled(resp):
+    """The control event carries its label; later events may deliberately not.
+
+    `_labels_applied` demands a label on every event, which a known-missing key
+    can never satisfy.
+    """
+    if resp.status_code != 200:
+        return False
+    results = resp.json().get("results", [])
+    return bool(results) and bool(results[0].get("event", {}).get("label"))
+
+
+def _wait_for_lookup(session, base_url, vrl, events):
+    """Poll until the table backs the lookup and every event carries its label."""
+    return _poll_function_test(session, base_url, vrl, events, _labels_applied)
 
 
 @pytest.fixture
@@ -126,11 +153,15 @@ def test_vrl_lookup_of_a_missing_key_leaves_the_event_unenriched(
         f'rec, err = get_enrichment_table_record("{enrichment_table}", '
         '{"code": to_string!(.code)})\n.label = rec.label\n.'
     )
-    resp = create_session.post(
-        f"{base_url}api/{ORG_ID}/functions/test",
-        json={"function": vrl, "events": [{"code": "no-such-code"}]},
-        timeout=60,
-    )
+    # A known key rides along as the control: an empty table and a broken lookup look alike.
+    events = [{"code": "c1"}, {"code": "no-such-code"}]
+    resp = _poll_function_test(create_session, base_url, vrl, events, _control_event_labelled)
 
     assert resp.status_code == 200, f"function test failed: {resp.text}"
-    assert not resp.json()["results"][0]["event"].get("label")
+    results = resp.json()["results"]
+    assert results[0]["event"].get("label") == "ALPHA", (
+        "the known key must still enrich, or this test cannot tell a missing key from a "
+        f"lookup that does not work at all: {results}"
+    )
+    assert not results[1]["event"].get("label"), \
+        f"a key with no row must not fabricate a value: {results}"

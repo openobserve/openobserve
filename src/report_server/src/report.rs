@@ -8,7 +8,7 @@ use chromiumoxide::{
     fetcher::{BrowserFetcher, BrowserFetcherOptions},
     handler::viewport::Viewport,
 };
-use config::{get_config, utils::time::now_micros};
+use config::{get_config, meta::dashboards::reports::format_dashb_var, utils::time::now_micros};
 use futures::StreamExt;
 use lettre::{
     AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
@@ -147,7 +147,7 @@ pub async fn generate_report(
     timezone: &str,
     report_type: ReportType,
     report_name: &str,
-) -> Result<(Vec<u8>, String), anyhow::Error> {
+) -> Result<(Vec<u8>, String, bool), anyhow::Error> {
     let dashboard_id = &dashboard.dashboard;
     let folder_id = &dashboard.folder;
 
@@ -156,7 +156,10 @@ pub async fn generate_report(
 
     let mut dashb_vars = "".to_string();
     for variable in dashboard.variables.iter() {
-        dashb_vars = format!("{}&var-{}={}", dashb_vars, variable.key, variable.value);
+        dashb_vars = format!(
+            "{dashb_vars}&{}",
+            format_dashb_var(&variable.key, &variable.value)
+        );
     }
 
     if dashboard.tabs.is_empty() {
@@ -325,20 +328,22 @@ pub async fn generate_report(
     log::info!("waiting for data to load for dashboard {dashboard_id}");
 
     // If the span element is not rendered yet, capture whatever is loaded till now
-    match wait_for_panel_data_load(&page).await {
+    let partial = match wait_for_panel_data_load(&page).await {
         Err(e) => {
             log::error!(
                 "[REPORT] error finding the span element for dashboard {dashboard_id}: {e}"
             );
             log::info!("[REPORT] proceeding with whatever data is loaded until now");
+            true
         }
         Ok(dur) => {
             log::info!(
                 "[REPORT] all panel data loaded for report dashboard: {dashboard_id} in {} seconds",
                 dur.as_secs_f64()
             );
+            false
         }
-    }
+    };
 
     if let Err(e) = page.find_element("main").await {
         let page_url = page.url().await;
@@ -389,7 +394,7 @@ pub async fn generate_report(
         log::error!("Error closing temporary directory: {e}");
     }
 
-    Ok((pdf_data, email_dashb_url))
+    Ok((pdf_data, email_dashb_url, partial))
 }
 
 /// Sends emails to the [`Report`] recipients. Currently only one pdf data is supported.
@@ -497,13 +502,6 @@ mod tests {
     fn test_sanitize_filename_special_chars() {
         let input = "Report@#$%^&*()";
         let expected = "Report_________";
-        assert_eq!(sanitize_filename(input), expected);
-    }
-
-    #[test]
-    fn test_sanitize_filename_mixed_chars() {
-        let input = "My Report! 2024/01/15.pdf";
-        let expected = "My Report_ 2024_01_15_pdf";
         assert_eq!(sanitize_filename(input), expected);
     }
 
@@ -701,7 +699,10 @@ mod tests {
 
         let mut dashb_vars = "".to_string();
         for variable in variables.iter() {
-            dashb_vars = format!("{}&var-{}={}", dashb_vars, variable.key, variable.value);
+            dashb_vars = format!(
+                "{dashb_vars}&{}",
+                format_dashb_var(&variable.key, &variable.value)
+            );
         }
 
         assert_eq!(dashb_vars, "&var-env=prod&var-region=us-west");

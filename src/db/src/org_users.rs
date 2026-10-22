@@ -178,10 +178,15 @@ pub async fn remove(org_id: &str, user_email: &str) -> Result<(), anyhow::Error>
 }
 
 pub async fn remove_by_user(email: &str) -> Result<(), anyhow::Error> {
-    let key = format!("{ORG_USERS_KEY_PREFIX}many/user/{email}");
     org_users::remove_by_user(email)
         .await
         .map_err(|e| anyhow::anyhow!("Failed to remove user from org: {e}"))?;
+    notify_removed_by_user(email).await
+}
+
+/// Emits the many/user delete event; call it only once the rows are gone from the store.
+pub async fn notify_removed_by_user(email: &str) -> Result<(), anyhow::Error> {
+    let key = format!("{ORG_USERS_KEY_PREFIX}many/user/{email}");
     delete_from_db_coordinator(&key, false, true, None)
         .await
         .inspect_err(|e| {
@@ -231,6 +236,18 @@ pub async fn get(org_id: &str, user_email: &str) -> Result<OrgUserRecord, anyhow
     let org_user = org_users::get(org_id, user_email)
         .await
         .map_err(|e| anyhow::anyhow!("Failed to fetch user role: {}", e))?;
+    Ok(org_user)
+}
+
+pub async fn get_optional(
+    org_id: &str,
+    user_email: &str,
+) -> Result<Option<OrgUserRecord>, anyhow::Error> {
+    let cache_key = user_email.to_lowercase();
+    if let Some(org_user) = ORG_USERS.get(&format!("{org_id}/{cache_key}")) {
+        return Ok(Some(org_user.value().clone()));
+    }
+    let org_user = org_users::get_optional(org_id, user_email).await?;
     Ok(org_user)
 }
 

@@ -790,6 +790,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="lg"
         />
 
+        <OToggleGroup
+          v-if="!promqlMode && shouldShowCartesianAxisConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('axis', 'axis-label-mode')"
+          type="single"
+          label-position="top"
+          v-model="axisLabelModeModel"
+          data-test="dashboard-config-axis-label-mode"
+          :data-test-selected-value="axisLabelModeModel"
+        >
+          <template #label>
+            <span class="flex items-center gap-1">
+              {{ t("dashboard.axisLabelMode") }}
+              <OIcon
+                name="info-outline"
+                size="sm"
+                class="cursor-help"
+                data-test="dashboard-config-axis-label-mode-info"
+              >
+                <OTooltip :content="t('dashboard.axisLabelModeTooltip')" max-width="15.625rem" />
+              </OIcon>
+            </span>
+          </template>
+          <OToggleGroupItem
+            v-for="opt in axisLabelModeOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+            data-test="dashboard-config-axis-label-mode-option"
+            :data-test-label="opt.label"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
+
         <div
           class="flex gap-2"
           v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
@@ -1804,7 +1837,8 @@ import {
   watchEffect,
   watch,
 } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import type { AxisLabelMode } from "@/utils/dashboard/fieldLabel";
 import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
 import ColorBySeries from "./ColorBySeries.vue";
@@ -1816,6 +1850,12 @@ import ColorPaletteDropDown from "./ColorPaletteDropDown.vue";
 import BackGroundColorConfig from "./BackGroundColorConfig.vue";
 import SparklineConfig from "./SparklineConfig.vue";
 import ConfigPanelSearch from "./ConfigPanelSearch.vue";
+import {
+  isShown,
+  revealAndFocus,
+  usePanelEditorFocus,
+  waitForElement,
+} from "@/composables/dashboard/usePanelEditorFocus";
 import { useConfigPanel } from "../../../composables/dashboard/useConfigPanel";
 import LinearIcon from "@/components/icons/dashboards/LinearIcon.vue";
 import NoSymbol from "@/components/icons/dashboards/NoSymbol.vue";
@@ -1909,6 +1949,17 @@ export default defineComponent({
             v === TOGGLE_AUTO ? null : v;
         },
       });
+    const axisLabelModeModel = computed({
+      get: (): AxisLabelMode => dashboardPanelData.data.config.axis_label_mode ?? "auto",
+      set: (v: AxisLabelMode) => {
+        dashboardPanelData.data.config.axis_label_mode = v;
+      },
+    });
+    const axisLabelModeOptions: { label: I18nText; value: AxisLabelMode }[] = [
+      { label: t("dashboard.auto"), value: "auto" },
+      { label: t("common.show"), value: "show" },
+      { label: t("common.hide"), value: "hide" },
+    ];
     const legendsPositionModel = toggleModel("legends_position");
     const legendsTypeModel = toggleModel("legends_type");
     const chartAlignModel = toggleModel("chart_align");
@@ -2599,6 +2650,25 @@ export default defineComponent({
       isPivotMode,
     );
 
+    // "Use Top N" on a dashboard notice lands on the Top N input, opening its section first.
+    const { pendingFocus, takeFocus } = usePanelEditorFocus();
+    watch(
+      pendingFocus,
+      async () => {
+        if (!takeFocus("top-n")) return;
+        searchQuery.value = "";
+        expandedSections.value.data = true;
+        const el = await waitForElement(() => {
+          const found = document.querySelector<HTMLElement>(
+            '[data-test="dashboard-config-top_results"]',
+          );
+          return isShown(found) ? found : null;
+        });
+        if (el) revealAndFocus(el);
+      },
+      { immediate: true },
+    );
+
     // Focus the search box when the config panel opens so users can start
     // filtering settings right away.
     onMounted(() => {
@@ -2641,6 +2711,8 @@ export default defineComponent({
 
     return {
       raw,
+      axisLabelModeModel,
+      axisLabelModeOptions,
       legendsPositionModel,
       legendsTypeModel,
       chartAlignModel,

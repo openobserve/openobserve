@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import { h, nextTick } from "vue";
+import { h, nextTick, ref } from "vue";
 import { TooltipProvider } from "reka-ui";
 import OTooltip from "./OTooltip.vue";
 
@@ -147,6 +147,211 @@ describe("OTooltip", () => {
       expect(document.body.textContent).not.toContain("Hello");
 
       wrapper.unmount();
+    });
+  });
+
+  // ── Child-mode anchoring ───────────────────────────────────────────────────
+  describe("child-mode anchoring", () => {
+    it("skips a display:contents parent and attaches to the nearest box", () => {
+      const wrapper = mount({
+        render: () =>
+          h("div", { "data-testid": "box" }, [
+            h("span", { "data-testid": "wrapper", style: "display: contents" }, [
+              h(OTooltip, { content: "Hello" }),
+            ]),
+          ]),
+      });
+
+      expect(wrapper.find('[data-testid="box"]').attributes("data-o-tooltip-trigger")).toBe("");
+      expect(
+        wrapper.find('[data-testid="wrapper"]').attributes("data-o-tooltip-trigger"),
+      ).toBeUndefined();
+    });
+
+    it("attaches to a plain parent without asking for its computed style", () => {
+      const spy = vi.spyOn(window, "getComputedStyle");
+      const wrapper = mount({
+        render: () => h("span", { "data-testid": "plain" }, [h(OTooltip, { content: "Hello" })]),
+      });
+      const plain = wrapper.find('[data-testid="plain"]').element;
+
+      expect(plain.getAttribute("data-o-tooltip-trigger")).toBe("");
+      expect(spy.mock.calls.some(([el]) => el === plain)).toBe(false);
+      spy.mockRestore();
+    });
+  });
+
+  describe("trigger naming", () => {
+    it("uses the tooltip text as the name of an icon-only trigger", () => {
+      const wrapper = mount({
+        render: () => h("button", { "data-testid": "btn" }, [h(OTooltip, { content: "Refresh" })]),
+      });
+      expect(wrapper.find('[data-testid="btn"]').attributes("aria-label")).toBe("Refresh");
+    });
+
+    it("names the button, not the icon before the tooltip, when an icon precedes it", () => {
+      const wrapper = mount({
+        render: () =>
+          h("button", { "data-testid": "btn" }, [
+            h("span", { "data-testid": "icon", "aria-hidden": "true" }),
+            h(OTooltip, { content: "Refresh" }),
+          ]),
+      });
+      expect(wrapper.find('[data-testid="btn"]').attributes("aria-label")).toBe("Refresh");
+      expect(wrapper.find('[data-testid="icon"]').attributes("aria-label")).toBeUndefined();
+    });
+
+    it("keeps the button name in step with a changing tooltip text", async () => {
+      const text = ref("Expand");
+      const wrapper = mount({
+        render: () => h("button", { "data-testid": "btn" }, [h(OTooltip, { content: text.value })]),
+      });
+      expect(wrapper.find('[data-testid="btn"]').attributes("aria-label")).toBe("Expand");
+      text.value = "Collapse";
+      await nextTick();
+      expect(wrapper.find('[data-testid="btn"]').attributes("aria-label")).toBe("Collapse");
+    });
+
+    it("leaves a trigger that already has text or a name alone", () => {
+      const wrapper = mount({
+        render: () =>
+          h("div", [
+            h("button", { "data-testid": "text" }, ["Save", h(OTooltip, { content: "Hint" })]),
+            h("button", { "data-testid": "named", "aria-label": "Own" }, [
+              h(OTooltip, { content: "Hint" }),
+            ]),
+          ]),
+      });
+      expect(wrapper.find('[data-testid="text"]').attributes("aria-label")).toBeUndefined();
+      expect(wrapper.find('[data-testid="named"]').attributes("aria-label")).toBe("Own");
+    });
+  });
+
+  // ── Overflow-only and anchored tooltips ────────────────────────────────────
+  describe("overflow-only", () => {
+    // jsdom has no layout, so a test sets the two widths the cut-off check compares.
+    const setWidths = (el: Element, scrollWidth: number, clientWidth: number) => {
+      Object.defineProperty(el, "scrollWidth", { configurable: true, value: scrollWidth });
+      Object.defineProperty(el, "clientWidth", { configurable: true, value: clientWidth });
+    };
+    const settle = async () => {
+      await new Promise((r) => setTimeout(r, 60));
+      await nextTick();
+    };
+    const mountChild = () =>
+      mount(
+        {
+          render: () =>
+            h("span", { "data-testid": "t" }, [
+              h(OTooltip, { overflowOnly: true, delay: 10 }),
+              "payment-service-production-eu-west",
+            ]),
+        },
+        { attachTo: document.body },
+      );
+
+    it("opens in child mode with the parent's own text when the parent is cut", async () => {
+      const wrapper = mountChild();
+      const trigger = wrapper.find('[data-testid="t"]').element;
+      setWidths(trigger, 310, 200);
+
+      trigger.dispatchEvent(new MouseEvent("mouseenter"));
+      await settle();
+
+      expect(document.body.querySelector('[data-test="o-tooltip-content"]')?.textContent).toContain(
+        "payment-service-production-eu-west",
+      );
+      wrapper.unmount();
+    });
+
+    it("stays closed in child mode when the parent's text fits", async () => {
+      const wrapper = mountChild();
+      const trigger = wrapper.find('[data-testid="t"]').element;
+      setWidths(trigger, 200, 200);
+
+      trigger.dispatchEvent(new MouseEvent("mouseenter"));
+      await settle();
+
+      expect(document.body.querySelector('[data-test="o-tooltip-content"]')).toBeNull();
+      wrapper.unmount();
+    });
+
+    it("opens in wrapper mode only when the wrapped trigger is cut", async () => {
+      const mountWrapper = (cut: boolean) => {
+        const wrapper = mount(OTooltip, {
+          props: { overflowOnly: true, delay: 10 },
+          slots: { default: () => h("button", { "data-testid": "t" }, "Long name") },
+          attachTo: document.body,
+        });
+        const trigger = wrapper.find('[data-testid="t"]').element;
+        setWidths(trigger, cut ? 310 : 200, 200);
+        return { wrapper, trigger };
+      };
+
+      const fits = mountWrapper(false);
+      fits.trigger.dispatchEvent(new MouseEvent("pointermove", { bubbles: true }));
+      await settle();
+      expect(fits.trigger.getAttribute("data-state")).toBe("closed");
+      fits.wrapper.unmount();
+
+      const cut = mountWrapper(true);
+      cut.trigger.dispatchEvent(new MouseEvent("pointermove", { bubbles: true }));
+      await settle();
+      expect(cut.trigger.getAttribute("data-state")).not.toBe("closed");
+      cut.wrapper.unmount();
+    });
+
+    it("stays closed in child mode when the cut element has no text, such as an icon", async () => {
+      const wrapper = mount(
+        {
+          render: () =>
+            h("span", { "data-testid": "t" }, [
+              h(OTooltip, { overflowOnly: true, delay: 10 }),
+              h("i", { class: "icon" }),
+            ]),
+        },
+        { attachTo: document.body },
+      );
+      const trigger = wrapper.find('[data-testid="t"]').element;
+      setWidths(trigger, 310, 200);
+
+      trigger.dispatchEvent(new MouseEvent("mouseenter"));
+      await settle();
+
+      expect(document.body.querySelector('[data-test="o-tooltip-content"]')).toBeNull();
+      wrapper.unmount();
+    });
+
+    it("marks the element it belongs to in both modes, flagging overflow-only ones", () => {
+      const child = mountChild();
+      expect(child.find('[data-testid="t"]').attributes("data-o-tooltip-trigger")).toBe("overflow");
+      child.unmount();
+
+      const wrapped = mount(OTooltip, {
+        props: { content: "Hello" },
+        slots: { default: () => h("button", { "data-testid": "w" }, "Hover") },
+      });
+      expect(wrapped.find('[data-testid="w"]').attributes("data-o-tooltip-trigger")).toBe("");
+      wrapped.unmount();
+    });
+
+    it("positions one shared tooltip on the given anchor and follows `open`", async () => {
+      const anchor = document.createElement("div");
+      document.body.appendChild(anchor);
+      const wrapper = mount(OTooltip, {
+        props: { anchor, open: true, content: "Full cell value" },
+        attachTo: document.body,
+      });
+      await nextTick();
+      expect(document.body.textContent).toContain("Full cell value");
+
+      await wrapper.setProps({ open: false });
+      // reka removes a closed bubble a few ticks after `open` turns false.
+      for (let i = 0; i < 4; i++) await nextTick();
+      expect(document.body.querySelector('[data-test="o-tooltip-content"]')).toBeNull();
+
+      wrapper.unmount();
+      anchor.remove();
     });
   });
 

@@ -96,6 +96,14 @@ describe("buildPreviewContext", () => {
     expect(ctx.sample.alert_trigger_time).toBe("2026-06-28T10:30:00Z");
   });
 
+  it("samples the window bounds in epoch millis, matching the sample window", () => {
+    const ctx = buildPreviewContext({});
+    expect(ctx.sample.alert_start_time_millis).toBe(
+      String(Date.parse(ctx.sample.alert_start_time)),
+    );
+    expect(ctx.sample.alert_end_time_millis).toBe(String(Date.parse(ctx.sample.alert_end_time)));
+  });
+
   it("renders a mixed template end to end", () => {
     const ctx = buildPreviewContext({ alert_name: "High CPU" });
     const segs = renderTemplate("{alert_name} count {alert_count} rows {rows}", ctx);

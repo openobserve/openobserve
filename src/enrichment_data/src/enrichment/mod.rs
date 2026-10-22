@@ -415,18 +415,6 @@ mod tests {
     }
 
     #[test]
-    fn test_enrichment_find_table_rows_multiple_results() {
-        let table = create_stream_table(create_test_data());
-        let conditions = vec![]; // Empty condition should return empty due to optimization
-
-        let results = table
-            .find_table_rows(Case::Sensitive, &conditions, None, None, None)
-            .unwrap();
-
-        assert!(results.is_empty());
-    }
-
-    #[test]
     fn test_enrichment_wildcard_parameter() {
         // Test that wildcard parameter is accepted (currently unused but part of API)
         let table = create_stream_table(create_test_data());

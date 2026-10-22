@@ -20,19 +20,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   Purely presentational: everything (hero, ordered steps, context chips, code
   chrome, supplementary accordions, footer) is rendered from a RichCardContent
-  object (see ./types.ts). Detection ("has my data arrived?") is delegated to
-  useStreamDetect — a single user-triggered check per "Test" click, no
-  background polling.
+  object (see ./types.ts). Detection ("has my data arrived?") is the shared
+  FirstEventStatus bar, which polls the card's own detect stream and filter;
+  useStreamDetect keeps the step and confetti state it reports into.
 
   Drive it by building a RichCardContent (AI: markdown frontmatter; data sources:
   setupCard/content/*) — no edits here.
 -->
 <script setup lang="ts">
-import { computed, ref, watch, nextTick } from "vue";
+import { computed, inject, ref, watch, nextTick } from "vue";
+import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
-import { b64EncodeUnicode } from "@/utils/zincutils";
-import useStreams from "@/composables/useStreams";
 import analytics from "@/services/product_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -45,6 +44,10 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+import type { CodeBlockCopyPayload } from "@/lib/core/Code/OCodeBlock.types";
+import { OPEN_TOKEN_PICKER } from "@/composables/useCredentialSnippet";
+import type { FirstEventState, StreamSignal } from "@/composables/firstEvent/useFirstEventWatch";
+import FirstEventStatus from "../FirstEventStatus.vue";
 import { safeHttpUrl } from "./subs";
 import type {
   CardSubstitutions,
@@ -52,11 +55,15 @@ import type {
   RichCardInput,
   RichCardStep,
   RichCardStepVariant,
+  RichCardStepVariantGroup,
   RichCardStreamInput,
   StepChipKind,
 } from "./types";
 import { useStreamDetect, prefersReducedMotion } from "./useStreamDetect";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
+
+/** The data-test prefix of a step's code block when the content names none. */
+const SETUP_CODE_BLOCK = "ingestion-setup-code-block";
 
 const props = defineProps<{
   /** The integration's rich content (already token-substituted). */
@@ -79,109 +86,12 @@ const emit = defineEmits<{
 }>();
 
 const router = useRouter();
+const store = useStore();
 const { t } = useI18nTyped();
-const { getStreams } = useStreams(t);
 const { isDark } = useTheme();
+const openTokenPicker = inject(OPEN_TOKEN_PICKER, null);
 
-// The detected stream type drives the status copy + the "View …" destination.
-// traces / logs land in their explorers; metrics (which fan out into many
-// per-metric streams) link to the Streams page where those streams appear.
 const streamKind = computed(() => props.content.detect?.streamType);
-const isLogsStream = computed(() => streamKind.value === "logs");
-const isMetricsStream = computed(() => streamKind.value === "metrics");
-// Status-bar copy that names the data ("Checking for metrics…" / "No spans
-// Found Yet"). The noun can't be appended to a translated fragment — word order
-// differs across languages — so, like countUnitKey below, we pick the KEY per
-// stream type and each message carries the whole sentence.
-const testForKey = computed<I18nKey>(() =>
-  isMetricsStream.value
-    ? "ingestion.setupCard.startIngestingTestForMetrics"
-    : isLogsStream.value
-      ? "ingestion.setupCard.startIngestingTestForLogs"
-      : "ingestion.setupCard.startIngestingTestForSpans",
-);
-const checkingForKey = computed<I18nKey>(() =>
-  isMetricsStream.value
-    ? "ingestion.setupCard.checkingForMetrics"
-    : isLogsStream.value
-      ? "ingestion.setupCard.checkingForLogs"
-      : "ingestion.setupCard.checkingForSpans",
-);
-const noneFoundKey = computed<I18nKey>(() =>
-  isMetricsStream.value
-    ? "ingestion.setupCard.noMetricsFoundYet"
-    : isLogsStream.value
-      ? "ingestion.setupCard.noLogsFoundYet"
-      : "ingestion.setupCard.noSpansFoundYet",
-);
-// Singular unit for the connected count ("3 metric streams" / "5 spans").
-// The count must live inside the translated string, and vue-i18n picks the
-// plural branch per key — hence one key per unit rather than a shared suffix.
-const countUnitKey = computed<I18nKey>(() =>
-  isMetricsStream.value
-    ? "ingestion.setupCard.countMetricStreams"
-    : isLogsStream.value
-      ? "ingestion.setupCard.countLogs"
-      : "ingestion.setupCard.countSpans",
-);
-const connectedHeadline = computed(() =>
-  isMetricsStream.value
-    ? t("ingestion.setupCard.connectedMetricsHeadline")
-    : isLogsStream.value
-      ? t("ingestion.setupCard.connectedLogsHeadline")
-      : t("ingestion.setupCard.connectedTracesHeadline"),
-);
-const viewDataLabel = computed(() =>
-  isMetricsStream.value
-    ? t("ingestion.setupCard.viewStreams")
-    : isLogsStream.value
-      ? t("ingestion.setupCard.viewLogs")
-      : t("ingestion.setupCard.viewTraces"),
-);
-const viewDataIcon = computed(() =>
-  isMetricsStream.value ? "list" : isLogsStream.value ? "article" : "timeline",
-);
-
-// Open the Logs/Traces view for the detected stream, pre-filtered to this
-// integration's data over a 15m window (covers detection's 10m lookback). The
-// detection filter is a SQL WHERE fragment — passed base64-encoded as the
-// search-bar query, matching how the rest of the app deep-links into search.
-const viewData = async () => {
-  const detectCfg = props.content.detect;
-  if (!detectCfg) return;
-  // The destination Logs/Traces view reads its stream list from the cached
-  // streams store. A stream this integration just created won't be in that
-  // cache yet, so the deep-link can't select it. Force-refresh this stream type
-  // first so the new stream is present before we navigate. Best-effort — if the
-  // refetch fails we still navigate (the view runs its own fetch on load).
-  try {
-    await getStreams(detectCfg.streamType, false, false, true);
-  } catch {
-    // ignore — navigate anyway
-  }
-
-  // Metrics fan out into many per-metric streams with no single SQL filter, so
-  // we send the user to the Streams page (where the new sqlserver_* streams
-  // appear) rather than a pre-filtered explorer.
-  if (isMetricsStream.value) {
-    router.push({ name: "logstreams", query: { org_identifier: props.subs.org } }).catch(() => {});
-    return;
-  }
-
-  const query: Record<string, string> = {
-    org_identifier: props.subs.org,
-    stream: watchedStream.value,
-    period: "15m",
-    refresh: "0",
-    query: b64EncodeUnicode(detectCfg.filter) ?? "",
-  };
-  if (isLogsStream.value) {
-    query.stream_type = "logs";
-  } else {
-    query.tab = "spans";
-  }
-  router.push({ name: isLogsStream.value ? "logs" : "traces", query }).catch(() => {});
-};
 
 // Logo precedence per theme: manifest override → content (frontmatter) → none.
 // In dark mode the dark variant is preferred, falling back to the light logo.
@@ -222,7 +132,15 @@ const watchedStream = computed(() =>
 // reactively, like `{stream}` above. We aggregate every step's inputs so a value
 // can fill code anywhere, and seed from defaults so all keys exist (keeps
 // mutations reactive) and code shows sensible values before the user edits.
-const allInputs = computed(() => props.content.steps.flatMap((s) => s.inputs ?? []));
+// Variant inputs are included whether selected or not, so ids must be unique card-wide.
+const allInputs = computed(() =>
+  props.content.steps.flatMap((s) => [
+    ...(s.inputs ?? []),
+    ...(s.variants ?? [])
+      .flatMap((v) => ("variants" in v ? v.variants : [v]))
+      .flatMap((v) => v.inputs ?? []),
+  ]),
+);
 const inputValues = ref<Record<string, string>>(
   Object.fromEntries(allInputs.value.map((i) => [i.id, i.default])),
 );
@@ -230,14 +148,45 @@ const inputValues = ref<Record<string, string>>(
 // Substitute live values (stream + free-form inputs) into authored code at
 // display/copy time (kept out of build-time subs because they change as the user
 // types). Build-time {url}/{org}/{token} are already resolved.
-const subStream = (text?: string): string | undefined => {
+const subStream = (text?: string, variant?: RichCardStepVariant): string | undefined => {
   if (text == null) return text;
-  let out = text.replaceAll("{stream}", watchedStream.value);
+  const flags = variantFlags(variant);
+  let out = text.replaceAll("{stream}", watchedStream.value).replaceAll("{flags}", () => flags);
   for (const inp of allInputs.value) {
-    out = out.replaceAll(`{${inp.id}}`, inputValues.value[inp.id] ?? inp.default);
+    if (inp.flag || inp.helmSet) continue;
+    const value = inputValues.value[inp.id] ?? inp.default;
+    // A function replacement keeps typed `$&`, `$$` etc. literal.
+    out = out.replaceAll(`{${inp.id}}`, () => value);
   }
   return out;
 };
+
+const inputValue = (id: string) => inputValues.value[id]?.trim() ?? "";
+const missingRequired = (variant?: RichCardStepVariant) =>
+  !!variant?.requireOneOf &&
+  variant.requireOneOf.ids.every((id) => !inputValue(id).replace(/[\s,]/g, ""));
+// Single-quoted for POSIX shells, so globs like *app* reach the installer unexpanded.
+const shellQuote = (v: string) => `'${v.replaceAll("'", "'\\''")}'`;
+// Helm list items end at an unescaped `,` or `}`; escaping stops a value from closing the list.
+const helmList = (v: string) =>
+  v
+    .split(",")
+    .map((item) => item.trim().replace(/[\\{}]/g, "\\$&"))
+    .filter(Boolean)
+    .join(",");
+const variantFlags = (variant?: RichCardStepVariant): string =>
+  (variant?.inputs ?? [])
+    .map((inp) => {
+      // A blank list is set to null, not omitted: --reset-then-reuse-values would keep the old one.
+      if (inp.helmSet) {
+        const list = helmList(inputValue(inp.id));
+        return list
+          ? ` \\\n  --set-string ${shellQuote(`${inp.helmSet}={${list}}`)}`
+          : ` \\\n  --set ${inp.helmSet}=null`;
+      }
+      return inp.flag && inputValue(inp.id) ? ` ${inp.flag} ${shellQuote(inputValue(inp.id))}` : "";
+    })
+    .join("");
 
 const detect = useStreamDetect({
   config: () => ({
@@ -253,6 +202,48 @@ const detect = useStreamDetect({
 });
 const detected = computed(() => detect.connected.value);
 
+// A keyword card's streams share a name fragment (system_ for host metrics), so the bar watches the fragment.
+const barTargetStream = computed(() => (props.content.detect ? watchedStream.value : undefined));
+const barMatch = computed(() => props.content.detect?.match);
+const barSignal = computed<StreamSignal | undefined>(() => props.content.detect?.streamType);
+const barFilter = computed(() => props.content.detect?.filter || undefined);
+// The cluster or host the user typed names the source on the bar; an untouched default names nothing the user chose.
+const barSourceLabel = computed(() => {
+  for (const id of ["cluster", "host"]) {
+    const value = inputValues.value[id]?.trim();
+    const fallback = allInputs.value.find((inp) => inp.id === id)?.default.trim();
+    if (value && value !== fallback) return value;
+  }
+  return undefined;
+});
+const barState = ref<FirstEventState>("waiting");
+const statusBar = ref<InstanceType<typeof FirstEventStatus> | null>(null);
+// A function ref: inside the steps' v-for a string ref would collect an array.
+const setStatusBar = (el: unknown) => {
+  statusBar.value = (el as InstanceType<typeof FirstEventStatus> | null) ?? null;
+};
+const cardRoot = ref<HTMLElement | null>(null);
+
+const onBarDetected = (result: { count: number }) => detect.markConnected(result.count);
+
+// Re-copies through the first step's own block, so the clipboard and the toast match a click on it.
+const copyFirstSnippet = () => {
+  const index = props.content.steps.findIndex((st) => displayCode(st));
+  const step = props.content.steps[index];
+  if (!step) return;
+  // A hidden command can't be copied; show the step and its warning instead.
+  if (missingRequired(activeVariant(step))) return scrollToStep(index);
+  const prefix = displayCode(step)?.dataTest ?? SETUP_CODE_BLOCK;
+  cardRoot.value?.querySelector<HTMLElement>(`[data-test="${prefix}-copy-btn"]`)?.click();
+};
+
+const tokenName = computed<string | undefined>(() => {
+  const passcode = store.state.organizationData?.organizationPasscode;
+  const tokens: Array<{ name: string; token: string }> =
+    store.state.organizationData?.orgTokens ?? [];
+  return passcode ? tokens.find((tk) => tk.token === passcode)?.name : undefined;
+});
+
 // Fires once per false→true transition — a remount starts idle and stays silent.
 watch(detected, (connected, was) => {
   if (connected && !was) {
@@ -264,23 +255,11 @@ watch(detected, (connected, was) => {
   }
 });
 
-// Don't surface the "most likely fix" hint on the first miss — the user may
-// simply not have run their app yet. Only after a few failed Tests does an
-// instrumentation-ordering problem become the likely cause.
-const FIX_HINT_AFTER_FAILURES = 3;
-const failedChecks = ref(0);
-watch(
-  () => detect.state.value,
-  (s) => {
-    if (s === "stalled") failedChecks.value++;
-    else if (s === "connected" || s === "idle") failedChecks.value = 0;
-  },
-);
+// The fix box joins the bar's diagnosis, so it shows only once the bar has named a cause or found no requests.
 const showFixHint = computed(
   () =>
-    detect.stalled.value &&
-    !!extras.value.fixSnippet &&
-    failedChecks.value >= FIX_HINT_AFTER_FAILURES,
+    (barState.value === "rejected" || barState.value === "no-requests") &&
+    !!extras.value.fixSnippet,
 );
 
 // ── per-step variant selection (e.g. OS/arch for an install command) ─────────
@@ -292,8 +271,22 @@ const variantSel = ref<Record<string, string>>({});
 const variantKey = (step: RichCardStep): string => step.variantGroup ?? step.id;
 const currentVariantId = (step: RichCardStep): string | undefined =>
   step.variants?.length ? (variantSel.value[variantKey(step)] ?? step.variants[0].id) : undefined;
-const activeVariant = (step: RichCardStep) =>
+const topVariant = (step: RichCardStep) =>
   step.variants?.find((v) => v.id === currentVariantId(step));
+// A nested selection is keyed under its parent, so each top-level choice remembers its own.
+const subVariantKey = (step: RichCardStep) => `${variantKey(step)}/${topVariant(step)?.id}`;
+const subVariants = (step: RichCardStep) => {
+  const top = topVariant(step);
+  return top && "variants" in top ? top.variants : undefined;
+};
+const currentSubVariantId = (step: RichCardStep): string | undefined =>
+  variantSel.value[subVariantKey(step)] ?? subVariants(step)?.[0]?.id;
+const activeVariant = (step: RichCardStep): RichCardStepVariant | undefined => {
+  const top = topVariant(step);
+  return top && "variants" in top
+    ? top.variants.find((v) => v.id === currentSubVariantId(step))
+    : top;
+};
 const selectVariant = (key: string, variantId: unknown) => {
   variantSel.value = { ...variantSel.value, [key]: String(variantId) };
 };
@@ -308,7 +301,7 @@ const stepTitle = (step: RichCardStep): I18nText =>
   step.titleKey ? t(step.titleKey) : (step.title ?? raw(""));
 const stepDescription = (step: RichCardStep): I18nText =>
   step.descriptionKey ? t(step.descriptionKey) : (step.description ?? raw(""));
-const variantLabel = (variant: RichCardStepVariant): I18nText =>
+const variantLabel = (variant: RichCardStepVariant | RichCardStepVariantGroup): I18nText =>
   variant.labelKey ? t(variant.labelKey) : (variant.label ?? raw(""));
 const streamInputHelp = (input: RichCardStreamInput): I18nText | undefined =>
   input.helpKey ? t(input.helpKey) : input.help;
@@ -350,9 +343,6 @@ const onStepAction = (step: RichCardStep, index: number) => {
 const activeIndex = computed(() => props.content.steps.findIndex((s) => !isStepDone(s)));
 const activeStepNumber = computed(() => (activeIndex.value >= 0 ? activeIndex.value + 1 : 0));
 
-// Detection runs only when the user clicks Test in the status bar
-// (detect.check()) — one check per click, never automatically.
-
 // ── next-step auto-advance scroll ────────────────────────────────────────────
 // Refs are OStep component instances; we scroll to their root element ($el).
 const stepEls = ref<any[]>([]);
@@ -367,8 +357,12 @@ const scrollToStep = (i: number) => {
       block: "center",
     });
 };
-const onStepCopy = (step: RichCardStep, index: number) => {
-  analytics.track("snippet_copied", { route: router.currentRoute.value.name });
+const onStepCopy = (step: RichCardStep, index: number, payload?: CodeBlockCopyPayload) => {
+  analytics.track("snippet_copied", {
+    route: router.currentRoute.value.name,
+    partial: payload?.partial ?? false,
+  });
+  statusBar.value?.start("copy");
   if (step.completeOn === "copy") copied.value = { ...copied.value, [step.id]: true };
   scrollToStep(index + 1);
 };
@@ -518,7 +512,7 @@ function fireConfetti() {
 </script>
 
 <template>
-  <div class="dirC-demo" :class="{ dark: isDark }" data-test="ai-rich-setup-card">
+  <div ref="cardRoot" class="dirC-demo" :class="{ dark: isDark }" data-test="ai-rich-setup-card">
     <div class="dirC">
       <!-- Hero -->
       <div v-if="!hideHero" class="c-hero">
@@ -665,6 +659,62 @@ function fireConfetti() {
               </OToggleGroup>
             </div>
 
+            <div
+              v-if="subVariants(step)?.length && step.variantToggle !== false"
+              class="variant-tabs"
+              :data-test="`ai-subvariant-tabs-${step.id}`"
+            >
+              <OToggleGroup
+                :model-value="currentSubVariantId(step)"
+                @update:model-value="(v) => selectVariant(subVariantKey(step), v)"
+              >
+                <OToggleGroupItem
+                  v-for="v in subVariants(step)"
+                  :key="v.id"
+                  :value="v.id"
+                  size="sm"
+                  :data-test="`ai-variant-${v.id}`"
+                >
+                  <template v-if="v.icon" #icon-left>
+                    <img
+                      :src="v.icon"
+                      alt=""
+                      aria-hidden="true"
+                      class="variant-icon"
+                      :class="{ 'variant-icon-invert': v.iconInvertDark }"
+                    />
+                  </template>
+                  {{ variantLabel(v) }}
+                </OToggleGroupItem>
+              </OToggleGroup>
+            </div>
+
+            <div
+              v-if="activeVariant(step)?.inputs?.length"
+              class="step-inputs"
+              :data-test="`ai-variant-inputs-${step.id}`"
+            >
+              <OInput
+                v-for="inp in activeVariant(step)?.inputs"
+                :key="inp.id"
+                v-model="inputValues[inp.id]"
+                :label="inputLabel(inp)"
+                :placeholder="raw(inp.placeholder || inp.default)"
+                :help-text="inp.helpKey ? t(inp.helpKey) : undefined"
+                size="sm"
+                :width="inp.width || 'md'"
+                :data-test="`ai-input-${inp.id}`"
+              />
+            </div>
+            <p
+              v-if="missingRequired(activeVariant(step))"
+              class="step-note"
+              :data-test="`ai-variant-require-${step.id}`"
+            >
+              <OIcon name="warning-amber" size="sm" />
+              <span>{{ t(activeVariant(step)!.requireOneOf!.messageKey) }}</span>
+            </p>
+
             <!-- Page-supplied controls that CHOOSE this step's code (a client
                  picker, an install shortcut) — above the block they drive. -->
             <div
@@ -676,16 +726,18 @@ function fireConfetti() {
             </div>
 
             <OCodeBlock
-              v-if="displayCode(step)"
+              v-if="displayCode(step) && !missingRequired(activeVariant(step))"
               :lang="displayCode(step)?.lang"
               :chrome="codeChrome(step)"
               :filename="displayCode(step)?.filename"
-              :code="subStream(displayCode(step)?.raw) || ''"
-              :code-masked="subStream(displayCode(step)?.masked)"
-              :data-test="displayCode(step)?.dataTest ?? 'ai-code'"
+              :code="subStream(displayCode(step)?.raw, activeVariant(step)) || ''"
+              :code-masked="subStream(displayCode(step)?.masked, activeVariant(step))"
+              :data-test="displayCode(step)?.dataTest ?? SETUP_CODE_BLOCK"
               :reveal-tooltip="t('ingestion.setupCard.revealToken')"
               :hide-tooltip="t('ingestion.setupCard.hideToken')"
-              @copy="onStepCopy(step, i)"
+              :token-name="displayCode(step)?.masked ? tokenName : undefined"
+              @copy="(payload: CodeBlockCopyPayload) => onStepCopy(step, i, payload)"
+              @token-click="openTokenPicker?.()"
             >
               <template v-if="displayCode(step)?.downloadEnv" #actions>
                 <OButton
@@ -741,74 +793,21 @@ function fireConfetti() {
 
             <!-- Live status bar + fix box on the detection-anchor step -->
             <template v-if="step.detectionAnchor">
-              <div class="statusbar mt-3" :class="detect.state.value" data-test="ai-c-statusbar">
-                <span class="sb-dot" />
-                <span v-if="detect.idle.value" class="sb-txt"
-                  >{{ t("ingestion.setupCard.notTestedYet")
-                  }}<span class="sb-sub">{{ t(testForKey) }}</span></span
-                >
-                <span v-else-if="detect.checking.value" class="sb-txt"
-                  >{{ t(checkingForKey)
-                  }}<span class="sb-sub">{{
-                    t("ingestion.setupCard.onStream", { stream: watchedStream })
-                  }}</span></span
-                >
-                <span v-else-if="detect.connected.value" class="sb-txt"
-                  >{{ connectedHeadline
-                  }}<span class="sb-sub"
-                    >{{ t(countUnitKey, { count: detect.count.value }, detect.count.value)
-                    }}<template v-if="content.detect?.modelLabel">
-                      · {{ content.detect.modelLabel }}</template
-                    ></span
-                  ></span
-                >
-                <span v-else class="sb-txt sb-warn"
-                  >{{ t(noneFoundKey)
-                  }}<span class="sb-sub">{{
-                    t("ingestion.setupCard.nothingOnStream", { stream: watchedStream })
-                  }}</span></span
-                >
-
-                <OButton
-                  v-if="detect.idle.value"
-                  variant="primary"
-                  size="sm"
-                  icon-left="radio-button-checked"
-                  data-test="ai-c-test"
-                  @click="detect.check()"
-                >
-                  {{ t("common.test") }}
-                </OButton>
-                <OButton
-                  v-else-if="detect.checking.value"
-                  variant="secondary"
-                  size="sm"
-                  :loading="true"
-                  data-test="ai-c-checking"
-                >
-                  {{ t("ingestion.setupCard.checking") }}
-                </OButton>
-                <OButton
-                  v-else-if="detect.connected.value"
-                  variant="primary"
-                  size="sm"
-                  :icon-left="viewDataIcon"
-                  data-test="ai-c-traces"
-                  @click="viewData()"
-                >
-                  {{ viewDataLabel }}
-                </OButton>
-                <OButton
-                  v-else-if="detect.stalled.value"
-                  variant="secondary"
-                  size="sm"
-                  icon-left="refresh"
-                  data-test="ai-c-recheck"
-                  @click="detect.check()"
-                >
-                  {{ t("ingestion.setupCard.testAgain") }}
-                </OButton>
-              </div>
+              <FirstEventStatus
+                :ref="setStatusBar"
+                class="mt-3"
+                :org="subs.org"
+                :signal="barSignal"
+                :target-stream="barTargetStream"
+                :match="barMatch"
+                :filter="barFilter"
+                :guide-name="content.provider.name"
+                :doc-url="content.docUrl ? safeHttpUrl(content.docUrl) : undefined"
+                :source-label="barSourceLabel"
+                @detected="onBarDetected"
+                @copy-command="copyFirstSnippet"
+                @state="(s) => (barState = s)"
+              />
 
               <div v-if="showFixHint" class="fixbox mt-3">
                 <div class="fixbox-h">
@@ -829,7 +828,7 @@ function fireConfetti() {
                     size="sm"
                     icon-left="refresh"
                     data-test="ai-c-fix-recheck"
-                    @click="detect.check()"
+                    @click="statusBar?.probeNow()"
                   >
                     {{ t("ingestion.setupCard.iFixedItTestAgain") }}
                   </OButton>
@@ -885,6 +884,8 @@ function fireConfetti() {
               data-test="ai-advanced-code"
               :reveal-tooltip="t('ingestion.setupCard.revealToken')"
               :hide-tooltip="t('ingestion.setupCard.hideToken')"
+              :token-name="extras.advanced.code.masked ? tokenName : undefined"
+              @token-click="openTokenPicker?.()"
             />
           </div>
         </OCollapsible>
@@ -928,7 +929,7 @@ function fireConfetti() {
         >
           <div class="acc-body">
             <div v-for="(r, i) in extras.troubleshooting" :key="i" class="ts-row">
-              <div class="ts-q"><OIcon name="warning" size="sm" /> {{ r.q }}</div>
+              <div class="ts-q"><OIcon name="help-outline" size="sm" /> {{ r.q }}</div>
               <div class="ts-a" v-html="inlineMd(r.a)"></div>
             </div>
           </div>
@@ -990,9 +991,8 @@ function fireConfetti() {
 </template>
 
 <style scoped>
-/* keep(complex-state): the statusbar/fixbox state machine (idle→checking→
-   connected/stalled) plus its radar keyframes and OStepper/OCollapsible :deep()
-   content styling — not expressible as template utilities. */
+/* keep(complex-state): the fix box and its rise keyframes plus OStepper/OCollapsible
+   :deep() content styling — not expressible as template utilities. */
 /* The card's local aliases are thin names over the GLOBAL semantic tokens, so a
    change to a semantic value propagates here too. They resolve per-theme on their
    own — no local .dark overrides. (.dark stays on the root only for the
@@ -1227,95 +1227,7 @@ function fireConfetti() {
   border-radius: var(--radius-default);
 }
 
-/* ---- status bar ---- */
-.statusbar {
-  display: flex;
-  align-items: center;
-  gap: 0.8125rem;
-  margin-top: 0.875rem;
-  padding: 0.8125rem 1.125rem;
-  border-radius: var(--radius-surface);
-  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
-  border: 1px solid var(--border);
-  background: var(--panel);
-  transition: all 0.3s;
-}
-
-.statusbar.checking {
-  border-color: var(--clay-soft);
-  background: var(--clay-soft-2);
-}
-
-.statusbar.connected {
-  border-color: color-mix(in srgb, var(--ok) 45%, var(--border));
-  background: var(--ok-soft);
-}
-
-.statusbar.stalled {
-  border-color: color-mix(in srgb, var(--warn) 45%, var(--border));
-  background: var(--warn-soft);
-}
-
-.sb-dot {
-  width: 0.6875rem;
-  height: 0.6875rem;
-  border-radius: var(--radius-full);
-  flex: none;
-  position: relative;
-}
-
-.statusbar.idle .sb-dot {
-  background: var(--text-3);
-}
-
-.statusbar.checking .sb-dot {
-  background: var(--clay-bright);
-}
-
-.statusbar.checking .sb-dot::after {
-  content: "";
-  position: absolute;
-  inset: -0.3125rem;
-  border-radius: var(--radius-full);
-  border: 0.125rem solid var(--clay-bright);
-  animation: dirc-radar 1.6s ease-out infinite;
-}
-
-.statusbar.connected .sb-dot {
-  background: var(--ok);
-}
-
-.statusbar.stalled .sb-dot {
-  background: var(--warn);
-}
-
-.sb-txt {
-  font-weight: 700;
-  font-size: var(--text-compact);
-  flex: 1;
-}
-
-.statusbar.checking .sb-txt {
-  color: var(--clay);
-}
-
-.statusbar.connected .sb-txt {
-  color: var(--ok);
-}
-
-.sb-txt.sb-warn {
-  color: var(--warn-ink);
-}
-
-.sb-txt .sb-sub {
-  font-weight: 600;
-  color: var(--text-3);
-  font-size: var(--text-xs);
-  margin-left: 0.5rem;
-}
-
-/* Status-bar actions use the shared <OButton variant="secondary"> component.
-   ---- fix box ---- */
+/* ---- fix box ---- */
 .fixbox {
   /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid color-mix(in srgb, var(--warn) 38%, var(--border));
@@ -1357,7 +1269,7 @@ function fireConfetti() {
 /* These sit at the very bottom of a long card, after the detection status bar.
    OCollapsible's default trigger is borderless and background-less, which reads
    as stray body text down there — give each one the same bordered panel as
-   .statusbar / .fixbox so it registers as a real, clickable section. */
+   .fixbox so it registers as a real, clickable section. */
 .c-more {
   margin-top: 0.875rem;
 }
@@ -1423,7 +1335,7 @@ function fireConfetti() {
 }
 
 .ts-q :deep(svg) {
-  color: var(--warn);
+  color: var(--text-3);
   flex: none;
   /* eslint-disable-next-line local/no-hardcoded-px -- 1px optical nudge, not layout — a single device pixel of alignment that must not scale with text */
   margin-top: 1px;
@@ -1473,18 +1385,6 @@ function fireConfetti() {
   z-index: 60;
 }
 
-@keyframes dirc-radar {
-  0% {
-    transform: scale(0.35);
-    opacity: 0.65;
-  }
-
-  100% {
-    transform: scale(1);
-    opacity: 0;
-  }
-}
-
 @keyframes dirc-rise {
   from {
     opacity: 0;
@@ -1493,7 +1393,6 @@ function fireConfetti() {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .statusbar .sb-dot::after,
   .fixbox {
     animation: none !important;
   }

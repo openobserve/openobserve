@@ -197,7 +197,7 @@ async fn refresh_local_stream_cache(org_id: &str, stream_name: &str, stream_type
         ));
     }
     let mut w = STREAM_SCHEMAS_LATEST.write().await;
-    w.insert(cache_key.clone(), SchemaCache::new(schema));
+    infra::schema::insert_latest(&mut w, cache_key.clone(), SchemaCache::new(schema));
     drop(w);
     infra::schema::put_stream_settings(cache_key, Arc::new(settings)).await;
 }
@@ -606,30 +606,6 @@ pub async fn check_for_schema(
     Ok((ret, Some(inferred_schema)))
 }
 
-pub async fn get_merged_schema(
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
-    inferred_schema: &Schema,
-) -> Option<(Vec<Field>, Schema)> {
-    let mut db_schema = infra::schema::get_from_db(org_id, stream_name, stream_type)
-        .await
-        .unwrap();
-
-    let (is_schema_changed, field_datatype_delta, merged_fields) =
-        infra::schema::get_merge_schema_changes(&db_schema, inferred_schema);
-
-    if !is_schema_changed {
-        return None;
-    }
-
-    let metadata = std::mem::take(&mut db_schema.metadata);
-    Some((
-        field_datatype_delta,
-        Schema::new(merged_fields).with_metadata(metadata),
-    ))
-}
-
 // handle_diff_schema is a slow path, it acquires a lock to update schema
 // steps:
 // 1. get schema from db, if schema is empty, set schema and return
@@ -839,7 +815,7 @@ pub async fn handle_diff_schema(
     // update node cache
     let final_schema = SchemaCache::new(final_schema);
     let mut w = STREAM_SCHEMAS_LATEST.write().await;
-    w.insert(cache_key.clone(), final_schema.clone());
+    infra::schema::insert_latest(&mut w, cache_key.clone(), final_schema.clone());
     drop(w);
     let need_original = stream_setting.store_original_data;
     let index_original_data = stream_setting.index_original_data;

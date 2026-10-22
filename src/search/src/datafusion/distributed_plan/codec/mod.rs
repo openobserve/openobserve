@@ -28,6 +28,8 @@ mod physical_plan_node;
 mod streaming_aggs_exec;
 mod tmp_exec;
 
+pub use tmp_exec::is_join_result_path;
+
 pub fn get_physical_extension_codec() -> ComposedPhysicalExtensionCodec {
     ComposedPhysicalExtensionCodec {
         codecs: vec![Arc::new(

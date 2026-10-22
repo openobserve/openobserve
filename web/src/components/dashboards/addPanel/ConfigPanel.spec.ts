@@ -39,6 +39,7 @@ import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
+import { usePanelEditorFocus } from "@/composables/dashboard/usePanelEditorFocus";
 
 const mockDashboardPanelData = {
   data: {
@@ -180,6 +181,34 @@ describe("ConfigPanel", () => {
       },
     });
   };
+
+  describe("focus=top-n deep link", () => {
+    it("consumes the request, opens the Data section and focuses the Top N input", async () => {
+      const panelData = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          queries: [
+            {
+              ...mockDashboardPanelData.data.queries[0],
+              fields: { breakdown: [{ alias: "breakdown_1" }] },
+            },
+          ],
+        },
+      };
+      const { requestFocus, pendingFocus } = usePanelEditorFocus();
+      requestFocus("top-n");
+      wrapper = createWrapper({ dashboardPanelData: panelData });
+      document.body.appendChild(wrapper.element);
+      await flushPromises();
+      await new Promise((r) => setTimeout(r, 120));
+
+      expect(pendingFocus.value).toBeNull();
+      expect((wrapper.vm as any).expandedSections.data).toBe(true);
+      const input = wrapper.find('[data-test="dashboard-config-top_results"] input');
+      expect(document.activeElement).toBe(input.element);
+    });
+  });
 
   describe("Component Rendering", () => {
     it("should render config panel with description field", () => {
@@ -329,6 +358,45 @@ describe("ConfigPanel", () => {
     it("is absent outside PromQL mode", () => {
       wrapper = createWrapper({ dashboardPanelData: promqlPanel("line") }, { promqlMode: false });
       expect(wrapper.find('[data-test="dashboard-config-show-exemplars"]').exists()).toBe(false);
+    });
+  });
+
+  describe("Axis labels mode", () => {
+    const panelOf = (type: string, config: Record<string, unknown> = {}) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type,
+        config: { ...mockDashboardPanelData.data.config, ...config },
+      },
+    });
+    const toggleOf = () =>
+      wrapper
+        .findAllComponents({ name: "OToggleGroup" })
+        .find((group: any) => group.text().includes("Axis Labels"));
+
+    it("offers Auto, Show and Hide and writes config.axis_label_mode", async () => {
+      const panel = panelOf("bar", { axis_label_mode: "auto" });
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      expect(toggleOf()?.props("modelValue")).toBe("auto");
+      expect(toggleOf()?.text()).toContain("AutoShowHide");
+      await toggleOf()?.vm.$emit("update:modelValue", "hide");
+      expect(panel.data.config.axis_label_mode).toBe("hide");
+    });
+
+    it("reads Auto for a panel saved before the mode existed", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("bar") });
+      expect(toggleOf()?.props("modelValue")).toBe("auto");
+    });
+
+    it.each(["table", "pie", "metric", "heatmap"])("is absent for %s", (type) => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf(type) });
+      expect(toggleOf()).toBeUndefined();
+    });
+
+    it("is absent in PromQL mode", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("line") }, { promqlMode: true });
+      expect(toggleOf()).toBeUndefined();
     });
   });
 

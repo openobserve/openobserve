@@ -127,8 +127,9 @@ const props = withDefaults(
     sampled?: SampleRatio;
     events?: NamedEvent[];
     pathKeys?: string[];
+    deletedNames?: Readonly<Record<string, string>>;
   }>(),
-  { sampled: 1, events: () => [], pathKeys: () => [] },
+  { sampled: 1, events: () => [], pathKeys: () => [], deletedNames: () => ({}) },
 );
 const emit = defineEmits<{ "update:open": [boolean]; "build-funnel": [StepRef[]] }>();
 const { t } = useI18nTyped();
@@ -185,7 +186,7 @@ async function load(force = false, resetRetry = true) {
         0,
         opts(),
       ),
-      ...cur,
+      ...pa.newUsersRange(cur, !!pa.identitySql.value),
       limit: PAGE_LIMIT,
       sampled: props.sampled,
     },
@@ -227,7 +228,7 @@ const loadMore = async () => {
           page,
           opts(),
         ),
-        ...cur,
+        ...pa.newUsersRange(cur, !!pa.identitySql.value),
         limit: PAGE_LIMIT,
         sampled: props.sampled,
       },
@@ -249,7 +250,7 @@ const openSession = (row: SessionRow) => {
   const label = last
     ? pathStepLabel(last, props.events)
     : anchor
-      ? stepLabel(anchor, props.events)
+      ? stepLabel(anchor, props.events, props.deletedNames)
       : "";
   const kind = last ? last.slice(0, 1) : (props.def.anchor?.kind ?? "p");
   void router.push({

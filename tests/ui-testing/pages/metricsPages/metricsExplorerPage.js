@@ -78,6 +78,13 @@ export class MetricsExplorerPage {
         this.detailClose = '[data-test="metrics-detail-close"]';
         this.detailOpenVisualize = '[data-test="metrics-detail-open-visualize"]';
         this.breakdownChart = '[data-test="metrics-breakdown-chart"]';
+        this.detailOverview = '[data-test="metrics-detail-overview"]';
+        this.detailCreateAlert = '[data-test="metrics-detail-create-alert"]';
+        this.alertContextMenuAbove = '[data-test="alert-context-menu-above"]';
+        this.alertStreamName = '[data-test="add-alert-stream-name-select-dropdown"]';
+        this.detailDrilldown = '[data-test="metrics-detail-drilldown"]';
+        this.detailDrilldownLock = '[data-test="metrics-detail-drilldown-lock"]';
+        this.tooltipContent = '[data-test="o-tooltip-content"]';
         this.breakdownTopk = '[data-test="metrics-breakdown-topk"]';
         this.breakdownBack = '[data-test="metrics-breakdown-back"]';
         this.labelChipPrefix = 'metrics-explorer-label-chip-';
@@ -466,6 +473,36 @@ export class MetricsExplorerPage {
      */
     cardChart(metric) {
         return this.cardRoot(metric).locator(this.cardChartCanvas).first();
+    }
+
+    /** Right-click a drawn chart, then "Alert when above"; the alert form opens on an Explorer prefill. */
+    async createAlertAboveFromChart(chart) {
+        // zrender stacks a hover canvas over the drawn one, so click their shared root instead.
+        await chart.locator('xpath=..').click({ button: 'right' });
+        await this.page.locator(this.alertContextMenuAbove).click();
+        await this.page.waitForURL(/alerts\/add.*prefill=explorer/, { timeout: 30000 });
+    }
+
+    /** The detail header's Create alert button; the alert form opens on an Explorer prefill. */
+    async createAlertFromDetailHeader() {
+        await this.page.locator(this.detailCreateAlert).click();
+        await this.page.waitForURL(/alerts\/add.*prefill=explorer/, { timeout: 30000 });
+    }
+
+    /** OSS: the drilldown is shown locked; its span, not the disabled button, carries the tooltip. */
+    async expectDrilldownLocked(tooltipText) {
+        const button = this.page.locator(this.detailDrilldown);
+        await expect(button).toBeVisible({ timeout: 30000 });
+        await expect(button).toBeDisabled();
+        await expect(button.locator(this.detailDrilldownLock)).toBeVisible();
+        await button.locator('xpath=..').hover();
+        await expect(this.page.locator(this.tooltipContent)).toContainText(tooltipText, {
+            timeout: 10000,
+        });
+    }
+
+    async expectAlertFormStream(metric) {
+        await expect(this.page.locator(this.alertStreamName)).toContainText(metric, { timeout: 30000 });
     }
 
     async expectCardNoData(metric, timeout = 60000) {

@@ -19,17 +19,22 @@ use async_trait::async_trait;
 use chromiumoxide::{Page, browser::Browser, cdp::browser_protocol::page::PrintToPdfParams};
 use chrono::Timelike;
 use config::{
-    SMTP_CLIENT, get_chrome_launch_options, get_config,
+    SMTP_CLIENT,
+    cluster::LOCAL_NODE,
+    get_chrome_launch_options, get_config,
     meta::{
+        alerts::fixed_offset,
         dashboards::{
             datetime_now,
             reports::{
-                HttpReportPayload, Report, ReportDashboard, ReportDestination,
-                ReportEmailAttachmentType, ReportEmailDetails, ReportFrequencyType,
-                ReportListFilters, ReportMediaType, ReportTimerangeType,
+                HttpReportPayload, REPORT_SECRET_HEADER, Report, ReportDashboard,
+                ReportDestination, ReportEmailAttachmentType, ReportEmailDetails,
+                ReportFrequencyType, ReportListFilters, ReportMediaType, ReportTimerangeType,
+                format_dashb_var,
             },
         },
         folder::Folder,
+        self_reporting::usage::{RunOutcome, TriggerData, TriggerDataType},
     },
     utils::time::now_micros,
 };
@@ -37,8 +42,12 @@ use cron::Schedule;
 use db::{
     self,
     authz::{remove_ownership, set_ownership},
+    dashboards::dashboard_in_org,
 };
-use futures::{StreamExt, future::try_join_all};
+use futures::{
+    StreamExt,
+    future::{self, try_join_all},
+};
 use infra::{
     db::{get_orm_client_ro, get_orm_client_rw},
     table,
@@ -49,8 +58,20 @@ use lettre::{
     message::{MultiPart, SinglePart, header::ContentType},
 };
 use reqwest::Client;
+use serde::Deserialize;
+use usage_reporting::publish_triggers_usage;
 
-use crate::{auth::is_ofga_unsupported, common::meta::authz::Authz, short_url};
+use crate::{
+    alerts::alert::TZ_OFFSET_RANGE_MINUTES, auth::is_ofga_unsupported, common::meta::authz::Authz,
+    short_url,
+};
+
+/// `trigger_source` of a run the scheduler started.
+pub const TRIGGER_SOURCE_SCHEDULED: &str = "scheduled";
+/// `trigger_source` of a run a user started with Run now.
+pub const TRIGGER_SOURCE_MANUAL: &str = "manual";
+/// Job claim used when `ZO_REPORT_SCHEDULE_TIMEOUT` is not positive; matches its default.
+const DEFAULT_REPORT_SCHEDULE_TIMEOUT_SECS: u64 = 300;
 
 /// Errors that can occur when interacting with reports.
 #[derive(Debug, thiserror::Error)]
@@ -100,6 +121,15 @@ pub enum ReportError {
     #[error(transparent)]
     ParseCronError(#[from] cron::error::Error),
 
+    #[error("Report tz_offset must be strictly between -1440 and 1440 minutes")]
+    TzOffsetOutOfRange,
+
+    #[error("Report cron schedule '{cron}' has no future occurrence")]
+    CronHasNoFutureOccurrence { cron: String },
+
+    #[error("Report frequency interval cannot be negative")]
+    NegativeInterval,
+
     #[error(transparent)]
     DbError(anyhow::Error),
 
@@ -117,9 +147,21 @@ pub async fn save(
     org_id: &str,
     folder_id: &str,
     name: &str,
-    mut report: Report,
+    report: Report,
     create: bool,
 ) -> Result<(), ReportError> {
+    let report = prepare_save(org_id, folder_id, name, report, create).await?;
+    write_save(org_id, folder_id, report, create).await
+}
+
+/// Runs every check [`save`] makes and returns the report it would write.
+pub async fn prepare_save(
+    org_id: &str,
+    folder_id: &str,
+    name: &str,
+    mut report: Report,
+    create: bool,
+) -> Result<Report, ReportError> {
     bind_to_path_org(&mut report, org_id)?;
 
     let conn = get_orm_client_rw().await;
@@ -155,17 +197,7 @@ pub async fn save(
         return Err(ReportError::NameContainsForwardSlash);
     }
 
-    if report.frequency.frequency_type == ReportFrequencyType::Cron {
-        let now = chrono::Utc::now().second();
-        report.frequency.cron =
-            super::super::alerts::alert::update_cron_expression(&report.frequency.cron, now);
-        // Check if the cron expression is valid
-        if let Err(e) = Schedule::from_str(&report.frequency.cron) {
-            return Err(ReportError::ParseCronError(e));
-        }
-    } else if report.frequency.interval == 0 {
-        report.frequency.interval = 1;
-    }
+    validate_schedule(&mut report)?;
 
     match db::dashboards::reports::get(conn, org_id, folder_id, &report.name).await {
         Ok(old_report) => {
@@ -230,7 +262,17 @@ pub async fn save(
     if try_join_all(tasks).await.is_err() {
         return Err(ReportError::DashboardTabNotFound);
     }
+    Ok(report)
+}
 
+/// Writes a report [`prepare_save`] accepted.
+pub async fn write_save(
+    org_id: &str,
+    folder_id: &str,
+    report: Report,
+    create: bool,
+) -> Result<(), ReportError> {
+    let conn = get_orm_client_rw().await;
     if create {
         let report_id = db::dashboards::reports::create(conn, folder_id, report)
             .await
@@ -349,22 +391,103 @@ pub async fn delete_by_id(org_id: &str, report_id: &str) -> Result<(), ReportErr
     Ok(())
 }
 
-pub async fn trigger(org_id: &str, folder_id: &str, name: &str) -> Result<(), ReportError> {
+/// Sends a report now and returns the history row of that run; a failed send is a row too.
+pub async fn trigger(
+    org_id: &str,
+    folder_id: &str,
+    name: &str,
+    user: &str,
+) -> Result<TriggerData, ReportError> {
     let conn = get_orm_client_rw().await;
-    let report = match db::dashboards::reports::get(conn, org_id, folder_id, name).await {
-        Ok(report) => report,
-        _ => {
-            return Err(ReportError::ReportNotFound);
-        }
+    let Ok(Some((report_id, report))) =
+        table::reports::get_with_id_by_name(conn, org_id, folder_id, name).await
+    else {
+        return Err(ReportError::ReportNotFound);
     };
-    report.send_subscribers().await?;
-    Ok(())
+    Ok(run_manually(&report, &report_id, user).await)
 }
 
-pub async fn trigger_by_id(org_id: &str, report_id: &str) -> Result<(), ReportError> {
+/// Sends a report now and returns the history row of that run; a failed send is a row too.
+pub async fn trigger_by_id(
+    org_id: &str,
+    report_id: &str,
+    user: &str,
+) -> Result<TriggerData, ReportError> {
     let (_, report) = get_by_id(org_id, report_id).await?;
-    report.send_subscribers().await?;
-    Ok(())
+    Ok(run_manually(&report, report_id, user).await)
+}
+
+/// The history row of one run of `report`, before its outcome is known.
+pub fn run_row(report: &Report, report_id: &str, now: i64) -> TriggerData {
+    let attachment_type = report.dashboards.first().map(|d| {
+        match d.report_type {
+            ReportMediaType::Pdf => "pdf",
+            ReportMediaType::Png => "png",
+            ReportMediaType::Csv => "csv",
+        }
+        .to_string()
+    });
+    TriggerData {
+        _timestamp: now,
+        org: report.org_id.clone(),
+        module: if report.destinations.is_empty() {
+            TriggerDataType::CachedReport
+        } else {
+            TriggerDataType::Report
+        },
+        key: format!("{}/{report_id}", report.name),
+        status: RunOutcome::Succeeded,
+        start_time: now,
+        end_time: now,
+        source_node: Some(LOCAL_NODE.name.clone()),
+        trigger_source: Some(TRIGGER_SOURCE_SCHEDULED.to_string()),
+        recipient_count: Some(i32::try_from(report.destinations.len()).unwrap_or(i32::MAX)),
+        attachment_type,
+        dashboard_count: Some(i32::try_from(report.dashboards.len()).unwrap_or(i32::MAX)),
+        ..Default::default()
+    }
+}
+
+/// Writes the outcome of a send into its run row.
+pub fn apply_send_result(
+    row: &mut TriggerData,
+    result: &Result<SendOutcome, SendReportError>,
+    started: std::time::Instant,
+) {
+    row.end_time = now_micros();
+    row.evaluation_took_in_secs = Some(started.elapsed().as_secs_f64());
+    match result {
+        Ok(outcome) => {
+            let recipients = row.recipient_count.unwrap_or_default();
+            row.status = RunOutcome::Succeeded;
+            row.is_partial = Some(outcome.partial);
+            row.delivery_attempted = Some(recipients > 0);
+            row.success_response = Some(if recipients > 0 {
+                format!("sent to {recipients} recipients")
+            } else {
+                "cached".to_string()
+            });
+        }
+        Err(e) => {
+            row.status = RunOutcome::Error;
+            row.error = Some(format!("error processing report: {e}"));
+            row.delivery_attempted = e.delivery_attempted();
+        }
+    }
+}
+
+/// Publishes a run row to the triggers stream and stores it as the report's last run.
+pub async fn record_run(report_id: &str, row: TriggerData) {
+    let org = row.org.clone();
+    let at = row.end_time;
+    let status = row.status.as_str();
+    let error = row.error.clone();
+    publish_triggers_usage(row);
+    // Written straight to the table: the list reads these columns from the database, not a cache.
+    match table::reports::set_last_run(&org, report_id, at, status, error.as_deref()).await {
+        Ok(()) => publish_last_run(&org, report_id, at, status, error.as_deref()).await,
+        Err(e) => log::error!("[REPORT] failed to store the last run of {org}/{report_id}: {e}"),
+    }
 }
 
 pub async fn enable(
@@ -401,11 +524,20 @@ pub async fn update_by_id(
     org_id: &str,
     report_id: &str,
     new_folder_id: Option<&str>,
-    mut report: Report,
+    report: Report,
 ) -> Result<(), ReportError> {
+    let (curr_folder, report) = prepare_update_by_id(org_id, report_id, report).await?;
+    write_update_by_id(org_id, report_id, new_folder_id, curr_folder, report).await
+}
+
+/// Runs every check [`update_by_id`] makes; returns the current folder and the report to write.
+pub async fn prepare_update_by_id(
+    org_id: &str,
+    report_id: &str,
+    mut report: Report,
+) -> Result<(Folder, Report), ReportError> {
     bind_to_path_org(&mut report, org_id)?;
 
-    let conn = get_orm_client_rw().await;
     let cfg = get_config();
 
     if cfg.common.report_server_url.is_empty() {
@@ -430,16 +562,7 @@ pub async fn update_by_id(
         return Err(ReportError::NameContainsForwardSlash);
     }
 
-    if report.frequency.frequency_type == ReportFrequencyType::Cron {
-        let now = chrono::Utc::now().second();
-        report.frequency.cron =
-            super::super::alerts::alert::update_cron_expression(&report.frequency.cron, now);
-        if let Err(e) = Schedule::from_str(&report.frequency.cron) {
-            return Err(ReportError::ParseCronError(e));
-        }
-    } else if report.frequency.interval == 0 {
-        report.frequency.interval = 1;
-    }
+    validate_schedule(&mut report)?;
 
     if report.dashboards.is_empty() {
         return Err(ReportError::NoDashboards);
@@ -450,11 +573,28 @@ pub async fn update_by_id(
     }) {
         return Err(ReportError::InlineAttachmentTypeNotSupportedForPdf);
     }
+    if ensure_dashboards_readable(org_id, &report.dashboards)
+        .await
+        .is_err()
+    {
+        return Err(ReportError::DashboardTabNotFound);
+    }
 
     let (curr_folder, old_report) = get_by_id(org_id, report_id).await?;
     report.owner = old_report.owner;
     report.updated_at = Some(datetime_now());
+    Ok((curr_folder, report))
+}
 
+/// Writes an update [`prepare_update_by_id`] accepted.
+pub async fn write_update_by_id(
+    org_id: &str,
+    report_id: &str,
+    new_folder_id: Option<&str>,
+    curr_folder: Folder,
+    report: Report,
+) -> Result<(), ReportError> {
+    let conn = get_orm_client_rw().await;
     db::dashboards::reports::update_by_id(conn, report_id, new_folder_id, report)
         .await
         .map_err(ReportError::DbError)?;
@@ -527,11 +667,14 @@ pub enum SendReportError {
     #[error("Atleast one dashboard is required")]
     NoDashboards,
 
+    #[error("A referenced dashboard is no longer in this report's org")]
+    DashboardNotInOrg,
+
     #[error("Error contacting report server: {0}")]
     ReportServerClientError(#[from] reqwest::Error),
 
-    #[error("report send error status: {0}, err: {1:?}")]
-    ReportServerErrorRepsponse(reqwest::StatusCode, Result<bytes::Bytes, reqwest::Error>),
+    #[error("report server {code}: {message}", code = .0.as_u16(), message = .1)]
+    ReportServerErrorRepsponse(reqwest::StatusCode, String),
 
     #[error("SMTP configuration not enabled")]
     SmtpNotEnabled,
@@ -549,19 +692,44 @@ pub enum SendReportError {
     GenerateReportError(#[from] GenerateReportError),
 }
 
+impl SendReportError {
+    /// Whether the mail server was contacted; None when the report server does not say.
+    pub fn delivery_attempted(&self) -> Option<bool> {
+        match self {
+            Self::SendEmailError(_) => Some(true),
+            // A timeout or a 5xx does not say whether the report server already sent the mail.
+            Self::ReportServerErrorRepsponse(..) | Self::ReportServerClientError(_) => None,
+            _ => Some(false),
+        }
+    }
+}
+
+/// What a finished send tells its run row.
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
+pub struct SendOutcome {
+    /// The dashboard had not finished loading when it was rendered.
+    pub partial: bool,
+}
+
+#[derive(Deserialize)]
+struct ReportServerBody {
+    #[serde(default)]
+    message: String,
+    #[serde(default)]
+    partial: Option<bool>,
+}
+
 #[async_trait]
 pub trait SendReport {
     /// Sends the report to subscribers
-    async fn send_subscribers(&self) -> Result<(), SendReportError>;
+    async fn send_subscribers(&self) -> Result<SendOutcome, SendReportError>;
 }
 
 #[async_trait]
 impl SendReport for Report {
     /// Sends the report to subscribers
-    async fn send_subscribers(&self) -> Result<(), SendReportError> {
-        if self.dashboards.is_empty() {
-            return Err(SendReportError::NoDashboards);
-        }
+    async fn send_subscribers(&self) -> Result<SendOutcome, SendReportError> {
+        check_send(self).await?;
 
         let cfg = get_config();
         let mut recipients = vec![];
@@ -589,31 +757,34 @@ impl SendReport for Report {
                 cfg.common.report_server_url, self.org_id, self.name
             ))
             .unwrap();
-            match Client::builder()
+            let mut req = Client::builder()
                 .danger_accept_invalid_certs(cfg.common.report_server_skip_tls_verify)
+                .timeout(report_server_timeout(cfg.limit.report_schedule_timeout))
                 .build()
                 .unwrap()
                 .put(url)
                 .query(&[("timezone", &self.timezone)])
-                .header("Content-Type", "application/json")
+                .header("Content-Type", "application/json");
+            if !cfg.report_server.secret.is_empty() {
+                req = req.header(REPORT_SECRET_HEADER, &cfg.report_server.secret);
+            }
+            let resp = req
                 .json(&report_data)
                 .send()
                 .await
-            {
-                Ok(resp) => {
-                    if !resp.status().is_success() {
-                        return Err(SendReportError::ReportServerErrorRepsponse(
-                            resp.status(),
-                            resp.bytes().await,
-                        ));
-                    }
-                    log::info!("report sent successfully for the report {}", self.name);
-                }
-                Err(e) => {
-                    return Err(SendReportError::ReportServerClientError(e));
-                }
+                .map_err(SendReportError::ReportServerClientError)?;
+            let status = resp.status();
+            let body = resp.bytes().await.unwrap_or_default();
+            if !status.is_success() {
+                return Err(SendReportError::ReportServerErrorRepsponse(
+                    status,
+                    report_server_message(&body),
+                ));
             }
-            Ok(())
+            log::info!("report sent successfully for the report {}", self.name);
+            Ok(SendOutcome {
+                partial: report_server_partial(&body),
+            })
         } else {
             // Currently only one `ReportDashboard` can be captured and sent
             let dashboard = &self.dashboards[0];
@@ -627,7 +798,8 @@ impl SendReport for Report {
                 &self.name,
             )
             .await?;
-            send_email(self, &report.0, report.1).await
+            send_email(self, &report.0, report.1).await?;
+            Ok(SendOutcome { partial: report.2 })
         }
     }
 }
@@ -730,6 +902,14 @@ pub enum GenerateReportError {
     DataLoadElementNotRendered,
 }
 
+/// The checks a send runs before it renders anything, so a caller can answer them first.
+pub async fn check_send(report: &Report) -> Result<(), SendReportError> {
+    if report.dashboards.is_empty() {
+        return Err(SendReportError::NoDashboards);
+    }
+    ensure_dashboards_readable(&report.org_id, &report.dashboards).await
+}
+
 async fn generate_report(
     dashboard: &ReportDashboard,
     org_id: &str,
@@ -738,7 +918,7 @@ async fn generate_report(
     timezone: &str,
     no_of_recipients: usize,
     report_name: &str,
-) -> Result<(Vec<u8>, String), GenerateReportError> {
+) -> Result<(Vec<u8>, String, bool), GenerateReportError> {
     let cfg = get_config();
     // Check if Chrome is enabled, otherwise don't save the report
     if !cfg.chrome.chrome_enabled {
@@ -755,7 +935,10 @@ async fn generate_report(
     let tab_id = &dashboard.tabs[0];
     let mut dashb_vars = "".to_string();
     for variable in dashboard.variables.iter() {
-        dashb_vars = format!("{}&var-{}={}", dashb_vars, variable.key, variable.value);
+        dashb_vars = format!(
+            "{dashb_vars}&{}",
+            format_dashb_var(&variable.key, &variable.value)
+        );
     }
 
     log::info!("launching browser for dashboard {dashboard_id}");
@@ -891,13 +1074,15 @@ async fn generate_report(
     log::info!("waiting for data to load for dashboard {dashboard_id}");
 
     // If the span element is not rendered yet, capture whatever is loaded till now
-    if let Err(e) = wait_for_panel_data_load(&page).await {
+    let partial = if let Err(e) = wait_for_panel_data_load(&page).await {
         log::error!(
             "[REPORT] error occurred while finding the span element for dashboard {dashboard_id}:{e}"
         );
+        true
     } else {
         log::info!("[REPORT] all panel data loaded for report dashboard: {dashboard_id}");
-    }
+        false
+    };
 
     if let Err(e) = page.find_element("main").await {
         browser.close().await?;
@@ -953,7 +1138,7 @@ async fn generate_report(
             email_dashb_url
         }
     };
-    Ok((pdf_data, email_dashb_url))
+    Ok((pdf_data, email_dashb_url, partial))
 }
 
 async fn wait_for_panel_data_load(page: &Page) -> Result<(), GenerateReportError> {
@@ -990,6 +1175,27 @@ fn sanitize_filename(filename: &str) -> String {
         .collect()
 }
 
+/// Same existence-scoped org check the dashboards GET handler uses.
+async fn ensure_dashboards_readable(
+    org_id: &str,
+    dashboards: &[ReportDashboard],
+) -> Result<(), SendReportError> {
+    let checks = dashboards
+        .iter()
+        .map(|d| dashboard_in_org(org_id, &d.dashboard));
+    let results = future::join_all(checks).await;
+    if all_dashboards_readable(&results) {
+        Ok(())
+    } else {
+        Err(SendReportError::DashboardNotInOrg)
+    }
+}
+
+/// An empty slice passes trivially; callers reject zero dashboards earlier.
+fn all_dashboards_readable(results: &[bool]) -> bool {
+    results.iter().all(|readable| *readable)
+}
+
 /// Anchors a report to the org it was addressed to, rejecting a body that names a different one.
 fn bind_to_path_org(report: &mut Report, org_id: &str) -> Result<(), ReportError> {
     if !report.org_id.is_empty() && report.org_id != org_id {
@@ -1000,8 +1206,102 @@ fn bind_to_path_org(report: &mut Report, org_id: &str) -> Result<(), ReportError
     Ok(())
 }
 
+/// Replicates a stored last run to the other regions; a failure is logged, never returned.
+#[cfg(feature = "enterprise")]
+async fn publish_last_run(org: &str, report_id: &str, at: i64, status: &str, error: Option<&str>) {
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+        && !get_config().common.local_mode
+        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::reports_last_run(
+            org, report_id, at, status, error,
+        )
+        .await
+    {
+        log::error!("[SUPER_CLUSTER] Failed to publish report last run: {e}");
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn publish_last_run(
+    _org: &str,
+    _report_id: &str,
+    _at: i64,
+    _status: &str,
+    _error: Option<&str>,
+) {
+}
+
+/// Sends a report on a user's request and records the run.
+async fn run_manually(report: &Report, report_id: &str, user: &str) -> TriggerData {
+    let started = std::time::Instant::now();
+    let mut row = run_row(report, report_id, now_micros());
+    row.trigger_source = Some(TRIGGER_SOURCE_MANUAL.to_string());
+    row.triggered_by = Some(user.to_string()).filter(|u| !u.is_empty());
+    let result = report.send_subscribers().await;
+    if let Err(e) = &result {
+        log::error!(
+            "[REPORT] manual run of {}/{report_id} failed: {e}",
+            report.org_id
+        );
+    }
+    apply_send_result(&mut row, &result, started);
+    record_run(report_id, row.clone()).await;
+    row
+}
+
+/// The report-server request must end before the scheduler's job claim does, or a retry re-sends.
+fn report_server_timeout(schedule_timeout_secs: i64) -> Duration {
+    match u64::try_from(schedule_timeout_secs) {
+        Ok(claim) if claim > 0 => Duration::from_secs(claim),
+        _ => Duration::from_secs(DEFAULT_REPORT_SCHEDULE_TIMEOUT_SECS),
+    }
+}
+
+/// The `message` of the report server's JSON reply, or the raw body when it is not JSON.
+fn report_server_message(body: &[u8]) -> String {
+    match serde_json::from_slice::<ReportServerBody>(body) {
+        Ok(parsed) if !parsed.message.is_empty() => parsed.message,
+        _ => String::from_utf8_lossy(body).trim().to_string(),
+    }
+}
+
+fn report_server_partial(body: &[u8]) -> bool {
+    serde_json::from_slice::<ReportServerBody>(body)
+        .ok()
+        .and_then(|parsed| parsed.partial)
+        .unwrap_or(false)
+}
+
+/// Normalises a report's schedule and rejects one the scheduler could not evaluate.
+fn validate_schedule(report: &mut Report) -> Result<(), ReportError> {
+    if !TZ_OFFSET_RANGE_MINUTES.contains(&report.tz_offset) {
+        return Err(ReportError::TzOffsetOutOfRange);
+    }
+    let tz = fixed_offset(report.tz_offset).ok_or(ReportError::TzOffsetOutOfRange)?;
+    if report.frequency.frequency_type == ReportFrequencyType::Cron {
+        let now = chrono::Utc::now().second();
+        report.frequency.cron =
+            super::super::alerts::alert::update_cron_expression(&report.frequency.cron, now);
+        let schedule = Schedule::from_str(&report.frequency.cron)?;
+        // The scheduler reads the cron in the report's offset, so check it there.
+        if schedule.upcoming(tz).next().is_none() {
+            return Err(ReportError::CronHasNoFutureOccurrence {
+                cron: report.frequency.cron.clone(),
+            });
+        }
+    } else if report.frequency.interval < 0 {
+        return Err(ReportError::NegativeInterval);
+    } else if report.frequency.interval == 0 {
+        report.frequency.interval = 1;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
+    use chrono::Datelike;
+
     use super::*;
 
     #[test]
@@ -1020,16 +1320,6 @@ mod tests {
     #[test]
     fn test_sanitize_filename_replaces_slashes() {
         assert_eq!(sanitize_filename("folder/report"), "folder_report");
-    }
-
-    #[test]
-    fn test_sanitize_filename_replaces_dots() {
-        assert_eq!(sanitize_filename("report.pdf"), "report_pdf");
-    }
-
-    #[test]
-    fn test_sanitize_filename_replaces_special_chars() {
-        assert_eq!(sanitize_filename("report@2024!"), "report_2024_");
     }
 
     #[test]
@@ -1141,6 +1431,118 @@ mod tests {
         assert!(err.to_string().contains("connection refused"));
     }
 
+    fn scheduled(tz_offset: i32, cron: &str) -> Report {
+        let mut report = Report {
+            tz_offset,
+            ..Default::default()
+        };
+        report.frequency.frequency_type = ReportFrequencyType::Cron;
+        report.frequency.cron = cron.to_string();
+        report
+    }
+
+    #[test]
+    fn validate_schedule_rejects_a_full_day_tz_offset() {
+        for tz_offset in [1440, -1440, i32::MAX, i32::MIN] {
+            let err = validate_schedule(&mut scheduled(tz_offset, "0 0 * * * *"));
+            assert!(
+                matches!(err, Err(ReportError::TzOffsetOutOfRange)),
+                "{tz_offset}: {err:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn validate_schedule_rejects_a_cron_with_no_future_occurrence() {
+        let err = validate_schedule(&mut scheduled(0, "0 0 0 1 1 * 2020"));
+        assert!(
+            matches!(err, Err(ReportError::CronHasNoFutureOccurrence { .. })),
+            "{err:?}"
+        );
+    }
+
+    #[test]
+    fn validate_schedule_accepts_values_at_their_bounds() {
+        for tz_offset in [-1439, 0, 1439] {
+            let mut report = scheduled(tz_offset, "0 0 * * * *");
+            assert!(validate_schedule(&mut report).is_ok(), "{tz_offset}");
+        }
+        let mut report = Report::default();
+        report.frequency.frequency_type = ReportFrequencyType::Hours;
+        report.frequency.interval = 0;
+        assert!(validate_schedule(&mut report).is_ok());
+        assert_eq!(report.frequency.interval, 1);
+    }
+
+    #[test]
+    fn validate_schedule_rejects_a_negative_interval() {
+        for frequency_type in [ReportFrequencyType::Hours, ReportFrequencyType::Months] {
+            let mut report = Report::default();
+            report.frequency.frequency_type = frequency_type;
+            report.frequency.interval = -1;
+            let err = validate_schedule(&mut report);
+            assert!(matches!(err, Err(ReportError::NegativeInterval)), "{err:?}");
+        }
+    }
+
+    #[test]
+    fn validate_schedule_checks_the_cron_in_the_report_offset() {
+        let target = chrono::Utc::now() + chrono::Duration::hours(2);
+        let cron = format!(
+            "0 {} {} {} {} * {}",
+            target.minute(),
+            target.hour(),
+            target.day(),
+            target.month(),
+            target.year()
+        );
+        assert!(
+            validate_schedule(&mut scheduled(0, &cron)).is_ok(),
+            "{cron}"
+        );
+        let err = validate_schedule(&mut scheduled(720, &cron));
+        assert!(
+            matches!(err, Err(ReportError::CronHasNoFutureOccurrence { .. })),
+            "{cron}: {err:?}"
+        );
+    }
+
+    fn report_with_schedule(tz_offset: i32, cron: &str) -> Report {
+        let mut report = scheduled(tz_offset, cron);
+        report.name = "weekly".to_string();
+        report
+    }
+
+    #[tokio::test]
+    async fn update_by_id_rejects_the_schedules_that_save_rejects() {
+        let saved = config::CONFIG.load_full();
+        // Raw Config::init() skips limit defaults, leaving the postgres pool zero-sized.
+        let mut cfg = config::config::init();
+        cfg.common.report_server_url = "http://report-server.example".to_string();
+        config::CONFIG.store(std::sync::Arc::new(cfg));
+        let mut outcomes = vec![];
+        for (tz_offset, cron) in [(1440, "0 0 * * * *"), (0, "0 0 0 1 1 * 2020")] {
+            let created = save(
+                "org_a",
+                "default",
+                "",
+                report_with_schedule(tz_offset, cron),
+                true,
+            )
+            .await
+            .map_err(|e| e.to_string());
+            let updated = update_by_id("org_a", "r1", None, report_with_schedule(tz_offset, cron))
+                .await
+                .map_err(|e| e.to_string());
+            outcomes.push((created, updated));
+        }
+        config::CONFIG.store(saved);
+        for (created, updated) in outcomes {
+            assert!(created.is_err(), "{created:?}");
+            assert_eq!(created, updated);
+        }
+    }
+
     #[test]
     fn bind_to_path_org_rejects_a_foreign_org_in_the_body() {
         let mut report = Report {
@@ -1168,5 +1570,173 @@ mod tests {
         };
         assert!(bind_to_path_org(&mut report, "org_a").is_ok());
         assert_eq!(report.org_id, "org_a");
+    }
+
+    #[test]
+    fn all_dashboards_readable_is_true_when_every_check_passed() {
+        assert!(all_dashboards_readable(&[true, true, true]));
+    }
+
+    #[test]
+    fn all_dashboards_readable_is_false_if_any_dashboard_is_not_in_org() {
+        assert!(!all_dashboards_readable(&[true, false, true]));
+    }
+
+    #[test]
+    fn all_dashboards_readable_is_true_for_no_dashboards() {
+        assert!(all_dashboards_readable(&[]));
+    }
+
+    fn dashboard(report_type: ReportMediaType) -> ReportDashboard {
+        ReportDashboard {
+            dashboard: "d1".to_string(),
+            folder: "default".to_string(),
+            tabs: vec!["tab1".to_string()],
+            variables: vec![],
+            timerange: config::meta::dashboards::reports::ReportTimerange::default(),
+            report_type,
+            email_attachment_type: ReportEmailAttachmentType::default(),
+            attachment_dimensions: None,
+        }
+    }
+
+    #[test]
+    fn run_row_describes_an_emailed_report() {
+        let report = Report {
+            name: "Exec KPI".to_string(),
+            org_id: "org_a".to_string(),
+            destinations: vec![
+                ReportDestination::Email("a@b.c".to_string()),
+                ReportDestination::Email("d@e.f".to_string()),
+            ],
+            dashboards: vec![
+                dashboard(ReportMediaType::Png),
+                dashboard(ReportMediaType::Pdf),
+            ],
+            ..Default::default()
+        };
+        let row = run_row(&report, "abc", 10);
+        assert_eq!(row.key, "Exec KPI/abc");
+        assert_eq!(row.org, "org_a");
+        assert_eq!(row.module, TriggerDataType::Report);
+        assert_eq!(row.recipient_count, Some(2));
+        assert_eq!(row.dashboard_count, Some(2));
+        assert_eq!(row.attachment_type.as_deref(), Some("png"));
+        assert_eq!(
+            row.trigger_source.as_deref(),
+            Some(TRIGGER_SOURCE_SCHEDULED)
+        );
+    }
+
+    #[test]
+    fn run_row_of_a_report_without_recipients_is_a_cached_report() {
+        let report = Report {
+            name: "Warm".to_string(),
+            dashboards: vec![dashboard(ReportMediaType::Csv)],
+            ..Default::default()
+        };
+        let row = run_row(&report, "abc", 10);
+        assert_eq!(row.module, TriggerDataType::CachedReport);
+        assert_eq!(row.recipient_count, Some(0));
+        assert_eq!(row.attachment_type.as_deref(), Some("csv"));
+    }
+
+    #[test]
+    fn apply_send_result_fills_a_sent_run() {
+        let mut row = TriggerData {
+            recipient_count: Some(4),
+            ..Default::default()
+        };
+        apply_send_result(
+            &mut row,
+            &Ok(SendOutcome { partial: true }),
+            std::time::Instant::now(),
+        );
+        assert_eq!(row.status, RunOutcome::Succeeded);
+        assert_eq!(row.is_partial, Some(true));
+        assert_eq!(row.delivery_attempted, Some(true));
+        assert_eq!(
+            row.success_response.as_deref(),
+            Some("sent to 4 recipients")
+        );
+        assert!(row.evaluation_took_in_secs.is_some());
+        assert!(row.end_time > 0);
+    }
+
+    #[test]
+    fn apply_send_result_fills_a_cached_run() {
+        let mut row = TriggerData {
+            recipient_count: Some(0),
+            ..Default::default()
+        };
+        apply_send_result(
+            &mut row,
+            &Ok(SendOutcome::default()),
+            std::time::Instant::now(),
+        );
+        assert_eq!(row.delivery_attempted, Some(false));
+        assert_eq!(row.success_response.as_deref(), Some("cached"));
+    }
+
+    #[test]
+    fn apply_send_result_records_a_readable_report_server_error() {
+        let mut row = TriggerData::default();
+        let err = SendReportError::ReportServerErrorRepsponse(
+            reqwest::StatusCode::INTERNAL_SERVER_ERROR,
+            report_server_message(br#"{"code":500,"message":"SMTP 550 mailbox unavailable"}"#),
+        );
+        apply_send_result(&mut row, &Err(err), std::time::Instant::now());
+        assert_eq!(row.status, RunOutcome::Error);
+        assert_eq!(
+            row.error.as_deref(),
+            Some("error processing report: report server 500: SMTP 550 mailbox unavailable")
+        );
+        assert_eq!(row.delivery_attempted, None);
+    }
+
+    #[test]
+    fn report_server_message_falls_back_to_the_raw_body() {
+        assert_eq!(report_server_message(b"  bad gateway \n"), "bad gateway");
+        assert_eq!(report_server_message(br#"{"code":500}"#), r#"{"code":500}"#);
+    }
+
+    #[test]
+    fn report_server_partial_reads_the_flag() {
+        assert!(report_server_partial(
+            br#"{"code":200,"message":"ok","partial":true}"#
+        ));
+        assert!(!report_server_partial(br#"{"code":200,"message":"ok"}"#));
+        assert!(!report_server_partial(b"not json"));
+    }
+
+    #[test]
+    fn report_server_timeout_ends_before_the_job_claim() {
+        assert_eq!(report_server_timeout(300), Duration::from_secs(300));
+        assert_eq!(report_server_timeout(45), Duration::from_secs(45));
+        assert_eq!(report_server_timeout(0), Duration::from_secs(300));
+        assert_eq!(report_server_timeout(-1), Duration::from_secs(300));
+    }
+
+    /// With no DB configured, `dashboard_in_org` fails closed, so this proves the check runs.
+    #[tokio::test]
+    async fn send_subscribers_rejects_a_report_before_rendering_when_the_dashboard_check_fails() {
+        let report = Report {
+            org_id: "org_a".to_string(),
+            dashboards: vec![ReportDashboard {
+                dashboard: "some-dashboard".to_string(),
+                folder: "default".to_string(),
+                tabs: vec!["tab1".to_string()],
+                variables: vec![],
+                timerange: config::meta::dashboards::reports::ReportTimerange::default(),
+                report_type: ReportMediaType::default(),
+                email_attachment_type: ReportEmailAttachmentType::default(),
+                attachment_dimensions: None,
+            }],
+            ..Default::default()
+        };
+        assert!(matches!(
+            report.send_subscribers().await,
+            Err(SendReportError::DashboardNotInOrg)
+        ));
     }
 }

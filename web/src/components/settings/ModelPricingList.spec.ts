@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
@@ -53,7 +54,8 @@ vi.mock("vue-router", () => ({
   }),
 }));
 
-vi.mock("@/utils/zincutils", () => ({
+vi.mock("@/utils/zincutils", async (importOriginal) => ({
+  ...(await importOriginal<any>()),
   getImageURL: (path: string) => `mock://${path}`,
 }));
 
@@ -248,6 +250,7 @@ const mockI18n = createI18n({
     en: {
       modelPricing: {
         header: "LLM Model Pricing",
+        ruleOpIn: "is one of",
         matchingPriorityTooltip: "Your Org > Global > Built-in",
         searchPlaceholder: "Search models...",
         refresh: "Refresh",
@@ -344,6 +347,8 @@ function mountComponent(extra: { store?: any; query?: Record<string, any> } = {}
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
+
+beforeEach(() => resetListViewState());
 
 describe("ModelPricingList.vue", () => {
   let wrapper: VueWrapper;
@@ -724,6 +729,61 @@ describe("ModelPricingList.vue", () => {
       wrapper = mountComponent();
       await flushPromises();
       expect(wrapper.vm.getDefaultTier({ tiers: [] })).toBeUndefined();
+    });
+
+    it("skips tiers restricted only by attribute rules", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const model = {
+        tiers: [
+          {
+            condition: null,
+            rules: [{ keys: ["service_tier"], op: "in", values: ["flex"] }],
+            prices: { input: 0.1 },
+          },
+          { condition: null, prices: { input: 0.5 } },
+        ],
+      };
+      expect(wrapper.vm.getDefaultTier(model).prices.input).toBe(0.5);
+    });
+  });
+
+  describe("attribute-rule (service tier) pricing", () => {
+    const flexModel = () => ({
+      id: "flex",
+      name: "GPT-6 Sol",
+      match_pattern: "(?i)gpt-6-sol",
+      enabled: true,
+      source: "org",
+      tiers: [
+        { name: "Default", condition: null, prices: { input: 0.000002 } },
+        {
+          name: "Flex",
+          condition: null,
+          rules: [
+            {
+              keys: ["openai.response.service_tier", "openai.request.service_tier"],
+              op: "in",
+              values: ["flex"],
+            },
+          ],
+          prices: { input: 0.000001 },
+        },
+      ],
+    });
+
+    it("renders each rule of a tier in the drawer and no always-active label for it", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+
+      wrapper.vm.openPricingDialog(flexModel());
+      await nextTick();
+
+      const rules = wrapper.findAll('[data-test="model-pricing-drawer-tier-rule"]');
+      expect(rules).toHaveLength(1);
+      expect(rules[0].text()).toBe("openai.response.service_tier +1 is one of flex");
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.text().match(/Always active \(default\)/g)).toHaveLength(1);
     });
   });
 
@@ -1329,6 +1389,45 @@ describe("ModelPricingList.vue", () => {
       expect(wrapper.vm.hasTimeBasedTiers(peakOffPeakModel())).toBe(true);
       expect(wrapper.vm.hasTimeBasedTiers(orgModel())).toBe(false);
       expect(wrapper.vm.hasTimeBasedTiers({ tiers: [{ utc_windows: [] }] })).toBe(false);
+    });
+  });
+});
+
+describe("list view state", () => {
+  it("restores search, page size, page and sort from the saved view", async () => {
+    Object.assign(useListViewState("model-pricing", {}), {
+      filterQuery: "abc",
+      selectedTab: "org",
+      pageSize: 50,
+      currentPage: 2,
+      sortBy: "name",
+      sortOrder: "desc",
+    });
+    const w: any = mountComponent();
+    await flushPromises();
+    expect(w.vm.filterQuery).toBe("abc");
+    expect(w.vm.selectedTab).toBe("org");
+    expect(w.vm.pageSize).toBe(50);
+    expect(w.vm.currentPage).toBe(2);
+    expect(w.vm.sortBy).toBe("name");
+    expect(w.vm.sortOrder).toBe("desc");
+    w.unmount();
+  });
+
+  it("saves list state so it survives unmount", async () => {
+    const w: any = mountComponent();
+    await flushPromises();
+    w.vm.filterQuery = "xyz";
+    w.vm.pageSize = 100;
+    w.vm.sortBy = "name";
+    w.vm.sortOrder = "desc";
+    await flushPromises();
+    w.unmount();
+    expect(useListViewState("model-pricing", {})).toMatchObject({
+      filterQuery: "xyz",
+      pageSize: 100,
+      sortBy: "name",
+      sortOrder: "desc",
     });
   });
 });

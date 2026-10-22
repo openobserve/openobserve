@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :description="t('passwordPolicy.maxLengthDesc')"
                 data-test="settings-password-policy-max-length"
               >
-                <OFormInput name="max_length" type="number" :min="0" width="xs">
+                <OFormInput name="max_length" type="number" :min="1" :max="128" width="xs">
                   <template #error />
                 </OFormInput>
               </OSettingRow>

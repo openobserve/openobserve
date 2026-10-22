@@ -42,20 +42,19 @@ use infra::{
 use promql::{
     DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, adjust_start_end,
     ast::{
-        at_modifier::resolve_query, result_order::top_level_sort_descending,
+        at_modifier::resolve_query, result_order::top_level_order,
         selector_window::selector_window, subquery_grid::max_subquery_steps,
     },
     micros,
 };
 use promql_parser::parser;
 use proto::cluster_rpc;
-use search_service::server_internal_error;
+use search_service::{LeaderInfo, SEARCH_SERVER, server_internal_error};
 use tracing::{Instrument, info_span};
 #[cfg(feature = "enterprise")]
 use {
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
-    o2_enterprise::enterprise::search::{TaskStatus, WorkGroup},
-    search_service::SEARCH_SERVER,
+    o2_enterprise::enterprise::search::WorkGroup, search_service::QueryPhase,
 };
 
 use crate::MetricsQueryRequest;
@@ -63,6 +62,13 @@ use crate::MetricsQueryRequest;
 mod cache;
 pub mod grpc;
 pub use cache::get_cache_stats;
+
+#[derive(Debug)]
+pub struct SearchResponse {
+    pub value: Value,
+    /// Non-empty when some nodes failed and the value may be incomplete.
+    pub warnings: Vec<String>,
+}
 
 pub async fn init() -> Result<()> {
     if !config::cluster::LOCAL_NODE.is_querier() {
@@ -82,31 +88,24 @@ pub async fn search(
     user_email: &str,
     timeout: i64,
     is_super_cluster: bool,
-) -> Result<Value> {
-    #[cfg(feature = "enterprise")]
-    {
-        let query = Some(req.query.clone());
-        let start_time = Some(req.start);
-        let end_time = Some(req.end);
-
-        SEARCH_SERVER
-            .insert(
-                trace_id.to_string(),
-                TaskStatus::new_leader(
-                    vec![],
-                    true,
-                    Some(user_email.to_string()),
-                    Some(org_id.to_string()),
-                    Some(StreamType::Metrics.to_string()),
-                    query,
-                    start_time,
-                    end_time,
-                    None,
-                    None,
-                ),
-            )
-            .await;
-    }
+) -> Result<SearchResponse> {
+    let trace_id = search_service::leader_trace_id(trace_id);
+    let trace_id = trace_id.as_str();
+    // callers such as Grafana share one trace_id across concurrent requests
+    let registration = SEARCH_SERVER.register_leader(
+        org_id,
+        trace_id,
+        LeaderInfo {
+            user_id: Some(user_email),
+            stream_type: StreamType::Metrics.as_str(),
+            sql: &req.query,
+            start_time: req.start,
+            end_time: req.end,
+            search_type: None,
+            search_event_context: None,
+        },
+    );
+    let query_tracker = registration.tracker();
 
     let timeout = if timeout > 0 {
         timeout as u64
@@ -156,7 +155,7 @@ pub async fn search(
     // Check work group (OSS uses dist_lock, Enterprise uses WorkGroup::Short)
     #[cfg(not(feature = "enterprise"))]
     let _lock = search_service::work_group::check_work_group(
-        trace_id,
+        query_tracker,
         &req.org_id,
         timeout,
         &mut stop_watch,
@@ -168,7 +167,7 @@ pub async fn search(
     // Enterprise: Always use Short workgroup for metrics queries
     #[cfg(feature = "enterprise")]
     let _lock = search_service::work_group::check_work_group(
-        trace_id,
+        query_tracker,
         &req.org_id,
         Some(user_email),
         timeout,
@@ -215,20 +214,14 @@ pub async fn search(
     log::info!("[trace_id {trace_id}] promql->search: total wait in queue took: {_took_wait} ms");
 
     #[cfg(feature = "enterprise")]
-    let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
-    #[cfg(feature = "enterprise")]
-    if SEARCH_SERVER
-        .insert_sender(trace_id, abort_sender, true)
-        .await
-        .is_err()
-    {
+    let Ok(abort_receiver) = query_tracker.abort_receiver(QueryPhase::Running) else {
         log::info!("[trace_id {trace_id}] promql->search: search canceled before execution plan");
         return Err(Error::ErrorCode(
             infra::errors::ErrorCodes::SearchCancelQuery(format!(
                 "[trace_id {trace_id}] promql->search: search canceled before execution plan"
             )),
         ));
-    }
+    };
 
     let trace_id_move = trace_id.to_string();
     let user_email_move = user_email.to_string();
@@ -268,10 +261,6 @@ pub async fn search(
     // release lock
     drop(_lock);
 
-    // Clean up task record before returning
-    #[cfg(feature = "enterprise")]
-    SEARCH_SERVER.remove(trace_id, false).await;
-
     match task {
         Ok(Ok(ret)) => Ok(ret),
         Ok(Err(err)) => Err(err),
@@ -285,12 +274,12 @@ async fn search_in_cluster(
     req: cluster_rpc::MetricsQueryRequest,
     user_email: &str,
     nodes: &[Node],
-) -> Result<Value> {
+) -> Result<SearchResponse> {
     let start_ins = std::time::Instant::now();
     let started_at = now_micros();
     let cfg = get_config();
     let timeout = req.timeout as u64;
-    let ast = parser::parse(&req.query.as_ref().unwrap().query)
+    let ast = promql::parse(&req.query.as_ref().unwrap().query)
         .map_err(|e| Error::ErrorCode(ErrorCodes::InvalidParams(e)))?;
     let window = selector_window(&ast);
 
@@ -351,7 +340,7 @@ async fn search_in_cluster(
         (start, vec![])
     } else {
         let start_time = std::time::Instant::now();
-        match cache::get(query, start, end, step).await {
+        match cache::get(&req.org_id, query, start, end, step).await {
             Ok(Some((new_start, values))) => {
                 let took = start_time.elapsed().as_millis() as i32;
                 let cache_ratio = (new_start - start) as f64 / (end - start) as f64;
@@ -375,13 +364,17 @@ async fn search_in_cluster(
     // cache hits and full cache found
     if start > end && !cached_values.is_empty() {
         log::info!("[trace_id {trace_id}] promql->search->cache: hit full cache");
+        let mut warnings = Vec::new();
         let values = if query_exemplars {
-            merge_exemplars_query(&cached_values, &req.org_id).await?
+            merge_exemplars_query(&cached_values, &req.org_id, &mut warnings).await?
         } else {
-            merge_matrix_query(&cached_values, &req.org_id).await?
+            merge_matrix_query(&cached_values, &req.org_id, &mut warnings).await?
         };
 
-        return Ok(values);
+        return Ok(SearchResponse {
+            value: values,
+            warnings,
+        });
     }
 
     if (end - start) / step > max_points as i64 {
@@ -498,8 +491,14 @@ async fn search_in_cluster(
     let mut scan_stats = ScanStats::new();
     let mut result_type = String::new();
     let mut series_data: Vec<cluster_rpc::Series> = Vec::new();
+    let mut warnings: Vec<String> = Vec::new();
     for resp in results {
         scan_stats.add(&resp.scan_stats.as_ref().unwrap().into());
+        for warning in resp.warnings {
+            if !warnings.contains(&warning) {
+                warnings.push(warning);
+            }
+        }
         if result_type.is_empty() {
             result_type = resp.result_type.clone();
         }
@@ -520,13 +519,13 @@ async fn search_in_cluster(
 
     // merge result
     let values = if result_type == "matrix" {
-        merge_matrix_query(&series_data, &req.org_id).await?
+        merge_matrix_query(&series_data, &req.org_id, &mut warnings).await?
     } else if result_type == "vector" {
-        merge_vector_query(&series_data, &req.org_id, query).await?
+        merge_vector_query(&series_data, &req.org_id, query, &mut warnings).await?
     } else if result_type == "scalar" {
         merge_scalar_query(&series_data)
     } else if result_type == "exemplars" {
-        merge_exemplars_query(&series_data, &req.org_id).await?
+        merge_exemplars_query(&series_data, &req.org_id, &mut warnings).await?
     } else {
         return Err(server_internal_error(format!(
             "invalid result type: {result_type}"
@@ -564,8 +563,13 @@ async fn search_in_cluster(
     )
     .await;
 
-    // cache the result
+    if !warnings.is_empty() {
+        log::warn!("[trace_id {trace_id}] promql->search: partial result: {warnings:?}");
+    }
+
+    // an incomplete result must not be served from cache later
     if cacheable
+        && warnings.is_empty()
         && let Some(matrix) = values.get_ref_matrix_values()
         && let Err(err) = cache::set(
             trace_id,
@@ -585,7 +589,10 @@ async fn search_in_cluster(
     let took = start_ins.elapsed().as_millis() as f64;
     log::info!("[trace_id {trace_id}] promql->search search finished took: {took} ms",);
 
-    Ok(values)
+    Ok(SearchResponse {
+        value: values,
+        warnings,
+    })
 }
 
 /// Whether a range query would answer with a subquery's own samples, which sit off its grid.
@@ -601,7 +608,11 @@ fn is_root_subquery(expr: &parser::Expr) -> bool {
     }
 }
 
-async fn merge_matrix_query(series: &[cluster_rpc::Series], org_id: &str) -> Result<Value> {
+async fn merge_matrix_query(
+    series: &[cluster_rpc::Series],
+    org_id: &str,
+    warnings: &mut Vec<String>,
+) -> Result<Value> {
     let mut merged_data = HashMap::new();
     let mut merged_metrics = HashMap::new();
     for ser in series {
@@ -620,6 +631,8 @@ async fn merge_matrix_query(series: &[cluster_rpc::Series], org_id: &str) -> Res
     }
     let mut merged_data = merged_data
         .into_iter()
+        // Prometheus never answers a range query with a series that has no samples
+        .filter(|(_, samples)| !samples.is_empty())
         .map(|(sig, samples)| {
             let mut samples = samples
                 .into_iter()
@@ -633,11 +646,8 @@ async fn merge_matrix_query(series: &[cluster_rpc::Series], org_id: &str) -> Res
         })
         .collect::<Vec<_>>();
 
-    // Check series limit and truncate if necessary
     let max_limit = get_max_series_limit(org_id).await;
-    if should_truncate_series(merged_data.len(), max_limit) {
-        merged_data.truncate(max_limit);
-    }
+    truncate_series(&mut merged_data, max_limit, warnings);
 
     let mut value = Value::Matrix(merged_data);
     value.sort();
@@ -648,7 +658,19 @@ async fn merge_vector_query(
     series: &[cluster_rpc::Series],
     org_id: &str,
     query: &str,
+    warnings: &mut Vec<String>,
 ) -> Result<Value> {
+    let max_limit = get_max_series_limit(org_id).await;
+    Ok(merge_vector_series(series, query, max_limit, warnings))
+}
+
+/// Orders before truncating, so a capped response keeps the series the order puts first.
+fn merge_vector_series(
+    series: &[cluster_rpc::Series],
+    query: &str,
+    max_limit: usize,
+    warnings: &mut Vec<String>,
+) -> Value {
     let mut merged_data = HashMap::new();
     let mut merged_metrics: HashMap<u64, Vec<Arc<Label>>> = HashMap::new();
     for ser in series {
@@ -663,7 +685,7 @@ async fn merge_vector_query(
             merged_metrics.insert(signature(&labels), labels);
         }
     }
-    let mut merged_data = merged_data
+    let merged_data = merged_data
         .into_iter()
         .map(|(sig, sample)| InstantValue {
             labels: merged_metrics.get(&sig).unwrap().to_owned(),
@@ -671,21 +693,18 @@ async fn merge_vector_query(
         })
         .collect::<Vec<_>>();
 
-    // Check series limit and truncate if necessary
-    let max_limit = get_max_series_limit(org_id).await;
-    if should_truncate_series(merged_data.len(), max_limit) {
-        merged_data.truncate(max_limit);
-    }
-
     let mut value = Value::Vector(merged_data);
-    let sort_descending = promql_parser::parser::parse(query)
+    match promql::parse(query)
         .ok()
-        .and_then(|expr| top_level_sort_descending(&expr));
-    match sort_descending {
-        Some(descending) => value.sort_by_value(descending),
+        .and_then(|expr| top_level_order(&expr))
+    {
+        Some(order) => order.apply(&mut value),
         None => value.sort(),
     }
-    Ok(value)
+    if let Value::Vector(vector) = &mut value {
+        truncate_series(vector, max_limit, warnings);
+    }
+    value
 }
 
 fn merge_scalar_query(series: &[cluster_rpc::Series]) -> Value {
@@ -700,7 +719,11 @@ fn merge_scalar_query(series: &[cluster_rpc::Series]) -> Value {
     Value::Sample(sample)
 }
 
-async fn merge_exemplars_query(series: &[cluster_rpc::Series], org_id: &str) -> Result<Value> {
+async fn merge_exemplars_query(
+    series: &[cluster_rpc::Series],
+    org_id: &str,
+    warnings: &mut Vec<String>,
+) -> Result<Value> {
     let mut merged_data = HashMap::new();
     let mut merged_metrics = HashMap::new();
     for ser in series {
@@ -732,11 +755,8 @@ async fn merge_exemplars_query(series: &[cluster_rpc::Series], org_id: &str) -> 
         })
         .collect::<Vec<_>>();
 
-    // Check series limit and truncate if necessary
     let max_limit = get_max_series_limit(org_id).await;
-    if should_truncate_series(merged_data.len(), max_limit) {
-        merged_data.truncate(max_limit);
-    }
+    truncate_series(&mut merged_data, max_limit, warnings);
 
     let mut value = Value::Matrix(merged_data);
     value.sort();
@@ -775,28 +795,15 @@ async fn get_max_series_limit(org_id: &str) -> usize {
     }
 }
 
-/// Check if series count exceeds the limit and log a warning if truncation is needed.
-///
-/// This function does not return an error. Instead, it logs a warning when the series
-/// count exceeds the limit, allowing the caller to truncate the results.
-///
-/// # Arguments
-/// * `series_count` - The actual number of series in the result
-/// * `max_limit` - The maximum allowed series limit
-///
-/// # Returns
-/// `true` if series count exceeds limit (truncation needed), `false` otherwise
-fn should_truncate_series(series_count: usize, max_limit: usize) -> bool {
-    if series_count > max_limit {
-        log::warn!(
-            "Query result exceeds maximum allowed series limit. Returning first {} series out of {}. \
-             You can increase this limit via organization settings or ZO_METRICS_MAX_SERIES_RESPONSE environment variable.",
-            max_limit,
-            series_count
+fn truncate_series<T>(series: &mut Vec<T>, max_limit: usize, warnings: &mut Vec<String>) {
+    if series.len() > max_limit {
+        let warning = format!(
+            "PromQL result truncated from {} to {max_limit} series; increase the organization limit or ZO_METRICS_MAX_SERIES_RESPONSE",
+            series.len(),
         );
-        true
-    } else {
-        false
+        log::warn!("{warning}");
+        series.truncate(max_limit);
+        warnings.push(warning);
     }
 }
 
@@ -814,7 +821,7 @@ mod tests {
             ("up", false),
         ] {
             assert_eq!(
-                is_root_subquery(&parser::parse(query).unwrap()),
+                is_root_subquery(&promql::parse(query).unwrap()),
                 expected,
                 "{query}"
             );
@@ -823,7 +830,7 @@ mod tests {
 
     #[test]
     fn test_rejects_root_subquery_only_in_range_sample_queries() {
-        let expr = parser::parse("up[5m:1m]").unwrap();
+        let expr = promql::parse("up[5m:1m]").unwrap();
         assert!(rejects_root_subquery(&expr, true, false));
         assert!(!rejects_root_subquery(&expr, false, false));
         assert!(!rejects_root_subquery(&expr, true, true));
@@ -853,9 +860,10 @@ mod tests {
                 )]),
             );
 
-            let value = merge_matrix_query(&response.series, "test_instant_worker_merge")
-                .await
-                .unwrap();
+            let value =
+                merge_matrix_query(&response.series, "test_instant_worker_merge", &mut vec![])
+                    .await
+                    .unwrap();
             let Value::Matrix(matrix) = value else {
                 panic!("expected matrix result");
             };
@@ -871,6 +879,37 @@ mod tests {
                 vec![(1_000_000, 1.0), (2_000_000, 2.0), (3_000_000, 3.0)]
             );
         }
+    }
+
+    #[tokio::test]
+    async fn test_merge_matrix_drops_series_without_samples() {
+        let mut response = cluster_rpc::MetricsQueryResponse::default();
+        grpc::add_value(
+            &mut response,
+            Value::Range(RangeValue::new(
+                vec![Arc::new(Label::new("pod", "recovered"))],
+                Vec::<Sample>::new(),
+            )),
+        );
+        grpc::add_value(
+            &mut response,
+            Value::Range(RangeValue::new(
+                vec![Arc::new(Label::new("pod", "waiting"))],
+                vec![Sample::new(1_000_000, 1.0)],
+            )),
+        );
+
+        let value = merge_matrix_query(&response.series, "test_merge_empty_series", &mut vec![])
+            .await
+            .unwrap();
+        let Value::Matrix(matrix) = value else {
+            panic!("expected matrix result");
+        };
+        assert_eq!(matrix.len(), 1);
+        assert_eq!(
+            matrix[0].labels,
+            vec![Arc::new(Label::new("pod", "waiting"))]
+        );
     }
 
     #[tokio::test]
@@ -896,7 +935,7 @@ mod tests {
             )]),
         );
 
-        let value = merge_exemplars_query(&response.series, "test_exemplars_merge")
+        let value = merge_exemplars_query(&response.series, "test_exemplars_merge", &mut vec![])
             .await
             .unwrap();
         let Value::Matrix(matrix) = value else {
@@ -905,33 +944,6 @@ mod tests {
         assert_eq!(matrix.len(), 1);
         assert_eq!(matrix[0].labels, labels);
         assert_eq!(matrix[0].exemplars.as_ref().unwrap().len(), 1);
-    }
-
-    #[test]
-    fn test_should_truncate_series_within_limit() {
-        // Test series count within limit - should not truncate
-        assert!(!should_truncate_series(1000, 10000));
-
-        // Test series count exactly at limit - should not truncate
-        assert!(!should_truncate_series(10000, 10000));
-    }
-
-    #[test]
-    fn test_should_truncate_series_exceeds_limit() {
-        // Test series count exceeds limit - should truncate
-        assert!(should_truncate_series(10001, 10000));
-        assert!(should_truncate_series(50000, 10000));
-    }
-
-    #[test]
-    fn test_should_truncate_series_edge_cases() {
-        // Test zero series - should not truncate
-        assert!(!should_truncate_series(0, 1000));
-
-        // Test with limit of 1
-        assert!(!should_truncate_series(0, 1));
-        assert!(!should_truncate_series(1, 1));
-        assert!(should_truncate_series(2, 1));
     }
 
     #[tokio::test]
@@ -946,5 +958,124 @@ mod tests {
 
         // Verify the default is the expected value (40,000)
         assert_eq!(expected_default, 40_000);
+    }
+
+    fn instance_vector(instances: &[(&str, f64)]) -> cluster_rpc::MetricsQueryResponse {
+        let mut response = cluster_rpc::MetricsQueryResponse::default();
+        grpc::add_value(
+            &mut response,
+            Value::Vector(
+                instances
+                    .iter()
+                    .map(|(instance, value)| InstantValue {
+                        labels: vec![Arc::new(Label::new("instance", instance))],
+                        sample: Sample::new(3_000_000, *value),
+                    })
+                    .collect(),
+            ),
+        );
+        response
+    }
+
+    fn instances(value: Value) -> Vec<String> {
+        let Value::Vector(vector) = value else {
+            panic!("expected a vector, got {value:?}");
+        };
+        vector
+            .iter()
+            .map(|v| v.labels.get_value("instance"))
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn test_merge_vector_orders_by_label() {
+        let response = instance_vector(&[("host10", 1.0), ("host2", 3.0), ("host1", 2.0)]);
+        let value = merge_vector_query(
+            &response.series,
+            "test_sort_by_label_merge",
+            r#"sort_by_label(up, "instance")"#,
+            &mut vec![],
+        )
+        .await
+        .unwrap();
+        assert_eq!(instances(value), ["host1", "host2", "host10"]);
+    }
+
+    #[test]
+    fn test_merge_vector_orders_before_truncating() {
+        let response = instance_vector(&[("host10", 1.0), ("host2", 3.0), ("host1", 2.0)]);
+        for (query, expected) in [
+            (r#"sort_by_label(up, "instance")"#, ["host1", "host2"]),
+            ("sort(up)", ["host10", "host1"]),
+            ("up", ["host2", "host1"]),
+        ] {
+            let value = merge_vector_series(&response.series, query, 2, &mut vec![]);
+            assert_eq!(instances(value), expected, "{query}");
+        }
+    }
+    #[test]
+    fn test_vector_truncation_warns_only_when_series_are_dropped() {
+        let response = instance_vector(&[("a", 1.0), ("b", 2.0), ("c", 3.0)]);
+        for (limit, expected_len, warning_count) in [(4, 3, 0), (3, 3, 0), (2, 2, 1), (0, 0, 1)] {
+            let mut warnings = vec!["ingester timeout".into()];
+            let value = merge_vector_series(&response.series, "up", limit, &mut warnings);
+            assert_eq!(instances(value).len(), expected_len);
+            assert_eq!(warnings.len(), warning_count + 1);
+            assert_eq!(warnings[0], "ingester timeout");
+            if warning_count > 0 {
+                assert!(warnings[1].contains(&format!("from 3 to {limit} series")));
+            }
+        }
+        let mut warnings = vec![];
+        let value = merge_vector_series(&[], "up", 0, &mut warnings);
+        assert!(instances(value).is_empty());
+        assert!(warnings.is_empty());
+    }
+
+    #[test]
+    fn test_vector_truncation_counts_merged_series() {
+        let response = instance_vector(&[("a", 1.0), ("a", 2.0), ("b", 3.0)]);
+        let mut warnings = vec![];
+        let value = merge_vector_series(&response.series, "up", 2, &mut warnings);
+        assert_eq!(instances(value).len(), 2);
+        assert!(warnings.is_empty());
+    }
+
+    #[test]
+    fn test_matrix_and_exemplar_truncation_preserves_readings_and_reports_limit() {
+        for with_exemplars in [false, true] {
+            let mut series: Vec<_> = (0..3)
+                .map(|i| {
+                    let labels = vec![Arc::new(Label::new("instance".to_string(), i.to_string()))];
+                    if with_exemplars {
+                        RangeValue::new_with_exemplars(
+                            labels,
+                            vec![Arc::new(Exemplar {
+                                timestamp: 10,
+                                value: i as f64,
+                                labels: vec![],
+                            })],
+                        )
+                    } else {
+                        RangeValue::new(labels, vec![Sample::new(10, i as f64)])
+                    }
+                })
+                .collect();
+            let mut warnings = vec![];
+            truncate_series(&mut series, 3, &mut warnings);
+            assert_eq!(series.len(), 3);
+            assert!(warnings.is_empty());
+            truncate_series(&mut series, 2, &mut warnings);
+            assert_eq!(series.len(), 2);
+            assert_eq!(warnings.len(), 1);
+            assert!(warnings[0].contains("from 3 to 2 series"));
+            for (i, row) in series.iter().enumerate() {
+                if with_exemplars {
+                    assert_eq!(row.exemplars.as_ref().unwrap()[0].value, i as f64);
+                } else {
+                    assert_eq!(row.samples[0].value, i as f64);
+                }
+            }
+        }
     }
 }

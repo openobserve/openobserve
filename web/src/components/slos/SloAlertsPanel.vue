@@ -86,7 +86,7 @@
         :data-test="`slo-alerts-row-${a.alert_id}`"
       >
         <div class="flex min-w-0 flex-col">
-          <span class="truncate text-sm font-medium">{{ a.name }}</span>
+          <OTruncatedText class="text-sm font-medium">{{ a.name }}</OTruncatedText>
           <span class="text-compact text-text-secondary">{{ describe(a) }}</span>
         </div>
         <div class="flex shrink-0 items-center gap-2">
@@ -118,6 +118,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import SloAlertForm from "@/components/slos/SloAlertForm.vue";
 import alertsService from "@/services/alerts";
 import type { Slo } from "@/ts/interfaces/slo";

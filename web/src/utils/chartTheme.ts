@@ -39,7 +39,17 @@ const FALLBACKS: Record<string, string> = {
   "--color-border-default": "#d4d4d4",
   "--color-border-strong": "#a3a3a3",
   "--color-border-subtle": "#ededed",
+  "--color-border-control": "#949494",
   "--color-surface-base": "#ffffff",
+  "--color-surface-overlay": "#ffffff",
+  "--color-map-card-header": "#e5e5e5",
+  "--color-map-seq-1": "#05a92e",
+  "--color-map-seq-2": "#819307",
+  "--color-map-seq-3": "#a57c04",
+  "--color-map-seq-4": "#bd6100",
+  "--color-map-seq-5": "#d72601",
+  "--color-status-positive": "#208a3c",
+  "--color-surface-subtle": "#f5f5f5",
   "--color-white": "#ffffff",
   "--color-tooltip-text": "#262626",
   "--color-tooltip-bg": "#ffffff",
@@ -131,6 +141,9 @@ const FALLBACKS: Record<string, string> = {
   "--color-json-number": "#2563eb",
   "--color-json-object": "#4b5563",
   "--color-json-string": "#047857",
+  "--color-latency-p95": "#0a4ce8",
+  "--color-progress-bar-default": "#3f7994",
+  "--color-progress-bar-neutral": "#a3a3a3",
 };
 
 /**

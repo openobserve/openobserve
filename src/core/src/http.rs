@@ -66,7 +66,7 @@ impl From<AlertError> for Response {
             AlertError::AlertNameMissing
             | AlertError::AlertNameOfgaUnsupported
             | AlertError::AlertNameContainsForwardSlash
-            | AlertError::AlertDestinationMissing
+            | AlertError::ProtectedStream(_)
             | AlertError::TemplateNotConfigured { .. }
             | AlertError::RealtimeMissingCustomQuery
             // Both are user input errors -> 400, same as the other
@@ -85,6 +85,7 @@ impl From<AlertError> for Response {
             | AlertError::InvalidSloAlert(_)
             | AlertError::SqlMissingQuery
             | AlertError::SqlContainsSelectStar
+            | AlertError::PromRuleStreamMissing(_)
             | AlertError::PromqlMissingQuery
             | AlertError::SqlUnsupportedQueryType { .. }
             | AlertError::PeriodExceedsMaxQueryRange { .. }
@@ -92,6 +93,11 @@ impl From<AlertError> for Response {
             | AlertError::PendingPeriodOnRealtimeAlert
             | AlertError::NegativePendingPeriod
             | AlertError::KeepFiringForOutOfRange
+            | AlertError::FrequencyOutOfRange
+            | AlertError::SilenceOutOfRange
+            | AlertError::ToleranceOutOfRange
+            | AlertError::TzOffsetOutOfRange
+            | AlertError::CronHasNoFutureOccurrence { .. }
             | AlertError::RecoveryOnRealtimeAlert
             | AlertError::RecoveryDestinationsWithoutRecovery
             | AlertError::RecoveryDestinationIsPlatform { .. }
@@ -229,7 +235,10 @@ impl From<ReportError> for Response {
             | ReportError::NoDashboards
             | ReportError::InlineAttachmentTypeNotSupportedForPdf
             | ReportError::NoDashboardTabs
-            | ReportError::NoDestinations => MetaHttpResponse::bad_request(value),
+            | ReportError::NoDestinations
+            | ReportError::TzOffsetOutOfRange
+            | ReportError::CronHasNoFutureOccurrence { .. }
+            | ReportError::NegativeInterval => MetaHttpResponse::bad_request(value),
             ReportError::ReportNotFound
             | ReportError::DashboardTabNotFound
             | ReportError::FolderNotFound => MetaHttpResponse::not_found(value),
@@ -247,6 +256,7 @@ impl From<PipelineError> for Response {
             PipelineError::InfraError(err) => MetaHttpResponse::internal_error(err),
             PipelineError::NotFound(_) => MetaHttpResponse::not_found(value),
             PipelineError::Modified(_) => MetaHttpResponse::conflict(value),
+            PipelineError::Refused(refusal) => refusal.into_response(),
             error => MetaHttpResponse::bad_request(error),
         }
     }

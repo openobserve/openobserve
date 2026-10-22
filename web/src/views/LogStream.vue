@@ -108,9 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   value="profiles"
                   size="sm"
                 >
-                  <template #icon-left
-                    ><OIcon name="bar-chart" size="xs" class="shrink-0"
-                  /></template>
+                  <template #icon-left><OIcon name="memory" size="xs" class="shrink-0" /></template>
                   {{ t("logStream.labelProfiles") }}
                 </OToggleGroupItem>
                 <OToggleGroupItem value="metadata" size="sm">
@@ -217,6 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdown side="bottom" align="end">
                 <template #trigger>
                   <OButton
+                    :aria-label="t('common.moreActions')"
                     icon-left="more-vert"
                     variant="ghost"
                     size="icon-xs-sq"
@@ -429,6 +428,7 @@ import { orgSummaryQuery } from "@/services/organizations.queries";
 import { computed, defineComponent, ref, onActivated, onBeforeMount, type Ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import { useListViewState } from "@/composables/useListViewState";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -498,9 +498,17 @@ export default defineComponent({
     const selectedIds = ref<string[]>([]);
     const orgData: any = ref(store.state.selectedOrganization);
     const previousOrgIdentifier = ref("");
-    const filterQuery = ref("");
+    const viewState = useListViewState("logStreams", {
+      filterQuery: "",
+      streamType: "logs",
+      pageSize: 20,
+      currentPage: 1,
+      sortBy: "name",
+      sortOrder: "asc" as "asc" | "desc",
+    });
+    const filterQuery = ref(viewState.filterQuery);
     const duplicateStreamList: Ref<any[]> = ref([]);
-    const selectedStreamType = ref("logs");
+    const selectedStreamType = ref(viewState.streamType);
     const loadingState = ref(true);
     // A refresh with rows already on screen: the button spins, the table does not
     // go back to a skeleton.
@@ -509,14 +517,14 @@ export default defineComponent({
     const forbidden = ref(false);
     const searchKeyword = ref("");
     const deleteAssociatedAlertsPipelines = ref(true);
-    const streamActiveTab = ref("logs");
+    const streamActiveTab = ref(viewState.streamType);
     const { track } = useReo();
 
-    const pageSize = ref(20);
+    const pageSize = ref(viewState.pageSize);
     const pageSizeOptions = [20, 50, 100, 250, 500];
-    const currentPage = ref(1);
-    const sortBy = ref("name");
-    const sortOrder = ref<"asc" | "desc">("asc");
+    const currentPage = ref(viewState.currentPage);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
     const totalCount = ref(0);
 
     const selectedItems = computed(() =>
@@ -1162,6 +1170,17 @@ export default defineComponent({
       getLogStream();
     });
 
+    watch([filterQuery, selectedStreamType, pageSize, currentPage, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        filterQuery: filterQuery.value,
+        streamType: selectedStreamType.value,
+        pageSize: pageSize.value,
+        currentPage: currentPage.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
+    });
+
     watch(filterQuery, () => {
       currentPage.value = 1;
       getLogStream();
@@ -1223,6 +1242,18 @@ export default defineComponent({
     };
 
     const exploreStream = async (props: any) => {
+      // Profiles have their own explorer; Logs cannot read a profiles stream.
+      if (props.row.stream_type === "profiles") {
+        router.push({
+          name: "profiles",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+            stream: props.row.name,
+            period: "15m",
+          },
+        });
+        return;
+      }
       store.dispatch("logs/setIsInitialized", false);
 
       // We need to check if stream is present in store, if not then we need to fetch the stream

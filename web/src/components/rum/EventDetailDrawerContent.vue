@@ -42,21 +42,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="me-1 inline"
                   />
                 </template>
-                <div
-                  class="semi-bold flex-1 overflow-hidden text-sm leading-tight text-ellipsis whitespace-nowrap"
-                  :title="event.name"
-                >
+                <OTruncatedText as="div" class="semi-bold flex-1 text-sm leading-tight">
                   {{ event.name }}
-                </div>
+                </OTruncatedText>
               </div>
             </div>
             <div
               data-test="event-session-meta-data"
               class="event-metadata flex flex-wrap items-center gap-x-3 gap-y-1"
             >
-              <div class="flex items-center truncate text-xs">
+              <div class="flex min-w-0 items-center text-xs">
                 <OIcon name="language" size="sm" class="pe-1" />
-                {{ sessionDetails.ip }}
+                <OTruncatedText>{{ sessionDetails.ip }}</OTruncatedText>
               </div>
               <div class="flex items-center text-xs">
                 <OIcon name="code" size="sm" class="pe-1" />
@@ -70,17 +67,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="mail" size="sm" class="pe-1" />
                 {{ sessionDetails.user_email || t("common.unknownUser") }}
               </div>
-              <div class="flex items-center truncate text-xs">
+              <div class="flex min-w-0 items-center text-xs">
                 <OIcon name="settings" size="sm" class="pe-1" />
-                {{ sessionDetails.browser }}, {{ sessionDetails.os }}
+                <OTruncatedText
+                  >{{ sessionDetails.browser }}, {{ sessionDetails.os }}</OTruncatedText
+                >
               </div>
-              <div class="flex items-center truncate text-xs">
+              <div class="flex min-w-0 items-center text-xs">
                 <OIcon name="location-on" size="sm" class="pe-1" />
-                {{ sessionDetails.city }}, {{ sessionDetails.country }}
+                <OTruncatedText
+                  >{{ sessionDetails.city }}, {{ sessionDetails.country }}</OTruncatedText
+                >
               </div>
-              <div class="flex items-center truncate text-xs">
+              <div class="flex min-w-0 items-center text-xs">
                 <OIcon name="schedule" size="sm" class="pe-1" />
-                {{ sessionDetails.date }}
+                <OTruncatedText>{{ sessionDetails.date }}</OTruncatedText>
               </div>
             </div>
           </div>
@@ -200,12 +201,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="text-text-secondary w-25 shrink-0 font-medium">
                   {{ t("common.urlLabel") }}
                 </div>
-                <div
-                  class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
-                  :title="rawEvent.view_url"
-                >
+                <OTruncatedText as="div" class="flex-1">
                   {{ rawEvent.view_url }}
-                </div>
+                </OTruncatedText>
               </div>
               <div v-if="rawEvent?.view_id" class="flex px-1.5 py-1 text-xs">
                 <div class="text-text-secondary w-25 shrink-0 font-medium">
@@ -265,37 +263,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span class="text-3xs text-button-primary me-1 font-bold">
                         {{ item.resource_method || "GET" }}
                       </span>
-                      <span class="overflow-hidden text-xs text-ellipsis whitespace-nowrap">
+                      <OTruncatedText class="text-xs">
                         {{ item.resource_url }}
-                      </span>
+                      </OTruncatedText>
                     </template>
 
                     <!-- Error -->
                     <template v-else-if="item.type === 'error'">
-                      <span class="overflow-hidden text-xs text-ellipsis whitespace-nowrap">
+                      <OTruncatedText class="text-xs">
                         {{ item.error_message || item.error_type }}
-                      </span>
+                      </OTruncatedText>
                     </template>
 
                     <!-- View -->
                     <template v-else-if="item.type === 'view'">
-                      <span class="overflow-hidden text-xs text-ellipsis whitespace-nowrap">
+                      <OTruncatedText class="text-xs">
                         {{ item.view_url }}
-                      </span>
+                      </OTruncatedText>
                     </template>
 
                     <!-- Action -->
                     <template v-else-if="item.type === 'action'">
-                      <span class="overflow-hidden text-xs text-ellipsis whitespace-nowrap">
+                      <OTruncatedText class="text-xs">
                         {{ item.action_type }} {{ t("common.on") }} {{ item.action_target_name }}
-                      </span>
+                      </OTruncatedText>
                     </template>
 
                     <!-- Other -->
                     <template v-else>
-                      <span class="overflow-hidden text-xs text-ellipsis whitespace-nowrap">
+                      <OTruncatedText class="text-xs">
                         {{ item.type }} {{ t("common.event") }}
-                      </span>
+                      </OTruncatedText>
                     </template>
                   </div>
 
@@ -467,6 +465,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 const props = defineProps({
   open: {

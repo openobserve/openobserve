@@ -26,16 +26,17 @@ import {
 import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { cloneDeep, debounce } from "lodash-es";
+import { cloneDeep, debounce, set } from "lodash-es";
 
 import alertsService from "@/services/alerts";
 import searchService from "@/services/search";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import {
+  anomalyConfigQuery,
   saveAnomalyConfigMutation,
   triggerAnomalyTrainingMutation,
 } from "@/services/anomaly_detection.queries";
-import { useMutation } from "@tanstack/vue-query";
+import { useMutation, useQuery as useServerQuery } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query";
 import analytics from "@/services/product_analytics";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -56,6 +57,7 @@ import {
 import { convertDateToTimestamp } from "@/utils/date";
 import { generateSqlQuery } from "@/utils/alerts/alertQueryBuilder";
 import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
+import { modesWithContent } from "@/utils/alerts/alertCondition";
 import {
   validateInputs as validateInputsUtil,
   validateSqlQuery as validateSqlQueryUtil,
@@ -94,8 +96,14 @@ import {
 } from "@/utils/alerts/alertDataTransforms";
 import { AlertFocusManager } from "@/utils/alerts/focusManager";
 import { readAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
+import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
-import type { AlertPrefillWarning } from "@/ts/interfaces/alertPrefill";
+import type { AlertPrefill, AlertPrefillWarning } from "@/ts/interfaces/alertPrefill";
+import {
+  forecastModeFields,
+  parseForecastAlertPromql,
+  type ForecastAlert,
+} from "@/utils/alerts/forecastAlert";
 import { createAlertsContextProvider, contextRegistry } from "@/composables/contextProviders";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
@@ -103,7 +111,6 @@ import {
   operatorNeedsValue,
 } from "@/utils/alerts/anomalyFilterOperators";
 import { toDetectionFunctionSql } from "@/utils/alerts/anomalySqlBuilder";
-import config from "@/aws-exports";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeAddAlertSchema, defaultAddAlertMeta } from "@/components/alerts/AddAlert.schema";
 import {
@@ -153,6 +160,7 @@ export const defaultAlertValue: any = () => {
       // aggregation.multi_alert — a PromQL alert has no aggregation, so the
       // flag cannot live there.
       promql_multi_alert: false,
+      promql_rule_mode: false,
       // Feature 5 (§6b.6). `null` until the SLO query mode is chosen: the
       // backend enforces `query_type == slo` IFF this is present, so an empty
       // object here would make every ordinary alert fail validation.
@@ -292,6 +300,17 @@ export const anomalyBandPayload = (
   alert_window_recover_pct: numberOrNull(c.alert_window_recover_pct),
 });
 
+/**
+ * Mutually exclusive on the wire; in budget mode `threshold` is controller-derived, never sent.
+ * Band/percentile mode must send an explicit null (not omit the field): the update endpoint's
+ * `alert_budget_per_day` is a double-Option, so an absent field means "leave as-is" and a
+ * previously stored budget would never clear.
+ */
+export const anomalySensitivityPayload = (budgetPerDay: number | null, threshold: unknown) =>
+  budgetPerDay !== null
+    ? { alert_budget_per_day: budgetPerDay }
+    : { threshold, alert_budget_per_day: null };
+
 export const defaultAnomalyConfig = () => ({
   name: "",
   description: "",
@@ -337,6 +356,30 @@ export const defaultAnomalyConfig = () => ({
   priority: null as number | null,
   tags: [] as string[],
 });
+
+/** A saved alert's forecast fields, when its PromQL is a generated forecast query. */
+export const formForecastOf = (alert: any): ForecastAlert | null =>
+  alert?.query_condition?.type === "promql"
+    ? parseForecastAlertPromql(alert.query_condition.promql, alert.query_condition.promql_condition)
+    : null;
+
+/** Seeds a form value from a PromQL prefill; a generated forecast query opens Forecast mode. */
+export const applyPromqlPrefill = (data: any, prefill: AlertPrefill): any => {
+  data.query_condition.type = "promql";
+  data.query_condition.promql = prefill.promql ?? "";
+  if (prefill.promqlCondition) {
+    data.query_condition.promql_condition = { ...prefill.promqlCondition };
+  }
+  if (prefill.promqlMultiAlert !== undefined) {
+    data.query_condition.promql_multi_alert = prefill.promqlMultiAlert;
+  }
+  const forecast = formForecastOf(data);
+  data._ui = { ...data._ui, forecast };
+  if (forecast) {
+    Object.entries(forecastModeFields(forecast)).forEach(([path, value]) => set(data, path, value));
+  }
+  return data;
+};
 
 // ─── Composable ─────────────────────────────────────────────────────────────
 
@@ -456,6 +499,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       _ui: obj?._ui ?? {
         checkEvery: freq.checkEvery,
         pendingPeriod: pendingPeriodDisplay(obj).value,
+        forecast: formForecastOf(obj),
       },
       _meta:
         obj?._meta ??
@@ -473,21 +517,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   };
 
   // i18n-driven validation schema (messages resolve via `t` — see AddAlert.schema).
-  // Workflows are enterprise/cloud-only; where they exist an alert may be
-  // delivered to a destination OR a workflow, which relaxes "destinations ≥ 1"
-  // into "at least one of the two". In OSS this stays false and the rule (and
-  // its message) is byte-identical to before.
-  // Also respects the backend /config flag: on an enterprise build with
-  // workflows switched OFF the picker has no Workflows group, so relaxing the
-  // rule would surface "destination or workflow required" for a choice the user
-  // cannot make. Falls back to the strict "destination required" rule, which is
-  // the same rule OSS gets. (Built once in setup — if /config has not landed
-  // yet this is the stricter of the two, which is the safe direction.)
-  const addAlertSchema = makeAddAlertSchema(
-    t,
-    (config.isEnterprise === "true" || config.isCloud === "true") &&
-      store.state.zoConfig?.workflows_enabled === true,
-  );
+  const addAlertSchema = makeAddAlertSchema(t);
   const form = useOForm<AlertFormValues>({
     defaultValues: buildDefaultForm() as AlertFormValues,
     schema: addAlertSchema,
@@ -547,6 +577,34 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   );
   const triggerAnomalyTraining = useMutation(() =>
     triggerAnomalyTrainingMutation(anomalyOrgId.value),
+  );
+
+  const anomalyModelQuery = useServerQuery(() => ({
+    ...anomalyConfigQuery(
+      anomalyOrgId.value,
+      String(router.currentRoute.value.params.anomaly_id ?? ""),
+    ),
+    enabled: anomalyEditMode.value,
+    refetchInterval: (query) => (query.state.data?.status === "training" ? 5000 : false),
+  }));
+  watch(
+    () => anomalyModelQuery.data.value,
+    (data) => {
+      if (!data) return;
+      // Refresh only model metadata so training cannot erase unsaved form fields.
+      for (const key of [
+        "status",
+        "is_trained",
+        "current_model_version",
+        "band_k",
+        "last_error",
+        "training_started_at",
+        "training_completed_at",
+        "notice_class",
+      ] as const) {
+        (anomalyConfig.value as Record<string, unknown>)[key] = data[key];
+      }
+    },
   );
 
   const anomalyStatusVariant = computed<BadgeVariant>(() => {
@@ -916,7 +974,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const isSyncingStreamFromSql = ref(false);
 
   const debouncedSyncStreamFromSql = debounce(async (sql: string) => {
-    if (!sql || !parser || isSyncingStreamFromSql.value) return;
+    // An edit keeps its stream: the field is locked and the backend never updates it.
+    if (!sql || !parser || isSyncingStreamFromSql.value || beingUpdated.value) return;
     // parse() is exponential in paren nesting depth — skip a pathologically
     // nested query rather than freeze the tab. Losing this convenience sync
     // is fine; the user can still pick the stream from the dropdown.
@@ -926,9 +985,14 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       const fromStream = parsed?.ast?.from?.[0]?.table as string | undefined;
       if (fromStream && fromStream !== formData.value.stream_name) {
         isSyncingStreamFromSql.value = true;
-        setF("stream_name", fromStream);
-        await updateStreamFields(fromStream);
-        isSyncingStreamFromSql.value = false;
+        try {
+          setF("stream_name", fromStream);
+          await updateStreamFields(fromStream);
+        } finally {
+          // updateStreamFields throws for a stream that does not exist; a flag
+          // left set would skip every later sync.
+          isSyncingStreamFromSql.value = false;
+        }
       }
     } catch {
       // ignore parse errors while user is mid-typing
@@ -1761,11 +1825,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       }
 
       if (prefill.queryType === "promql") {
-        data.query_condition.type = "promql";
-        data.query_condition.promql = prefill.promql ?? "";
-        if (prefill.promqlCondition) {
-          data.query_condition.promql_condition = { ...prefill.promqlCondition };
-        }
+        applyPromqlPrefill(data, prefill);
       } else if (prefill.queryType === "custom" && prefill.conditions) {
         data.query_condition.type = "custom";
         data.query_condition.conditions = cloneDeep(prefill.conditions);
@@ -1824,7 +1884,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // Otherwise: with a threshold expressed inside the query (HAVING / promql
       // condition), the trigger itself only needs "at least one row came back".
       const hasQueryThreshold =
-        !!prefill.promqlCondition || !!prefill.meta?.sqlHaving || !!prefill.aggregation;
+        !!prefill.promqlCondition ||
+        !!prefill.meta?.sqlHaving ||
+        (!!prefill.aggregation && !getAlertSource(prefill.source).aggregationIsSeed);
       if (prefill.triggerThreshold !== undefined) {
         data.trigger_condition.threshold = prefill.triggerThreshold;
         if (prefill.triggerOperator) {
@@ -1960,18 +2022,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       return;
     }
 
-    if (
-      anomalyConfig.value.alert_enabled &&
-      anomalyConfig.value.alert_destination_ids.length === 0
-    ) {
-      activeTab.value = "anomaly-alerting";
-      toast({
-        variant: "error",
-        message: t("alerts.validation.destinationRequired"),
-      });
-      return;
-    }
-
     anomalySaving.value = true;
     const orgId = store.state.selectedOrganization.identifier;
     const c = anomalyConfig.value;
@@ -2044,10 +2094,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           ...anomalyIntervalPayload(c, anomalyStoredIntervals.value),
           training_window_days: c.training_window_days,
           retrain_interval_days: c.retrain_interval_days,
-          // Mutually exclusive on the wire; in budget mode `threshold` is controller-derived, never sent.
-          ...(budgetPerDay !== null
-            ? { alert_budget_per_day: budgetPerDay }
-            : { threshold: c.threshold }),
+          ...anomalySensitivityPayload(budgetPerDay, c.threshold),
           ...anomalyBandPayload(c, budgetPerDay !== null),
           alert_enabled: c.alert_enabled,
         },
@@ -2098,6 +2145,75 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         variant: "error",
         message: t("alerts.messages.fixHighlightedFields"),
       });
+    }
+  };
+
+  // ── Save-mode dialog ──────────────────────────────────────────────────────
+  // Only the selected query mode runs. When another runnable mode also holds
+  // content (or the selected one is empty while another is not), Save asks
+  // which mode the alert uses. Scheduled alerts only: Realtime runs Builder
+  // only, and anomaly/composite alerts have no query mode.
+  const queryModesWithContent = computed(() => {
+    const modes = modesWithContent({
+      sql: formData.value.query_condition?.sql,
+      promql: formData.value.query_condition?.promql,
+      conditions: formData.value.query_condition?.conditions,
+      streamType: formData.value.stream_type,
+    });
+    // An aggregation with no filters is still a Builder query, but only when
+    // Builder is selected: a new metrics alert's default avg is not content.
+    if (
+      (formData.value.query_condition?.type || "custom") === "custom" &&
+      isAggregationEnabled.value &&
+      !modes.includes("custom")
+    )
+      modes.unshift("custom");
+    return modes;
+  });
+  const saveModeChoices = computed(() => {
+    if (formData.value.is_real_time !== "false") return null;
+    const selected = formData.value.query_condition?.type || "custom";
+    const choices = (["custom", "sql", "promql"] as const).filter(
+      (mode) => mode === selected || queryModesWithContent.value.includes(mode),
+    );
+    return choices.length > 1 ? choices : null;
+  });
+  const saveModeDialogOpen = ref(false);
+  const saveModePick = ref<"custom" | "sql" | "promql">("custom");
+  // The user's last pick, so a save that fails validation does not ask again.
+  const confirmedSaveMode = ref<"custom" | "sql" | "promql" | null>(null);
+
+  // True while the dialog's own Save submits, so performSave does not ask again.
+  let savingPickedMode = false;
+
+  // Opens the dialog instead of saving. performSave calls it, so every submit
+  // asks: the footer Save button, and Enter in the name field (OInlineEdit
+  // calls form.requestSubmit(), which never goes through handleSave).
+  const askForSaveMode = () => {
+    if (savingPickedMode || !saveModeChoices.value) return false;
+    const selected = formData.value.query_condition?.type || "custom";
+    const selectedHasContent = queryModesWithContent.value.includes(selected);
+    if (selected === confirmedSaveMode.value && selectedHasContent) return false;
+    saveModePick.value = selected;
+    saveModeDialogOpen.value = true;
+    return true;
+  };
+
+  // The schema picks its rules from `_meta.tab`, which QueryConfig only syncs
+  // through watchers, so set it here too and let them settle before submitting.
+  // The guard stops a second click while the dialog plays its exit animation.
+  const saveWithPickedMode = async () => {
+    if (!saveModeDialogOpen.value) return;
+    saveModeDialogOpen.value = false;
+    confirmedSaveMode.value = saveModePick.value;
+    setF("query_condition.type", saveModePick.value);
+    setF("_meta.tab", saveModePick.value);
+    await nextTick();
+    savingPickedMode = true;
+    try {
+      await handleSave();
+    } finally {
+      savingPickedMode = false;
     }
   };
 
@@ -2296,6 +2412,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     }
 
     const payload = getAlertPayload();
+    // Read before the save: resetForm in .then clears the form the payload came from.
+    const sendsNowhere = !hasDeliveryTarget(payload);
 
     const dismiss = toast({
       variant: "loading",
@@ -2344,7 +2462,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           dismiss();
           toast({
             variant: "success",
-            message: t("alerts.messages.alertUpdated"),
+            message: sendsNowhere
+              ? t("alerts.messages.alertUpdatedNoDestination")
+              : t("alerts.messages.alertUpdated"),
           });
           showSaveWarnings(res);
         })
@@ -2382,7 +2502,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           dismiss();
           toast({
             variant: "success",
-            message: t("alerts.messages.alertSaved"),
+            message: sendsNowhere
+              ? t("alerts.messages.alertSavedNoDestination")
+              : t("alerts.messages.alertSaved"),
           });
           showSaveWarnings(res);
         })
@@ -2415,6 +2537,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       await saveAnomalyDetection();
       return;
     }
+    if (askForSaveMode()) return;
     await onSubmit();
   };
 
@@ -2470,8 +2593,14 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // frequency field's display unit). Falls back to 0 for any alert type
       // where the field is absent from the GET response (older cached
       // response shape, etc.) rather than showing NaN.
-      data.pending_period_sec = Math.round((Number(data.pending_period_sec) || 0) / 60);
+      const pendingMinutes = (Number(data.pending_period_sec) || 0) / 60;
+      data.pending_period_sec =
+        data.query_condition?.type === "promql" && data.query_condition.promql_rule_mode
+          ? pendingMinutes
+          : Math.round(pendingMinutes);
       isAggregationEnabled.value = !!data.query_condition?.aggregation;
+      // The saved type is the user's earlier answer; ask again only on a switch.
+      confirmedSaveMode.value = data.query_condition?.type ?? null;
 
       if (data.query_condition?.promql_condition) {
         if (!data.query_condition.promql_condition.column) {
@@ -2648,21 +2777,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     },
   );
 
-  // Watch for destination changes
-  watch(
-    () => props.destinations.length,
-    () => {
-      setF(
-        "destinations",
-        (formData.value.destinations ?? []).filter((destination: any) => {
-          return props.destinations.some((dest: any) => {
-            return dest.name === destination;
-          });
-        }),
-      );
-    },
-  );
-
   watch(
     triggerCols.value,
     () => {
@@ -2705,7 +2819,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           ? formData.value.query_condition.promql.trim()
           : "";
         isUsingBackendSql.value = false;
-        if (!formData.value.query_condition.promql_condition) {
+        if (
+          !formData.value.query_condition.promql_condition &&
+          !formData.value.query_condition.promql_rule_mode
+        ) {
           setF("query_condition.promql_condition", {
             column: "value",
             operator: ">=",
@@ -3234,6 +3351,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     saveAlertJson,
     applyAlertPrefill,
     handleSave,
+    queryModesWithContent,
+    saveModeChoices,
+    saveModeDialogOpen,
+    saveModePick,
+    saveWithPickedMode,
     onSubmit,
     saveAnomalyDetection,
     previewAlert,

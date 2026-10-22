@@ -83,10 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-name="{ row }">
             <div class="item-name flex items-center gap-1.5">
-              <span class="block overflow-hidden text-ellipsis whitespace-nowrap">
-                {{ row.name }}
-              </span>
-              <OTooltip v-if="row.name.length > 30" :content="row.name" />
+              <OTruncatedText>{{ row.name }}</OTruncatedText>
               <!-- Dependency indicator: icon + count of variables this one depends
                    on. OTooltip WRAPS the chip (default-slot mode) so the whole chip
                    is the hover target — child mode would anchor only to the count. -->
@@ -268,6 +265,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import VariablesDependenciesGraph from "./VariablesDependenciesGraph.vue";
 import useNotifications from "@/composables/useNotifications";
+import { useDashboardSaveConflict } from "@/composables/dashboard/useDashboardSaveConflict";
 import Sortable from "sortablejs";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -277,6 +275,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL, TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 export default defineComponent({
   name: "VariableSettings",
@@ -294,6 +293,7 @@ export default defineComponent({
     OTag,
     OTooltip,
     OTable,
+    OTruncatedText,
   },
   emits: ["save"],
   setup(props, { emit }) {
@@ -367,11 +367,9 @@ export default defineComponent({
       return index < 9 ? `0${index + 1}` : `${index + 1}`;
     };
 
-    const {
-      showPositiveNotification,
-      showErrorNotification,
-      showConfictErrorNotificationWithRefreshBtn,
-    } = useNotifications();
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
+
+    const saveConflict = useDashboardSaveConflict();
     // list of all variables, which will be same as the dashboard variables list
     const dashboardVariablesList: any = ref([]);
 
@@ -461,18 +459,19 @@ export default defineComponent({
 
         emit("save");
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              t("dashboard.variableSettingsPage.variableReorderFailed"),
-            t,
-          );
-        } else {
-          showErrorNotification(
-            error?.message ?? t("dashboard.variableSettingsPage.variableReorderFailed"),
-          );
+        if (saveConflict.isConflict(error)) {
+          void saveConflict.openConflict({
+            dashboardId: dashboardVariableData.data.dashboardId,
+            folderId: (route.query.folder as string) ?? "default",
+            mine: dashboardVariableData.data,
+            change: t("dashboard.saveConflict.change.reorderedVariables"),
+            onResolved: getDashboardData,
+          });
+          return;
         }
+        showErrorNotification(
+          error?.message ?? t("dashboard.variableSettingsPage.variableReorderFailed"),
+        );
         await getDashboardData();
       }
     };
@@ -570,13 +569,15 @@ export default defineComponent({
           timeout: 2000,
         });
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              t("dashboard.variableSettingsPage.variableDeletionFailed"),
-            t,
-          );
+        if (saveConflict.isConflict(error)) {
+          void saveConflict.openConflict({
+            dashboardId: route.query.dashboard as string,
+            folderId: (route.query.folder as string) ?? "default",
+            change: t("dashboard.saveConflict.change.deletedVariable", {
+              name: selectedDelete.value?.name ?? "",
+            }),
+            onResolved: getDashboardData,
+          });
         } else {
           showErrorNotification(
             error?.message ?? t("dashboard.variableSettingsPage.variableDeletionFailed"),

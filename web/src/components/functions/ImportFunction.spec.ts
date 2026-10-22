@@ -22,6 +22,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import ImportFunction from "@/components/functions/ImportFunction.vue";
 import config from "@/aws-exports";
 import { queryClient } from "@/composables/query/queryClient";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import i18n from "@/locales";
 
 const { mockList, mockCreate, mockUpdate, mockGetAssociatedPipelines, mockToastFn } = vi.hoisted(
@@ -556,22 +557,38 @@ describe("ImportFunction", () => {
       expect(wrapper.vm.bodyLanguage(0)).toBe("vrl");
     });
 
-    // OSS builds cannot run JavaScript, so offering it would only trade this
-    // validation error for a server-side one.
-    it("offers VRL only on OSS", async () => {
+    // OSS builds cannot run JavaScript, so the option is shown locked (not
+    // hidden) but still selectable — picking it opens the upgrade dialog
+    // instead of trading this validation error for a server-side one.
+    it("offers a JavaScript option on OSS, locked via isJsAllowed", async () => {
       (config as any).isEnterprise = "false";
       const wrapper = mountScreen();
       await flushPromises();
 
-      expect(wrapper.vm.transTypeOptions.map((o: any) => o.value)).toEqual(["0"]);
+      const options = wrapper.vm.transTypeOptions;
+      expect(options.map((o: any) => o.value)).toEqual(["0", "1"]);
+      expect(wrapper.vm.isJsAllowed).toBe(false);
     });
 
-    it("offers JavaScript where the build can run it", async () => {
+    it("offers an unlocked JavaScript option where the build can run it", async () => {
       (config as any).isEnterprise = "true";
       const wrapper = mountScreen();
       await flushPromises();
 
-      expect(wrapper.vm.transTypeOptions.map((o: any) => o.value)).toEqual(["0", "1"]);
+      const options = wrapper.vm.transTypeOptions;
+      expect(options.map((o: any) => o.value)).toEqual(["0", "1"]);
+      expect(wrapper.vm.isJsAllowed).toBe(true);
+    });
+
+    it("picking the locked JavaScript option opens the upgrade dialog instead of selecting it", async () => {
+      (config as any).isEnterprise = "false";
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      const { isOpen, close } = useEnterpriseUpgradeDialog();
+      close();
+      wrapper.vm.updateTransType("1", 0);
+      expect(isOpen.value).toBe(true);
     });
 
     it("takes unusable params from the params box", async () => {
@@ -615,6 +632,9 @@ describe("ImportFunction", () => {
     });
 
     it("re-sends the item once the language is corrected", async () => {
+      // JS must be entitled for this edition — otherwise selecting it opens
+      // the upgrade dialog instead of writing the correction.
+      (config as any).isEnterprise = "true";
       mockCreate.mockRejectedValueOnce({
         response: { data: { message: "error[E203]: syntax error" } },
       });

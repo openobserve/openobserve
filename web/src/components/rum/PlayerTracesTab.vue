@@ -71,9 +71,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon name="arrow-back" size="sm" />
         </OButton>
-        <code class="text-text-secondary min-w-0 flex-1 truncate text-sm">{{
+        <OTruncatedText as="code" class="text-text-secondary flex-1 text-sm">{{
           traceDisplayName(selectedTrace)
-        }}</code>
+        }}</OTruncatedText>
         <div class="flex flex-shrink-0 items-center gap-1.5">
           <span
             v-if="selectedTrace.metadata?.errorCount > 0"
@@ -188,12 +188,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </template>
           <template #cell-page="{ row }">
-            <span class="block truncate font-mono text-xs" :title="pageRoute(row)">
+            <span class="font-mono text-xs">
               {{ pageRoute(row) }}
             </span>
           </template>
           <template #cell-route="{ row }">
-            <span class="block truncate font-mono text-xs" :title="traceDisplayName(row)">
+            <span class="font-mono text-xs">
               {{ traceDisplayName(row) }}
             </span>
           </template>
@@ -239,6 +239,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import TraceStatusCell from "@/plugins/traces/components/TraceStatusCell.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
@@ -246,8 +247,11 @@ import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 const { t } = useI18nTyped();
 const store = useStore();
 const { getStream } = useStreams(t);
-const { resolveTraceLocationsBulk, cancel: cancelCorrelatedTracesStream } =
-  useCorrelatedTracesStream(t);
+const {
+  resolveTraceLocationsBulk,
+  fallbackTracesStream,
+  cancel: cancelCorrelatedTracesStream,
+} = useCorrelatedTracesStream(t);
 
 const props = defineProps({
   sessionId: {
@@ -654,16 +658,17 @@ async function fetchTraces() {
       try {
         // Which stream holds each trace (one bulk request; cached in the store).
         // Every row keeps ITS OWN stream so multi-stream sessions list fully and
-        // each click opens against the right stream; unresolved ids fall back to
-        // the default correlation stream — today's behavior.
+        // each click opens against the right stream; an unresolved id falls back
+        // to `default` only where the org has it, and otherwise drops out unfetched.
         const locationById = await resolveTraceLocationsBulk(
           views.map((v) => v.traceId),
           searchWindow.start,
           searchWindow.end,
         );
+        const fallbackStream = await fallbackTracesStream();
         for (const view of views as any[]) {
           const location = locationById[view.traceId];
-          view.stream = location?.stream ?? RUM_CORRELATION_TRACES_STREAM;
+          view.stream = location?.stream ?? fallbackStream;
           view.range = location?.range;
         }
 
@@ -671,6 +676,7 @@ async function fetchTraces() {
         const idsByStream = new Map<string, string[]>();
         const rangeById = new Map<string, TraceTimeRange | undefined>();
         for (const view of views as any[]) {
+          if (!view.stream) continue;
           const ids = idsByStream.get(view.stream) ?? [];
           ids.push(view.traceId);
           idsByStream.set(view.stream, ids);

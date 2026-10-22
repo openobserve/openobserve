@@ -64,7 +64,7 @@ test.describe('RUM Product Analytics on the real engine', () => {
     const funnel = encodeDef({ s: [['p', a], ['c', b], ['p', c]], u: 'sessions', w: 'session' });
     await pa.goto('funnels', { app: facts.appId, period: '7d', funnel });
     await pa.expectFunnelCounts(facts.funnel.counts);
-    await expect(pa.funnelOrderLabel).toContainText('In order (other events allowed between)');
+    await expect(pa.funnelOrderLabel).toHaveAttribute('aria-label', 'In order (other events allowed between)');
 
     // B then A: s4 (B,A,B) and s5 (B,A) both reach A after B; s1 and s2 do not.
     const reversed = encodeDef({ s: [['c', b], ['p', a]], u: 'sessions', w: 'session' });
@@ -93,16 +93,31 @@ test.describe('RUM Product Analytics on the real engine', () => {
     expect(await pa.retentionPct(1, 0)).toBe(100);
     expect(await pa.retentionPct(1, 1)).toBe(0);
 
-    await page.locator('[data-test="rum-analytics-retention-mode-after"]').click();
-    await expect.poll(() => pa.retentionPct(0, 1), { timeout: 20000 }).toBe(100);
-    expect(await pa.retentionPct(0, 2)).toBe(100);
-    expect(await pa.retentionPct(1, 1)).toBe(0);
-    expect(new URL(page.url()).searchParams.get('rmode')).toBe('after');
+    // The mode only re-reads the loaded result, so switching it must not issue a search.
+    await pa.waitForNetworkQuiet();
+    const searches = [];
+    const onSearch = (r) => {
+      if (/\/_search(\?|$)/.test(r.url())) searches.push(r.url());
+    };
+    page.on('request', onSearch);
+    try {
+      await pa.retentionModeAfter.click();
+      await expect.poll(() => pa.retentionPct(0, 1), { timeout: 20000 }).toBe(100);
+      expect(await pa.retentionPct(0, 2)).toBe(100);
+      expect(await pa.retentionPct(1, 1)).toBe(0);
+      expect(new URL(page.url()).searchParams.get('rmode')).toBe('after');
+      await pa.waitForNetworkQuiet();
+    } finally {
+      page.off('request', onSearch);
+    }
+    expect(searches, 'On or after issues no new _search').toEqual([]);
   });
 
   const basic = (user, pass) => ({ Authorization: `Basic ${Buffer.from(`${user}:${pass}`).toString('base64')}` });
   const eventsUrl = (baseUrl, orgId) =>
     `${baseUrl}/api/${orgId}/rum/analytics/named_events?app=${encodeURIComponent(facts.appId)}`;
+  const funnelsUrl = (baseUrl, orgId) =>
+    `${baseUrl}/api/${orgId}/rum/analytics/funnels?app=${encodeURIComponent(facts.appId)}`;
   // page.request carries the global login's root cookie, which the server prefers over a Basic header.
   const apiAs = (playwright, headers) =>
     playwright.request.newContext({ extraHTTPHeaders: headers, storageState: { cookies: [], origins: [] } });
@@ -152,11 +167,14 @@ test.describe('RUM Product Analytics on the real engine', () => {
       const config = await (await page.request.get(`${baseUrl}/config`)).json();
       test.skip(config.build_type === 'opensource', 'Custom roles are enterprise-only');
 
-      const iam = new PageManager(page).iamFormValidation;
+      const pm = new PageManager(page);
+      const iam = pm.iamFormValidation;
+      const roles = pm.rolesPage;
       const role = `pa_${preset}_${facts.appId.slice(-8)}`.replace(/-/g, '_');
       const user = `pa-${preset}-${facts.appId}@e2e.test`;
       const userPassword = 'Preset#12345678';
       let eventId = null;
+      let strayFunnelId = null;
       const root = await apiAs(playwright, basic(email, password));
       let asUser = null;
       try {
@@ -171,9 +189,9 @@ test.describe('RUM Product Analytics on the real engine', () => {
         await iam.getRoleStartFromOptionLocator(preset).click();
         await iam.submitRoleForm();
         await expect(page).toHaveURL(new RegExp(`preset=${preset}`), { timeout: 30000 });
-        const saved = page.waitForResponse((r) => r.request().method() === 'PUT' && r.url().includes(`/roles/${role}`));
-        await page.locator('[data-test="edit-role-save-btn"]').click();
-        expect((await saved).ok()).toBe(true);
+        // The preset stages after the URL changes; saving before it sends no PUT.
+        await roles.waitForPresetStaged();
+        expect((await roles.saveAndWaitForPut(role)).ok()).toBe(true);
 
         const made = await root.post(`${baseUrl}/api/${orgId}/users`, {
           data: { email: user, password: userPassword, role: 'user', first_name: 'pa', last_name: preset },
@@ -203,7 +221,40 @@ test.describe('RUM Product Analytics on the real engine', () => {
         });
         if (write.status() === 201) eventId = (await write.json()).id;
         expect(write.status(), await write.text()).toBe(canWrite ? 201 : 403);
+
+        const rules = [{ t: 'view', op: 'eq', value: '/web/a' }];
+        const eventUrl = (id) =>
+          `${baseUrl}/api/${orgId}/rum/analytics/named_events/${id}?app=${encodeURIComponent(facts.appId)}`;
+        if (canWrite) {
+          const put = await asUser.put(eventUrl(eventId), { data: { name: `Preset ${preset} edited`, rules, version: 1 } });
+          expect(put.status(), await put.text()).toBe(200);
+          const del = await asUser.delete(eventUrl(eventId));
+          expect(del.status(), await del.text()).toBe(204);
+          eventId = null;
+        } else {
+          const rootEvent = await root.post(eventsUrl(baseUrl, orgId), { data: { name: `Root ${preset}`, rules } });
+          expect(rootEvent.status(), await rootEvent.text()).toBe(201);
+          eventId = (await rootEvent.json()).id;
+          const put = await asUser.put(eventUrl(eventId), { data: { name: 'Viewer edit', rules, version: 1 } });
+          expect(put.status(), await put.text()).toBe(403);
+          const del = await asUser.delete(eventUrl(eventId));
+          expect(del.status(), await del.text()).toBe(403);
+          const funnel = await asUser.post(funnelsUrl(baseUrl, orgId), {
+            data: {
+              name: `Viewer funnel ${preset}`,
+              def: { s: [['p', '/web/a'], ['c', 'b-btn']], u: 'sessions', w: 'session' },
+              sql: 'SELECT 1 AS x_axis_1 FROM "_rumdata"',
+            },
+          });
+          if (funnel.status() === 201) strayFunnelId = (await funnel.json()).id;
+          expect(funnel.status(), await funnel.text()).toBe(403);
+        }
       } finally {
+        if (strayFunnelId) {
+          await root.delete(
+            `${baseUrl}/api/${orgId}/rum/analytics/funnels/${strayFunnelId}?app=${encodeURIComponent(facts.appId)}`,
+          );
+        }
         if (eventId) {
           await root.delete(
             `${baseUrl}/api/${orgId}/rum/analytics/named_events/${eventId}?app=${encodeURIComponent(facts.appId)}&force=true`,

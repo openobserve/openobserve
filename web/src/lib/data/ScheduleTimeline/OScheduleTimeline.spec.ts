@@ -49,6 +49,19 @@ describe("OScheduleBand", () => {
     expect(w.attributes("aria-label")).toContain("Devi");
   });
 
+  it("cuts its label inside its own box, with a cut-only tooltip by default", () => {
+    const w = mount(OScheduleBand, { props: { band: band() } });
+    const label = w.find('[data-test="o-truncated-text"]');
+    expect(label.text()).toBe("Devi");
+    expect(label.attributes("data-o-tooltip-trigger")).toBe("overflow");
+    expect(w.classes()).not.toContain("text-ellipsis");
+  });
+
+  it("drops its own tooltip when the caller wraps it in one", () => {
+    const w = mount(OScheduleBand, { props: { band: band(), tooltip: false } });
+    expect(w.find('[data-test="o-truncated-text"]').attributes("data-o-tooltip-off")).toBe("");
+  });
+
   it.each([
     [1, "bg-schedule-band-1-bg"],
     [6, "bg-schedule-band-6-bg"],
@@ -103,7 +116,8 @@ describe("OScheduleTimeline", () => {
     const w = mount(OScheduleTimeline, {
       props: { tracks: [track()], dayColumns: [0, 0.5, 1] },
     });
-    expect(w.findAll("[aria-hidden='true']")).toHaveLength(3);
+    // Bands carry a hidden tooltip anchor of their own, so count the guide lines alone.
+    expect(w.findAll("span.border-s[aria-hidden='true']")).toHaveLength(3);
   });
 
   // Paging forward through a calendar must not pin "now" to an edge and imply
@@ -114,6 +128,21 @@ describe("OScheduleTimeline", () => {
   ] as const)("renders the now marker for nowOffset=%s → %s", (nowOffset, expected) => {
     const w = mount(OScheduleTimeline, { props: { tracks: [track()], nowOffset } });
     expect(w.find("[data-test='o2-schedule-timeline-now']").exists()).toBe(expected);
+  });
+
+  // A stack of day rows shares one clock time, but "now" is on one day only.
+  it("draws the now marker on the named track only", () => {
+    const w = mount(OScheduleTimeline, {
+      props: {
+        tracks: [track({ key: "mon" }), track({ key: "tue" })],
+        nowOffset: 0.5,
+        nowTrackKey: "tue",
+      },
+    });
+    expect(w.findAll("[data-test='o2-schedule-timeline-now']")).toHaveLength(1);
+    expect(
+      w.find("[data-test='o2-schedule-track-tue'] [data-test='o2-schedule-timeline-now']").exists(),
+    ).toBe(true);
   });
 
   it("lets a caller replace a band through the #band slot", () => {

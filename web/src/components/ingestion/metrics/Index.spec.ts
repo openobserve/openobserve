@@ -477,3 +477,47 @@ describe("IngestMetrics Component", () => {
     });
   });
 });
+
+describe("IngestMetrics: Get started pick", () => {
+  const PICK_KEY = `o2.onboarding.firstSource.${store.state.selectedOrganization.identifier}`;
+  const mountRail = () => {
+    const options = buildMountOptions();
+    options.global.stubs.OTabs = { template: "<div><slot /></div>" } as any;
+    return mount(IngestMetrics, options);
+  };
+  const tabNames = (wrapper: any): string[] =>
+    wrapper.findAllComponents({ name: "ORouteTab" }).map((c: any) => c.props("name"));
+
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it("moves the OTel collector guide to the top under Your pick, the rest under Metrics", () => {
+    localStorage.setItem(PICK_KEY, "otel");
+    const wrapper = mountRail();
+    expect(wrapper.find('[data-test="ingestion-metrics-pick-group"]').text()).toBe("Your pick");
+    expect(wrapper.find('[data-test="ingestion-metrics-rest-group"]').text()).toBe("Metrics");
+    expect(wrapper.find('[data-test="ingestion-metrics-pick-tab-otelCollector"]').exists()).toBe(
+      true,
+    );
+    const names = tabNames(wrapper);
+    expect(names[0]).toBe("otelCollector");
+    expect(names.filter((n) => n === "otelCollector")).toHaveLength(1);
+    wrapper.unmount();
+  });
+
+  it("keeps today's order with no pick", () => {
+    const wrapper = mountRail();
+    expect(wrapper.find('[data-test="ingestion-metrics-pick-group"]').exists()).toBe(false);
+    expect(tabNames(wrapper)).toEqual([
+      "prometheus",
+      "vmagent",
+      "nightingale",
+      "categraf",
+      "otelCollector",
+      "telegraf",
+      "cloudwatchMetrics",
+    ]);
+    wrapper.unmount();
+  });
+});

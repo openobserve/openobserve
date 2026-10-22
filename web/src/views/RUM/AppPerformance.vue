@@ -20,57 +20,115 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     :key="store.state.selectedOrganization.identifier"
     data-test="rum-performance-page"
-    :title="t('rum.performanceSummaryLabel')"
-    :subtitle="t('rum.performanceSummarySubtitle', { product: raw('Core Web Vitals') })"
-    title-data-test="rum-performance-title"
-    icon="speed"
     bleed
   >
-    <template #actions>
-      <DateTimePickerDashboard
-        class="rum-date-time-picker"
-        ref="dateTimePicker"
-        v-model="selectedDate"
-        menu-align="end"
-      />
-      <AutoRefreshInterval
-        v-model="refreshInterval"
-        :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
-        trigger
-        :is-compact="isMobile"
-        class="app-performance-auto-refresh-interval"
-        @trigger="refreshData"
-      />
-      <OButton
-        icon-left="refresh"
-        :variant="isVariablesChanged ? 'ghost-warning' : 'outline'"
-        size="icon-toolbar"
-        data-test="rum-performance-refresh"
-        @click="refreshData"
-      >
-        <OTooltip
-          :content="
-            isVariablesChanged
-              ? t('dashboard.refreshToApplyVariableChanges')
-              : t('dashboard.refresh')
-          "
-        />
-      </OButton>
-      <ShareButton
-        data-test="rum-performance-share-link-btn"
-        :url="shareUrl"
-        variant="outline"
-        size="icon-toolbar"
-      />
-    </template>
-    <OTabs
-      class="px-page-edge border-border-default shrink-0 border-b"
-      v-model="activePerformanceTab"
-      align="left"
-      dense
+    <div
+      class="px-page-edge border-border-default flex shrink-0 items-center gap-2 border-b py-2 max-md:flex-wrap"
+      data-test="rum-performance-toolbar"
     >
-      <OTab v-for="tab in tabs" :key="tab.value" :name="tab.value" :label="tab.label" />
-    </OTabs>
+      <OToggleGroup
+        v-model="activePerformanceTab"
+        mobile-dropdown
+        class="shrink-0"
+        data-test="rum-performance-tabs"
+      >
+        <OToggleGroupItem
+          v-for="tab in tabs"
+          :key="tab.value"
+          :value="tab.value"
+          :icon-left="tab.icon"
+          size="sm"
+          :data-test="`rum-performance-tab-${tab.value}`"
+        >
+          {{ tab.label }}
+        </OToggleGroupItem>
+      </OToggleGroup>
+      <div
+        class="ms-auto flex shrink-0 items-center gap-2 max-md:max-w-full max-md:shrink max-md:flex-wrap max-md:justify-end max-md:[&_.date-time-label]:hidden"
+      >
+        <DateTimePickerDashboard
+          class="rum-date-time-picker"
+          ref="dateTimePicker"
+          v-model="selectedDate"
+          menu-align="end"
+        />
+        <AutoRefreshInterval
+          v-model="refreshInterval"
+          :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+          trigger
+          :is-compact="isMobile"
+          class="app-performance-auto-refresh-interval"
+          @trigger="refreshData"
+        />
+        <OButtonGroup>
+          <!-- Wrapper mode: a child-mode tooltip would hover-bind only the icon, not the labelled button. -->
+          <OTooltip
+            :content="
+              isAutoRunOn
+                ? t('search.autoRunEnabled')
+                : isVariablesChanged
+                  ? t('dashboard.refreshToApplyVariableChanges')
+                  : t('dashboard.refresh')
+            "
+            :disabled="!isMobile && !isAutoRunOn && !isVariablesChanged"
+          >
+            <OButton
+              :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
+              :variant="isVariablesChanged ? 'warning' : 'primary'"
+              :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
+              :aria-label="t('dashboard.refresh')"
+              data-test="rum-performance-refresh"
+              @click="refreshData"
+            >
+              <template v-if="!isMobile">{{ t("dashboard.refresh") }}</template>
+            </OButton>
+          </OTooltip>
+          <ODropdown v-if="isAutoRunAvailable" align="end" side="bottom">
+            <template #trigger>
+              <OButton
+                :variant="isVariablesChanged ? 'warning' : 'primary'"
+                size="icon-toolbar"
+                class="w-5"
+                :aria-label="t('dashboard.viewDashboard.moreRefreshOptions')"
+                data-test="rum-performance-refresh-options-btn"
+                icon-left="arrow-drop-down"
+              />
+            </template>
+            <ODropdownItem
+              data-test="rum-performance-refresh-item"
+              icon-left="refresh"
+              @select="refreshData"
+            >
+              {{ t("dashboard.refresh") }}
+            </ODropdownItem>
+            <ODropdownSeparator />
+            <ODropdownItem data-test="rum-performance-auto-run-toggle-btn" @select="toggleAutoRun">
+              <template #icon-left>
+                <OIcon
+                  :name="isAutoRunOn ? 'autorenew' : 'sync-disabled'"
+                  size="sm"
+                  :class="isAutoRunOn ? 'text-accent' : ''"
+                />
+              </template>
+              <span>
+                <div class="font-medium">
+                  {{ isAutoRunOn ? t("search.turnOffLiveMode") : t("search.turnOnLiveMode") }}
+                </div>
+                <div class="text-text-secondary text-xs">
+                  {{ t("search.liveModeTooltip") }}
+                </div>
+              </span>
+            </ODropdownItem>
+          </ODropdown>
+        </OButtonGroup>
+        <ShareButton
+          data-test="rum-performance-share-link-btn"
+          :url="shareUrl"
+          variant="outline"
+          size="icon-toolbar"
+        />
+      </div>
+    </div>
 
     <router-view v-slot="{ Component }">
       <keep-alive>
@@ -93,9 +151,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, watch, onMounted, nextTick, computed, onActivated } from "vue";
+import {
+  defineComponent,
+  ref,
+  watch,
+  onMounted,
+  nextTick,
+  computed,
+  onActivated,
+  provide,
+} from "vue";
 import { useStore } from "vuex";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { getDashboard } from "@/utils/commons.ts";
 import { parseDuration, generateDurationLabel } from "@/utils/date";
@@ -103,12 +170,22 @@ import { reactive } from "vue";
 import { useRoute } from "vue-router";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import overviewDashboard from "@/utils/rum/overview.json";
-import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
-import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import usePerformance from "@/composables/rum/usePerformance";
 import useRum from "@/composables/rum/useRum";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
+import {
+  DASHBOARD_FRESH_PANEL_TIME,
+  freshTimeFromAppliedRange,
+} from "@/composables/dashboard/dashboardFreshPanelTime";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
@@ -118,10 +195,15 @@ export default defineComponent({
   name: "AppPerformance",
   components: {
     AutoRefreshInterval,
-    OTabs,
-    OTab,
+    OToggleGroup,
+    OToggleGroupItem,
     DateTimePickerDashboard,
     OButton,
+    OButtonGroup,
+    ODropdown,
+    ODropdownItem,
+    ODropdownSeparator,
+    OIcon,
     OTooltip,
     OPageLayout,
     ShareButton,
@@ -138,11 +220,16 @@ export default defineComponent({
     // Variables manager will be initialized by RenderDashboardCharts in child components
     const variablesManager = ref(null);
 
+    const { isAutoRunAvailable, isAutoRunOn, toggleAutoRun } = useAutoRunToggle();
+    provide("dashboardAutoRun", isAutoRunOn);
+
     // Track if there are uncommitted variable changes
     const isVariablesChanged = computed(() => {
       // If using variables manager, access hasUncommittedChanges directly from the manager
       // Explicitly dereference to ensure Vue tracks the dependency
       const manager = variablesManager.value;
+
+      if (isAutoRunOn.value) return false;
 
       if (manager && "hasUncommittedChanges" in manager) {
         // Access the value (Vue auto-unwraps computed refs in composable returns)
@@ -164,12 +251,12 @@ export default defineComponent({
     });
 
     const tabs = [
-      { label: t("rum.overview"), value: "overview" },
+      { label: t("rum.overview"), value: "overview", icon: "dashboard" },
       // Adaptive Vitals tab: browser Web Vitals or (Phase 2) Mobile Vitals, chosen by the
       // platform whose data the stream holds. See docs/designs/MOBILE_RUM_ADAPTIVE_UI_DESIGN.md.
-      { label: t("rum.vitals"), value: "web_vitals" },
-      { label: t("rum.errors"), value: "errors" },
-      { label: t("rum.api"), value: "api" },
+      { label: t("rum.vitals"), value: "web_vitals", icon: "speed" },
+      { label: t("rum.errors"), value: "errors", icon: "error-outline" },
+      { label: t("rum.api"), value: "api", icon: "network-check" },
     ];
 
     const routeName = computed(() => router.currentRoute.value.name);
@@ -292,6 +379,14 @@ export default defineComponent({
     // holds the date picker v-modal
     const selectedDate = ref(getSelectedDateFromQueryParams(route.query));
 
+    provide(
+      DASHBOARD_FRESH_PANEL_TIME,
+      freshTimeFromAppliedRange(
+        () => isAutoRunOn.value,
+        () => selectedDate.value,
+      ),
+    );
+
     // holds the current time for the dashboard
     const currentTimeObj = ref({});
 
@@ -396,7 +491,6 @@ export default defineComponent({
     return {
       currentDashboardData,
       t,
-      raw,
       getDashboard,
       store,
       // date variables
@@ -417,6 +511,9 @@ export default defineComponent({
       activePerformanceTab,
       activePerformanceComponent,
       isVariablesChanged,
+      isAutoRunAvailable,
+      isAutoRunOn,
+      toggleAutoRun,
       shareUrl,
       isMobile,
     };

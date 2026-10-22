@@ -21,7 +21,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="trace-details-sidebar-header"
     >
       <div
-        :title="span.operation_name"
         class="flex w-[calc(100%-1.5rem)] items-center truncate ps-1 pb-0"
         data-test="trace-details-sidebar-header-operation-name"
       >
@@ -46,10 +45,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}</OTag
         >
 
-        <span class="truncate">{{ span.operation_name }}</span>
+        <OTruncatedText>{{ span.operation_name }}</OTruncatedText>
       </div>
 
       <OButton
+        :aria-label="t('common.close')"
         variant="ghost"
         size="icon"
         @click="closeSidebar"
@@ -390,13 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="px-page-edge span_details_tabs">
-      <OTabs
-        :model-value="activeTabModel"
-        @update:model-value="$emit('update:activeTab', $event)"
-        dense
-        align="left"
-        data-test="trace-details-sidebar-tabs"
-      >
+      <OTabs v-model="activeTabModel" dense align="left" data-test="trace-details-sidebar-tabs">
         <!-- LLM Preview Tab (conditional - shown first for LLM traces) -->
         <OTab
           v-if="canPreviewSpan"
@@ -446,18 +440,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="trace-details-sidebar-tabs-links"
           class="font-normal! capitalize"
         />
-        <!-- Correlation Tabs (only visible when service streams enabled and enterprise license) -->
+        <!-- Correlation Tabs (visible whenever service streams are enabled; locked without an enterprise license) -->
         <OTab
-          v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
+          v-if="serviceStreamsEnabled"
           name="correlated-logs"
           :label="t('correlation.correlatedLogs')"
+          :suffix-icon="!correlationAccess.allowed ? 'lock' : undefined"
           data-test="trace-details-sidebar-tabs-correlated-logs"
           class="font-normal! capitalize"
         />
         <OTab
-          v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
+          v-if="serviceStreamsEnabled"
           name="correlated-metrics"
           :label="t('correlation.correlatedMetrics')"
+          :suffix-icon="!correlationAccess.allowed ? 'lock' : undefined"
           data-test="trace-details-sidebar-tabs-correlated-metrics"
           class="font-normal! capitalize"
         />
@@ -670,7 +666,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   >
                     <span class="me-1 inline-flex shrink-0">
-                      <OButton variant="ghost" size="icon-xs-circle">
+                      <OButton
+                        :aria-label="
+                          action.operator === '='
+                            ? t('traces.applyAndSearchEquals')
+                            : t('traces.applyAndSearchNotEquals')
+                        "
+                        variant="ghost"
+                        size="icon-xs-circle"
+                      >
                         <OIcon color="currentColor" class="h-[0.7rem]! w-[0.7rem]! pb-[0.185rem]!">
                           <component :is="action.iconComponent" />
                         </OIcon>
@@ -721,7 +725,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                       >
                         <span class="me-1 inline-flex shrink-0">
-                          <OButton variant="ghost" size="icon-xs-circle">
+                          <OButton
+                            :aria-label="
+                              action.operator === '='
+                                ? t('traces.applyAndSearchEquals')
+                                : t('traces.applyAndSearchNotEquals')
+                            "
+                            variant="ghost"
+                            size="icon-xs-circle"
+                          >
                             <OIcon
                               color="currentColor"
                               class="h-[0.7rem]! w-[0.7rem]! pb-[0.185rem]!"
@@ -794,6 +806,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :columns="eventsTableColumns"
                 row-key="__rowId"
                 :wrap="eventsWrap"
+                :cell-overflow-tooltip="false"
                 :default-columns="false"
                 :row-height="28"
                 :show-global-filter="false"
@@ -987,8 +1000,11 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { cloneDeep } from "lodash-es";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import {
@@ -1185,6 +1201,7 @@ export default defineComponent({
     OButton,
     OIcon,
     OTooltip,
+    OTruncatedText,
     OCollapsible,
     OEmptyState,
     LogsHighLighting,
@@ -1265,7 +1282,19 @@ export default defineComponent({
 
     const activeTabModel = computed({
       get: () => props.activeTab,
-      set: (value: string) => emit("update:activeTab", value),
+      // OTabs is controlled (`:model-value`), so refusing to emit here is
+      // what keeps a locked correlation tab from becoming active — clicking
+      // it opens the upgrade dialog instead of switching.
+      set: (value: string) => {
+        if (
+          (value === "correlated-logs" || value === "correlated-metrics") &&
+          !correlationAccess.value.allowed
+        ) {
+          openUpgradeDialog();
+          return;
+        }
+        emit("update:activeTab", value);
+      },
     });
 
     const navigateToError = () => {
@@ -2196,7 +2225,8 @@ export default defineComponent({
 
     const getStartTime = computed(() => {
       return formatTimeWithSuffix(
-        convertTimeFromNsToUs(props.span.start_time) - (props.baseTracePosition?.startTimeUs || 0),
+        convertTimeFromNsToUs(props.span.start_time) -
+          (props.baseTracePosition?.traceStartUs ?? props.baseTracePosition?.startTimeUs ?? 0),
       );
     });
 
@@ -2726,8 +2756,12 @@ export default defineComponent({
       });
     };
 
+    const correlationAccess = useLockedAffordance("correlation");
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+
     return {
       t,
+      correlationAccess,
       activeTabModel,
       filterActions,
       closeSidebar,

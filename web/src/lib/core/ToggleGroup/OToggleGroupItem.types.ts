@@ -14,6 +14,8 @@ export interface ToggleGroupItemProps {
   value: AcceptableValue;
   /** Disables only this item */
   disabled?: boolean;
+  /** Keeps the disabled reason reachable by keyboard. */
+  focusableUnavailable?: boolean;
   /** Tooltip shown on hover — especially useful when disabled is true to explain why */
   tooltip?: I18nText;
   /** Size controls padding and font-size. md (default) = full toolbar; sm = small toolbar; xs = compact inline toggle */

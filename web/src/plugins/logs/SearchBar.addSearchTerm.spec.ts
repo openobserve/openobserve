@@ -111,4 +111,51 @@ describe("SearchBar — adding a filter term to the query", () => {
 
     expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe("");
   });
+
+  describe("free text (item 1 AC6.9)", () => {
+    const stream = (name: string, fts: boolean) => ({
+      name,
+      schema: [
+        { name: fts ? "body" : "msg_text", type: "Utf8" },
+        { name: "level", type: "Utf8" },
+      ],
+      settings: fts ? { full_text_search_keys: ["body"] } : {},
+    });
+
+    const select = (...streams: any[]) => {
+      wrapper.vm.searchObj.data.stream.selectedStream = streams.map((s) => s.name);
+      wrapper.vm.searchObj.data.streamResults = { list: streams };
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [{ name: "level" }];
+    };
+
+    afterEach(() => {
+      wrapper.vm.searchObj.data.stream.selectedStream = [];
+      wrapper.vm.searchObj.data.streamResults = { list: [] };
+    });
+
+    it("materialises the text and wraps every OR branch before adding the facet", async () => {
+      select(stream("fts_a", true));
+      wrapper.vm.searchObj.data.query = "timeout OR refused";
+
+      const query = await addFilterTerm("level='error'");
+
+      expect(query).toBe("(\nmatch_all('timeout') OR match_all('refused')\n) AND level='error'");
+    });
+
+    it("keeps today's plain append when a selected stream cannot search text", async () => {
+      select(stream("fts_a", true), stream("nofts_b", false));
+      wrapper.vm.searchObj.data.query = "timeout";
+
+      const query = await addFilterTerm("level='error'");
+
+      expect(query).toBe("timeout and level='error'");
+    });
+
+    it("uses the facet alone for a comment-only filter", async () => {
+      select(stream("fts_a", true));
+      wrapper.vm.searchObj.data.query = "-- note";
+
+      expect(await addFilterTerm("level='error'")).toBe("level='error'");
+    });
+  });
 });

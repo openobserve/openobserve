@@ -84,6 +84,10 @@ export const editedInSession = (id: string, d: FunnelDef): boolean =>
   sessionEdits.get(id) === signature(d);
 
 // Only a ready events list can prove an event is gone; a create naming one would be refused.
+/** The saved sql was compiled under app filters that have changed since. */
+export const funnelStale = (f: SavedFunnel | null): boolean =>
+  !!f && f.currentRulesHash !== undefined && f.rulesHash !== f.currentRulesHash;
+
 export const hasDeletedStep = (d: FunnelDef, events: readonly NamedEvent[], ready: boolean) =>
   ready && d.steps.some((s) => s.kind === "e" && !events.some((e) => e.id === s.key));
 
@@ -184,12 +188,16 @@ export function useFunnelSaveBlockers(opts: {
     }
     return null;
   });
-  // An unchanged opened funnel would only bump its version.
+  // An unchanged opened funnel would only bump its version; a deleted step stays editable otherwise.
   const saveBlocked = computed<I18nText | null>(() => {
     const opened = pa.openedFunnel.value;
     if (!opened) return copyBlocked.value;
-    if (signature(pa.funnel.value) === signature(opened.def))
-      return t("rum.analytics.saved.noChanges");
+    // A stale funnel is saved unchanged to recompile its sql under the current app filters.
+    if (signature(pa.funnel.value) === signature(opened.def) && !funnelStale(opened)) {
+      return hasDeletedStep(pa.funnel.value, opts.events, opts.eventsReady)
+        ? t("rum.analytics.saved.deletedStepFirst")
+        : t("rum.analytics.saved.noChanges");
+    }
     return uncompiled.value;
   });
   return { sql, uncompiled, copyBlocked, saveBlocked };

@@ -15,12 +15,13 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { nextTick } from "vue";
+import { nextTick, ref } from "vue";
 import * as vueRouter from "vue-router";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import reports from "@/services/reports";
 import ReportList from "./ReportList.vue";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 
 // ─── Module mocks (hoisted) ──────────────────────────────────────────────────
 
@@ -191,11 +192,11 @@ const MoveAcrossFoldersStub = {
   `,
 };
 
-function mountComponent() {
+function mountComponent(query: Record<string, string> = {}) {
   const mockRouter = {
     push: vi.fn(),
     replace: vi.fn(),
-    currentRoute: { value: { query: {} } },
+    currentRoute: ref<{ query: Record<string, string> }>({ query }),
   };
   vi.mocked(vueRouter.useRouter).mockReturnValue(mockRouter as any);
 
@@ -228,6 +229,7 @@ describe("ReportList", () => {
   let mockRouter: { push: ReturnType<typeof vi.fn>; replace: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
+    resetListViewState();
     vi.mocked(reports.listByFolderId).mockResolvedValue({
       data: [REPORT_SCHEDULED, REPORT_CACHED],
     } as any);
@@ -350,6 +352,12 @@ describe("ReportList", () => {
       expect(wrapper.vm.reportsTableRows).toHaveLength(2);
     });
 
+    it("switches tabs through the route so History is deep-linkable", () => {
+      const router = vi.mocked(vueRouter.useRouter).mock.results.at(-1)!.value;
+      wrapper.vm.onTabChange("history");
+      expect(router.push).toHaveBeenCalledWith({ query: { tab: "history" } });
+    });
+
     it("refreshes rows after filtering (index is OTable's built-in show-index)", async () => {
       wrapper.vm.staticReportsList = [{ ...REPORT_SCHEDULED }, { ...REPORT_CACHED }];
       wrapper.vm.activeTab = "shared";
@@ -422,30 +430,26 @@ describe("ReportList", () => {
 
   // ── Date formatting ──────────────────────────────────────────────────────
 
-  describe("last_triggered_at formatting", () => {
-    // These used to call `wrapper.vm.convertUnixToDateFormat(null)` — asserting
-    // the shared util's null handling, which `date.spec.ts` already owns, and
-    // forcing the component to `defineExpose` a function purely so a test could
-    // reach it. What is actually ReportList's to get right is the ROW mapping:
-    // format a real timestamp, and show "-" when there is none.
-    it("formats a triggered report's timestamp for the table", () => {
+  describe("last run column", () => {
+    it("shows Never for a report that has not run", () => {
       const row = wrapper.vm.reportsTableRows.find((r: any) => r.name === REPORT_SCHEDULED.name);
-
-      // 1234567890000000µs = 2009-02-13T23:31:30Z. The suite pins TZ=UTC
-      // (vitest.config.ts), so the zero offset renders as `Z`.
-      expect(row.last_triggered_at).toBe("2009-02-13T23:31:30Z");
-      // ...and the raw value is kept alongside it, for sorting.
-      expect(row.last_triggered_at_raw).toBe(REPORT_SCHEDULED.last_triggered_at);
+      expect(row.last_run_chip).toBe("unrecorded");
     });
 
-    it("shows a dash for a report that has never triggered", async () => {
-      wrapper.vm.activeTab = "cached";
-      await flushPromises();
+    it("maps the stored last run onto the chip", () => {
+      const rows = wrapper.vm.shapeReports([
+        { ...REPORT_SCHEDULED, last_run_status: "error", last_run_at: 5 },
+        { ...REPORT_SCHEDULED, last_run_status: "succeeded", last_run_at: 5 },
+      ]);
+      expect(rows.map((r: any) => r.last_run_chip)).toEqual(["error", "succeeded"]);
+    });
 
-      const row = wrapper.vm.reportsTableRows.find((r: any) => r.name === REPORT_CACHED.name);
-
-      expect(row.last_triggered_at).toBe("-");
-      expect(row.last_triggered_at_raw).toBeNull();
+    it("calls an enabled report overdue once its run is 15 minutes late", () => {
+      const late = (Date.now() - 16 * 60_000) * 1000;
+      const [row] = wrapper.vm.shapeReports([
+        { ...REPORT_SCHEDULED, enabled: true, next_run_at: late, last_run_status: "succeeded" },
+      ]);
+      expect(row.last_run_chip).toBe("overdue");
     });
   });
 
@@ -848,5 +852,84 @@ describe("ReportList", () => {
       expect(wrapper.vm.showMoveDialog).toBe(true);
       expect(wrapper.vm.reportIdsToMove).toEqual([REPORT_SCHEDULED.report_id]);
     });
+  });
+});
+
+describe("ReportList view state persistence", () => {
+  let wrapper: VueWrapper;
+  const defaults = {
+    filterQuery: "",
+    searchQuery: "",
+    searchAcrossFolders: false,
+    sortBy: "",
+    sortOrder: "asc" as "asc" | "desc",
+    pageSize: 20,
+    currentPage: 1,
+  };
+
+  beforeEach(() => {
+    resetListViewState();
+    vi.mocked(reports.listByFolderId).mockResolvedValue({
+      data: [REPORT_SCHEDULED, REPORT_CACHED],
+    } as any);
+    store.state.selectedOrganization = { identifier: "test-org", name: "Test Org" };
+    store.state.theme = "light";
+    store.state.organizationData.allReportsListByFolderId = {};
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    resetListViewState();
+    vi.clearAllMocks();
+  });
+
+  it("takes the tab from the route and seeds filter, sort and paging from the saved view", async () => {
+    Object.assign(useListViewState("reports", defaults), {
+      filterQuery: "daily",
+      sortBy: "name",
+      sortOrder: "desc",
+      pageSize: 50,
+      currentPage: 2,
+    });
+    wrapper = mountComponent({ tab: "cached" }).wrapper;
+    await flushPromises();
+
+    const vm = wrapper.vm as any;
+    expect(vm.activeTab).toBe("cached");
+    expect(vm.filterQuery).toBe("daily");
+    expect(vm.sortBy).toBe("name");
+    expect(vm.sortOrder).toBe("desc");
+    expect(vm.pageSize).toBe(50);
+    expect(vm.currentPage).toBe(2);
+  });
+
+  it("saves filter, sort and page changes into the view state", async () => {
+    wrapper = mountComponent().wrapper;
+    await flushPromises();
+    const vm = wrapper.vm as any;
+
+    vm.filterQuery = "weekly";
+    vm.sortBy = "name";
+    vm.currentPage = 3;
+    await flushPromises();
+
+    expect(useListViewState("reports", defaults)).toMatchObject({
+      filterQuery: "weekly",
+      sortBy: "name",
+      currentPage: 3,
+    });
+  });
+
+  it("resets the page when the tab changes", async () => {
+    Object.assign(useListViewState("reports", defaults), { currentPage: 3 });
+    const mounted = mountComponent();
+    wrapper = mounted.wrapper;
+    await flushPromises();
+    const vm = wrapper.vm as any;
+
+    mounted.mockRouter.currentRoute.value = { query: { tab: "cached" } };
+    await flushPromises();
+
+    expect(vm.currentPage).toBe(1);
   });
 });

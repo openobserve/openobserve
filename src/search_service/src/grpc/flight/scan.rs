@@ -24,7 +24,7 @@ use config::{
         inverted_index::IndexOptimizeMode,
         search::ScanStats,
         sql::TableReferenceExt,
-        stream::{FileKey, StreamSettings},
+        stream::{FileKey, StreamSettings, StreamType},
     },
 };
 use hashbrown::HashMap;
@@ -53,6 +53,7 @@ use crate::{
 #[derive(Default)]
 pub(super) struct StreamSearchSettings {
     pub(super) settings: Option<StreamSettings>,
+    pub(super) stream_type: StreamType,
     pub(super) created_at: Option<i64>,
     pub(super) fts_fields: Vec<String>,
     pub(super) index_fields: Vec<String>,
@@ -89,7 +90,7 @@ impl StreamSearchSettings {
                     .unwrap_or_default()
             })
             .collect_vec();
-        let index_fields = get_stream_setting_index_fields(&settings)
+        let index_fields = get_stream_setting_index_fields(&settings, source.stream_type)
             .into_iter()
             .filter(|v| schema_fields.contains_key(v))
             .collect_vec();
@@ -107,6 +108,7 @@ impl StreamSearchSettings {
         Self {
             created_at: unwrap_stream_created_at(&db_schema),
             settings,
+            stream_type: source.stream_type,
             fts_fields,
             index_fields,
             bloom_fields,
@@ -121,6 +123,7 @@ impl StreamSearchSettings {
             infra::db::tantivy_index::get_ttv_distinct_fields_updated_at().await;
         let index_updated_at = get_stream_setting_index_updated_at_for_fields(
             &self.settings,
+            self.stream_type,
             self.created_at,
             &mode.referenced_fields(),
             distinct_fields_updated_at,

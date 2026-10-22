@@ -5,6 +5,9 @@ import {
 } from "@/utils/dashboard/colorPalette";
 import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { dataZoomBrushStyle } from "@/utils/chartTheme";
+import { resolveSeverityFieldValue } from "@/utils/logs/statusParser";
+import { BREAKDOWN_EMPTY_LABEL, BREAKDOWN_EMPTY_VALUE } from "@/utils/logs/constants";
+import { getDefaultTheme } from "@/constants/themes";
 
 export const convertLogData = (
   x: any,
@@ -104,19 +107,8 @@ export const convertLogData = (
         itemStyle: params.itemStyle
           ? params.itemStyle
           : {
-              color: (() => {
-                // eslint-disable-next-line no-restricted-syntax -- reads the applied `dark` class off the document, not store.state.theme. This runs inside an ECharts formatter callback outside any component scope, where useTheme() is not callable.
-                const isDarkMode = document.documentElement.classList.contains("dark");
-                if (isDarkMode) {
-                  return getComputedStyle(document.body)
-                    .getPropertyValue("--color-theme-accent")
-                    .trim();
-                } else {
-                  return getComputedStyle(document.documentElement)
-                    .getPropertyValue("--color-theme-accent")
-                    .trim();
-                }
-              })(),
+              // Reads the applied `dark` class because this runs outside component scope, where useTheme() is unavailable.
+              color: getThemeAccentColor(document.documentElement.classList.contains("dark")),
             },
       },
     ],
@@ -169,8 +161,6 @@ const SEMANTIC_COLORS_LIGHT: Record<string, string> = {
   pending: "#FFC107",
   success: "#43A047",
   ok: "#43A047",
-  // untagged
-  "(empty)": "#BDBDBD",
 };
 
 const SEMANTIC_COLORS_DARK: Record<string, string> = {
@@ -191,7 +181,6 @@ const SEMANTIC_COLORS_DARK: Record<string, string> = {
   pending: "#D4A83A",
   success: "#4DAD55",
   ok: "#4DAD55",
-  "(empty)": "#707070",
 };
 
 export const formatCount = (value: number): string => {
@@ -200,38 +189,28 @@ export const formatCount = (value: number): string => {
   return String(value);
 };
 
-// Maps numeric severity levels (0-7) to their semantic names, matching
-// statusParser.ts mapNumericStatus. Needed because the backend histogram
-// query selects the raw field value as zo_sql_breakdown, which for OTEL
-// severity data are numbers. useHistogram.ts coerces these to strings.
-// Only maps 0-7; other numeric strings (200, 500, etc.) pass through.
-const NUMERIC_SEVERITY_TO_SEMANTIC: Record<string, string> = {
-  "0": "info", // OTEL UNSPECIFIED
-  "1": "alert",
-  "2": "critical",
-  "3": "error",
-  "4": "warning",
-  "5": "notice",
-  "6": "info",
-  "7": "debug",
+// The applied theme writes the accent on <body> in dark mode and on <html> in light mode.
+const getThemeAccentColor = (isDarkMode: boolean): string => {
+  const target = isDarkMode ? document.body : document.documentElement;
+  const accent = getComputedStyle(target).getPropertyValue("--color-theme-accent").trim();
+  return accent || getDefaultTheme()[isDarkMode ? "dark" : "light"].themeColor;
 };
 
 const getSemanticColor = (
   label: unknown,
   isDarkTheme: boolean,
   fallbackPalette: string[],
+  breakdownField?: string | null,
 ): string => {
   const map = isDarkTheme ? SEMANTIC_COLORS_DARK : SEMANTIC_COLORS_LIGHT;
   const lowerLabel = String(label ?? "")
     .trim()
     .toLowerCase();
 
-  const directMatch = map[lowerLabel];
-  if (directMatch) return directMatch;
+  if (Object.hasOwn(map, lowerLabel)) return map[lowerLabel];
 
-  const semanticName = NUMERIC_SEVERITY_TO_SEMANTIC[lowerLabel];
-  if (semanticName)
-    return map[semanticName] ?? fallbackPalette[getSeriesHash(String(label), fallbackPalette)];
+  const resolved = breakdownField ? resolveSeverityFieldValue(breakdownField, label) : null;
+  if (resolved && map[resolved.level]) return map[resolved.level];
 
   return fallbackPalette[getSeriesHash(String(label), fallbackPalette)];
 };
@@ -245,12 +224,10 @@ export const convertStackedLogData = (
   const palette = isDarkTheme ? classicColorPaletteDarkTheme : classicColorPaletteLightTheme;
 
   const series = [...breakdownSeries.entries()].map(([category, values]) => {
-    // Use explicit check so numeric 0 is treated as a real value, not empty.
-    // `category || "(empty)"` would incorrectly map 0 → "(empty)" because 0 is falsy.
-    // Case is preserved from the source data — "INFO", "Info", "info" render as
-    // three distinct series instead of being collapsed to one normalized label.
-    const label =
-      category === null || category === undefined || category === "" ? "(empty)" : String(category);
+    // Explicit check so a numeric 0 stays a real category; case is kept as the source sent it.
+    const isEmpty =
+      category === null || category === undefined || category === BREAKDOWN_EMPTY_VALUE;
+    const label = isEmpty ? BREAKDOWN_EMPTY_LABEL : String(category);
     return {
       name: label,
       type: "bar",
@@ -261,7 +238,9 @@ export const convertStackedLogData = (
         values[i] ?? 0,
       ]),
       itemStyle: {
-        color: getSemanticColor(label, isDarkTheme, palette),
+        color: isEmpty
+          ? getThemeAccentColor(isDarkTheme)
+          : getSemanticColor(label, isDarkTheme, palette, params.breakdownField),
       },
     };
   });

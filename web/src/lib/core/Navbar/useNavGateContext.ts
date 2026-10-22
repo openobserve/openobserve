@@ -51,6 +51,8 @@ const ALL_GATES_OPEN: NavGateContext = {
   onlineEvals: true,
   oncallEnabled: true,
   databaseMonitoring: true,
+  downtimesEnabled: true,
+  alertCalibrationEnabled: true,
   hiddenMenus: new Set<string>(),
   features: {},
 };
@@ -75,6 +77,8 @@ export function useNavGateContext(): ComputedRef<NavGateContext> {
       onlineEvals: !!z.online_evals_enabled,
       oncallEnabled: z.oncall_enabled !== false,
       databaseMonitoring: !!z.database_monitoring_enabled,
+      downtimesEnabled: z.downtimes_enabled === true,
+      alertCalibrationEnabled: z.alert_calibration_enabled === true,
       // Raw split (no trim) to match how pages test custom_hide_menus.
       hiddenMenus: new Set((z.custom_hide_menus ?? "").split(",")),
       features: z.features ?? {},

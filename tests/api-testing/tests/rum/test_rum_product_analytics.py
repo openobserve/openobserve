@@ -209,6 +209,54 @@ def test_writes_with_another_apps_id_are_not_found(create_session, base_url, org
         assert kept.json()["name"] != "Hijacked"
 
 
+def test_stale_funnel_put_is_a_version_conflict(create_session, base_url, org_id, app):
+    s = create_session
+    funnel = s.post(_url(base_url, org_id, "funnels", app), json=_funnel_body("Flow", ["p", "/"], ["p", "/a"]))
+    assert funnel.status_code == 201, funnel.text
+    path = _url(base_url, org_id, f"funnels/{funnel.json()['id']}", app)
+    first = s.put(path, json={**_funnel_body("Flow 2", ["p", "/"], ["p", "/a"]), "version": 1})
+    assert first.status_code == 200, first.text
+    assert first.json()["version"] == 2
+    stale = s.put(path, json={**_funnel_body("Stale", ["p", "/"], ["p", "/b"]), "version": 1})
+    assert stale.status_code == 409, stale.text
+    body = stale.json()
+    assert body["code"] == "version_conflict"
+    assert body["current"]["name"] == "Flow 2" and body["current"]["version"] == 2
+
+
+def test_funnel_name_validation_and_duplicate(create_session, base_url, org_id, app):
+    s = create_session
+    url = _url(base_url, org_id, "funnels", app)
+    steps = (["p", "/"], ["p", "/a"])
+    assert s.post(url, json=_funnel_body("Flow", *steps)).status_code == 201
+    dup = s.post(url, json=_funnel_body("  FLOW ", *steps))
+    assert dup.status_code == 409 and dup.json()["code"] == "duplicate_name", dup.text
+    long_name = s.post(url, json=_funnel_body("n" * 81, *steps))
+    assert long_name.status_code == 400 and long_name.json()["code"] == "invalid_name", long_name.text
+    empty = s.post(url, json=_funnel_body("", *steps))
+    assert empty.status_code == 400 and empty.json()["code"] == "invalid_name", empty.text
+    listed = s.get(url).json()["list"]
+    assert [f["name"] for f in listed] == ["Flow"]
+
+
+def test_funnel_update_then_delete(create_session, base_url, org_id, app):
+    s = create_session
+    created = s.post(_url(base_url, org_id, "funnels", app), json=_funnel_body("Flow", ["p", "/"], ["p", "/a"]))
+    assert created.status_code == 201, created.text
+    path = _url(base_url, org_id, f"funnels/{created.json()['id']}", app)
+    updated = s.put(path, json={**_funnel_body("Flow", ["p", "/"], ["p", "/b"]), "version": 1})
+    assert updated.status_code == 200, updated.text
+    fetched = s.get(path)
+    assert fetched.status_code == 200
+    assert fetched.json()["def"]["s"] == [["p", "/"], ["p", "/b"]]
+    assert fetched.json()["version"] == 2
+    deleted = s.delete(path)
+    assert deleted.status_code == 204, deleted.text
+    gone = s.get(path)
+    assert gone.status_code == 404 and gone.json()["code"] == "not_found"
+    assert s.get(_url(base_url, org_id, "funnels", app)).json()["list"] == []
+
+
 @pytest.fixture(scope="module")
 def second_org(create_session, base_url):
     """One extra org per module: `DELETE /api/organizations/{id}` is not available to clean it up."""
@@ -265,5 +313,30 @@ def test_viewer_reads_but_cannot_write(create_session, base_url, org_id, app):
         assert listed.status_code == 200, listed.text
         refused = viewer.post(_url(base_url, org_id, "named_events", app), json=_event_body("Nope"))
         assert refused.status_code == 403, refused.text
+
+        event = create_session.post(_url(base_url, org_id, "named_events", app), json=_event_body("Root event"))
+        assert event.status_code == 201, event.text
+        funnel = create_session.post(
+            _url(base_url, org_id, "funnels", app), json=_funnel_body("Root flow", ["p", "/"], ["p", "/a"])
+        )
+        assert funnel.status_code == 201, funnel.text
+        assert viewer.get(_url(base_url, org_id, "funnels", app)).status_code == 200
+
+        event_path = _url(base_url, org_id, f"named_events/{event.json()['id']}", app)
+        put_event = viewer.put(event_path, json={**_event_body("Viewer edit"), "version": 1})
+        assert put_event.status_code == 403, put_event.text
+        del_event = viewer.delete(_url(base_url, org_id, f"named_events/{event.json()['id']}", app, force="true"))
+        assert del_event.status_code == 403, del_event.text
+
+        funnel_path = _url(base_url, org_id, f"funnels/{funnel.json()['id']}", app)
+        post_funnel = viewer.post(
+            _url(base_url, org_id, "funnels", app), json=_funnel_body("Viewer flow", ["p", "/"], ["p", "/a"])
+        )
+        assert post_funnel.status_code == 403, post_funnel.text
+        put_funnel = viewer.put(funnel_path, json={**_funnel_body("Viewer edit", ["p", "/"], ["p", "/b"]), "version": 1})
+        assert put_funnel.status_code == 403, put_funnel.text
+        assert viewer.delete(funnel_path).status_code == 403
+        kept = create_session.get(funnel_path)
+        assert kept.status_code == 200 and kept.json()["name"] == "Root flow", kept.text
     finally:
         create_session.delete(f"{base_url}api/{org_id}/users/{email}")

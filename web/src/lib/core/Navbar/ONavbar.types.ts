@@ -26,8 +26,14 @@ export interface NavItem {
   display?: boolean;
   hide?: boolean;
   badge?: number;
-  /** Shown with a lock badge; the link already points at the upsell page. */
+  /**
+   * Present but unreachable — an enterprise/cloud-only item in a build that
+   * doesn't unlock it. Rendered dimmed with `lockedMessage` as a tooltip and
+   * inert on click, instead of being spliced out of the rail. Set from
+   * `checkFeatureAccess()` in utils/enterpriseFeatures.ts.
+   */
   locked?: boolean;
+  lockedMessage?: I18nText;
 }
 
 /**
@@ -40,6 +46,11 @@ export interface NavItem {
  */
 export const RailIndicatorActiveKey: InjectionKey<ComputedRef<boolean>> = Symbol(
   "o-navbar-rail-indicator-active",
+);
+
+/** Provided by ONavbar so a teleported flyout item can mark its click as rail-started. */
+export const RailNavigationMarkKey: InjectionKey<(event: MouseEvent) => void> = Symbol(
+  "o-navbar-rail-navigation-mark",
 );
 
 /**
@@ -93,6 +104,14 @@ export interface SubnavChild {
   beta?: boolean;
   /** License feature key; `locked` routes to the upsell page, `hidden` drops the child. */
   feature?: string;
+  /**
+   * Set at RENDER time (ONavGroup.vue), not in the static NAV_GROUPS/NAV_SUBNAV
+   * tables: when `gate` corresponds to a registered `FeatureKey`
+   * (utils/enterpriseFeatures.ts) and that feature isn't unlocked, the child
+   * is kept rather than filtered out, dimmed, and inert on click.
+   */
+  locked?: boolean;
+  lockedMessage?: I18nText;
 }
 
 /** Context for evaluating subnav `gate` predicates (see navGroups.ts). */
@@ -110,6 +129,10 @@ export interface NavGateContext {
   oncallEnabled: boolean;
   /** `zoConfig.database_monitoring_enabled`. OSS feature — no build gate. */
   databaseMonitoring: boolean;
+  /** `/config` `downtimes_enabled` (enterprise `O2_DOWNTIMES_ENABLED`). */
+  downtimesEnabled: boolean;
+  /** `/config` `alert_calibration_enabled` (enterprise `O2_ALERT_CALIBRATION_ENABLED`). */
+  alertCalibrationEnabled: boolean;
   /** Raw `custom_hide_menus` entries (split on ",") — matches how pages test it. */
   hiddenMenus: Set<string>;
   /** `/config` `features` map (enabled / locked / hidden per license feature). */
@@ -129,7 +152,7 @@ export interface NavGateContext {
  */
 export type RailEntry =
   | { type: "link"; item: NavItem }
-  | { type: "linkGroup"; item: NavItem; children: SubnavChild[] }
+  | { type: "linkGroup"; item: NavItem; children: SubnavChild[]; filtered?: SubnavChild[] }
   | {
       type: "group";
       key: string;

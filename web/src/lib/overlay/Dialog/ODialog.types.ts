@@ -8,6 +8,8 @@ import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 
 export type DialogSize = "xs" | "sm" | "md" | "lg" | "xl" | "full";
 
+export type DialogInitialFocus = "primary" | "secondary";
+
 export interface DialogProps {
   /** Controlled open state — use with v-model:open */
   open?: boolean;
@@ -71,6 +73,8 @@ export interface DialogProps {
 
   /** Label for the primary action button (right side). Omit to hide. */
   primaryButtonLabel?: I18nText;
+  /** data-test for the primary button. @default "o-dialog-primary-btn" */
+  primaryButtonDataTest?: string;
   /** Label for the secondary action button (right of neutral, left of primary). Omit to hide. */
   secondaryButtonLabel?: I18nText;
   /** Label for the neutral action button (left side). Omit to hide. */
@@ -96,6 +100,9 @@ export interface DialogProps {
   secondaryButtonLoading?: boolean;
   /** Shows loading spinner on neutral button (also disables all buttons). */
   neutralButtonLoading?: boolean;
+
+  /** The footer button focused on open when the body has no field; `secondary` keeps Enter off a destructive primary. @default "primary" */
+  initialFocus?: DialogInitialFocus;
 }
 
 export interface DialogEmits {

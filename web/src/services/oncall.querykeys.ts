@@ -68,6 +68,14 @@ export const oncallKeys = {
       quantizeRange(from, to),
       rotationId ?? "primary",
     ),
+  /** Keyed by the draft itself, so an unchanged draft is a cache hit rather than a request. */
+  resolvedSchedulePreview: (
+    org: string,
+    teamId: string,
+    from: number,
+    to: number,
+    rotation: unknown,
+  ) => orgKey(org, "oncall", "teams", teamId, "resolvedSchedulePreview", from, to, rotation),
   overrides: (org: string, teamId: string, from?: number, to?: number) =>
     orgKey(
       org,
@@ -141,6 +149,10 @@ export const oncallKeys = {
   myOnCall: (org: string) => orgKey(org, "oncall", "my", "teams"),
   myDeliveries: (org: string, filters: Record<string, unknown> = {}) =>
     orgKey(org, "oncall", "my", "deliveries", stableFilters(filters)),
+  /** Every member's contact; a provider change moves `phone_provider_available` on all of them. */
+  contactsAll: (org: string) => orgKey(org, "oncall", "contacts"),
+  contact: (org: string, userEmail: string) => orgKey(org, "oncall", "contacts", userEmail),
+  telephony: (org: string) => orgKey(org, "oncall", "telephony"),
 
   routingConfig: (org: string) => orgKey(org, "oncall", "routing", "config"),
 };

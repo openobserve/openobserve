@@ -44,6 +44,9 @@ vi.mock("@/services/search", async (importOriginal) => {
       result_schema: vi.fn().mockResolvedValue({
         data: { group_by: [], projections: [], timeseries_field: null },
       }),
+      metrics_query: vi.fn().mockResolvedValue({
+        data: { status: "success", data: { resultType: "vector", result: [] } },
+      }),
       search: vi.fn().mockResolvedValue({ data: { hits: [], total: 0 } }),
     },
   });
@@ -2546,5 +2549,123 @@ describe("PreviewAlert - SQL verdict under streaming aggregates", () => {
     await emitResultMetadata(w, [[{ hits: rows(2) }]]);
 
     expectVerdict(w, { matched: 2, gate: "2 >= 2", trigger: true, label: LABEL });
+  });
+});
+
+describe("PreviewAlert - Forecast mode", () => {
+  const T0 = 1700000000000;
+  const series = (name: string, values: string[]) => ({
+    name,
+    data: values.map((v, i) => [T0 + i * 15000, v]),
+  });
+
+  const mountForecast = (H = 7) =>
+    mountComp({
+      query: "forecast_query",
+      selectedTab: "promql",
+      formData: {
+        stream_name: "disk_used",
+        stream_type: "metrics",
+        is_real_time: "false",
+        trigger_condition: { period: 5, threshold: 1, operator: ">=" },
+        query_condition: {
+          promql_condition: { column: "value", operator: "<=", value: H },
+          promql_multi_alert: true,
+        },
+        _ui: { forecast: { U: "sum(disk_used)", T: 1500, direction: "rises", W: "2d", H } },
+      },
+    });
+
+  const emitSeries = async (w: VueWrapper<any>, ...s: any[]) => {
+    w.findComponent({ name: "PanelSchemaRenderer" }).vm.$emit("series-data-update", {
+      options: { series: s },
+    });
+    await nextTick();
+  };
+
+  it("states the forecast verdict, not a threshold-mode count gate", async () => {
+    const w = await mountForecast();
+    await emitSeries(w, series("a", ["9", "3"]), series("b", ["36500", "36500"]));
+
+    expect(w.vm.evaluationStatus?.wouldTrigger).toBe(true);
+    expect(w.vm.evaluationStatus?.reason).toBe(
+      i18n.global.t("alerts.forecast.previewReason", {
+        count: 1,
+        threshold: 1500,
+        horizon: i18n.global.t("alerts.forecast.dayCount", { n: 7 }, 7),
+      }),
+    );
+    expect(w.vm.evaluationStatus?.reason).not.toContain(">=");
+    w.unmount();
+  });
+
+  it("reports no series in time without a count comparison", async () => {
+    const w = await mountForecast(1);
+    await emitSeries(w, series("a", ["36500", "36500"]));
+
+    expect(w.vm.evaluationStatus?.wouldTrigger).toBe(false);
+    expect(w.vm.evaluationStatus?.reason).toBe("0 series forecast to reach 1500 within 1 day");
+    w.unmount();
+  });
+
+  it("gives no verdict while the horizon is out of range, as the summary does", async () => {
+    for (const H of [0, 31, 2.5]) {
+      const w = await mountForecast(H);
+      await emitSeries(w, series("a", ["0", "0"]));
+      expect(w.vm.evaluationStatus).toBeNull();
+      w.unmount();
+    }
+  });
+
+  it("labels the charted series as days until the threshold", async () => {
+    const w = await mountForecast();
+    w.vm.refreshData();
+    await nextTick();
+
+    expect(w.vm.dashboardPanelData?.data?.queries?.[0]?.config?.promql_legend_fallback).toBe(
+      "days until 1500",
+    );
+    w.unmount();
+  });
+});
+
+describe("PromQL rule preview", () => {
+  it("uses an instant reply and never classifies chart NaN/Inf as missing", async () => {
+    vi.mocked(searchService.metrics_query).mockResolvedValue({
+      data: {
+        status: "success",
+        data: {
+          resultType: "vector",
+          result: [
+            { metric: { host: "a" }, value: [600, "NaN"] },
+            { metric: { host: "b" }, value: [600, "+Inf"] },
+          ],
+        },
+      },
+    } as any);
+    const w = await mountComp({
+      selectedTab: "promql",
+      query: "foo > 0",
+      formData: {
+        stream_name: "",
+        stream_type: "metrics",
+        trigger_condition: { period: 5, threshold: 1, operator: ">=" },
+        query_condition: {
+          promql_rule_mode: true,
+          promql_multi_alert: true,
+          promql_condition: null,
+        },
+      },
+    });
+    await flushPromises();
+    expect(searchService.metrics_query).toHaveBeenCalled();
+    expect(w.vm.evaluationStatus?.wouldTrigger).toBe(true);
+    expect(w.vm.evaluationStatus?.reason).toContain("2 returned series");
+    w.findComponent({ name: "PanelSchemaRenderer" }).vm.$emit("series-data-update", {
+      options: { series: [] },
+    });
+    await nextTick();
+    expect(w.vm.evaluationStatus?.wouldTrigger).toBe(true);
+    w.unmount();
   });
 });

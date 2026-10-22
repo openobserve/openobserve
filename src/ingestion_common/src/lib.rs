@@ -18,7 +18,6 @@ use std::{
     io::{BufReader, Cursor, Lines},
 };
 
-use ::common::meta::stream::SchemaRecords;
 use bytes::Bytes;
 use config::utils::json;
 use serde::{Deserialize, Serialize};
@@ -102,10 +101,6 @@ pub struct RecordStatus {
     pub policy_dropped: u32,
 }
 
-pub struct BulkStreamData {
-    pub data: HashMap<String, SchemaRecords>,
-}
-
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct StreamStatus {
     pub name: String,
@@ -180,26 +175,6 @@ pub struct StreamSchemaChk {
     pub has_partition_keys: bool,
     pub has_metrics_metadata: bool,
 }
-
-pub const INGESTION_EP: [&str; 17] = [
-    "_bulk",
-    "_json",
-    "_multi",
-    "traces",
-    "write",
-    "_kinesis_firehose",
-    "_license",
-    "_xpack",
-    "_index_template",
-    "_data_stream",
-    "_sub",
-    "logs",
-    "metrics",
-    "profiles",
-    "_json_arrow",
-    "_hec",
-    "push",
-];
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct BulkResponse {
@@ -459,6 +434,8 @@ pub enum IngestionError {
     JsonError(json::Error),
     AWSError(KinesisFHIngestionResponse),
     GCPError(GCPIngestionResponse),
+    /// Records inflated past the request's decompressed budget, so a retry cannot succeed.
+    PayloadTooLarge(String),
 }
 
 impl From<json::Error> for IngestionError {
@@ -480,10 +457,7 @@ pub enum IngestionDataIter {
         std::vec::IntoIter<json::Value>,
         Option<GCPIngestionResponse>,
     ),
-    KinesisFH(
-        std::vec::IntoIter<json::Value>,
-        Option<KinesisFHIngestionResponse>,
-    ),
+    KinesisFH(std::vec::IntoIter<json::Value>, Option<IngestionError>),
 }
 
 pub enum HecStatus {

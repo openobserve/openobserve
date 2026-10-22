@@ -17,7 +17,7 @@
 
 /** Default x-axis: histogram(_timestamp). */
 export const DEFAULT_SQL_X_FIELD = () => ({
-  label: "_timestamp",
+  label: "",
   alias: "x_axis_1",
   column: "_timestamp",
   color: null,
@@ -34,7 +34,7 @@ export const DEFAULT_SQL_X_FIELD = () => ({
 
 /** Default y-axis for logs/traces (and metrics without a "value" column): count(_timestamp). */
 export const DEFAULT_SQL_Y_FIELD_COUNT = () => ({
-  label: "_timestamp",
+  label: "",
   alias: "y_axis_1",
   column: "_timestamp",
   color: "#5960b2",
@@ -48,7 +48,7 @@ export const DEFAULT_SQL_Y_FIELD_COUNT = () => ({
 
 /** Metrics-only y-axis when the stream has a "value" column: avg(value). */
 export const DEFAULT_SQL_Y_FIELD_VALUE = () => ({
-  label: "value",
+  label: "",
   alias: "y_axis_1",
   column: "value",
   color: "#5960b2",

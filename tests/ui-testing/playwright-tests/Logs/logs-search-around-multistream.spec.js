@@ -23,6 +23,7 @@ const {
   waitForStreamListed,
 } = require('../utils/data-ingestion.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
+const PageManager = require('../../pages/page-manager.js');
 
 const SUFFIX = Math.random().toString(36).slice(2, 7);
 const STREAM_A = `e2e_sa_one_${SUFFIX}`;
@@ -36,9 +37,6 @@ const ROWS_B = [
   { body: 'beta one', origin: 'b' },
   { body: 'beta two', origin: 'b' },
 ];
-
-const RESULTS_TABLE = '[data-test="logs-search-result-logs-table"]';
-const SEARCH_AROUND_BTN = '[data-test="logs-detail-table-search-around-btn"]';
 
 test.describe('Logs search around with several streams selected', () => {
   test.describe.configure({ mode: 'serial' });
@@ -66,8 +64,11 @@ test.describe('Logs search around with several streams selected', () => {
     }
   });
 
+  let pm;
+
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
+    pm = new PageManager(page);
     await navigateToBase(page);
     // Both streams selected, which is the condition that used to hide the action.
     await page.goto(
@@ -75,45 +76,25 @@ test.describe('Logs search around with several streams selected', () => {
         `&stream_type=logs&stream=${STREAM_A},${STREAM_B}&period=15m&quick_mode=false&sql_mode=false`,
     );
     await page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await expect(page.locator(RESULTS_TABLE)).toBeVisible({ timeout: 30000 });
+    await pm.logsPage.runSearchAndWaitForResults();
     // A multi-stream result set carries the stream-name column; wait for it so the
     // row we open is definitely one of the merged rows.
-    await expect(
-      page.locator(`${RESULTS_TABLE} td[data-test="o2-table-cell-_stream_name"]`).first(),
-    ).toBeVisible({ timeout: 30000 });
+    await expect(pm.logsPage.streamNameCells().first()).toBeVisible({ timeout: 30000 });
   });
-
-  /** Opens the first row's detail and returns the stream name that row came from. */
-  async function openFirstHit(page) {
-    const streamCell = page
-      .locator(`${RESULTS_TABLE} td[data-test="o2-table-cell-_stream_name"]`)
-      .first();
-    const hitStream = (await streamCell.innerText()).trim();
-    await streamCell.click();
-    await expect(page.locator('[data-test="logs-search-result-detail-dialog"]')).toBeVisible({
-      timeout: 20000,
-    });
-    return hitStream;
-  }
 
   test('offers search around on a hit when several streams are selected', {
     tag: ['@logsSearchAround', '@logs', '@P1', '@all'],
   }, async ({ page }) => {
-    await openFirstHit(page);
+    await pm.logsPage.openFirstHitDetail();
     // Previously hidden outright for multi-stream selections.
-    await expect(page.locator(SEARCH_AROUND_BTN)).toBeVisible({ timeout: 20000 });
+    await expect(pm.logsPage.searchAroundButton()).toBeVisible({ timeout: 20000 });
   });
 
   test("runs search around against the hit's own stream, not the multi endpoint", {
     tag: ['@logsSearchAround', '@logs', '@P1', '@all'],
   }, async ({ page }) => {
-    const hitStream = await openFirstHit(page);
-
-    const [request] = await Promise.all([
-      page.waitForRequest((r) => /_around/.test(r.url()), { timeout: 30000 }),
-      page.locator(SEARCH_AROUND_BTN).click(),
-    ]);
+    const hitStream = await pm.logsPage.openFirstHitDetail();
+    const request = await pm.logsPage.clickSearchAroundAwaitingRequest();
 
     // The _around endpoint is single-stream; the hit's _stream_name picks which one.
     expect(request.url()).toContain(`/${hitStream}/_around`);
@@ -123,21 +104,18 @@ test.describe('Logs search around with several streams selected', () => {
   test('tags the search-around results with the stream they came from', {
     tag: ['@logsSearchAround', '@logs', '@P2', '@all'],
   }, async ({ page }) => {
-    const hitStream = await openFirstHit(page);
-    await page.locator(SEARCH_AROUND_BTN).click();
+    const hitStream = await pm.logsPage.openFirstHitDetail();
+
+    // Wait for the round trip before reading the table. The pre-click table is the
+    // multi-stream result set, so an assertion about the new rows could otherwise be
+    // satisfied by the old ones — passing without the search-around having run.
+    const response = await pm.logsPage.clickSearchAroundAwaitingResponse();
+    expect(response.status(), 'search around request failed').toBe(200);
 
     // _around returns SELECT * rows, so the stream-name column has to be repopulated
     // by the client or the results lose track of which stream they belong to.
     await expect
-      .poll(
-        async () => {
-          const cells = await page
-            .locator(`${RESULTS_TABLE} td[data-test="o2-table-cell-_stream_name"]`)
-            .allInnerTexts();
-          return [...new Set(cells.map((c) => c.trim()))].filter(Boolean);
-        },
-        { timeout: 30000 },
-      )
+      .poll(() => pm.logsPage.distinctStreamNames(), { timeout: 30000 })
       .toEqual([hitStream]);
   });
 });

@@ -138,6 +138,7 @@
 
                 <!-- Remove argument button -->
                 <OButton
+                  :aria-label="t('common.remove')"
                   v-if="canRemoveArgument(fields.functionName, argIndex)"
                   variant="ghost"
                   size="icon"

@@ -191,6 +191,21 @@ async fn run() -> Result<(), anyhow::Error> {
                 panic!("infra init failed: {e}");
             }
 
+            // Must precede every cipher_keys read or write, including default-org creation.
+            #[cfg(feature = "enterprise")]
+            let master_key = Some(
+                o2_enterprise::enterprise::common::config::get_config()
+                    .encryption
+                    .master_key
+                    .clone(),
+            );
+            #[cfg(not(feature = "enterprise"))]
+            let master_key: Option<String> = None;
+            if let Err(e) = infra::table::cipher::boot(master_key.as_deref()).await {
+                job_init_tx.send(false).ok();
+                panic!("cipher master key boot failed: {e}");
+            }
+
             if let Err(e) = bootstrap::init().await {
                 job_init_tx.send(false).ok();
                 panic!("common infra init failed: {e}");
@@ -509,22 +524,6 @@ fn check_ratelimit_config(cfg: &Config, o2cfg: &O2Config) -> Result<(), anyhow::
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[cfg(feature = "enterprise")]
-    #[test]
-    #[ignore] // TODO: Fix enterprise config structure issues
-    fn test_check_ratelimit_config_valid() {
-        // Test disabled due to enterprise config structure mismatch
-        // Need to properly construct O2Config and RateLimitConfig structs
-    }
-
-    #[cfg(feature = "enterprise")]
-    #[test]
-    #[ignore = "Enterprise config struct fields don't match - needs fixing"]
-    fn test_check_ratelimit_config_invalid_interval() {
-        // Test disabled due to enterprise config structure mismatch
-        // Need to properly construct O2Config and RateLimitConfig structs
-    }
 
     #[tokio::test]
     async fn test_socket_addr_parsing() {

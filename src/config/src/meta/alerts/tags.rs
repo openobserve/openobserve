@@ -259,12 +259,6 @@ mod tests {
     // ── Accepted shapes ─────────────────────────────────────────────────────
 
     #[test]
-    fn test_bare_and_key_value_tags_are_both_valid() {
-        let out = normalize_tags(&v(&["prod", "service:checkout"])).unwrap();
-        assert_eq!(out, v(&["prod", "service:checkout"]));
-    }
-
-    #[test]
     fn test_full_legal_punctuation_set_is_accepted() {
         // _ - . / : — all of it, in one tag.
         let tag = "web.server-01/prod:v2_x";

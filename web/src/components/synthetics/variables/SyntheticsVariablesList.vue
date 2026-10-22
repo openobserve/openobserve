@@ -106,13 +106,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="synthetics-variable-value-empty"
           >{{ t("synthetics.variables.valueEmpty") }}</OBadge
         >
-        <span
-          v-else
-          class="truncate font-mono"
-          :title="row.value"
-          data-test="synthetics-variable-plain-value"
-          >{{ row.value }}</span
-        >
+        <span v-else class="font-mono" data-test="synthetics-variable-plain-value">{{
+          row.value
+        }}</span>
       </template>
 
       <template #cell-used_by_checks="{ row }">
@@ -129,6 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #cell-actions="{ row }">
         <OButton
+          :aria-label="t('common.edit')"
           variant="ghost"
           size="icon-sm"
           icon-left="edit"
@@ -155,6 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span class="inline-flex">
             <OButton
+              :aria-label="t('synthetics.promote.toGlobal')"
               variant="ghost"
               size="icon-sm"
               icon-left="drive-file-move"
@@ -175,6 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip side="bottom" :content="t('synthetics.split.action')" />
         </OButton>
         <OButton
+          :aria-label="t('common.delete')"
           variant="ghost"
           size="icon-sm"
           icon-left="delete"

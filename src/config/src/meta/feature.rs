@@ -91,6 +91,7 @@ pub enum Feature {
     AlertCorrelation,
     AlertLibrary,
     AlertInsights,
+    Downtimes,
     RootCauseAnalysis,
     IncidentIntegrations,
     AiSreAgent,

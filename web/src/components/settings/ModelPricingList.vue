@@ -94,8 +94,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :selected-ids="selectedIds"
           selection="multiple"
           pagination="client"
-          :page-size="20"
+          :page-size="pageSize"
           :page-size-options="[20, 50, 100, 250, 500]"
+          :current-page="currentPage"
+          :sort-by="sortBy"
+          :sort-order="sortOrder"
           sorting="client"
           filter-mode="client"
           :default-columns="false"
@@ -109,6 +112,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             (row: any) => !!(row.children?.length && shadowingParentNames.has(row.name))
           "
           @update:selected-ids="handleSelectedIdsUpdate"
+          @update:page-size="pageSize = $event"
+          @update:current-page="currentPage = $event"
+          @update:sort-by="sortBy = $event"
+          @update:sort-order="sortOrder = $event"
         >
           <!-- Toolbar: Built-in/Custom tabs + search -->
           <template #toolbar>
@@ -175,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="person" size="sm" class="text-text-secondary" />
                 <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
               </span>
-              <div class="block w-full truncate">{{ row.name }}</div>
+              <OTruncatedText as="div" class="block w-full">{{ row.name }}</OTruncatedText>
             </div>
           </template>
           <template #cell-match_pattern="{ row }">
@@ -294,9 +301,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             {{ t("modelPricing.localTimeHint", { range: tierWindowsLocal(tier) }) }}
                           </div>
                           <div
-                            v-if="!tier.condition && !tier.utc_windows?.length"
-                            class="text-2xs opacity-70"
+                            v-for="(rule, rIdx) in tier.rules ?? []"
+                            :key="rIdx"
+                            class="text-2xs font-mono opacity-70"
                           >
+                            {{ formatTierRule(rule, t) }}
+                          </div>
+                          <div v-if="isUnrestrictedTier(tier)" class="text-2xs opacity-70">
                             {{ t("modelPricing.tierAlwaysActive") }}
                           </div>
                           <table class="mt-0.5 w-full border-collapse">
@@ -369,6 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ODropdown side="bottom" align="end">
                   <template #trigger>
                     <OButton
+                      :aria-label="t('common.moreActions')"
                       icon-left="more-vert"
                       variant="ghost"
                       size="icon-xs-sq"
@@ -559,9 +571,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <UtcHoursBar :windows="tier.utc_windows" />
                   </div>
                   <div
-                    v-if="!tier.condition && !tier.utc_windows?.length"
-                    class="text-2xs mt-0.5 opacity-55"
+                    v-for="(rule, rIdx) in tier.rules ?? []"
+                    :key="rIdx"
+                    class="mt-0.5"
+                    data-test="model-pricing-drawer-tier-rule"
                   >
+                    <OCode>{{ formatTierRule(rule, t) }}</OCode>
+                  </div>
+                  <div v-if="isUnrestrictedTier(tier)" class="text-2xs mt-0.5 opacity-55">
                     {{ t("modelPricing.tierAlwaysActive") }}
                   </div>
                 </div>
@@ -653,11 +670,18 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import UtcHoursBar from "@/components/settings/UtcHoursBar.vue";
 import OCode from "@/lib/core/Code/OCode.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import { operatorSymbol, formatUtcWindows, formatUtcWindowsInTz } from "@/utils/formatters";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import {
+  operatorSymbol,
+  formatTierRule,
+  formatUtcWindows,
+  formatUtcWindowsInTz,
+} from "@/utils/formatters";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { forbiddenState } from "@/utils/featureGate";
+import { useListViewState } from "@/composables/useListViewState";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -675,6 +699,15 @@ const modelsQuery = useQuery(() =>
 // repaints these rows with no wiring here.
 const models = computed(() => modelsQuery.data.value ?? []);
 const loading = modelsQuery.isPending;
+// setTimeout(0) runs after TanStack's deferred auto-reset-on-data-change, so the restored page wins.
+watch(
+  loading,
+  (isLoading) => {
+    if (isLoading) return;
+    setTimeout(() => qTableRef.value?.restorePage?.(currentPage.value), 0);
+  },
+  { once: true, immediate: true },
+);
 // Request in flight, with rows still on screen — the refresh button's
 // spinner. `loading` stays for the skeleton, which only a cold read wants.
 const fetching = modelsQuery.isFetching;
@@ -706,12 +739,35 @@ const confirmDialogMeta = ref({
 const resetConfirmDialog = () => {
   confirmDialogMeta.value.show = false;
 };
-const filterQuery = ref("");
+const viewState = useListViewState("model-pricing", {
+  filterQuery: "",
+  selectedTab: "all",
+  pageSize: 20,
+  currentPage: 1,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+});
+const filterQuery = ref(viewState.filterQuery);
+const pageSize = ref(viewState.pageSize);
+const currentPage = ref(viewState.currentPage);
+const sortBy = ref(viewState.sortBy);
+const sortOrder = ref(viewState.sortOrder);
 const showImportModelPricingPage = ref(false);
 const showTestMatchDialog = ref(false);
 const selectedIds = ref<string[]>([]);
 const bulkDeleteLoading = ref(false);
-const selectedTab = ref("all");
+const selectedTab = ref(viewState.selectedTab);
+
+watch([filterQuery, selectedTab, pageSize, currentPage, sortBy, sortOrder], () => {
+  Object.assign(viewState, {
+    filterQuery: filterQuery.value,
+    selectedTab: selectedTab.value,
+    pageSize: pageSize.value,
+    currentPage: currentPage.value,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+  });
+});
 
 const tabOptions = computed(() => [
   { label: t("modelPricing.tabAll"), value: "all", icon: "format-list-bulleted" },
@@ -872,10 +928,13 @@ function formatPerMillion(pricePerToken: number | undefined | null): string {
   return `$${perMillion.toFixed(2)}`;
 }
 
-// Mirrors the backend fallback rule: the default tier is the one restricted by
-// neither a usage condition nor a UTC time window (peak / off-peak pricing).
+/** Mirrors the backend: a tier with no usage condition, UTC window or attribute rule. */
+function isUnrestrictedTier(tier: any): boolean {
+  return !tier?.condition && !tier?.utc_windows?.length && !tier?.rules?.length;
+}
+
 function getDefaultTier(model: any) {
-  const fallback = model.tiers?.find((t: any) => !t.condition && !t.utc_windows?.length);
+  const fallback = model.tiers?.find(isUnrestrictedTier);
   return fallback || model.tiers?.[0];
 }
 

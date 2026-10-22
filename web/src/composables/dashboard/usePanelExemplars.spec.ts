@@ -109,6 +109,16 @@ describe("usePanelExemplars", () => {
 
   afterEach(() => harness?.stop());
 
+  it("skips a query the executor did not send, and still fetches the others", async () => {
+    fetchMock.mockResolvedValue(response([]));
+    const metadata = metaFor(["A / C", "rate(b[5m])"]);
+    (metadata.queries[0] as any).notSent = true;
+    harness = mount({ queryTypes: ["range", "range"], metadata });
+    await flushPromises();
+
+    expect(fetchMock.mock.calls.map((c) => c[0].query)).toEqual(["rate(b[5m])"]);
+  });
+
   it("sends one request per range query with the query's own substituted text and window", async () => {
     fetchMock.mockResolvedValue(response([]));
     const panelWindow = metaFor(["rate(a[5m])", "rate(b[5m])"], START_US + 7, END_US - 7);

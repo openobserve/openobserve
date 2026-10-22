@@ -90,6 +90,8 @@ pub async fn put_file_contents(
     // Write to temporary file first
     let mut file_handle = File::create(&temp_file).await?;
     file_handle.write_all(contents).await?;
+    // tokio writes on a blocking task; without flush, rename can publish a short file
+    file_handle.flush().await?;
 
     // Atomically rename the temp file to the target file
     // This ensures we either have the old file or the new file, never a partially written file
@@ -144,6 +146,19 @@ pub async fn clean_empty_dirs(
         }
     }
     Ok(())
+}
+
+/// Removes `dir` and then each ancestor below `root`, stopping at the first non-empty one.
+pub async fn remove_empty_parents(root: &Path, dir: &Path) {
+    // remove_dir fails atomically on a non-empty dir, so no emptiness check is needed
+    for cur in dir
+        .ancestors()
+        .take_while(|p| *p != root && p.starts_with(root))
+    {
+        if remove_dir(cur).await.is_err() {
+            break;
+        }
+    }
 }
 
 /// Creates a closure that filters file paths based on a datetime range extracted
@@ -367,6 +382,42 @@ mod tests {
     use chrono::{TimeZone, Utc};
 
     use super::*;
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_put_file_contents_is_complete_when_it_returns() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("large.bin");
+        // Past tokio's 2 MiB write buffer, so an unflushed tail is still in flight at the rename.
+        let content = vec![7u8; 4 << 20];
+        for _ in 0..20 {
+            put_file_contents(&path, &content).await.unwrap();
+            assert_eq!(
+                std::fs::metadata(&path).unwrap().len(),
+                content.len() as u64
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_remove_empty_parents_stops_at_non_empty_and_root() {
+        let root = tempfile::tempdir().unwrap();
+        let root = root.path();
+        let leaf = root.join("a/b/c");
+        std::fs::create_dir_all(&leaf).unwrap();
+        std::fs::write(root.join("a/keep.txt"), b"x").unwrap();
+
+        remove_empty_parents(root, &leaf).await;
+        assert!(!root.join("a/b").exists());
+        assert!(root.join("a/keep.txt").exists());
+
+        std::fs::remove_file(root.join("a/keep.txt")).unwrap();
+        remove_empty_parents(root, &root.join("a")).await;
+        assert!(!root.join("a").exists());
+        assert!(root.exists());
+
+        remove_empty_parents(root, &root.join("missing/x")).await;
+        assert!(root.exists());
+    }
 
     #[tokio::test]
     async fn test_get_file_contents_with_range() {

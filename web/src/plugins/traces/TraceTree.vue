@@ -88,6 +88,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
           @mouseleave="onUnhoverSpan"
           :data-test="`trace-tree-span-container-${(spans as any[])[virtualRow.index].spanId}`"
+          :aria-current="
+            (spans as any[])[virtualRow.index].spanId === selectedSpanId ? 'true' : undefined
+          "
         >
           <div :style="{ width: leftWidth + 'px' }" class="ps-1.5">
             <div
@@ -169,8 +172,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`trace-tree-span-error-icon-${(spans as any[])[virtualRow.index].spanId}`"
                       />
                       <!-- shrink-0 + a cap, not plain shrink: flex shrinks in proportion to width, so a long operation name would eat a short service name first. -->
-                      <span
-                        class="me-2 max-w-[50%] shrink-0 truncate text-sm font-bold font-medium"
+                      <OTruncatedText
+                        class="me-2 max-w-[50%] shrink-0 text-sm font-bold font-medium"
                         :class="{
                           'bg-table-highlight-bg text-table-highlight-text font-bold':
                             isHighlighted((spans as any[])[virtualRow.index].spanId),
@@ -178,10 +181,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             currentSelectedValue === (spans as any[])[virtualRow.index].spanId,
                         }"
                         :data-test="`trace-tree-span-service-name-${(spans as any[])[virtualRow.index].spanId}`"
-                        :title="(spans as any[])[virtualRow.index].resolvedIdentity"
                       >
                         {{ (spans as any[])[virtualRow.index].resolvedIdentity }}
-                      </span>
+                      </OTruncatedText>
                       <SpanKindBadge
                         v-if="(spans as any[])[virtualRow.index]?.spanKind"
                         :kind="(spans as any[])[virtualRow.index]?.spanKind"
@@ -197,12 +199,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         alt=""
                         :data-test="`trace-tree-span-tech-icon-${(spans as any[])[virtualRow.index].spanId}`"
                       />
-                      <!-- min-w-0: a flex item defaults to min-width:auto and would refuse to shrink, so the row's ellipsis never fires. -->
-                      <span
-                        class="text-text-secondary min-w-0 truncate text-sm"
+                      <OTruncatedText
+                        class="text-text-secondary text-sm"
                         :data-test="`trace-tree-span-operation-name-${(spans as any[])[virtualRow.index].spanId}`"
-                        :title="(spans as any[])[virtualRow.index].operationName"
-                        >{{ (spans as any[])[virtualRow.index].operationName }}</span
+                        >{{ (spans as any[])[virtualRow.index].operationName }}</OTruncatedText
                       >
                     </div>
                     <!-- LLM Metrics -->
@@ -381,6 +381,7 @@ import { useRouter } from "vue-router";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import config from "@/aws-exports";
 
 export default defineComponent({
@@ -931,7 +932,7 @@ export default defineComponent({
       ancestorSiblingMap,
     };
   },
-  components: { SpanBlock, SpanKindBadge, OBadge, OButton, OIcon },
+  components: { SpanBlock, SpanKindBadge, OBadge, OButton, OIcon, OTruncatedText },
 });
 </script>
 

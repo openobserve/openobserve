@@ -377,21 +377,17 @@
             @row-click="openEvaluationRun"
           >
             <template #cell-timestampMs="{ row }">
-              <span class="text-text-secondary">{{ relativeTime(row.timestampMs) }}</span>
+              <span class="text-text-secondary">{{ relativeTime(row.timestampMs, t) }}</span>
             </template>
             <template #cell-scorerId="{ row }">
               <span>{{ scorerNameFor(row.scorerId) }}</span>
             </template>
             <template #cell-targetSpanId="{ row }">
-              <span v-if="row.targetSpanId" class="block truncate" :title="row.targetSpanId">{{
-                row.targetSpanId
-              }}</span>
+              <span v-if="row.targetSpanId">{{ row.targetSpanId }}</span>
               <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-targetTraceId="{ row }">
-              <span v-if="row.targetTraceId" class="block truncate" :title="row.targetTraceId">{{
-                row.targetTraceId
-              }}</span>
+              <span v-if="row.targetTraceId">{{ row.targetTraceId }}</span>
               <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-scoreDisplay="{ row }">
@@ -429,21 +425,17 @@
             @row-click="openEvaluationRun"
           >
             <template #cell-timestampMs="{ row }">
-              <span class="text-text-secondary">{{ relativeTime(row.timestampMs) }}</span>
+              <span class="text-text-secondary">{{ relativeTime(row.timestampMs, t) }}</span>
             </template>
             <template #cell-scorerId="{ row }">
               <span>{{ scorerNameFor(row.scorerId) }}</span>
             </template>
             <template #cell-targetSpanId="{ row }">
-              <span v-if="row.targetSpanId" class="block truncate" :title="row.targetSpanId">{{
-                row.targetSpanId
-              }}</span>
+              <span v-if="row.targetSpanId">{{ row.targetSpanId }}</span>
               <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-targetTraceId="{ row }">
-              <span v-if="row.targetTraceId" class="block truncate" :title="row.targetTraceId">{{
-                row.targetTraceId
-              }}</span>
+              <span v-if="row.targetTraceId">{{ row.targetTraceId }}</span>
               <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-scoreDisplay="{ row }">
@@ -489,6 +481,7 @@ import type {
   ScoreConfig,
 } from "@/services/online-evals.service";
 import { entityId, targetScopeOf } from "../utils/evalEntity";
+import { relativeTime } from "../utils/evalFormat";
 import { normalizeJobFilterCondition } from "../utils/jobFilter";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import { useEvalJobRuns, type JobRunRow, type JobRunsWindow } from "../composables/useEvalJobRuns";
@@ -969,18 +962,5 @@ function splitLatency(ms: number | null): { value: string; unit: string } {
   if (ms == null) return { value: "—", unit: "" };
   if (ms >= 1000) return { value: (ms / 1000).toFixed(1), unit: "s" };
   return { value: String(Math.round(ms)), unit: "ms" };
-}
-
-function relativeTime(timestampMs: number): string {
-  const diff = Date.now() - timestampMs;
-  if (diff < 0 || !Number.isFinite(diff)) return "—";
-  const sec = Math.floor(diff / 1000);
-  if (sec < 60) return t("refreshButton.secondsAgo", { sec });
-  const min = Math.floor(sec / 60);
-  if (min < 60) return t("refreshButton.minutesAgo", { min });
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return t("refreshButton.hoursAgo", { h: hr });
-  const day = Math.floor(hr / 24);
-  return t("onlineEvals.quality.overview.relativeTime.daysAgo", { day });
 }
 </script>

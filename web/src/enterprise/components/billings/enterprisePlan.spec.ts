@@ -18,6 +18,9 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import enterprisePlan from "@/enterprise/components/billings/enterprisePlan.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 const mockEnterpriseFeatures = [
   { name: "Everything in Pay as you go plan, plus:", price: "", is_parent: true },
@@ -270,5 +273,60 @@ describe("enterprisePlan.vue", () => {
   it("should have setup function defined", () => {
     // Verify the component uses composition API setup
     expect(wrapper.vm.$options.setup).toBeDefined();
+  });
+
+  it("renders the contact id once and fires billing_contact_sales_clicked once with the plan", async () => {
+    vi.mocked(analytics.track).mockClear();
+    expect(wrapper.findAll('[data-test="billing-plans-enterprise-contact-btn"]')).toHaveLength(1);
+    await wrapper.find('[data-test="billing-plans-enterprise-contact-btn"]').trigger("click");
+    expect(vi.mocked(analytics.track).mock.calls).toEqual([
+      ["billing_contact_sales_clicked", { plan: "enterprise" }],
+    ]);
+  });
+});
+
+describe("pa gap fixes: plan button test ids (P8)", () => {
+  it("P8-R3: Contact sales carries a data-test", () => {
+    const w = mount(enterprisePlan, {
+      props: { features: mockEnterpriseFeatures },
+      global: { plugins: [i18n], provide: { store }, stubs: { OIcon: true } },
+    });
+    expect(w.find("button").attributes("data-test")).toBeTruthy();
+  });
+});
+
+describe("enterprisePlan.vue price line", () => {
+  const mountPlan = (props = {}) =>
+    mount(enterprisePlan, {
+      props: { features: mockEnterpriseFeatures, ...props },
+      global: { plugins: [i18n], provide: { store }, stubs: { OIcon: true } },
+    });
+
+  it("renders the price and its note when given", () => {
+    const w = mountPlan({ price: { price: "Custom", note: "volume discounts, BYOB" } });
+    const line = w.get('[data-test="billing-plans-enterprise-price"]').text();
+    expect(line).toContain("Custom");
+    expect(line).toContain("volume discounts, BYOB");
+  });
+
+  it("keeps the seven subgrid rows as the card's direct children, priced or not", () => {
+    expect(mountPlan().classes()).toContain("grid-rows-subgrid");
+    const priced = mountPlan({ price: { price: "Custom", note: "volume discounts, BYOB" } });
+    expect(priced.element.children).toHaveLength(7);
+    expect(mountPlan().element.children).toHaveLength(7);
+  });
+
+  it("renders no price line without a price", () => {
+    expect(mountPlan().find('[data-test="billing-plans-enterprise-price"]').exists()).toBe(false);
+  });
+
+  it("shows the discount tag once: in the price block when priced, in the header otherwise", () => {
+    const priced = mountPlan({ price: { price: "Custom", note: "volume discounts, BYOB" } });
+    expect(priced.text().match(/On discount/g)).toHaveLength(1);
+    expect(priced.get('[data-test="billing-plans-enterprise-price"]').text()).toContain(
+      "On discount",
+    );
+    const unpriced = mountPlan();
+    expect(unpriced.text().match(/On discount/g)).toHaveLength(1);
   });
 });

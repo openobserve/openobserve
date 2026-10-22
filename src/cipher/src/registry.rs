@@ -30,9 +30,6 @@ impl Registry {
     pub fn new() -> Self {
         Self::default()
     }
-    pub fn new_with_keys(keys: HashMap<String, Box<dyn Cipher>>) -> Self {
-        Self { keys }
-    }
     pub fn add_key(&mut self, name: String, k: Box<dyn Cipher>) {
         self.keys.insert(name, k);
     }
@@ -57,14 +54,6 @@ mod tests {
         assert!(
             registry.get_key("any-key").is_none(),
             "Empty registry should return None for any key"
-        );
-
-        // Test registry creation with empty keys
-        let keys = hashbrown::HashMap::new();
-        let registry_with_keys = Registry::new_with_keys(keys);
-        assert!(
-            registry_with_keys.get_key("any-key").is_none(),
-            "Registry with empty keys should return None for any key"
         );
     }
 

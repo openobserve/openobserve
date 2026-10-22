@@ -204,6 +204,8 @@ const MSG = {
   duplicateColumn: (col: string) => mi("sqlEditor.diagnostics.duplicateColumn", { col }),
   tableNotFound: (tbl: string) => mi("sqlEditor.diagnostics.tableNotFound", { tbl }),
   functionSignature: (fn: string) => mi("sqlEditor.diagnostics.functionSignature", { fn }),
+  notACondition: (field: string, isText: boolean) =>
+    mi(`sqlEditor.diagnostics.${isText ? "notACondition" : "notAConditionValue"}`, { field }),
 } as const;
 
 // ─── Backward context scanner ─────────────────────────────────────────────────
@@ -1084,6 +1086,62 @@ export function locateIdentifier(sql: string, rawName: string): TokenHit[] {
   return hits;
 }
 
+/** The bare operand DataFusion's "logical boolean operation <lhs> AND <rhs>" names only by type, or null. */
+export function locateNotACondition(
+  text: string,
+  query: string,
+  typeOf: FieldTypeOf | null = fieldTypeOf,
+): { field: string; hit: TokenHit; message: I18nText } | null {
+  const types = text.match(/logical boolean operation\s+(\w+)\s+(AND|OR)\s+(\w+)/i);
+  if (!types) return null;
+  const [, lhsType, opName, rhsType] = types;
+  const tokens = tokenizeOperands(query);
+  const betweenAnds = betweenAndIndexes(tokens);
+  const candidates: { field: string; type: string; start: number; end: number }[] = [];
+  for (let k = 0; k < tokens.length; k++) {
+    const op = tokens[k].text.toUpperCase();
+    // The types belong to the operator the error names; the other kind's operands say nothing about them.
+    if (tokens[k].kind !== "word" || op !== opName.toUpperCase() || betweenAnds.has(k)) continue;
+    const sides: [string, number, number][] = [
+      [lhsType, k - 1, -1],
+      [rhsType, k + 1, 1],
+    ];
+    for (const [type, from, step] of sides) {
+      if (/^boolean$/i.test(type)) continue;
+      const span = bareOperandSpan(tokens, from, step, betweenAnds);
+      if (span)
+        candidates.push({
+          ...span,
+          type,
+          field: query.slice(span.start, span.end).replace(/["`]/g, ""),
+        });
+    }
+  }
+  // With the stream's column types known, a bare Boolean column elsewhere in the query is not the culprit.
+  const columnType = (c: (typeof candidates)[number]) =>
+    typeOf?.(c.field.split(".").pop() ?? c.field);
+  const sameType = (c: (typeof candidates)[number]) => sameColumnType(columnType(c), c.type);
+  const possible = candidates.filter((c) => !/^boolean$/i.test(columnType(c) ?? ""));
+  const pick = possible.find(sameType) ?? possible[0];
+  if (!pick) return null;
+  return {
+    field: pick.field,
+    hit: {
+      ...offsetToLineCol(query, pick.start),
+      endCol: offsetToLineCol(query, pick.end).startCol,
+    },
+    message: MSG.notACondition(pick.field, /utf8/i.test(pick.type)),
+  };
+}
+
+/** Logs registers its stream's column types here, so a type error can be pinned to the right column; the release clears only its own lookup. */
+export function setFieldTypeOf(lookup: FieldTypeOf): () => void {
+  fieldTypeOf = lookup;
+  return () => {
+    if (fieldTypeOf === lookup) fieldTypeOf = null;
+  };
+}
+
 /** Strip quotes/backticks and trailing punctuation from an extracted identifier. */
 function cleanIdent(raw: string | undefined | null): string | null {
   if (!raw) return null;
@@ -1185,6 +1243,142 @@ function extractSemanticError(text: string): { field: string; message: string } 
   return null;
 }
 
+type FieldTypeOf = (field: string) => string | undefined;
+
+let fieldTypeOf: FieldTypeOf | null = null;
+
+// Arrow names its string types Utf8, LargeUtf8 and Utf8View; any of them matches an error's Utf8.
+const sameColumnType = (column: string | undefined, errorType: string): boolean => {
+  if (!column) return false;
+  const norm = (t: string) => (/utf8/i.test(t) ? "utf8" : t.toLowerCase());
+  return norm(column) === norm(errorType);
+};
+
+interface OperandToken {
+  kind: "word" | "ident" | "literal" | "punct";
+  text: string;
+  start: number;
+  end: number;
+}
+
+const OPERAND_BOUNDARY_WORDS = new Set([
+  "AND",
+  "OR",
+  "NOT",
+  "WHERE",
+  "HAVING",
+  "ON",
+  "WHEN",
+  "THEN",
+  "ELSE",
+  "END",
+  "GROUP",
+  "ORDER",
+  "LIMIT",
+  "SELECT",
+  "FROM",
+]);
+const NON_FIELD_WORDS = new Set(["TRUE", "FALSE", "NULL"]);
+
+function tokenizeOperands(sql: string): OperandToken[] {
+  const tokens: OperandToken[] = [];
+  let i = 0;
+  while (i < sql.length) {
+    const rest = sql.slice(i);
+    const skip = rest.match(/^(\s+|--[^\n]*|\/\*[\s\S]*?(\*\/|$))/);
+    if (skip) {
+      i += skip[0].length;
+      continue;
+    }
+    const lexeme = rest.match(/^'(?:[^'\\]|\\.|'')*'?/)?.[0] ?? rest.match(/^\d[\w.]*/)?.[0];
+    const ident = rest.match(/^("(?:[^"]|"")*"?|`[^`]*`?)/)?.[0];
+    const word = rest.match(/^[A-Za-z_$][\w$]*/)?.[0];
+    const punct = rest.match(/^(<=|>=|!=|<>|\|\||::|.)/)![0];
+    const [kind, text]: [OperandToken["kind"], string] = lexeme
+      ? ["literal", lexeme]
+      : ident
+        ? ["ident", ident]
+        : word
+          ? ["word", word]
+          : ["punct", punct];
+    tokens.push({ kind, text, start: i, end: i + text.length });
+    i += text.length;
+  }
+  return tokens;
+}
+
+// The AND inside `x BETWEEN a AND b` joins the range bounds, not two conditions.
+function betweenAndIndexes(tokens: OperandToken[]): Set<number> {
+  const result = new Set<number>();
+  const pendingDepths: number[] = [];
+  let depth = 0;
+  tokens.forEach((t, k) => {
+    if (t.text === "(") depth++;
+    else if (t.text === ")") depth--;
+    const upper = t.kind === "word" ? t.text.toUpperCase() : "";
+    if (upper === "BETWEEN") pendingDepths.push(depth);
+    else if (upper === "AND" && pendingDepths.at(-1) === depth) {
+      pendingDepths.pop();
+      result.add(k);
+    }
+  });
+  return result;
+}
+
+function isOperandBoundary(t: OperandToken, index: number, betweenAnds: Set<number>): boolean {
+  if (t.kind === "punct") return t.text === "(" || t.text === ")" || t.text === ",";
+  return (
+    t.kind === "word" && OPERAND_BOUNDARY_WORDS.has(t.text.toUpperCase()) && !betweenAnds.has(index)
+  );
+}
+
+// A bare operand is one identifier, optionally qualified, and never a call's name.
+function bareOperandSpan(
+  tokens: OperandToken[],
+  from: number,
+  step: number,
+  betweenAnds: Set<number>,
+): { start: number; end: number } | null {
+  const picked: OperandToken[] = [];
+  let k = from;
+  while (k >= 0 && k < tokens.length && !isOperandBoundary(tokens[k], k, betweenAnds)) {
+    picked.push(tokens[k]);
+    k += step;
+  }
+  if (step < 0) picked.reverse();
+  const after = tokens[from + step * picked.length];
+  if (step > 0 && after?.text === "(") return null;
+  const shape = picked.map((t) => (t.text === "." ? "." : t.kind)).join(" ");
+  if (!/^(word|ident)( \. (word|ident))*$/.test(shape)) return null;
+  const last = picked[picked.length - 1];
+  if (picked.length === 1 && NON_FIELD_WORDS.has(last.text.toUpperCase())) return null;
+  return { start: picked[0].start, end: last.end };
+}
+
+function offsetToLineCol(text: string, offset: number): { line: number; startCol: number } {
+  const before = text.slice(0, offset).split("\n");
+  return { line: before.length, startCol: before[before.length - 1].length + 1 };
+}
+
+function isSqlSyntaxErrorText(text: string): boolean {
+  return (
+    /at\s+Line:\s*\d+,\s*Column:\s*\d+/i.test(text) || /ParserError|sql parser error/i.test(text)
+  );
+}
+
+const QUERY_ERROR_MESSAGES: [RegExp, number][] = [
+  [/Search SQL not valid/i, 20001],
+  [/Search field not found/i, 20004],
+  [/Search function not defined/i, 20005],
+  [/Search field has no compatible data type/i, 20007],
+  [/Search SQL execute error/i, 20008],
+];
+
+export function queryErrorCodeFromText(text: string): number | null {
+  if (isSqlSyntaxErrorText(text)) return 20001;
+  return QUERY_ERROR_MESSAGES.find(([pattern]) => pattern.test(text))?.[1] ?? null;
+}
+
 /**
  * Unified server-error → editor ranges entry point. Handles ALL locatable
  * search error codes. This is the single function response handlers should
@@ -1220,10 +1414,7 @@ export async function rangesFromServerError(params: {
   // ParserError signature (some callers surface only the HTTP status, not the
   // 2000x business code). Falls through to the semantic path if it locates
   // nothing (the client parser can't always reproduce the server's error).
-  const looksLikeSyntax =
-    code === 20001 ||
-    /at\s+Line:\s*\d+,\s*Column:\s*\d+/i.test(text) ||
-    /ParserError|sql parser error/i.test(text);
+  const looksLikeSyntax = code === 20001 || isSqlSyntaxErrorText(text);
   if (looksLikeSyntax) {
     let syntaxRanges: SqlErrorRange[] = [];
     if (sqlMode && (errorDetail || message)) {
@@ -1237,6 +1428,14 @@ export async function rangesFromServerError(params: {
       );
     }
     if (syntaxRanges.length) return syntaxRanges;
+  }
+
+  const bare = locateNotACondition(text, query);
+  if (bare) {
+    const { line, startCol, endCol } = bare.hit;
+    return [
+      { startLine: line, endLine: line, column: startCol, endColumn: endCol, error: bare.message },
+    ];
   }
 
   // ── Semantic errors: locate the identifier the backend named ────────────────

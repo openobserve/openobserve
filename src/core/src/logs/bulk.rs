@@ -30,15 +30,13 @@ use config::{
     },
 };
 use infra::errors::Result;
-use ingestion_common::{
-    BulkResponse, BulkResponseError, BulkResponseItem, IngestionRequest, IngestionValueType,
-};
+use ingestion_common::{BulkResponse, BulkResponseError, BulkResponseItem};
 use schema::{get_future_discard_error, get_upto_discard_error};
 use transform::TRANSFORM_FAILED;
 
 use crate::{
     ingestion::check_ingestion_allowed,
-    logs::{ingestion_log_enabled, log_failed_record},
+    logs::{columnar::JsonColumnar, ingest::BulkPlan, ingestion_log_enabled, log_failed_record},
 };
 pub const TS_PARSE_FAILED: &str = "timestamp_parsing_failed";
 pub const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
@@ -69,12 +67,14 @@ pub async fn ingest(
 
     let log_ingestion_errors = ingestion_log_enabled().await;
     let mut action = String::new();
+    let mut raw_stream_name = String::new();
     let mut stream_name = String::new();
     let mut doc_id: Option<String> = None;
     let stream_type = StreamType::Logs;
 
     let mut stream_key_cache: HashMap<String, String> = HashMap::new();
     let mut streams_data: HashMap<String, Vec<json::Value>> = HashMap::new();
+    let mut plans: HashMap<String, Option<BulkPlan>> = HashMap::new();
     let mut next_line_is_data = false;
     // Read lines as bytes to handle potential invalid UTF-8 characters
     let mut line_buffer = Vec::new();
@@ -94,12 +94,22 @@ pub async fn ingest(
         if line_buffer.is_empty() {
             continue;
         }
+
+        let is_data = std::mem::take(&mut next_line_is_data);
+        if is_data
+            && stream_columnar(&mut plans, org_id, &stream_name, (min_ts, max_ts))
+                .await
+                .is_some_and(|c| c.parse_bulk_line(&line_buffer, doc_id.as_deref()))
+        {
+            tokio::task::coop::consume_budget().await;
+            continue;
+        }
         // Use from_utf8_lossy to handle potential invalid UTF-8 characters
         // Invalid UTF-8 sequences will be replaced with the replacement character (�)
         let line_str = String::from_utf8_lossy(&line_buffer);
         let mut value: json::Value = json::from_slice(line_str.as_bytes())?;
 
-        if !next_line_is_data {
+        if !is_data {
             // check bulk operate
             let Some((line_action, line_stream_name, line_doc_id)) =
                 super::parse_bulk_index(&value)
@@ -109,18 +119,24 @@ pub async fn ingest(
             if line_action != action {
                 action = line_action.to_string();
             }
-            if line_stream_name != stream_name {
-                stream_name = line_stream_name.to_string();
+            // formatting reads the shared config, too costly to repeat for every action line
+            if line_stream_name != raw_stream_name {
+                raw_stream_name = line_stream_name.to_string();
+                stream_name = if cfg.common.skip_formatting_stream_name {
+                    raw_stream_name.clone()
+                } else {
+                    format_stream_name(raw_stream_name.clone())
+                };
             }
             doc_id = line_doc_id.map(|id| id.to_string());
 
-            if stream_name.is_empty() || stream_name == "_" || stream_name == "/" {
+            if raw_stream_name.is_empty() || raw_stream_name == "_" || raw_stream_name == "/" {
                 let err_msg = "Invalid stream name: ".to_string() + &line_str;
                 log::warn!("[LOGS:BULK] {err_msg}, org_id: {org_id}");
                 bulk_res.errors = true;
                 let err = BulkResponseError::new(
                     err_msg.to_string(),
-                    stream_name.to_string(),
+                    raw_stream_name.to_string(),
                     err_msg,
                     "0".to_string(),
                 );
@@ -128,19 +144,15 @@ pub async fn ingest(
                 item.insert(
                     action.to_string(),
                     BulkResponseItem::new_failed(
-                        stream_name.to_string(),
+                        raw_stream_name.to_string(),
                         doc_id.clone().unwrap_or_default(),
                         err,
                         Some(value),
-                        stream_name.to_string(),
+                        raw_stream_name.to_string(),
                     ),
                 );
                 bulk_res.items.push(item);
                 continue; // skip
-            }
-
-            if !cfg.common.skip_formatting_stream_name {
-                stream_name = format_stream_name(stream_name);
             }
 
             // Reject internal rollup streams (_o2_*, _agent_signals) in ALL
@@ -187,57 +199,16 @@ pub async fn ingest(
             }
             next_line_is_data = true;
         } else {
-            next_line_is_data = false;
-
             // get json object
             let mut local_val = match value.take() {
                 json::Value::Object(v) => v,
                 _ => unreachable!(),
             };
 
-            // set _id
-            if let Some(doc_id) = &doc_id {
-                local_val.insert("_id".to_string(), json::Value::String(doc_id.to_string()));
-            }
-
-            // check _timestamp
-            let (timestamp, has_valid_timestamp) = match local_val.get(TIMESTAMP_COL_NAME) {
-                Some(v) => match parse_timestamp_micro_from_value(v) {
-                    Ok(t) => (t.0, t.1),
-                    Err(_e) => {
-                        bulk_res.errors = true;
-                        metrics::INGEST_ERRORS
-                            .with_label_values(&[
-                                org_id,
-                                StreamType::Logs.as_str(),
-                                &stream_name,
-                                TS_PARSE_FAILED,
-                            ])
-                            .inc();
-                        log_failed_record(log_ingestion_errors, &value, TS_PARSE_FAILED);
-                        add_record_status(
-                            stream_name.to_string(),
-                            doc_id.clone(),
-                            action.to_string(),
-                            Some(value),
-                            &mut bulk_res,
-                            Some(TS_PARSE_FAILED.to_string()),
-                            Some(TS_PARSE_FAILED.to_string()),
-                        );
-                        continue;
-                    }
-                },
-                None => (now_micros(), false),
-            };
-
-            // check ingestion time
-            if timestamp < min_ts || timestamp > max_ts {
+            if let Err(failure_reason) =
+                prepare_bulk_record(&mut local_val, doc_id.as_deref(), min_ts, max_ts)
+            {
                 bulk_res.errors = true;
-                let failure_reason = if timestamp < min_ts {
-                    Some(get_upto_discard_error().to_string())
-                } else {
-                    Some(get_future_discard_error().to_string())
-                };
                 metrics::INGEST_ERRORS
                     .with_label_values(&[
                         org_id,
@@ -254,15 +225,9 @@ pub async fn ingest(
                     Some(value),
                     &mut bulk_res,
                     Some(TS_PARSE_FAILED.to_string()),
-                    failure_reason,
+                    Some(failure_reason),
                 );
                 continue;
-            }
-            if !has_valid_timestamp {
-                local_val.insert(
-                    TIMESTAMP_COL_NAME.to_string(),
-                    json::Value::Number(timestamp.into()),
-                );
             }
 
             let val = json::Value::Object(local_val);
@@ -274,6 +239,11 @@ pub async fn ingest(
             }
         }
         tokio::task::coop::consume_budget().await;
+    }
+
+    plans.retain(|_, plan| plan.as_ref().is_some_and(|p| p.columnar.rows() > 0));
+    for stream in plans.keys() {
+        streams_data.entry(stream.clone()).or_default();
     }
 
     // Checked up front, pipeline destinations included: a whole-request 503 is retried safely.
@@ -300,14 +270,14 @@ pub async fn ingest(
     for (stream_name, records) in streams_data {
         #[cfg(feature = "vectorscan")]
         let record_count = records.len();
-        match super::ingest::ingest(
+        let plan = plans.remove(&stream_name).flatten();
+        match super::ingest::ingest_bulk(
             thread_id,
             org_id,
             &stream_name,
-            IngestionRequest::JsonValues(IngestionValueType::Bulk, records),
+            records,
+            plan,
             user.clone(),
-            None,
-            false,
         )
         .await
         {
@@ -441,15 +411,102 @@ pub fn add_record_status(
             bulk_res.items.push(item);
         }
         None => {
-            item.insert(
-                action,
-                BulkResponseItem::new(stream_name.clone(), doc_id, value, stream_name),
-            );
             if !get_config().common.bulk_api_response_errors_only {
-                bulk_res.items.push(item);
+                bulk_res
+                    .items
+                    .push(success_item(action, &stream_name, doc_id));
             }
         }
     }
+}
+
+/// The response item of a written record; callers skip it under `bulk_api_response_errors_only`.
+pub fn success_item(
+    action: String,
+    stream_name: &str,
+    doc_id: String,
+) -> HashMap<String, BulkResponseItem> {
+    HashMap::from([(
+        action,
+        BulkResponseItem::new(
+            stream_name.to_string(),
+            doc_id,
+            None,
+            stream_name.to_string(),
+        ),
+    )])
+}
+
+/// Success items for records written together, reading the config once rather than per record.
+pub fn add_success_items(
+    stream_name: &str,
+    doc_ids: Vec<Option<String>>,
+    bulk_res: &mut BulkResponse,
+) {
+    if get_config().common.bulk_api_response_errors_only {
+        return;
+    }
+    bulk_res.items.extend(
+        doc_ids.into_iter().map(|doc_id| {
+            success_item("index".to_string(), stream_name, doc_id.unwrap_or_default())
+        }),
+    );
+}
+
+/// `_bulk`'s own step for a data record: set the action's `_id`, then check and set `_timestamp`.
+pub(super) fn prepare_bulk_record(
+    record: &mut json::Map<String, json::Value>,
+    doc_id: Option<&str>,
+    min_ts: i64,
+    max_ts: i64,
+) -> std::result::Result<(), String> {
+    if let Some(doc_id) = doc_id {
+        record.insert("_id".to_string(), json::Value::String(doc_id.to_string()));
+    }
+    let parsed = record
+        .get(TIMESTAMP_COL_NAME)
+        .map(parse_timestamp_micro_from_value);
+    let (timestamp, has_valid_timestamp) = resolve_bulk_timestamp(parsed, min_ts, max_ts)?;
+    if !has_valid_timestamp {
+        record.insert(
+            TIMESTAMP_COL_NAME.to_string(),
+            json::Value::Number(timestamp.into()),
+        );
+    }
+    Ok(())
+}
+
+/// `_bulk`'s verdict on a parsed `_timestamp`, stamping now when absent; the error is the reason.
+pub(super) fn resolve_bulk_timestamp(
+    parsed: Option<anyhow::Result<(i64, bool)>>,
+    min_ts: i64,
+    max_ts: i64,
+) -> std::result::Result<(i64, bool), String> {
+    let (timestamp, has_valid_timestamp) = match parsed {
+        Some(parsed) => parsed.map_err(|_| TS_PARSE_FAILED.to_string())?,
+        None => (now_micros(), false),
+    };
+    if timestamp < min_ts {
+        return Err(get_upto_discard_error().to_string());
+    }
+    if timestamp > max_ts {
+        return Err(get_future_discard_error().to_string());
+    }
+    Ok((timestamp, has_valid_timestamp))
+}
+
+/// The stream's columnar rows, planned on its first data line of the request.
+async fn stream_columnar<'a>(
+    plans: &'a mut HashMap<String, Option<BulkPlan>>,
+    org_id: &str,
+    stream_name: &str,
+    time_range: (i64, i64),
+) -> Option<&'a mut JsonColumnar> {
+    if !plans.contains_key(stream_name) {
+        let plan = super::ingest::plan_bulk_columnar(org_id, stream_name, time_range).await;
+        plans.insert(stream_name.to_string(), plan);
+    }
+    Some(&mut plans.get_mut(stream_name)?.as_mut()?.columnar)
 }
 
 #[cfg(test)]
@@ -475,6 +532,39 @@ mod tests {
             None,
         );
         assert!(bulk_res.items.len() == 1);
+    }
+
+    #[test]
+    fn test_prepare_bulk_record() {
+        let now = now_micros();
+        let (min_ts, max_ts) = (now - 3_600_000_000, now + 3_600_000_000);
+        let prepare = |record: json::Value, doc_id: Option<&str>| {
+            let mut record = record.as_object().unwrap().clone();
+            prepare_bulk_record(&mut record, doc_id, min_ts, max_ts).map(|()| record)
+        };
+        let record = prepare(json::json!({"_id": "own", "_timestamp": now}), Some("a")).unwrap();
+        assert_eq!(record["_id"], "a");
+        assert_eq!(record["_timestamp"], json::json!(now));
+        let record = prepare(json::json!({"_id": "own", "level": "x"}), None).unwrap();
+        assert_eq!(record["_id"], "own");
+        assert!(record["_timestamp"].as_i64().is_some_and(|ts| ts >= now));
+        let record = prepare(json::json!({"_timestamp": now / 1_000_000}), None).unwrap();
+        assert_eq!(
+            record["_timestamp"],
+            json::json!(now / 1_000_000 * 1_000_000)
+        );
+        assert_eq!(
+            prepare(json::json!({"_timestamp": "garbage"}), None),
+            Err(TS_PARSE_FAILED.to_string())
+        );
+        assert_eq!(
+            prepare(json::json!({"_timestamp": min_ts - 1}), None),
+            Err(get_upto_discard_error().to_string())
+        );
+        assert_eq!(
+            prepare(json::json!({"_timestamp": max_ts + 1}), None),
+            Err(get_future_discard_error().to_string())
+        );
     }
 
     #[tokio::test]

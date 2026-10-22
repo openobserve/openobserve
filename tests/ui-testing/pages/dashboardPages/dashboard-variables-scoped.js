@@ -522,12 +522,13 @@ export default class DashboardVariablesScoped {
   }
 
   /**
-   * Get a dashboard-list entry locator by its title text
+   * Get a dashboard-list entry locator by its name
    * @param {string} title - Dashboard title
    * @returns {import('@playwright/test').Locator}
    */
   getDashboardTitleLocator(title) {
-    return this.page.getByTitle(title, { exact: true });
+    const name = String(title).replace(/["\\]/g, "\\$&");
+    return this.page.locator(`[data-test="dashboard-name-cell-${name}"]`);
   }
 
   /**

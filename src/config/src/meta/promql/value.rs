@@ -20,7 +20,6 @@ use std::{
     time::Duration,
 };
 
-use hashbrown::HashSet;
 use regex::Regex;
 use serde::{
     Deserialize, Serialize,
@@ -536,11 +535,6 @@ pub struct RangeValue {
 }
 
 impl RangeValue {
-    /// Returns the values from the `samples` field as an array of f64
-    pub fn get_sample_values(&self) -> Vec<f64> {
-        self.samples.iter().map(|sample| sample.value).collect()
-    }
-
     pub fn extend(&mut self, other: RangeValue) {
         if !other.samples.is_empty() {
             self.samples.extend(other.samples);
@@ -855,7 +849,6 @@ fn extrapolate_from_delta(
             .checked_sub(range_plus_offset)
             .expect("BUG: overflow")
     };
-    assert!(start > 0);
     let end = eval_ts
         .checked_sub(
             offset
@@ -864,7 +857,6 @@ fn extrapolate_from_delta(
                 .expect("BUG: integer conversion failed"),
         )
         .expect("BUG: overflow");
-    assert!(end > 0);
     assert!(start <= end);
 
     let first = &samples[0];
@@ -880,11 +872,15 @@ fn extrapolate_from_delta(
 
     // Duration between first/last samples and boundary of range.
     let mut duration_to_start = (first.timestamp - start) as f64 / 1_000.0;
-    let duration_to_end = (end - last.timestamp) as f64 / 1_000.0;
+    let mut duration_to_end = (end - last.timestamp) as f64 / 1_000.0;
 
     let sampled_interval = (last.timestamp - first.timestamp) as f64 / 1_000.0;
     let avg_duration_between_samples = sampled_interval / (samples.len() - 1) as f64;
 
+    let extrapolation_threshold = avg_duration_between_samples * 1.1;
+    if duration_to_start >= extrapolation_threshold {
+        duration_to_start = avg_duration_between_samples / 2.0;
+    }
     if is_counter && result > 0.0 && first.value >= 0.0 {
         // Counters cannot be negative. If we have any slope at all
         // (i.e. `result` went up), we can extrapolate the zero point
@@ -898,24 +894,10 @@ fn extrapolate_from_delta(
         }
     }
 
-    // If the first/last samples are close to the boundaries of the range,
-    // extrapolate the result. This is as we expect that another sample
-    // will exist given the spacing between samples we've seen thus far,
-    // with an allowance for noise.
-    let extrapolation_threshold = avg_duration_between_samples * 1.1;
-    let mut extrapolate_to_interval = sampled_interval;
-
-    if duration_to_start < extrapolation_threshold {
-        extrapolate_to_interval += duration_to_start;
-    } else {
-        extrapolate_to_interval += avg_duration_between_samples / 2.0;
+    if duration_to_end >= extrapolation_threshold {
+        duration_to_end = avg_duration_between_samples / 2.0;
     }
-    if duration_to_end < extrapolation_threshold {
-        extrapolate_to_interval += duration_to_end;
-    } else {
-        extrapolate_to_interval += avg_duration_between_samples / 2.0;
-    }
-    let factor = extrapolate_to_interval / sampled_interval;
+    let factor = (sampled_interval + duration_to_start + duration_to_end) / sampled_interval;
     if matches!(kind, ExtrapolationKind::Rate) {
         result *= factor / range.as_secs_f64();
     } else {
@@ -953,21 +935,6 @@ impl Value {
         }
     }
 
-    pub fn get_range_values(self) -> Option<Vec<RangeValue>> {
-        match self {
-            Value::Matrix(values) => Some(values),
-            _ => None,
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn get_vector(&self) -> Option<&Vec<InstantValue>> {
-        match self {
-            Value::Vector(values) => Some(values),
-            _ => None,
-        }
-    }
-
     pub fn get_string(&self) -> Option<String> {
         match self {
             Value::String(v) => Some(v.into()),
@@ -975,12 +942,6 @@ impl Value {
         }
     }
 
-    pub fn get_float(&self) -> Option<f64> {
-        match self {
-            Value::Float(f) => Some(*f),
-            _ => None,
-        }
-    }
     pub fn get_type(&self) -> &str {
         match self {
             Value::Instant(_) => "vector",
@@ -1018,45 +979,6 @@ impl Value {
     pub fn sort_by_value(&mut self, descending: bool) {
         if let Value::Vector(v) = self {
             v.sort_by(|a, b| sort_float_nan_last(&a.sample.value, &b.sample.value, descending));
-        }
-    }
-
-    /// Checks if the vector or matrix types contain duplicated label set or
-    /// not. This is an undefined condition, hence caller should raise an
-    /// error in case this evaluates to `true`.
-    pub fn contains_same_label_set(&self) -> bool {
-        match self {
-            Value::Vector(v) => match v.len() {
-                0 | 1 => false,
-                2 => v[0].labels.signature() == v[1].labels.signature(),
-                _ => {
-                    let mut signatures = HashSet::new();
-                    for instant in v.iter() {
-                        // If the set already contained this value, false is returned.
-                        let new = signatures.insert(instant.labels.signature());
-                        if !new {
-                            return true;
-                        }
-                    }
-                    false
-                }
-            },
-            Value::Matrix(v) => match v.len() {
-                0 | 1 => false,
-                2 => v[0].labels.signature() == v[1].labels.signature(),
-                _ => {
-                    let mut signatures = HashSet::new();
-                    for instant in v.iter() {
-                        // If the set already contained this value, false is returned.
-                        let new = signatures.insert(instant.labels.signature());
-                        if !new {
-                            return true;
-                        }
-                    }
-                    false
-                }
-            },
-            _ => false,
         }
     }
 }
@@ -1758,19 +1680,6 @@ mod tests {
     }
 
     #[test]
-    fn test_range_value_get_sample_values() {
-        let samples = vec![
-            Sample::new(1000, 1.5),
-            Sample::new(2000, 2.5),
-            Sample::new(3000, 3.5),
-        ];
-        let range_value = RangeValue::new(vec![], samples);
-
-        let values = range_value.get_sample_values();
-        assert_eq!(values, vec![1.5, 2.5, 3.5]);
-    }
-
-    #[test]
     fn test_range_value_extend() {
         let mut range_value1 = RangeValue::new(vec![], vec![Sample::new(1000, 1.0)]);
         let range_value2 = RangeValue::new(vec![], vec![Sample::new(2000, 2.0)]);
@@ -1844,18 +1753,13 @@ mod tests {
         let matrix = vec![range_value.clone()];
 
         let value_vector = Value::Vector(vector.clone());
-        assert!(value_vector.get_vector().is_some());
         assert!(value_vector.get_ref_matrix_values().is_none());
 
         let value_matrix = Value::Matrix(matrix.clone());
         assert!(value_matrix.get_ref_matrix_values().is_some());
-        assert!(value_matrix.get_vector().is_none());
 
         let value_string = Value::String("test".to_string());
         assert_eq!(value_string.get_string(), Some("test".to_string()));
-
-        let value_float = Value::Float(1.23);
-        assert_eq!(value_float.get_float(), Some(1.23));
     }
 
     #[test]
@@ -1878,66 +1782,6 @@ mod tests {
         assert_eq!(Value::Float(std::f64::consts::PI).get_type(), "scalar");
         assert_eq!(Value::String("test".to_string()).get_type(), "string");
         assert_eq!(Value::None.get_type(), "scalar");
-    }
-
-    #[test]
-    fn test_value_contains_same_label_set() {
-        let label1 = vec![Arc::new(Label::new("name", "value1"))];
-        let label2 = vec![Arc::new(Label::new("name", "value2"))];
-        let label1_dup = vec![Arc::new(Label::new("name", "value1"))];
-
-        // Test vector with unique labels
-        let vector_unique = Value::Vector(vec![
-            InstantValue {
-                labels: label1.clone(),
-                sample: Sample::new(1000, 1.0),
-            },
-            InstantValue {
-                labels: label2.clone(),
-                sample: Sample::new(2000, 2.0),
-            },
-        ]);
-        assert!(!vector_unique.contains_same_label_set());
-
-        // Test vector with duplicate labels
-        let vector_duplicate = Value::Vector(vec![
-            InstantValue {
-                labels: label1.clone(),
-                sample: Sample::new(1000, 1.0),
-            },
-            InstantValue {
-                labels: label1_dup.clone(),
-                sample: Sample::new(2000, 2.0),
-            },
-        ]);
-        assert!(vector_duplicate.contains_same_label_set());
-
-        // Test matrix with unique labels
-        let matrix_unique = Value::Matrix(vec![
-            RangeValue::new(label1.clone(), vec![Sample::new(1000, 1.0)]),
-            RangeValue::new(label2.clone(), vec![Sample::new(2000, 2.0)]),
-        ]);
-        assert!(!matrix_unique.contains_same_label_set());
-
-        // Test matrix with duplicate labels
-        let matrix_duplicate = Value::Matrix(vec![
-            RangeValue::new(label1.clone(), vec![Sample::new(1000, 1.0)]),
-            RangeValue::new(label1_dup.clone(), vec![Sample::new(2000, 2.0)]),
-        ]);
-        assert!(matrix_duplicate.contains_same_label_set());
-
-        // Test single element cases
-        let single_vector = Value::Vector(vec![InstantValue {
-            labels: label1.clone(),
-            sample: Sample::new(1000, 1.0),
-        }]);
-        assert!(!single_vector.contains_same_label_set());
-
-        let empty_vector = Value::Vector(vec![]);
-        assert!(!empty_vector.contains_same_label_set());
-
-        // Test non-vector/matrix types
-        assert!(!Value::Float(1.0).contains_same_label_set());
     }
 
     #[test]
@@ -2065,6 +1909,37 @@ mod tests {
     }
 
     #[test]
+    fn test_extrapolated_rate_caps_start_before_the_counter_zero_point() {
+        let second = 1_000_000;
+        let samples: Vec<_> = [(70, 1.0), (80, 2.0), (90, 3.0), (100, 4.0)]
+            .into_iter()
+            .map(|(ts, value)| Sample::new(ts * second, value))
+            .collect();
+        let increase = extrapolated_rate(
+            &samples,
+            100 * second,
+            Duration::from_secs(60),
+            Duration::ZERO,
+            ExtrapolationKind::Increase,
+        );
+        assert_eq!(increase, Some(3.5));
+
+        // a window reaching back before epoch 0 is still a window
+        let samples: Vec<_> = [(15, 1.0), (30, 2.0), (45, 3.0), (60, 4.0)]
+            .into_iter()
+            .map(|(ts, value)| Sample::new(ts * second, value))
+            .collect();
+        let rate = extrapolated_rate(
+            &samples,
+            60 * second,
+            Duration::from_secs(300),
+            Duration::ZERO,
+            ExtrapolationKind::Rate,
+        );
+        assert!((rate.unwrap() - 3.5 / 300.0).abs() < 1e-15);
+    }
+
+    #[test]
     fn test_sample_is_nan() {
         let normal = Sample::new(1000, 42.0);
         assert!(!normal.is_nan());
@@ -2102,45 +1977,12 @@ mod tests {
     }
 
     #[test]
-    fn test_value_get_range_values() {
-        let rv = RangeValue::new(vec![], vec![Sample::new(1000, 1.0)]);
-        let val = Value::Matrix(vec![rv]);
-        let result = val.get_range_values();
-        assert!(result.is_some());
-        assert_eq!(result.unwrap().len(), 1);
-
-        assert!(Value::Float(1.0).get_range_values().is_none());
-    }
-
-    #[test]
-    fn test_value_get_vector() {
-        let iv = InstantValue {
-            labels: vec![],
-            sample: Sample::new(1000, 5.0),
-        };
-        let val = Value::Vector(vec![iv]);
-        assert!(val.get_vector().is_some());
-        assert_eq!(val.get_vector().unwrap().len(), 1);
-
-        assert!(Value::Float(1.0).get_vector().is_none());
-    }
-
-    #[test]
     fn test_value_get_string() {
         let val = Value::String("hello".to_string());
         assert_eq!(val.get_string(), Some("hello".to_string()));
 
         assert!(Value::Float(1.0).get_string().is_none());
         assert!(Value::None.get_string().is_none());
-    }
-
-    #[test]
-    fn test_value_get_float() {
-        let val = Value::Float(3.25);
-        assert_eq!(val.get_float(), Some(3.25));
-
-        assert!(Value::String("x".to_string()).get_float().is_none());
-        assert!(Value::None.get_float().is_none());
     }
 
     #[test]
@@ -2180,75 +2022,5 @@ mod tests {
         assert!(!ctx.is_instant());
         let ts = ctx.timestamps();
         assert_eq!(ts, vec![0, 100, 200]);
-    }
-
-    #[test]
-    fn test_contains_same_label_set_vector_three_unique() {
-        let label_a = vec![Arc::new(Label::new("n", "a"))];
-        let label_b = vec![Arc::new(Label::new("n", "b"))];
-        let label_c = vec![Arc::new(Label::new("n", "c"))];
-        let v = Value::Vector(vec![
-            InstantValue {
-                labels: label_a,
-                sample: Sample::new(1, 1.0),
-            },
-            InstantValue {
-                labels: label_b,
-                sample: Sample::new(2, 2.0),
-            },
-            InstantValue {
-                labels: label_c,
-                sample: Sample::new(3, 3.0),
-            },
-        ]);
-        assert!(!v.contains_same_label_set());
-    }
-
-    #[test]
-    fn test_contains_same_label_set_vector_three_with_duplicate() {
-        let label_a = vec![Arc::new(Label::new("n", "a"))];
-        let label_b = vec![Arc::new(Label::new("n", "b"))];
-        let label_a2 = vec![Arc::new(Label::new("n", "a"))]; // dup
-        let v = Value::Vector(vec![
-            InstantValue {
-                labels: label_a,
-                sample: Sample::new(1, 1.0),
-            },
-            InstantValue {
-                labels: label_b,
-                sample: Sample::new(2, 2.0),
-            },
-            InstantValue {
-                labels: label_a2,
-                sample: Sample::new(3, 3.0),
-            },
-        ]);
-        assert!(v.contains_same_label_set());
-    }
-
-    #[test]
-    fn test_contains_same_label_set_matrix_three_unique() {
-        let la = vec![Arc::new(Label::new("n", "a"))];
-        let lb = vec![Arc::new(Label::new("n", "b"))];
-        let lc = vec![Arc::new(Label::new("n", "c"))];
-        let m = Value::Matrix(vec![
-            RangeValue::new(la, vec![]),
-            RangeValue::new(lb, vec![]),
-            RangeValue::new(lc, vec![]),
-        ]);
-        assert!(!m.contains_same_label_set());
-    }
-
-    #[test]
-    fn test_contains_same_label_set_matrix_three_with_duplicate() {
-        let la = vec![Arc::new(Label::new("n", "a"))];
-        let lb = vec![Arc::new(Label::new("n", "b"))];
-        let la2 = vec![Arc::new(Label::new("n", "a"))]; // dup
-        let m = Value::Matrix(vec![
-            RangeValue::new(la, vec![]),
-            RangeValue::new(lb, vec![]),
-            RangeValue::new(la2, vec![]),
-        ]);
-        assert!(m.contains_same_label_set());
     }
 }

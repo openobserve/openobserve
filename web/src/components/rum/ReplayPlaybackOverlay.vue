@@ -53,6 +53,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-if="singleSnapshot" class="text-text-secondary text-xs">
           {{ t("rum.sessionReplaySinglePageHint", { time: targetLabel }) }}
         </span>
+        <span
+          v-else-if="multiTabHint"
+          class="text-text-secondary text-xs"
+          data-test="replay-overlay-multi-tab-hint"
+        >
+          {{ t("rum.sessionReplayMultiTabHint") }}
+        </span>
       </template>
       <template v-else>
         <OSpinner size="sm" />
@@ -85,6 +92,7 @@ const props = defineProps({
   failedFromMs: { type: Number as PropType<number | null>, default: null },
   timelineMs: { type: Number, default: 0 },
   singleSnapshot: { type: Boolean, default: false },
+  multiTabHint: { type: Boolean, default: false },
   retryAttempt: { type: Number, default: 0 },
 });
 

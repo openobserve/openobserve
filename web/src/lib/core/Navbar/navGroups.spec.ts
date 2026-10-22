@@ -25,6 +25,8 @@ function keysOf(entries: RailEntry[]): string[] {
  */
 const oncallOff = (gate: string) => gate !== "oncall";
 const oncallOn = () => true;
+// OSS serves neither on-call nor alert calibration, which are both enterprise-gated.
+const ossGates = (gate: string) => gate !== "oncall" && gate !== "alertCalibration";
 
 /**
  * `keysOf` minus the Infra tile. Infra is `standalone` — it absorbs nothing and
@@ -245,6 +247,7 @@ describe("groupNavLinks", () => {
       "alertLibrary",
       "sloList",
       "incidentList",
+      "alertCalibration",
       "alertSources",
     ]);
   });
@@ -284,14 +287,14 @@ describe("groupNavLinks", () => {
         e.type === "linkGroup" && e.item.name === "reliability",
     );
     const outside = reliability?.children.filter((c) => !c.categoryKey).map((c) => c.name);
-    expect(outside).toEqual(["sloList", "incidentList", "alertSources"]);
+    expect(outside).toEqual(["sloList", "incidentList", "alertCalibration", "alertSources"]);
   });
 
   it("drops Incidents from Reliability on OSS (no incidents route)", () => {
     const entries = groupNavLinks(
       [link("home"), link("alertList"), link("sloList")],
       undefined,
-      oncallOff,
+      ossGates,
     );
     expect(keysWithoutInfra(entries)).toEqual(["link:home", "linkGroup:reliability"]);
     const reliability = entries.find(
@@ -319,6 +322,7 @@ describe("groupNavLinks", () => {
       "alertDestinations",
       "alertTemplates",
       "alertLibrary",
+      "alertCalibration",
     ]);
   });
 
@@ -559,10 +563,11 @@ describe("groupNavLinks", () => {
       "infraHosts",
       "dbmDatabases",
       "infraKubernetes",
+      "infraKubernetes2",
     ]);
   });
 
-  it("declares the two workload children ungated, with their titleKey/icon/route", () => {
+  it("declares the workload children ungated, with their titleKey/icon/route", () => {
     // Ungated = always present under Infra; detection changes page state, never existence.
     const infra = NAV_GROUPS.find((g) => g.key === "infra");
     const byName = (name: string) => infra?.children.find((c) => c.name === name);
@@ -576,7 +581,12 @@ describe("groupNavLinks", () => {
       icon: "hub",
       name: "infraKubernetes",
     });
-    for (const name of ["infraHosts", "infraKubernetes"]) {
+    expect(byName("infraKubernetes2")).toMatchObject({
+      titleKey: "menu.kubernetes2",
+      icon: "hub",
+      name: "infraKubernetes2",
+    });
+    for (const name of ["infraHosts", "infraKubernetes", "infraKubernetes2"]) {
       expect(byName(name)?.gate, name).toBeUndefined();
     }
   });
@@ -643,7 +653,7 @@ describe("groupNavLinks", () => {
     const infra = NAV_GROUPS.find((g) => g.key === "infra");
     expect(infra?.standalone).toBe(true);
     expect(infra?.absorbs).toEqual([]);
-    expect(infra?.children).toHaveLength(3);
+    expect(infra?.children).toHaveLength(4);
     expect(infraGroup(groupNavLinks([link("home"), link("traces")]))).toBeTruthy();
   });
 
@@ -766,6 +776,54 @@ describe("groupNavLinks", () => {
   });
 });
 
+describe("ship guards (AC-15, AC-22, D-27)", () => {
+  it("keeps the Reliability flyout children exactly: no on-call My on-call or Policies rows (AC-15, D-8)", () => {
+    const reliability = NAV_GROUPS.find((g) => g.key === "reliability")!;
+    expect(reliability.children.map((c) => c.name)).toEqual([
+      "alertList",
+      "alertDestinations",
+      "alertTemplates",
+      "alertLibrary",
+      "sloList",
+      "incidentList",
+      "downtimes",
+      "alertCalibration",
+      "onCallResponses",
+      "onCallTeams",
+      "onCallRouting",
+      "alertSources",
+    ]);
+  });
+
+  it("still lands the Traces tile on the Spans tab (AC-22, #13852)", () => {
+    const spans = NAV_SUBNAV.traces.find((c) => c.tab === "spans")!;
+    expect(spans.defaultForRoute).toBe(true);
+    expect(NAV_SUBNAV.traces.filter((c) => c.defaultForRoute)).toHaveLength(1);
+  });
+
+  it("emits the children its requires/gate filter removed as `filtered` (D-27)", () => {
+    const entries = groupNavLinks(
+      [
+        { title: "Home", icon: "home", link: "/home", name: "home" },
+        { title: "Alerts", icon: "shield", link: "/alerts", name: "alertList" },
+      ],
+      undefined,
+      () => true,
+    );
+    const reliability = entries.find(
+      (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
+        e.type === "linkGroup" && e.item.name === "reliability",
+    );
+    expect(reliability?.filtered?.map((c) => c.name)).toEqual([
+      "sloList",
+      "incidentList",
+      "downtimes",
+      "alertSources",
+    ]);
+    expect(reliability?.children.some((c) => c.name === "alertSources")).toBe(false);
+  });
+});
+
 describe("GATE_PREDICATES", () => {
   const ctx = (over: Partial<NavGateContext> = {}): NavGateContext => ({
     isEnterprise: false,
@@ -779,6 +837,7 @@ describe("GATE_PREDICATES", () => {
     onlineEvals: false,
     oncallEnabled: false,
     databaseMonitoring: false,
+    downtimesEnabled: false,
     hiddenMenus: new Set<string>(),
     features: {},
     ...over,
@@ -799,6 +858,36 @@ describe("GATE_PREDICATES", () => {
     ).toBe(true);
     expect(GATE_PREDICATES.databaseMonitoring(ctx({ isEnterprise: true }))).toBe(false);
     expect(GATE_PREDICATES.databaseMonitoring(ctx())).toBe(false);
+  });
+
+  it("downtimes needs enterprise or cloud AND the runtime flag", () => {
+    expect(GATE_PREDICATES.downtimes(ctx({ isEnterprise: true, downtimesEnabled: true }))).toBe(
+      true,
+    );
+    expect(GATE_PREDICATES.downtimes(ctx({ isCloud: true, downtimesEnabled: true }))).toBe(true);
+    expect(GATE_PREDICATES.downtimes(ctx({ downtimesEnabled: true }))).toBe(false);
+    expect(GATE_PREDICATES.downtimes(ctx({ isEnterprise: true }))).toBe(false);
+  });
+
+  it("marks Downtimes and Alert Calibration as Beta in the Reliability flyout, and nothing else there", () => {
+    const reliability = NAV_GROUPS.find((g) => g.children.some((c) => c.name === "downtimes"))!;
+    const beta = reliability.children.filter((c) => c.beta).map((c) => c.name);
+    expect(beta).toEqual(["downtimes", "alertCalibration"]);
+  });
+
+  it("puts Downtimes after Incidents when the rail carries a downtimes item", () => {
+    const entries = groupNavLinks(
+      [link("home"), link("alertList"), link("incidentList"), link("downtimes")],
+      undefined,
+      oncallOff,
+    );
+    const reliability = entries.find(
+      (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
+        e.type === "linkGroup" && e.item.name === "reliability",
+    );
+    const names = reliability?.children.map((c) => c.name) ?? [];
+    expect(names.indexOf("downtimes")).toBe(names.indexOf("incidentList") + 1);
+    expect(keysWithoutInfra(entries)).toEqual(["link:home", "linkGroup:reliability"]);
   });
 
   it("enterpriseMeta (e.g. Nodes) needs BOTH enterprise and meta-org", () => {

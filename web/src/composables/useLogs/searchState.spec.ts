@@ -534,6 +534,44 @@ describe("searchState composable", () => {
       (wrapper.vm.store.state as any).logs = originalLogs;
     });
 
+    it("restores with the drawer closed and no row, crossing or page request left over (4a §3.2.5)", async () => {
+      const store = wrapper.vm.store as any;
+      const live = JSON.parse(JSON.stringify(wrapper.vm.searchObj));
+      live.meta.showDetailTab = true;
+      live.meta.resultGrid.navigation = {
+        currentRowIndex: 12,
+        selectionActive: true,
+        pendingPageSelection: { page: 3, position: "first", requestId: "t9" },
+      };
+      live.data.resultGrid.pageRequest = { requestId: "t9" };
+      live.data.resultGrid.pageLoad = { requestId: "t8", ok: true, reason: "done" };
+      live.data.resultGrid.hitsSettled = false;
+      live.data.queryResults = { hits: [{ a: 1 }] };
+      live.data.sortedQueryResults = [];
+      store.state.logs = { isInitialized: true };
+      Object.defineProperty(store.getters, "logs/getLogs", {
+        get: () => live,
+        configurable: true,
+      });
+      try {
+        await wrapper.vm.initialLogsState();
+      } finally {
+        delete store.getters["logs/getLogs"];
+        store.state.logs = undefined;
+      }
+
+      const { meta, data } = wrapper.vm.searchObj;
+      expect(meta.showDetailTab).toBe(false);
+      expect(meta.resultGrid.navigation).toEqual({
+        currentRowIndex: null,
+        selectionActive: false,
+        pendingPageSelection: null,
+      });
+      expect(data.resultGrid.pageRequest).toBeNull();
+      expect(data.resultGrid.pageLoad).toBeNull();
+      expect(data.resultGrid.hitsSettled).toBe(true);
+    });
+
     it("should return true even when the store getter throws an error", async () => {
       // Simulate isInitialized = true but getLogs getter absent (throws),
       // so the catch branch executes and resolves to true via finally.
@@ -603,8 +641,33 @@ describe("searchState composable", () => {
   // fieldValues and notificationMsg
   // ---------------------------------------------------------------------------
   describe("fieldValues", () => {
-    it("should expose fieldValues as undefined by default", () => {
-      expect(wrapper.vm.fieldValues).toBeUndefined();
+    // useStreamFields fills it and logs/Index.vue hands it to the SearchBar, so both must hold the same one.
+    it("is one value list shared by every caller, like searchObj", () => {
+      const other = mountTestComponent();
+      (wrapper.vm as any).fieldValues = { level: new Set(["error"]) };
+      expect([...(other.vm as any).fieldValues.level]).toEqual(["error"]);
+      other.unmount();
+    });
+
+    it("is cleared with the search object, on org switch", () => {
+      (wrapper.vm as any).fieldValues = { level: new Set(["error"]) };
+      wrapper.vm.resetSearchObj();
+      expect(wrapper.vm.fieldValues).toEqual({});
+    });
+
+    it("is emptied in place, so the editor's copy sees the next search's values", () => {
+      (wrapper.vm as any).fieldValues = { level: new Set(["error"]) };
+      const held = wrapper.vm.fieldValues;
+      wrapper.vm.resetSearchObj();
+      (wrapper.vm as any).clearFieldValues();
+      expect(wrapper.vm.fieldValues).toBe(held);
+      expect(held).toEqual({});
+    });
+
+    it("is cleared with the stream data, on stream change", () => {
+      (wrapper.vm as any).fieldValues = { level: new Set(["error"]) };
+      wrapper.vm.resetStreamData();
+      expect(wrapper.vm.fieldValues).toEqual({});
     });
   });
 

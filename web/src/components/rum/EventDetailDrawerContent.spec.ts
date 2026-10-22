@@ -1387,9 +1387,9 @@ describe("EventDetailDrawerContent", () => {
       expect(findByTestId(wrapper, "close-drawer-btn").exists()).toBe(true);
     });
 
-    it.skip("provides title attribute for truncated text elements", () => {
-      // Skip: title attribute detection depends on dynamic content rendering
-      expect(wrapper.find("[title]").exists()).toBe(true);
+    it.skip("renders truncated text through OTruncatedText", () => {
+      // Skip: truncated text detection depends on dynamic content rendering
+      expect(wrapper.find('[data-test="o-truncated-text"]').exists()).toBe(true);
     });
 
     it.skip("has semantic HTML structure with drawer stub wrapper", () => {

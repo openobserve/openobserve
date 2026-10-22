@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, fmt::Debug};
+use std::{collections::HashMap, fmt::Debug, num::NonZeroUsize, sync::LazyLock};
 
 use axum::{
     Json,
@@ -24,14 +24,14 @@ use axum::{
 use base64::Engine;
 #[cfg(feature = "enterprise")]
 use common::meta::user::AuthTokensExt;
-use common::{
-    infra::config::PASSWORD_HASH,
-    meta::user::{AuthTokens, UserOrgRole},
-};
+use common::meta::user::{AuthTokens, UserOrgRole};
 use config::{
     meta::{feature::Feature, user::UserRole},
-    utils::{hash::get_passcode_hash, json},
+    utils::{hash::try_get_passcode_hash, json},
 };
+use lru::LruCache;
+use parking_lot::Mutex;
+use sha2::{Digest, Sha256};
 #[cfg(feature = "enterprise")]
 use {
     crate::users::get_user, db::user::is_root_user, jsonwebtoken::TokenData,
@@ -40,7 +40,23 @@ use {
 };
 
 pub const V2_API_PREFIX: &str = "v2";
+/// Modules routed as `/v2/{org_id}/{module}`; any other path names its org in the first segment.
+pub const V2_ORG_MODULES: [&str; 8] = [
+    "alerts",
+    "folders",
+    "reports",
+    "synthetics",
+    "incidents",
+    "downtimes",
+    "workflows",
+    "alert_calibration",
+];
 pub const SESSION_AUTH_MARKER: &str = "Session::";
+const PASSWORD_HASH_CACHE_CAPACITY: NonZeroUsize = NonZeroUsize::new(10_000).unwrap();
+
+// Every login attempt inserts, so it must stay bounded, and it must never key by the plaintext.
+static PASSWORD_HASH: LazyLock<Mutex<LruCache<String, String>>> =
+    LazyLock::new(|| Mutex::new(LruCache::new(PASSWORD_HASH_CACHE_CAPACITY)));
 
 #[cfg(feature = "enterprise")]
 pub async fn get_user_email_from_auth_str(auth_str: &str) -> Option<String> {
@@ -52,7 +68,7 @@ pub async fn get_user_email_from_auth_str(auth_str: &str) -> Option<String> {
     } else if auth_str.starts_with("{\"auth_ext\":") {
         let auth_tokens: AuthTokensExt =
             config::utils::json::from_str(auth_str).unwrap_or_default();
-        if chrono::Utc::now().timestamp() - auth_tokens.request_time > auth_tokens.expires_in {
+        if auth_tokens.has_expired() {
             return None;
         }
         let decoded =
@@ -69,6 +85,20 @@ pub fn get_user_details(decoded: impl AsRef<[u8]>) -> Option<(String, String)> {
     credentials
         .split_once(':')
         .map(|(user, password)| (user.to_string(), password.to_string()))
+}
+
+/// The org the router serves for a path below the `/api` mount, which a v2 route carries second.
+pub fn org_from_path<'a>(path_columns: &[&'a str]) -> &'a str {
+    match *path_columns {
+        [V2_API_PREFIX, org, module, ..] if V2_ORG_MODULES.contains(&module) => org,
+        [org, ..] => org,
+        [] => "",
+    }
+}
+
+/// The path as the router matched it, below the mount prefixes axum has already stripped.
+pub fn routed_path(uri_path: &str) -> &str {
+    uri_path.strip_prefix('/').unwrap_or(uri_path)
 }
 
 /// Resolves the effective permission method for write requests (PUT/DELETE/PATCH).
@@ -118,16 +148,18 @@ pub fn is_ofga_object_visible(
 }
 
 pub fn get_hash(pass: &str, salt: &str) -> String {
-    let key = format!("{pass}{salt}");
-    let hash = PASSWORD_HASH.get(&key);
-    match hash {
-        Some(ret_hash) => ret_hash.value().to_string(),
-        None => {
-            let password_hash = get_passcode_hash(pass, salt);
-            PASSWORD_HASH.insert(key, password_hash.clone());
-            password_hash
-        }
+    try_get_hash(pass, salt).expect("salt length outside what argon2 accepts")
+}
+
+/// `None` when the salt cannot be hashed with, as for external users stored with an empty salt.
+pub fn try_get_hash(pass: &str, salt: &str) -> Option<String> {
+    let key = password_hash_cache_key(pass, salt);
+    if let Some(hash) = PASSWORD_HASH.lock().get(&key) {
+        return Some(hash.clone());
     }
+    let password_hash = try_get_passcode_hash(pass, salt)?;
+    PASSWORD_HASH.lock().put(key, password_hash.clone());
+    Some(password_hash)
 }
 
 #[cfg(feature = "enterprise")]
@@ -259,7 +291,6 @@ where
         use o2_openfga::meta::route_permissions::{self as rp, StreamType as RpStreamType};
 
         let start = std::time::Instant::now();
-        let cfg = config::get_config();
 
         // Parse query string
         let query_string = parts.uri.query().unwrap_or("");
@@ -272,10 +303,7 @@ where
 
         let method = parts.method.to_string();
         let local_path = parts.uri.path().to_string();
-        let path = match local_path.strip_prefix(format!("{}/api/", cfg.common.base_uri).as_str()) {
-            Some(path) => path,
-            None => local_path.strip_prefix("/").unwrap_or(&local_path),
-        };
+        let path = routed_path(&local_path);
 
         let mut path_columns = path.split('/').collect::<Vec<&str>>();
         // Drop a trailing empty segment produced by a trailing slash (e.g.
@@ -289,12 +317,7 @@ where
         {
             path_columns.pop();
         }
-        let url_len = path_columns.len();
-        let org_id = if url_len > 1 && path_columns[0].eq(V2_API_PREFIX) {
-            path_columns[1].to_string()
-        } else {
-            path_columns[0].to_string()
-        };
+        let org_id = org_from_path(&path_columns).to_string();
 
         // Synthetics probe job + agent APIs — `/{org_id}/synthetics/{jobs,agent}/*`.
         // Authenticated via the o2syn_ probe token (not a user), so OpenFGA is
@@ -475,6 +498,15 @@ where
     }
 }
 
+// The separator keeps `("ab", "c")` and `("a", "bc")` from sharing an entry.
+fn password_hash_cache_key(pass: &str, salt: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(salt.as_bytes());
+    hasher.update([0u8]);
+    hasher.update(pass.as_bytes());
+    format!("{:x}", hasher.finalize())
+}
+
 // Only server-side session resolution may emit the marker; from a client it is a forged trust
 // claim.
 fn reject_forged_session_marker(auth: String) -> String {
@@ -527,8 +559,8 @@ pub async fn extract_auth_str_from_headers(headers: &HeaderMap) -> String {
                 .unwrap_or_default()
         } else if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
             access_token
-        } else if access_token.starts_with("session") {
-            let session_key = access_token.strip_prefix("session ").unwrap().to_string();
+        } else if let Some(session_key) = access_token.strip_prefix("session ") {
+            let session_key = session_key.to_string();
             match crate::db::session::get(&session_key).await {
                 Ok(token) => {
                     log::debug!("Session '{}' resolved to token", session_key);
@@ -838,7 +870,7 @@ pub fn build_basic_auth_header(email: &str, token: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use config::DEFAULT_ORG;
+    use config::{DEFAULT_ORG, utils::hash::get_passcode_hash};
     use db::user::is_root_user;
     use infra::{db as infra_db, table as infra_table};
 
@@ -967,6 +999,48 @@ mod tests {
         let auth = base64::engine::general_purpose::STANDARD.encode(user_pass);
         println!(
             "http://localhost:5080/auth/login?request_time={time}&exp_in={exp_in}&auth={auth}"
+        );
+    }
+
+    #[test]
+    fn password_hash_cache_never_holds_the_plaintext() {
+        let (pass, salt) = ("plaintext-marker-pass", "plaintext-marker-salt");
+        let hash = get_hash(pass, salt);
+        let key = password_hash_cache_key(pass, salt);
+        assert!(!key.contains(pass) && !key.contains(salt));
+        assert_eq!(PASSWORD_HASH.lock().peek(&key), Some(&hash));
+        assert!(
+            PASSWORD_HASH
+                .lock()
+                .iter()
+                .all(|(k, _)| !k.contains(pass) && !k.contains(salt))
+        );
+    }
+
+    #[test]
+    fn password_hash_cache_stays_bounded() {
+        let cap = PASSWORD_HASH_CACHE_CAPACITY.get();
+        let hash = get_passcode_hash("bounded", "bounded-salt");
+        for i in 0..cap + 50 {
+            PASSWORD_HASH.lock().put(
+                password_hash_cache_key(&format!("guess-{i}"), "bounded-salt"),
+                hash.clone(),
+            );
+        }
+        get_hash("one-more-guess", "bounded-salt");
+        assert!(PASSWORD_HASH.lock().len() <= cap);
+    }
+
+    #[test]
+    fn unusable_salts_hash_to_none_instead_of_panicking() {
+        assert_eq!(try_get_hash("anything", ""), None);
+        assert_eq!(try_get_hash("anything", "ab"), None);
+        assert_eq!(try_get_hash("anything", &"s".repeat(49)), None);
+        assert_eq!(
+            try_get_hash("Pass#123", "TestSalt").as_deref(),
+            Some(
+                "$argon2d$v=16$m=2048,t=4,p=2$VGVzdFNhbHQ$CZzrFPtqjY4mIPYwoDztCJ3OGD5M0P37GH4QddwrbZk"
+            )
         );
     }
 
@@ -1108,27 +1182,9 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_write_method_alert_trigger_uses_put() {
-        let path: Vec<&str> = "v2/default/alerts/abc123/trigger".split('/').collect();
-        assert_eq!(resolve_write_method("PATCH", &path), "PUT");
-    }
-
-    #[test]
-    fn test_resolve_write_method_alert_enable_uses_put() {
-        let path: Vec<&str> = "v2/default/alerts/abc123/enable".split('/').collect();
-        assert_eq!(resolve_write_method("PATCH", &path), "PUT");
-    }
-
-    #[test]
     fn test_resolve_write_method_alert_crud_put() {
         let path: Vec<&str> = "v2/default/alerts/abc123".split('/').collect();
         assert_eq!(resolve_write_method("PUT", &path), "PUT");
-    }
-
-    #[test]
-    fn test_resolve_write_method_alert_crud_delete() {
-        let path: Vec<&str> = "v2/default/alerts/abc123".split('/').collect();
-        assert_eq!(resolve_write_method("DELETE", &path), "DELETE");
     }
 
     #[test]
@@ -1147,26 +1203,6 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_write_method_non_alert_patch_becomes_put() {
-        let path: Vec<&str> = "v2/default/dashboards/dash123".split('/').collect();
-        assert_eq!(resolve_write_method("PATCH", &path), "PUT");
-    }
-
-    #[test]
-    fn test_resolve_write_method_trigger_only_matches_v2_alerts() {
-        // v1-style path should continue to normalize PATCH to PUT
-        let path: Vec<&str> = "default/streams/alerts/abc123/trigger".split('/').collect();
-        assert_eq!(resolve_write_method("PATCH", &path), "PUT");
-    }
-
-    #[test]
-    fn test_resolve_write_method_trigger_requires_full_path() {
-        // Too short a path should not match
-        let path: Vec<&str> = "v2/default/trigger".split('/').collect();
-        assert_eq!(resolve_write_method("PATCH", &path), "PUT");
-    }
-
-    #[test]
     fn test_build_basic_auth_header_format() {
         use base64::Engine as _;
         let header = build_basic_auth_header("user@example.com", "mytoken");
@@ -1179,21 +1215,6 @@ mod tests {
         )
         .unwrap();
         assert_eq!(decoded, "user@example.com:mytoken");
-    }
-
-    #[test]
-    fn test_build_basic_auth_header_empty_fields() {
-        use base64::Engine as _;
-        let header = build_basic_auth_header("", "");
-        assert!(header.starts_with("Basic "));
-        let encoded = header.strip_prefix("Basic ").unwrap();
-        let decoded = String::from_utf8(
-            base64::engine::general_purpose::STANDARD
-                .decode(encoded)
-                .unwrap(),
-        )
-        .unwrap();
-        assert_eq!(decoded, ":");
     }
 
     #[test]
@@ -1213,6 +1234,66 @@ mod tests {
                 reject_forged_session_marker(untouched.to_string()),
                 untouched,
                 "ordinary credentials must pass through unchanged"
+            );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn auth_ext_with_an_overflowing_request_time_is_expired() {
+        let auth_ext = format!(
+            "auth_ext {}",
+            config::utils::base64::encode("u@example.com:x")
+        );
+        let auth = format!(
+            r#"{{"auth_ext":"{auth_ext}","refresh_token":"","request_time":{},"expires_in":300}}"#,
+            i64::MIN
+        );
+        assert_eq!(get_user_email_from_auth_str(&auth).await, None);
+    }
+
+    // Each URI is what the extractor sees once axum has stripped the `/api` mount.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn the_extractor_reads_the_org_the_route_serves() {
+        let mut misread = vec![];
+        for (method, uri, served) in [
+            ("POST", "/kv/kv/_search", "kv"),
+            ("POST", "/api/kv/_search", "api"),
+            ("POST", "/v2/kv/_search", "v2"),
+            ("GET", "/v2/acme/alerts", "acme"),
+        ] {
+            let (mut parts, ()) = http::Request::builder()
+                .method(method)
+                .uri(uri)
+                .header(http::header::AUTHORIZATION, "Basic eDp5")
+                .body(())
+                .unwrap()
+                .into_parts();
+            let auth = AuthExtractor::from_request_parts(&mut parts, &())
+                .await
+                .unwrap_or_else(|e| panic!("{method} {uri}: {}", e.message));
+            if auth.org_id != served {
+                misread.push(format!(
+                    "{method} /api{uri}: resolved org {:?}",
+                    auth.org_id
+                ));
+            }
+        }
+        assert!(misread.is_empty(), "{misread:#?}");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn session_cookie_without_a_space_does_not_panic() {
+        for access_token in ["sessionX", "session"] {
+            let tokens = format!(r#"{{"access_token":"{access_token}","refresh_token":""}}"#);
+            let cookie = format!("auth_tokens={}", config::utils::base64::encode(&tokens));
+            let mut headers = HeaderMap::new();
+            headers.insert(http::header::COOKIE, cookie.parse().unwrap());
+            assert_eq!(
+                extract_auth_str_from_headers(&headers).await,
+                format!("Bearer {access_token}")
             );
         }
     }

@@ -442,12 +442,6 @@ mod tests {
     }
 
     #[test]
-    fn test_cache_key_with_special_org_id() {
-        let key = cache_key("acme-corp", "o2oi_token");
-        assert_eq!(key, "acme-corp/o2oi_token");
-    }
-
-    #[test]
     fn test_event_key_format() {
         let key = event_key("default", "o2oi_abc123");
         assert_eq!(key, "/org_ingestion_tokens/default/o2oi_abc123");

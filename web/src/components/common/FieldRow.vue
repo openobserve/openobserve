@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OFieldLabel :field="field" :show-type-icon="false" />
     <OButton
       :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
-      v-if="showQuickMode && field.name !== timestampColumn"
+      v-if="showQuickMode && isInterestingCandidate && field.name !== timestampColumn"
       :name="field.isInterestingField ? 'info-filled' : 'info-outline'"
       variant="ghost-neutral"
       class="me-1 gap-0!"
@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template v-if="field.name !== timestampColumn" #actions>
       <OButton
+        :aria-label="t('common.addFilter')"
         v-if="field.isSchemaField && field.name != timestampColumn"
         variant="ghost-neutral"
         size="icon"
@@ -74,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       <OButton
         :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
-        v-if="showQuickMode && field.name !== timestampColumn"
+        v-if="showQuickMode && isInterestingCandidate && field.name !== timestampColumn"
         variant="ghost-neutral"
         class="gap-0!"
         size="icon"
@@ -100,6 +101,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
 import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
+import { isSchemaBackedField } from "@/utils/logs/interestingFields";
 import { useI18nTyped } from "@/types/i18n";
 
 interface Props {
@@ -126,4 +128,7 @@ defineEmits<{
 }>();
 
 const isFieldSelected = computed(() => props.selectedFields.includes(props.field.name));
+
+// Quick mode selects the interesting fields by name, so only a schema-backed field can be one.
+const isInterestingCandidate = computed(() => isSchemaBackedField(props.field));
 </script>
