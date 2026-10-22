@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="hasNewPanelDraft"
               role="img"
               :aria-label="t('dashboard.panelDraft.addPanelDot')"
-              class="bg-button-pending-bg ring-badge-amber-ol-text pointer-events-none absolute -end-0.5 -top-0.5 size-2 rounded-full ring-1"
+              class="bg-button-pending-bg ring-button-pending-bg/30 pointer-events-none absolute -end-1 -top-1 size-2.5 rounded-full ring-4"
               data-test="dashboard-panel-add-draft-dot"
             />
           </OButton>
