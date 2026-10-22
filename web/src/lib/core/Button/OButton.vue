@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { ButtonProps, ButtonEmits, ButtonSlots } from "./OButton.types";
 import { Primitive } from "reka-ui";
-import { computed, ref, onMounted, useAttrs, useId } from "vue";
-import { warnIfUnnamedIconOnly } from "./iconOnlyName";
+import { computed, ref, onMounted, onBeforeUnmount, useAttrs, useId } from "vue";
+import { UNNAMED_ICON_ONLY_DELAY_MS, warnIfUnnamedIconOnly } from "./iconOnlyName";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 defineOptions({ inheritAttrs: false });
@@ -25,7 +25,16 @@ const id = useId();
 const unavailable = computed(() => props.disabled && props.focusableUnavailable);
 const reasonId = computed(() => props.descriptionId ?? `${id}-reason`);
 const rootRef = ref<{ $el?: Element } | null>(null);
-onMounted(() => warnIfUnnamedIconOnly(rootRef.value?.$el));
+// Labels that arrive with data are not unnamed, so the dev check waits for them.
+let nameCheckTimer: ReturnType<typeof setTimeout> | undefined;
+onMounted(() => {
+  if (!import.meta.env.DEV || import.meta.env.MODE === "test") return;
+  nameCheckTimer = setTimeout(
+    () => warnIfUnnamedIconOnly(rootRef.value?.$el),
+    UNNAMED_ICON_ONLY_DELAY_MS,
+  );
+});
+onBeforeUnmount(() => clearTimeout(nameCheckTimer));
 
 defineSlots<ButtonSlots>();
 
@@ -152,7 +161,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   // destructive (delete/danger). No dedicated hover/active token yet, so
   // states are opacity-derived from the one cancel-query-bg color.
   "cancel-query": [
-    "bg-cancel-query-bg text-button-primary-foreground border-0",
+    "bg-cancel-query-bg text-button-primary-foreground",
     "enabled:hover:opacity-90",
     "enabled:active:opacity-80",
     "focus-visible:ring-3 focus-visible:ring-cancel-query-bg",

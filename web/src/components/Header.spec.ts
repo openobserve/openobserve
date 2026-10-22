@@ -1092,6 +1092,68 @@ describe("Header Component", () => {
     });
   });
 
+  describe("Linked accounts (AC-1.4 Header part)", () => {
+    const menuOpen = {
+      ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
+      LinkedAccountsDialog: {
+        name: "LinkedAccountsDialog",
+        props: ["open"],
+        template: '<div data-test-stub="linked-accounts-dialog" :data-open="open" />',
+      },
+    };
+    const linkedItem = '[data-test="menu-link-linked-accounts-item"]';
+
+    it.each([
+      ["enterprise", { isEnterprise: "true", isCloud: "false" }],
+      ["Cloud", { isEnterprise: "true", isCloud: "true" }],
+    ])("shows Linked accounts on %s when the org has Slack enabled", (_label, edition) => {
+      const w = createWrapper({
+        configOverrides: edition,
+        storeOverrides: { state: { zoConfig: { slack_enabled: true } } },
+        stubsOverrides: menuOpen,
+      });
+      expect(w.find(linkedItem).exists()).toBe(true);
+      expect(w.find('[data-test-stub="linked-accounts-dialog"]').exists()).toBe(true);
+    });
+
+    it.each([
+      ["Cloud with Slack disabled", { isEnterprise: "true", isCloud: "true" }, false],
+      [
+        "enterprise without the Slack fields",
+        { isEnterprise: "true", isCloud: "false" },
+        undefined,
+      ],
+      ["OSS even when the config says enabled", { isEnterprise: "false", isCloud: "false" }, true],
+    ])("hides Linked accounts on %s", (_label, edition, enabled) => {
+      const w = createWrapper({
+        configOverrides: edition,
+        storeOverrides: { state: { zoConfig: { slack_enabled: enabled } } },
+        stubsOverrides: menuOpen,
+      });
+      expect(w.find(linkedItem).exists()).toBe(false);
+      expect(w.find('[data-test-stub="linked-accounts-dialog"]').exists()).toBe(false);
+    });
+
+    it("opens the Linked accounts dialog from the user menu", async () => {
+      const w = createWrapper({
+        configOverrides: { isEnterprise: "true", isCloud: "false" },
+        storeOverrides: { state: { zoConfig: { slack_enabled: true } } },
+        stubsOverrides: menuOpen,
+      });
+      const item = w
+        .findAllComponents({ name: "ODropdownItem" })
+        .find((c: any) => c.attributes("data-test") === "menu-link-linked-accounts-item");
+      expect(w.find('[data-test-stub="linked-accounts-dialog"]').attributes("data-open")).toBe(
+        "false",
+      );
+      item!.vm.$emit("select");
+      await nextTick();
+      expect(w.find('[data-test-stub="linked-accounts-dialog"]').attributes("data-open")).toBe(
+        "true",
+      );
+    });
+  });
+
   describe("Props Validation", () => {
     it("should accept all required props", () => {
       // Migration: filteredOrganizations/searchQuery/rowsPerPage merged into

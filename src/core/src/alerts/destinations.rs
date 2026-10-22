@@ -21,7 +21,7 @@ use db::{
     self,
     alerts::{destinations::DestinationError, templates::TemplateError},
     authz::{remove_ownership, set_ownership},
-    user,
+    org_users, user,
 };
 
 use crate::{auth::is_ofga_unsupported, common::meta::authz::Authz};
@@ -123,6 +123,24 @@ async fn ensure_prebuilt_template(
     }
 }
 
+/// Rejects a recipient list naming any non-member of the org. [strong]
+async fn ensure_org_members(org_id: &str, recipients: &[String]) -> Result<(), DestinationError> {
+    reject_non_members(org_member_split(org_id, recipients).await)
+}
+
+/// Passes a split with nobody skipped; a lookup error stays an error, not a non-member. [pure]
+fn reject_non_members(
+    split: Result<(Vec<String>, Vec<String>), anyhow::Error>,
+) -> Result<(), DestinationError> {
+    let (_, skipped) = split
+        .map_err(|e| DestinationError::InfraError(infra::errors::Error::Message(e.to_string())))?;
+    if skipped.is_empty() {
+        Ok(())
+    } else {
+        Err(DestinationError::UserNotPermitted(skipped.join(", ")))
+    }
+}
+
 pub async fn save(
     name: &str,
     mut destination: Destination,
@@ -140,16 +158,12 @@ pub async fn save(
                 if !config::get_config().smtp.smtp_enabled {
                     return Err(DestinationError::SMTPUnavailable);
                 }
-                let mut lowercase_emails = vec![];
-                for email in email.recipients.iter() {
-                    let email = email.trim().to_lowercase();
-                    // Check if the email is part of the org
-                    let res = user::get(Some(&destination.org_id), &email).await;
-                    if res.is_err() || res.is_ok_and(|usr| usr.is_none()) {
-                        return Err(DestinationError::UserNotPermitted);
-                    }
-                    lowercase_emails.push(email);
-                }
+                let lowercase_emails: Vec<String> = email
+                    .recipients
+                    .iter()
+                    .map(|email| email.trim().to_lowercase())
+                    .collect();
+                ensure_org_members(&destination.org_id, &lowercase_emails).await?;
                 email.recipients = lowercase_emails;
             }
             DestinationType::Http(endpoint) => {
@@ -287,16 +301,11 @@ pub async fn test_email(
         return Err(DestinationError::EmptyEmail);
     }
 
-    // Validate each recipient is part of the org (same as save())
-    let mut validated_recipients = Vec::with_capacity(recipients.len());
-    for email in recipients {
-        let email = email.trim().to_lowercase();
-        let res = user::get(Some(org_id), &email).await;
-        if res.is_err() || res.is_ok_and(|usr| usr.is_none()) {
-            return Err(DestinationError::UserNotPermitted);
-        }
-        validated_recipients.push(email);
-    }
+    let validated_recipients: Vec<String> = recipients
+        .iter()
+        .map(|email| email.trim().to_lowercase())
+        .collect();
+    ensure_org_members(org_id, &validated_recipients).await?;
 
     let default_body = "<html><body><h2>OpenObserve Test Email</h2>\
          <p>This is a test email from OpenObserve to verify your email destination \
@@ -316,6 +325,53 @@ pub async fn test_email(
     )
     .await
     .map_err(|e| DestinationError::EmailSendFailed(e.to_string()))
+}
+
+/// Appends the skipped addresses to a send response; unchanged when none were skipped. [pure]
+pub fn note_skipped(response: String, skipped: &[String]) -> String {
+    if skipped.is_empty() {
+        return response;
+    }
+    format!(
+        "{response} (skipped recipients not part of this org: {})",
+        skipped.join(", ")
+    )
+}
+
+/// Splits recipients into org members and non-members; a failed lookup fails the split. [pure]
+pub fn split_org_members(
+    checked: Vec<(String, Result<bool, anyhow::Error>)>,
+) -> Result<(Vec<String>, Vec<String>), anyhow::Error> {
+    let mut kept = vec![];
+    let mut skipped = vec![];
+    for (recipient, member) in checked {
+        if member? {
+            kept.push(recipient);
+        } else {
+            skipped.push(recipient);
+        }
+    }
+    Ok((kept, skipped))
+}
+
+/// Looks up each recipient's org membership and splits kept from skipped. [strong]
+pub async fn org_member_split(
+    org_id: &str,
+    recipients: &[String],
+) -> Result<(Vec<String>, Vec<String>), anyhow::Error> {
+    let mut checked = Vec::with_capacity(recipients.len());
+    for recipient in recipients {
+        let email = recipient.trim().to_lowercase();
+        let member = if user::is_root_user(&email) {
+            Ok(true)
+        } else {
+            org_users::get_optional(org_id, &email)
+                .await
+                .map(|found| found.is_some())
+        };
+        checked.push((recipient.clone(), member));
+    }
+    split_org_members(checked)
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Destination, DestinationError> {
@@ -399,6 +455,81 @@ mod tests {
     use config::meta::destinations::{DestinationType, Endpoint, HTTPType, Module};
 
     use super::*;
+
+    fn addrs(list: &[&str]) -> Vec<String> {
+        list.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn test_split_org_members() {
+        type Checked<'a> = &'a [(&'a str, Option<bool>)];
+        type Split = (Vec<String>, Vec<String>);
+        let cases: Vec<(Checked, Option<Split>)> = vec![
+            (
+                &[("a@x.com", Some(true)), ("b@x.com", Some(true))],
+                Some((addrs(&["a@x.com", "b@x.com"]), vec![])),
+            ),
+            (
+                &[("a@x.com", Some(true)), ("gone@x.com", Some(false))],
+                Some((addrs(&["a@x.com"]), addrs(&["gone@x.com"]))),
+            ),
+            (
+                &[("gone@x.com", Some(false)), ("left@x.com", Some(false))],
+                Some((vec![], addrs(&["gone@x.com", "left@x.com"]))),
+            ),
+            (&[], Some((vec![], vec![]))),
+            (&[("a@x.com", Some(true)), ("db@x.com", None)], None),
+            (&[("gone@x.com", Some(false)), ("db@x.com", None)], None),
+        ];
+        for (checked, expected) in cases {
+            let input = checked
+                .iter()
+                .map(|(r, m)| (r.to_string(), m.ok_or_else(|| anyhow::anyhow!("db down"))))
+                .collect();
+            let got = split_org_members(input);
+            assert_eq!(got.ok(), expected, "split for {checked:?}");
+        }
+    }
+
+    #[test]
+    fn test_reject_non_members() {
+        type Split = Result<(Vec<String>, Vec<String>), anyhow::Error>;
+        let cases: Vec<(Split, Result<(), String>)> = vec![
+            (Ok((addrs(&["a@x.com"]), vec![])), Ok(())),
+            (Ok((vec![], vec![])), Ok(())),
+            (
+                Ok((addrs(&["a@x.com"]), addrs(&["gone@x.com"]))),
+                Err("UserNotPermitted(\"gone@x.com\")".to_string()),
+            ),
+            (
+                Ok((vec![], addrs(&["gone@x.com", "left@x.com"]))),
+                Err("UserNotPermitted(\"gone@x.com, left@x.com\")".to_string()),
+            ),
+            (
+                Err(anyhow::anyhow!("db down")),
+                Err("InfraError(Message(\"db down\"))".to_string()),
+            ),
+        ];
+        for (split, expected) in cases {
+            let got = reject_non_members(split).map_err(|e| format!("{e:?}"));
+            assert_eq!(got, expected);
+        }
+    }
+
+    #[test]
+    fn test_note_skipped() {
+        assert_eq!(note_skipped("sent".to_string(), &[]), "sent");
+        assert_eq!(
+            note_skipped("sent".to_string(), &addrs(&["gone@x.com", "left@x.com"])),
+            "sent (skipped recipients not part of this org: gone@x.com, left@x.com)"
+        );
+    }
+
+    #[test]
+    fn test_user_not_permitted_names_the_address() {
+        let msg = DestinationError::UserNotPermitted("gone@x.com".to_string()).to_string();
+        assert!(msg.contains("gone@x.com"), "{msg}");
+    }
 
     /// Test that ensure_prebuilt_template creates a new template when it doesn't exist
     #[tokio::test]

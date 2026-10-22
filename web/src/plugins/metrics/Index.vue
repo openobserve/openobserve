@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)">
         <OButton
           v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
-          variant="outline-destructive"
+          variant="cancel-query"
           size="sm-toolbar"
           data-test="metrics-cancel"
           @click="cancelAddPanelQuery"

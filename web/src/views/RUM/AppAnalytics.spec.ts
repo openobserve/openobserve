@@ -1055,6 +1055,17 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
     [...root.querySelectorAll<HTMLButtonElement>("button, a, [role='button']")].find(
       (b) => b.textContent?.trim() === label,
     );
+  // Submit validates on timers before the PUT, so a fixed settle can miss it and leak the call into the next test.
+  const clickSave = async (d: HTMLElement) => {
+    const before = settingsApi.putAppSettings.mock.calls.length;
+    buttonIn(d, "Save")!.click();
+    await vi.waitFor(
+      () => expect(settingsApi.putAppSettings.mock.calls.length).toBeGreaterThan(before),
+      { timeout: 5000 },
+    );
+    await Promise.resolve(settingsApi.putAppSettings.mock.results.at(-1)!.value).catch(() => {});
+    await settle();
+  };
   const drawer = () =>
     [...document.querySelectorAll<HTMLElement>("[role='dialog']")].find((d) =>
       d.textContent?.includes("Built-in bot rule"),
@@ -1293,8 +1304,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
     const d = drawer()!;
     botSwitch(d).click();
     await settle();
-    buttonIn(d, "Save")!.click();
-    await settle();
+    await clickSave(d);
     expect(settingsApi.putAppSettings).toHaveBeenCalledTimes(1);
     const [org, app, body] = settingsApi.putAppSettings.mock.calls[0];
     expect([org, app]).toEqual(["org1", "web"]);
@@ -1320,8 +1330,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
     expect(d.querySelector('[data-test="rum-analytics-exclusions-page-0"]')?.textContent).toContain(
       "Page is /health",
     );
-    buttonIn(d, "Save")!.click();
-    await settle();
+    await clickSave(d);
     const body = settingsApi.putAppSettings.mock.calls[0][2];
     expect(body).toMatchObject({ pages: [{ op: "eq", value: "/health" }] });
   });
@@ -1340,8 +1349,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
       .querySelector<HTMLElement>('[data-test="rum-analytics-funnel-field-picker-apply"]')!
       .click();
     await settle();
-    buttonIn(d, "Save")!.click();
-    await settle();
+    await clickSave(d);
     expect(settingsApi.putAppSettings.mock.calls[0][2]).toMatchObject({ sessions: [rule] });
   });
 
@@ -1366,8 +1374,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
     const d = drawer()!;
     botSwitch(d).click();
     await settle();
-    buttonIn(d, "Save")!.click();
-    await settle();
+    await clickSave(d);
     expect(settingsApi.getAppSettings.mock.calls.length).toBeGreaterThan(reads);
     const scope = useProductAnalytics().scope.value as unknown as { exclusions: unknown };
     expect(scope.exclusions).toMatchObject({ bots: false, rulesHash: "fedcba9876543210" });
@@ -1411,8 +1418,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
     const d = drawer()!;
     botSwitch(d).click();
     await settle();
-    buttonIn(d, "Save")!.click();
-    await settle();
+    await clickSave(d);
     expect(settingsApi.putAppSettings).toHaveBeenCalledTimes(1);
     expect(drawer()!.textContent).toContain(
       "Reloaded with the latest app filters, re-apply your change",
@@ -1487,8 +1493,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
     const d = drawer()!;
     botSwitch(d).click();
     await settle();
-    buttonIn(d, "Save")!.click();
-    await settle();
+    await clickSave(d);
     expect(settingsApi.putAppSettings).toHaveBeenCalledTimes(1);
     expect(uaSearches()).toBe(1);
     await useProductAnalytics().refresh();

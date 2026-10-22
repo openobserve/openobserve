@@ -16,6 +16,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import ViewPanel from "./ViewPanel.vue";
+import config from "@/aws-exports";
 import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
 
 // Mock vue-router
@@ -966,6 +967,34 @@ describe("ViewPanel", () => {
 
       expect(wrapper.find('[data-test="dashboard-viewpanel-cancel-btn"]').exists()).toBe(false);
     });
+
+    it("shows a labelled Cancel while an enterprise query runs, with the options arrow to match", async () => {
+      const wasEnterprise = config.isEnterprise;
+      config.isEnterprise = "true";
+      try {
+        wrapper = createWrapper();
+        await flushPromises();
+        const loading = (wrapper.vm as any).$.provides.variablesAndPanelsDataLoadingState;
+        loading.searchRequestTraceIds = { p1: ["trace-id-1"] };
+        loading.panels = { p1: true };
+        await flushPromises();
+
+        const cancel = wrapper
+          .findAllComponents({ name: "OButton" })
+          .find((b) => b.attributes("data-test") === "dashboard-viewpanel-cancel-btn")!;
+        expect(cancel.props("variant")).toBe("cancel-query");
+        expect(cancel.text()).toContain("Cancel");
+        expect(wrapper.vm.refreshOptionsVariant).toBe("cancel-query");
+        // No X icon on wide screens; a hidden Refresh label keeps the button width. The OButton
+        // stub keeps icon-left in $attrs rather than on the DOM.
+        expect(cancel.vm.$attrs["icon-left"]).toBeUndefined();
+        expect(cancel.find('[aria-hidden="true"]').text()).toContain(
+          "dashboard.viewDashboard.refresh",
+        );
+      } finally {
+        config.isEnterprise = wasEnterprise;
+      }
+    });
   });
 
   describe("Data Loading", () => {
@@ -1143,9 +1172,9 @@ describe("ViewPanel", () => {
     };
     const refreshTooltip = () =>
       wrapper
-        .findComponent('[data-test="dashboard-viewpanel-refresh-data-btn"]')
-        .findComponent({ name: "OTooltip" })
-        .props("content");
+        .findAllComponents({ name: "OTooltip" })
+        .find((tip) => tip.find('[data-test="dashboard-viewpanel-refresh-data-btn"]').exists())
+        ?.props("content");
     const chartSpan = () => {
       const time = wrapper.vm.dashboardPanelData.meta.dateTime;
       return time.end_time.getTime() - time.start_time.getTime();
@@ -1262,6 +1291,15 @@ describe("ViewPanel", () => {
       await flushPromises();
     };
 
+    const refreshButton = () =>
+      wrapper
+        .findAllComponents({ name: "OButton" })
+        .find((b) => b.attributes("data-test") === "dashboard-viewpanel-refresh-data-btn")!;
+    const refreshTooltipWrapper = () =>
+      wrapper
+        .findAllComponents({ name: "OTooltip" })
+        .find((tip) => tip.find('[data-test="dashboard-viewpanel-refresh-data-btn"]').exists())!;
+
     afterEach(() => {
       localStorage.removeItem("oo_toggle_auto_run");
       setAutoQuery(false);
@@ -1275,6 +1313,9 @@ describe("ViewPanel", () => {
 
       expect(wrapper.vm.isVariablesChanged).toBe(false);
       expect(wrapper.vm.showApplyHint).toBe(false);
+      expect(refreshButton().props("variant")).toBe("primary");
+      expect(refreshButton().text()).toContain("dashboard.viewDashboard.refresh");
+      expect(refreshTooltipWrapper().props("disabled")).toBe(true);
     });
 
     it("Refresh turns amber on an unapplied change and clears after Refresh", async () => {
@@ -1282,27 +1323,14 @@ describe("ViewPanel", () => {
       await flushPromises();
       await changeAppliedVariables();
       expect(wrapper.vm.showApplyHint).toBe(true);
+      expect(refreshButton().props("variant")).toBe("pending");
+      expect(refreshTooltipWrapper().props("disabled")).toBe(false);
 
       wrapper.vm.disable = false;
       wrapper.vm.refreshData();
       await flushPromises();
       expect(wrapper.vm.showApplyHint).toBe(false);
-    });
-
-    it("marks an unapplied change with the pending variant and names it for screen readers", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-      const refreshButton = () =>
-        wrapper
-          .findAllComponents({ name: "OButton" })
-          .find((b: any) => b.attributes("data-test") === "dashboard-viewpanel-refresh-data-btn");
-
-      expect(refreshButton().props("variant")).toBe("outline");
-      expect(refreshButton().vm.$attrs["aria-label"]).toBe("common.refresh");
-
-      await changeAppliedVariables();
-      expect(refreshButton().props("variant")).toBe("pending");
-      expect(refreshButton().vm.$attrs["aria-label"]).toBe("dashboard.refreshToApplyVariables");
+      expect(refreshButton().props("variant")).toBe("primary");
     });
 
     it("hides the Auto Run menu when the server flag is off", async () => {
@@ -1326,6 +1354,7 @@ describe("ViewPanel", () => {
       );
       expect(wrapper.vm.isAutoRunOn).toBe(true);
       expect(wrapper.vm.showApplyHint).toBe(false);
+      expect(refreshButton().props("variant")).toBe("primary");
     });
 
     it("uses the dashboard Auto Run copy for the Refresh tooltip while Auto Run is on", async () => {
@@ -1334,9 +1363,9 @@ describe("ViewPanel", () => {
       await flushPromises();
 
       const tooltip = wrapper
-        .findComponent('[data-test="dashboard-viewpanel-refresh-data-btn"]')
-        .findComponent({ name: "OTooltip" })
-        .props("content");
+        .findAllComponents({ name: "OTooltip" })
+        .find((tip) => tip.find('[data-test="dashboard-viewpanel-refresh-data-btn"]').exists())
+        ?.props("content");
       expect(tooltip).toBe("dashboard.viewDashboard.autoRunDescription");
     });
 

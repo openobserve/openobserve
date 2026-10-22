@@ -322,3 +322,19 @@ describe("alertStatus: waiting", () => {
     expect(r.variant).toBe("default-soft");
   });
 });
+
+describe("slackInstallStatus", () => {
+  it("AC-12.4 maps every installation status to a coloured, translated badge", () => {
+    const expected = {
+      healthy: "success-soft",
+      degraded: "warning-soft",
+      pending: "blue-soft",
+      revoked: "error-soft",
+    };
+    for (const [status, variant] of Object.entries(expected)) {
+      const r = resolveBadge("slackInstallStatus", status);
+      expect(r.variant).toBe(variant);
+      expect(r.labelKey).toBe(`components.badge.slackInstallStatus.${status}`);
+    }
+  });
+});

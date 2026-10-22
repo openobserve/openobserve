@@ -774,7 +774,7 @@ pub async fn test_send(
         return MetaHttpResponse::bad_request("Test-send is only supported for alert destinations");
     };
 
-    match core_test_send(destination_type, &spec).await {
+    match core_test_send(&org_id, destination_type, &spec).await {
         Ok(message) => MetaHttpResponse::json(TestSendResponse {
             success: true,
             message,
@@ -960,7 +960,7 @@ mod tests {
     #[test]
     fn test_user_not_permitted_is_bad_request() {
         assert_eq!(
-            status(DestinationError::UserNotPermitted),
+            status(DestinationError::UserNotPermitted("a@x.com".to_string())),
             StatusCode::BAD_REQUEST
         );
     }
