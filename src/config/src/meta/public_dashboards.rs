@@ -136,6 +136,12 @@ pub struct PublicDashboardConfig {
     pub expires_at: Option<i64>,
 }
 
+/// Admin body to take over a link; a publisher other than the one the caller saw is a 409.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TakeOverRequest {
+    pub expected_publisher: String,
+}
+
 /// A link's state as the admin UI shows it; `NeedsAttention` comes from the batch status call.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]

@@ -66,7 +66,7 @@ pub async fn under_flight(
             from_wait(f.wait(timeout, u32::MAX).await)
         }
         Start::Follower(_) | Start::Capacity => {
-            let Some(stored) = store::read(key).await else {
+            let Some(stored) = read_own(key, link).await else {
                 return Checked::Missing;
             };
             match recheck(engine, link, &stored, now).await {
@@ -92,7 +92,7 @@ pub async fn check(
     link: &PublicDashboard,
     now: i64,
 ) -> Outcome {
-    let Some(stored) = store::read(key).await else {
+    let Some(stored) = read_own(key, link).await else {
         return Ok(Built {
             header: Header::default(),
             body: None,
@@ -225,6 +225,16 @@ async fn recheck_variables(
         }
     }
     Ok(restored)
+}
+
+/// The file only when the link's current publisher built it; any other publisher's file is evicted.
+async fn read_own(key: &str, link: &PublicDashboard) -> Option<Stored> {
+    let stored = store::read(key).await?;
+    if stored.header.published_by != link.published_by {
+        store::evict(key).await;
+        return None;
+    }
+    Some(stored)
 }
 
 fn from_wait(wait: Wait) -> Checked {

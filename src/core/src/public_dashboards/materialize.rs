@@ -70,12 +70,13 @@ pub struct Capture {
     pub org_enabled: bool,
 }
 
-/// The live revisions a file is compared with.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// The live revisions and publisher a file is compared with.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Live {
     pub dashboard_updated_at: i64,
     pub link_rev: i64,
     pub settings_rev: i64,
+    pub published_by: String,
 }
 
 impl Live {
@@ -84,6 +85,7 @@ impl Live {
             dashboard_updated_at: header.dashboard_updated_at,
             link_rev: header.link_rev,
             settings_rev: header.settings_rev,
+            published_by: header.published_by.clone(),
         }
     }
 
@@ -269,15 +271,17 @@ pub async fn read(
         dashboard_updated_at: req.dashboard.updated_at,
         link_rev: link.rev,
         settings_rev: req.settings_rev,
+        published_by: link.published_by.clone(),
     };
     let mut header = store::read_header(&key).await;
     if header.as_ref().is_some_and(|h| deadline_passed(h, req.now)) {
         match authz_check::under_flight(engine, flights, &key, link, req.now).await {
             authz_check::Checked::Passed(fresh) => header = Some(fresh),
-            authz_check::Checked::Missing => header = None,
-            authz_check::Checked::Once(built) => {
-                return once(&built, &req, &intents, live, "denied_masked");
+            // A joined check that began with the previous publisher's row holds their body.
+            authz_check::Checked::Once(built) if built.header.published_by == live.published_by => {
+                return once(&built, &req, &intents, &live, "denied_masked");
             }
+            authz_check::Checked::Missing | authz_check::Checked::Once(_) => header = None,
             authz_check::Checked::Unavailable => {
                 count_read(&link.org_id, "error");
                 return Served::Unavailable { retry_after: 60 };
@@ -287,15 +291,17 @@ pub async fn read(
     }
     let header = header.or_else(|| WRITE_BACKOFF.get(&key).map(|h| h.clone()));
     match header {
-        Some(h) if h.has_body() => serve_file(engine, flights, &key, h, &req, &intents, live).await,
-        other => serve_cold(engine, flights, &key, other, &req, &intents, live).await,
+        Some(h) if h.has_body() => {
+            serve_file(engine, flights, &key, h, &req, &intents, &live).await
+        }
+        other => serve_cold(engine, flights, &key, other, &req, &intents, &live).await,
     }
 }
 
 /// The due rules in order; an edit or a masked screen after one failure skips the backoff once.
 pub fn due(
     header: &Header,
-    live: Live,
+    live: &Live,
     relative: bool,
     eff_secs: i64,
     all_masked: bool,
@@ -412,7 +418,8 @@ pub fn assemble(
                 header.withheld_panels.push(w);
             }
         }
-        fail(&mut header, live, now, eff_secs, jitter, first_error);
+        fail(&mut header, &live, now, eff_secs, jitter, first_error);
+        header.published_by = live.published_by;
         return Assembled {
             header,
             manifest: prior.map(|p| p.stored.manifest.clone()).unwrap_or_default(),
@@ -433,6 +440,7 @@ pub fn assemble(
         settings_rev: live.settings_rev,
         refresh_count: prior_header.as_ref().map_or(0, |h| h.refresh_count) + 1,
         fail_streak: prior_header.as_ref().map_or(0, |h| h.fail_streak),
+        published_by: live.published_by.clone(),
         ..Default::default()
     };
     let mut panels = BTreeMap::new();
@@ -492,7 +500,7 @@ pub fn assemble(
         .collect();
     let kind = if header.incomplete_count > 0 {
         header.attempted_revs = prior_header.as_ref().and_then(|h| h.attempted_revs);
-        fail(&mut header, live, now, eff_secs, jitter, first_error);
+        fail(&mut header, &live, now, eff_secs, jitter, first_error);
         BuildKind::Partial
     } else {
         header.fail_streak = 0;
@@ -550,9 +558,13 @@ pub async fn build(
         dashboard_updated_at: dashboard.updated_at,
         link_rev: cap.link.rev,
         settings_rev: cap.settings_rev,
+        published_by: cap.link.published_by.clone(),
     };
     let eff = effective_secs(&cap.link, &range);
-    let prior = read_prior(&key).await;
+    // Data built under another publisher is neither reused nor retained.
+    let prior = read_prior(&key)
+        .await
+        .filter(|p| p.stored.header.published_by == live.published_by);
     if let Some(p) = prior.as_ref().filter(|p| p.body.is_some()) {
         // A build that finished between the miss and this task already holds the answer.
         let h = &p.stored.header;
@@ -560,7 +572,7 @@ pub async fn build(
         let intents = intent::intents(dashboard, &frozen);
         let states = mask::visible_states(h, &intents, now, max_age_micros());
         let masked = all_masked(&intents, &states);
-        if !due(h, live, range.is_relative(), eff, masked, now).start && !deadline_passed(h, now) {
+        if !due(h, &live, range.is_relative(), eff, masked, now).start && !deadline_passed(h, now) {
             return Ok(Built {
                 header: h.clone(),
                 body: p.body.clone().map(Arc::new),
@@ -614,7 +626,11 @@ pub async fn range_status(link: &PublicDashboard, with_sources: bool) -> Vec<Ran
         let building = super::flight::FLIGHTS
             .get(&key)
             .is_some_and(|f| f.kind == Kind::Build);
-        let status = match store::read(&key).await {
+        // A file of the previous publisher is never reported as this link's.
+        let own = store::read(&key)
+            .await
+            .filter(|s| s.header.published_by == link.published_by);
+        let status = match own {
             None => RangeStatus {
                 key: range_key,
                 state: if building {
@@ -738,7 +754,7 @@ fn in_backoff(header: &Header, now: i64) -> bool {
 
 fn fail(
     header: &mut Header,
-    live: Live,
+    live: &Live,
     now: i64,
     eff_secs: i64,
     jitter: f64,
@@ -910,8 +926,13 @@ async fn serve_file(
     header: Header,
     req: &ReadRequest<'_>,
     intents: &BTreeMap<String, String>,
-    live: Live,
+    live: &Live,
 ) -> Served {
+    // A file built under another publisher is a miss, never served stale or masked.
+    if header.published_by != live.published_by {
+        store::evict(key).await;
+        return serve_cold(engine, flights, key, None, req, intents, live).await;
+    }
     let link = req.link;
     let eff = effective_secs(link, &req.range);
     let states = mask::visible_states(&header, intents, req.now, max_age_micros());
@@ -977,12 +998,12 @@ async fn serve_cold(
     held: Option<Header>,
     req: &ReadRequest<'_>,
     intents: &BTreeMap<String, String>,
-    live: Live,
+    live: &Live,
 ) -> Served {
     let link = req.link;
     let cfg = &get_config().public_dashboards;
     if let Some(h) = held.as_ref() {
-        let edited = live != Live::of(h) && h.attempted_revs != Some(live.as_array());
+        let edited = *live != Live::of(h) && h.attempted_revs != Some(live.as_array());
         if in_backoff(h, req.now) && !edited {
             count_read(&link.org_id, "cooldown_503");
             return Served::Cooldown(NotReadyResponse::Cooldown {
@@ -1016,6 +1037,11 @@ async fn serve_cold(
         }
     };
     match outcome {
+        // A build that started under the previous publisher finished after a takeover.
+        Ok(built) if built.header.published_by != live.published_by => {
+            count_read(&link.org_id, "building_202");
+            Served::Building(flight.building(now_micros()))
+        }
         Ok(built) => match built.body.as_ref() {
             Some(_) => once(&built, req, intents, live, label),
             None => {
@@ -1041,7 +1067,7 @@ fn once(
     built: &Built,
     req: &ReadRequest<'_>,
     intents: &BTreeMap<String, String>,
-    live: Live,
+    live: &Live,
     outcome: &'static str,
 ) -> Served {
     let Some(body) = built.body.as_ref() else {
@@ -1227,18 +1253,33 @@ pub(super) mod tests {
 
     /// An in-process engine: panels end as `classes` says; `denied` streams and tables are refused.
     pub(in super::super) struct Fake {
-        link: Mutex<PublicDashboard>,
+        pub(in super::super) link: Mutex<PublicDashboard>,
         dashboard: Mutex<Option<Dashboard>>,
         settings_rev: AtomicI64,
-        classes: Mutex<BTreeMap<String, Class>>,
+        pub(in super::super) classes: Mutex<BTreeMap<String, Class>>,
         pub(in super::super) denied: Mutex<BTreeSet<String>>,
+        /// Streams refused to one publisher only, at the build and at the deadline.
+        pub(in super::super) denied_to: Mutex<BTreeMap<String, BTreeSet<String>>>,
+        /// The publisher each build ran as, in order.
+        pub(in super::super) built_as: Mutex<Vec<String>>,
         /// None: the membership read fails.
         member: Mutex<Option<bool>>,
         authz_down: AtomicBool,
+        pub(in super::super) authz_delay_ms: AtomicU64,
         builds: AtomicUsize,
-        authz_calls: AtomicUsize,
-        delay_ms: AtomicU64,
+        pub(in super::super) authz_calls: AtomicUsize,
+        pub(in super::super) delay_ms: AtomicU64,
         panic: AtomicBool,
+    }
+
+    impl Fake {
+        fn refused_to(&self, user: &str) -> BTreeSet<String> {
+            let mut out = self.denied.lock().unwrap().clone();
+            if let Some(own) = self.denied_to.lock().unwrap().get(user) {
+                out.extend(own.iter().cloned());
+            }
+            out
+        }
     }
 
     #[async_trait]
@@ -1264,6 +1305,8 @@ pub(super) mod tests {
             _probe: &AuthorizerProbe,
         ) -> Run {
             let n = self.builds.fetch_add(1, Ordering::SeqCst) + 1;
+            let by = cap.link.published_by.clone();
+            self.built_as.lock().unwrap().push(by.clone());
             let delay = self.delay_ms.load(Ordering::SeqCst);
             if delay > 0 {
                 tokio::time::sleep(Duration::from_millis(delay)).await;
@@ -1271,11 +1314,21 @@ pub(super) mod tests {
             assert!(!self.panic.load(Ordering::SeqCst), "the fake build panics");
             let dash = cap.dashboard.as_ref().unwrap();
             let frozen = super::super::parse_frozen_vars(cap.link.frozen_variables.as_deref());
-            let classes = self.classes.lock().unwrap().clone();
+            let mut classes = self.classes.lock().unwrap().clone();
+            let refused = self
+                .denied_to
+                .lock()
+                .unwrap()
+                .get(&by)
+                .cloned()
+                .unwrap_or_default();
             let panels = intent::intents(dash, &frozen)
                 .into_iter()
                 .map(|(id, intent)| {
                     let stream = stream_of(dash, &id);
+                    if refused.contains(&stream) {
+                        classes.entry(id.clone()).or_insert(Class::Denied);
+                    }
                     let manifest = ManifestPanel {
                         intent,
                         sources: vec![(StreamType::Logs, stream.clone())],
@@ -1287,7 +1340,7 @@ pub(super) mod tests {
                         built_at: Some(now),
                         ..Default::default()
                     };
-                    fake_run(id, &classes, manifest, n, now)
+                    fake_run(id, &classes, manifest, (n, &by), now)
                 })
                 .collect();
             // One variable whose value came from a values query on stream `vals`.
@@ -1321,15 +1374,19 @@ pub(super) mod tests {
         async fn authorize(
             &self,
             _org: &str,
-            _user: &str,
+            user: &str,
             panel: &ManifestPanel,
             _probe: &AuthorizerProbe,
         ) -> Result<bool, anyhow::Error> {
             self.authz_calls.fetch_add(1, Ordering::SeqCst);
+            let delay = self.authz_delay_ms.load(Ordering::SeqCst);
+            if delay > 0 {
+                tokio::time::sleep(Duration::from_millis(delay)).await;
+            }
             if self.authz_down.load(Ordering::SeqCst) {
                 anyhow::bail!("the authorizer is down");
             }
-            let denied = self.denied.lock().unwrap();
+            let denied = self.refused_to(user);
             let mut streams = panel.sources.iter().chain(
                 panel
                     .values_dependencies
@@ -1352,7 +1409,7 @@ pub(super) mod tests {
         id: String,
         classes: &BTreeMap<String, Class>,
         manifest: ManifestPanel,
-        build: usize,
+        (build, by): (usize, &str),
         now: i64,
     ) -> PanelRun {
         let class = classes.get(&id).copied().unwrap_or(Class::Fresh);
@@ -1385,7 +1442,7 @@ pub(super) mod tests {
                     intent: manifest.intent.clone(),
                     built_at: Some(now),
                     window: Some(Window { start: 0, end: 1 }),
-                    data: vec![json!({ "build": build })],
+                    data: vec![json!({ "build": build, "as": by })],
                     result_meta_data: vec![],
                     metadata: json!({ "queries": [] }),
                 },
@@ -1411,7 +1468,7 @@ pub(super) mod tests {
             .unwrap_or_default()
     }
 
-    fn dashboard(panels: &[(&str, &str)]) -> Dashboard {
+    pub(in super::super) fn dashboard(panels: &[(&str, &str)]) -> Dashboard {
         let panels: Vec<serde_json::Value> = panels
             .iter()
             .map(|(id, stream)| {
@@ -1439,7 +1496,7 @@ pub(super) mod tests {
         }
     }
 
-    fn link(ranges: serde_json::Value) -> PublicDashboard {
+    pub(in super::super) fn link(ranges: serde_json::Value) -> PublicDashboard {
         let id = config::ider::uuid();
         PublicDashboard {
             org_id: format!("org-{id}"),
@@ -1475,8 +1532,11 @@ pub(super) mod tests {
             settings_rev: AtomicI64::new(0),
             classes: Mutex::new(BTreeMap::new()),
             denied: Mutex::new(BTreeSet::new()),
+            denied_to: Mutex::new(BTreeMap::new()),
+            built_as: Mutex::new(Vec::new()),
             member: Mutex::new(Some(true)),
             authz_down: AtomicBool::new(false),
+            authz_delay_ms: AtomicU64::new(0),
             builds: AtomicUsize::new(0),
             authz_calls: AtomicUsize::new(0),
             delay_ms: AtomicU64::new(0),
@@ -1484,15 +1544,15 @@ pub(super) mod tests {
         }))
     }
 
-    fn flights(max: u32, per_org: u32) -> &'static Flights {
+    pub(in super::super) fn flights(max: u32, per_org: u32) -> &'static Flights {
         Box::leak(Box::new(Flights::new(max, per_org)))
     }
 
-    fn rel(secs: i64) -> TimeRange {
+    pub(in super::super) fn rel(secs: i64) -> TimeRange {
         TimeRange::Relative { secs }
     }
 
-    async fn read_at(
+    pub(in super::super) async fn read_at(
         engine: &'static Fake,
         flights: &'static Flights,
         link: &PublicDashboard,
@@ -1515,14 +1575,14 @@ pub(super) mod tests {
         .await
     }
 
-    fn data(served: &Served) -> &DataResponse {
+    pub(in super::super) fn data(served: &Served) -> &DataResponse {
         match served {
             Served::Data { response, .. } => response,
             other => panic!("expected data, got {other:?}"),
         }
     }
 
-    fn reason(resp: &DataResponse, id: &str) -> Option<NotAvailableReason> {
+    pub(in super::super) fn reason(resp: &DataResponse, id: &str) -> Option<NotAvailableReason> {
         match resp.panels[id].state {
             PanelState::NotAvailable { reason } => Some(reason),
             PanelState::Ok { .. } => None,
@@ -1533,7 +1593,7 @@ pub(super) mod tests {
         resp.panels[id].data[0]["build"].as_i64().unwrap()
     }
 
-    async fn settle(flights: &'static Flights) {
+    pub(in super::super) async fn settle(flights: &'static Flights) {
         for _ in 0..200 {
             if flights.in_flight() == 0 {
                 return;
@@ -2072,11 +2132,12 @@ pub(super) mod tests {
             dashboard_updated_at: 1,
             link_rev: 2,
             settings_rev: 3,
+            published_by: String::new(),
         };
         let mut h = Header::default();
         // Three failures as reported, then more: from the fifth the uncapped wait passes 300 s.
         for failures in 1..=8_u16 {
-            fail(&mut h, live, 0, eff, 0.2, None);
+            fail(&mut h, &live, 0, eff, 0.2, None);
             assert_eq!(h.fail_streak, failures);
             let wait = h.next_retry_at.unwrap();
             assert!(wait <= 360 * SECOND, "{failures} failures: {wait}");
@@ -2262,6 +2323,7 @@ pub(super) mod tests {
             dashboard_updated_at: 1,
             link_rev: 2,
             settings_rev: 3,
+            published_by: String::new(),
         };
         let fresh = Header {
             built_at: Some(100 * MIN),
@@ -2271,14 +2333,14 @@ pub(super) mod tests {
             ..Default::default()
         };
         let at = |min: i64| 100 * MIN + min * MIN;
-        assert_eq!(due(&fresh, live, true, 300, false, at(4)).reason, None);
-        let interval = due(&fresh, live, true, 300, false, at(6));
+        assert_eq!(due(&fresh, &live, true, 300, false, at(4)).reason, None);
+        let interval = due(&fresh, &live, true, 300, false, at(6));
         assert_eq!(
             (interval.reason, interval.start),
             (Some(StaleReason::Interval), true)
         );
         assert_eq!(
-            due(&fresh, live, false, 300, false, at(600)).reason,
+            due(&fresh, &live, false, 300, false, at(600)).reason,
             None,
             "absolute never ages"
         );
@@ -2286,18 +2348,18 @@ pub(super) mod tests {
             next_retry_at: Some(at(10)),
             ..fresh.clone()
         };
-        assert!(!due(&backoff, live, true, 300, false, at(6)).start);
+        assert!(!due(&backoff, &live, true, 300, false, at(6)).start);
         let edited = Live {
             link_rev: 9,
-            ..live
+            ..live.clone()
         };
-        let d = due(&backoff, edited, true, 300, false, at(6));
+        let d = due(&backoff, &edited, true, 300, false, at(6));
         assert_eq!((d.reason, d.start), (Some(StaleReason::Interval), true));
         let d = due(
             &backoff,
-            Live {
+            &Live {
                 settings_rev: 9,
-                ..live
+                ..live.clone()
             },
             false,
             300,
@@ -2307,9 +2369,9 @@ pub(super) mod tests {
         assert_eq!((d.reason, d.start), (Some(StaleReason::Settings), true));
         let d = due(
             &backoff,
-            Live {
+            &Live {
                 dashboard_updated_at: 9,
-                ..live
+                ..live.clone()
             },
             false,
             300,
@@ -2322,8 +2384,8 @@ pub(super) mod tests {
             next_retry_at: Some(at(1)),
             ..fresh
         };
-        assert!(!due(&partial, live, false, 300, false, at(0)).start);
-        let d = due(&partial, live, false, 300, false, at(2));
+        assert!(!due(&partial, &live, false, 300, false, at(0)).start);
+        let d = due(&partial, &live, false, 300, false, at(2));
         assert_eq!((d.reason, d.start), (Some(StaleReason::Retry), true));
     }
 
@@ -2364,6 +2426,7 @@ pub(super) mod tests {
             dashboard_updated_at: 1,
             link_rev: 1,
             settings_rev: 0,
+            published_by: String::new(),
         };
         let a = assemble(live, (0, 1), run, None, &BTreeSet::new(), 5, 0, 300, 0.0);
         assert_eq!(a.kind, BuildKind::Complete);

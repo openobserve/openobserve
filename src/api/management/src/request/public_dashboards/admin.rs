@@ -22,10 +22,10 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use common::meta::http::HttpResponse as MetaHttpResponse;
-use config::meta::public_dashboards::PublicDashboardConfig;
+use config::meta::public_dashboards::{PublicDashboardConfig, TakeOverRequest};
 use infra::table::entity::public_dashboards::Model as PublicDashboard;
 use openobserve_api_common::extractors::Headers;
-use openobserve_core::public_dashboards::{Forbidden, Invalid, LINK_NOT_FOUND};
+use openobserve_core::public_dashboards::{Conflict, Forbidden, Invalid, LINK_NOT_FOUND};
 
 use crate::service::auth::UserEmail;
 #[cfg(feature = "enterprise")]
@@ -37,6 +37,9 @@ pub(super) fn map_err(ctx: &str, e: anyhow::Error) -> Response {
     }
     if let Some(forbidden) = e.downcast_ref::<Forbidden>() {
         return MetaHttpResponse::forbidden(&forbidden.0);
+    }
+    if let Some(conflict) = e.downcast_ref::<Conflict>() {
+        return MetaHttpResponse::conflict(&conflict.0);
     }
     let msg = e.to_string();
     if msg == "dashboard not found" || msg == LINK_NOT_FOUND {
@@ -267,6 +270,34 @@ pub async fn resume(
     }
 }
 
+/// POST .../public_links/{link_id}/take_over — the caller becomes the publisher; same slug.
+pub async fn take_over(
+    Path((org_id, dashboard_id, link_id)): Path<(String, String, String)>,
+    Headers(user): Headers<UserEmail>,
+    Json(body): Json<TakeOverRequest>,
+) -> Response {
+    if let Some(r) = feature_gate() {
+        return r;
+    }
+    if let Some(r) = edit_access_gate(&org_id, &dashboard_id, &user.user_id, false).await {
+        return r;
+    }
+    let link = match load_link(&org_id, &dashboard_id, &link_id).await {
+        Ok(link) => link,
+        Err(r) => return r,
+    };
+    match openobserve_core::public_dashboards::take_over_link(
+        link,
+        &user.user_id,
+        &body.expected_publisher,
+    )
+    .await
+    {
+        Ok(link) => view_response("take_over", &org_id, link).await,
+        Err(e) => map_err("take_over", e),
+    }
+}
+
 /// POST .../public_links/{link_id}/refresh — every range is due on its next view; no query runs.
 pub async fn refresh(
     Path((org_id, dashboard_id, link_id)): Path<(String, String, String)>,
@@ -323,6 +354,8 @@ mod tests {
         assert_eq!(map_err("pause", gone).status(), StatusCode::NOT_FOUND);
         let forbidden = anyhow::Error::new(Forbidden("no read permission on logs/s".into()));
         assert_eq!(map_err("update", forbidden).status(), StatusCode::FORBIDDEN);
+        let taken = anyhow::Error::new(Conflict("this link was taken over by b; reload".into()));
+        assert_eq!(map_err("take_over", taken).status(), StatusCode::CONFLICT);
         // A driver error that mentions permission is still a 500 with nothing of it shown.
         let driver = anyhow::anyhow!("permission denied for table public_dashboards");
         assert_eq!(
@@ -334,5 +367,24 @@ mod tests {
             map_err("create", other).status(),
             StatusCode::INTERNAL_SERVER_ERROR
         );
+    }
+
+    /// `edit_access_gate` answers 403 in Enterprise; take_over returns it untouched before any
+    /// read.
+    #[test]
+    fn take_over_returns_the_edit_access_gate_refusal_before_loading_the_link() {
+        let src = include_str!("admin.rs");
+        let start = src.find("pub async fn take_over(").unwrap();
+        let body = &src[start..start + src[start..].find("\n}\n").unwrap()];
+        let gate = body
+            .find(
+                "if let Some(r) = edit_access_gate(&org_id, &dashboard_id, &user.user_id, false)\
+                 .await {\n        return r;\n    }",
+            )
+            .expect("take_over must return the edit access refusal as is");
+        let load = body.find("load_link(").unwrap();
+        let core = body.find("take_over_link(").unwrap();
+        assert!(body.find("feature_gate()").unwrap() < gate);
+        assert!(gate < load && load < core, "{body}");
     }
 }

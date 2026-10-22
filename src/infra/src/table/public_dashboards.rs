@@ -252,6 +252,10 @@ pub async fn update_cas<C: ConnectionTrait>(
             Expr::value(next.frozen_variables.clone()),
         )
         .col_expr(links::Column::RefreshSecs, Expr::value(next.refresh_secs))
+        .col_expr(
+            links::Column::PublishedBy,
+            Expr::value(next.published_by.clone()),
+        )
         .col_expr(links::Column::Enabled, Expr::value(next.enabled))
         .col_expr(links::Column::ExpiresAt, Expr::value(next.expires_at))
         .col_expr(
@@ -696,6 +700,7 @@ mod tests {
 
         let mut edit = get(&db, "l").await.unwrap().unwrap();
         edit.name = "renamed".into();
+        edit.published_by = "heir".into();
         edit.rev = next_rev(1, 2);
         assert!(update_cas(&db, &edit, 1).await.unwrap());
         let mut stale = edit.clone();
@@ -704,6 +709,7 @@ mod tests {
 
         let row = get(&db, "l").await.unwrap().unwrap();
         assert_eq!(row.name, "renamed");
+        assert_eq!(row.published_by, "heir", "a takeover is a semantic write");
         assert_eq!(row.rev, 2);
         assert_eq!(row.access_count, 5);
         assert_eq!(row.last_accessed_at, Some(50));

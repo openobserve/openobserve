@@ -29,7 +29,7 @@ pub mod store;
 mod variables;
 
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, HashMap},
     sync::atomic::{AtomicUsize, Ordering},
 };
 
@@ -63,7 +63,7 @@ use futures::StreamExt;
 use infra::{
     db::{get_orm_client_ro, get_orm_client_rw},
     table::{
-        dashboards,
+        dashboards::{self, DashboardLabel},
         entity::{
             public_dashboard_org_settings::Model as OrgSettings,
             public_dashboards::Model as PublicDashboard,
@@ -90,6 +90,7 @@ pub const OLDER_FORMAT_ERROR: &str =
     "This dashboard uses an older format. Open it and save it once, then publish.";
 pub const LINK_NOT_FOUND: &str = "public link not found";
 pub const ORG_SWITCHED_OFF: &str = "Public links are turned off for this organization.";
+const LINK_EXPIRED: &str = "this link has expired; extend its expiry date to bring it back";
 
 /// Search-response fields the renderer reads; SQL, VRL errors and trace ids stay private.
 const PUBLIC_META_FIELDS: [&str; 6] = [
@@ -303,6 +304,16 @@ pub struct Invalid(pub String);
 #[error("{0}")]
 pub struct Forbidden(pub String);
 
+/// A request made against a link that changed since the caller saw it; the admin API answers 409.
+#[derive(Debug, thiserror::Error)]
+#[error("{0}")]
+pub struct Conflict(pub String);
+
+/// The departure pause found the link taken over since it was listed, so it is left as is.
+#[derive(Debug, thiserror::Error)]
+#[error("the public link has another publisher now")]
+struct Republished;
+
 /// Identifiers returned after publishing.
 pub struct PublishResult {
     pub id: String,
@@ -326,6 +337,8 @@ pub struct PublicLinkView {
     pub refresh_secs: i32,
     pub expires_at: Option<i64>,
     pub published_by: String,
+    /// The publisher is no longer an org member; the link may still be enabled while cleanup lags.
+    pub publisher_left: bool,
     pub updated_by: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
@@ -651,7 +664,7 @@ pub async fn list_for_dashboard(
     Ok(pd_table::list_by_dashboard(get_orm_client_ro().await, org, dashboard_id).await?)
 }
 
-/// Each link with its dashboard title, folder and lifecycle status, from one dashboard lookup.
+/// Each link with its dashboard, status and departed publisher, from one dashboard lookup.
 pub async fn views(
     org: &str,
     links: Vec<PublicDashboard>,
@@ -663,8 +676,33 @@ pub async fn views(
         .into_iter()
         .collect();
     let labels = dashboards::labels_by_ids(org, &ids).await?;
+    let is_member = |user: String| async move { publisher_is_member(org, &user).await };
+    Ok(views_with(links, &labels, is_member).await)
+}
+
+/// The views with one membership lookup per distinct publisher; a failed lookup is not leaving.
+async fn views_with<F, Fut>(
+    links: Vec<PublicDashboard>,
+    labels: &HashMap<String, DashboardLabel>,
+    is_member: F,
+) -> Vec<PublicLinkView>
+where
+    F: Fn(String) -> Fut,
+    Fut: std::future::Future<Output = Result<bool, anyhow::Error>>,
+{
+    let mut left = BTreeSet::new();
+    let publishers: BTreeSet<&str> = links.iter().map(|l| l.published_by.as_str()).collect();
+    for user in publishers {
+        match is_member(user.to_string()).await {
+            Ok(true) => {}
+            Ok(false) => {
+                left.insert(user.to_string());
+            }
+            Err(e) => log::warn!("[public_dashboards] membership lookup of {user} failed: {e}"),
+        }
+    }
     let now = now_micros();
-    Ok(links
+    links
         .into_iter()
         .map(|link| {
             let label = labels.get(&link.dashboard_id);
@@ -687,6 +725,7 @@ pub async fn views(
                 frozen_variables: parse_frozen_vars(link.frozen_variables.as_deref()),
                 refresh_secs: link.refresh_secs,
                 expires_at: link.expires_at,
+                publisher_left: left.contains(&link.published_by),
                 published_by: link.published_by,
                 updated_by: link.updated_by,
                 created_at: link.created_at,
@@ -699,7 +738,7 @@ pub async fn views(
                 dashboard_id: link.dashboard_id,
             }
         })
-        .collect())
+        .collect()
 }
 
 /// A live link of this org and dashboard only, read from the primary as every edit starts here.
@@ -767,8 +806,11 @@ pub async fn publisher_is_member(org: &str, user: &str) -> Result<bool, anyhow::
 
 /// Pause a link whose publisher left the org; the queries ran with that person's access.
 pub async fn pause_for_departed_publisher(link: PublicDashboard) -> Result<(), anyhow::Error> {
-    let updated_by = link.updated_by.clone();
-    set_paused(&link, updated_by).await.map(|_| ())
+    let db = get_orm_client_rw().await;
+    if let Some(row) = pause_departed_link_on(db, &link, replication::enabled()).await? {
+        replication::replicate(&row).await;
+    }
+    Ok(())
 }
 
 /// After a membership delete: pauses the user's links; a failure is left to the deadline check.
@@ -867,17 +909,14 @@ pub async fn resume_link(
 ) -> Result<PublicDashboard, anyhow::Error> {
     let now = now_micros();
     if is_expired(link.expires_at, now) {
-        return Err(Invalid(
-            "this link has expired; extend its expiry date to bring it back".to_string(),
-        )
-        .into());
+        return Err(Invalid(LINK_EXPIRED.to_string()).into());
     }
     current_dashboard(&link.org_id, &link.dashboard_id).await?;
     // Resuming would serve again only until the next view pauses it for the same reason.
     if publisher_left(&link).await {
         return Err(Invalid(format!(
             "{} has left this organization, and this link runs queries with their access; \
-             revoke it and publish a new link",
+             take over the link to publish it under your own access",
             link.published_by
         ))
         .into());
@@ -891,16 +930,35 @@ pub async fn resume_link(
     .await
 }
 
+/// Make the caller the publisher at the same address; the next view builds under their access.
+pub async fn take_over_link(
+    link: PublicDashboard,
+    user_id: &str,
+    expected_publisher: &str,
+) -> Result<PublicDashboard, anyhow::Error> {
+    current_dashboard(&link.org_id, &link.dashboard_id).await?;
+    let member = publisher_is_member(&link.org_id, user_id).await?;
+    let db = get_orm_client_rw().await;
+    let row = take_over_on(
+        db,
+        &link,
+        user_id,
+        expected_publisher,
+        member,
+        replication::enabled(),
+    )
+    .await?;
+    replication::replicate(&row).await;
+    Ok(row)
+}
+
 /// Make every result of the link due on its next view; runs no query.
 pub async fn refresh_now(link: PublicDashboard) -> Result<PublicDashboard, anyhow::Error> {
     if !link.enabled {
         return Err(Invalid("resume this link before refreshing it".to_string()).into());
     }
     if is_expired(link.expires_at, now_micros()) {
-        return Err(Invalid(
-            "this link has expired; extend its expiry date to bring it back".to_string(),
-        )
-        .into());
+        return Err(Invalid(LINK_EXPIRED.to_string()).into());
     }
     edit(&link.org_id, &link.id, |_| Ok(())).await
 }
@@ -1263,6 +1321,74 @@ fn create_gate(settings: Option<&OrgSettings>) -> Result<u32, String> {
     Ok(org_link_limit(settings))
 }
 
+/// The takeover; every check runs on the row `edit_on` re-reads, so a concurrent one gets 409.
+async fn take_over_on<C>(
+    db: &C,
+    link: &PublicDashboard,
+    user_id: &str,
+    expected_publisher: &str,
+    member: bool,
+    queue: bool,
+) -> Result<PublicDashboard, anyhow::Error>
+where
+    C: ConnectionTrait + TransactionTrait,
+{
+    if !member {
+        return Err(Forbidden(
+            "only a member of this organization can take over its public links".to_string(),
+        )
+        .into());
+    }
+    let now = now_micros();
+    edit_on(db, &link.org_id, &link.id, queue, |l| {
+        if l.published_by != expected_publisher {
+            return Err(Conflict(format!(
+                "this link was taken over by {}; reload",
+                l.published_by
+            ))
+            .into());
+        }
+        if l.published_by == user_id {
+            return Err(Invalid("you already publish this link".to_string()).into());
+        }
+        if is_expired(l.expires_at, now) {
+            return Err(Invalid(LINK_EXPIRED.to_string()).into());
+        }
+        l.published_by = user_id.to_string();
+        l.enabled = true;
+        l.updated_by = Some(user_id.to_string());
+        l.updated_at = now;
+        Ok(())
+    })
+    .await
+}
+
+/// None when the link was taken over since `link` was read: the new publisher's link stays live.
+async fn pause_departed_link_on<C>(
+    db: &C,
+    link: &PublicDashboard,
+    queue: bool,
+) -> Result<Option<PublicDashboard>, anyhow::Error>
+where
+    C: ConnectionTrait + TransactionTrait,
+{
+    let now = now_micros();
+    let pause = |l: &mut PublicDashboard| {
+        if l.published_by != link.published_by {
+            return Err(Republished.into());
+        }
+        l.enabled = false;
+        l.updated_by = link.updated_by.clone();
+        l.updated_at = now;
+        Ok::<(), anyhow::Error>(())
+    };
+    match edit_on(db, &link.org_id, &link.id, queue, pause).await {
+        Ok(row) => Ok(Some(row)),
+        Err(e) if e.is::<Republished>() => Ok(None),
+        Err(e) => Err(e),
+    }
+}
+
 /// Returns how many links were paused; each pause is its own compare-and-set and queued Put.
 async fn pause_departed_on<C, F, Fut>(db: &C, org: &str, user: &str, queue: bool, emit: F) -> usize
 where
@@ -1280,10 +1406,30 @@ where
             return 0;
         }
     };
+    pause_listed_on(db, org, user, links, queue, &emit).await
+}
+
+/// Pauses each listed live link `user` still publishes; one taken over since the listing is kept.
+async fn pause_listed_on<C, F, Fut>(
+    db: &C,
+    org: &str,
+    user: &str,
+    links: Vec<PublicDashboard>,
+    queue: bool,
+    emit: &F,
+) -> usize
+where
+    C: ConnectionTrait + TransactionTrait,
+    F: Fn(PublicDashboard) -> Fut,
+    Fut: std::future::Future<Output = Result<(), anyhow::Error>>,
+{
     let mut paused = 0;
     for link in links.into_iter().filter(|l| l.enabled) {
         let now = now_micros();
         let pause = |l: &mut PublicDashboard| {
+            if l.published_by != user {
+                return Err(Republished.into());
+            }
             l.enabled = false;
             l.updated_at = now;
             Ok::<(), anyhow::Error>(())
@@ -1291,10 +1437,11 @@ where
         match edit_on(db, org, &link.id, queue, pause).await {
             Ok(row) => {
                 if queue {
-                    replication::deliver_on(db, &row, &emit).await;
+                    replication::deliver_on(db, &row, emit).await;
                 }
                 paused += 1;
             }
+            Err(e) if e.is::<Republished>() => {}
             Err(e) => log::error!(
                 "[public_dashboards] pausing link {} of departed publisher {user} failed; the \
                  deadline check pauses it on its next read: {e}",
@@ -2517,7 +2664,7 @@ async fn gen_unique_slug() -> Result<String, anyhow::Error> {
 
 #[cfg(test)]
 mod tests {
-    use config::meta::public_dashboards::Visibility;
+    use config::meta::public_dashboards::{RangeState, Visibility};
     use serde_json::json;
 
     use super::*;
@@ -3257,6 +3404,507 @@ mod tests {
         );
     }
 
+    const LEAVER: &str = "leaver@example.com";
+    const HEIR: &str = "heir@example.com";
+
+    /// A one-hour link published by the leaver, stored in a fresh database.
+    async fn leavers_link() -> (sea_orm::DatabaseConnection, PublicDashboard) {
+        let db = replication::tests::db().await;
+        let mut link = materialize::tests::link(json!([{ "type": "relative", "secs": 3600 }]));
+        link.published_by = LEAVER.into();
+        link.created_by = LEAVER.into();
+        pd_table::insert_capped(&db, &link, 10, 10, false)
+            .await
+            .unwrap();
+        (db, link)
+    }
+
+    async fn row(db: &sea_orm::DatabaseConnection, link: &PublicDashboard) -> PublicDashboard {
+        pd_table::get(db, &link.id).await.unwrap().unwrap()
+    }
+
+    async fn take_over(
+        db: &sea_orm::DatabaseConnection,
+        seen: &PublicDashboard,
+        user: &str,
+    ) -> Result<PublicDashboard, anyhow::Error> {
+        take_over_on(db, seen, user, LEAVER, true, false).await
+    }
+
+    /// The leaver can read s1 and s2, the heir only s1.
+    fn two_stream_engine(link: &PublicDashboard) -> (&'static materialize::tests::Fake, Dashboard) {
+        let dash = materialize::tests::dashboard(&[("p1", "s1"), ("p2", "s2")]);
+        let engine = materialize::tests::fake(link, &dash);
+        engine
+            .denied_to
+            .lock()
+            .unwrap()
+            .insert(HEIR.into(), BTreeSet::from(["s2".to_string()]));
+        (engine, dash)
+    }
+
+    fn built_by(resp: &config::meta::public_dashboards::DataResponse, panel: &str) -> String {
+        resp.panels[panel].data[0]["as"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    }
+
+    /// The heir's rebuild: s1 under the heir's access, s2 refused, nothing of the leaver's rows.
+    fn assert_rebuilt_by_the_heir(served: &materialize::Served) {
+        let resp = materialize::tests::data(served);
+        assert_eq!(built_by(resp, "p1"), HEIR);
+        assert_eq!(
+            materialize::tests::reason(resp, "p2"),
+            Some(NotAvailableReason::Unauthorized)
+        );
+        assert!(resp.panels["p2"].data.is_empty(), "{:?}", resp.panels["p2"]);
+        assert!(!resp.stale, "nothing of the old file is served stale");
+    }
+
+    #[tokio::test]
+    async fn taking_over_a_departed_publishers_paused_link_republishes_it_as_the_heir() {
+        let (db, link) = leavers_link().await;
+        let queue = replication::tests::Queue::default();
+        assert_eq!(
+            pause_departed_on(&db, &link.org_id, LEAVER, false, queue.emitter()).await,
+            1
+        );
+        let paused = row(&db, &link).await;
+        assert!(!paused.enabled);
+
+        let taken = take_over(&db, &paused, HEIR).await.unwrap();
+        assert_eq!(taken.published_by, HEIR);
+        assert!(taken.enabled);
+        assert_eq!(taken.updated_by.as_deref(), Some(HEIR));
+        assert!(taken.rev > paused.rev);
+        assert_eq!(
+            (taken.slug.as_str(), taken.created_by.as_str()),
+            (link.slug.as_str(), LEAVER)
+        );
+        assert_eq!(row(&db, &link).await, taken);
+
+        let dash = materialize::tests::dashboard(&[("p1", "s1")]);
+        let engine = materialize::tests::fake(&taken, &dash);
+        let flights = materialize::tests::flights(8, 1);
+        let range = materialize::tests::rel(3600);
+        let served =
+            materialize::tests::read_at(engine, flights, &taken, &dash, range, now_micros()).await;
+        assert_eq!(built_by(materialize::tests::data(&served), "p1"), HEIR);
+        materialize::tests::settle(flights).await;
+        assert_eq!(*engine.built_as.lock().unwrap(), [HEIR]);
+    }
+
+    #[test]
+    fn a_takeover_asks_whether_the_caller_is_a_member_not_the_old_publisher() {
+        let body = fn_body(include_str!("mod.rs"), "pub async fn take_over_link(");
+        assert!(
+            body.contains("publisher_is_member(&link.org_id, user_id)"),
+            "{body}"
+        );
+        assert!(!body.contains("published_by"), "{body}");
+        let check = body.find("publisher_is_member(").unwrap();
+        assert!(check < body.find("take_over_on(").unwrap(), "{body}");
+    }
+
+    #[tokio::test]
+    async fn a_takeover_by_someone_outside_the_org_is_refused() {
+        let (db, link) = leavers_link().await;
+        let err = take_over_on(&db, &link, HEIR, LEAVER, false, false)
+            .await
+            .unwrap_err();
+        assert!(err.is::<Forbidden>(), "{err}");
+        assert_eq!(row(&db, &link).await, link);
+    }
+
+    #[tokio::test]
+    async fn an_expired_link_is_not_taken_over() {
+        let (db, mut link) = leavers_link().await;
+        let expire = |l: &mut PublicDashboard| {
+            l.expires_at = Some(1);
+            Ok::<(), anyhow::Error>(())
+        };
+        edit_on(&db, &link.org_id, &link.id, false, expire)
+            .await
+            .unwrap();
+        let expired = row(&db, &link).await;
+        // The caller saw the link before it expired; the check reads the row being changed.
+        link.expires_at = None;
+        let err = take_over(&db, &link, HEIR).await.unwrap_err();
+        assert!(err.is::<Invalid>(), "{err}");
+        assert_eq!(err.to_string(), LINK_EXPIRED);
+        assert_eq!(row(&db, &link).await, expired);
+    }
+
+    #[tokio::test]
+    async fn the_current_publisher_cannot_take_over_their_own_link() {
+        let (db, link) = leavers_link().await;
+        let err = take_over(&db, &link, LEAVER).await.unwrap_err();
+        assert!(err.is::<Invalid>(), "{err}");
+        assert_eq!(err.to_string(), "you already publish this link");
+        assert_eq!(row(&db, &link).await, link);
+    }
+
+    #[tokio::test]
+    async fn a_takeover_from_a_publisher_the_link_no_longer_has_is_a_conflict() {
+        let (db, link) = leavers_link().await;
+        let taken = take_over(&db, &link, HEIR).await.unwrap();
+        // The third user still sees the leaver as the publisher.
+        let err = take_over(&db, &link, "third@example.com")
+            .await
+            .unwrap_err();
+        assert!(err.is::<Conflict>(), "{err}");
+        assert_eq!(
+            err.to_string(),
+            "this link was taken over by heir@example.com; reload"
+        );
+        assert_eq!(row(&db, &link).await, taken);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn two_concurrent_takeovers_end_with_one_winner_and_one_conflict() {
+        for _ in 0..10 {
+            let (db, link) = leavers_link().await;
+            let db = std::sync::Arc::new(db);
+            let tasks: Vec<_> = ["b@example.com", "c@example.com"]
+                .into_iter()
+                .map(|user| {
+                    let (db, seen) = (db.clone(), link.clone());
+                    tokio::spawn(async move { (user, take_over(&db, &seen, user).await) })
+                })
+                .collect();
+            let mut winners = Vec::new();
+            let mut conflicts = 0;
+            for task in tasks {
+                match task.await.unwrap() {
+                    (user, Ok(row)) => winners.push((user, row)),
+                    (_, Err(e)) if e.is::<Conflict>() => conflicts += 1,
+                    (_, Err(e)) => panic!("{e}"),
+                }
+            }
+            assert_eq!((winners.len(), conflicts), (1, 1));
+            let (user, won) = &winners[0];
+            assert_eq!(won.published_by, *user);
+            assert_eq!(row(&db, &link).await, *won);
+        }
+    }
+
+    #[tokio::test]
+    async fn a_departure_pause_before_the_takeover_is_undone_by_it() {
+        let (db, link) = leavers_link().await;
+        let queue = replication::tests::Queue::default();
+        pause_departed_on(&db, &link.org_id, LEAVER, false, queue.emitter()).await;
+        let taken = take_over(&db, &row(&db, &link).await, HEIR).await.unwrap();
+        assert!(taken.enabled);
+        let now = row(&db, &link).await;
+        assert_eq!((now.enabled, now.published_by.as_str()), (true, HEIR));
+    }
+
+    #[tokio::test]
+    async fn a_departure_pause_after_the_takeover_leaves_the_heirs_link_live() {
+        let (db, link) = leavers_link().await;
+        let queue = replication::tests::Queue::default();
+        // Listed before the takeover, paused after it.
+        let listed = pd_table::list_by_publisher(&db, &link.org_id, LEAVER)
+            .await
+            .unwrap();
+        assert_eq!(listed.len(), 1);
+        let taken = take_over(&db, &link, HEIR).await.unwrap();
+        let emit = queue.emitter();
+        assert_eq!(
+            pause_listed_on(&db, &link.org_id, LEAVER, listed, false, &emit).await,
+            0
+        );
+        assert_eq!(
+            pause_departed_on(&db, &link.org_id, LEAVER, false, queue.emitter()).await,
+            0
+        );
+        // A build that read the leaver's row before the takeover pauses nothing either.
+        assert!(
+            pause_departed_link_on(&db, &link, false)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(row(&db, &link).await, taken);
+        assert!(taken.enabled);
+    }
+
+    #[tokio::test]
+    async fn views_flag_each_departed_publisher_with_one_lookup_per_publisher() {
+        let links: Vec<PublicDashboard> = [LEAVER, HEIR, LEAVER, HEIR, LEAVER, "down@example.com"]
+            .iter()
+            .enumerate()
+            .map(|(i, by)| PublicDashboard {
+                published_by: by.to_string(),
+                ..replication::tests::link(&format!("l{i}"))
+            })
+            .collect();
+        let lookups = std::sync::Mutex::new(Vec::new());
+        let is_member = |user: String| {
+            lookups.lock().unwrap().push(user.clone());
+            async move {
+                match user.as_str() {
+                    LEAVER => Ok(false),
+                    HEIR => Ok(true),
+                    _ => Err(anyhow::anyhow!("the database is down")),
+                }
+            }
+        };
+        let views = views_with(links, &HashMap::new(), is_member).await;
+        let left: Vec<(&str, bool)> = views
+            .iter()
+            .map(|v| (v.published_by.as_str(), v.publisher_left))
+            .collect();
+        assert_eq!(
+            left,
+            [
+                (LEAVER, true),
+                (HEIR, false),
+                (LEAVER, true),
+                (HEIR, false),
+                (LEAVER, true),
+                ("down@example.com", false)
+            ]
+        );
+        let mut asked = lookups.into_inner().unwrap();
+        asked.sort();
+        assert_eq!(asked, ["down@example.com", HEIR, LEAVER]);
+        let json = serde_json::to_value(&views[0]).unwrap();
+        assert_eq!(json["publisher_left"], json!(true));
+    }
+
+    #[tokio::test]
+    async fn after_a_takeover_the_next_read_serves_nothing_from_the_old_publishers_file() {
+        let (db, link) = leavers_link().await;
+        let (engine, dash) = two_stream_engine(&link);
+        let flights = materialize::tests::flights(8, 1);
+        let range = materialize::tests::rel(3600);
+        let now = now_micros();
+        let before = materialize::tests::read_at(engine, flights, &link, &dash, range, now).await;
+        materialize::tests::settle(flights).await;
+        let resp = materialize::tests::data(&before);
+        assert_eq!(
+            (built_by(resp, "p1"), built_by(resp, "p2")),
+            (LEAVER.into(), LEAVER.into())
+        );
+
+        assert_eq!(range_state(&link).await, RangeState::Cached);
+
+        let taken = take_over(&db, &link, HEIR).await.unwrap();
+        *engine.link.lock().unwrap() = taken.clone();
+        // The status route reports nothing of the leaver's file once the row changed.
+        let status = materialize::range_status(&taken, true).await;
+        assert_eq!(status[0].state, RangeState::NotCached);
+        assert!(status[0].sources.is_none() && status[0].built_at.is_none());
+        let after =
+            materialize::tests::read_at(engine, flights, &taken, &dash, range, now + 1).await;
+        assert_rebuilt_by_the_heir(&after);
+        assert_eq!(*engine.built_as.lock().unwrap(), [LEAVER, HEIR]);
+        let key = store::key(&link.org_id, &link.id, &range.key());
+        assert_eq!(store::read_header(&key).await.unwrap().published_by, HEIR);
+        assert_eq!(range_state(&taken).await, RangeState::NeedsAttention);
+    }
+
+    async fn range_state(link: &PublicDashboard) -> RangeState {
+        materialize::range_status(link, false).await[0].state
+    }
+
+    /// A deadline check that began with the leaver's row and failed its rewrite holds their body.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn a_deadline_check_joined_after_the_takeover_never_serves_the_old_publishers_body() {
+        let (db, link) = leavers_link().await;
+        let (engine, dash) = two_stream_engine(&link);
+        let flights = materialize::tests::flights(8, 1);
+        let range = materialize::tests::rel(3600);
+        let key = store::key(&link.org_id, &link.id, &range.key());
+        let now = now_micros();
+        materialize::tests::read_at(engine, flights, &link, &dash, range, now).await;
+        materialize::tests::settle(flights).await;
+
+        store::FAIL_WRITES.insert(key.clone());
+        engine.authz_delay_ms.store(400, Ordering::SeqCst);
+        let later = now + authz_check::AUTH_DEADLINE_MICROS + 1;
+        let leader = {
+            let (key, link) = (key.clone(), link.clone());
+            tokio::spawn(async move {
+                authz_check::under_flight(engine, flights, &key, &link, later).await
+            })
+        };
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        let taken = take_over(&db, &link, HEIR).await.unwrap();
+        *engine.link.lock().unwrap() = taken.clone();
+        let served =
+            materialize::tests::read_at(engine, flights, &taken, &dash, range, later).await;
+        assert!(
+            matches!(leader.await.unwrap(), authz_check::Checked::Once(_)),
+            "the leader's rewrite failed and it holds the leaver's body"
+        );
+        store::FAIL_WRITES.remove(&key);
+        engine.authz_delay_ms.store(0, Ordering::SeqCst);
+        match &served {
+            materialize::Served::Building(_) => {}
+            materialize::Served::Data { .. } => assert_rebuilt_by_the_heir(&served),
+            other => panic!("{other:?}"),
+        }
+        materialize::tests::settle(flights).await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn a_build_started_as_the_old_publisher_and_finished_after_the_takeover_is_never_served()
+    {
+        let (db, link) = leavers_link().await;
+        let (engine, dash) = two_stream_engine(&link);
+        engine.delay_ms.store(400, Ordering::SeqCst);
+        let flights = materialize::tests::flights(8, 1);
+        let range = materialize::tests::rel(3600);
+        let now = now_micros();
+        let early = {
+            let (link, dash) = (link.clone(), dash.clone());
+            tokio::spawn(async move {
+                materialize::tests::read_at(engine, flights, &link, &dash, range, now).await
+            })
+        };
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        let taken = take_over(&db, &link, HEIR).await.unwrap();
+        *engine.link.lock().unwrap() = taken.clone();
+
+        // A read after the takeover joins the leaver's build and gets none of it.
+        let joined =
+            materialize::tests::read_at(engine, flights, &taken, &dash, range, now + 1).await;
+        assert!(
+            matches!(joined, materialize::Served::Building(_)),
+            "{joined:?}"
+        );
+        // The read made before the takeover is answered with the build it started.
+        let early = early.await.unwrap();
+        assert_eq!(built_by(materialize::tests::data(&early), "p2"), LEAVER);
+        materialize::tests::settle(flights).await;
+        let key = store::key(&link.org_id, &link.id, &range.key());
+        assert_eq!(store::read_header(&key).await.unwrap().published_by, LEAVER);
+        assert_eq!(range_state(&taken).await, RangeState::NotCached);
+
+        engine.delay_ms.store(0, Ordering::SeqCst);
+        let next =
+            materialize::tests::read_at(engine, flights, &taken, &dash, range, now + 2).await;
+        assert_rebuilt_by_the_heir(&next);
+        assert_eq!(*engine.built_as.lock().unwrap(), [LEAVER, HEIR]);
+        assert_eq!(store::read_header(&key).await.unwrap().published_by, HEIR);
+    }
+
+    #[tokio::test]
+    async fn a_second_querier_holding_the_old_file_evicts_it_on_its_first_read_after_the_takeover()
+    {
+        let (db, link) = leavers_link().await;
+        // The second querier's engine and flights; it hears nothing of the takeover but the row.
+        let (second, dash) = two_stream_engine(&link);
+        let flights = materialize::tests::flights(8, 1);
+        let range = materialize::tests::rel(3600);
+        let now = now_micros();
+        let held = materialize::tests::read_at(second, flights, &link, &dash, range, now).await;
+        let held_rev = materialize::tests::data(&held).rev.clone();
+        materialize::tests::settle(flights).await;
+
+        let taken = take_over(&db, &link, HEIR).await.unwrap();
+        *second.link.lock().unwrap() = row(&db, &link).await;
+        let served = materialize::read(
+            second,
+            flights,
+            materialize::ReadRequest {
+                link: &taken,
+                settings_rev: 0,
+                dashboard: &dash,
+                range,
+                now: now + 1,
+                if_none_match: Some(&format!("\"{held_rev}\"")),
+            },
+        )
+        .await;
+        assert_rebuilt_by_the_heir(&served);
+        assert_eq!(*second.built_as.lock().unwrap(), [LEAVER, HEIR]);
+    }
+
+    #[tokio::test]
+    async fn the_deadline_check_evicts_the_old_publishers_file_without_serving_it() {
+        let (db, link) = leavers_link().await;
+        let (engine, dash) = two_stream_engine(&link);
+        let range = materialize::tests::rel(3600);
+        let key = store::key(&link.org_id, &link.id, &range.key());
+        let now = now_micros();
+        let flights = materialize::tests::flights(8, 1);
+        materialize::tests::read_at(engine, flights, &link, &dash, range, now).await;
+        materialize::tests::settle(flights).await;
+        let taken = take_over(&db, &link, HEIR).await.unwrap();
+        *engine.link.lock().unwrap() = taken.clone();
+        let authz = engine.authz_calls.load(Ordering::SeqCst);
+
+        let later = now + authz_check::AUTH_DEADLINE_MICROS + 1;
+        let checked = authz_check::check(engine, &key, &taken, later)
+            .await
+            .unwrap();
+        assert!(checked.stored && !checked.header.has_body() && checked.body.is_none());
+        assert!(store::read_header(&key).await.is_none());
+        assert_eq!(
+            engine.authz_calls.load(Ordering::SeqCst),
+            authz,
+            "nothing re-authorized"
+        );
+
+        // With a build holding the key, the check runs without its flight and still evicts.
+        *engine.link.lock().unwrap() = link.clone();
+        materialize::tests::read_at(engine, flights, &link, &dash, range, now).await;
+        materialize::tests::settle(flights).await;
+        assert_eq!(store::read_header(&key).await.unwrap().published_by, LEAVER);
+        let busy = materialize::tests::flights(8, 1);
+        let blocker = busy.start(&key, &link.org_id, flight::Kind::Build, |_| async {
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            Err(flight::Failure::Panic)
+        });
+        assert!(matches!(blocker, flight::Start::Leader(_)));
+        let checked = authz_check::under_flight(engine, busy, &key, &taken, later).await;
+        assert!(
+            matches!(checked, authz_check::Checked::Missing),
+            "{checked:?}"
+        );
+        assert!(store::read_header(&key).await.is_none());
+        assert_eq!(engine.authz_calls.load(Ordering::SeqCst), authz);
+    }
+
+    #[tokio::test]
+    async fn a_build_as_the_heir_never_keeps_the_old_publishers_body() {
+        let (db, link) = leavers_link().await;
+        let (engine, dash) = two_stream_engine(&link);
+        let range = materialize::tests::rel(3600);
+        let key = store::key(&link.org_id, &link.id, &range.key());
+        let now = now_micros();
+        let flights = materialize::tests::flights(8, 1);
+        materialize::tests::read_at(engine, flights, &link, &dash, range, now).await;
+        materialize::tests::settle(flights).await;
+        let taken = take_over(&db, &link, HEIR).await.unwrap();
+        *engine.link.lock().unwrap() = taken.clone();
+        // Every panel fails transiently, which would otherwise fall back to the prior body.
+        engine.classes.lock().unwrap().extend([
+            ("p1".to_string(), Class::Transient),
+            ("p2".to_string(), Class::Transient),
+        ]);
+        let built = materialize::build(
+            engine,
+            key.clone(),
+            link.id.clone(),
+            range,
+            now + 1,
+            flight(),
+        )
+        .await
+        .unwrap();
+        assert!(built.body.is_none());
+        let header = store::read_header(&key).await.unwrap();
+        assert_eq!(header.published_by, HEIR);
+        assert!(!header.has_body());
+        let stored = store::read(&key).await.unwrap();
+        assert!(stored.body_zst.is_empty() && stored.manifest.panels.is_empty());
+    }
+
     #[cfg(feature = "enterprise")]
     fn templated_dashboard() -> Dashboard {
         Dashboard {
@@ -3901,6 +4549,7 @@ mod tests {
             dashboard_updated_at: 1,
             link_rev: 1,
             settings_rev: 0,
+            published_by: String::new(),
         };
         let a = materialize::assemble(live, (10, 20), run, None, &BTreeSet::new(), 20, 0, 300, 0.0);
         let stored = store::Stored {
@@ -3977,6 +4626,7 @@ mod tests {
             dashboard_updated_at: 1,
             link_rev: 1,
             settings_rev: 0,
+            published_by: String::new(),
         };
         let a = materialize::assemble(live, (10, 20), run, None, &BTreeSet::new(), 20, 0, 300, 0.0);
         let stored = store::Stored {

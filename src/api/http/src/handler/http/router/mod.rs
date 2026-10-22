@@ -821,6 +821,10 @@ fn public_dashboard_admin_routes(router: Router) -> Router {
             post(public_dashboards::admin::resume),
         )
         .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/take_over",
+            post(public_dashboards::admin::take_over),
+        )
+        .route(
             "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/refresh",
             post(public_dashboards::admin::refresh),
         )
@@ -4917,5 +4921,34 @@ mod tests {
             .unwrap();
         let status = app.oneshot(req).await.unwrap().status();
         assert_eq!(status, StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn the_public_link_take_over_route_is_mounted_for_post_only() {
+        let app = public_dashboard_admin_routes(Router::new());
+        let request = |method: &str, path: &str| {
+            Request::builder()
+                .method(method)
+                .uri(format!("/o1/dashboards/d1/public_links/l1/{path}"))
+                .body(Body::empty())
+                .unwrap()
+        };
+        let status = |req: Request<Body>| {
+            let app = app.clone();
+            async move { app.oneshot(req).await.unwrap().status() }
+        };
+        assert_eq!(
+            status(request("GET", "take_over")).await,
+            StatusCode::METHOD_NOT_ALLOWED
+        );
+        // No user header: the handler's own extractor answers, so the route reached take_over.
+        assert_eq!(
+            status(request("POST", "take_over")).await,
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            status(request("POST", "take_overs")).await,
+            StatusCode::NOT_FOUND
+        );
     }
 }

@@ -40,8 +40,8 @@ use infra::cache::file_data::disk::{
 use serde::{Deserialize, Serialize};
 
 const MAGIC: &[u8; 4] = b"O2PD";
-/// 3: manifests record VRL enrichment reads, which a version 2 file never re-checks.
-pub const FORMAT_VERSION: u16 = 3;
+/// 4: headers record the publisher, so a file built before a takeover is never served after it.
+pub const FORMAT_VERSION: u16 = 4;
 /// Magic, version and the header length.
 const PREFIX_LEN: usize = 4 + 2 + 4;
 
@@ -86,6 +86,9 @@ pub struct Header {
     pub attempted_revs: Option<[i64; 3]>,
     pub refresh_count: u32,
     pub last_read_at: i64,
+    /// The publisher whose access built the body; a file of any other publisher is a miss.
+    #[serde(default)]
+    pub published_by: String,
 }
 
 impl Header {
@@ -467,6 +470,26 @@ mod tests {
             .unwrap();
         assert!(read_header(&key).await.is_none());
         assert!(disk::get(&key, None).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn a_file_written_before_headers_named_the_publisher_is_a_miss_and_is_evicted() {
+        let key = key("o", &config::ider::uuid(), "r60");
+        let header = Header {
+            built_at: Some(1),
+            ..Default::default()
+        };
+        let mut old = encode(&header, &manifest(), &[]).unwrap().to_vec();
+        old[4..6].copy_from_slice(&3_u16.to_le_bytes());
+        public_dashboards_replace(&key, 1, Bytes::from(old))
+            .await
+            .unwrap();
+        assert!(read_header(&key).await.is_none());
+        assert!(disk::get(&key, None).await.is_none());
+        let mut json = serde_json::to_value(&header).unwrap();
+        json.as_object_mut().unwrap().remove("published_by");
+        let back: Header = serde_json::from_value(json).unwrap();
+        assert_eq!(back.published_by, "");
     }
 
     #[tokio::test]
