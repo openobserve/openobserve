@@ -225,6 +225,8 @@ mod m20261013_000001_create_oncall_phone_verifications;
 mod m20261013_000002_create_org_telephony;
 mod m20261015_000001_reports_add_last_run_columns;
 mod m20261016_000001_create_rum_pa_app_settings;
+mod m20261018_000001_create_slack_tables;
+mod m20261020_000001_create_eval_job_states_tables;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -367,6 +369,12 @@ pub(crate) async fn create_rum_pa_tables(db: &sea_orm::DatabaseConnection) -> Re
     m20261016_000001_create_rum_pa_app_settings::Migration
         .up(&manager)
         .await
+}
+
+/// Apply only the Slack app tables, idempotently, for tests in any crate.
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) async fn create_slack_tables<C: sea_orm::ConnectionTrait>(db: &C) -> Result<(), DbErr> {
+    m20261018_000001_create_slack_tables::create_all(db).await
 }
 
 pub struct Migrator;
@@ -582,6 +590,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20261013_000002_create_org_telephony::Migration),
             Box::new(m20261015_000001_reports_add_last_run_columns::Migration),
             Box::new(m20261016_000001_create_rum_pa_app_settings::Migration),
+            Box::new(m20261020_000001_create_eval_job_states_tables::Migration),
+            Box::new(m20261018_000001_create_slack_tables::Migration),
         ]
     }
 }
@@ -651,6 +661,8 @@ mod tests {
         (108, "m20261013_000002_create_org_telephony"),
         (109, "m20261015_000001_reports_add_last_run_columns"),
         (110, "m20261016_000001_create_rum_pa_app_settings"),
+        (111, "m20261020_000001_create_eval_job_states_tables"),
+        (112, "m20261018_000001_create_slack_tables"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

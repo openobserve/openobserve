@@ -153,7 +153,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   // destructive (delete/danger). No dedicated hover/active token yet, so
   // states are opacity-derived from the one cancel-query-bg color.
   "cancel-query": [
-    "bg-cancel-query-bg text-button-primary-foreground border-0",
+    "bg-cancel-query-bg text-button-primary-foreground",
     "enabled:hover:opacity-90",
     "enabled:active:opacity-80",
     "focus-visible:ring-3 focus-visible:ring-cancel-query-bg",
