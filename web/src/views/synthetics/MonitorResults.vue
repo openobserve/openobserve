@@ -77,6 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("synthetics.results.editCheck") }}
       </OButton>
       <OButton
+        :aria-label="t('common.refresh')"
         variant="outline"
         size="icon-sm"
         icon-left="refresh"
