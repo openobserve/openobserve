@@ -995,4 +995,41 @@ mod tests {
         assert_eq!(payloads(&db).await, 2);
         assert_eq!(status_of(&db, "running").await.0, "running");
     }
+
+    #[tokio::test]
+    async fn running_counts_are_read_per_org_and_in_total() {
+        let db = db().await;
+        let mut other = request("other-1", None, NOW);
+        other.org_id = "globex".to_string();
+        enqueue(&db, other, "p".to_string()).await.unwrap();
+        let other_id = get_run(&db, "t1", "other-1").await.unwrap().unwrap().id;
+        for run_id in ["run-1", "run-2", "run-3"] {
+            let id = enqueue_one(&db, run_id, NOW).await;
+            if run_id != "run-3" {
+                assert!(claim(&db, id, "node-a", NOW).await.unwrap());
+            }
+        }
+        assert!(claim(&db, other_id, "node-b", NOW).await.unwrap());
+        let counts = running_counts(&db).await.unwrap();
+        assert_eq!(counts.total, 3);
+        assert_eq!(counts.by_org.get("acme"), Some(&2));
+        assert_eq!(counts.by_org.get("globex"), Some(&1));
+        assert_eq!(orgs_with_queued(&db).await.unwrap(), ["acme"]);
+    }
+
+    #[tokio::test]
+    async fn claim_succeeds_once_for_two_concurrent_claimers() {
+        let db = db().await;
+        let id = enqueue_one(&db, "run-1", NOW).await;
+        let (a, b) = tokio::join!(
+            claim(&db, id, "node-a", NOW),
+            claim(&db, id, "node-b", NOW + 1)
+        );
+        let (a, b) = (a.unwrap(), b.unwrap());
+        assert!(a ^ b, "exactly one claimer wins: {a} {b}");
+        let row = get_run(&db, "t1", "run-1").await.unwrap().unwrap();
+        let winner = if a { "node-a" } else { "node-b" };
+        assert_eq!(row.claimed_by.as_deref(), Some(winner));
+        assert!(!claim(&db, id, "node-c", NOW + 2).await.unwrap());
+    }
 }
