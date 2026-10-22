@@ -4,6 +4,7 @@
     "actual_folder": "Alerts",
     "browser": "chrome",
     "run_files": [
+      "alerts-help-drawer.spec.js",
       "alerts-ui-operations.spec.js",
       "alerts-import.spec.js",
       "alerts-metrics-notification.spec.js",
@@ -93,6 +94,7 @@
     "actual_folder": "Dashboards",
     "browser": "chrome",
     "run_files": [
+      "dashboard-sql-autocomplete-values.spec.js",
       "dashboard.spec.js",
       "dashboard2.spec.js",
       "dashboardtype.spec.js",
@@ -242,6 +244,7 @@
     "actual_folder": "GeneralTests",
     "browser": "chrome",
     "run_files": [
+      "navRailGeometry.spec.js",
       "sanity.spec.js",
       "landingPage.spec.js",
       "datetime-picker-copy-paste.spec.js",
@@ -317,6 +320,7 @@
     "actual_folder": "Logs",
     "browser": "chrome",
     "run_files": [
+      "streamsExploreLogsTypePersistence.spec.js",
       "logspage.spec.js",
       "logstable.spec.js",
       "logsqueries.spec.js",
@@ -345,6 +349,7 @@
     "actual_folder": "Logs",
     "browser": "chrome",
     "run_files": [
+      "logs-autocomplete-quote-enter.spec.js",
       "logs-autocomplete-suggestions.spec.js",
       "logs-sql-autocomplete.spec.js",
       "logsqueries.cte.spec.js",
@@ -391,6 +396,7 @@
     "actual_folder": "Metrics",
     "browser": "chrome",
     "run_files": [
+      "metrics-explorer-exemplars.spec.js",
       "metrics.spec.js",
       "metrics-queries.spec.js",
       "metrics-aggregations.spec.js",
@@ -529,6 +535,7 @@
     "actual_folder": "Traces",
     "browser": "chrome",
     "run_files": [
+      "traces-autocomplete-filter-mode.spec.js",
       "service-catalog.spec.js",
       "tracesSearch.spec.js",
       "traceQueryEditor.spec.js",

@@ -5002,6 +5002,8 @@
       "idleInConfig": "{stream} zaten veri alıyor. Kontroller, yapılandırmayı kopyaladığınızda başlar.",
       "idleMatches": "Eşleşen akışlar zaten veri alıyor. Kontroller, komutu kopyaladığınızda başlar.",
       "idleMatchesConfig": "Eşleşen akışlar zaten veri alıyor. Kontroller, yapılandırmayı kopyaladığınızda başlar.",
+      "idleNew": "Komutu kopyaladığınızda kontroller başlar.",
+      "idleNewConfig": "Yapılandırmayı kopyaladığınızda kontroller başlar.",
       "checkNow": "Şimdi kontrol et",
       "receivedPill": "İlk olay alındı",
       "receivedNewPill": "Yeni veri alındı",

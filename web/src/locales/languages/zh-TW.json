@@ -5002,6 +5002,8 @@
       "idleInConfig": "{stream} 已在接收數據。複製設定後即開始檢查。",
       "idleMatches": "符合的串流已在接收數據。複製指令後即開始檢查。",
       "idleMatchesConfig": "符合的串流已在接收數據。複製設定後即開始檢查。",
+      "idleNew": "複製指令後，檢查就會開始。",
+      "idleNewConfig": "複製設定後，檢查就會開始。",
       "checkNow": "立即檢查",
       "receivedPill": "已收到第一個事件",
       "receivedNewPill": "已收到新資料",
