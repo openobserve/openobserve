@@ -20,6 +20,7 @@ import { convertPromQLData } from "./convertPromQLData";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { getAreaStyleOverride } from "./colorPalette";
 import { toSeriesOverrideEntry } from "./seriesOverrides";
+import { getLegendSeriesNames } from "@/composables/dashboard/useSeriesFormatting";
 
 // Chart overrides are stored as `series` / `series_regex` entries of override_config.
 const seriesEntries = (overrides: any[]) =>
@@ -489,6 +490,21 @@ describe("SQL metric", () => {
     expect(options.series.map((s: any) => s._metricLabel)).toEqual(["Latency", "Second"]);
     expect(options.series[0]._metricText).toBe(panelValue(1200));
     expect(options.series[1]._metricText).toBe(fmt(2048, "bytes", 0));
+  });
+
+  it("the series picker lists original names while the drawn label shows the display name", async () => {
+    const renamed = { matchBy: "name", value: "Latency", displayName: "Checkout" };
+    const single = await runSQL(metricPanel({ override_config: seriesEntries([renamed]) }), [
+      [{ y_axis_1: 1200 }],
+    ]);
+    expect(single.series[0]._metricLabel).toBe("Checkout");
+    expect(getLegendSeriesNames(single, "metric")).toEqual(["Latency"]);
+    const grid = await runSQL(metricPanel({ override_config: seriesEntries([renamed]) }, 2), [
+      [{ y_axis_1: 1200 }],
+      [{ y_axis_1: 2048 }],
+    ]);
+    expect(grid.series.map((s: any) => s._metricLabel)).toEqual(["Checkout", "Other"]);
+    expect(getLegendSeriesNames(grid, "metric")).toEqual(["Latency", "Other"]);
   });
 });
 

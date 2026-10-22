@@ -343,6 +343,8 @@ export function applyMetricChart(ctx: SQLContext): void {
     _metricFillColor: metricFillColor,
     _metricBgColor: metricStyle.bgColor,
     _metricLabel: metricOverride?.displayName ?? metricFieldLabel,
+    // Overrides match the original name; the label above is only drawn.
+    _metricName: metricFieldLabel,
     // Raw trend + config so the multi-query grid can draw a per-cell sparkline.
     _metricSparkData: sparkline?.data ?? null,
     _metricSparkConfig: sparkline?.resolved ?? null,

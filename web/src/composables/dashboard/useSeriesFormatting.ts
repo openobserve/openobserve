@@ -174,7 +174,8 @@ export const getLegendSeriesNames = (options: any, chartType: string): string[] 
   } else if (chartType === "gauge") {
     names = series.map((s: any) => s?.data?.[0]?.name);
   } else if (chartType === "metric") {
-    names = series.map((s: any) => s?._metricLabel);
+    // `_metricLabel` is drawn and may hold a display name; overrides match `_metricName`.
+    names = series.map((s: any) => s?._metricName ?? s?._metricLabel);
   } else {
     names = series.map((s: any) => s?.name);
   }
