@@ -978,18 +978,29 @@ pub struct CoverageSegment {
     /// infer from missing rows is a gap nobody notices.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub user_email: Option<String>,
-    /// The layer that produced the holder, so the grid can colour by layer.
+    /// The layer that produced the holder, or whose rostered turn a gap leaves unfilled.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rotation: Option<String>,
     /// Set when an override produced the holder.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub override_id: Option<String>,
+    /// The rule's rostered member here, before absences and covers, when not `user_email`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scheduled_email: Option<String>,
 }
 
 impl CoverageSegment {
     pub fn is_gap(&self) -> bool {
         self.user_email.is_none()
     }
+}
+
+/// Who holds this rotation's pager at `at`, what put them there, and whom the roster had there.
+struct Holder {
+    user_email: Option<String>,
+    rule: Option<String>,
+    override_id: Option<String>,
+    scheduled_email: Option<String>,
 }
 
 /// Why a window could not be resolved.
@@ -1076,14 +1087,19 @@ pub fn resolve_window(
         if end <= start {
             continue;
         }
-        let (user_email, rule, override_id) =
-            holder_at(rotation, overrides, unavailability, start, tz);
+        let Holder {
+            user_email,
+            rule,
+            override_id,
+            scheduled_email,
+        } = holder_at(rotation, overrides, unavailability, start, tz);
         match segments.last_mut() {
             // Two candidates resolving the same way were not really a boundary, so merge them.
             Some(last)
                 if last.user_email == user_email
                     && last.rotation == rule
-                    && last.override_id == override_id =>
+                    && last.override_id == override_id
+                    && last.scheduled_email == scheduled_email =>
             {
                 last.to = end;
             }
@@ -1100,6 +1116,7 @@ pub fn resolve_window(
                     user_email,
                     rotation: rule,
                     override_id,
+                    scheduled_email,
                 });
             }
         }
@@ -1117,21 +1134,30 @@ fn holder_at(
     unavailability: &[Unavailability],
     at: i64,
     tz: chrono_tz::Tz,
-) -> (Option<String>, Option<String>, Option<String>) {
+) -> Holder {
     let winner = rotation.winning_rule(at, tz);
-    if let Some(ov) = covering_override_for(overrides, &rotation.id, at) {
-        return (
-            Some(ov.user_email.clone()),
-            winner.map(|r| r.name.clone()),
-            Some(ov.id.clone()),
-        );
-    }
-    match winner.and_then(|r| {
-        r.available_member_at(at, tz, unavailability)
-            .map(|m| (r.name.clone(), m.to_string()))
-    }) {
-        Some((rule, member)) => (Some(member), Some(rule), None),
-        None => (None, None, None),
+    let rostered = winner.and_then(|r| r.member_at(at, tz)).map(str::to_string);
+    let (user_email, override_id) = match covering_override_for(overrides, &rotation.id, at) {
+        Some(ov) => (Some(ov.user_email.clone()), Some(ov.id.clone())),
+        None => (
+            winner
+                .and_then(|r| r.available_member_at(at, tz, unavailability))
+                .map(str::to_string),
+            None,
+        ),
+    };
+    let scheduled_email = rostered.filter(|r| user_email.as_deref() != Some(r.as_str()));
+    // An away holder's gap is still the rule's turn, so the turn must keep its rule.
+    let rule = if override_id.is_some() || user_email.is_some() || scheduled_email.is_some() {
+        winner.map(|r| r.name.clone())
+    } else {
+        None
+    };
+    Holder {
+        user_email,
+        rule,
+        override_id,
+        scheduled_email,
     }
 }
 
@@ -2659,6 +2685,52 @@ mod tests {
         assert!(segments[2].is_gap());
     }
 
+    /// The roster's own holder rides along only when somebody else holds the pager.
+    #[test]
+    fn test_a_segment_names_the_scheduled_member_only_when_someone_else_holds_it() {
+        let rotations = vec![ShiftRule::weekly(
+            "On-call rotation",
+            vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
+            ANCHOR,
+        )];
+        let (from, to) = (ANCHOR, ANCHOR + MICROS_PER_DAY);
+        let cases = [
+            ("plain", vec![], vec![], Some("ana@o2.ai"), None),
+            (
+                "absence stand-in",
+                vec![],
+                vec![away("ana@o2.ai", from, to)],
+                Some("bob@o2.ai"),
+                Some("ana@o2.ai"),
+            ),
+            (
+                "cover",
+                vec![cover("ov_1", "sam@o2.ai", from, to, 1)],
+                vec![],
+                Some("sam@o2.ai"),
+                Some("ana@o2.ai"),
+            ),
+            (
+                "everyone away",
+                vec![],
+                vec![away("ana@o2.ai", from, to), away("bob@o2.ai", from, to)],
+                None,
+                Some("ana@o2.ai"),
+            ),
+        ];
+        for (name, overrides, absences, holder, scheduled) in cases {
+            let segments = resolve_grid(&rotations, &overrides, &absences, from, to, TZ).unwrap();
+            assert_eq!(segments.len(), 1, "{name}");
+            assert_eq!(segments[0].user_email.as_deref(), holder, "{name}");
+            assert_eq!(segments[0].scheduled_email.as_deref(), scheduled, "{name}");
+            assert_eq!(
+                segments[0].rotation.as_deref(),
+                Some("On-call rotation"),
+                "{name}"
+            );
+        }
+    }
+
     /// The grid is the resolved schedule, so a cover appears in it as a cover
     /// — marked, and splitting the shift it took a slice out of.
     #[test]
@@ -2877,7 +2949,7 @@ mod tests {
     /// An override that starts before the window and ends after it covers the
     /// whole of it, without contributing boundaries outside it.
     #[test]
-    fn test_an_override_enclosing_the_whole_window_is_one_segment() {
+    fn test_an_override_enclosing_the_whole_window_splits_only_at_the_handover_beneath() {
         let rotations = vec![ShiftRule::weekly(
             "On-call rotation",
             vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
@@ -2894,12 +2966,17 @@ mod tests {
         let segments = resolve_grid(&rotations, &overrides, &[], from, to, TZ).unwrap();
 
         assert_tiles(&segments, from, to);
+        // The handover underneath splits the cover, because whose turn it covers changes there.
         assert_eq!(
-            segments.len(),
-            1,
-            "the handover underneath is invisible while one person covers both shifts"
+            segments
+                .iter()
+                .map(|s| (s.user_email.as_deref(), s.scheduled_email.as_deref()))
+                .collect::<Vec<_>>(),
+            vec![
+                (Some("sam@o2.ai"), Some("ana@o2.ai")),
+                (Some("sam@o2.ai"), Some("bob@o2.ai")),
+            ]
         );
-        assert_eq!(segments[0].user_email.as_deref(), Some("sam@o2.ai"));
     }
 
     // GAP 1: two slots answer at once without interfering, and a pre-slots schedule is unchanged.

@@ -8,9 +8,9 @@ export async function waitForDateTimeButtonToBeEnabled(page) {
 }
 
 const WAITING_REFRESH_BUTTONS = [
-  '[data-test="dashboard-viewpanel-refresh-data-btn"][data-o2-variant="warning"]',
+  '[data-test="dashboard-viewpanel-refresh-data-btn"][data-o2-variant="pending"]',
   '[data-test="dashboard-panel-refresh-panel-btn"][data-o2-variant="ghost-warning"]',
-  '[data-test="dashboard-refresh-btn"][data-o2-variant="warning"]',
+  '[data-test="dashboard-refresh-btn"][data-o2-variant="pending"]',
 ];
 
 /**

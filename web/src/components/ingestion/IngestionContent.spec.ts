@@ -11,7 +11,16 @@ import store from "@/test/unit/helpers/store";
 const barStart = vi.fn();
 const FirstEventStatusStub = defineComponent({
   name: "FirstEventStatus",
-  props: ["org", "signal", "targetStream", "kind", "guideName", "docUrl", "snippetKind"],
+  props: [
+    "org",
+    "signal",
+    "targetStream",
+    "kind",
+    "guideName",
+    "docUrl",
+    "snippetKind",
+    "configTool",
+  ],
   emits: ["copy-command"],
   setup: (_props, { expose }) => {
     expose({ start: barStart });
@@ -205,6 +214,22 @@ describe("IngestionContent.vue", () => {
       wrapper.findComponent(FirstEventStatusStub).vm.$emit("copy-command");
       expect(clicks.config).toHaveBeenCalledTimes(1);
       expect(clicks.install).toHaveBeenCalledTimes(1);
+    });
+
+    it("re-copies the first block of a config guide whose main config comes first", async () => {
+      clicks.config = vi.fn();
+      clicks.env = vi.fn();
+      wrapper = await mountAt(
+        "/servers/nginx",
+        { default: () => [codeBlock("config"), codeBlock("env")] },
+        { snippetKind: "config", copySnippet: "first", configTool: "OpenTelemetry Collector" },
+      );
+      wrapper.findComponent(FirstEventStatusStub).vm.$emit("copy-command");
+      expect(clicks.config).toHaveBeenCalledTimes(1);
+      expect(clicks.env).not.toHaveBeenCalled();
+      expect(wrapper.findComponent(FirstEventStatusStub).props("configTool")).toBe(
+        "OpenTelemetry Collector",
+      );
     });
   });
 });

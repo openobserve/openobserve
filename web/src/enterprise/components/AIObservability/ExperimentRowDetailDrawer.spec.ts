@@ -183,4 +183,73 @@ describe("ExperimentRowDetailDrawer", () => {
       { traceId: "evaluator-trace-1", timestamp: 200 },
     ]);
   });
+
+  it("renders a structured SDK output and the client-reported scores", () => {
+    const sdkRow: ExperimentRowDetail = {
+      ...detail,
+      trials: [
+        {
+          ...detail.trials[0],
+          taskStatus: "ok",
+          execution: {
+            ...detail.trials[0].execution!,
+            status: "ok",
+            output: { run_id: "run-1", grade: { band: "medium" } },
+            errorMessage: null,
+          },
+          scores: [],
+          clientScores: [
+            {
+              client_scorer_key: "six-axis/service",
+              score_config_id: "service-config",
+              status: "success",
+              value_numeric: 1,
+              reasoning: "Correct service",
+              evaluator_trace_id: "generated-not-a-trace",
+              _timestamp: 300,
+            },
+            {
+              client_scorer_key: "six-axis/uncertainty",
+              score_config_id: "uncertainty-config",
+              status: "success",
+              value_numeric: 0.5,
+              _timestamp: 300,
+            },
+          ],
+        },
+      ],
+      scoreSummaries: [],
+      clientScoreSummaries: [
+        {
+          scoreConfigId: "service-config",
+          scoreConfigName: "orca_service",
+          clientScorerKey: "six-axis/service",
+          sampleCount: 1,
+          value: { kind: "numeric", mean: 1 },
+        },
+        {
+          scoreConfigId: "uncertainty-config",
+          scoreConfigName: "orca_uncertainty",
+          clientScorerKey: "six-axis/uncertainty",
+          sampleCount: 1,
+          value: { kind: "numeric", mean: 0.5 },
+        },
+      ],
+    };
+
+    const wrapper = mountDrawer(sdkRow);
+    const output = wrapper.get('[data-test="ai-experiment-row-output"]').text();
+    const matrix = wrapper.get('[data-test="ai-experiment-row-score-matrix"]').text();
+
+    expect(output).toContain('"run_id": "run-1"');
+    expect(output).toContain('"band": "medium"');
+    expect(matrix).toContain("orca_service");
+    expect(matrix).toContain("1.000");
+    expect(matrix).toContain("orca_uncertainty");
+    expect(matrix).toContain("0.500");
+    expect(matrix).not.toContain("No data available");
+    expect(wrapper.text()).toContain("Correct service");
+    // A client Score's evaluator trace id is generated, not a real trace.
+    expect(wrapper.find('[data-test^="ai-experiment-row-score-trace-"]').exists()).toBe(false);
+  });
 });

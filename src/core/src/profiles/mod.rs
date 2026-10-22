@@ -317,8 +317,6 @@ pub async fn handle_otlp_request(
         for scope_profile in &resource_profile.scope_profiles {
             for profile in &scope_profile.profiles {
                 let (records, rejected_samples) = build_sample_records(
-                    org_id,
-                    &stream_name,
                     resource_profile,
                     scope_profile,
                     profile,
@@ -559,10 +557,7 @@ fn export_service_response(
 ///
 /// Observations whose `_timestamp` falls outside `[min_ts, max_ts]` (microseconds)
 /// are skipped; the returned `rejected` count mirrors traces' retention filter.
-#[allow(clippy::too_many_arguments)]
 fn build_sample_records(
-    org_id: &str,
-    stream_name: &str,
     resource_profile: &ResourceProfiles,
     scope_profile: &ScopeProfiles,
     profile: &Profile,
@@ -677,7 +672,7 @@ fn build_sample_records(
 
     let mut records = Vec::with_capacity(profile.samples.len());
     let mut rejected = 0_i64;
-    for (sample_idx, sample) in profile.samples.iter().enumerate() {
+    for sample in &profile.samples {
         let (stack, frame_count) = resolve_stack(sample.stack_index, dictionary);
         let (trace_id, span_id) = resolve_link(sample.link_index, dictionary);
         let (thread_id, thread_name, cpu_logical_number, sample_tags) =
@@ -693,7 +688,7 @@ fn build_sample_records(
             continue;
         };
 
-        for (obs_idx, (timestamp, value)) in observations.into_iter().enumerate() {
+        for (timestamp, value) in observations {
             if timestamp < min_ts {
                 log::error!(
                     "[PROFILES:OTLP] skipping observation with timestamp older than allowed retention period, profile_id: {profile_id}"
@@ -754,15 +749,6 @@ fn build_sample_records(
                 }
                 record.insert(key.clone(), value.clone());
             }
-
-            // `stack` is excluded: redaction runs later, so its digest would outlive the text.
-            let event_id = format!(
-                "{:x}",
-                md5::compute(format!(
-                    "{org_id}/{stream_name}/{timestamp}/{profile_id}/{sample_idx}/{obs_idx}/{value}"
-                ))
-            );
-            record.insert("event_id".to_string(), json::Value::String(event_id));
 
             records.push(record);
         }
@@ -1265,8 +1251,6 @@ mod tests {
         let min_ts = now - 5 * 3600 * 1_000_000;
         let max_ts = now + 24 * 3600 * 1_000_000;
         let (records, rejected) = build_sample_records(
-            "default",
-            "default",
             &ResourceProfiles::default(),
             &ScopeProfiles::default(),
             &profile,
@@ -1790,8 +1774,6 @@ mod tests {
         };
         let scope = ScopeProfiles::default();
         let (records, rejected) = build_sample_records(
-            "default",
-            "default",
             &resource,
             &scope,
             &profile,
@@ -1915,8 +1897,6 @@ mod tests {
         let resource = &request.resource_profiles[0];
         let scope = &resource.scope_profiles[0];
         let (records, rejected) = build_sample_records(
-            "default",
-            "default",
             resource,
             scope,
             &scope.profiles[0],
@@ -1949,8 +1929,6 @@ mod tests {
         let resource = &request.resource_profiles[0];
         let scope = &resource.scope_profiles[0];
         let (records, rejected) = build_sample_records(
-            "default",
-            "default",
             resource,
             scope,
             &scope.profiles[0],
@@ -1987,8 +1965,6 @@ mod tests {
         let resource = &request.resource_profiles[0];
         let scope = &resource.scope_profiles[0];
         let (records, rejected) = build_sample_records(
-            "default",
-            "default",
             resource,
             scope,
             &scope.profiles[0],
@@ -2107,8 +2083,6 @@ mod tests {
         };
 
         let (records, rejected) = build_sample_records(
-            "default",
-            "default",
             &resource,
             &scope,
             &profile,
@@ -2208,8 +2182,6 @@ mod tests {
         };
 
         let (records, rejected) = build_sample_records(
-            "default",
-            "default",
             &resource,
             &ScopeProfiles::default(),
             &profile,
@@ -2307,8 +2279,6 @@ mod tests {
         let min_ts = now - 5 * 3600 * 1_000_000;
         let max_ts = now + 24 * 3600 * 1_000_000;
         let (records, rejected) = build_sample_records(
-            "default",
-            "default",
             &ResourceProfiles::default(),
             &ScopeProfiles::default(),
             &profile,
