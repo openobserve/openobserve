@@ -2003,6 +2003,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
             name: format!("fleet-{id}"),
             fleet_id: "default".to_string(),
             created_at: 1,
+            expires_at: None,
             revoked,
             loaded_at: std::time::Instant::now(),
         };

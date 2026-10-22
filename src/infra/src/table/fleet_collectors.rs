@@ -140,6 +140,22 @@ pub async fn get_with<C: ConnectionTrait>(
         .await?)
 }
 
+/// One query for a page of ids; an id with no row is simply absent.
+pub async fn get_many_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    ids: &[String],
+) -> Result<Vec<Model>, errors::Error> {
+    if ids.is_empty() {
+        return Ok(vec![]);
+    }
+    Ok(Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Id.is_in(ids.iter().map(String::as_str)))
+        .all(conn)
+        .await?)
+}
+
 pub async fn delete_with<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
