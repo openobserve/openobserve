@@ -68,8 +68,8 @@
             <OSeparator vertical />
           </div>
           <div
-            v-if="updatedAgo"
-            class="bg-surface-subtle rounded-surface flex shrink-0 items-center gap-3 px-3 py-0.5 text-sm"
+            v-if="updatedAge"
+            class="border-button-outline-border rounded-default flex h-8 shrink-0 items-center gap-1.5 border ps-0.5 pe-3 text-sm"
             data-test="dashboards-public-dashboard-meta"
           >
             <KioskCountdownRing
@@ -88,11 +88,15 @@
               />
             </KioskCountdownRing>
             <span
-              class="text-text-heading font-medium whitespace-nowrap tabular-nums"
+              class="text-text-secondary whitespace-nowrap"
               tabindex="0"
               data-test="dashboards-public-dashboard-updated"
             >
-              {{ updatedAgo }}
+              <i18n-t keypath="dashboard.publicDashboard.lastUpdatedAgo" tag="span" scope="global">
+                <template #time>
+                  <span class="text-text-body tabular-nums">{{ updatedAge }}</span>
+                </template>
+              </i18n-t>
               <OTooltip :content="updatedExact" />
             </span>
           </div>
@@ -516,7 +520,7 @@ const windowLabel = computed<I18nText | "">(() => {
 });
 
 // The data's age, as the TV strip shows it; the exact time is in its tooltip.
-const updatedAgo = computed<I18nText | "">(() => {
+const updatedAge = computed<I18nText | "">(() => {
   const at = toLocalMs(body.value?.built_at, clockOffset.value);
   if (at === null) return "";
   const sec = Math.max(0, Math.floor((nowMs.value - at) / 1000));
@@ -529,7 +533,7 @@ const updatedAgo = computed<I18nText | "">(() => {
         : min < 60
           ? t("refreshButton.minutesAgo", { min })
           : t("refreshButton.hoursAgo", { h: Math.floor(min / 60) });
-  return t("dashboard.publicDashboard.lastUpdatedAgo", { time: age });
+  return age;
 });
 
 const updatedExact = computed<I18nText>(() =>

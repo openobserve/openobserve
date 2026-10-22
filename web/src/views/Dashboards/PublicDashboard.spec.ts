@@ -64,6 +64,8 @@ const CONFIG = {
 
 // Shallow mounts stub OEmptyState; this stub keeps its title readable in the page text.
 config.global.stubs.OEmptyState = { props: ["title"], template: "<div>{{ title }}</div>" };
+// The update chip's sentence is an i18n-t with the age slotted in; render it, not a stub.
+config.global.stubs["i18n-t"] = false;
 // A mounted page keeps polling and listening for visibility, so each test unmounts its own.
 enableAutoUnmount(afterEach);
 
