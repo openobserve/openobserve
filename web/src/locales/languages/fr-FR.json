@@ -6105,6 +6105,7 @@
       "addPanelDot": "Ajouter un panneau · brouillon non enregistré",
       "panelDot": "Modifications non enregistrées dans ce navigateur",
       "panelActionsDot": "Actions du panneau · brouillon non enregistré",
+      "keepFailed": "Impossible de conserver le brouillon, car le stockage de ce navigateur est plein ou indisponible. Enregistrez le panneau ou supprimez vos modifications.",
       "panelMissingOnSave": "Ce panneau n'existe plus dans le tableau de bord. Rechargez le tableau de bord et ajoutez-le à nouveau."
     },
     "sortByClear": "Effacer le tri",

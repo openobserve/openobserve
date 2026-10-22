@@ -6105,6 +6105,7 @@
       "addPanelDot": "Aggiungi pannello · bozza non salvata",
       "panelDot": "Modifiche non salvate in questo browser",
       "panelActionsDot": "Azioni del pannello · bozza non salvata",
+      "keepFailed": "Impossibile conservare la bozza perché lo spazio di archiviazione di questo browser è pieno o non disponibile. Salva il pannello o elimina le modifiche.",
       "panelMissingOnSave": "Questo pannello non esiste più nella dashboard. Ricarica la dashboard e aggiungilo di nuovo."
     },
     "sortByClear": "Cancella ordinamento",

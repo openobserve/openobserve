@@ -6105,6 +6105,7 @@
       "addPanelDot": "Panel ekle · kaydedilmemiş taslak",
       "panelDot": "Bu tarayıcıda kaydedilmemiş değişiklikler var",
       "panelActionsDot": "Panel işlemleri · kaydedilmemiş taslak",
+      "keepFailed": "Bu tarayıcının depolama alanı dolu veya kullanılamıyor olduğundan taslak saklanamadı. Paneli kaydedin veya değişikliklerinizi atın.",
       "panelMissingOnSave": "Bu panel artık panoda yok. Panoyu yeniden yükleyin ve paneli tekrar ekleyin."
     },
     "sortByClear": "Sıralamayı temizle",

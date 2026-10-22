@@ -6105,6 +6105,7 @@
       "addPanelDot": "添加面板 · 未保存的草稿",
       "panelDot": "此浏览器中有未保存的更改",
       "panelActionsDot": "面板操作 · 未保存的草稿",
+      "keepFailed": "此浏览器的存储空间已满或不可用，无法保留草稿。请保存面板或放弃更改。",
       "panelMissingOnSave": "此面板已不在仪表板中。请重新加载仪表板并再次添加。"
     },
     "sortByClear": "清除排序",

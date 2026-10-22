@@ -6105,6 +6105,7 @@
       "addPanelDot": "Add panel · unsaved draft",
       "panelDot": "Unsaved changes in this browser",
       "panelActionsDot": "Panel actions · unsaved draft",
+      "keepFailed": "The draft could not be kept because this browser's storage is full or unavailable. Save the panel or discard your changes.",
       "panelMissingOnSave": "This panel no longer exists on the dashboard. Reload the dashboard and add it again."
     },
     "sortByClear": "Clear sorting",

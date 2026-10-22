@@ -6105,6 +6105,7 @@
       "addPanelDot": "Panel hinzufügen · nicht gespeicherter Entwurf",
       "panelDot": "Nicht gespeicherte Änderungen in diesem Browser",
       "panelActionsDot": "Panel-Aktionen · nicht gespeicherter Entwurf",
+      "keepFailed": "Der Entwurf konnte nicht behalten werden, weil der Speicher dieses Browsers voll oder nicht verfügbar ist. Speichern Sie das Panel oder verwerfen Sie Ihre Änderungen.",
       "panelMissingOnSave": "Dieses Panel existiert nicht mehr im Dashboard. Laden Sie das Dashboard neu und fügen Sie es erneut hinzu."
     },
     "sortByClear": "Sortierung aufheben",

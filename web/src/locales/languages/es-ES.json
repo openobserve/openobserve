@@ -6105,6 +6105,7 @@
       "addPanelDot": "Añadir panel · borrador sin guardar",
       "panelDot": "Cambios sin guardar en este navegador",
       "panelActionsDot": "Acciones del panel · borrador sin guardar",
+      "keepFailed": "No se pudo conservar el borrador porque el almacenamiento de este navegador está lleno o no está disponible. Guarda el panel o descarta los cambios.",
       "panelMissingOnSave": "Este panel ya no existe en el panel de control. Vuelve a cargar el panel de control y añádelo de nuevo."
     },
     "sortByClear": "Quitar ordenación",

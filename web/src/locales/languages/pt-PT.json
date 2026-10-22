@@ -6105,6 +6105,7 @@
       "addPanelDot": "Adicionar painel · rascunho não guardado",
       "panelDot": "Alterações não guardadas neste navegador",
       "panelActionsDot": "Ações do painel · rascunho não guardado",
+      "keepFailed": "Não foi possível manter o rascunho porque o armazenamento deste navegador está cheio ou indisponível. Guarde o painel ou descarte as alterações.",
       "panelMissingOnSave": "Este painel já não existe no dashboard. Recarregue o dashboard e adicione-o novamente."
     },
     "sortByClear": "Limpar ordenação",

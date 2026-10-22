@@ -25,8 +25,6 @@ export const NEW_PANEL_DRAFT_ID = "new";
 /** Bumped on every write, delete and cross-tab storage event, so dots can re-read storage. */
 export const panelDraftRevision = ref(0);
 
-let storageListenerInstalled = false;
-
 export interface PanelDraftScope {
   userEmail: string;
   org: string;
@@ -66,14 +64,13 @@ const getStorage = (): Storage | null => {
   }
 };
 
-const ensureStorageListener = () => {
-  if (storageListenerInstalled || typeof window === "undefined") return;
-  storageListenerInstalled = true;
-  window.addEventListener("storage", (event: StorageEvent) => {
-    // A null key means another tab cleared the whole storage.
-    if (event.key === null || event.key.startsWith(PANEL_DRAFT_PREFIX)) bumpRevision();
-  });
+const onStorageEvent = (event: StorageEvent) => {
+  // A null key means another tab cleared the whole storage.
+  if (event.key === null || event.key.startsWith(PANEL_DRAFT_PREFIX)) bumpRevision();
 };
+
+// Registered once at module load, so reading a draft never adds listeners.
+if (typeof window !== "undefined") window.addEventListener("storage", onStorageEvent);
 
 const draftKeys = (storage: Storage): string[] => {
   const keys: string[] = [];
@@ -169,8 +166,7 @@ export const readPanelDraft = (scope: PanelDraftScope, now: number = Date.now())
 
 /** Side-effect free, so it is safe in a computed; reading the revision re-runs it after any write in any tab. */
 export const hasPanelDraft = (scope: PanelDraftScope): boolean => {
-  ensureStorageListener();
-  if (panelDraftRevision.value < 0) return false;
+  panelDraftRevision.value;
   try {
     return isLive(parseDraft(getStorage()?.getItem(panelDraftKey(scope)) ?? null), Date.now());
   } catch {
@@ -206,7 +202,6 @@ export const writePanelDraft = (scope: PanelDraftScope, input: PanelDraftInput):
       return false;
     }
   }
-  cleanupPanelDrafts();
   return true;
 };
 
@@ -274,7 +269,8 @@ export interface PanelDraftAutosaveOptions {
   /** True once the editor finished loading and the user's first input set the starting snapshot. */
   isReady: () => boolean;
   hasChanges: () => boolean;
-  write: () => void;
+  /** Resolves true only when the draft was actually stored. */
+  write: () => boolean;
   remove: () => void;
   delay?: number;
 }
@@ -294,8 +290,8 @@ export const usePanelDraftAutosave = (options: PanelDraftAutosaveOptions) => {
     cancel();
     if (!options.isReady()) return;
     if (options.hasChanges()) {
-      options.write();
-      owned = true;
+      // A refused write (storage full, protected draft) must not count as this session's draft.
+      if (options.write()) owned = true;
     } else if (owned) {
       options.remove();
       owned = false;

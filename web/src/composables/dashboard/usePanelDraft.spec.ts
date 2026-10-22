@@ -116,12 +116,14 @@ describe("usePanelDraft storage", () => {
     expect(localStorage.getItem(`${PANEL_DRAFT_PREFIX}d${PANEL_DRAFT_MAX + 1}`)).toBeNull();
   });
 
-  it("a write past the limit evicts the oldest draft", () => {
+  it("a write does not run the clean-up; the editor runs it once per mount", () => {
     const now = Date.now();
     for (let i = 0; i < PANEL_DRAFT_MAX; i++) store(`${PANEL_DRAFT_PREFIX}d${i}`, now - 1000 - i);
 
     writePanelDraft(panelScope, input());
+    expect(draftKeyCount()).toBe(PANEL_DRAFT_MAX + 1);
 
+    cleanupPanelDrafts();
     expect(draftKeyCount()).toBe(PANEL_DRAFT_MAX);
     expect(readPanelDraft(panelScope)).not.toBeNull();
     expect(localStorage.getItem(`${PANEL_DRAFT_PREFIX}d${PANEL_DRAFT_MAX - 1}`)).toBeNull();
@@ -175,7 +177,6 @@ describe("usePanelDraft storage", () => {
 
   it("bumps the shared revision on write, delete and another tab's storage event", () => {
     const start = panelDraftRevision.value;
-    hasPanelDraft(scope);
 
     writePanelDraft(scope, input());
     expect(panelDraftRevision.value).toBe(start + 1);
@@ -186,6 +187,22 @@ describe("usePanelDraft storage", () => {
     expect(panelDraftRevision.value).toBe(start + 3);
     window.dispatchEvent(new StorageEvent("storage", { key: "unrelated" }));
     expect(panelDraftRevision.value).toBe(start + 3);
+  });
+
+  it("hasPanelDraft has no side effects: no listeners, no writes, no revision bump", () => {
+    writePanelDraft(scope, input());
+    const addListener = vi.spyOn(window, "addEventListener");
+    const setItem = vi.spyOn(Storage.prototype, "setItem");
+    const removeItem = vi.spyOn(Storage.prototype, "removeItem");
+    const revision = panelDraftRevision.value;
+
+    expect(hasPanelDraft(scope)).toBe(true);
+    expect(hasPanelDraft(panelScope)).toBe(false);
+
+    expect(addListener).not.toHaveBeenCalled();
+    expect(setItem).not.toHaveBeenCalled();
+    expect(removeItem).not.toHaveBeenCalled();
+    expect(panelDraftRevision.value).toBe(revision);
   });
 
   it("hasPanelDraft sees a live draft without deleting a stale one", () => {
@@ -244,7 +261,7 @@ describe("usePanelDraft storage", () => {
 
 describe("usePanelDraftAutosave", () => {
   const state = { ready: true, changes: true };
-  const write = vi.fn();
+  const write = vi.fn(() => true);
   const remove = vi.fn();
   const options: PanelDraftAutosaveOptions = {
     isReady: () => state.ready,
@@ -354,6 +371,19 @@ describe("usePanelDraftAutosave", () => {
     document.dispatchEvent(new Event("visibilitychange"));
     expect(write).toHaveBeenCalledTimes(3);
     visibility.mockRestore();
+    wrapper.unmount();
+  });
+
+  it("a refused write is not treated as stored, so undoing deletes nothing", () => {
+    write.mockReturnValueOnce(false);
+    const { wrapper, api } = mountAutosave();
+
+    api.flush();
+    expect(write).toHaveBeenCalledTimes(1);
+    state.changes = false;
+    api.flush();
+
+    expect(remove).not.toHaveBeenCalled();
     wrapper.unmount();
   });
 

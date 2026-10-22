@@ -18,16 +18,22 @@ import { mount } from "@vue/test-utils";
 import { defineComponent, h, nextTick, reactive } from "vue";
 import { createStore } from "vuex";
 import { onBeforeRouteLeave } from "vue-router";
-import { addPanel, getDashboard, getPanel, updatePanel } from "@/utils/commons";
+import { addPanel, getDashboard, getPanel, updateDashboard, updatePanel } from "@/utils/commons";
 import analytics from "@/services/product_analytics";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import {
   PANEL_DRAFT_VERSION,
+  cleanupPanelDrafts,
   panelDraftKey,
   readPanelDraft,
   writePanelDraft,
 } from "@/composables/dashboard/usePanelDraft";
 import AddPanel from "./AddPanel.vue";
+
+vi.mock("@/composables/dashboard/usePanelDraft", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return { ...actual, cleanupPanelDrafts: vi.fn(actual.cleanupPanelDrafts) };
+});
 
 const conflict = vi.hoisted(() => ({ active: false, open: null as any }));
 
@@ -357,8 +363,8 @@ describe("AddPanel drafts and Save and keep editing", () => {
       expect(wrapper.vm.dashboardPanelData.data.title).toBe("Draft title");
       expect(wrapper.vm.form.state.values.title).toBe("Draft title");
       expect(getDashboard).toHaveBeenCalled();
-      // The new-panel draft lands in the tab of the URL, not the one it was written in.
-      expect(nav.route.query.tab).toBe("t1");
+      // The new-panel draft goes back to the tab it was written in, which still exists.
+      expect(nav.route.query.tab).toBe("t2");
       const { next, done } = leave();
       await flush();
       expect(leaveDialog()).not.toBeNull();
@@ -401,7 +407,17 @@ describe("AddPanel drafts and Save and keep editing", () => {
       expect(getDashboard).toHaveBeenCalled();
     });
 
-    it("Escape starts fresh but keeps the draft until the first edit replaces it", async () => {
+    it("Continue keeps the URL's tab when the draft's tab no longer exists", async () => {
+      seedDraft(newScope, { tabId: "gone" });
+      wrapper = await mountEditor();
+
+      restoreButton("continue").click();
+      await flush();
+
+      expect(nav.route.query.tab).toBe("t1");
+    });
+
+    it("Escape starts fresh and autosave never overwrites the kept draft", async () => {
       seedDraft(newScope);
       wrapper = await mountEditor();
 
@@ -409,24 +425,98 @@ describe("AddPanel drafts and Save and keep editing", () => {
       expect(restoreDialog()?.isConnected ?? false).toBe(false);
       expect(wrapper.vm.dashboardPanelData.data.title).toBe("");
 
-      window.dispatchEvent(new Event("pointerdown"));
-      window.dispatchEvent(new Event("pagehide"));
-      expect(readPanelDraft(newScope)?.data.title).toBe("Draft title");
-
       await userEdits(wrapper, "New work");
       window.dispatchEvent(new Event("pagehide"));
+      window.dispatchEvent(unloadEvent());
+      expect(readPanelDraft(newScope)?.data.title).toBe("Draft title");
+    });
+
+    it("after Escape, an explicit Keep draft replaces the kept draft", async () => {
+      seedDraft(newScope);
+      wrapper = await mountEditor();
+      await pressEscape();
+      await userEdits(wrapper, "New work");
+
+      const { next, done } = leave();
+      await flush();
+      leaveButton("keep").click();
+      await done;
+
+      expect(next).toHaveBeenCalledWith();
       expect(readPanelDraft(newScope)?.data.title).toBe("New work");
     });
 
-    it("draft=resume continues without the dialog and drops the flag from the URL", async () => {
-      seedDraft(editScope);
-      nav.route = routeWith({ panelId: "p1", draft: "resume" });
+    it("after Escape, autosave resumes once the kept draft is gone", async () => {
+      seedDraft(newScope);
+      wrapper = await mountEditor();
+      await pressEscape();
+      await userEdits(wrapper, "New work");
+
+      localStorage.removeItem(panelDraftKey(newScope));
+      window.dispatchEvent(new Event("pagehide"));
+
+      expect(readPanelDraft(newScope)?.data.title).toBe("New work");
+    });
+
+    it("never restores the draft's grid layout over the dashboard's", async () => {
+      seedDraft(editScope, {
+        data: { ...serverPanel("Draft title"), layout: { x: 9, y: 9, w: 2, h: 2, i: 7 } },
+      });
+      nav.route = routeWith({ panelId: "p1" });
       wrapper = await mountEditor();
 
-      expect(restoreDialog()).toBeNull();
+      restoreButton("continue").click();
+      await flush();
+
       expect(wrapper.vm.dashboardPanelData.data.title).toBe("Draft title");
-      expect(nav.route.query.draft).toBeUndefined();
-      expect(nav.route.query.panelId).toBe("p1");
+      expect(wrapper.vm.dashboardPanelData.data.layout).toEqual(serverPanel().layout);
+    });
+
+    it("a new-panel draft keeps the new panel's own grid layout", async () => {
+      seedDraft(newScope, {
+        data: { ...serverPanel("Draft title"), id: "", layout: { x: 9, y: 9, w: 2, h: 2, i: 7 } },
+      });
+      wrapper = await mountEditor();
+
+      restoreButton("continue").click();
+      await flush();
+
+      expect(wrapper.vm.dashboardPanelData.data.layout).toBeUndefined();
+    });
+
+    it("a layout-only change on the server is not reported as a changed panel", async () => {
+      seedDraft(editScope, {
+        basePanel: { ...serverPanel(), layout: { x: 3, y: 3, w: 10, h: 4, i: 2 } },
+      });
+      nav.route = routeWith({ panelId: "p1" });
+      wrapper = await mountEditor();
+
+      expect(restoreDialog()).not.toBeNull();
+      expect(q('[data-test="dashboard-panel-draft-changed-on-server"]')).toBeNull();
+    });
+
+    it("runs the draft clean-up once per mount, not on every write", async () => {
+      wrapper = await mountEditor();
+      await userEdits(wrapper, "One");
+      window.dispatchEvent(new Event("pagehide"));
+      await userEdits(wrapper, "Two");
+      window.dispatchEvent(new Event("pagehide"));
+
+      expect(cleanupPanelDrafts).toHaveBeenCalledTimes(1);
+      expect(readPanelDraft(newScope)?.data.title).toBe("Two");
+    });
+
+    it("unmounting while the restore dialog is open settles the opening sequence", async () => {
+      seedDraft(newScope);
+      wrapper = await mountEditor();
+      expect(restoreDialog()).not.toBeNull();
+
+      wrapper.unmount();
+      wrapper = null;
+      await flush();
+
+      expect(getDashboard).not.toHaveBeenCalled();
+      expect(readPanelDraft(newScope)?.data.title).toBe("Draft title");
     });
 
     it("warns in the same dialog when the panel changed on the server after the draft", async () => {
@@ -543,6 +633,25 @@ describe("AddPanel drafts and Save and keep editing", () => {
       expect(draft.sessionVariables.map((v: any) => v.name)).toEqual(["session_var2"]);
       const names = wrapper.vm.currentDashboardData.data.variables.list.map((v: any) => v.name);
       expect(names).not.toContain("session_var2");
+    });
+
+    it("Keep draft with storage full shows an error and stays in the editor", async () => {
+      wrapper = await mountEditor();
+      await userEdits(wrapper, "Cannot keep");
+      const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+        throw new DOMException("full", "QuotaExceededError");
+      });
+
+      const { next, done } = leave();
+      await flush();
+      leaveButton("keep").click();
+      await done;
+      setItem.mockRestore();
+
+      expect(next).toHaveBeenCalledWith(false);
+      expect(toasts.error).toHaveBeenCalledTimes(1);
+      expect(readPanelDraft(newScope)).toBeNull();
+      expect(wrapper.vm.dashboardPanelData.data.title).toBe("Cannot keep");
     });
 
     it("Discard deletes the draft and leaves", async () => {
@@ -675,6 +784,86 @@ describe("AddPanel drafts and Save and keep editing", () => {
       window.dispatchEvent(new Event("pagehide"));
       expect(readPanelDraft({ ...newScope, panelId })?.data.title).toBe("Edited after save");
       expect(readPanelDraft(newScope)).toBeNull();
+    });
+
+    it("a panel moved to another tab is saved there together with session variables", async () => {
+      nav.route = routeWith({ panelId: "p1", tab: "t1" });
+      vi.mocked(getDashboard).mockImplementation(
+        async () =>
+          ({
+            title: "Dash",
+            variables: { list: [] },
+            tabs: [
+              { tabId: "t1", panels: [] },
+              { tabId: "t2", panels: [serverPanel()] },
+            ],
+          }) as any,
+      );
+      vi.mocked(updateDashboard).mockResolvedValue(undefined as any);
+      wrapper = await mountEditor();
+      await wrapper.vm.handleSaveVariable({ variableData: { name: "session_var" } });
+      await userEdits(wrapper, "Moved and edited");
+      window.dispatchEvent(new Event("pagehide"));
+
+      expect(await wrapper.vm.submitPanel("view")).toBe(true);
+
+      const saved = vi.mocked(updateDashboard).mock.calls[0][3] as any;
+      expect(saved.tabs[1].panels[0].title).toBe("Moved and edited");
+      expect(saved.variables.list.map((v: any) => v.name)).toContain("session_var");
+      expect(readPanelDraft(editScope)).toBeNull();
+    });
+
+    it("a panel gone from every tab is not reported as saved and keeps its draft", async () => {
+      nav.route = routeWith({ panelId: "p1" });
+      wrapper = await mountEditor();
+      await wrapper.vm.handleSaveVariable({ variableData: { name: "session_var" } });
+      await userEdits(wrapper, "Orphaned");
+      window.dispatchEvent(new Event("pagehide"));
+      wrapper.vm.currentDashboardData.data.tabs.forEach((tab: any) => (tab.panels = []));
+
+      expect(await wrapper.vm.submitPanel("view")).toBe(false);
+
+      expect(updateDashboard).not.toHaveBeenCalled();
+      expect(toasts.error).toHaveBeenCalledTimes(1);
+      expect(readPanelDraft(editScope)?.data.title).toBe("Orphaned");
+    });
+
+    it("pressing Ctrl+S twice saves a new panel once", async () => {
+      wrapper = await mountEditor();
+      await userEdits(wrapper, "Twice");
+      let release: () => void = () => {};
+      vi.mocked(addPanel).mockImplementation(
+        () => new Promise((resolve) => (release = () => resolve(undefined as any))),
+      );
+
+      const shortcuts = vi.mocked(useShortcuts).mock.calls.at(-1)![0] as any[];
+      const save = shortcuts.find((s) => s.id === "panelEditorSave").handler;
+      const first = save();
+      await flush();
+      const second = save();
+      await flush();
+      release();
+      await Promise.all([first, second]);
+      await flush();
+
+      expect(addPanel).toHaveBeenCalledTimes(1);
+    });
+
+    it("the leave dialog's Save does nothing while another save is running", async () => {
+      nav.route = routeWith({ panelId: "p1" });
+      wrapper = await mountEditor();
+      await userEdits(wrapper, "Busy");
+      let release: () => void = () => {};
+      vi.mocked(updatePanel).mockImplementation(
+        () => new Promise((resolve) => (release = () => resolve(undefined as any))),
+      );
+      const running = wrapper.vm.saveAndStay();
+      await flush();
+
+      expect(await wrapper.vm.submitPanel("none")).toBe(false);
+      release();
+      await running;
+      expect(updatePanel).toHaveBeenCalledTimes(1);
     });
 
     it("Ctrl+S saves and stays in the editor", async () => {

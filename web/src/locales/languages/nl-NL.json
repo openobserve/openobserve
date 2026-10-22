@@ -6105,6 +6105,7 @@
       "addPanelDot": "Paneel toevoegen · niet-opgeslagen concept",
       "panelDot": "Niet-opgeslagen wijzigingen in deze browser",
       "panelActionsDot": "Paneelacties · niet-opgeslagen concept",
+      "keepFailed": "Het concept kon niet worden bewaard omdat de opslag van deze browser vol of niet beschikbaar is. Sla het paneel op of verwijder je wijzigingen.",
       "panelMissingOnSave": "Dit paneel bestaat niet meer op het dashboard. Laad het dashboard opnieuw en voeg het opnieuw toe."
     },
     "sortByClear": "Sortering wissen",

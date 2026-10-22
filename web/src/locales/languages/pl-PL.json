@@ -6105,6 +6105,7 @@
       "addPanelDot": "Dodaj panel · niezapisany szkic",
       "panelDot": "Niezapisane zmiany w tej przeglądarce",
       "panelActionsDot": "Akcje panelu · niezapisany szkic",
+      "keepFailed": "Nie udało się zachować szkicu, ponieważ pamięć tej przeglądarki jest pełna lub niedostępna. Zapisz panel lub odrzuć zmiany.",
       "panelMissingOnSave": "Ten panel już nie istnieje na pulpicie. Wczytaj pulpit ponownie i dodaj go jeszcze raz."
     },
     "sortByClear": "Wyczyść sortowanie",
