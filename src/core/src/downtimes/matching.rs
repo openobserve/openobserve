@@ -116,22 +116,45 @@ impl Matches {
             TargetModule::Slos => &self.slos,
         }
     }
+
+    pub(super) fn output_lists(
+        &self,
+        include_undecidable: bool,
+    ) -> Vec<(TargetModule, &[PreviewMatch])> {
+        let mut lists = vec![
+            (TargetModule::Alerts, self.alerts.matched.as_slice()),
+            (
+                TargetModule::AnomalyDetections,
+                self.anomalies.matched.as_slice(),
+            ),
+            (TargetModule::Synthetics, self.synthetics.matched.as_slice()),
+            (TargetModule::Slos, self.slos.matched.as_slice()),
+            (TargetModule::Alerts, self.alerts.at_fire_time.as_slice()),
+        ];
+        if include_undecidable {
+            for module in [
+                TargetModule::Alerts,
+                TargetModule::AnomalyDetections,
+                TargetModule::Slos,
+            ] {
+                lists.push((module, self.module(module).undecidable.as_slice()));
+            }
+        }
+        lists
+    }
 }
 
-/// The folders a user may list, per folder type; `None` means every folder.
+/// Readable resource ids per module; `None` means unrestricted access.
 #[derive(Clone, Debug, Default)]
 pub struct Visibility {
-    pub alert_folders: Option<HashSet<String>>,
-    pub synthetics_folders: Option<HashSet<String>>,
+    pub readable: Option<HashMap<TargetModule, HashSet<String>>>,
 }
 
 impl Visibility {
-    pub fn sees(&self, module: TargetModule, folder_id: &str) -> bool {
-        let folders = match module {
-            TargetModule::Synthetics => &self.synthetics_folders,
-            _ => &self.alert_folders,
-        };
-        folders.as_ref().is_none_or(|f| f.contains(folder_id))
+    pub fn sees(&self, module: TargetModule, id: &str) -> bool {
+        self.readable
+            .as_ref()
+            .is_none_or(|items| items.get(&module).is_some_and(|ids| ids.contains(id)))
     }
 }
 
@@ -184,11 +207,11 @@ pub fn match_module(
     out
 }
 
-/// The preview a user sees: names filtered to what the user may list, capped, totals complete.
+/// The preview a user sees: entries filtered to what the user may read, capped, totals complete.
 pub fn to_preview(matches: &Matches, visibility: &Visibility) -> PreviewResponse {
     let visible = |module: TargetModule, list: &[PreviewMatch], cap: usize| -> Vec<PreviewMatch> {
         list.iter()
-            .filter(|m| visibility.sees(module, &m.folder_id))
+            .filter(|m| visibility.sees(module, &m.id))
             .take(cap)
             .cloned()
             .collect()
@@ -442,7 +465,7 @@ mod tests {
     }
 
     #[test]
-    fn the_preview_hides_names_the_user_cannot_list_and_keeps_the_totals() {
+    fn the_preview_hides_unreadable_entries_and_keeps_the_totals() {
         let inventory = Inventory {
             alerts: (0..60)
                 .map(|i| {
@@ -454,8 +477,10 @@ mod tests {
         };
         let matches = match_all(&inventory, None, &[target(TargetModule::Alerts)]);
         let visibility = Visibility {
-            alert_folders: Some(HashSet::from(["mine".to_string()])),
-            synthetics_folders: None,
+            readable: Some(HashMap::from([(
+                TargetModule::Alerts,
+                (0..60).step_by(2).map(|i| format!("a{i}")).collect(),
+            )])),
         };
         let preview = to_preview(&matches, &visibility);
         assert_eq!(preview.alerts_total, 60);

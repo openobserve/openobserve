@@ -235,9 +235,9 @@ const PINNED_COPY: Record<string, { tooltip: string; budgetTooltip: string; hint
   },
   "de-DE": {
     tooltip:
-      "Jeder Bucket wird mit einem Band aus Erwartungswert ± Stufe × σ verglichen, wobei σ die typische Streuung für diese Stunde ist. Ein Bucket außerhalb des Bands wird als Anomalie markiert. Ein breiteres Band (höhere Stufe) sendet weniger Warnmeldungen, ein schmaleres mehr. Änderungen gelten ohne erneutes Training.",
+      "Jeder Bucket wird mit einem Band aus Erwartungswert ± Stufe × σ verglichen, wobei σ die typische Streuung für diese Stunde ist. Ein Bucket außerhalb des Bands wird als Anomalie markiert. Ein breiteres Band (höhere Stufe) sendet weniger Alarme, ein schmaleres mehr. Änderungen gelten ohne erneutes Training.",
     budgetTooltip:
-      "Die maximale Zahl von Warnmeldungen, die diese Konfiguration zustellen darf — bei der Zustellung erzwungen. Die Erkennung bewertet weiterhin jeden Bucket; ist das Budget aufgebraucht, werden weitere Warnmeldungen unterdrückt, bis es sich auffüllt.",
+      "Die maximale Zahl von Alarmen, die diese Konfiguration zustellen darf — bei der Zustellung erzwungen. Die Erkennung bewertet weiterhin jeden Bucket; ist das Budget aufgebraucht, werden weitere Alarme unterdrückt, bis es sich auffüllt.",
     hint: "Ein Bucket wird markiert, wenn er außerhalb von Erwartungswert ± {k}σ liegt.",
   },
   "en-US": {
@@ -284,7 +284,7 @@ const PINNED_COPY: Record<string, { tooltip: string; budgetTooltip: string; hint
   },
   "nl-NL": {
     tooltip:
-      "Elk interval wordt vergeleken met een band van verwachte waarde ± niveau × σ, waarbij σ de typische spreiding voor dat uur is. Een interval buiten de band wordt als afwijkend gemarkeerd. Een bredere band (hoger niveau) stuurt minder waarschuwingen, een smallere meer. Wijzigingen gelden zonder opnieuw te trainen.",
+      "Elk interval wordt vergeleken met een band van verwachte waarde ± niveau × σ, waarbij σ de typische spreiding voor dat uur is. Een interval buiten de band wordt als afwijkend gemarkeerd. Een bredere band (hoger niveau) stuurt minder alarmen, een smallere meer. Wijzigingen gelden zonder opnieuw te trainen.",
     budgetTooltip:
       "Het maximale aantal meldingen dat deze configuratie mag bezorgen, afgedwongen bij bezorging. Detectie blijft elke bucket scoren; is het budget op, dan worden verdere meldingen onderdrukt tot het zich aanvult.",
     hint: "Een interval wordt gemarkeerd als het buiten verwachte waarde ± {k}σ valt.",

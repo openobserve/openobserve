@@ -143,6 +143,7 @@
               </div>
 
               <OButton
+                :aria-label="t('common.cancel')"
                 variant="outline"
                 size="icon"
                 class="shrink-0"

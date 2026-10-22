@@ -134,7 +134,7 @@ pub async fn create_downtime(
     tag = "Downtimes",
     operation_id = "PreviewDowntime",
     summary = "Preview what a downtime covers",
-    description = "Lists, per module, what the targets match today, the alerts decided at fire time, and the items a resource refinement cannot decide. Names are limited to what the user may list; totals count everything.",
+    description = "Lists, per module, what the targets match today, the alerts decided at fire time, and the items a resource refinement cannot decide. Entries are limited to resources the user may read; totals count everything.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = PreviewRequest, description = "Condition and targets", content_type = "application/json"),

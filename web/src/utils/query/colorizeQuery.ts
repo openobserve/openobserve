@@ -6,6 +6,8 @@ let languagesRegistered = false;
 
 const registerLanguages = async () => {
   if (languagesRegistered) return;
+  // The first Monaco call freezes its services, so editor contributions must register before it or editors lose suggest.
+  await import("monaco-editor/esm/vs/editor/editor.all.js");
 
   // Monaco has no built-in PromQL — register the official grammar.
   languages.register({ id: "promql" });

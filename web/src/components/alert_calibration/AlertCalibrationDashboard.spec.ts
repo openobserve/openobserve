@@ -56,7 +56,6 @@ const coverage = {
   coverage_error_clusters_truncated: false,
   coverage_error_clusters_unattributed: 0,
   coverage_stream_substrate_empty: false,
-  coverage_meta_fallback_used: false,
 };
 
 const run: RunRow = {
@@ -186,6 +185,35 @@ describe("AlertCalibrationDashboard", () => {
     expect(alert.text()).toContain("payments");
     expect(alert.text()).toContain("failed 10 of 20 evaluations");
     wrapper.unmount();
+  });
+
+  it("shows the cluster-wide scheduler rule only in _meta, without an alert count", async () => {
+    const cluster = record({
+      rule_id: "scheduler_health",
+      severity: "Medium",
+      confidence: "High",
+      title: "In the last 24 hours the alert scheduler skipped 4 evaluation windows",
+      actions: "ScaleAlertScheduler",
+    });
+    vi.mocked(alertCalibration.readDigests).mockImplementation(async (_org, read) =>
+      read === "" ? ([run] as never) : ([...findings, cluster] as never),
+    );
+    const selected = store.state.selectedOrganization;
+    store.state.selectedOrganization = { ...selected, identifier: "_meta" };
+    try {
+      const wrapper = await mountPage();
+      const rule = wrapper.find('[data-test="alert-calibration-dashboard-rule-scheduler_health"]');
+      expect(rule.exists()).toBe(true);
+      expect(rule.text()).not.toMatch(/\d+ alerts?/);
+      await rule.find("button").trigger("click");
+      await flushPromises();
+      expect(
+        wrapper.find('[data-test="alert-calibration-dashboard-rule-scheduler_health"]').text(),
+      ).toContain("skipped 4 evaluation windows");
+      wrapper.unmount();
+    } finally {
+      store.state.selectedOrganization = selected;
+    }
   });
 
   it("opens the flagged alert, and the evidence filtered to its rule", async () => {

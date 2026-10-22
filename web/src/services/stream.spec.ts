@@ -381,6 +381,24 @@ describe("stream service", () => {
       );
     });
 
+    it("sends a typed keyword URL-encoded, so quotes and spaces reach the server intact", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: [] });
+
+      await stream.fieldValues({
+        org_identifier: "org123",
+        stream_name: "test_stream",
+        fields: ["service_name"],
+        size: 10,
+        start_time: 1,
+        end_time: 2,
+        keyword: "open obs&x",
+      });
+
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(
+        "/api/org123/test_stream/_values?fields=service_name&size=10&start_time=1&end_time=2&keyword=open%20obs%26x",
+      );
+    });
+
     it("should handle empty query_fn", async () => {
       const params = {
         org_identifier: "org123",

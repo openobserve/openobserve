@@ -177,10 +177,6 @@ async fn query(
         if let Err(e) = search_service::check_search_allowed(org_id, None) {
             return MetaHttpResponse::too_many_requests(e);
         }
-        use db::org_users::get_cached_user_org;
-
-        use crate::service::auth::AuthExtractor;
-
         let ast = match promql::parse(&req.query.clone().unwrap_or_default()) {
             Ok(v) => v,
             Err(e) => {
@@ -208,38 +204,9 @@ async fn query(
                 .into_response();
         }
 
-        if !db::user::is_root_user(user_email) {
-            let stream_type_str = StreamType::Metrics.as_str();
-            for name in visitor.into_names() {
-                let user: config::meta::user::User =
-                    get_cached_user_org(org_id, user_email).unwrap();
-                if !openobserve_core::authz::check_permissions(
-                    user_email,
-                    AuthExtractor {
-                        auth: "".to_string(),
-                        method: "GET".to_string(),
-                        o2_type: format!(
-                            "{}:{}",
-                            OFGA_MODELS
-                                .get(stream_type_str)
-                                .map_or(stream_type_str, |model| model.key),
-                            openobserve_core::auth::into_ofga_supported_format(&name)
-                        ),
-                        org_id: org_id.to_string(),
-                        bypass_check: false,
-                        parent_id: "".to_string(),
-                        use_all_org: false,
-                        use_self_context: false,
-                        use_self_parent: true,
-                    },
-                    user.role,
-                    user.is_external,
-                )
-                .await
-                {
-                    return MetaHttpResponse::forbidden("Unauthorized Access");
-                }
-            }
+        if let Some(res) = check_metric_permissions(org_id, user_email, visitor.into_names()).await
+        {
+            return res;
         }
     }
 
@@ -473,10 +440,6 @@ async fn query_range(
     let trace_id = get_or_create_trace_id(headers, &http_span);
     #[cfg(feature = "enterprise")]
     {
-        use db::org_users::get_cached_user_org;
-
-        use crate::service::auth::AuthExtractor;
-
         if let Err(e) = search_service::check_search_allowed(org_id, None) {
             return MetaHttpResponse::too_many_requests(e);
         }
@@ -508,39 +471,9 @@ async fn query_range(
                 .into_response();
         }
 
-        if !db::user::is_root_user(user_email) {
-            let stream_type_str = StreamType::Metrics.as_str();
-            for name in visitor.into_names() {
-                let user: config::meta::user::User =
-                    get_cached_user_org(org_id, user_email).unwrap();
-                if user.is_external
-                    && !openobserve_core::authz::check_permissions(
-                        user_email,
-                        AuthExtractor {
-                            auth: "".to_string(),
-                            method: "GET".to_string(),
-                            o2_type: format!(
-                                "{}:{}",
-                                OFGA_MODELS
-                                    .get(stream_type_str)
-                                    .map_or(stream_type_str, |model| model.key),
-                                openobserve_core::auth::into_ofga_supported_format(&name)
-                            ),
-                            org_id: org_id.to_string(),
-                            bypass_check: false,
-                            parent_id: "".to_string(),
-                            use_all_org: false,
-                            use_self_context: false,
-                            use_self_parent: true,
-                        },
-                        user.role,
-                        user.is_external,
-                    )
-                    .await
-                {
-                    return MetaHttpResponse::forbidden("Unauthorized Access");
-                }
-            }
+        if let Some(res) = check_metric_permissions(org_id, user_email, visitor.into_names()).await
+        {
+            return res;
         }
     }
 
@@ -854,50 +787,10 @@ async fn series(
     }
 
     #[cfg(feature = "enterprise")]
+    if let Some(res) =
+        check_metric_permissions(org_id, _user_email, series_metric_names(selector.as_ref())).await
     {
-        use db::org_users::get_cached_user_org;
-
-        use crate::service::auth::AuthExtractor;
-
-        let metric_name = match selector
-            .as_ref()
-            .and_then(metrics::prom::try_into_metric_name)
-        {
-            Some(name) => name,
-            None => "".to_string(),
-        };
-
-        if !db::user::is_root_user(_user_email) {
-            let user: config::meta::user::User = get_cached_user_org(org_id, _user_email).unwrap();
-            let stream_type_str = StreamType::Metrics.as_str();
-            if user.is_external
-                && !openobserve_core::authz::check_permissions(
-                    _user_email,
-                    AuthExtractor {
-                        auth: "".to_string(),
-                        method: "GET".to_string(),
-                        o2_type: format!(
-                            "{}:{}",
-                            OFGA_MODELS
-                                .get(stream_type_str)
-                                .map_or(stream_type_str, |model| model.key),
-                            openobserve_core::auth::into_ofga_supported_format(&metric_name)
-                        ),
-                        org_id: org_id.to_string(),
-                        bypass_check: false,
-                        parent_id: "".to_string(),
-                        use_all_org: false,
-                        use_self_context: false,
-                        use_self_parent: true,
-                    },
-                    user.role,
-                    user.is_external,
-                )
-                .await
-            {
-                return MetaHttpResponse::forbidden("Unauthorized Access");
-            }
-        }
+        return res;
     }
 
     match metrics::prom::get_series(org_id, selector, start, end).await {
@@ -1414,6 +1307,38 @@ fn format_query(query: &str) -> Response {
         .into_response()
 }
 
+/// Requires read permission on every named metric for any non-root caller; `None` means allowed.
+#[cfg(feature = "enterprise")]
+async fn check_metric_permissions(
+    org_id: &str,
+    user_id: &str,
+    names: impl IntoIterator<Item = String>,
+) -> Option<Response> {
+    for name in names {
+        if let Some(res) = openobserve_core::authz::check_stream_permissions(
+            &name,
+            org_id,
+            user_id,
+            &StreamType::Metrics,
+            openobserve_core::authz::StreamPermissionResourceType::Search,
+        )
+        .await
+        {
+            return Some(res);
+        }
+    }
+    None
+}
+
+/// No `match[]` reads no metric (`get_series` answers `[]`), so it needs no grant.
+#[cfg(any(feature = "enterprise", test))]
+fn series_metric_names(selector: Option<&parser::VectorSelector>) -> Vec<String> {
+    selector
+        .and_then(metrics::prom::try_into_metric_name)
+        .into_iter()
+        .collect()
+}
+
 fn search_timeout(timeout: Option<String>) -> i64 {
     match timeout {
         None => 0,
@@ -1812,6 +1737,41 @@ impl promql_parser::util::ExprVisitor for MaxLookbackWindowVisitor {
 mod tests {
     use super::*;
 
+    #[test]
+    fn metric_reads_check_permission_for_every_non_root_user() {
+        let text = include_str!("mod.rs");
+        for signature in [
+            "async fn query(",
+            "async fn query_range(",
+            "async fn series(",
+        ] {
+            let start = text
+                .find(signature)
+                .unwrap_or_else(|| panic!("{signature} not found"));
+            let body = &text[start..];
+            let body = &body[..body.find("\n}\n").expect("handler end")];
+            assert!(
+                body.contains("check_metric_permissions("),
+                "{signature} must check every metric it reads"
+            );
+        }
+        let flat = text.split_whitespace().collect::<Vec<_>>().join(" ");
+        assert!(
+            !flat.contains(concat!("if user.is_external", " && !")),
+            "a metric permission check must not depend on how the user signed in"
+        );
+    }
+
+    #[test]
+    fn series_without_match_checks_no_metric() {
+        assert!(series_metric_names(None).is_empty());
+        let selector = match parser::parse("up{job=\"x\"}").unwrap() {
+            parser::Expr::VectorSelector(selector) => selector,
+            other => panic!("unexpected {other:?}"),
+        };
+        assert_eq!(series_metric_names(Some(&selector)), ["up"]);
+    }
+
     async fn parse_tree_response(query: &str) -> (StatusCode, serde_json::Value) {
         let response = parse_tree(
             Path("org".to_string()),
@@ -2046,19 +2006,6 @@ mod tests {
         assert!(result > 0, "5m range query should return positive lookback");
         // 5 minutes = 300 seconds = 300_000_000 micros
         assert_eq!(result, 300_000_000);
-    }
-
-    #[test]
-    fn test_max_lookback_single_range_5m() {
-        // Single range selector 5m -> 300s -> 300_000_000 micros
-        let result = get_max_lookback_window("rate(http_requests_total[5m])");
-        assert_eq!(result, 300_000_000);
-    }
-
-    #[test]
-    fn test_max_lookback_10m() {
-        let result = get_max_lookback_window("rate(up[10m])");
-        assert_eq!(result, 600_000_000); // 10m in micros
     }
 
     // --- MaxLookbackWindowVisitor ---

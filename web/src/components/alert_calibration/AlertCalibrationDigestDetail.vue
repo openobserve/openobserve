@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}
         </OText>
         <OText v-else-if="findings.length !== run.finding_count" variant="meta" as="div">
-          {{ t("alertCalibration.detail.perAlertNote") }}
+          {{ t("alertCalibration.detail.perSubjectNote") }}
         </OText>
         <div class="flex flex-col gap-3">
           <AlertCalibrationFindingCard

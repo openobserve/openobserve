@@ -309,13 +309,6 @@ impl MemorySize for ExecutableNode {
     }
 }
 
-#[derive(Debug)]
-pub struct ExecutablePipelineBulkInputs {
-    records: Vec<Value>,
-    doc_ids: Vec<Option<String>>,
-    originals: Vec<Option<String>>,
-}
-
 impl ExecutablePipeline {
     pub fn contains_llm_evaluation_node(&self) -> bool {
         self.node_map
@@ -1218,37 +1211,6 @@ impl std::fmt::Display for ExecutableNode {
     }
 }
 
-impl ExecutablePipelineBulkInputs {
-    pub fn new() -> Self {
-        Self {
-            records: Vec::new(),
-            doc_ids: Vec::new(),
-            originals: Vec::new(),
-        }
-    }
-
-    pub fn add_input(
-        &mut self,
-        record: Value,
-        doc_id: Option<String>,
-        original_data: Option<String>,
-    ) {
-        self.records.push(record);
-        self.doc_ids.push(doc_id);
-        self.originals.push(original_data);
-    }
-
-    pub fn into_parts(self) -> (Vec<Value>, Vec<Option<String>>, Vec<Option<String>>) {
-        (self.records, self.doc_ids, self.originals)
-    }
-}
-
-impl Default for ExecutablePipelineBulkInputs {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[derive(Debug, Clone)]
 struct PipelineItem {
     idx: usize,
@@ -2093,7 +2055,7 @@ async fn process_function_node(
                     if !is_result_array {
                         // Single record processing with JS
                         let js_timer = Instant::now();
-                        let js_res = apply_js_fn(
+                        let js_res = apply_js_fn_off_worker(
                             js_config,
                             record,
                             &metadata.org_id,
@@ -2234,7 +2196,7 @@ async fn process_function_node(
             CompiledFunctionRuntime::JS(js_config, true) => {
                 // JS result array processing
                 let js_arr_timer = Instant::now();
-                let js_arr_res = apply_js_fn(
+                let js_arr_res = apply_js_fn_off_worker(
                     js_config,
                     json::Value::Array(result_array_records),
                     &metadata.org_id,
@@ -2302,6 +2264,16 @@ async fn process_function_node(
     );
 
     count
+}
+
+/// `apply_js_fn`, run where its synchronous eval cannot stall the other tasks on this worker.
+fn apply_js_fn_off_worker(
+    js_config: &JSRuntimeConfig,
+    record: json::Value,
+    org_id: &str,
+    stream_name: &[String],
+) -> (json::Value, Option<String>) {
+    tokio::task::block_in_place(|| apply_js_fn(js_config, record, org_id, stream_name))
 }
 
 async fn process_condition_node(
@@ -3271,7 +3243,13 @@ fn resolve_stream_name(haystack: &str, record: &Value) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::{
+        collections::HashMap,
+        sync::{
+            Arc,
+            atomic::{AtomicU64, Ordering},
+        },
+    };
 
     use config::{
         meta::pipeline::components::{Edge, Node},
@@ -3307,15 +3285,6 @@ mod tests {
         assert!(err1.is_err());
         let err1 = resolve_stream_name("{{eulav}}", &record);
         assert!(err1.is_err());
-    }
-
-    // Test ExecutablePipelineBulkInputs
-    #[test]
-    fn test_executable_pipeline_bulk_inputs_new() {
-        let inputs = ExecutablePipelineBulkInputs::new();
-        assert!(inputs.records.is_empty());
-        assert!(inputs.doc_ids.is_empty());
-        assert!(inputs.originals.is_empty());
     }
 
     #[test]
@@ -3464,74 +3433,6 @@ mod tests {
         assert_eq!(eval_sampling_key(&first_span, 0), "span-a");
         assert_eq!(eval_sampling_key(&second_span, 0), "span-b");
         assert_eq!(eval_sampling_key(&trace_only, 99), "same-trace");
-    }
-
-    #[test]
-    fn test_executable_pipeline_bulk_inputs_default() {
-        let inputs = ExecutablePipelineBulkInputs::default();
-        assert!(inputs.records.is_empty());
-        assert!(inputs.doc_ids.is_empty());
-        assert!(inputs.originals.is_empty());
-    }
-
-    #[test]
-    fn test_executable_pipeline_bulk_inputs_add_input() {
-        let mut inputs = ExecutablePipelineBulkInputs::new();
-        let record = json::json!({"key": "value"});
-        let doc_id = Some("doc123".to_string());
-        let original = Some("original_data".to_string());
-
-        inputs.add_input(record.clone(), doc_id.clone(), original.clone());
-
-        assert_eq!(inputs.records.len(), 1);
-        assert_eq!(inputs.doc_ids.len(), 1);
-        assert_eq!(inputs.originals.len(), 1);
-        assert_eq!(inputs.records[0], record);
-        assert_eq!(inputs.doc_ids[0], doc_id);
-        assert_eq!(inputs.originals[0], original);
-    }
-
-    #[test]
-    fn test_executable_pipeline_bulk_inputs_add_multiple() {
-        let mut inputs = ExecutablePipelineBulkInputs::new();
-
-        // Add first input
-        let record1 = json::json!({"key1": "value1"});
-        inputs.add_input(record1.clone(), Some("doc1".to_string()), None);
-
-        // Add second input
-        let record2 = json::json!({"key2": "value2"});
-        inputs.add_input(record2.clone(), None, Some("original2".to_string()));
-
-        assert_eq!(inputs.records.len(), 2);
-        assert_eq!(inputs.doc_ids.len(), 2);
-        assert_eq!(inputs.originals.len(), 2);
-
-        assert_eq!(inputs.records[0], record1);
-        assert_eq!(inputs.records[1], record2);
-        assert_eq!(inputs.doc_ids[0], Some("doc1".to_string()));
-        assert_eq!(inputs.doc_ids[1], None);
-        assert_eq!(inputs.originals[0], None);
-        assert_eq!(inputs.originals[1], Some("original2".to_string()));
-    }
-
-    #[test]
-    fn test_executable_pipeline_bulk_inputs_into_parts() {
-        let mut inputs = ExecutablePipelineBulkInputs::new();
-        let record = json::json!({"test": "data"});
-        let doc_id = Some("test_doc".to_string());
-        let original = Some("test_original".to_string());
-
-        inputs.add_input(record.clone(), doc_id.clone(), original.clone());
-
-        let (records, doc_ids, originals) = inputs.into_parts();
-
-        assert_eq!(records.len(), 1);
-        assert_eq!(doc_ids.len(), 1);
-        assert_eq!(originals.len(), 1);
-        assert_eq!(records[0], record);
-        assert_eq!(doc_ids[0], doc_id);
-        assert_eq!(originals[0], original);
     }
 
     // Test ExecutableNode
@@ -5590,5 +5491,47 @@ mod tests {
         assert!(result_rx.try_recv().is_err());
         let (_, _, err, ..) = error_rx.try_recv().expect("the internal write is reported");
         assert!(err.contains("_o2_ai_chat_events"), "{err}");
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+    async fn a_js_function_does_not_stall_the_other_tasks_on_its_worker() {
+        const BURN_MS: u64 = 600;
+        let js_config = compile_js_function(
+            &format!(
+                "var t = Date.now(); while (Date.now() - t < {BURN_MS}) {{}} row.done = true;"
+            ),
+            "off_worker_org",
+        )
+        .unwrap();
+
+        let start = Instant::now();
+        // Queued first on the only worker, so the eval holds it unless it declares the block.
+        let eval = tokio::spawn(async move {
+            apply_js_fn_off_worker(
+                &js_config,
+                json::json!({"a": 1}),
+                "off_worker_org",
+                std::slice::from_ref(&String::new()),
+            )
+        });
+        let woke_after = Arc::new(AtomicU64::new(0));
+        let ticker = {
+            let woke_after = woke_after.clone();
+            tokio::spawn(async move {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+                woke_after.store(start.elapsed().as_millis() as u64, Ordering::SeqCst);
+            })
+        };
+
+        let (record, error) = eval.await.unwrap();
+        assert_eq!(error, None);
+        assert_eq!(record["done"], json::json!(true));
+
+        ticker.await.unwrap();
+        let woke_after = woke_after.load(Ordering::SeqCst);
+        assert!(
+            woke_after < BURN_MS / 2,
+            "the sleeping task only woke after {woke_after}ms, so the JavaScript eval held the worker"
+        );
     }
 }

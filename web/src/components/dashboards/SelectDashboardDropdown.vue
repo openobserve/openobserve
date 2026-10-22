@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <OButton
+      :aria-label="t('dashboard.selectDashboardDropdown.newDashboard')"
       data-test="dashboard-dashboard-new-add"
       variant="outline"
       size="icon-xs-sq"

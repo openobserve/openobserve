@@ -124,6 +124,7 @@
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
+                  :aria-label="t('search.moreActions')"
                   icon-left="more-vert"
                   variant="ghost"
                   size="icon-xs-sq"
@@ -188,6 +189,7 @@
                     >{{ t("search_scheduler_job.sql_query") }} :
                     <span>
                       <OButton
+                        :aria-label="t('common.copyToClipboard')"
                         variant="outline"
                         size="icon-chip"
                         class="ms-2"
@@ -240,6 +242,7 @@
                     >{{ t("search_scheduler_job.function_definition") }} :
                     <span>
                       <OButton
+                        :aria-label="t('common.copyToClipboard')"
                         data-test="search-scheduler-copy-function-btn"
                         variant="outline"
                         size="icon-chip"

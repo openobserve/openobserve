@@ -132,7 +132,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </div>
                 <div class="ms-auto flex shrink-0 items-center">
-                  <OButton variant="ghost" size="icon-circle-sm" @click.stop="viewGroup(group)">
+                  <OButton
+                    :aria-label="t('common.view')"
+                    variant="ghost"
+                    size="icon-circle-sm"
+                    @click.stop="viewGroup(group)"
+                  >
                     <OIcon name="visibility" size="sm" />
                   </OButton>
                 </div>
@@ -173,6 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="ms-auto flex shrink-0 items-center">
                   <OButton
+                    :aria-label="t('common.compare')"
                     variant="ghost"
                     size="icon-circle-sm"
                     @click.stop="viewModification(mod)"

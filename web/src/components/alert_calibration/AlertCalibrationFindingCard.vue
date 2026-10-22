@@ -53,20 +53,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OSeparator />
 
-    <OCardSection role="body" class="flex flex-col gap-2 pt-3">
-      <dl class="flex flex-wrap gap-x-6 gap-y-1">
+    <OCardSection role="body" class="flex flex-col gap-3 pt-3">
+      <dl class="flex flex-wrap gap-x-8 gap-y-2">
         <div
           v-for="row in evidence"
           :key="row.column"
-          class="flex min-w-0 items-baseline gap-1.5"
+          class="flex min-w-0 flex-col"
           :class="row.wide ? 'basis-full' : ''"
         >
-          <dt class="text-text-secondary shrink-0 text-xs">{{ row.label }}</dt>
-          <OTruncatedText as="dd" class="text-text-body min-w-0 text-xs font-medium tabular-nums">
+          <dt class="text-text-secondary text-xs">{{ row.label }}</dt>
+          <OTruncatedText as="dd" class="text-text-body min-w-0 text-sm font-medium tabular-nums">
             {{ row.value }}
           </OTruncatedText>
         </div>
       </dl>
+
+      <div v-if="lagLists.length" class="grid gap-3 lg:grid-cols-2">
+        <div
+          v-for="list in lagLists"
+          :key="list.column"
+          class="border-border-default rounded-default grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-x-4 gap-y-1.5 border px-3 py-2"
+          :data-test="`alert-calibration-finding-${list.key}-list`"
+        >
+          <OText variant="label" as="div" class="min-w-0">{{ list.label }}</OText>
+          <OText
+            v-for="column in LAG_COLUMNS"
+            :key="column.field"
+            variant="label"
+            as="div"
+            class="text-end"
+          >
+            {{ t(column.labelKey) }}
+          </OText>
+          <div
+            v-for="row in list.rows"
+            :key="row.key"
+            class="contents"
+            data-test="alert-calibration-finding-lag-row"
+          >
+            <OTruncatedText
+              class="text-text-body min-w-0 text-xs font-medium"
+              data-test="alert-calibration-finding-lag-cell"
+            >
+              {{ row.label }}
+            </OTruncatedText>
+            <span
+              v-for="column in LAG_COLUMNS"
+              :key="column.field"
+              class="text-text-body text-end text-xs tabular-nums"
+              data-test="alert-calibration-finding-lag-cell"
+            >
+              {{ formatEvidence(t, row[column.field], "count") }}
+            </span>
+          </div>
+        </div>
+      </div>
 
       <div
         v-if="actions.length"
@@ -90,6 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRouter } from "vue-router";
+import { format } from "date-fns";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
@@ -99,8 +141,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useOrgId } from "@/composables/query";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import type { FindingRecord } from "./digests";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
+import { parseLagRows, type FindingRecord, type LagRow } from "./digests";
 import { ACTION_META, isProposedAction, RULE_META } from "./rules";
 import {
   CONFIDENCE_LABEL,
@@ -111,6 +153,12 @@ import {
 } from "./format";
 
 const props = defineProps<{ finding: FindingRecord }>();
+
+const LAG_COLUMNS: { field: keyof LagRow; labelKey: I18nKey }[] = [
+  { field: "skipped_windows", labelKey: "alertCalibration.evidence.skippedWindows" },
+  { field: "late_evaluations", labelKey: "alertCalibration.evidence.lateEvaluations" },
+  { field: "evaluations", labelKey: "alertCalibration.evidence.evaluations" },
+];
 
 const { t } = useI18nTyped();
 const router = useRouter();
@@ -138,6 +186,24 @@ const evidence = computed(() =>
   })),
 );
 
+/** Only lists that name something show, each row labelled by its org or its hour. */
+const lagLists = computed(() =>
+  (meta.value.lagLists ?? [])
+    .map((list) => ({
+      column: list.column,
+      key: list.key,
+      label: t(list.labelKey),
+      rows: parseLagRows(props.finding[list.column], list.key).map((row) => ({
+        ...row,
+        label:
+          list.key === "org_id"
+            ? raw(String(row.key))
+            : raw(format(Number(row.key) / 1000, "MMM d, HH:mm")),
+      })),
+    }))
+    .filter((list) => list.rows.length > 0),
+);
+
 /** `actions` is comma-joined; an action this build does not know still shows, by its raw name. */
 const actions = computed<{ name: string; label: I18nText; description?: I18nText }[]>(() =>
   (props.finding.actions ?? "")
@@ -148,7 +214,10 @@ const actions = computed<{ name: string; label: I18nText; description?: I18nText
         ? {
             name,
             label: t(ACTION_META[name].labelKey),
-            description: t(ACTION_META[name].descriptionKey),
+            description: t(
+              ACTION_META[name].descriptionKey,
+              ACTION_META[name].descriptionParams ?? {},
+            ),
           }
         : { name, label: raw(name) },
     ),

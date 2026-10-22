@@ -21,7 +21,7 @@ import store from "@/test/unit/helpers/store";
 import { computeUserOrgKey } from "@/utils/userOrgKey";
 import i18n from "@/locales";
 
-vi.mock("highlight.js", () => ({
+vi.mock("@/lib/core/Code/highlighter", () => ({
   default: {
     highlight: vi.fn(() => ({ value: "" })),
     highlightAuto: vi.fn(() => ({ value: "" })),

@@ -522,7 +522,7 @@ mod tests {
     #[test]
     fn test_topn_collector() {
         let mut schema_builder = SchemaBuilder::new();
-        let opts = TextOptions::default().set_fast(None);
+        let opts = TextOptions::default().set_fast(tantivy::tokenizer::RAW_TOKENIZER_NAME);
         let f0 = schema_builder.add_text_field("f0", opts.clone());
         let f1 = schema_builder.add_text_field("f1", opts.clone());
         let f2 = schema_builder.add_text_field("f2", opts);

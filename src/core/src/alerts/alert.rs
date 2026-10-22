@@ -33,7 +33,7 @@ use config::{
         },
         folder::{DEFAULT_FOLDER, Folder, FolderType},
         search::{SearchEventContext, SearchEventType},
-        sql::resolve_stream_names,
+        sql::{TableReferenceExt, resolve_stream_names_with_type},
         stream::StreamType,
     },
     utils::{
@@ -55,7 +55,7 @@ use infra::{db::get_orm_client_ro, schema::unwrap_stream_settings, table};
 use itertools::Itertools;
 use lettre::{
     AsyncTransport, Message,
-    message::{Attachment, MultiPart, SinglePart},
+    message::{Attachment, MessageBuilder, MultiPart, SinglePart},
 };
 #[cfg(feature = "enterprise")]
 use o2_openfga::{
@@ -74,7 +74,8 @@ use svix_ksuid::Ksuid;
 use crate::auth::{check_folder_write_permissions, check_permissions};
 use crate::{
     alerts::{
-        QueryConditionExt, build_sql, destinations,
+        QueryConditionExt, build_sql,
+        destinations::{self, note_skipped, org_member_split},
         notifications::{
             NotificationContext, RenderedMessage, apply_custom_template, build_row_columns, chart,
             custom::{VarValue, process_variable_replace},
@@ -1024,8 +1025,8 @@ async fn prepare_alert(
             }
 
             let sql = alert.query_condition.sql.as_ref().unwrap();
-            let stream_names = match resolve_stream_names(sql) {
-                Ok(stream_names) => stream_names,
+            let stream_refs = match resolve_stream_names_with_type(sql) {
+                Ok(stream_refs) => stream_refs,
                 Err(e) => {
                     return Err(AlertError::ResolveStreamNameError(e));
                 }
@@ -1033,10 +1034,12 @@ async fn prepare_alert(
 
             // SQL may contain multiple stream names, check for each stream
             // if the alert period is greater than the max query range
-            for stream in stream_names.iter() {
-                if !stream.eq(stream_name)
+            for stream_ref in stream_refs.iter() {
+                let stream = stream_ref.stream_name();
+                let ref_type = stream_ref.get_stream_type(stream_type);
+                if !(stream == stream_name && ref_type == stream_type)
                     && let Some(settings) =
-                        infra::schema::get_settings(org_id, stream, stream_type).await
+                        infra::schema::get_settings(org_id, &stream, ref_type).await
                 {
                     let max_query_range = settings.max_query_range;
                     if max_query_range > 0
@@ -1045,7 +1048,7 @@ async fn prepare_alert(
                     {
                         return Err(AlertError::PeriodExceedsMaxQueryRange {
                             max_query_range_hours: max_query_range,
-                            stream_name: stream_name.to_owned(),
+                            stream_name: stream,
                         });
                     }
                 }
@@ -2167,21 +2170,6 @@ mod slo_source_guard_tests {
     }
 }
 
-pub async fn delete_by_name(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    name: &str,
-) -> Result<(), AlertError> {
-    let alert = db::alerts::alert::get_by_name(org_id, stream_type, stream_name, name)
-        .await
-        .map_err(|_| AlertError::AlertNotFound)?
-        .ok_or(AlertError::AlertNotFound)?;
-    let alert_id = alert.id.ok_or(AlertError::AlertNotFound)?;
-    let client = infra::db::get_orm_client_rw().await;
-    delete_by_id_user(client, org_id, alert_id).await
-}
-
 /// Enables an alert.
 pub async fn enable_by_id<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
@@ -2362,115 +2350,6 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     if o2_enterprise::enterprise::oncall::is_enabled() && !incident_notified {
         crate::alerts::scheduler::handlers::page_for_alert_firing(&trace_id, &alert, &rows).await;
     }
-    let outcome = alert
-        .send_notification(
-            &trace_id,
-            &rows,
-            now,
-            None,
-            now,
-            None,
-            None,
-            None,
-            skip_destinations,
-            None,
-        )
-        .await?;
-    let error_message = with_incident_notify_error(outcome.error_message, incident_notify_error);
-
-    Ok(ManualTrigger::Sent {
-        success_message: outcome.success_message,
-        error_message,
-    })
-}
-
-pub async fn trigger_by_name(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    name: &str,
-) -> Result<ManualTrigger, AlertError> {
-    let (_folder, alert) =
-        match db::alerts::alert::get_by_name_with_folder(org_id, stream_type, stream_name, name)
-            .await
-        {
-            Ok(Some(found)) => found,
-            _ => {
-                return Err(AlertError::AlertNotFound);
-            }
-        };
-    let now = Utc::now().timestamp_micros();
-    #[cfg(feature = "enterprise")]
-    if let Some(downtime) = suppressed_manual_trigger(&alert, &_folder.folder_id, now).await {
-        return Ok(ManualTrigger::Suppressed(downtime));
-    }
-
-    // For creates_incident=true alerts the incident correlation path handles
-    // the notification. For all other cases send the direct notification.
-    #[cfg(feature = "enterprise")]
-    let (incident_notified, incident_notify_error) = if alert.creates_incident
-        && o2_enterprise::enterprise::common::config::get_config()
-            .incidents
-            .enabled
-    {
-        let synthetic_row = manual_trigger_row(&alert);
-        let notify = std::slice::from_ref(&synthetic_row);
-
-        match crate::alerts::incidents::correlate_alert_to_incident(
-            &alert,
-            &synthetic_row,
-            notify,
-            now,
-            // Manual triggers evaluate nothing; no level to map.
-            None,
-            None,
-        )
-        .await
-        {
-            Ok(Some(correlated)) => {
-                log::info!(
-                    "Manual trigger for alert {org_id}/{} correlated to incident {} (service: {})",
-                    alert.name,
-                    correlated.outcome.incident_id(),
-                    correlated.outcome.service_name(),
-                );
-                (
-                    incident_path_notified(&correlated.outcome),
-                    correlated.notify_error,
-                )
-            }
-            Ok(None) => {
-                log::debug!(
-                    "No incident correlation for manually triggered alert {org_id}/{}",
-                    alert.name
-                );
-                (false, None)
-            }
-            Err(e) => {
-                log::error!(
-                    "Error correlating manual trigger to incident, falling back to direct notification: {e}"
-                );
-                (false, None)
-            }
-        }
-    } else {
-        (false, None)
-    };
-
-    #[cfg(not(feature = "enterprise"))]
-    let (incident_notified, incident_notify_error) = (false, None);
-
-    let trace_id = config::ider::generate_trace_id();
-    let trace_id = format!("trig_name_{trace_id}");
-    // Always sent: alert-attached workflows dispatch only from here. When the
-    // incident path already notified the destinations, they are skipped so the
-    // same manual trigger cannot page them twice.
-    let skip_destinations: &[String] = if incident_notified {
-        &alert.destinations
-    } else {
-        &[]
-    };
-    let rows = vec![manual_trigger_row(&alert)];
     let outcome = alert
         .send_notification(
             &trace_id,
@@ -2678,8 +2557,8 @@ impl AlertExt for Alert {
         // every surface below (each destination's template, and the workflow
         // trigger metadata). An SLO alert reports its SLO where an ordinary
         // alert reports its stream, and the SLO's NAME is on the evaluation
-        // row rather than on the alert — so the rowless paths
-        // (`trigger_by_id`, `trigger_by_name`) need one primary-key read to
+        // row rather than on the alert — so the rowless path
+        // (`trigger_by_id`) needs one primary-key read to
         // say the same thing a firing says. Resolving it here rather than
         // inside the renderer is what keeps that at one read per notification
 
@@ -3284,9 +3163,10 @@ async fn send_to_destination(
             match dest_type {
                 DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
                 DestinationType::Email(email) => {
-                    // Same string for both parts: identical to the MIME this
-                    // path emitted before the signature took two bodies.
-                    send_email_notification(&email_subject, email, msg.clone(), msg).await
+                    let (email, skipped) = org_member_email(&alert.org_id, email).await?;
+                    send_email_notification(&email_subject, &email, None, msg)
+                        .await
+                        .map(|resp| note_skipped(resp, &skipped))
                 }
                 DestinationType::Sns(aws_sns) => {
                     send_sns_notification(&alert.name, aws_sns, msg).await
@@ -3323,14 +3203,16 @@ async fn send_to_destination(
                     },
                     DestinationType::Email(email),
                 ) => {
+                    let (email, skipped) = org_member_email(&alert.org_id, email).await?;
                     send_email_notification_with_inline_png(
                         &subject,
-                        email,
-                        text,
+                        &email,
+                        Some(text),
                         html,
                         ctx.chart_png.clone(),
                     )
                     .await
+                    .map(|resp| note_skipped(resp, &skipped))
                 }
                 (
                     RenderedMessage::Sns {
@@ -3353,6 +3235,7 @@ async fn send_to_destination(
 /// going through the alert template system.
 #[cfg(feature = "enterprise")]
 pub(crate) async fn dispatch_notification(
+    org_id: &str,
     dest_type: &DestinationType,
     subject: &str,
     msg: String,
@@ -3363,7 +3246,10 @@ pub(crate) async fn dispatch_notification(
         // split, so both parts carry the same string — byte-identical to the
         // MIME this path emitted before the signature took two bodies.
         DestinationType::Email(email) => {
-            send_email_notification(subject, email, msg.clone(), msg).await
+            let (email, skipped) = org_member_email(org_id, email).await?;
+            send_email_notification(subject, &email, Some(msg.clone()), msg)
+                .await
+                .map(|resp| note_skipped(resp, &skipped))
         }
         DestinationType::Sns(aws_sns) => send_sns_notification(subject, aws_sns, msg).await,
     }
@@ -3388,6 +3274,7 @@ pub(crate) async fn dispatch_notification(
 /// itself, so the enterprise-only incident-notification call sites are
 /// untouched.
 pub(crate) async fn dispatch_test_message(
+    org_id: &str,
     dest_type: &DestinationType,
     title: &str,
     rendered: RenderedMessage,
@@ -3403,7 +3290,12 @@ pub(crate) async fn dispatch_test_message(
                 text,
             },
             DestinationType::Email(email),
-        ) => send_email_notification(&subject, email, text, html).await,
+        ) => {
+            let (email, skipped) = org_member_email(org_id, email).await?;
+            send_email_notification(&subject, &email, Some(text), html)
+                .await
+                .map(|resp| note_skipped(resp, &skipped))
+        }
         (RenderedMessage::Http { body }, DestinationType::Sns(aws_sns)) => {
             send_sns_notification(title, aws_sns, body).await
         }
@@ -3414,6 +3306,26 @@ pub(crate) async fn dispatch_test_message(
             "Rendered message {rendered:?} does not match destination type {dest_type:?}"
         )),
     }
+}
+
+/// Narrows an email destination to org members and returns the skipped ones. [strong]
+async fn org_member_email(
+    org_id: &str,
+    email: &Email,
+) -> Result<(Email, Vec<String>), anyhow::Error> {
+    let (kept, skipped) = org_member_split(org_id, &email.recipients).await?;
+    Ok((members_to_send(kept, &skipped)?, skipped))
+}
+
+/// Email to the kept members, or an error naming the skipped when none is left. [pure]
+fn members_to_send(kept: Vec<String>, skipped: &[String]) -> Result<Email, anyhow::Error> {
+    if kept.is_empty() && !skipped.is_empty() {
+        return Err(anyhow::anyhow!(
+            "Email not sent: no recipient is part of this org (skipped: {})",
+            skipped.join(", ")
+        ));
+    }
+    Ok(Email { recipients: kept })
 }
 
 async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<String, anyhow::Error> {
@@ -3481,12 +3393,15 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
         Ok(v) => v,
         Err(e) => {
             log::error!("error sending request to {} with error {e:?}", endpoint.url);
-            return Err(anyhow::anyhow!("error sending request : {e:?}"));
+            return Err(anyhow::anyhow!(
+                "error sending request : {:?}",
+                e.without_url()
+            ));
         }
     };
     let resp_status = resp.status();
     let hide_body = config::utils::ssrf_guard::admitted_only_by_allowlist(&resp);
-    let resp_body = resp.text().await?;
+    let resp_body = resp.text().await.map_err(reqwest::Error::without_url)?;
 
     log::debug!(
         "Alert sent to destination {} with status: {}, body:\n{}",
@@ -3544,21 +3459,17 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
     send_outcome(resp_status, &resp_body, hide_body)
 }
 
-/// Send a multipart/alternative email.
+/// Send an email; with `text_body: None` it carries only the HTML part.
 ///
 /// Parameter order is `(text_body, html_body)` to MATCH
 /// `MultiPart::alternative_plain_html`, whose first argument is the plaintext
 /// part. Keeping the two orderings identical is deliberate: the failure mode of
 /// swapping them — HTML delivered as the plaintext part, so every alert email
 /// shows raw markup — is silent and customer-visible.
-///
-/// The custom-template path passes the SAME string for both, which reproduces
-/// exactly the MIME this function emitted when it took one `msg`. The
-/// Phase-1b renderers pass genuinely distinct parts.
 pub async fn send_email_notification(
     email_subject: &str,
     email: &Email,
-    text_body: String,
+    text_body: Option<String>,
     html_body: String,
 ) -> Result<String, anyhow::Error> {
     send_email_notification_with_inline_png(email_subject, email, text_body, html_body, None).await
@@ -3566,16 +3477,15 @@ pub async fn send_email_notification(
 
 /// [`send_email_notification`] plus an optional inline chart PNG.
 ///
-/// With a PNG the MIME becomes
-/// `alternative(plain, related(html, image))` — the HTML part references the
+/// With a PNG the MIME becomes `alternative(plain, related(html, image))`, or
+/// `related(html, image)` alone when `text_body` is `None` — the HTML part references the
 /// image as `cid:` ([`render::email::CHART_CONTENT_ID`]) and the bytes travel
 /// inside this same email, so the chart renders even in clients that block
-/// remote images and nothing is hosted anywhere. Without a PNG the MIME is
-/// byte-identical to what this function always emitted.
+/// remote images and nothing is hosted anywhere.
 pub async fn send_email_notification_with_inline_png(
     email_subject: &str,
     email: &Email,
-    text_body: String,
+    text_body: Option<String>,
     html_body: String,
     inline_png: Option<std::sync::Arc<Vec<u8>>>,
 ) -> Result<String, anyhow::Error> {
@@ -3597,32 +3507,43 @@ pub async fn send_email_notification_with_inline_png(
         email = email.reply_to(cfg.smtp.smtp_reply_to.parse()?);
     }
 
-    let multipart = match inline_png {
-        None => MultiPart::alternative_plain_html(text_body, html_body),
-        Some(png) => MultiPart::alternative()
-            .singlepart(SinglePart::plain(text_body))
-            .multipart(
-                MultiPart::related()
-                    .singlepart(SinglePart::html(html_body))
-                    .singlepart(
-                        Attachment::new_inline(
-                            crate::alerts::notifications::render::email::CHART_CONTENT_ID
-                                .to_string(),
-                        )
-                        .body(
-                            png.as_ref().clone(),
-                            "image/png".parse().expect("static mime type"),
-                        ),
-                    ),
-            ),
-    };
-    let email = email.multipart(multipart).unwrap();
+    let email = with_email_body(email, text_body, html_body, inline_png)?;
 
     // Send the email
     match SMTP_CLIENT.as_ref().unwrap().send(email).await {
         Ok(resp) => Ok(format!("sent email response code: {}", resp.code())),
         Err(e) => Err(anyhow::anyhow!("Error sending email: {e}")),
     }
+}
+
+/// Attach `alternative(plain, html)`, or the HTML alone when `text_body` is `None`.
+fn with_email_body(
+    builder: MessageBuilder,
+    text_body: Option<String>,
+    html_body: String,
+    inline_png: Option<std::sync::Arc<Vec<u8>>>,
+) -> Result<Message, lettre::error::Error> {
+    match (text_body, inline_png) {
+        (Some(text), None) => builder.multipart(MultiPart::alternative_plain_html(text, html_body)),
+        (Some(text), Some(png)) => builder.multipart(
+            MultiPart::alternative()
+                .singlepart(SinglePart::plain(text))
+                .multipart(html_with_inline_png(html_body, &png)),
+        ),
+        (None, None) => builder.singlepart(SinglePart::html(html_body)),
+        (None, Some(png)) => builder.multipart(html_with_inline_png(html_body, &png)),
+    }
+}
+
+fn html_with_inline_png(html_body: String, png: &[u8]) -> MultiPart {
+    MultiPart::related()
+        .singlepart(SinglePart::html(html_body))
+        .singlepart(
+            Attachment::new_inline(
+                crate::alerts::notifications::render::email::CHART_CONTENT_ID.to_string(),
+            )
+            .body(png.to_vec(), "image/png".parse().expect("static mime type")),
+        )
 }
 
 /// Discord webhook send with the chart PNG uploaded in the same request
@@ -3657,10 +3578,15 @@ async fn send_discord_with_attachment(
                 .mime_str("image/png")?,
         );
 
-    let resp = client.post(url).multipart(form).send().await?;
+    let resp = client
+        .post(url)
+        .multipart(form)
+        .send()
+        .await
+        .map_err(reqwest::Error::without_url)?;
     let resp_status = resp.status();
     let hide_body = config::utils::ssrf_guard::admitted_only_by_allowlist(&resp);
-    let resp_body = resp.text().await?;
+    let resp_body = resp.text().await.map_err(reqwest::Error::without_url)?;
     if !resp_status.is_success() {
         log::error!(
             "Alert discord notification failed with status: {resp_status}, body: {resp_body}, payload: {msg}"
@@ -3772,11 +3698,25 @@ fn process_row_templates_plain(
     let alert_count = rows.len();
     let mut rows_tpl = Vec::with_capacity(rows.len());
 
-    // For JSON row template type, try to parse the template as JSON
     let is_json_template = row_type == RowTemplateType::Json;
 
     for (row, tpl) in rows.iter().zip(templates) {
+        let spread_enabled = !row.contains_key("...row");
+        if spread_enabled && tpl.template.trim() == "{...row}" {
+            rows_tpl.push(if is_json_template {
+                Value::Object(row.clone())
+            } else {
+                Value::String(serde_json::to_string(row).unwrap_or_default())
+            });
+            continue;
+        }
         let mut resp = tpl.template.clone();
+        // Protect source tokens so row values cannot introduce or alter a spread expansion.
+        let spread_marker = (spread_enabled && resp.contains("{...row}")).then(|| {
+            let marker = format!("\u{e000}{:032x}\u{e001}", rand::random::<u128>());
+            resp = resp.replace("{...row}", &marker);
+            marker
+        });
         let mut alert_start_time = 0;
         let mut alert_end_time = 0;
         for (key, value) in row.iter() {
@@ -3886,6 +3826,9 @@ fn process_row_templates_plain(
         }
 
         resp = tpl.finish(resp);
+        if let Some(marker) = spread_marker {
+            resp = resp.replace(&marker, &serde_json::to_string(row).unwrap_or_default());
+        }
 
         // If this is a JSON row template, try to parse it as JSON
         if is_json_template {
@@ -4877,7 +4820,7 @@ mod send_path_tests {
     };
     use crate::{
         alerts::notifications::platform::{Platform, send_resolve},
-        ssrf_test_support::{isolated, secret_server},
+        ssrf_test_support::{isolated, secret_server, truncated_server},
     };
 
     #[test]
@@ -5122,6 +5065,72 @@ mod send_path_tests {
         );
     }
 
+    #[test]
+    fn a_destination_that_cannot_be_reached_keeps_its_url_out_of_the_error() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_destination_that_cannot_be_reached_keeps_its_url_out_of_the_error"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let port = std::net::TcpListener::bind("127.0.0.1:0")
+                    .unwrap()
+                    .local_addr()
+                    .unwrap()
+                    .port();
+                let dest = endpoint(
+                    &format!("http://127.0.0.1:{port}"),
+                    "/hooks/T0/hooktoken?key=querytoken",
+                );
+                let png = std::sync::Arc::new(vec![0u8; 8]);
+                let seen = [
+                    send_http_notification(&dest, "{}".into()).await,
+                    send_discord_with_attachment(&dest, "{}".into(), png).await,
+                    send_resolve(Platform::PagerDuty, &dest, "ep-1").await,
+                ];
+                for (path, shown) in ["http", "discord", "resolve"].into_iter().zip(seen) {
+                    let shown = shown.expect_err("nothing listens on the port").to_string();
+                    assert!(
+                        !shown.contains("hooktoken") && !shown.contains("querytoken"),
+                        "{path}: {shown}"
+                    );
+                }
+            },
+        );
+    }
+
+    #[test]
+    fn a_destination_that_drops_its_body_keeps_its_url_out_of_the_error() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_destination_that_drops_its_body_keeps_its_url_out_of_the_error"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let dest = endpoint(
+                    &truncated_server().await,
+                    "/hooks/T0/hooktoken?key=querytoken",
+                );
+                let png = std::sync::Arc::new(vec![0u8; 8]);
+                let seen = [
+                    send_http_notification(&dest, "{}".into()).await,
+                    send_discord_with_attachment(&dest, "{}".into(), png).await,
+                ];
+                for (path, shown) in ["http", "discord"].into_iter().zip(seen) {
+                    let shown = shown.expect_err("the body is cut short").to_string();
+                    assert!(
+                        shown.contains("decoding response body")
+                            && !shown.contains("hooktoken")
+                            && !shown.contains("querytoken"),
+                        "{path}: {shown}"
+                    );
+                }
+            },
+        );
+    }
+
     #[cfg(feature = "enterprise")]
     #[test]
     fn a_repeated_alert_does_not_suppress_the_direct_notification() {
@@ -5168,6 +5177,50 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn email_body_is_html_only_without_text() {
+        let builder = || {
+            Message::builder()
+                .from("o2@example.com".parse().unwrap())
+                .to("on-call@example.com".parse().unwrap())
+                .subject("s")
+        };
+        let html = "<p>hi</p>".to_string();
+        let html_only = with_email_body(builder(), None, html.clone(), None).unwrap();
+        let html_only = String::from_utf8(html_only.formatted()).unwrap();
+        assert!(!html_only.contains("text/plain"));
+        assert!(!html_only.contains("multipart/alternative"));
+        assert!(html_only.contains("text/html"));
+
+        let both = with_email_body(builder(), Some("hi".into()), html, None).unwrap();
+        let both = String::from_utf8(both.formatted()).unwrap();
+        assert!(both.contains("multipart/alternative"));
+        assert!(both.contains("text/plain"));
+        assert!(both.contains("text/html"));
+    }
+
+    #[test]
+    fn test_members_to_send() {
+        let to = |list: &[&str]| list.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        type Expected = Result<Vec<String>, String>;
+        let cases: Vec<(Vec<String>, Vec<String>, Expected)> = vec![
+            (to(&["a@x.com"]), vec![], Ok(to(&["a@x.com"]))),
+            (to(&["a@x.com"]), to(&["gone@x.com"]), Ok(to(&["a@x.com"]))),
+            (vec![], vec![], Ok(vec![])),
+            (
+                vec![],
+                to(&["gone@x.com", "left@x.com"]),
+                Err("Email not sent: no recipient is part of this org (skipped: gone@x.com, left@x.com)".to_string()),
+            ),
+        ];
+        for (kept, skipped, expected) in cases {
+            let got = members_to_send(kept, &skipped)
+                .map(|email| email.recipients)
+                .map_err(|e| e.to_string());
+            assert_eq!(got, expected, "skipped {skipped:?}");
+        }
+    }
 
     #[test]
     fn test_with_incident_notify_error() {
@@ -5392,33 +5445,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_update_cron_expression_3() {
-        let cron_exp = "**/15 21-23,0-8 * * *";
-        let now = Utc::now().second();
-        let new_cron_exp = update_cron_expression(cron_exp, now);
-        let updated = format!("{now} */15 21-23,0-8 * * *");
-        assert_eq!(new_cron_exp, updated);
-    }
-
-    #[tokio::test]
-    async fn test_update_cron_expression_4() {
-        let cron_exp = "*10*****";
-        let now = Utc::now().second();
-        let new_cron_exp = update_cron_expression(cron_exp, now);
-        let updated = format!("{now} 10*****");
-        assert_eq!(new_cron_exp, updated);
-    }
-
-    #[tokio::test]
-    async fn test_update_cron_expression_5() {
-        let cron_exp = "* */10 2 * * * *";
-        let now = Utc::now().second();
-        let new_cron_exp = update_cron_expression(cron_exp, now);
-        let updated = format!("{now} */10 2 * * * *");
-        assert_eq!(new_cron_exp, updated);
-    }
-
-    #[tokio::test]
     async fn test_contains_operator_sql() {
         let condition = Condition {
             column: "auth_username".to_string(),
@@ -5564,13 +5590,6 @@ mod tests {
         let original = tpl.clone();
         process_variable_replace(&mut tpl, "age", &VarValue::Str("30"), false);
         assert_eq!(tpl, original); // Should remain unchanged
-    }
-
-    #[test]
-    fn test_process_variable_replace_multiple_occurrences() {
-        let mut tpl = "{name} says hello to {name}".to_string();
-        process_variable_replace(&mut tpl, "name", &VarValue::Str("Bob"), false);
-        assert_eq!(tpl, "Bob says hello to Bob");
     }
 
     #[test]
@@ -5783,12 +5802,6 @@ mod tests {
     }
 
     #[test]
-    fn test_check_json_context_in_middle_of_text() {
-        let tpl = r#"This is {rows} in text"#;
-        assert!(!check_json_context(tpl, "rows"));
-    }
-
-    #[test]
     fn test_check_json_context_with_comma() {
         let tpl = r#"{"hits": "{rows}", "count": 5}"#;
         assert!(check_json_context(tpl, "rows"));
@@ -5913,6 +5926,190 @@ mod tests {
         assert_eq!(result.len(), 1);
         // Should fallback to string when JSON parsing fails
         assert!(result[0].is_string());
+    }
+
+    #[test]
+    fn test_process_row_template_spread_row_json_type() {
+        let row_template = "{...row}".to_string();
+        let mut row1 = Map::new();
+        row1.insert("host".to_string(), json!("web-1"));
+        row1.insert("cpu".to_string(), json!(92.5));
+        let mut row2 = Map::new();
+        row2.insert("host".to_string(), json!("web-2"));
+        row2.insert("cpu".to_string(), json!(88.1));
+        let rows = vec![row1, row2];
+
+        let mut alert = Alert::default();
+        alert.row_template_type = RowTemplateType::Json;
+
+        let result = process_row_template(
+            "test_org",
+            &row_template,
+            &alert,
+            RowTemplateType::Json,
+            &rows,
+        );
+
+        assert_eq!(result.len(), 2);
+        assert!(result[0].is_object());
+        assert_eq!(
+            result[0].get("host").and_then(|v| v.as_str()),
+            Some("web-1")
+        );
+        assert_eq!(result[0].get("cpu").and_then(|v| v.as_f64()), Some(92.5));
+        assert!(result[1].is_object());
+        assert_eq!(
+            result[1].get("host").and_then(|v| v.as_str()),
+            Some("web-2")
+        );
+    }
+
+    #[test]
+    fn test_process_row_template_spread_row_string_type() {
+        let row_template = "{...row}".to_string();
+        let mut row1 = Map::new();
+        row1.insert("host".to_string(), json!("web-1"));
+        row1.insert("cpu".to_string(), json!(92.5));
+        let rows = vec![row1];
+
+        let alert = Alert::default();
+
+        let result = process_row_template(
+            "test_org",
+            &row_template,
+            &alert,
+            RowTemplateType::String,
+            &rows,
+        );
+
+        assert_eq!(result.len(), 1);
+        assert!(result[0].is_string());
+        let s = result[0].as_str().unwrap();
+        let v: Value = serde_json::from_str(s).unwrap();
+        assert_eq!(v.get("host").and_then(|v| v.as_str()), Some("web-1"));
+    }
+
+    #[test]
+    fn test_process_row_template_spread_row_with_surrounding_whitespace() {
+        let row_template = "  {...row}  ".to_string();
+        let mut row1 = Map::new();
+        row1.insert("level".to_string(), json!("error"));
+        let rows = vec![row1];
+
+        let mut alert = Alert::default();
+        alert.row_template_type = RowTemplateType::Json;
+
+        let result = process_row_template(
+            "test_org",
+            &row_template,
+            &alert,
+            RowTemplateType::Json,
+            &rows,
+        );
+
+        assert_eq!(result.len(), 1);
+        assert!(result[0].is_object());
+        assert_eq!(
+            result[0].get("level").and_then(|v| v.as_str()),
+            Some("error")
+        );
+    }
+
+    #[test]
+    fn test_process_row_template_spread_row_embedded_json_with_modifiers() {
+        let row = json!({
+            "host": "web-1",
+            "message": "{alert_name} {...row} {host|humanize}",
+            "nested": {"values": [true, null, 42]},
+            "ratio": 0.5
+        });
+        let rows = vec![serde_json::from_value(row.clone()).unwrap()];
+        let result = process_row_template(
+            "test_org",
+            r#"{"payload":{...row},"host":"{host}","ratio":"{ratio|humanizePercentage}"}"#,
+            &Alert::default(),
+            RowTemplateType::Json,
+            &rows,
+        );
+        assert_eq!(
+            result,
+            vec![json!({"payload": row, "host": "web-1", "ratio": "50%"})]
+        );
+    }
+
+    #[test]
+    fn test_process_row_template_spread_row_does_not_expand_row_values() {
+        let row = json!({"message": "{...row}"});
+        let rows = vec![serde_json::from_value(row.clone()).unwrap()];
+        let json = serde_json::to_string(&row).unwrap();
+        let result = process_row_template(
+            "test_org",
+            "{message} | {...row} | {...row}",
+            &Alert::default(),
+            RowTemplateType::String,
+            &rows,
+        );
+        assert_eq!(
+            result,
+            vec![Value::String(format!("{{...row}} | {json} | {json}"))]
+        );
+    }
+
+    #[test]
+    fn test_process_row_template_spread_row_empty_inputs() {
+        for row_type in [RowTemplateType::Json, RowTemplateType::String] {
+            assert!(
+                process_row_template("test_org", "{...row}", &Alert::default(), row_type, &[])
+                    .is_empty()
+            );
+            let result = process_row_template(
+                "test_org",
+                "{...row}",
+                &Alert::default(),
+                row_type,
+                &[Map::new()],
+            );
+            let expected = if row_type == RowTemplateType::Json {
+                json!({})
+            } else {
+                json!("{}")
+            };
+            assert_eq!(result, vec![expected]);
+        }
+    }
+
+    #[test]
+    fn test_process_row_template_spread_row_preserves_literal_field_precedence() {
+        let rows = vec![
+            serde_json::from_value(json!({
+                "...row": "literal value",
+                "host": "web-1"
+            }))
+            .unwrap(),
+        ];
+        for row_type in [RowTemplateType::String, RowTemplateType::Json] {
+            for (template, expected) in [
+                ("{...row}", "literal value"),
+                ("  {...row}  ", "  literal value  "),
+                ("{...row:4}", "lite"),
+                ("{...row} | {...row:4}", "literal value | lite"),
+            ] {
+                assert_eq!(
+                    process_row_template("test_org", template, &Alert::default(), row_type, &rows),
+                    vec![Value::String(expected.into())]
+                );
+            }
+        }
+        assert_eq!(
+            process_row_template(
+                "test_org",
+                r#"{"value":"{...row}","short":"{...row:4}"}"#,
+                &Alert::default(),
+                RowTemplateType::Json,
+                &rows,
+            ),
+            vec![json!({"value": "literal value", "short": "lite"})]
+        );
     }
 
     #[test]
@@ -6645,25 +6842,11 @@ mod tests {
         assert_eq!(result, "5 * * * *");
     }
 
-    #[test]
-    fn test_update_cron_expression_zero_seconds() {
-        let result = update_cron_expression("* */5 * * * *", 0);
-        assert_eq!(result, "0 */5 * * * *");
-    }
-
     // ── format_variable_value ──────────────────────────────────────────────
 
     #[test]
     fn test_format_variable_value_single_quote() {
         assert_eq!(format_variable_value("'".to_string()), "\\\\'");
-    }
-
-    #[test]
-    fn test_format_variable_value_soh_stx_us() {
-        // \x01 SOH, \x02 STX, \x1f US — each has a dedicated arm
-        assert_eq!(format_variable_value("\x01".to_string()), "\\u{1}");
-        assert_eq!(format_variable_value("\x02".to_string()), "\\u{2}");
-        assert_eq!(format_variable_value("\x1f".to_string()), "\\u{1f}");
     }
 
     #[test]
@@ -8334,6 +8517,52 @@ mod tests {
     async fn prepare_alert_saves_an_alert_with_nowhere_to_send() {
         let err = prepare_schedule(|a| a.trigger_condition.frequency = 60).await;
         assert!(reached_the_schema_lookup(&err), "{err:?}");
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_checks_a_joined_stream_range_by_its_own_type() {
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = "test_org_alert_save_join_range";
+        let logs_key = format!("{org_id}/{}/app", StreamType::Logs);
+        let traces_key = format!("{org_id}/{}/spans", StreamType::Traces);
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            logs_key.clone(),
+            SchemaCache::new(arrow_schema::Schema::new(vec![arrow_schema::Field::new(
+                "id",
+                DataType::Utf8,
+                true,
+            )])),
+        );
+        let settings = config::meta::stream::StreamSettings {
+            max_query_range: 1,
+            ..Default::default()
+        };
+        infra::schema::put_stream_settings_batch(vec![(
+            traces_key.clone(),
+            std::sync::Arc::new(settings),
+        )])
+        .await;
+
+        let mut alert = Alert::default();
+        alert.trigger_condition.frequency = 60;
+        alert.trigger_condition.period = 120;
+        alert.query_condition.query_type = QueryType::SQL;
+        alert.query_condition.sql = Some(
+            r#"SELECT a.id FROM "app" AS a JOIN "traces"."spans" AS b ON a.id = b.id"#.to_string(),
+        );
+        let res = prepare_alert(org_id, "app", "join", &mut alert, true, false).await;
+
+        STREAM_SCHEMAS_LATEST.write().await.remove(&logs_key);
+        infra::schema::remove_stream_settings(&traces_key).await;
+
+        assert!(
+            matches!(
+                &res,
+                Err(AlertError::PeriodExceedsMaxQueryRange { stream_name, .. }) if stream_name == "spans"
+            ),
+            "{res:?}"
+        );
     }
 
     #[tokio::test]

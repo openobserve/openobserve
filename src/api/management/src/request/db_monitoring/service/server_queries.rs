@@ -236,12 +236,7 @@ pub(crate) async fn read_server_queries_body(
     {
         return Err(unauthorized_response());
     }
-    let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
-    if start_time >= end_time {
-        return Err(MetaHttpResponse::bad_request(
-            "start_time must be before end_time",
-        ));
-    }
+    let (start_time, end_time) = resolve_range(q.start_time, q.end_time)?;
     let limit = q
         .limit
         .unwrap_or(DEFAULT_SERVER_QUERIES_LIMIT)

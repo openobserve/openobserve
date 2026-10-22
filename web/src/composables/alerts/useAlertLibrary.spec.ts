@@ -406,6 +406,84 @@ describe("useAlertLibrary — loadManifest", () => {
 
     await expect(useAlertLibrary().loadManifest()).rejects.toThrow();
   });
+
+  it("accepts a 1.1 manifest carrying anomaly_alerts", async () => {
+    const anomaly = entry({
+      id: "apm/traces_server_error_ratio_anomaly",
+      alert_type: "anomaly_detection",
+      query_type: "sql",
+    });
+    respondOnceWith(
+      manifest({ format_version: "1.1.0", anomaly_alerts: [anomaly], anomaly_alert_count: 1 }),
+    );
+
+    const result = await useAlertLibrary().loadManifest();
+    expect(result.anomaly_alerts?.[0].id).toBe("apm/traces_server_error_ratio_anomaly");
+  });
+
+  it("accepts a manifest without anomaly_alerts", async () => {
+    respondOnceWith(manifest());
+
+    const result = await useAlertLibrary().loadManifest();
+    expect(result.anomaly_alerts).toBeUndefined();
+  });
+
+  it("rejects anomaly_alerts that is not an array", async () => {
+    respondOnceWith(manifest({ anomaly_alerts: { nope: true } }));
+
+    await expect(useAlertLibrary().loadManifest()).rejects.toMatchObject({ code: "malformed" });
+  });
+
+  it("applies the per-entry checks to anomaly entries too", async () => {
+    respondOnceWith(manifest({ anomaly_alerts: [entry({ path: "" })] }));
+
+    await expect(useAlertLibrary().loadManifest()).rejects.toMatchObject({ code: "malformed" });
+    expect(committedTypes()).not.toContain("setAlertLibraryManifest");
+  });
+});
+
+describe("useAnomalyLibraryAccess", () => {
+  let useAnomalyLibraryAccess: typeof import("./useAlertLibrary").useAnomalyLibraryAccess;
+  let config: { isEnterprise: string };
+
+  beforeEach(async () => {
+    ({ useAnomalyLibraryAccess } = await import("./useAlertLibrary"));
+    config = (await import("@/aws-exports")).default as { isEnterprise: string };
+  });
+
+  afterEach(() => {
+    delete (mockStore.state as { zoConfig?: unknown }).zoConfig;
+  });
+
+  const access = (isEnterprise: string, zoConfig: Record<string, unknown>) => {
+    config.isEnterprise = isEnterprise;
+    (mockStore.state as { zoConfig?: unknown }).zoConfig = zoConfig;
+    return useAnomalyLibraryAccess().value;
+  };
+
+  it("is locked on a build that is not enterprise", () => {
+    expect(access("false", { build_type: "enterprise", anomaly_detection_enabled: true })).toBe(
+      "locked",
+    );
+  });
+
+  it("is locked when an enterprise UI talks to an OSS backend", () => {
+    expect(access("true", { build_type: "opensource", anomaly_detection_enabled: true })).toBe(
+      "locked",
+    );
+  });
+
+  it("is hidden when entitled but the feature is turned off", () => {
+    expect(access("true", { build_type: "enterprise", anomaly_detection_enabled: false })).toBe(
+      "hidden",
+    );
+  });
+
+  it("is enabled when entitled and turned on", () => {
+    expect(access("true", { build_type: "enterprise", anomaly_detection_enabled: true })).toBe(
+      "enabled",
+    );
+  });
 });
 
 describe("useAlertLibrary — loadAlertFile", () => {

@@ -167,6 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Histogram (pinned by default — see useToolbarPins) -->
           <OButton
             v-if="showPinnedHistogram"
+            as="div"
             data-test="logs-search-bar-histogram-btn"
             size="xs"
             variant="outline"
@@ -175,6 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OSwitch
               v-model="searchObj.meta.showHistogram"
+              :aria-label="t('search.showHistogramLabel')"
               :size="toolbarToggleIconOnly ? 'sm' : 'md'"
               @click.stop
             />
@@ -192,6 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- SQL Mode (pinned) -->
           <OButton
             v-if="showPinnedSqlMode"
+            as="div"
             data-test="logs-search-bar-sql-mode-pinned-btn"
             size="xs"
             variant="outline"
@@ -200,6 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OSwitch
               :model-value="searchObj.meta.sqlMode"
+              :aria-label="t('search.sqlModeLabel')"
               :disabled="isSqlModeDisabled"
               :size="toolbarToggleIconOnly ? 'sm' : 'md'"
               @click.stop="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
@@ -211,6 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Quick Mode (pinned) -->
           <OButton
             v-if="showPinnedQuickMode"
+            as="div"
             data-test="logs-search-bar-quick-mode-pinned-btn"
             size="xs"
             variant="outline"
@@ -219,6 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OSwitch
               :model-value="searchObj.meta.quickMode"
+              :aria-label="t('search.quickModeLabel')"
               :size="toolbarToggleIconOnly ? 'sm' : 'md'"
               @click.stop="handleQuickMode"
             />
@@ -907,6 +913,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Function Editor (pinned) — sits to the left of the date picker -->
         <OButton
           v-if="showPinnedFunctionEditor"
+          as="div"
           data-test="logs-search-bar-function-editor-pinned-btn"
           size="xs"
           variant="outline"
@@ -915,6 +922,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OSwitch
             v-model="searchObj.meta.showTransformEditor"
+            :aria-label="t('search.functionEditorLabel')"
             :size="toolbarToggleIconOnly ? 'sm' : 'md'"
             @click.stop
           />
@@ -1001,42 +1009,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
                 >
-                <!-- Main action button: "Ask AI" when NL detected + AI bar not open, otherwise "Run Query" -->
                 <OButton
                   v-else
                   data-test="logs-search-bar-visualize-refresh-btn"
                   variant="ghost"
-                  :title="
-                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                      ? t('search.generateQueryTooltip')
-                      : t('search.runQuery')
-                  "
-                  :disabled="
-                    buildRunBlocked ||
-                    isGeneratingSQL ||
-                    (isNaturalLanguageDetected &&
-                      !searchObj.meta.nlpMode &&
-                      !searchObj.data.stream.selectedStream.length)
-                  "
-                  :size="isNaturalLanguageDetected && !searchObj.meta.nlpMode ? 'md' : 'sm-toolbar'"
-                  class="element-box-shadow h-[1.875rem]! p-0"
-                  :class="[
-                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                      ? 'o2-ai-generate-button rounded-s-default! rounded-e-none!'
-                      : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md',
-                    'rounded-s-default! rounded-e-none!',
-                  ]"
-                  @click="
-                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                      ? handleGenerateSQLQuery()
-                      : handleRunQueryFn()
-                  "
+                  :title="t('search.runQuery')"
+                  :disabled="buildRunBlocked"
+                  size="sm-toolbar"
+                  class="element-box-shadow bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 rounded-s-default! h-[1.875rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
+                  @click="handleRunQueryFn()"
                 >
-                  {{
-                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                      ? t("search.generateQuery")
-                      : t("search.runQuery")
-                  }}
+                  {{ t("search.runQuery") }}
                 </OButton>
                 <OSeparator class="h-[1.875rem]! w-px" vertical />
                 <ODropdown align="end" side="bottom">
@@ -1044,15 +1027,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       variant="ghost"
                       size="icon-xs"
+                      :aria-label="t('search.refreshCacheAndRunQuery')"
                       data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                       :class="[
-                        !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
-                        config.isEnterprise == 'true' &&
-                        visualizeSearchRequestTraceIds.length
+                        config.isEnterprise == 'true' && visualizeSearchRequestTraceIds.length
                           ? 'bg-cancel-query-bg! text-button-primary-foreground!'
-                          : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                            ? 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md'
-                            : '',
+                          : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
                         'rounded-e-default! rounded-s-none!',
                       ]"
                     >
@@ -1060,7 +1040,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                   </template>
                   <ODropdownItem
-                    v-if="!(isNaturalLanguageDetected && !searchObj.meta.nlpMode)"
                     data-test="logs-search-bar-refresh-btn"
                     data-cy="search-bar-visuzlie-hard-refresh-button"
                     :disabled="
@@ -1072,9 +1051,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #icon-left><OIcon name="refresh" size="sm" /></template>
                     {{ t("search.refreshCacheAndRunQuery") }}
                   </ODropdownItem>
-                  <p v-else class="text-text-secondary px-3 py-2 text-center text-xs">
-                    {{ t("nlMode.noAdditionalOptions") }}
-                  </p>
                 </ODropdown>
               </div>
               <div v-else class="flex items-center">
@@ -1094,38 +1070,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-else
                   data-test="logs-search-bar-visualize-refresh-btn"
                   variant="ghost"
-                  :title="
-                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                      ? t('search.generateQueryTooltip')
-                      : t('search.runQuery')
-                  "
-                  :disabled="
-                    buildRunBlocked ||
-                    disable ||
-                    isGeneratingSQL ||
-                    (isNaturalLanguageDetected &&
-                      !searchObj.meta.nlpMode &&
-                      !searchObj.data.stream.selectedStream.length)
-                  "
-                  :size="isNaturalLanguageDetected && !searchObj.meta.nlpMode ? 'md' : 'sm-toolbar'"
-                  class="element-box-shadow h-[1.875rem]! p-0"
-                  :class="[
-                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                      ? 'o2-ai-generate-button rounded-s-default! rounded-e-none!'
-                      : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md',
-                    'rounded-s-default! rounded-e-none!',
-                  ]"
-                  @click="
-                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                      ? handleGenerateSQLQuery()
-                      : handleRunQueryFn()
-                  "
+                  :title="t('search.runQuery')"
+                  :disabled="buildRunBlocked || disable"
+                  size="sm-toolbar"
+                  class="element-box-shadow bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 rounded-s-default! h-[1.875rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
+                  @click="handleRunQueryFn()"
                 >
-                  {{
-                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                      ? t("search.generateQuery")
-                      : t("search.runQuery")
-                  }}
+                  {{ t("search.runQuery") }}
                 </OButton>
                 <OSeparator class="h-[1.875rem]! w-px" vertical />
                 <ODropdown align="end" side="bottom">
@@ -1133,15 +1084,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       variant="ghost"
                       size="icon-xs"
+                      :aria-label="t('search.refreshCacheAndRunQuery')"
                       data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                       :class="[
-                        !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
-                        config.isEnterprise == 'true' &&
-                        visualizeSearchRequestTraceIds.length
+                        config.isEnterprise == 'true' && visualizeSearchRequestTraceIds.length
                           ? 'bg-cancel-query-bg! text-button-primary-foreground!'
-                          : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                            ? 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md'
-                            : '',
+                          : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
                         'rounded-e-default! rounded-s-none!',
                       ]"
                     >
@@ -1149,7 +1097,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                   </template>
                   <ODropdownItem
-                    v-if="!(isNaturalLanguageDetected && !searchObj.meta.nlpMode)"
                     data-test="logs-search-bar-refresh-btn"
                     data-cy="search-bar-visuzlie-hard-refresh-button"
                     :disabled="
@@ -1161,9 +1108,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #icon-left><OIcon name="refresh" size="sm" /></template>
                     {{ t("search.refreshCacheAndRunQuery") }}
                   </ODropdownItem>
-                  <p v-else class="text-text-secondary px-3 py-2 text-center text-xs">
-                    {{ t("nlMode.noAdditionalOptions") }}
-                  </p>
                 </ODropdown>
               </div>
             </div>
@@ -1190,44 +1134,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="cancelRun"
                 >{{ t("search.cancel") }}</OButton
               >
-              <!-- Main action button: "Ask AI" when NL detected but AI bar not open, otherwise "Run Query" -->
               <OButton
                 v-else
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
                 :data-run-pending="showRunQueryPending ? 'true' : undefined"
                 :aria-label="showRunQueryPending ? t('search.runQueryPendingLabel') : undefined"
-                :variant="showRunQueryPending ? 'warning' : 'primary'"
-                :title="
-                  isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                    ? t('search.generateQueryTooltip')
-                    : t('search.runQuery')
-                "
-                :size="isNaturalLanguageDetected && !searchObj.meta.nlpMode ? 'md' : 'sm-toolbar'"
-                class="element-box-shadow relative h-[1.875rem]! p-0"
+                :variant="showRunQueryPending ? 'pending' : 'primary'"
+                :title="t('search.runQuery')"
+                size="sm-toolbar"
+                class="element-box-shadow rounded-s-default! relative h-[1.875rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
                 :class="[
-                  isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                    ? 'o2-ai-generate-button'
-                    : 'w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]',
-                  showRunQueryPending || (isNaturalLanguageDetected && !searchObj.meta.nlpMode)
+                  showRunQueryPending
                     ? ''
                     : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
-                  'rounded-s-default! rounded-e-none!',
+                  showRunQueryPending ? 'border-e-button-pending-hover-bg!' : '',
                 ]"
-                @click="
-                  isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                    ? handleGenerateSQLQuery()
-                    : handleRunQueryFn()
-                "
+                @click="handleRunQueryFn()"
                 :loading="searchObj.loading || searchObj.loadingHistogram"
                 :disabled="
                   searchObj.loading == true ||
                   searchObj.loadingHistogram == true ||
-                  patternsState.loading ||
-                  isGeneratingSQL ||
-                  (isNaturalLanguageDetected &&
-                    !searchObj.meta.nlpMode &&
-                    !searchObj.data.stream.selectedStream.length)
+                  patternsState.loading
                 "
               >
                 <OTooltip
@@ -1240,44 +1168,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                 />
                 <OIcon
-                  v-if="
-                    searchObj.meta.liveMode &&
-                    store.state.zoConfig.auto_query_enabled &&
-                    !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                  "
+                  v-if="searchObj.meta.liveMode && store.state.zoConfig.auto_query_enabled"
                   name="autorenew"
                   size="xs"
                   class="me-1"
                 />
-                {{
-                  isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                    ? t("search.generateQuery")
-                    : t("search.runQuery")
-                }}
+                {{ t("search.runQuery") }}
               </OButton>
-              <OSeparator class="h-[1.875rem]! w-px" vertical />
+              <OSeparator
+                v-if="!showRunQueryPending || isRunQueryCancelShown"
+                class="h-[1.875rem]! w-px"
+                vertical
+              />
               <ODropdown align="end" side="bottom">
                 <template #trigger>
                   <OButton
-                    :variant="showRunQueryPending && !isRunQueryCancelShown ? 'warning' : 'ghost'"
+                    :variant="showRunQueryPending && !isRunQueryCancelShown ? 'pending' : 'ghost'"
                     size="icon-xs"
+                    :aria-label="t('search.refreshCacheAndRunQuery')"
                     data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                     :class="[
                       isRunQueryCancelShown
                         ? 'bg-cancel-query-bg! text-button-primary-foreground!'
-                        : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
-                            !showRunQueryPending
+                        : !showRunQueryPending
                           ? 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md'
-                          : '',
+                          : showRunQueryPending
+                            ? 'border-s-0'
+                            : '',
                       'rounded-e-default! rounded-s-none!',
                     ]"
                   >
                     <OIcon name="arrow-drop-down" size="sm" />
                   </OButton>
                 </template>
-                <!-- Normal mode: Refresh + Live Mode items -->
                 <ODropdownItem
-                  v-if="!(isNaturalLanguageDetected && !searchObj.meta.nlpMode)"
                   data-test="logs-search-bar-refresh-btn"
                   data-cy="search-bar-refresh-button"
                   :disabled="searchObj.loading == true || searchObj.loadingHistogram == true"
@@ -1286,17 +1210,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #icon-left><OIcon name="refresh" size="sm" /></template>
                   {{ t("search.refreshCacheAndRunQuery") }}
                 </ODropdownItem>
-                <ODropdownSeparator
-                  v-if="
-                    store.state.zoConfig.auto_query_enabled &&
-                    !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                  "
-                />
+                <ODropdownSeparator v-if="store.state.zoConfig.auto_query_enabled" />
                 <ODropdownItem
-                  v-if="
-                    store.state.zoConfig.auto_query_enabled &&
-                    !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                  "
+                  v-if="store.state.zoConfig.auto_query_enabled"
                   data-test="logs-search-bar-live-mode-toggle-btn"
                   @select="toggleLiveMode"
                 >
@@ -1323,13 +1239,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </span>
                 </ODropdownItem>
-                <!-- NLP mode: info message -->
-                <p
-                  v-if="isNaturalLanguageDetected && !searchObj.meta.nlpMode"
-                  class="text-text-secondary px-3 py-2 text-center text-xs"
-                >
-                  {{ t("nlMode.noAdditionalOptions") }}
-                </p>
               </ODropdown>
               <!-- Compact Auto Refresh Button -->
               <AutoRefreshInterval
@@ -1413,6 +1322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :free-text-decorations="
                   searchObj.meta.sqlMode ? null : searchObj.data.freeTextDecorations
                 "
+                :filter-mode="!searchObj.meta.sqlMode"
                 editor-height="100%"
                 :style="editorWidthToggleFunction"
                 language="sql"
@@ -1868,6 +1778,7 @@ import { appendConjunct, looksLikeSqlStatement } from "@/utils/query/freeTextFil
 import { buildFilterContext, isFilterHeld } from "@/composables/useLogs/freeTextSearch";
 import { useFreeTextPreview } from "@/composables/useLogs/useFreeTextPreview";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
+import { setFieldTypeOf } from "@/utils/query/sqlDiagnostics";
 import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 import { logsUtils, removeFieldFromWhereAST } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
@@ -2260,20 +2171,16 @@ export default defineComponent({
         searchObj.meta.logsVisualizeToggle !== "patterns" &&
         (searchObj.loading === true || searchObj.loadingHistogram === true),
     );
-    const showRunPendingDot = computed(
+    const showRunQueryPending = computed(
       () =>
         !!searchObj.meta.runPending ||
         !!searchObj.meta.editorDirty ||
         (searchObj.meta.logsVisualizeToggle === "logs" && autoRun.engine.isRunDirty()),
     );
-    const showRunQueryPending = computed(
-      () =>
-        showRunPendingDot.value && !(isNaturalLanguageDetected.value && !searchObj.meta.nlpMode),
-    );
     const isRunQueryCancelShown = computed(
       () =>
         (searchObj.meta.logsVisualizeToggle === "patterns" && patternsState.value.loading) ||
-        (!(isNaturalLanguageDetected.value && !searchObj.meta.nlpMode) && isGridInFlight.value),
+        isGridInFlight.value,
     );
     const blockWithReason = (reason: I18nText | null) => {
       if (!reason) return false;
@@ -2306,10 +2213,22 @@ export default defineComponent({
       externalErrors: toRef(searchObj.data, "sqlSyntaxErrorRanges"),
     });
 
+    // A server type error names only types, so the squiggle needs the stream's column types to pick its operand.
+    const releaseFieldTypes = setFieldTypeOf((name) => {
+      // The field loader stores dataType; a raw stream schema written straight in carries type.
+      const field = (searchObj.data.stream.selectedStreamFields ?? []).find(
+        (f: any) => f.name === name,
+      );
+      return field?.dataType || field?.type;
+    });
+    onBeforeUnmount(releaseFieldTypes);
+
     const onQueryEditorFocus = () => {
       searchObj.meta.queryEditorPlaceholderFlag = false;
       _sqlOnFocus();
     };
+
+    const focusEditor = () => queryEditorRef.value?.focus?.();
 
     const handleQueryEditorBlur = async () => {
       searchObj.meta.queryEditorPlaceholderFlag = true;
@@ -2485,20 +2404,6 @@ export default defineComponent({
         searchObj.meta.showHistogram = value;
       },
     });
-
-    // Track if AI is currently generating SQL query
-    // Updated via @generation-start / @generation-end events from QueryEditor
-    const isGeneratingSQL = ref(false);
-
-    const hasInteractedWithAI = ref(false); // Track if user has used AI in non-NLP mode
-    const isNaturalLanguageDetected = ref(false); // Track NL detection without switching modes
-    watch(
-      isNaturalLanguageDetected,
-      (detected) => {
-        searchObj.meta.nlDetected = detected;
-      },
-      { immediate: true },
-    );
 
     // Track window width for responsive toolbar layout
     const windowWidth = ref(window.innerWidth);
@@ -2731,21 +2636,6 @@ export default defineComponent({
       { immediate: true, deep: true },
     );
 
-    // Watch NLP mode toggle - AI mode is independent of SQL mode
-    watch(
-      () => searchObj.meta.nlpMode,
-      (newNlpMode, oldNlpMode) => {
-        if (newNlpMode === true && oldNlpMode === false) {
-          // NLP mode turned ON - reset detection flag
-          isNaturalLanguageDetected.value = false;
-        } else if (newNlpMode === false && oldNlpMode === true) {
-          // NLP mode turned OFF - reset flags
-          isNaturalLanguageDetected.value = false;
-          hasInteractedWithAI.value = false;
-        }
-      },
-    );
-
     onBeforeUnmount(() => {
       queryEditorRef.value = null;
       fnEditorRef.value = null;
@@ -2762,15 +2652,30 @@ export default defineComponent({
       return searchObj.data.transformType === "function" ? "Function" : "Transform";
     });
 
+    // Set as soon as the stream is chosen, so a value lookup on the first keystroke is not left without one.
+    const syncSuggestStreamContext = () => {
+      autoCompleteData.value.org = store.state.selectedOrganization?.identifier ?? "";
+      autoCompleteData.value.streamType = searchObj.data.stream.streamType ?? "logs";
+      autoCompleteData.value.streamName = searchObj.data.stream.selectedStream?.[0] ?? "";
+      autoCompleteData.value.fieldValues = props.fieldValues;
+    };
+    watch(
+      () => [
+        store.state.selectedOrganization?.identifier,
+        searchObj.data.stream.streamType,
+        searchObj.data.stream.selectedStream?.[0],
+        props.fieldValues,
+      ],
+      syncSuggestStreamContext,
+      { immediate: true },
+    );
+
     const updateAutoComplete = (value) => {
       autoCompleteData.value.query = value;
       autoCompleteData.value.cursorIndex = queryEditorRef?.value?.getCursorIndex();
       autoCompleteData.value.fieldValues = props.fieldValues;
       autoCompleteData.value.popup.open = queryEditorRef?.value?.triggerAutoComplete;
-      // [NEW] Pass stream context for IndexedDB value lookups
-      autoCompleteData.value.org = store.state.selectedOrganization.identifier;
-      autoCompleteData.value.streamType = searchObj.data.stream.streamType ?? "logs";
-      autoCompleteData.value.streamName = searchObj.data.stream.selectedStream?.[0] ?? "";
+      syncSuggestStreamContext();
       getSuggestions();
     };
 
@@ -5040,7 +4945,6 @@ export default defineComponent({
       scheduleJobNote,
       visualizeReason,
       isGridInFlight,
-      showRunPendingDot,
       showRunQueryPending,
       isRunQueryCancelShown,
       blockWithReason,
@@ -5055,6 +4959,7 @@ export default defineComponent({
       fnEditorRef,
       searchObj,
       queryEditorRef,
+      focusEditor,
       syntaxGuideRef,
       confirmDialogVisible,
       confirmCallback,
@@ -5226,8 +5131,6 @@ export default defineComponent({
       updateEditorWidth,
       showExplainDialog,
       openExplainDialog,
-      isNaturalLanguageDetected,
-      isGeneratingSQL,
       vrlEditorNlpMode,
       shouldMoveShareToMenu,
       toolbarLeftRef,

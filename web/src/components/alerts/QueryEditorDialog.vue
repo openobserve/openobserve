@@ -78,6 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :ripple="false"
           @click="toggleAIChat"
           data-test="menu-link-ai-item"
+          :aria-label="t('menu.aiAssistant')"
           variant="ghost"
           size="icon-toolbar"
           class="group hover:shadow-ai-accent/35 transition-[background,box-shadow] duration-300 ease-[ease] [background:var(--color-gradient-ai-subtle)]! hover:shadow-md hover:[background:var(--color-gradient-ai)]!"
@@ -85,6 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @mouseleave="isHovered = false"
         >
           <img
+            alt=""
             :src="getBtnLogo"
             class="transition-transform duration-[600ms] ease-[ease] group-hover:rotate-180"
             style="width: 1.125rem; height: 1.125rem"
@@ -1123,7 +1125,8 @@ watch(
     if (cols?.length) {
       const fields = (cols as any[]).map((c: any) => ({
         name: typeof c === "string" ? c : (c.value ?? c.label ?? c),
-        type: c.type ?? "Utf8",
+        // An untyped column must read as unknown, so operators and quoting fall back to the value itself.
+        type: c.type,
       }));
       updateFieldKeywords(fields);
     }

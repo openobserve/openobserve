@@ -206,12 +206,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_puffin_dir_writer_new() {
-        let writer = PuffinDirWriter::new();
-        assert!(writer.list_files().is_empty());
-    }
-
-    #[test]
     fn test_puffin_dir_writer_default() {
         let writer = PuffinDirWriter::default();
         assert!(writer.list_files().is_empty());

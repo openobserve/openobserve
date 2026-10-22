@@ -140,6 +140,35 @@ describe("reports service", () => {
     });
   });
 
+  describe("history request identity", () => {
+    it.each([0, 4])("sends retry index %s on the wire", async (retries) => {
+      await reports.getHistory("org", { report_id: "r1", start_time: 100, end_time: 101, retries });
+      const url = new URL(mockHttpInstance.get.mock.calls[0][0], "http://localhost");
+      expect(url.searchParams.get("report_id")).toBe("r1");
+      expect(url.searchParams.get("retries")).toBe(String(retries));
+    });
+
+    it("serializes an org-wide run selector without selecting report GET authorization", async () => {
+      await reports.getHistory("org", {
+        run_report_id: "r2",
+        start_time: 100,
+        end_time: 101,
+        retries: 4,
+      });
+      const url = new URL(mockHttpInstance.get.mock.calls[0][0], "http://localhost");
+      expect(url.pathname).toBe("/api/v2/org/reports/history");
+      expect(url.searchParams.get("run_report_id")).toBe("r2");
+      expect(url.searchParams.has("report_id")).toBe(false);
+      expect(url.searchParams.get("retries")).toBe("4");
+    });
+
+    it("omits retry filtering for ordinary history requests", async () => {
+      await reports.getHistory("org", { start_time: 100, end_time: 200 });
+      const url = new URL(mockHttpInstance.get.mock.calls[0][0], "http://localhost");
+      expect(url.searchParams.has("retries")).toBe(false);
+    });
+  });
+
   describe("getReport", () => {
     it("should make GET request to fetch a report by name", async () => {
       const org_identifier = "org123";

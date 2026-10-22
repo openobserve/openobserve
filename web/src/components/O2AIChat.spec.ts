@@ -21,7 +21,7 @@ import i18n from "@/locales";
 
 // ── Module mocks (hoisted) ───────────────────────────────────────────────────
 
-vi.mock("highlight.js", () => ({
+vi.mock("@/lib/core/Code/highlighter", () => ({
   default: {
     highlight: vi.fn(() => ({ value: "" })),
     highlightAuto: vi.fn(() => ({ value: "" })),

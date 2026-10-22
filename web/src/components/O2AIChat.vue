@@ -12,7 +12,7 @@
         <div class="chat-title flex w-full items-center justify-between font-bold">
           <div class="flex min-w-0 items-center gap-2">
             <div class="inline-flex h-6 w-6 shrink-0 overflow-hidden rounded-full">
-              <img :src="o2AiTitleLogo" class="h-full w-full object-cover" />
+              <img alt="" :src="o2AiTitleLogo" class="h-full w-full object-cover" />
             </div>
 
             <ODropdown @update:open="(v) => v && loadHistory()">
@@ -240,7 +240,7 @@
             <O2AIHomeWelcome v-if="centeredStart" @select-prompt="selectWelcomePrompt" />
             <div v-else class="flex h-full w-full flex-col items-center justify-center">
               <div class="flex flex-col items-center gap-2">
-                <img :src="o2AiTitleLogo" />
+                <img alt="" :src="o2AiTitleLogo" />
                 <div class="flex items-center gap-2">
                   <span class="text-sm font-[600]">{{
                     t("aiAssistant.welcome.taglineHighlight")

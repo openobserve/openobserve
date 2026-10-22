@@ -347,8 +347,8 @@ SELECT * FROM pipeline
         {
             Ok(pipelines) => Ok(pipelines),
             Err(e) => {
-                log::debug!("[SQLITE] list pipeline by org error: {e}");
-                Ok(vec![])
+                log::error!("[SQLITE] list pipeline by org error: {e}");
+                Err(e.into())
             }
         }
     }

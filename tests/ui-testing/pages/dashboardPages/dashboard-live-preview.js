@@ -135,7 +135,7 @@ export default class DashboardLivePreview {
 
   // While a run is in flight enterprise swaps Apply for Cancel, so either button is checked.
   async expectApplyNotPending() {
-    await expect(this.applyBtn.or(this.cancelBtn).first()).not.toHaveAttribute("data-o2-variant", "warning");
+    await expect(this.applyBtn.or(this.cancelBtn).first()).not.toHaveAttribute("data-o2-variant", "pending");
   }
 
   // A hover that lands while the query editor still holds focus can miss the tooltip, so it is re-hovered.

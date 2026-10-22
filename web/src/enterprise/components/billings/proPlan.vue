@@ -16,38 +16,77 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OCard
-    class="border-card-glass-border bg-card-glass-bg rounded-default dark:bg-surface-base dark:border-border-default flex h-full w-full flex-col border shadow-none"
+    class="border-card-glass-border bg-card-glass-bg rounded-default dark:bg-surface-base dark:border-border-default row-span-7 grid! h-full w-full grid-rows-subgrid gap-0 border shadow-none max-lg:row-span-1 max-lg:flex!"
   >
-    <div class="flex items-center justify-between px-3 py-2">
+    <div class="flex items-start justify-between gap-3 px-4 py-3">
       <div>
-        <h3 class="text-text-heading m-0 pt-2 text-base leading-6 font-semibold">
+        <h3 class="text-text-heading m-0 text-base leading-6 font-semibold">
           {{ t("billing.proPlanLabel") }}
         </h3>
-        <p class="text-text-secondary m-0 mt-2 text-sm leading-4.5 font-normal">
+        <p class="text-text-secondary m-0 text-xs leading-4 font-normal">
           {{ t("billing.proPlanSubtitle") }}
         </p>
       </div>
-      <OTag v-if="planType == planName" type="billingTag" value="subscribed" class="mt-2" />
+      <OTag v-if="planType == planName" type="billingTag" value="subscribed" class="shrink-0" />
     </div>
 
-    <OSeparator class="my-2" />
+    <!-- Always rendered: the card is a subgrid row, so the price slot must exist even when empty. -->
+    <div :class="{ 'px-4 pb-3': pricingOptions?.length }">
+      <div
+        v-if="pricingOptions?.length"
+        class="grid h-full grid-cols-1 gap-1.5 md:grid-cols-2"
+        data-test="billing-plans-pro-price-options"
+      >
+        <!-- The first option is what Subscribe buys; the rest are contract terms sold by sales. -->
+        <div
+          v-for="(option, index) in pricingOptions"
+          :key="index"
+          class="rounded-default flex flex-col border px-2.5 py-2"
+          :class="index === 0 ? 'border-accent' : 'border-border-default'"
+          :data-test="`billing-plans-pro-price-option-${index}`"
+        >
+          <div class="flex min-h-4 items-center gap-2">
+            <span class="text-text-secondary text-xs">{{ raw(option.label) }}</span>
+            <OTag
+              v-if="option.badge"
+              variant="success-soft"
+              size="xs"
+              :label="raw(option.badge)"
+              data-test="billing-plans-pro-price-option-badge"
+            />
+          </div>
+          <div class="flex items-baseline gap-1">
+            <span class="text-text-heading text-2xl leading-7 font-semibold">
+              {{ raw(option.price) }}
+            </span>
+            <span class="text-text-secondary text-xs">{{ raw(option.period) }}</span>
+          </div>
+          <div class="flex flex-wrap items-center gap-x-2">
+            <span class="text-text-secondary text-xs leading-4">{{ raw(option.note) }}</span>
+            <OButton
+              v-if="index !== 0"
+              variant="ghost-primary"
+              size="xs"
+              class="ms-auto"
+              data-test="billing-plans-pro-contact-sales-btn"
+              @click="$emit('contact-sales')"
+            >
+              {{ t("billing.contactLabel") }}
+            </OButton>
+          </div>
+        </div>
+      </div>
+    </div>
 
-    <div class="px-3 py-2">
-      <h4 class="text-compact text-text-heading m-0 leading-[0.983rem] font-semibold">
-        {{ t("billing.features") }}
-      </h4>
-      <p class="text-compact text-text-secondary m-0 mt-1 mb-3 leading-4.5 font-normal">
-        {{ t("billing.included") }}
-      </p>
+    <OSeparator />
 
+    <div class="flex-1 px-4 py-3">
       <div
         v-if="pricingError && !features?.length"
         class="text-status-error-text mb-2 flex items-center"
       >
         <OIcon name="warning" size="sm" class="me-2" />
-        <span class="text-text-body text-base leading-5.5">{{
-          t("billing.pricingErrorMessage")
-        }}</span>
+        <span class="text-text-body text-sm leading-5">{{ t("billing.pricingErrorMessage") }}</span>
         <OButton
           variant="ghost"
           size="sm"
@@ -61,16 +100,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(feature, index) in features"
         :key="index"
-        class="mb-2 flex items-center justify-between"
+        class="flex items-center justify-between py-0.5"
       >
-        <div class="flex items-center">
+        <div class="flex items-start">
           <OIcon
             v-if="feature.is_parent"
             name="check-circle"
-            size="md"
-            class="text-status-positive check-icon me-2"
+            size="sm"
+            class="text-status-positive check-icon me-2 mt-0.5 shrink-0"
           />
-          <div class="text-text-body text-base leading-5.5" :class="{ 'ms-6': !feature.is_parent }">
+          <div
+            class="text-sm leading-5"
+            :class="feature.is_parent ? 'text-text-body' : 'text-text-secondary ms-6'"
+          >
             {{ feature.name }}
           </div>
         </div>
@@ -78,18 +120,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="feature.price !== ''"
           class="border-border-default mx-2 h-0 flex-1 border-t border-dotted opacity-40"
         ></div>
-        <div class="text-text-body text-base leading-5.5 font-bold">{{ feature.price }}</div>
+        <div class="text-text-body text-sm leading-5 font-semibold whitespace-nowrap">
+          {{ feature.price }}
+        </div>
       </div>
     </div>
 
     <OSeparator />
 
-    <p class="text-compact text-text-secondary m-0 px-3 pt-2 leading-4.5 font-normal">
+    <p class="text-text-secondary m-0 px-4 pt-3 text-xs leading-4 font-normal">
       {{ t("billing.unlimitedNote") }}<br />
       {{ t("billing.paymentNote") }}
+      <template v-if="additionalInfo">
+        <br />
+        <span data-test="billing-plans-pro-additional-info">{{ raw(additionalInfo) }}</span>
+      </template>
     </p>
 
-    <div class="flex justify-between p-3">
+    <div class="flex justify-between px-4 pt-2 pb-3">
       <!-- AWS Marketplace billing - show managed externally message -->
       <div v-if="billingProvider === 'aws'" class="w-full text-center">
         <OTag type="billingManagement" value="aws" class="inline-flex items-center gap-1">
@@ -149,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -160,7 +208,16 @@ import analytics from "@/services/product_analytics";
 export default defineComponent({
   name: "proPlan",
   components: { OSeparator, OButton, OTag, OIcon, OCard },
-  props: ["planType", "billingProvider", "subscriptionType", "features", "pricingError"],
+  props: [
+    "planType",
+    "billingProvider",
+    "subscriptionType",
+    "features",
+    "pricingOptions",
+    "additionalInfo",
+    "pricingError",
+  ],
+  emits: ["retry-pricing", "contact-sales", "update:proSubscription", "update:cancelSubscription"],
   setup(props, { emit }) {
     const { t } = useI18nTyped();
     const planName = "pay-as-you-go";
@@ -187,6 +244,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       cancelSubscription,
       onSubscribe,
       planName,

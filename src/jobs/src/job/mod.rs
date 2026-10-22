@@ -76,6 +76,8 @@ mod scheduler;
 #[cfg(feature = "enterprise")]
 mod service_graph;
 mod session_cleanup;
+#[cfg(feature = "enterprise")]
+pub mod slack_hooks;
 mod slo_maintenance;
 mod stats;
 
@@ -590,6 +592,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
         cloud::start_trial_quota_jobs();
     }
 
+    // Routers serve the inbound /api/slack/* routes, whose audit and lookups need the hooks.
+    #[cfg(feature = "enterprise")]
+    slack_hooks::register();
+
     // Router doesn't need to initialize job
     if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role() {
         return Ok(());
@@ -745,6 +751,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // fallback (design §4.4) covers any org this misses.
     if let Err(e) = alerts::notifications::org_default::backfill_org_default_templates().await {
         log::error!("[TEMPLATES] default_alert_template backfill failed: {e}");
+    }
+    #[cfg(feature = "enterprise")]
+    if let Err(e) = alerts::alert_calibration::backfill_org_configs().await {
+        log::error!("[alert_calibration] default config backfill failed: {e}");
     }
 
     // cache alerts (this will include the system templates we just created)
@@ -1021,10 +1031,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
         );
 
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::search::register_executor(
-            |request| {
+            |request, scope| {
                 Box::pin(async move {
                     let stream_type =
                         config::meta::stream::StreamType::from(request.stream_type.as_str());
+                    let local = scope
+                        == o2_enterprise::enterprise::llm_evaluations::eval_jobs::search::SearchScope::LocalCluster;
                     let req = config::meta::search::Request {
                         query: config::meta::search::Query {
                             sql: request.sql,
@@ -1036,6 +1048,17 @@ pub async fn init() -> Result<(), anyhow::Error> {
                             ..Default::default()
                         },
                         use_cache: false,
+                        // `local` is what the super-cluster router reads as "this cluster only".
+                        regions: if local {
+                            vec!["local".to_string()]
+                        } else {
+                            vec![]
+                        },
+                        clusters: if local {
+                            vec!["local".to_string()]
+                        } else {
+                            vec![]
+                        },
                         ..Default::default()
                     };
                     search_service::search(
@@ -1069,27 +1092,37 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
         o2_enterprise::enterprise::llm_evaluations::providers::register_provider_cost_calculator(
             |org_id, model, input_tokens, output_tokens, timestamp| {
+                use openobserve_core::traces::otel::pricing::{ResolvedPricing, resolve_pricing};
+
                 let entries = db::model_pricing::get_org_pricing_entries(org_id);
-                let definition =
-                    db::model_pricing::find_pricing_sync_at(&entries, model, Some(timestamp))?;
-                let usage = std::collections::HashMap::from([
-                    ("input".to_string(), input_tokens),
-                    ("output".to_string(), output_tokens),
-                ]);
-                db::model_pricing::calculate_cost_from_definition(
-                    &definition,
-                    &usage,
-                    Some(timestamp),
-                )
-                .cost
-                .get("total")
-                .copied()
+                let resolved = resolve_pricing(&entries, model, Some(timestamp))?;
+                match resolved.pricing {
+                    ResolvedPricing::Definition(definition) => {
+                        let usage = std::collections::HashMap::from([
+                            ("input".to_string(), input_tokens),
+                            ("output".to_string(), output_tokens),
+                        ]);
+                        db::model_pricing::calculate_cost_from_definition(
+                            &definition,
+                            &usage,
+                            Some(timestamp),
+                            &config::meta::model_pricing::PricingContext::default(),
+                        )
+                        .cost
+                        .get("total")
+                        .copied()
+                    }
+                    ResolvedPricing::Compiled(pricing) => {
+                        Some(pricing.cost(input_tokens, output_tokens, Some(timestamp)).2)
+                    }
+                }
             },
         );
 
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::start_eval_task_consumers();
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::start_eval_scheduler();
         o2_enterprise::enterprise::llm_evaluations::experiments::runner::start();
+        o2_enterprise::enterprise::slack::boot().await;
 
         o2_enterprise::enterprise::anomaly_detection::query_executor::register_query_executor(
             |org_id, sql, start, end, cfg_id, stream_type| {
@@ -1589,6 +1622,31 @@ mod tests {
         assert_eq!(
             anomaly_claim_transition(false, true),
             AnomalyClaimTransition::Stop
+        );
+    }
+
+    #[test]
+    fn slack_hooks_register_before_the_router_return_and_boot_after_it() {
+        let source = include_str!("mod.rs");
+        let init = source
+            .split("pub async fn init()")
+            .nth(1)
+            .and_then(|rest| rest.split("mod tests {").next())
+            .expect("init() body");
+        let at = |needle: &str| {
+            init.find(needle)
+                .unwrap_or_else(|| panic!("`{needle}` not found in init()"))
+        };
+        let register = at("slack_hooks::register();");
+        let router_return = at("if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role()");
+        let boot = at("slack::boot().await;");
+        assert!(
+            register < router_return,
+            "routers serve /api/slack/* and must have the hooks"
+        );
+        assert!(
+            router_return < boot,
+            "Slack tasks start only on the roles that ran them before"
         );
     }
 

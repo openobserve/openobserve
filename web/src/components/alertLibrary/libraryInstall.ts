@@ -39,6 +39,9 @@ import {
   detectConditionsVersion,
 } from "@/utils/alerts/alertDataTransforms";
 
+/** Catalogue metadata the create body has no field for. */
+const ANOMALY_LIBRARY_ONLY_KEYS = ["title", "severity", "source"] as const;
+
 /** The batch-shared pair the wizard's Tune step edits, for every alert at once. */
 export interface InstallOverrides {
   /** Evaluation interval, minutes. */
@@ -61,13 +64,21 @@ export interface InstallPayloadInput {
   overrides?: InstallOverrides;
 }
 
+export interface AnomalyInstallPayloadInput {
+  entry: AlertLibraryEntry;
+  file: AlertLibraryFile;
+  folderId: string;
+  /** A destination NAME that exists in this org, or "" to install with none. */
+  destination: string;
+}
+
 const asRecord = (value: unknown): Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
 
 /** Why a file could not be turned into a payload. Resolved to copy by the caller. */
-export type InstallPayloadErrorCode = "unreadable_conditions";
+export type InstallPayloadErrorCode = "unreadable_conditions" | "anomaly_unavailable";
 
 /**
  * A file this builder refuses to install.
@@ -144,6 +155,12 @@ const stringValuedOnly = (record: Record<string, unknown>): Record<string, strin
   return kept;
 };
 
+const withPackTag = (tags: unknown, pack: string): unknown[] => {
+  const packTag = `pack:${pack}`;
+  const list = Array.isArray(tags) ? (tags as unknown[]) : [];
+  return list.includes(packTag) ? list : [...list, packTag];
+};
+
 export function buildInstallPayload(input: InstallPayloadInput): Record<string, unknown> {
   const { entry, file, folderId, destination, owner, timezone, overrides } = input;
 
@@ -189,9 +206,7 @@ export function buildInstallPayload(input: InstallPayloadInput): Record<string, 
     library_hash: entry.content_hash,
   };
 
-  const packTag = `pack:${entry.pack}`;
-  const tags = Array.isArray(payload.tags) ? (payload.tags as unknown[]) : [];
-  payload.tags = tags.includes(packTag) ? tags : [...tags, packTag];
+  payload.tags = withPackTag(payload.tags, entry.pack);
 
   // Integers on the wire; "P1" is a display label and a 400.
   const priority = priorityForSeverity(entry.severity);
@@ -202,6 +217,33 @@ export function buildInstallPayload(input: InstallPayloadInput): Record<string, 
   } else {
     payload.priority = priority;
   }
+
+  return payload;
+}
+
+export function buildAnomalyInstallPayload(
+  input: AnomalyInstallPayloadInput,
+): Record<string, unknown> {
+  const { entry, file, folderId, destination } = input;
+  const payload = JSON.parse(JSON.stringify(file)) as Record<string, unknown>;
+
+  if (typeof payload.name !== "string" || payload.name === "") {
+    if (typeof payload.title === "string") payload.name = payload.title;
+  }
+  for (const key of ANOMALY_LIBRARY_ONLY_KEYS) delete payload[key];
+
+  // The backend routes on this field; without it the body becomes a scheduled alert.
+  payload.alert_type = "anomaly_detection";
+  payload.destinations = destination ? [destination] : [];
+  // The backend 400s when this disagrees with ?folder=.
+  payload.folder_id = folderId;
+  // Absent means disabled, and a disabled config never trains.
+  payload.enabled = true;
+  payload.tags = withPackTag(payload.tags, entry.pack);
+
+  const priority = priorityForSeverity(entry.severity);
+  if (priority === null) delete payload.priority;
+  else payload.priority = priority;
 
   return payload;
 }

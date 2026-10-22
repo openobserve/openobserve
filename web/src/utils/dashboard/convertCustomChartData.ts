@@ -18,8 +18,14 @@ import * as walk from "acorn-walk";
 import { ref } from "vue";
 
 import { gt } from "@/types/i18n";
+import echartsUrl from "echarts/dist/echarts.min.js?url";
+import dompurifyUrl from "dompurify/dist/purify.min.js?url";
 
 export const panelIdToBeRefreshed = ref<string | null>(null);
+
+// import.meta.url is this chunk's URL, so relative ?url paths resolve to the correct assets directory.
+const sandboxEchartsUrl = new URL(echartsUrl, import.meta.url).href;
+const sandboxDompurifyUrl = new URL(dompurifyUrl, import.meta.url).href;
 
 /**
  * Converts SQL data into a format suitable for rendering a chart.
@@ -42,13 +48,6 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
     iframe.setAttribute("sandbox", "allow-scripts");
     document.body.appendChild(iframe);
 
-    let staticEchartsRef = "/web/src/assets/dashboard/echarts.min.js";
-    let staticPurifierRef = "/web/src/assets/dashboard/purify.min.js";
-
-    if (!window.location.pathname.includes("web")) {
-      staticEchartsRef = "/src/assets/dashboard/echarts.min.js";
-      staticPurifierRef = "/src/assets/dashboard/purify.min.js";
-    }
     let userCode = panelSchema.customChartContent;
 
     // **Validation before execution**
@@ -80,8 +79,8 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
     connect-src 'none';
   ">
 
-  <script src="${staticEchartsRef}" nonce="${nonce}"></script>
-  <script src="${staticPurifierRef}" nonce="${nonce}"></script>
+  <script src="${sandboxEchartsUrl}" nonce="${nonce}"></script>
+  <script src="${sandboxDompurifyUrl}" nonce="${nonce}"></script>
   <script nonce="${nonce}">
     const i18nMessages = ${sandboxMessages};
     let securityPolicyError = false;

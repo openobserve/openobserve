@@ -37,6 +37,7 @@ class PipelineImportExportPage {
     // here rather than inside the methods.
     this.rowMoreOptionsSelector = (name) => `[data-test="pipeline-list-${name}-more-options"]`;
     this.rowExportActionSelector = (name) => `[data-test="pipeline-list-${name}-export-action"]`;
+    this.anyRowMoreOptionsSelector = '[data-test^="pipeline-list-"][data-test$="-more-options"]';
     this.errorAtSelector = (itemIndex, errorIndex) =>
       `[data-test="pipeline-import-error-${itemIndex}-${errorIndex}"]`;
     this.creationLineSelector = '[data-test^="pipeline-import-creation-"]';
@@ -75,6 +76,8 @@ class PipelineImportExportPage {
    * hover shortcut; the menu item is the one a user actually clicks.
    */
   async exportPipelineByRow(name) {
+    // The list pages at 20, so in a busy org the row can sit on page two and never render.
+    await this.searchPipelines(name);
     await this.page.locator(this.rowMoreOptionsSelector(name)).click();
     const downloadPromise = this.page.waitForEvent('download', { timeout: 30000 });
     await this.page.locator(this.rowExportActionSelector(name)).click();
@@ -89,12 +92,18 @@ class PipelineImportExportPage {
    */
   async searchPipelines(term) {
     await this.listSearchInput.fill(term);
+    // Gate on the filter having applied: rows exist and every row matches the term.
     await expect
-      .poll(async () => await this.page.locator('[data-test^="pipeline-list-"]').count(), {
-        timeout: 15000,
-        intervals: [250, 500],
-      })
-      .toBeGreaterThan(0);
+      .poll(
+        async () => {
+          const rows = await this.page.locator(this.anyRowMoreOptionsSelector).evaluateAll((els) =>
+            els.map((el) => el.getAttribute('data-test')),
+          );
+          return rows.length > 0 && rows.every((dataTest) => dataTest.includes(term));
+        },
+        { timeout: 15000, intervals: [250, 500] },
+      )
+      .toBe(true);
   }
 
   /** Tick the header select-all box and wait for the bulk action to appear. */

@@ -200,6 +200,7 @@ vi.mock("@/composables/useSuggestions", () => ({
     updateFunctionKeywords: vi.fn(),
     updateAllKeywords: vi.fn(),
     updateStreamKeywords: vi.fn(),
+    setValuesTimeRange: vi.fn(),
   })),
 }));
 

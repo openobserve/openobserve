@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 use axum::{
     Json,
@@ -22,10 +22,14 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::meta::model_pricing::{
-    BUILT_IN_ORG, META_ORG, MINUTES_PER_DAY, ModelPricingDefinition, PricingSource,
+    BUILT_IN_ORG, META_ORG, MatchKind, ModelPricingDefinition, PricingSource, PricingTierDefinition,
 };
-use db::model_pricing;
+use db::model_pricing::{self, CachedModelPricing};
+use openobserve_core::traces::otel::pricing::{
+    ResolvedPricing, model_canonical_names, resolve_pricing,
+};
 use serde::{Deserialize, Serialize};
+use svix_ksuid::KsuidLike;
 #[cfg(feature = "enterprise")]
 use {
     openobserve_api_common::extractors::Headers,
@@ -118,34 +122,41 @@ pub async fn list(
             .then_with(|| a.name.cmp(&b.name))
     });
 
-    // Build a parent-children hierarchy based on regex overlap.
-    //
-    // For each item (processed in priority order) we derive a testable literal string from its
-    // match_pattern (by stripping flags/anchors and extracting the literal prefix). We then check
-    // whether any already-placed parent's compiled regex matches that test string. If yes the item
-    // is a child (shadowed by that parent). If no, it becomes a new parent.
-    //
-    // This reflects actual runtime behaviour: a parent with pattern `(?i)claude-3` genuinely
-    // shadows any built-in whose pattern starts with "claude-3" (e.g. "claude-3-haiku").
+    // An item nests under the parent the resolver would pick for the item's own name: the
+    // higher-priority source first, then the better match kind; ties keep the earlier entry.
+    let rank = |source: &PricingSource, kind: Option<MatchKind>| {
+        (std::cmp::Reverse(source_priority(source)), kind)
+    };
     let never_matches = regex::Regex::new("$^").unwrap();
     let mut parents: Vec<(ModelPricingDefinition, regex::Regex)> = Vec::new();
 
     for item in all_items {
+        let compiled = regex::RegexBuilder::new(&item.match_pattern)
+            .size_limit(db::model_pricing::REGEX_SIZE_LIMIT)
+            .build()
+            .unwrap_or_else(|_| never_matches.clone());
         let test_str = derive_test_string(&item.match_pattern);
 
-        let parent_idx = if !test_str.is_empty() {
-            parents.iter().position(|(_, re)| re.is_match(&test_str))
-        } else {
+        let parent_idx = if test_str.is_empty() {
             None
+        } else {
+            let own_rank = rank(&item.source, MatchKind::of(&compiled, &test_str));
+            let mut best = None;
+            for (idx, (parent, re)) in parents.iter().enumerate() {
+                let Some(kind) = MatchKind::of(re, &test_str) else {
+                    continue;
+                };
+                let parent_rank = rank(&parent.source, Some(kind));
+                if parent_rank >= own_rank && best.is_none_or(|(_, b)| parent_rank > b) {
+                    best = Some((idx, parent_rank));
+                }
+            }
+            best.map(|(idx, _)| idx)
         };
 
         if let Some(idx) = parent_idx {
             parents[idx].0.children.push(item);
         } else {
-            let compiled = regex::RegexBuilder::new(&item.match_pattern)
-                .size_limit(db::model_pricing::REGEX_SIZE_LIMIT)
-                .build()
-                .unwrap_or_else(|_| never_matches.clone());
             parents.push((item, compiled));
         }
     }
@@ -608,11 +619,45 @@ fn strip_leading_flags(s: &str) -> &str {
     rest
 }
 
+/// Strip one leading optional group such as `(?:[\w-]+[/.:])*` (a provider/route prefix like
+/// `openai/` or `us.anthropic.`). Only a group quantified with `*` or `?` is stripped, because it
+/// can match nothing; any other leading group is part of the model name and is kept.
+fn strip_leading_optional_group(s: &str) -> &str {
+    if !s.starts_with('(') {
+        return s;
+    }
+    let mut depth = 0usize;
+    let mut in_class = false;
+    let mut chars = s.char_indices();
+    while let Some((i, c)) = chars.next() {
+        match c {
+            '\\' => {
+                chars.next();
+            }
+            '[' if !in_class => in_class = true,
+            ']' if in_class => in_class = false,
+            '(' if !in_class => depth += 1,
+            ')' if !in_class => {
+                depth -= 1;
+                if depth == 0 {
+                    let rest = &s[i + 1..];
+                    return match rest.strip_prefix(['*', '?']) {
+                        Some(after) => after.strip_prefix('?').unwrap_or(after),
+                        None => s,
+                    };
+                }
+            }
+            _ => {}
+        }
+    }
+    s
+}
+
 /// Derive a testable literal string from a regex pattern.
 ///
-/// Strips inline flags and leading `^` anchors, then walks the pattern character by character
-/// collecting literal characters. Stops at the first unescaped regex metacharacter
-/// (`(`, `)`, `[`, `]`, `{`, `}`, `*`, `+`, `?`, `|`, `$`, `^`, `.`).
+/// Strips inline flags, leading `^` anchors and one leading optional prefix group, then walks the
+/// pattern character by character collecting literal characters. Stops at the first unescaped
+/// regex metacharacter (`(`, `)`, `[`, `]`, `{`, `}`, `*`, `+`, `?`, `|`, `$`, `^`, `.`).
 /// Backslash-escaped characters are treated as their literal value (e.g. `\.` → `.`).
 ///
 /// Examples:
@@ -620,9 +665,10 @@ fn strip_leading_flags(s: &str) -> &str {
 ///   `(?i)gpt-4o(?:-\d{4}[-\d]*)?$`   → `"gpt-4o"`
 ///   `(?i)claude-3-sonnet$`            → `"claude-3-sonnet"`
 ///   `(?i)gpt-3\.5`                    → `"gpt-3.5"`
+///   `(?i)^(?:[\w-]+[/.:])*gpt-5\.4(?:-\d{8})?$` → `"gpt-5.4"`
 fn derive_test_string(pattern: &str) -> String {
     let s = strip_leading_flags(pattern.trim());
-    let s = s.trim_start_matches('^');
+    let s = strip_leading_optional_group(s.trim_start_matches('^'));
     let mut result = String::new();
     let mut iter = s.chars().peekable();
     while let Some(c) = iter.next() {
@@ -642,7 +688,9 @@ fn derive_test_string(pattern: &str) -> String {
 /// Request body for the test-model-match endpoint.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct TestModelMatchRequest {
-    /// The model name to test (e.g. "gpt-4o", "claude-opus-3-5").
+    /// The model name to test (e.g. "gpt-4o", "claude-opus-3-5"). Empty skips the single-name
+    /// test, e.g. when only previewing `match_pattern`.
+    #[serde(default)]
     pub model_name: String,
     /// Optional token counts keyed by usage type (e.g. {"input": 1000, "output": 500}).
     /// When provided, cost is calculated using the matched pricing definition.
@@ -653,19 +701,118 @@ pub struct TestModelMatchRequest {
     /// recurring UTC time-of-day windows (peak / off-peak) are resolved against it.
     #[serde(default)]
     pub timestamp: Option<i64>,
+    /// Optional span attributes (e.g. {"openai.response.service_tier": "flex"}) for tier rules.
+    #[serde(default)]
+    #[schema(value_type = HashMap<String, Object>)]
+    pub attributes: HashMap<String, config::utils::json::Value>,
+    /// An unsaved rule pattern to preview. When set, the response lists in `captured_models`
+    /// every known model this pattern would price if it were saved in this org. The
+    /// `model_name` test is unaffected and still runs against the saved rules.
+    #[serde(default)]
+    pub match_pattern: Option<String>,
+    /// Id of the rule being edited. It is left out of the preview, so its saved pattern does
+    /// not compete with the edited one.
+    #[serde(default)]
+    pub rule_id: Option<String>,
 }
 
 /// Response for the test-model-match endpoint.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct TestModelMatchResponse {
-    /// The matched pricing definition, or null if no definition matched.
+    /// The matched pricing definition, or null if no definition matched. A match from the
+    /// compiled-in fallback table is shown as a built-in definition without an id.
     pub matched: Option<ModelPricingDefinition>,
+    /// How the matched pattern covers the model name: `exact` when it matches the whole name,
+    /// `approximate` when the name continues before or after the match (the price may belong
+    /// to a different model). Null if nothing matched.
+    pub match_kind: Option<MatchKind>,
     /// The name of the selected pricing tier, or null if no definition matched.
     pub tier: Option<String>,
+    /// Index of the selected tier in `matched.tiers`, which stays unambiguous when names repeat.
+    pub tier_index: Option<usize>,
     /// Per-usage-key costs (excluding "total").
     pub costs: HashMap<String, f64>,
     /// Sum of all per-key costs.
     pub total_cost: f64,
+    /// The known models the previewed `match_pattern` would price, the model the pattern names
+    /// first. Empty when no pattern was sent.
+    pub captured_models: Vec<CapturedModel>,
+}
+
+/// A known model that a previewed rule pattern would price.
+#[derive(Debug, PartialEq, Serialize, utoipa::ToSchema)]
+pub struct CapturedModel {
+    /// A model name some pricing rule or the compiled-in table is written for.
+    pub model_name: String,
+    /// How the previewed pattern covers this name.
+    pub match_kind: MatchKind,
+    /// True for the model the pattern itself names (its literal text); false for every other
+    /// model the pattern also catches.
+    pub primary: bool,
+    /// The rule that prices this model today, which the previewed rule would replace.
+    pub replaces: Option<PricingRuleRef>,
+}
+
+/// The name and source of a pricing rule.
+#[derive(Debug, PartialEq, Serialize, utoipa::ToSchema)]
+pub struct PricingRuleRef {
+    pub name: String,
+    pub source: PricingSource,
+}
+
+/// The known models `candidate` would price if it were added to `entries`.
+///
+/// Known models are the names the saved rules and the compiled-in table are written for (see
+/// [`derive_test_string`]), plus the name the candidate itself spells out. A model counts as
+/// captured only when the candidate would actually win it, so a model an equal-or-higher
+/// source prices more precisely is left out. `candidate` must carry an id no entry has.
+fn captured_models(
+    entries: &[CachedModelPricing],
+    candidate: &CachedModelPricing,
+) -> Vec<CapturedModel> {
+    let primary = derive_test_string(&candidate.definition.match_pattern);
+    let names: BTreeSet<String> = entries
+        .iter()
+        .map(|e| derive_test_string(&e.definition.match_pattern))
+        .chain(model_canonical_names().map(|(_, canonical)| canonical.to_string()))
+        .chain(std::iter::once(primary.clone()))
+        .filter(|name| !name.is_empty())
+        .collect();
+    let with_candidate: Vec<CachedModelPricing> = std::iter::once(candidate.clone())
+        .chain(entries.iter().cloned())
+        .collect();
+
+    let mut captured: Vec<CapturedModel> = names
+        .into_iter()
+        .filter_map(|name| {
+            let match_kind = MatchKind::of(&candidate.compiled_regex, &name)?;
+            let wins = matches!(
+                resolve_pricing(&with_candidate, &name, None),
+                Some(r) if matches!(&r.pricing, ResolvedPricing::Definition(d) if d.id == candidate.definition.id)
+            );
+            if !wins {
+                return None;
+            }
+            let replaces = resolve_pricing(entries, &name, None).map(|r| match r.pricing {
+                ResolvedPricing::Definition(d) => PricingRuleRef {
+                    name: d.name,
+                    source: d.source,
+                },
+                ResolvedPricing::Compiled(p) => PricingRuleRef {
+                    name: p.canonical.clone(),
+                    source: PricingSource::BuiltIn,
+                },
+            });
+            Some(CapturedModel {
+                primary: name == primary,
+                model_name: name,
+                match_kind,
+                replaces,
+            })
+        })
+        .collect();
+    captured.sort_by_key(|c| std::cmp::Reverse(c.primary));
+    captured
 }
 
 /// TestModelMatch
@@ -678,7 +825,7 @@ pub struct TestModelMatchResponse {
     tag = "LLM",
     operation_id = "TestModelMatch",
     summary = "Test which pricing definition matches a model name and calculate cost",
-    description = "Simulates the pricing lookup for a given model name and optional usage data, returning the matched definition, selected tier, and cost breakdown.",
+    description = "Simulates the pricing lookup for a given model name and optional usage data, returning the matched definition, selected tier, and cost breakdown. With `match_pattern`, also lists the known models that pattern would price if saved as a rule in this organization.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -711,27 +858,81 @@ pub async fn test_model_match(
         return MetaHttpResponse::forbidden("Unauthorized Access");
     }
 
-    let entries = model_pricing::get_org_pricing_entries(&org_id);
-    let matched = model_pricing::find_pricing_sync_at(&entries, &req.model_name, req.timestamp);
+    let saved = model_pricing::get_org_pricing_entries(&org_id);
 
-    let (tier, costs, total_cost) = if let Some(ref def) = matched {
-        let result = model_pricing::calculate_cost_from_definition(def, &req.usage, req.timestamp);
+    let captured_models = match req.match_pattern.as_deref().map(str::trim) {
+        Some(pattern) if !pattern.is_empty() => {
+            let compiled_regex = match regex::RegexBuilder::new(pattern)
+                .size_limit(model_pricing::REGEX_SIZE_LIMIT)
+                .build()
+            {
+                Ok(re) => re,
+                Err(e) => {
+                    return MetaHttpResponse::bad_request(format!("Invalid regex pattern: {e}"));
+                }
+            };
+            let others: Vec<CachedModelPricing> = saved
+                .iter()
+                .filter(|e| {
+                    req.rule_id.is_none() || e.definition.id.map(|id| id.to_string()) != req.rule_id
+                })
+                .cloned()
+                .collect();
+            let candidate = CachedModelPricing {
+                definition: ModelPricingDefinition {
+                    id: Some(svix_ksuid::Ksuid::new(None, None)),
+                    match_pattern: pattern.to_string(),
+                    source: if org_id == META_ORG {
+                        PricingSource::MetaOrg
+                    } else {
+                        PricingSource::Org
+                    },
+                    ..Default::default()
+                },
+                compiled_regex,
+            };
+            captured_models(&others, &candidate)
+        }
+        _ => Vec::new(),
+    };
+
+    let resolved = if req.model_name.is_empty() {
+        None
+    } else {
+        resolve_pricing(&saved, &req.model_name, req.timestamp)
+    };
+    let match_kind = resolved.as_ref().map(|r| r.match_kind);
+    let matched = resolved.map(|r| match r.pricing {
+        ResolvedPricing::Definition(definition) => *definition,
+        ResolvedPricing::Compiled(pricing) => pricing.to_definition(),
+    });
+
+    let (tier, tier_index, costs, total_cost) = if let Some(def) = &matched {
+        let ctx = openobserve_core::traces::otel::processor::pricing_context_for_test_endpoint(
+            def,
+            &req.attributes,
+        );
+        let result =
+            model_pricing::calculate_cost_from_definition(def, &req.usage, req.timestamp, &ctx);
         let total = result.cost.get("total").copied().unwrap_or(0.0);
         let costs = result
             .cost
             .into_iter()
             .filter(|(k, _)| k != "total")
             .collect();
-        (Some(result.tier_name), costs, total)
+        (Some(result.tier_name), result.tier_index, costs, total)
     } else {
-        (None, HashMap::new(), 0.0)
+        (None, None, HashMap::new(), 0.0)
     };
 
     MetaHttpResponse::json(TestModelMatchResponse {
         matched,
+        match_kind,
         tier,
+        tier_index,
         costs,
         total_cost,
+        captured_models,
     })
 }
 
@@ -754,64 +955,19 @@ fn validate_definition(item: &ModelPricingDefinition) -> Result<(), String> {
     {
         return Err(format!("Invalid regex pattern: {e}"));
     }
-    if item.tiers.is_empty() {
-        return Err("At least one pricing tier is required".to_string());
-    }
-    // The fallback tier must be unrestricted: no usage condition *and* no UTC time
-    // window. Otherwise a span outside every window would have no tier to price with.
+    item.validate_tiers(false)?;
+    // Builds without rules read a rule tier as unrestricted and would price with it.
+    let first_default = item
+        .tiers
+        .iter()
+        .position(PricingTierDefinition::is_default);
     if item
         .tiers
         .iter()
-        .all(|t| t.condition.is_some() || !t.utc_windows.is_empty())
+        .take(first_default.unwrap_or(0))
+        .any(|t| !t.rules.is_empty())
     {
-        return Err(
-            "At least one tier must have no condition and no time window (default fallback)"
-                .to_string(),
-        );
-    }
-    for tier in &item.tiers {
-        if let Some(ref cond) = tier.condition {
-            if cond.usage_key.trim().is_empty() {
-                return Err(format!(
-                    "Tier '{}' has a condition with an empty usage_key",
-                    tier.name
-                ));
-            }
-            if cond.value.is_nan() || cond.value.is_infinite() {
-                return Err(format!(
-                    "Tier '{}' condition value must be a finite number, got {}",
-                    tier.name, cond.value
-                ));
-            }
-        }
-        for window in &tier.utc_windows {
-            if window.start_minute > MINUTES_PER_DAY || window.end_minute > MINUTES_PER_DAY {
-                return Err(format!(
-                    "Tier '{}' time window must be within 0-{} minutes past UTC midnight, got {}-{}",
-                    tier.name, MINUTES_PER_DAY, window.start_minute, window.end_minute
-                ));
-            }
-            if window.start_minute % MINUTES_PER_DAY == window.end_minute % MINUTES_PER_DAY {
-                return Err(format!(
-                    "Tier '{}' time window start and end are the same ({}); leave the window list empty for an always-on tier",
-                    tier.name, window.start_minute
-                ));
-            }
-        }
-        for (key, &price) in &tier.prices {
-            if price.is_nan() || price.is_infinite() {
-                return Err(format!(
-                    "Price for '{}' in tier '{}' must be a finite number, got {}",
-                    key, tier.name, price
-                ));
-            }
-            if price < 0.0 {
-                return Err(format!(
-                    "Price for '{}' in tier '{}' must be >= 0, got {}",
-                    key, tier.name, price
-                ));
-            }
-        }
+        return Err("The default tier must come before any tier with rules".to_string());
     }
     Ok(())
 }
@@ -926,6 +1082,23 @@ mod tests {
         assert_eq!(derive_test_string("foo|bar"), "foo");
     }
 
+    #[test]
+    fn test_derive_test_string_skips_optional_provider_prefix_group() {
+        assert_eq!(
+            derive_test_string(
+                r"(?i)^(?:[\w-]+[/.:])*gpt-5\.4-mini(?:-\d{4}-\d{2}-\d{2}|-\d{8})?$"
+            ),
+            "gpt-5.4-mini"
+        );
+        assert_eq!(derive_test_string(r"(?i)(?:openai/)?gpt-4o"), "gpt-4o");
+    }
+
+    #[test]
+    fn test_derive_test_string_keeps_required_leading_group() {
+        // A group that must match is part of the name; it stops literal collection.
+        assert_eq!(derive_test_string(r"(?i)(gpt|o)-4"), "");
+    }
+
     // ── validate_definition ───────────────────────────────────────────────────
 
     fn default_tier() -> PricingTierDefinition {
@@ -934,6 +1107,8 @@ mod tests {
             condition: None,
             prices: Default::default(),
             utc_windows: Vec::new(),
+            rules: Vec::new(),
+            priority: 0,
         }
     }
 
@@ -1019,6 +1194,8 @@ mod tests {
             }),
             prices: Default::default(),
             utc_windows: Vec::new(),
+            rules: Vec::new(),
+            priority: 0,
         }];
         let err = validate_definition(&def).unwrap_err();
         assert!(err.contains("At least one tier must have no condition"));
@@ -1033,16 +1210,87 @@ mod tests {
             PricingTierDefinition {
                 name: "peak".to_string(),
                 utc_windows: vec![UtcTimeWindow::from_hm((1, 0), (4, 0))],
+                rules: Vec::new(),
                 ..default_tier()
             },
             PricingTierDefinition {
                 name: "off-peak".to_string(),
                 utc_windows: vec![UtcTimeWindow::from_hm((10, 0), (1, 0))],
+                rules: Vec::new(),
                 ..default_tier()
             },
         ];
         let err = validate_definition(&def).unwrap_err();
-        assert!(err.contains("no condition and no time window"));
+        assert!(err.contains("no condition, no time window and no rule"));
+    }
+
+    #[test]
+    fn test_validate_definition_all_rule_restricted_tiers_fails() {
+        use config::meta::model_pricing::{RuleOp, TierRule};
+        let mut def = valid_definition();
+        // Only a Flex tier leaves no tier for a span sent on the standard service tier.
+        def.tiers = vec![PricingTierDefinition {
+            name: "flex".to_string(),
+            rules: vec![TierRule::new(
+                &["openai.request.service_tier"],
+                RuleOp::In,
+                &["flex"],
+                None,
+            )],
+            ..default_tier()
+        }];
+        let err = validate_definition(&def).unwrap_err();
+        assert!(err.contains("no rule"));
+    }
+
+    #[test]
+    fn test_validate_definition_rejects_invalid_rule() {
+        use config::meta::model_pricing::{RuleOp, TierRule};
+        let mut def = valid_definition();
+        def.tiers.push(PricingTierDefinition {
+            name: "flex".to_string(),
+            rules: vec![TierRule::new(&[" "], RuleOp::In, &["flex"], None)],
+            ..default_tier()
+        });
+        let err = validate_definition(&def).unwrap_err();
+        assert!(err.contains("Tier 'flex'") && err.contains("attribute key"));
+
+        def.tiers[1].rules[0].keys = vec!["openai.request.service_tier".to_string()];
+        def.tiers[1].rules[0].values = vec!["".to_string()];
+        assert!(
+            validate_definition(&def)
+                .unwrap_err()
+                .contains("at least one value")
+        );
+
+        def.tiers[1].rules[0].values = vec!["flex".to_string()];
+        assert!(validate_definition(&def).is_ok());
+    }
+
+    #[test]
+    fn test_validate_definition_rule_tier_before_default_fails() {
+        use config::meta::model_pricing::{RuleOp, TierRule};
+        let mut def = valid_definition();
+        def.tiers.insert(
+            0,
+            PricingTierDefinition {
+                name: "flex".to_string(),
+                rules: vec![TierRule::new(
+                    &["service_tier"],
+                    RuleOp::In,
+                    &["flex"],
+                    None,
+                )],
+                ..default_tier()
+            },
+        );
+        assert!(
+            validate_definition(&def)
+                .unwrap_err()
+                .contains("default tier")
+        );
+        def.tiers.swap(0, 1);
+        assert!(validate_definition(&def).is_ok());
     }
 
     #[test]
@@ -1056,6 +1304,7 @@ mod tests {
                     UtcTimeWindow::from_hm((1, 0), (4, 0)),
                     UtcTimeWindow::from_hm((6, 0), (10, 0)),
                 ],
+                rules: Vec::new(),
                 ..default_tier()
             },
             default_tier(),
@@ -1130,6 +1379,8 @@ mod tests {
                 }),
                 prices: Default::default(),
                 utc_windows: Vec::new(),
+                rules: Vec::new(),
+                priority: 0,
             },
             default_tier(),
         ];
@@ -1151,6 +1402,8 @@ mod tests {
                 }),
                 prices: Default::default(),
                 utc_windows: Vec::new(),
+                rules: Vec::new(),
+                priority: 0,
             },
             default_tier(),
         ];
@@ -1185,5 +1438,83 @@ mod tests {
         tier.prices.insert("input".to_string(), 0.0);
         def.tiers = vec![tier];
         assert!(validate_definition(&def).is_ok());
+    }
+
+    // ── captured_models ───────────────────────────────────────────────────────
+
+    fn entry(name: &str, pattern: &str, source: PricingSource) -> CachedModelPricing {
+        CachedModelPricing {
+            definition: ModelPricingDefinition {
+                id: Some(svix_ksuid::Ksuid::new(None, None)),
+                name: name.to_string(),
+                match_pattern: pattern.to_string(),
+                source,
+                ..Default::default()
+            },
+            compiled_regex: regex::Regex::new(pattern).unwrap(),
+        }
+    }
+
+    fn org_candidate(pattern: &str) -> CachedModelPricing {
+        entry("", pattern, PricingSource::Org)
+    }
+
+    fn find<'a>(captured: &'a [CapturedModel], model: &str) -> Option<&'a CapturedModel> {
+        captured.iter().find(|c| c.model_name == model)
+    }
+
+    fn built_in_gpt_4o() -> Vec<CachedModelPricing> {
+        vec![
+            entry("GPT-4o", r"(?i)^gpt-4o$", PricingSource::BuiltIn),
+            entry("GPT-4o Mini", r"(?i)^gpt-4o-mini$", PricingSource::BuiltIn),
+        ]
+    }
+
+    #[test]
+    fn test_captured_models_prefix_rule_also_catches_other_models() {
+        let captured = captured_models(&built_in_gpt_4o(), &org_candidate(r"(?i)^gpt-4o"));
+
+        assert_eq!(
+            captured.first(),
+            Some(&CapturedModel {
+                model_name: "gpt-4o".to_string(),
+                match_kind: MatchKind::Exact,
+                primary: true,
+                replaces: Some(PricingRuleRef {
+                    name: "GPT-4o".to_string(),
+                    source: PricingSource::BuiltIn,
+                }),
+            })
+        );
+        assert_eq!(
+            find(&captured, "gpt-4o-mini"),
+            Some(&CapturedModel {
+                model_name: "gpt-4o-mini".to_string(),
+                match_kind: MatchKind::Approximate,
+                primary: false,
+                replaces: Some(PricingRuleRef {
+                    name: "GPT-4o Mini".to_string(),
+                    source: PricingSource::BuiltIn,
+                }),
+            })
+        );
+        assert!(find(&captured, "gpt-4").is_none());
+    }
+
+    #[test]
+    fn test_captured_models_anchored_rule_catches_only_its_model() {
+        let captured = captured_models(&built_in_gpt_4o(), &org_candidate(r"(?i)^gpt-4o$"));
+        let names: Vec<&str> = captured.iter().map(|c| c.model_name.as_str()).collect();
+        assert_eq!(names, ["gpt-4o"]);
+    }
+
+    #[test]
+    fn test_captured_models_skips_models_a_same_source_rule_prices_exactly() {
+        let mut entries = built_in_gpt_4o();
+        entries.push(entry("org-mini", r"(?i)^gpt-4o-mini$", PricingSource::Org));
+
+        let captured = captured_models(&entries, &org_candidate(r"(?i)^gpt-4o"));
+        assert!(find(&captured, "gpt-4o").is_some());
+        assert!(find(&captured, "gpt-4o-mini").is_none());
     }
 }
