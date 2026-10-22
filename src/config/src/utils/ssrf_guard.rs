@@ -112,12 +112,7 @@ impl SsrfGuard {
             let lower_host = host.to_lowercase();
             let host_allowed = allowlist.allows_host(host);
 
-            if !allow_loopback
-                && !host_allowed
-                && (lower_host == "localhost"
-                    || lower_host.starts_with("localhost.")
-                    || lower_host == "127.0.0.1")
-            {
+            if !allow_loopback && !host_allowed && is_loopback_name(&lower_host) {
                 return Err("Access to localhost is not allowed for security reasons".to_string());
             }
 
@@ -134,12 +129,7 @@ impl SsrfGuard {
                 ));
             }
 
-            if lower_host == "169.254.169.254"
-                || lower_host == "metadata.google.internal"
-                || lower_host == "metadata"
-                || lower_host.ends_with(".metadata.google.internal")
-                || lower_host.ends_with("metadata.")
-            {
+            if is_metadata_name(&lower_host) {
                 return Err(format!(
                     "Access to cloud metadata endpoint {} is not allowed for security reasons",
                     host
@@ -528,37 +518,40 @@ pub fn is_always_blocked_host(host: &str) -> bool {
         return is_always_blocked_ip(&ip);
     }
     let lower = host.to_ascii_lowercase();
-    lower == "localhost"
-        || lower.starts_with("localhost.")
-        || lower == "metadata"
-        || lower == "metadata.google.internal"
-        || lower.ends_with(".metadata.google.internal")
-        || lower == "metadata.goog"
+    is_loopback_name(&lower) || is_metadata_name(&lower)
 }
 
+/// The subset of [`SsrfGuard::is_private_ip_inner`] that no policy relaxes: link-local and
+/// metadata (via [`needs_explicit_cidr`]) plus loopback, unspecified, multicast and `0.0.0.0/8`.
 fn is_always_blocked_ip(ip: &IpAddr) -> bool {
-    if METADATA_IPS.contains(ip) {
+    if needs_explicit_cidr(ip) {
         return true;
     }
-    match ip {
+    match unwrap_embedded_ipv4(ip) {
         IpAddr::V4(v4) => {
             v4.is_loopback()
-                || v4.is_link_local()
-                || v4.is_multicast()
                 || v4.is_unspecified()
+                || v4.is_multicast()
                 || v4.is_broadcast()
                 || v4.octets()[0] == 0
         }
-        IpAddr::V6(v6) => {
-            v6.is_loopback()
-                || v6.is_multicast()
-                || v6.is_unspecified()
-                || (v6.segments()[0] & 0xffc0) == 0xfe80
-                || v6
-                    .to_ipv4_mapped()
-                    .is_some_and(|v4| is_always_blocked_ip(&IpAddr::V4(v4)))
-        }
+        IpAddr::V6(v6) => v6.is_loopback() || v6.is_unspecified() || v6.is_multicast(),
     }
+}
+
+/// `host` (lowercased) names the local machine without going through DNS.
+fn is_loopback_name(host: &str) -> bool {
+    host == "localhost" || host.starts_with("localhost.") || host == "127.0.0.1"
+}
+
+/// `host` (lowercased) is a cloud metadata endpoint by name or by its well-known literal.
+fn is_metadata_name(host: &str) -> bool {
+    host == "169.254.169.254"
+        || host == "metadata"
+        || host == "metadata.google.internal"
+        || host.ends_with(".metadata.google.internal")
+        || host == "metadata.goog"
+        || host.ends_with("metadata.")
 }
 
 /// The guard's refusal in `err`'s source chain; it is permanent, so never worth a retry.
@@ -761,6 +754,8 @@ mod tests {
             "[fd00:ec2::254]",
             "::ffff:127.0.0.1",
             "::ffff:169.254.169.254",
+            "64:ff9b::a9fe:a9fe",
+            "2002:7f00:1::",
             "localhost",
             "LOCALHOST",
             "localhost.localdomain",
