@@ -81,6 +81,7 @@
             :decision="licenseData.decision"
             :base="licenseData.base"
             :env-key-active="!!licenseData.env_key_active"
+            :env-key-in-use="licenseData.env_key_in_use"
             :evaluated-at="licenseData.evaluated_at"
           />
           <OCard class="border-card-glass-border border border-solid">
@@ -213,16 +214,9 @@
                   data-test="add-license-key-btn"
                   variant="primary"
                   size="sm-action"
-                  :disabled="!!licenseData.env_key_active"
-                  focusable-unavailable
                   @click="showUpdateFormAndFocus"
                 >
-                  <OTooltip
-                    v-if="licenseData.env_key_active"
-                    :content="t('about.license_status_env_key')"
-                  />
                   {{ t("about.add_new_license_key") }}
-                  <template #unavailable-reason>{{ t("about.license_status_env_key") }}</template>
                 </OButton>
                 <OButton
                   data-test="refresh-license-limits-btn"
@@ -504,7 +498,6 @@ import LicenseWaiversCard from "./LicenseWaiversCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
@@ -531,7 +524,6 @@ export default defineComponent({
     RenderDashboardCharts,
     OButton,
     ODialog,
-    OTooltip,
     OSpinner,
     OIcon,
     OBadge,
@@ -596,6 +588,12 @@ export default defineComponent({
 
     const reloadLicenseData = () => loadLicenseData({ background: true });
 
+    // The settle reload already refetched the licence query, so reuse it instead of a second request.
+    const adoptRefetchedLicense = () => {
+      const data = queryClient.getQueryData(licenseQuery().queryKey);
+      if (data) licenseData.value = data as typeof licenseData.value;
+    };
+
     // @submit handler — fires only once the schema passes (licenseKey required +
     // trim), so the `:disabled` gate is gone (R3). Still callable directly with
     // no args (reads the shared working ref); OForm awaits it so the inline Save
@@ -619,7 +617,7 @@ export default defineComponent({
         window.history.replaceState({}, document.title, url.toString());
 
         await reloadLicenseData();
-        scheduleReload(reloadLicenseData);
+        scheduleReload(adoptRefetchedLicense);
       } catch (error) {
         const e = error as { response?: { data?: { message?: string } } };
         console.error("Error updating license:", error);
@@ -654,7 +652,7 @@ export default defineComponent({
       if (refreshing.value) return;
       refreshing.value = true;
       try {
-        if (await refreshLicenseLimits(reloadLicenseData)) await reloadLicenseData();
+        if (await refreshLicenseLimits(adoptRefetchedLicense)) await reloadLicenseData();
       } finally {
         refreshing.value = false;
       }

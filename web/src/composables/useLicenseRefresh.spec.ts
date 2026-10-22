@@ -76,6 +76,7 @@ describe("useLicenseRefresh", () => {
     expect(invalidateQueries).toHaveBeenCalledWith(
       expect.objectContaining({ queryKey: ["config", "acme"], exact: true, refetchType: "none" }),
     );
+    expect(fetchQuery).toHaveBeenCalledWith(expect.objectContaining({ queryKey: ["license"] }));
   });
 
   it("a 403 toasts the permission message and schedules nothing", async () => {

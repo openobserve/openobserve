@@ -108,10 +108,21 @@ describe("LicenseStatusCard", () => {
   });
 
   it("env key notice shows only when the env key is active", () => {
-    const on = mountCard({ envKeyActive: true });
+    const on = mountCard({ envKeyActive: true, envKeyInUse: true });
     expect(on.find("[data-test=license-status-env-key]").text()).toContain("O2_LICENSE_KEY");
+    expect(on.find("[data-test=license-status-env-key]").text()).toContain("paste a newer key");
+    expect(on.findComponent({ name: "OBanner" }).props("variant")).toBe("warning");
     expect(on.findComponent({ name: "OBanner" }).props("icon")).toBe("warning");
     const off = mountCard({ envKeyActive: false });
     expect(off.find("[data-test=license-status-env-key]").exists()).toBe(false);
+  });
+
+  it("a pasted key newer than the env key shows the info banner", () => {
+    const w = mountCard({ envKeyActive: true, envKeyInUse: false });
+    const banner = w.findComponent({ name: "OBanner" });
+    expect(banner.props("variant")).toBe("info");
+    expect(w.find("[data-test=license-status-env-key]").text()).toContain(
+      "newer than O2_LICENSE_KEY is in use",
+    );
   });
 });

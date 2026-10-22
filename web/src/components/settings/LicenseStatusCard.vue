@@ -20,65 +20,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="mb-3 text-xl font-semibold">{{ t("about.license_status_title") }}</div>
       <OBanner
         v-if="envKeyActive"
-        variant="warning"
-        icon="warning"
+        :variant="envKeyInUse ? 'warning' : 'info'"
+        :icon="envKeyInUse ? 'warning' : 'info'"
         class="mb-3"
-        :content="t('about.license_status_env_key')"
+        :content="
+          envKeyInUse
+            ? t('about.license_status_env_key')
+            : t('about.license_status_env_key_superseded')
+        "
         data-test="license-status-env-key"
       />
-      <table class="border-table-header-border w-full border-collapse border border-solid">
-        <tbody>
-          <tr class="border-table-row-divider border-b border-solid">
-            <td
-              class="border-table-row-divider border-e border-solid px-3 py-2 leading-[1.2] font-bold"
-            >
-              {{ t("about.license_status_search") }}
-            </td>
-            <td class="px-3 py-2 leading-[1.2]" data-test="license-status-search">
-              <OBadge :variant="decision.search_allowed ? 'success' : 'error'">
-                {{
-                  decision.search_allowed
-                    ? t("about.license_status_on")
-                    : t("about.license_status_paused")
-                }}
-              </OBadge>
-              <div v-if="restoredByWaiver && base" class="mt-2 text-sm">
-                {{
-                  t("about.license_status_on_by_waiver", {
-                    exceeded: base.exceeded_days,
-                    allowed: base.allowed_days,
-                  })
-                }}
-              </div>
-              <ul v-if="reasons.length" class="mt-2 list-disc ps-5 text-sm">
-                <li v-for="reason in reasons" :key="reason.key" data-test="license-status-reason">
-                  {{ reason.text }}
-                </li>
-              </ul>
-            </td>
-          </tr>
-          <tr class="border-table-row-divider border-b border-solid">
-            <td
-              class="border-table-row-divider border-e border-solid px-3 py-2 leading-[1.2] font-bold"
-            >
-              {{ t("about.license_status_limit_today") }}
-            </td>
-            <td class="px-3 py-2 leading-[1.2]" data-test="license-status-limit">
-              {{ limitText }}
-            </td>
-          </tr>
-          <tr v-if="evaluated && decision.limit_today_gb != null" data-test="license-status-days">
-            <td
-              class="border-table-row-divider border-e border-solid px-3 py-2 leading-[1.2] font-bold"
-            >
-              {{ t("about.license_status_allowed_days") }}
-            </td>
-            <td class="px-3 py-2 leading-[1.2]">
-              {{ daysText }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <ODescriptionList>
+        <ODescriptionItem :label="t('about.license_status_search')">
+          <div data-test="license-status-search">
+            <OBadge :variant="decision.search_allowed ? 'success' : 'error'">
+              {{
+                decision.search_allowed
+                  ? t("about.license_status_on")
+                  : t("about.license_status_paused")
+              }}
+            </OBadge>
+            <div v-if="restoredByWaiver && base" class="mt-2 text-sm">
+              {{
+                t("about.license_status_on_by_waiver", {
+                  exceeded: base.exceeded_days,
+                  allowed: base.allowed_days,
+                })
+              }}
+            </div>
+            <ul v-if="reasons.length" class="mt-2 list-disc ps-5 text-sm">
+              <li v-for="reason in reasons" :key="reason.key" data-test="license-status-reason">
+                {{ reason.text }}
+              </li>
+            </ul>
+          </div>
+        </ODescriptionItem>
+        <ODescriptionItem :label="t('about.license_status_limit_today')">
+          <span data-test="license-status-limit">{{ limitText }}</span>
+        </ODescriptionItem>
+        <ODescriptionItem
+          v-if="evaluated && decision.limit_today_gb != null"
+          :label="t('about.license_status_allowed_days')"
+          data-test="license-status-days"
+        >
+          {{ daysText }}
+        </ODescriptionItem>
+      </ODescriptionList>
     </OCardSection>
   </OCard>
 </template>
@@ -90,16 +77,21 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
+import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import { quotaPercent, type LicenseDecision } from "@/utils/licenseWaivers";
 
 const props = defineProps<{
   decision: LicenseDecision;
   base?: LicenseDecision;
   envKeyActive: boolean;
+  envKeyInUse?: boolean;
   evaluatedAt?: number;
 }>();
 
 const { t } = useI18nTyped();
+
+const envKeyInUse = computed(() => props.envKeyInUse !== false);
 
 const evaluated = computed(() => props.evaluatedAt !== 0);
 

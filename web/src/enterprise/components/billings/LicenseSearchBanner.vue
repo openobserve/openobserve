@@ -152,9 +152,10 @@ const restoredMessage = computed(() => {
   if (s.kind !== "restored") return "";
   const until = formatUtc(s.untilUs, locale.value, true);
   if (s.endsSoon) return t("about.banner_ends_soon", { until });
-  const base = t("about.banner_restored", { until });
   const note = activeSearchUnblock(licenseData.value?.waivers, nowUs.value)?.note;
-  return note ? `${base} ${t("about.banner_restored_note", { note })}` : base;
+  return note
+    ? t("about.banner_restored_with_note", { until, note })
+    : t("about.banner_restored", { until });
 });
 
 const message = computed(() => (isPaused.value ? pausedMessage.value : restoredMessage.value));

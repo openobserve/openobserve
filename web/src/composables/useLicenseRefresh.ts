@@ -35,6 +35,7 @@ export function useLicenseRefresh() {
         exact: true,
         refetchType: "none",
       });
+      await queryClient.fetchQuery(licenseQuery());
       if (!org) return;
       await queryClient.invalidateQueries({
         queryKey: configFullQuery(org).queryKey,
