@@ -1539,13 +1539,19 @@ pub async fn build_sql(
                 ))?
         )
     };
-    if query_condition.aggregation.is_none() {
+    let Some(agg) = query_condition.aggregation.as_ref() else {
         return Ok(format!("SELECT * FROM \"{stream_name}\" {where_sql}"));
     };
+    build_aggregation_sql(stream_name, &schema, agg, &where_sql)
+}
 
-    // handle aggregation
-    let mut sql = String::new();
-    let agg = query_condition.aggregation.as_ref().unwrap();
+/// Only columns of `schema` reach the SQL; any other `group_by`/`having` entry is refused.
+fn build_aggregation_sql(
+    stream_name: &str,
+    schema: &Schema,
+    agg: &config::meta::alerts::Aggregation,
+    where_sql: &str,
+) -> Result<String, anyhow::Error> {
     let having_expr = {
         let data_type = match schema.field_with_name(&agg.having.column) {
             Ok(field) => field.data_type(),
@@ -1588,40 +1594,41 @@ pub async fn build_sql(
         ),
     };
 
-    if let Some(group) = agg.group_by.as_ref()
-        && !group.is_empty()
-    {
-        let cols = group.join(", ");
-        if agg.multi_alert {
-            // Multi-alerts drop the HAVING filter. A group that falls back
-            // under the threshold must still be RETURNED: otherwise its
-            // recovery is indistinguishable from it vanishing, and it would
-            // only resolve later via the reaper timeout, with a NULL value
-            // where the real reading should be.
-            //
-            // The page stays bounded, so it is ordered worst-first. That
-            // ordering keeps the rollup level exact and lets the cap admit the
-            // true top of the distribution rather than an arbitrary slice. The
-            // group columns are the deterministic tiebreak within a severity
-            // band.
-            let severity_order =
-                config::meta::alerts::aggregation_level::severity_order_sql(agg, "alert_agg_value")
-                    .map_err(|e| anyhow::anyhow!("Invalid aggregation threshold: {e}"))?;
-            sql = format!(
-                "SELECT {cols}, {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"{where_sql} GROUP BY {cols} ORDER BY {severity_order}, {cols}"
-            );
-        } else {
-            sql = format!(
-                "SELECT {cols}, {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"{where_sql} GROUP BY {cols} HAVING {having_expr}"
-            );
-        }
-    }
-    if sql.is_empty() {
-        sql = format!(
+    let group = agg.group_by.as_deref().unwrap_or(&[]);
+    if group.is_empty() {
+        return Ok(format!(
             "SELECT {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"{where_sql} HAVING {having_expr}"
-        );
+        ));
     }
-    Ok(sql)
+    let cols = quoted_group_by(schema, group)
+        .map_err(|column| {
+            anyhow::anyhow!("Group by column {column} not found on stream {stream_name}")
+        })?
+        .join(", ");
+    if agg.multi_alert {
+        // No HAVING: a group back under the threshold must still be returned to show recovery.
+        // Worst-first order keeps the bounded page exact; group columns are the tiebreak.
+        let severity_order =
+            config::meta::alerts::aggregation_level::severity_order_sql(agg, "alert_agg_value")
+                .map_err(|e| anyhow::anyhow!("Invalid aggregation threshold: {e}"))?;
+        return Ok(format!(
+            "SELECT {cols}, {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"{where_sql} GROUP BY {cols} ORDER BY {severity_order}, {cols}"
+        ));
+    }
+    Ok(format!(
+        "SELECT {cols}, {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"{where_sql} GROUP BY {cols} HAVING {having_expr}"
+    ))
+}
+
+/// Quoted identifiers; `Err` carries the first entry that is not a column of `schema`.
+fn quoted_group_by(schema: &Schema, group_by: &[String]) -> Result<Vec<String>, String> {
+    group_by
+        .iter()
+        .map(|col| match schema.field_with_name(col) {
+            Ok(_) => Ok(format!("\"{col}\"")),
+            Err(_) => Err(col.clone()),
+        })
+        .collect()
 }
 
 /// `HAVING` clause filtering the `alert_agg_value` aggregate.
@@ -2949,6 +2956,95 @@ mod tests {
         );
         let expr = build_expr(&cond, "", &DataType::Int64).unwrap();
         assert_eq!(expr, "\"code\" < 1.5");
+    }
+
+    // ── Aggregation SQL: group_by identifiers ───────────────────────────────
+
+    fn agg_schema() -> Schema {
+        Schema::new(vec![
+            Field::new("host", DataType::Utf8, false),
+            Field::new("region", DataType::Utf8, false),
+            Field::new("latency", DataType::Int64, false),
+        ])
+    }
+
+    fn group_agg(group_by: &[&str], multi_alert: bool) -> Aggregation {
+        Aggregation {
+            group_by: Some(group_by.iter().map(|s| s.to_string()).collect()),
+            function: AggFunction::Avg,
+            having: make_cond(
+                "latency",
+                Operator::GreaterThan,
+                Value::Number(serde_json::Number::from(100)),
+            ),
+            warning_value: None,
+            multi_alert,
+        }
+    }
+
+    #[test]
+    fn test_build_aggregation_sql_quotes_group_by_columns() {
+        let agg = group_agg(&["host", "region"], false);
+        let sql = build_aggregation_sql("svc", &agg_schema(), &agg, "").unwrap();
+        assert_eq!(
+            sql,
+            "SELECT \"host\", \"region\", AVG(\"latency\") AS alert_agg_value, MIN(_timestamp) as zo_sql_min_time, MAX(_timestamp) AS zo_sql_max_time FROM \"svc\" GROUP BY \"host\", \"region\" HAVING \"alert_agg_value\" > 100"
+        );
+    }
+
+    #[test]
+    fn test_build_aggregation_sql_multi_alert_quotes_group_by_in_order_by() {
+        let agg = group_agg(&["host"], true);
+        let sql = build_aggregation_sql("svc", &agg_schema(), &agg, " WHERE 1 = 1").unwrap();
+        assert_eq!(
+            sql,
+            "SELECT \"host\", AVG(\"latency\") AS alert_agg_value, MIN(_timestamp) as zo_sql_min_time, MAX(_timestamp) AS zo_sql_max_time FROM \"svc\" WHERE 1 = 1 GROUP BY \"host\" ORDER BY CASE WHEN \"alert_agg_value\" > 100 THEN 2 ELSE 0 END DESC, \"host\""
+        );
+    }
+
+    #[test]
+    fn test_build_aggregation_sql_rejects_group_by_entry_not_in_schema() {
+        for entry in [
+            "nonexistent",
+            "host, (SELECT secret FROM \"other\" LIMIT 1)",
+            "host\" FROM \"other\" --",
+            "",
+        ] {
+            let agg = group_agg(&["host", entry], false);
+            let err = build_aggregation_sql("svc", &agg_schema(), &agg, "")
+                .unwrap_err()
+                .to_string();
+            assert_eq!(
+                err,
+                format!("Group by column {entry} not found on stream svc"),
+                "entry {entry:?} must be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn test_build_aggregation_sql_empty_group_by_collapses_to_single_row() {
+        let mut agg = group_agg(&[], false);
+        let sql = build_aggregation_sql("svc", &agg_schema(), &agg, "").unwrap();
+        assert!(!sql.contains("GROUP BY"), "{sql}");
+        agg.group_by = None;
+        assert_eq!(
+            build_aggregation_sql("svc", &agg_schema(), &agg, "").unwrap(),
+            sql
+        );
+    }
+
+    #[test]
+    fn test_quoted_group_by_reports_first_unknown_column() {
+        let schema = agg_schema();
+        assert_eq!(
+            quoted_group_by(&schema, &["host".into(), "region".into()]),
+            Ok(vec!["\"host\"".to_string(), "\"region\"".to_string()])
+        );
+        assert_eq!(
+            quoted_group_by(&schema, &["host".into(), "a".into(), "b".into()]),
+            Err("a".to_string())
+        );
     }
 
     // ── HAVING clause type resolution ───────────────────────────────────────
