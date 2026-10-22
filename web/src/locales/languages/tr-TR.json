@@ -6649,7 +6649,7 @@
     "thresholdErrorPercent": "0 ile 100 arasında bir yüzde yazın",
     "thresholdValueMappingsWin": "Değer eşlemeleri bu adımlardan önceliklidir",
     "thresholdStepCount": "{count} adım | {count} adım",
-    "thresholdOverridesOwnLimits": "Kendi sınırları olan seri geçersiz kılmaları: {count}",
+    "thresholdOverridesOwnLimits": "{count} seri geçersiz kılmanın kendi sınırları var | {count} seri geçersiz kılmanın kendi sınırları var",
     "thresholdHint": "= {value}",
     "thresholdErrorEnterNumber": "Bir sayı girin",
     "thresholdPlaceholder": "ör. {example}",

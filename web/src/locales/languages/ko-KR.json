@@ -6649,7 +6649,7 @@
     "thresholdErrorPercent": "0에서 100 사이의 백분율을 입력하세요",
     "thresholdValueMappingsWin": "값 매핑이 이 단계보다 우선합니다",
     "thresholdStepCount": "{count}개 단계 | {count}개 단계",
-    "thresholdOverridesOwnLimits": "시리즈 재정의 {count}개에 자체 한계가 있습니다",
+    "thresholdOverridesOwnLimits": "시리즈 재정의 {count}개에 자체 한계가 있습니다 | 시리즈 재정의 {count}개에 자체 한계가 있습니다",
     "thresholdHint": "= {value}",
     "thresholdErrorEnterNumber": "숫자를 입력하세요",
     "thresholdPlaceholder": "예: {example}",

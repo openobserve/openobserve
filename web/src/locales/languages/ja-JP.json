@@ -6649,7 +6649,7 @@
     "thresholdErrorPercent": "0 から 100 のパーセンテージを入力してください",
     "thresholdValueMappingsWin": "値マッピングがこれらのステップより優先されます",
     "thresholdStepCount": "{count} ステップ | {count} ステップ",
-    "thresholdOverridesOwnLimits": "{count} 件の系列オーバーライドに独自の制限があります",
+    "thresholdOverridesOwnLimits": "{count} 件の系列オーバーライドに独自の制限があります | {count} 件の系列オーバーライドに独自の制限があります",
     "thresholdHint": "= {value}",
     "thresholdErrorEnterNumber": "数値を入力してください",
     "thresholdPlaceholder": "例: {example}",

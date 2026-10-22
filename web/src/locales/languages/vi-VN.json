@@ -6649,7 +6649,7 @@
     "thresholdErrorPercent": "Nhập phần trăm từ 0 đến 100",
     "thresholdValueMappingsWin": "Ánh xạ giá trị được ưu tiên hơn các bước này",
     "thresholdStepCount": "{count} bước | {count} bước",
-    "thresholdOverridesOwnLimits": "{count} ghi đè chuỗi có giới hạn riêng",
+    "thresholdOverridesOwnLimits": "{count} ghi đè chuỗi có giới hạn riêng | {count} ghi đè chuỗi có giới hạn riêng",
     "thresholdHint": "= {value}",
     "thresholdErrorEnterNumber": "Nhập một số",
     "thresholdPlaceholder": "ví dụ: {example}",

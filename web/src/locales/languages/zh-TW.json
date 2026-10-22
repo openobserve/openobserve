@@ -6644,7 +6644,7 @@
     "thresholdErrorPercent": "請輸入 0 到 100 之間的百分比",
     "thresholdValueMappingsWin": "值對應優先於這些步驟",
     "thresholdStepCount": "{count} 個步驟 | {count} 個步驟",
-    "thresholdOverridesOwnLimits": "{count} 個系列覆寫有自己的限制",
+    "thresholdOverridesOwnLimits": "{count} 個系列覆寫有自己的限制 | {count} 個系列覆寫有自己的限制",
     "thresholdHint": "= {value}",
     "thresholdErrorEnterNumber": "請輸入數字",
     "thresholdPlaceholder": "例如 {example}",

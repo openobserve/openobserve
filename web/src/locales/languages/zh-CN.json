@@ -6649,7 +6649,7 @@
     "thresholdErrorPercent": "请输入 0 到 100 之间的百分比",
     "thresholdValueMappingsWin": "值映射优先于这些步骤",
     "thresholdStepCount": "{count} 个步骤 | {count} 个步骤",
-    "thresholdOverridesOwnLimits": "{count} 个系列覆盖有自己的限制",
+    "thresholdOverridesOwnLimits": "{count} 个系列覆盖有自己的限制 | {count} 个系列覆盖有自己的限制",
     "thresholdHint": "= {value}",
     "thresholdErrorEnterNumber": "请输入数字",
     "thresholdPlaceholder": "例如 {example}",
