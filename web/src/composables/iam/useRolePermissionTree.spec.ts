@@ -334,6 +334,15 @@ describe("useRolePermissionTree - modifyResourcePermissions new resource types",
     ["AllowList", "AllowGet"].forEach((action) => expect(r.permission[action].show).toBe(false));
   });
 
+  it("AC-5.8 slack_integration hides Get and Post, which OpenFGA does not define", () => {
+    const r = makeResource("slack_integration");
+    modifyResourcePermissions(r);
+    ["AllowAll", "AllowList", "AllowPut", "AllowDelete"].forEach((action) =>
+      expect(r.permission[action].show).toBe(true),
+    );
+    ["AllowGet", "AllowPost"].forEach((action) => expect(r.permission[action].show).toBe(false));
+  });
+
   it("prompt_label shows only Update", () => {
     const r = makeResource("prompt_label");
     modifyResourcePermissions(r);

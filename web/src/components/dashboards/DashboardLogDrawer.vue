@@ -1142,6 +1142,7 @@ function openInLogs() {
                       >
                       <!-- Open in Logs -->
                       <OButton
+                        :aria-label="t('panel.logExplorer.openInLogs')"
                         size="sm"
                         variant="ghost"
                         icon-left="open-in-new"

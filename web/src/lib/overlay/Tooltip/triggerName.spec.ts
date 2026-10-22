@@ -20,6 +20,14 @@ describe("tooltipNameTarget", () => {
     expect(tooltipNameTarget(trigger)).toBeNull();
   });
 
+  it("leaves a control named by its title", () => {
+    const icon = build(
+      '<button title="Delete"><span aria-hidden="true" id="i"></span></button>',
+      "#i",
+    );
+    expect(tooltipNameTarget(icon)).toBeNull();
+  });
+
   it("leaves a control that already has visible text or a name", () => {
     const text = build('<button>Save<span id="i"></span></button>', "#i");
     const named = build('<button aria-label="Own"><span id="i"></span></button>', "#i");

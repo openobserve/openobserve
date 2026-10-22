@@ -59,15 +59,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @trigger="refreshData"
           size="sm"
         />
-        <OButton
-          variant="outline"
-          size="icon-toolbar"
-          icon-left="refresh"
-          data-test="pinned-dashboard-refresh-btn"
-          @click="refreshData"
-        >
-          <OTooltip :content="t('common.refresh')" />
-        </OButton>
+        <!-- The tooltip would only repeat the visible label, so it shows on phones alone. -->
+        <OTooltip :content="t('common.refresh')" :disabled="!isMobile">
+          <OButton
+            variant="primary"
+            :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
+            icon-left="refresh"
+            :aria-label="t('common.refresh')"
+            data-test="pinned-dashboard-refresh-btn"
+            @click="refreshData"
+          >
+            <template v-if="!isMobile">{{ t("common.refresh") }}</template>
+          </OButton>
+        </OTooltip>
       </div>
       <div class="min-h-0 flex-1 overflow-auto">
         <RenderDashboardCharts
@@ -96,8 +100,10 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped } from "@/types/i18n";
+import useBreakpoint from "@/composables/useBreakpoint";
 
 const { t } = useI18nTyped();
+const { isMobile } = useBreakpoint();
 
 const props = defineProps<{ dashboardId: string; folderId: string }>();
 const emit = defineEmits<{
