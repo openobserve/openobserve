@@ -6224,7 +6224,6 @@
       "pastDays": "Son {n} gün | Son {n} gün",
       "pastWeeks": "Son {n} hafta | Son {n} hafta",
       "pastMonths": "Son {n} ay | Son {n} ay",
-      "window": "{start} → {end}",
       "variableUnset": "Ayarlanmadı",
       "footerNote": "Salt okunur görünüm. Bağlantıya sahip olan herkes bu gösterge panosunu görebilir.",
       "panelNotAvailable": "Bu panel genel görünümde mevcut değil.",

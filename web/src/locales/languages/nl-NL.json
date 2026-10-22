@@ -6224,7 +6224,6 @@
       "pastDays": "Afgelopen {n} dag | Afgelopen {n} dagen",
       "pastWeeks": "Afgelopen {n} week | Afgelopen {n} weken",
       "pastMonths": "Afgelopen {n} maand | Afgelopen {n} maanden",
-      "window": "{start} → {end}",
       "variableUnset": "Niet ingesteld",
       "footerNote": "Alleen-lezenweergave. Iedereen met de link kan dit dashboard zien.",
       "panelNotAvailable": "Dit paneel is niet beschikbaar in de openbare weergave.",

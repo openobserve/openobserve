@@ -6224,7 +6224,6 @@
       "pastDays": "지난 {n}일 | 지난 {n}일",
       "pastWeeks": "지난 {n}주 | 지난 {n}주",
       "pastMonths": "지난 {n}개월 | 지난 {n}개월",
-      "window": "{start} → {end}",
       "variableUnset": "설정 안 됨",
       "footerNote": "읽기 전용 보기입니다. 링크가 있는 사람은 누구나 이 대시보드를 볼 수 있습니다.",
       "panelNotAvailable": "이 패널은 공개 보기에서 사용할 수 없습니다.",

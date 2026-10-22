@@ -39,7 +39,7 @@ import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue"
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
+import KioskCountdownRing from "@/components/dashboards/kiosk/KioskCountdownRing.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 
 const CONFIG = {
@@ -66,7 +66,6 @@ const CONFIG = {
 config.global.stubs.OEmptyState = { props: ["title"], template: "<div>{{ title }}</div>" };
 // A mounted page keeps polling and listening for visibility, so each test unmounts its own.
 enableAutoUnmount(afterEach);
-const OTagStub = { name: "OTag", props: ["variant"], template: "<span><slot /></span>" };
 
 const buildWrapper = () =>
   shallowMount(PublicDashboard, { global: { plugins: [i18n], provide: { store } } });
@@ -78,7 +77,7 @@ const mountWithActions = () =>
     global: {
       plugins: [i18n],
       provide: { store },
-      stubs: { OPageHeader: { template: "<div><slot name='actions' /></div>" }, OTag: OTagStub },
+      stubs: { OPageHeader: { template: "<div><slot name='actions' /></div>" } },
     },
   });
 const grid = (w: any) => w.findComponent(RenderDashboardCharts);
@@ -217,21 +216,23 @@ describe("PublicDashboard viewer", () => {
       .mockResolvedValueOnce({ status: 200, data: { ...okBody("b"), built_at: built } } as never);
     const w = mountWithActions();
     await flushPromises();
-    const chip = () => w.findComponent<typeof OTag>({ name: "OTag" });
-    expect(chip().text()).toMatch(/^Last updated at .+ · Refreshing…$/);
-    expect(chip().props("variant")).toBe("warning-soft");
+    const ringState = () => {
+      const ring = w.findComponent(KioskCountdownRing);
+      return ring.exists() ? ring.props("state") : null;
+    };
+    expect(find(w, "dashboards-public-dashboard-updated").text()).toBe("Last updated 20s ago");
+    expect(ringState()).toBe("spinning");
 
     await vi.advanceTimersByTimeAsync(4_900);
     expect(service.getData).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(100);
     expect(service.getData).toHaveBeenCalledTimes(2);
     expect(service.getData).toHaveBeenLastCalledWith("abc", "r3600", "a");
-    expect(chip().text()).toContain("Refreshing…");
+    expect(ringState()).toBe("spinning");
 
     await vi.advanceTimersByTimeAsync(5_000);
     expect(service.getData).toHaveBeenCalledTimes(3);
-    expect(chip().text()).not.toContain("Refreshing…");
-    expect(chip().props("variant")).toBe("default-soft");
+    expect(ringState()).not.toBe("spinning");
     await vi.advanceTimersByTimeAsync(59_000);
     expect(service.getData).toHaveBeenCalledTimes(3);
   });
@@ -499,9 +500,38 @@ describe("PublicDashboard viewer", () => {
     });
     const w = mountWithActions();
     await flushPromises();
-    expect(find(w, "dashboards-public-dashboard-next-refresh").text()).toBe("Next refresh in 0:10");
+    const ring = () => w.findComponent(KioskCountdownRing);
+    expect(ring().props("tooltip")).toBe("Next refresh in 0:10");
+    expect(ring().props("state")).toBe("running");
     await vi.advanceTimersByTimeAsync(3_000);
-    expect(find(w, "dashboards-public-dashboard-next-refresh").text()).toBe("Next refresh in 0:07");
+    expect(ring().props("tooltip")).toBe("Next refresh in 0:07");
+  });
+
+  it("shows times in the chosen timezone and saves it as the app's own setting", async () => {
+    const before = store.state.timezone;
+    try {
+      store.state.timezone = "UTC";
+      (service.getConfig as any).mockResolvedValue({ data: CONFIG, status: 200 });
+      (service.getData as any).mockResolvedValue({ status: 200, data: okBody("a") });
+      const w = mountWithActions();
+      await flushPromises();
+      const select = w.findComponent({ name: "OSelect" });
+      expect(select.props("modelValue")).toBe("UTC");
+      expect(find(w, "dashboards-public-dashboard-window").text()).toBe(
+        "2027/01/15 07:54 - 2027/01/15 08:00",
+      );
+
+      select.vm.$emit("update:modelValue", "Asia/Tokyo");
+      await flushPromises();
+      expect(store.state.timezone).toBe("Asia/Tokyo");
+      expect(window.localStorage.getItem("timezone")).toBe("Asia/Tokyo");
+      expect(find(w, "dashboards-public-dashboard-window").text()).toBe(
+        "2027/01/15 16:54 - 2027/01/15 17:00",
+      );
+    } finally {
+      store.state.timezone = before;
+      window.localStorage.removeItem("timezone");
+    }
   });
 
   it("separates a relative range's window from the update chip", async () => {
@@ -511,8 +541,12 @@ describe("PublicDashboard viewer", () => {
     await flushPromises();
     expect(has(w, "dashboards-public-dashboard-window")).toBe(true);
     expect(has(w, "dashboards-public-dashboard-window-separator")).toBe(true);
+    // The same form as a printed dashboard's time range.
+    expect(w.find('[data-test="dashboards-public-dashboard-window"]').text()).toMatch(
+      /^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2} - \d{4}\/\d{2}\/\d{2} \d{2}:\d{2}$/,
+    );
     expect(w.find('[data-test="dashboards-public-dashboard-updated"]').text()).toMatch(
-      /^Last updated at /,
+      /^Last updated /,
     );
   });
 

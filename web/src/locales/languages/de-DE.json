@@ -6224,7 +6224,6 @@
       "pastDays": "Letzte {n} Tag | Letzte {n} Tage",
       "pastWeeks": "Letzte {n} Woche | Letzte {n} Wochen",
       "pastMonths": "Letzte {n} Monat | Letzte {n} Monate",
-      "window": "{start} → {end}",
       "variableUnset": "Nicht gesetzt",
       "footerNote": "Schreibgeschützte Ansicht. Jeder mit dem Link kann dieses Dashboard sehen.",
       "panelNotAvailable": "Dieses Panel ist in der öffentlichen Ansicht nicht verfügbar.",

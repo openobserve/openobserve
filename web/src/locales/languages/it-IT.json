@@ -6224,7 +6224,6 @@
       "pastDays": "Ultimo {n} giorno | Ultimi {n} giorni",
       "pastWeeks": "Ultima {n} settimana | Ultime {n} settimane",
       "pastMonths": "Ultimo {n} mese | Ultimi {n} mesi",
-      "window": "{start} → {end}",
       "variableUnset": "Non impostato",
       "footerNote": "Visualizzazione di sola lettura. Chiunque abbia il link può vedere questa dashboard.",
       "panelNotAvailable": "Questo pannello non è disponibile nella visualizzazione pubblica.",
