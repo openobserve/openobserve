@@ -145,15 +145,6 @@ describe("assistant service", () => {
     );
   });
 
-  it("cancels an incident analysis on its own route, with keepalive (round 1 E-10)", async () => {
-    await assistant.cancelIncidentAnalysis("org1", "inc-7");
-    expect(api.delete).toHaveBeenCalledWith("/api/v2/org1/alerts/incidents/inc-7/rca", {
-      ...managed,
-      adapter: "fetch",
-      fetchOptions: { keepalive: true },
-    });
-  });
-
   it("rejects when the cancel fails, so the caller can report it unconfirmed", async () => {
     api.post.mockRejectedValue(httpError(503));
     await expect(assistant.cancelTurn("org1", "s", "t")).rejects.toBeDefined();

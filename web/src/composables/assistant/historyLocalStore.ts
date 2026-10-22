@@ -26,7 +26,7 @@ import {
   sessionHints,
   type HistoryCtx,
 } from "./historyContext";
-import { LOCAL_CAP, MAX_INCIDENT_ID, type LocalRecord, type LocalTurn } from "./historyDb";
+import { LOCAL_CAP, type LocalRecord, type LocalTurn } from "./historyDb";
 import type { StoredTurn } from "./record";
 import { isTerminal } from "./turnStates";
 
@@ -206,7 +206,6 @@ function recordFromSession(
     userOrgKey: session.userOrgKey,
     titleSource: session.titleSource,
     origin: originOf(session.origin),
-    ...(session.incidentId && { incidentId: session.incidentId.slice(0, MAX_INCIDENT_ID) }),
     ...(pinned !== undefined && { pinned }),
     ...(server && { serverBacked: true }),
     ...(server &&

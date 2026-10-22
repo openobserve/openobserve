@@ -21,7 +21,9 @@ import { queryClient } from "@/composables/query/queryClient";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { alertDetailQuery } from "@/services/alerts.queries";
 import { trackAssistant } from "@/services/assistantAnalytics";
-import { gt, type I18nText } from "@/types/i18n";
+import { gt, raw, type I18nText } from "@/types/i18n";
+import { formatTimestampInTimezone } from "@/utils/date";
+import { formatBytes } from "@/utils/formatters";
 
 import type {
   EntryVerb,
@@ -33,6 +35,7 @@ import type {
 import { useAssistantStore } from "./assistantStore";
 import { ASSISTANT_QUERY_KEYS, openAssistant, type OpenAssistantCall } from "./openAssistant";
 import { useAssistantCapability } from "./useAssistantCapability";
+import { readIncidentReport } from "./useAssistantClient";
 
 /** What a resolver knows besides the `ref`: the org and zone the prompt is worded in. */
 export interface DeepLinkContext {
@@ -74,10 +77,14 @@ const BLOCKED: ReadonlySet<GateCode> = new Set([
   "no_permission",
 ]);
 
-/** The objects a link can name today: alerts and their firings, resolved by alert id. */
+// The incident's Time chip pads its alert span so the lead-up and the recovery are in range.
+const INCIDENT_WINDOW_PAD_MS = 15 * 60_000;
+
+/** The objects a link can name today: alerts, their firings and incidents, resolved by id. */
 export const DEEP_LINK_RESOLVERS: NonNullable<DeepLinkDoorDeps["resolvers"]> = {
   alert: { objectKind: "alert", resolve: resolveAlert },
   alert_firing: { objectKind: "alert_firing", resolve: resolveAlertFiring },
+  incident: { objectKind: "incident", resolve: resolveIncident },
 };
 
 /** Reads `assistant`, `object`, `ref` on a layout route, stages (never sends), and strips the keys. */
@@ -205,5 +212,39 @@ async function resolveAlertFiring(id: string, ctx: DeepLinkContext) {
     ...input,
     firedAt: input.lastFiredAt,
     query: input.condition,
+  });
+}
+
+async function resolveIncident(id: string, ctx: DeepLinkContext) {
+  const read = await readIncidentReport(ctx.org, id);
+  if (!read) return null;
+  const prompts = await import("@/utils/assistant/prompts");
+  const { incident } = read;
+  const firstMs = Math.floor(incident.first_alert_at / 1000);
+  const lastMs = Math.ceil((incident.resolved_at ?? incident.last_alert_at) / 1000);
+  // The run label names UTC, as the analysis tab's run selector does.
+  const time = formatTimestampInTimezone(read.startedAt, "MMM D, HH:mm", "UTC");
+  const run =
+    read.runNumber === null
+      ? raw(`${time} UTC`)
+      : gt("alerts.incidents.rcaRun.runAt", { number: read.runNumber, time });
+  return prompts.buildIncidentReportPrompt({
+    org: ctx.org,
+    incidentId: id,
+    runId: read.runId,
+    title: incident.title ?? "",
+    severity: incident.severity,
+    status: incident.status,
+    report: read.report,
+    reportLabel: gt("assistant.rca.reportChip", {
+      run,
+      size: raw(formatBytes(new TextEncoder().encode(read.report).length)),
+    }),
+    ...(firstMs > 0 && {
+      window: {
+        from: firstMs - INCIDENT_WINDOW_PAD_MS,
+        to: Math.max(firstMs, lastMs) + INCIDENT_WINDOW_PAD_MS,
+      },
+    }),
   });
 }

@@ -126,6 +126,7 @@ export interface AssistantContextTrayProps {
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 
 import {
@@ -169,6 +170,7 @@ const props = withDefaults(defineProps<AssistantContextTrayProps>(), {
 
 const { t } = useI18nTyped();
 const store = useAssistantStore();
+const route = useRoute();
 const vuex = useStore();
 const { mdUp } = useBreakpoint();
 const context = useAssistantContext(() => props.sid, { store });
@@ -391,7 +393,16 @@ function openQueryOf(chip: ContextChip) {
   return org ? chipOpenQuery(chip, org) : null;
 }
 
+// The incident page reads `?tab` only on load, so on that incident's own page the action would do nothing.
+function incidentRouteOf(chip: ContextChip) {
+  const id = chip.ref?.type === "incident" ? chip.ref.id : undefined;
+  if (!id || id.startsWith("door:")) return null;
+  if (route?.name === "incidentDetail" && route.params.id === id) return null;
+  return { name: "incidentDetail", params: { id }, query: { tab: "incidentAnalysis" } };
+}
+
 function openLabelOf(chip: ContextChip): I18nText | null {
+  if (incidentRouteOf(chip)) return t("assistant.rca.runAnalysis");
   const query = openQueryOf(chip);
   if (!query) return null;
   return t("assistant.context.openSource", { page: explorerLabel(explorerOf(query), t) });
@@ -399,6 +410,8 @@ function openLabelOf(chip: ContextChip): I18nText | null {
 
 // Through the explorer applier, so a docked container opens a new tab and nothing runs.
 async function openSource(chip: ContextChip): Promise<void> {
+  const incident = incidentRouteOf(chip);
+  if (incident) return runAnalysis(chip, incident);
   const query = openQueryOf(chip);
   const sid = props.sid;
   if (!sid || !query) return;
@@ -410,5 +423,27 @@ async function openSource(chip: ContextChip): Promise<void> {
   });
   if (!result.ok && result.reason === "other_org")
     announceComposer(sid, t("assistant.evidence.otherOrg", { org: raw(query.org) }));
+}
+
+async function runAnalysis(
+  chip: ContextChip,
+  target: NonNullable<ReturnType<typeof incidentRouteOf>>,
+): Promise<void> {
+  const sid = props.sid;
+  const org = sid ? store.state.sessions[sid]?.org : null;
+  if (!sid || !org) return;
+  openId.value = null;
+  // The navigation sets the session's org, so a chip from another org must not open under it.
+  if (chip.ref?.org && chip.ref.org !== org) {
+    announceComposer(sid, t("assistant.evidence.otherOrg", { org: raw(chip.ref.org) }));
+    return;
+  }
+  const result = await store.dispatch(sid, {
+    kind: "navigate",
+    target,
+    label: t("assistant.rca.runAnalysis"),
+  });
+  if (!result.ok && result.reason === "other_org")
+    announceComposer(sid, t("assistant.evidence.otherOrg", { org: raw(chip.ref?.org ?? org) }));
 }
 </script>
