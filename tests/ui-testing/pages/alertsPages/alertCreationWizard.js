@@ -10,6 +10,7 @@
 
 import { expect } from '@playwright/test';
 import testLogger from '../../playwright-tests/utils/test-logger.js';
+import MonacoEditorHelper from '../../playwright-tests/utils/MonacoEditorHelper.js';
 import { openOSelectDropdown } from './oselectHelpers.js';
 
 export class AlertCreationWizard {
@@ -1254,19 +1255,8 @@ export class AlertCreationWizard {
     async _replaceSqlEditorQuery(query) {
         const monacoEditor = this.page.locator(this.locators.sqlEditorDialog).locator('.monaco-editor').last();
         await monacoEditor.waitFor({ state: 'visible', timeout: 30000 });
-        const readQuery = () => monacoEditor.evaluate((node) => {
-            const editor = window.monaco?.editor?.getEditors?.().find((e) => node.contains(e.getDomNode()));
-            return editor ? editor.getValue() : null;
-        });
         // The dialog pre-fills `SELECT * FROM "<stream>"` once the stream loads; typing over a late pre-fill glues both into invalid SQL.
-        await expect.poll(async () => {
-            if ((await readQuery()) === query) return true;
-            await monacoEditor.click({ force: true });
-            await this.page.keyboard.press('ControlOrMeta+A');
-            await this.page.keyboard.press('Delete');
-            await this.page.keyboard.type(query);
-            return (await readQuery()) === query;
-        }, { timeout: 30000, intervals: [1000, 2000, 3000] }).toBe(true);
+        await new MonacoEditorHelper(this.page).setContentVerified(monacoEditor, query, 30000);
         testLogger.info('Entered SQL query', { query });
     }
 

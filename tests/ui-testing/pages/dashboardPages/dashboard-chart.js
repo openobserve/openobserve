@@ -202,20 +202,7 @@ export default class ChartTypeSelector {
           .locator(`[data-test="index-dropdown-stream-option"][data-test-value="${streamName}"]`)
           .first();
 
-        // The list opens scrolled to the current stream and filtering kept that offset, so the exact match at the top could sit outside the rendered rows.
-        await expect
-          .poll(
-            async () => {
-              await popover.evaluate((el) => {
-                el.querySelectorAll("*").forEach((node) => {
-                  if (node.scrollHeight > node.clientHeight) node.scrollTop = 0;
-                });
-              });
-              return streamOption.isVisible();
-            },
-            { timeout: 15000, intervals: [250, 500, 1000] },
-          )
-          .toBe(true);
+        await streamOption.waitFor({ state: "visible", timeout: 15000 });
         await streamOption.click();
         return; // Success
       } catch (error) {
