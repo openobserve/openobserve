@@ -129,7 +129,7 @@
       </template>
       <template #cell-last_viewed="{ row }">
         <span
-          class="inline-flex min-w-0 items-baseline text-sm"
+          class="inline-flex min-w-0 items-baseline gap-1 text-sm"
           :data-test="`dashboards-public-links-${row.id}-last-viewed`"
         >
           <OTimeCell
@@ -139,16 +139,18 @@
             :now="now"
             :empty-label="t('dashboard.publicLinks.never')"
           />
-          <span v-if="row.access_count" class="text-text-secondary whitespace-nowrap tabular-nums">
-            {{ raw(" · ")
-            }}{{
-              t(
-                "dashboard.publicLinks.requestCount",
-                { count: row.access_count.toLocaleString() },
-                row.access_count,
-              )
-            }}
-          </span>
+          <template v-if="row.access_count">
+            <span class="text-text-secondary" aria-hidden="true">{{ raw("·") }}</span>
+            <span class="text-text-secondary whitespace-nowrap tabular-nums">
+              {{
+                t(
+                  "dashboard.publicLinks.requestCount",
+                  { count: row.access_count.toLocaleString() },
+                  row.access_count,
+                )
+              }}
+            </span>
+          </template>
         </span>
       </template>
       <template #cell-published_by="{ row }">
