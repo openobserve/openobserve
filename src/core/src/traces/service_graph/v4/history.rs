@@ -20,7 +20,7 @@ use std::collections::BTreeMap;
 use config::meta::{promql::value::RangeValue, service_graph::EdgeTrendDataPoint};
 
 use super::{
-    read::{QUANTILES, count, label_eq, range, secs_to_ns, selector},
+    read::{QUANTILES, V4_ONLY, count, label_eq, range, secs_to_ns, selector},
     schedule::align_down,
     writer::{LABEL_TRACE_STREAM, M_CLIENT_SECONDS, M_REQUEST_FAILED_TOTAL, M_REQUEST_TOTAL},
 };
@@ -40,23 +40,30 @@ pub struct EdgeFilter {
 
 impl EdgeFilter {
     /// Values PromQL cannot quote are the caller's input error, not a read failure.
-    pub fn matcher(&self) -> Result<String, String> {
-        [
+    pub fn validate(&self) -> Result<(), String> {
+        self.matcher(true).map(|_| ())
+    }
+
+    fn matcher(&self, v4_only: bool) -> Result<String, String> {
+        let mut parts = [
             ("client", &self.client),
             ("server", &self.server),
             (LABEL_TRACE_STREAM, &self.trace_stream),
         ]
         .into_iter()
         .filter_map(|(label, v)| v.as_deref().map(|v| label_eq(label, v)))
-        .collect::<Result<Vec<_>, _>>()
-        .map(|parts| parts.join(","))
+        .collect::<Result<Vec<_>, _>>()?;
+        if v4_only && self.trace_stream.is_none() {
+            parts.push(V4_ONLY.to_string());
+        }
+        Ok(parts.join(","))
     }
 }
 
 /// Reads the edge trend over `[start, end)`; each point covers the step ending at its timestamp.
 pub async fn fetch_edge_history(
     org: &str,
-    matcher: &str,
+    filter: &EdgeFilter,
     start: i64,
     end: i64,
 ) -> Result<Vec<EdgeTrendDataPoint>, anyhow::Error> {
@@ -64,12 +71,20 @@ pub async fn fetch_edge_history(
     let Some((first, last)) = eval_bounds(start, end, step) else {
         return Ok(vec![]);
     };
-    let results = futures::future::try_join_all(
-        plan(matcher, step)
-            .iter()
-            .map(|q| range(org, q, first, last, step)),
-    )
-    .await?;
+    let run = |v4_only: bool| async move {
+        let matcher = filter.matcher(v4_only).map_err(anyhow::Error::msg)?;
+        futures::future::try_join_all(
+            plan(&matcher, step)
+                .iter()
+                .map(|q| range(org, q, first, last, step)),
+        )
+        .await
+    };
+    let mut results = run(true).await?;
+    // Collector series are read only for an edge v4 never wrote, so the two never add up.
+    if filter.trace_stream.is_none() && results[0].is_empty() {
+        results = run(false).await?;
+    }
     Ok(assemble(&results))
 }
 
@@ -159,16 +174,29 @@ mod tests {
             server: None,
             trace_stream: Some("default".to_string()),
         };
-        assert_eq!(
-            f.matcher().unwrap(),
-            "client=\"a\\\"b\",trace_stream=\"default\""
-        );
-        assert_eq!(EdgeFilter::default().matcher().unwrap(), "");
+        for v4_only in [true, false] {
+            assert_eq!(
+                f.matcher(v4_only).unwrap(),
+                "client=\"a\\\"b\",trace_stream=\"default\""
+            );
+        }
+        assert_eq!(EdgeFilter::default().matcher(false).unwrap(), "");
         let bad = EdgeFilter {
             server: Some("x\u{7}".to_string()),
             ..Default::default()
         };
-        assert!(bad.matcher().is_err());
+        assert!(bad.validate().is_err());
+    }
+
+    #[test]
+    fn test_matcher_without_a_stream_reads_v4_series_first() {
+        let f = EdgeFilter {
+            server: Some("b".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(f.matcher(true).unwrap(), "server=\"b\",trace_stream!=\"\"");
+        assert_eq!(f.matcher(false).unwrap(), "server=\"b\"");
+        assert_eq!(EdgeFilter::default().matcher(true).unwrap(), V4_ONLY);
     }
 
     #[test]

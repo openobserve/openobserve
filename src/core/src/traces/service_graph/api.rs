@@ -177,11 +177,10 @@ pub async fn get_edge_history(
         server: non_empty(query.server_service),
         trace_stream: trace_stream_filter(query.stream_name),
     };
-    let matcher = match filter.matcher() {
-        Ok(m) => m,
-        Err(e) => return MetaHttpResponse::bad_request(e),
-    };
-    match fetch_edge_history(&org_id, &matcher, start_time, end_time).await {
+    if let Err(e) = filter.validate() {
+        return MetaHttpResponse::bad_request(e);
+    }
+    match fetch_edge_history(&org_id, &filter, start_time, end_time).await {
         Ok(data_points) => MetaHttpResponse::json(EdgeTrendResponse { data_points }),
         Err(e) => {
             log::error!("[ServiceGraph] Edge history query failed for org '{org_id}': {e}");

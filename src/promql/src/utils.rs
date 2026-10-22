@@ -514,6 +514,42 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_not_equal_empty_keeps_only_rows_carrying_the_label() {
+        let schema = Arc::new(ArrowSchema::new(vec![Field::new(
+            "trace_stream",
+            DataType::Utf8,
+            true,
+        )]));
+        let batch = RecordBatch::try_new(
+            schema,
+            vec![Arc::new(StringArray::from(vec![
+                Some("default"),
+                None,
+                Some(""),
+                Some("traces"),
+                None,
+            ]))],
+        )
+        .unwrap();
+        let df = SessionContext::new().read_batch(batch).unwrap();
+        let rows = apply_matchers(df, &parsed_matchers(r#"m{trace_stream!=""}"#))
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+        let kept: Vec<String> = rows
+            .iter()
+            .flat_map(|b| {
+                let col = b.column(0).as_any().downcast_ref::<StringArray>().unwrap();
+                (0..col.len())
+                    .map(|i| col.value(i).to_string())
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        assert_eq!(kept, ["default", "traces"]);
+    }
+
+    #[tokio::test]
     async fn test_apply_matchers_exact_regex_supports_utf8_view() {
         let (df, _) = make_string_view_df();
         let matchers = parsed_matchers(r#"m{service=~"api"}"#);
