@@ -11131,12 +11131,14 @@ export class LogsPage {
      * Fails the test if the editor stays empty beyond the timeout.
      */
     async expectQueryEditorPopulated(timeout = 60000) {
-        // 60s, not 30s: the editor fills only after makeAutoSQLQuery(), which awaits
-        // updateGroupedFields() -> loadStreamFields() -> GET /streams/{name}/schema.
-        // Under CI load that chain regularly passed 30s, which made this the flakiest
-        // wait in the Logs suite (two tests passing only on retry, a third exhausting
-        // them). Waiting on the schema response instead is not an option: useStreams
-        // caches it, so on a warm cache no request fires and the wait would hang.
+        // 60s, not 30s: the editor fills only after the Build-tab init awaits
+        // updateGroupedFields() -> loadStreamFields() -> GET /{org}/streams/{name}/schema
+        // and THEN calls makeAutoSQLQuery() (useDefaultPanelFields.ts:66 and :92 —
+        // makeAutoSQLQuery does not await the schema load itself). Under CI load that
+        // sequence regularly passed 30s, which made this the flakiest wait in the Logs
+        // suite (two tests passing only on retry, a third exhausting them). Waiting on
+        // the schema response instead is not an option: useStreams caches it, so on a
+        // warm cache no request fires and the wait would hang.
         try {
             await this.page.waitForFunction(
                 (selector) => {
@@ -11173,7 +11175,7 @@ export class LogsPage {
             throw new Error(
                 `Query editor stayed empty after ${timeout}ms (host=${diag?.hostPresent} ` +
                 `monaco=${diag?.monacoLoaded} editors=${diag?.editorsInHost}). ` +
-                `makeAutoSQLQuery() likely never resolved — check the stream schema call.`
+                `the Build-tab schema load or makeAutoSQLQuery() never resolved.`
             );
         }
         testLogger.info('Query editor populated');
