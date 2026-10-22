@@ -477,6 +477,7 @@ pub(super) fn supported_query(
     query_sql: &str,
     stream_type: &str,
     window: (i64, i64),
+    stream_fields: Option<&HashSet<String>>,
 ) -> Result<SupportedQuery, String> {
     let metadata = metadata.ok_or("eligibility metadata could not be loaded")?;
     if !metadata.stream_type.eq_ignore_ascii_case(stream_type) {
@@ -502,7 +503,7 @@ pub(super) fn supported_query(
             .ok_or("no histogram(_timestamp, '<interval>') AS time_bucket column")?;
         (literal, ResultColumns::generated())
     } else if metadata.query_mode.eq_ignore_ascii_case("custom_sql") {
-        check_custom_shape(&statement, metadata)?
+        check_custom_shape(&statement, metadata, stream_fields)?
     } else {
         return Err(format!(
             "query mode '{}' is neither filters nor custom_sql",
@@ -631,6 +632,7 @@ fn check_filter_shape(statement: &Statement, stream_name: &str) -> Result<(), St
 fn check_custom_shape<'a>(
     statement: &'a Statement,
     metadata: &QueryMetadata,
+    stream_fields: Option<&HashSet<String>>,
 ) -> Result<(&'a str, ResultColumns), String> {
     let Statement::Query(query) = statement else {
         return Err("SQL is not a SELECT query".to_string());
@@ -660,7 +662,7 @@ fn check_custom_shape<'a>(
     if value == bucket.alias {
         return Err(format!("value column '{value}' is the bucket column"));
     }
-    check_custom_group_by(select, &bucket)?;
+    check_custom_group_by(select, &bucket, stream_fields)?;
     Ok((
         bucket.literal,
         ResultColumns {
@@ -871,7 +873,11 @@ fn custom_value_column(names: &[Option<&str>], declared: Option<&str>) -> Result
 }
 
 /// GROUP BY must be the bucket alone: by alias, by ordinal, or by the histogram call itself.
-fn check_custom_group_by(select: &Select, bucket: &CustomBucket<'_>) -> Result<(), String> {
+fn check_custom_group_by(
+    select: &Select,
+    bucket: &CustomBucket<'_>,
+    stream_fields: Option<&HashSet<String>>,
+) -> Result<(), String> {
     let GroupByExpr::Expressions(exprs, modifiers) = &select.group_by else {
         return Err("GROUP BY ALL does not name the bucket".to_string());
     };
@@ -880,7 +886,11 @@ fn check_custom_group_by(select: &Select, bucket: &CustomBucket<'_>) -> Result<(
     };
     let ordinal = (bucket.position + 1).to_string();
     let is_bucket = match expr {
-        Expr::Identifier(ident) => ident.value == bucket.alias,
+        Expr::Identifier(ident) if ident.value == bucket.alias => {
+            alias_free_of_stream_fields(&bucket.alias, stream_fields)?;
+            true
+        }
+        Expr::Identifier(_) => false,
         Expr::Value(v) => matches!(&v.value, Value::Number(n, false) if *n == ordinal),
         other => other.to_string() == bucket.expr.to_string(),
     };
@@ -888,6 +898,28 @@ fn check_custom_group_by(select: &Select, bucket: &CustomBucket<'_>) -> Result<(
         Ok(())
     } else {
         Err("GROUP BY is not exactly the histogram bucket".to_string())
+    }
+}
+
+/// The engine binds a GROUP BY name to a stream field before a projection alias of that name.
+fn alias_free_of_stream_fields(
+    alias: &str,
+    stream_fields: Option<&HashSet<String>>,
+) -> Result<(), String> {
+    let hint = "use GROUP BY <ordinal> or the histogram call";
+    if alias == "_timestamp" {
+        return Err(format!(
+            "GROUP BY _timestamp groups by the stream column, not the bucket: {hint}"
+        ));
+    }
+    match stream_fields {
+        None => Err(format!(
+            "stream schema unavailable to prove that GROUP BY {alias} is the bucket: {hint}"
+        )),
+        Some(fields) if fields.contains(alias) => Err(format!(
+            "GROUP BY {alias} groups by the stream field of that name, not the bucket: {hint}"
+        )),
+        Some(_) => Ok(()),
     }
 }
 
@@ -1394,12 +1426,36 @@ mod tests {
     }
 
     fn supported(metadata: &QueryMetadata, sql: &str) -> Result<SupportedQuery, String> {
+        supported_with(metadata, sql, Some(&stream_fields()))
+    }
+
+    fn supported_with(
+        metadata: &QueryMetadata,
+        sql: &str,
+        fields: Option<&HashSet<String>>,
+    ) -> Result<SupportedQuery, String> {
         supported_query(
             Some(metadata),
             sql,
             &metadata.stream_type,
             training_window(),
+            fields,
         )
+    }
+
+    /// The seed stream's fields: `time` is deliberately absent, `_timestamp` always present.
+    fn stream_fields() -> HashSet<String> {
+        [
+            "_timestamp",
+            "level",
+            "latency",
+            "service",
+            "bytes",
+            "duration",
+            "id",
+        ]
+        .map(str::to_string)
+        .into()
     }
 
     fn columns(bucket: &str, value: &str) -> ResultColumns {
@@ -1584,6 +1640,48 @@ mod tests {
             declared_over_legacy.unwrap().columns,
             columns("time_bucket", "p50")
         );
+        let two_legacy = "SELECT histogram(_timestamp, '5m') AS time_bucket, avg(latency) AS \
+                          value, count(*) AS count FROM default GROUP BY time_bucket";
+        let declared = supported(&custom_metadata(Some("count")), two_legacy);
+        assert_eq!(declared.unwrap().columns, columns("time_bucket", "count"));
+        let deterministic_time = "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) \
+                                  AS value FROM default WHERE _timestamp > \
+                                  to_timestamp('2026-01-01') GROUP BY time_bucket";
+        assert_eq!(
+            eligible(&custom_metadata(None), deterministic_time),
+            Ok(GRID_5M)
+        );
+    }
+
+    #[test]
+    fn a_group_by_alias_that_names_a_stream_field_falls_back() {
+        let meta = custom_metadata(None);
+        let by_timestamp = "SELECT histogram(_timestamp, '5m') AS _timestamp, count(*) AS value \
+                            FROM default GROUP BY _timestamp";
+        let reason = supported(&meta, by_timestamp).unwrap_err();
+        assert!(
+            reason.contains("GROUP BY _timestamp groups by the stream column"),
+            "{reason}"
+        );
+        let by_ordinal = by_timestamp.replace("GROUP BY _timestamp", "GROUP BY 1");
+        assert_eq!(
+            supported(&meta, &by_ordinal).unwrap().columns,
+            columns("_timestamp", "value")
+        );
+        let by_time = "SELECT histogram(_timestamp, '5m') AS time, count(*) AS value FROM \
+                       default GROUP BY time";
+        assert_eq!(
+            supported(&meta, by_time).unwrap().columns,
+            columns("time", "value")
+        );
+        let mut with_time_field = stream_fields();
+        with_time_field.insert("time".to_string());
+        let reason = supported_with(&meta, by_time, Some(&with_time_field)).unwrap_err();
+        assert!(reason.contains("stream field of that name"), "{reason}");
+        let no_schema = supported_with(&meta, &filter_sql(""), None).unwrap_err();
+        assert!(no_schema.contains("schema unavailable"), "{no_schema}");
+        let ordinal_without_schema = filter_sql("").replace("GROUP BY time_bucket", "GROUP BY 1");
+        assert!(supported_with(&meta, &ordinal_without_schema, None).is_ok());
     }
 
     #[test]
@@ -1711,6 +1809,39 @@ mod tests {
                 "one statement",
             ),
             ("VALUES (1, 2)".to_string(), "set operation"),
+            (
+                "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) / extract(epoch \
+                 FROM now()) AS value FROM default GROUP BY time_bucket"
+                    .to_string(),
+                "now(), bound at query time",
+            ),
+            (
+                format!(
+                    "{base} WHERE _timestamp > CURRENT_TIMESTAMP - INTERVAL '1 day' GROUP BY \
+                     time_bucket"
+                ),
+                "current_timestamp(), bound at query time",
+            ),
+            (
+                format!("{base} GROUP BY time_bucket HAVING count(*) > random() * 10"),
+                "random(), bound at query time",
+            ),
+            (
+                format!("{base} GROUP BY time_bucket ORDER BY pg_catalog.NOW()"),
+                "now(), bound at query time",
+            ),
+            (
+                "SELECT histogram(_timestamp, '5m') AS time_bucket, unnest(array_agg(latency)) \
+                 AS value FROM default GROUP BY time_bucket"
+                    .to_string(),
+                "unnest(), which expands a bucket into rows",
+            ),
+            (
+                "SELECT histogram(_timestamp, '5m') AS time_bucket, avg(latency) AS value, \
+                 count(*) AS count FROM default GROUP BY time_bucket"
+                    .to_string(),
+                "legacy value names value, count are all SELECT columns",
+            ),
         ];
         for (sql, expected) in cases {
             let reason = supported(&custom_metadata(None), &sql).unwrap_err();
@@ -1726,9 +1857,19 @@ mod tests {
     #[test]
     fn metadata_mismatches_fall_back() {
         let sql = filter_sql("");
-        assert!(supported_query(None, &sql, "logs", training_window()).is_err());
+        let fields = stream_fields();
+        assert!(supported_query(None, &sql, "logs", training_window(), Some(&fields)).is_err());
         let meta = filter_metadata("5m");
-        assert!(supported_query(Some(&meta), &sql, "traces", training_window()).is_err());
+        assert!(
+            supported_query(
+                Some(&meta),
+                &sql,
+                "traces",
+                training_window(),
+                Some(&fields)
+            )
+            .is_err()
+        );
         let mut conflicting = filter_metadata("5m");
         conflicting.value_column = Some("requests".to_string());
         assert!(eligible(&conflicting, &sql).is_err());
