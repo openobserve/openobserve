@@ -255,6 +255,26 @@
     "disabled": []
   },
   {
+    "testfolder": "Infra",
+    "actual_folder": "Infra",
+    "browser": "chrome",
+    "run_files": [
+      "databaseMonitoring.spec.js",
+      "databaseMonitoringFlows.spec.js",
+      "databaseMonitoringFilterMatrix.spec.js"
+    ],
+    "disabled": [
+      {
+        "file": "databaseMonitoringScopeIntegrity.spec.js",
+        "reason": "every test self-skips without database-monitoring data in the org; wiring it would report green while asserting nothing"
+      },
+      {
+        "file": "databaseMonitoringPlans.spec.js",
+        "reason": "same: both tests self-skip without database-monitoring data in the org"
+      }
+    ]
+  },
+  {
     "testfolder": "Management",
     "actual_folder": "Management",
     "browser": "chrome",

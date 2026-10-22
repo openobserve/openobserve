@@ -123,6 +123,11 @@
       "web/src/services/auth.*",
       "tests/ui-testing/pages/generalPages/**"
     ],
+    "Infra": [
+      "web/src/components/dbm/**",
+      "web/src/composables/dbm/**",
+      "tests/ui-testing/pages/dbmPages/**"
+    ],
     "Management": [
       "web/src/components/iam/**",
       "web/src/components/settings/**",
