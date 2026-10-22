@@ -461,7 +461,7 @@ function destinationLabel(id: string): I18nText {
   const d = destinationById.value.get(id);
   if (d?.target) return raw(d.target.replace(/^[a-z][a-z0-9+.-]*:\/\//i, ""));
   const fleet = pipelines.value.find((p) => p.exporters.some((e) => e.destination === id))?.fleet;
-  return raw([d?.exporter, fleet].filter(Boolean).join(" · "));
+  return raw([d?.exporter, fleet && fleetName(fleet)].filter(Boolean).join(" · "));
 }
 
 const fleetName = (id: string) => fleetById.value.get(id)?.name ?? id;
