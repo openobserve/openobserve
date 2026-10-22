@@ -270,6 +270,52 @@ def test_workflows_cross_org_isolation(create_session, base_url, workflow):
     assert resp.status_code in (401, 403, 404)
 
 
+# --------------------------------------------------------------------------- incident link and HTTP endpoint flag
+
+def _incident_associated(session, base_url, wf_id):
+    found = _find_in_list(session, base_url, wf_id)
+    assert found is not None
+    return any(a.get("trigger_type") == "IncidentEvent" for a in found.get("associations") or [])
+
+
+def test_switching_an_incident_workflow_to_another_trigger_type_drops_the_incident_association(
+    create_session, base_url, pipeline_destination
+):
+    """AC-API-24 — saving an incident workflow with another trigger type removes the incident link."""
+    payload = _workflow_payload(f"wf_auto_api_{_suffix()}", pipeline_destination)
+    payload["trigger_type"] = "IncidentEvent"
+    created = create_session.post(f"{base_url}api/{ORG_ID}/workflows", json=payload)
+    assert created.status_code == 200, f"create failed: {created.status_code} {created.text[:300]}"
+    wf_id = created.json()["id"]
+    try:
+        assert _incident_associated(create_session, base_url, wf_id)
+        payload["workflow"]["id"] = wf_id
+        payload["trigger_type"] = "AlertResolved"
+        resp = create_session.put(f"{base_url}api/{ORG_ID}/workflows/{wf_id}", json=payload)
+        assert resp.status_code == 200, f"update failed: {resp.status_code} {resp.text[:300]}"
+        assert not _incident_associated(create_session, base_url, wf_id)
+    finally:
+        create_session.delete(f"{base_url}api/{ORG_ID}/workflows/{wf_id}")
+
+
+def test_list_marks_http_endpoint_enabled(create_session, base_url, workflow):
+    """AC-API-17 — `http_endpoint_enabled` follows a live, enabled endpoint."""
+    config = create_session.get(f"{base_url}api/{ORG_ID}/config").json()
+    if config.get("workflow_hooks_enabled") is not True:
+        pytest.skip("Workflow HTTP endpoints are off on this server (workflow_hooks_enabled is not true).")
+    wf_id = workflow["id"]
+    url = f"{base_url}api/{ORG_ID}/workflows/{wf_id}/http_trigger"
+    assert _find_in_list(create_session, base_url, wf_id)["http_endpoint_enabled"] is False
+    resp = create_session.put(url, json={"enabled": True, "auth_mode": "token"})
+    assert resp.status_code == 201, resp.text[:300]
+    try:
+        assert _find_in_list(create_session, base_url, wf_id)["http_endpoint_enabled"] is True
+        create_session.put(url, json={"enabled": False, "auth_mode": "token"})
+        assert _find_in_list(create_session, base_url, wf_id)["http_endpoint_enabled"] is False
+    finally:
+        create_session.delete(url)
+
+
 # --------------------------------------------------------------------------- Fixmes (documented gaps)
 
 @pytest.mark.skip(reason="No public API to seed a genuinely-errored run_id (runs come from an alert firing).")
