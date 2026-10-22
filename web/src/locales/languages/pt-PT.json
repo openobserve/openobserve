@@ -1516,6 +1516,7 @@
     "diffSame": "Sem alteração",
     "diffMore": "Maior proporção",
     "diffLegendHelp": "A largura representa {comparison}. A cor mostra como a proporção de cada função no total mudou de {baseline} para {comparison}.",
+    "diffLegendHelpSides": "A largura corresponde ao tempo próprio de cada valor. A cor mostra como a quota de cada função no total mudou de {baseline} para {comparison}, de forma idêntica nos dois gráficos.",
     "diffSidePercent": "{side} %",
     "diffChange": "Alteração",
     "diffPoints": "{value} pt",

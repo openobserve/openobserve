@@ -1516,6 +1516,7 @@
     "diffSame": "Değişiklik Yok",
     "diffMore": "Daha Büyük Pay",
     "diffLegendHelp": "Genişlik {comparison}. Renk, her fonksiyonun toplam içindeki payının {baseline} değerinden {comparison} değerine nasıl değiştiğini gösterir.",
+    "diffLegendHelpSides": "Genişlik, her değerin kendi süresidir. Renk, her fonksiyonun toplam içindeki payının {baseline} değerinden {comparison} değerine nasıl değiştiğini gösterir; bu, her iki grafikte de aynıdır.",
     "diffSidePercent": "{side} %",
     "diffChange": "Değişim",
     "diffPoints": "{value} puan",

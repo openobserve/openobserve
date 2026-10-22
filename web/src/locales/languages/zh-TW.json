@@ -1516,6 +1516,7 @@
     "diffSame": "無變化",
     "diffMore": "佔比變大",
     "diffLegendHelp": "寬度為 {comparison}。顏色顯示每個函式的總佔比從 {baseline} 到 {comparison} 的變化。",
+    "diffLegendHelpSides": "寬度代表每個值自身的時間。顏色顯示每個函式佔總量的比例從 {baseline} 到 {comparison} 的變化，兩張圖表皆相同。",
     "diffSidePercent": "{side} %",
     "diffChange": "變化",
     "diffPoints": "{value} 個百分點",

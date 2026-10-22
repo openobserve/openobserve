@@ -1516,6 +1516,7 @@
     "diffSame": "Без изменений",
     "diffMore": "Большая доля",
     "diffLegendHelp": "Ширина — {comparison}. Цвет показывает, как изменилась доля каждой функции в общем объёме от {baseline} к {comparison}.",
+    "diffLegendHelpSides": "Ширина — это собственное время каждого значения. Цвет показывает, как доля каждой функции в общем изменилась от {baseline} к {comparison} — одинаково на обоих графиках.",
     "diffSidePercent": "{side} %",
     "diffChange": "Изменение",
     "diffPoints": "{value} п.п.",

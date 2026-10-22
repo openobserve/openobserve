@@ -1516,6 +1516,7 @@
     "diffSame": "Sin cambios",
     "diffMore": "Mayor proporción",
     "diffLegendHelp": "El ancho es {comparison}. El color muestra cómo cambió la proporción de cada función sobre el total de {baseline} a {comparison}.",
+    "diffLegendHelpSides": "La anchura representa el tiempo propio de cada valor. El color muestra cómo cambió la proporción de cada función sobre el total de {baseline} a {comparison}, igual en ambos gráficos.",
     "diffSidePercent": "{side} %",
     "diffChange": "Cambio",
     "diffPoints": "{value} pt",

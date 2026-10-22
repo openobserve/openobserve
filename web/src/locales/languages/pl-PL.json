@@ -1516,6 +1516,7 @@
     "diffSame": "Bez zmian",
     "diffMore": "Większy udział",
     "diffLegendHelp": "Szerokość to {comparison}. Kolor pokazuje, jak zmienił się udział każdej funkcji w całości z {baseline} na {comparison}.",
+    "diffLegendHelpSides": "Szerokość oznacza własny czas każdej wartości. Kolor pokazuje, jak udział każdej funkcji w całości zmienił się z {baseline} na {comparison}, tak samo na obu wykresach.",
     "diffSidePercent": "{side} %",
     "diffChange": "Zmiana",
     "diffPoints": "{value} p.p.",

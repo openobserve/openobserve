@@ -1516,6 +1516,7 @@
     "diffSame": "Nessuna variazione",
     "diffMore": "Quota maggiore",
     "diffLegendHelp": "La larghezza corrisponde a {comparison}. Il colore mostra come è cambiata la quota di ciascuna funzione sul totale da {baseline} a {comparison}.",
+    "diffLegendHelpSides": "La larghezza rappresenta il tempo proprio di ciascun valore. Il colore mostra come la quota di ciascuna funzione sul totale è cambiata da {baseline} a {comparison}, in modo identico in entrambi i grafici.",
     "diffSidePercent": "{side} %",
     "diffChange": "Variazione",
     "diffPoints": "{value} pt",

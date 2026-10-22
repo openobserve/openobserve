@@ -1516,6 +1516,7 @@
     "diffSame": "Geen wijziging",
     "diffMore": "Groter aandeel",
     "diffLegendHelp": "Breedte is {comparison}. Kleur toont hoe het aandeel van elke functie in het totaal veranderde van {baseline} naar {comparison}.",
+    "diffLegendHelpSides": "Breedte is de eigen tijd van elke waarde. Kleur toont hoe het aandeel van elke functie in het totaal is veranderd van {baseline} naar {comparison}, hetzelfde in beide grafieken.",
     "diffSidePercent": "{side} %",
     "diffChange": "Wijziging",
     "diffPoints": "{value} pt",

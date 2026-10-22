@@ -1516,6 +1516,7 @@
     "diffSame": "変化なし",
     "diffMore": "シェア増",
     "diffLegendHelp": "幅は {comparison} です。色は、各関数の全体に占める割合が {baseline} から {comparison} へどのように変化したかを示します。",
+    "diffLegendHelpSides": "幅は各値固有の時間です。色は、合計に占める各関数のシェアが{baseline}から{comparison}へとどのように変化したかを示しており、これは両方のグラフで同じです。",
     "diffSidePercent": "{side} %",
     "diffChange": "変化",
     "diffPoints": "{value} pt",

@@ -1516,6 +1516,7 @@
     "diffSame": "بدون تغيير",
     "diffMore": "حصة أكبر",
     "diffLegendHelp": "العرض هو {comparison}. يُظهر اللون كيف تغيّرت حصة كل دالة من الإجمالي من {baseline} إلى {comparison}.",
+    "diffLegendHelpSides": "العرض هو الوقت الخاص بكل قيمة. يُظهر اللون كيف تغيّرت حصة كل دالة من الإجمالي من {baseline} إلى {comparison}، وذلك بالشكل نفسه في كلا الرسمين البيانيين.",
     "diffSidePercent": "{side} %",
     "diffChange": "التغيير",
     "diffPoints": "{value} نقطة",

@@ -1516,6 +1516,7 @@
     "diffSame": "Aucun changement",
     "diffMore": "Part accrue",
     "diffLegendHelp": "La largeur correspond à {comparison}. La couleur indique comment la part de chaque fonction dans le total a évolué de {baseline} à {comparison}.",
+    "diffLegendHelpSides": "La largeur correspond au temps propre de chaque valeur. La couleur indique comment la part de chaque fonction dans le total a évolué de {baseline} à {comparison}, de la même manière dans les deux graphiques.",
     "diffSidePercent": "{side} %",
     "diffChange": "Variation",
     "diffPoints": "{value} pt",

@@ -1516,6 +1516,7 @@
     "diffSame": "无变化",
     "diffMore": "占比更大",
     "diffLegendHelp": "宽度表示 {comparison}。颜色显示每个函数在总量中的占比从 {baseline} 到 {comparison} 的变化。",
+    "diffLegendHelpSides": "宽度表示每个值自身的时间。颜色显示每个函数占总量的比例从 {baseline} 到 {comparison} 的变化，两个图中的含义相同。",
     "diffSidePercent": "{side} %",
     "diffChange": "变化",
     "diffPoints": "{value} 个百分点",

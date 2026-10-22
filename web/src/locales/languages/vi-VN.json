@@ -1516,6 +1516,7 @@
     "diffSame": "Không thay đổi",
     "diffMore": "Tỷ trọng lớn hơn",
     "diffLegendHelp": "Độ rộng là {comparison}. Màu sắc cho thấy tỷ trọng của từng hàm trong tổng số đã thay đổi như thế nào từ {baseline} đến {comparison}.",
+    "diffLegendHelpSides": "Chiều rộng là thời gian riêng của mỗi giá trị. Màu sắc cho biết tỷ lệ đóng góp của mỗi hàm trong tổng số đã thay đổi như thế nào từ {baseline} đến {comparison}, giống nhau ở cả hai biểu đồ.",
     "diffSidePercent": "{side} %",
     "diffChange": "Thay đổi",
     "diffPoints": "{value} điểm",

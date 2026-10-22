@@ -1516,6 +1516,7 @@
     "diffSame": "Keine Änderung",
     "diffMore": "Größerer Anteil",
     "diffLegendHelp": "Die Breite ist {comparison}. Die Farbe zeigt, wie sich der Anteil jeder Funktion an der Gesamtsumme von {baseline} zu {comparison} geändert hat.",
+    "diffLegendHelpSides": "Die Breite entspricht der eigenen Zeit jedes Werts. Die Farbe zeigt, wie sich der Anteil jeder Funktion am Gesamtwert von {baseline} zu {comparison} verändert hat – in beiden Diagrammen gleich.",
     "diffSidePercent": "{side} %",
     "diffChange": "Änderung",
     "diffPoints": "{value} pt",

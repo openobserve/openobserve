@@ -1516,6 +1516,7 @@
     "diffSame": "변동 없음",
     "diffMore": "큰 비중",
     "diffLegendHelp": "너비는 {comparison}입니다. 색상은 전체에서 각 함수가 차지하는 비중이 {baseline}에서 {comparison}로 어떻게 바뀌었는지 보여줍니다.",
+    "diffLegendHelpSides": "너비는 각 값 자체의 시간을 나타냅니다. 색상은 각 함수가 전체에서 차지하는 비중이 {baseline}에서 {comparison}까지 어떻게 변했는지를 보여주며, 두 그래프에서 동일합니다.",
     "diffSidePercent": "{side} %",
     "diffChange": "변화",
     "diffPoints": "{value} pt",
