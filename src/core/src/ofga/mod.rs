@@ -491,7 +491,7 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
         keys.extend(["providers", "score_configs", "scorers", "eval_jobs"]);
     }
     if pending.llm_workbench {
-        // Playground shipped at 0.0.43, after this gate; the 0.0.57 back-fill covers it.
+        // Playground shipped at 0.0.43, after this gate; the 0.0.58 back-fill covers it.
         keys.extend([
             "playground",
             "annotation_queues",
@@ -551,6 +551,8 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
             LOGS_INSIGHTS_KEY,
             LOGS_PATTERN_KEY,
             RESULT_LOGS_CACHE_KEY,
+            "alert_calibration",
+            "slack",
         ]);
     }
     keys
@@ -595,7 +597,7 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     let v0_0_53 = version_compare::Version::from("0.0.53").unwrap();
     let v0_0_54 = version_compare::Version::from("0.0.54").unwrap();
     let v0_0_55 = version_compare::Version::from("0.0.55").unwrap();
-    let v0_0_57 = version_compare::Version::from("0.0.57").unwrap();
+    let v0_0_58 = version_compare::Version::from("0.0.58").unwrap();
 
     if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
         pending.pipeline = true;
@@ -724,8 +726,8 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
         log::info!("[OFGA:Local] AI chat share permissions migration needed");
         pending.ai_chat_shares = true;
     }
-    // Earlier arms were gated below the version these nine types shipped at, or missing.
-    if meta_version >= v0_0_57 && existing_model_version < v0_0_57 {
+    // Earlier arms were gated below the version these eleven types shipped at, or missing.
+    if meta_version >= v0_0_58 && existing_model_version < v0_0_58 {
         log::info!("[OFGA:Local] missing org-ownership back-fill needed");
         pending.missing_ownership = true;
     }
@@ -784,8 +786,8 @@ mod tests {
     }
 
     #[test]
-    fn test_missing_ownership_back_fill_below_0_0_57() {
-        let pending = pending_migrations("0.0.57", "0.0.56");
+    fn test_missing_ownership_back_fill_below_0_0_58() {
+        let pending = pending_migrations("0.0.58", "0.0.57");
         assert!(pending.missing_ownership && !pending.ai_chat_shares);
         assert_eq!(
             all_org_ownership_keys(&pending),
@@ -799,10 +801,12 @@ mod tests {
                 LOGS_INSIGHTS_KEY,
                 LOGS_PATTERN_KEY,
                 RESULT_LOGS_CACHE_KEY,
+                "alert_calibration",
+                "slack",
             ]
         );
 
-        assert!(all_org_ownership_keys(&pending_migrations("0.0.57", "0.0.57")).is_empty());
-        assert!(!pending_migrations("0.0.56", "0.0.56").missing_ownership);
+        assert!(all_org_ownership_keys(&pending_migrations("0.0.58", "0.0.58")).is_empty());
+        assert!(!pending_migrations("0.0.57", "0.0.57").missing_ownership);
     }
 }
