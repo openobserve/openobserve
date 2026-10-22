@@ -494,7 +494,7 @@ async fn stored_status(
             log::error!("[WORKFLOW_HOOK] run lookup failed: {e}");
             (HookReason::InternalError, None)
         })?
-        // A revived trigger keeps its id; runs from before its tombstone belong to the old endpoint.
+        // A revived trigger keeps its id; older runs belong to the endpoint it replaced.
         .filter(|row| row.received_at >= auth.trigger.trigger.created_at)
         .ok_or((HookReason::RunNotFound, None))?;
     let body = serde_json::json!({

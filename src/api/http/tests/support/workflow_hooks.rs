@@ -25,8 +25,13 @@ use axum::{
     http::{HeaderMap, Method, Request, StatusCode},
 };
 use config::{
-    axum::middlewares::RealIp, cluster::LOCAL_NODE, meta::organization::OrganizationType,
-    utils::time::now_micros,
+    axum::middlewares::RealIp,
+    cluster::LOCAL_NODE,
+    meta::{
+        organization::OrganizationType,
+        user::{UserRole, UserType},
+    },
+    utils::{base64, time::now_micros},
 };
 use infra::{
     db::{NO_NEED_WATCH, get_orm_client_rw},
@@ -37,7 +42,7 @@ use infra::{
             workflow_http_trigger_credentials::Model as CredentialRow,
             workflow_http_triggers::Model as TriggerRow,
         },
-        organizations,
+        org_users, organizations, users,
         workflow_http_trigger_requests::{self as ledger, LedgerInsert, NewHookRequest},
         workflow_http_triggers::{
             self as triggers, AuthMode, CredentialKind, CredentialState, ReplicatedCredential,
@@ -66,6 +71,10 @@ pub static RUNTIME: LazyLock<tokio::runtime::Runtime> = LazyLock::new(|| {
 });
 
 static APP: OnceCell<Router> = OnceCell::const_new();
+static AUDITS: std::sync::Mutex<Vec<serde_json::Value>> = std::sync::Mutex::new(Vec::new());
+
+pub const PASSWORD: &str = "Complexpass#123";
+const SALT: &str = "0123456789abcdef";
 
 pub struct Seeded {
     pub org: String,
@@ -132,7 +141,11 @@ pub async fn boot(env: &'static [(&'static str, &'static str)]) {
         infra::db::create_table().await.unwrap();
         infra::db_init().await.unwrap();
         infra::table::migrate().await.unwrap();
-        cipher::boot(None).await.unwrap();
+        let master_key = env
+            .iter()
+            .find(|(key, _)| *key == "O2_MASTER_ENCRYPTION_KEY")
+            .map(|(_, value)| *value);
+        cipher::boot(master_key).await.unwrap();
         openobserve_api_http::handler::http::router::create_app_router(stub_ui)
     })
     .await;
@@ -529,6 +542,112 @@ pub async fn seed_ledger_row(seeded: &Seeded, run_id: &str) {
     .await
     .unwrap();
     assert!(matches!(inserted, LedgerInsert::Inserted));
+}
+
+/// A password user in `org`; Basic auth reaches the management routes through `auth_middleware`.
+pub async fn seed_user(org: &str, email: &str, role: UserRole) {
+    seed_org(org).await;
+    let _ = users::add(users::UserRecord {
+        email: email.to_string(),
+        first_name: "T".to_string(),
+        last_name: "U".to_string(),
+        password: openobserve_core::auth::get_hash(PASSWORD, SALT),
+        salt: SALT.to_string(),
+        is_root: false,
+        password_ext: None,
+        user_type: UserType::Internal,
+        created_at: 0,
+        updated_at: 0,
+        must_reset_password: false,
+        password_reset_reason: None,
+        flagged_at: None,
+        password_updated_at: Some(now_micros()),
+    })
+    .await;
+    let _ = org_users::add(org, email, role, &format!("tok-{org}-{email}"), None).await;
+}
+
+pub fn as_user(
+    method: Method,
+    uri: &str,
+    email: &str,
+    body: Option<serde_json::Value>,
+) -> Request<Body> {
+    let basic = format!("Basic {}", base64::encode(&format!("{email}:{PASSWORD}")));
+    let mut headers = vec![("authorization", basic.as_str())];
+    if body.is_some() {
+        headers.push(("content-type", "application/json"));
+    }
+    let body = body.map_or_else(Body::empty, |b| Body::from(b.to_string()));
+    request(method, uri, "203.0.113.200", &headers, body)
+}
+
+/// Audit rows since the last drain; needs `O2_AUDIT_ENABLED` and a batch larger than the test.
+pub async fn drained_audits() -> Vec<serde_json::Value> {
+    o2_enterprise::enterprise::common::auditor::publish_existing_audits(
+        "_meta",
+        |request| async move {
+            let data = request.data.map(|d| d.data).unwrap_or_default();
+            let rows: Vec<serde_json::Value> = serde_json::from_slice(&data).unwrap_or_default();
+            AUDITS.lock().unwrap().extend(rows);
+            Ok(Default::default())
+        },
+    )
+    .await;
+    std::mem::take(&mut *AUDITS.lock().unwrap())
+}
+
+pub async fn claim_run(trigger_id: &str, run_id: &str, node: &str) {
+    let row = run_row(trigger_id, run_id).await.unwrap();
+    assert!(
+        ledger::claim(get_orm_client_rw().await, row.id, node, now_micros())
+            .await
+            .unwrap()
+    );
+}
+
+/// Reaps as a node that sees no live claimer, so every running row is reaped.
+pub async fn reap_runs() -> u64 {
+    let no_runs = Default::default();
+    let local = ledger::LocalClaims {
+        node_uuid: "",
+        in_flight: &no_runs,
+        stale_before_us: i64::MAX,
+    };
+    ledger::reap(
+        get_orm_client_rw().await,
+        &Default::default(),
+        local,
+        now_micros(),
+    )
+    .await
+    .unwrap()
+}
+
+pub async fn finish_queued_run(trigger_id: &str, run_id: &str, status: ledger::HookRunStatus) {
+    let row = run_row(trigger_id, run_id).await.unwrap();
+    assert!(
+        ledger::finish_unclaimed(
+            get_orm_client_rw().await,
+            row.id,
+            status,
+            None,
+            now_micros()
+        )
+        .await
+        .unwrap()
+    );
+}
+
+/// A ledger row for any trigger id, whether or not that trigger still has a row.
+pub async fn seed_run(org: &str, workflow_id: &str, trigger_id: &str, run_id: &str) {
+    let seeded = Seeded {
+        org: org.to_string(),
+        trigger_id: trigger_id.to_string(),
+        workflow_id: workflow_id.to_string(),
+        secret: String::new(),
+    };
+    seed_ledger_row(&seeded, run_id).await;
 }
 
 fn workflow(org: &str, id: &str, enabled: bool) -> Workflow {
