@@ -121,7 +121,16 @@ pub async fn serve(haddr: SocketAddr, app: axum::Router) -> Result<(), anyhow::E
 }
 
 fn otel_layer() -> OtelAxumLayer {
-    OtelAxumLayer::default().filter(config::meta::logger::otel_middleware_enabled)
+    OtelAxumLayer::default().filter(otel_span_filter)
+}
+
+fn otel_span_filter(path: &str) -> bool {
+    otel_span_wanted(path, config::meta::logger::otel_middleware_enabled(path))
+}
+
+/// The span records the raw path and query, and a hook URL may hold a pasted credential.
+fn otel_span_wanted(path: &str, enabled: bool) -> bool {
+    enabled && !path.contains("/workflows/hooks/")
 }
 
 async fn shutdown_signal() {
@@ -197,6 +206,20 @@ mod tests {
             .unwrap();
         app.oneshot(request).await.unwrap();
         *warnings.lock().unwrap()
+    }
+
+    #[test]
+    fn hook_routes_never_get_a_request_span() {
+        assert!(!otel_span_wanted(
+            "/api/v2/acme/workflows/hooks/o2wh_abc",
+            true
+        ));
+        assert!(!otel_span_wanted(
+            "/base/api/v2/acme/workflows/hooks/t1/runs/r1",
+            true
+        ));
+        assert!(otel_span_wanted("/api/acme/_search", true));
+        assert!(!otel_span_wanted("/api/acme/_search", false));
     }
 
     #[tokio::test]
