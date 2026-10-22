@@ -22,7 +22,7 @@ signatures.
 | `../stack/replay-proxy/` | the replay LLM proxy o2-ai uses in `stack-ee` (see its README) |
 | `out/` | captures, axe reports, telemetry exports and server switches of a run (git-ignored; the nightly uploads it) |
 | `../*.spec.js` | The assistant flows; every flow uses `tests/ui-testing/pages/assistantPage.js` |
-| `../fixme.spec.js` | One `test.fixme` per state the harness cannot reach yet, naming the WP that adds it |
+| `../fixme.spec.js` | One `test.fixme` per state the harness cannot reach yet, naming the capability it waits for |
 
 Specs load the harness with `await import("./harness/setup.mjs")`: Playwright compiles a
 static `import` in a `.spec.js` to `require()`, which would evaluate the `.mjs` modules as

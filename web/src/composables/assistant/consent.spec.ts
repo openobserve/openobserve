@@ -379,6 +379,27 @@ describe("consent", () => {
     });
   });
 
+  it("drops a Stop deferred into the enabled line when the card goes another way, so the next card's Enable still sends", async () => {
+    const { sid, deps, session, pending } = setup();
+    let release: () => void = () => undefined;
+    deps.delay = () => new Promise<void>((resolve) => (release = resolve));
+    const runtime = createConsentRuntime(deps as never);
+    runtime.onConsentRequired(sid, {} as never);
+    await runtime.resolve(sid, true, true);
+    runtime.cancel(sid, "stopped");
+    session.pendingConsent = null;
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    session.turn = { state: "awaiting_consent" };
+    session.pendingConsent = { ...pending, status: status() };
+    runtime.onConsentRequired(sid, {} as never);
+    await runtime.resolve(sid, true, true);
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(deps.withdraw).not.toHaveBeenCalled();
+    expect(deps.send).toHaveBeenCalledTimes(1);
+  });
+
   it("reports a partial Enable stopped meanwhile as what went on, never as nothing written", async () => {
     const { consent, sid, deps, session } = setup(
       status({ payer: { org_id: "payer1", enabled: false, can_manage: true } }),

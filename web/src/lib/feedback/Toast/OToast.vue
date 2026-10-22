@@ -233,7 +233,7 @@ onUnmounted(() => {
               'rounded-default inline-flex items-center justify-center gap-1 px-2.5 py-0.5 text-xs font-semibold transition-all focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none',
               actionSucceeded
                 ? 'bg-toast-success-icon focus-visible:ring-toast-success-icon text-white'
-                : 'bg-toast-action-text hover:bg-toast-action-hover focus-visible:ring-button-primary-focus-ring text-white',
+                : 'bg-toast-action-bg hover:bg-toast-action-bg-hover focus-visible:ring-button-primary-focus-ring text-toast-action-fg',
             ]"
             @click.stop="handleActionClick"
           >

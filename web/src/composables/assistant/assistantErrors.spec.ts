@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -30,6 +30,21 @@ import {
 import type { AssistantErrorCode } from "./assistantStore.types";
 
 const FIXTURES = join(__dirname, "__fixtures__", "errors");
+
+// o2-ai vendors some of these fixtures; this repo's copy is the one they must agree with.
+const O2AI_FIXTURES = join(
+  process.env.O2AI_DIR ?? join(__dirname, "..", "..", "..", "..", "..", "o2-ai"),
+  "tests",
+  "fixtures",
+  "assistant_frames",
+  "errors",
+);
+
+const vendored = ["envelope", "wire"].flatMap((dir) =>
+  existsSync(join(O2AI_FIXTURES, dir))
+    ? readdirSync(join(O2AI_FIXTURES, dir)).map((file) => [dir, file] as const)
+    : [],
+);
 
 const read = (dir: string, file: string) =>
   JSON.parse(readFileSync(join(FIXTURES, dir, file), "utf8")) as {
@@ -324,5 +339,17 @@ describe("the error ledger", () => {
         expect(text).not.toMatch(/Please|!$|O2 Assistant|AI Assistant/);
         expect(text[0]).toBe(text[0].toUpperCase());
       }
+  });
+});
+
+describe.skipIf(!vendored.length)("o2-ai's vendored error fixtures", () => {
+  it.each(vendored)("%s/%s agrees with this repo's fixture", (dir, file) => {
+    const theirs = JSON.parse(readFileSync(join(O2AI_FIXTURES, dir, file), "utf8")) as {
+      status?: number;
+      body: Record<string, unknown>;
+    };
+    const ours = read(dir, file);
+    expect(theirs.status).toBe(ours.status);
+    expect(ours.body).toMatchObject(theirs.body);
   });
 });

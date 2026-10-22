@@ -28,6 +28,11 @@ export interface CreditsRefusalCopy {
 
 const CREDIT_CODES: ReadonlySet<string> = new Set(["credits_exhausted", "subscription_required"]);
 
+/** A credits or subscription 402, the refusal the transcript explains as credits. */
+export function isCreditsRefusal(code: string | undefined): boolean {
+  return !!code && CREDIT_CODES.has(code);
+}
+
 /** The role and billing split of a 402; `null` for every other code. */
 export function creditsRefusal(
   code: string | undefined,
@@ -36,7 +41,7 @@ export function creditsRefusal(
   ctx: CreditRefusalContext,
   day: (ts: number) => string,
 ): CreditsRefusalCopy | null {
-  if (!code || !CREDIT_CODES.has(code)) return null;
+  if (!isCreditsRefusal(code)) return null;
   const { payer } = ctx;
   const params = { org, payer, date: ctx.resetsAt === undefined ? undefined : day(ctx.resetsAt) };
   const titleKey: I18nKey = payer

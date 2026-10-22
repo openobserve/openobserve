@@ -41,9 +41,10 @@ const STARTER: Starter = {
   dataTest: "assistant-starter-0",
 };
 
-const { fake, starters } = vi.hoisted(() => ({
+const { fake, starters, creditUsage } = vi.hoisted(() => ({
   fake: { current: null as any },
   starters: vi.fn(),
+  creditUsage: { current: null as null | Record<string, unknown> },
 }));
 
 vi.mock("@/composables/assistant", async (importOriginal) => ({
@@ -51,6 +52,14 @@ vi.mock("@/composables/assistant", async (importOriginal) => ({
   useAssistantStore: () => fake.current.store,
   useAssistantHistory: () => fake.current.history,
   useAssistantCapability: () => fake.current.handle,
+  useAssistantCredits: () => ({
+    usage: computed(() => creditUsage.current),
+    overage: computed(() => null),
+    status: computed(() => (creditUsage.current ? "ready" : "error")),
+    canManage: computed(() => true),
+    refusal: computed(() => ({})),
+    retry: vi.fn(),
+  }),
   useAssistantStarters: (...args: unknown[]) => {
     starters(...args);
     return {
@@ -1123,6 +1132,39 @@ describe("AssistantShell history states", () => {
       "History unavailable",
     );
     expect(wrapper.find('[data-test="assistant-transcript"]').exists()).toBe(true);
+  });
+
+  it("puts history unavailable before the credit notice, which shows once history is back", async () => {
+    creditUsage.current = { mode: "free", credits_used: 75, credits_limit: 100 };
+    const { wrapper, store } = setup({}, "available", { edition: "cloud" });
+    const sid = open(store);
+    store.state.sessions[sid].record.historyUnavailable = true;
+    await flushPromises();
+    const row = wrapper.get('[data-test="assistant-shell-notice-row"]');
+    expect(row.find('[data-test="assistant-shell-history-unavailable"]').exists()).toBe(true);
+    expect(row.find('[data-test="assistant-credit-notice"]').exists()).toBe(false);
+    store.state.sessions[sid].record.historyUnavailable = false;
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-shell-history-unavailable"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-credit-notice"]').exists()).toBe(true);
+    creditUsage.current = null;
+  });
+
+  it("keeps history unavailable first when credits are used up, and the used-up notice follows once history is back", async () => {
+    creditUsage.current = { mode: "free", credits_used: 100, credits_limit: 100 };
+    const { wrapper, store } = setup({}, "available", { edition: "cloud" });
+    store.state.capability.creditMode = "exhausted";
+    const sid = open(store);
+    store.state.sessions[sid].record.historyUnavailable = true;
+    await flushPromises();
+    const row = wrapper.get('[data-test="assistant-shell-notice-row"]');
+    expect(row.find('[data-test="assistant-shell-history-unavailable"]').exists()).toBe(true);
+    expect(row.find('[data-test="assistant-credit-notice"]').exists()).toBe(false);
+    store.state.sessions[sid].record.historyUnavailable = false;
+    await flushPromises();
+    expect(wrapper.get('[data-test="assistant-credit-notice"]').text()).toContain("90");
+    store.state.capability.creditMode = undefined;
+    creditUsage.current = null;
   });
 
   it("replaces the body when another tab deletes the open chat, and writes nothing back", async () => {

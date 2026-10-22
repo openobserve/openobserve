@@ -25,7 +25,7 @@ import type {
   Sid,
   WireAttachment,
 } from "../assistantStore.types";
-import type { CompleteFrame } from "../frames";
+import { contextUsedKeys, type CompleteFrame } from "../frames";
 import { neutralizeBlockSyntax } from "../record";
 import type { WireMessage } from "../useAssistantClient";
 import {
@@ -53,6 +53,8 @@ export const NONCE_LENGTH = 8;
 
 // Below this many bytes left, a block is dropped rather than cut to a useless stub.
 const MIN_BLOCK_BYTES = 256;
+
+const MAX_INCIDENT_ID = 128;
 
 const UTF8 = /* @__PURE__ */ new TextEncoder();
 
@@ -87,18 +89,24 @@ export const serialize: RequestBuilder = (session, snapshot, client, turn) => {
   const blocks = typed ? null : serializeBlocks(attached, makeNonce());
   const typedText = neutralizeBlockSyntax(snapshot.text.trim());
   const text = [typedText, blocks?.text ?? ""].filter(Boolean).join("\n\n");
+  const context = wireContextOf(page, composer, { org: session.org, window, now });
+  // Without an explicit chat mode the server runs the autonomous analysis agent on any `incident_id`.
+  const incidentId =
+    turn?.rcaChatMode && (turn.mode ?? "chat") === "chat" ? incidentIdOf(page, composer) : null;
+  if (incidentId) context.incident_id = incidentId;
   const request: SendRequest = {
     org: session.org,
     sid: session.sid,
     turnId: session.turnMeta.turnId ?? turn?.turnId ?? "",
     message: { text, ...(snapshot.images.length > 0 && { images: [...snapshot.images] }) },
     context: {
-      ...wireContextOf(page, composer, { org: session.org, window, now }),
+      ...context,
       client,
       user_timezone: browserTimezone(),
       locale: uiIntlLocale(),
     },
-    ...(turn?.mode && { mode: turn.mode }),
+    ...(turn?.mode && turn.mode !== "chat" && { mode: turn.mode }),
+    ...(incidentId && { mode: "chat" as const }),
     ...(turn?.ephemeral && { ephemeral: true }),
     ...(typed && attached.length > 0 && { attachments: attached.map(toAttachment) }),
     ...(turn?.replyToApproval && { replyToApproval: turn.replyToApproval }),
@@ -181,8 +189,7 @@ export function makeNonce(random: (bytes: Uint8Array) => Uint8Array = cryptoRand
 
 /** B-09's `context_used` echo for `turnMeta.contextUsed` (CT-12); `null` when the server sent none. */
 export function contextUsedOf(frame: CompleteFrame): string[] | null {
-  const used = (frame as { context_used?: unknown }).context_used;
-  return Array.isArray(used) ? used.filter((key): key is string => typeof key === "string") : null;
+  return contextUsedKeys((frame as { context_used?: unknown }).context_used) ?? null;
 }
 
 /** A browser-only chat's earlier messages, text only, up to this turn's user message. */
@@ -244,6 +251,16 @@ function incidentOf(session: AssistantSession): NonNullable<SendRequest["inciden
     reanalysis: session.rcaRun?.reanalysis === true,
     buildOnPrevious: session.rcaRun?.buildOnPrevious === true,
   };
+}
+
+// The incident the page is on, unless the reader removed its chip from the tray.
+function incidentIdOf(page: PageContext | null, composer: WireComposer): string | null {
+  const value = page?.incident_id;
+  if (typeof value !== "string" || !value || value.length > MAX_INCIDENT_ID) return null;
+  const removed = composer.removedPageKeys.some((key) =>
+    (fieldRowOf(key)?.fields ?? [key]).includes("incident_id"),
+  );
+  return removed ? null : value;
 }
 
 function toAttachment(chip: ContextChip): WireAttachment {

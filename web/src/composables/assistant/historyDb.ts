@@ -24,6 +24,7 @@ export const HISTORY_DB_VERSION = 2;
 export const HISTORY_STORE = "chatHistory";
 export const LOCAL_CAP = 100;
 export const LIVE_SAVE_GRACE_MS = 10 * 60_000;
+export const MAX_INCIDENT_ID = 128;
 
 /** One stored turn with the time it started, for ordering a merge. */
 export type LocalTurn = StoredTurn & { startedAt?: number };
@@ -49,6 +50,8 @@ export interface LocalRecord {
   writer?: string;
   titleSource?: "generated" | "renamed" | "object";
   origin?: EntryOrigin;
+  /** The incident an analysis chat ran for. */
+  incidentId?: string;
   pinned?: boolean;
   ephemeral?: boolean;
   agentType?: string | null;

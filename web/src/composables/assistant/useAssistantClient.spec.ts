@@ -138,6 +138,12 @@ describe("useAssistantClient: send", () => {
     expect(body).not.toHaveProperty("mode");
   });
 
+  it("sends the mode the request builder named, chat included", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(sse([]));
+    await useAssistantClient({ fetchImpl }).send(request({ mode: "chat" }), sink(), signal());
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body).mode).toBe("chat");
+  });
+
   it("carries the transcript only when the request does (browser-only chats)", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(sse([]));
     const transcript = [

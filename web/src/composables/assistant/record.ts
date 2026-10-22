@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { ChatMessage, ContentBlock, ImageAttachment, TurnSpan } from "@/ts/interfaces/chat";
+import type { ChatApproval } from "@/services/assistant";
 import { gt, raw, type TranslateFn } from "@/types/i18n";
 
 import { toAssistantError } from "./assistantErrors";
@@ -70,6 +71,8 @@ export interface ProjectRecordOptions {
   scrubModels: boolean;
   /** Defaults to the app's translator; the golden tests pass a key echo. */
   t?: TranslateFn;
+  /** The chat read's `approvals[]`: how the owner answered cards whose resolution the turns lack. */
+  approvals?: readonly ChatApproval[];
 }
 
 declare module "@/ts/interfaces/chat" {
@@ -595,15 +598,21 @@ function settleMessage(
   const blocks = message.contentBlocks ?? [];
   for (const block of blocks) {
     if (block.approval && !blocks.some((other) => other.resolved?.id === block.approval?.id))
-      block.approval = { ...block.approval, noDecision: true };
+      block.approval = withRecordedDecision(block.approval, options.approvals);
     // Targets come from the arguments on an untyped card, so the redaction goes after the fold, not before it.
     if (block.approval && options.redacted) block.approval = redactedApproval(block.approval);
     if (block.resolved && options.redacted) {
-      const { id, approved, at } = block.resolved;
-      block.resolved = { id, approved, ...(at !== undefined && { at }) };
+      const { id, approved, at, expired, withdrawn } = block.resolved;
+      block.resolved = {
+        id,
+        approved,
+        ...(at !== undefined && { at }),
+        ...(expired && { expired }),
+        ...(withdrawn && { withdrawn }),
+      };
     }
     if (block.resolved?.at !== undefined) block.resolved.at = toMinute(block.resolved.at);
-    if (options.redacted) redactNavigation(block);
+    if (options.redacted) redactNavigation(block, t);
     const hidden = block.call_id ? options.hidden?.[block.call_id] : undefined;
     if (hidden)
       block.hidden = { reason: hidden.reason, stream: options.redacted ? "" : hidden.stream };
@@ -622,25 +631,47 @@ function settleMessage(
   }
 }
 
+// A decided server row says how the card ended; an approval with no time to show stays a record without one.
+function withRecordedDecision(
+  card: ApprovalBlockData,
+  approvals: readonly ChatApproval[] | undefined,
+): ApprovalBlockData {
+  const row = approvals?.find((approval) => approval.id === card.id);
+  const decided = row && row.status !== "pending" && (row.status !== "approved" || !!row.at);
+  if (!row || !decided) return { ...card, noDecision: true };
+  const recorded = {
+    status: row.status as Exclude<ChatApproval["status"], "pending">,
+    ...(row.at && { at: toMinute(row.at) }),
+  };
+  return { ...card, recorded };
+}
+
 // A redacted link names no resource: the card keeps what it was, how many items and whether it was answered.
 function redactedApproval(card: ApprovalBlockData): ApprovalBlockData {
-  const kept: Pick<ApprovalBlockData, "id" | "kind" | "total" | "noDecision"> = {
+  const kept: Pick<ApprovalBlockData, "id" | "kind" | "total" | "noDecision" | "recorded"> = {
     id: card.id,
     kind: card.kind,
     total: card.total ?? card.targets?.length ?? 0,
     ...(card.noDecision && { noDecision: true }),
+    ...(card.recorded && { recorded: card.recorded }),
   };
   return kept as ApprovalBlockData;
 }
 
 // Tool results derive links from their arguments, so the fold's link and navigation targets go after it too.
-function redactNavigation(block: ContentBlock): void {
-  if (block.link) block.link = { ...block.link, target: {} };
+function redactNavigation(block: ContentBlock, t: TranslateFn): void {
+  if (block.link)
+    block.link = {
+      resourceType: block.link.resourceType,
+      action: block.link.action,
+      target: {},
+      redacted: true,
+    };
   if (block.navigationAction)
     block.navigationAction = {
       resource_type: block.navigationAction.resource_type,
       action: block.navigationAction.action,
-      label: raw(""),
+      label: t("assistant.link.redacted"),
       target: {},
     };
 }

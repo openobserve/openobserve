@@ -310,6 +310,7 @@ import AssistantChipPopover from "@/components/ai-assistant/context/AssistantChi
 import AssistantMentionMenu, {
   type MentionOption,
 } from "@/components/ai-assistant/context/AssistantMentionMenu.vue";
+import { isCreditsRefusal } from "@/components/ai-assistant/turn/creditsRefusal";
 import {
   MAX_IMAGES,
   STALL_MS,
@@ -502,6 +503,11 @@ const recallHint = computed(() => {
   return t("assistant.composer.recallHint", { count }, count);
 });
 
+const creditsRefusedAbove = computed(() => {
+  const turn = session.value?.turn;
+  return turn?.state === "refused" && isCreditsRefusal(turn.error.code);
+});
+
 const helper = computed<I18nText | null>(() => {
   if (inertKind.value === "approval") return t("assistant.composer.waitingApproval");
   if (inertKind.value === "consent") return t("assistant.composer.waitingConsent");
@@ -516,7 +522,7 @@ const helper = computed<I18nText | null>(() => {
       droppedImages.value,
     );
   // Send stays enabled: the server is the gate, the line only predicts a refusal not yet shown above.
-  if (store.state.capability.creditMode === "exhausted" && session.value?.turn.state !== "refused")
+  if (store.state.capability.creditMode === "exhausted" && !creditsRefusedAbove.value)
     return t("assistant.credits.predictedExhausted", { org: raw(org.value) });
   return recallHint.value;
 });

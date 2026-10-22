@@ -336,6 +336,46 @@ describe("the request", () => {
     expect(typeof request.context.locale).toBe("string");
   });
 
+  it("names the incident and mode chat only where the server routes that to the interactive agent", () => {
+    const on = serialize(
+      session(),
+      snapshot(),
+      CLIENT,
+      turn(PAGE_CONTEXTS.incidents, { rcaChatMode: true }),
+    );
+    expect(on.mode).toBe("chat");
+    expect(on.context.incident_id).toBe("INC-142");
+    expect(on.context).not.toHaveProperty("agent_type");
+    const off = serialize(session(), snapshot(), CLIENT, turn(PAGE_CONTEXTS.incidents));
+    expect(off).not.toHaveProperty("mode");
+    expect(off.context).not.toHaveProperty("incident_id");
+    const helper = serialize(
+      session(),
+      snapshot(),
+      CLIENT,
+      turn(PAGE_CONTEXTS.incidents, { rcaChatMode: true, mode: "generate_query" }),
+    );
+    expect(helper.mode).toBe("generate_query");
+    expect(helper.context).not.toHaveProperty("incident_id");
+    const removed = session();
+    removed.composer.removedPageKeys = ["incident_id"];
+    const withoutChip = serialize(
+      removed,
+      snapshot({ removedPageKeys: ["incident_id"] }),
+      CLIENT,
+      turn(PAGE_CONTEXTS.incidents, { rcaChatMode: true }),
+    );
+    expect(withoutChip).not.toHaveProperty("mode");
+    expect(withoutChip.context).not.toHaveProperty("incident_id");
+    const plain = serialize(
+      session(),
+      snapshot(),
+      CLIENT,
+      turn(PAGE_CONTEXTS.logs, { rcaChatMode: true }),
+    );
+    expect(plain).not.toHaveProperty("mode");
+  });
+
   it("never sends agent_type, nor a field the agent does not read (constraint 41)", () => {
     const request = serialize(session(), snapshot(), CLIENT, turn(PAGE_CONTEXTS.incidents));
     expect(request.context).not.toHaveProperty("agent_type");

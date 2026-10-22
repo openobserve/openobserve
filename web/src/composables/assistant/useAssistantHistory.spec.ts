@@ -28,7 +28,7 @@ import type { AssistantCapability } from "./assistantStore.types";
 import { LOCAL_CAP, type LocalRecord } from "./historyDb";
 import { LIVE_SAVE_GRACE_MS } from "./historyDb";
 import { patchCards } from "./historyRecords";
-import { HELPER_PREFIXES, IMPORT_BATCH, groupOf, isHelperChat } from "./useAssistantHistory";
+import { HELPER_REQUEST_STARTS, IMPORT_BATCH, groupOf, isHelperChat } from "./useAssistantHistory";
 
 const KEY = "k1";
 
@@ -108,6 +108,27 @@ describe("useAssistantHistory in local-only mode", () => {
     expect(fake.history.rows.value.map((row) => row.sid)).toEqual([sid]);
   });
 
+  it("keeps an incident chat's origin and incident through a save and a reopen", async () => {
+    const fake = setup();
+    await flushPromises();
+    const sid = chat(fake);
+    const session = fake.store.state.sessions[sid];
+    session.origin = { entryKind: "object_verb", objectKind: "incident", container: "rca" };
+    session.incidentId = "inc-42";
+    await fake.history.save(sid);
+    const stored = [...fake.db.rows.values()][0];
+    expect(stored).toMatchObject({ origin: "incident", incidentId: "inc-42" });
+    expect(fake.history.rows.value[0].origin).toBe("incident");
+    const reopened = setup({}, [record(7, { origin: "incident", incidentId: "inc-42" })]);
+    await flushPromises();
+    const id = record(7).sessionId!;
+    expect(await reopened.history.open({ sid: id })).toBe(id);
+    expect(reopened.store.state.sessions[id]).toMatchObject({
+      incidentId: "inc-42",
+      origin: { objectKind: "incident" },
+    });
+  });
+
   it("reads as loading, not empty, until the browser store answers", async () => {
     const fake = setup({}, [record(1)]);
     fake.history.ensureLoaded();
@@ -136,11 +157,20 @@ describe("useAssistantHistory in local-only mode", () => {
       record(1),
       record(2, { agentType: "generate_query" }),
       record(3, { ephemeral: true }),
-      record(4, { title: `${HELPER_PREFIXES[0]}top errors` }),
+      record(4, { title: `${HELPER_REQUEST_STARTS[0]}top errors` }),
     ]);
     await flushPromises();
     expect(fake.history.rows.value.map((row) => String(row.title))).toEqual(["Chat 1"]);
     expect(isHelperChat({ firstPrompt: "Generate VRL function for nginx" })).toBe(true);
+  });
+
+  it("shows under Shared the chats the user's links point at", async () => {
+    const fake = setup({}, [record(1), record(2)]);
+    await flushPromises();
+    fake.history.setFilter({ kind: "shared" });
+    expect(fake.history.visible.value).toEqual([]);
+    fake.history.noteShared([record(2).sessionId!]);
+    expect(fake.history.visible.value.map((row) => String(row.title))).toEqual(["Chat 2"]);
   });
 
   it("searches the loaded rows by title and first prompt on the client", async () => {

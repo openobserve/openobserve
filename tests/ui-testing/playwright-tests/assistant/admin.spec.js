@@ -71,6 +71,9 @@ test.describe("assistant settings", () => {
     });
     await openTab(page, "status");
     await expect(assistant.settingsControl("status-chip")).toHaveText("Reachable");
+    // The runtime may read the chat list at any time after boot; only a chat Test starts would break "without a chat".
+    const sinceOpen = state.log.length;
+    const chatsBefore = state.chats.length;
     const button = assistant.settingsControl("test-btn");
     const announce = assistant.settingsControl("test-announce");
     await button.click();
@@ -81,7 +84,8 @@ test.describe("assistant settings", () => {
     await expect(announce).toHaveText("Test failed: connection refused");
     await expect(assistant.settingsControl("status-last-test")).toContainText("failed · connection refused");
     expect(state.log.filter((line) => line === "TEST capabilities")).toHaveLength(2);
-    expect(state.log.filter((line) => /\/ai\/(chat_stream|chats)/.test(line))).toEqual([]);
+    expect(state.log.slice(sinceOpen).filter((line) => /^POST \/api\/[^/]+\/ai\/(chat_stream|chats)\b/.test(line))).toEqual([]);
+    expect(state.chats).toHaveLength(chatsBefore);
   });
 
   test("ADMIN-04 turning the assistant off confirms with Cancel focused and the doors follow", { tag: ["@mock"] }, async ({

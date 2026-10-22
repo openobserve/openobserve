@@ -43,7 +43,8 @@ import { readClearOnSignOut, takeKeptOnSignOut, writeClearOnSignOut } from "./pr
 import type { StoredTurn } from "./record";
 import { getAssistantRuntime } from "./runtime";
 
-export { HELPER_PREFIXES, isHelperChat, originOf } from "./historyContext";
+export { isHelperChat, originOf } from "./historyContext";
+export { HELPER_REQUEST_STARTS } from "./helperPrefixes";
 export type {
   DeletedNotice,
   HistoryAnnouncement,
@@ -69,6 +70,8 @@ export interface AssistantHistory extends HistoryService {
   retry(): Promise<void>;
   filter: ComputedRef<HistoryFilter>;
   setFilter(patch: Partial<HistoryFilter>): void;
+  /** The chats the user's share links point at, for the Shared filter. */
+  noteShared(sids: readonly Sid[]): void;
   /** `rows` after the filter chip and the search; client-side unless the server advertises search. */
   visible: ComputedRef<HistoryRow[]>;
   /** Loaded pages only, so the list says it searched those. */

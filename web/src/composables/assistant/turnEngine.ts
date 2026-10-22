@@ -121,6 +121,7 @@ export interface EngineCapability {
   persistence(): boolean;
   /** B-09 typed attachments; absent means delimiter blocks. */
   attachments?(): boolean;
+  rcaChatMode?(): boolean;
 }
 
 export interface TurnEngineDeps {
@@ -930,7 +931,7 @@ function defaultRequestBuilder(
         client,
         user_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       },
-      ...(rec?.mode && { mode: rec.mode }),
+      ...(rec?.mode && rec.mode !== "chat" && { mode: rec.mode }),
       ...(rec?.ephemeral && { ephemeral: true }),
       ...(rec?.replyToApproval && { replyToApproval: rec.replyToApproval }),
     };
@@ -953,6 +954,7 @@ function requestTurnOf(rec: TurnRecord, deps: TurnEngineDeps): RequestTurn {
     userIndex: rec.userIndex,
     persisted: capability.persistence(),
     attachments: capability.attachments?.() ?? false,
+    ...(capability.rcaChatMode?.() && { rcaChatMode: true }),
     now: deps.now(),
     ...(rec.replyToApproval && { replyToApproval: rec.replyToApproval }),
   };

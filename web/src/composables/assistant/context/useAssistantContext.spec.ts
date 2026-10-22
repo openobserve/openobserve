@@ -28,6 +28,7 @@ import {
 } from "../assistantStore";
 import type { AssistantCapability } from "../assistantStore.types";
 import { resetPrefsForTests } from "../prefs";
+import { chipStateOf } from "./contextChips";
 import { sentWindows } from "./serialize";
 import type { PageContext } from "./types";
 import {
@@ -171,6 +172,25 @@ describe("useAssistantContext", () => {
       sent: "serialized",
     });
     expect(incidents().map((chip) => chip.id)).toEqual(["door:incident:1"]);
+  });
+
+  it("reads the page's incident as sent once chat turns carry its id, and as not read before", async () => {
+    const view = mountContext(async () => ({
+      ...PAGE_CONTEXTS.logs,
+      incident_id: "inc-1",
+      incident_title: "Checkout latency",
+    }));
+    await flushPromises();
+    const chip = () => view.chips.value.find((c) => c.kind === "incident")!;
+    const row = () => view.sees.value.find((r) => r.id === "incident_id")!;
+    expect(chipStateOf(chip())).toBe("not_read");
+    expect(row().group).toBe("not_read");
+    store.syncCapability({ ...store.state.capability, rcaChatMode: true });
+    await flushPromises();
+    expect(chipStateOf(chip())).toBe("sent");
+    expect(row().group).toBe("sent");
+    store.setDraft(sid, { removedPageKeys: ["incident_id"] });
+    expect(view.chips.value.some((c) => c.kind === "incident")).toBe(false);
   });
 
   it("adds an attachments row and the shared disclosure", async () => {

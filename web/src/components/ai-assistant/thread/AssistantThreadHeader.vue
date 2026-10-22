@@ -79,6 +79,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="shrink-0"
         data-test="assistant-thread-save-tag"
       />
+      <OTag
+        v-if="originTag"
+        type="assistantOrigin"
+        :value="originTag"
+        size="xs"
+        class="shrink-0"
+        data-test="assistant-thread-origin"
+      />
       <slot name="tags" />
       <span v-if="$slots['share-chip']" :id="shareChipId" class="contents">
         <slot name="share-chip" />
@@ -312,6 +320,7 @@ import AssistantHistoryList from "@/components/ai-assistant/history/AssistantHis
 import {
   historyTargetAbove,
   isRunning,
+  originOf,
   registerHistoryTarget,
   runHistoryTarget,
   useAssistantCapability,
@@ -383,6 +392,10 @@ const running = computed(
   () => !!session.value && (isRunning(session.value.turn) || !!session.value.pendingApproval),
 );
 const notSavedHere = computed(() => history.notSaved(props.sid));
+// An analysis chat keeps saying what it was about once reopened outside its incident.
+const originTag = computed(() =>
+  session.value && originOf(session.value.origin) === "incident" ? "incident" : null,
+);
 const saveTag = computed(() => {
   const current = session.value;
   if (!current) return null;

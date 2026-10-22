@@ -170,8 +170,8 @@ test.describe("assistant honest turns", () => {
     await expect(page.locator('[data-test^="assistant-feedback"]')).toHaveCount(0);
   });
 
-  // The engine reads B-03 from a capability the runtime does not wire until WP-18 (`tailEnabled` dep of turnEngine.ts).
-  test.fixme("TURN-06 a drop with the tail reconnects, catches up and finishes (B-03, WP-18)", { tag: ["@mock", "@stack-ee"] }, async () => {});
+  // The engine resumes from the turn tail only when the runtime passes `tailEnabled` to turnEngine.ts, which it does not yet.
+  test.fixme("TURN-06 a drop with the tail reconnects, catches up and finishes (blocked: the client does not resume a dropped stream from the server's turn tail yet)", { tag: ["@mock", "@stack-ee"] }, async () => {});
 
   test("TURN-14 a stream whose ids repeat by design shows the whole answer and ends done (D2, WP-18)", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);

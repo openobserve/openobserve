@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     role="group"
     :aria-label="groupName"
     class="rounded-surface border-border-default bg-surface-base flex min-w-0 flex-wrap items-start gap-x-3 gap-y-2 border p-2"
-    :data-kind="link?.kind ?? 'unsupported'"
+    :data-kind="redacted ? 'redacted' : (link?.kind ?? 'unsupported')"
     :data-source="source"
     data-test="assistant-link-card"
   >
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </ODropdownItem>
         </ODropdown>
       </template>
-      <template v-else-if="!link">
+      <template v-else-if="!link && !redacted">
         <OButton
           variant="secondary"
           size="sm"
@@ -177,8 +177,10 @@ const props = withDefaults(
     copyText?: string | null;
     /** False on a readonly page with no explorer or app behind it. */
     openable?: boolean;
+    /** A redacted reader's copy of a link: it says only that a view was linked. */
+    redacted?: boolean;
   }>(),
-  { sid: null, readonly: false, copyText: null, openable: true },
+  { sid: null, readonly: false, copyText: null, openable: true, redacted: false },
 );
 
 const { t } = useI18nTyped();
@@ -215,6 +217,7 @@ const href = computed(() => {
 
 const title = computed<I18nText>(() => {
   const link = props.link;
+  if (props.redacted) return t("assistant.link.redacted");
   if (!link) return t("assistant.link.cantOpen");
   const name = raw(link.name ?? "");
   switch (link.kind) {

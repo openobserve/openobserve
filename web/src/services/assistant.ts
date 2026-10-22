@@ -23,7 +23,11 @@ import http from "./http";
 
 /** `GET /api/{org}/ai/capabilities` (B-06); every field is optional so consumers only read it. */
 export interface AssistantCapabilitiesResponse {
-  health?: { status?: "ok" | "down"; checked_at?: number; last_error?: string };
+  health?: {
+    status?: "ok" | "down" | "unreachable" | "unknown";
+    checked_at?: number | string;
+    last_error?: string | { message?: string; at?: string };
+  };
   model?: string;
   agent_version?: string;
   model_provider?: string;
@@ -31,6 +35,9 @@ export interface AssistantCapabilitiesResponse {
   can_chat?: boolean;
   can_write?: boolean;
   can_share?: boolean;
+  can_read_shares?: boolean;
+  persistence?: boolean;
+  public_links?: boolean;
   agents?: unknown[];
   toolsets?: unknown[];
   toolset_secret_merge?: boolean;
@@ -44,7 +51,9 @@ export interface AssistantCapabilitiesResponse {
   history_search?: boolean;
   history_pins?: boolean;
   history_import?: boolean;
+  /** `chat_stream` takes `replaces_turn_id`. */
   turn_versions?: boolean;
+  /** `POST /ai/feedback` stores the vote with its turn. */
   feedback_stored?: boolean;
   rca_chat_mode?: boolean;
   rca_feedback?: boolean;
@@ -141,6 +150,16 @@ export interface ChatDetail extends ChatSummaryWire {
   turns?: StoredTurn[];
   partial_from_seq?: number;
   has_more?: boolean;
+  /** Each approval card the chat raised and the server's record of its decision. */
+  approvals?: ChatApproval[];
+}
+
+export interface ChatApproval {
+  id: string;
+  /** `withdrawn` and a denied row's `expired` come from the stored `confirmation_resolved`, since the row stores both as `denied`. */
+  status: "pending" | "approved" | "denied" | "expired" | "withdrawn";
+  /** Epoch ms of the decision, from the stored `confirmation_resolved`. */
+  at?: number;
 }
 
 export interface ChatImportItem {
@@ -167,8 +186,11 @@ export interface ListChatsParams {
 
 export const PROBE_TIMEOUT_MS = 5_000;
 
-/** A deny or an undo with no answer by then reads as unconfirmed; an approve adds time per item it acts on. */
-export const CONFIRM_TIMEOUT_MS = 15_000;
+/** Past OpenObserve's 60 s `/confirm` relay, so its own answer lands first; an approve adds time per item. */
+export const CONFIRM_TIMEOUT_MS = 65_000;
+
+/** An undo with no answer by then reads as unconfirmed. */
+export const UNDO_TIMEOUT_MS = 15_000;
 
 // Assistant calls render their own 403 and handle 401 without the interceptor's logout-and-reload.
 const ASSISTANT_REQUEST: AxiosRequestConfig = { silentForbidden: true, assistantManaged: true };
@@ -226,6 +248,7 @@ export function parseAiUsage(body: unknown): AssistantUsage | null {
 const MAX_CHATS_PER_PAGE = 200;
 const MAX_TURNS = 2_000;
 const MAX_FRAMES_PER_TURN = 5_000;
+const MAX_APPROVALS = 500;
 
 const chatSummarySchema = z.object({
   session_id: z.string().min(1).max(128),
@@ -243,6 +266,20 @@ const chatSummarySchema = z.object({
   pinned: z.boolean().optional().catch(undefined),
   agent_type: z.string().max(64).nullable().optional().catch(undefined),
   origin: z.string().max(32).optional().catch(undefined),
+});
+
+const chatApprovalSchema = z.object({
+  id: z.string().min(1).max(128),
+  status: z.enum(["pending", "approved", "denied", "expired"]),
+  resolved: z
+    .object({
+      at: z.number().optional().catch(undefined),
+      withdrawn: z.boolean().optional().catch(undefined),
+      expired: z.boolean().optional().catch(undefined),
+    })
+    .nullable()
+    .optional()
+    .catch(null),
 });
 
 const storedTurnSchema = z.object({
@@ -300,6 +337,9 @@ export function parseChatDetail(data: unknown): ChatDetail {
     const parsed = storedTurnSchema.safeParse(turn);
     return parsed.success ? [parsed.data as StoredTurn] : [];
   });
+  const approvals = Array.isArray(body.approvals)
+    ? body.approvals.slice(0, MAX_APPROVALS).flatMap(chatApprovalOf)
+    : undefined;
   return {
     ...(summary as ChatSummaryWire),
     ...(body.not_modified === true && { not_modified: true }),
@@ -309,10 +349,41 @@ export function parseChatDetail(data: unknown): ChatDetail {
     ...(turns && { turns }),
     ...(typeof body.partial_from_seq === "number" && { partial_from_seq: body.partial_from_seq }),
     ...(typeof body.has_more === "boolean" && { has_more: body.has_more }),
+    ...(approvals && { approvals }),
   };
 }
 
+function chatApprovalOf(value: unknown): ChatApproval[] {
+  const parsed = chatApprovalSchema.safeParse(value);
+  if (!parsed.success) return [];
+  const { id, resolved } = parsed.data;
+  const at = resolved?.at;
+  const status =
+    parsed.data.status !== "denied"
+      ? parsed.data.status
+      : resolved?.withdrawn === true
+        ? "withdrawn"
+        : resolved?.expired === true
+          ? "expired"
+          : "denied";
+  return [{ id, status, ...(typeof at === "number" && at > 0 && { at }) }];
+}
+
 const assistant = {
+  /** Whether this browser's session cookie is still signed in; a 401 never logs the page out. */
+  sessionAlive: async (): Promise<boolean> => {
+    try {
+      await http().get("/api/organizations", {
+        ...ASSISTANT_REQUEST,
+        params: { page_num: 1, page_size: 1 },
+        timeout: PROBE_TIMEOUT_MS,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
   /** `null` when the backend predates B-06 (404). */
   capabilities: async (org: string): Promise<AssistantCapabilitiesResponse | null> => {
     try {
@@ -404,7 +475,7 @@ const assistant = {
     const res = await http().post<UndoResponse>(
       `/api/${enc(org)}/ai/actions/${enc(ledgerId)}/undo`,
       {},
-      { ...ASSISTANT_REQUEST, timeout: CONFIRM_TIMEOUT_MS },
+      { ...ASSISTANT_REQUEST, timeout: UNDO_TIMEOUT_MS },
     );
     return res.data ?? {};
   },

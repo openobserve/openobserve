@@ -639,6 +639,20 @@ describe("useAssistantApprovals", () => {
     expect(engine.approvalExtended).toHaveBeenCalledWith(sid, until);
   });
 
+  it("re-arms the card's expiry when a Send again fails again", async () => {
+    const { sid, env, approvals, engine, session } = setup(PERMISSION);
+    const until = session.pendingApproval?.expiresAt;
+    env.confirm.mockRejectedValueOnce({ response: { status: 502 } });
+    await approvals.decide(sid, { approved: false, reason: "deny" }, held(sid));
+    expect(session.pendingApproval).toBeNull();
+    engine.approvalExtended.mockClear();
+    env.confirm.mockRejectedValueOnce({ response: { status: 502 } });
+    await approvals.sendAgain(sid, "per_1");
+    expect(env.confirm).toHaveBeenCalledTimes(2);
+    expect(until).toBeTypeOf("number");
+    expect(engine.approvalExtended).toHaveBeenCalledWith(sid, until);
+  });
+
   it("re-reads the open lists once, later, after an approve whose outcome is unknown", async () => {
     const { sid, env, approvals, changed } = setup();
     env.confirm.mockRejectedValueOnce({ code: "ECONNABORTED" });

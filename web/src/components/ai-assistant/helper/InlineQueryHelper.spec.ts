@@ -22,7 +22,7 @@ import i18n from "@/locales";
 
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
 
-const { fake, helper, controller, openAssistant, track, toast, rung } = vi.hoisted(() => ({
+const { fake, helper, controller, openAssistant, track, toast, rung, usage } = vi.hoisted(() => ({
   fake: { current: null as any },
   helper: { current: null as any },
   controller: { current: null as any },
@@ -30,6 +30,7 @@ const { fake, helper, controller, openAssistant, track, toast, rung } = vi.hoist
   track: vi.fn(),
   toast: vi.fn(),
   rung: { current: null as null | ((event: KeyboardEvent) => boolean) },
+  usage: { current: null as null | { resetsAt?: number } },
 }));
 
 vi.mock("@/composables/assistant", async (importOriginal) => ({
@@ -37,6 +38,7 @@ vi.mock("@/composables/assistant", async (importOriginal) => ({
   useAssistantStore: () => fake.current.store,
   useAssistantCapability: () => fake.current.handle,
   useTurnLock: () => computed(() => null),
+  useAssistantCredits: () => ({ usage: computed(() => usage.current) }),
   proposalFor: () => controller.current,
   registerEscapeRung: (_key: string, fn: (event: KeyboardEvent) => boolean) => {
     rung.current = fn;
@@ -257,6 +259,29 @@ describe("InlineQueryHelper", () => {
     );
     expect(wrapper.find('[data-test="inline-helper-write-myself"]').exists()).toBe(true);
     expect(toast).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("says when used-up credits reset, from the usage read, and no date without one", async () => {
+    const failed = (code: string) => ({
+      kind: "failed",
+      refused: true,
+      elapsedMs: 10,
+      error: { code, phase: "pre_admission", retryable: false, action: "manage_usage" },
+    });
+    usage.current = { resetsAt: Date.UTC(2026, 10, 1, 12) };
+    const wrapper = mountHelper();
+    helper.current.set(failed("credits_exhausted"));
+    await nextTick();
+    expect(wrapper.get('[data-test="inline-helper-error"]').text()).toMatch(
+      /^AI credits are used up for this organization\. They reset Nov 1\./,
+    );
+    helper.current.set(failed("subscription_required"));
+    await nextTick();
+    const line = wrapper.get('[data-test="inline-helper-error"]').text();
+    expect(line).toMatch(/^AI credits are used up for this organization\./);
+    expect(line).not.toContain("reset");
+    usage.current = null;
     wrapper.unmount();
   });
 

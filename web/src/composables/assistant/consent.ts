@@ -234,9 +234,11 @@ export function createConsentRuntime(deps: ConsentDeps): ConsentRuntime {
     holding.add(sid);
     void delay(RESOLVED_LINE_MS).then(() => {
       holding.delete(sid);
+      // A Stop deferred into the hold ends with it, so it never stops the next card's Enable.
+      const stopped = cancelAfter.delete(sid);
       if (!live(sid, pending)) return void delete views[sid];
       // Stopped while the line showed: paid usage is on, so the note says so and the prompt comes back unsent.
-      if (cancelAfter.delete(sid)) return stopAfterEnable(session, pending, [pending.org]);
+      if (stopped) return stopAfterEnable(session, pending, [pending.org]);
       noteGrant(session, pending, pending.org, enabledBy(status));
       void deps.send(sid, pending.turnId).finally(() => {
         if (!sessionOf(sid)?.pendingConsent) delete views[sid];

@@ -60,7 +60,7 @@ describe("static editor placeholders on the v2 path", () => {
     const hint = run(() => useFilterHint(names, ref(true)));
     expect(hint.placeholder.value).toBe('Filter, for example: pod =~ "500|503"');
     names.value = [];
-    expect(hint.placeholder.value).toBe('Filter, for example: status =~ "500|503"');
+    expect(hint.placeholder.value).toBe("Filter metrics by label");
   });
 
   it("keeps the typed-out placeholder on the legacy path", () => {

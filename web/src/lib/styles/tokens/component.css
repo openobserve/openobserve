@@ -506,8 +506,9 @@
   /* shared foreground */
   --color-toast-fg: var(--color-text-heading);
   --color-toast-fg-secondary: var(--color-text-secondary);
-  --color-toast-action-text: var(--color-primary-700);
-  --color-toast-action-hover: var(--color-primary-800);
+  --color-toast-action-bg: var(--color-primary-700);
+  --color-toast-action-bg-hover: var(--color-primary-800);
+  --color-toast-action-fg: var(--color-white);
   --shadow-toast: var(--shadow-lg);
 
   /* Spinner */
@@ -1870,8 +1871,9 @@
   --color-toast-default-border: var(--color-toast-default-border);
   --color-toast-fg: var(--color-toast-fg);
   --color-toast-fg-secondary: var(--color-toast-fg-secondary);
-  --color-toast-action-text: var(--color-toast-action-text);
-  --color-toast-action-hover: var(--color-toast-action-hover);
+  --color-toast-action-bg: var(--color-toast-action-bg);
+  --color-toast-action-bg-hover: var(--color-toast-action-bg-hover);
+  --color-toast-action-fg: var(--color-toast-action-fg);
   --shadow-toast: var(--shadow-toast);
 
   /* Stepper */

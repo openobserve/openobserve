@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :get-event-badge-text="getEventBadgeText"
     :get-event-layout="getEventLayout"
     :is-ai-labelled="isAiLabelled"
-    :ai-sre-badge-text="assistantV2 ? product : t('alerts.incidents.aiSreBadge')"
+    :ai-sre-badge-text="t('alerts.incidents.aiSreBadge')"
     :get-tooltip="getFailureTooltip"
     :get-inline-html="getSanitizedInlineHtml"
     :get-comment-body="getCommentBody"
@@ -62,8 +62,6 @@ import ActivityTimeline from "@/components/shared/ActivityTimeline.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { getActivityAvatarColor } from "@/utils/activityTimeline";
 import { formatToDateOnly } from "@/utils/date";
-import { isAssistantV2 } from "@/composables/assistant/flags";
-import { useAssistantName } from "@/composables/assistant/pure";
 
 interface Props {
   orgId: string;
@@ -77,8 +75,6 @@ const props = defineProps<Props>();
 const store = useStore();
 const { t } = useI18nTyped();
 const { isDark } = useTheme();
-const assistantV2 = isAssistantV2();
-const { product } = useAssistantName();
 
 const events = ref<any[]>([]);
 const loading = ref(false);
@@ -394,14 +390,10 @@ const getInlineEventText = (event: any): string => {
       return t("alerts.incidents.timeline.correlationKeyUpgraded");
 
     case "ai_analysis_begin":
-      return assistantV2
-        ? t("assistant.rca.timeline.started")
-        : t("alerts.incidents.timeline.aiStarted");
+      return t("alerts.incidents.timeline.aiStarted");
 
     case "ai_analysis_complete":
-      return assistantV2
-        ? t("assistant.rca.timeline.finished")
-        : t("alerts.incidents.timeline.aiFinished");
+      return t("alerts.incidents.timeline.aiFinished");
 
     case "ai_analysis_failed":
       return bold(data.reason || t("alerts.incidents.timeline.analysisFailed"));
