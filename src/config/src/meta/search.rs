@@ -1232,7 +1232,9 @@ impl From<proto::cluster_rpc::SearchEventContext> for SearchEventContext {
             dashboard_name: proto_sec.dashboard_name,
             dashboard_folder_id: proto_sec.dashboard_folder_id,
             dashboard_folder_name: proto_sec.dashboard_folder_name,
-            ..Default::default()
+            public_dashboard_link_id: proto_sec.public_dashboard_link_id,
+            range_key: proto_sec.range_key,
+            panel_id: proto_sec.panel_id,
         }
     }
 }
@@ -1248,6 +1250,9 @@ impl From<SearchEventContext> for proto::cluster_rpc::SearchEventContext {
             dashboard_name: sec.dashboard_name,
             dashboard_folder_id: sec.dashboard_folder_id,
             dashboard_folder_name: sec.dashboard_folder_name,
+            public_dashboard_link_id: sec.public_dashboard_link_id,
+            range_key: sec.range_key,
+            panel_id: sec.panel_id,
         }
     }
 }
@@ -2586,6 +2591,19 @@ mod tests {
         assert_eq!(ctx.dashboard_name, Some("New Dashboard".to_string()));
         assert_eq!(ctx.dashboard_folder_name, Some("New Folder".to_string()));
         assert_eq!(ctx.dashboard_folder_id, Some("new_folder_id".to_string()));
+    }
+
+    #[test]
+    fn test_search_event_context_round_trips_through_cluster_rpc() {
+        let ctx = SearchEventContext {
+            dashboard_id: Some("d1".into()),
+            public_dashboard_link_id: Some("l1".into()),
+            range_key: Some("r3600".into()),
+            panel_id: Some("p1".into()),
+            ..Default::default()
+        };
+        let rpc: cluster_rpc::SearchEventContext = ctx.clone().into();
+        assert_eq!(SearchEventContext::from(rpc), ctx);
     }
 
     #[test]

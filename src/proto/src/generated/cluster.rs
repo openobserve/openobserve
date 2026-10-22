@@ -122,6 +122,12 @@ pub struct SearchEventContext {
     pub dashboard_folder_name: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "8")]
     pub alert_name: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "9")]
+    pub public_dashboard_link_id: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "10")]
+    pub range_key: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "11")]
+    pub panel_id: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FileContentResponse {
