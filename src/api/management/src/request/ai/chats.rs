@@ -55,6 +55,7 @@ const RUNNING_GRACE_SECS: i64 = 60;
 const MICROS_PER_SEC: i64 = 1_000_000;
 const PROMPT_TITLE_CHARS: usize = 80;
 const TURN_LIMIT: &str = "turn_limit";
+const TURN_ALREADY_RUNNING: &str = "turn_already_running";
 const EPOCH_CONFLICT: &str = "epoch_conflict";
 
 /// Everything a persisted turn needs once admitted.
@@ -1121,9 +1122,7 @@ async fn acquire_lease(
             config::metrics::AI_CHAT_TURN_RESULT_TOTAL
                 .with_label_values(&[org_id, "busy"])
                 .inc();
-            Err(MetaHttpResponse::conflict(
-                "Another turn is already running in this conversation",
-            ))
+            Err(lease_conflict_response())
         }
         Err(LeaseError::Backend(e)) => {
             log::error!(
@@ -1135,6 +1134,19 @@ async fn acquire_lease(
             ))
         }
     }
+}
+
+/// 409 with the reason in `error_code`, so the Slack bridge matches on it instead of the text.
+fn lease_conflict_response() -> Response {
+    (
+        StatusCode::CONFLICT,
+        Json(serde_json::json!({
+            "code": StatusCode::CONFLICT.as_u16(),
+            "error_code": TURN_ALREADY_RUNNING,
+            "message": "Another turn is already running in this conversation",
+        })),
+    )
+        .into_response()
 }
 
 /// 429 with the numeric HTTP code in `code` and the reason in `error_code` (E2E #5).
@@ -1200,6 +1212,24 @@ mod tests {
         assert_eq!(body["code"], 429);
         assert_eq!(body["error_code"], "turn_limit");
         assert_eq!(body["scope"], "user");
+    }
+
+    #[tokio::test]
+    async fn a_lease_conflict_is_a_409_with_turn_already_running() {
+        let resp = lease_conflict_response();
+        assert_eq!(resp.status(), StatusCode::CONFLICT);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(
+            body,
+            serde_json::json!({
+                "code": 409,
+                "error_code": "turn_already_running",
+                "message": "Another turn is already running in this conversation",
+            })
+        );
     }
 
     #[test]

@@ -485,38 +485,33 @@ pub async fn search_http2_stream(
         };
 
     #[cfg(feature = "enterprise")]
-    for stream_name in stream_names.iter() {
-        if let Some(res) = check_stream_permissions(
-            stream_name,
-            &org_id,
-            &user_id,
-            &stream_type,
-            permission_resource_type,
+    if let Some(res) = crate::search::check_sql_stream_permissions(
+        &req.query.sql,
+        &org_id,
+        &user_id,
+        stream_type,
+        permission_resource_type,
+        &trace_id,
+    )
+    .await
+    {
+        report_to_audit(
+            user_id,
+            org_id.clone(),
+            trace_id,
+            res.status().into(),
+            Some("Unauthorized Access".to_string()),
+            "POST".to_string(),
+            format!("/api/{}/_search_stream", org_id),
+            query
+                .iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect::<Vec<_>>()
+                .join("&"),
+            body_bytes,
         )
-        .await
-        {
-            // Add audit before closing
-            #[cfg(feature = "enterprise")]
-            {
-                report_to_audit(
-                    user_id,
-                    org_id.clone(),
-                    trace_id,
-                    res.status().into(),
-                    Some("Unauthorized Access".to_string()),
-                    "POST".to_string(),
-                    format!("/api/{}/_search_stream", org_id),
-                    query
-                        .iter()
-                        .map(|(k, v)| format!("{}={}", k, v))
-                        .collect::<Vec<_>>()
-                        .join("&"),
-                    body_bytes,
-                )
-                .await;
-            }
-            return res;
-        }
+        .await;
+        return res;
     }
 
     #[cfg(feature = "enterprise")]

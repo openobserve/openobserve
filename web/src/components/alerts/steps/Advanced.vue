@@ -136,6 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon name="delete-outline" size="sm" />
                 </OButton>
                 <OButton
+                  :aria-label="t('common.add')"
                   data-test="alert-variables-add-variable-btn"
                   v-if="index === variableRows.length - 1"
                   variant="ghost"

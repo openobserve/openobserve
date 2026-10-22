@@ -216,6 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <div class="flex gap-x-2">
                 <OButton
+                  :aria-label="t('common.cancel')"
                   type="button"
                   variant="outline-destructive"
                   size="icon-xs-sq"
@@ -223,6 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon-left="close"
                 />
                 <OButton
+                  :aria-label="t('common.save')"
                   data-test="settings_ent_logo_custom_text_save_btn"
                   :loading="loadingState"
                   variant="outline"
@@ -238,6 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ store.state.zoConfig.custom_logo_text || t("settings.noTextAvailable") }}
               </OTruncatedText>
               <OButton
+                :aria-label="t('common.edit')"
                 data-test="settings_ent_logo_custom_text_edit_btn"
                 :loading="loadingState"
                 variant="outline"
@@ -290,6 +293,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="mx-3 max-h-7.75 max-w-37.5"
               />
               <OButton
+                :aria-label="t('common.delete')"
                 data-test="setting_ent_custom_logo_img_delete_btn"
                 variant="ghost-destructive"
                 size="icon-xs-sq"
@@ -316,6 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OFile>
               <div class="flex gap-x-2 pt-5.75">
                 <OButton
+                  :aria-label="t('common.cancel')"
                   type="button"
                   variant="outline-destructive"
                   size="icon-xs-sq"
@@ -323,6 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon-left="close"
                 />
                 <OButton
+                  :aria-label="t('common.save')"
                   data-test="settings_ent_logo_custom_light_save_btn"
                   :loading="loadingState"
                   variant="outline"
@@ -376,6 +382,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="mx-3 max-h-7.75 max-w-37.5"
               />
               <OButton
+                :aria-label="t('common.delete')"
                 data-test="setting_ent_custom_logo_dark_img_delete_btn"
                 variant="ghost-destructive"
                 size="icon-xs-sq"
@@ -402,6 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OFile>
               <div class="flex gap-x-2 pt-5.75">
                 <OButton
+                  :aria-label="t('common.cancel')"
                   type="button"
                   variant="outline-destructive"
                   size="icon-xs-sq"
@@ -409,6 +417,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon-left="close"
                 />
                 <OButton
+                  :aria-label="t('common.save')"
                   data-test="settings_ent_logo_custom_dark_save_btn"
                   :loading="loadingState"
                   variant="outline"
