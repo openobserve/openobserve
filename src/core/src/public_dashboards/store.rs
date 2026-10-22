@@ -40,7 +40,8 @@ use infra::cache::file_data::disk::{
 use serde::{Deserialize, Serialize};
 
 const MAGIC: &[u8; 4] = b"O2PD";
-pub const FORMAT_VERSION: u16 = 2;
+/// 3: manifests record VRL enrichment reads, which a version 2 file never re-checks.
+pub const FORMAT_VERSION: u16 = 3;
 /// Magic, version and the header length.
 const PREFIX_LEN: usize = 4 + 2 + 4;
 
@@ -452,6 +453,20 @@ mod tests {
         let b = next_incarnation();
         assert!(b > a);
         assert!(a >= u64::try_from(now_micros()).unwrap() - 60_000_000);
+    }
+
+    #[tokio::test]
+    async fn a_file_written_before_enrichment_tables_were_recorded_is_a_miss_and_is_evicted() {
+        let key = key("o", &config::ider::uuid(), "a1-2");
+        let mut old = encode(&Header::default(), &manifest(), &[])
+            .unwrap()
+            .to_vec();
+        old[4..6].copy_from_slice(&2_u16.to_le_bytes());
+        public_dashboards_replace(&key, 1, Bytes::from(old))
+            .await
+            .unwrap();
+        assert!(read_header(&key).await.is_none());
+        assert!(disk::get(&key, None).await.is_none());
     }
 
     #[tokio::test]

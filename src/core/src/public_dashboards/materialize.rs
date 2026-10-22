@@ -52,6 +52,8 @@ use super::{
 
 const SECOND: i64 = 1_000_000;
 const BACKOFF_BASE_SECS: i64 = 30;
+/// A failed build is bounded by the build caps, not by the window, so long windows retry as often.
+const BACKOFF_MAX_SECS: i64 = 300;
 /// Shortest poll hint and 202 Retry-After.
 pub const MIN_RETRY_SECS: u64 = 3;
 
@@ -290,8 +292,15 @@ pub async fn read(
     }
 }
 
-/// The due rules in order; rules 3, 4 and 6 bypass the backoff once per edit.
-pub fn due(header: &Header, live: Live, relative: bool, eff_secs: i64, now: i64) -> Due {
+/// The due rules in order; an edit or a masked screen after one failure skips the backoff once.
+pub fn due(
+    header: &Header,
+    live: Live,
+    relative: bool,
+    eff_secs: i64,
+    all_masked: bool,
+    now: i64,
+) -> Due {
     let backoff = in_backoff(header, now);
     let edited = |file: i64, live: i64, idx: usize| {
         file != live && header.attempted_revs.is_none_or(|revs| revs[idx] != live)
@@ -322,6 +331,12 @@ pub fn due(header: &Header, live: Live, relative: bool, eff_secs: i64, now: i64)
             StaleReason::Settings,
             edited(header.settings_rev, live.settings_rev, 2),
         ),
+        // Only the first retry: a failure that repeats waits out the capped backoff.
+        (
+            all_masked && header.fail_streak <= 1,
+            StaleReason::Retry,
+            true,
+        ),
     ];
     Due {
         reason: rules.iter().find(|r| r.0).map(|r| r.1),
@@ -331,11 +346,12 @@ pub fn due(header: &Header, live: Live, relative: bool, eff_secs: i64, now: i64)
     }
 }
 
-/// `now + min(30 s * 2^fail_streak, effective interval) + jitter`, `jitter` in `0..=0.2`.
+/// `now + min(30 s * 2^fail_streak, effective interval, 300 s) + jitter`, `jitter` in `0..=0.2`.
 pub fn backoff_until(fail_streak: u16, eff_secs: i64, now: i64, jitter: f64) -> i64 {
     let base = BACKOFF_BASE_SECS
         .saturating_mul(1_i64 << fail_streak.min(30))
-        .min(eff_secs.max(BACKOFF_BASE_SECS));
+        .min(eff_secs.max(BACKOFF_BASE_SECS))
+        .min(BACKOFF_MAX_SECS);
     now + base * SECOND + (base as f64 * jitter.clamp(0.0, 0.2) * SECOND as f64) as i64
 }
 
@@ -539,7 +555,11 @@ pub async fn build(
     if let Some(p) = prior.as_ref().filter(|p| p.body.is_some()) {
         // A build that finished between the miss and this task already holds the answer.
         let h = &p.stored.header;
-        if !due(h, live, range.is_relative(), eff, now).start && !deadline_passed(h, now) {
+        let frozen = super::parse_frozen_vars(cap.link.frozen_variables.as_deref());
+        let intents = intent::intents(dashboard, &frozen);
+        let states = mask::visible_states(h, &intents, now, max_age_micros());
+        let masked = all_masked(&intents, &states);
+        if !due(h, live, range.is_relative(), eff, masked, now).start && !deadline_passed(h, now) {
             return Ok(Built {
                 header: h.clone(),
                 body: p.body.clone().map(Arc::new),
@@ -606,6 +626,7 @@ pub async fn range_status(link: &PublicDashboard, with_sources: bool) -> Vec<Ran
                 unavailable_count: 0,
                 incomplete_count: 0,
                 last_error: None,
+                next_retry_at: None,
                 sources: None,
             },
             Some(stored) => file_status(range_key, stored, building, with_sources),
@@ -888,7 +909,16 @@ async fn serve_file(
 ) -> Served {
     let link = req.link;
     let eff = effective_secs(link, &req.range);
-    let due = due(&header, live, req.range.is_relative(), eff, req.now);
+    let states = mask::visible_states(&header, intents, req.now, max_age_micros());
+    // A build already running is joined by start_build, never started twice.
+    let due = due(
+        &header,
+        live,
+        req.range.is_relative(),
+        eff,
+        all_masked(intents, &states),
+        req.now,
+    );
     let flight = if due.start {
         match start_build(engine, flights, key, link, &req.range, req.now) {
             Start::Leader(f) => Some(f),
@@ -906,7 +936,7 @@ async fn serve_file(
             rand::random_range(0.0..=0.2),
         )
     });
-    let rev = rev_for(&header, req, intents, due.reason, flight.is_some(), eff);
+    let rev = rev_for(&header, &states, req, due.reason, flight.is_some(), eff);
     if req.if_none_match.is_some_and(|v| etag_matches(v, &rev)) {
         return Served::NotModified { rev, retry_hint };
     }
@@ -1015,8 +1045,17 @@ fn once(
         };
     };
     let eff = effective_secs(req.link, &req.range);
-    let due = due(&built.header, live, req.range.is_relative(), eff, req.now);
-    let rev = rev_for(&built.header, req, intents, due.reason, false, eff);
+    let states = mask::visible_states(&built.header, intents, req.now, max_age_micros());
+    let relative = req.range.is_relative();
+    let due = due(
+        &built.header,
+        live,
+        relative,
+        eff,
+        all_masked(intents, &states),
+        req.now,
+    );
+    let rev = rev_for(&built.header, &states, req, due.reason, false, eff);
     if req.if_none_match.is_some_and(|v| etag_matches(v, &rev)) {
         return Served::NotModified {
             rev,
@@ -1089,22 +1128,35 @@ fn envelope(
 
 fn rev_for(
     header: &Header,
+    states: &[(String, PanelState)],
     req: &ReadRequest<'_>,
-    intents: &BTreeMap<String, String>,
     reason: Option<StaleReason>,
     refreshing: bool,
     eff: i64,
 ) -> String {
-    let states = mask::visible_states(header, intents, req.now, max_age_micros());
     let next_retry_at = header.next_retry_at.filter(|t| *t > req.now);
     rev(
         header,
-        &states,
+        states,
         reason,
         refreshing,
         next_retry_at,
         fresh_until(header, req, eff),
     )
+}
+
+/// Nothing useful is on screen: every live panel is new since the build or hidden as changed.
+fn all_masked(intents: &BTreeMap<String, String>, states: &[(String, PanelState)]) -> bool {
+    let changed = PanelState::NotAvailable {
+        reason: NotAvailableReason::Changed,
+    };
+    !intents.is_empty()
+        && intents.keys().all(|id| {
+            states
+                .iter()
+                .find(|(shown, _)| shown == id)
+                .is_none_or(|(_, state)| *state == changed)
+        })
 }
 
 fn fresh_until(header: &Header, req: &ReadRequest<'_>, eff: i64) -> Option<i64> {
@@ -1148,6 +1200,7 @@ fn file_status(
         unavailable_count: h.unavailable_count,
         incomplete_count: h.incomplete_count,
         last_error: h.last_error.clone(),
+        next_retry_at: h.next_retry_at,
         sources,
     }
 }
@@ -1998,6 +2051,162 @@ pub(super) mod tests {
     }
 
     #[test]
+    fn gate11_a_110_day_absolute_window_retries_within_five_minutes_after_failures() {
+        let link =
+            link(json!([{ "type": "absolute", "start": 0, "end": 110 * DAY_SECS * SECOND }]));
+        let range = TimeRange::Absolute {
+            start: 0,
+            end: 110 * DAY_SECS * SECOND,
+        };
+        let eff = effective_secs(&link, &range);
+        assert!(
+            eff > 300 * 100,
+            "the window alone allows a backoff of hours: {eff}"
+        );
+        let live = Live {
+            dashboard_updated_at: 1,
+            link_rev: 2,
+            settings_rev: 3,
+        };
+        let mut h = Header::default();
+        // Three failures as reported, then more: from the fifth the uncapped wait passes 300 s.
+        for failures in 1..=8_u16 {
+            fail(&mut h, live, 0, eff, 0.2, None);
+            assert_eq!(h.fail_streak, failures);
+            let wait = h.next_retry_at.unwrap();
+            assert!(wait <= 360 * SECOND, "{failures} failures: {wait}");
+        }
+        assert_eq!(h.next_retry_at, Some(360 * SECOND));
+    }
+
+    #[tokio::test]
+    async fn an_edit_whose_rebuild_failed_wholly_is_rebuilt_on_the_next_read_if_nothing_shows() {
+        let changed_both = [("p1", "t1"), ("p2", "t2")];
+        let changed_one = [("p1", "t1"), ("p2", "s2")];
+        for (edit, rebuilds) in [(&changed_both, true), (&changed_one, false)] {
+            let link = link(json!([{ "type": "absolute", "start": 0, "end": 3_600_000_000_i64 }]));
+            let range = TimeRange::Absolute {
+                start: 0,
+                end: 3_600_000_000,
+            };
+            let dash = dashboard(&[("p1", "s1"), ("p2", "s2")]);
+            let engine = fake(&link, &dash);
+            let flights = flights(8, 1);
+            let now = now_micros();
+            data(&read_at(engine, flights, &link, &dash, range, now).await);
+            let mut edited = dashboard(edit);
+            edited.updated_at = 2_000;
+            *engine.dashboard.lock().unwrap() = Some(edited.clone());
+            engine.classes.lock().unwrap().extend([
+                ("p1".to_string(), Class::Transient),
+                ("p2".to_string(), Class::Transient),
+            ]);
+            let first = read_at(engine, flights, &link, &edited, range, now + SECOND).await;
+            assert!(
+                data(&first).refreshing,
+                "the edit itself bypasses the backoff"
+            );
+            settle(flights).await;
+            let h = header(&link, &range).await;
+            assert_eq!((h.fail_streak, h.has_body()), (1, true));
+            assert!(h.next_retry_at.unwrap() > now + 2 * SECOND);
+            assert_eq!(engine.builds.load(Ordering::SeqCst), 2);
+            let next = read_at(engine, flights, &link, &edited, range, now + 2 * SECOND).await;
+            let next = data(&next).clone();
+            let shown = next
+                .panels
+                .values()
+                .filter(|p| {
+                    p.state
+                        != PanelState::NotAvailable {
+                            reason: NotAvailableReason::Changed,
+                        }
+                })
+                .count();
+            assert_eq!(shown, usize::from(!rebuilds), "{edit:?}");
+            assert_eq!(next.refreshing, rebuilds, "{edit:?}");
+            settle(flights).await;
+            let builds = if rebuilds { 3 } else { 2 };
+            assert_eq!(engine.builds.load(Ordering::SeqCst), builds, "{edit:?}");
+        }
+    }
+
+    /// An absolute two-panel link built once, then edited to `edit`, whose rebuilds all fail.
+    async fn failing_edit(
+        edit: &[(&str, &str)],
+    ) -> (
+        &'static Fake,
+        &'static Flights,
+        PublicDashboard,
+        Dashboard,
+        TimeRange,
+        i64,
+    ) {
+        let link = link(json!([{ "type": "absolute", "start": 0, "end": 3_600_000_000_i64 }]));
+        let range = TimeRange::Absolute {
+            start: 0,
+            end: 3_600_000_000,
+        };
+        let dash = dashboard(&[("p1", "s1"), ("p2", "s2")]);
+        let engine = fake(&link, &dash);
+        let flights = flights(8, 1);
+        let now = now_micros();
+        data(&read_at(engine, flights, &link, &dash, range, now).await);
+        let mut edited = dashboard(edit);
+        edited.updated_at = 2_000;
+        *engine.dashboard.lock().unwrap() = Some(edited.clone());
+        let failing = edit
+            .iter()
+            .map(|(id, _)| (id.to_string(), Class::Transient));
+        engine.classes.lock().unwrap().extend(failing);
+        let first = read_at(engine, flights, &link, &edited, range, now + SECOND).await;
+        assert!(
+            data(&first).refreshing,
+            "the edit itself bypasses the backoff"
+        );
+        settle(flights).await;
+        assert_eq!(header(&link, &range).await.fail_streak, 1);
+        assert_eq!(engine.builds.load(Ordering::SeqCst), 2);
+        (engine, flights, link, edited, range, now)
+    }
+
+    #[tokio::test]
+    async fn a_masked_screen_retries_once_at_once_then_waits_for_the_backoff() {
+        let (engine, flights, link, edited, range, now) =
+            failing_edit(&[("p1", "t1"), ("p2", "t2")]).await;
+        let retry = read_at(engine, flights, &link, &edited, range, now + 2 * SECOND).await;
+        assert!(data(&retry).refreshing);
+        settle(flights).await;
+        let h = header(&link, &range).await;
+        assert_eq!(
+            (h.fail_streak, engine.builds.load(Ordering::SeqCst)),
+            (2, 3)
+        );
+        let polled = read_at(engine, flights, &link, &edited, range, now + 3 * SECOND).await;
+        assert!(
+            !data(&polled).refreshing,
+            "a second failure waits for its backoff"
+        );
+        settle(flights).await;
+        assert_eq!(engine.builds.load(Ordering::SeqCst), 3);
+        let after = h.next_retry_at.unwrap() + SECOND;
+        let due = read_at(engine, flights, &link, &edited, range, after).await;
+        assert!(data(&due).refreshing);
+        settle(flights).await;
+        assert_eq!(engine.builds.load(Ordering::SeqCst), 4);
+    }
+
+    #[tokio::test]
+    async fn a_masked_screen_of_replaced_panels_retries_on_the_next_read() {
+        let (engine, flights, link, edited, range, now) =
+            failing_edit(&[("q1", "s1"), ("q2", "s2")]).await;
+        let next = read_at(engine, flights, &link, &edited, range, now + 2 * SECOND).await;
+        assert!(data(&next).refreshing, "no live panel has a result to show");
+        settle(flights).await;
+        assert_eq!(engine.builds.load(Ordering::SeqCst), 3);
+    }
+
+    #[test]
     fn due_rules_follow_their_order_and_only_edits_bypass_the_backoff() {
         let live = Live {
             dashboard_updated_at: 1,
@@ -2012,14 +2221,14 @@ pub(super) mod tests {
             ..Default::default()
         };
         let at = |min: i64| 100 * MIN + min * MIN;
-        assert_eq!(due(&fresh, live, true, 300, at(4)).reason, None);
-        let interval = due(&fresh, live, true, 300, at(6));
+        assert_eq!(due(&fresh, live, true, 300, false, at(4)).reason, None);
+        let interval = due(&fresh, live, true, 300, false, at(6));
         assert_eq!(
             (interval.reason, interval.start),
             (Some(StaleReason::Interval), true)
         );
         assert_eq!(
-            due(&fresh, live, false, 300, at(600)).reason,
+            due(&fresh, live, false, 300, false, at(600)).reason,
             None,
             "absolute never ages"
         );
@@ -2027,12 +2236,12 @@ pub(super) mod tests {
             next_retry_at: Some(at(10)),
             ..fresh.clone()
         };
-        assert!(!due(&backoff, live, true, 300, at(6)).start);
+        assert!(!due(&backoff, live, true, 300, false, at(6)).start);
         let edited = Live {
             link_rev: 9,
             ..live
         };
-        let d = due(&backoff, edited, true, 300, at(6));
+        let d = due(&backoff, edited, true, 300, false, at(6));
         assert_eq!((d.reason, d.start), (Some(StaleReason::Interval), true));
         let d = due(
             &backoff,
@@ -2042,6 +2251,7 @@ pub(super) mod tests {
             },
             false,
             300,
+            false,
             at(6),
         );
         assert_eq!((d.reason, d.start), (Some(StaleReason::Settings), true));
@@ -2053,6 +2263,7 @@ pub(super) mod tests {
             },
             false,
             300,
+            false,
             at(6),
         );
         assert_eq!((d.reason, d.start), (Some(StaleReason::Dashboard), true));
@@ -2061,8 +2272,8 @@ pub(super) mod tests {
             next_retry_at: Some(at(1)),
             ..fresh
         };
-        assert!(!due(&partial, live, false, 300, at(0)).start);
-        let d = due(&partial, live, false, 300, at(2));
+        assert!(!due(&partial, live, false, 300, false, at(0)).start);
+        let d = due(&partial, live, false, 300, false, at(2));
         assert_eq!((d.reason, d.start), (Some(StaleReason::Retry), true));
     }
 

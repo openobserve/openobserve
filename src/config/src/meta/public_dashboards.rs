@@ -249,6 +249,9 @@ pub struct RangeStatus {
     pub unavailable_count: u16,
     pub incomplete_count: u16,
     pub last_error: Option<String>,
+    /// When the next build may start after a failure; absent from a querier that predates it.
+    #[serde(default)]
+    pub next_retry_at: Option<i64>,
     /// Panel id to the typed streams its data was read from; left out of the batch call.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sources: Option<BTreeMap<String, Vec<(StreamType, String)>>>,
@@ -749,6 +752,7 @@ mod tests {
             unavailable_count: 1,
             incomplete_count: 0,
             last_error: None,
+            next_retry_at: None,
             sources: Some(sources),
         };
         assert_eq!(
@@ -757,7 +761,7 @@ mod tests {
                 "key": "r3600", "state": "needs_attention", "built_at": 5,
                 "withheld_panels": [{ "panel_id": "p2", "reason": "unauthorized" }],
                 "unavailable_count": 1, "incomplete_count": 0, "last_error": null,
-                "sources": { "p1": [["logs", "default"]] }
+                "next_retry_at": null, "sources": { "p1": [["logs", "default"]] }
             })
         );
         let batch = RangeStatus {

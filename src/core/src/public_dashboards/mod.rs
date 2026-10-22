@@ -1155,7 +1155,7 @@ pub async fn authorize_tables(
     probe: &AuthorizerProbe,
 ) -> Result<(), NotAvailableReason> {
     #[cfg(feature = "enterprise")]
-    if !tables_allowed(user_id, tables).await {
+    if !tables_allowed(org, user_id, tables).await {
         return Err(probe.refusal(org, user_id).await);
     }
     Ok(())
@@ -1178,7 +1178,7 @@ pub async fn authorize_manifest(
                 .flat_map(|d| d.sources.iter()),
         );
         let denied = !streams_allowed(org, user_id, streams).await
-            || !tables_allowed(user_id, &panel.enrichment_tables).await
+            || !tables_allowed(org, user_id, &panel.enrichment_tables).await
             || !crate::authz::denied_named_cipher_keys(org, user_id, &panel.cipher_keys)
                 .await
                 .is_empty();
@@ -2330,24 +2330,24 @@ async fn streams_allowed<'a>(
     true
 }
 
-/// Whether `user` may read every `(org, table)` enrichment table, each in its own org.
+/// Whether `user` may read every enrichment table of the link's `org` that a VRL reads.
 #[cfg(feature = "enterprise")]
-async fn tables_allowed(user_id: &str, tables: &[(String, String)]) -> bool {
+async fn tables_allowed(org: &str, user_id: &str, tables: &[(String, String)]) -> bool {
     use crate::authz::QuerySource;
-    if tables.is_empty() {
-        return true;
-    }
+    // Another org's table is the default-org fallback, which the live search reads unchecked too.
     let sources: Vec<QuerySource> = tables
         .iter()
+        .filter(|(table_org, _)| table_org == org)
         .map(|(org, name)| QuerySource::Stream {
             org_id: org.clone(),
             stream_type: StreamType::EnrichmentTables,
             name: name.clone(),
         })
         .collect();
-    crate::authz::authorize_query_sources(user_id, &sources)
-        .await
-        .is_ok()
+    sources.is_empty()
+        || crate::authz::authorize_query_sources(user_id, &sources)
+            .await
+            .is_ok()
 }
 
 /// Confirms a denial through calls that return errors, which the permission check folds into false.
@@ -4011,7 +4011,7 @@ mod tests {
         let checker = crate::authz::fake_checker();
         let publisher = format!("{}@example.com", config::ider::uuid());
         let panel = ManifestPanel {
-            enrichment_tables: vec![(config::DEFAULT_ORG.to_string(), "fallback_lookup".into())],
+            enrichment_tables: vec![("o1".to_string(), "own_lookup".into())],
             ..Default::default()
         };
         let probe = AuthorizerProbe(tokio::sync::OnceCell::new_with(Some(Ok(()))));
@@ -4023,15 +4023,64 @@ mod tests {
         checker.grant_read(
             &publisher,
             &crate::authz::TypedStream {
-                org_id: config::DEFAULT_ORG.to_string(),
+                org_id: "o1".to_string(),
                 stream_type: StreamType::EnrichmentTables,
-                name: "fallback_lookup".into(),
+                name: "own_lookup".into(),
             },
         );
         assert!(
             authorize_manifest("o1", &publisher, &panel, &probe)
                 .await
                 .unwrap()
+        );
+    }
+
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    #[tokio::test]
+    async fn a_default_org_fallback_table_is_recorded_but_not_checked_as_the_live_search_reads_it()
+    {
+        use transform::enrichment::{ENRICHMENT_TABLES, StreamTable};
+        crate::authz::fake_checker();
+        let name = format!("fallback_{}", config::ider::uuid().to_lowercase());
+        let key = format!("{}/enrichment_tables/{name}", config::DEFAULT_ORG);
+        let table = StreamTable {
+            org_id: config::DEFAULT_ORG.into(),
+            stream_name: name.clone(),
+            data: std::sync::Arc::new(vec![]),
+        };
+        ENRICHMENT_TABLES.insert(key.clone(), table);
+        let search = FakeSearch {
+            hits: 1,
+            ..Default::default()
+        };
+        let mut panel = typed_panel("p", "table", "sql", "SELECT * FROM \"s\"", None);
+        panel.queries[0].vrl_function_query = Some(format!(
+            r#".x = get_enrichment_table_record!("{name}", {{"k": .k}})"#
+        ));
+        let run = run_one(&search, panel).await;
+        ENRICHMENT_TABLES.remove(&key);
+        let recorded = vec![(config::DEFAULT_ORG.to_string(), name)];
+        assert_eq!(run.manifest.enrichment_tables, recorded);
+        // A publisher with no role in the default org.
+        let publisher = format!("{}@example.com", config::ider::uuid());
+        let probe = AuthorizerProbe(tokio::sync::OnceCell::new_with(Some(Ok(()))));
+        assert_eq!(
+            authorize_tables("o1", &publisher, &recorded, &probe).await,
+            Ok(())
+        );
+        let deadline = ManifestPanel {
+            enrichment_tables: recorded,
+            ..Default::default()
+        };
+        assert!(
+            authorize_manifest("o1", &publisher, &deadline, &probe)
+                .await
+                .unwrap()
+        );
+        let own = [("o1".to_string(), "own_secret".to_string())];
+        assert_eq!(
+            authorize_tables("o1", &publisher, &own, &probe).await,
+            Err(NotAvailableReason::Unauthorized)
         );
     }
 
