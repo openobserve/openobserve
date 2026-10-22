@@ -25,6 +25,7 @@ use axum::{
     body::Body,
     http::{Method, StatusCode},
 };
+use config::meta::user::UserRole;
 use support::*;
 
 const ENV: &[(&str, &str)] = &[("O2_WORKFLOW_HOOKS_ENABLED", "false")];
@@ -54,5 +55,64 @@ fn hook_routes_are_404_when_hooks_are_off() {
                 "{path}: the hook handler answered"
             );
         }
+    });
+}
+
+/// The proxy auth layer also guards the fallback, so an unknown route answers as this control does.
+#[test]
+fn management_routes_are_404_when_hooks_are_off() {
+    run(ENV, async {
+        seed_user("acme", "admin@acme.io", UserRole::Admin).await;
+        seed_workflow("acme", "wf-off", true).await;
+        let control = send(as_user(
+            Method::GET,
+            "/api/acme/workflows/wf-off/no_such_route",
+            "admin@acme.io",
+            None,
+        ))
+        .await;
+        assert!(
+            matches!(
+                control.status,
+                StatusCode::NOT_FOUND | StatusCode::UNAUTHORIZED
+            ),
+            "{}",
+            control.status
+        );
+        let base = "/api/acme/workflows/wf-off/http_trigger";
+        let put = serde_json::json!({"enabled": true, "auth_mode": "token"});
+        for (method, path, body) in [
+            (Method::GET, base.to_string(), None),
+            (Method::PUT, base.to_string(), Some(put)),
+            (Method::DELETE, base.to_string(), None),
+            (
+                Method::POST,
+                format!("{base}/credentials"),
+                Some(serde_json::json!({"overlap_seconds": 0})),
+            ),
+            (Method::DELETE, format!("{base}/credentials/c1"), None),
+            (Method::GET, format!("{base}/credentials/c1/secret"), None),
+            (
+                Method::POST,
+                format!("{base}/test"),
+                Some(serde_json::json!({"data": []})),
+            ),
+        ] {
+            let reply = send(as_user(method.clone(), &path, "admin@acme.io", body)).await;
+            assert_eq!(
+                (reply.status, &reply.body),
+                (control.status, &control.body),
+                "{method} {path}"
+            );
+        }
+        let config = send(as_user(
+            Method::GET,
+            "/api/acme/config",
+            "admin@acme.io",
+            None,
+        ))
+        .await;
+        assert_eq!(config.status, StatusCode::OK);
+        assert_eq!(config.json()["workflow_hooks_enabled"], false);
     });
 }

@@ -18,6 +18,7 @@
 pub mod cache;
 pub mod credentials;
 pub mod enqueue;
+pub mod manage;
 pub mod payload;
 pub mod rejections;
 pub mod signature;
