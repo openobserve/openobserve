@@ -77,6 +77,8 @@ pub enum AuthError {
     Locked {
         retry_after_secs: i64,
     },
+    /// The credential could not be checked because a store it needs is down; the client may retry.
+    Unavailable(String),
 }
 
 impl std::fmt::Display for AuthError {
@@ -88,6 +90,7 @@ impl std::fmt::Display for AuthError {
             AuthError::Locked { retry_after_secs } => {
                 write!(f, "Locked: {}", lockout_message(*retry_after_secs))
             }
+            AuthError::Unavailable(msg) => write!(f, "Unavailable: {}", msg),
         }
     }
 }
@@ -129,6 +132,7 @@ impl IntoResponse for AuthError {
                 .header(header::RETRY_AFTER, retry_after_secs)
                 .body(Body::from(lockout_message(retry_after_secs)))
                 .unwrap(),
+            AuthError::Unavailable(msg) => (StatusCode::SERVICE_UNAVAILABLE, msg).into_response(),
         }
     }
 }
@@ -148,6 +152,7 @@ pub struct AuthValidationResult {
     pub is_internal_user: bool,
     /// Name of the org ingestion token the request authenticated with.
     pub token_name: Option<String>,
+    pub delegation: Option<super::delegation::DelegatedCaller>,
 }
 
 /// What a password comparison decided, once the lockout policy has had its say.
@@ -234,6 +239,7 @@ pub async fn validator(
                         user_role: res.user_role,
                         is_internal_user: res.is_internal_user,
                         token_name: None,
+                        delegation: None,
                     });
                 }
 
@@ -255,6 +261,7 @@ pub async fn validator(
                         user_role: res.user_role,
                         is_internal_user: res.is_internal_user,
                         token_name,
+                        delegation: None,
                     })
                 } else {
                     Err(AuthError::Forbidden("Unauthorized Access".to_string()))
@@ -291,7 +298,7 @@ pub async fn validate_token(token: &str, org_id: &str) -> Result<(), AuthError> 
 /// `is_external` short-circuit means native/internal principals (incl. root, which is internal)
 /// skip the cache lookup entirely. Kept as one helper so the validator call sites stay identical.
 #[cfg(feature = "enterprise")]
-async fn blocked_external(user: &config::meta::user::User) -> bool {
+pub(crate) async fn blocked_external(user: &config::meta::user::User) -> bool {
     use o2_enterprise::enterprise::domain_management::{self, meta::AccessDecision};
     user.is_external
         && matches!(
@@ -1137,6 +1144,7 @@ pub async fn validator_aws(req_data: &RequestData) -> Result<AuthValidationResul
                                 user_role: res.user_role,
                                 is_internal_user: res.is_internal_user,
                                 token_name: None,
+                                delegation: None,
                             })
                         } else {
                             Err(AuthError::Unauthorized("Unauthorized Access".to_string()))
@@ -1180,6 +1188,7 @@ pub async fn validator_gcp(req_data: &RequestData) -> Result<AuthValidationResul
                             user_role: res.user_role,
                             is_internal_user: res.is_internal_user,
                             token_name: None,
+                            delegation: None,
                         })
                     } else {
                         Err(AuthError::Unauthorized("Unauthorized Access".to_string()))
@@ -1262,6 +1271,7 @@ pub async fn validator_rum(req_data: &RequestData) -> Result<AuthValidationResul
                         user_role: Some(user.role),
                         is_internal_user: !user.is_external,
                         token_name: None,
+                        delegation: None,
                     })
                 } else {
                     Ok(AuthValidationResult {
@@ -1269,6 +1279,7 @@ pub async fn validator_rum(req_data: &RequestData) -> Result<AuthValidationResul
                         user_role: None,
                         is_internal_user: false,
                         token_name: None,
+                        delegation: None,
                     })
                 }
             }
@@ -1330,6 +1341,19 @@ async fn oo_validator_internal(
             is_from_session,
         )
         .await
+    } else if let Some(token) = auth_str
+        .strip_prefix("Bearer ")
+        .map(str::trim)
+        .filter(|token| token.starts_with(config::utils::delegation::TOKEN_PREFIX))
+    {
+        let result = super::delegation::validate_delegated(
+            token,
+            req_data.uri.path(),
+            path_prefix,
+            &req_data.method,
+        )
+        .await?;
+        super::delegation::authorize(result, auth_info).await
     } else if auth_str.starts_with("Bearer") {
         log::debug!("Bearer token found");
         // token_validator unwraps a "Bearer" prefix, so it must not see the session marker.
@@ -2825,6 +2849,12 @@ CN5lTowpVXP2OIiiNTGa75Fj
     }
 
     #[test]
+    fn an_unavailable_store_answers_503() {
+        let response = AuthError::Unavailable("Service Unavailable".to_string()).into_response();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[test]
     fn test_get_user_details() {
         // Test valid credentials
         let valid_creds = "username:password".as_bytes().to_vec();
@@ -2979,5 +3009,20 @@ CN5lTowpVXP2OIiiNTGa75Fj
         assert!(!is_org_agnostic_read("acme/streams"));
         assert!(!is_org_agnostic_read("password_complexity"));
         assert!(!is_org_agnostic_read("license/keys"));
+    }
+
+    #[tokio::test]
+    async fn an_o2dt_bearer_token_goes_to_the_delegated_validator() {
+        let req_data = RequestData {
+            uri: "/api/default/streams".parse::<Uri>().unwrap(),
+            method: Method::GET,
+            headers: HeaderMap::new(),
+        };
+        let auth_info = AuthExtractor::bypass("Bearer o2dt.e30.bWFj".to_string(), String::new());
+        match oo_validator(&req_data, &auth_info).await {
+            Err(AuthError::Unauthorized(msg)) => assert_eq!(msg, "Unauthorized Access"),
+            Err(other) => panic!("expected 401, got {other}"),
+            Ok(_) => panic!("a forged delegated token was accepted"),
+        }
     }
 }

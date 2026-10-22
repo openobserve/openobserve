@@ -48,6 +48,7 @@ pub async fn exchange_token(
             error_msg: None,
             trace_id: None,
         },
+        delegated: None,
     };
     match result {
         Ok(response) => {

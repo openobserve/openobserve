@@ -116,6 +116,9 @@ pub struct PromptRequest {
     /// Optional image attachments for multimodal queries (max 2MB each, PNG/JPEG only)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub images: Option<Vec<ImageAttachment>>,
+    /// Seconds the agent waits for a tool approval before denying it (capped at 600).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub confirm_timeout_secs: Option<u32>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]

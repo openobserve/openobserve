@@ -35,6 +35,7 @@ import {
   formatMinuteOfDay,
   fromZonedInputValue,
   groupBySubject,
+  holderStretches,
   isEscalating,
   isOnCallUnavailable,
   speakTarget,
@@ -44,8 +45,16 @@ import {
   isSnoozed,
   isStaffed,
   isUnresolved,
+  coverageHoursSummary,
+  effectiveRivals,
+  effectiveWeekCoverage,
   memberAt,
   nextHandover,
+  overlappingRules,
+  overlapStanding,
+  prioritiesFor,
+  ruleHoursSummary,
+  rulesClash,
   normalizeDimensionValue,
   ownershipPath,
   priorityLabel,
@@ -66,11 +75,24 @@ import {
   shiftBands,
   shortReachReason,
   toZonedInputValue,
+  zonedMidnight,
+  coversPresetOf,
+  COVERS_PRESETS,
+  rotateMembersTo,
+  turnLine,
+  ruleHolder,
+  anchorAtWeekdayTime,
+  anchorWeekdayTime,
+  dayFraction,
+  dayRows,
+  stopChoices,
+  stopConsequence,
   stateTagVariant,
   upcomingShifts,
   windowContains,
 } from "@/utils/oncall";
 import type { TranslateFn } from "@/types/i18n";
+import i18n from "@/locales";
 
 const ANCHOR = 1_700_000_000_000_000;
 
@@ -1563,6 +1585,34 @@ describe("rungProblem", () => {
 /// while the label promised the team's, so an operator in Berlin editing an
 /// Asia/Kolkata team saw the handover three and a half hours from where it was
 /// and moved it there by saving.
+describe("zonedMidnight", () => {
+  const KOLKATA_10AM = Date.UTC(2026, 7, 17, 4, 30);
+  it.each([
+    ["Asia/Kolkata", KOLKATA_10AM, 0, Date.UTC(2026, 7, 16, 18, 30)],
+    ["America/New_York", KOLKATA_10AM, 0, Date.UTC(2026, 7, 17, 4, 0)],
+    ["UTC", KOLKATA_10AM, 2, Date.UTC(2026, 7, 19)],
+    // Starts in EST and lands in EDT: the step is local days, not 24-hour blocks.
+    ["America/New_York", Date.UTC(2026, 2, 1, 17), 14, Date.UTC(2026, 2, 15, 4, 0)],
+    // No local 00:00 on these days: the day starts where the clocks jump to 01:00.
+    ["America/Santiago", Date.UTC(2026, 8, 5, 16), 1, Date.UTC(2026, 8, 6, 4)],
+    ["America/Havana", Date.UTC(2026, 2, 7, 17), 1, Date.UTC(2026, 2, 8, 5)],
+    ["America/Santiago", Date.UTC(2026, 8, 6, 16), 0, Date.UTC(2026, 8, 6, 4)],
+  ])("%s from %i plus %i days", (zone, startMs, days, expectedMs) => {
+    expect(zonedMidnight(startMs * 1000, zone, days)).toBe(expectedMs * 1000);
+  });
+
+  it("rows tile without gap or overlap across a day with no midnight", () => {
+    const rows = dayRows([], Date.UTC(2026, 8, 4, 16) * 1000, 4, "America/Santiago");
+    expect(rows.map((r) => toZonedInputValue(r.start, "America/Santiago"))).toEqual([
+      "2026-09-04T00:00",
+      "2026-09-05T00:00",
+      "2026-09-06T01:00",
+      "2026-09-07T00:00",
+    ]);
+    rows.slice(1).forEach((row, i) => expect(row.start).toBe(rows[i].end));
+  });
+});
+
 describe("toZonedInputValue / fromZonedInputValue", () => {
   /// The instant Asia/Kolkata calls 2026-08-17 10:00 — UTC+05:30.
   const KOLKATA_10AM = Date.UTC(2026, 7, 17, 4, 30) * 1000;
@@ -1636,5 +1686,564 @@ describe("toZonedInputValue / fromZonedInputValue", () => {
 
   it("answers empty for an instant that is not one", () => {
     expect(toZonedInputValue(Number.NaN, "UTC")).toBe("");
+  });
+});
+
+describe("rotation drawer, part B", () => {
+  const MON = Date.UTC(2026, 0, 5) * 1000;
+  const HOUR = MICROS_PER_HOUR;
+  const seg = (
+    from: number,
+    to: number,
+    user?: string,
+    rule?: string,
+    override?: string,
+    scheduled?: string,
+  ) => ({
+    rotation_id: "rot",
+    from: MON + from * HOUR,
+    to: MON + to * HOUR,
+    user_email: user,
+    rotation: rule,
+    override_id: override,
+    scheduled_email: scheduled,
+  });
+
+  // B3 Covers: a pick writes exactly these windows, and only exact windows read back as that pick.
+  it.each([
+    ["all", []],
+    ["businessHours", [window([0, 1, 2, 3, 4], 540, 1020)]],
+    ["weekdays", [window([0, 1, 2, 3, 4], 0, 1440)]],
+    ["weekends", [window([5, 6], 0, 1440)]],
+  ] as const)("covers %s round-trips", (key, windows) => {
+    expect(COVERS_PRESETS[key]).toEqual(windows);
+    expect(coversPresetOf(windows as unknown as TimeWindow[])).toBe(key);
+  });
+
+  it.each([
+    ["different hours", [window([0, 1, 2, 3, 4], 540, 1080)]],
+    ["two windows", [window([0, 1, 2, 3, 4], 540, 1020), window([5], 600, 840)]],
+    ["one weekend day", [window([5], 0, 1440)]],
+  ])("covers %s is custom", (_name, windows) => {
+    expect(coversPresetOf(windows)).toBe("custom");
+  });
+
+  // B3 Make on call now: an array rotation that puts the person at the turn's index.
+  it.each([
+    [["a", "b", "c", "d"], "c", 0, ["c", "d", "a", "b"]],
+    [["a", "b", "c", "d"], "a", 2, ["c", "d", "a", "b"]],
+    [["a", "b", "c"], "b", 1, ["a", "b", "c"]],
+    [["a", "b"], "z", 0, ["a", "b"]],
+  ])("rotateMembersTo(%j, %s, %i)", (members, person, index, expected) => {
+    expect(rotateMembersTo(members, person, index)).toEqual(expected);
+  });
+
+  it.each([
+    [["a", "b", "c", "d"], "c", ["c", "d", "a", "b"]],
+    [["a", "b"], null, ["a", "b"]],
+  ])("turnLine(%j, %s)", (members, holder, expected) => {
+    expect(turnLine(members, holder)).toEqual(expected);
+  });
+
+  // B3 People line: read from the server's segments, covers ignored.
+  it.each([
+    ["on now", [seg(-1, 1, "ana", "Base"), seg(1, 3, "bo", "Base")], { email: "ana", now: true }],
+    ["next up", [seg(-1, 1, "cy", "Office"), seg(1, 3, "bo", "Base")], { email: "bo", now: false }],
+    [
+      "a cover keeps the rostered turn",
+      [seg(-1, 1, "di", "Base", "ov1", "ana"), seg(1, 3, "bo", "Base")],
+      { email: "ana", now: true },
+    ],
+    [
+      "an absence keeps the rostered turn",
+      [seg(-1, 1, "bo", "Base", undefined, "ana")],
+      { email: "ana", now: true },
+    ],
+    [
+      "a gap left by an away holder keeps the rostered turn",
+      [seg(-1, 1, undefined, "Base", undefined, "ana")],
+      { email: "ana", now: true },
+    ],
+    ["never in the window", [seg(-1, 3, "cy", "Office")], null],
+  ])("ruleHolder: %s", (_name, segments, expected) => {
+    expect(ruleHolder(segments as any, "Base", MON)).toEqual(expected);
+  });
+
+  // B3 Handover: weekday and time move the first shift within its team-local week, DST-correct.
+  it.each([
+    [
+      "Kolkata weekly to Wed 09:00",
+      Date.UTC(2026, 2, 2, 3, 30),
+      "Asia/Kolkata",
+      2,
+      540,
+      Date.UTC(2026, 2, 4, 3, 30),
+    ],
+    [
+      "daily keeps the date",
+      Date.UTC(2026, 2, 2, 3, 30),
+      "Asia/Kolkata",
+      null,
+      0,
+      Date.UTC(2026, 2, 1, 18, 30),
+    ],
+    [
+      "New York across spring forward",
+      Date.UTC(2026, 2, 2, 14),
+      "America/New_York",
+      6,
+      540,
+      Date.UTC(2026, 2, 8, 13),
+    ],
+  ])("anchorAtWeekdayTime: %s", (_name, anchorMs, zone, weekday, minute, expectedMs) => {
+    expect(anchorAtWeekdayTime(anchorMs * 1000, zone, weekday, minute)).toBe(expectedMs * 1000);
+  });
+
+  it("anchorWeekdayTime reads the team-local weekday and minute", () => {
+    expect(anchorWeekdayTime(Date.UTC(2026, 2, 4, 3, 30) * 1000, "Asia/Kolkata")).toEqual({
+      weekday: 2,
+      minute: 540,
+    });
+  });
+
+  // B1 Picture: one row per team-local day, segments cut at its midnights.
+  it("dayRows cuts segments at the team's midnights", () => {
+    const rows = dayRows([seg(-2, 30, "ana", "Base")] as any, MON, 2, "UTC");
+    expect(rows.map((r) => [r.start, r.end])).toEqual([
+      [MON, MON + 24 * HOUR],
+      [MON + 24 * HOUR, MON + 48 * HOUR],
+    ]);
+    expect(rows[0].pieces.map((p) => [p.from, p.to])).toEqual([[MON, MON + 24 * HOUR]]);
+    expect(rows[1].pieces.map((p) => [p.from, p.to])).toEqual([[MON + 24 * HOUR, MON + 30 * HOUR]]);
+  });
+
+  // F1: an instant's place on its day row; the repeated hour holds both occurrences, half each.
+  const NY = "America/New_York";
+  const at = (zone: string, ms: number) =>
+    dayFraction(ms * 1000, dayRows([], ms * 1000, 1, zone)[0], zone);
+  it.each([
+    ["Kolkata 09:30 is wall/24", "Asia/Kolkata", Date.UTC(2026, 2, 4, 4), 9.5 / 24],
+    [
+      "Kolkata keeps micros",
+      "Asia/Kolkata",
+      Date.UTC(2026, 2, 4, 4, 0, 30, 500),
+      (570.5 + 0.5 / 60) / 1440,
+    ],
+    ["fall-back noon sits at the middle", NY, Date.UTC(2026, 10, 1, 17), 0.5],
+    [
+      "fall-back first 01:30 fills the slot's first half",
+      NY,
+      Date.UTC(2026, 10, 1, 5, 30),
+      75 / 1440,
+    ],
+    ["fall-back second 01:30 fills its second half", NY, Date.UTC(2026, 10, 1, 6, 30), 105 / 1440],
+    ["fall-back 03:00 is wall/24", NY, Date.UTC(2026, 10, 1, 8), 3 / 24],
+    ["spring-forward 01:30 EST is wall/24", NY, Date.UTC(2026, 2, 8, 6, 30), 1.5 / 24],
+    ["spring-forward 03:30 EDT is wall/24", NY, Date.UTC(2026, 2, 8, 7, 30), 3.5 / 24],
+    ["no-midnight day starts at 01:00", "America/Santiago", Date.UTC(2026, 8, 6, 4), 1 / 24],
+    ["no-midnight day noon", "America/Santiago", Date.UTC(2026, 8, 6, 15), 0.5],
+    ["no-midnight day noon in Havana", "America/Havana", Date.UTC(2026, 2, 8, 16), 0.5],
+  ])("dayFraction: %s", (_name, zone, ms, expected) => {
+    expect(at(zone, ms)).toBeCloseTo(expected, 12);
+  });
+
+  it("dayFraction strictly increases across a day with no midnight and stays below 1", () => {
+    const zone = "America/Santiago";
+    const row = dayRows([], Date.UTC(2026, 8, 6, 12) * 1000, 1, zone)[0];
+    const hours = Array.from({ length: 23 }, (_, h) => row.start + h * 3_600_000_000);
+    const positions = [...hours, row.end - 1].map((t) => dayFraction(t, row, zone));
+    positions.slice(1).forEach((p, i) => expect(p).toBeGreaterThan(positions[i]));
+    expect(positions.at(-1)).toBeLessThan(1);
+  });
+
+  it.each([
+    [
+      "fall-back cover 01:45 EDT to 01:15 EST",
+      NY,
+      Date.UTC(2026, 10, 1, 5, 45),
+      Date.UTC(2026, 10, 1, 6, 15),
+      15 / 1440,
+    ],
+    [
+      "spring-forward 01:30 EST to 03:30 EDT",
+      NY,
+      Date.UTC(2026, 2, 8, 6, 30),
+      Date.UTC(2026, 2, 8, 7, 30),
+      2 / 24,
+    ],
+    [
+      "a 30-second piece",
+      "Asia/Kolkata",
+      Date.UTC(2026, 2, 4, 4),
+      Date.UTC(2026, 2, 4, 4, 0, 30),
+      30 / 86400,
+    ],
+    [
+      "a 30-second piece in the repeated hour",
+      NY,
+      Date.UTC(2026, 10, 1, 6),
+      Date.UTC(2026, 10, 1, 6, 0, 30),
+      15 / 86400,
+    ],
+  ])("dayFraction width: %s", (_name, zone, fromMs, toMs, width) => {
+    const row = dayRows([], fromMs * 1000, 1, zone)[0];
+    const span = dayFraction(toMs * 1000, row, zone) - dayFraction(fromMs * 1000, row, zone);
+    expect(span).toBeGreaterThan(0);
+    expect(span).toBeCloseTo(width, 12);
+  });
+
+  // B4: the next ends of this rule's own stretches, inside the window and after now.
+  it("stopChoices lists up to three real ends of the rule's turns", () => {
+    const segments = [
+      seg(-5, 1, "ana", "Base"),
+      seg(1, 2, "cy", "Office"),
+      seg(2, 4, "bo", "Base"),
+      seg(4, 5, "di", "Base", "ov", "bo"),
+      seg(5, 6, "ana", "Base"),
+      seg(6, 7, "bo", "Base"),
+      seg(7, 9, "ana", "Base"),
+    ];
+    expect(stopChoices(segments as any, "Base", MON, MON + 9 * HOUR)).toEqual([
+      { email: "ana", at: MON + HOUR },
+      { email: "bo", at: MON + 5 * HOUR },
+      { email: "ana", at: MON + 6 * HOUR },
+    ]);
+  });
+
+  // D4: one holder's stretch stays one even where the rostered member under it changes.
+  it.each([
+    [
+      "a cover across a roster handover is one stretch",
+      [seg(0, 2, "di", "Base", "ov", "ana"), seg(2, 5, "di", "Base", "ov", "bo")],
+      [{ ...seg(0, 5, "di", "Base", "ov"), scheduled_email: undefined }],
+    ],
+    [
+      "parts that agree on the rostered member keep it",
+      [seg(0, 2, "di", "Base", "ov", "ana"), seg(2, 5, "di", "Base", "ov", "ana")],
+      [seg(0, 5, "di", "Base", "ov", "ana")],
+    ],
+    [
+      "a different cover, person or rule is kept apart",
+      [
+        seg(0, 1, "di", "Base", "ov"),
+        seg(1, 2, "di", "Base", "ov2"),
+        seg(2, 3, "cy", "Base", "ov2"),
+        seg(3, 4, "cy", "Office", "ov2"),
+      ],
+      [
+        seg(0, 1, "di", "Base", "ov"),
+        seg(1, 2, "di", "Base", "ov2"),
+        seg(2, 3, "cy", "Base", "ov2"),
+        seg(3, 4, "cy", "Office", "ov2"),
+      ],
+    ],
+    [
+      "parts that do not touch are kept apart",
+      [seg(0, 1, "ana", "Base"), seg(2, 3, "ana", "Base")],
+      [seg(0, 1, "ana", "Base"), seg(2, 3, "ana", "Base")],
+    ],
+  ])("holderStretches: %s", (_name, segments, expected) => {
+    expect(holderStretches(segments as any)).toEqual(expected);
+  });
+
+  // B4: who takes the stopped rule's hours, or which hours nobody covers.
+  it.each([
+    [
+      "the catch-all takes them",
+      [rule("Base"), rule("Office", [window([0, 1, 2, 3, 4], 540, 1020)])],
+      1,
+      MON,
+      [0],
+      0,
+    ],
+    [
+      "nobody takes them",
+      [rule("Night", [window([], 0, 480)]), rule("Day", [window([], 480, 1440)])],
+      0,
+      MON,
+      [],
+      7,
+    ],
+    [
+      "a rule stopped before the chosen stop takes nothing",
+      [rule("Primary"), { ...rule("Fallback"), ends_at: MON + 24 * HOUR }],
+      0,
+      MON + 7 * 24 * HOUR,
+      [],
+      1,
+    ],
+    [
+      "a rule starting after the chosen stop takes nothing",
+      [rule("Primary"), { ...rule("Fallback"), starts_at: MON + 8 * 24 * HOUR }],
+      0,
+      MON + 7 * 24 * HOUR,
+      [],
+      1,
+    ],
+  ])("stopConsequence: %s", (_name, rules, index, at, takers, gapSpans) => {
+    const result = stopConsequence(rules, index, at);
+    expect(result.takers).toEqual(takers);
+    expect(result.gap).toHaveLength(gapSpans);
+  });
+
+  function rule(name: string, restrictions: TimeWindow[] = []): ShiftRule {
+    return {
+      name,
+      members: [`${name}@o2.ai`],
+      shift_micros: MICROS_PER_DAY,
+      anchor_micros: MON,
+      priority: restrictions.length ? 1 : 0,
+      restrictions,
+    };
+  }
+});
+
+describe("rotation editor: how several shift rules add up", () => {
+  /** Monday 2026-01-05 00:00 UTC. */
+  const MON = Date.UTC(2026, 0, 5) * 1000;
+  const t = i18n.global.t as unknown as TranslateFn;
+
+  function shiftRule(name: string, over: Partial<ShiftRule> = {}): ShiftRule {
+    return {
+      name,
+      members: [`${name.toLowerCase()}@o2.ai`],
+      shift_micros: MICROS_PER_WEEK,
+      anchor_micros: MON,
+      priority: 0,
+      restrictions: [],
+      ...over,
+    };
+  }
+
+  const base = shiftRule("Base");
+  const office = shiftRule("Office", {
+    priority: 1,
+    restrictions: [window([0, 1, 2, 3, 4], 540, 1020)],
+  });
+
+  describe("rulesClash", () => {
+    it.each([
+      ["same priority, both all hours", shiftRule("A"), shiftRule("B"), true],
+      [
+        "missing fields read as their defaults",
+        { ...shiftRule("A"), priority: undefined, restrictions: undefined },
+        shiftRule("B"),
+        true,
+      ],
+      [
+        "same priority, different hours",
+        shiftRule("A", { priority: 10, restrictions: [window([], 0, 480)] }),
+        shiftRule("B", { priority: 10, restrictions: [window([], 480, 960)] }),
+        false,
+      ],
+      ["different priority, same hours", shiftRule("A", { priority: 1 }), shiftRule("B"), false],
+      [
+        "days in a different order are different",
+        shiftRule("A", { restrictions: [window([0, 1], 0, 60)] }),
+        shiftRule("B", { restrictions: [window([1, 0], 0, 60)] }),
+        false,
+      ],
+    ])("%s", (_name, a, b, expected) => {
+      expect(rulesClash(a, b)).toBe(expected);
+    });
+  });
+
+  describe("overlappingRules", () => {
+    const sun = (name: string, start: number, end: number) =>
+      shiftRule(name, { priority: 10, restrictions: [window([], start, end)] });
+    const followTheSun = [sun("APAC", 0, 480), sun("EMEA", 480, 960), sun("AMER", 960, 1440), base];
+
+    it.each([
+      ["a window over the catch-all", [base, office], 0, [1]],
+      ["follow-the-sun regions meet only the catch-all", followTheSun, 0, [3]],
+      ["the catch-all meets every region", followTheSun, 3, [0, 1, 2]],
+      [
+        "different days never meet",
+        [
+          office,
+          shiftRule("Tue", { restrictions: [window([1], 0, 1440)] }),
+          shiftRule("Sat", { restrictions: [window([5], 0, 1440)] }),
+        ],
+        2,
+        [],
+      ],
+      [
+        "a Sunday night runs into Monday",
+        [
+          shiftRule("Night", { restrictions: [window([6], 1320, 360)] }),
+          shiftRule("Early", { restrictions: [window([0], 60, 120)] }),
+        ],
+        0,
+        [1],
+      ],
+      [
+        "a zero-length window covers nothing",
+        [shiftRule("Zero", { restrictions: [window([], 600, 600)] }), base],
+        0,
+        [],
+      ],
+    ])("%s", (_name, rules, index, expected) => {
+      expect(overlappingRules(rules, index)).toEqual(expected);
+    });
+  });
+
+  describe("overlapStanding", () => {
+    const top = shiftRule("Top", { priority: 2, restrictions: [window([], 0, 60)] });
+    it.each([
+      ["the restricted rule wins", [base, office], 1, { winsOver: [0], losesTo: [] }],
+      ["the catch-all loses", [base, office], 0, { winsOver: [], losesTo: [1] }],
+      [
+        "wins over one, loses to another",
+        [
+          shiftRule("Mid", { priority: 1 }),
+          shiftRule("Low", { restrictions: [window([], 0, 60)] }),
+          top,
+        ],
+        0,
+        { winsOver: [1], losesTo: [2] },
+      ],
+    ])("%s", (_name, rules, index, expected) => {
+      expect(overlapStanding(rules, index)).toEqual(expected);
+    });
+  });
+
+  describe("prioritiesFor", () => {
+    const night = shiftRule("Night", { priority: 5, restrictions: [window([], 1320, 360)] });
+    it.each([
+      ["already in that order", [base, office], 1, true, [0, 1]],
+      ["the catch-all goes on top", [base, office], 0, true, [2, 1]],
+      ["a window drops below, never negative", [base, office], 1, false, [1, 0]],
+      [
+        "a region below a catch-all it overlaps",
+        [shiftRule("APAC", { priority: 10, restrictions: [window([], 0, 480)] }), base],
+        0,
+        false,
+        [0, 1],
+      ],
+      ["other rules keep their order", [base, office, night], 1, false, [1, 0, 6]],
+      ["nothing to overlap, nothing changes", [office, night], 0, true, [1, 5]],
+    ])("%s", (_name, rules, index, wins, expected) => {
+      expect(prioritiesFor(rules, index, wins)).toEqual(expected);
+    });
+  });
+
+  describe("ruleHoursSummary", () => {
+    it.each([
+      ["no windows", [], "All hours"],
+      ["the working week", [window([0, 1, 2, 3, 4], 540, 1080)], "Mon–Fri 09:00–18:00"],
+      ["every day past midnight", [window([], 1320, 360)], "Every day 22:00–06:00 next day"],
+      ["a whole weekend", [window([5, 6], 0, 1440)], "Sat, Sun all day"],
+      [
+        "several windows",
+        [window([0], 540, 720), window([4], 780, 1020)],
+        "Mon 09:00–12:00, Fri 13:00–17:00",
+      ],
+    ])("%s", (_name, restrictions, expected) => {
+      expect(ruleHoursSummary(shiftRule("A", { restrictions }), t)).toBe(expected);
+    });
+  });
+
+  describe("effectiveWeekCoverage / effectiveRivals", () => {
+    const DAY = 1440;
+    const region = (name: string, start: number, end: number, over: Partial<ShiftRule> = {}) =>
+      shiftRule(name, { priority: 10, restrictions: [window([], start, end)], ...over });
+    const everyDay = (start: number, end: number) =>
+      [0, 1, 2, 3, 4, 5, 6].map((d): [number, number] => [d * DAY + start, d * DAY + end]);
+    const india = region("India", 0, 720);
+    const americas = region("Americas", 720, 1440);
+    const catchAll = shiftRule("Catch-all");
+
+    it.each([
+      ["a lone rule gets the whole week", [base], 0, [[0, 7 * DAY]], []],
+      [
+        "the window that wins keeps its hours",
+        [base, office],
+        1,
+        [0, 1, 2, 3, 4].map((d): [number, number] => [d * DAY + 540, d * DAY + 1020]),
+        [],
+      ],
+      ["a catch-all under regions that cover the day", [india, americas, catchAll], 2, [], [0, 1]],
+      [
+        "regions under a catch-all set to win",
+        [india, americas, shiftRule("Catch-all", { priority: 11 })],
+        0,
+        [],
+        [2],
+      ],
+      [
+        "a retired rival takes nothing",
+        [india, shiftRule("Catch-all", { priority: 11, ends_at: MON })],
+        0,
+        everyDay(0, 720),
+        [],
+      ],
+      [
+        "a rival not yet started takes nothing",
+        [india, shiftRule("Catch-all", { priority: 11, starts_at: MON + 30 * MICROS_PER_DAY })],
+        0,
+        everyDay(0, 720),
+        [],
+      ],
+      [
+        "a rival with nobody in it takes nothing",
+        [india, shiftRule("Empty", { priority: 11, members: [] })],
+        0,
+        everyDay(0, 720),
+        [],
+      ],
+      [
+        "a catch-all under a weekday rule keeps the weekend",
+        [
+          base,
+          shiftRule("Weekdays", { priority: 1, restrictions: [window([0, 1, 2, 3, 4], 0, DAY)] }),
+        ],
+        0,
+        [[5 * DAY, 7 * DAY]],
+        [1],
+      ],
+    ])("%s", (_name, rules, index, coverage, rivals) => {
+      expect(effectiveWeekCoverage(rules, index, MON)).toEqual(coverage);
+      expect(effectiveRivals(rules, index, MON)).toEqual(rivals);
+    });
+  });
+
+  describe("coverageHoursSummary", () => {
+    const DAY = 1440;
+    it.each([
+      ["the whole week", [[0, 7 * DAY]], "All hours"],
+      ["a whole weekend", [[5 * DAY, 7 * DAY]], "Sat, Sun all day"],
+      [
+        "identical days grouped",
+        [
+          [5 * DAY, 5 * DAY + 480],
+          [6 * DAY, 6 * DAY + 480],
+        ],
+        "Sat, Sun 00:00–08:00",
+      ],
+      ["across midnight", [[4 * DAY + 1320, 5 * DAY + 360]], "Fri 22:00–06:00 next day"],
+      [
+        "across the end of the week",
+        [
+          [0, 360],
+          [6 * DAY + 1320, 7 * DAY],
+        ],
+        "Sun 22:00–06:00 next day",
+      ],
+      [
+        "every day",
+        [0, 1, 2, 3, 4, 5, 6].map((d) => [d * DAY + 540, d * DAY + 1020]),
+        "Every day 09:00–17:00",
+      ],
+      [
+        "two shapes",
+        [
+          [0, 480],
+          [DAY + 600, DAY + 660],
+        ],
+        "Mon 00:00–08:00, Tue 10:00–11:00",
+      ],
+    ])("%s", (_name, spans, expected) => {
+      expect(coverageHoursSummary(spans as Array<[number, number]>, t)).toBe(expected);
+    });
   });
 });

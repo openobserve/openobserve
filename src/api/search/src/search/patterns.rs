@@ -22,8 +22,7 @@ use openobserve_core::auth::UserEmail;
 #[cfg(feature = "enterprise")]
 use {
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
-    openobserve_core::authz::{StreamPermissionResourceType, check_stream_permissions},
-    search_service::streaming,
+    openobserve_core::authz::StreamPermissionResourceType, search_service::streaming,
     tokio::sync::mpsc,
 };
 
@@ -140,22 +139,20 @@ pub async fn extract_patterns(
             "[PATTERNS trace_id {trace_id}] Resolved stream names from SQL: {stream_names:?}",
         );
 
-        // Check permissions for each stream (same as _search API)
-        for stream_name_check in stream_names.iter() {
-            if let Some(res) = check_stream_permissions(
-                stream_name_check,
-                &org_id,
-                &user_id,
-                &config::meta::stream::StreamType::Logs,
-                StreamPermissionResourceType::PatternExtract,
-            )
-            .await
-            {
-                log::warn!(
-                    "[PATTERNS trace_id {trace_id}] Unauthorized access attempt by user {user_id} for stream {stream_name_check}"
-                );
-                return res;
-            }
+        if let Some(res) = crate::search::check_sql_stream_permissions(
+            &req.query.sql,
+            &org_id,
+            &user_id,
+            config::meta::stream::StreamType::Logs,
+            StreamPermissionResourceType::PatternExtract,
+            &trace_id,
+        )
+        .await
+        {
+            log::warn!(
+                "[PATTERNS trace_id {trace_id}] Unauthorized access attempt by user {user_id} for streams {stream_names:?}"
+            );
+            return res;
         }
 
         // Size limit for pattern extraction (max logs to analyze). This bounds the

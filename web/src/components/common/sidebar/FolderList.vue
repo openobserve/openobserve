@@ -128,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ODropdown side="bottom" align="start">
                     <template #trigger>
                       <OButton
+                        :aria-label="t('common.moreActions')"
                         size="icon"
                         variant="ghost"
                         icon-left="more-vert"
