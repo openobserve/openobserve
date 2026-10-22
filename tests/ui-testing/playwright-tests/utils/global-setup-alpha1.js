@@ -334,8 +334,20 @@ async function performDexLogin(page, baseUrl, userEmail, userPassword) {
     throw new Error(`Login failed — redirected back to Dex after token exchange: ${page.url()}`);
   }
 
-  await page.locator('[data-test="menu-link-\\/-item"]').waitFor({ state: 'visible', timeout: 15000 });
+  await waitForAppMenu(page, 15000);
   testLogger.info('[alpha1] Login successful — main menu visible');
+}
+
+// A blank page is usually a JS chunk that never downloaded, not a failed login; reload once before giving up.
+async function waitForAppMenu(page, timeout) {
+  const menuItem = page.locator('[data-test="menu-link-\\/-item"]');
+  try {
+    await menuItem.waitFor({ state: 'visible', timeout });
+  } catch (e) {
+    testLogger.warn('[alpha1] Main menu not visible — reloading once', { error: e.message });
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 });
+    await menuItem.waitFor({ state: 'visible', timeout });
+  }
 }
 
 /**
@@ -394,7 +406,7 @@ async function switchOrgViaDropdown(page, targetOrgId) {
   // Land on /web/ so the navbar (and its org dropdown) renders
   const baseUrl = (process.env.ZO_BASE_URL || '').replace(/\/$/, '');
   await page.goto(`${baseUrl}/web/`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  await page.locator('[data-test="menu-link-\\/-item"]').waitFor({ state: 'visible', timeout: 20000 });
+  await waitForAppMenu(page, 20000);
   await page.waitForTimeout(2000); // navbar dropdown needs SPA hydration
 
   // Map identifier → org name (dropdown options are by name, not identifier)
@@ -632,8 +644,7 @@ async function verifySharedAuth(baseUrl) {
     }
 
     // Verify the main menu is visible
-    const menuItem = page.locator('[data-test="menu-link-\\/-item"]');
-    await menuItem.waitFor({ state: 'visible', timeout: 15000 });
+    await waitForAppMenu(page, 15000);
     testLogger.info('[alpha1] Shared auth verified — menu visible');
 
     // Note: no dropdown org-switch needed here. Each test pins its own org by
