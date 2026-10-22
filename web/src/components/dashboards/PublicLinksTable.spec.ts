@@ -210,7 +210,7 @@ describe("PublicLinksTable", () => {
     expect(find(w, "dashboards-public-links-l1-status").text()).toBe("Live");
     expect(find(w, "dashboards-public-links-l1-ranges").text()).toBe("1h · 1d");
     expect(find(w, "dashboards-public-links-l1-expires").text()).toBe("Never");
-    expect(w.text()).toContain("10 minutes");
+    expect(w.text()).not.toContain("10 minutes");
     expect(w.text()).toContain("a@b.c");
   });
 
@@ -429,7 +429,7 @@ describe("PublicLinksTable", () => {
     expect(find(w, "dashboards-public-links-l1-menu-btn").attributes("aria-busy")).toBeUndefined();
   });
 
-  it("shows an absolute-only link as refreshed once and marks it for refresh on next view", async () => {
+  it("marks an absolute-only link for refresh on next view", async () => {
     const absolute = { type: "absolute" as const, start: 1_000_000, end: 86_401_000_000 };
     vi.mocked(admin.listOrg).mockResolvedValue({
       data: { list: [link({ time_range: { ranges: [absolute], default: absolute } })] },
@@ -437,7 +437,6 @@ describe("PublicLinksTable", () => {
     vi.mocked(admin.refresh).mockResolvedValue({ data: link() } as never);
     const w = build();
     await flushPromises();
-    expect(w.text()).toContain("Once");
     expect(find(w, "dashboards-public-links-l1-refresh-menu").text()).toBe("Refresh on next view");
     await find(w, "dashboards-public-links-l1-refresh-menu").trigger("click");
     await flushPromises();

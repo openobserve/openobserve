@@ -120,13 +120,6 @@
       <template #cell-ranges="{ row }">
         <PublicLinkRangesCell :link="row" :data-test="`dashboards-public-links-${row.id}-ranges`" />
       </template>
-      <template #cell-refresh="{ row }">
-        <span class="text-text-body text-sm">{{
-          hasRelativeRange(row)
-            ? refreshLabel(row.refresh_secs, t)
-            : t("dashboard.publicLinks.refreshOnce")
-        }}</span>
-      </template>
       <template #cell-expires="{ row }">
         <PublicLinkExpiresCell
           :link="row"
@@ -379,13 +372,11 @@ import {
   canPause,
   canRefresh,
   displayStatus,
-  hasRelativeRange,
   publicLinkColumns,
   publicLinkSearchTerm,
   forbiddenMessage,
   pauseBlockedReason,
   publicLinkUrl,
-  refreshLabel,
 } from "./publicLinkDisplay";
 import PublicLinkRangesCell from "./PublicLinkRangesCell.vue";
 import FolderIcon from "@/components/common/sidebar/FolderIcon.vue";

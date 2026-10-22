@@ -128,7 +128,7 @@
         class="text-text-secondary text-xs"
         data-test="dashboards-public-links-panel-created-build-note"
       >
-        {{ createdBuildNote }}
+        {{ t("dashboard.publicLinks.createdBuildNoteOnce") }}
       </div>
       <!-- Best effort: a failed status call shows no table rather than an error. -->
       <OTable
@@ -417,13 +417,6 @@
         <template #cell-ranges="{ row }">
           <PublicLinkRangesCell :link="row" />
         </template>
-        <template #cell-refresh="{ row }">
-          <span class="text-text-body text-sm">{{
-            hasRelativeRange(row)
-              ? refreshLabel(row.refresh_secs, t)
-              : t("dashboard.publicLinks.refreshOnce")
-          }}</span>
-        </template>
         <template #cell-expires="{ row }">
           <PublicLinkExpiresCell
             :link="row"
@@ -650,8 +643,6 @@ import {
   rangeError,
   rangeFromPicker,
   rangeKey,
-  DEFAULT_MIN_REFRESH_SECS,
-  effectiveRefreshSecs,
   sortRanges,
   todayIn,
   toPublicLinkConfig,
@@ -663,7 +654,6 @@ import {
   canPause,
   canRefresh,
   displayStatus,
-  hasRelativeRange,
   lifecycleStatus,
   rangeAttentionReason,
   unavailablePanels,
@@ -673,7 +663,6 @@ import {
   forbiddenMessage,
   pauseBlockedReason,
   publicLinkUrl as publicUrl,
-  refreshLabel,
 } from "./publicLinkDisplay";
 
 type VariableValues = { values?: Array<{ name: string; value: unknown }> };
@@ -910,25 +899,6 @@ const rangeStateColumns: OTableColumnDef[] = [
     meta: { align: "left" },
   },
 ];
-
-// The operator minimum the server applies to every link; older servers don't report it.
-const minRefreshSecs = computed<number>(
-  () => Number(store.state.zoConfig?.public_dashboard_min_refresh_secs) || DEFAULT_MIN_REFRESH_SECS,
-);
-
-// The default range's effective interval is how long the first viewer's result is shared.
-const createdBuildNote = computed<I18nText>(() => {
-  const range = createdLink.value?.time_range.default;
-  if (!createdLink.value || range?.type !== "relative") {
-    return t("dashboard.publicLinks.createdBuildNoteOnce");
-  }
-  const secs = effectiveRefreshSecs(
-    createdLink.value.refresh_secs,
-    range.secs,
-    minRefreshSecs.value,
-  );
-  return t("dashboard.publicLinks.createdBuildNote", { interval: refreshLabel(secs, t) });
-});
 
 const drawerTitle = computed<I18nText>(() =>
   props.dashboardTitle

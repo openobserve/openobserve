@@ -1005,19 +1005,6 @@ describe("PublicDashboard viewer", () => {
     expect(grid(w).exists()).toBe(true);
   });
 
-  it("reads the footer interval from the data body", async () => {
-    vi.mocked(service.getConfig).mockResolvedValue({ data: CONFIG, status: 200 } as never);
-    vi.mocked(service.getData).mockResolvedValue({
-      status: 200,
-      data: { ...okBody("a"), refresh_secs: 9000 },
-    } as never);
-    const w = buildWrapper();
-    await flushPromises();
-    expect((w.vm as unknown as { footerNote: string }).footerNote).toBe(
-      "Read-only view, refreshed every 150 minutes. Anyone with the link can see this dashboard.",
-    );
-  });
-
   it("gets its messages and markdown content past the real panel renderer", async () => {
     const panels = [
       { id: "p1", type: "line", queryType: "sql", queries: [], config: {} },
