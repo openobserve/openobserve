@@ -73,15 +73,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-else
-          variant="primary"
+          :variant="isRunQueryPending ? 'pending' : 'primary'"
           size="sm-toolbar"
           data-test="metrics-apply"
+          :data-run-pending="isRunQueryPending ? 'true' : undefined"
+          :aria-label="isRunQueryPending ? t('search.runQueryPendingLabel') : undefined"
           :loading="disable"
           :disabled="disable"
           @click="onUserRun"
         >
           {{ t("metrics.runQuery") }}
-          <OTooltip :content="t('metrics.runQuery')" shortcut-id="metricsRunQuery" />
+          <OTooltip
+            :content="isRunQueryPending ? t('search.autoRunPendingDot') : t('metrics.runQuery')"
+            shortcut-id="metricsRunQuery"
+          />
         </OButton>
       </template>
     </template>
@@ -117,6 +122,7 @@ import {
   reactive,
   onMounted,
   onBeforeMount,
+  onBeforeUnmount,
   defineAsyncComponent,
   provide,
 } from "vue";
@@ -133,6 +139,7 @@ import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
+import { panelPayloadSignature } from "@/composables/dashboard/usePanelLivePreview";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- PanelEditorVariablesData is used only in a template `as` cast (:variablesData), which eslint-plugin-vue cannot see; vue-tsc keeps it honest
 import { PanelEditor, type PanelEditorVariablesData } from "@/components/dashboards/PanelEditor";
 import { saveMetricsStream, restoreMetricsStream } from "@/utils/streamPersist";
@@ -409,6 +416,10 @@ export default defineComponent({
       },
     );
 
+    // chartData is also rewritten without a run (chart-type and config watchers), so the last run is tracked by its own signature.
+    const appliedSignature = ref<string | null>(null);
+    const isRunQueryArmed = ref(false);
+
     // Auto-refresh and deep links run here too, so only `onUserRun` writes history.
     const runQuery = (): boolean => {
       if (!isValid(true, false)) {
@@ -417,6 +428,7 @@ export default defineComponent({
 
       // copy the data object excluding the reactivity
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      appliedSignature.value = panelPayloadSignature(dashboardPanelData.data);
       // refresh the date time based on current time if relative date is selected
       dateTimePickerRef.value && dateTimePickerRef.value.refresh();
       updateDateTime();
@@ -586,6 +598,28 @@ export default defineComponent({
       disable.value = panelsValues.some((item: any) => item === true);
     });
 
+    const isRunQueryPending = computed(() => {
+      if (!isRunQueryArmed.value || disable.value || appliedSignature.value === null) return false;
+      return panelPayloadSignature(dashboardPanelData.data) !== appliedSignature.value;
+    });
+
+    // Load-time seeding (stream pick, default query, builder normalisation) is not an edit, so whatever is on screen at the user's first input counts as applied.
+    const armRunQueryPending = () => {
+      if (isRunQueryArmed.value) return;
+      isRunQueryArmed.value = true;
+      if (appliedSignature.value !== null) {
+        appliedSignature.value = panelPayloadSignature(dashboardPanelData.data);
+      }
+    };
+    onMounted(() => {
+      window.addEventListener("pointerdown", armRunQueryPending, true);
+      window.addEventListener("keydown", armRunQueryPending, true);
+    });
+    onBeforeUnmount(() => {
+      window.removeEventListener("pointerdown", armRunQueryPending, true);
+      window.removeEventListener("keydown", armRunQueryPending, true);
+    });
+
     const addToDashboard = () => {
       const errors: any = [];
       // will push errors in errors array
@@ -678,6 +712,7 @@ export default defineComponent({
       searchRequestTraceIds,
       cancelAddPanelQuery,
       disable,
+      isRunQueryPending,
       config,
       showAddToDashboardDialog,
       addPanelToDashboard,

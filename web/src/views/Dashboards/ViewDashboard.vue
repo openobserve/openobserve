@@ -1710,7 +1710,7 @@ export default defineComponent({
 
     // Refresh is the dashboard's main action, but in layout edit Save owns the primary slot.
     const refreshVariant = computed(() => {
-      if (isRefreshPending.value) return "warning";
+      if (isRefreshPending.value) return "pending";
       return isEditingLayout.value ? "outline" : "primary";
     });
 

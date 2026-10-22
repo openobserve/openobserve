@@ -40,6 +40,8 @@ export type ButtonVariant =
   | "on-dark-ghost"
   // Solid warning (yellow) background — use to draw attention to a required action
   | "warning"
+  // Solid amber for a Run/Apply button whose result is behind unapplied edits; never the theme accent (light amber-400, dark amber-500)
+  | "pending"
   // Destination preview buttons — brand-colored CTAs inside alert destination preview cards
   | "preview-slack"
   | "preview-teams"
