@@ -1,5 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
-// The incident analysis tab with the flag on: a streamed report with Stop, and asking about the report.
+// An incident in an assistant chat: its analysis report attached by run, chat mode on the wire, and Run analysis handing off to the incident's own tab.
 
 import { test, expect } from "@playwright/test";
 import { AssistantPage } from "../../pages/assistantPage.js";
@@ -8,22 +8,38 @@ import { AssistantPage } from "../../pages/assistantPage.js";
 const loadHarness = () => import("./harness/setup.mjs");
 
 const INCIDENT_ID = "inc-e2e-checkout";
+const RUN_ID = "run-e2e-2";
+const REPORT =
+  "## Root cause\n\nThe 14:02 checkout deploy exhausted the connection pool.";
 
-test.describe("assistant incident analysis", () => {
-  // Every scenario drives the removed analysis tab and its stream; they return once it is ported to the incident run model.
-  test.fixme(true, "ported with the incident run model");
-
+test.describe("assistant incident chat", () => {
   let assistant;
   let harness;
-  let state;
-  let cancels;
-  let server;
+  let reads;
 
   const url = (path) =>
     `${harness.ENV.appUrl}${path}${path.includes("?") ? "&" : "?"}org_identifier=${harness.ENV.org}`;
 
+  const runItem = (run_id, started_at) => ({
+    run_id,
+    subject_type: "incident",
+    trigger: "auto_new_incident",
+    mode: "fresh",
+    started_by: "system",
+    state: "completed",
+    started_at,
+    ended_at: started_at + 60_000_000,
+    outcome: null,
+    confidence: null,
+    cancelled_by: null,
+    error_reason: null,
+    report_format: "v1",
+    has_record: false,
+  });
+
   const incident = () => {
     const nowUs = Date.now() * 1000;
+    const latest = runItem(RUN_ID, nowUs - 600_000_000);
     return {
       id: INCIDENT_ID,
       org_id: harness.ENV.org,
@@ -38,329 +54,211 @@ test.describe("assistant incident analysis", () => {
       updated_at: nowUs,
       alerts: [],
       triggers: [],
-      ...(server.report && {
-        topology_context: { suggested_root_cause: server.report },
-      }),
+      rca_off_reason: null,
+      rca: {
+        run_id: RUN_ID,
+        state: "completed",
+        stale: false,
+        started_at: latest.started_at,
+        updated_at: latest.ended_at,
+        outcome: null,
+        confidence: null,
+        report_format: "v1",
+        summary: {
+          stage: null,
+          stage_index: null,
+          stage_count: 7,
+          steps: 4,
+          tool_calls: 9,
+          steered_by: [],
+          unblocked_by: null,
+          detail: null,
+          deadline_at: null,
+          cancelled_by: null,
+          previous: null,
+        },
+        report_run: latest,
+        history: [latest, runItem("run-e2e-1", nowUs - 3_000_000_000)],
+        current_run: null,
+        resume_run_id: null,
+      },
     };
   };
 
-  // Only the incident's own routes are faked; the analysis stream itself comes from the stream shim.
+  // The incident routes the assistant reads, plus the ones the incident page loads; never a POST to start a run.
   async function mockIncident(page) {
-    const json = (route, body, status = 200) =>
-      route.fulfill({
-        status,
-        contentType: "application/json",
-        body: JSON.stringify(body),
-      });
-    await page.route(/\/api\/v2\/[^/]+\/alerts\/incidents\/.*/, (route) => {
-      const request = route.request();
-      const path = new URL(request.url()).pathname;
-      if (path.endsWith(`/incidents/${INCIDENT_ID}`))
-        return json(route, incident());
-      if (path.endsWith("/rca/history"))
-        return json(route, { current: server.report, previous: [] });
-      if (path.endsWith("/events")) {
-        server.eventReads += 1;
-        if (
-          server.finishAfter !== null &&
-          server.eventReads >= server.finishAfter
-        ) {
-          server.events.push({
-            type: "ai_analysis_complete",
-            timestamp: Date.now() * 1000,
+    await page
+      .context()
+      .route(/\/api\/v2\/[^/]+\/alerts\/incidents\/.*/, (route) => {
+        const request = route.request();
+        const path = new URL(request.url()).pathname;
+        reads.push(
+          `${request.method()} ${path.replace(/^\/api\/v2\/[^/]+/, "")}`,
+        );
+        const reply = (body, status = 200) =>
+          route.fulfill({
+            status,
+            contentType: "application/json",
+            headers: {
+              "access-control-allow-origin": request.headers()["origin"] || "*",
+              "access-control-allow-credentials": "true",
+            },
+            body: JSON.stringify(body),
           });
-          server.finishAfter = null;
-        }
-        return json(route, { events: server.events });
-      }
-      if (path.endsWith("/rca") && request.method() === "DELETE") {
-        cancels.push(request.url());
-        server.events.push({
-          type: "ai_analysis_cancelled",
-          timestamp: Date.now() * 1000,
-        });
-        return json(route, { message: "cancelled", aborted_local_task: true });
-      }
-      return json(route, {});
-    });
+        if (path.endsWith(`/incidents/${INCIDENT_ID}`))
+          return reply(incident());
+        if (path.endsWith(`/rca/runs/${RUN_ID}`))
+          return reply({
+            ...runItem(RUN_ID, Date.now() * 1000),
+            report: REPORT,
+            error: null,
+          });
+        if (path.endsWith("/rca/live_stream"))
+          return reply({ code: 404, message: "Not Found" }, 404);
+        if (/\/rca(\/|$)/.test(path))
+          return reply({ code: 404, message: "Not Found" }, 404);
+        return reply({});
+      });
   }
 
-  async function openAnalysis(page) {
-    await page.goto(url(`/incidents/${INCIDENT_ID}`), {
-      waitUntil: "domcontentloaded",
-    });
-    await expect(assistant.headerButton).toHaveAttribute(
-      "data-state",
-      /idle|open/,
-      { timeout: 30_000 },
-    );
-    await expect(
-      page.locator('[data-test="incident-detail-title"]'),
-    ).toBeVisible({ timeout: 30_000 });
-    await page.locator('[data-test="incident-analysis-tab"]').click();
-    const panel = page.locator('[data-test="rca-panel"]');
-    await expect(panel).toBeVisible();
-    return panel;
+  async function axeSerious(page, selector) {
+    await page.addScriptTag({ path: require.resolve("axe-core/axe.min.js") });
+    return page.evaluate(async (include) => {
+      const { violations } = await window.axe.run(
+        { include: [[include]] },
+        {
+          runOnly: { type: "tag", values: ["wcag2a", "wcag2aa"] },
+        },
+      );
+      return violations
+        .filter((v) => v.impact === "serious" || v.impact === "critical")
+        .map((v) => ({
+          id: v.id,
+          targets: v.nodes.map((n) => n.target.join(" ")),
+        }));
+    }, selector);
   }
+
+  // The deep link names the incident; the assistant reads incident.rca's report run, then that run.
+  async function openIncidentChat(page) {
+    await page.goto(
+      url(`/logs?assistant=explain&object=incident&ref=${INCIDENT_ID}`),
+      {
+        waitUntil: "domcontentloaded",
+      },
+    );
+    await expect(assistant.composer()).toHaveValue(
+      "Explain this incident analysis report",
+      {
+        timeout: 30_000,
+      },
+    );
+  }
+
+  const chatBodies = (page) =>
+    page.evaluate(() =>
+      window.__o2mock.requests.map((r) => JSON.parse(r.body || "{}")),
+    );
 
   test.beforeEach(async ({ context, page }) => {
     harness = await loadHarness();
     await harness.setFlag(context, true);
-    state = harness.createMockState();
+    reads = [];
+  });
+
+  async function start(page, context, capabilities) {
+    const state = harness.createMockState(
+      capabilities ? { capabilitiesEnabled: true, capabilities } : {},
+    );
     await harness.installMocks(context, state);
     await harness.login(page);
     assistant = new AssistantPage(page);
-    cancels = [];
-    server = { events: [], report: null, eventReads: 0, finishAfter: null };
     await mockIncident(page);
-  });
+  }
 
-  test("RCA-01 the analysis streams with a status card; Stop cancels it and the incident stays actionable", { tag: ["@mock", "@stack-ee"] }, async ({
-    page,
-  }) => {
-    const panel = await openAnalysis(page);
-    const acknowledge = page
-      .getByRole("button", { name: /acknowledge/i })
-      .first();
-    await expect(acknowledge).toBeEnabled();
-    await panel.locator('[data-test="trigger-rca-btn"]').click();
-    const status = panel.locator('[data-test="rca-turn-status"]');
-    await expect(status).toBeVisible({ timeout: 15_000 });
-    await expect(panel.locator('[data-test="rca-report"]')).toContainText(
-      "Root cause",
-      { timeout: 15_000 },
-    );
-    await expect(acknowledge).toBeEnabled();
-    const requests = await page.evaluate(
-      () => window.__o2mock.rcaRequests || [],
-    );
-    expect(requests).toHaveLength(1);
-    expect(requests[0].url).toContain("stream=true");
-    await status.getByRole("button", { name: /stop/i }).click();
-    await expect(panel.locator('[data-test="rca-end-line"]')).toContainText(
-      "Stopped after",
-      { timeout: 15_000 },
-    );
-    await expect.poll(() => cancels.length).toBe(1);
-    await expect(panel.locator('[data-test="rca-report"]')).toContainText(
-      "Root cause",
-    );
-    await expect(
-      panel.locator('[data-test="rca-reanalyze-btn"]'),
-    ).toBeFocused();
-    await expect(acknowledge).toBeEnabled();
-  });
-
-  test("RCA-02 Ask about this report opens the assistant with the incident and report chips", { tag: ["@mock"] }, async ({
-    page,
-  }) => {
-    test.setTimeout(60_000);
-    const panel = await openAnalysis(page);
-    await page.evaluate(() => (window.__o2mock.speed = 10));
-    await panel.locator('[data-test="trigger-rca-btn"]').click();
-    await expect(panel.locator('[data-test="rca-end-line"]')).toContainText(
-      "Analysed in",
-      { timeout: 30_000 },
-    );
-    await panel.locator('[data-test="ai-entry-incident-report-ask"]').click();
-    await expect(assistant.composer()).toBeVisible({ timeout: 15_000 });
-    await expect(assistant.chips()).toContainText([
-      /^Time ·/,
-      /Checkout latency/,
-      /^Report 1 · /,
-    ]);
-    await expect(
-      assistant.chips().filter({ hasText: "Checkout latency" }),
-    ).toHaveCount(1);
-    await expect(assistant.composer()).toHaveValue(
-      "Explain this incident analysis report",
-    );
-  });
-
-  test("RCA-03 a re-analysis answers 202 and is followed to its end through the event log", { tag: ["@mock"] }, async ({
-    page,
-  }) => {
-    test.setTimeout(90_000);
-    const panel = await openAnalysis(page);
-    await page.evaluate(() => (window.__o2mock.speed = 10));
-    await panel.locator('[data-test="trigger-rca-btn"]').click();
-    await expect(panel.locator('[data-test="rca-end-line"]')).toContainText(
-      "Analysed in",
-      { timeout: 30_000 },
-    );
-    server.report =
-      "## Root cause\n\nThe database pool, confirmed on the re-run.";
-    server.events = [
-      { type: "ai_analysis_begin", timestamp: Date.now() * 1000 },
-    ];
-    server.finishAfter = server.eventReads + 2;
-    await panel.locator('[data-test="rca-reanalyze-btn"]').click();
-    await expect(panel.locator('[data-test="rca-turn-status"]')).toContainText(
-      /Starting analysis|Analysing/,
-      {
-        timeout: 15_000,
-      },
-    );
-    const requests = await page.evaluate(
-      () => window.__o2mock.rcaRequests || [],
-    );
-    expect(requests.at(-1).url).toContain("reanalysis=true");
-    await expect(panel.locator('[data-test="rca-report"]')).toContainText(
-      "confirmed on the re-run",
-      {
-        timeout: 45_000,
-      },
-    );
-    await expect(panel.locator('[data-test="rca-end-line"]')).toContainText(
-      "Analysed in",
-    );
-    await expect(panel.locator('[data-test="rca-error-card"]')).toHaveCount(0);
-  });
-
-  test("RCA-04 a run already in progress is its own running state with Stop, not analysis off", { tag: ["@mock"] }, async ({
-    page,
-  }) => {
-    const panel = await openAnalysis(page);
-    await page.evaluate(
-      () => (window.__o2mock.rcaScenario = "rca_in_progress"),
-    );
-    server.events = [
-      { type: "ai_analysis_begin", timestamp: (Date.now() - 90_000) * 1000 },
-    ];
-    await panel.locator('[data-test="trigger-rca-btn"]').click();
-    const elsewhere = panel.locator('[data-test="rca-running-elsewhere"]');
-    await expect(elsewhere).toBeVisible({ timeout: 15_000 });
-    await expect(elsewhere).toContainText("Analysing ·");
-    await expect(panel.locator('[data-test="rca-gate-state"]')).toHaveCount(0);
-    await elsewhere.locator('[data-test="rca-stop-btn"]').click();
-    await expect.poll(() => cancels.length).toBe(1);
-    await expect(panel.locator('[data-test="rca-end-line"]')).toContainText(
-      "Stopped by you after",
-      {
-        timeout: 15_000,
-      },
-    );
-  });
-
-  test("RCA-05 analysis turned off for the priority and for the org are told apart", { tag: ["@mock"] }, async ({
-    page,
-  }) => {
-    const panel = await openAnalysis(page);
-    await page.evaluate(
-      () => (window.__o2mock.rcaScenario = "rca_priority_off"),
-    );
-    await panel.locator('[data-test="trigger-rca-btn"]').click();
-    await expect(panel.locator('[data-test="rca-priority-off"]')).toBeVisible({
-      timeout: 15_000,
-    });
-    await expect(panel.locator('[data-test="rca-gate-state"]')).toHaveCount(0);
-    await page.evaluate(
-      () => (window.__o2mock.rcaScenario = "rca_not_enabled"),
-    );
-    await panel.locator('[data-test="trigger-rca-btn"]').click();
-    await expect(panel.locator('[data-test="rca-gate-state"]')).toContainText(
-      "Incident analysis is off for this organization.",
-      { timeout: 15_000 },
-    );
-  });
-
-  test("RCA-06 a dropped stream reconnects through the event log and catches up", { tag: ["@mock"] }, async ({
-    page,
-  }) => {
-    test.setTimeout(60_000);
-    const panel = await openAnalysis(page);
-    await page.evaluate(() => (window.__o2mock.rcaScenario = "rca_dropped"));
-    server.report =
-      "## Root cause\n\nThe **checkout** service started timing out at 10:02 after its database pool hit the limit.";
-    server.events = [
-      { type: "ai_analysis_begin", timestamp: Date.now() * 1000 },
-    ];
-    server.finishAfter = server.eventReads + 2;
-    await panel.locator('[data-test="trigger-rca-btn"]').click();
-    await expect(panel.locator('[data-test="rca-turn-status"]')).toContainText(
-      /Reconnecting|Caught up/,
-      {
-        timeout: 20_000,
-      },
-    );
-    await expect(panel.locator('[data-test="rca-report"]')).toContainText(
-      "hit the limit",
-      { timeout: 30_000 },
-    );
-    await expect(panel.locator('[data-test="rca-end-line"]')).toContainText(
-      "Analysed in",
-    );
-  });
-
-  test("RCA-07 Jump to is a full-width select on a phone and a side list on a desktop", { tag: ["@mock"] }, async ({
-    page,
-  }) => {
-    test.setTimeout(60_000);
-    server.report =
-      "## Root cause\n\nPool.\n\n## Evidence\n\n- latency\n\n## Next steps\n\n1. Raise the pool";
-    server.events = [
-      { type: "ai_analysis_begin", timestamp: (Date.now() - 120_000) * 1000 },
-      { type: "ai_analysis_complete", timestamp: (Date.now() - 60_000) * 1000 },
-    ];
-    await page.setViewportSize({ width: 375, height: 812 });
-    let panel = await openAnalysis(page);
-    await expect(panel.locator('[data-test="rca-jump-to"]')).toBeVisible({
-      timeout: 15_000,
-    });
-    await expect(panel.locator('[data-test="rca-jump-list"]')).toBeHidden();
-    await panel.getByRole("combobox", { name: "Jump to" }).click();
-    await page.getByRole("option", { name: "Evidence" }).click();
-    await expect(page.locator(":focus")).toHaveText("Evidence");
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= window.innerWidth,
-      ),
-    ).toBe(true);
-    await page.setViewportSize({ width: 1280, height: 900 });
-    panel = page.locator('[data-test="rca-panel"]');
-    const list = panel.locator('[data-test="rca-jump-list"]');
-    await expect(list).toBeVisible();
-    await list.getByRole("button", { name: "Next steps" }).click();
-    await expect(panel.locator("#rca-section-2")).toBeFocused();
-  });
-
-  test("RCA-08 with rca_enabled in /config the gate shows before any click", { tag: ["@mock"] }, async ({
+  test("RCA-10 an incident link attaches Time, Incident and the report run's Report, and sends nothing", async ({
     context,
     page,
   }) => {
-    state.configPatch.rca_enabled = false;
-    const panel = await openAnalysis(page);
-    await expect(panel.locator('[data-test="rca-gate-state"]')).toBeVisible();
-    await expect(panel.locator('[data-test="trigger-rca-btn"]')).toHaveCount(0);
+    await start(page, context);
+    await openIncidentChat(page);
+    const chips = assistant.chips();
+    await expect(chips).toHaveCount(3);
+    await expect(chips.filter({ hasText: "Checkout latency" })).toHaveCount(1);
+    await expect(
+      chips.filter({ hasText: /Run 2 · .* UTC · \d+ B/ }),
+    ).toHaveCount(1);
+    expect(reads).toContain(`GET /alerts/incidents/${INCIDENT_ID}`);
+    expect(reads).toContain(
+      `GET /alerts/incidents/${INCIDENT_ID}/rca/runs/${RUN_ID}`,
+    );
+    expect(
+      reads.some((r) => r.startsWith("POST") || r.includes("rca/history")),
+    ).toBe(false);
+    expect(await page.evaluate(() => window.__o2mock.requests.length)).toBe(0);
+    expect(await axeSerious(page, "[data-assistant-root]")).toEqual([]);
   });
 
-  test("RCA-09 with re-analysis streaming on the server, the re-run streams like the first run", { tag: ["@mock"] }, async ({
+  test("RCA-11 with rca_chat_mode every incident chat turn sends mode chat, never rca", async ({
+    context,
     page,
   }) => {
-    test.setTimeout(60_000);
-    const panel = await openAnalysis(page);
-    await page.evaluate(() => {
-      window.__o2mock.speed = 10;
-      window.__o2mock.knobs.rcaReanalysisStreams = true;
+    await start(page, context, { rca_chat_mode: true });
+    await openIncidentChat(page);
+    await assistant.composer().press("Enter");
+    await expect
+      .poll(async () => (await chatBodies(page)).length, { timeout: 30_000 })
+      .toBe(1);
+    await expect(assistant.composerState()).toHaveAttribute("data-state", "empty", { timeout: 60_000 });
+    await assistant.send("And what should I roll back?");
+    await expect
+      .poll(async () => (await chatBodies(page)).length, { timeout: 30_000 })
+      .toBe(2);
+    const bodies = await chatBodies(page);
+    expect(bodies.map((b) => b.mode)).toEqual(["chat", "chat"]);
+    expect(bodies.some((b) => "incident" in b)).toBe(false);
+    expect(reads.some((r) => r.startsWith("POST"))).toBe(false);
+    expect(await axeSerious(page, "[data-assistant-root]")).toEqual([]);
+  });
+
+  test("RCA-13 a server without rca_chat_mode gets no mode on an incident chat turn", async ({
+    context,
+    page,
+  }) => {
+    await start(page, context);
+    await openIncidentChat(page);
+    await assistant.composer().press("Enter");
+    await expect
+      .poll(async () => (await chatBodies(page)).length, { timeout: 30_000 })
+      .toBe(1);
+    expect((await chatBodies(page))[0]).not.toHaveProperty("mode");
+  });
+
+  test("RCA-12 Run analysis on the incident chip opens the incident on its Incident Analysis tab", async ({
+    context,
+    page,
+  }) => {
+    await start(page, context);
+    await openIncidentChat(page);
+    await assistant
+      .tray()
+      .locator(
+        '[data-test="assistant-context-chip-incident"] [data-test="assistant-context-chip-button"]',
+      )
+      .click();
+    const action = page.locator('[data-test="assistant-chip-open-source"]');
+    await expect(action).toHaveText(/Run analysis/);
+    expect(
+      await axeSerious(page, '[data-test="assistant-chip-popover"]'),
+    ).toEqual([]);
+    await action.click();
+    await expect(page).toHaveURL(new RegExp(`/incidents/${INCIDENT_ID}`), {
+      timeout: 30_000,
     });
-    await panel.locator('[data-test="trigger-rca-btn"]').click();
-    await expect(panel.locator('[data-test="rca-end-line"]')).toContainText(
-      "Analysed in",
-      { timeout: 30_000 },
-    );
-    const reads = server.eventReads;
-    await panel.locator('[data-test="rca-reanalyze-btn"]').click();
-    await expect(panel.locator('[data-test="rca-end-line"]')).toContainText(
-      "Analysed in",
-      { timeout: 30_000 },
-    );
-    await expect(panel.locator('[data-test="rca-report"]')).toContainText(
-      "Next steps",
-    );
-    const requests = await page.evaluate(
-      () => window.__o2mock.rcaRequests || [],
-    );
-    expect(requests.at(-1).url).toContain("reanalysis=true");
-    expect(server.eventReads - reads).toBeLessThan(3);
+    await expect(
+      page.locator('[data-test="rca-analysis-container"]'),
+    ).toBeVisible({ timeout: 30_000 });
+    await expect.poll(() => page.url()).not.toContain("tab=incidentAnalysis");
+    expect(reads.some((r) => r.startsWith("POST"))).toBe(false);
   });
 });

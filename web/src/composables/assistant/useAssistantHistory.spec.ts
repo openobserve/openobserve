@@ -108,23 +108,21 @@ describe("useAssistantHistory in local-only mode", () => {
     expect(fake.history.rows.value.map((row) => row.sid)).toEqual([sid]);
   });
 
-  it("keeps an incident chat's origin and incident through a save and a reopen", async () => {
+  it("keeps an incident chat's origin through a save and a reopen", async () => {
     const fake = setup();
     await flushPromises();
     const sid = chat(fake);
     const session = fake.store.state.sessions[sid];
     session.origin = { entryKind: "object_verb", objectKind: "incident", container: "rca" };
-    session.incidentId = "inc-42";
     await fake.history.save(sid);
     const stored = [...fake.db.rows.values()][0];
-    expect(stored).toMatchObject({ origin: "incident", incidentId: "inc-42" });
+    expect(stored).toMatchObject({ origin: "incident" });
     expect(fake.history.rows.value[0].origin).toBe("incident");
-    const reopened = setup({}, [record(7, { origin: "incident", incidentId: "inc-42" })]);
+    const reopened = setup({}, [record(7, { origin: "incident" })]);
     await flushPromises();
     const id = record(7).sessionId!;
     expect(await reopened.history.open({ sid: id })).toBe(id);
     expect(reopened.store.state.sessions[id]).toMatchObject({
-      incidentId: "inc-42",
       origin: { objectKind: "incident" },
     });
   });

@@ -447,14 +447,6 @@ const assistant = {
     );
   },
 
-  /** The incident analysis has its own cancel route (`incidents.rs:755`; round 1 E-10). */
-  cancelIncidentAnalysis: async (org: string, incidentId: string): Promise<void> => {
-    await http().delete(
-      `/api/v2/${enc(org)}/alerts/incidents/${enc(incidentId)}/rca`,
-      KEEPALIVE_REQUEST,
-    );
-  },
-
   /** Posted on the originating session only; keepalive, so a decision made as the page goes still lands, and bounded, so a card never hangs on it. */
   confirm: async (
     org: string,

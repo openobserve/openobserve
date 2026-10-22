@@ -345,4 +345,75 @@ describe("AssistantContextTray", () => {
       now.mockRestore();
     }
   });
+
+  describe("Run analysis on an incident chip", () => {
+    const incidentChip = (org: string): ContextChip => ({
+      id: "door:incident:1",
+      kind: "incident",
+      label: raw("Incident · Checkout errors"),
+      ref: { type: "incident", id: "inc-1", org },
+      sizeBytes: 40,
+      provenance: "door",
+      sent: "serialized",
+    });
+    const openPopover = async (wrapper: Awaited<ReturnType<typeof setup>>["wrapper"]) => {
+      await wrapper
+        .get(
+          '[data-test="assistant-context-chip-incident"] [data-test="assistant-context-chip-button"]',
+        )
+        .trigger("click");
+      await flushPromises();
+      return document.body.querySelector<HTMLElement>('[data-test="assistant-chip-open-source"]');
+    };
+
+    it("opens the incident on its Incident Analysis tab through the navigation applier", async () => {
+      const { wrapper, store, sid } = await setup();
+      const dispatch = vi.spyOn(store, "dispatch").mockResolvedValue({ ok: true });
+      store.addChip(sid, incidentChip("default"));
+      await flushPromises();
+      const action = await openPopover(wrapper);
+      expect(action?.textContent).toContain("Run analysis");
+      action!.click();
+      await flushPromises();
+      expect(dispatch).toHaveBeenCalledWith(sid, {
+        kind: "navigate",
+        target: {
+          name: "incidentDetail",
+          params: { id: "inc-1" },
+          query: { tab: "incidentAnalysis" },
+        },
+        label: "Run analysis",
+      });
+    });
+
+    it("offers no Run analysis on that incident's own page", async () => {
+      fake.current = fakeAssistant();
+      const store = fake.current.store;
+      const sid = store.createSession({
+        origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+      });
+      const router = fakeRouter([
+        { path: "/incidents/:id", name: "incidentDetail", component: { render: () => null } },
+      ]);
+      await router.push("/incidents/inc-1");
+      const wrapper = mount(AssistantContextTray, {
+        props: { sid },
+        global: { plugins: [router, fakeVuex()] },
+        attachTo: document.body,
+      });
+      store.addChip(sid, incidentChip("default"));
+      await flushPromises();
+      expect(await openPopover(wrapper)).toBeNull();
+    });
+
+    it("refuses a chip from another org instead of opening it under this one", async () => {
+      const { wrapper, store, sid } = await setup();
+      const dispatch = vi.spyOn(store, "dispatch").mockResolvedValue({ ok: true });
+      store.addChip(sid, incidentChip("other-org"));
+      await flushPromises();
+      (await openPopover(wrapper))!.click();
+      await flushPromises();
+      expect(dispatch).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -10278,64 +10278,17 @@
       "try": "Try: \"{prompt}\""
     },
     "rca": {
-      "analyze": "Analyze incident",
-      "analyzeHint": "Usually takes 2–4 minutes",
-      "analyzeHintMetered": "Usually takes 2–4 minutes · uses AI credits",
-      "askAbout": "Ask about this report",
-      "askAboutTooltip": "Opens {product} with this incident and report attached",
-      "askAboutWait": "Available when the analysis finishes",
-      "buildOnPrevious": "Build on previous report",
-      "done": "Analysed in {elapsed}",
-      "fresh": "Fresh analysis",
-      "gate": {
-        "off": "Incident analysis is off for this organization.",
-        "offAdmin": "Turn it on with O2_INCIDENTS_RCA_ENABLED and restart.",
-        "offMember": "Ask an admin to turn it on."
-      },
-      "stopped": "Stopped after {elapsed}. Findings so far are kept below.",
       "tag": "Incident analysis",
       "prompt": "Explain this incident analysis report",
-      "modeFallback": "Sent as text. Interactive incident mode isn't available on this server yet.",
-      "jumpTo": "Jump to",
-      "reportRegion": "Incident analysis report",
-      "moreActions": "More actions",
-      "reanalyze": "Re-analyze",
-      "severityChanged": "Severity changed to {severity}. Re-analyze with the new severity?",
-      "rerunSuggested": "Re-analysis suggested",
+      "reportChip": "{run} · {size}",
+      "runAnalysis": "Run analysis",
       "status": {
         "starting": "Starting analysis… {elapsed}",
-        "analysing": "Analysing · {elapsed}",
-        "running": "Analysis running"
-      },
-      "runningStarted": "Started {time}",
-      "stale": "Still running after {elapsed}. It may have stopped. You can stop it and start again.",
-      "stop": "Stop analysis",
-      "stopFailed": "Couldn't stop the analysis.",
-      "tryAgain": "Try again",
-      "stoppedByYou": "Stopped by you after {elapsed}",
-      "priorityOff": "Analysis is turned off for this incident's priority.",
-      "openLogs": "Open logs for this incident",
-      "partial": "Partial · stopped at {time}",
-      "analyzedAgo": "Analysed {time}",
-      "version": "Report {n} · {time}",
-      "reportChip": "{version} · {size}",
-      "rerunTimed": "{action} · ~3 min",
-      "rerunMetered": "{action} · ~3 min · uses AI credits",
-      "announce": {
-        "started": "Analysis started",
-        "stopped": "Analysis stopped. Findings so far are kept.",
-        "done": "Analysis done",
-        "failed": "Analysis failed"
-      },
-      "timeline": {
-        "started": "Incident analysis started",
-        "finished": "Incident analysis finished"
-      },
-      "versionOnly": "Report {n}"
+        "analysing": "Analysing · {elapsed}"
+      }
     },
     "oncall": {
-      "continue": "Continue in the assistant",
-      "prompt": "Explain this on-call verdict and what to do next"
+      "continue": "Continue in the assistant"
     },
     "autoobserve": {
       "askChip": "AutoObserve ask · {name}",
@@ -11789,9 +11742,7 @@
       "rcaFreshAnalysisHint": "Analyze from scratch, ignoring the previous report",
       "rcaBuildOnPrevious": "Build on previous report",
       "rcaBuildOnPreviousHint": "Send the current report so the agent extends it",
-      "rcaBackToCurrent": "Back to current report",
       "rcaHistory": "Report history",
-      "rcaViewingArchived": "You are viewing an earlier report",
       "rcaAsk": {
         "button": "Ask about this analysis",
         "chip": "Analysis · {run}"
@@ -26560,14 +26511,7 @@
     "scopeClaimServiceEverywhere": "{service} pages this team in every cluster and namespace, whoever owns the ones around it.",
     "scopeClaimServiceHere": "{service} pages this team in {scope} only. Elsewhere it falls to whoever owns the scope around it.",
     "scopeNothingDiscovered": "Nothing has been discovered yet, so there is no estate to pick from. Use Advanced to write the rule by field, or send some telemetry first.",
-    "scopeAdvancedHint": "Match on any field and value, including ones the levels above do not cover.",
-    "verdictByAssistant": "On-call verdict · by {product}",
-    "reportByAssistant": "On-call report · by {product}",
-    "reportNone": "No report for this response.",
-    "reportFailed": "Couldn't load the report.",
-    "reportTryAgain": "Try again",
-    "severityRaised": "Severity raised to {severity}",
-    "verdictArrived": "Verdict arrived: {sentence}"
+    "scopeAdvancedHint": "Match on any field and value, including ones the levels above do not cover."
   },
   "paidUsage": {
     "consentTitle": "Turn on paid AI usage?",

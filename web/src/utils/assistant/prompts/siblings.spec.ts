@@ -18,13 +18,13 @@ import { describe, expect, it } from "vitest";
 import { buildAutoObserveAskPrompt, MAX_ASK_CHARS } from "./autoobserve";
 import { buildIncidentReportPrompt, MAX_REPORT_CHARS } from "./incident";
 import { raw } from "@/types/i18n";
-import { buildOnCallVerdictPrompt, MAX_VERDICT_CHARS } from "./oncall";
 
 describe("buildIncidentReportPrompt", () => {
   it("asks about the report with the incident and the report as blocks", () => {
     const prompt = buildIncidentReportPrompt({
       org: "default",
       incidentId: "inc-1",
+      runId: "run-9",
       title: "Checkout errors",
       severity: "P1",
       report: "## Root cause\nA bad deploy.",
@@ -32,7 +32,8 @@ describe("buildIncidentReportPrompt", () => {
     expect(prompt.text).toBe("Explain this incident analysis report");
     expect(prompt.chips.map((chip) => chip.kind)).toEqual(["incident", "report"]);
     expect(prompt.chips[0].ref).toMatchObject({ type: "incident", id: "inc-1", org: "default" });
-    expect(String(prompt.chips[0].secondary)).toContain("Interactive incident mode");
+    expect(prompt.chips[0].secondary).toBeUndefined();
+    expect(prompt.chips[1].ref).toMatchObject({ type: "incident_report", id: "run-9" });
     expect(String(prompt.title)).toContain("Checkout errors");
   });
 
@@ -40,6 +41,7 @@ describe("buildIncidentReportPrompt", () => {
     const prompt = buildIncidentReportPrompt({
       org: "default",
       incidentId: "inc-1",
+      runId: "run-9",
       title: "x",
       report: "a".repeat(MAX_REPORT_CHARS + 10),
     });
@@ -50,37 +52,22 @@ describe("buildIncidentReportPrompt", () => {
     const prompt = buildIncidentReportPrompt({
       org: "default",
       incidentId: "inc-1",
+      runId: "run-9",
       title: "x",
       report: "## Cause",
-      reportLabel: raw("Report 1 · 02:14 · 8 B"),
+      reportLabel: raw("Run 1 · Oct 16, 14:09 UTC · 8 B"),
       window: { from: 1_000_000, to: 2_000_000 },
     });
     expect(prompt.chips.map((chip) => chip.kind)).toEqual(["time", "incident", "report"]);
-    expect(String(prompt.chips[2].label)).toBe("Report 1 · 02:14 · 8 B");
+    expect(String(prompt.chips[2].label)).toBe("Run 1 · Oct 16, 14:09 UTC · 8 B");
   });
-});
 
-describe("buildOnCallVerdictPrompt", () => {
-  it("sends the verdict and asks what to do next", () => {
-    const prompt = buildOnCallVerdictPrompt({
-      org: "default",
-      id: "r1",
-      name: "Payments down",
-      verdict: "Likely the database failover.",
-    });
-    expect(prompt.text).toContain("what to do next");
-    expect(prompt.chips).toHaveLength(1);
-    expect(prompt.chips[0].ref).toMatchObject({ type: "oncall_verdict", id: "r1" });
-    expect(
-      (
-        buildOnCallVerdictPrompt({
-          org: "o",
-          id: "r",
-          name: "n",
-          verdict: "v".repeat(MAX_VERDICT_CHARS + 1),
-        }).chips[0].data as { verdict: string }
-      ).verdict,
-    ).toHaveLength(MAX_VERDICT_CHARS);
+  it("keys the Report chip by run, so two runs of one incident are two chips", () => {
+    const base = { org: "default", incidentId: "inc-1", title: "x", report: "## Cause" };
+    const first = buildIncidentReportPrompt({ ...base, runId: "run-1" });
+    const second = buildIncidentReportPrompt({ ...base, runId: "run-2" });
+    expect(first.chips[0].id).toBe(second.chips[0].id);
+    expect(first.chips[1].id).not.toBe(second.chips[1].id);
   });
 });
 
