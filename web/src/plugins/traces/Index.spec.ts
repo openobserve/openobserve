@@ -790,6 +790,22 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockSearchObj.data.editorValue).toBe("service_name = 'checkout'");
       expect(mockSearchObj.meta.sqlMode).toBe(false);
     });
+
+    it("clears a stale editor for an empty handoff ?filter= (unfiltered RCA evidence)", async () => {
+      routerCurrentRouteSpy.mockReturnValue(
+        ref({
+          query: { filter: "" },
+          name: "traces",
+          path: "/traces",
+        }) as typeof router.currentRoute,
+      );
+      mockSearchObj.data.editorValue = "service_name = 'stale'";
+
+      wrapper = mountIndex();
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toBe("");
+    });
   });
 
   describe("Auto Run off (#14760)", () => {
