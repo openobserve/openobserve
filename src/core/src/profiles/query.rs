@@ -628,4 +628,23 @@ mod tests {
         assert!(!is_profiles_tag_column("service_name"));
         assert!(is_profiles_tag_column("k8s_pod_name"));
     }
+
+    #[test]
+    fn merge_result_at_max_stack_depth_serializes() {
+        // serde_json's 128-level recursion limit applies to deserializing only, not serializing.
+        let stack = (0..MAX_STACK_DEPTH)
+            .map(|i| format!("f{i}"))
+            .collect::<Vec<_>>()
+            .join(";");
+        let result = build_merge_result(&[(stack, 1)], DEFAULT_MAX_NODES);
+        let mut depth = 0usize;
+        let mut node = &result.root;
+        while let Some(child) = node.children.first() {
+            depth += 1;
+            node = child;
+        }
+        assert_eq!(depth, MAX_STACK_DEPTH);
+        let json = serde_json::to_string(&result).unwrap();
+        assert!(json.contains("\"name\":\"f0\""));
+    }
 }
