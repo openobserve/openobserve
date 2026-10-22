@@ -6214,8 +6214,6 @@
       "cooldown": "当前无法加载此仪表盘。将在 {time} 后重试。",
       "rateLimitedRetry": "请求过多。将在 {time} 后重试。",
       "nextRefreshIn": "下次刷新：{time}",
-      "updatedAt": "更新于 {time}",
-      "updatedRefreshing": "更新于 {time} · 正在刷新…",
       "refreshFailed": "部分面板在 {time} 时未能刷新。它们显示的是较旧的数据。将在 {next} 后重试。",
       "refreshFailedNoRetry": "部分面板在 {time} 时未能刷新。它们显示的是较旧的数据。",
       "panelFrom": "自 {time}",

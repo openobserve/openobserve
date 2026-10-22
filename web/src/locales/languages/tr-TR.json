@@ -6214,8 +6214,6 @@
       "cooldown": "Bu gösterge panosu şu anda yüklenemiyor. {time} sonra tekrar denenecek.",
       "rateLimitedRetry": "Çok fazla istek. {time} sonra tekrar denenecek.",
       "nextRefreshIn": "{time} sonra yenilenecek",
-      "updatedAt": "Güncellendi: {time}",
-      "updatedRefreshing": "Güncellendi: {time} · Yenileniyor…",
       "refreshFailed": "Bazı paneller {time} itibarıyla yenilenemedi. Daha eski veriler gösteriliyor. Sonraki deneme {next} sonra.",
       "refreshFailedNoRetry": "Bazı paneller {time} itibarıyla yenilenemedi. Daha eski veriler gösteriliyor.",
       "panelFrom": "{time} itibarıyla",

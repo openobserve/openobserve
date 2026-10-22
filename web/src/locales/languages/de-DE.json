@@ -6214,8 +6214,6 @@
       "cooldown": "Dieses Dashboard kann derzeit nicht geladen werden. Neuer Versuch in {time}.",
       "rateLimitedRetry": "Zu viele Anfragen. Neuer Versuch in {time}.",
       "nextRefreshIn": "Nächste Aktualisierung in {time}",
-      "updatedAt": "Aktualisiert {time}",
-      "updatedRefreshing": "Aktualisiert {time} · Wird aktualisiert…",
       "refreshFailed": "Einige Panels konnten um {time} nicht aktualisiert werden. Sie zeigen ältere Daten. Nächster Versuch in {next}.",
       "refreshFailedNoRetry": "Einige Panels konnten um {time} nicht aktualisiert werden. Sie zeigen ältere Daten.",
       "panelFrom": "von {time}",

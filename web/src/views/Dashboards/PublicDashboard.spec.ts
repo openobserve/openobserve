@@ -218,7 +218,7 @@ describe("PublicDashboard viewer", () => {
     const w = mountWithActions();
     await flushPromises();
     const chip = () => w.findComponent<typeof OTag>({ name: "OTag" });
-    expect(chip().text()).toMatch(/^Updated .+ · Refreshing…$/);
+    expect(chip().text()).toMatch(/^Last updated at .+ · Refreshing…$/);
     expect(chip().props("variant")).toBe("warning-soft");
 
     await vi.advanceTimersByTimeAsync(4_900);
@@ -502,6 +502,30 @@ describe("PublicDashboard viewer", () => {
     expect(find(w, "dashboards-public-dashboard-next-refresh").text()).toBe("Next refresh in 0:10");
     await vi.advanceTimersByTimeAsync(3_000);
     expect(find(w, "dashboards-public-dashboard-next-refresh").text()).toBe("Next refresh in 0:07");
+  });
+
+  it("separates a relative range's window from the update chip", async () => {
+    (service.getConfig as any).mockResolvedValue({ data: CONFIG, status: 200 });
+    (service.getData as any).mockResolvedValue({ status: 200, data: okBody("a") });
+    const w = mountWithActions();
+    await flushPromises();
+    expect(has(w, "dashboards-public-dashboard-window")).toBe(true);
+    expect(has(w, "dashboards-public-dashboard-window-separator")).toBe(true);
+    expect(w.find('[data-test="dashboards-public-dashboard-updated"]').text()).toMatch(
+      /^Last updated at /,
+    );
+  });
+
+  it("drops the window and its separator when the range picker already shows an absolute range", async () => {
+    mockAbsoluteLink();
+    vi.mocked(service.getConfig).mockResolvedValue({
+      data: { ...CONFIG, ranges: [ABSOLUTE, CONFIG.ranges[0]], default_key: ABSOLUTE.key },
+      status: 200,
+    } as never);
+    const w = mountWithActions();
+    await flushPromises();
+    expect(has(w, "dashboards-public-dashboard-window")).toBe(false);
+    expect(has(w, "dashboards-public-dashboard-window-separator")).toBe(false);
   });
 
   it("shows an absolute range's fixed window without a countdown, checking it each minute", async () => {

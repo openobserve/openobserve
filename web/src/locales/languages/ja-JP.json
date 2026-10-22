@@ -6214,8 +6214,6 @@
       "cooldown": "現在このダッシュボードを読み込めません。{time} 後に再試行します。",
       "rateLimitedRetry": "リクエストが多すぎます。{time} 後に再試行します。",
       "nextRefreshIn": "次回の更新まで {time}",
-      "updatedAt": "{time} に更新",
-      "updatedRefreshing": "{time} に更新 · 更新中…",
       "refreshFailed": "一部のパネルは {time} に更新できませんでした。古いデータを表示しています。{next} 後に再試行します。",
       "refreshFailedNoRetry": "一部のパネルは {time} に更新できませんでした。古いデータを表示しています。",
       "panelFrom": "{time} から",

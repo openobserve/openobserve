@@ -6214,8 +6214,6 @@
       "cooldown": "Không thể tải bảng điều khiển này ngay bây giờ. Sẽ thử lại sau {time}.",
       "rateLimitedRetry": "Quá nhiều yêu cầu. Sẽ thử lại sau {time}.",
       "nextRefreshIn": "Lần làm mới tiếp theo sau {time}",
-      "updatedAt": "Đã cập nhật {time}",
-      "updatedRefreshing": "Đã cập nhật {time} · Đang làm mới…",
       "refreshFailed": "Một số panel không thể làm mới lúc {time}. Chúng đang hiển thị dữ liệu cũ hơn. Lần thử tiếp theo sau {next}.",
       "refreshFailedNoRetry": "Một số panel không thể làm mới lúc {time}. Chúng đang hiển thị dữ liệu cũ hơn.",
       "panelFrom": "từ {time}",

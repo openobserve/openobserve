@@ -6214,8 +6214,6 @@
       "cooldown": "Impossible de charger ce tableau de bord pour le moment. Nouvelle tentative dans {time}.",
       "rateLimitedRetry": "Trop de requêtes. Nouvelle tentative dans {time}.",
       "nextRefreshIn": "Prochain rafraîchissement dans {time}",
-      "updatedAt": "Mis à jour {time}",
-      "updatedRefreshing": "Mis à jour {time} · Actualisation…",
       "refreshFailed": "Certains panneaux n'ont pas pu être actualisés à {time}. Ils affichent des données plus anciennes. Nouvelle tentative dans {next}.",
       "refreshFailedNoRetry": "Certains panneaux n'ont pas pu être actualisés à {time}. Ils affichent des données plus anciennes.",
       "panelFrom": "depuis {time}",

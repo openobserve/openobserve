@@ -6214,8 +6214,6 @@
       "cooldown": "Não é possível carregar este painel agora. Tentando novamente em {time}.",
       "rateLimitedRetry": "Muitas requisições. Tentando novamente em {time}.",
       "nextRefreshIn": "Próxima atualização em {time}",
-      "updatedAt": "Atualizado em {time}",
-      "updatedRefreshing": "Atualizado em {time} · Atualizando…",
       "refreshFailed": "Alguns painéis não puderam ser atualizados em {time}. Eles exibem dados mais antigos. Próxima tentativa em {next}.",
       "refreshFailedNoRetry": "Alguns painéis não puderam ser atualizados em {time}. Eles exibem dados mais antigos.",
       "panelFrom": "desde {time}",

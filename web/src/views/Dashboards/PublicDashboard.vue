@@ -60,7 +60,11 @@
           >
             {{ windowLabel }}
           </span>
-          <div class="flex h-8 self-center max-md:hidden">
+          <div
+            v-if="windowLabel && !pickerShowsWindow"
+            class="flex h-8 self-center max-lg:hidden"
+            data-test="dashboards-public-dashboard-window-separator"
+          >
             <OSeparator vertical />
           </div>
           <OTag
@@ -475,8 +479,8 @@ const updatedLabel = computed<I18nText | "">(() => {
   if (!builtAt) return "";
   const time = raw(clockTime(builtAt));
   return body.value?.refreshing
-    ? t("dashboard.publicDashboard.updatedRefreshing", { time })
-    : t("dashboard.publicDashboard.updatedAt", { time });
+    ? t("dashboard.publicDashboard.lastUpdatedRefreshing", { time })
+    : t("dashboard.publicDashboard.lastUpdatedAt", { time });
 });
 
 // Counts down to fresh_until on the server's clock; an absolute range has none.

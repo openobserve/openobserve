@@ -6214,8 +6214,6 @@
       "cooldown": "Nie można teraz załadować tego pulpitu. Ponowna próba za {time}.",
       "rateLimitedRetry": "Zbyt wiele żądań. Ponowna próba za {time}.",
       "nextRefreshIn": "Następne odświeżenie za {time}",
-      "updatedAt": "Zaktualizowano {time}",
-      "updatedRefreshing": "Zaktualizowano {time} · Odświeżanie…",
       "refreshFailed": "Nie udało się odświeżyć niektórych paneli o {time}. Pokazują starsze dane. Następna próba za {next}.",
       "refreshFailedNoRetry": "Nie udało się odświeżyć niektórych paneli o {time}. Pokazują starsze dane.",
       "panelFrom": "od {time}",

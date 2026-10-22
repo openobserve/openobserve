@@ -6214,8 +6214,6 @@
       "cooldown": "Kan dit dashboard nu niet laden. Nieuwe poging over {time}.",
       "rateLimitedRetry": "Te veel verzoeken. Nieuwe poging over {time}.",
       "nextRefreshIn": "Volgende vernieuwing over {time}",
-      "updatedAt": "Bijgewerkt {time}",
-      "updatedRefreshing": "Bijgewerkt {time} · Vernieuwen…",
       "refreshFailed": "Sommige panelen konden om {time} niet worden vernieuwd. Ze tonen oudere gegevens. Volgende poging over {next}.",
       "refreshFailedNoRetry": "Sommige panelen konden om {time} niet worden vernieuwd. Ze tonen oudere gegevens.",
       "panelFrom": "vanaf {time}",

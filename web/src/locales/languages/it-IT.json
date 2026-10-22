@@ -6214,8 +6214,6 @@
       "cooldown": "Impossibile caricare questa dashboard in questo momento. Nuovo tentativo tra {time}.",
       "rateLimitedRetry": "Troppe richieste. Nuovo tentativo tra {time}.",
       "nextRefreshIn": "Prossimo aggiornamento tra {time}",
-      "updatedAt": "Aggiornata {time}",
-      "updatedRefreshing": "Aggiornata {time} · Aggiornamento in corso…",
       "refreshFailed": "Alcuni pannelli non sono stati aggiornati a {time}. I dati mostrati sono meno recenti. Nuovo tentativo tra {next}.",
       "refreshFailedNoRetry": "Alcuni pannelli non sono stati aggiornati a {time}. I dati mostrati sono meno recenti.",
       "panelFrom": "da {time}",
