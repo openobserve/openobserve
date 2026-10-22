@@ -510,6 +510,57 @@ pub fn init_allowlist() {
     LazyLock::force(&ALLOWLIST);
 }
 
+/// True when every synthetics probe refuses `host` under every SSRF policy: loopback,
+/// link-local (the cloud metadata endpoint lives there), multicast, unspecified, the
+/// `METADATA_IPS` list and the fixed metadata hostnames.
+///
+/// This is a save-time courtesy for URLs a remote probe will fetch, so it ignores the
+/// operator allowlist and the `ZO_SSRF_*` flags, which describe the server's network,
+/// not the probe's. Private ranges (RFC1918, ULA) are allowed: a private location exists
+/// to reach them. Only literal IPs and fixed names are judged; other names resolve in the
+/// probe, whose dialer is the authoritative control.
+pub fn is_always_blocked_host(host: &str) -> bool {
+    let unbracketed = host
+        .strip_prefix('[')
+        .and_then(|h| h.strip_suffix(']'))
+        .unwrap_or(host);
+    if let Ok(ip) = unbracketed.parse::<IpAddr>() {
+        return is_always_blocked_ip(&ip);
+    }
+    let lower = host.to_ascii_lowercase();
+    lower == "localhost"
+        || lower.starts_with("localhost.")
+        || lower == "metadata"
+        || lower == "metadata.google.internal"
+        || lower.ends_with(".metadata.google.internal")
+        || lower == "metadata.goog"
+}
+
+fn is_always_blocked_ip(ip: &IpAddr) -> bool {
+    if METADATA_IPS.contains(ip) {
+        return true;
+    }
+    match ip {
+        IpAddr::V4(v4) => {
+            v4.is_loopback()
+                || v4.is_link_local()
+                || v4.is_multicast()
+                || v4.is_unspecified()
+                || v4.is_broadcast()
+                || v4.octets()[0] == 0
+        }
+        IpAddr::V6(v6) => {
+            v6.is_loopback()
+                || v6.is_multicast()
+                || v6.is_unspecified()
+                || (v6.segments()[0] & 0xffc0) == 0xfe80
+                || v6
+                    .to_ipv4_mapped()
+                    .is_some_and(|v4| is_always_blocked_ip(&IpAddr::V4(v4)))
+        }
+    }
+}
+
 /// The guard's refusal in `err`'s source chain; it is permanent, so never worth a retry.
 pub fn find_ssrf_refusal<'a>(
     err: &'a (dyn std::error::Error + 'static),
@@ -687,6 +738,58 @@ fn prefix_eq(a: u128, b: u128, prefix: u8, bits: u32) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn always_blocked_hosts_match_what_every_probe_refuses() {
+        for blocked in [
+            "127.0.0.1",
+            "127.8.8.8",
+            "0.0.0.0",
+            "0.1.2.3",
+            "169.254.169.254",
+            "169.254.170.2",
+            "169.254.1.1",
+            "100.100.100.200",
+            "224.0.0.1",
+            "255.255.255.255",
+            "::1",
+            "[::1]",
+            "::",
+            "fe80::1",
+            "[fe80::1]",
+            "ff02::1",
+            "fd00:ec2::254",
+            "[fd00:ec2::254]",
+            "::ffff:127.0.0.1",
+            "::ffff:169.254.169.254",
+            "localhost",
+            "LOCALHOST",
+            "localhost.localdomain",
+            "metadata",
+            "metadata.google.internal",
+            "foo.metadata.google.internal",
+            "metadata.goog",
+        ] {
+            assert!(super::is_always_blocked_host(blocked), "{blocked}");
+        }
+        // Private ranges stay allowed: a private location exists to reach them.
+        for allowed in [
+            "10.0.0.5",
+            "172.16.0.1",
+            "192.168.1.1",
+            "100.64.0.1",
+            "fd12::1",
+            "[fd12::1]",
+            "::ffff:10.0.0.5",
+            "8.8.8.8",
+            "shop.test",
+            "api.internal",
+            "service.local",
+            "metadata.example.com",
+        ] {
+            assert!(!super::is_always_blocked_host(allowed), "{allowed}");
+        }
+    }
+
     use super::*;
 
     fn none() -> SsrfAllowlist {
