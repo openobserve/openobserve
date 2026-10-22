@@ -24,7 +24,9 @@ use axum::{
 };
 #[cfg(feature = "enterprise")]
 use config::meta::oncall::rca::RcaContext;
-use openobserve_api_common::{X_O2_ASSISTANT_SESSION_ID, extractors::Headers};
+use openobserve_api_common::{
+    X_O2_ASSISTANT_SESSION_ID, X_O2_ASSISTANT_TURN_ID, extractors::Headers,
+};
 use serde::Deserialize;
 #[cfg(feature = "enterprise")]
 use {
@@ -32,7 +34,7 @@ use {
     o2_enterprise::enterprise::{
         ai::{
             agent::meta::Role,
-            chat::{PersistSettings, TurnIdentity, TurnSpec, spawn_turn},
+            chat::{PersistSettings, TurnCaps, TurnEnd, TurnIdentity, TurnSpec, spawn_turn},
             client::{
                 DEFAULT_AGENT_TYPE, ImageAttachment, QueryRequest, RCA_AGENT_TYPE,
                 SESSION_OWNER_UNAVAILABLE, get_agent_client, is_session_owner_unavailable,
@@ -54,12 +56,6 @@ use crate::{
 /// Context flag telling o2-ai that `history` is a forked share's transcript, not the caller's own.
 #[cfg(feature = "enterprise")]
 const FORK_SEED_CONTEXT_KEY: &str = "o2_fork_seed";
-/// How long a cancel waits for o2-ai before stopping the turn on this node.
-#[cfg(feature = "enterprise")]
-const UPSTREAM_CANCEL_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
-/// How long a turn may keep settling after o2-ai accepted its abort.
-#[cfg(feature = "enterprise")]
-const CANCEL_GRACE: std::time::Duration = std::time::Duration::from_secs(15);
 
 /// The RCA agent's context contract (`RcaContext`, `is_reanalysis`); o2-ai routes on key presence.
 #[cfg(feature = "enterprise")]
@@ -193,9 +189,39 @@ async fn chat_agent_and_context(
     select_chat_agent(context, rca)
 }
 
+/// An existing chat keeps its stored agent, so an Ask chat reopened over an incident never becomes
+/// an RCA run.
+#[cfg(feature = "enterprise")]
+async fn session_agent_and_context(
+    org_id: &str,
+    user_id: &str,
+    session_id: Option<&str>,
+    context: serde_json::Value,
+) -> (&'static str, serde_json::Value) {
+    let stored = match session_id.and_then(openobserve_core::ai_chat::admission::normalize_uuid) {
+        Some(id) => match infra::table::ai_chat_sessions::get(org_id, &id).await {
+            Ok(row) => row.map(|row| row.agent_type),
+            Err(e) => {
+                log::warn!("[org_id:{org_id}] cannot read the agent of chat {id}: {e}");
+                None
+            }
+        },
+        None => None,
+    };
+    if keeps_default_agent(stored.as_deref()) {
+        return select_chat_agent(context, None);
+    }
+    chat_agent_and_context(org_id, user_id, context).await
+}
+
+#[cfg(feature = "enterprise")]
+fn keeps_default_agent(stored_agent_type: Option<&str>) -> bool {
+    stored_agent_type.is_some_and(|agent| agent != RCA_AGENT_TYPE)
+}
+
 /// Matches the RCA endpoint: RCA enabled, incident in this org, and its `POST .../rca` permission.
 #[cfg(feature = "enterprise")]
-async fn can_run_incident_rca(org_id: &str, user_id: &str, incident_id: &str) -> bool {
+pub(crate) async fn can_run_incident_rca(org_id: &str, user_id: &str, incident_id: &str) -> bool {
     let incidents = &get_o2_config().incidents;
     if !incidents.enabled || !incidents.rca_enabled {
         return false;
@@ -431,7 +457,9 @@ async fn check_chat_owner(
         .get("user_id")
         .and_then(|v| v.to_str().ok())
         .unwrap_or_default();
-    let owner = super::chats::resolve_owner(user_id).await?;
+    let owner = openobserve_core::ai_chat::admission::resolve_owner(user_id)
+        .await
+        .map_err(super::chats::admit_error_response)?;
     match infra::table::ai_chat_sessions::get(org_id, session_id).await {
         Ok(Some(row))
             if row.user_id == owner
@@ -450,91 +478,30 @@ async fn check_chat_owner(
     }
 }
 
-/// Asks o2-ai to abort first so the partial reply is still stored, else stops the turn here.
+/// A chat cancel's response: the stop, o2-ai's own refusal relayed, or a retryable 500.
 #[cfg(feature = "enterprise")]
-async fn cancel_turn(org_id: String, session_id: String, auth: String) -> Response {
-    use o2_enterprise::enterprise::ai::chat::registry::{self, CancelReason};
+fn cancel_response(
+    outcome: Result<
+        openobserve_core::ai_chat::cancel::ChatCancel,
+        openobserve_core::ai_chat::cancel::ChatCancelError,
+    >,
+) -> Response {
+    use openobserve_core::ai_chat::cancel::ChatCancelError;
 
-    let persisted = o2_enterprise::enterprise::ai::chat::is_enabled();
-    let upstream = match get_agent_client() {
-        Some(client) => {
-            let (org_id, session_id) = (org_id.clone(), session_id.clone());
-            let task =
-                tokio::spawn(
-                    async move { client.cancel_session(&session_id, &org_id, &auth).await },
-                );
-            Some(tokio::time::timeout(UPSTREAM_CANCEL_WAIT, task).await)
+    match outcome {
+        Ok(stopped) => MetaHttpResponse::json(
+            serde_json::json!({"cancelled": stopped.cancelled, "active": stopped.active}),
+        ),
+        Err(ChatCancelError::Upstream { status, body }) => {
+            let status = StatusCode::from_u16(status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+            let json = serde_json::from_str::<serde_json::Value>(&body)
+                .unwrap_or_else(|_| serde_json::json!({"message": body}));
+            (status, axum::Json(json)).into_response()
         }
-        None => None,
-    };
-    let answered = match upstream {
-        Some(Ok(Ok(Ok(resp)))) => Some(resp),
-        Some(Ok(Ok(Err(e)))) => {
-            log::warn!("[AI-CHAT] failed to forward cancel for {session_id}: {e}");
-            None
-        }
-        Some(Ok(Err(e))) => {
-            log::error!("[AI-CHAT] cancel task for {session_id} failed: {e}");
-            None
-        }
-        Some(Err(_)) => {
-            log::warn!("[AI-CHAT] o2-ai did not answer the cancel for {session_id} in time");
-            None
-        }
-        None => None,
-    };
-    match answered {
-        Some(resp) if resp.status().is_success() => {
-            let body = resp.json::<serde_json::Value>().await.unwrap_or_default();
-            let upstream_active = body.get("active").and_then(|v| v.as_bool()) == Some(true)
-                || body.get("cancelled").and_then(|v| v.as_bool()) == Some(true);
-            let mut stopped = upstream_active;
-            if persisted && upstream_active {
-                schedule_cancel_fallback(org_id, session_id);
-            } else if persisted {
-                // o2-ai runs nothing for it, but this node may hold the turn (owner wait, restore).
-                stopped = registry::cancel(&org_id, &session_id, CancelReason::User);
-            }
-            MetaHttpResponse::json(serde_json::json!({"cancelled": stopped, "active": stopped}))
-        }
-        answered => {
-            if persisted && registry::cancel(&org_id, &session_id, CancelReason::User) {
-                return MetaHttpResponse::json(
-                    serde_json::json!({"cancelled": true, "active": true}),
-                );
-            }
-            match answered {
-                Some(resp) => relay_response(resp).await,
-                None => {
-                    MetaHttpResponse::internal_error("Failed to cancel the response; please retry")
-                }
-            }
+        Err(ChatCancelError::Unanswered) => {
+            MetaHttpResponse::internal_error("Failed to cancel the response; please retry")
         }
     }
-}
-
-/// Stops the turn here if it is still running once o2-ai has had time to settle the abort.
-#[cfg(feature = "enterprise")]
-fn schedule_cancel_fallback(org_id: String, session_id: String) {
-    use o2_enterprise::enterprise::ai::chat::registry::{self, CancelReason};
-
-    let Some(turn) = registry::get(&org_id, &session_id) else {
-        return;
-    };
-    tokio::spawn(async move {
-        tokio::time::sleep(CANCEL_GRACE).await;
-        registry::cancel_if(&org_id, &session_id, &turn.turn_id, CancelReason::User);
-    });
-}
-
-#[cfg(feature = "enterprise")]
-async fn relay_response(resp: reqwest::Response) -> Response {
-    let status =
-        StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
-    let body = resp.text().await.unwrap_or_else(|_| "{}".to_string());
-    let json = serde_json::from_str::<serde_json::Value>(&body)
-        .unwrap_or_else(|_| serde_json::json!({"message": body}));
-    (status, axum::Json(json)).into_response()
 }
 
 /// Request headers matching the passthrough patterns (exact names or `prefix*`).
@@ -735,9 +702,13 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
         let delegated = parts.extensions.get::<DelegatedCaller>().is_some();
         let context = agent_context(&prompt_body.context, org_id_str, delegated);
 
-        // Determine agent type based on context (incident_id -> sre, otherwise o2-ai)
-        // Must be done before context is moved into QueryRequest
-        let (agent_type, context) = chat_agent_and_context(org_id_str, user_id, context).await;
+        // An existing chat keeps its stored agent; resolve before context moves into QueryRequest.
+        let session_header = parts
+            .headers
+            .get(X_O2_ASSISTANT_SESSION_ID.as_str())
+            .and_then(|v| v.to_str().ok());
+        let (agent_type, context) =
+            session_agent_and_context(org_id_str, user_id, session_header, context).await;
 
         // Convert images to agent format
         let images = prompt_body.images.map(|imgs| {
@@ -1013,7 +984,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
     // The browser's id for this turn, so a retried request does not run the model twice.
     let persist_turn_id = parts
         .headers
-        .get(super::chats::X_O2_ASSISTANT_TURN_ID)
+        .get(X_O2_ASSISTANT_TURN_ID.as_str())
         .and_then(|v| v.to_str().ok())
         .map(str::to_string);
 
@@ -1183,9 +1154,16 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
 
         let context = agent_context(&prompt_body.context, &org_id_str, delegated);
 
-        // Determine agent type based on context (incident_id -> sre, otherwise o2-ai)
-        // Must be done before context is moved into QueryRequest
-        let (agent_type, context) = chat_agent_and_context(&org_id_str, &user_id, context).await;
+        // An existing chat keeps its stored agent; resolve before context moves into QueryRequest.
+        let (agent_type, context) = session_agent_and_context(
+            &org_id_str,
+            &user_id,
+            forward_headers
+                .get(X_O2_ASSISTANT_SESSION_ID.as_str())
+                .map(String::as_str),
+            context,
+        )
+        .await;
 
         // Convert images to agent format
         let images = prompt_body.images.map(|imgs| {
@@ -1264,7 +1242,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 Ok(seed) => seed,
                 Err(resp) => return resp,
             };
-            let admitted = match super::chats::admit_turn(
+            let admitted = match openobserve_core::ai_chat::admission::admit_turn(
                 &org_id_str,
                 session_id.as_deref(),
                 persist_turn_id.as_deref(),
@@ -1272,11 +1250,12 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 agent_type,
                 &query_req.query,
                 &trace_id,
+                TurnCaps::from_config(),
             )
             .await
             {
                 Ok(admitted) => admitted,
-                Err(resp) => return resp,
+                Err(e) => return super::chats::admit_error_response(e),
             };
             #[cfg(feature = "cloud")]
             if let Err(error) = openobserve_core::trial_quota::authorize_ai_usage(
@@ -1286,10 +1265,12 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             )
             .await
             {
-                super::chats::abandon_turn(admitted, "usage_denied").await;
+                openobserve_core::ai_chat::admission::abandon_turn(admitted, "usage_denied").await;
                 return ai_post_upstream_authorization_error_response(error);
             }
-            let super::chats::AdmittedTurn {
+            let mut query_req = query_req;
+            openobserve_core::ai_chat::admission::apply_admission(&mut query_req, &admitted);
+            let openobserve_core::ai_chat::admission::AdmittedTurn {
                 row,
                 owner,
                 turn_id,
@@ -1299,12 +1280,6 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             audit.report(StatusCode::OK.as_u16(), None).await;
             let session_id = row.session_id.clone();
 
-            // o2-ai forwards only events past `known_seq` (restore_required when it holds fewer).
-            let mut query_req = query_req;
-            query_req.turn_id = Some(turn_id.clone());
-            query_req.known_seq = Some(row.last_committed_seq);
-            query_req.known_opencode_session_id = row.opencode_session_id.clone();
-            query_req.session_epoch = Some(row.session_epoch);
             if row.last_committed_seq == infra::table::ai_chat_sessions::NO_SEQ
                 && let Some(seed) = fork_seed
             {
@@ -1340,12 +1315,13 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                     lease,
                     registration,
                     // The span outlives this response, so the task ends it.
-                    on_end: Some(Box::new(move || {
+                    on_end: Some(Box::new(move |_end: TurnEnd| {
                         if let Some(span_cx) = span_for_task {
                             use opentelemetry::trace::TraceContextExt;
                             span_cx.span().end();
                         }
                     })),
+                    on_commit: None,
                 },
                 settings,
             );
@@ -1765,7 +1741,10 @@ pub async fn cancel(
             return resp;
         }
         let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
-        cancel_turn(org_id, session_id, auth_str).await
+        cancel_response(
+            openobserve_core::ai_chat::cancel::cancel_chat_turn(&org_id, &session_id, &auth_str)
+                .await,
+        )
     }
 
     #[cfg(not(feature = "enterprise"))]
@@ -2433,5 +2412,211 @@ mod tests {
                 "user_timezone": "Europe/Berlin",
             })
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    const STICKY_ROOT: &str = "root@sticky.chat.test";
+
+    /// The SQLite meta store with incident analysis on and [STICKY_ROOT] as root; refuses other
+    /// stores.
+    #[cfg(feature = "enterprise")]
+    async fn sticky_tables() -> &'static sea_orm::DatabaseConnection {
+        use infra::table::entity::{ai_chat_sessions, alert_incidents};
+        use sea_orm::{ConnectionTrait, Schema};
+
+        static TABLES: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+        TABLES
+            .get_or_init(|| async {
+                // SAFETY: set once inside the `OnceCell` initializer, before the refresh reads
+                // them.
+                unsafe {
+                    std::env::set_var("O2_INCIDENTS_ENABLED", "true");
+                    std::env::set_var("O2_INCIDENTS_RCA_ENABLED", "true");
+                    std::env::set_var("O2_AGENT_URL", "http://127.0.0.1:1");
+                }
+                o2_enterprise::enterprise::common::config::refresh_config().unwrap();
+                let cfg = config::get_config();
+                assert!(
+                    cfg.common.meta_store.is_empty() || cfg.common.meta_store == "sqlite",
+                    "the sticky agent tests need the default SQLite meta store, found {:?}",
+                    cfg.common.meta_store
+                );
+                std::fs::create_dir_all(&cfg.common.data_db_dir).unwrap();
+                let conn = infra::db::get_orm_client_rw().await;
+                let backend = conn.get_database_backend();
+                let schema = Schema::new(backend);
+                for mut table in [
+                    schema.create_table_from_entity(alert_incidents::Entity),
+                    schema.create_table_from_entity(ai_chat_sessions::Entity),
+                ] {
+                    conn.execute(backend.build(table.if_not_exists()))
+                        .await
+                        .unwrap();
+                }
+                common::infra::config::ORG_USERS.insert(
+                    format!("{}/{STICKY_ROOT}", config::DEFAULT_ORG),
+                    infra::table::org_users::OrgUserRecord::new(
+                        config::DEFAULT_ORG,
+                        STICKY_ROOT,
+                        config::meta::user::UserRole::Root,
+                        "token",
+                        None,
+                    ),
+                );
+            })
+            .await;
+        infra::db::get_orm_client_rw().await
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn sticky_incident(conn: &sea_orm::DatabaseConnection, org_id: &str, incident_id: &str) {
+        use infra::table::entity::alert_incidents;
+        use sea_orm::{ActiveModelTrait, EntityTrait};
+
+        let now = config::utils::time::now_micros();
+        let row = alert_incidents::Model {
+            id: incident_id.to_string(),
+            org_id: org_id.to_string(),
+            status: "open".to_string(),
+            severity: "P2".to_string(),
+            group_values: serde_json::json!({}),
+            key_type: "alert_id".to_string(),
+            topology_context: None,
+            first_alert_at: now,
+            last_alert_at: now,
+            resolved_at: None,
+            alert_count: 1,
+            title: Some("checkout errors".to_string()),
+            assigned_to: None,
+            acknowledged_by: None,
+            acknowledged_at: None,
+            created_at: now,
+            updated_at: now,
+            muted_by_downtime_id: None,
+            rca_run_id: None,
+            rca_state: None,
+            rca_started_at: None,
+            rca_updated_at: None,
+            rca_outcome: None,
+            rca_confidence: None,
+            rca_summary: None,
+            rca_off_reason: None,
+        };
+        alert_incidents::Entity::insert(alert_incidents::ActiveModel::from(row).reset_all())
+            .exec(conn)
+            .await
+            .unwrap();
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn sticky_session(
+        conn: &sea_orm::DatabaseConnection,
+        org_id: &str,
+        session_id: &str,
+        agent_type: &str,
+    ) {
+        use infra::table::entity::ai_chat_sessions;
+        use sea_orm::{ActiveModelTrait, EntityTrait};
+
+        let row = ai_chat_sessions::Model {
+            org_id: org_id.to_string(),
+            session_id: session_id.to_string(),
+            user_id: STICKY_ROOT.to_string(),
+            user_email: STICKY_ROOT.to_string(),
+            opencode_session_id: None,
+            agent_type: agent_type.to_string(),
+            title: "Analysis · run 2".to_string(),
+            title_source: "prompt".to_string(),
+            status: "active".to_string(),
+            created_at: 1_000,
+            updated_at: 1_000,
+            first_event_at: None,
+            last_event_at: None,
+            last_committed_seq: infra::table::ai_chat_sessions::NO_SEQ,
+            session_epoch: 0,
+            last_turn_id: None,
+            forked_from_share: None,
+            fork_seed_seq: None,
+            replica_purged_at: None,
+        };
+        ai_chat_sessions::Entity::insert(ai_chat_sessions::ActiveModel::from(row).reset_all())
+            .exec(conn)
+            .await
+            .unwrap();
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_only_a_non_rca_row_keeps_the_default_agent() {
+        assert!(!keeps_default_agent(None));
+        assert!(!keeps_default_agent(Some(RCA_AGENT_TYPE)));
+        assert!(keeps_default_agent(Some(DEFAULT_AGENT_TYPE)));
+        assert!(keeps_default_agent(Some("sre")));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_an_existing_chat_keeps_its_agent_and_a_new_one_picks_from_its_context() {
+        let conn = sticky_tables().await;
+        let org = format!(
+            "sticky_{}",
+            infra::table::rca_runs::new_run_id().to_lowercase()
+        );
+        let other_org = format!("{org}_other");
+        let incident = format!("inc.{org}");
+        sticky_incident(conn, &org, &incident).await;
+        let ask_chat = sea_orm::prelude::Uuid::new_v4().to_string();
+        let rca_chat = sea_orm::prelude::Uuid::new_v4().to_string();
+        let new_chat = sea_orm::prelude::Uuid::new_v4().to_string();
+        let foreign_chat = sea_orm::prelude::Uuid::new_v4().to_string();
+        sticky_session(conn, &org, &ask_chat, DEFAULT_AGENT_TYPE).await;
+        sticky_session(conn, &org, &rca_chat, RCA_AGENT_TYPE).await;
+        sticky_session(conn, &other_org, &foreign_chat, DEFAULT_AGENT_TYPE).await;
+
+        let context = serde_json::json!({
+            "org_id": org,
+            "currentPage": "incidents",
+            "incident_id": incident,
+            "subject_type": "incident",
+            "subject_id": incident,
+            "previous_analysis": "forged",
+            "past_causes": ["forged"],
+            "is_reanalysis": true,
+            "incident_title": "Checkout errors",
+        });
+        let pick = async |session: Option<&str>, context: serde_json::Value| {
+            session_agent_and_context(&org, STICKY_ROOT, session, context).await
+        };
+
+        for session in [ask_chat.clone(), ask_chat.to_uppercase()] {
+            let (agent, picked) = pick(Some(&session), context.clone()).await;
+            assert_eq!(agent, DEFAULT_AGENT_TYPE, "{session}");
+            let obj = picked.as_object().unwrap();
+            for key in RCA_CONTEXT_KEYS {
+                assert!(!obj.contains_key(key), "{session}: {key} kept: {picked}");
+            }
+            assert_eq!(picked["currentPage"], "incidents", "{session}");
+            assert_eq!(picked["org_id"], org.as_str(), "{session}");
+        }
+
+        for session in [
+            Some(rca_chat.as_str()),
+            Some(new_chat.as_str()),
+            Some(foreign_chat.as_str()),
+            None,
+        ] {
+            let (agent, picked) = pick(session, context.clone()).await;
+            assert_eq!(agent, RCA_AGENT_TYPE, "{session:?}: {picked}");
+            assert_eq!(picked["incident_id"], incident.as_str(), "{session:?}");
+            assert_eq!(picked["subject_type"], "incident", "{session:?}");
+            assert_eq!(picked["subject_id"], incident.as_str(), "{session:?}");
+            assert!(picked.get("previous_analysis").is_none(), "{session:?}");
+            assert_eq!(picked["incident_title"], "Checkout errors", "{session:?}");
+        }
+
+        let plain = serde_json::json!({"org_id": org, "currentPage": "logs"});
+        let (agent, picked) = pick(Some(&new_chat), plain.clone()).await;
+        assert_eq!(agent, DEFAULT_AGENT_TYPE);
+        assert_eq!(picked, plain);
     }
 }

@@ -51,7 +51,7 @@ use crate::{
     common::meta::stream::SchemaRecords,
     ingestion::{
         PartitionMemo, TriggerAlertData, evaluate_trigger, resolve_batch_schema,
-        schema_records_to_entries, write_entries,
+        schema_records_to_entries, write_entries, write_entries_synced,
     },
 };
 
@@ -615,13 +615,19 @@ async fn write_logs(
     }
     let writer =
         ingester::get_writer(thread_id, org_id, StreamType::Logs.as_str(), stream_name).await;
-    let req_stats = write_entries(
-        &writer,
-        stream_name,
-        entries,
-        !cfg.common.wal_fsync_disabled,
-    )
-    .await?;
+    // A chat-events ack lets the writer advance its watermark in the DB, so those bytes must
+    // reach the OS before the ack: a kill after it must not lose them.
+    let req_stats = if stream_name == config::meta::self_reporting::ai_chat::AI_CHAT_EVENTS_STREAM {
+        write_entries_synced(&writer, stream_name, entries).await?
+    } else {
+        write_entries(
+            &writer,
+            stream_name,
+            entries,
+            !cfg.common.wal_fsync_disabled,
+        )
+        .await?
+    };
 
     // only one trigger per request
     if !triggers.is_empty() {

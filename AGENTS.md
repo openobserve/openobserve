@@ -60,6 +60,20 @@ reworded:
 - `///` / JSDoc doc comments on public APIs: one summary sentence, and only when
   the behaviour is non-obvious; never to restate the signature.
 
+## Database schema (migrations / SeaORM entities)
+
+Applies to every NEW table and column (sqlite, MySQL and PostgreSQL alike):
+
+- No `json` / `jsonb` columns (sea-orm `.json()` / `.json_binary()`). JSON is
+  stored in a `.text()` column holding the serialized string; Rust
+  (`serde_json`) parses it. Never push JSON operators or extraction into SQL.
+- No `timestamp` / `datetime` / `date` columns (sea-orm `.timestamp()`,
+  `.date_time()`, `.date()`). A time field is a Unix timestamp in MICROSECONDS
+  stored as `.big_integer()` (Rust `i64`), the same unit `_timestamp` uses
+  everywhere else.
+- Existing columns that break these rules are legacy; do not add new ones next
+  to them, and do not migrate them as part of an unrelated change.
+
 ## PR conventions
 
 - CI runs on a PR only while it carries the `ready-for-ci` label and is not a draft

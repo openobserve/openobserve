@@ -51,11 +51,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import {
+  computed,
   defineComponent,
   ref,
   provide,
   onBeforeMount,
   onMounted,
+  onBeforeUnmount,
   nextTick,
   watch,
   type PropType,
@@ -71,6 +73,8 @@ import type { SelectedDate } from "@/utils/dashboard/urlTimeParams";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
 import type { PanelEditorVariablesData } from "@/components/dashboards/PanelEditor";
 import AddToDashboard from "../AddToDashboard.vue";
+import { usePanelLivePreview } from "@/composables/dashboard/usePanelLivePreview";
+import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
 
 export default defineComponent({
   name: "MetricsVisualize",
@@ -191,6 +195,13 @@ export default defineComponent({
       // PanelEditor surfaces its own error UI; nothing extra to do here.
     };
 
+    const timeKey = () => `${props.selectedDateTime?.startTime}:${props.selectedDateTime?.endTime}`;
+    // The window the chart last ran with; null until the first one is applied, which always applies.
+    const appliedTimeKey = ref<string | null>(null);
+    const isTimeChangePending = computed(
+      () => appliedTimeKey.value !== null && timeKey() !== appliedTimeKey.value,
+    );
+
     /**
      * Push the toolbar's window into the panel's `meta.dateTime` — the shape the
      * PanelEditor/chart reads (absolute start/end Dates).
@@ -202,6 +213,7 @@ export default defineComponent({
     const applyDateTime = () => {
       const dt = props.selectedDateTime;
       if (dt?.startTime != null && dt?.endTime != null) {
+        appliedTimeKey.value = timeKey();
         dashboardPanelData.meta.dateTime = {
           start_time: new Date(dt.startTime),
           end_time: new Date(dt.endTime),
@@ -214,16 +226,55 @@ export default defineComponent({
      * so the toolbar's refresh can drive Visualize (in this mode refresh must
      * re-run this query, NOT sweep the Explore grid).
      */
-    const runQuery = () => {
+    const runQuery = (withoutCache = false) => {
+      livePreview.markRunStarted();
       applyDateTime();
-      panelEditorRef.value?.runQuery?.();
+      panelEditorRef.value?.runQuery?.(withoutCache);
     };
+
+    const { isAutoRunOn } = useAutoRunToggle();
+
+    const isBuilderValid = () => {
+      const errors: string[] = [];
+      validatePanel(errors, true);
+      return errors.length === 0;
+    };
+
+    // Auto Run's live runs go through runQuery, never onUserRun, so they write no history.
+    const livePreview = usePanelLivePreview({
+      panel: () => dashboardPanelData.data,
+      applied: () => panelEditorRef.value?.chartData,
+      liveVariables: () => [],
+      committedVariables: () => [],
+      isBuilderValid,
+      isLoading: computed(() => panelEditorRef.value?.isLoading ?? false),
+      run: () => runQuery(),
+      pendingApply: () => isTimeChangePending.value,
+      autoRun: () => isAutoRunOn.value,
+    });
+    const isRunQueryPending = computed(() => livePreview.isPending.value);
+
+    // A seeded panel's load-time normalisation is not an edit, so live preview starts with the user's first input.
+    const armOnFirstInput = () => livePreview.arm();
+    onMounted(() => {
+      window.addEventListener("pointerdown", armOnFirstInput, true);
+      window.addEventListener("keydown", armOnFirstInput, true);
+    });
+    onBeforeUnmount(() => {
+      window.removeEventListener("pointerdown", armOnFirstInput, true);
+      window.removeEventListener("keydown", armOnFirstInput, true);
+    });
+
+    // Turning Auto Run back on applies a range picked while it was off.
+    watch(isAutoRunOn, (on) => {
+      if (on && isTimeChangePending.value) runQuery();
+    });
 
     const { record } = useQueryHistoryRecorder();
 
-    /** An explicit Run (button or shortcut): the only run that writes history. */
-    const onUserRun = (selectedDate: SelectedDate) => {
-      runQuery();
+    /** An explicit Run (button, shortcut or Refresh Cache & Run): the only run that writes history. */
+    const onUserRun = (selectedDate: SelectedDate, withoutCache = false) => {
+      runQuery(withoutCache);
       const errors: string[] = [];
       validatePanel(errors, false);
       if (!errors.length) record(dashboardPanelData, selectedDate);
@@ -263,14 +314,13 @@ export default defineComponent({
       runQuery();
     });
 
-    // Follow the toolbar's window: re-run when the range changes (only once there
-    // is a query to run).
+    // With Auto Run off a picked range waits for Run like any other edit, as in Add Panel.
     watch(
       () => props.selectedDateTime,
       () => {
         if (applyingEntry) return;
-        if (dashboardPanelData.data?.queries?.[0]?.query) runQuery();
-        else applyDateTime();
+        if (!dashboardPanelData.data?.queries?.[0]?.query) applyDateTime();
+        else if (isAutoRunOn.value) runQuery();
       },
       { deep: true },
     );
@@ -285,6 +335,7 @@ export default defineComponent({
       runQuery,
       onUserRun,
       applyPanelData,
+      isRunQueryPending,
     };
   },
 });
