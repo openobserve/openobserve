@@ -6224,7 +6224,6 @@
       "pastDays": "過去 {n} 日 | 過去 {n} 日",
       "pastWeeks": "過去 {n} 週間 | 過去 {n} 週間",
       "pastMonths": "過去 {n} か月 | 過去 {n} か月",
-      "window": "{start} → {end}",
       "variableUnset": "未設定",
       "footerNote": "読み取り専用ビューです。このリンクを知っている人は誰でもこのダッシュボードを表示できます。",
       "panelNotAvailable": "このパネルは公開ビューでは利用できません。",

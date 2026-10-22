@@ -6224,7 +6224,6 @@
       "pastDays": "Dernier {n} jour | Derniers {n} jours",
       "pastWeeks": "Dernière {n} semaine | Dernières {n} semaines",
       "pastMonths": "Dernier {n} mois | Derniers {n} mois",
-      "window": "{start} → {end}",
       "variableUnset": "Non défini",
       "footerNote": "Vue en lecture seule. Toute personne disposant du lien peut voir ce tableau de bord.",
       "panelNotAvailable": "Ce panneau n'est pas disponible dans la vue publique.",

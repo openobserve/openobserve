@@ -67,22 +67,41 @@
           >
             <OSeparator vertical />
           </div>
-          <OTag
-            v-if="updatedLabel"
-            :variant="body?.refreshing ? 'warning-soft' : 'default-soft'"
-            class="whitespace-nowrap tabular-nums"
-            data-test="dashboards-public-dashboard-updated"
+          <div
+            v-if="updatedAge"
+            class="border-button-outline-border rounded-default flex h-8 shrink-0 items-center gap-1.5 border pe-3 text-sm"
+            :class="ring ? 'ps-2' : 'ps-3'"
+            data-test="dashboards-public-dashboard-meta"
           >
-            {{ updatedLabel }}
-          </OTag>
-          <span
-            v-if="nextRefreshLabel"
-            class="text-text-secondary text-sm whitespace-nowrap tabular-nums max-md:hidden"
-            data-test="dashboards-public-dashboard-next-refresh"
+            <KioskCountdownRing
+              v-if="ring"
+              :progress="ring.progress"
+              :state="ring.state"
+              :tooltip="ring.tooltip"
+              size="sm"
+              data-test="dashboards-public-dashboard-next-refresh"
+            />
+            <span
+              class="text-text-secondary whitespace-nowrap"
+              tabindex="0"
+              data-test="dashboards-public-dashboard-updated"
+            >
+              <i18n-t keypath="dashboard.publicDashboard.lastUpdatedAgo" tag="span" scope="global">
+                <template #time>
+                  <span class="text-text-body tabular-nums">{{ updatedAge }}</span>
+                </template>
+              </i18n-t>
+              <OTooltip :content="updatedExact" />
+            </span>
+          </div>
+          <!-- One picker for range and timezone, as the app's own date-time picker. -->
+          <OPopover
+            v-model:open="rangeMenuOpen"
+            side="bottom"
+            align="end"
+            :aria-label="t('common.selectDateRange')"
+            content-class="p-1"
           >
-            {{ nextRefreshLabel }}
-          </span>
-          <ODropdown v-if="rangeOptions.length > 1" side="bottom" align="end">
             <template #trigger>
               <OButton
                 variant="outline"
@@ -95,15 +114,36 @@
                 {{ selectedRange ? rangeLabel(selectedRange) : "" }}
               </OButton>
             </template>
-            <ODropdownItem
-              v-for="option in rangeOptions"
-              :key="option.key"
-              :data-test="`dashboards-public-dashboard-preset-${option.key}`"
-              @select="selectRange(option.key)"
-            >
-              {{ rangeLabel(option) }}
-            </ODropdownItem>
-          </ODropdown>
+            <div class="flex w-max max-w-[calc(100vw-1.5rem)] min-w-72 flex-col">
+              <template v-if="rangeOptions.length > 1">
+                <OButton
+                  v-for="option in rangeOptions"
+                  :key="option.key"
+                  variant="ghost"
+                  size="sm"
+                  block
+                  :data-test="`dashboards-public-dashboard-preset-${option.key}`"
+                  @click="pickRange(option.key)"
+                >
+                  <span class="flex-1 text-start">{{ rangeLabel(option) }}</span>
+                  <template v-if="option.key === selectedKey" #icon-right>
+                    <OIcon name="check" size="sm" />
+                  </template>
+                </OButton>
+                <OSeparator class="my-1" />
+              </template>
+              <div class="px-2 pb-2">
+                <OSelect
+                  :model-value="viewerTimezone"
+                  :options="timezoneOptions"
+                  searchable
+                  :label="t('logStream.timezone')"
+                  data-test="dashboards-public-dashboard-timezone"
+                  @update:model-value="setTimezone"
+                />
+              </div>
+            </div>
+          </OPopover>
           <ThemeSwitcher bordered />
         </template>
       </OPageHeader>
@@ -191,20 +231,22 @@ import { useStore } from "vuex";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import PoweredByOpenObserve from "@/components/common/PoweredByOpenObserve.vue";
+import KioskCountdownRing from "@/components/dashboards/kiosk/KioskCountdownRing.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import { useLocalTimezone } from "@/utils/storage";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { IllustrationName } from "@/lib/core/EmptyState/illustrations";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ThemeSwitcher from "@/components/ThemeSwitcher.vue";
 import publicDashboardsService from "@/services/public_dashboards";
+import { formatInTimeZone } from "date-fns-tz";
 import { durationFormatter } from "@/utils/formatters";
 import type { PublicLinkRange } from "@/services/public_dashboards_admin";
 import { sortRanges } from "@/components/dashboards/PublicLinkForm.schema";
@@ -286,7 +328,26 @@ const clockOffset = ref(0);
 const cooldownUntil = ref<number | null>(null);
 const holdKind = ref<"ratelimited" | "cooldown" | null>(null);
 // Anonymous viewers have no saved timezone, so dates read in the browser's.
-const viewerTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+// The app's own timezone setting, so charts and header times agree and a choice here carries to OpenObserve.
+const viewerTimezone = computed<string>(() => store.state.timezone || browserTimezone);
+const timezoneOptions = [
+  { label: t("common.browserTimeWithZone", { zone: browserTimezone }), value: browserTimezone },
+  { label: raw("UTC"), value: "UTC" },
+  ...Intl.supportedValuesOf("timeZone").map((tz) => ({ label: raw(tz), value: tz })),
+];
+
+const rangeMenuOpen = ref(false);
+const pickRange = (key: string) => {
+  rangeMenuOpen.value = false;
+  selectRange(key);
+};
+
+const setTimezone = (tz: unknown) => {
+  if (typeof tz !== "string" || !tz) return;
+  useLocalTimezone(tz);
+  store.dispatch("setTimezone", tz);
+};
 // RenderDashboardCharts and TabList read and switch the active tab through this.
 const selectedTabId = ref<string>("");
 provide("selectedTabId", selectedTabId);
@@ -482,29 +543,39 @@ const pickerShowsWindow = computed(
   () => rangeOptions.value.length > 1 && selectedRange.value?.type === "absolute",
 );
 
-function rangeLabel(range: PublicLinkRange): I18nText {
-  return longRange(range, t, viewerTimezone);
+// A printed dashboard's time-range form, so every window on this page reads alike.
+function printedWindow(startMs: number, endMs: number): I18nText {
+  const fmt = (ms: number) => formatInTimeZone(ms, viewerTimezone.value, "yyyy/MM/dd HH:mm");
+  return raw(`${fmt(startMs)} - ${fmt(endMs)}`);
 }
 
-// Start → end of the window the shown body covers; spans of a day or more show the date too.
+function rangeLabel(range: PublicLinkRange): I18nText {
+  return range.type === "absolute"
+    ? printedWindow(range.start / 1000, range.end / 1000)
+    : longRange(range, t, viewerTimezone.value);
+}
+
+// The window the shown body covers; the zone is in the picker beside it.
 const windowLabel = computed<I18nText | "">(() => {
   if (!shownWindow.value) return "";
-  const { startMs, endMs } = shownWindow.value;
-  const opts: Intl.DateTimeFormatOptions =
-    endMs - startMs >= 86_400_000
-      ? { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }
-      : { hour: "2-digit", minute: "2-digit" };
-  const fmt = (ms: number) => raw(new Date(ms).toLocaleString(undefined, opts));
-  return t("dashboard.publicDashboard.window", { start: fmt(startMs), end: fmt(endMs) });
+  return printedWindow(shownWindow.value.startMs, shownWindow.value.endMs);
 });
 
-const updatedLabel = computed<I18nText | "">(() => {
-  const builtAt = body.value?.built_at;
-  if (!builtAt) return "";
-  const time = raw(clockTime(builtAt));
-  return body.value?.refreshing
-    ? t("dashboard.publicDashboard.lastUpdatedRefreshing", { time })
-    : t("dashboard.publicDashboard.lastUpdatedAt", { time });
+// The data's age, as the TV strip shows it; the exact time is in its tooltip.
+const updatedAge = computed<I18nText | "">(() => {
+  const at = toLocalMs(body.value?.built_at, clockOffset.value);
+  if (at === null) return "";
+  const sec = Math.max(0, Math.floor((nowMs.value - at) / 1000));
+  const min = Math.floor(sec / 60);
+  const age =
+    sec < 5
+      ? t("refreshButton.justNow")
+      : sec < 60
+        ? t("refreshButton.secondsAgo", { sec })
+        : min < 60
+          ? t("refreshButton.minutesAgo", { min })
+          : t("refreshButton.hoursAgo", { h: Math.floor(min / 60) });
+  return age;
 });
 
 // Counts down to fresh_until on the server's clock; an absolute range has none.
@@ -513,6 +584,37 @@ const nextRefreshLabel = computed<I18nText | "">(() => {
   const left = msUntil(body.value.fresh_until);
   if (left === null || left <= 0) return "";
   return t("dashboard.publicDashboard.nextRefreshIn", { time: raw(countdown(left)) });
+});
+
+// The exact build time, and when the next one is due while the range still refreshes.
+const updatedExact = computed<I18nText>(() => {
+  const time = raw(
+    formatInTimeZone((body.value?.built_at ?? 0) / 1000, viewerTimezone.value, "HH:mm:ss"),
+  );
+  return nextRefreshLabel.value
+    ? t("dashboard.publicDashboard.lastRefreshedNext", { time, next: nextRefreshLabel.value })
+    : t("refreshButton.lastRefreshed", { time });
+});
+
+// Fills toward fresh_until and spins while a refresh runs; an absolute range has no ring.
+const ring = computed<{
+  state: "running" | "spinning";
+  progress: number;
+  tooltip: I18nText;
+} | null>(() => {
+  const b = body.value;
+  if (!b) return null;
+  const left = msUntil(b.fresh_until);
+  if (b.refreshing || (left !== null && left <= 0)) {
+    return { state: "spinning", progress: 0, tooltip: t("common.loading") };
+  }
+  if (left === null || !b.built_at || !b.fresh_until) return null;
+  const totalMs = (b.fresh_until - b.built_at) / 1000;
+  return {
+    state: "running",
+    progress: totalMs > 0 ? 1 - left / totalMs : 1,
+    tooltip: nextRefreshLabel.value || t("common.loading"),
+  };
 });
 
 const failureNote = computed<I18nText | null>(() => {

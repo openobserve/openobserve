@@ -6224,7 +6224,6 @@
       "pastDays": "{n} ngày qua | {n} ngày qua",
       "pastWeeks": "{n} tuần qua | {n} tuần qua",
       "pastMonths": "{n} tháng qua | {n} tháng qua",
-      "window": "{start} → {end}",
       "variableUnset": "Chưa đặt",
       "footerNote": "Chế độ chỉ xem. Bất kỳ ai có liên kết đều có thể xem bảng điều khiển này.",
       "panelNotAvailable": "Panel này không khả dụng ở chế độ xem công khai.",

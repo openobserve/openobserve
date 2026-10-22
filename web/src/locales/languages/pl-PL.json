@@ -6224,7 +6224,6 @@
       "pastDays": "Ostatni {n} dzień | Ostatnie {n} dni",
       "pastWeeks": "Ostatni {n} tydzień | Ostatnie {n} tygodni",
       "pastMonths": "Ostatni {n} miesiąc | Ostatnie {n} miesięcy",
-      "window": "{start} → {end}",
       "variableUnset": "Nie ustawiono",
       "footerNote": "Widok tylko do odczytu. Każdy, kto ma link, może wyświetlić ten pulpit.",
       "panelNotAvailable": "Ten panel nie jest dostępny w widoku publicznym.",

@@ -6224,7 +6224,6 @@
       "pastDays": "过去 {n} 天 | 过去 {n} 天",
       "pastWeeks": "过去 {n} 周 | 过去 {n} 周",
       "pastMonths": "过去 {n} 个月 | 过去 {n} 个月",
-      "window": "{start} → {end}",
       "variableUnset": "未设置",
       "footerNote": "只读视图。任何拥有此链接的人都可以查看此仪表盘。",
       "panelNotAvailable": "此面板在公开视图中不可用。",

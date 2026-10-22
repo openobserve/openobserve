@@ -6224,7 +6224,6 @@
       "pastDays": "Último {n} dia | Últimos {n} dias",
       "pastWeeks": "Última {n} semana | Últimas {n} semanas",
       "pastMonths": "Último {n} mês | Últimos {n} meses",
-      "window": "{start} → {end}",
       "variableUnset": "Não definido",
       "footerNote": "Visualização somente leitura. Qualquer pessoa com o link pode ver este painel.",
       "panelNotAvailable": "Este painel não está disponível na visualização pública.",

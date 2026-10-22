@@ -6224,7 +6224,6 @@
       "pastDays": "過去 {n} 天 | 過去 {n} 天",
       "pastWeeks": "過去 {n} 週 | 過去 {n} 週",
       "pastMonths": "過去 {n} 個月 | 過去 {n} 個月",
-      "window": "{start} → {end}",
       "variableUnset": "未設定",
       "footerNote": "唯讀檢視。任何擁有連結的人都能查看此儀表板。",
       "panelNotAvailable": "此面板無法在公開檢視中使用。",
