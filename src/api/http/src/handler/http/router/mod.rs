@@ -2165,6 +2165,10 @@ fn oncall_routes(router: Router) -> Router {
             get(oncall::get_resolved_schedule),
         )
         .route(
+            "/{org_id}/oncall/teams/{team_id}/resolved-schedule/preview",
+            post(oncall::preview_resolved_schedule),
+        )
+        .route(
             "/{org_id}/oncall/teams/{team_id}/policy",
             get(oncall::get_policy).put(oncall::set_policy),
         )
