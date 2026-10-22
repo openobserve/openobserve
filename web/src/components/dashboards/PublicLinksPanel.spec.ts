@@ -1044,6 +1044,27 @@ describe("PublicLinksPanel", () => {
       expect(states).toContain("9 of 10");
     });
 
+    it("says when a failed range is tried next", async () => {
+      const retryAt = (Date.now() + 5 * 60_000) * 1000;
+      const w = await createLink(async () => ({
+        data: {
+          link_id: "l1",
+          access_count: 2,
+          last_accessed_at: 1,
+          ranges: [
+            rangeStatus("r3600", {
+              state: "needs_attention",
+              last_error: "timeout",
+              next_retry_at: retryAt,
+            }),
+          ],
+        },
+      }));
+      const nextTry = w.find('[data-test="dashboards-public-links-panel-next-try-r3600"]');
+      expect(nextTry.text()).toMatch(/^Next try at \d{2}:\d{2}$/);
+      expect(stateText(w, "r3600")).toContain("Needs attention");
+    });
+
     it("says never viewed only for a link with no access history", async () => {
       const w = await createLink(
         async () => ({ data: { link_id: "l1", access_count: 0, ranges: [] } }),

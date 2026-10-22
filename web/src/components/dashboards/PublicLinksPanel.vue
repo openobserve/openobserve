@@ -157,9 +157,18 @@
           <span class="text-text-body text-sm">{{ longRange(row.range, t, timezone) }}</span>
         </template>
         <template #cell-state="{ row }">
-          <span class="inline-flex" :data-test="`dashboards-public-links-panel-state-${row.key}`">
+          <span
+            class="inline-flex items-center gap-2"
+            :data-test="`dashboards-public-links-panel-state-${row.key}`"
+          >
             <OTag type="publicLinkRangeState" :value="row.state" />
             <OTooltip v-if="row.reason" side="bottom" :content="row.reason" />
+            <span
+              v-if="row.nextTry"
+              class="text-text-secondary text-xs"
+              :data-test="`dashboards-public-links-panel-next-try-${row.key}`"
+              >{{ row.nextTry }}</span
+            >
           </span>
         </template>
         <template #cell-built_at="{ row }">
@@ -575,6 +584,7 @@
 import { computed, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useMutation, useQuery } from "@tanstack/vue-query";
+import { formatInTimeZone } from "date-fns-tz";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -696,6 +706,7 @@ interface RangeStateRow {
   state: PublicLinkRangeState | "never_viewed";
   reason: I18nText | null;
   builtAt: number | null;
+  nextTry: I18nText | null;
   panels: I18nText | null;
 }
 
@@ -859,12 +870,19 @@ const createdRangeRows = computed<RangeStateRow[]>(() => {
     const state = status?.state ?? "not_cached";
     const builtAt = status?.built_at ?? null;
     const shown = status ? total - unavailablePanels(status) : 0;
+    const retryAt = status?.next_retry_at;
     return {
       key,
       range,
       state: state === "not_cached" && neverViewed ? "never_viewed" : state,
       reason: status ? rangeAttentionReason(status, t) : null,
       builtAt,
+      nextTry:
+        retryAt && retryAt / 1000 > now.value
+          ? t("dashboard.publicLinks.stateNextTry", {
+              time: raw(formatInTimeZone(retryAt / 1000, timezone.value, "HH:mm")),
+            })
+          : null,
       panels:
         builtAt && total
           ? t("dashboard.publicLinks.statePanelsOf", { shown: Math.max(shown, 0), total })

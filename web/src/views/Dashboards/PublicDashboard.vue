@@ -417,25 +417,45 @@ const panelBadge = (result: PanelResult): I18nText | undefined => {
   return undefined;
 };
 
+// Content panels need no build, and a custom chart is never built for the public view.
+const isBuiltPanel = (panel: { type?: string }) =>
+  !CONTENT_PANEL_TYPES.includes(panel.type ?? "") && panel.type !== "custom_chart";
+
+// No result yet (a panel added since the build), or one built from a query that changed since.
+const waitsForBuild = (panel: { id: string }) => {
+  const result = body.value?.panels?.[panel.id];
+  if (!result) return true;
+  if (result.state?.state !== "ok") return result.state?.reason === "changed";
+  // The server masks a changed query too; this keeps a layout and a result of different intents apart.
+  return result.intent !== intents.value[panel.id];
+};
+
+// Nothing on screen has data, so the failure is told on the panels instead of the banner.
+const nothingShown = computed(() => {
+  const built = tabs.value.flatMap((tab) => tab?.panels ?? []).filter(isBuiltPanel);
+  return built.length > 0 && built.every(waitsForBuild);
+});
+
+const preparingText = computed<I18nText>(() => {
+  const failedAt = body.value?.last_error_at;
+  if (body.value?.refreshing || !failedAt || !nothingShown.value) {
+    return t("dashboard.publicDashboard.panelPreparing");
+  }
+  const retryAt = body.value?.next_retry_at;
+  const next =
+    retryAt && (msUntil(retryAt) ?? 0) > 0
+      ? t("dashboard.publicDashboard.panelRetryingAt", { time: raw(clockTime(retryAt)) })
+      : raw("");
+  return t("dashboard.publicDashboard.panelRetrying", { time: raw(clockTime(failedAt)), next });
+});
+
 const panelEntry = (panel: { id: string; type?: string }) => {
   if (CONTENT_PANEL_TYPES.includes(panel.type ?? "")) return emptyPanelData();
-  // A custom chart runs the author's script, so it is never built for the public view.
-  if (panel.type === "custom_chart") {
-    return panelNotice(t("dashboard.publicDashboard.panelNotAvailable"));
-  }
+  if (!isBuiltPanel(panel)) return panelNotice(t("dashboard.publicDashboard.panelNotAvailable"));
+  if (waitsForBuild(panel)) return panelNotice(preparingText.value);
   const result = body.value?.panels?.[panel.id];
-  // A panel added since the last build has no entry until the next one.
-  if (!result) return panelNotice(t("dashboard.publicDashboard.panelPreparing"));
-  if (result.state?.state !== "ok") {
-    return panelNotice(
-      result.state?.reason === "changed"
-        ? t("dashboard.publicDashboard.panelPreparing")
-        : t("dashboard.publicDashboard.panelNotAvailable"),
-    );
-  }
-  // The server masks a changed query too; this keeps a layout and a result of different intents apart.
-  if (result.intent !== intents.value[panel.id]) {
-    return panelNotice(t("dashboard.publicDashboard.panelPreparing"));
+  if (!result || result.state?.state !== "ok") {
+    return panelNotice(t("dashboard.publicDashboard.panelNotAvailable"));
   }
   return {
     data: result.data ?? [],
@@ -497,7 +517,7 @@ const nextRefreshLabel = computed<I18nText | "">(() => {
 
 const failureNote = computed<I18nText | null>(() => {
   const failedAt = body.value?.last_error_at;
-  if (!failedAt) return null;
+  if (!failedAt || nothingShown.value) return null;
   const time = raw(clockTime(failedAt));
   const left = msUntil(body.value?.next_retry_at);
   return left !== null && left > 0

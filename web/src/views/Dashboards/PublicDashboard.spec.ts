@@ -915,6 +915,97 @@ describe("PublicDashboard viewer", () => {
     }
   });
 
+  it("says once, on the panels, that the last update failed when no panel shows data", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.UTC(2027, 0, 15, 12, 6));
+    vi.mocked(service.getConfig).mockResolvedValue({
+      data: { ...panelsConfig([{ id: "masked", type: "line" }]), intents: { masked: "i1" } },
+      status: 200,
+    } as never);
+    const show = async (nextRetryAt: number) => {
+      vi.mocked(service.getData).mockResolvedValue({
+        status: 200,
+        data: {
+          ...okBody("a"),
+          last_error_at: Date.UTC(2027, 0, 15, 12, 4) * 1000,
+          next_retry_at: nextRetryAt,
+          panels: { masked: { state: { state: "not_available", reason: "changed" } } },
+        },
+      } as never);
+      const w = buildWrapper();
+      await flushPromises();
+      return w;
+    };
+    const message = (w: VueWrapper) =>
+      grid(w).props("injectedPanelData").masked.errorDetail.message;
+    const w = await show(Date.UTC(2027, 0, 15, 12, 9) * 1000);
+    expect(message(w)).toMatch(
+      /^The last update failed at \d{1,2}:04( [AP]M)?\. Trying again at \d{1,2}:09( [AP]M)?\.$/,
+    );
+    expect(w.findComponent({ name: "OBanner" }).exists()).toBe(false);
+    // A retry time already passed is not promised again.
+    const late = await show(Date.UTC(2027, 0, 15, 12, 5) * 1000);
+    expect(message(late)).toMatch(
+      /^The last update failed at \d{1,2}:04( [AP]M)?\. Trying again\.$/,
+    );
+  });
+
+  it("leaves the failure to the banner while other panels still show data", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_800_000_020_000);
+    vi.mocked(service.getConfig).mockResolvedValue({
+      data: {
+        ...panelsConfig([
+          { id: "kept", type: "line" },
+          { id: "masked", type: "line" },
+        ]),
+        intents: { kept: "i1", masked: "i2" },
+      },
+      status: 200,
+    } as never);
+    vi.mocked(service.getData).mockResolvedValue({
+      status: 200,
+      data: {
+        ...okBody("a"),
+        last_error_at: 1_800_000_000_000_000,
+        next_retry_at: 1_800_000_080_000_000,
+        panels: {
+          kept: { state: { state: "ok" }, intent: "i1", data: [[{ y: 1 }]] },
+          masked: { state: { state: "not_available", reason: "changed" } },
+        },
+      },
+    } as never);
+    const w = buildWrapper();
+    await flushPromises();
+    expect(grid(w).props("injectedPanelData").masked.errorDetail.message).toBe(
+      "This panel will appear after the next update.",
+    );
+    expect(w.findComponent<typeof OBanner>({ name: "OBanner" }).props("content")).toMatch(
+      /^Some panels could not be refreshed at /,
+    );
+  });
+
+  it("keeps the preparing text on a masked panel while a new build runs", async () => {
+    vi.mocked(service.getConfig).mockResolvedValue({
+      data: { ...panelsConfig([{ id: "masked", type: "line" }]), intents: { masked: "i1" } },
+      status: 200,
+    } as never);
+    vi.mocked(service.getData).mockResolvedValue({
+      status: 200,
+      data: {
+        ...okBody("a"),
+        refreshing: true,
+        last_error_at: 1_800_000_000_000_000,
+        panels: { masked: { state: { state: "not_available", reason: "changed" } } },
+      },
+    } as never);
+    const w = buildWrapper();
+    await flushPromises();
+    expect(grid(w).props("injectedPanelData").masked.errorDetail.message).toBe(
+      "This panel will appear after the next update.",
+    );
+  });
+
   it("shows retained, partial, truncated and too-large panels as such", async () => {
     vi.mocked(service.getConfig).mockResolvedValue({
       data: panelsConfig([

@@ -71,6 +71,8 @@ export interface PublicLinkRangeStatus {
   unavailable_count: number;
   incomplete_count: number;
   last_error: string | null;
+  /** Microseconds; absent from a querier that predates it. */
+  next_retry_at?: number | null;
   sources?: Record<string, Array<[string, string]>>;
 }
 
