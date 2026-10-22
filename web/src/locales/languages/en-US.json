@@ -11536,6 +11536,7 @@
     },
     "add": "Add",
     "runQuery": "Run query",
+    "runQueryOptions": "Run query options",
     "explorer": {
       "detail": {
         "loading": "Loading metric details...",
