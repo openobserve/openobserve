@@ -279,11 +279,14 @@ const makeSearchObj = () =>
 // call-time so every mount gets the fresh instance.
 let searchObjInstance = makeSearchObj();
 
+const tracesParserRef = vi.hoisted(() => ({ value: { astify: (() => ({})) as any } }));
+
 vi.mock("@/composables/useTraces", () => ({
   default: () => ({
     get searchObj() {
       return searchObjInstance;
     },
+    tracesParser: tracesParserRef,
     tracesShareURL: computed(() => "http://localhost/traces?shared=1"),
     resetSearchObj: vi.fn(),
     updatedLocalLogFilterField: vi.fn(),
@@ -2344,6 +2347,23 @@ describe("SearchBar", () => {
         expect(toolbarGroup().exists()).toBe(false);
         expect(moreGroup().exists()).toBe(true);
       });
+    });
+  });
+  describe("updateQueryValue with unparsable SQL", () => {
+    it("keeps the last parsed query when the parser throws mid-typing", async () => {
+      searchObjInstance.meta.sqlMode = true;
+      const previous = { from: [{ table: "default" }] };
+      searchObjInstance.data.parsedQuery = previous;
+      tracesParserRef.value.astify = vi.fn(() => {
+        throw new Error('Expected end of input but "(" found.');
+      });
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      await expect((wrapper.vm as any).updateQueryValue("SELECT * FROM (")).resolves.toBe(
+        undefined,
+      );
+      expect(searchObjInstance.data.parsedQuery).toEqual(previous);
     });
   });
 });

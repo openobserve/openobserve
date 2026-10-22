@@ -1525,7 +1525,13 @@ const restoreFilters = (query: string) => {
 
   const defaultQuery = `SELECT * FROM "${selectedStreamName.value}" WHERE `;
 
-  const parsedQuery = tracesParser.value.astify(defaultQuery + query);
+  let parsedQuery;
+  try {
+    parsedQuery = tracesParser.value.astify(defaultQuery + query);
+  } catch {
+    // A filter the parser rejects just leaves the field-value selections as they are.
+    return;
+  }
 
   restoreFiltersFromQuery(parsedQuery.where);
 };

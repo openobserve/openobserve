@@ -3958,4 +3958,31 @@ describe("Index.vue (Main Traces Page)", () => {
       mockFetchQueryDataWithHttpStream.mockReset();
     });
   });
+
+  describe("restoreFilters with unparsable SQL", () => {
+    it("returns without touching filters when the saved filter does not parse", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      const parser = createdTracesParsers.at(-1) as { astify: ReturnType<typeof vi.fn> };
+      parser.astify.mockImplementationOnce(() => {
+        throw new Error("Expected end of input");
+      });
+
+      expect(() => wrapper.vm.restoreFilters("service_name = ")).not.toThrow();
+    });
+  });
 });
