@@ -333,15 +333,25 @@ describe("IncidentRCAAnalysis", () => {
       expect(byTest(wrapper, "rca-thread-final-note").exists()).toBe(true);
     });
 
-    it("TH32: an expired thread shows the expired transcript", async () => {
+    it("TH32: an expired thread of a finished run shows the expired transcript", async () => {
       answers.thread = null;
       answers.threadStatus = "expired";
-      wrapper = mountPanel(liveProps());
+      wrapper = mountPanel(completedProps());
       await flushPromises();
 
       expect(byTest(wrapper, "rca-thread-empty").text()).toBe(
         "The transcript of this run is no longer stored.",
       );
+    });
+
+    it("a live run whose transcript is not stored yet shows the working line", async () => {
+      answers.thread = null;
+      answers.threadStatus = "expired";
+      wrapper = mountPanel(liveProps());
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-thread-working").exists()).toBe(true);
+      expect(byTest(wrapper, "rca-thread-empty").exists()).toBe(false);
     });
   });
 
