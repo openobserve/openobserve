@@ -320,7 +320,7 @@ pub async fn test_email(
     super::alert::send_email_notification(
         "OpenObserve - Test Email Destination",
         &email,
-        email_body.clone(),
+        None,
         email_body,
     )
     .await

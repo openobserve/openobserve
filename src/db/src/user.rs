@@ -189,13 +189,19 @@ pub async fn get_db_user(name: &str) -> Result<DBUser, anyhow::Error> {
     })
 }
 
-pub async fn add(db_user: &DBUser) -> Result<(), anyhow::Error> {
-    let key = format!("{USER_RECORD_KEY}{}", db_user.email);
-    let user = users::UserRecord::from(db_user);
-    users::add(user.clone())
+/// Insert a users row and publish the event every node caches it from; a raw table write skips it.
+pub async fn add_record(user: users::UserRecord) -> Result<(), anyhow::Error> {
+    let key = format!("{USER_RECORD_KEY}{}", user.email);
+    users::add(user)
         .await
         .map_err(|e| anyhow::anyhow!("Error adding user: {e}"))?;
     let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
+    Ok(())
+}
+
+pub async fn add(db_user: &DBUser) -> Result<(), anyhow::Error> {
+    let user = users::UserRecord::from(db_user);
+    add_record(user.clone()).await?;
 
     // Add user to orgs
     for org in &db_user.organizations {
@@ -520,5 +526,49 @@ mod tests {
 
         let resp = delete(email).await;
         assert!(resp.is_ok());
+    }
+
+    // Writing straight to the table skipped the cache event, so `get_cached_user_org` returned
+    // None.
+    #[tokio::test]
+    async fn test_add_record_publishes_cache_event() {
+        infra_db::create_table().await.unwrap();
+        infra_table::create_user_tables().await.unwrap();
+        let email = "add-record-event@example.com";
+        let expected_key = format!("{USER_RECORD_KEY}{email}");
+        let mut events = db::get_coordinator()
+            .await
+            .watch(USER_RECORD_KEY)
+            .await
+            .unwrap();
+        let events = Arc::get_mut(&mut events).unwrap();
+
+        let record = users::UserRecord::from(&DBUser {
+            email: email.to_string(),
+            password: "pass".to_string(),
+            salt: "salt".to_string(),
+            first_name: "add".to_owned(),
+            last_name: "record".to_owned(),
+            is_external: false,
+            organizations: vec![],
+            password_ext: None,
+        });
+        add_record(record).await.unwrap();
+
+        let published = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            while let Some(ev) = events.recv().await {
+                if let db::Event::Put(ev) = ev
+                    && ev.key == expected_key
+                {
+                    return true;
+                }
+            }
+            false
+        })
+        .await
+        .unwrap_or(false);
+        assert!(published, "no {expected_key} put event after add_record");
+
+        delete(email).await.unwrap();
     }
 }

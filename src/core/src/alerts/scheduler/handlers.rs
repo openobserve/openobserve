@@ -1226,6 +1226,7 @@ async fn handle_composite_alert_trigger(
                     &rows,
                     now,
                     Some(evaluated.level),
+                    Some(i32::from(evaluated.result) as f64),
                     None,
                 )
                 .await
@@ -2205,11 +2206,7 @@ pub(crate) async fn page_for_alert_identity(
     }
 }
 
-/// I9-I11: one RCA run for a whole firing, guarded by config, agent health and
-/// "no analysis already pending on these records" — the three guards §2.3 says
-/// apply to an alert subject, cooldown and in-flight-via-event-log having no
-/// referent here. Mirrors `create_new_incident`'s spawn shape (guards, spawn,
-/// `tokio::spawn`), but serves every record `opened` rather than one incident.
+/// One RCA run per firing; its finalizer delivers to, or releases, the pending on-call records.
 ///
 /// Blocked by any guard ⇒ `escalation::skip_analysis` for every record, so I9's
 /// removal of the incident-only gate never holds a page with nothing coming to
@@ -2220,9 +2217,14 @@ async fn trigger_rca_for_alert_firing(
     alert: &config::meta::alerts::alert::Alert,
     opened: Vec<o2_enterprise::enterprise::oncall::escalation::PagedGroup>,
 ) {
+    use config::meta::alerts::rca_runs::{RunMode, RunTrigger};
     use o2_enterprise::enterprise::{
-        ai::client::get_agent_client, common::config::get_config as get_o2_config,
-        oncall::escalation,
+        alerts::rca_service, common::config::get_config as get_o2_config, oncall::escalation,
+    };
+
+    use crate::alerts::{
+        rca_runs,
+        rca_turn::{RcaPrompt, RcaPromptSubject, RcaTurnRun, start_rca_turn},
     };
 
     let cfg = get_o2_config();
@@ -2243,8 +2245,8 @@ async fn trigger_rca_for_alert_firing(
 
     tokio::spawn(async move {
         // §2.3: the record's own `AnalysisState` is the in-flight marker a retried opener reads.
-        // Asked before the credentials fetch and the health round-trip, so a firing that reopened
-        // nothing pays for neither.
+        // Checked first so a firing that reopened nothing skips the credentials and health
+        // round-trips.
         let mut pending = Vec::new();
         for paged in &opened {
             if escalation::analysis_may_run(&org_id, &paged.response.subject).await {
@@ -2256,27 +2258,44 @@ async fn trigger_rca_for_alert_firing(
             return;
         };
 
-        let (email, token) = match crate::organization::get_sre_agent_credentials(&org_id).await {
-            Ok(c) => c,
+        // The agent fetches the alert by this; a record's `{source}#{firing}` is not one.
+        let subject_id = alert_id.unwrap_or_else(|| representative.response.subject.subject_id());
+        let subjects: Vec<config::meta::oncall::SubjectRef> =
+            pending.iter().map(|p| p.response.subject.clone()).collect();
+
+        // One `alert` run per firing; every exit below ends it.
+        let run_id = match rca_runs::start_run(rca_runs::StartRun {
+            org_id: org_id.clone(),
+            subject: rca_runs::RunSubject::Alert {
+                alert_id: subject_id.clone(),
+                incident_id: None,
+            },
+            trigger: RunTrigger::OncallPage,
+            mode: RunMode::Fresh,
+            started_by: "system".to_string(),
+            guidance: None,
+            skip_cooldown: true,
+            oncall_subjects: serde_json::to_value(&subjects).ok(),
+            context_used: None,
+        })
+        .await
+        {
+            Ok(rca_runs::StartOutcome::Started { run_id }) => run_id,
+            Ok(outcome) => {
+                log::debug!(
+                    "[SCHEDULER trace_id {trace_id}] alert RCA run not started for {org_id}/{alert_name}: {outcome:?}"
+                );
+                release_alert_firing_hold(&org_id, &opened).await;
+                return;
+            }
             Err(e) => {
-                log::warn!("[SCHEDULER trace_id {trace_id}] no RCA credentials for {org_id}: {e}");
+                log::error!(
+                    "[SCHEDULER trace_id {trace_id}] could not record alert RCA run for {org_id}/{alert_name}: {e}"
+                );
                 release_alert_firing_hold(&org_id, &opened).await;
                 return;
             }
         };
-        let auth_header = crate::auth::build_basic_auth_header(&email, &token);
-
-        let Some(client) = get_agent_client() else {
-            log::warn!("[SCHEDULER trace_id {trace_id}] RCA agent client not initialized");
-            release_alert_firing_hold(&org_id, &opened).await;
-            return;
-        };
-
-        if let Err(e) = client.health(&auth_header).await {
-            log::debug!("[SCHEDULER trace_id {trace_id}] agent health check failed: {e}");
-            release_alert_firing_hold(&org_id, &opened).await;
-            return;
-        }
 
         // One report is written to every record this firing opened, so scoping the prompt to one
         // group's dimensions would mis-describe the others. Sent only when they all agree.
@@ -2289,63 +2308,64 @@ async fn trigger_rca_for_alert_firing(
         // §2.2: one context for the whole firing — every record it opened reads the same answer.
         let context = config::meta::oncall::RcaContext {
             subject_type: config::meta::oncall::SubjectType::Alert,
-            // The agent fetches the alert by this; a record's `{source}#{firing}` is not one.
-            subject_id: alert_id.unwrap_or_else(|| representative.response.subject.subject_id()),
+            subject_id: subject_id.clone(),
             // Omitted, never null — the agent routes on `"incident_id" in context`.
             incident_id: None,
             org_id: org_id.clone(),
             previous_analysis: None,
             severity: Some(severity),
-            past_causes: o2_enterprise::enterprise::alerts::rca_service::past_causes_for_record(
-                &org_id,
-                &representative.response.id,
-            )
-            .await,
+            past_causes: rca_service::past_causes_for_record(&org_id, &representative.response.id)
+                .await,
             alert_name: Some(alert_name.clone()),
-            stream: Some(stream_name),
+            stream: Some(stream_name.clone()),
             dimensions,
         };
-        let subjects: Vec<config::meta::oncall::SubjectRef> =
-            pending.iter().map(|p| p.response.subject.clone()).collect();
 
-        match client.analyze_incident(context, &auth_header).await {
-            Ok(content) if !content.is_empty() => {
-                o2_enterprise::enterprise::alerts::rca_service::save_rca_result_for_records(
-                    &org_id, &subjects, &content, None,
-                )
-                .await;
-            }
-            Ok(_) => {
-                release_analysis_without_verdict(&org_id, &subjects).await;
-            }
-            Err(e) => {
-                log::warn!(
-                    "[SCHEDULER trace_id {trace_id}] RCA call failed for {org_id}/{alert_name}: {e}"
+        // The turn's finalizer delivers the report to `oncall_subjects` or releases them.
+        let run = RcaTurnRun {
+            org_id: org_id.clone(),
+            run_id: run_id.clone(),
+            subject: rca_runs::RunSubject::Alert {
+                alert_id: subject_id,
+                incident_id: None,
+            },
+            trigger: RunTrigger::OncallPage,
+            mode: RunMode::Fresh,
+            context: rca_service::rca_context_json(&context),
+            session_id: None,
+        };
+        let prompt = RcaPrompt::Initial {
+            trigger: RunTrigger::OncallPage,
+            subject: RcaPromptSubject::Alert {
+                name: alert_name.clone(),
+                stream: stream_name,
+            },
+            guidance: None,
+        };
+        if let Err(e) = start_rca_turn(run, prompt).await {
+            log::warn!(
+                "[SCHEDULER trace_id {trace_id}] alert RCA run {run_id} for {org_id}/{alert_name} could not start: {}",
+                e.error_code()
+            );
+            let (reason, details) = crate::alerts::incidents::rca_turn_failure(&e);
+            if let Err(err) = rca_runs::fail_run(
+                &org_id,
+                &run_id,
+                RunTrigger::OncallPage,
+                e.error_code(),
+                reason,
+                details,
+            )
+            .await
+            {
+                log::error!(
+                    "[SCHEDULER trace_id {trace_id}] could not fail alert RCA run {run_id}: {err}"
                 );
-                release_analysis_without_verdict(&org_id, &subjects).await;
             }
+            // No verdict is coming: every pending record is released at once.
+            rca_service::no_verdict_for_subjects(&org_id, &subjects).await;
         }
     });
-}
-
-/// I10 again, for a run that happened and came back empty: `Failed`, not `Skipped`, because the
-/// agent was asked. Without it the hold serves out the whole triage budget waiting on an answer
-/// that already came back.
-#[cfg(feature = "enterprise")]
-async fn release_analysis_without_verdict(
-    org_id: &str,
-    subjects: &[config::meta::oncall::SubjectRef],
-) {
-    let now = config::utils::time::now_micros();
-    for subject in subjects {
-        if let Err(e) = o2_enterprise::enterprise::oncall::escalation::analysis_produced_no_verdict(
-            org_id, subject, now,
-        )
-        .await
-        {
-            log::warn!("[SCHEDULER] could not release the triage hold on {subject}: {e}");
-        }
-    }
 }
 
 /// I10: nothing is coming, so nothing may go on holding a page for one.
@@ -2725,6 +2745,7 @@ pub(crate) async fn correlate_muted_incident(
         rows,
         triggered_at,
         eval_level,
+        None,
         Some(downtime),
     )
     .await
@@ -3950,6 +3971,7 @@ async fn handle_alert_triggers(
                 correlation_rows,
                 triggered_at,
                 eval_level,
+                trigger_results.actual_value,
                 None,
             )
             .await

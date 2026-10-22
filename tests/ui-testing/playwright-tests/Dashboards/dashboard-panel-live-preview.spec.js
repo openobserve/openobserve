@@ -81,7 +81,7 @@ test.describe('Dashboard panel editor live preview', { tag: ['@dashboards', '@pa
     await lp.openNewPanelOn(STREAM, { autoRun: 'false' });
 
     await lp.expectNoNewRun(STREAM, 0);
-    await lp.expectApplyVariant('warning');
+    await lp.expectApplyVariant('pending');
     await lp.expectApplyTooltip(TOOLTIP.pending);
 
     await lp.clickApply();
@@ -90,7 +90,7 @@ test.describe('Dashboard panel editor live preview', { tag: ['@dashboards', '@pa
     await lp.expectApplyVariant('primary');
 
     await pm.chartTypeSelector.searchAndAddField(NAMESPACE_FIELD, 'b');
-    await lp.expectApplyVariant('warning');
+    await lp.expectApplyVariant('pending');
     await lp.expectNoNewRun(STREAM, 1);
 
     await lp.clickApply();
@@ -106,7 +106,7 @@ test.describe('Dashboard panel editor live preview', { tag: ['@dashboards', '@pa
 
     await pm.chartTypeSelector.setCustomSQL(TYPED_SQL);
     await lp.expectNoNewRun(STREAM, base);
-    await lp.expectApplyVariant('warning');
+    await lp.expectApplyVariant('pending');
     await lp.expectApplyTooltip(TOOLTIP.typed);
 
     await lp.clickApply();
@@ -122,7 +122,7 @@ test.describe('Dashboard panel editor live preview', { tag: ['@dashboards', '@pa
 
     await pm.chartTypeSelector.searchAndAddField(NAMESPACE_FIELD, 'filter');
     await lp.expectNoNewRun(STREAM, base);
-    await lp.expectApplyVariant('warning');
+    await lp.expectApplyVariant('pending');
     await lp.expectApplyTooltip(TOOLTIP.incomplete);
 
     await pm.dashboardFilter.clickRemoveCondition();
@@ -140,7 +140,7 @@ test.describe('Dashboard panel editor live preview', { tag: ['@dashboards', '@pa
     await lp.expectAutoRunToggleLabel('Turn on Auto Run');
 
     await pm.chartTypeSelector.searchAndAddField(NAMESPACE_FIELD, 'b');
-    await lp.expectApplyVariant('warning');
+    await lp.expectApplyVariant('pending');
     await lp.expectNoNewRun(STREAM, base);
 
     await lp.toggleAutoRun();
@@ -155,7 +155,7 @@ test.describe('Dashboard panel editor live preview', { tag: ['@dashboards', '@pa
     await lp.openNewPanelOn(STREAM, { autoQueryEnabled: false });
 
     await lp.expectNoNewRun(STREAM, 0);
-    await lp.expectApplyVariant('warning');
+    await lp.expectApplyVariant('pending');
     await lp.expectNoAutoRunToggle();
 
     await lp.clickApply();
@@ -163,7 +163,7 @@ test.describe('Dashboard panel editor live preview', { tag: ['@dashboards', '@pa
     await lp.expectApplyIdle();
 
     await pm.chartTypeSelector.searchAndAddField(NAMESPACE_FIELD, 'b');
-    await lp.expectApplyVariant('warning');
+    await lp.expectApplyVariant('pending');
     await lp.expectNoNewRun(STREAM, 1);
   });
 
@@ -197,7 +197,7 @@ test.describe('Dashboard panel editor live preview', { tag: ['@dashboards', '@pa
     await lp.pickRelativeTime(30, 'm');
     await lp.expectNoPickerApply();
     await lp.closeTimePicker();
-    await lp.expectApplyVariant('warning');
+    await lp.expectApplyVariant('pending');
     await lp.expectNoNewRun(STREAM, 1);
 
     await lp.clickApply();
