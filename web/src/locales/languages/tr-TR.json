@@ -25695,6 +25695,7 @@
       "eventEnrolled": "Kaydedildi",
       "lastEffectiveReport": "Etkin yapılandırma bildirildi",
       "delivery": "Teslimat",
+      "deliveryOffline": "Çevrimdışı olmadan önceki son rapor:",
       "noCapabilities": "Bildirilmedi",
       "noComponentHealth": "Bildirilen bileşen sağlığı yok",
       "noHealth": "Bildirilen sağlık durumu yok",

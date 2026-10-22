@@ -25703,6 +25703,7 @@
       "eventEnrolled": "Enrolled",
       "lastEffectiveReport": "Effective config reported",
       "delivery": "Delivery",
+      "deliveryOffline": "Last reported before going offline:",
       "noCapabilities": "None reported",
       "noComponentHealth": "No component health reported",
       "noHealth": "No health reported",

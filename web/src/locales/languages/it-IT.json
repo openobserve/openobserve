@@ -25695,6 +25695,7 @@
       "eventEnrolled": "Registrato",
       "lastEffectiveReport": "Configurazione effettiva segnalata",
       "delivery": "Consegna",
+      "deliveryOffline": "Ultimo report prima di andare offline:",
       "noCapabilities": "Nessuna segnalata",
       "noComponentHealth": "Nessuna salute dei componenti segnalata",
       "noHealth": "Nessuna salute segnalata",

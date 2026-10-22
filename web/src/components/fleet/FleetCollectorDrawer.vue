@@ -180,12 +180,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}</span>
             </ODescriptionItem>
             <ODescriptionItem :label="t('fleet.collectors.delivery')">
-              <OTag
+              <span
                 v-if="collector.delivery"
-                type="fleetDelivery"
-                :value="collector.delivery"
+                class="inline-flex flex-wrap items-center gap-2"
                 data-test="fleet-collector-drawer-delivery"
-              />
+              >
+                <OTag
+                  type="fleetDelivery"
+                  :value="collector.delivery"
+                  :variant="collector.status === 'offline' ? 'default-outline' : undefined"
+                />
+                <OText
+                  v-if="collector.status === 'offline'"
+                  as="span"
+                  variant="meta"
+                  class="inline-flex items-center gap-1"
+                  data-test="fleet-collector-drawer-delivery-offline"
+                >
+                  {{ t("fleet.collectors.deliveryOffline") }}
+                  <OTimeCell
+                    :value="collector.evidence?.last_heartbeat_at ?? collector.lastSeen"
+                    unit="ms"
+                    mode="relative"
+                  />
+                </OText>
+              </span>
               <span v-else class="text-text-muted" data-test="fleet-collector-drawer-delivery">{{
                 DASH
               }}</span>

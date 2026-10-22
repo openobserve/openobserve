@@ -25690,6 +25690,7 @@
       "eventEnrolled": "已註冊",
       "lastEffectiveReport": "已回報生效組態",
       "delivery": "派送",
+      "deliveryOffline": "離線前最後一次回報:",
       "noCapabilities": "未回報",
       "noComponentHealth": "未回報元件健康度",
       "noHealth": "未回報健康度",

@@ -25695,6 +25695,7 @@
       "eventEnrolled": "已注册",
       "lastEffectiveReport": "已上报生效配置",
       "delivery": "下发",
+      "deliveryOffline": "掉线前最后一次上报:",
       "noCapabilities": "未上报",
       "noComponentHealth": "未上报组件健康状况",
       "noHealth": "未上报健康状况",

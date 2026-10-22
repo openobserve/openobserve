@@ -25695,6 +25695,7 @@
       "eventEnrolled": "Зарегистрирован",
       "lastEffectiveReport": "Действующая конфигурация передана",
       "delivery": "Доставка",
+      "deliveryOffline": "Последний отчёт до перехода в офлайн:",
       "noCapabilities": "Не передано",
       "noComponentHealth": "Здоровье компонентов не передано",
       "noHealth": "Здоровье не передано",

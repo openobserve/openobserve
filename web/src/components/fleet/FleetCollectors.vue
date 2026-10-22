@@ -203,7 +203,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #cell-delivery="{ row }">
         <span :data-test="`fleet-collectors-delivery-${row.id}`">
-          <OTag v-if="row.delivery" type="fleetDelivery" :value="row.delivery" size="xs" />
+          <OTag
+            v-if="row.delivery"
+            type="fleetDelivery"
+            :value="row.delivery"
+            size="xs"
+            :variant="row.status === 'offline' ? 'default-outline' : undefined"
+          />
           <span v-else class="text-text-muted">{{ DASH }}</span>
         </span>
       </template>

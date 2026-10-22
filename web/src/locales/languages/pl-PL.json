@@ -25695,6 +25695,7 @@
       "eventEnrolled": "Zarejestrowano",
       "lastEffectiveReport": "Zgłoszono obowiązującą konfigurację",
       "delivery": "Dostarczenie",
+      "deliveryOffline": "Ostatni raport przed przejściem w tryb offline:",
       "noCapabilities": "Nie zgłoszono",
       "noComponentHealth": "Nie zgłoszono kondycji komponentów",
       "noHealth": "Nie zgłoszono kondycji",

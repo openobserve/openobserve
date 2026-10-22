@@ -230,6 +230,20 @@ describe("FleetCollectorDrawer", () => {
     expect(labels).not.toContain("Assignment");
   });
 
+  it("mutes delivery for an offline collector and says when it last reported", async () => {
+    vi.mocked(fleet.getCollector).mockResolvedValue({
+      data: detail({ status: "offline", delivery: "running" }),
+    } as any);
+    wrapper = mountDrawer();
+    await flushPromises();
+    const delivery = wrapper.find(sel("delivery"));
+    expect(delivery.text()).toContain("Running");
+    expect(delivery.findComponent({ name: "OBadge" }).props("variant")).toBe("default-outline");
+    expect(wrapper.find(sel("delivery-offline")).text()).toContain(
+      "Last reported before going offline:",
+    );
+  });
+
   it("shows a rejection's error and the placeholder for an unassigned fleet", async () => {
     vi.mocked(fleet.getCollector).mockResolvedValue({
       data: detail({

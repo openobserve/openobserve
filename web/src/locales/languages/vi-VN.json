@@ -25695,6 +25695,7 @@
       "eventEnrolled": "Đã đăng ký",
       "lastEffectiveReport": "Đã báo cáo cấu hình hiệu lực",
       "delivery": "Phân phối",
+      "deliveryOffline": "Báo cáo cuối trước khi ngoại tuyến:",
       "noCapabilities": "Chưa báo cáo",
       "noComponentHealth": "Chưa báo cáo tình trạng thành phần",
       "noHealth": "Chưa báo cáo tình trạng",

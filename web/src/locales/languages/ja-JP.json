@@ -25695,6 +25695,7 @@
       "eventEnrolled": "登録済み",
       "lastEffectiveReport": "有効な構成を報告",
       "delivery": "配信",
+      "deliveryOffline": "オフラインになる前の最終報告:",
       "noCapabilities": "報告なし",
       "noComponentHealth": "コンポーネントのヘルスは報告されていません",
       "noHealth": "ヘルスは報告されていません",

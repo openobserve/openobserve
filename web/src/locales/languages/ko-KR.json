@@ -25695,6 +25695,7 @@
       "eventEnrolled": "등록됨",
       "lastEffectiveReport": "유효 구성 보고됨",
       "delivery": "전달",
+      "deliveryOffline": "오프라인 전 마지막 보고:",
       "noCapabilities": "보고된 항목 없음",
       "noComponentHealth": "보고된 구성 요소 상태 없음",
       "noHealth": "보고된 상태 없음",

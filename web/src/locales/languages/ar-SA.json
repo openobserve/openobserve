@@ -25695,6 +25695,7 @@
       "eventEnrolled": "تم التسجيل",
       "lastEffectiveReport": "تم الإبلاغ عن التكوين الفعلي",
       "delivery": "التسليم",
+      "deliveryOffline": "آخر تقرير قبل الانقطاع:",
       "noCapabilities": "لم يُبلَّغ عن أي إمكانات",
       "noComponentHealth": "لم يُبلَّغ عن صحة المكوّنات",
       "noHealth": "لم يُبلَّغ عن الصحة",

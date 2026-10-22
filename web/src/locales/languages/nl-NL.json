@@ -25695,6 +25695,7 @@
       "eventEnrolled": "Geregistreerd",
       "lastEffectiveReport": "Effectieve configuratie gerapporteerd",
       "delivery": "Levering",
+      "deliveryOffline": "Laatste melding voor het offline gaan:",
       "noCapabilities": "Geen gerapporteerd",
       "noComponentHealth": "Geen componentgezondheid gerapporteerd",
       "noHealth": "Geen gezondheid gerapporteerd",
