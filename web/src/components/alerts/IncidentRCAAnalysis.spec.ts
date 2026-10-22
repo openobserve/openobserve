@@ -386,6 +386,32 @@ describe("IncidentRCAAnalysis", () => {
       expect(wrapper.emitted("cancel-rca")).toHaveLength(1);
     });
 
+    it("M: a resumed run names the step it resumed from", async () => {
+      wrapper = mountPanel(
+        liveProps({
+          rca: rcaSummary({
+            current_run: rcaRun({
+              trigger: "resume",
+              context_used: {
+                resumed_from: {
+                  run_id: "run-1",
+                  steps: 2,
+                  from_step: { index: 3, stage: "changes", title: "Await flag change actor" },
+                },
+              },
+            }),
+          }),
+          reportRun: rcaRunItem(),
+          reportText: REPORT,
+        }),
+      );
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-reanalyzing-message").text()).toBe(
+        "Resuming from “Await flag change actor”…",
+      );
+    });
+
     it("M: Follow in thread scrolls the thread column", async () => {
       const scrollTo = vi.fn();
       Object.defineProperty(HTMLElement.prototype, "scrollTo", {
