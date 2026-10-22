@@ -1007,6 +1007,39 @@ describe("PublicDashboard viewer", () => {
     );
   });
 
+  it("tells the failure on the panels when the others are not available either", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_800_000_020_000);
+    vi.mocked(service.getConfig).mockResolvedValue({
+      data: {
+        ...panelsConfig([
+          { id: "failed", type: "line" },
+          { id: "masked", type: "line" },
+        ]),
+        intents: { failed: "i1", masked: "i2" },
+      },
+      status: 200,
+    } as never);
+    vi.mocked(service.getData).mockResolvedValue({
+      status: 200,
+      data: {
+        ...okBody("a"),
+        last_error_at: 1_800_000_000_000_000,
+        next_retry_at: 1_800_000_080_000_000,
+        panels: {
+          failed: { state: { state: "not_available", reason: "build_error" }, intent: "i1" },
+          masked: { state: { state: "not_available", reason: "changed" } },
+        },
+      },
+    } as never);
+    const w = buildWrapper();
+    await flushPromises();
+    expect(grid(w).props("injectedPanelData").masked.errorDetail.message).toMatch(
+      /^The last update failed at .+\. Trying again at .+\.$/,
+    );
+    expect(w.findComponent({ name: "OBanner" }).exists()).toBe(false);
+  });
+
   it("leaves the failure to the banner while other panels still show data", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_800_000_020_000);

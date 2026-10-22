@@ -491,10 +491,16 @@ const waitsForBuild = (panel: { id: string }) => {
   return result.intent !== intents.value[panel.id];
 };
 
+// An ok result built from the query the layout has now.
+const showsData = (panel: { id: string }) => {
+  const result = body.value?.panels?.[panel.id];
+  return result?.state?.state === "ok" && result.intent === intents.value[panel.id];
+};
+
 // Nothing on screen has data, so the failure is told on the panels instead of the banner.
 const nothingShown = computed(() => {
   const built = tabs.value.flatMap((tab) => tab?.panels ?? []).filter(isBuiltPanel);
-  return built.length > 0 && built.every(waitsForBuild);
+  return built.length > 0 && !built.some(showsData);
 });
 
 const preparingText = computed<I18nText>(() => {
