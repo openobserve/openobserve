@@ -42,10 +42,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('fleet.install.httpTransport')"
       data-test="fleet-install-command-http"
     />
-    <FleetCodeEditor
-      class="h-60"
+    <OCodeBlock
       :code="command"
-      :language="platform === 'windows' ? 'powershell' : 'shell'"
+      :code-masked="commandMasked"
+      :lang="platform === 'windows' ? 'powershell' : 'bash'"
+      chrome="terminal"
+      :reveal-tooltip="t('fleet.install.revealToken')"
+      :hide-tooltip="t('fleet.install.hideToken')"
       data-test="fleet-install-command-code"
     />
     <OText variant="meta" data-test="fleet-install-command-note">{{ note }}</OText>
@@ -61,7 +64,8 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { getIngestionURL } from "@/utils/queryUtils";
 import { raw, useI18nTyped } from "@/types/i18n";
-import FleetCodeEditor from "./FleetCodeEditor.vue";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+import { maskSecret } from "@/composables/useCredentialSnippet";
 import {
   INSTALL_PLATFORMS,
   PLATFORM_LABEL,
@@ -93,13 +97,17 @@ const note = computed(() => {
   return t("fleet.install.rerunNote");
 });
 
-const command = computed(() =>
+const build = (token: string) =>
   installCommand(platform.value, {
     baseUrl,
     org: orgId.value,
-    token: props.token,
+    token,
     version: version.value,
     http: http.value && platform.value !== "kubernetes",
-  }),
+  });
+const command = computed(() => build(props.token));
+// A placeholder stays readable; a real token shows masked until revealed, while copy takes the full command.
+const commandMasked = computed(() =>
+  /^o2ft_/.test(props.token) ? build(maskSecret(props.token)) : undefined,
 );
 </script>

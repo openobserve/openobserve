@@ -25439,7 +25439,9 @@
       "rerunNote": "The script installs the supervisor, the collector and a service. Re-run it to upgrade or to switch tokens.",
       "tokenOption": "{name} (no collectors) | {name} ({count} collector) | {name} ({count} collectors)",
       "versionLatest": "Installs the latest supported collector version",
-      "versionLine": "Installs collector version {version}"
+      "versionLine": "Installs collector version {version}",
+      "revealToken": "Reveal token",
+      "hideToken": "Hide token"
     },
     "settings": {
       "governance": "Governance",

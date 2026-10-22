@@ -30,15 +30,16 @@ vi.mock("@/services/fleet", () => ({
 }));
 
 const CodeStub = {
-  name: "FleetCodeEditor",
-  props: ["code", "language"],
-  template: '<pre data-test="fleet-install-command-code">{{ code }}</pre>',
+  name: "OCodeBlock",
+  props: ["code", "codeMasked", "lang"],
+  template:
+    '<div><pre data-test="fleet-install-command-code">{{ code }}</pre><pre data-test="fleet-install-command-masked">{{ codeMasked }}</pre></div>',
 };
 
 function mountCommand(props: Record<string, unknown> = {}) {
   return mount(FleetInstallCommand, {
     props: { token: "o2ft_abc123", ...props },
-    global: { plugins: [i18n, store], stubs: { FleetCodeEditor: CodeStub } },
+    global: { plugins: [i18n, store], stubs: { OCodeBlock: CodeStub } },
   });
 }
 
@@ -64,6 +65,17 @@ describe("FleetInstallCommand", () => {
       .findAll('[data-test^="fleet-install-command-os-"]')
       .map((b) => b.text());
     expect(offered).toEqual(["Linux", "macOS", "Windows", "Docker", "Kubernetes"]);
+  });
+
+  it("masks a real token in the shown command and leaves a placeholder readable", () => {
+    const w = mountCommand();
+    expect(code(w)).toContain("o2ft_abc123");
+    const masked = w.find('[data-test="fleet-install-command-masked"]').text();
+    expect(masked).toContain("o2ft••••••••••••c123");
+    expect(masked).not.toContain("o2ft_abc123");
+    expect(
+      mountCommand({ token: "<TOKEN>" }).find('[data-test="fleet-install-command-masked"]').text(),
+    ).toBe("");
   });
 
   it("runs the install script for the current org with the token", () => {
