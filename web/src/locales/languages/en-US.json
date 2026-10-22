@@ -581,6 +581,15 @@
     }
   },
   "common": {
+    "dismiss": "Dismiss",
+    "exitFullscreen": "Exit full screen",
+    "moreActions": "More actions",
+    "moreOptions": "More options",
+    "addFilter": "Add filter",
+    "view": "View",
+    "compare": "Compare",
+    "openInNewTab": "Open in new tab",
+    "send": "Send",
     "copiedToClipboard": "Copied to clipboard",
     "customLogoAlt": "Organization logo",
     "dragToReorder": "Drag to reorder",
@@ -13055,6 +13064,8 @@
     "traceFilters": "Trace Filters",
     "showTraces": "Show Traces",
     "applyAndSearch": "Apply & Search",
+    "applyAndSearchEquals": "Apply & Search (equals)",
+    "applyAndSearchNotEquals": "Apply & Search (not equals)",
     "timestamp": "Timestamp",
     "noErrorPresent": "No error present for this span",
     "noEventsPresent": "No events for this span",
@@ -15120,6 +15131,7 @@
         "noDataAvailable": "No data available",
         "copyInput": "Copy Input",
         "copyOutput": "Copy Output",
+        "copyExpected": "Copy Expected Output",
         "copied": "{type} copied to clipboard",
         "copyFailed": "Failed to copy to clipboard",
         "execution": "Execution",
@@ -17681,6 +17693,7 @@
       "warning": "Warning"
     },
     "journey": {
+      "clearResults": "Clear results",
       "extract": {
         "action": "Extract to subtest",
         "title": "Extract {count} step to a new test | Extract {count} steps to a new test",

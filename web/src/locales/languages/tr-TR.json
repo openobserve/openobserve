@@ -581,6 +581,15 @@
     }
   },
   "common": {
+    "dismiss": "Kapat",
+    "exitFullscreen": "Tam ekrandan çık",
+    "moreActions": "Daha fazla işlem",
+    "moreOptions": "Daha fazla seçenek",
+    "addFilter": "Filtre ekle",
+    "view": "Görüntüle",
+    "compare": "Karşılaştır",
+    "openInNewTab": "Yeni sekmede aç",
+    "send": "Gönder",
     "copiedToClipboard": "Panoya kopyalandı",
     "customLogoAlt": "Kuruluş logosu",
     "dragToReorder": "Sıralamak için sürükleyin",
@@ -13055,6 +13064,8 @@
     "traceFilters": "İz Filtreleri",
     "showTraces": "İzleri Göster",
     "applyAndSearch": "Uygula ve Ara",
+    "applyAndSearchEquals": "Uygula ve Ara (eşittir)",
+    "applyAndSearchNotEquals": "Uygula ve Ara (eşit değildir)",
     "timestamp": "Zaman damgası",
     "noErrorPresent": "Bu Span için hata mevcut değil",
     "noEventsPresent": "Bu Span için olay yok",
@@ -15120,6 +15131,7 @@
         "noDataAvailable": "Veri mevcut değil",
         "copyInput": "Girdiyi Kopyala",
         "copyOutput": "Çıktıyı Kopyala",
+        "copyExpected": "Beklenen Çıktıyı Kopyala",
         "copied": "{type} panoya kopyalandı",
         "copyFailed": "Panoya kopyalanamadı",
         "execution": "Yürütme",
@@ -17681,6 +17693,7 @@
       "warning": "Uyarı"
     },
     "journey": {
+      "clearResults": "Sonuçları temizle",
       "extract": {
         "action": "Alt teste çıkar",
         "title": "{count} adımı yeni bir teste çıkar | {count} adımı yeni bir teste çıkar",

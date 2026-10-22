@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODropdown side="bottom" align="end">
       <template #trigger>
         <OButton
+          :aria-label="t('common.moreActions')"
           icon-left="more-vert"
           variant="ghost"
           size="icon-xs-sq"
@@ -75,7 +76,7 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import type { I18nText } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 
 /** One row action. `id` is what the row emits back to the page. */
 export interface DbmRowAction {
@@ -91,6 +92,8 @@ const props = withDefaults(
   }>(),
   { actions: () => [], dataTest: "dbm-row-actions" },
 );
+
+const { t } = useI18nTyped();
 
 const moreTest = computed(() => `${props.dataTest.replace(/-row-actions$/, "")}-row-more-actions`);
 

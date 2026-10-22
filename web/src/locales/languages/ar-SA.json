@@ -581,6 +581,15 @@
     }
   },
   "common": {
+    "dismiss": "تجاهل",
+    "exitFullscreen": "إنهاء ملء الشاشة",
+    "moreActions": "المزيد من الإجراءات",
+    "moreOptions": "المزيد من الخيارات",
+    "addFilter": "إضافة فلتر",
+    "view": "عرض",
+    "compare": "مقارنة",
+    "openInNewTab": "فتح في علامة تبويب جديدة",
+    "send": "إرسال",
     "copiedToClipboard": "تم نسخها إلى الحافظة",
     "customLogoAlt": "شعار المؤسسة",
     "dragToReorder": "اسحب لإعادة الترتيب",
@@ -13055,6 +13064,8 @@
     "traceFilters": "فلاتر التتبع",
     "showTraces": "عرض التتبعات",
     "applyAndSearch": "تطبيق & البحث",
+    "applyAndSearchEquals": "تطبيق والبحث (يساوي)",
+    "applyAndSearchNotEquals": "تطبيق والبحث (لا يساوي)",
     "timestamp": "الطابع الزمني",
     "noErrorPresent": "لا يوجد خطأ لهذا الامتداد",
     "noEventsPresent": "لا توجد أحداث لهذا الامتداد",
@@ -15120,6 +15131,7 @@
         "noDataAvailable": "لا توجد بيانات متاحة",
         "copyInput": "نسخ المُدخل",
         "copyOutput": "نسخ المُخرج",
+        "copyExpected": "نسخ المخرجات المتوقعة",
         "copied": "{type} نسخ إلى الحافظة",
         "copyFailed": "فشل في النسخ إلى الحافظة",
         "execution": "الإعدام",
@@ -17681,6 +17693,7 @@
       "warning": "تحذير"
     },
     "journey": {
+      "clearResults": "مسح النتائج",
       "extract": {
         "action": "استخراج إلى اختبار فرعي",
         "title": "استخراج {count} خطوة إلى اختبار جديد | استخراج {count} من الخطوات إلى اختبار جديد",
