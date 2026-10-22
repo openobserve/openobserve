@@ -1465,8 +1465,10 @@ export class AlertsPage {
     async waitForEvaluationHistoryRow({ attempts = 8 } = {}) {
         const row = this.getAlertHistoryDataRowLocator().first();
         const refresh = this.page.locator(this.locators.alertDetailsRefreshButton).first();
+        // isVisible() ignores its timeout and returns at once, so waitFor is what gives each attempt its 5s.
+        const rowShows = () => row.waitFor({ state: 'visible', timeout: 5000 }).then(() => true, () => false);
         for (let i = 0; i < attempts; i++) {
-            if (await row.isVisible({ timeout: 5000 }).catch(() => false)) return true;
+            if (await rowShows()) return true;
             // The history fetch is single-shot on load, so re-issue it; a reload is the fallback when the toolbar is absent.
             if (await refresh.isVisible().catch(() => false)) {
                 await refresh.click().catch(() => {});
@@ -1474,7 +1476,7 @@ export class AlertsPage {
                 await this.page.reload({ waitUntil: 'networkidle' }).catch(() => {});
             }
         }
-        return await row.isVisible({ timeout: 5000 }).catch(() => false);
+        return await rowShows();
     }
 
     /**
@@ -3253,6 +3255,11 @@ export class AlertsPage {
         const valueEl = this.page.locator('[data-test="add-alert-name-input-value"]').first();
         await valueEl.waitFor({ state: 'visible', timeout: 30000 });
         return ((await valueEl.textContent()) ?? '').trim();
+    }
+
+    /** Display-mode alert name value element (OFormInlineEdit span, not an <input>). */
+    getAlertNameValueLocator() {
+        return this.page.locator('[data-test="add-alert-name-input-value"]').first();
     }
 
     /**

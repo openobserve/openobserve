@@ -5025,6 +5025,8 @@
       "idleInConfig": "{stream}은(는) 이미 데이터를 수신하고 있습니다. 구성을 복사하면 확인이 시작됩니다.",
       "idleMatches": "일치하는 스트림은 이미 데이터를 수신하고 있습니다. 명령을 복사하면 확인이 시작됩니다.",
       "idleMatchesConfig": "일치하는 스트림은 이미 데이터를 수신하고 있습니다. 구성을 복사하면 확인이 시작됩니다.",
+      "idleNew": "명령을 복사하면 확인이 시작됩니다.",
+      "idleNewConfig": "구성을 복사하면 확인이 시작됩니다.",
       "checkNow": "지금 확인",
       "receivedPill": "첫 이벤트 수신됨",
       "receivedNewPill": "새 데이터 수신됨",

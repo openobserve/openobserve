@@ -5025,6 +5025,8 @@
       "idleInConfig": "{stream} empfängt bereits Daten. Die Prüfung startet, wenn Sie die Konfiguration kopieren.",
       "idleMatches": "Passende Streams empfangen bereits Daten. Die Prüfung startet, wenn Sie den Befehl kopieren.",
       "idleMatchesConfig": "Passende Streams empfangen bereits Daten. Die Prüfung startet, wenn Sie die Konfiguration kopieren.",
+      "idleNew": "Die Prüfungen starten, sobald Sie den Befehl kopieren.",
+      "idleNewConfig": "Die Prüfungen starten, sobald Sie die Konfiguration kopieren.",
       "checkNow": "Jetzt prüfen",
       "receivedPill": "Erstes Ereignis empfangen",
       "receivedNewPill": "Neue Daten empfangen",

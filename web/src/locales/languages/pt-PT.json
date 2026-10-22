@@ -5025,6 +5025,8 @@
       "idleInConfig": "{stream} já recebe dados. As verificações começam quando copia a configuração.",
       "idleMatches": "Os streams correspondentes já recebem dados. As verificações começam quando copia o comando.",
       "idleMatchesConfig": "Os streams correspondentes já recebem dados. As verificações começam quando copia a configuração.",
+      "idleNew": "As verificações começam quando copia o comando.",
+      "idleNewConfig": "As verificações começam quando copia a configuração.",
       "checkNow": "Verificar agora",
       "receivedPill": "Primeiro evento recebido",
       "receivedNewPill": "Novos dados recebidos",

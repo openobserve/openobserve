@@ -5025,6 +5025,8 @@
       "idleInConfig": "{stream} już odbiera dane. Sprawdzanie rozpocznie się po skopiowaniu konfiguracji.",
       "idleMatches": "Pasujące strumienie już odbierają dane. Sprawdzanie rozpocznie się po skopiowaniu polecenia.",
       "idleMatchesConfig": "Pasujące strumienie już odbierają dane. Sprawdzanie rozpocznie się po skopiowaniu konfiguracji.",
+      "idleNew": "Sprawdzanie rozpocznie się po skopiowaniu polecenia.",
+      "idleNewConfig": "Sprawdzanie rozpocznie się po skopiowaniu konfiguracji.",
       "checkNow": "Sprawdź teraz",
       "receivedPill": "Odebrano pierwsze zdarzenie",
       "receivedNewPill": "Odebrano nowe dane",
