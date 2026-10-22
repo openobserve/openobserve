@@ -32,14 +32,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="fleet-audit-table"
     >
       <template #toolbar>
-        <div class="min-w-0 flex-1 max-md:min-w-40">
+        <div class="flex min-w-0 flex-1 items-center gap-2 max-md:min-w-40">
           <OSearchInput
             v-model="search"
-            class="w-full"
+            class="min-w-0 flex-1"
             size="sm"
             clearable
             :placeholder="t('fleet.audit.search')"
             data-test="fleet-audit-search"
+          />
+          <OSelect
+            v-model="kindFilter"
+            width="sm"
+            size="sm"
+            clearable
+            :options="kindOptions"
+            :placeholder="t('fleet.audit.allObjects')"
+            data-test="fleet-audit-kind-filter"
           />
         </div>
       </template>
@@ -56,6 +65,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-at="{ row }">
         <OTimeCell :value="row.at" unit="ms" mode="relative" />
       </template>
+      <template #cell-kind="{ row }">
+        <span :data-test="`fleet-audit-kind-${row.id}`">{{
+          kindLabel(auditKind(row.action))
+        }}</span>
+      </template>
       <template #cell-action="{ row }">
         {{ te(row.action) ? t(row.action) : raw(row.action) }}
       </template>
@@ -66,9 +80,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OEmptyState
           size="block"
           preset="no-data"
-          :filtered="!!search"
+          :filtered="!!search || !!kindFilter"
           :title="audit.disabled.value ? t('fleet.settings.auditDisabled') : undefined"
-          @action="search = ''"
+          @action="clearFilters"
         />
       </template>
       <template #error>
@@ -89,14 +103,17 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { FleetAuditEvent } from "@/services/fleet";
 import { isForbidden, useFleetAudit } from "./useFleetApi";
+import { AUDIT_KINDS, auditKind, type AuditKind } from "./auditKind";
 
 const { t, te } = useI18nTyped();
 
 const audit = useFleetAudit();
 const search = ref("");
+const kindFilter = ref<AuditKind | null>(null);
 const auditLoading = audit.loading;
 const auditForbidden = computed(() => isForbidden(audit.error.value));
 const auditError = computed(() =>
@@ -106,13 +123,26 @@ const auditError = computed(() =>
 );
 
 const actionText = (e: FleetAuditEvent) => (te(e.action) ? t(e.action) : e.action);
+const kindLabel = (kind: AuditKind) => t(`fleet.audit.kind.${kind}`);
+const kindOptions = computed(() =>
+  AUDIT_KINDS.map((kind) => ({ label: kindLabel(kind), value: kind })),
+);
+
+function clearFilters() {
+  search.value = "";
+  kindFilter.value = null;
+}
 
 const rows = computed(() => {
   const q = search.value.trim().toLowerCase();
-  if (!q) return audit.rows.value;
-  return audit.rows.value.filter((e) =>
-    [e.actor, actionText(e), e.target ?? ""].some((s) => String(s).toLowerCase().includes(q)),
-  );
+  return audit.rows.value.filter((e) => {
+    const kind = auditKind(e.action);
+    if (kindFilter.value && kind !== kindFilter.value) return false;
+    if (!q) return true;
+    return [e.actor, kindLabel(kind), actionText(e), e.target ?? ""].some((s) =>
+      String(s).toLowerCase().includes(q),
+    );
+  });
 });
 
 const auditColumns = computed<OTableColumnDef<FleetAuditEvent>[]>(() => [
@@ -122,6 +152,13 @@ const auditColumns = computed<OTableColumnDef<FleetAuditEvent>[]>(() => [
     header: t("fleet.settings.actor"),
     accessorKey: "actor",
     size: 220,
+    sortable: true,
+  },
+  {
+    id: "kind",
+    header: t("fleet.audit.object"),
+    accessorFn: (e) => auditKind(e.action),
+    size: 140,
     sortable: true,
   },
   { id: "action", header: t("fleet.settings.action"), accessorKey: "action", size: 240 },

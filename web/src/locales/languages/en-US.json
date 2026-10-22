@@ -25515,7 +25515,18 @@
       "resumedRollout": "Resumed rollout",
       "skippedInRollout": "Skipped collectors in rollout",
       "rolledBackRollout": "Rolled back rollout",
-      "movedByToken": "Moved by enrollment token"
+      "movedByToken": "Moved by enrollment token",
+      "object": "Object",
+      "allObjects": "All objects",
+      "kind": {
+        "fleet": "Fleet",
+        "collector": "Collector",
+        "configuration": "Configuration",
+        "rollout": "Rollout",
+        "token": "Token",
+        "settings": "Settings",
+        "other": "Other"
+      }
     },
     "editor": {
       "pageTitle": "Configuration editor",

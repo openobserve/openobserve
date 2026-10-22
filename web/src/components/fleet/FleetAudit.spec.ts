@@ -87,6 +87,22 @@ describe("FleetAudit", () => {
     await mountAudit();
     expect(auditText(wrapper)).toContain("O2_AUDIT_ENABLED");
   });
+  it("files each row under its object and filters by it", async () => {
+    wrapper = await mountAudit();
+    expect(wrapper.find('[data-test="fleet-audit-kind-a1"]').text()).toBe("Configuration");
+    expect(wrapper.find('[data-test="fleet-audit-kind-a2"]').text()).toBe("Other");
+    wrapper
+      .findComponent('[data-test="fleet-audit-kind-filter"]')
+      .vm.$emit("update:modelValue", "token");
+    await flushPromises();
+    expect(wrapper.findAll("tbody tr").length).toBe(0);
+    wrapper
+      .findComponent('[data-test="fleet-audit-kind-filter"]')
+      .vm.$emit("update:modelValue", "configuration");
+    await flushPromises();
+    expect(wrapper.findAll("tbody tr").map((tr) => tr.text())).toHaveLength(1);
+  });
+
   it("translates a known action key and shows an unknown one raw", async () => {
     await mountAudit();
     expect(auditText(wrapper)).toContain("Published version");
