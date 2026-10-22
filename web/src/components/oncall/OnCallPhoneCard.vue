@@ -200,7 +200,7 @@ import {
   sendCodeMutation,
   setContactMutation,
 } from "@/services/oncall.queries";
-import type { Contact } from "@/ts/interfaces/oncall";
+import type { Contact, RefusalReason } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
@@ -213,6 +213,12 @@ import {
 
 // The server's minimum gap between two codes for one number (R17).
 const RESEND_SECS = 60;
+// Refusals the server returns after storing the new code, so the old one no longer works.
+const UNDELIVERED: ReadonlySet<RefusalReason> = new Set([
+  "number_rejected",
+  "number_not_allowed",
+  "provider_unavailable",
+]);
 const PHONE_EXAMPLE = raw("+1 415 555 0134");
 const CODE_EXAMPLE = raw("000000");
 
@@ -309,7 +315,7 @@ async function requestCode(phone: string) {
       return;
     }
     // The server stored the undelivered code, so no code works yet the 60 s gap still runs.
-    if (refusal?.reason === "number_rejected" || refusal?.reason === "provider_unavailable") {
+    if (refusal && UNDELIVERED.has(refusal.reason)) {
       codeSent.value = false;
       startCountdown(phone, RESEND_SECS);
     }

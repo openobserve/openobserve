@@ -1940,6 +1940,7 @@ const REFUSAL_REASONS: ReadonlySet<string> = new Set<RefusalReason>([
   "no_provider",
   "no_phone",
   "number_rejected",
+  "number_not_allowed",
   "provider_unavailable",
 ]);
 
@@ -1991,6 +1992,8 @@ export function phoneRefusalText(t: TranslateFn, body: VerificationRefusalBody):
       return t("oncall.phoneRefusalNoPhone");
     case "number_rejected":
       return t("oncall.phoneRefusalNumberRejected");
+    case "number_not_allowed":
+      return t("oncall.phoneRefusalNumberNotAllowed");
     case "provider_unavailable":
       return t("oncall.phoneRefusalProviderUnavailable");
   }

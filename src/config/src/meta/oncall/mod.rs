@@ -35,9 +35,9 @@ pub use agent::{
     update_channels, verdict_lines,
 };
 pub use contact::{
-    CODE_MAX_ATTEMPTS, CODE_TTL_MICROS, CodeCheck, CodeRow, Contact, ContactError, DAY_MICROS,
-    SEND_GAP_MICROS, SENDS_PER_NUMBER_PER_DAY, SENDS_PER_USER_PER_DAY, SendDecision, WaitLimit,
-    code_check, code_send_decision, next_counts, to_e164, wait_message,
+    CODE_MAX_ATTEMPTS, CODE_TTL_MICROS, CodeCheck, CodeRow, Contact, ContactError, SEND_GAP_MICROS,
+    SEND_WINDOW_MICROS, SENDS_PER_NUMBER_PER_WINDOW, SENDS_PER_USER_PER_WINDOW, SendDecision,
+    WaitLimit, code_check, code_send_decision, next_counts, to_e164, wait_message,
 };
 pub use policy::{
     Admission, AfterRung, BREAKER_OPEN_MICROS, BREAKER_WINDOW_MICROS, CHANNEL_ORDER, Channel,
