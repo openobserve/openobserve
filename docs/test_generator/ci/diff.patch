@@ -1,0 +1,2121 @@
+===== COMPLETE LIST OF CHANGED FILES (44 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+scripts/translations/.translation_state.json
+web/src/components/ingestion/FirstDataPanel.spec.ts
+web/src/components/ingestion/FirstEventStatus.spec.ts
+web/src/components/ingestion/FirstEventStatus.vue
+web/src/components/ingestion/IngestionContent.spec.ts
+web/src/components/ingestion/IngestionContent.vue
+web/src/components/ingestion/configGuides.spec.ts
+web/src/components/ingestion/databases/CouchDB.vue
+web/src/components/ingestion/databases/Elasticsearch.vue
+web/src/components/ingestion/databases/SAPHana.vue
+web/src/components/ingestion/logs/FileBeat.vue
+web/src/components/ingestion/logs/FluentBit.vue
+web/src/components/ingestion/logs/Fluentd.vue
+web/src/components/ingestion/logs/LogstashDatasource.vue
+web/src/components/ingestion/logs/LoongCollector.vue
+web/src/components/ingestion/logs/SyslogNg.vue
+web/src/components/ingestion/logs/Vector.vue
+web/src/components/ingestion/metrics/CategrafConfig.vue
+web/src/components/ingestion/metrics/NightingaleConfig.vue
+web/src/components/ingestion/metrics/OtelCollector.vue
+web/src/components/ingestion/metrics/PrometheusConfig.vue
+web/src/components/ingestion/metrics/TelegrafConfig.vue
+web/src/components/ingestion/profiles/OtelCollector.vue
+web/src/components/ingestion/recommended/OtelConfig.vue
+web/src/composables/firstEvent/useFirstDataNotice.spec.ts
+web/src/composables/firstEvent/useFirstDataNotice.ts
+web/src/composables/firstEvent/useFirstEventWatch.spec.ts
+web/src/composables/firstEvent/useFirstEventWatch.ts
+web/src/locales/languages/ar-SA.json
+web/src/locales/languages/de-DE.json
+web/src/locales/languages/en-US.json
+web/src/locales/languages/es-ES.json
+web/src/locales/languages/fr-FR.json
+web/src/locales/languages/it-IT.json
+web/src/locales/languages/ja-JP.json
+web/src/locales/languages/ko-KR.json
+web/src/locales/languages/nl-NL.json
+web/src/locales/languages/pl-PL.json
+web/src/locales/languages/pt-PT.json
+web/src/locales/languages/ru-RU.json
+web/src/locales/languages/tr-TR.json
+web/src/locales/languages/vi-VN.json
+web/src/locales/languages/zh-CN.json
+web/src/locales/languages/zh-TW.json
+===== END CHANGED FILES =====
+
+diff --git a/scripts/translations/.translation_state.json b/scripts/translations/.translation_state.json
+index 70b08c6ff9a4..46de93f118b5 100644
+--- a/scripts/translations/.translation_state.json
++++ b/scripts/translations/.translation_state.json
+@@ -13066,6 +13066,8 @@
+       "idleInConfig": "654a3d3a666c47da",
+       "idleMatches": "07b128b00baed4cc",
+       "idleMatchesConfig": "50da86325e8062d0",
++      "idleNew": "9ad87a51f28cd79d",
++      "idleNewConfig": "4c7fccd2b51a4c5f",
+       "idlePill": "062093d7d3f4ff01",
+       "installCheck": "64399266f1936bde",
+       "meta": "2c6ef980667c5380",
+diff --git a/web/src/components/ingestion/FirstDataPanel.spec.ts b/web/src/components/ingestion/FirstDataPanel.spec.ts
+index 2717252cd24a..037a64434e7b 100644
+--- a/web/src/components/ingestion/FirstDataPanel.spec.ts
++++ b/web/src/components/ingestion/FirstDataPanel.spec.ts
+@@ -48,6 +48,8 @@ vi.mock("@/composables/firstEvent/useFirstEventWatch", () => ({
+       ...fake,
+       scope: computed(() => "new-data"),
+       sinceUs: computed(() => undefined),
++      targetExists: computed(() => true),
++      deciding: computed(() => false),
+     };
+   },
+ }));
+diff --git a/web/src/components/ingestion/FirstEventStatus.spec.ts b/web/src/components/ingestion/FirstEventStatus.spec.ts
+index a2b8a25d0292..c3182ce9f3bf 100644
+--- a/web/src/components/ingestion/FirstEventStatus.spec.ts
++++ b/web/src/components/ingestion/FirstEventStatus.spec.ts
+@@ -35,6 +35,8 @@ const fake = {
+   scope: ref<"new-data" | "since-watch-start">("new-data"),
+   troubleshooting: ref(false),
+   sinceUs: ref<number>(),
++  targetExists: ref(true),
++  deciding: ref(false),
+   start: vi.fn(),
+   stop: vi.fn(),
+   probeNow: vi.fn(),
+@@ -48,6 +50,8 @@ vi.mock("@/composables/firstEvent/useFirstEventWatch", () => ({
+       ...fake,
+       scope: computed(() => fake.scope.value),
+       sinceUs: computed(() => fake.sinceUs.value),
++      targetExists: computed(() => fake.targetExists.value),
++      deciding: computed(() => fake.deciding.value),
+     };
+   },
+ }));
+@@ -112,6 +116,8 @@ beforeEach(() => {
+   fake.scope.value = "new-data";
+   fake.troubleshooting.value = false;
+   fake.sinceUs.value = undefined;
++  fake.targetExists.value = true;
++  fake.deciding.value = false;
+   awsConfig.isEnterprise = "false";
+ });
+ 
+@@ -187,6 +193,29 @@ describe("FirstEventStatus — waiting", () => {
+   });
+ });
+ 
++describe("FirstEventStatus — before the first decision", () => {
++  it.each([{}, { display: "pill" }])(
++    "renders a neutral placeholder and no claim until the watch decides (%o)",
++    async (props) => {
++      fake.deciding.value = true;
++      mountBar({ targetStream: "syslog_ng", signal: "logs", ...props });
++      const root = q("first-event-status");
++      expect(root.attributes("data-state")).toBe("deciding");
++      expect(root.text()).toBe("");
++      expect(root.find('[role="status"]').exists()).toBe(true);
++      expect(q("first-event-status-meta").exists()).toBe(false);
++      expect(q("first-event-status-troubleshoot-btn").exists()).toBe(false);
++      expect(q("first-event-status-check-now-btn").exists()).toBe(false);
++      await vi.advanceTimersByTimeAsync(130_000);
++      expect(q("first-event-status").text()).not.toContain("Waiting");
++      fake.deciding.value = false;
++      await nextTick();
++      expect(q("first-event-status").attributes("data-state")).toBe("waiting");
++      expect(q("first-event-status").text()).toContain("Waiting for logs in syslog_ng");
++    },
++  );
++});
++
+ describe("FirstEventStatus — received", () => {
+   const result: FirstEventResult = {
+     streamName: "default",
+@@ -419,6 +448,22 @@ describe("FirstEventStatus — diagnosis", () => {
+     expect(wrapper.emitted("copy-command")).toHaveLength(1);
+   });
+ 
++  it("names the guide's own tool in the config fix", async () => {
++    mountBar({ snippetKind: "config", configTool: "syslog-ng" });
++    fake.diagnosis.value = {
++      form: "rejected",
++      trigger: "troubleshoot",
++      rejections: [rejection("invalid_credentials", 401)],
++    };
++    fake.state.value = "rejected";
++    await nextTick();
++    expect(q("first-event-diagnosis-fix").text()).toContain(
++      "The password in your syslog-ng config",
++    );
++    expect(q("first-event-diagnosis-fix").text()).toContain("restart syslog-ng");
++    expect(q("first-event-diagnosis-fix").text()).not.toContain("Fluent Bit");
++  });
++
+   it("shows the org id, endpoint and compare sentence when no request reached the org", async () => {
+     mountBar();
+     fake.diagnosis.value = { form: "no-requests", trigger: "troubleshoot", rejections: [] };
+@@ -687,6 +732,28 @@ describe("FirstEventStatus — pill display for empty pages", () => {
+     expect(q("first-event-status-meta").text()).toContain(text);
+   });
+ 
++  it.each([
++    [{ targetStream: "syslog_ng" }, "Checks start when you copy the command."],
++    [
++      { targetStream: "syslog_ng", snippetKind: "config" },
++      "Checks start when you copy the config.",
++    ],
++    [{ targetStream: "system_", match: "keyword" }, "Checks start when you copy the command."],
++    [{ targetStream: "syslog_ng", display: "pill" }, "Checks start when you copy the command."],
++  ])(
++    "claims no existing data when the idle bar waits on a target that does not exist (%o)",
++    async (props, text) => {
++      mountBar(props);
++      fake.state.value = "idle";
++      fake.targetExists.value = false;
++      await nextTick();
++      expect(q("first-event-status-meta").text()).toBe(text);
++      expect(q("first-event-status").text()).toContain("Not checking yet");
++      await q("first-event-status-check-now-btn").trigger("click");
++      expect(fake.start).toHaveBeenCalledWith("check");
++    },
++  );
++
+   it("offers no Check now outside the idle state", () => {
+     mountBar({ targetStream: "default" });
+     expect(q("first-event-status-check-now-btn").exists()).toBe(false);
+diff --git a/web/src/components/ingestion/FirstEventStatus.vue b/web/src/components/ingestion/FirstEventStatus.vue
+index a06d9be26065..aa1691f755f2 100644
+--- a/web/src/components/ingestion/FirstEventStatus.vue
++++ b/web/src/components/ingestion/FirstEventStatus.vue
+@@ -19,6 +19,7 @@ import { computed, inject, onBeforeUnmount, onMounted, ref, toRef, watch } from
+ import { useStore } from "vuex";
+ import { useRouter } from "vue-router";
+ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
++import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+ import OButton from "@/lib/core/Button/OButton.vue";
+ import OTag from "@/lib/core/Badge/OTag.vue";
+ import OText from "@/lib/core/Typography/OText.vue";
+@@ -50,6 +51,8 @@ const props = withDefaults(
+     guideName?: string;
+     docUrl?: string;
+     snippetKind?: "command" | "config";
++    /** The tool whose config holds the password, named in the invalid-credentials fix. */
++    configTool?: string;
+     /** The guide's host or cluster input, when the user typed one. */
+     sourceLabel?: string;
+     /** `pill` renders the state pill and its one line only, for empty pages that link to the guide for diagnosis. */
+@@ -67,6 +70,7 @@ const props = withDefaults(
+     guideName: "",
+     docUrl: undefined,
+     snippetKind: "command",
++    configTool: "Fluent Bit",
+     sourceLabel: undefined,
+     display: "bar",
+     waitingLabel: undefined,
+@@ -94,10 +98,10 @@ const watcher = useFirstEventWatch(toRef(props, "org"), toRef(props, "signal"),
+   match: toRef(props, "match"),
+   autoDiagnosis: computed(() => props.display !== "pill"),
+ });
+-const { state, result, diagnosis, startedAtMs, scope, troubleshooting } = watcher;
++const { state, result, diagnosis, startedAtMs, scope, troubleshooting, targetExists, deciding } =
++  watcher;
+ 
+ const CLOCK_TICK_MS = 1000;
+-const FLUENT_BIT = raw("Fluent Bit");
+ 
+ // a reactive clock, so the elapsed time and the cadence shown move on their own
+ const nowMs = ref(Date.now());
+@@ -247,6 +251,9 @@ const idleStream = computed(() =>
+ );
+ const idleKey = computed<I18nKey>(() => {
+   const config = props.snippetKind === "config";
++  if (!targetExists.value) {
++    return config ? "ingestion.firstEvent.idleNewConfig" : "ingestion.firstEvent.idleNew";
++  }
+   if (!idleStream.value) {
+     return config ? "ingestion.firstEvent.idleMatchesConfig" : "ingestion.firstEvent.idleMatches";
+   }
+@@ -310,8 +317,13 @@ const reasonText = (reason: keyof typeof REJECTION_REASON_KEYS) =>
+ const invalidCredentialsFix = (token: I18nText | undefined): I18nText => {
+   if (props.snippetKind === "config") {
+     return token
+-      ? t("ingestion.firstEvent.fixInvalidCredentialsConfig", { tool: FLUENT_BIT, token })
+-      : t("ingestion.firstEvent.fixInvalidCredentialsConfigUnnamed", { tool: FLUENT_BIT });
++      ? t("ingestion.firstEvent.fixInvalidCredentialsConfig", {
++          tool: raw(props.configTool),
++          token,
++        })
++      : t("ingestion.firstEvent.fixInvalidCredentialsConfigUnnamed", {
++          tool: raw(props.configTool),
++        });
+   }
+   return token
+     ? t("ingestion.firstEvent.fixInvalidCredentials", { token })
+@@ -438,7 +450,34 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow });
+ 
+ <template>
+   <div
+-    v-if="display === 'pill'"
++    v-if="deciding && display === 'pill'"
++    class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"
++    data-test="first-event-status"
++    data-state="deciding"
++    data-display="pill"
++  >
++    <OSkeleton class="h-5 w-28" />
++    <OSkeleton class="h-3.5 w-48" />
++  </div>
++  <div v-else-if="deciding" class="flex flex-col gap-2 text-sm">
++    <OBanner
++      variant="default"
++      inline-actions
++      dense
++      data-test="first-event-status"
++      data-state="deciding"
++    >
++      <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
++        <OSkeleton class="h-5 w-28" />
++        <OSkeleton class="h-3.5 w-56" />
++      </div>
++      <template #actions>
++        <OSkeleton class="h-8.5 w-24" />
++      </template>
++    </OBanner>
++  </div>
++  <div
++    v-else-if="display === 'pill'"
+     class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"
+     data-test="first-event-status"
+     :data-state="state"
+diff --git a/web/src/components/ingestion/IngestionContent.spec.ts b/web/src/components/ingestion/IngestionContent.spec.ts
+index f883161c0bc3..5b709b421922 100644
+--- a/web/src/components/ingestion/IngestionContent.spec.ts
++++ b/web/src/components/ingestion/IngestionContent.spec.ts
+@@ -11,7 +11,16 @@ import store from "@/test/unit/helpers/store";
+ const barStart = vi.fn();
+ const FirstEventStatusStub = defineComponent({
+   name: "FirstEventStatus",
+-  props: ["org", "signal", "targetStream", "kind", "guideName", "docUrl", "snippetKind"],
++  props: [
++    "org",
++    "signal",
++    "targetStream",
++    "kind",
++    "guideName",
++    "docUrl",
++    "snippetKind",
++    "configTool",
++  ],
+   emits: ["copy-command"],
+   setup: (_props, { expose }) => {
+     expose({ start: barStart });
+@@ -206,5 +215,21 @@ describe("IngestionContent.vue", () => {
+       expect(clicks.config).toHaveBeenCalledTimes(1);
+       expect(clicks.install).toHaveBeenCalledTimes(1);
+     });
++
++    it("re-copies the first block of a config guide whose main config comes first", async () => {
++      clicks.config = vi.fn();
++      clicks.env = vi.fn();
++      wrapper = await mountAt(
++        "/servers/nginx",
++        { default: () => [codeBlock("config"), codeBlock("env")] },
++        { snippetKind: "config", copySnippet: "first", configTool: "OpenTelemetry Collector" },
++      );
++      wrapper.findComponent(FirstEventStatusStub).vm.$emit("copy-command");
++      expect(clicks.config).toHaveBeenCalledTimes(1);
++      expect(clicks.env).not.toHaveBeenCalled();
++      expect(wrapper.findComponent(FirstEventStatusStub).props("configTool")).toBe(
++        "OpenTelemetry Collector",
++      );
++    });
+   });
+ });
+diff --git a/web/src/components/ingestion/IngestionContent.vue b/web/src/components/ingestion/IngestionContent.vue
+index aa6596b3aa36..39617c7277d4 100644
+--- a/web/src/components/ingestion/IngestionContent.vue
++++ b/web/src/components/ingestion/IngestionContent.vue
+@@ -40,6 +40,10 @@ const props = defineProps<{
+   docUrl?: string;
+   guideName?: string;
+   snippetKind?: "command" | "config";
++  /** The tool whose config holds the password, for a config guide's invalid-credentials fix. */
++  configTool?: string;
++  /** The block the bar re-copies; a config defaults to its last block, after any install command. */
++  copySnippet?: "first" | "last";
+   signal?: StreamSignal;
+   targetStream?: string;
+ }>();
+@@ -82,7 +86,8 @@ const copyPageSnippet = () => {
+       '[data-test^="ingestion-"][data-test$="-code-block-copy-btn"]',
+     ) ?? [],
+   );
+-  const button = props.snippetKind === "config" ? buttons[buttons.length - 1] : buttons[0];
++  const which = props.copySnippet ?? (props.snippetKind === "config" ? "last" : "first");
++  const button = which === "last" ? buttons[buttons.length - 1] : buttons[0];
+   button?.click();
+ };
+ 
+@@ -102,6 +107,7 @@ const SlotWithBar = () => {
+     guideName: props.guideName ?? "",
+     docUrl,
+     snippetKind: props.snippetKind ?? "command",
++    ...(props.configTool ? { configTool: props.configTool } : {}),
+     onCopyCommand: copyPageSnippet,
+   });
+   if (!org.value) return nodes;
+diff --git a/web/src/components/ingestion/configGuides.spec.ts b/web/src/components/ingestion/configGuides.spec.ts
+new file mode 100644
+index 000000000000..08c013f9e6a2
+--- /dev/null
++++ b/web/src/components/ingestion/configGuides.spec.ts
+@@ -0,0 +1,109 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++import { describe, expect, it } from "vitest";
++import { flushPromises, mount } from "@vue/test-utils";
++import { defineComponent, h, type Component } from "vue";
++import { createMemoryHistory, createRouter } from "vue-router";
++import i18n from "@/locales";
++import store from "@/test/unit/helpers/store";
++import FileBeat from "./logs/FileBeat.vue";
++import FluentBit from "./logs/FluentBit.vue";
++import Fluentd from "./logs/Fluentd.vue";
++import LogstashDatasource from "./logs/LogstashDatasource.vue";
++import LoongCollector from "./logs/LoongCollector.vue";
++import SyslogNg from "./logs/SyslogNg.vue";
++import Vector from "./logs/Vector.vue";
++import Curl from "./logs/Curl.vue";
++import CategrafConfig from "./metrics/CategrafConfig.vue";
++import NightingaleConfig from "./metrics/NightingaleConfig.vue";
++import PrometheusConfig from "./metrics/PrometheusConfig.vue";
++import TelegrafConfig from "./metrics/TelegrafConfig.vue";
++import MetricsOtelCollector from "./metrics/OtelCollector.vue";
++import VMagentConfig from "./metrics/VMagentConfig.vue";
++import ProfilesOtelCollector from "./profiles/OtelCollector.vue";
++import CouchDB from "./databases/CouchDB.vue";
++import Elasticsearch from "./databases/Elasticsearch.vue";
++import SAPHana from "./databases/SAPHana.vue";
++
++const IngestionContentStub = defineComponent({
++  name: "IngestionContent",
++  props: ["snippetKind", "configTool", "copySnippet", "targetStream", "signal", "guideName"],
++  setup:
++    (_props, { slots }) =>
++    () =>
++      h("div", slots.default?.()),
++});
++
++const mountGuide = async (guide: Component) => {
++  const router = createRouter({
++    history: createMemoryHistory(),
++    routes: [{ path: "/:any(.*)*", name: "guide", component: { template: "<div />" } }],
++  });
++  await router.push("/");
++  const wrapper = mount(guide, {
++    props: { currOrgIdentifier: "default", currUserEmail: "you@acme.io" },
++    global: {
++      plugins: [i18n, store, router],
++      stubs: {
++        IngestionContent: IngestionContentStub,
++        CredentialCodeBlock: true,
++        IngestionDocLink: true,
++      },
++    },
++  });
++  await flushPromises();
++  return wrapper.findComponent(IngestionContentStub).props();
++};
++
++const OTEL = "OpenTelemetry Collector";
++
++describe("ingestion guides mark a config snippet and name its tool", () => {
++  it.each([
++    ["Filebeat", FileBeat, "Filebeat"],
++    ["Fluent Bit", FluentBit, "Fluent Bit"],
++    ["Fluentd", Fluentd, "Fluentd"],
++    ["Logstash", LogstashDatasource, "Logstash"],
++    ["LoongCollector", LoongCollector, "LoongCollector"],
++    ["syslog-ng", SyslogNg, "syslog-ng"],
++    ["Vector", Vector, "Vector"],
++    ["Categraf", CategrafConfig, "Categraf"],
++    ["Nightingale", NightingaleConfig, "Nightingale"],
++    ["Prometheus", PrometheusConfig, "Prometheus"],
++    ["Telegraf", TelegrafConfig, "Telegraf"],
++    ["CouchDB", CouchDB, OTEL],
++    ["Elasticsearch", Elasticsearch, OTEL],
++    ["SAP HANA", SAPHana, OTEL],
++  ] as const)("%s", async (_name, guide, tool) => {
++    expect(await mountGuide(guide)).toMatchObject({ snippetKind: "config", configTool: tool });
++  });
++
++  it.each([
++    ["metrics OpenTelemetry Collector", MetricsOtelCollector],
++    ["profiles OpenTelemetry Collector", ProfilesOtelCollector],
++  ] as const)("%s re-copies its first config, not a later block", async (_name, guide) => {
++    expect(await mountGuide(guide)).toMatchObject({
++      snippetKind: "config",
++      configTool: OTEL,
++      copySnippet: "first",
++    });
++  });
++
++  it.each([
++    ["curl", Curl],
++    ["vmagent", VMagentConfig],
++  ] as const)("%s stays a command", async (_name, guide) => {
++    expect((await mountGuide(guide)).snippetKind ?? "command").toBe("command");
++  });
++});
+diff --git a/web/src/components/ingestion/databases/CouchDB.vue b/web/src/components/ingestion/databases/CouchDB.vue
+index 9adda78031e3..75a4367c34e3 100644
+--- a/web/src/components/ingestion/databases/CouchDB.vue
++++ b/web/src/components/ingestion/databases/CouchDB.vue
+@@ -25,7 +25,7 @@ const docURL = databaseDocURLs[name];
+ </script>
+ 
+ <template>
+-  <IngestionContent>
++  <IngestionContent snippet-kind="config" config-tool="OpenTelemetry Collector">
+     <CredentialCodeBlock slug="couchdb" :content="content" />
+     <IngestionDocLink :href="docURL" />
+   </IngestionContent>
+diff --git a/web/src/components/ingestion/databases/Elasticsearch.vue b/web/src/components/ingestion/databases/Elasticsearch.vue
+index cb768fd3b7b3..af3c53ecca4b 100644
+--- a/web/src/components/ingestion/databases/Elasticsearch.vue
++++ b/web/src/components/ingestion/databases/Elasticsearch.vue
+@@ -26,7 +26,7 @@ const docURL = databaseDocURLs[name];
+ </script>
+ 
+ <template>
+-  <IngestionContent>
++  <IngestionContent snippet-kind="config" config-tool="OpenTelemetry Collector">
+     <CredentialCodeBlock slug="elasticsearch" :content="content" />
+     <IngestionDocLink :href="docURL" />
+   </IngestionContent>
+diff --git a/web/src/components/ingestion/databases/SAPHana.vue b/web/src/components/ingestion/databases/SAPHana.vue
+index a2097b529889..04992e0d25db 100644
+--- a/web/src/components/ingestion/databases/SAPHana.vue
++++ b/web/src/components/ingestion/databases/SAPHana.vue
+@@ -26,7 +26,7 @@ const docURL = databaseDocURLs[name];
+ </script>
+ 
+ <template>
+-  <IngestionContent>
++  <IngestionContent snippet-kind="config" config-tool="OpenTelemetry Collector">
+     <CredentialCodeBlock slug="saphana" :content="content" />
+     <IngestionDocLink :href="docURL" />
+   </IngestionContent>
+diff --git a/web/src/components/ingestion/logs/FileBeat.vue b/web/src/components/ingestion/logs/FileBeat.vue
+index 2b547ef867f7..1b71b4f8be43 100644
+--- a/web/src/components/ingestion/logs/FileBeat.vue
++++ b/web/src/components/ingestion/logs/FileBeat.vue
+@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ -->
+ 
+ <template>
+-  <IngestionContent :target-stream="targetStream">
++  <IngestionContent :target-stream="targetStream" snippet-kind="config" config-tool="Filebeat">
+     <CredentialCodeBlock slug="filebeat" :content="content" />
+   </IngestionContent>
+ </template>
+diff --git a/web/src/components/ingestion/logs/FluentBit.vue b/web/src/components/ingestion/logs/FluentBit.vue
+index 38ca1c2aed73..dc20537faf2d 100644
+--- a/web/src/components/ingestion/logs/FluentBit.vue
++++ b/web/src/components/ingestion/logs/FluentBit.vue
+@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ -->
+ 
+ <template>
+-  <IngestionContent :target-stream="targetStream">
++  <IngestionContent :target-stream="targetStream" snippet-kind="config" config-tool="Fluent Bit">
+     <CredentialCodeBlock slug="fluentbit" :content="content" />
+     <IngestionDocLink
+       href="https://openobserve.ai/blog/how-to-send-kubernetes-logs-using-fluent-bit"
+diff --git a/web/src/components/ingestion/logs/Fluentd.vue b/web/src/components/ingestion/logs/Fluentd.vue
+index 24c1c6adf016..ee8f4e801747 100644
+--- a/web/src/components/ingestion/logs/Fluentd.vue
++++ b/web/src/components/ingestion/logs/Fluentd.vue
+@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ -->
+ 
+ <template>
+-  <IngestionContent :target-stream="targetStream">
++  <IngestionContent :target-stream="targetStream" snippet-kind="config" config-tool="Fluentd">
+     <CredentialCodeBlock slug="fluentd" :content="content" />
+   </IngestionContent>
+ </template>
+diff --git a/web/src/components/ingestion/logs/LogstashDatasource.vue b/web/src/components/ingestion/logs/LogstashDatasource.vue
+index cf70b244152f..a63d57587871 100644
+--- a/web/src/components/ingestion/logs/LogstashDatasource.vue
++++ b/web/src/components/ingestion/logs/LogstashDatasource.vue
+@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ -->
+ 
+ <template>
+-  <IngestionContent :target-stream="targetStream">
++  <IngestionContent :target-stream="targetStream" snippet-kind="config" config-tool="Logstash">
+     <CredentialCodeBlock slug="logstash" :content="content" />
+   </IngestionContent>
+ </template>
+diff --git a/web/src/components/ingestion/logs/LoongCollector.vue b/web/src/components/ingestion/logs/LoongCollector.vue
+index 9418323cbdaa..c69c3c18e104 100644
+--- a/web/src/components/ingestion/logs/LoongCollector.vue
++++ b/web/src/components/ingestion/logs/LoongCollector.vue
+@@ -15,7 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ -->
+ 
+ <template>
+-  <IngestionContent :target-stream="targetStream">
++  <IngestionContent
++    :target-stream="targetStream"
++    snippet-kind="config"
++    config-tool="LoongCollector"
++  >
+     <CredentialCodeBlock slug="loong-collector" :content="content" />
+     <IngestionDocLink href="https://github.com/alibaba/loongcollector">
+       {{ t("ingestion.loongCollectorDocLinkText") }}
+diff --git a/web/src/components/ingestion/logs/SyslogNg.vue b/web/src/components/ingestion/logs/SyslogNg.vue
+index 25180f77682f..f7ae9a08cf81 100644
+--- a/web/src/components/ingestion/logs/SyslogNg.vue
++++ b/web/src/components/ingestion/logs/SyslogNg.vue
+@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ -->
+ 
+ <template>
+-  <IngestionContent :target-stream="targetStream">
++  <IngestionContent :target-stream="targetStream" snippet-kind="config" config-tool="syslog-ng">
+     <CredentialCodeBlock slug="syslog-ng" :content="content" />
+     <IngestionDocLink
+       href="https://axoflow.com/docs/axosyslog-core/chapter-destinations/openobserve/"
+diff --git a/web/src/components/ingestion/logs/Vector.vue b/web/src/components/ingestion/logs/Vector.vue
+index f9c0d60ac97b..4ea3d36d871b 100644
+--- a/web/src/components/ingestion/logs/Vector.vue
++++ b/web/src/components/ingestion/logs/Vector.vue
+@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ -->
+ 
+ <template>
+-  <IngestionContent :target-stream="targetStream">
++  <IngestionContent :target-stream="targetStream" snippet-kind="config" config-tool="Vector">
+     <CredentialCodeBlock slug="vector" :content="content" />
+   </IngestionContent>
+ </template>
+diff --git a/web/src/components/ingestion/metrics/CategrafConfig.vue b/web/src/components/ingestion/metrics/CategrafConfig.vue
+index 9f81088acd31..372afbd44879 100644
+--- a/web/src/components/ingestion/metrics/CategrafConfig.vue
++++ b/web/src/components/ingestion/metrics/CategrafConfig.vue
+@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ -->
+ 
+ <template>
+-  <IngestionContent>
++  <IngestionContent snippet-kind="config" config-tool="Categraf">
+     <CredentialCodeBlock slug="categraf" :content="content" />
+     <IngestionDocLink href="https://github.com/flashcatcloud/categraf">
+       {{ t("ingestion.categrafDocLinkText") }}
+diff --git a/web/src/components/ingestion/metrics/NightingaleConfig.vue b/web/src/components/ingestion/metrics/NightingaleConfig.vue
+index 977a04372384..134798eb81f3 100644
+--- a/web/src/components/ingestion/metrics/NightingaleConfig.vue
++++ b/web/src/components/ingestion/metrics/NightingaleConfig.vue
+@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ -->
+ 
+ <template>
+-  <IngestionContent>
++  <IngestionContent snippet-kind="config" config-tool="Nightingale">
+     <CredentialCodeBlock slug="nightingale" :content="content" />
+     <IngestionDocLink href="https://github.com/ccfos/nightingale">
+       {{ t("ingestion.nightingaleDocLinkText") }}
+diff --git a/web/src/components/ingestion/metrics/OtelCollector.vue b/web/src/components/ingestion/metrics/OtelCollector.vue
+index 54064fdc25d9..2a8859adbf98 100644
+--- a/web/src/components/ingestion/metrics/OtelCollector.vue
++++ b/web/src/components/ingestion/metrics/OtelCollector.vue
+@@ -1,5 +1,9 @@
+ <template>
+-  <IngestionContent>
++  <IngestionContent
++    snippet-kind="config"
++    config-tool="OpenTelemetry Collector"
++    copy-snippet="first"
++  >
+     <div class="flex flex-col gap-2">
+       <div class="text-base font-semibold">{{ t("ingestion.hostMetricsReceiver") }}</div>
+       <CredentialCodeBlock slug="metrics-otel-host-metrics" :content="getHostMetricsConfig" />
+diff --git a/web/src/components/ingestion/metrics/PrometheusConfig.vue b/web/src/components/ingestion/metrics/PrometheusConfig.vue
+index d2e67bd03e28..4637f711dd1e 100644
+--- a/web/src/components/ingestion/metrics/PrometheusConfig.vue
++++ b/web/src/components/ingestion/metrics/PrometheusConfig.vue
+@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ -->
+ 
+ <template>
+-  <IngestionContent>
++  <IngestionContent snippet-kind="config" config-tool="Prometheus">
+     <CredentialCodeBlock slug="prometheus" :content="content" />
+     <IngestionDocLink
+       href="https://openobserve.ai/blog/send-metrics-using-kube-prometheus-stack-to-openobserve"
+diff --git a/web/src/components/ingestion/metrics/TelegrafConfig.vue b/web/src/components/ingestion/metrics/TelegrafConfig.vue
+index 0c42c511f037..70e7fd2fd8b0 100644
+--- a/web/src/components/ingestion/metrics/TelegrafConfig.vue
++++ b/web/src/components/ingestion/metrics/TelegrafConfig.vue
+@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ -->
+ 
+ <template>
+-  <IngestionContent>
++  <IngestionContent snippet-kind="config" config-tool="Telegraf">
+     <CredentialCodeBlock slug="telegraf" :content="content" />
+   </IngestionContent>
+ </template>
+diff --git a/web/src/components/ingestion/profiles/OtelCollector.vue b/web/src/components/ingestion/profiles/OtelCollector.vue
+index 62379f7cfc90..287285505bdf 100644
+--- a/web/src/components/ingestion/profiles/OtelCollector.vue
++++ b/web/src/components/ingestion/profiles/OtelCollector.vue
+@@ -1,5 +1,9 @@
+ <template>
+-  <IngestionContent>
++  <IngestionContent
++    snippet-kind="config"
++    config-tool="OpenTelemetry Collector"
++    copy-snippet="first"
++  >
+     <!-- Same configs as the profiles docs (OTLP page), so the snippet runs on its own. -->
+     <div class="flex flex-col gap-2">
+       <div class="text-base font-semibold">{{ t("ingestion.otlpHttp") }}</div>
+diff --git a/web/src/components/ingestion/recommended/OtelConfig.vue b/web/src/components/ingestion/recommended/OtelConfig.vue
+index b1ba39b8487d..ce023758e291 100644
+--- a/web/src/components/ingestion/recommended/OtelConfig.vue
++++ b/web/src/components/ingestion/recommended/OtelConfig.vue
+@@ -16,6 +16,7 @@
+       :org="org"
+       signal="traces"
+       snippet-kind="config"
++      config-tool="OpenTelemetry Collector"
+       @copy-command="copyHttpConfig"
+     />
+   </div>
+diff --git a/web/src/composables/firstEvent/useFirstDataNotice.spec.ts b/web/src/composables/firstEvent/useFirstDataNotice.spec.ts
+index 0d373cd3afed..445e4ec5bbce 100644
+--- a/web/src/composables/firstEvent/useFirstDataNotice.spec.ts
++++ b/web/src/composables/firstEvent/useFirstDataNotice.spec.ts
+@@ -19,6 +19,7 @@ import { queryClient } from "@/composables/query/queryClient";
+ import {
+   firstDataStorageKey,
+   markDetectionSeen,
++  orgHasUserStreams,
+   readFirstDataRecord,
+   useFirstDataNotice,
+   writeFirstDataRecord,
+@@ -80,6 +81,18 @@ afterEach(() => {
+   vi.useRealTimers();
+ });
+ 
++describe("orgHasUserStreams", () => {
++  it("answers null, never throws, when a stream page holds no list", async () => {
++    const real = nameList.getMockImplementation()!;
++    nameList.mockImplementation(async () => ({ data: { list: "unavailable" as never, total: 1 } }));
++    try {
++      await expect(orgHasUserStreams(ORG)).resolves.toBeNull();
++    } finally {
++      nameList.mockImplementation(real);
++    }
++  });
++});
++
+ describe("useFirstDataNotice", () => {
+   it("records the first visit without a banner", async () => {
+     rows.logs = [userStream("default", NOW * 1000 - HOUR_US)];
+diff --git a/web/src/composables/firstEvent/useFirstDataNotice.ts b/web/src/composables/firstEvent/useFirstDataNotice.ts
+index 91f4fc14e929..2689a7f13481 100644
+--- a/web/src/composables/firstEvent/useFirstDataNotice.ts
++++ b/web/src/composables/firstEvent/useFirstDataNotice.ts
+@@ -18,7 +18,11 @@ import { useRouter } from "vue-router";
+ import { queryClient } from "@/composables/query/queryClient";
+ import { streamPageQuery, streamProbeQuery, STREAM_PROBE_PAGE } from "@/services/stream.queries";
+ import analytics from "@/services/product_analytics";
+-import { USER_DATA_STREAM_TYPES, isUserDataStream } from "@/utils/internalStreams";
++import {
++  USER_DATA_STREAM_TYPES,
++  isUserDataStream,
++  type UserDataStreamType,
++} from "@/utils/internalStreams";
+ import { rangeRoute, recordRange, type TimeWindowUs } from "./confirmQuery";
+ 
+ const MAX_PAGES_PER_TYPE = 5;
+@@ -84,6 +88,16 @@ export function markDetectionSeen(org: string): void {
+   writeFirstDataRecord(org, { ...record, seenDetection: true });
+ }
+ 
++/** Whether the org holds a user stream, read with the notice's own bounded probes; null when a read fails. */
++export async function orgHasUserStreams(orgId: string): Promise<boolean | null> {
++  for (const type of USER_DATA_STREAM_TYPES) {
++    const users = await userStreamsOfType(orgId, type);
++    if (users === null) return null;
++    if (users.length) return true;
++  }
++  return false;
++}
++
+ const toFirstDataStream = (s: ListedStream): FirstDataStream => ({
+   name: s.name ?? "",
+   streamType: s.stream_type ?? "logs",
+@@ -104,6 +118,34 @@ const sinceCreatedRange = (createdAtUs: number): TimeWindowUs | undefined => {
+   return { startUs, endUs: Math.max(endUs, Date.now() * 1000) };
+ };
+ 
++// internal streams can fill the first rows, so pages are read until a user stream turns up, at most five
++const userStreamsOfType = async (
++  orgId: string,
++  type: UserDataStreamType,
++): Promise<ListedStream[] | null> => {
++  const total = await queryClient
++    .fetchQuery(streamProbeQuery(orgId, type))
++    .then((r) => r.total)
++    .catch(() => null);
++  if (total === null) return null;
++  for (let page = 0; page < MAX_PAGES_PER_TYPE && page * STREAM_PROBE_PAGE < total; page++) {
++    const res = await queryClient
++      .fetchQuery(
++        streamPageQuery(orgId, type, {
++          offset: page * STREAM_PROBE_PAGE,
++          limit: STREAM_PROBE_PAGE,
++        }),
++      )
++      .catch(() => null);
++    if (!res || !Array.isArray(res.list)) return null;
++    const users = (res.list as ListedStream[]).filter((s) =>
++      isUserDataStream(s?.name ?? "", s?.stream_type ?? type),
++    );
++    if (users.length) return users;
++  }
++  return [];
++};
++
+ /** Shows the next-visit banner once, after a visit that recorded no user data. */
+ export function useFirstDataNotice(
+   org: Ref<string>,
+@@ -127,33 +169,12 @@ export function useFirstDataNotice(
+     return cfg.restricted_routes_on_empty_data === true ? "on" : "off";
+   };
+ 
+-  // Flag off: three limit-1 probes, then at most five 20-row pages per type until a user stream turns up.
+   const probeUserStreams = async (orgId: string): Promise<FirstDataStream[] | null> => {
+     const found: FirstDataStream[] = [];
+     for (const type of USER_DATA_STREAM_TYPES) {
+-      const total = await queryClient
+-        .fetchQuery(streamProbeQuery(orgId, type))
+-        .then((r) => r.total)
+-        .catch(() => null);
+-      if (total === null) return null;
+-      for (let page = 0; page < MAX_PAGES_PER_TYPE && page * STREAM_PROBE_PAGE < total; page++) {
+-        const res = await queryClient
+-          .fetchQuery(
+-            streamPageQuery(orgId, type, {
+-              offset: page * STREAM_PROBE_PAGE,
+-              limit: STREAM_PROBE_PAGE,
+-            }),
+-          )
+-          .catch(() => null);
+-        if (!res) return null;
+-        const users = (res.list as ListedStream[]).filter((s) =>
+-          isUserDataStream(s?.name ?? "", s?.stream_type ?? type),
+-        );
+-        if (users.length) {
+-          found.push(...users.map(toFirstDataStream));
+-          break;
+-        }
+-      }
++      const users = await userStreamsOfType(orgId, type);
++      if (users === null) return null;
++      found.push(...users.map(toFirstDataStream));
+     }
+     return found;
+   };
+diff --git a/web/src/composables/firstEvent/useFirstEventWatch.spec.ts b/web/src/composables/firstEvent/useFirstEventWatch.spec.ts
+index eff9d8e84869..057f4ef0958e 100644
+--- a/web/src/composables/firstEvent/useFirstEventWatch.spec.ts
++++ b/web/src/composables/firstEvent/useFirstEventWatch.spec.ts
+@@ -67,7 +67,7 @@ const storeState = {
+   zoConfig,
+   API_ENDPOINT: "http://o2.test",
+   selectedOrganization: { identifier: "acme" },
+-  organizationData: { isDataIngested: false },
++  organizationData: { isDataIngested: false } as { isDataIngested?: boolean | null },
+   streams: {
+     logs: {},
+     metrics: {},
+@@ -131,6 +131,7 @@ const setVisibility = (v: "visible" | "hidden") => {
+ 
+ beforeEach(() => {
+   storeState.selectedOrganization.identifier = "acme";
++  storeState.organizationData.isDataIngested = false;
+   vi.useFakeTimers();
+   vi.setSystemTime(NOW);
+   rows.logs = [];
+@@ -140,6 +141,7 @@ beforeEach(() => {
+   for (const k of Object.keys(zoConfig)) delete zoConfig[k];
+   setVisibility("visible");
+   localStorage.clear();
++  sessionStorage.clear();
+ });
+ 
+ afterEach(() => {
+@@ -526,6 +528,7 @@ describe("useFirstEventWatch — a target that already has data waits for the us
+     w.start("open");
+     await vi.advanceTimersByTimeAsync(1);
+     expect(w.state.value).toBe("idle");
++    expect(w.targetExists.value).toBe(true);
+     const listCalls = nameList.mock.calls.length;
+     await vi.advanceTimersByTimeAsync(10 * 60_000);
+     expect(w.state.value).toBe("idle");
+@@ -539,6 +542,7 @@ describe("useFirstEventWatch — a target that already has data waits for the us
+     w.start("open");
+     await vi.advanceTimersByTimeAsync(10 * 60_000);
+     expect(w.state.value).toBe("idle");
++    expect(w.targetExists.value).toBe(true);
+     expect(search).not.toHaveBeenCalled();
+   });
+ 
+@@ -621,7 +625,7 @@ describe("useFirstEventWatch — a target that already has data waits for the us
+     expect(w.result.value?.sinceUs).toBeUndefined();
+   });
+ 
+-  it("probes a changed target from idle and keeps checking when it does not exist", async () => {
++  it("probes a changed target from idle and holds it when it does not exist, since the org has data", async () => {
+     rows.logs = [{ name: "default", stats: { doc_num: 99, doc_time_min: 1 } }];
+     const target = ref<string | undefined>("default");
+     const w = watchOf("logs", { targetStream: target });
+@@ -629,13 +633,605 @@ describe("useFirstEventWatch — a target that already has data waits for the us
+     await vi.advanceTimersByTimeAsync(1);
+     expect(w.state.value).toBe("idle");
+     target.value = "nginx_access";
++    await vi.advanceTimersByTimeAsync(1);
++    expect(keywordPageCalls("logs", "nginx_access")).toHaveLength(1);
+     await vi.advanceTimersByTimeAsync(10_000);
+-    expect(w.state.value).toBe("waiting");
+-    expect(keywordPageCalls("logs", "nginx_access").length).toBeGreaterThan(1);
++    expect(w.state.value).toBe("idle");
++    expect(keywordPageCalls("logs", "nginx_access")).toHaveLength(1);
+     expect(search).not.toHaveBeenCalled();
+   });
+ });
+ 
++describe("useFirstEventWatch — an org with data waits for the user on a missing target", () => {
++  it("goes idle on open when the exact target does not exist, and stops probing", async () => {
++    storeState.organizationData.isDataIngested = true;
++    rows.logs = [{ name: "default", stats: { doc_num: 99, doc_time_min: 1 } }];
++    const w = watchOf("logs", { targetStream: "syslog_ng" });
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    expect(w.state.value).toBe("idle");
++    const listCalls = nameList.mock.calls.length;
++    await vi.advanceTimersByTimeAsync(10 * 60_000);
++    expect(w.state.value).toBe("idle");
++    expect(nameList.mock.calls.length).toBe(listCalls);
++    expect(search).not.toHaveBeenCalled();
++    expect(recentRejections).not.toHaveBeenCalled();
++    expect(w.targetExists.value).toBe(false);
++  });
++
++  it("goes idle on open when no keyword match exists, and stops probing", async () => {
++    storeState.organizationData.isDataIngested = true;
++    rows.logs = [{ name: "default", stats: { doc_num: 99, doc_time_min: 1 } }];
++    const w = watchOf("metrics", { targetStream: "system_", match: "keyword" });
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    expect(w.state.value).toBe("idle");
++    expect(w.targetExists.value).toBe(false);
++    const listCalls = nameList.mock.calls.length;
++    await vi.advanceTimersByTimeAsync(10 * 60_000);
++    expect(w.state.value).toBe("idle");
++    expect(nameList.mock.calls.length).toBe(listCalls);
++    expect(search).not.toHaveBeenCalled();
++    expect(recentRejections).not.toHaveBeenCalled();
++  });
++
++  it.each(["check", "copy"] as const)(
++    "polls for the missing target once %s starts it from idle, and reports its first record",
++    async (reason) => {
++      storeState.organizationData.isDataIngested = true;
++      const w = watchOf("logs", { targetStream: "syslog_ng" });
++      w.start("open");
++      await vi.advanceTimersByTimeAsync(1);
++      expect(w.state.value).toBe("idle");
++      w.start(reason);
++      expect(w.state.value).toBe("waiting");
++      const before = keywordPageCalls("logs", "syslog_ng").length;
++      await vi.advanceTimersByTimeAsync(10_000);
++      expect(w.state.value).toBe("waiting");
++      expect(keywordPageCalls("logs", "syslog_ng").length).toBeGreaterThan(before + 1);
++      rows.logs = [{ name: "syslog_ng", stats: { doc_num: 4, doc_time_min: NOW * 1000 } }];
++      await vi.advanceTimersByTimeAsync(5000);
++      expect(w.state.value).toBe("received");
++      expect(w.result.value).toMatchObject({ streamName: "syslog_ng", count: 4 });
++      expect(w.result.value?.sinceUs).toBeUndefined();
++      expect(w.scope.value).toBe("new-data");
++    },
++  );
++
++  it("reports the first keyword match once Check now starts it from idle", async () => {
++    storeState.organizationData.isDataIngested = true;
++    const w = watchOf("metrics", { targetStream: "system_", match: "keyword" });
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    expect(w.state.value).toBe("idle");
++    await w.probeNow();
++    expect(w.state.value).toBe("waiting");
++    await vi.advanceTimersByTimeAsync(5000);
++    rows.metrics = [{ name: "system_cpu_time", stats: { doc_num: 7, doc_time_min: NOW * 1000 } }];
++    await vi.advanceTimersByTimeAsync(5000);
++    expect(w.state.value).toBe("received");
++    expect(w.result.value).toMatchObject({ streamName: "system_cpu_time", count: 7 });
++  });
++
++  it.each([false, undefined, null])(
++    "keeps checking on open for a missing target while isDataIngested is %s",
++    async (ingested) => {
++      storeState.organizationData.isDataIngested = ingested;
++      const w = watchOf("logs", { targetStream: "syslog_ng" });
++      w.start("open");
++      await vi.advanceTimersByTimeAsync(1);
++      expect(w.state.value).toBe("waiting");
++      const before = keywordPageCalls("logs", "syslog_ng").length;
++      await vi.advanceTimersByTimeAsync(10_000);
++      expect(keywordPageCalls("logs", "syslog_ng").length).toBeGreaterThan(before + 1);
++      rows.logs = [{ name: "syslog_ng", stats: { doc_num: 4, doc_time_min: NOW * 1000 } }];
++      await vi.advanceTimersByTimeAsync(5000);
++      expect(w.state.value).toBe("received");
++    },
++  );
++
++  it.each([false, undefined])(
++    "keeps checking on open with no keyword match while isDataIngested is %s",
++    async (ingested) => {
++      storeState.organizationData.isDataIngested = ingested;
++      const w = watchOf("metrics", { targetStream: "system_", match: "keyword" });
++      w.start("open");
++      await vi.advanceTimersByTimeAsync(10_000);
++      expect(w.state.value).toBe("waiting");
++      expect(keywordPageCalls("metrics", "system_").length).toBeGreaterThan(1);
++    },
++  );
++});
++
++describe("useFirstEventWatch — org data on a direct load, before the flag is set", () => {
++  const unkeyedCalls = () => nameList.mock.calls.filter((c) => !c[5]);
++  const userStreamIn = (type: string) => {
++    rows[type] = [{ name: "cpu_load", stats: { doc_num: 5, doc_time_min: 1 } }];
++  };
++
++  it.each([false, undefined])(
++    "reads the org's user streams and goes idle on a missing target while isDataIngested is %s",
++    async (ingested) => {
++      storeState.organizationData.isDataIngested = ingested;
++      userStreamIn("metrics");
++      const w = watchOf("logs", { targetStream: "syslog_ng" });
++      w.start("open");
++      await vi.advanceTimersByTimeAsync(1);
++      expect(w.state.value).toBe("idle");
++      expect(dispatch).toHaveBeenCalledWith("setIsDataIngested", true);
++      const listCalls = nameList.mock.calls.length;
++      await vi.advanceTimersByTimeAsync(10 * 60_000);
++      expect(w.state.value).toBe("idle");
++      expect(nameList.mock.calls.length).toBe(listCalls);
++      expect(search).not.toHaveBeenCalled();
++    },
++  );
++
++  it("goes idle with no keyword match when the org's user streams show data", async () => {
++    userStreamIn("logs");
++    const w = watchOf("metrics", { targetStream: "system_", match: "keyword" });
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    expect(w.state.value).toBe("idle");
++    const listCalls = nameList.mock.calls.length;
++    await vi.advanceTimersByTimeAsync(60_000);
++    expect(nameList.mock.calls.length).toBe(listCalls);
++  });
++
++  it("reads the org's user streams only after the target lookup finds no target", async () => {
++    userStreamIn("metrics");
++    const lookup = deferred<Awaited<ReturnType<typeof nameList>>>();
++    const real = nameList.getMockImplementation()!;
++    nameList.mockImplementation((...a) => (a[5] ? lookup.promise : real(...a)));
++    const w = watchOf("logs", { targetStream: "syslog_ng" });
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    expect(unkeyedCalls()).toHaveLength(0);
++    expect(w.deciding.value).toBe(true);
++    lookup.resolve({ data: { list: [], total: 0 } });
++    await vi.advanceTimersByTimeAsync(1);
++    expect(unkeyedCalls().length).toBeGreaterThan(0);
++    expect(w.deciding.value).toBe(false);
++    expect(w.state.value).toBe("idle");
++  });
++
++  it.each([
++    ["an exact target exists", "logs", "syslog_ng", undefined, "syslog_ng"],
++    ["keyword matches exist", "metrics", "system_", "keyword", "system_cpu"],
++  ] as const)("reads no org stream list when %s", async (_label, signal, name, match, row) => {
++    userStreamIn("traces");
++    rows[signal] = [{ name: row, stats: {} }];
++    const w = watchOf(signal, { targetStream: name, match });
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(10_000);
++    expect(w.state.value).toBe("waiting");
++    expect(unkeyedCalls()).toHaveLength(0);
++  });
++
++  it("ignores the stored flag when it belongs to another selected org", async () => {
++    storeState.organizationData.isDataIngested = true;
++    storeState.selectedOrganization.identifier = "beta";
++    const w = watchOf("logs", { targetStream: "syslog_ng" });
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    expect(w.state.value).toBe("waiting");
++    expect(unkeyedCalls().length).toBeGreaterThan(0);
++  });
++
++  it("never sets the shared flag from an earlier visit's record alone", async () => {
++    localStorage.setItem(
++      "o2.onboarding.firstData.acme",
++      JSON.stringify({ lastVisit: NOW, hadData: true }),
++    );
++    const w = watchOf("logs", { targetStream: "syslog_ng" });
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    expect(w.state.value).toBe("idle");
++    expect(dispatch).not.toHaveBeenCalledWith("setIsDataIngested", true);
++  });
++
++  it("never sets the shared flag from another org's streams", async () => {
++    storeState.selectedOrganization.identifier = "beta";
++    userStreamIn("metrics");
++    const w = watchOf("logs", { targetStream: "syslog_ng" });
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    expect(w.state.value).toBe("idle");
++    expect(dispatch).not.toHaveBeenCalledWith("setIsDataIngested", true);
++  });
++
++  it("keeps checking when the org holds only internal streams", async () => {
++    rows.logs = [
++      { name: "usage", stats: { doc_num: 9, doc_time_min: 1 } },
++      { name: "_o2_pipeline", stats: { doc_num: 9, doc_time_min: 1 } },
++    ];
++    rows.metrics = [{ name: "_anomalies", stats: { doc_num: 9, doc_time_min: 1 } }];
++    const w = watchOf("logs", { targetStream: "syslog_ng" });
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    expect(w.state.value).toBe("waiting");
++    const before = keywordPageCalls("logs", "syslog_ng").length;
++    await vi.advanceTimersByTimeAsync(10_000);
++    expect(keywordPageCalls("logs", "syslog_ng").length).toBeGreaterThan(before + 1);
++    expect(dispatch).not.toHaveBeenCalledWith("setIsDataIngested", true);
++  });
++
++  it("keeps checking when reading the org's user streams fails", async () => {
++    userStreamIn("metrics");
++    const real = nameList.getMockImplementation()!;
++    nameList.mockImplementation(async (...a) => {
++      if (!a[5]) throw new Error("503");
++      return real(...a);
++    });
++    const w = watchOf("logs", { targetStream: "syslog_ng" });
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    expect(w.state.value).toBe("waiting");
++    const before = keywordPageCalls("logs", "syslog_ng").length;
++    await vi.advanceTimersByTimeAsync(10_000);
++    expect(keywordPageCalls("logs", "syslog_ng").length).toBeGreaterThan(before + 1);
++  });
++
++  it("reads no stream list beyond the target lookup when isDataIngested is already true", async () => {
++    storeState.organizationData.isDataIngested = true;
++    userStreamIn("metrics");
++    const w = watchOf("logs", { targetStream: "syslog_ng" });
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    expect(w.state.value).toBe("idle");
++    expect(unkeyedCalls()).toHaveLength(0);
++  });
++
++  it("reads no stream list beyond the target lookup when an earlier visit recorded user data", async () => {
++    userStreamIn("metrics");
++    localStorage.setItem(
++      "o2.onboarding.firstData.acme",
++      JSON.stringify({ lastVisit: NOW, hadData: true }),
++    );
++    const w = watchOf("logs", { targetStream: "syslog_ng" });
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    expect(w.state.value).toBe("idle");
++    expect(unkeyedCalls()).toHaveLength(0);
++  });
++});
++
++describe("useFirstEventWatch — no claim before the first decision", () => {
++  it.each([
++    [true, "idle"],
++    [false, "waiting"],
++  ] as const)(
++    "decides a missing target only once the lookup answers (org has data: %s)",
++    async (ingested, decided) => {
++      storeState.organizationData.isDataIngested = ingested;
++      const lookup = deferred<Awaited<ReturnType<typeof nameList>>>();
++      const real = nameList.getMockImplementation()!;
++      nameList.mockImplementation((...a) => (a[5] ? lookup.promise : real(...a)));
++      const w = watchOf("logs", { targetStream: "syslog_ng" });
++      w.start("open");
++      expect(w.deciding.value).toBe(true);
++      await vi.advanceTimersByTimeAsync(2000);
++      expect(w.deciding.value).toBe(true);
++      lookup.resolve({ data: { list: [], total: 0 } });
++      await vi.advanceTimersByTimeAsync(1);
++      expect(w.deciding.value).toBe(false);
++      expect(w.state.value).toBe(decided);
++    },
++  );
++
++  it("falls back to waiting when the first lookup fails", async () => {
++    const real = nameList.getMockImplementation()!;
++    nameList.mockImplementation(async (...a) => {
++      if (a[5]) throw new Error("503");
++      return real(...a);
++    });
++    const w = watchOf("logs", { targetStream: "syslog_ng" });
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    expect(w.deciding.value).toBe(false);
++    expect(w.state.value).toBe("waiting");
++  });
++
++  it("never decides a watch without a target, and never on Check now from idle", async () => {
++    const any = watchOf("logs");
++    any.start("open");
++    expect(any.deciding.value).toBe(false);
++    scope.stop();
++    storeState.organizationData.isDataIngested = true;
++    const w = watchOf("logs", { targetStream: "syslog_ng" });
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    expect(w.state.value).toBe("idle");
++    w.start("check");
++    expect(w.deciding.value).toBe(false);
++    expect(w.state.value).toBe("waiting");
++  });
++
++  it("keeps checking when an org stream page answers without a list", async () => {
++    const real = nameList.getMockImplementation()!;
++    nameList.mockImplementation(async (...a) =>
++      a[5] ? real(...a) : { data: { list: "unavailable" as never, total: 1 } },
++    );
++    const w = watchOf("logs", { targetStream: "syslog_ng" });
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    expect(w.deciding.value).toBe(false);
++    expect(w.state.value).toBe("waiting");
++  });
++
++  it("lifts the placeholder and keeps checking when the first decision throws", async () => {
++    const real = nameList.getMockImplementation()!;
++    nameList.mockImplementation(async (...a) =>
++      a[5] ? { data: { list: {} as never, total: 1 } } : real(...a),
++    );
++    const w = watchOf("logs", { targetStream: "syslog_ng" });
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    expect(w.deciding.value).toBe(false);
++    expect(w.state.value).toBe("waiting");
++    const before = keywordPageCalls("logs", "syslog_ng").length;
++    await vi.advanceTimersByTimeAsync(10_000);
++    expect(keywordPageCalls("logs", "syslog_ng").length).toBeGreaterThan(before);
++  });
++});
++
++describe("useFirstEventWatch — engagement survives a reload", () => {
++  const serverNowS = Math.floor(NOW / 1000);
++  const reload = (
++    opts: WatchOpts = { targetStream: "syslog_ng" },
++    signal: StreamSignal = "logs",
++  ) => {
++    scope.stop();
++    const w = watchOf(signal, opts);
++    w.start("open");
++    return w;
++  };
++  const engagedKeys = () =>
++    Array.from({ length: sessionStorage.length }, (_, i) => sessionStorage.key(i) ?? "").filter(
++      (k) => k.startsWith("o2.firstEvent.engaged:"),
++    );
++
++  beforeEach(() => {
++    storeState.organizationData.isDataIngested = true;
++  });
++
++  it("resumes a copied watch after a reload instead of holding, timed from the copy", async () => {
++    const w = watchOf("logs", { targetStream: "syslog_ng" });
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    w.start("copy");
++    const copiedAt = w.startedAtMs.value;
++    await vi.advanceTimersByTimeAsync(30_000);
++    const after = reload();
++    expect(after.deciding.value).toBe(true);
++    await vi.advanceTimersByTimeAsync(1);
++    expect(after.state.value).toBe("waiting");
++    expect(after.startedAtMs.value).toBe(copiedAt);
++    rows.logs = [{ name: "syslog_ng", stats: { doc_num: 4, doc_time_min: NOW * 1000 } }];
++    await vi.advanceTimersByTimeAsync(5000);
++    expect(after.state.value).toBe("received");
++    expect(engagedKeys()).toHaveLength(0);
++  });
++
++  it("counts a target created between the copy and the reload as new data", async () => {
++    const w = watchOf("logs", { targetStream: "syslog_ng" });
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    w.start("check");
++    await vi.advanceTimersByTimeAsync(10_000);
++    scope.stop();
++    rows.logs = [{ name: "syslog_ng", stats: { doc_num: 4, doc_time_min: NOW * 1000 } }];
++    const after = watchOf("logs", { targetStream: "syslog_ng" });
++    after.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    expect(after.state.value).toBe("received");
++    expect(after.scope.value).toBe("new-data");
++  });
++
++  it("keeps the server-clock anchor of an existing target across a reload", async () => {
++    rows.logs = [{ name: "default", stats: { doc_num: 99, doc_time_min: 1 } }];
++    anchorHits.mockReturnValue([{ zo_count: 0, zo_now: serverNowS }]);
++    const w = watchOf("logs", { targetStream: "default" });
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    w.start("copy");
++    await vi.advanceTimersByTimeAsync(10_000);
++    const anchors = search.mock.calls.filter((c) => c[0].query.query.sql.includes("zo_now")).length;
++    anchorHits.mockReturnValue([{ zo_count: 0, zo_now: serverNowS + 600 }]);
++    const after = reload({ targetStream: "default" });
++    await vi.advanceTimersByTimeAsync(5000);
++    expect(after.state.value).toBe("waiting");
++    expect(search.mock.calls.filter((c) => c[0].query.query.sql.includes("zo_now")).length).toBe(
++      anchors,
++    );
++    expect(countCalls().at(-1)?.query.query.sql).toContain(
++      `_timestamp >= ${serverNowS * 1_000_000}`,
++    );
++    expect(after.sinceUs.value).toBe(serverNowS * 1_000_000);
++  });
++
++  it("counts a keyword match created between the copy and the reload", async () => {
++    rows.metrics = [{ name: "system_cpu", stats: { doc_num: 9, doc_time_min: 1 } }];
++    anchorHits.mockReturnValue([{ zo_count: 0, zo_now: serverNowS }]);
++    const opts: WatchOpts = { targetStream: "system_", match: "keyword" };
++    const w = watchOf("metrics", opts);
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    w.start("copy");
++    await vi.advanceTimersByTimeAsync(10_000);
++    scope.stop();
++    rows.metrics.push({ name: "system_mem", stats: { doc_num: 3, doc_time_min: NOW * 1000 } });
++    const after = watchOf("metrics", opts);
++    after.start("open");
++    await vi.advanceTimersByTimeAsync(5000);
++    expect(after.state.value).toBe("received");
++    expect(after.result.value?.streamName).toBe("system_mem");
++  });
++
++  it("reads rejections 120 s after the original copy, not after the reload", async () => {
++    const w = watchOf("logs", { targetStream: "syslog_ng" });
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    w.start("copy");
++    await vi.advanceTimersByTimeAsync(100_000);
++    recentRejections.mockClear();
++    reload();
++    await vi.advanceTimersByTimeAsync(10_000);
++    expect(recentRejections).not.toHaveBeenCalled();
++    await vi.advanceTimersByTimeAsync(15_000);
++    expect(recentRejections).toHaveBeenCalled();
++  });
++
++  it("holds again after a reload once the copy is past the 60-minute budget", async () => {
++    const w = watchOf("logs", { targetStream: "syslog_ng" });
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    w.start("copy");
++    scope.stop();
++    await vi.advanceTimersByTimeAsync(61 * 60_000);
++    const after = watchOf("logs", { targetStream: "syslog_ng" });
++    after.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    expect(after.state.value).toBe("idle");
++    expect(engagedKeys()).toHaveLength(0);
++  });
++
++  it("forgets the copy when the watch is stopped", async () => {
++    const w = watchOf("logs", { targetStream: "syslog_ng" });
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    w.start("copy");
++    w.stop();
++    const after = reload();
++    await vi.advanceTimersByTimeAsync(1);
++    expect(after.state.value).toBe("idle");
++  });
++
++  it("forgets the copy when the org changes", async () => {
++    const org = ref("acme");
++    const w = watchOf("logs", { org, targetStream: "syslog_ng" });
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    w.start("copy");
++    org.value = "beta";
++    await vi.advanceTimersByTimeAsync(1);
++    const after = reload({ targetStream: "syslog_ng" });
++    await vi.advanceTimersByTimeAsync(1);
++    expect(after.state.value).toBe("idle");
++  });
++
++  it("forgets the copy when the bar remounts for another org", async () => {
++    const w = watchOf("logs", { targetStream: "syslog_ng" });
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    w.start("copy");
++    reload({ org: ref("beta"), targetStream: "syslog_ng" });
++    await vi.advanceTimersByTimeAsync(1);
++    const after = reload();
++    await vi.advanceTimersByTimeAsync(1);
++    expect(after.state.value).toBe("idle");
++  });
++
++  it("forgets the previous target's copy on a target change, so switching back holds", async () => {
++    const target = ref<string | undefined>("syslog_ng");
++    const w = watchOf("logs", { targetStream: target });
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    w.start("copy");
++    expect(engagedKeys()).toHaveLength(1);
++    target.value = "nginx_access";
++    await vi.advanceTimersByTimeAsync(1);
++    expect(w.state.value).toBe("idle");
++    expect(engagedKeys()).toHaveLength(0);
++    target.value = "syslog_ng";
++    await vi.advanceTimersByTimeAsync(1);
++    expect(w.state.value).toBe("idle");
++  });
++
++  it.each([
++    ["a non-numeric start", { at: "now" }],
++    ["a target that is not an object", { at: NOW, target: "system_" }],
++    ["a non-boolean existed", { at: NOW, target: { existed: "yes" } }],
++    ["a non-numeric anchor", { at: NOW, target: { existed: true, zoNowUs: "x" } }],
++    ["a baseline that is not a list", { at: NOW, target: { existed: true, baseline: 5 } }],
++    ["a baseline holding a non-name", { at: NOW, target: { existed: true, baseline: ["a", 1] } }],
++    ["matches that are not a list", { at: NOW, target: { existed: true, matches: "system_a" } }],
++  ])("drops a stored copy with %s and holds instead of resuming", async (_label, record) => {
++    const key =
++      "o2.firstEvent.engaged:" + JSON.stringify(["acme", ["metrics"], true, "system_", ""]);
++    sessionStorage.setItem(key, JSON.stringify(record));
++    const w = watchOf("metrics", { targetStream: "system_", match: "keyword" });
++    expect(() => w.start("open")).not.toThrow();
++    await vi.advanceTimersByTimeAsync(1);
++    expect(w.state.value).toBe("idle");
++    expect(engagedKeys()).toHaveLength(0);
++  });
++
++  it("sweeps another org's copy past a malformed stored key", async () => {
++    const beta = "o2.firstEvent.engaged:" + JSON.stringify(["beta", ["logs"], false, "x", ""]);
++    sessionStorage.setItem(beta, JSON.stringify({ at: NOW }));
++    sessionStorage.setItem("o2.firstEvent.engaged:5", JSON.stringify({ at: NOW }));
++    const w = watchOf("logs", { targetStream: "syslog_ng" });
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    expect(engagedKeys()).not.toContain(beta);
++  });
++
++  it("resumes a keyword watch without re-counting matches whose stats never moved", async () => {
++    rows.metrics = ["m0", "m1", "m2", "m3"].map((n, i) => ({
++      name: `system_${n}`,
++      stats: { doc_num: 9, doc_time_min: 1, doc_time_max: 10 - i },
++    }));
++    anchorHits.mockReturnValue([{ zo_count: 0, zo_now: serverNowS }]);
++    const opts: WatchOpts = { targetStream: "system_", match: "keyword" };
++    const w = watchOf("metrics", opts);
++    w.start("open");
++    await vi.advanceTimersByTimeAsync(1);
++    w.start("copy");
++    await vi.advanceTimersByTimeAsync(1);
++    const before = countCalls().length;
++    reload(opts, "metrics");
++    await vi.advanceTimersByTimeAsync(10_001);
++    const counted = countCalls()
++      .slice(before)
++      .map((r) => /"(system_m\d)"/.exec(r.query.query.sql)?.[1]);
++    expect(counted).toEqual([
++      "system_m0",
++      "system_m1",
++      "system_m0",
++      "system_m2",
++      "system_m0",
++      "system_m3",
++    ]);
++  });
++
++  it("keeps today's behaviour when session storage throws", async () => {
++    const fail = () => {
++      throw new Error("SecurityError");
++    };
++    const spies = [
++      vi.spyOn(Storage.prototype, "getItem").mockImplementation(fail),
++      vi.spyOn(Storage.prototype, "setItem").mockImplementation(fail),
++      vi.spyOn(Storage.prototype, "removeItem").mockImplementation(fail),
++      vi.spyOn(Storage.prototype, "key").mockImplementation(fail),
++    ];
++    try {
++      const w = watchOf("logs", { targetStream: "syslog_ng" });
++      w.start("open");
++      await vi.advanceTimersByTimeAsync(1);
++      expect(w.state.value).toBe("idle");
++      w.start("copy");
++      expect(w.state.value).toBe("waiting");
++      await vi.advanceTimersByTimeAsync(5000);
++      const after = reload();
++      await vi.advanceTimersByTimeAsync(1);
++      expect(after.state.value).toBe("idle");
++    } finally {
++      for (const s of spies) s.mockRestore();
++    }
++  });
++});
++
+ describe("useFirstEventWatch — handoff and configuration changes (F1, F5)", () => {
+   it("refreshes the detected type's name list and the stream store before it reports the arrival", async () => {
+     queryClient.setQueryData(streamKeys.nameList("acme", "logs"), []);
+@@ -705,10 +1301,10 @@ describe("useFirstEventWatch — handoff and configuration changes (F1, F5)", ()
+     target.value = "new";
+     pending.resolve({ data: { hits: [{ zo_count: 5, zo_min: serverNowS * 1_000_000 }] } });
+     await vi.advanceTimersByTimeAsync(1);
+-    expect(w.state.value).toBe("waiting");
++    expect(w.state.value).toBe("idle");
+     expect(w.result.value).toBeUndefined();
+     await vi.advanceTimersByTimeAsync(10_000);
+-    expect(w.state.value).toBe("waiting");
++    expect(w.state.value).toBe("idle");
+     expect(w.scope.value).toBe("new-data");
+   });
+ });
+diff --git a/web/src/composables/firstEvent/useFirstEventWatch.ts b/web/src/composables/firstEvent/useFirstEventWatch.ts
+index cb03abd1fa61..0a6f80a417f1 100644
+--- a/web/src/composables/firstEvent/useFirstEventWatch.ts
++++ b/web/src/composables/firstEvent/useFirstEventWatch.ts
+@@ -47,7 +47,7 @@ import {
+   sinceWindow,
+   type TimeWindowUs,
+ } from "./confirmQuery";
+-import { markDetectionSeen } from "./useFirstDataNotice";
++import { markDetectionSeen, orgHasUserStreams, readFirstDataRecord } from "./useFirstDataNotice";
+ 
+ // Profiles are watched only on their own setup page; "any" (no signal) still means logs, metrics and traces.
+ export type StreamSignal = UserDataStreamType | "profiles";
+@@ -112,6 +112,12 @@ interface Confirmation {
+   tsUs: number;
+ }
+ 
++/** A copy or Check now kept across a reload: when it started the watch and the target state it had reached. */
++interface EngagementRecord {
++  at: number;
++  target?: Omit<TargetState, "baseline"> & { baseline?: string[] };
++}
++
+ /** One poll's view of the watch, captured when it starts. */
+ interface PollContext {
+   gen: number;
+@@ -123,6 +129,7 @@ interface PollContext {
+ const MAX_TARGET_PAGES = 10;
+ const ONE_SECOND_US = 1_000_000;
+ const QUARTER_HOUR_US = 15 * 60 * ONE_SECOND_US;
++const ENGAGED_KEY_PREFIX = "o2.firstEvent.engaged:";
+ 
+ const nowMs = () => Date.now();
+ 
+@@ -135,6 +142,99 @@ const fetchOrNull = async <T>(fn: () => Promise<T>): Promise<T | null> => {
+   }
+ };
+ 
++const typesFor = (signal: StreamSignal | undefined, target: string | undefined): StreamSignal[] => {
++  if (signal) return [signal];
++  return target ? ["logs"] : [...USER_DATA_STREAM_TYPES];
++};
++
++const engagementKeyFor = (
++  orgId: string,
++  signal: StreamSignal | undefined,
++  target: string | undefined,
++  filter: string | undefined,
++  keyword: boolean,
++): string | undefined =>
++  target
++    ? ENGAGED_KEY_PREFIX +
++      JSON.stringify([orgId, typesFor(signal, target), keyword, target, filter ?? ""])
++    : undefined;
++
++const isOptionalNumber = (v: unknown): boolean =>
++  v === undefined || (typeof v === "number" && Number.isFinite(v));
++
++const isOptionalNames = (v: unknown): v is string[] | undefined =>
++  v === undefined || (Array.isArray(v) && v.every((n) => typeof n === "string"));
++
++// storage is user-editable, so a record is taken only when every field has the shape the watch relies on
++const parseEngagement = (raw: string): EngagementRecord | null => {
++  const parsed: unknown = JSON.parse(raw);
++  if (!parsed || typeof parsed !== "object") return null;
++  const { at, target } = parsed as Record<string, unknown>;
++  if (typeof at !== "number" || !Number.isFinite(at)) return null;
++  if (target === undefined) return { at };
++  if (!target || typeof target !== "object" || Array.isArray(target)) return null;
++  const { existed, zoNowUs, anchoredAtMs, baselineTotal, baseline, matches } = target as Record<
++    string,
++    unknown
++  >;
++  if (existed !== undefined && typeof existed !== "boolean") return null;
++  if (![zoNowUs, anchoredAtMs, baselineTotal].every(isOptionalNumber)) return null;
++  if (!isOptionalNames(baseline) || !isOptionalNames(matches)) return null;
++  return {
++    at,
++    target: {
++      existed: existed as boolean | undefined,
++      zoNowUs: zoNowUs as number | undefined,
++      anchoredAtMs: anchoredAtMs as number | undefined,
++      baselineTotal: baselineTotal as number | undefined,
++      baseline,
++      matches,
++    },
++  };
++};
++
++const readEngagement = (key: string): EngagementRecord | null => {
++  try {
++    const raw = sessionStorage.getItem(key);
++    return raw ? parseEngagement(raw) : null;
++  } catch {
++    // unreadable or blocked storage: the watch starts as if nothing was copied
++    return null;
++  }
++};
++
++const writeEngagement = (key: string, record: EngagementRecord | null) => {
++  try {
++    if (record) sessionStorage.setItem(key, JSON.stringify(record));
++    else sessionStorage.removeItem(key);
++  } catch {
++    // storage unavailable: the copy counts for this page only
++  }
++};
++
++const orgOfKey = (key: string): unknown => {
++  try {
++    const parsed: unknown = JSON.parse(key.slice(ENGAGED_KEY_PREFIX.length));
++    return Array.isArray(parsed) ? parsed[0] : undefined;
++  } catch {
++    // a malformed key names no org, so the sweep drops it
++    return undefined;
++  }
++};
++
++// a bar remounted for another org never sees its old key, so switching orgs sweeps every other org's record
++const forgetOtherOrgs = (orgId: string) => {
++  try {
++    for (let i = sessionStorage.length - 1; i >= 0; i--) {
++      const key = sessionStorage.key(i);
++      if (!key?.startsWith(ENGAGED_KEY_PREFIX)) continue;
++      if (orgOfKey(key) !== orgId) sessionStorage.removeItem(key);
++    }
++  } catch {
++    // storage unavailable: nothing was kept to sweep
++  }
++};
++
+ const newestFirst = (rows: StreamRow[]): StreamRow[] =>
+   [...rows].sort((a, b) => Number(b.stats?.doc_time_max ?? 0) - Number(a.stats?.doc_time_max ?? 0));
+ 
+@@ -158,6 +258,8 @@ export function useFirstEventWatch(
+   const startedAtMs = ref<number>();
+   const troubleshooting = ref(false);
+   const target = ref<TargetState>({});
++  // a target watch makes no claim until its first lookup answers, so a page load never flashes the wrong state
++  const deciding = ref(false);
+ 
+   let running = false;
+   // bumped on every org, signal, target, match or filter change; results of an older generation are dropped
+@@ -183,16 +285,15 @@ export function useFirstEventWatch(
+   const targetName = computed(() => options.targetStream?.value?.trim() || undefined);
+   const filter = computed(() => options.filter?.value?.trim() || undefined);
+   const keywordMatch = computed(() => options.match?.value === "keyword");
+-  const watchedTypes = computed<StreamSignal[]>(() => {
+-    if (signal?.value) return [signal.value];
+-    return targetName.value ? ["logs"] : [...USER_DATA_STREAM_TYPES];
+-  });
++  const watchedTypes = computed<StreamSignal[]>(() => typesFor(signal?.value, targetName.value));
+   const elapsedMs = () => (startedAtMs.value === undefined ? 0 : nowMs() - startedAtMs.value);
+   const scope = computed(() =>
+     target.value.existed && targetName.value ? "since-watch-start" : "new-data",
+   );
+   const stale = (ctx: { gen: number }) => !running || ctx.gen !== generation;
+   const autoDiagnosis = () => options.autoDiagnosis?.value !== false;
++  const engagementKey = (): string | undefined =>
++    engagementKeyFor(org.value, signal?.value, targetName.value, filter.value, keywordMatch.value);
+ 
+   const configNumber = (key: string, fallback: number): number => {
+     const raw = store.state.zoConfig?.[key];
+@@ -344,6 +445,26 @@ export function useFirstEventWatch(
+ 
+   const selectedOrg = (): string | undefined => store.state.selectedOrganization?.identifier;
+ 
++  // the flag is the selected org's and is set only where a page lists streams, so a direct load reads the streams itself
++  const orgDataSource = async (
++    orgId: string,
++  ): Promise<"flag" | "record" | "streams" | undefined> => {
++    try {
++      if (orgId === selectedOrg() && store.state.organizationData?.isDataIngested === true) {
++        return "flag";
++      }
++      if (readFirstDataRecord(orgId)?.hadData) return "record";
++      return (await orgHasUserStreams(orgId)) === true ? "streams" : undefined;
++    } catch {
++      // a failed read counts as a new org, so a brand-new org never misses its first record
++      return undefined;
++    }
++  };
++
++  // only a live read that found user streams may set the shared flag, which belongs to the selected org
++  const sharedFlagOrg = (ctx: PollContext, source: string | undefined) =>
++    source === "streams" && ctx.org === selectedOrg() ? ctx.org : undefined;
++
+   // Pages read the name list and the store, which may still hold the empty list from before the first record.
+   const refreshStreamLists = async (ctx: PollContext) => {
+     if (ctx.org !== selectedOrg()) return;
+@@ -384,6 +505,7 @@ export function useFirstEventWatch(
+     state.value = "received";
+     markDetectionSeen(ctx.org);
+     halt();
++    forgetEngagement();
+   };
+ 
+   const probeTarget = async (ctx: PollContext, name: string) => {
+@@ -391,8 +513,10 @@ export function useFirstEventWatch(
+     if (t.existed === undefined) {
+       const row = await findTarget(ctx, name);
+       if (row === undefined || stale(ctx)) return;
++      const source = row || engaged ? undefined : await orgDataSource(ctx.org);
++      if (stale(ctx)) return;
+       target.value = { existed: !!row };
+-      if (row && !engaged && hasRecords(row)) holdForUser();
++      if (!engaged && (row ? hasRecords(row) : source)) holdForUser(sharedFlagOrg(ctx, source));
+       else if (row) await anchor(ctx, name);
+       return;
+     }
+@@ -433,9 +557,11 @@ export function useFirstEventWatch(
+     const others = (target.value.matches ?? []).filter((n) => n !== busiest);
+     if (!others.length) return undefined;
+     for (const r of seen) {
+-      if (!others.includes(r.name) || matchStats.get(r.name) === statsKey(r)) continue;
++      const known = matchStats.get(r.name);
++      if (!others.includes(r.name) || known === statsKey(r)) continue;
+       matchStats.set(r.name, statsKey(r));
+-      owed.add(r.name);
++      // a resumed watch has no stats from before the reload, so a first sighting sets the baseline
++      if (known !== undefined) owed.add(r.name);
+     }
+     lastFromOwed = owed.size > 0 && !lastFromOwed;
+     const next = lastFromOwed ? [...owed][0] : others[rotation++ % others.length];
+@@ -465,6 +591,8 @@ export function useFirstEventWatch(
+       const found = await listMatches(ctx, keyword);
+       if (!found || stale(ctx)) return;
+       const matches = newestFirst(found.rows);
++      const source = matches.length || engaged ? undefined : await orgDataSource(ctx.org);
++      if (stale(ctx)) return;
+       for (const row of matches) matchStats.set(row.name, statsKey(row));
+       target.value = {
+         existed: matches.length > 0,
+@@ -472,8 +600,9 @@ export function useFirstEventWatch(
+         baselineTotal: found.total,
+         matches: matches.map((s) => s.name),
+       };
+-      if (!engaged && matches.some(hasRecords)) holdForUser();
+-      else if (matches.length) await anchor(ctx, matches[0].name);
++      if (!engaged && (matches.length ? matches.some(hasRecords) : source)) {
++        holdForUser(sharedFlagOrg(ctx, source));
++      } else if (matches.length) await anchor(ctx, matches[0].name);
+       return;
+     }
+     const pending = candidates[ctx.type] ?? new Map<string, StreamRow>();
+@@ -635,8 +764,13 @@ export function useFirstEventWatch(
+       return;
+     }
+     const gen = generation;
+-    await poll();
++    try {
++      await poll();
++    } catch {
++      // a throw must not freeze the placeholder or the schedule; the watch keeps polling as for a new org
++    }
+     if (gen !== generation) return;
++    deciding.value = false;
+     if (running && state.value !== "received" && autoDiagnosis() && !untracked && rejectionsDue()) {
+       await readRejections("auto");
+     }
+@@ -651,20 +785,63 @@ export function useFirstEventWatch(
+ 
+   function halt() {
+     running = false;
++    deciding.value = false;
+     clearTimer();
+     if (typeof document !== "undefined") {
+       document.removeEventListener("visibilitychange", onVisibilityChange);
+     }
+   }
+ 
+-  function holdForUser() {
++  // flagOrg is set only when a live stream read found user streams in the selected org; a local record can outlive them
++  function holdForUser(flagOrg?: string) {
+     halt();
+     state.value = "idle";
++    if (flagOrg && flagOrg === selectedOrg() && !store.state.organizationData?.isDataIngested) {
++      store.dispatch("setIsDataIngested", true);
++    }
+   }
+ 
+   function finish() {
+     halt();
+     if (state.value !== "received") state.value = "stopped";
++    forgetEngagement();
++  }
++
++  function saveEngagement() {
++    const key = engagementKey();
++    if (!key || !engaged || !running || startedAtMs.value === undefined) return;
++    const { baseline, ...rest } = target.value;
++    writeEngagement(key, {
++      at: startedAtMs.value,
++      target: { ...rest, ...(baseline ? { baseline: [...baseline] } : {}) },
++    });
++  }
++
++  function forgetEngagement() {
++    const key = engagementKey();
++    if (key) writeEngagement(key, null);
++  }
++
++  // A copy still inside the budget resumes engaged, with the target state it had reached, so a reload neither holds nor re-anchors.
++  function resumeEngagement(): EngagementRecord | undefined {
++    if (!org.value) return undefined;
++    forgetOtherOrgs(org.value);
++    const key = engagementKey();
++    if (!key) return undefined;
++    const saved = readEngagement(key);
++    if (!saved) {
++      writeEngagement(key, null);
++      return undefined;
++    }
++    const age = nowMs() - saved.at;
++    if (age < 0 || cadenceAt(age) === null) {
++      writeEngagement(key, null);
++      return undefined;
++    }
++    engaged = true;
++    const { baseline, ...rest } = saved.target ?? {};
++    target.value = { ...rest, ...(baseline ? { baseline: new Set(baseline) } : {}) };
++    return saved;
+   }
+ 
+   const resetWatch = () => {
+@@ -697,11 +874,15 @@ export function useFirstEventWatch(
+         startedAtMs.value = nowMs();
+         schedule(FIRST_EVENT_BUDGET.fastMs);
+       }
++      saveEngagement();
+       return;
+     }
++    const resumed = reason === "open" && !engaged ? resumeEngagement() : undefined;
++    deciding.value =
++      reason === "open" && !!targetName.value && (!!resumed || target.value.existed === undefined);
+     running = true;
+     pausedWhileHidden = false;
+-    startedAtMs.value = nowMs();
++    startedAtMs.value = resumed?.at ?? nowMs();
+     // a restart is a new watch: its first automatic read waits the full diagnosisAtMs again
+     lastRejectionsReadMs = undefined;
+     untracked = false;
+@@ -713,10 +894,14 @@ export function useFirstEventWatch(
+     if (typeof document !== "undefined") {
+       document.addEventListener("visibilitychange", onVisibilityChange);
+     }
++    saveEngagement();
+     schedule(0);
+   };
+ 
+-  const stop = () => halt();
++  const stop = () => {
++    halt();
++    forgetEngagement();
++  };
+ 
+   const probeNow = async () => {
+     if (state.value === "idle") {
+@@ -736,7 +921,11 @@ export function useFirstEventWatch(
+   // sync, so the generation moves before any in-flight answer for the old configuration can land
+   watch(
+     [org, () => signal?.value, targetName, filter, keywordMatch],
+-    () => {
++    ([nextOrg], [prevOrg, prevSignal, prevTarget, prevFilter, prevKeyword]) => {
++      if (nextOrg !== prevOrg && nextOrg) forgetOtherOrgs(nextOrg);
++      // a copy belongs to the watch it was made in, so switching back to that target holds again
++      const prevKey = engagementKeyFor(prevOrg, prevSignal, prevTarget, prevFilter, prevKeyword);
++      if (prevKey) writeEngagement(prevKey, null);
+       const resume = running || state.value === "idle";
+       generation++;
+       halt();
+@@ -746,6 +935,8 @@ export function useFirstEventWatch(
+     { flush: "sync" },
+   );
+ 
++  watch(target, saveEngagement, { flush: "sync" });
++
+   onScopeDispose(halt);
+ 
+   return {
+@@ -756,6 +947,8 @@ export function useFirstEventWatch(
+     scope,
+     troubleshooting,
+     sinceUs: computed(() => target.value.zoNowUs),
++    targetExists: computed(() => target.value.existed === true),
++    deciding,
+     start,
+     stop,
+     probeNow,
+diff --git a/web/src/locales/languages/ar-SA.json b/web/src/locales/languages/ar-SA.json
+index f23a8748a9a6..a919a122377c 100644
+--- a/web/src/locales/languages/ar-SA.json
++++ b/web/src/locales/languages/ar-SA.json
+@@ -4990,6 +4990,8 @@
+       "idleInConfig": "{stream} يتلقى البيانات بالفعل. تبدأ عمليات التحقق عند نسخ التكوين.",
+       "idleMatches": "التدفقات المطابقة تتلقى البيانات بالفعل. تبدأ عمليات التحقق عند نسخ الأمر.",
+       "idleMatchesConfig": "التدفقات المطابقة تتلقى البيانات بالفعل. تبدأ عمليات التحقق عند نسخ التكوين.",
++      "idleNew": "تبدأ الفحوصات عند نسخ الأمر.",
++      "idleNewConfig": "تبدأ الفحوصات عند نسخ التكوين.",
+       "checkNow": "تحقق الآن",
+       "receivedPill": "تم استلام الحدث الأول",
+       "receivedNewPill": "تم استلام بيانات جديدة",
+diff --git a/web/src/locales/languages/de-DE.json b/web/src/locales/languages/de-DE.json
+index 78cd7634c49c..dbc5e39cbfdb 100644
+--- a/web/src/locales/languages/de-DE.json
++++ b/web/src/locales/languages/de-DE.json
+@@ -4990,6 +4990,8 @@
+       "idleInConfig": "{stream} empfängt bereits Daten. Die Prüfung startet, wenn Sie die Konfiguration kopieren.",
+       "idleMatches": "Passende Streams empfangen bereits Daten. Die Prüfung startet, wenn Sie den Befehl kopieren.",
+       "idleMatchesConfig": "Passende Streams empfangen bereits Daten. Die Prüfung startet, wenn Sie die Konfiguration kopieren.",
++      "idleNew": "Die Prüfungen starten, sobald Sie den Befehl kopieren.",
++      "idleNewConfig": "Die Prüfungen starten, sobald Sie die Konfiguration kopieren.",
+       "checkNow": "Jetzt prüfen",
+       "receivedPill": "Erstes Ereignis empfangen",
+       "receivedNewPill": "Neue Daten empfangen",
+diff --git a/web/src/locales/languages/en-US.json b/web/src/locales/languages/en-US.json
+index 0aa769c1a4f0..e23e98cca49c 100644
+--- a/web/src/locales/languages/en-US.json
++++ b/web/src/locales/languages/en-US.json
+@@ -4990,6 +4990,8 @@
+       "idleInConfig": "{stream} already receives data. Checks start when you copy the config.",
+       "idleMatches": "Matching streams already receive data. Checks start when you copy the command.",
+       "idleMatchesConfig": "Matching streams already receive data. Checks start when you copy the config.",
++      "idleNew": "Checks start when you copy the command.",
++      "idleNewConfig": "Checks start when you copy the config.",
+       "checkNow": "Check now",
+       "receivedPill": "First event received",
+       "receivedNewPill": "New data received",
+diff --git a/web/src/locales/languages/es-ES.json b/web/src/locales/languages/es-ES.json
+index c45dd69c8692..7f2903dcbf19 100644
+--- a/web/src/locales/languages/es-ES.json
++++ b/web/src/locales/languages/es-ES.json
+@@ -4990,6 +4990,8 @@
+       "idleInConfig": "{stream} ya recibe datos. Las verificaciones comienzan cuando copias la configuración.",
+       "idleMatches": "Los streams coincidentes ya reciben datos. Las verificaciones comienzan cuando copias el comando.",
+       "idleMatchesConfig": "Los streams coincidentes ya reciben datos. Las verificaciones comienzan cuando copias la configuración.",
++      "idleNew": "Las comprobaciones se inician cuando copias el comando.",
++      "idleNewConfig": "Las comprobaciones se inician cuando copias la configuración.",
+       "checkNow": "Verificar ahora",
+       "receivedPill": "Primer evento recibido",
+       "receivedNewPill": "Nuevos datos recibidos",
+diff --git a/web/src/locales/languages/fr-FR.json b/web/src/locales/languages/fr-FR.json
+index cfbad45848c9..c5b7fbb2ee72 100644
+--- a/web/src/locales/languages/fr-FR.json
++++ b/web/src/locales/languages/fr-FR.json
+@@ -4990,6 +4990,8 @@
+       "idleInConfig": "{stream} reçoit déjà des données. Les vérifications démarrent lorsque vous copiez la configuration.",
+       "idleMatches": "Les flux correspondants reçoivent déjà des données. Les vérifications démarrent lorsque vous copiez la commande.",
+       "idleMatchesConfig": "Les flux correspondants reçoivent déjà des données. Les vérifications démarrent lorsque vous copiez la configuration.",
++      "idleNew": "Les vérifications démarrent lorsque vous copiez la commande.",
++      "idleNewConfig": "Les vérifications démarrent lorsque vous copiez la configuration.",
+       "checkNow": "Vérifier maintenant",
+       "receivedPill": "Premier événement reçu",
+       "receivedNewPill": "Nouvelles données reçues",
+diff --git a/web/src/locales/languages/it-IT.json b/web/src/locales/languages/it-IT.json
+index e5719cebb9d6..0192ec87f400 100644
+--- a/web/src/locales/languages/it-IT.json
++++ b/web/src/locales/languages/it-IT.json
+@@ -4990,6 +4990,8 @@
+       "idleInConfig": "{stream} riceve già dati. I controlli iniziano quando copi la configurazione.",
+       "idleMatches": "Gli stream corrispondenti ricevono già dati. I controlli iniziano quando copi il comando.",
+       "idleMatchesConfig": "Gli stream corrispondenti ricevono già dati. I controlli iniziano quando copi la configurazione.",
++      "idleNew": "I controlli iniziano quando copi il comando.",
++      "idleNewConfig": "I controlli iniziano quando copi la configurazione.",
+       "checkNow": "Verifica ora",
+       "receivedPill": "Primo evento ricevuto",
+       "receivedNewPill": "Nuovi dati ricevuti",
+diff --git a/web/src/locales/languages/ja-JP.json b/web/src/locales/languages/ja-JP.json
+index 6f24169794d8..8609a2d0a398 100644
+--- a/web/src/locales/languages/ja-JP.json
++++ b/web/src/locales/languages/ja-JP.json
+@@ -4990,6 +4990,8 @@
+       "idleInConfig": "{stream} はすでにデータを受信しています。設定をコピーするとチェックが開始されます。",
+       "idleMatches": "一致するストリームはすでにデータを受信しています。コマンドをコピーするとチェックが開始されます。",
+       "idleMatchesConfig": "一致するストリームはすでにデータを受信しています。設定をコピーするとチェックが開始されます。",
++      "idleNew": "コマンドをコピーするとチェックが開始されます。",
++      "idleNewConfig": "設定をコピーするとチェックが開始されます。",
+       "checkNow": "今すぐ確認",
+       "receivedPill": "最初のイベントを受信しました",
+       "receivedNewPill": "新しいデータを受信しました",
+diff --git a/web/src/locales/languages/ko-KR.json b/web/src/locales/languages/ko-KR.json
+index 515ce2e2c918..20683d3b85f0 100644
+--- a/web/src/locales/languages/ko-KR.json
++++ b/web/src/locales/languages/ko-KR.json
+@@ -4990,6 +4990,8 @@
+       "idleInConfig": "{stream}은(는) 이미 데이터를 수신하고 있습니다. 구성을 복사하면 확인이 시작됩니다.",
+       "idleMatches": "일치하는 스트림은 이미 데이터를 수신하고 있습니다. 명령을 복사하면 확인이 시작됩니다.",
+       "idleMatchesConfig": "일치하는 스트림은 이미 데이터를 수신하고 있습니다. 구성을 복사하면 확인이 시작됩니다.",
++      "idleNew": "명령을 복사하면 확인이 시작됩니다.",
++      "idleNewConfig": "구성을 복사하면 확인이 시작됩니다.",
+       "checkNow": "지금 확인",
+       "receivedPill": "첫 이벤트 수신됨",
+       "receivedNewPill": "새 데이터 수신됨",
+diff --git a/web/src/locales/languages/nl-NL.json b/web/src/locales/languages/nl-NL.json
+index e89d4c4eb1bb..3e0379f8a175 100644
+--- a/web/src/locales/languages/nl-NL.json
++++ b/web/src/locales/languages/nl-NL.json
+@@ -4990,6 +4990,8 @@
+       "idleInConfig": "{stream} ontvangt al gegevens. Controles starten zodra je de configuratie kopieert.",
+       "idleMatches": "Overeenkomende streams ontvangen al gegevens. Controles starten zodra je het commando kopieert.",
+       "idleMatchesConfig": "Overeenkomende streams ontvangen al gegevens. Controles starten zodra je de configuratie kopieert.",
++      "idleNew": "Checks starten wanneer je het commando kopieert.",
++      "idleNewConfig": "Checks starten wanneer je de configuratie kopieert.",
+       "checkNow": "Nu controleren",
+       "receivedPill": "Eerste event ontvangen",
+       "receivedNewPill": "Nieuwe gegevens ontvangen",
+diff --git a/web/src/locales/languages/pl-PL.json b/web/src/locales/languages/pl-PL.json
+index 1defd7afb6fe..042f53bbd743 100644
+--- a/web/src/locales/languages/pl-PL.json
++++ b/web/src/locales/languages/pl-PL.json
+@@ -4990,6 +4990,8 @@
+       "idleInConfig": "{stream} już odbiera dane. Sprawdzanie rozpocznie się po skopiowaniu konfiguracji.",
+       "idleMatches": "Pasujące strumienie już odbierają dane. Sprawdzanie rozpocznie się po skopiowaniu polecenia.",
+       "idleMatchesConfig": "Pasujące strumienie już odbierają dane. Sprawdzanie rozpocznie się po skopiowaniu konfiguracji.",
++      "idleNew": "Sprawdzanie rozpocznie się po skopiowaniu polecenia.",
++      "idleNewConfig": "Sprawdzanie rozpocznie się po skopiowaniu konfiguracji.",
+       "checkNow": "Sprawdź teraz",
+       "receivedPill": "Odebrano pierwsze zdarzenie",
+       "receivedNewPill": "Odebrano nowe dane",
+diff --git a/web/src/locales/languages/pt-PT.json b/web/src/locales/languages/pt-PT.json
+index 9baf296a18bb..139f518f54ff 100644
+--- a/web/src/locales/languages/pt-PT.json
++++ b/web/src/locales/languages/pt-PT.json
+@@ -4990,6 +4990,8 @@
+       "idleInConfig": "{stream} já recebe dados. As verificações começam quando copia a configuração.",
+       "idleMatches": "Os streams correspondentes já recebem dados. As verificações começam quando copia o comando.",
+       "idleMatchesConfig": "Os streams correspondentes já recebem dados. As verificações começam quando copia a configuração.",
++      "idleNew": "As verificações começam quando copia o comando.",
++      "idleNewConfig": "As verificações começam quando copia a configuração.",
+       "checkNow": "Verificar agora",
+       "receivedPill": "Primeiro evento recebido",
+       "receivedNewPill": "Novos dados recebidos",
+diff --git a/web/src/locales/languages/ru-RU.json b/web/src/locales/languages/ru-RU.json
+index 60f53c841886..38ddf7af605c 100644
+--- a/web/src/locales/languages/ru-RU.json
++++ b/web/src/locales/languages/ru-RU.json
+@@ -4990,6 +4990,8 @@
+       "idleInConfig": "{stream} уже получает данные. Проверка начнётся, когда вы скопируете конфигурацию.",
+       "idleMatches": "Совпадающие потоки уже получают данные. Проверка начнётся, когда вы скопируете команду.",
+       "idleMatchesConfig": "Совпадающие потоки уже получают данные. Проверка начнётся, когда вы скопируете конфигурацию.",
++      "idleNew": "Проверки начнутся, когда вы скопируете команду.",
++      "idleNewConfig": "Проверки начнутся, когда вы скопируете конфигурацию.",
+       "checkNow": "Проверить сейчас",
+       "receivedPill": "Первое событие получено",
+       "receivedNewPill": "Получены новые данные",
+diff --git a/web/src/locales/languages/tr-TR.json b/web/src/locales/languages/tr-TR.json
+index bc27389a46fb..33dd80d3e041 100644
+--- a/web/src/locales/languages/tr-TR.json
++++ b/web/src/locales/languages/tr-TR.json
+@@ -4990,6 +4990,8 @@
+       "idleInConfig": "{stream} zaten veri alıyor. Kontroller, yapılandırmayı kopyaladığınızda başlar.",
+       "idleMatches": "Eşleşen akışlar zaten veri alıyor. Kontroller, komutu kopyaladığınızda başlar.",
+       "idleMatchesConfig": "Eşleşen akışlar zaten veri alıyor. Kontroller, yapılandırmayı kopyaladığınızda başlar.",
++      "idleNew": "Komutu kopyaladığınızda kontroller başlar.",
++      "idleNewConfig": "Yapılandırmayı kopyaladığınızda kontroller başlar.",
+       "checkNow": "Şimdi kontrol et",
+       "receivedPill": "İlk olay alındı",
+       "receivedNewPill": "Yeni veri alındı",
+diff --git a/web/src/locales/languages/vi-VN.json b/web/src/locales/languages/vi-VN.json
+index 38c3ed44d56e..8e202660d7f6 100644
+--- a/web/src/locales/languages/vi-VN.json
++++ b/web/src/locales/languages/vi-VN.json
+@@ -4990,6 +4990,8 @@
+       "idleInConfig": "{stream} đã nhận dữ liệu. Quá trình kiểm tra bắt đầu khi bạn sao chép cấu hình.",
+       "idleMatches": "Các stream khớp đã nhận dữ liệu. Quá trình kiểm tra bắt đầu khi bạn sao chép lệnh.",
+       "idleMatchesConfig": "Các stream khớp đã nhận dữ liệu. Quá trình kiểm tra bắt đầu khi bạn sao chép cấu hình.",
++      "idleNew": "Quá trình kiểm tra bắt đầu khi bạn sao chép lệnh.",
++      "idleNewConfig": "Quá trình kiểm tra bắt đầu khi bạn sao chép cấu hình.",
+       "checkNow": "Kiểm tra ngay",
+       "receivedPill": "Đã nhận sự kiện đầu tiên",
+       "receivedNewPill": "Đã nhận dữ liệu mới",
+diff --git a/web/src/locales/languages/zh-CN.json b/web/src/locales/languages/zh-CN.json
+index e02acd6977bd..f2e582e6086d 100644
+--- a/web/src/locales/languages/zh-CN.json
++++ b/web/src/locales/languages/zh-CN.json
+@@ -4990,6 +4990,8 @@
+       "idleInConfig": "{stream} 已在接收数据。复制配置后将开始检查。",
+       "idleMatches": "匹配的数据流已在接收数据。复制命令后将开始检查。",
+       "idleMatchesConfig": "匹配的数据流已在接收数据。复制配置后将开始检查。",
++      "idleNew": "复制命令后即开始检查。",
++      "idleNewConfig": "复制配置后即开始检查。",
+       "checkNow": "立即检查",
+       "receivedPill": "已收到首个事件",
+       "receivedNewPill": "已收到新数据",
+diff --git a/web/src/locales/languages/zh-TW.json b/web/src/locales/languages/zh-TW.json
+index d3faedd2c719..a202598f2670 100644
+--- a/web/src/locales/languages/zh-TW.json
++++ b/web/src/locales/languages/zh-TW.json
+@@ -4990,6 +4990,8 @@
+       "idleInConfig": "{stream} 已在接收數據。複製設定後即開始檢查。",
+       "idleMatches": "符合的串流已在接收數據。複製指令後即開始檢查。",
+       "idleMatchesConfig": "符合的串流已在接收數據。複製設定後即開始檢查。",
++      "idleNew": "複製指令後，檢查就會開始。",
++      "idleNewConfig": "複製設定後，檢查就會開始。",
+       "checkNow": "立即檢查",
+       "receivedPill": "已收到第一個事件",
+       "receivedNewPill": "已收到新資料",

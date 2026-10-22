@@ -1,0 +1,20 @@
+{
+  "feature_slug": "first-event-status",
+  "feature_title": "Ingestion First-Event Status",
+  "area": "Streams",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "first-event-status.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Streams/first-event-status.spec.js",
+  "playwright_group": "Streams",
+  "source_files": [
+    "web/src/components/ingestion/FirstEventStatus.vue",
+    "web/src/components/ingestion/IngestionContent.vue",
+    "web/src/composables/firstEvent/useFirstEventWatch.ts",
+    "web/src/composables/firstEvent/useFirstDataNotice.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

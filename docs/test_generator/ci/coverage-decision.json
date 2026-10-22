@@ -1,0 +1,13 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Streams/first-event-status.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Onboarding/first-event.spec.js",
+    "tests/ui-testing/playwright-tests/Onboarding/diagnosis.spec.js",
+    "tests/ui-testing/playwright-tests/Onboarding/first-data-notice.spec.js",
+    "tests/ui-testing/playwright-tests/Onboarding/home-first-data.spec.js",
+    "tests/ui-testing/playwright-tests/Onboarding/empty-pages-flag-off.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "The first-event status bar is already substantially covered by the Onboarding specs (received via standard fluentbit + metrics/traces + keyword card; rejected via 401; no-requests via 120s auto; stopped + pill via clock mock; next-visit notice; flag-off), but (a) those specs are not registered in any ci_matrix.json shard so they do not run in the CI shard for this feature, and (b) the feature doc and run-context label the feature 'area: Streams', whose shard globs already own web/src/components/ingestion/** and pages/generalPages/firstEventPage.js. Three WIRED behaviors remain uncovered: the test-guide (curl, kind=test) received path with 'Connect your real source', the idle -> Check now -> received flow (Workflow 2), and the instant no-requests diagnosis via the Troubleshoot click (trigger=troubleshoot, vs the 120s auto path). A new Streams spec is created to cover only these gaps and is registered into the existing 'Streams' shard; the Onboarding specs are left as-is to avoid duplication."
+}
