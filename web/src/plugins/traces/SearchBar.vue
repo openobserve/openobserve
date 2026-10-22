@@ -362,6 +362,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdown v-if="store.state.zoConfig.auto_query_enabled" side="bottom" align="end">
                 <template #trigger>
                   <OButton
+                    :aria-label="t('common.moreOptions')"
                     variant="ghost"
                     size="icon-xs"
                     :disabled="isLoading"
