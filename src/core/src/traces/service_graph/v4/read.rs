@@ -22,7 +22,7 @@ use std::{
 
 use config::meta::{
     alerts::incidents::EdgeType,
-    promql::value::{InstantValue, LabelsExt, Value},
+    promql::value::{InstantValue, LabelsExt, RangeValue, Value},
     service_graph::{
         EdgeIdentity, MetricEdge, MetricNode, TopologyInput, TopologyMeta, UnresolvedCounts,
     },
@@ -43,7 +43,7 @@ use super::{
 const EDGE_BY: &str = "client, client_type, server, connection_type";
 const EDGE_BY_ENV: &str = "client, client_type, server, connection_type, agent_env";
 const LABEL_AGENT_ENV: &str = "agent_env";
-const QUANTILES: [f64; 3] = [0.5, 0.95, 0.99];
+pub(super) const QUANTILES: [f64; 3] = [0.5, 0.95, 0.99];
 /// The engine ignores `step` on an instant query; any positive value works.
 const INSTANT_STEP_MICROS: i64 = 300_000_000;
 /// Positions inside a `plan_queries` result; `assemble` reads by these.
@@ -150,6 +150,36 @@ pub fn q_edge_exists(client: &str, server: &str, range_secs: i64) -> Result<Stri
     ))
 }
 
+/// On-call blast radius: every client that called `server` within the range.
+pub fn q_callers(server: &str, range_secs: i64) -> Result<String, String> {
+    Ok(format!(
+        "sum by (client, client_type, connection_type) (increase({}[{range_secs}s]))",
+        selector(M_REQUEST_TOTAL, &label_eq("server", server)?)
+    ))
+}
+
+/// Whether the org has any service graph traffic in the range at all.
+pub fn q_org_requests(range_secs: i64) -> String {
+    format!("sum(increase({M_REQUEST_TOTAL}[{range_secs}s]))")
+}
+
+/// Sorted callers with traffic; the synthetic `user` entry and the service itself are not callers.
+pub fn callers_from(rows: &[InstantValue], server: &str) -> Vec<String> {
+    let mut callers: Vec<String> = rows
+        .iter()
+        .filter(|r| count(r.sample.value) > 0.0)
+        .map(edge_identity)
+        .filter(drawn)
+        .filter(|(client, client_type, ..)| {
+            client_type != CLIENT_TYPE_USER && !client.is_empty() && client != server
+        })
+        .map(|(client, ..)| client)
+        .collect();
+    callers.sort();
+    callers.dedup();
+    callers
+}
+
 pub fn edge_type_from(forward: f64) -> EdgeType {
     if forward > 0.0 {
         EdgeType::ServiceDependency
@@ -164,33 +194,31 @@ pub async fn instant(
     query: &str,
     at_micros: i64,
 ) -> Result<Vec<InstantValue>, anyhow::Error> {
-    let req = promql_service::MetricsQueryRequest {
-        query: query.to_string(),
-        start: at_micros,
-        end: at_micros,
-        step: INSTANT_STEP_MICROS,
-        query_exemplars: false,
-        use_cache: None,
-        search_type: None,
-        search_event_context: None,
-        regions: vec![],
-        clusters: vec![],
-    };
-    #[cfg(not(feature = "enterprise"))]
-    let is_super_cluster = false;
-    #[cfg(feature = "enterprise")]
-    let is_super_cluster = o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled;
-    let trace_id = config::ider::generate_trace_id();
-    let resp =
-        promql_service::search::search(&trace_id, org, &req, "", 0, is_super_cluster).await?;
-    match resp.value {
+    match run_query(org, query, at_micros, at_micros, INSTANT_STEP_MICROS).await? {
         Value::Vector(v) => Ok(v),
         Value::Instant(i) => Ok(vec![i]),
         Value::None => Ok(vec![]),
         other => anyhow::bail!(
             "service graph query returned {} instead of a vector: {query}",
+            other.get_type()
+        ),
+    }
+}
+
+/// Runs one range query over `[start, end]` evaluated every `step` microseconds.
+pub async fn range(
+    org: &str,
+    query: &str,
+    start: i64,
+    end: i64,
+    step: i64,
+) -> Result<Vec<RangeValue>, anyhow::Error> {
+    match run_query(org, query, start, end, step).await? {
+        Value::Matrix(m) => Ok(m),
+        Value::Range(r) => Ok(vec![r]),
+        Value::None => Ok(vec![]),
+        other => anyhow::bail!(
+            "service graph query returned {} instead of a matrix: {query}",
             other.get_type()
         ),
     }
@@ -344,6 +372,37 @@ fn assemble(
     Ok((input, meta))
 }
 
+async fn run_query(
+    org: &str,
+    query: &str,
+    start: i64,
+    end: i64,
+    step: i64,
+) -> Result<Value, anyhow::Error> {
+    let req = promql_service::MetricsQueryRequest {
+        query: query.to_string(),
+        start,
+        end,
+        step,
+        query_exemplars: false,
+        use_cache: None,
+        search_type: None,
+        search_event_context: None,
+        regions: vec![],
+        clusters: vec![],
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let is_super_cluster = false;
+    #[cfg(feature = "enterprise")]
+    let is_super_cluster = o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled;
+    let trace_id = config::ider::generate_trace_id();
+    let resp =
+        promql_service::search::search(&trace_id, org, &req, "", 0, is_super_cluster).await?;
+    Ok(resp.value)
+}
+
 /// PromQL string-literal escaping; control characters other than newline are refused.
 fn escape_label_value(v: &str) -> Result<String, String> {
     let mut out = String::with_capacity(v.len());
@@ -359,11 +418,11 @@ fn escape_label_value(v: &str) -> Result<String, String> {
     Ok(out)
 }
 
-fn label_eq(label: &str, value: &str) -> Result<String, String> {
+pub(super) fn label_eq(label: &str, value: &str) -> Result<String, String> {
     Ok(format!("{label}=\"{}\"", escape_label_value(value)?))
 }
 
-fn selector(metric: &str, matcher: &str) -> String {
+pub(super) fn selector(metric: &str, matcher: &str) -> String {
     if matcher.is_empty() {
         metric.to_string()
     } else {
@@ -523,13 +582,18 @@ fn edge_identity(r: &InstantValue) -> EdgeIdentity {
     )
 }
 
+/// The collector's `virtual_node` edges that `edge_identity` did not map are unresolved, not drawn.
+fn drawn(id: &EdgeIdentity) -> bool {
+    id.3 != COLLECTOR_VIRTUAL_NODE
+}
+
 /// A counter value; the engine yields NaN for an empty range, which is "no requests".
-fn count(v: f64) -> f64 {
+pub(super) fn count(v: f64) -> f64 {
     if v.is_finite() { v } else { 0.0 }
 }
 
 /// Quantile seconds to whole nanoseconds; NaN means the histogram had no samples.
-fn secs_to_ns(v: f64) -> Option<u64> {
+pub(super) fn secs_to_ns(v: f64) -> Option<u64> {
     v.is_finite().then(|| (v * 1e9).round() as u64)
 }
 
@@ -603,11 +667,11 @@ fn assemble_edges(results: &[Vec<InstantValue>]) -> (Vec<MetricEdge>, u64) {
     let mut unresolved = 0.0;
     let edges = edges
         .into_iter()
-        .filter(|((_, _, _, connection_type), e)| {
-            if connection_type == COLLECTOR_VIRTUAL_NODE {
+        .filter(|(id, e)| {
+            if !drawn(id) {
                 unresolved += e.requests;
             }
-            connection_type != COLLECTOR_VIRTUAL_NODE
+            drawn(id)
         })
         .map(|((client, client_type, server, connection_type), mut e)| {
             e.streams.sort_by(|a, b| a.0.cmp(&b.0));
@@ -1084,6 +1148,38 @@ mod tests {
         );
         assert!(q_edge_exists("a\tb", "c", 3600).is_err());
         assert!(q_edge_exists("a", "c\u{7}", 3600).is_err());
+    }
+
+    #[test]
+    fn test_blast_radius_queries() {
+        assert_eq!(
+            q_callers("checkout", 3600).unwrap(),
+            "sum by (client, client_type, connection_type) (increase(traces_service_graph_request_total{server=\"checkout\"}[3600s]))"
+        );
+        assert!(q_callers("a\u{7}", 3600).is_err());
+        assert_eq!(
+            q_org_requests(3600),
+            "sum(increase(traces_service_graph_request_total[3600s]))"
+        );
+    }
+
+    #[test]
+    fn test_callers_from_skips_user_self_idle_and_unnamed() {
+        let rows = vec![
+            row(&[("client", "frontend"), ("client_type", "")], 5.0),
+            row(&[("client", "user"), ("client_type", "user")], 9.0),
+            row(
+                &[("client", "user"), ("connection_type", "virtual_node")],
+                7.0,
+            ),
+            row(&[("client", "checkout")], 3.0),
+            row(&[("client", "api")], 0.0),
+            row(&[("client", "batch")], f64::NAN),
+            row(&[("client", "")], 4.0),
+            row(&[("client", "cart")], 1.0),
+            row(&[("client", "frontend"), ("client_type", "queue")], 2.0),
+        ];
+        assert_eq!(callers_from(&rows, "checkout"), vec!["cart", "frontend"]);
     }
 
     #[test]

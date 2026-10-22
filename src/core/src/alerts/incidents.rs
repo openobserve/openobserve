@@ -2372,17 +2372,8 @@ pub async fn enrich_with_topology(
     Ok(())
 }
 
-/// Whether the service graph knows the `from -> to` dependency around `at`.
+/// Whether the service graph saw `from -> to` near `at`; an unquotable name is no dependency.
 async fn dependency_edge_type(org_id: &str, from: &str, to: &str, at: i64) -> EdgeType {
-    if crate::traces::service_graph::use_v4_source(org_id, None).await {
-        dependency_edge_type_v4(org_id, from, to, at).await
-    } else {
-        dependency_edge_type_v1(org_id, from, to).await
-    }
-}
-
-/// One forward instant query at the alert time; a name the escaper refuses is not a dependency.
-async fn dependency_edge_type_v4(org_id: &str, from: &str, to: &str, at: i64) -> EdgeType {
     use crate::traces::service_graph::v4::read::{
         edge_type_from, instant, q_edge_exists, scalar_sum,
     };
@@ -2396,40 +2387,6 @@ async fn dependency_edge_type_v4(org_id: &str, from: &str, to: &str, at: i64) ->
             log::debug!("[incidents] Service graph query failed: {e}, defaulting to temporal edge");
             EdgeType::Temporal
         }
-    }
-}
-
-async fn dependency_edge_type_v1(org_id: &str, from: &str, to: &str) -> EdgeType {
-    // Query service graph to check for a known dependency
-    let raw_sg_edges = match crate::traces::service_graph::query_edges_from_stream_internal(
-        org_id, None, None, None, None,
-    )
-    .await
-    {
-        Ok(e) => e,
-        Err(e) => {
-            log::debug!("[incidents] Service graph query failed: {e}, defaulting to temporal edge");
-            vec![]
-        }
-    };
-
-    let (_, sg_topo_edges) = if !raw_sg_edges.is_empty() {
-        o2_enterprise::enterprise::service_graph::build_topology(
-            raw_sg_edges,
-            std::collections::HashMap::new(),
-        )
-    } else {
-        (vec![], vec![])
-    };
-
-    let has_sg_edge = sg_topo_edges
-        .iter()
-        .any(|e| e.from.as_deref() == Some(from) && e.to == to);
-
-    if has_sg_edge {
-        EdgeType::ServiceDependency
-    } else {
-        EdgeType::Temporal
     }
 }
 
