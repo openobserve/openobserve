@@ -4990,6 +4990,8 @@
       "idleInConfig": "{stream} 已在接收数据。复制配置后将开始检查。",
       "idleMatches": "匹配的数据流已在接收数据。复制命令后将开始检查。",
       "idleMatchesConfig": "匹配的数据流已在接收数据。复制配置后将开始检查。",
+      "idleNew": "复制命令后即开始检查。",
+      "idleNewConfig": "复制配置后即开始检查。",
       "checkNow": "立即检查",
       "receivedPill": "已收到首个事件",
       "receivedNewPill": "已收到新数据",

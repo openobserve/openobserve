@@ -4993,6 +4993,8 @@
       "idleInConfig": "{stream} already receives data. Checks start when you copy the config.",
       "idleMatches": "Matching streams already receive data. Checks start when you copy the command.",
       "idleMatchesConfig": "Matching streams already receive data. Checks start when you copy the config.",
+      "idleNew": "Checks start when you copy the command.",
+      "idleNewConfig": "Checks start when you copy the config.",
       "checkNow": "Check now",
       "receivedPill": "First event received",
       "receivedNewPill": "New data received",

@@ -4990,6 +4990,8 @@
       "idleInConfig": "{stream} riceve già dati. I controlli iniziano quando copi la configurazione.",
       "idleMatches": "Gli stream corrispondenti ricevono già dati. I controlli iniziano quando copi il comando.",
       "idleMatchesConfig": "Gli stream corrispondenti ricevono già dati. I controlli iniziano quando copi la configurazione.",
+      "idleNew": "I controlli iniziano quando copi il comando.",
+      "idleNewConfig": "I controlli iniziano quando copi la configurazione.",
       "checkNow": "Verifica ora",
       "receivedPill": "Primo evento ricevuto",
       "receivedNewPill": "Nuovi dati ricevuti",

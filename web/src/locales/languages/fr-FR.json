@@ -4990,6 +4990,8 @@
       "idleInConfig": "{stream} reçoit déjà des données. Les vérifications démarrent lorsque vous copiez la configuration.",
       "idleMatches": "Les flux correspondants reçoivent déjà des données. Les vérifications démarrent lorsque vous copiez la commande.",
       "idleMatchesConfig": "Les flux correspondants reçoivent déjà des données. Les vérifications démarrent lorsque vous copiez la configuration.",
+      "idleNew": "Les vérifications démarrent lorsque vous copiez la commande.",
+      "idleNewConfig": "Les vérifications démarrent lorsque vous copiez la configuration.",
       "checkNow": "Vérifier maintenant",
       "receivedPill": "Premier événement reçu",
       "receivedNewPill": "Nouvelles données reçues",

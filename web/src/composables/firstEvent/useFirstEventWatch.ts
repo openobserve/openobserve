@@ -47,7 +47,7 @@ import {
   sinceWindow,
   type TimeWindowUs,
 } from "./confirmQuery";
-import { markDetectionSeen } from "./useFirstDataNotice";
+import { markDetectionSeen, orgHasUserStreams, readFirstDataRecord } from "./useFirstDataNotice";
 
 // Profiles are watched only on their own setup page; "any" (no signal) still means logs, metrics and traces.
 export type StreamSignal = UserDataStreamType | "profiles";
@@ -112,6 +112,12 @@ interface Confirmation {
   tsUs: number;
 }
 
+/** A copy or Check now kept across a reload: when it started the watch and the target state it had reached. */
+interface EngagementRecord {
+  at: number;
+  target?: Omit<TargetState, "baseline"> & { baseline?: string[] };
+}
+
 /** One poll's view of the watch, captured when it starts. */
 interface PollContext {
   gen: number;
@@ -123,6 +129,7 @@ interface PollContext {
 const MAX_TARGET_PAGES = 10;
 const ONE_SECOND_US = 1_000_000;
 const QUARTER_HOUR_US = 15 * 60 * ONE_SECOND_US;
+const ENGAGED_KEY_PREFIX = "o2.firstEvent.engaged:";
 
 const nowMs = () => Date.now();
 
@@ -132,6 +139,99 @@ const fetchOrNull = async <T>(fn: () => Promise<T>): Promise<T | null> => {
   } catch {
     // a failed probe or query counts as a zero; the next poll tries again
     return null;
+  }
+};
+
+const typesFor = (signal: StreamSignal | undefined, target: string | undefined): StreamSignal[] => {
+  if (signal) return [signal];
+  return target ? ["logs"] : [...USER_DATA_STREAM_TYPES];
+};
+
+const engagementKeyFor = (
+  orgId: string,
+  signal: StreamSignal | undefined,
+  target: string | undefined,
+  filter: string | undefined,
+  keyword: boolean,
+): string | undefined =>
+  target
+    ? ENGAGED_KEY_PREFIX +
+      JSON.stringify([orgId, typesFor(signal, target), keyword, target, filter ?? ""])
+    : undefined;
+
+const isOptionalNumber = (v: unknown): boolean =>
+  v === undefined || (typeof v === "number" && Number.isFinite(v));
+
+const isOptionalNames = (v: unknown): v is string[] | undefined =>
+  v === undefined || (Array.isArray(v) && v.every((n) => typeof n === "string"));
+
+// storage is user-editable, so a record is taken only when every field has the shape the watch relies on
+const parseEngagement = (raw: string): EngagementRecord | null => {
+  const parsed: unknown = JSON.parse(raw);
+  if (!parsed || typeof parsed !== "object") return null;
+  const { at, target } = parsed as Record<string, unknown>;
+  if (typeof at !== "number" || !Number.isFinite(at)) return null;
+  if (target === undefined) return { at };
+  if (!target || typeof target !== "object" || Array.isArray(target)) return null;
+  const { existed, zoNowUs, anchoredAtMs, baselineTotal, baseline, matches } = target as Record<
+    string,
+    unknown
+  >;
+  if (existed !== undefined && typeof existed !== "boolean") return null;
+  if (![zoNowUs, anchoredAtMs, baselineTotal].every(isOptionalNumber)) return null;
+  if (!isOptionalNames(baseline) || !isOptionalNames(matches)) return null;
+  return {
+    at,
+    target: {
+      existed: existed as boolean | undefined,
+      zoNowUs: zoNowUs as number | undefined,
+      anchoredAtMs: anchoredAtMs as number | undefined,
+      baselineTotal: baselineTotal as number | undefined,
+      baseline,
+      matches,
+    },
+  };
+};
+
+const readEngagement = (key: string): EngagementRecord | null => {
+  try {
+    const raw = sessionStorage.getItem(key);
+    return raw ? parseEngagement(raw) : null;
+  } catch {
+    // unreadable or blocked storage: the watch starts as if nothing was copied
+    return null;
+  }
+};
+
+const writeEngagement = (key: string, record: EngagementRecord | null) => {
+  try {
+    if (record) sessionStorage.setItem(key, JSON.stringify(record));
+    else sessionStorage.removeItem(key);
+  } catch {
+    // storage unavailable: the copy counts for this page only
+  }
+};
+
+const orgOfKey = (key: string): unknown => {
+  try {
+    const parsed: unknown = JSON.parse(key.slice(ENGAGED_KEY_PREFIX.length));
+    return Array.isArray(parsed) ? parsed[0] : undefined;
+  } catch {
+    // a malformed key names no org, so the sweep drops it
+    return undefined;
+  }
+};
+
+// a bar remounted for another org never sees its old key, so switching orgs sweeps every other org's record
+const forgetOtherOrgs = (orgId: string) => {
+  try {
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+      const key = sessionStorage.key(i);
+      if (!key?.startsWith(ENGAGED_KEY_PREFIX)) continue;
+      if (orgOfKey(key) !== orgId) sessionStorage.removeItem(key);
+    }
+  } catch {
+    // storage unavailable: nothing was kept to sweep
   }
 };
 
@@ -158,6 +258,8 @@ export function useFirstEventWatch(
   const startedAtMs = ref<number>();
   const troubleshooting = ref(false);
   const target = ref<TargetState>({});
+  // a target watch makes no claim until its first lookup answers, so a page load never flashes the wrong state
+  const deciding = ref(false);
 
   let running = false;
   // bumped on every org, signal, target, match or filter change; results of an older generation are dropped
@@ -183,16 +285,15 @@ export function useFirstEventWatch(
   const targetName = computed(() => options.targetStream?.value?.trim() || undefined);
   const filter = computed(() => options.filter?.value?.trim() || undefined);
   const keywordMatch = computed(() => options.match?.value === "keyword");
-  const watchedTypes = computed<StreamSignal[]>(() => {
-    if (signal?.value) return [signal.value];
-    return targetName.value ? ["logs"] : [...USER_DATA_STREAM_TYPES];
-  });
+  const watchedTypes = computed<StreamSignal[]>(() => typesFor(signal?.value, targetName.value));
   const elapsedMs = () => (startedAtMs.value === undefined ? 0 : nowMs() - startedAtMs.value);
   const scope = computed(() =>
     target.value.existed && targetName.value ? "since-watch-start" : "new-data",
   );
   const stale = (ctx: { gen: number }) => !running || ctx.gen !== generation;
   const autoDiagnosis = () => options.autoDiagnosis?.value !== false;
+  const engagementKey = (): string | undefined =>
+    engagementKeyFor(org.value, signal?.value, targetName.value, filter.value, keywordMatch.value);
 
   const configNumber = (key: string, fallback: number): number => {
     const raw = store.state.zoConfig?.[key];
@@ -344,6 +445,26 @@ export function useFirstEventWatch(
 
   const selectedOrg = (): string | undefined => store.state.selectedOrganization?.identifier;
 
+  // the flag is the selected org's and is set only where a page lists streams, so a direct load reads the streams itself
+  const orgDataSource = async (
+    orgId: string,
+  ): Promise<"flag" | "record" | "streams" | undefined> => {
+    try {
+      if (orgId === selectedOrg() && store.state.organizationData?.isDataIngested === true) {
+        return "flag";
+      }
+      if (readFirstDataRecord(orgId)?.hadData) return "record";
+      return (await orgHasUserStreams(orgId)) === true ? "streams" : undefined;
+    } catch {
+      // a failed read counts as a new org, so a brand-new org never misses its first record
+      return undefined;
+    }
+  };
+
+  // only a live read that found user streams may set the shared flag, which belongs to the selected org
+  const sharedFlagOrg = (ctx: PollContext, source: string | undefined) =>
+    source === "streams" && ctx.org === selectedOrg() ? ctx.org : undefined;
+
   // Pages read the name list and the store, which may still hold the empty list from before the first record.
   const refreshStreamLists = async (ctx: PollContext) => {
     if (ctx.org !== selectedOrg()) return;
@@ -384,6 +505,7 @@ export function useFirstEventWatch(
     state.value = "received";
     markDetectionSeen(ctx.org);
     halt();
+    forgetEngagement();
   };
 
   const probeTarget = async (ctx: PollContext, name: string) => {
@@ -391,8 +513,10 @@ export function useFirstEventWatch(
     if (t.existed === undefined) {
       const row = await findTarget(ctx, name);
       if (row === undefined || stale(ctx)) return;
+      const source = row || engaged ? undefined : await orgDataSource(ctx.org);
+      if (stale(ctx)) return;
       target.value = { existed: !!row };
-      if (row && !engaged && hasRecords(row)) holdForUser();
+      if (!engaged && (row ? hasRecords(row) : source)) holdForUser(sharedFlagOrg(ctx, source));
       else if (row) await anchor(ctx, name);
       return;
     }
@@ -433,9 +557,11 @@ export function useFirstEventWatch(
     const others = (target.value.matches ?? []).filter((n) => n !== busiest);
     if (!others.length) return undefined;
     for (const r of seen) {
-      if (!others.includes(r.name) || matchStats.get(r.name) === statsKey(r)) continue;
+      const known = matchStats.get(r.name);
+      if (!others.includes(r.name) || known === statsKey(r)) continue;
       matchStats.set(r.name, statsKey(r));
-      owed.add(r.name);
+      // a resumed watch has no stats from before the reload, so a first sighting sets the baseline
+      if (known !== undefined) owed.add(r.name);
     }
     lastFromOwed = owed.size > 0 && !lastFromOwed;
     const next = lastFromOwed ? [...owed][0] : others[rotation++ % others.length];
@@ -465,6 +591,8 @@ export function useFirstEventWatch(
       const found = await listMatches(ctx, keyword);
       if (!found || stale(ctx)) return;
       const matches = newestFirst(found.rows);
+      const source = matches.length || engaged ? undefined : await orgDataSource(ctx.org);
+      if (stale(ctx)) return;
       for (const row of matches) matchStats.set(row.name, statsKey(row));
       target.value = {
         existed: matches.length > 0,
@@ -472,8 +600,9 @@ export function useFirstEventWatch(
         baselineTotal: found.total,
         matches: matches.map((s) => s.name),
       };
-      if (!engaged && matches.some(hasRecords)) holdForUser();
-      else if (matches.length) await anchor(ctx, matches[0].name);
+      if (!engaged && (matches.length ? matches.some(hasRecords) : source)) {
+        holdForUser(sharedFlagOrg(ctx, source));
+      } else if (matches.length) await anchor(ctx, matches[0].name);
       return;
     }
     const pending = candidates[ctx.type] ?? new Map<string, StreamRow>();
@@ -635,8 +764,13 @@ export function useFirstEventWatch(
       return;
     }
     const gen = generation;
-    await poll();
+    try {
+      await poll();
+    } catch {
+      // a throw must not freeze the placeholder or the schedule; the watch keeps polling as for a new org
+    }
     if (gen !== generation) return;
+    deciding.value = false;
     if (running && state.value !== "received" && autoDiagnosis() && !untracked && rejectionsDue()) {
       await readRejections("auto");
     }
@@ -651,20 +785,63 @@ export function useFirstEventWatch(
 
   function halt() {
     running = false;
+    deciding.value = false;
     clearTimer();
     if (typeof document !== "undefined") {
       document.removeEventListener("visibilitychange", onVisibilityChange);
     }
   }
 
-  function holdForUser() {
+  // flagOrg is set only when a live stream read found user streams in the selected org; a local record can outlive them
+  function holdForUser(flagOrg?: string) {
     halt();
     state.value = "idle";
+    if (flagOrg && flagOrg === selectedOrg() && !store.state.organizationData?.isDataIngested) {
+      store.dispatch("setIsDataIngested", true);
+    }
   }
 
   function finish() {
     halt();
     if (state.value !== "received") state.value = "stopped";
+    forgetEngagement();
+  }
+
+  function saveEngagement() {
+    const key = engagementKey();
+    if (!key || !engaged || !running || startedAtMs.value === undefined) return;
+    const { baseline, ...rest } = target.value;
+    writeEngagement(key, {
+      at: startedAtMs.value,
+      target: { ...rest, ...(baseline ? { baseline: [...baseline] } : {}) },
+    });
+  }
+
+  function forgetEngagement() {
+    const key = engagementKey();
+    if (key) writeEngagement(key, null);
+  }
+
+  // A copy still inside the budget resumes engaged, with the target state it had reached, so a reload neither holds nor re-anchors.
+  function resumeEngagement(): EngagementRecord | undefined {
+    if (!org.value) return undefined;
+    forgetOtherOrgs(org.value);
+    const key = engagementKey();
+    if (!key) return undefined;
+    const saved = readEngagement(key);
+    if (!saved) {
+      writeEngagement(key, null);
+      return undefined;
+    }
+    const age = nowMs() - saved.at;
+    if (age < 0 || cadenceAt(age) === null) {
+      writeEngagement(key, null);
+      return undefined;
+    }
+    engaged = true;
+    const { baseline, ...rest } = saved.target ?? {};
+    target.value = { ...rest, ...(baseline ? { baseline: new Set(baseline) } : {}) };
+    return saved;
   }
 
   const resetWatch = () => {
@@ -697,11 +874,15 @@ export function useFirstEventWatch(
         startedAtMs.value = nowMs();
         schedule(FIRST_EVENT_BUDGET.fastMs);
       }
+      saveEngagement();
       return;
     }
+    const resumed = reason === "open" && !engaged ? resumeEngagement() : undefined;
+    deciding.value =
+      reason === "open" && !!targetName.value && (!!resumed || target.value.existed === undefined);
     running = true;
     pausedWhileHidden = false;
-    startedAtMs.value = nowMs();
+    startedAtMs.value = resumed?.at ?? nowMs();
     // a restart is a new watch: its first automatic read waits the full diagnosisAtMs again
     lastRejectionsReadMs = undefined;
     untracked = false;
@@ -713,10 +894,14 @@ export function useFirstEventWatch(
     if (typeof document !== "undefined") {
       document.addEventListener("visibilitychange", onVisibilityChange);
     }
+    saveEngagement();
     schedule(0);
   };
 
-  const stop = () => halt();
+  const stop = () => {
+    halt();
+    forgetEngagement();
+  };
 
   const probeNow = async () => {
     if (state.value === "idle") {
@@ -736,7 +921,11 @@ export function useFirstEventWatch(
   // sync, so the generation moves before any in-flight answer for the old configuration can land
   watch(
     [org, () => signal?.value, targetName, filter, keywordMatch],
-    () => {
+    ([nextOrg], [prevOrg, prevSignal, prevTarget, prevFilter, prevKeyword]) => {
+      if (nextOrg !== prevOrg && nextOrg) forgetOtherOrgs(nextOrg);
+      // a copy belongs to the watch it was made in, so switching back to that target holds again
+      const prevKey = engagementKeyFor(prevOrg, prevSignal, prevTarget, prevFilter, prevKeyword);
+      if (prevKey) writeEngagement(prevKey, null);
       const resume = running || state.value === "idle";
       generation++;
       halt();
@@ -745,6 +934,8 @@ export function useFirstEventWatch(
     },
     { flush: "sync" },
   );
+
+  watch(target, saveEngagement, { flush: "sync" });
 
   onScopeDispose(halt);
 
@@ -756,6 +947,8 @@ export function useFirstEventWatch(
     scope,
     troubleshooting,
     sinceUs: computed(() => target.value.zoNowUs),
+    targetExists: computed(() => target.value.existed === true),
+    deciding,
     start,
     stop,
     probeNow,
