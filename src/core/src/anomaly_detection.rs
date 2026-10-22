@@ -917,10 +917,12 @@ pub async fn update_config(
     }
     // A row saved before the create gate existed carries no stream. The next edit repairs it
     // from the SQL it will run, so the row stops reaching the UI with a blank stream.
-    if previous.stream_name.trim().is_empty()
-        && let Some(sql) = req.custom_sql.as_deref().or(previous.custom_sql.as_deref())
-        && let Ok(stream_name) = stream_name_from_sql(sql)
-    {
+    if let Some(stream_name) = repaired_stream_name(
+        &previous.stream_name,
+        &previous.stream_type,
+        previous.custom_sql.as_deref(),
+        req.custom_sql.as_deref(),
+    ) {
         active_model.stream_name = Set(stream_name);
     }
     if let Some(custom_sql) = req.custom_sql {
@@ -1940,24 +1942,72 @@ fn resolved_stream_name(req: &CreateAnomalyConfigRequest) -> Result<String> {
     let Some(sql) = req.custom_sql.as_deref().filter(|s| !s.trim().is_empty()) else {
         anyhow::bail!("stream_name is required");
     };
-    stream_name_from_sql(sql).map_err(|e| anyhow::anyhow!("stream_name is required: {e}"))
+    stream_name_from_sql(sql, &req.stream_type)
+        .map_err(|e| anyhow::anyhow!("stream_name is required: {e}"))
 }
 
-/// The one stream a custom query reads. A query over several streams has no single
-/// stream to name, so the caller must say which one the config belongs to.
-fn stream_name_from_sql(sql: &str) -> Result<String> {
-    let mut streams = config::meta::sql::resolve_stream_names(sql)
-        .map_err(|e| anyhow::anyhow!("custom_sql could not be parsed: {e}"))?;
+/// The one stream a custom query reads, which must be of the config's own stream type.
+///
+/// Streams are told apart by type AND name: `logs.prod` and `metrics.prod` are two streams,
+/// not one. A stream of another type is refused rather than adopted, because the row would
+/// then name a `{stream_type}/{name}` stream the SQL never reads, and every later access
+/// check would ask for it. A query over several streams has no single stream to name, so
+/// the caller must say which one the config belongs to.
+fn stream_name_from_sql(sql: &str, stream_type: &str) -> Result<String> {
+    use config::meta::sql::TableReferenceExt;
+
+    let own_type = StreamType::from(stream_type);
+    let mut streams: Vec<(String, String)> = config::meta::sql::resolve_stream_names_with_type(sql)
+        .map_err(|e| anyhow::anyhow!("custom_sql could not be parsed: {e}"))?
+        .into_iter()
+        .map(|table| {
+            (
+                table.get_stream_type(own_type).to_string(),
+                table.stream_name(),
+            )
+        })
+        .collect();
     streams.sort();
     streams.dedup();
     match streams.as_slice() {
-        [one] => Ok(one.clone()),
+        [(read_type, name)] => {
+            // `FROM ""` parses: the quoted identifier is legal SQL and names nothing.
+            if name.trim().is_empty() {
+                anyhow::bail!("custom_sql names no stream");
+            }
+            if *read_type != own_type.to_string() {
+                anyhow::bail!(
+                    "custom_sql reads {read_type}/{name}, not a {own_type} stream; set \
+                     stream_type to {read_type} or name the stream"
+                );
+            }
+            Ok(name.clone())
+        }
         [] => anyhow::bail!("custom_sql reads no stream"),
         many => anyhow::bail!(
             "custom_sql reads several streams ({}), so name the one the config is for",
-            many.join(", ")
+            many.iter()
+                .map(|(t, n)| format!("{t}/{n}"))
+                .collect::<Vec<_>>()
+                .join(", ")
         ),
     }
+}
+
+/// The stream an update writes onto a row that has none, read from the SQL the row will
+/// run after the update: the submitted one, else the stored one. `None` leaves the row as
+/// it is, so a legacy row never blocks an unrelated edit.
+fn repaired_stream_name(
+    stored_name: &str,
+    stored_type: &str,
+    stored_sql: Option<&str>,
+    submitted_sql: Option<&str>,
+) -> Option<String> {
+    if !stored_name.trim().is_empty() {
+        return None;
+    }
+    let sql = submitted_sql.or(stored_sql)?;
+    stream_name_from_sql(sql, stored_type).ok()
 }
 
 fn create_folder_name(req: &CreateAnomalyConfigRequest) -> &str {
@@ -3842,14 +3892,99 @@ mod tests {
             assert!(err.contains("stream_name is required"), "got: {err}");
         }
 
+        /// `logs.prod` and `metrics.prod` share a name and are still two streams.
+        #[test]
+        fn two_streams_of_different_types_with_one_name_are_several() {
+            let mut req = custom_sql_req(
+                "SELECT count(*) FROM logs.prod a JOIN metrics.prod b ON a.id = b.id",
+            );
+            let err = checked_create_body(&mut req).unwrap_err().to_string();
+            assert!(err.contains("several streams"), "got: {err}");
+            assert!(err.contains("logs/prod"), "got: {err}");
+            assert!(err.contains("metrics/prod"), "got: {err}");
+        }
+
+        /// A `logs` config over a metrics stream would name `logs/cpu`, a stream the SQL
+        /// never reads, and every later access check would ask for it.
+        #[test]
+        fn a_stream_of_another_type_is_refused_not_adopted() {
+            let mut req = custom_sql_req("SELECT count(*) FROM metrics.cpu");
+            let err = checked_create_body(&mut req).unwrap_err().to_string();
+            assert!(err.contains("stream_name is required"), "got: {err}");
+            assert!(err.contains("metrics/cpu"), "got: {err}");
+            assert!(err.contains("not a logs stream"), "got: {err}");
+        }
+
+        #[test]
+        fn a_qualifier_of_the_configs_own_type_is_accepted() {
+            let mut req = custom_sql_req("SELECT count(*) FROM logs.prod");
+            checked_create_body(&mut req).unwrap();
+            assert_eq!(req.stream_name, "prod");
+            let mut req = custom_sql_req("SELECT count(*) FROM metrics.cpu");
+            req.stream_type = "metrics".to_string();
+            checked_create_body(&mut req).unwrap();
+            assert_eq!(req.stream_name, "cpu");
+        }
+
+        /// `FROM ""` is legal SQL: the parser accepts the empty quoted identifier, so the
+        /// gate must refuse it itself or the blank row comes back.
+        #[test]
+        fn an_empty_quoted_identifier_does_not_pass_as_a_stream() {
+            for sql in [
+                "SELECT count(*) FROM \"\"",
+                "SELECT count(*) FROM \"   \"",
+                "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value \
+                 FROM \"\" GROUP BY time_bucket",
+            ] {
+                let mut req = custom_sql_req(sql);
+                let err = checked_create_body(&mut req).expect_err(sql).to_string();
+                assert!(err.contains("stream_name is required"), "{sql}: {err}");
+                assert!(req.stream_name.trim().is_empty(), "{sql} wrote a name");
+            }
+        }
+
         /// The repair the update path runs on a row saved before this gate existed.
         #[test]
-        fn the_sql_names_its_stream_for_the_update_repair() {
+        fn a_blank_legacy_row_is_repaired_from_the_sql_it_will_run() {
+            let stored = Some("SELECT count(*) FROM prod WHERE x = 1");
             assert_eq!(
-                stream_name_from_sql("SELECT count(*) FROM prod WHERE x = 1").unwrap(),
-                "prod"
+                repaired_stream_name("", "logs", stored, None).as_deref(),
+                Some("prod")
             );
-            assert!(stream_name_from_sql("SELECT 1").is_err());
+            // The submitted SQL is what the row will run, so it wins over the stored one.
+            assert_eq!(
+                repaired_stream_name("", "logs", stored, Some("SELECT count(*) FROM other"))
+                    .as_deref(),
+                Some("other")
+            );
+        }
+
+        #[test]
+        fn the_update_repair_leaves_every_other_row_alone() {
+            let stored = Some("SELECT count(*) FROM prod");
+            // A named row is never renamed by its SQL.
+            assert_eq!(repaired_stream_name("app", "logs", stored, None), None);
+            // Nothing to read from.
+            assert_eq!(repaired_stream_name("", "logs", None, None), None);
+            // A blank legacy row whose SQL does not name one stream of its own type stays
+            // blank rather than failing the edit.
+            assert_eq!(
+                repaired_stream_name("", "logs", Some("SELECT count(*) FROM metrics.cpu"), None),
+                None
+            );
+            assert_eq!(
+                repaired_stream_name("", "logs", Some("SELECT count(*) FROM \"\""), None),
+                None
+            );
+            assert_eq!(
+                repaired_stream_name(
+                    "",
+                    "logs",
+                    Some("SELECT count(*) FROM a JOIN b ON true"),
+                    None
+                ),
+                None
+            );
         }
     }
 
