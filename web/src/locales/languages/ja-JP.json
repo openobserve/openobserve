@@ -9890,7 +9890,6 @@
         },
         "whatHappened": "何が起きたか",
         "linkCount": "{count} リンク | {count} リンク",
-        "clickNumberHint": "番号をクリックするとクエリが表示されます",
         "timelineComesWithReport": "因果タイムラインはレポートに含まれます。",
         "timelineEmpty": "レポートにタイムラインはありません。",
         "marker": {

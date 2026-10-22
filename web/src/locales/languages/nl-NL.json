@@ -9890,7 +9890,6 @@
         },
         "whatHappened": "Wat is er gebeurd",
         "linkCount": "{count} link | {count} links",
-        "clickNumberHint": "Klik op een nummer om de query te bekijken",
         "timelineComesWithReport": "De causale tijdlijn wordt bij het rapport geleverd.",
         "timelineEmpty": "Het rapport heeft geen tijdlijn.",
         "marker": {

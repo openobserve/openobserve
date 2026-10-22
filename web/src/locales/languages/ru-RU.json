@@ -9890,7 +9890,6 @@
         },
         "whatHappened": "Что произошло",
         "linkCount": "{count} ссылка | {count} ссылок",
-        "clickNumberHint": "Нажмите на число, чтобы увидеть запрос",
         "timelineComesWithReport": "Причинно-следственная хронология прилагается к отчёту.",
         "timelineEmpty": "В отчёте нет хронологии.",
         "marker": {

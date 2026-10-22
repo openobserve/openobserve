@@ -33,7 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="size-2.5 rounded-full" :class="MARKER[marker].dot" aria-hidden="true" />
           {{ markerLabel(marker) }}
         </span>
-        <span>{{ t("alerts.incidents.rcaSummary.clickNumberHint") }}</span>
       </span>
     </div>
 

@@ -9890,7 +9890,6 @@
         },
         "whatHappened": "ماذا حدث",
         "linkCount": "{count} رابط | {count} روابط",
-        "clickNumberHint": "انقر على رقم لعرض الاستعلام",
         "timelineComesWithReport": "يأتي الجدول الزمني السببي مع التقرير.",
         "timelineEmpty": "لا يحتوي التقرير على جدول زمني.",
         "marker": {

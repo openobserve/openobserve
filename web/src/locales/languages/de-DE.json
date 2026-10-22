@@ -9890,7 +9890,6 @@
         },
         "whatHappened": "Was ist passiert",
         "linkCount": "{count} Link | {count} Links",
-        "clickNumberHint": "Klicken Sie auf eine Zahl, um die Abfrage anzuzeigen",
         "timelineComesWithReport": "Die kausale Zeitachse ist Teil des Berichts.",
         "timelineEmpty": "Der Bericht enthält keine Zeitachse.",
         "marker": {

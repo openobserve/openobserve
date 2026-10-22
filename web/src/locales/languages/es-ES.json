@@ -9890,7 +9890,6 @@
         },
         "whatHappened": "Qué ocurrió",
         "linkCount": "{count} enlace | {count} enlaces",
-        "clickNumberHint": "Haz clic en un número para ver la consulta",
         "timelineComesWithReport": "La cronología causal viene con el informe.",
         "timelineEmpty": "El informe no tiene cronología.",
         "marker": {

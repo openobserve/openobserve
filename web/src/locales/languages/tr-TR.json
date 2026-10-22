@@ -9890,7 +9890,6 @@
         },
         "whatHappened": "Ne oldu",
         "linkCount": "{count} bağlantı | {count} bağlantı",
-        "clickNumberHint": "Sorguyu görmek için bir sayıya tıklayın",
         "timelineComesWithReport": "Nedensel zaman çizelgesi raporla birlikte gelir.",
         "timelineEmpty": "Raporda zaman çizelgesi yok.",
         "marker": {

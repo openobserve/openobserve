@@ -9890,7 +9890,6 @@
         },
         "whatHappened": "무슨 일이 있었나요",
         "linkCount": "{count}개 링크 | {count}개 링크",
-        "clickNumberHint": "숫자를 클릭하면 쿼리를 볼 수 있습니다",
         "timelineComesWithReport": "인과 타임라인은 보고서와 함께 제공됩니다.",
         "timelineEmpty": "보고서에 타임라인이 없습니다.",
         "marker": {

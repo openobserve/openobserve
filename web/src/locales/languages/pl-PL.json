@@ -9890,7 +9890,6 @@
         },
         "whatHappened": "Co się stało",
         "linkCount": "{count} link | {count} linków",
-        "clickNumberHint": "Kliknij numer, aby zobaczyć zapytanie",
         "timelineComesWithReport": "Oś czasu związków przyczynowych jest częścią raportu.",
         "timelineEmpty": "Raport nie zawiera osi czasu.",
         "marker": {

@@ -9890,7 +9890,6 @@
         },
         "whatHappened": "发生了什么",
         "linkCount": "{count} 个链接 | {count} 个链接",
-        "clickNumberHint": "点击数字查看查询",
         "timelineComesWithReport": "因果时间线随报表一起提供。",
         "timelineEmpty": "报表中没有时间线。",
         "marker": {

@@ -9885,7 +9885,6 @@
         },
         "whatHappened": "發生什麼事",
         "linkCount": "{count} 個連結 | {count} 個連結",
-        "clickNumberHint": "點按數字即可查看查詢",
         "timelineComesWithReport": "因果時間軸隨報表一併提供。",
         "timelineEmpty": "此報表沒有時間軸。",
         "marker": {

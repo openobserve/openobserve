@@ -9890,7 +9890,6 @@
         },
         "whatHappened": "Điều gì đã xảy ra",
         "linkCount": "{count} liên kết | {count} liên kết",
-        "clickNumberHint": "Nhấp vào một số để xem truy vấn",
         "timelineComesWithReport": "Dòng thời gian nhân quả đi kèm báo cáo.",
         "timelineEmpty": "Báo cáo không có dòng thời gian.",
         "marker": {

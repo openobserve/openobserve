@@ -9890,7 +9890,6 @@
         },
         "whatHappened": "What happened",
         "linkCount": "{count} link | {count} links",
-        "clickNumberHint": "Click a number to see the query",
         "timelineComesWithReport": "The causal timeline comes with the report.",
         "timelineEmpty": "The report has no timeline.",
         "marker": {
