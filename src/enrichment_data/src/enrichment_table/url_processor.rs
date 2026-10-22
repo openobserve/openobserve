@@ -759,6 +759,11 @@ pub async fn check_range_support_for_url(
     org_id: &str,
     table_name: &str,
 ) -> Result<bool> {
+    if let Err(e) = common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(url).await
+    {
+        return Err(anyhow!("URL blocked by SSRF guard: {}", e));
+    }
+
     let cfg = get_config();
     let timeout = std::time::Duration::from_secs(cfg.enrichment_table.url_fetch_timeout_secs);
 
@@ -983,14 +988,6 @@ impl UrlCsvProcessor {
     /// `None` if the header is missing (common with dynamic/chunked responses).
     /// The size can be logged for monitoring but isn't required for processing.
     pub async fn validate_url(&self) -> Result<Option<u64>> {
-        // SSRF protection: resolve and validate the URL (literal-IP, hostname,
-        // and every resolved A/AAAA record) before issuing any request.
-        if let Err(e) =
-            common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(&self.url).await
-        {
-            return Err(anyhow!("URL blocked by SSRF guard: {}", e));
-        }
-
         let response = self.client.head(&self.url).send().await?;
 
         // Check HTTP status. Anything outside 2xx range is a failure.
@@ -1368,6 +1365,12 @@ async fn process_enrichment_table_url(
     append_data: bool,
     job: &EnrichmentTableUrlJob,
 ) -> Result<(i64, u64)> {
+    // Literal-IP hosts bypass the client's resolver, so every branch below relies on this check.
+    if let Err(e) = common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(url).await
+    {
+        return Err(anyhow!("URL blocked by SSRF guard: {}", e));
+    }
+
     // Create CSV processor
     let processor = UrlCsvProcessor::new(url.to_string());
 
@@ -1912,6 +1915,25 @@ async fn save_enrichment_batch(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn test_check_range_support_rejects_internal_addresses() {
+        for url in [
+            "http://127.0.0.1/x.csv",
+            "http://100.100.100.200/x.csv",
+            "http://198.18.0.1/x.csv",
+            "http://240.0.0.1/x.csv",
+            "http://[64:ff9b::7f00:1]/x.csv",
+            "http://[64:ff9b::a9fe:a9fe]/x.csv",
+        ] {
+            assert!(
+                check_range_support_for_url(url, "org", "table")
+                    .await
+                    .is_err(),
+                "{url} was not rejected"
+            );
+        }
+    }
 
     fn test_sender() -> (
         mpsc::UnboundedSender<EnrichmentUrlJobEvent>,
