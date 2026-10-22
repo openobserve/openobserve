@@ -179,7 +179,14 @@ use crate::{
         openobserve_api_management::request::alerts::incidents::get_incident_stats,
         openobserve_api_management::request::alerts::incidents::trigger_incident_rca,
         openobserve_api_management::request::alerts::incidents::cancel_incident_rca,
-        openobserve_api_management::request::alerts::incidents::get_incident_rca_history,
+        openobserve_api_management::request::alerts::incidents::list_incident_rca_runs,
+        openobserve_api_management::request::alerts::incidents::get_incident_rca_run,
+        openobserve_api_management::request::alerts::incidents::get_incident_rca_thread,
+        openobserve_api_management::request::alerts::incidents::steer_incident_rca_run,
+        openobserve_api_management::request::alerts::incidents::get_incident_rca_steering,
+        openobserve_api_management::request::alerts::incidents::resume_incident_rca_run,
+        openobserve_api_management::request::alerts::incidents::get_incident_rca_summary,
+        openobserve_api_management::request::alerts::incidents::get_incident_rca_live_stream,
         openobserve_api_management::request::alerts::templates::list_templates,
         openobserve_api_management::request::alerts::templates::get_template,
         openobserve_api_management::request::alerts::templates::save_template,
@@ -491,6 +498,41 @@ use crate::{
             openobserve_api_management::request::alerts::incidents::IncidentSeverity,
             openobserve_api_management::request::alerts::incidents::IncidentStatus,
             config::meta::alerts::incidents::Incident,
+            openobserve_api_management::request::alerts::incidents::RcaStartedResponse,
+            openobserve_api_management::request::alerts::incidents::CancelRcaResponse,
+            openobserve_api_management::request::alerts::incidents::ListRcaRunsQuery,
+            openobserve_api_management::request::alerts::incidents::RcaThreadQuery,
+            openobserve_api_management::request::alerts::incidents::TriggerRcaBody,
+            openobserve_api_management::request::alerts::incidents::SteerRequestBody,
+            config::meta::alerts::rca_steering::SteerRecord,
+            config::meta::alerts::rca_steering::SteerKind,
+            config::meta::alerts::rca_steering::SteerStatus,
+            config::meta::alerts::rca_steering::SteerAction,
+            config::meta::alerts::rca_steering::SteerStatusReason,
+            config::meta::alerts::rca_runs::RcaSummary,
+            config::meta::alerts::rca_runs::RcaDetailFields,
+            config::meta::alerts::rca_runs::RunSummaryFields,
+            config::meta::alerts::rca_runs::PreviousResult,
+            config::meta::alerts::rca_runs::RcaRun,
+            config::meta::alerts::rca_runs::RcaRunItem,
+            config::meta::alerts::rca_runs::ListRcaRunsResponse,
+            config::meta::alerts::rca_runs::RunError,
+            config::meta::alerts::rca_runs::RunStats,
+            config::meta::alerts::rca_runs::RunState,
+            config::meta::oncall::rca_run::RcaRunSummary,
+            config::meta::oncall::rca_run::SummaryCard,
+            config::meta::oncall::rca_run::SummaryCause,
+            config::meta::oncall::rca_run::SummaryTimelineEntry,
+            config::meta::oncall::rca_run::SummaryHypothesis,
+            config::meta::oncall::rca_run::EvidenceEntry,
+            config::meta::oncall::rca_run::Citation,
+            config::meta::oncall::rca_run::EvidenceTarget,
+            config::meta::oncall::rca_run::LeadingEntry,
+            config::meta::oncall::rca_run::BlindSpot,
+            config::meta::oncall::confidence::UnverifiedCitation,
+            config::meta::alerts::rca_runs::RunTrigger,
+            config::meta::alerts::rca_runs::RunMode,
+            config::meta::alerts::rca_runs::RunSubjectType,
             config::meta::downtimes::Downtime,
             config::meta::downtimes::DowntimeRequest,
             config::meta::downtimes::DowntimeListItem,
@@ -820,6 +862,8 @@ pub struct ApiDoc;
     openobserve_api_management::models::experiments::ExperimentResultRowSortBody,
     o2_enterprise::enterprise::password_policy::lockout::LockoutState,
     openobserve_api_management::request::users::UserDetailsResponse,
+    openobserve_api_management::request::alerts::incidents::RcaResumedResponse,
+    openobserve_core::alerts::rca_resume::ResumeStep,
 )))]
 struct EnterpriseExperimentApiDoc;
 
@@ -1600,6 +1644,27 @@ mod tests {
             .collect();
         assert!(tags.contains(&"Product Analytics"), "{tags:?}");
         assert!(!tags.contains(&"RUM"), "{tags:?}");
+    }
+
+    #[test]
+    fn rca_resume_path_is_documented() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec["paths"].as_object().unwrap();
+        let resume = "/api/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/resume";
+        let op = &paths[resume]["post"];
+        assert!(op.is_object(), "post {resume} missing");
+        assert_eq!(op["operationId"], "ResumeIncidentRcaRun");
+        assert_eq!(op["tags"], serde_json::json!(["Incidents"]));
+        assert_eq!(op["x-o2-ratelimit"]["module"], "Alerts");
+        assert_eq!(op["x-o2-ratelimit"]["operation"], "update");
+        #[cfg(feature = "enterprise")]
+        for status in ["202", "404", "409", "410", "503"] {
+            assert!(
+                op["responses"].get(status).is_some(),
+                "post {resume} {status}"
+            );
+        }
+        assert!(paths[resume].get("get").is_none());
     }
 
     #[test]
