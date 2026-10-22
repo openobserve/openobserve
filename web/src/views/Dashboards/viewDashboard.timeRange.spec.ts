@@ -237,8 +237,8 @@ describe("ViewDashboard time range gate", () => {
 
       await pick(relative("1h"));
 
-      expect(refreshButton().props("variant")).toBe("warning");
-      expect(refreshOptions().props("variant")).toBe("warning");
+      expect(refreshButton().props("variant")).toBe("pending");
+      expect(refreshOptions().props("variant")).toBe("pending");
       expect(refreshTooltip()).toBe("Refresh to apply the time range");
     });
 
@@ -317,7 +317,7 @@ describe("ViewDashboard time range gate", () => {
     expect(wrapper.vm.isEditingLayout).toBe(true);
 
     await pick(relative("1h"));
-    expect(refreshButton().props("variant")).toBe("warning");
+    expect(refreshButton().props("variant")).toBe("pending");
 
     refreshButton().vm.$emit("click");
     await flushPromises();
@@ -334,7 +334,7 @@ describe("ViewDashboard time range gate", () => {
 
     await pick(relative("1h"));
 
-    expect(refreshButton().props("variant")).toBe("warning");
+    expect(refreshButton().props("variant")).toBe("pending");
     expect(refreshTooltip()).toBe("Refresh to apply the time range and variable changes");
   });
 
@@ -496,6 +496,6 @@ describe("ViewDashboard time range gate", () => {
     await flushPromises();
 
     expect(pickerCalls.setSavedDate).not.toHaveBeenCalled();
-    expect(refreshButton().props("variant")).toBe("warning");
+    expect(refreshButton().props("variant")).toBe("pending");
   });
 });
