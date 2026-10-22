@@ -2751,6 +2751,290 @@ pub static AI_CHAT_SHARE_READS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+// RCA runs (incident analysis; see core::alerts::rca_turn)
+pub static RCA_RUNS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_runs_total",
+            "Ended RCA runs by trigger, end state and error code (empty when none)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "trigger", "state", "error_code"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_RUN_DURATION_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "rca_run_duration_seconds",
+            "Wall time of an ended RCA run by end state",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![
+            10.0, 30.0, 60.0, 120.0, 300.0, 600.0, 1200.0, 1800.0, 3600.0,
+        ]),
+        &["organization", "state"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_RUN_STEPS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "rca_run_steps",
+            "Narrated steps recorded by an ended RCA run",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 30.0]),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_RUN_TOOL_CALLS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new("rca_run_tool_calls", "Tool calls made by an ended RCA run")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels())
+            .buckets(vec![1.0, 5.0, 10.0, 20.0, 40.0, 80.0, 150.0, 300.0]),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_RUN_CONTINUATIONS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_run_continuations_total",
+            "Continuation turns started for RCA runs that ended without a report",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_RUNS_WITHOUT_REPORT_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_runs_without_report_total",
+            "RCA runs whose turns ended without a submitted report",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+// RCA verdicts; counted by the finalizer's winning end write.
+pub static RCA_OUTCOME_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_outcome_total",
+            "Outcomes that code derived for completed RCA runs",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "outcome", "trigger"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_OUTCOME_CLAIM_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_outcome_claim_total",
+            "Outcomes the agent claimed against the outcomes code derived for completed RCA runs",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "claimed", "derived"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_HYPOTHESIS_LEFT_TESTING_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_hypothesis_left_testing_total",
+            "Hypotheses still testing when their RCA run ended, rewritten to untested",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_LEDGER_TRUNCATED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_ledger_truncated_total",
+            "Evidence ledger items and strings cut at their limits, by field",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "field"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_LEDGER_INVALID_CALL_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_ledger_invalid_call_total",
+            "Evidence ledger calls dropped as invalid, by tool",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "tool"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_TIMELINE_UNVERIFIED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_timeline_unverified_total",
+            "Submitted timeline entries shown as unverified",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_VERDICT_REVISED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_verdict_revised_total",
+            "RCA runs whose leading hypothesis changed during the run",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_CONFIDENCE_GRADE_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_confidence_grade_total",
+            "Confidence bands the agent claimed against the bands code graded",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "claimed", "graded"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_UNVERIFIED_CITATIONS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_unverified_citations_total",
+            "Evidence citations that matched no successful tool call, by reason",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "reason"],
+    )
+    .expect("Metric created")
+});
+// RCA steering and questions (see core::alerts::rca_steering)
+pub static RCA_STEERING_MESSAGES_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_steering_messages_total",
+            "Steering rows of ended RCA runs, by kind and final status",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "kind", "final_status"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_STEERING_READ_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "rca_steering_read_latency_seconds",
+            "Time from a steering message's delivery to the agent reading it",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0, 600.0]),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_STEERING_NOT_READ_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_steering_not_read_total",
+            "Steering messages the agent never read, by reason",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "status_reason"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_STEERING_ACKS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_steering_acks_total",
+            "Read steering messages by the agent's action: applied, declined or unacknowledged",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "action"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_QUESTIONS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_questions_total",
+            "Questions RCA runs asked responders, by result: answered or deadline",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "result"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_ANSWER_WAIT_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "rca_answer_wait_seconds",
+            "Time an RCA run waited for an answer to its question",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![
+            30.0, 60.0, 120.0, 300.0, 600.0, 900.0, 1800.0, 3600.0, 7200.0,
+        ]),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+// RCA resume
+pub static RCA_RESUME_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_resume_total",
+            "Requests to resume an RCA run, by result: started or refused",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "result"],
+    )
+    .expect("Metric created")
+});
+// RCA live stream (see core::alerts::rca_live)
+pub static RCA_LIVE_STREAMS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new("rca_live_streams", "Open RCA live streams on this node")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
 // Deliberate: spec §14.1 says `org_id` and four `result` values; `organization` is the house label.
 pub static HEC_AUTH_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -3543,6 +3827,29 @@ pub(crate) fn register(registry: &Registry) {
         Box::new(AI_CHAT_RESTORE_EVENTS.clone()),
         Box::new(AI_CHAT_RESTORE_BYTES.clone()),
         Box::new(AI_CHAT_REPLICA_PURGES_TOTAL.clone()),
+        Box::new(RCA_RUNS_TOTAL.clone()),
+        Box::new(RCA_RUN_DURATION_SECONDS.clone()),
+        Box::new(RCA_RUN_STEPS.clone()),
+        Box::new(RCA_RUN_TOOL_CALLS.clone()),
+        Box::new(RCA_RUN_CONTINUATIONS_TOTAL.clone()),
+        Box::new(RCA_RUNS_WITHOUT_REPORT_TOTAL.clone()),
+        Box::new(RCA_OUTCOME_TOTAL.clone()),
+        Box::new(RCA_OUTCOME_CLAIM_TOTAL.clone()),
+        Box::new(RCA_HYPOTHESIS_LEFT_TESTING_TOTAL.clone()),
+        Box::new(RCA_LEDGER_TRUNCATED_TOTAL.clone()),
+        Box::new(RCA_LEDGER_INVALID_CALL_TOTAL.clone()),
+        Box::new(RCA_TIMELINE_UNVERIFIED_TOTAL.clone()),
+        Box::new(RCA_VERDICT_REVISED_TOTAL.clone()),
+        Box::new(RCA_CONFIDENCE_GRADE_TOTAL.clone()),
+        Box::new(RCA_UNVERIFIED_CITATIONS_TOTAL.clone()),
+        Box::new(RCA_STEERING_MESSAGES_TOTAL.clone()),
+        Box::new(RCA_STEERING_READ_LATENCY_SECONDS.clone()),
+        Box::new(RCA_STEERING_NOT_READ_TOTAL.clone()),
+        Box::new(RCA_STEERING_ACKS_TOTAL.clone()),
+        Box::new(RCA_QUESTIONS_TOTAL.clone()),
+        Box::new(RCA_ANSWER_WAIT_SECONDS.clone()),
+        Box::new(RCA_RESUME_TOTAL.clone()),
+        Box::new(RCA_LIVE_STREAMS.clone()),
         Box::new(PUBLIC_DASHBOARD_READS_TOTAL.clone()),
         Box::new(PUBLIC_DASHBOARD_BUILDS_TOTAL.clone()),
         Box::new(PUBLIC_DASHBOARD_BUILD_SECONDS.clone()),

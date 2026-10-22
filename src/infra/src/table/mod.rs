@@ -79,6 +79,8 @@ pub mod providers;
 pub mod public_dashboards;
 pub mod query_history;
 pub mod ratelimit;
+pub mod rca_runs;
+pub mod rca_steering;
 pub mod re_pattern;
 pub mod re_pattern_stream_map;
 pub mod reports;

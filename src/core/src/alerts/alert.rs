@@ -55,7 +55,7 @@ use infra::{db::get_orm_client_ro, schema::unwrap_stream_settings, table};
 use itertools::Itertools;
 use lettre::{
     AsyncTransport, Message,
-    message::{Attachment, MultiPart, SinglePart},
+    message::{Attachment, MessageBuilder, MultiPart, SinglePart},
 };
 #[cfg(feature = "enterprise")]
 use o2_openfga::{
@@ -358,6 +358,8 @@ pub enum AlertError {
     RecoveryNeedsRoutingKey { destination: String },
     #[error("Error in multi alert grouping: {0}")]
     MultiAlertGroupingError(String),
+    #[error("Group by column {column} not found on stream {stream_name}")]
+    GroupByColumnNotFound { column: String, stream_name: String },
 }
 
 /// What a manual trigger did: sent, with its messages, or held by an active downtime.
@@ -475,6 +477,30 @@ fn validate_multi_alert_config(alert: &Alert) -> Result<(), AlertError> {
         ));
     }
     Ok(())
+}
+
+/// Refuses, at save time, a custom-aggregation `group_by` entry that is not a column of the stream.
+#[allow(clippy::result_large_err)]
+fn validate_custom_group_by(
+    stream_name: &str,
+    schema: &arrow_schema::Schema,
+    alert: &Alert,
+) -> Result<(), AlertError> {
+    if alert.query_condition.query_type != QueryType::Custom {
+        return Ok(());
+    }
+    let group_by = alert
+        .query_condition
+        .aggregation
+        .as_ref()
+        .and_then(|agg| agg.group_by.as_deref())
+        .unwrap_or(&[]);
+    super::quoted_group_by(schema, group_by)
+        .map(drop)
+        .map_err(|column| AlertError::GroupByColumnNotFound {
+            column,
+            stream_name: stream_name.to_owned(),
+        })
 }
 
 /// Structural half only: `{var}` tokens are unresolved until send time, so a body shaped right but
@@ -842,6 +868,7 @@ async fn prepare_alert(
                 stream_name: stream_name.to_owned(),
             });
         }
+        validate_custom_group_by(stream_name, &schema, alert)?;
 
         // Alerts must follow the max_query_range of the stream as set in the schema
         if let Some(settings) = unwrap_stream_settings(&schema) {
@@ -2296,6 +2323,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
             // Manual triggers evaluate nothing; no level to map.
             None,
             None,
+            None,
         )
         .await
         {
@@ -2728,7 +2756,9 @@ impl AlertExt for Alert {
                 }
             }
 
-            match send_to_destination(self, destination_type, template, ctx).await {
+            match send_to_destination(&self.org_id, &self.name, destination_type, template, ctx)
+                .await
+            {
                 Ok(resp) => {
                     outcome.succeeded.push(dest_name.clone());
                     success_message = format!("{success_message} destination {dest_name} {resp};");
@@ -2888,7 +2918,7 @@ fn all_workflows_failed(
 /// Build the notification context for a send, resolving the row template
 /// first. Metadata is left empty — the caller swaps in each destination's.
 #[allow(clippy::too_many_arguments)]
-async fn build_send_context(
+pub(crate) async fn build_send_context(
     alert: &Alert,
     rows: &[Map<String, Value>],
     rows_end_time: i64,
@@ -3035,7 +3065,15 @@ pub async fn send_recovery_notification(
         .await;
         // Logged because a resolve nobody sees land is the hard one to debug — a vendor can answer
         // 202 to one it drops. Body at debug only: it can carry recipient data.
-        match send_to_destination(alert, &destination_type, effective.template(), &mut ctx).await {
+        match send_to_destination(
+            &alert.org_id,
+            &alert.name,
+            &destination_type,
+            effective.template(),
+            &mut ctx,
+        )
+        .await
+        {
             Ok(resp) => {
                 log::info!(
                     "[RECOVERY] {}/{} episode {} destination {dest_name} sent",
@@ -3134,7 +3172,8 @@ fn stamp_platform_key(
 /// `ctx` is the notification-wide context; this function swaps in the
 /// destination's metadata before rendering (§5.1).
 async fn send_to_destination(
-    alert: &Alert,
+    org_id: &str,
+    sns_subject: &str,
     dest_type: &DestinationType,
     template: &Template,
     ctx: &mut NotificationContext,
@@ -3163,15 +3202,13 @@ async fn send_to_destination(
             match dest_type {
                 DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
                 DestinationType::Email(email) => {
-                    let (email, skipped) = org_member_email(&alert.org_id, email).await?;
-                    // Same string for both parts: identical to the MIME this
-                    // path emitted before the signature took two bodies.
-                    send_email_notification(&email_subject, &email, msg.clone(), msg)
+                    let (email, skipped) = org_member_email(org_id, email).await?;
+                    send_email_notification(&email_subject, &email, None, msg)
                         .await
                         .map(|resp| note_skipped(resp, &skipped))
                 }
                 DestinationType::Sns(aws_sns) => {
-                    send_sns_notification(&alert.name, aws_sns, msg).await
+                    send_sns_notification(sns_subject, aws_sns, msg).await
                 }
             }
         }
@@ -3205,11 +3242,11 @@ async fn send_to_destination(
                     },
                     DestinationType::Email(email),
                 ) => {
-                    let (email, skipped) = org_member_email(&alert.org_id, email).await?;
+                    let (email, skipped) = org_member_email(org_id, email).await?;
                     send_email_notification_with_inline_png(
                         &subject,
                         &email,
-                        text,
+                        Some(text),
                         html,
                         ctx.chart_png.clone(),
                     )
@@ -3222,7 +3259,7 @@ async fn send_to_destination(
                         message,
                     },
                     DestinationType::Sns(aws_sns),
-                ) => send_sns_notification(&alert.name, aws_sns, message).await,
+                ) => send_sns_notification(sns_subject, aws_sns, message).await,
                 (rendered, dest_type) => Err(anyhow::anyhow!(
                     "Rendered message {rendered:?} does not match destination type {dest_type:?}"
                 )),
@@ -3231,10 +3268,41 @@ async fn send_to_destination(
     }
 }
 
+/// Render `ctx` with the alert's template, else the destination's, else the org default, and send
+/// it.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn send_templated_to_destination(
+    org_id: &str,
+    sns_subject: &str,
+    dest_name: &str,
+    alert_template: Option<&Template>,
+    ctx: &mut NotificationContext,
+) -> Result<String, anyhow::Error> {
+    let (dest, dest_template) = destinations::get_with_template(org_id, dest_name).await?;
+    let Module::Alert {
+        destination_type, ..
+    } = dest.module
+    else {
+        anyhow::bail!("not an alert destination");
+    };
+    let explicit = choose_template(alert_template, dest_template.as_ref()).cloned();
+    let effective =
+        crate::alerts::notifications::org_default::resolve_effective_template(org_id, explicit)
+            .await;
+    send_to_destination(
+        org_id,
+        sns_subject,
+        &destination_type,
+        effective.template(),
+        ctx,
+    )
+    .await
+}
+
 /// Send a pre-built message string to a single destination type.
 ///
-/// Used by incident notifications, which build their own payload rather than
-/// going through the alert template system.
+/// Used by synthetics and downtime notifications, which build their own
+/// payload rather than going through the alert template system.
 #[cfg(feature = "enterprise")]
 pub(crate) async fn dispatch_notification(
     org_id: &str,
@@ -3244,12 +3312,12 @@ pub(crate) async fn dispatch_notification(
 ) -> Result<String, anyhow::Error> {
     match dest_type {
         DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
-        // Incident notifications build one payload with no HTML/plaintext
-        // split, so both parts carry the same string — byte-identical to the
-        // MIME this path emitted before the signature took two bodies.
+        // Callers build one payload with no HTML/plaintext split, so both
+        // parts carry the same string — byte-identical to the MIME this path
+        // emitted before the signature took two bodies.
         DestinationType::Email(email) => {
             let (email, skipped) = org_member_email(org_id, email).await?;
-            send_email_notification(subject, &email, msg.clone(), msg)
+            send_email_notification(subject, &email, Some(msg.clone()), msg)
                 .await
                 .map(|resp| note_skipped(resp, &skipped))
         }
@@ -3273,7 +3341,7 @@ pub(crate) async fn dispatch_notification(
 /// `send_http_notification` / `send_email_notification` / `send_sns_notification`
 /// transports this module already owns. Kept as a distinct, narrowly-scoped
 /// function rather than removing the `#[cfg]` from `dispatch_notification`
-/// itself, so the enterprise-only incident-notification call sites are
+/// itself, so the enterprise-only synthetics and downtime call sites are
 /// untouched.
 pub(crate) async fn dispatch_test_message(
     org_id: &str,
@@ -3294,7 +3362,7 @@ pub(crate) async fn dispatch_test_message(
             DestinationType::Email(email),
         ) => {
             let (email, skipped) = org_member_email(org_id, email).await?;
-            send_email_notification(&subject, &email, text, html)
+            send_email_notification(&subject, &email, Some(text), html)
                 .await
                 .map(|resp| note_skipped(resp, &skipped))
         }
@@ -3461,21 +3529,17 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
     send_outcome(resp_status, &resp_body, hide_body)
 }
 
-/// Send a multipart/alternative email.
+/// Send an email; with `text_body: None` it carries only the HTML part.
 ///
 /// Parameter order is `(text_body, html_body)` to MATCH
 /// `MultiPart::alternative_plain_html`, whose first argument is the plaintext
 /// part. Keeping the two orderings identical is deliberate: the failure mode of
 /// swapping them — HTML delivered as the plaintext part, so every alert email
 /// shows raw markup — is silent and customer-visible.
-///
-/// The custom-template path passes the SAME string for both, which reproduces
-/// exactly the MIME this function emitted when it took one `msg`. The
-/// Phase-1b renderers pass genuinely distinct parts.
 pub async fn send_email_notification(
     email_subject: &str,
     email: &Email,
-    text_body: String,
+    text_body: Option<String>,
     html_body: String,
 ) -> Result<String, anyhow::Error> {
     send_email_notification_with_inline_png(email_subject, email, text_body, html_body, None).await
@@ -3483,16 +3547,15 @@ pub async fn send_email_notification(
 
 /// [`send_email_notification`] plus an optional inline chart PNG.
 ///
-/// With a PNG the MIME becomes
-/// `alternative(plain, related(html, image))` — the HTML part references the
+/// With a PNG the MIME becomes `alternative(plain, related(html, image))`, or
+/// `related(html, image)` alone when `text_body` is `None` — the HTML part references the
 /// image as `cid:` ([`render::email::CHART_CONTENT_ID`]) and the bytes travel
 /// inside this same email, so the chart renders even in clients that block
-/// remote images and nothing is hosted anywhere. Without a PNG the MIME is
-/// byte-identical to what this function always emitted.
+/// remote images and nothing is hosted anywhere.
 pub async fn send_email_notification_with_inline_png(
     email_subject: &str,
     email: &Email,
-    text_body: String,
+    text_body: Option<String>,
     html_body: String,
     inline_png: Option<std::sync::Arc<Vec<u8>>>,
 ) -> Result<String, anyhow::Error> {
@@ -3514,32 +3577,43 @@ pub async fn send_email_notification_with_inline_png(
         email = email.reply_to(cfg.smtp.smtp_reply_to.parse()?);
     }
 
-    let multipart = match inline_png {
-        None => MultiPart::alternative_plain_html(text_body, html_body),
-        Some(png) => MultiPart::alternative()
-            .singlepart(SinglePart::plain(text_body))
-            .multipart(
-                MultiPart::related()
-                    .singlepart(SinglePart::html(html_body))
-                    .singlepart(
-                        Attachment::new_inline(
-                            crate::alerts::notifications::render::email::CHART_CONTENT_ID
-                                .to_string(),
-                        )
-                        .body(
-                            png.as_ref().clone(),
-                            "image/png".parse().expect("static mime type"),
-                        ),
-                    ),
-            ),
-    };
-    let email = email.multipart(multipart).unwrap();
+    let email = with_email_body(email, text_body, html_body, inline_png)?;
 
     // Send the email
     match SMTP_CLIENT.as_ref().unwrap().send(email).await {
         Ok(resp) => Ok(format!("sent email response code: {}", resp.code())),
         Err(e) => Err(anyhow::anyhow!("Error sending email: {e}")),
     }
+}
+
+/// Attach `alternative(plain, html)`, or the HTML alone when `text_body` is `None`.
+fn with_email_body(
+    builder: MessageBuilder,
+    text_body: Option<String>,
+    html_body: String,
+    inline_png: Option<std::sync::Arc<Vec<u8>>>,
+) -> Result<Message, lettre::error::Error> {
+    match (text_body, inline_png) {
+        (Some(text), None) => builder.multipart(MultiPart::alternative_plain_html(text, html_body)),
+        (Some(text), Some(png)) => builder.multipart(
+            MultiPart::alternative()
+                .singlepart(SinglePart::plain(text))
+                .multipart(html_with_inline_png(html_body, &png)),
+        ),
+        (None, None) => builder.singlepart(SinglePart::html(html_body)),
+        (None, Some(png)) => builder.multipart(html_with_inline_png(html_body, &png)),
+    }
+}
+
+fn html_with_inline_png(html_body: String, png: &[u8]) -> MultiPart {
+    MultiPart::related()
+        .singlepart(SinglePart::html(html_body))
+        .singlepart(
+            Attachment::new_inline(
+                crate::alerts::notifications::render::email::CHART_CONTENT_ID.to_string(),
+            )
+            .body(png.to_vec(), "image/png".parse().expect("static mime type")),
+        )
 }
 
 /// Discord webhook send with the chart PNG uploaded in the same request
@@ -4805,6 +4879,73 @@ mod threshold_validation_tests {
 }
 
 #[cfg(test)]
+mod group_by_validation_tests {
+    use arrow_schema::{DataType, Field, Schema};
+    use config::{
+        meta::alerts::{AggFunction, Aggregation, Condition, Operator, QueryType, alert::Alert},
+        utils::json::json,
+    };
+
+    use super::{AlertError, validate_custom_group_by};
+
+    fn schema() -> Schema {
+        Schema::new(vec![
+            Field::new("host", DataType::Utf8, false),
+            Field::new("latency", DataType::Int64, false),
+        ])
+    }
+
+    fn custom_alert(group_by: &[&str]) -> Alert {
+        let mut alert = Alert::default();
+        alert.query_condition.query_type = QueryType::Custom;
+        alert.query_condition.aggregation = Some(Aggregation {
+            group_by: Some(group_by.iter().map(|s| s.to_string()).collect()),
+            function: AggFunction::Avg,
+            having: Condition {
+                column: "latency".into(),
+                operator: Operator::GreaterThan,
+                value: json!(100),
+                ignore_case: false,
+            },
+            warning_value: None,
+            multi_alert: false,
+        });
+        alert
+    }
+
+    #[test]
+    fn test_group_by_columns_in_the_schema_pass() {
+        assert!(validate_custom_group_by("svc", &schema(), &custom_alert(&["host"])).is_ok());
+        assert!(validate_custom_group_by("svc", &schema(), &custom_alert(&[])).is_ok());
+        assert!(validate_custom_group_by("svc", &schema(), &Alert::default()).is_ok());
+    }
+
+    #[test]
+    fn test_group_by_column_outside_the_schema_is_rejected_and_named() {
+        let alert = custom_alert(&["host", "host, (SELECT 1)"]);
+        let err = validate_custom_group_by("svc", &schema(), &alert).unwrap_err();
+        assert!(matches!(
+            &err,
+            AlertError::GroupByColumnNotFound { column, stream_name }
+                if column == "host, (SELECT 1)" && stream_name == "svc"
+        ));
+        assert_eq!(
+            err.to_string(),
+            "Group by column host, (SELECT 1) not found on stream svc"
+        );
+        let response = axum::response::Response::from(err);
+        assert_eq!(response.status(), axum::http::StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_sql_alerts_derive_group_by_elsewhere_and_are_not_checked_here() {
+        let mut alert = custom_alert(&["nonexistent"]);
+        alert.query_condition.query_type = QueryType::SQL;
+        assert!(validate_custom_group_by("svc", &schema(), &alert).is_ok());
+    }
+}
+
+#[cfg(test)]
 mod send_path_tests {
     use config::meta::destinations::{Endpoint, HTTPType, Template, TemplateKind};
 
@@ -5173,6 +5314,28 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn email_body_is_html_only_without_text() {
+        let builder = || {
+            Message::builder()
+                .from("o2@example.com".parse().unwrap())
+                .to("on-call@example.com".parse().unwrap())
+                .subject("s")
+        };
+        let html = "<p>hi</p>".to_string();
+        let html_only = with_email_body(builder(), None, html.clone(), None).unwrap();
+        let html_only = String::from_utf8(html_only.formatted()).unwrap();
+        assert!(!html_only.contains("text/plain"));
+        assert!(!html_only.contains("multipart/alternative"));
+        assert!(html_only.contains("text/html"));
+
+        let both = with_email_body(builder(), Some("hi".into()), html, None).unwrap();
+        let both = String::from_utf8(both.formatted()).unwrap();
+        assert!(both.contains("multipart/alternative"));
+        assert!(both.contains("text/plain"));
+        assert!(both.contains("text/html"));
+    }
 
     #[test]
     fn test_members_to_send() {

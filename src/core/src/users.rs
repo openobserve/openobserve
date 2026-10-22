@@ -1521,7 +1521,9 @@ pub async fn create_service_account_if_not_exists(email: &str) -> Result<(), any
         password_updated_at: Some(now),
     };
 
-    infra::table::users::add(user_record).await?;
+    // Through the db layer, not the table: its cluster event caches the user for
+    // `get_cached_user_org`.
+    db::user::add_record(user_record).await?;
     log::info!("Service account user record created for '{}'", email);
 
     Ok(())

@@ -804,6 +804,7 @@ const STREAMING_ENDPOINTS: &[&str] = &[
     "/_search_multi_stream",
     "/ai/chat_stream",
     "/playground/run",
+    "/rca/live_stream",
     "/prometheus/api/v1/query_range",
 ];
 
@@ -965,6 +966,9 @@ mod tests {
         assert!(is_streaming_endpoint("/api/org/ai/chat_stream"));
         assert!(is_streaming_endpoint(
             "/api/org/prometheus/api/v1/query_range"
+        ));
+        assert!(is_streaming_endpoint(
+            "/api/v2/org/alerts/incidents/inc1/rca/live_stream"
         ));
         assert!(!is_streaming_endpoint("/api/org/_search"));
         assert!(!is_streaming_endpoint("/api/org/logs"));

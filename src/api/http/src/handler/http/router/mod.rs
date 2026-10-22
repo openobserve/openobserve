@@ -24,7 +24,7 @@ use axum::{
     routing::{delete, get, patch, post, put},
 };
 use config::get_config;
-use openobserve_api_common::X_O2_ASSISTANT_SESSION_ID;
+use openobserve_api_common::{X_O2_ASSISTANT_SESSION_ID, X_O2_ASSISTANT_TURN_ID};
 use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
 #[cfg(feature = "profiling")]
 use openobserve_api_management::request::profiling;
@@ -121,6 +121,7 @@ pub fn cors_layer() -> CorsLayer {
             header::HeaderName::from_static("x-openobserve-parent-id"),
             header::HeaderName::from_static("x-openobserve-sampling-priority"),
             X_O2_ASSISTANT_SESSION_ID,
+            X_O2_ASSISTANT_TURN_ID,
             // The public dashboard viewer polls conditionally.
             header::IF_NONE_MATCH,
         ])
@@ -1408,7 +1409,14 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/incidents/external-alerts/{external_alert_id}/payload", get(alerts::incidents::get_external_alert_payload))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}", get(alerts::incidents::get_incident))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca", post(alerts::incidents::trigger_incident_rca).delete(alerts::incidents::cancel_incident_rca))
-        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/history", get(alerts::incidents::get_incident_rca_history))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs", get(alerts::incidents::list_incident_rca_runs))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/live_stream", get(alerts::incidents::get_incident_rca_live_stream))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}", get(alerts::incidents::get_incident_rca_run))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/thread", get(alerts::incidents::get_incident_rca_thread))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/steer", post(alerts::incidents::steer_incident_rca_run))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/steering", get(alerts::incidents::get_incident_rca_steering))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/resume", post(alerts::incidents::resume_incident_rca_run))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/summary", get(alerts::incidents::get_incident_rca_summary))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/update", patch(alerts::incidents::update_incident))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events", get(alerts::incidents::get_incident_events))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events/comment", post(alerts::incidents::post_incident_comment))
@@ -4285,6 +4293,47 @@ mod tests {
         assert!(is_origin_allowed(b"https://any.origin.com", ""));
     }
 
+    #[tokio::test]
+    async fn test_cors_preflight_allows_assistant_chat_headers() {
+        // One header missing from the allow-list fails the preflight and the POST is never sent.
+        let app = Router::new()
+            .route(
+                "/default/ai/chat_stream",
+                axum::routing::post(|| async { "ok" }),
+            )
+            .layer(cors_layer());
+        let req = Request::builder()
+            .method(Method::OPTIONS)
+            .uri("/default/ai/chat_stream")
+            .header(header::ORIGIN, "http://localhost:8081")
+            .header(header::ACCESS_CONTROL_REQUEST_METHOD, "POST")
+            .header(
+                header::ACCESS_CONTROL_REQUEST_HEADERS,
+                "content-type,traceparent,x-o2-assistant-session-id,x-o2-assistant-turn-id",
+            )
+            .body(Body::empty())
+            .unwrap();
+
+        let response = app.oneshot(req).await.unwrap();
+        let allowed = response
+            .headers()
+            .get(header::ACCESS_CONTROL_ALLOW_HEADERS)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        for name in [
+            "content-type",
+            "traceparent",
+            X_O2_ASSISTANT_SESSION_ID.as_str(),
+            X_O2_ASSISTANT_TURN_ID.as_str(),
+        ] {
+            assert!(
+                allowed.split(',').any(|h| h.trim() == name),
+                "{name} missing from access-control-allow-headers: {allowed}"
+            );
+        }
+    }
+
     #[test]
     fn mcp_www_authenticate_skips_non_401() {
         let uri: Uri = "/default/mcp".parse().unwrap();
@@ -4498,6 +4547,86 @@ mod tests {
         assert_eq!(post.status(), StatusCode::METHOD_NOT_ALLOWED);
     }
 
+    #[tokio::test]
+    async fn rca_steer_route_refuses_put_and_delete() {
+        const STEER_PATH: &str =
+            "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/steer";
+        assert!(
+            service_routes_registrations().contains(&format!(
+                r#".route("{STEER_PATH}",post(alerts::incidents::steer_incident_rca_run))"#
+            )),
+            "the steer path must be registered in service_routes() for POST only"
+        );
+        let app = Router::new().route(STEER_PATH, post(alerts::incidents::steer_incident_rca_run));
+        for method in ["PUT", "DELETE"] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method(method)
+                        .uri("/v2/myorg/alerts/incidents/inc1/rca/runs/run1/steer")
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                response.status(),
+                StatusCode::METHOD_NOT_ALLOWED,
+                "{method}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn rca_resume_route_takes_only_post() {
+        const RESUME_PATH: &str =
+            "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/resume";
+        let registrations = service_routes_registrations();
+        assert!(
+            registrations.contains(&format!(
+                r#".route("{RESUME_PATH}",post(alerts::incidents::resume_incident_rca_run))"#
+            )),
+            "the resume path must be registered in service_routes() for POST only"
+        );
+
+        let app = Router::new().route(
+            RESUME_PATH,
+            post(alerts::incidents::resume_incident_rca_run),
+        );
+        for (method, uri) in [
+            (
+                "GET",
+                "/v2/myorg/alerts/incidents/inc1/rca/runs/run1/resume",
+            ),
+            (
+                "PUT",
+                "/v2/myorg/alerts/incidents/inc1/rca/runs/run1/resume",
+            ),
+            (
+                "DELETE",
+                "/v2/myorg/alerts/incidents/inc1/rca/runs/run1/resume",
+            ),
+        ] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method(method)
+                        .uri(uri)
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                response.status(),
+                StatusCode::METHOD_NOT_ALLOWED,
+                "{method} {uri}"
+            );
+        }
+    }
+
     fn node_request(user_id: &str) -> Request<Body> {
         Request::builder()
             .uri("/metrics")
@@ -4630,7 +4759,8 @@ mod tests {
             "GET /v2/{org_id}/alerts/incidents/stats",
             "GET /v2/{org_id}/alerts/incidents/{incident_id}",
             "GET /v2/{org_id}/alerts/incidents/{incident_id}/events",
-            "GET /v2/{org_id}/alerts/incidents/{incident_id}/rca/history",
+            "GET /v2/{org_id}/alerts/incidents/{incident_id}/rca/runs",
+            "GET /v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}",
             "GET /v2/{org_id}/alerts/tags",
             "GET /v2/{org_id}/alerts/{alert_id}",
             "GET /v2/{org_id}/alerts/{alert_id}/groups",
