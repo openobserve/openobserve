@@ -57,8 +57,9 @@ use crate::ai_chat::{
 
 /// A `no_active_turn` relay is retried this often…
 const RELAY_RETRY_INTERVAL: Duration = Duration::from_secs(1);
-/// Retry only while the next turn is connecting, for at most this long.
-const TURN_CONNECT_WINDOW_US: i64 = 15_000_000;
+/// …only while the next turn is connecting, for at most this long. o2-ai registers an
+/// incident's first turn after its health survey, which may take 90 s.
+const TURN_CONNECT_WINDOW_US: i64 = 120_000_000;
 /// `rca_summary.detail` of a paused run that a resolve cancelled.
 const RESOLVED_DETAIL: &str = "Stopped: incident resolved";
 
@@ -742,7 +743,7 @@ async fn relay(deps: &impl SteerDeps, row: &mut SteerRecord) {
         steer_id: row.steer_id.clone(),
         text: render_row(row),
     };
-    // µs of the first `no_active_turn` answer; the retries end 15 s after it.
+    // µs of the first `no_active_turn` answer; the retries end TURN_CONNECT_WINDOW_US after it.
     let mut first_no_turn: Option<i64> = None;
     let mut no_turn = false;
     loop {
@@ -2147,8 +2148,22 @@ mod tests {
             "one second apart"
         );
 
+        // o2-ai registers the first turn only after its health survey (up to 90 s).
         let (org, inc, run_id) = live_run().await;
         started_ago(&org, &run_id, 20).await;
+        let fake = Fake::answering([SteerRelayResult::NoActiveTurn, delivered(8)]);
+        let outcome = steer_with(&fake, &org, &inc, &run_id, AUTHOR, message("Check it"))
+            .await
+            .unwrap();
+        assert_eq!(
+            outcome.steer.status,
+            SteerStatus::Delivered,
+            "during the survey"
+        );
+        assert_eq!(fake.relays(), 2);
+
+        let (org, inc, run_id) = live_run().await;
+        started_ago(&org, &run_id, 130).await;
         let fake = Fake::answering([SteerRelayResult::NoActiveTurn]);
         let outcome = steer_with(&fake, &org, &inc, &run_id, AUTHOR, message("Check it"))
             .await
@@ -3099,7 +3114,7 @@ mod tests {
         let mut relayed_rows = 0;
         for i in 0..8 {
             let (org, inc, run_id) = live_run().await;
-            started_ago(&org, &run_id, 60).await;
+            started_ago(&org, &run_id, 130).await;
             pause(&org, &run_id).await;
             let fake = Fake {
                 start_delay: Duration::from_millis(1_500),
