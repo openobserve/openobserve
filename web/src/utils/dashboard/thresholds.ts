@@ -324,6 +324,30 @@ export const getLineAreaPercentRange = (
   return Number.isFinite(min) && Number.isFinite(max) ? { min, max } : null;
 };
 
+/** Percentage range of a stacked chart: the axis shows per-x totals of each stack group, starting at 0. */
+export const getStackedPercentRange = (
+  config: any,
+  series: any[],
+  dimension = 1,
+): ValueRange | null => {
+  const yMin = toNumber(config?.y_axis_min);
+  const yMax = toNumber(config?.y_axis_max);
+  if (yMin !== null && yMax !== null) return { min: yMin, max: yMax };
+  const totals = new Map<string, number>();
+  for (const s of series) {
+    s.data.forEach((point: unknown, index: number) => {
+      const value = pointValue(point, dimension);
+      if (value === null) return;
+      const x = Array.isArray(point) ? String(point[dimension === 1 ? 0 : 1]) : String(index);
+      const key = `${s.stack ?? ""}\u0000${x}`;
+      totals.set(key, (totals.get(key) ?? 0) + value);
+    });
+  }
+  if (totals.size === 0) return null;
+  const sums = [...totals.values()];
+  return { min: Math.min(0, ...sums), max: Math.max(...sums) };
+};
+
 /** Empty series that carries the limit lines and bands of one grid, so they show once and survive legend toggles. */
 const buildMarkerSeries = (xAxisIndex: number, yAxisIndex: number): any => ({
   type: "line",
@@ -453,7 +477,9 @@ export const applyLineAreaThresholds = (options: any, panelSchema: any): void =>
     if (thresholds.mode !== "percentage") return null;
     if (percentRange === undefined) {
       const shown = options.series.filter((s: any) => isDataSeries(s) || isItemSeries(s));
-      percentRange = getLineAreaPercentRange(config, shown, dimension);
+      percentRange = stacked
+        ? getStackedPercentRange(config, shown, dimension)
+        : getLineAreaPercentRange(config, shown, dimension);
     }
     return percentRange;
   };

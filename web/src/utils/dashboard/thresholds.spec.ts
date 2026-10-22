@@ -27,6 +27,7 @@ import {
   buildThresholdVisualMap,
   echartsPaletteColor,
   getLineAreaPercentRange,
+  getStackedPercentRange,
   getSeriesThresholds,
   metricThresholdColor,
   normalizeThresholds,
@@ -660,6 +661,60 @@ describe("gaugeDialRange", () => {
     expect(gaugeDialRange(0, 50, "percent-1")).toEqual({ min: 0, max: 50 });
     expect(gaugeDialRange(10, 100, "percent-1")).toEqual({ min: 10, max: 100 });
     expect(gaugeDialRange(5, 2000, "milliseconds")).toEqual({ min: 5, max: 2000 });
+  });
+});
+
+describe("getStackedPercentRange", () => {
+  it("sums values per x within each stack group and spans 0..largest total", () => {
+    const series = [
+      {
+        stack: "q0",
+        data: [
+          [1, 10],
+          [2, 40],
+        ],
+      },
+      {
+        stack: "q0",
+        data: [
+          [1, 20],
+          [2, 50],
+        ],
+      },
+      {
+        stack: "q1",
+        data: [
+          [1, 300],
+          [2, 5],
+        ],
+      },
+      {
+        stack: "q1",
+        data: [
+          [1, 100],
+          [2, null],
+        ],
+      },
+    ];
+    // q0 totals 30 / 90, q1 totals 400 / 5
+    expect(getStackedPercentRange({}, series)).toEqual({ min: 0, max: 400 });
+  });
+
+  it("treats series without a stack name as one group and keys plain values by index", () => {
+    const series = [{ data: [10, 20] }, { data: [5, 30] }];
+    expect(getStackedPercentRange({}, series)).toEqual({ min: 0, max: 50 });
+  });
+
+  it("keeps a negative total as the minimum and honours a full configured range", () => {
+    expect(getStackedPercentRange({}, [{ data: [-30, 10] }, { data: [-20, 5] }])).toEqual({
+      min: -50,
+      max: 15,
+    });
+    expect(getStackedPercentRange({ y_axis_min: 0, y_axis_max: 9 }, [{ data: [1] }])).toEqual({
+      min: 0,
+      max: 9,
+    });
+    expect(getStackedPercentRange({}, [{ data: [null] }])).toBeNull();
   });
 });
 

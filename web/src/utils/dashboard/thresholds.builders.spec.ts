@@ -637,6 +637,37 @@ describe("bar, h-bar and scatter", () => {
   });
 });
 
+describe("percentage steps on stacked areas use the stacked totals", () => {
+  const pct80 = { mode: "percentage", steps: [{ value: 80, color: RED }] };
+  const three = { a: [0, 50, 100], b: [0, 50, 100], c: [0, 50, 100] };
+  const limit = (options: any) => markers(options)[0].markLine.data[0].yAxis;
+
+  it("SQL area-stacked: 3 series of 0..100 put 80% at 240", async () => {
+    const options = await runSQL(lineSQL("area-stacked", pct80), [breakdownRows(three)]);
+    expect(limit(options)).toBe(240);
+  });
+
+  it("PromQL area-stacked: 3 series of 0..100 put 80% at 240", async () => {
+    const options = await runPromQL(promPanel("area-stacked", { thresholds: pct80 }), [
+      promMatrix(three),
+    ]);
+    expect(limit(options)).toBe(240);
+  });
+
+  for (const type of ["line", "area", "bar"]) {
+    it(`SQL ${type} keeps the per-series range (80% at 80)`, async () => {
+      const options = await runSQL(lineSQL(type, pct80), [breakdownRows(three)]);
+      expect(limit(options)).toBe(80);
+    });
+  }
+
+  it("a configured y-axis range still wins on stacked areas", async () => {
+    const panel = lineSQL("area-stacked", pct80, { y_axis_min: 0, y_axis_max: 1000 });
+    const options = await runSQL(panel, [breakdownRows(three)]);
+    expect(limit(options)).toBe(800);
+  });
+});
+
 describe("performance", () => {
   it("builds options for 100 series with 3 steps", async () => {
     const services: Record<string, number[]> = {};
