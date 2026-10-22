@@ -34,7 +34,7 @@ use config::{
         },
         folder::{DEFAULT_FOLDER, Folder, FolderType},
         search::{SearchEventContext, SearchEventType},
-        sql::resolve_stream_names,
+        sql::{TableReferenceExt, resolve_stream_names_with_type},
         stream::StreamType,
     },
     utils::{
@@ -414,8 +414,8 @@ async fn prepare_alert(
             }
 
             let sql = alert.query_condition.sql.as_ref().unwrap();
-            let stream_names = match resolve_stream_names(sql) {
-                Ok(stream_names) => stream_names,
+            let stream_refs = match resolve_stream_names_with_type(sql) {
+                Ok(stream_refs) => stream_refs,
                 Err(e) => {
                     return Err(AlertError::ResolveStreamNameError(e));
                 }
@@ -423,10 +423,12 @@ async fn prepare_alert(
 
             // SQL may contain multiple stream names, check for each stream
             // if the alert period is greater than the max query range
-            for stream in stream_names.iter() {
-                if !stream.eq(stream_name)
+            for stream_ref in stream_refs.iter() {
+                let stream = stream_ref.stream_name();
+                let ref_type = stream_ref.get_stream_type(stream_type);
+                if !(stream == stream_name && ref_type == stream_type)
                     && let Some(settings) =
-                        infra::schema::get_settings(org_id, stream, stream_type).await
+                        infra::schema::get_settings(org_id, &stream, ref_type).await
                 {
                     let max_query_range = settings.max_query_range;
                     if max_query_range > 0
@@ -435,7 +437,7 @@ async fn prepare_alert(
                     {
                         return Err(AlertError::PeriodExceedsMaxQueryRange {
                             max_query_range_hours: max_query_range,
-                            stream_name: stream_name.to_owned(),
+                            stream_name: stream,
                         });
                     }
                 }
@@ -2224,6 +2226,75 @@ mod tests {
 
     use super::*;
     use crate::service::alerts::{Condition, build_expr};
+
+    #[tokio::test]
+    async fn prepare_alert_checks_a_joined_stream_range_by_its_own_type() {
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        use crate::common::infra::config::DESTINATIONS;
+
+        let org_id = "test_org_alert_save_join_range";
+        let logs_key = format!("{org_id}/{}/app", StreamType::Logs);
+        let traces_key = format!("{org_id}/{}/spans", StreamType::Traces);
+        let dest_key = format!("{org_id}/dest");
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            logs_key.clone(),
+            SchemaCache::new(arrow_schema::Schema::new(vec![arrow_schema::Field::new(
+                "id",
+                DataType::Utf8,
+                true,
+            )])),
+        );
+        {
+            let mut w = infra::schema::STREAM_SETTINGS.write().await;
+            w.insert(
+                traces_key.clone(),
+                config::meta::stream::StreamSettings {
+                    max_query_range: 1,
+                    ..Default::default()
+                },
+            );
+            infra::schema::set_stream_settings_atomic(
+                w.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+            );
+        }
+        DESTINATIONS.insert(
+            dest_key.clone(),
+            config::meta::destinations::Destination {
+                org_id: org_id.to_string(),
+                name: "dest".to_string(),
+                ..Default::default()
+            },
+        );
+
+        let mut alert = Alert::default();
+        alert.destinations = vec!["dest".to_string()];
+        alert.trigger_condition.frequency = 60;
+        alert.trigger_condition.period = 120;
+        alert.query_condition.query_type = QueryType::SQL;
+        alert.query_condition.sql = Some(
+            r#"SELECT a.id FROM "app" AS a JOIN "traces"."spans" AS b ON a.id = b.id"#.to_string(),
+        );
+        let res = prepare_alert(org_id, "app", "join", &mut alert, true, false).await;
+
+        STREAM_SCHEMAS_LATEST.write().await.remove(&logs_key);
+        {
+            let mut w = infra::schema::STREAM_SETTINGS.write().await;
+            w.remove(&traces_key);
+            infra::schema::set_stream_settings_atomic(
+                w.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+            );
+        }
+        DESTINATIONS.remove(&dest_key);
+
+        assert!(
+            matches!(
+                &res,
+                Err(AlertError::PeriodExceedsMaxQueryRange { stream_name, .. }) if stream_name == "spans"
+            ),
+            "{res:?}"
+        );
+    }
 
     #[test]
     fn test_format_variable_value() {
