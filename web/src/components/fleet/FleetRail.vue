@@ -103,37 +103,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-secondary shrink-0 text-xs tabular-nums">{{
               fleet.readable ? fleet.collectors : DASH
             }}</span>
-            <div
-              v-if="fleet.id !== DEFAULT_FLEET"
-              class="hidden shrink-0 items-center group-hover/row:flex has-[[data-state=open]]:flex"
-            >
-              <ODropdown side="bottom" align="start">
-                <template #trigger>
-                  <OButton
-                    size="icon-sm"
-                    variant="ghost"
-                    icon-left="more-vert"
-                    :aria-label="t('fleet.common.actions')"
-                    :data-test="`fleet-rail-menu-${fleet.id}`"
-                    @click.stop
-                  />
-                </template>
-                <ODropdownItem
-                  icon-left="edit"
-                  :data-test="`fleet-rail-rename-${fleet.id}`"
-                  @select="startRename(fleet)"
-                >
-                  {{ t("fleet.fleets.rename") }}
-                </ODropdownItem>
-                <ODropdownItem
-                  icon-left="delete"
-                  variant="destructive"
-                  :data-test="`fleet-rail-delete-${fleet.id}`"
-                  @select="startDelete(fleet)"
-                >
-                  {{ t("common.delete") }}
-                </ODropdownItem>
-              </ODropdown>
+            <!-- The slot is always reserved, so the count never moves when the menu appears. -->
+            <div class="flex w-5 shrink-0 items-center justify-center">
+              <div
+                v-if="fleet.id !== DEFAULT_FLEET"
+                class="invisible flex group-hover/row:visible has-[[data-state=open]]:visible"
+              >
+                <ODropdown side="bottom" align="start">
+                  <template #trigger>
+                    <OButton
+                      size="icon"
+                      variant="ghost"
+                      icon-left="more-vert"
+                      class="h-5 w-5"
+                      :aria-label="t('fleet.common.actions')"
+                      :data-test="`fleet-rail-menu-${fleet.id}`"
+                      @click.stop
+                    />
+                  </template>
+                  <ODropdownItem
+                    icon-left="edit"
+                    :data-test="`fleet-rail-rename-${fleet.id}`"
+                    @select="startRename(fleet)"
+                  >
+                    {{ t("fleet.fleets.rename") }}
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="delete"
+                    variant="destructive"
+                    :data-test="`fleet-rail-delete-${fleet.id}`"
+                    @select="startDelete(fleet)"
+                  >
+                    {{ t("common.delete") }}
+                  </ODropdownItem>
+                </ODropdown>
+              </div>
             </div>
           </div>
         </OTab>
