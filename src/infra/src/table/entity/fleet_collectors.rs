@@ -47,9 +47,6 @@ pub struct Model {
     pub enrolled_at: i64,
     pub last_seen_at: i64,
     pub token_id: Option<String>,
-    #[sea_orm(default_value = false)]
-    pub unenrolled: bool,
-    pub unenrolled_at: Option<i64>,
     #[sea_orm(default_value = 0)]
     pub assignment_rev: i64,
     pub config_id: Option<String>,
@@ -58,10 +55,6 @@ pub struct Model {
     pub assigned_at: Option<i64>,
     pub active_rollout_id: Option<String>,
     pub applied_at: Option<i64>,
-    pub baseline_hash: Option<Vec<u8>>,
-    #[sea_orm(column_type = "Text", nullable)]
-    pub baseline_config: Option<String>,
-    pub drift_since: Option<i64>,
     pub sent_rev: Option<i64>,
     pub sent_at: Option<i64>,
     pub effective_config_id: Option<String>,

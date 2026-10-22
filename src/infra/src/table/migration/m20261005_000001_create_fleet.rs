@@ -83,8 +83,6 @@ enum FleetCollectors {
     EnrolledAt,
     LastSeenAt,
     TokenId,
-    Unenrolled,
-    UnenrolledAt,
     AssignmentRev,
     ConfigId,
     ConfigVersion,
@@ -92,9 +90,6 @@ enum FleetCollectors {
     AssignedAt,
     ActiveRolloutId,
     AppliedAt,
-    BaselineHash,
-    BaselineConfig,
-    DriftSince,
     SentRev,
     SentAt,
     EffectiveConfigId,
@@ -271,15 +266,10 @@ fn collectors_table() -> TableCreateStatement {
     ] {
         table.col(big(column));
     }
-    for column in [C::EffectiveConfig, C::RemoteError, C::BaselineConfig] {
+    for column in [C::EffectiveConfig, C::RemoteError] {
         table.col(ColumnDef::new(column).custom(text()).null());
     }
-    for column in [
-        C::EffectiveHash,
-        C::RemoteHash,
-        C::DesiredHash,
-        C::BaselineHash,
-    ] {
+    for column in [C::EffectiveHash, C::RemoteHash, C::DesiredHash] {
         table.col(ColumnDef::new(column).binary().null());
     }
     table
@@ -289,13 +279,6 @@ fn collectors_table() -> TableCreateStatement {
         .col(big_not_null(C::EnrolledAt))
         .col(big_not_null(C::LastSeenAt))
         .col(ColumnDef::new(C::TokenId).string_len(36).null())
-        .col(
-            ColumnDef::new(C::Unenrolled)
-                .boolean()
-                .not_null()
-                .default(false),
-        )
-        .col(big(C::UnenrolledAt))
         .col(big_not_null(C::AssignmentRev).default(0).to_owned())
         .col(ColumnDef::new(C::ConfigId).string_len(63).null())
         .col(ColumnDef::new(C::ActiveRolloutId).string().null())
@@ -306,7 +289,6 @@ fn collectors_table() -> TableCreateStatement {
         C::ConfigVersion,
         C::AssignedAt,
         C::AppliedAt,
-        C::DriftSince,
         C::SentRev,
         C::SentAt,
         C::EffectiveConfigVersion,
@@ -615,12 +597,12 @@ mod tests {
         .unwrap();
         let row = one(
             &db,
-            "SELECT fleet_id, assignment_rev, heartbeats, unenrolled FROM fleet_collectors",
+            "SELECT fleet_id, assignment_rev, heartbeats FROM fleet_collectors",
         )
         .await;
         assert_eq!(row.try_get::<String>("", "fleet_id").unwrap(), "default");
         assert_eq!(row.try_get::<i64>("", "assignment_rev").unwrap(), 0);
-        assert!(!row.try_get::<bool>("", "unenrolled").unwrap());
+        assert_eq!(row.try_get::<i64>("", "heartbeats").unwrap(), 0);
         db.execute_unprepared(
             "INSERT INTO fleet_tokens (id, org_id, name, prefix, token_hash, scope, created_at, \
              created_by) VALUES ('t', 'o1', 'n', 'o2ft_abcd', 'h', 'fleet_agent', 1, 'u')",

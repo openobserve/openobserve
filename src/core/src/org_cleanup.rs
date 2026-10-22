@@ -577,11 +577,11 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_telephony: {e}"))?;
     // Flushes skip orgs gone from the org cache; retention removes a row a racing flush re-adds.
-    let tombstones = fleet_collectors::delete_by_org(org_id)
+    let collector_ids = fleet_collectors::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/fleet_collectors: {e}"))?;
-    // Other nodes find the row gone and drop the tombstone, so a re-created org starts clean.
-    for id in tombstones {
+    // Every node drops `admitted`, so a re-created org starts clean.
+    for id in collector_ids {
         if let Err(e) = infra::coordinator::fleet::emit_collector_changed(org_id, &id).await {
             log::error!("step_delete_db_resources/fleet_collectors: event for {id}: {e}");
         }

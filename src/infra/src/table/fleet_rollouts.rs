@@ -47,7 +47,6 @@ pub struct MemberDelivery {
     pub sent_rev: Option<i64>,
     pub remote_status: Option<i32>,
     pub remote_hash: Option<Vec<u8>>,
-    pub baseline_hash: Option<Vec<u8>>,
     pub capabilities: Option<i64>,
     pub last_seen_at: Option<i64>,
     pub active_rollout_id: Option<String>,
@@ -217,7 +216,7 @@ pub async fn members_with_delivery_with<C: ConnectionTrait>(
         .expr(Expr::cust(
             "m.rollout_id, m.collector_id, m.phase, m.state, m.assigned_rev, \
              c.assignment_rev, c.desired_hash, c.sent_rev, c.remote_status, \
-             c.remote_hash, c.baseline_hash, c.capabilities, c.last_seen_at, c.active_rollout_id, \
+             c.remote_hash, c.capabilities, c.last_seen_at, c.active_rollout_id, \
              c.healthy, c.heartbeats, m.heartbeat_base",
         ))
         .from_as(Alias::new("fleet_rollout_members"), Alias::new("m"))
