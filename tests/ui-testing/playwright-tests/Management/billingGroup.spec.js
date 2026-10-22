@@ -2,6 +2,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
 
 test.describe('Billing Group remove action icon', () => {
     test.describe.configure({ mode: 'parallel' });
@@ -9,6 +10,7 @@ test.describe('Billing Group remove action icon', () => {
     let pm;
 
     test.beforeEach(async ({ page }, testInfo) => {
+        test.skip(!isCloudEnvironment(), 'Billing groups are Cloud-only: the membership/remove/leave APIs are #[cfg(feature = "cloud")]');
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
@@ -18,6 +20,16 @@ test.describe('Billing Group remove action icon', () => {
     // A pinned route still in flight when the test ends must not fail it after its assertions passed.
     test.afterEach(async ({ page }) => {
         await page.unrouteAll({ behavior: 'ignoreErrors' });
+    });
+
+    test('should render the billing group page with exactly one role view', {
+        tag: ['@billing-group-remove-icon', '@all', '@management', '@cloud', '@P1'],
+    }, async ({ page }) => {
+        testLogger.info('Opening the billing group page with real data');
+        await pm.billingGroupPage.openBillingGroup();
+        await pm.billingGroupPage.expectPageVisible();
+        await pm.billingGroupPage.expectExactlyOneRoleView();
+        testLogger.info('Test completed');
     });
 
     test('should remove an Active member: icon, confirm dialog, DELETE, row gone', {

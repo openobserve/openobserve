@@ -10,7 +10,16 @@ export class BillingGroupPage {
     constructor(page) {
         this.page = page;
 
+        this.pageRoot = page.locator('[data-test="organization-group-page"]');
         this.superView = page.locator('[data-test="org-group-super-view"]');
+        this.roleViews = page.locator(
+            [
+                '[data-test="org-group-super-view"]',
+                '[data-test="org-group-child-view"]',
+                '[data-test="org-group-standalone-invites-view"]',
+                '[data-test="org-group-standalone-view"]',
+            ].join(', '),
+        );
         this.membersTable = page.locator('[data-test="org-group-members-table"]');
         this.moreActions = page.locator('[data-test="org-group-row-more-actions"]');
         this.removeDialog = page.locator('[data-test="org-group-remove-dialog"]');
@@ -76,6 +85,14 @@ export class BillingGroupPage {
             if (releaseGate && releaseGate.promise) await releaseGate.promise;
             await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
         });
+    }
+
+    async expectPageVisible() {
+        await expect(this.pageRoot).toBeVisible({ timeout: 15000 });
+    }
+
+    async expectExactlyOneRoleView() {
+        await expect(this.roleViews).toHaveCount(1, { timeout: 15000 });
     }
 
     async expectSuperView() {
