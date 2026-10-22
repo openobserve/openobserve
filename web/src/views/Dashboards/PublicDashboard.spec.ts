@@ -563,6 +563,20 @@ describe("PublicDashboard viewer", () => {
     expect(has(w, "dashboards-public-dashboard-window-separator")).toBe(false);
   });
 
+  it("labels an absolute range in the same form as the window", async () => {
+    const before = store.state.timezone;
+    try {
+      store.state.timezone = "UTC";
+      mockAbsoluteLink();
+      const w = mountWithActions();
+      await flushPromises();
+      const vm = w.vm as unknown as { rangeLabel: (r: typeof ABSOLUTE) => string };
+      expect(vm.rangeLabel(ABSOLUTE)).toBe("1970/01/01 00:00 - 1970/01/02 00:00");
+    } finally {
+      store.state.timezone = before;
+    }
+  });
+
   it("shows an absolute range's fixed window without a countdown, checking it each minute", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_800_000_020_000);
