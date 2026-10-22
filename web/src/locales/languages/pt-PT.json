@@ -1517,7 +1517,7 @@
     "shareOfCaller": "Parte do chamador",
     "partialResult": "A mostrar {percent} das amostras. As pilhas de chamadas menos comuns ficam fora desta vista.",
     "otherFrameHint": "Caminhos de chamada menores, agrupados para manter o gráfico rápido.",
-    "truncatedFrameHint": "Chamadores além de 128 frames, cortados desta pilha.",
+    "truncatedFrameHint": "Chamadores além de 1000 frames, cortados desta pilha.",
     "smallFrames": "{count} frame pequeno | {count} frames pequenos",
     "smallFramesHint": "Demasiado finos para desenhar um a um.",
     "cpuDuration": "Duração de CPU",

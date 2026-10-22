@@ -1517,7 +1517,7 @@
     "shareOfCaller": "Çağırandaki pay",
     "partialResult": "Örneklerin {percent} kadarı gösteriliyor. Daha az görülen çağrı yığınları bu görünümde yok.",
     "otherFrameHint": "Grafiği hızlı tutmak için birleştirilmiş daha küçük çağrı yolları.",
-    "truncatedFrameHint": "128 çerçeveyi aşan çağıranlar, bu yığından kesildi.",
+    "truncatedFrameHint": "1000 çerçeveyi aşan çağıranlar, bu yığından kesildi.",
     "smallFrames": "{count} küçük çerçeve | {count} küçük çerçeve",
     "smallFramesHint": "Tek tek çizilemeyecek kadar ince.",
     "cpuDuration": "CPU süresi",

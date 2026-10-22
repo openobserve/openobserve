@@ -1517,7 +1517,7 @@
     "shareOfCaller": "占调用方比例",
     "partialResult": "显示 {percent} 的样本。较少见的调用栈未包含在此视图中。",
     "otherFrameHint": "为保持图表速度，较小的调用路径已合并。",
-    "truncatedFrameHint": "超过 128 帧的调用方已从此调用栈中截断。",
+    "truncatedFrameHint": "超过 1000 帧的调用方已从此调用栈中截断。",
     "smallFrames": "{count} 个小帧 | {count} 个小帧",
     "smallFramesHint": "太窄，无法逐个绘制。",
     "cpuDuration": "CPU 时长",

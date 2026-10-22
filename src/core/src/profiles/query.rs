@@ -25,7 +25,7 @@ pub const DEFAULT_MAX_NODES: usize = 2048;
 pub const MAX_MAX_NODES: usize = 16_384;
 /// Max frames kept per stack at ingest and when folding into a call tree.
 /// Bounds recursion / stack use independently of the response `max_nodes` cap.
-pub const MAX_STACK_DEPTH: usize = 128;
+pub const MAX_STACK_DEPTH: usize = 1000;
 pub const OTHER_NODE_NAME: &str = "other";
 pub const ROOT_NODE_NAME: &str = "total";
 /// Synthetic frame for ancestors dropped when a stack exceeds [`MAX_STACK_DEPTH`].

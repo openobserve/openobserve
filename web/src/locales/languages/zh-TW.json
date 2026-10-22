@@ -1517,7 +1517,7 @@
     "shareOfCaller": "占呼叫者比例",
     "partialResult": "顯示 {percent} 的樣本。較少見的呼叫堆疊未包含在此檢視中。",
     "otherFrameHint": "為保持圖表速度，較小的呼叫路徑已合併。",
-    "truncatedFrameHint": "超過 128 個框架的呼叫者已從此堆疊截斷。",
+    "truncatedFrameHint": "超過 1000 個框架的呼叫者已從此堆疊截斷。",
     "smallFrames": "{count} 個小框架 | {count} 個小框架",
     "smallFramesHint": "太窄，無法逐一繪製。",
     "cpuDuration": "CPU 持續時間",

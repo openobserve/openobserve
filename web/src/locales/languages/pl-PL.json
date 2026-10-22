@@ -1517,7 +1517,7 @@
     "shareOfCaller": "Udział w wywołującym",
     "partialResult": "Pokazano {percent} próbek. Rzadsze stosy wywołań są pominięte w tym widoku.",
     "otherFrameHint": "Mniejsze ścieżki wywołań, zgrupowane, aby wykres działał szybko.",
-    "truncatedFrameHint": "Wywołujący powyżej 128 ramek, odcięci z tego stosu.",
+    "truncatedFrameHint": "Wywołujący powyżej 1000 ramek, odcięci z tego stosu.",
     "smallFrames": "{count} mała ramka | {count} małych ramek",
     "smallFramesHint": "Zbyt wąskie, by rysować je pojedynczo.",
     "cpuDuration": "Czas CPU",
