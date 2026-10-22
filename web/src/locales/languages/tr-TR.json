@@ -6103,7 +6103,8 @@
       "leaveMessage": "Paneli kaydedin, değişikliklerinizi bu tarayıcıda taslak olarak saklayın veya atın.",
       "keepDraft": "Taslağı sakla",
       "addPanelDot": "Panel ekle · kaydedilmemiş taslak",
-      "panelDot": "Bu tarayıcıda kaydedilmemiş değişiklikler var — devam etmek için tıklayın",
+      "panelDot": "Bu tarayıcıda kaydedilmemiş değişiklikler var",
+      "panelActionsDot": "Panel işlemleri · kaydedilmemiş taslak",
       "panelMissingOnSave": "Bu panel artık panoda yok. Panoyu yeniden yükleyin ve paneli tekrar ekleyin."
     },
     "sortByClear": "Sıralamayı temizle",

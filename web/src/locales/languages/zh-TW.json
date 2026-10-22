@@ -6103,7 +6103,8 @@
       "leaveMessage": "儲存面板、將變更作為草稿保留在此瀏覽器中，或捨棄變更。",
       "keepDraft": "保留草稿",
       "addPanelDot": "新增面板 · 未儲存的草稿",
-      "panelDot": "此瀏覽器中有未儲存的變更 — 點擊以繼續",
+      "panelDot": "此瀏覽器中有未儲存的變更",
+      "panelActionsDot": "面板操作 · 未儲存的草稿",
       "panelMissingOnSave": "此面板已不在儀表板中。請重新載入儀表板並再次新增。"
     },
     "sortByClear": "清除排序",

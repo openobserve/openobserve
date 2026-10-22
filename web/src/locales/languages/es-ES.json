@@ -6103,7 +6103,8 @@
       "leaveMessage": "Guarda el panel, conserva los cambios como borrador en este navegador o descártalos.",
       "keepDraft": "Conservar borrador",
       "addPanelDot": "Añadir panel · borrador sin guardar",
-      "panelDot": "Cambios sin guardar en este navegador: haz clic para continuar",
+      "panelDot": "Cambios sin guardar en este navegador",
+      "panelActionsDot": "Acciones del panel · borrador sin guardar",
       "panelMissingOnSave": "Este panel ya no existe en el panel de control. Vuelve a cargar el panel de control y añádelo de nuevo."
     },
     "sortByClear": "Quitar ordenación",

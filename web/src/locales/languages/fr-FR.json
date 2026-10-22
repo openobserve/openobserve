@@ -6103,7 +6103,8 @@
       "leaveMessage": "Enregistrez le panneau, conservez vos modifications comme brouillon dans ce navigateur ou supprimez-les.",
       "keepDraft": "Conserver le brouillon",
       "addPanelDot": "Ajouter un panneau · brouillon non enregistré",
-      "panelDot": "Modifications non enregistrées dans ce navigateur — cliquez pour continuer",
+      "panelDot": "Modifications non enregistrées dans ce navigateur",
+      "panelActionsDot": "Actions du panneau · brouillon non enregistré",
       "panelMissingOnSave": "Ce panneau n'existe plus dans le tableau de bord. Rechargez le tableau de bord et ajoutez-le à nouveau."
     },
     "sortByClear": "Effacer le tri",

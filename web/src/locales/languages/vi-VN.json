@@ -6103,7 +6103,8 @@
       "leaveMessage": "Lưu panel, giữ thay đổi dưới dạng bản nháp trong trình duyệt này hoặc hủy chúng.",
       "keepDraft": "Giữ bản nháp",
       "addPanelDot": "Thêm panel · bản nháp chưa lưu",
-      "panelDot": "Có thay đổi chưa lưu trong trình duyệt này — nhấp để tiếp tục",
+      "panelDot": "Có thay đổi chưa lưu trong trình duyệt này",
+      "panelActionsDot": "Thao tác panel · bản nháp chưa lưu",
       "panelMissingOnSave": "Panel này không còn tồn tại trên dashboard. Hãy tải lại dashboard và thêm lại panel."
     },
     "sortByClear": "Xóa sắp xếp",

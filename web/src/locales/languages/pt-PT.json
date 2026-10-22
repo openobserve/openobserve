@@ -6103,7 +6103,8 @@
       "leaveMessage": "Guarde o painel, mantenha as alterações como rascunho neste navegador ou descarte-as.",
       "keepDraft": "Manter rascunho",
       "addPanelDot": "Adicionar painel · rascunho não guardado",
-      "panelDot": "Alterações não guardadas neste navegador — clique para continuar",
+      "panelDot": "Alterações não guardadas neste navegador",
+      "panelActionsDot": "Ações do painel · rascunho não guardado",
       "panelMissingOnSave": "Este painel já não existe no dashboard. Recarregue o dashboard e adicione-o novamente."
     },
     "sortByClear": "Limpar ordenação",

@@ -2685,7 +2685,25 @@ describe("PanelContainer", () => {
         sessionVariables: [],
         variablesWithCurrentPanel: [],
       });
-    const dot = () => wrapper.find('[data-test="dashboard-panel-draft-dot"]');
+    // The menu renders open so the Edit Panel item and its dot are in the DOM.
+    const menuStubs = {
+      ODropdown: {
+        name: "ODropdown",
+        template: '<div class="o-dropdown-stub"><slot name="trigger" /><slot /></div>',
+      },
+      ODropdownItem: {
+        name: "ODropdownItem",
+        template:
+          '<div role="menuitem" v-bind="$attrs" @click="$emit(\'select\')"><slot name="icon-left" /><slot /><slot name="icon-right" /></div>',
+        emits: ["select"],
+      },
+      OTooltip: { template: "<slot />" },
+    };
+    const mountPanel = (props = {}) => createWrapper({ layoutMode: "view", ...props }, menuStubs);
+    const trigger = () => wrapper.find('[data-test="dashboard-edit-panel-Test Panel-dropdown"]');
+    const triggerDot = () => wrapper.find('[data-test="dashboard-panel-draft-dot"]');
+    const itemDot = () => wrapper.find('[data-test="dashboard-panel-edit-draft-dot"]');
+    const editItem = () => wrapper.find('[data-test="dashboard-edit-panel"]');
 
     beforeEach(() => {
       localStorage.clear();
@@ -2697,44 +2715,74 @@ describe("PanelContainer", () => {
       store.state.printMode = false;
     });
 
-    it("shows next to the title when this browser holds a draft for the panel", async () => {
+    it("badges the panel menu trigger and names the draft in its accessible name", async () => {
       seed();
-      wrapper = createWrapper({ layoutMode: "view" });
+      wrapper = mountPanel();
       await flushPromises();
 
-      expect(dot().exists()).toBe(true);
-      expect(dot().attributes("aria-label")).toBe(
-        "Unsaved changes in this browser — click to continue",
-      );
+      expect(triggerDot().exists()).toBe(true);
+      expect(trigger().element.contains(triggerDot().element)).toBe(true);
+      expect(triggerDot().attributes("aria-hidden")).toBe("true");
+      expect(trigger().element.tagName).toBe("BUTTON");
+      expect(trigger().attributes("aria-label")).toBe("Panel actions · unsaved draft");
     });
 
-    it("is a named, focusable button whose decorative dot is hidden from assistive tech", async () => {
-      seed();
-      wrapper = createWrapper({ layoutMode: "view" }, { OTooltip: { template: "<slot />" } });
+    it("keeps the plain trigger name and no dots without a draft", async () => {
+      wrapper = mountPanel();
       await flushPromises();
 
-      const button = dot().element as HTMLElement;
-      expect(button.tagName).toBe("BUTTON");
-      expect(button.getAttribute("aria-hidden")).toBeNull();
-      expect(button.tabIndex).toBe(0);
-      expect(button.textContent?.trim()).toBe(
-        "Unsaved changes in this browser — click to continue",
-      );
-      expect(button.querySelector(".bg-accent")?.getAttribute("aria-hidden")).toBe("true");
+      expect(triggerDot().exists()).toBe(false);
+      expect(itemDot().exists()).toBe(false);
+      expect(trigger().attributes("aria-label")).toBe("More actions");
     });
 
-    it("appears and disappears as drafts are written and deleted, including from another tab", async () => {
-      wrapper = createWrapper({ layoutMode: "view" });
+    it("marks Edit Panel with a labelled dot after its label", async () => {
+      seed();
+      wrapper = mountPanel();
       await flushPromises();
-      expect(dot().exists()).toBe(false);
+
+      expect(itemDot().exists()).toBe(true);
+      expect(itemDot().attributes("role")).toBe("img");
+      expect(itemDot().attributes("aria-label")).toBe("Unsaved changes in this browser");
+      const item = editItem().element;
+      expect(item.contains(itemDot().element)).toBe(true);
+      expect(item.textContent?.trim().startsWith("Edit Panel")).toBe(true);
+      expect(item.lastElementChild).toBe(itemDot().element);
+    });
+
+    it("Edit Panel keeps its normal behaviour and does not skip the restore dialog", async () => {
+      const routerPushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      seed();
+      wrapper = mountPanel();
+      await flushPromises();
+
+      await editItem().trigger("click");
+      await flushPromises();
+
+      expect(routerPushSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: "/dashboards/add_panel",
+          query: expect.objectContaining({ panelId: "panel-1" }),
+        }),
+      );
+      expect(routerPushSpy.mock.lastCall?.[0]).not.toHaveProperty("query.draft");
+      routerPushSpy.mockRestore();
+    });
+
+    it("follows drafts as they are written and deleted, including from another tab", async () => {
+      wrapper = mountPanel();
+      await flushPromises();
+      expect(triggerDot().exists()).toBe(false);
 
       seed();
       await flushPromises();
-      expect(dot().exists()).toBe(true);
+      expect(triggerDot().exists()).toBe(true);
+      expect(itemDot().exists()).toBe(true);
 
       deletePanelDraft(draftScope);
       await flushPromises();
-      expect(dot().exists()).toBe(false);
+      expect(triggerDot().exists()).toBe(false);
+      expect(itemDot().exists()).toBe(false);
 
       // Another tab writes straight to storage; only its storage event reaches this one.
       localStorage.setItem(
@@ -2745,7 +2793,7 @@ describe("PanelContainer", () => {
       window.dispatchEvent(new StorageEvent("storage", { key: panelDraftKey(draftScope) }));
       expect(panelDraftRevision.value).toBe(before + 1);
       await flushPromises();
-      expect(dot().exists()).toBe(true);
+      expect(triggerDot().exists()).toBe(true);
     });
 
     it.each([
@@ -2754,36 +2802,29 @@ describe("PanelContainer", () => {
       ["layout editing", { layoutMode: "edit" }],
     ])("is hidden in %s", async (_label, props) => {
       seed();
-      wrapper = createWrapper({ layoutMode: "view", ...props });
+      wrapper = mountPanel(props);
       await flushPromises();
 
-      expect(dot().exists()).toBe(false);
+      expect(triggerDot().exists()).toBe(false);
+      expect(itemDot().exists()).toBe(false);
     });
 
     it("is hidden in print mode", async () => {
       seed();
       store.state.printMode = true;
-      wrapper = createWrapper({ layoutMode: "view" });
+      wrapper = mountPanel();
       await flushPromises();
 
-      expect(dot().exists()).toBe(false);
+      expect(triggerDot().exists()).toBe(false);
+      expect(trigger().attributes("aria-label")).toBe("More actions");
     });
 
-    it("opens the editor with draft=resume", async () => {
-      const routerPushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+    it("hides the trigger badge in full screen", async () => {
       seed();
-      wrapper = createWrapper({ layoutMode: "view" });
+      wrapper = mountPanel();
       await flushPromises();
 
-      await dot().trigger("click");
-
-      expect(routerPushSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          path: "/dashboards/add_panel",
-          query: expect.objectContaining({ panelId: "panel-1", draft: "resume" }),
-        }),
-      );
-      routerPushSpy.mockRestore();
+      expect(triggerDot().classes()).toContain("in-[.fullscreen]:hidden");
     });
   });
 });

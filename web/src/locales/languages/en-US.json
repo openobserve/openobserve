@@ -6103,7 +6103,8 @@
       "leaveMessage": "Save the panel, keep your changes as a draft in this browser, or discard them.",
       "keepDraft": "Keep draft",
       "addPanelDot": "Add panel · unsaved draft",
-      "panelDot": "Unsaved changes in this browser — click to continue",
+      "panelDot": "Unsaved changes in this browser",
+      "panelActionsDot": "Panel actions · unsaved draft",
       "panelMissingOnSave": "This panel no longer exists on the dashboard. Reload the dashboard and add it again."
     },
     "sortByClear": "Clear sorting",

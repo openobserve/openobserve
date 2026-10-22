@@ -6103,7 +6103,8 @@
       "leaveMessage": "Zapisz panel, zachowaj zmiany jako szkic w tej przeglądarce lub je odrzuć.",
       "keepDraft": "Zachowaj szkic",
       "addPanelDot": "Dodaj panel · niezapisany szkic",
-      "panelDot": "Niezapisane zmiany w tej przeglądarce — kliknij, aby kontynuować",
+      "panelDot": "Niezapisane zmiany w tej przeglądarce",
+      "panelActionsDot": "Akcje panelu · niezapisany szkic",
       "panelMissingOnSave": "Ten panel już nie istnieje na pulpicie. Wczytaj pulpit ponownie i dodaj go jeszcze raz."
     },
     "sortByClear": "Wyczyść sortowanie",

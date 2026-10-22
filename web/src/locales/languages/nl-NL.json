@@ -6103,7 +6103,8 @@
       "leaveMessage": "Sla het paneel op, bewaar je wijzigingen als concept in deze browser of verwijder ze.",
       "keepDraft": "Concept bewaren",
       "addPanelDot": "Paneel toevoegen · niet-opgeslagen concept",
-      "panelDot": "Niet-opgeslagen wijzigingen in deze browser — klik om verder te gaan",
+      "panelDot": "Niet-opgeslagen wijzigingen in deze browser",
+      "panelActionsDot": "Paneelacties · niet-opgeslagen concept",
       "panelMissingOnSave": "Dit paneel bestaat niet meer op het dashboard. Laad het dashboard opnieuw en voeg het opnieuw toe."
     },
     "sortByClear": "Sortering wissen",

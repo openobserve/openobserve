@@ -6103,7 +6103,8 @@
       "leaveMessage": "Speichern Sie das Panel, behalten Sie Ihre Änderungen als Entwurf in diesem Browser oder verwerfen Sie sie.",
       "keepDraft": "Entwurf behalten",
       "addPanelDot": "Panel hinzufügen · nicht gespeicherter Entwurf",
-      "panelDot": "Nicht gespeicherte Änderungen in diesem Browser – zum Fortsetzen klicken",
+      "panelDot": "Nicht gespeicherte Änderungen in diesem Browser",
+      "panelActionsDot": "Panel-Aktionen · nicht gespeicherter Entwurf",
       "panelMissingOnSave": "Dieses Panel existiert nicht mehr im Dashboard. Laden Sie das Dashboard neu und fügen Sie es erneut hinzu."
     },
     "sortByClear": "Sortierung aufheben",

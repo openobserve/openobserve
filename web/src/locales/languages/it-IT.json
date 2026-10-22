@@ -6103,7 +6103,8 @@
       "leaveMessage": "Salva il pannello, conserva le modifiche come bozza in questo browser oppure eliminale.",
       "keepDraft": "Conserva la bozza",
       "addPanelDot": "Aggiungi pannello · bozza non salvata",
-      "panelDot": "Modifiche non salvate in questo browser: fai clic per continuare",
+      "panelDot": "Modifiche non salvate in questo browser",
+      "panelActionsDot": "Azioni del pannello · bozza non salvata",
       "panelMissingOnSave": "Questo pannello non esiste più nella dashboard. Ricarica la dashboard e aggiungilo di nuovo."
     },
     "sortByClear": "Cancella ordinamento",

@@ -63,20 +63,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ props.data.title }}
         </OTruncatedText>
-        <!-- Wrapper mode: in child mode the tooltip would bind to the dot span instead of the button. -->
-        <OTooltip v-if="showDraftDot" :content="t('dashboard.panelDraft.panelDot')" side="bottom">
-          <OButton
-            variant="ghost"
-            size="icon-xs-circle"
-            class="shrink-0 in-[.fullscreen]:hidden"
-            :aria-label="t('dashboard.panelDraft.panelDot')"
-            data-test="dashboard-panel-draft-dot"
-            @click="onResumeDraft"
-          >
-            <span class="bg-accent size-2 rounded-full" aria-hidden="true" />
-            <span class="sr-only">{{ t("dashboard.panelDraft.panelDot") }}</span>
-          </OButton>
-        </OTooltip>
         <!-- Icon-only on a narrow bar and gone on a tiny one: the dimmed body and page banner still say it is stale. -->
         <OTag
           v-if="curatedBadge"
@@ -289,12 +275,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ODropdown side="bottom" align="end" v-if="!viewOnly && !simplifiedPanelView">
           <template #trigger>
             <OButton
-              :aria-label="t('dashboard.moreActions')"
+              :aria-label="
+                showDraftDot
+                  ? t('dashboard.panelDraft.panelActionsDot')
+                  : t('dashboard.moreActions')
+              "
               variant="ghost"
               size="icon"
               :data-test="`dashboard-edit-panel-${props.data.title}-dropdown`"
             >
               <OIcon name="more-vert" size="sm" />
+              <span
+                v-if="showDraftDot"
+                class="bg-accent pointer-events-none absolute end-1 top-1 size-2 rounded-full in-[.fullscreen]:hidden"
+                aria-hidden="true"
+                data-test="dashboard-panel-draft-dot"
+              />
             </OButton>
           </template>
           <ODropdownItem
@@ -305,6 +301,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #icon-left><OIcon name="edit" size="sm" /></template>
             {{ t("panel.editPanel") }}
+            <template v-if="showDraftDot" #icon-right>
+              <OTooltip :content="t('dashboard.panelDraft.panelDot')" side="right">
+                <span
+                  role="img"
+                  :aria-label="t('dashboard.panelDraft.panelDot')"
+                  class="bg-accent size-2 shrink-0 rounded-full"
+                  data-test="dashboard-panel-edit-draft-dot"
+                />
+              </OTooltip>
+            </template>
           </ODropdownItem>
           <ODropdownItem
             v-if="!simplifiedPanelView && layoutMode !== 'view'"
@@ -861,11 +867,7 @@ export default defineComponent({
     });
 
     //for edit panel
-    const onEditPanel = (
-      data: any,
-      focus?: PanelEditorFocusTarget,
-      extraQuery: Record<string, string> = {},
-    ) => {
+    const onEditPanel = (data: any, focus?: PanelEditorFocusTarget) => {
       return router.push({
         path: "/dashboards/add_panel",
         query: {
@@ -875,7 +877,6 @@ export default defineComponent({
           folder: route.query.folder ?? "default",
           tab: route.query.tab ?? data.panels[0]?.tabId,
           ...(focus ? { [PANEL_EDITOR_FOCUS_PARAM]: focus } : {}),
-          ...extraQuery,
         },
       });
     };
@@ -895,9 +896,6 @@ export default defineComponent({
           panelId: String(props.data.id),
         }),
     );
-
-    // The editor skips its restore dialog for this flag, since the click already chose to continue.
-    const onResumeDraft = () => onEditPanel(props.data, undefined, { draft: "resume" });
 
     // A notice's fix action deep-links into the editor on the setting that resolves it.
     const NOTICE_EDITOR_FOCUS: Partial<Record<PanelNoticeActionId, PanelEditorFocusTarget>> = {
@@ -1284,7 +1282,6 @@ export default defineComponent({
       onEditPanel,
       onNoticeEditPanel,
       showDraftDot,
-      onResumeDraft,
       onLogPanel,
       onDuplicatePanel,
       deletePanelDialog,

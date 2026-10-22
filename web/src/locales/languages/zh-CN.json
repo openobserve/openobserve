@@ -6103,7 +6103,8 @@
       "leaveMessage": "保存面板，将更改作为草稿保留在此浏览器中，或放弃更改。",
       "keepDraft": "保留草稿",
       "addPanelDot": "添加面板 · 未保存的草稿",
-      "panelDot": "此浏览器中有未保存的更改 — 点击继续",
+      "panelDot": "此浏览器中有未保存的更改",
+      "panelActionsDot": "面板操作 · 未保存的草稿",
       "panelMissingOnSave": "此面板已不在仪表板中。请重新加载仪表板并再次添加。"
     },
     "sortByClear": "清除排序",
