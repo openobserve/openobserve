@@ -57,6 +57,24 @@ const FILTER_PREDICATE_FUNCTIONS: [&str; 4] = [
     "re_not_match",
 ];
 
+/// Functions bound at query execution time, so each partition search would see its own value.
+const VOLATILE_FUNCTIONS: [&str; 11] = [
+    "now",
+    "current_timestamp",
+    "current_date",
+    "current_time",
+    "localtime",
+    "localtimestamp",
+    "today",
+    "random",
+    "rand",
+    "uuid",
+    "gen_random_uuid",
+];
+
+/// Functions that turn one bucket into several rows, which the slice reader rejects as duplicates.
+const ROW_EXPANDING_FUNCTIONS: [&str; 1] = ["unnest"];
+
 /// An unchanged fallback reason is logged once per config per interval, not on every tick.
 const FALLBACK_LOG_INTERVAL: Duration = Duration::from_secs(3600);
 
@@ -735,20 +753,37 @@ fn check_custom_source(select: &Select, stream_name: &str) -> Result<(), String>
     }
 }
 
-/// Rejects expressions that read beyond their own row group: subqueries and window calls.
+/// Rejects expressions whose value depends on more than the bucket's own rows and the SQL text.
 fn check_row_local(statement: &Statement) -> Result<(), String> {
     let walk = visit_expressions(statement, |expr| match expr {
         Expr::Subquery(_) | Expr::InSubquery { .. } | Expr::Exists { .. } => {
-            ControlFlow::Break("SQL contains a subquery")
+            ControlFlow::Break("SQL contains a subquery".to_string())
         }
         Expr::Function(function) if function.over.is_some() => {
-            ControlFlow::Break("SQL contains a window function")
+            ControlFlow::Break("SQL contains a window function".to_string())
         }
+        Expr::Function(function) => match function_name(&function.name) {
+            Some(name) if VOLATILE_FUNCTIONS.contains(&name.as_str()) => {
+                ControlFlow::Break(format!("SQL calls {name}(), bound at query time"))
+            }
+            Some(name) if ROW_EXPANDING_FUNCTIONS.contains(&name.as_str()) => ControlFlow::Break(
+                format!("SQL calls {name}(), which expands a bucket into rows"),
+            ),
+            _ => ControlFlow::Continue(()),
+        },
         _ => ControlFlow::Continue(()),
     });
     match walk {
         ControlFlow::Continue(()) => Ok(()),
-        ControlFlow::Break(reason) => Err(reason.to_string()),
+        ControlFlow::Break(reason) => Err(reason),
+    }
+}
+
+/// The lowercased last part of a function name, so `pg_catalog.now` and `NOW` read the same.
+fn function_name(name: &sqlparser::ast::ObjectName) -> Option<String> {
+    match name.0.last()? {
+        ObjectNamePart::Identifier(ident) => Some(ident.value.to_ascii_lowercase()),
+        _ => None,
     }
 }
 
@@ -804,25 +839,34 @@ fn projection_names(select: &Select) -> Vec<Option<&str>> {
         .collect()
 }
 
-/// The declared value column, else the first legacy name present, as the single-call reader picks.
+/// The declared value column, else the one legacy name present; two legacy names stay single-call.
 fn custom_value_column(names: &[Option<&str>], declared: Option<&str>) -> Result<String, String> {
     let present = |column: &str| names.contains(&Some(column));
-    match declared.map(str::trim).filter(|c| !c.is_empty()) {
-        Some(column) if present(column) => Ok(column.to_string()),
-        Some(column) => Err(format!(
-            "declared value column '{column}' is not a SELECT column"
+    if let Some(column) = declared.map(str::trim).filter(|c| !c.is_empty()) {
+        return if present(column) {
+            Ok(column.to_string())
+        } else {
+            Err(format!(
+                "declared value column '{column}' is not a SELECT column"
+            ))
+        };
+    }
+    // The single-call reader falls through legacy names per row, so one candidate keeps them equal.
+    let candidates: Vec<&str> = LEGACY_VALUE_COLUMNS
+        .iter()
+        .copied()
+        .filter(|column| present(column))
+        .collect();
+    match candidates.as_slice() {
+        [column] => Ok(column.to_string()),
+        [] => Err(format!(
+            "no value column: none of {} is a SELECT column",
+            LEGACY_VALUE_COLUMNS.join(", ")
         )),
-        None => LEGACY_VALUE_COLUMNS
-            .iter()
-            .copied()
-            .find(|column| present(column))
-            .map(str::to_string)
-            .ok_or_else(|| {
-                format!(
-                    "no value column: none of {} is a SELECT column",
-                    LEGACY_VALUE_COLUMNS.join(", ")
-                )
-            }),
+        several => Err(format!(
+            "legacy value names {} are all SELECT columns; declare one",
+            several.join(", ")
+        )),
     }
 }
 
