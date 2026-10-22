@@ -455,6 +455,10 @@ fn is_secret_write(method: &Method, path: &str) -> bool {
     if method == Method::PUT && segments.ends_with(&["prompts", "settings", "secret"]) {
         return true;
     }
+    // Sample data for an endpoint test is often a pasted real call, credentials included.
+    if method == Method::POST && segments.ends_with(&["http_trigger", "test"]) {
+        return true;
+    }
     if let Some(slack) = slack_path(&segments) {
         return is_slack_secret_write(method, slack);
     }
@@ -1844,6 +1848,31 @@ pub fn service_routes() -> Router {
                     "/{org_id}/workflows/promote/{id}",
                     post(workflows::promote_draft),
                 );
+            if openobserve_core::workflows::http_trigger::hooks_enabled() {
+                router = router
+                    .route(
+                        "/{org_id}/workflows/{id}/http_trigger",
+                        get(workflows::http_trigger::get_http_trigger)
+                            .put(workflows::http_trigger::put_http_trigger)
+                            .delete(workflows::http_trigger::delete_http_trigger),
+                    )
+                    .route(
+                        "/{org_id}/workflows/{id}/http_trigger/credentials",
+                        post(workflows::http_trigger::rotate_http_credential),
+                    )
+                    .route(
+                        "/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}",
+                        delete(workflows::http_trigger::revoke_http_credential),
+                    )
+                    .route(
+                        "/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}/secret",
+                        get(workflows::http_trigger::reveal_http_credential_secret),
+                    )
+                    .route(
+                        "/{org_id}/workflows/{id}/http_trigger/test",
+                        post(workflows::http_trigger::test_http_trigger),
+                    );
+            }
         }
     }
 
@@ -2983,6 +3012,27 @@ mod tests {
                 serde_json::json!({"code": 404, "message": "Slack is not enabled"}),
                 "{what}"
             );
+        }
+    }
+
+    #[test]
+    fn workflow_endpoint_test_bodies_are_redacted() {
+        for path in [
+            "org/workflows/wf1/http_trigger/test",
+            "api/org/workflows/wf1/http_trigger/test",
+        ] {
+            assert!(is_secret_write(&Method::POST, path), "{path}");
+            assert_eq!(
+                audited(Method::POST, path, r#"{"data":[{"password":"p"}]}"#),
+                "[REDACTED: secret write]"
+            );
+        }
+        for (method, path) in [
+            (Method::PUT, "org/workflows/wf1/http_trigger"),
+            (Method::POST, "org/workflows/wf1/http_trigger/credentials"),
+            (Method::POST, "org/workflows/test"),
+        ] {
+            assert!(!is_secret_write(&method, path), "{method} {path}");
         }
     }
 
