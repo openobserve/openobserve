@@ -413,18 +413,24 @@ const addTooltipCues = (
     // The original formatter sorts params in place, so they are in row order here.
     for (const it of params) {
       // Item-coloured bars are keyed by their category name, other series by series name.
-      const key = stepsBySeries.has(String(it?.seriesName)) ? it?.seriesName : it?.name;
-      const thresholds = stepsBySeries.get(String(key));
+      const key =
+        stepsBySeries.has(String(it?.name)) && !stepsBySeries.has(String(it?.seriesName))
+          ? it?.name
+          : it?.seriesName;
       const value = pointValue(it?.value ?? it?.data, dimension);
-      if (!thresholds || value === null) continue;
-      const reached = thresholds.steps.filter((step) => value >= step.value).pop();
+      // Null rows are left out of the tooltip, so they have no text to step past.
+      if (value === null) continue;
       const markerAt = it.marker ? out.indexOf(it.marker, cursor) : cursor;
       if (markerAt < 0) continue;
       // Rows read "name : value" (SQL) or "name: value" (PromQL h-bar).
       const shown = `: ${escapeHtml(formatValue(value, key))}`;
       const valueAt = out.indexOf(shown, markerAt);
       if (valueAt < 0) continue;
+      // Rows without steps still move the cursor, or a same-coloured later row's cue lands on them.
       cursor = valueAt + shown.length;
+      const thresholds = stepsBySeries.get(String(key));
+      if (!thresholds) continue;
+      const reached = thresholds.steps.filter((step) => value >= step.value).pop();
       if (!reached) continue;
       const limit = formatValue(reached.value, key);
       const cue = escapeHtml(` · ${gt("dashboard.thresholdTooltipOver", { limit })}`);

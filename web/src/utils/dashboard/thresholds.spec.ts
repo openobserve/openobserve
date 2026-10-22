@@ -556,6 +556,27 @@ describe("tooltip over-limit cue", () => {
     expect(api).toBe('<span id="m0"></span> api : 700ms · over 500ms');
   });
 
+  it("puts the cue on the series that owns the steps when an earlier row has the same marker", () => {
+    const options: any = { ...lineOptions(), tooltip: { formatter: rowFormatter } };
+    applyLineAreaThresholds(
+      options,
+      panel("line", undefined, {
+        override_config: seriesEntries([
+          { matchBy: "name", value: "api", thresholds: { steps: [{ value: 500, color: RED }] } },
+        ]),
+      }),
+    );
+    const marker = '<span id="same"></span>';
+    const [web, api] = options.tooltip
+      .formatter([
+        { seriesName: "web", marker, value: [1, 1200] },
+        { seriesName: "api", marker, value: [1, 1200] },
+      ])
+      .split("<br/>");
+    expect(web).toBe(`${marker} web : 1s`);
+    expect(api).toBe(`${marker} api : 1s · over 500ms`);
+  });
+
   it("leaves tooltips alone without thresholds", () => {
     const options: any = { ...lineOptions(), tooltip: { formatter: rowFormatter } };
     applyLineAreaThresholds(options, panel("line", undefined));
