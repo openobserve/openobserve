@@ -1066,7 +1066,8 @@ export default defineComponent({
         }
         currentSearchAbortController = new AbortController();
         const searchResults = await fetchSearchResults.execute(searchQuery.value);
-        filteredResults.value = toRaw(searchResults);
+        // fetchSearchResults resolves undefined when the request fails.
+        filteredResults.value = toRaw(searchResults ?? []);
       } catch (error) {
         if (asCaughtError(error).name !== "AbortError") {
           filteredResults.value = [];
@@ -1578,7 +1579,7 @@ export default defineComponent({
       loading.value = true;
       try {
         const results = await fetchSearchResults.execute(query);
-        filteredResults.value = toRaw(results);
+        filteredResults.value = toRaw(results ?? []);
       } finally {
         loading.value = false;
       }

@@ -1389,4 +1389,40 @@ describe("Dashboards.vue", () => {
       expect(analytics.track).not.toHaveBeenCalledWith("dashboard_deleted", expect.anything());
     });
   });
+  describe("Cross-folder search failure", () => {
+    it("keeps the list renderable when the debounced search fails", async () => {
+      wrapper = shallowMount(Dashboards, { global: buildGlobalConfig(store, router, i18n) });
+      await flushPromises();
+      vi.mocked(dashboardService.list).mockRejectedValueOnce(new Error("boom"));
+      wrapper.vm.searchAcrossFolders = true;
+      wrapper.vm.searchQuery = "cpu";
+      await flushPromises();
+      vi.mocked(dashboardService.list).mockRejectedValueOnce(new Error("boom"));
+
+      wrapper.vm.debouncedSearch("cpu");
+      await wrapper.vm.debouncedSearch.flush();
+      await flushPromises();
+
+      expect(wrapper.vm.filteredResults).toEqual([]);
+      expect(() => wrapper.vm.dashboards).not.toThrow();
+    });
+
+    it("keeps the list renderable when the across-folders search fails", async () => {
+      const errorHandler = vi.fn();
+      const global = buildGlobalConfig(store, router, i18n);
+      wrapper = shallowMount(Dashboards, { global: { ...global, config: { errorHandler } } });
+      await flushPromises();
+      vi.mocked(dashboardService.list).mockRejectedValue(new Error("boom"));
+      wrapper.vm.searchQuery = "cpu";
+      await flushPromises();
+
+      wrapper.vm.searchAcrossFolders = true;
+      await flushPromises();
+
+      expect(errorHandler).not.toHaveBeenCalled();
+      expect(wrapper.vm.filteredResults).toEqual([]);
+      expect(() => wrapper.vm.dashboards).not.toThrow();
+      vi.mocked(dashboardService.list).mockResolvedValue([] as any);
+    });
+  });
 });
