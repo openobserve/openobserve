@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const testLogger = require('./test-logger.js');
 const logsdata = require('../../../test-data/logs_data.json');
+const { ingestBase } = require('./ingest-url.js');
 
 // Auth storage paths. Filenames stay canonical (user.json / cloud-config.json)
 // because ~20 spec files and shared utils (cloud-auth.js, enhanced-baseFixtures.js)
@@ -536,14 +537,14 @@ async function performGlobalIngestion(page) {
 
   for (const stream of streams) {
     try {
-      const response = await page.evaluate(async ({ headers, orgId, streamName, data }) => {
-        const r = await fetch(`/api/${orgId}/${streamName}/_json`, {
+      const response = await page.evaluate(async ({ base, headers, orgId, streamName, data }) => {
+        const r = await fetch(`${base}/api/${orgId}/${streamName}/_json`, {
           method: 'POST',
           headers,
           body: JSON.stringify(data),
         });
         return { status: r.status, text: await r.text() };
-      }, { headers, orgId, streamName: stream.name, data: stream.data });
+      }, { base: ingestBase(''), headers, orgId, streamName: stream.name, data: stream.data });
 
       if (response.status === 200) {
         testLogger.info(`[alpha1] Ingested test data into '${stream.name}'`, { status: response.status });
@@ -694,7 +695,7 @@ async function performGlobalIngestionWithFetch() {
 
   for (const stream of streams) {
     try {
-      const r = await fetch(`${baseUrl}/api/${orgId}/${stream.name}/_json`, {
+      const r = await fetch(`${ingestBase(baseUrl)}/api/${orgId}/${stream.name}/_json`, {
         method: 'POST',
         headers,
         body: JSON.stringify(stream.data),
