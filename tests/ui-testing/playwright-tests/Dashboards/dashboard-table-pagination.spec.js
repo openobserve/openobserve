@@ -1092,7 +1092,11 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
 
     // Check if PromQL button is visible (only shows for metrics stream type)
     const promqlButton = pm.chartTypeSelector.promqlQueryTypeBtn;
-    const isPromqlVisible = await promqlButton.isVisible().catch(() => false);
+    // isVisible() does not wait, so it raced the stream-type switch and skipped the test.
+    const isPromqlVisible = await promqlButton
+      .waitFor({ state: "visible", timeout: 10000 })
+      .then(() => true)
+      .catch(() => false);
 
     if (!isPromqlVisible) {
       testLogger.warn('PromQL button not visible - metrics stream type may not support PromQL or no metrics data available');
