@@ -581,6 +581,15 @@
     }
   },
   "common": {
+    "dismiss": "Закрыть",
+    "exitFullscreen": "Выйти из полноэкранного режима",
+    "moreActions": "Другие действия",
+    "moreOptions": "Другие параметры",
+    "addFilter": "Добавить фильтр",
+    "view": "Просмотр",
+    "compare": "Сравнить",
+    "openInNewTab": "Открыть в новой вкладке",
+    "send": "Отправить",
     "copiedToClipboard": "Скопировано в буфер обмена",
     "customLogoAlt": "Логотип организации",
     "dragToReorder": "Перетащите для изменения порядка",
@@ -13055,6 +13064,8 @@
     "traceFilters": "Фильтры трейсов",
     "showTraces": "Показать трейсы",
     "applyAndSearch": "Применить и искать",
+    "applyAndSearchEquals": "Применить и искать (равно)",
+    "applyAndSearchNotEquals": "Применить и искать (не равно)",
     "timestamp": "Временная метка",
     "noErrorPresent": "Для этого спана ошибок нет",
     "noEventsPresent": "Для этого спана нет событий",
@@ -15120,6 +15131,7 @@
         "noDataAvailable": "Нет доступных данных",
         "copyInput": "Копировать вход",
         "copyOutput": "Копировать выход",
+        "copyExpected": "Копировать ожидаемый вывод",
         "copied": "Скопировано в буфер обмена: {type}",
         "copyFailed": "Не удалось скопировать в буфер обмена",
         "execution": "Выполнение",
@@ -17681,6 +17693,7 @@
       "warning": "Предупреждение"
     },
     "journey": {
+      "clearResults": "Очистить результаты",
       "extract": {
         "action": "Извлечь в субтест",
         "title": "Извлечь {count} шаг в новый тест | Извлечь шаги ({count}) в новый тест",

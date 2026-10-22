@@ -581,6 +581,15 @@
     }
   },
   "common": {
+    "dismiss": "Ignora",
+    "exitFullscreen": "Esci da schermo intero",
+    "moreActions": "Altre azioni",
+    "moreOptions": "Altre opzioni",
+    "addFilter": "Aggiungi filtro",
+    "view": "Visualizza",
+    "compare": "Confronta",
+    "openInNewTab": "Apri in una nuova scheda",
+    "send": "Invia",
     "copiedToClipboard": "Copiato negli appunti",
     "customLogoAlt": "Logo dell'organizzazione",
     "dragToReorder": "Trascina per riordinare",
@@ -13055,6 +13064,8 @@
     "traceFilters": "Filtri delle tracce",
     "showTraces": "Mostra tracce",
     "applyAndSearch": "Applica e cerca",
+    "applyAndSearchEquals": "Applica e cerca (uguale)",
+    "applyAndSearchNotEquals": "Applica e cerca (diverso)",
     "timestamp": "Timestamp",
     "noErrorPresent": "Nessun errore presente per questo span",
     "noEventsPresent": "Nessun evento per questo span",
@@ -15120,6 +15131,7 @@
         "noDataAvailable": "Nessun dato disponibile",
         "copyInput": "Copia input",
         "copyOutput": "Copia output",
+        "copyExpected": "Copia output atteso",
         "copied": "{type} copiato negli appunti",
         "copyFailed": "Impossibile copiare negli appunti",
         "execution": "Esecuzione",
@@ -17681,6 +17693,7 @@
       "warning": "Avviso"
     },
     "journey": {
+      "clearResults": "Cancella risultati",
       "extract": {
         "action": "Estrai in subtest",
         "title": "Estrai {count} passo in un nuovo test | Estrai {count} passi in un nuovo test",

@@ -21,6 +21,7 @@
               {{ t("aiObservability.experiments.rowDetail.input") }}
             </h4>
             <OButton
+              :aria-label="t('aiObservability.experiments.rowDetail.copyInput')"
               variant="outline"
               size="sm"
               :disabled="!hasContent(detail.input)"
@@ -58,6 +59,7 @@
               {{ t("aiObservability.experiments.rowDetail.expectedOutput") }}
             </h4>
             <OButton
+              :aria-label="t('aiObservability.experiments.rowDetail.copyExpected')"
               variant="outline"
               size="sm"
               :disabled="!hasContent(detail.expectedOutput)"
@@ -149,6 +151,7 @@
                   {{ t("aiObservability.experiments.rowDetail.output") }}
                 </h4>
                 <OButton
+                  :aria-label="t('aiObservability.experiments.rowDetail.copyOutput')"
                   variant="outline"
                   size="sm"
                   :disabled="!hasContent(activeTrial.execution.output)"

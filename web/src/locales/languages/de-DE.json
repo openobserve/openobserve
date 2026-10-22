@@ -581,6 +581,15 @@
     }
   },
   "common": {
+    "dismiss": "Schließen",
+    "exitFullscreen": "Vollbild verlassen",
+    "moreActions": "Weitere Aktionen",
+    "moreOptions": "Weitere Optionen",
+    "addFilter": "Filter hinzufügen",
+    "view": "Anzeigen",
+    "compare": "Vergleichen",
+    "openInNewTab": "In neuem Tab öffnen",
+    "send": "Senden",
     "copiedToClipboard": "In die Zwischenablage kopiert",
     "customLogoAlt": "Organisationslogo",
     "dragToReorder": "Zum Neuanordnen ziehen",
@@ -13055,6 +13064,8 @@
     "traceFilters": "Trace-Filter",
     "showTraces": "Traces anzeigen",
     "applyAndSearch": "Anwenden & suchen",
+    "applyAndSearchEquals": "Anwenden & Suchen (gleich)",
+    "applyAndSearchNotEquals": "Anwenden & Suchen (ungleich)",
     "timestamp": "Zeitstempel",
     "noErrorPresent": "Kein Fehler für diesen Span vorhanden",
     "noEventsPresent": "Keine Ereignisse für diesen Span",
@@ -15120,6 +15131,7 @@
         "noDataAvailable": "Keine Daten verfügbar",
         "copyInput": "Eingabe kopieren",
         "copyOutput": "Ausgabe kopieren",
+        "copyExpected": "Erwartete Ausgabe kopieren",
         "copied": "{type} in die Zwischenablage kopiert",
         "copyFailed": "Fehler beim Kopieren in die Zwischenablage",
         "execution": "Ausführung",
@@ -17681,6 +17693,7 @@
       "warning": "Warnung"
     },
     "journey": {
+      "clearResults": "Ergebnisse löschen",
       "extract": {
         "action": "In Subtest extrahieren",
         "title": "{count} Schritt in einen neuen Test extrahieren | {count} Schritte in einen neuen Test extrahieren",

@@ -581,6 +581,15 @@
     }
   },
   "common": {
+    "dismiss": "閉じる",
+    "exitFullscreen": "全画面表示を終了",
+    "moreActions": "その他のアクション",
+    "moreOptions": "その他のオプション",
+    "addFilter": "フィルターを追加",
+    "view": "表示",
+    "compare": "比較",
+    "openInNewTab": "新しいタブで開く",
+    "send": "送信",
     "copiedToClipboard": "クリップボードにコピーしました",
     "customLogoAlt": "組織のロゴ",
     "dragToReorder": "ドラッグして並べ替え",
@@ -13055,6 +13064,8 @@
     "traceFilters": "トレースフィルター",
     "showTraces": "トレースを表示",
     "applyAndSearch": "適用して検索",
+    "applyAndSearchEquals": "適用して検索 (等しい)",
+    "applyAndSearchNotEquals": "適用して検索 (等しくない)",
     "timestamp": "タイムスタンプ",
     "noErrorPresent": "このスパンにはエラーがありません",
     "noEventsPresent": "このスパンにはイベントがありません",
@@ -15120,6 +15131,7 @@
         "noDataAvailable": "データがありません",
         "copyInput": "入力をコピー",
         "copyOutput": "出力をコピー",
+        "copyExpected": "期待される出力をコピー",
         "copied": "{type} をクリップボードにコピーしました",
         "copyFailed": "クリップボードへのコピーに失敗しました",
         "execution": "実行",
@@ -17681,6 +17693,7 @@
       "warning": "警告"
     },
     "journey": {
+      "clearResults": "結果をクリア",
       "extract": {
         "action": "サブテストに抽出",
         "title": "{count} 個のステップを新しいテストに抽出 | {count} 個のステップを新しいテストに抽出",

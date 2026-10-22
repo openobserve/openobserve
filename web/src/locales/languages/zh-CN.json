@@ -581,6 +581,15 @@
     }
   },
   "common": {
+    "dismiss": "关闭",
+    "exitFullscreen": "退出全屏",
+    "moreActions": "更多操作",
+    "moreOptions": "更多选项",
+    "addFilter": "添加过滤器",
+    "view": "查看",
+    "compare": "比较",
+    "openInNewTab": "在新标签页中打开",
+    "send": "发送",
     "copiedToClipboard": "已复制到剪贴板",
     "customLogoAlt": "组织 Logo",
     "dragToReorder": "拖动以重新排序",
@@ -13055,6 +13064,8 @@
     "traceFilters": "追踪过滤器",
     "showTraces": "显示追踪",
     "applyAndSearch": "应用并搜索",
+    "applyAndSearchEquals": "应用并搜索（等于）",
+    "applyAndSearchNotEquals": "应用并搜索（不等于）",
     "timestamp": "时间戳",
     "noErrorPresent": "此 Span 无错误",
     "noEventsPresent": "此 Span 没有事件",
@@ -15120,6 +15131,7 @@
         "noDataAvailable": "暂无数据",
         "copyInput": "复制输入",
         "copyOutput": "复制输出",
+        "copyExpected": "复制预期输出",
         "copied": "已将 {type} 复制到剪贴板",
         "copyFailed": "复制到剪贴板失败",
         "execution": "执行",
@@ -17681,6 +17693,7 @@
       "warning": "警告"
     },
     "journey": {
+      "clearResults": "清除结果",
       "extract": {
         "action": "提取为子测试",
         "title": "将 {count} 个步骤提取到新测试",
