@@ -25160,8 +25160,6 @@
       "eventMovedByToken": "Moved by its enrollment token",
       "eventRedelivered": "Configuration redelivered",
       "eventRestarted": "Restart requested",
-      "evidenceLine": "Assigned {config} v{version}; last reported {status} for hash {hash}; running marker: {marker}",
-      "evidenceUnassigned": "This collector's fleet has no configuration, so it runs the placeholder configuration that collects nothing",
       "healthMeaning": "Healthy means the collector process and its pipelines are up, not that data is flowing",
       "lastConnectedFrom": "Last connected from",
       "lastHeartbeat": "Last heartbeat",
@@ -25193,7 +25191,8 @@
       "restartUnsupported": "This collector does not accept restart commands",
       "systemSections": "System-managed sections",
       "systemSectionsCaption": "OpAMP extension and service telemetry, set by the supervisor and the server",
-      "token": "Enrollment token"
+      "token": "Enrollment token",
+      "remoteHash": "Reported hash"
     },
     "fleets": {
       "newFleet": "New fleet",

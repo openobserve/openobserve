@@ -223,9 +223,11 @@ describe("FleetCollectorDrawer", () => {
     await flushPromises();
     expect(wrapper.find(sel("assignment")).text()).toBe("edge v2, revision 7");
     expect(wrapper.find(sel("remote")).text()).toContain("APPLIED");
-    expect(wrapper.find(sel("remote")).text()).toContain("9f2c1a7e");
+    expect(wrapper.find(sel("remote-hash")).text()).toContain("9f2c1a7e");
     expect(wrapper.find(sel("marker")).text()).toBe("edge v2");
-    expect(wrapper.find(sel("evidence-line")).text()).toContain("hash 9f2c1a7e");
+    const labels = wrapper.findAll("dt").map((el) => el.text());
+    expect(labels.at(-1)).toBe("OpAMP capabilities");
+    expect(labels).not.toContain("Assignment");
   });
 
   it("shows a rejection's error and the placeholder for an unassigned fleet", async () => {
