@@ -518,7 +518,10 @@ pub async fn trigger_incident_rca(
         return MetaHttpResponse::bad_request("RCA is not enabled");
     }
     // Refused before a run row is written or the quota is charged.
-    if openobserve_core::ai_policy::rca_policy(&org_id).await.is_none() {
+    if openobserve_core::ai_policy::rca_policy(&org_id)
+        .await
+        .is_none()
+    {
         return crate::request::ai::settings::off_for_org();
     }
 
@@ -2510,6 +2513,7 @@ mod tests {
         let conn = steering_tables().await;
         let org = steering_org("trigger202");
         steering_incident(conn, &org, "inc_1", None).await;
+        assistant_settings_cached(&org).await;
         let (status, body) = status_and_body(
             trigger_incident_rca(
                 Path((org.clone(), sid(&org, "inc_1"))),
@@ -2666,6 +2670,10 @@ mod tests {
             forked_from_share: None,
             fork_seed_seq: None,
             replica_purged_at: None,
+            pinned: false,
+            pinned_at: None,
+            seed: None,
+            search_text: None,
         };
         ai_chat_sessions::Entity::insert(ai_chat_sessions::ActiveModel::from(session).reset_all())
             .exec(conn)
@@ -2892,6 +2900,10 @@ mod tests {
             forked_from_share: None,
             fork_seed_seq: None,
             replica_purged_at: None,
+            pinned: false,
+            pinned_at: None,
+            seed: None,
+            search_text: None,
         };
         ai_chat_sessions::Entity::insert(ai_chat_sessions::ActiveModel::from(session).reset_all())
             .exec(conn)
@@ -3079,6 +3091,10 @@ mod tests {
             forked_from_share: None,
             fork_seed_seq: None,
             replica_purged_at: None,
+            pinned: false,
+            pinned_at: None,
+            seed: None,
+            search_text: None,
         };
         ai_chat_sessions::Entity::insert(ai_chat_sessions::ActiveModel::from(session).reset_all())
             .exec(conn)
@@ -3375,6 +3391,18 @@ mod tests {
             "{prefix}_{}",
             infra::table::rca_runs::new_run_id().to_lowercase()
         )
+    }
+
+    /// The trigger reads the org's assistant switch from this cache; the defaults leave it on.
+    #[cfg(feature = "enterprise")]
+    async fn assistant_settings_cached(org_id: &str) {
+        common::infra::config::ORGANIZATION_SETTING
+            .write()
+            .await
+            .insert(
+                format!("/organization/setting/{org_id}"),
+                Default::default(),
+            );
     }
 
     /// Incident and run ids are primary keys across orgs: each test's names are scoped to its org.
@@ -4063,6 +4091,7 @@ mod tests {
         let conn = steering_tables().await;
         let org = steering_org("guidance");
         steering_incident(conn, &org, "inc_1", None).await;
+        assistant_settings_cached(&org).await;
         steering_incident(conn, &org, "inc_2", None).await;
         let trigger = |incident: &'static str, body: String| {
             trigger_incident_rca(
@@ -4213,6 +4242,10 @@ mod tests {
             forked_from_share: None,
             fork_seed_seq: None,
             replica_purged_at: None,
+            pinned: false,
+            pinned_at: None,
+            seed: None,
+            search_text: None,
         }
     }
 

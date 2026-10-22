@@ -2005,7 +2005,7 @@ mod tests {
         for name in names {
             let (events, expected) = load(&name);
             let mut actual = project(&events);
-            // Documented B-10 difference: o2-ai's history drops the streamed delete request.
+            // A documented difference: o2-ai's history drops the streamed delete request.
             for turn in actual["turns"].as_array_mut().unwrap() {
                 turn["frames"]
                     .as_array_mut()

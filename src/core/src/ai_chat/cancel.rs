@@ -56,14 +56,11 @@ pub async fn cancel_chat_turn(
                 session_id.to_string(),
                 auth_header.to_string(),
             );
-            let task =
-                tokio::spawn(
-                    async move {
-                        client
-                            .cancel_session(&session_id, &org_id, &auth, CancelBy::User)
-                            .await
-                    },
-                );
+            let task = tokio::spawn(async move {
+                client
+                    .cancel_session(&session_id, &org_id, &auth, CancelBy::User)
+                    .await
+            });
             Some(tokio::time::timeout(UPSTREAM_CANCEL_WAIT, task).await)
         }
         None => None,

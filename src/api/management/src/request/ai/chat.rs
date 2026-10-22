@@ -40,8 +40,7 @@ use {
         ai::{
             agent::meta::Role,
             chat::{
-                OwnerCancel, PersistSettings, TurnCaps, TurnEnd, TurnIdentity, TurnSpec,
-                spawn_turn,
+                OwnerCancel, PersistSettings, TurnCaps, TurnEnd, TurnIdentity, TurnSpec, spawn_turn,
             },
             client::{
                 DEFAULT_AGENT_TYPE, ImageAttachment, QueryRequest, RCA_AGENT_TYPE,
@@ -4512,7 +4511,7 @@ mod tests {
         assert!(!record["context_keys"].as_array().unwrap().is_empty());
     }
 
-    /// WP-01 fixtures that predate §3 (`""` = no action); WP-06 aligns them and drops this table.
+    /// Fixtures that predate the action field (`""` = no action), until they are aligned.
     #[cfg(feature = "enterprise")]
     const FIXTURE_ACTION_WORDS: [(&str, &str, &str); 10] = [
         ("credits_exhausted", "upgrade", "manage_billing"),
@@ -4527,7 +4526,7 @@ mod tests {
         ("persistence_failed", "", "none"),
     ];
 
-    /// The server case behind every B-01 envelope fixture, as the response or frame it sends.
+    /// The server case behind every envelope fixture, as the response or frame it sends.
     #[cfg(feature = "enterprise")]
     async fn server_case(code: &str) -> (Option<u16>, serde_json::Value) {
         use super::super::chats;
@@ -5391,6 +5390,10 @@ mod tests {
             forked_from_share: None,
             fork_seed_seq: None,
             replica_purged_at: None,
+            pinned: false,
+            pinned_at: None,
+            seed: None,
+            search_text: None,
         };
         ai_chat_sessions::Entity::insert(ai_chat_sessions::ActiveModel::from(row).reset_all())
             .exec(conn)
@@ -5858,7 +5861,8 @@ mod tests {
         let context =
             serde_json::json!({"incident_id": "inc-1", "severity": "P1", "locale": "de-DE"});
         let (agent, context) =
-            turn_agent_and_context("org", "user", None, context, Some(ChatMode::GenerateQuery)).await;
+            turn_agent_and_context("org", "user", None, context, Some(ChatMode::GenerateQuery))
+                .await;
         assert_eq!(agent, DEFAULT_AGENT_TYPE);
         assert!(context.get("incident_id").is_none() && context.get("severity").is_none());
         assert_eq!(context["locale"], "de-DE");

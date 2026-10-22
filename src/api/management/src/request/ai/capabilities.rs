@@ -94,21 +94,21 @@ pub struct Capabilities {
     pub toolsets: Vec<ToolsetSummary>,
     pub toolset_secret_merge: bool,
     pub policy_enforced: bool,
-    /// `GET /ai/chats` honours `q` (B-12).
+    /// `GET /ai/chats` honours `q`.
     pub history_search: bool,
-    /// `pinned` is stored and `PATCH /ai/chats/{id}` takes `{pinned}` (B-12).
+    /// `pinned` is stored and `PATCH /ai/chats/{id}` takes `{pinned}`.
     pub history_pins: bool,
-    /// `POST /ai/chats/import` moves browser chats to the server (B-12).
+    /// `POST /ai/chats/import` moves browser chats to the server.
     pub history_import: bool,
-    /// `chat_stream` takes `replaces_turn_id` and o2-ai says it answers versions (B-12).
+    /// `chat_stream` takes `replaces_turn_id` and o2-ai says it answers versions.
     pub turn_versions: bool,
-    /// `POST /ai/feedback` stores the vote with its turn; detail turns carry `feedback` (B-12).
+    /// `POST /ai/feedback` stores the vote with its turn; detail turns carry `feedback`.
     pub feedback_stored: bool,
-    /// B-09: o2-ai reads typed `attachments[]`; the client's `attachmentsEnabled` reads this.
+    /// o2-ai reads typed `attachments[]`; the client's `attachmentsEnabled` reads this.
     pub attachments: bool,
-    /// B-09: `complete` carries `context_used[]`.
+    /// `complete` carries `context_used[]`.
     pub context_used: bool,
-    /// A-02: answers follow `context.locale`, so doors need no English-only note.
+    /// Answers follow `context.locale`, so doors need no English-only note.
     pub answer_locale: bool,
     /// Set only when the org turned the assistant off; `can_chat` is then false.
     #[serde(skip_serializing_if = "Option::is_none")]
