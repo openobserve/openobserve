@@ -3514,7 +3514,7 @@ pub async fn send_email_notification_with_inline_png(
     }
 }
 
-/// Attach `alternative(plain, html)`, or the HTML alone when `text_body` is `None`.
+/// HTML (as `related(html, png)` with a PNG), inside `alternative(plain, ..)` when text is set.
 fn with_email_body(
     builder: MessageBuilder,
     text_body: Option<String>,
