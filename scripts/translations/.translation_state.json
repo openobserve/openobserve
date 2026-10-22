@@ -4449,7 +4449,6 @@
       },
       "rcaBlocked": "326e9c93794b5f9c",
       "rcaBuildOnPrevious": "1814393fc943a399",
-      "rcaBuildOnPreviousHint": "0c13ecfec9ce0ba4",
       "rcaCancel": "19766ed6ccb2f4a3",
       "rcaCancelFailed": "3f1defbbea9173e2",
       "rcaCancelled": "d5fe0196e924b419",
@@ -4461,7 +4460,6 @@
       "rcaFailed": "3a4e726007459403",
       "rcaFailedGeneric": "4e264146b6aed8dd",
       "rcaFreshAnalysis": "b4d28ed2b9fc0c8c",
-      "rcaFreshAnalysisHint": "550fff37c61ec70e",
       "rcaHistory": "8fa1339f3503b4f3",
       "rcaReanalyze": "6e0f3537158fc50f",
       "rcaResume": {
@@ -4572,12 +4570,11 @@
           "buildTitle": "78ac46d9a413df90",
           "freshHint": "9d28d9644a45b8b2",
           "freshTitle": "b4d28ed2b9fc0c8c",
-          "guidanceLabel": "10af9928ba801e7d",
+          "guidanceLabel": "5a77dca8b3c85405",
           "guidancePlaceholder": "14b164bbe627f81a",
           "mode": "5e23ec6a300dc60a",
           "note": "597da7008c2faa13",
-          "start": "7b61b91ea24ad753",
-          "title": "23f710375fd7db1f"
+          "start": "7b61b91ea24ad753"
         },
         "loadFailed": "af8f71cac0e9b04c",
         "needsInput": "aecc044c7725a655",
@@ -4615,9 +4612,7 @@
         "suggestions": "16c1d601fc669504",
         "unblocked": "e18c8432df3c797d",
         "unblockedWithNeed": "e4ace6a3e6a3dcec",
-        "waitingForAnswer": "db6a34e107f9c70b",
-        "withGuidance": "54f738fc945915d2",
-        "withGuidanceHint": "54725f21e008d8c9"
+        "waitingForAnswer": "db6a34e107f9c70b"
       },
       "rcaSummary": {
         "actionKind": {
@@ -4643,7 +4638,6 @@
         "citedNotVerified": "5123c83b48aaee0f",
         "citesContributing": "d274484ef55f1815",
         "citesRootCause": "5109ae3d3b90a16d",
-        "clickNumberHint": "514ea1c8677061ad",
         "confidenceCapped": "cf5976440a9e1691",
         "confidenceClaimed": "cd282687107195bc",
         "confidenceEvidence": "e1749565f03a9391",
@@ -4742,9 +4736,11 @@
         "suspectedNotConfirmed": "86351b9821b5f4d2",
         "timelineComesWithReport": "2404500f2d3a1d8c",
         "timelineEmpty": "1ca5574c9d1fd2f4",
+        "unverifiedAmbiguous": "70a8b6912f2ef82f",
         "unverifiedCount": "acd3c4c2a1f702a5",
         "unverifiedFailed": "031a8f0f659df890",
         "unverifiedNotRun": "25f0c23a0878a1de",
+        "unverifiedRef": "031d291a5ddb121f",
         "utcRange": "21057eddef7ecfda",
         "verdictSoFarPreliminary": "013730ff232c6996",
         "verdictSoFarRevised": "017c271877c71059",
