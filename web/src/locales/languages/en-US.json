@@ -1570,7 +1570,6 @@
     "zoomOutHere": "Zoom Out to Here",
     "resetZoom": "Reset Zoom",
     "highlight": "Highlight",
-    "function": "Function",
     "frameActions": "Actions for {name}",
     "frameClickHint": "Click to zoom in.",
     "ancestorHint": "Caller of the zoomed frame. Click to zoom out to it.",
