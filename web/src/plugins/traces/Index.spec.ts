@@ -1791,9 +1791,25 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
       vi.mocked(analytics.track).mockClear();
 
+      const { data, complete } = lastCallbacks();
+      data(null, meta([]));
+      data(null, chunk(spans("a", 7)));
+      complete(null);
+
+      expect(analytics.track).toHaveBeenCalledWith("traces_search_completed", { hits: 7 });
+    });
+
+    it("reports zero hits when the search writes no rows", async () => {
+      await mountPage();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      await wrapper.vm.getQueryData(false);
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+      mockSearchObj.data.queryResults.hits = spans("old", 5);
+
       lastCallbacks().complete(null);
 
-      expect(analytics.track).toHaveBeenCalledWith("traces_search_completed");
+      expect(analytics.track).toHaveBeenCalledWith("traces_search_completed", { hits: 0 });
     });
 
     it("does not track traces_search_completed when a page completes", async () => {
@@ -1805,7 +1821,8 @@ describe("Index.vue (Main Traces Page)", () => {
 
       lastCallbacks().complete(null);
 
-      expect(analytics.track).not.toHaveBeenCalledWith("traces_search_completed");
+      const events = vi.mocked(analytics.track).mock.calls.map((c) => c[0]);
+      expect(events).not.toContain("traces_search_completed");
     });
   });
 
