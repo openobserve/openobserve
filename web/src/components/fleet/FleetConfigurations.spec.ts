@@ -21,7 +21,6 @@ import store from "@/test/unit/helpers/store";
 import fleet from "@/services/fleet";
 import { queryClient } from "@/composables/query/queryClient";
 import OTable from "@/lib/core/Table/OTable.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import FleetConfigurations from "./FleetConfigurations.vue";
 import { takePendingImport } from "./useFleetApi";
 

@@ -1478,7 +1478,8 @@
     "trialPageNeedsPlanToast": "{page} needs a plan. Choose one on this page to keep using it.",
     "trialChoosePlanToast": "Choose a plan on this page to keep using {product}.",
     "trialFlyoutNote": "Your trial has ended. Pages with a lock need a plan.",
-    "linkedAccounts": "Linked accounts"
+    "linkedAccounts": "Linked accounts",
+    "fleet": "Fleet management"
   },
   "profiles": {
     "title": "Profiles",
@@ -3328,7 +3329,8 @@
       "k8sPresetSeeded": "Pre-selected read access on {matched} of {total} Kubernetes metric streams. Review before saving.",
       "k8sPresetNoMatch": "None of the {total} Kubernetes metric streams exist in this organization yet, so nothing was pre-selected.",
       "rumPresetSeeded": "Pre-selected read access on {matched} of {total} RUM streams, plus source maps and any RUM Product Analytics grant. Review before saving.",
-      "rumPresetNoMatch": "None of the {total} RUM streams exist in this organization yet, so nothing was pre-selected on them; source maps and any RUM Product Analytics grants were still staged."
+      "rumPresetNoMatch": "None of the {total} RUM streams exist in this organization yet, so nothing was pre-selected on them; source maps and any RUM Product Analytics grants were still staged.",
+      "moduleGroupFleet": "Fleet"
     },
     "rolesPage": {
       "subtitle": "Roles bundle permissions — assign them to Users, Service Accounts, or Groups to grant access.",
@@ -4962,7 +4964,8 @@
     "clearAndContinue": "Clear & Continue",
     "cancel": "Cancel",
     "ok": "OK",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "typeToConfirm": "To confirm, type {text} below"
   },
   "ingestion": {
     "firstEvent": {
@@ -19030,7 +19033,8 @@
       "rum": "RUM",
       "runningQueries": "Running Queries",
       "oncall": "On-Call",
-      "synthetics": "Synthetics"
+      "synthetics": "Synthetics",
+      "fleet": "Fleet"
     },
     "pages": {
       "global": "Global",
@@ -19083,7 +19087,9 @@
       "oncall": "On-Call",
       "oncallDetail": "On-Call Page",
       "syntheticsJourney": "Synthetics journey",
-      "downtimes": "Downtimes"
+      "downtimes": "Downtimes",
+      "fleetConfigEditor": "Configuration editor",
+      "fleetOverview": "Fleet pipelines"
     },
     "actions": {
       "openCheatsheet": "Open keyboard shortcuts cheatsheet",
@@ -19207,7 +19213,9 @@
       "tracesPrevRow": "Select previous trace",
       "tracesRowOpen": "Open the selected trace",
       "traceNextVisibleSpan": "Next visible span",
-      "tracePrevVisibleSpan": "Previous visible span"
+      "tracePrevVisibleSpan": "Previous visible span",
+      "fleetEditorDeleteNode": "Remove the selected component",
+      "fleetFlowCloseDetails": "Close the path details or collapse the map"
     }
   },
   "components": {
