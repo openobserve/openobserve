@@ -448,6 +448,23 @@ describe("PublicLinksPanel", () => {
     });
   });
 
+  it.each([
+    ["keeps the stored value when the picker loaded no options", [], "payroll"],
+    ["sends the cleared value when the picker had options", [{ label: "a", value: "a" }], null],
+  ])("%s", async (_name, options, expected) => {
+    const stored = link({ frozen_variables: { env: "payroll" } });
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [stored] } } as never);
+    vi.mocked(admin.update).mockResolvedValue({ data: stored } as never);
+    const w = build({ editLinkId: "l1" });
+    await flushPromises();
+    const vm = w.vm as unknown as {
+      formVars: { variablesData: { global: Array<{ value: unknown; options: unknown[] }> } };
+    };
+    Object.assign(vm.formVars.variablesData.global[0], { value: null, options });
+    await submit(w);
+    expect(vi.mocked(admin.update).mock.calls[0][3].frozen_variables).toEqual({ env: expected });
+  });
+
   it("edits each range in its own picker row, flags bad rows and adds new ones", async () => {
     vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
     vi.mocked(admin.update).mockResolvedValue({ data: link() } as never);

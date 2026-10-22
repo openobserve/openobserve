@@ -1076,14 +1076,28 @@ async function runRowAction(
   }
 }
 
+function isEmptyValue(value: unknown): boolean {
+  return (
+    value === null ||
+    value === undefined ||
+    value === "" ||
+    (Array.isArray(value) && value.length === 0)
+  );
+}
+
 // Keys follow the dashboard URL: `name`, `name.t.<tabId>`, `name.p.<panelId>`.
 function frozenVariables(): Record<string, unknown> {
   // Without the pickers (opened from the org list) an edit keeps the link's frozen values.
   if (!formVarsReady.value) return editing.value ? { ...editing.value.frozen_variables } : {};
   const out: Record<string, unknown> = {};
+  const stored = editing.value?.frozen_variables ?? {};
   const put = (vars: VariableRuntimeState[], suffix: string) =>
     vars.forEach((v) => {
-      if (v.type !== "dynamic_filters") out[`${v.name}${suffix}`] = v.value;
+      if (v.type === "dynamic_filters") return;
+      const key = `${v.name}${suffix}`;
+      // An empty picker with no options was never chosen from: its values failed to load, e.g. a stream this user can't read.
+      const failedLoad = isEmptyValue(v.value) && !v.options?.length && key in stored;
+      out[key] = failedLoad ? stored[key] : v.value;
     });
   put(formVars.variablesData.global, "");
   Object.entries(formVars.variablesData.tabs).forEach(([id, vars]) => put(vars, `.t.${id}`));
@@ -1112,15 +1126,10 @@ function withoutEmptyQuerySeeds(
   list: VariableConfig[],
 ): Record<string, unknown> {
   const queryNames = new Set(list.filter((v) => v.type === "query_values").map((v) => v.name));
-  const isEmpty = (value: unknown) =>
-    value === null ||
-    value === undefined ||
-    value === "" ||
-    (Array.isArray(value) && value.length === 0);
   return Object.fromEntries(
     Object.entries(params).filter(([key, value]) => {
       const name = key.match(/^var-(.+)\.[tp]\..+$/)?.[1] ?? key.replace(/^var-/, "");
-      return !(queryNames.has(name) && isEmpty(value));
+      return !(queryNames.has(name) && isEmptyValue(value));
     }),
   );
 }
