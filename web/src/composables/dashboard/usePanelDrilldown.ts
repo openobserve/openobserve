@@ -714,7 +714,9 @@ export function usePanelDrilldown({
             b64EncodeUnicode(currentQuery),
           );
 
-        window.open(resolvedUrl, "_blank");
+        // The stream settings API stores cross-link URLs unvalidated, so guard the resolved value here.
+        if (!isSafeNavigableUrl(resolvedUrl)) return;
+        window.open(resolvedUrl, "_blank", "noopener,noreferrer");
       } catch (error) {
         console.error("Failed to open cross-link:", error);
       }
