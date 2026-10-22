@@ -60,7 +60,11 @@
           >
             {{ windowLabel }}
           </span>
-          <div class="flex h-8 self-center max-md:hidden">
+          <div
+            v-if="windowLabel && !pickerShowsWindow"
+            class="flex h-8 self-center max-lg:hidden"
+            data-test="dashboards-public-dashboard-window-separator"
+          >
             <OSeparator vertical />
           </div>
           <OTag
@@ -169,7 +173,11 @@
           class="cursor-help"
           data-test="dashboards-public-dashboard-footer-info"
         >
-          <OTooltip side="top" max-width="20rem" :content="footerNote" />
+          <OTooltip
+            side="top"
+            max-width="20rem"
+            :content="t('dashboard.publicDashboard.footerNote')"
+          />
         </OIcon>
       </footer>
     </template>
@@ -197,7 +205,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ThemeSwitcher from "@/components/ThemeSwitcher.vue";
 import publicDashboardsService from "@/services/public_dashboards";
-import { durationFormatter, formatExactDuration } from "@/utils/formatters";
+import { durationFormatter } from "@/utils/formatters";
 import type { PublicLinkRange } from "@/services/public_dashboards_admin";
 import { sortRanges } from "@/components/dashboards/PublicLinkForm.schema";
 import { longRange } from "@/components/dashboards/publicLinkDisplay";
@@ -475,8 +483,8 @@ const updatedLabel = computed<I18nText | "">(() => {
   if (!builtAt) return "";
   const time = raw(clockTime(builtAt));
   return body.value?.refreshing
-    ? t("dashboard.publicDashboard.updatedRefreshing", { time })
-    : t("dashboard.publicDashboard.updatedAt", { time });
+    ? t("dashboard.publicDashboard.lastUpdatedRefreshing", { time })
+    : t("dashboard.publicDashboard.lastUpdatedAt", { time });
 });
 
 // Counts down to fresh_until on the server's clock; an absolute range has none.
@@ -496,15 +504,6 @@ const failureNote = computed<I18nText | null>(() => {
     ? t("dashboard.publicDashboard.refreshFailed", { time, next: raw(countdown(left)) })
     : t("dashboard.publicDashboard.refreshFailedNoRetry", { time });
 });
-
-const refreshSecs = computed(() => Number(body.value?.refresh_secs) || 0);
-const footerNote = computed<I18nText>(() =>
-  refreshSecs.value > 0 && selectedRange.value?.type === "relative"
-    ? t("dashboard.publicDashboard.footerNoteRefresh", {
-        interval: formatExactDuration(refreshSecs.value),
-      })
-    : t("dashboard.publicDashboard.footerNote"),
-);
 
 const holdTime = computed(() => raw(countdown((cooldownUntil.value ?? nowMs.value) - nowMs.value)));
 const cooldownMessage = computed<I18nText>(() =>

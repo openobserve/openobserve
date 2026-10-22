@@ -20,6 +20,7 @@ use sea_orm_migration::prelude::*;
 
 const LINKS: &str = "public_dashboards";
 const SNAPSHOTS: &str = "public_dashboard_snapshots";
+const SETTINGS: &str = "public_dashboard_org_settings";
 const DRAFT_MIGRATIONS: [&str; 6] = [
     "m20260907_000001_create_public_dashboards_tables",
     "m20260925_000001_add_name_to_public_dashboards",
@@ -47,6 +48,17 @@ impl MigrationTrait for Migration {
         manager.create_index(slug_idx()).await?;
         manager.create_index(org_dashboard_idx()).await?;
         manager.create_table(create_org_settings_stmt()).await?;
+        // A settings table left by the draft migrations predates the limit's setter column.
+        if !manager.has_column(SETTINGS, "max_links_set_by").await? {
+            manager
+                .alter_table(
+                    Table::alter()
+                        .table(PublicDashboardOrgSettings::Table)
+                        .add_column(max_links_set_by_col())
+                        .to_owned(),
+                )
+                .await?;
+        }
         manager.create_table(create_outbox_stmt()).await?;
         Ok(())
     }
@@ -121,6 +133,13 @@ fn add_column(col: ColumnDef) -> TableAlterStatement {
     Table::alter()
         .table(PublicDashboards::Table)
         .add_column(col)
+        .to_owned()
+}
+
+fn max_links_set_by_col() -> ColumnDef {
+    ColumnDef::new(PublicDashboardOrgSettings::MaxLinksSetBy)
+        .string_len(256)
+        .null()
         .to_owned()
 }
 
@@ -294,11 +313,7 @@ fn create_org_settings_stmt() -> TableCreateStatement {
                 .integer()
                 .null(),
         )
-        .col(
-            ColumnDef::new(PublicDashboardOrgSettings::MaxLinksSetBy)
-                .string_len(256)
-                .null(),
-        )
+        .col(max_links_set_by_col())
         .col(
             ColumnDef::new(PublicDashboardOrgSettings::UpdatedAt)
                 .big_integer()
@@ -483,6 +498,44 @@ mod tests {
     }
 
     /// A database that ran the four draft migrations keeps its links and loses only their results.
+    #[tokio::test]
+    async fn up_adds_the_limit_setter_to_a_draft_settings_table() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        for sql in [
+            "CREATE TABLE public_dashboard_org_settings (org_id varchar(100) NOT NULL PRIMARY KEY, \
+             rev bigint NOT NULL, enabled boolean NOT NULL DEFAULT true, max_links integer NULL, \
+             updated_at bigint NOT NULL, updated_by varchar(256) NOT NULL)",
+            "INSERT INTO public_dashboard_org_settings VALUES ('o', 3, true, 5, 1, 'a@b.c')",
+        ] {
+            db.execute_unprepared(sql).await.unwrap();
+        }
+
+        let manager = SchemaManager::new(&db);
+        Migration.up(&manager).await.unwrap();
+        Migration.up(&manager).await.unwrap();
+
+        assert!(
+            columns(&db, SETTINGS)
+                .await
+                .iter()
+                .any(|c| c == "max_links_set_by")
+        );
+        let row = db
+            .query_one(Statement::from_string(
+                db.get_database_backend(),
+                "SELECT max_links, max_links_set_by FROM public_dashboard_org_settings",
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.try_get::<i32>("", "max_links").unwrap(), 5);
+        assert_eq!(
+            row.try_get::<Option<String>>("", "max_links_set_by")
+                .unwrap(),
+            None
+        );
+    }
+
     #[tokio::test]
     async fn up_resets_a_database_built_by_the_draft_migrations() {
         let db = Database::connect("sqlite::memory:").await.unwrap();

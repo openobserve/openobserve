@@ -24,10 +24,6 @@ import type { I18nText, TranslateFn } from "@/types/i18n";
 import { parseDuration } from "@/utils/date";
 
 export const DEFAULT_REFRESH_SECS = 300;
-/** The operator minimum when the server does not report one (ZO_PUBLIC_DASHBOARD_MIN_REFRESH_SECS default). */
-export const DEFAULT_MIN_REFRESH_SECS = 60;
-// A window refreshes at most this many times, as on the server.
-const REFRESHES_PER_WINDOW = 288;
 
 export const MAX_RANGES = 10;
 const MIN_RANGE_SECS = 60;
@@ -84,16 +80,6 @@ const PICKER_UNITS: Array<[number, string]> = [
 export function pickerPeriod(secs: number): string {
   const [unit, suffix] = PICKER_UNITS.find(([u]) => secs % u === 0) ?? [1, "s"];
   return `${secs / unit}${suffix}`;
-}
-
-/** How often the server refreshes a relative range: ceil_to_minute(max(selected, window ÷ 288, minimum)). */
-export function effectiveRefreshSecs(
-  selected: number,
-  windowSecs: number,
-  minSecs: number = DEFAULT_MIN_REFRESH_SECS,
-): number {
-  const floor = Math.max(selected, windowSecs / REFRESHES_PER_WINDOW, minSecs);
-  return Math.ceil(floor / 60) * 60;
 }
 
 // Offered in order by Add, so a new row starts on a range the list doesn't have yet.

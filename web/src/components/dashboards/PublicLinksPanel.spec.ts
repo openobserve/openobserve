@@ -214,7 +214,7 @@ describe("PublicLinksPanel", () => {
       w.find('[data-test="dashboards-public-links-panel-created-url"] input').element,
     ).toHaveProperty("value", `${window.location.origin}/web/public/dashboards/new-slug`);
     expect(w.find('[data-test="dashboards-public-links-panel-created-build-note"]').text()).toBe(
-      "Opening the public page builds the first result. Viewers after that share it for 10 minutes.",
+      "Opening the public page builds the first result. Viewers after that share it.",
     );
 
     await w.find('[data-test="dashboards-public-links-panel-back-btn"]').trigger("click");
@@ -448,6 +448,23 @@ describe("PublicLinksPanel", () => {
     });
   });
 
+  it.each([
+    ["keeps the stored value when the picker loaded no options", [], "payroll"],
+    ["sends the cleared value when the picker had options", [{ label: "a", value: "a" }], null],
+  ])("%s", async (_name, options, expected) => {
+    const stored = link({ frozen_variables: { env: "payroll" } });
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [stored] } } as never);
+    vi.mocked(admin.update).mockResolvedValue({ data: stored } as never);
+    const w = build({ editLinkId: "l1" });
+    await flushPromises();
+    const vm = w.vm as unknown as {
+      formVars: { variablesData: { global: Array<{ value: unknown; options: unknown[] }> } };
+    };
+    Object.assign(vm.formVars.variablesData.global[0], { value: null, options });
+    await submit(w);
+    expect(vi.mocked(admin.update).mock.calls[0][3].frozen_variables).toEqual({ env: expected });
+  });
+
   it("edits each range in its own picker row, flags bad rows and adds new ones", async () => {
     vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
     vi.mocked(admin.update).mockResolvedValue({ data: link() } as never);
@@ -500,7 +517,6 @@ describe("PublicLinksPanel", () => {
     vi.mocked(admin.refresh).mockResolvedValue({ data: link() } as never);
     const w = build();
     await flushPromises();
-    expect(w.text()).toContain("Once");
     const item = w.find('[data-test="dashboards-public-links-panel-l1-refresh-menu"]');
     expect(item.text()).toBe("Refresh on next view");
     await item.trigger("click");
@@ -1053,35 +1069,13 @@ describe("PublicLinksPanel", () => {
       );
     });
 
-    it("applies the operator minimum the server reports to the promised interval", async () => {
-      const zo = store.state.zoConfig;
-      store.state.zoConfig = { ...zo, public_dashboard_min_refresh_secs: 600 };
-      try {
-        const w = await createLink(
-          async () => ({ data: { link_id: "l1", access_count: 0, ranges: [] } }),
-          link({ refresh_secs: 300 }),
-        );
-        expect(
-          w.find('[data-test="dashboards-public-links-panel-created-build-note"]').text(),
-        ).toBe(
-          "Opening the public page builds the first result. Viewers after that share it for 10 minutes.",
-        );
-      } finally {
-        store.state.zoConfig = zo;
-      }
-    });
-
-    it("promises the default range's effective interval in the created view", async () => {
-      const monthDefault = {
-        ...threeRanges,
-        default: { type: "relative" as const, secs: 30 * DAY },
-      };
+    it("names no refresh interval in the created view", async () => {
       const w = await createLink(
         async () => ({ data: { link_id: "l1", access_count: 0, ranges: [] } }),
-        link({ time_range: monthDefault, refresh_secs: 300 }),
+        link({ refresh_secs: 9000 }),
       );
       expect(w.find('[data-test="dashboards-public-links-panel-created-build-note"]').text()).toBe(
-        "Opening the public page builds the first result. Viewers after that share it for 150 minutes.",
+        "Opening the public page builds the first result. Viewers after that share it.",
       );
     });
 

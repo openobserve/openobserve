@@ -16,7 +16,6 @@
 import { describe, expect, it } from "vitest";
 import { gt } from "@/types/i18n";
 import {
-  effectiveRefreshSecs,
   endOfDayMicros,
   expiryDate,
   makePublicLinkSchema,
@@ -81,22 +80,6 @@ describe("PublicLinkForm schema", () => {
   it("allows any refresh for a long relative range", () => {
     const long = { ...named(), ranges: [rel(90 * 86400)], defaultKey: "r7776000" };
     expect(schema.safeParse({ ...long, refreshSecs: 60 }).success).toBe(true);
-  });
-});
-
-describe("PublicLinkForm effective refresh", () => {
-  it("refreshes a range at ceil_to_minute(max(selected, window / 288, 60))", () => {
-    expect(effectiveRefreshSecs(300, 3600)).toBe(300);
-    expect(effectiveRefreshSecs(300, 86_400)).toBe(300);
-    expect(effectiveRefreshSecs(300, 30 * 86_400)).toBe(9000);
-    expect(effectiveRefreshSecs(60, 7 * 86_400)).toBe(2100);
-    // A floor between minutes rounds up to the next minute.
-    expect(effectiveRefreshSecs(60, 86_401 * 288)).toBe(86_460);
-    expect(effectiveRefreshSecs(30, 60)).toBe(60);
-    // 1,441 minutes ÷ 288 is 300.2 s: the exact quotient rounds up to 6 minutes, as on the server.
-    expect(effectiveRefreshSecs(300, 1441 * 60)).toBe(360);
-    // A raised operator minimum lifts every range.
-    expect(effectiveRefreshSecs(300, 3600, 600)).toBe(600);
   });
 });
 

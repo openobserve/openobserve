@@ -23,7 +23,6 @@ import type {
   PublicLinkStatus,
   PublicLinkStatusReport,
 } from "@/services/public_dashboards_admin";
-import { formatExactDuration } from "@/utils/formatters";
 import { getPath } from "@/utils/zincutils";
 import { rangeKey, todayIn } from "./PublicLinkForm.schema";
 
@@ -73,11 +72,6 @@ export function longRange(range: PublicLinkRange, t: TranslateFn, timezone: stri
   return t(unit.long, { n }, n);
 }
 
-// 30 days is offered as "1 month", and reads the same wherever the interval is shown.
-export function refreshLabel(secs: number, t: TranslateFn): I18nText {
-  return secs === 2592000 ? t("dashboard.publicDashboard.refreshMonth") : formatExactDuration(secs);
-}
-
 // Under the router's base, so a server with ZO_BASE_URI (e.g. /o2/web/) gets a working link.
 export function publicLinkUrl(link: PublicLink): string {
   return new URL(`public/dashboards/${link.slug}`, window.location.origin + (getPath() || "/"))
@@ -117,10 +111,6 @@ export function forbiddenMessage(
 export function publicLinkSearchTerm(input: string): string {
   const q = input.trim();
   return (q.match(/\/public\/dashboards\/([^/?#\s]+)/)?.[1] ?? q).toLowerCase();
-}
-
-export function hasRelativeRange(link: PublicLink): boolean {
-  return link.time_range.ranges.some((r) => r.type === "relative");
 }
 
 // Offered on every link with a dashboard; a paused or expired one gets the server's reason.
@@ -235,7 +225,6 @@ export function publicLinkColumns(
       : []),
     col("status", t("dashboard.publicLinks.status"), 120, "status"),
     col("ranges", t("dashboard.publicLinks.timeRanges"), 190),
-    col("refresh", t("dashboard.publicLinks.refresh"), 90, "refresh_secs"),
     col("expires", t("dashboard.publicLinks.expires"), 115, "expires_at"),
     col(
       "last_viewed",
