@@ -2827,14 +2827,14 @@ describe("PanelContainer", () => {
       expect(triggerDot().classes()).toContain("in-[.fullscreen]:hidden");
     });
 
-    it("paints both dots with the warning token, edged for contrast in light mode", async () => {
+    it("paints both dots with the Refresh pending token, edged for contrast in light mode", async () => {
       seed();
       wrapper = mountPanel();
       await flushPromises();
 
       for (const dot of [triggerDot(), itemDot()]) {
         expect(dot.classes()).toEqual(
-          expect.arrayContaining(["bg-warning", "ring-1", "ring-status-warning-text"]),
+          expect.arrayContaining(["bg-button-pending-bg", "ring-1", "ring-badge-amber-ol-text"]),
         );
         expect(dot.classes()).not.toContain("bg-accent");
       }
