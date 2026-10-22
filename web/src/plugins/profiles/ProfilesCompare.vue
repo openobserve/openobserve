@@ -77,9 +77,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("profiles.diffTable") }}
           </OToggleGroupItem>
         </OToggleGroup>
+        <!-- Hidden, not removed, in Side by Side so the toolbar keeps its layout. -->
         <div
-          v-if="state.display !== 'sides'"
           class="flex items-center gap-2 text-xs"
+          :class="{ invisible: state.display === 'sides' }"
+          :aria-hidden="state.display === 'sides'"
           data-test="profiles-compare-legend"
         >
           <span

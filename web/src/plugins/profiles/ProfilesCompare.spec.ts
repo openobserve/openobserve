@@ -198,7 +198,8 @@ describe("ProfilesCompare", () => {
       "json",
       "http",
     ]);
-    expect(wrapper.find('[data-test="profiles-compare-legend"]').exists()).toBe(false);
+    // The colour legend means nothing here, but it keeps its space so the toolbar does not shift.
+    expect(wrapper.find('[data-test="profiles-compare-legend"]').classes()).toContain("invisible");
   });
 
   it("lists the change in each function's share in the diff table", async () => {
