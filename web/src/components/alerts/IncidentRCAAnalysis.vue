@@ -97,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :stage-index="rca.summary.stage_index"
         :stage="rca.summary.stage"
         :live-mode="currentRun?.mode ?? null"
+        :live-resume-step="liveResumeStep"
         :failed-mode="viewedRun?.mode ?? currentRun?.mode ?? null"
         :has-earlier-report="hasEarlierReport"
         :error="cardError"
@@ -427,6 +428,12 @@ const aiEnabled = computed(
 
 const live = computed(() => isLiveRca(props.rca));
 const currentRun = computed(() => props.rca?.current_run ?? null);
+/** Step a resumed live run restarted from. */
+const liveResumeStep = computed(() =>
+  currentRun.value?.trigger === "resume"
+    ? (currentRun.value.context_used?.resumed_from?.from_step.title ?? null)
+    : null,
+);
 
 const findRun = (runId: string | null | undefined) =>
   runId ? (props.history.find((run) => run.run_id === runId) ?? null) : null;
