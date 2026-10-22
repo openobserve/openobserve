@@ -18,6 +18,7 @@ use std::{collections::HashSet, sync::Arc};
 use async_trait::async_trait;
 use config::{meta::stream::StreamType, spawn_pausable_job};
 use infra::{db::get_orm_client_rw, dist_lock, table::org_cleanup_tasks};
+use sea_orm::ConnectionTrait;
 
 const LOCK_KEY: &str = "/org_cleanup/worker_lock";
 const MAX_ATTEMPTS: i32 = 10;
@@ -444,6 +445,137 @@ async fn delete_org_sourcemaps(org_id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Tombstones go out first: once the rows are gone nothing is left to build them from.
+async fn delete_org_workflow_http_triggers(org_id: &str) -> Result<(), anyhow::Error> {
+    #[cfg(feature = "enterprise")]
+    emit_org_trigger_tombstones(org_id).await?;
+    let gone = delete_org_workflow_rows(get_orm_client_rw().await, org_id).await?;
+    #[cfg(feature = "enterprise")]
+    forget_org_triggers(org_id, &gone).await;
+    #[cfg(not(feature = "enterprise"))]
+    drop(gone);
+    Ok(())
+}
+
+/// After the delete: a cache reload before it would find the rows and keep them for the TTL.
+#[cfg(feature = "enterprise")]
+async fn forget_org_triggers(org_id: &str, trigger_ids: &[String]) {
+    for trigger_id in trigger_ids {
+        if let Err(e) = crate::db::workflow_http_triggers::forget_local(trigger_id).await {
+            log::warn!(
+                "[OrgCleanup] org '{org_id}': cache of trigger {trigger_id} not evicted: {e}"
+            );
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+async fn emit_org_trigger_tombstones(org_id: &str) -> Result<(), anyhow::Error> {
+    let snapshots = org_trigger_tombstones(
+        get_orm_client_rw().await,
+        org_id,
+        config::utils::time::now_micros(),
+        &config::get_cluster_name(),
+    )
+    .await?;
+    for snapshot in &snapshots {
+        // Not retried: a region whose org row is gone refuses the org's hooks anyway.
+        if let Err(e) = crate::db::workflow_http_triggers::emit_prepared(snapshot).await {
+            log::warn!(
+                "[OrgCleanup] org '{org_id}': tombstone of trigger {} not sent: {e}",
+                snapshot.trigger.id
+            );
+        }
+    }
+    Ok(())
+}
+
+/// Version + 1, now and the local cluster outrank the stored row, so every receiver applies it.
+#[cfg(feature = "enterprise")]
+async fn org_trigger_tombstones<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    now_us: i64,
+    local_cluster: &str,
+) -> Result<Vec<infra::table::workflow_http_triggers::TriggerSnapshot>, anyhow::Error> {
+    use infra::table::workflow_http_triggers::{
+        self as http_triggers, AuthMode, CredentialKind, CredentialState, ReplicatedCredential,
+        ReplicatedTrigger, TriggerSnapshot,
+    };
+
+    let mut snapshots = Vec::new();
+    for trigger in http_triggers::list_by_org(db, org_id).await? {
+        let Some(auth_mode) = AuthMode::parse(&trigger.auth_mode) else {
+            log::warn!(
+                "[OrgCleanup] trigger {} has an unknown auth mode, no tombstone",
+                trigger.id
+            );
+            continue;
+        };
+        let credentials = http_triggers::list_credentials(db, &trigger.id)
+            .await?
+            .into_iter()
+            .filter_map(|credential| {
+                Some(ReplicatedCredential {
+                    kind: CredentialKind::parse(&credential.kind)?,
+                    state: CredentialState::Revoked,
+                    revoked_at: credential.revoked_at.or(Some(now_us)),
+                    updated_at: now_us,
+                    secret: None,
+                    id: credential.id,
+                    display_prefix: credential.display_prefix,
+                    token_sha256: credential.token_sha256,
+                    expires_at: credential.expires_at,
+                    created_by: credential.created_by,
+                    created_at: credential.created_at,
+                })
+            })
+            .collect();
+        snapshots.push(TriggerSnapshot {
+            version: trigger.version + 1,
+            origin_cluster: local_cluster.to_string(),
+            deleted: true,
+            trigger: ReplicatedTrigger {
+                id: trigger.id,
+                org_id: trigger.org_id,
+                workflow_id: trigger.workflow_id,
+                enabled: trigger.enabled,
+                auth_mode,
+                max_body_bytes: trigger.max_body_bytes,
+                rate_limit_per_minute: trigger.rate_limit_per_minute,
+                created_by: trigger.created_by,
+                created_at: trigger.created_at,
+                updated_at: now_us,
+                deleted_at: trigger.deleted_at.or(Some(now_us)),
+            },
+            credentials,
+        });
+    }
+    Ok(snapshots)
+}
+
+async fn delete_org_workflow_rows<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+) -> Result<Vec<String>, anyhow::Error> {
+    use infra::{
+        secrets::SecretOwnerKind,
+        table::{llm_secrets, workflow_http_trigger_requests, workflow_http_triggers, workflows},
+    };
+
+    let trigger_ids = workflow_http_triggers::list_by_org(db, org_id)
+        .await?
+        .into_iter()
+        .map(|trigger| trigger.id)
+        .collect();
+    workflow_http_trigger_requests::delete_by_org(db, org_id).await?;
+    workflow_http_triggers::delete_by_org(db, org_id).await?;
+    llm_secrets::delete_by_org_owner_kind(db, org_id, SecretOwnerKind::WorkflowTrigger.as_str())
+        .await?;
+    workflows::delete_all_for_org_in(db, org_id).await?;
+    Ok(trigger_ids)
+}
+
 async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     #[cfg(not(feature = "enterprise"))]
     use infra::table::service_streams;
@@ -532,7 +664,11 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     llm_prompts::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/llm_prompts: {e}"))?;
-    // folders are safe to delete after dashboards, annotations, reports, and prompts are gone
+    // workflows.folder_id and workflow_drafts.folder_id reference folders.id on Postgres.
+    delete_org_workflow_http_triggers(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/workflows: {e}"))?;
+    // folders are safe to delete after their dashboards, reports, prompts and workflows are gone
     folders::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/folders: {e}"))?;
@@ -1354,5 +1490,422 @@ mod tests {
             !body.contains("delete_by_id_user"),
             "org teardown must never route through the user-facing guard"
         );
+    }
+
+    mod workflow_teardown {
+        use infra::{
+            secrets::{self, SecretOwnerKind},
+            table::{
+                entity::{
+                    folders, llm_secrets, workflow_associations, workflow_drafts, workflow_errors,
+                    workflow_http_trigger_credentials as credentials,
+                    workflow_http_trigger_requests as requests, workflow_http_triggers as triggers,
+                    workflow_run_data, workflows,
+                },
+                workflow_http_trigger_requests::{self as ledger, NewHookRequest},
+                workflow_http_triggers as http_triggers,
+            },
+        };
+        use sea_orm::{
+            ActiveModelTrait, ColumnTrait, ConnectOptions, ConnectionTrait, Database,
+            DatabaseConnection, EntityTrait, NotSet, PaginatorTrait, QueryFilter, Schema, Set,
+        };
+
+        use super::{super::*, SOURCE, position_of};
+
+        const NOW: i64 = 1_760_000_000_000_000;
+
+        /// One connection: separate connections to `sqlite::memory:` are separate databases.
+        async fn db() -> DatabaseConnection {
+            let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
+            opts.max_connections(1);
+            let db = Database::connect(opts).await.unwrap();
+            http_triggers::create_tables_for_tests(&db).await.unwrap();
+            infra::table::workflows::create_tables_for_tests(&db)
+                .await
+                .unwrap();
+            db
+        }
+
+        /// Own schema per run, with the two folder FKs the migrations add on Postgres.
+        async fn pg_db() -> (DatabaseConnection, String) {
+            let url = std::env::var("TEST_POSTGRES_URL").expect("TEST_POSTGRES_URL is required");
+            let schema = format!("org_cleanup_{}_{}", std::process::id(), NOW);
+            let admin = Database::connect(&url).await.unwrap();
+            admin
+                .execute_unprepared(&format!("CREATE SCHEMA {schema}"))
+                .await
+                .unwrap();
+            let mut opts = ConnectOptions::new(url);
+            opts.max_connections(1)
+                .set_schema_search_path(schema.clone());
+            let db = Database::connect(opts).await.unwrap();
+            http_triggers::create_tables_for_tests(&db).await.unwrap();
+            infra::table::workflows::create_tables_for_tests(&db)
+                .await
+                .unwrap();
+            let backend = db.get_database_backend();
+            let folders_table = Schema::new(backend).create_table_from_entity(folders::Entity);
+            db.execute(backend.build(&folders_table)).await.unwrap();
+            for (table, fk) in [
+                ("workflows", "workflows_folder_fk"),
+                ("workflow_drafts", "workflow_drafts_folder_fk"),
+            ] {
+                db.execute_unprepared(&format!(
+                    "ALTER TABLE {table} ADD CONSTRAINT {fk} \
+                     FOREIGN KEY (folder_id) REFERENCES folders(id)"
+                ))
+                .await
+                .unwrap();
+            }
+            (db, schema)
+        }
+
+        async fn delete_org_folders(
+            db: &DatabaseConnection,
+            org: &str,
+        ) -> Result<sea_orm::DeleteResult, sea_orm::DbErr> {
+            folders::Entity::delete_many()
+                .filter(folders::Column::Org.eq(org))
+                .exec(db)
+                .await
+        }
+
+        async fn seed_trigger(db: &DatabaseConnection, org: &str) {
+            let trigger_id = format!("t-{org}");
+            http_triggers::insert_trigger(
+                db,
+                triggers::Model {
+                    id: trigger_id.clone(),
+                    org_id: org.to_string(),
+                    workflow_id: format!("wf-{org}"),
+                    enabled: true,
+                    auth_mode: "signature".to_string(),
+                    max_body_bytes: 1_048_576,
+                    rate_limit_per_minute: 60,
+                    created_by: "a@x.io".to_string(),
+                    created_at: NOW - 10,
+                    updated_at: NOW - 10,
+                    version: 3,
+                    origin_cluster: "r2".to_string(),
+                    deleted_at: None,
+                    last_invoked_at: None,
+                    rejections: None,
+                },
+            )
+            .await
+            .unwrap();
+            let credential_id = format!("c-{org}");
+            let prepared =
+                secrets::prepared_for_tests(org, SecretOwnerKind::WorkflowTrigger, &credential_id);
+            let secret_ref = secrets::insert_prepared(db, prepared)
+                .await
+                .unwrap()
+                .metadata
+                .secret_ref;
+            http_triggers::insert_credential(
+                db,
+                credentials::Model {
+                    id: credential_id,
+                    trigger_id: trigger_id.clone(),
+                    org_id: org.to_string(),
+                    kind: "signing_secret".to_string(),
+                    display_prefix: "whsec_abcd…wxyz".to_string(),
+                    token_sha256: None,
+                    secret_ref: Some(secret_ref),
+                    state: "active".to_string(),
+                    expires_at: None,
+                    revoked_at: None,
+                    created_by: "a@x.io".to_string(),
+                    created_at: NOW - 10,
+                    updated_at: NOW - 10,
+                    last_used_at: None,
+                },
+            )
+            .await
+            .unwrap();
+            let request = NewHookRequest {
+                trigger_id,
+                org_id: org.to_string(),
+                workflow_id: format!("wf-{org}"),
+                run_id: format!("run-{org}"),
+                idem_key: None,
+                body_sha256: "cd".repeat(32),
+                body_bytes: 2,
+                content_type: None,
+                meta: "{}".to_string(),
+                credential_id: format!("c-{org}"),
+                credential_prefix: "whsec_abcd…wxyz".to_string(),
+                caller_ip: "203.0.113.7".to_string(),
+                received_at: NOW,
+            };
+            ledger::enqueue(db, request, "{}".to_string())
+                .await
+                .unwrap();
+        }
+
+        async fn seed_workflow(db: &DatabaseConnection, org: &str) {
+            let id = format!("wf-{org}");
+            workflows::ActiveModel {
+                id: Set(id.clone()),
+                org_id: Set(org.to_string()),
+                folder_id: Set("f1".to_string()),
+                created_at: Set(NOW),
+                updated_at: Set(NOW),
+                created_by: Set("a@x.io".to_string()),
+                enabled: Set(true),
+                name: Set(id.clone()),
+                description: Set(String::new()),
+                nodes: Set("[]".to_string()),
+                edges: Set("[]".to_string()),
+            }
+            .insert(db)
+            .await
+            .unwrap();
+            workflow_drafts::ActiveModel {
+                id: Set(format!("draft-{org}")),
+                org_id: Set(org.to_string()),
+                folder_id: Set("f1".to_string()),
+                created_at: Set(NOW),
+                updated_at: Set(NOW),
+                created_by: Set("a@x.io".to_string()),
+                name: Set(id.clone()),
+                description: Set(String::new()),
+                nodes: Set("[]".to_string()),
+                edges: Set("[]".to_string()),
+            }
+            .insert(db)
+            .await
+            .unwrap();
+            workflow_errors::ActiveModel {
+                id: NotSet,
+                cluster: Set("r1".to_string()),
+                org_id: Set(org.to_string()),
+                workflow_id: Set(id.clone()),
+                run_id: Set(format!("err-run-{org}")),
+                ran_at: Set(NOW),
+                data: Set("[]".to_string()),
+                input_data: Set(None),
+            }
+            .insert(db)
+            .await
+            .unwrap();
+            workflow_associations::ActiveModel {
+                id: NotSet,
+                org_id: Set(org.to_string()),
+                entity_id: Set("alert-1".to_string()),
+                entity_type: Set("alert".to_string()),
+                workflow_id: Set(id.clone()),
+                trigger_type: Set("AlertFired".to_string()),
+                created_at: Set(NOW),
+            }
+            .insert(db)
+            .await
+            .unwrap();
+            workflow_run_data::ActiveModel {
+                id: NotSet,
+                org_id: Set(org.to_string()),
+                workflow_id: Set(id),
+                run_id: Set(format!("alert-run-{org}")),
+                triggered_at: Set(NOW),
+                data: Set("[]".to_string()),
+            }
+            .insert(db)
+            .await
+            .unwrap();
+        }
+
+        async fn hook_rows(db: &DatabaseConnection, org: &str) -> [u64; 4] {
+            [
+                triggers::Entity::find()
+                    .filter(triggers::Column::OrgId.eq(org))
+                    .count(db)
+                    .await
+                    .unwrap(),
+                credentials::Entity::find()
+                    .filter(credentials::Column::OrgId.eq(org))
+                    .count(db)
+                    .await
+                    .unwrap(),
+                requests::Entity::find()
+                    .filter(requests::Column::OrgId.eq(org))
+                    .count(db)
+                    .await
+                    .unwrap(),
+                llm_secrets::Entity::find()
+                    .filter(llm_secrets::Column::OrgId.eq(org))
+                    .filter(llm_secrets::Column::OwnerKind.eq("workflow_trigger"))
+                    .count(db)
+                    .await
+                    .unwrap(),
+            ]
+        }
+
+        async fn workflow_rows(db: &DatabaseConnection, org: &str) -> [u64; 5] {
+            [
+                workflows::Entity::find()
+                    .filter(workflows::Column::OrgId.eq(org))
+                    .count(db)
+                    .await
+                    .unwrap(),
+                workflow_drafts::Entity::find()
+                    .filter(workflow_drafts::Column::OrgId.eq(org))
+                    .count(db)
+                    .await
+                    .unwrap(),
+                workflow_errors::Entity::find()
+                    .filter(workflow_errors::Column::OrgId.eq(org))
+                    .count(db)
+                    .await
+                    .unwrap(),
+                workflow_associations::Entity::find()
+                    .filter(workflow_associations::Column::OrgId.eq(org))
+                    .count(db)
+                    .await
+                    .unwrap(),
+                workflow_run_data::Entity::find()
+                    .filter(workflow_run_data::Column::OrgId.eq(org))
+                    .count(db)
+                    .await
+                    .unwrap(),
+            ]
+        }
+
+        #[tokio::test]
+        async fn org_delete_removes_workflow_http_trigger_rows_and_secrets() {
+            let db = db().await;
+            seed_trigger(&db, "gone").await;
+            seed_trigger(&db, "kept").await;
+            assert_eq!(hook_rows(&db, "gone").await, [1, 1, 1, 1]);
+
+            let gone = delete_org_workflow_rows(&db, "gone").await.unwrap();
+            assert_eq!(
+                gone,
+                ["t-gone"],
+                "the deleted triggers are named for eviction"
+            );
+            assert_eq!(hook_rows(&db, "gone").await, [0, 0, 0, 0]);
+            assert_eq!(hook_rows(&db, "kept").await, [1, 1, 1, 1]);
+            assert_eq!(
+                workflow_run_data::Entity::find()
+                    .filter(workflow_run_data::Column::OrgId.eq("gone"))
+                    .count(&db)
+                    .await
+                    .unwrap(),
+                0,
+                "the queued run's payload goes with the org"
+            );
+        }
+
+        #[tokio::test]
+        async fn org_delete_removes_existing_workflow_tables() {
+            let db = db().await;
+            seed_workflow(&db, "gone").await;
+            seed_workflow(&db, "kept").await;
+            assert_eq!(workflow_rows(&db, "gone").await, [1, 1, 1, 1, 1]);
+
+            delete_org_workflow_rows(&db, "gone").await.unwrap();
+            assert_eq!(workflow_rows(&db, "gone").await, [0, 0, 0, 0, 0]);
+            assert_eq!(workflow_rows(&db, "kept").await, [1, 1, 1, 1, 1]);
+        }
+
+        /// SQLite never enforces the folder FKs, so only Postgres shows the delete order matters.
+        #[tokio::test]
+        #[ignore = "Requires test PostgreSQL database setup"]
+        async fn on_postgres_the_workflow_rows_must_go_before_their_folder() {
+            let (db, schema) = pg_db().await;
+            folders::ActiveModel {
+                id: Set("f1".to_string()),
+                org: Set("gone".to_string()),
+                folder_id: Set("f1".to_string()),
+                name: Set("Workflows".to_string()),
+                description: Set(None),
+                icon: Set(None),
+                r#type: Set(4),
+            }
+            .insert(&db)
+            .await
+            .unwrap();
+            seed_workflow(&db, "gone").await;
+            seed_trigger(&db, "gone").await;
+
+            let folders_first = delete_org_folders(&db, "gone").await;
+            assert!(
+                folders_first
+                    .as_ref()
+                    .is_err_and(|e| e.to_string().contains("_folder_fk")),
+                "the folder FK refuses while a workflow row points at it: {folders_first:?}"
+            );
+            delete_org_workflow_rows(&db, "gone").await.unwrap();
+            delete_org_folders(&db, "gone").await.unwrap();
+            assert_eq!(workflow_rows(&db, "gone").await, [0, 0, 0, 0, 0]);
+            assert_eq!(hook_rows(&db, "gone").await, [0, 0, 0, 0]);
+            db.execute_unprepared(&format!("DROP SCHEMA {schema} CASCADE"))
+                .await
+                .unwrap();
+        }
+
+        #[test]
+        fn the_db_resources_step_deletes_the_orgs_workflow_rows() {
+            assert!(
+                position_of("delete_org_workflow_http_triggers(org_id)")
+                    < position_of("folders::delete_by_org(org_id)"),
+                "workflows.folder_id references folders.id (workflows_folder_fk on Postgres)"
+            );
+            let helper = SOURCE
+                .find("async fn delete_org_workflow_http_triggers")
+                .expect("the helper is defined in this file");
+            let body = &SOURCE[helper..];
+            let body = &body[..body.find("\n}\n").unwrap()];
+            assert!(
+                body.find("emit_org_trigger_tombstones(org_id)").unwrap()
+                    < body.find("delete_org_workflow_rows(").unwrap(),
+                "tombstones are emitted while the rows still exist"
+            );
+            assert!(
+                body.contains("#[cfg(feature = \"enterprise\")]\n    emit_org_trigger_tombstones"),
+                "the super-cluster emit exists only in enterprise builds"
+            );
+            assert!(
+                body.find("delete_org_workflow_rows(").unwrap()
+                    < body.find("forget_org_triggers(org_id, &gone)").unwrap(),
+                "caches are evicted after the delete, so no reload finds the rows again"
+            );
+        }
+
+        #[cfg(feature = "enterprise")]
+        #[tokio::test]
+        async fn org_delete_emits_a_deleted_snapshot_per_trigger_before_deleting() {
+            let db = db().await;
+            seed_trigger(&db, "gone").await;
+            seed_trigger(&db, "kept").await;
+            let snapshots = org_trigger_tombstones(&db, "gone", NOW, "r1")
+                .await
+                .unwrap();
+            assert_eq!(snapshots.len(), 1);
+            let snapshot = &snapshots[0];
+            assert_eq!(snapshot.trigger.id, "t-gone");
+            assert!(snapshot.deleted);
+            assert_eq!(snapshot.version, 4, "local version + 1");
+            assert_eq!(snapshot.trigger.updated_at, NOW);
+            assert_eq!(snapshot.trigger.deleted_at, Some(NOW));
+            assert_eq!(snapshot.origin_cluster, "r1");
+            let local = http_triggers::get(&db, "t-gone").await.unwrap().unwrap();
+            assert!(
+                snapshot.supersedes(Some(&local)),
+                "a receiver holding the local row applies it"
+            );
+            assert_eq!(snapshot.credentials.len(), 1);
+            assert_eq!(
+                snapshot.credentials[0].state,
+                http_triggers::CredentialState::Revoked
+            );
+            assert_eq!(snapshot.credentials[0].secret, None);
+            assert_eq!(
+                hook_rows(&db, "gone").await,
+                [1, 1, 1, 1],
+                "nothing deleted yet"
+            );
+        }
     }
 }

@@ -39,7 +39,9 @@ use crate::{
     pipeline::batch_execution::{ExecutablePipeline, WorkflowResult, WorkflowRunOptions},
 };
 
+pub mod http_trigger;
 pub mod runtime;
+
 #[derive(Serialize, Deserialize)]
 pub struct InputMap {
     // even though a bad naming convention, node_map is
@@ -69,7 +71,7 @@ pub struct TestWorkflowOptions {
     pub suppress_destinations: bool,
 }
 
-enum WorkflowExecutionStatus {
+pub(crate) enum WorkflowExecutionStatus {
     Success,
     Errored,
 }
@@ -634,6 +636,8 @@ fn is_permitted(workflow_id: &str, org_id: &str, permitted: Option<&Vec<String>>
 }
 
 pub async fn delete_workflow(org_id: &str, id: &str) -> Result<(), anyhow::Error> {
+    // First, so a failed tombstone leaves the workflow in place for a retry.
+    http_trigger::sweeper::tombstone_workflow_trigger(org_id, id).await?;
     let associations = AssociationDeleteEvent::Workflow {
         org_id: org_id.to_string(),
         workflow_id: id.to_string(),
@@ -646,6 +650,10 @@ pub async fn delete_workflow(org_id: &str, id: &str) -> Result<(), anyhow::Error
 }
 
 pub async fn delete_draft(org_id: &str, id: &str) -> Result<(), anyhow::Error> {
+    // A published workflow with the same id still owns its endpoint.
+    if get_workflow_by_id(org_id, id).await?.is_none() {
+        http_trigger::sweeper::tombstone_workflow_trigger(org_id, id).await?;
+    }
     db::workflows::delete_draft_record(id).await?;
     remove_ownership(org_id, "workflows", Authz::new(id)).await;
     db::workflows::notify_draft_delete(id).await?;
@@ -935,6 +943,7 @@ async fn execute_workflow(
     id: &str,
     run_id: &str,
     inputs: Vec<serde_json::Value>,
+    options: WorkflowRunOptions,
 ) -> Result<WorkflowExecutionStatus, anyhow::Error> {
     let workflow = get_workflow_by_id(org_id, id)
         .await?
@@ -947,7 +956,7 @@ async fn execute_workflow(
     let executable = ExecutablePipeline::new_from_workflow(&workflow).await?;
 
     let res = executable
-        .process_workflow(org_id, inputs, None, Default::default())
+        .process_workflow(org_id, inputs, None, options)
         .await?;
 
     let WorkflowResult {
@@ -966,6 +975,27 @@ async fn execute_workflow(
     } else {
         Ok(WorkflowExecutionStatus::Success)
     }
+}
+
+/// The caller owns `cancel`, so a timed-out run stops dispatching before its slot is freed.
+pub(crate) async fn run_hook_workflow(
+    org_id: &str,
+    workflow_id: &str,
+    run_id: &str,
+    input: Value,
+    cancel: tokio_util::sync::CancellationToken,
+) -> Result<WorkflowExecutionStatus, anyhow::Error> {
+    execute_workflow(
+        org_id,
+        workflow_id,
+        run_id,
+        vec![input],
+        WorkflowRunOptions {
+            cancel: Some(cancel),
+            ..Default::default()
+        },
+    )
+    .await
 }
 
 pub async fn get_workflow_errors(
@@ -1117,6 +1147,45 @@ pub fn workflow_history_key(
     format!("{workflow_id}/{trigger_type}/{source_id}/{run_id}")
 }
 
+pub(crate) fn publish_hook_history(
+    org_id: &str,
+    workflow_id: &str,
+    trigger_id: &str,
+    run_id: &str,
+    start_time: i64,
+    end_time: i64,
+    error: Option<String>,
+) {
+    publish_triggers_usage(hook_history_row(
+        org_id,
+        workflow_id,
+        trigger_id,
+        run_id,
+        start_time,
+        end_time,
+        error,
+    ));
+}
+
+/// Hook runs have no trace id of their own; the run id is what callers poll and search by.
+fn hook_history_row(
+    org_id: &str,
+    workflow_id: &str,
+    trigger_id: &str,
+    run_id: &str,
+    start_time: i64,
+    end_time: i64,
+    error: Option<String>,
+) -> TriggerData {
+    let key = workflow_history_key(
+        workflow_id,
+        WorkflowTriggerType::Webhook,
+        &format!("hook:{trigger_id}"),
+        run_id,
+    );
+    history_row_for(org_id, key, run_id, start_time, end_time, error)
+}
+
 pub async fn handle_workflow_trigger(trigger: WorkflowTrigger) {
     let o2_cfg = get_o2_config();
     if !o2_cfg.common.workflows_enabled {
@@ -1205,6 +1274,7 @@ pub async fn handle_workflow_trigger(trigger: WorkflowTrigger) {
         &trigger.workflow_id,
         &run_id,
         vec![final_data],
+        WorkflowRunOptions::default(),
     )
     .await;
     let end_time = chrono::Utc::now().timestamp_micros();
@@ -1502,6 +1572,25 @@ mod tests {
         assert_eq!(errors.data.len(), 1, "the node error must be persisted");
         assert_eq!(errors.data[0].node_id, "n1");
         assert_eq!(errors.data[0].error, vec!["boom".to_string()]);
+    }
+
+    #[test]
+    fn a_hook_run_history_key_names_webhook_and_the_trigger() {
+        let row = hook_history_row("acme", "wf1", "t1", "run1", 10, 20, None);
+        assert_eq!(row.key, "wf1/Webhook/hook:t1/run1");
+        assert_eq!(row.status, RunOutcome::Succeeded);
+        assert_eq!(row.scheduler_trace_id.as_deref(), Some("run1"));
+        let failed = hook_history_row(
+            "acme",
+            "wf1",
+            "t1",
+            "run1",
+            10,
+            20,
+            Some("run_timeout".into()),
+        );
+        assert_eq!(failed.status, RunOutcome::Error);
+        assert_eq!(failed.error.as_deref(), Some("run_timeout"));
     }
 
     #[test]
