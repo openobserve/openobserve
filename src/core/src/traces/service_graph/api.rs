@@ -150,7 +150,9 @@ pub struct EdgeHistoryQuery {
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "A service or stream name the metrics query cannot quote", content_type = "application/json", body = String),
         (status = 403, description = "Forbidden - Enterprise feature"),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
 )]
 #[cfg(feature = "enterprise")]
