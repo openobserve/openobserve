@@ -55,8 +55,36 @@ pub async fn report_http(
     http_query_params: String,
     req_body: String,
 ) {
+    report_with_protocol(
+        auditor::Protocol::Http,
+        user_id,
+        org_id,
+        trace_id,
+        code,
+        error_message,
+        http_method,
+        http_path,
+        http_query_params,
+        req_body,
+    )
+    .await;
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn report_with_protocol(
+    protocol: auditor::Protocol,
+    user_id: String,
+    org_id: String,
+    trace_id: String,
+    code: u16,
+    error_message: Option<String>,
+    http_method: String,
+    http_path: String,
+    http_query_params: String,
+    req_body: String,
+) {
     use o2_enterprise::enterprise::common::{
-        auditor::{AuditMessage, Protocol, ResponseMeta},
+        auditor::{AuditMessage, ResponseMeta},
         config::get_config,
     };
 
@@ -65,7 +93,7 @@ pub async fn report_http(
             user_email: user_id,
             org_id,
             _timestamp: config::utils::time::now_micros(),
-            protocol: Protocol::Http,
+            protocol,
             response_meta: ResponseMeta {
                 http_method,
                 http_path,
@@ -75,6 +103,7 @@ pub async fn report_http(
                 error_msg: error_message,
                 trace_id: Some(trace_id),
             },
+            delegated: None,
         })
         .await;
     }

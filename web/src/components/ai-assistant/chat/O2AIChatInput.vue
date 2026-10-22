@@ -55,6 +55,7 @@ const forwardChatInput = (instance: Element | ComponentPublicInstance | null) =>
           class="preview-image rounded-default border-border-default h-16 w-16 border object-cover [transition:transform_0.2s_ease] hover:scale-105"
         />
         <OButton
+          :aria-label="t('common.remove')"
           variant="ghost"
           size="icon-xs-circle"
           class="image-remove-btn bg-status-negative! hover:bg-status-negative! absolute! -top-1.5! -right-1.5! z-10 h-5! min-h-5! w-5! min-w-5! p-0!"
@@ -134,6 +135,7 @@ const forwardChatInput = (instance: Element | ComponentPublicInstance | null) =>
       <div class="flex items-center gap-2">
         <!-- Send button - shown when not loading -->
         <OButton
+          :aria-label="t('common.send')"
           v-if="!isLoading"
           :disabled="!modelValue.trim() && pendingImages.length === 0"
           @click="emit('send')"
@@ -146,6 +148,7 @@ const forwardChatInput = (instance: Element | ComponentPublicInstance | null) =>
 
         <!-- Stop button - shown when loading/streaming -->
         <OButton
+          :aria-label="t('common.stopGenerating')"
           v-if="isLoading"
           @click="emit('cancel')"
           variant="ghost"

@@ -353,6 +353,7 @@ const selectedLocations = computed({
           data-test="synthetics-check-locations-search"
         />
         <OButton
+          :aria-label="t('common.refresh')"
           variant="outline"
           size="sm"
           icon-left="refresh"

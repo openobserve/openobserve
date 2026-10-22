@@ -33,7 +33,7 @@ use config::{
         },
         folder::{DEFAULT_FOLDER, Folder, FolderType},
         search::{SearchEventContext, SearchEventType},
-        sql::resolve_stream_names,
+        sql::{TableReferenceExt, resolve_stream_names_with_type},
         stream::StreamType,
     },
     utils::{
@@ -74,7 +74,8 @@ use svix_ksuid::Ksuid;
 use crate::auth::{check_folder_write_permissions, check_permissions};
 use crate::{
     alerts::{
-        QueryConditionExt, build_sql, destinations,
+        QueryConditionExt, build_sql,
+        destinations::{self, note_skipped, org_member_split},
         notifications::{
             NotificationContext, RenderedMessage, apply_custom_template, build_row_columns, chart,
             custom::{VarValue, process_variable_replace},
@@ -1024,8 +1025,8 @@ async fn prepare_alert(
             }
 
             let sql = alert.query_condition.sql.as_ref().unwrap();
-            let stream_names = match resolve_stream_names(sql) {
-                Ok(stream_names) => stream_names,
+            let stream_refs = match resolve_stream_names_with_type(sql) {
+                Ok(stream_refs) => stream_refs,
                 Err(e) => {
                     return Err(AlertError::ResolveStreamNameError(e));
                 }
@@ -1033,10 +1034,12 @@ async fn prepare_alert(
 
             // SQL may contain multiple stream names, check for each stream
             // if the alert period is greater than the max query range
-            for stream in stream_names.iter() {
-                if !stream.eq(stream_name)
+            for stream_ref in stream_refs.iter() {
+                let stream = stream_ref.stream_name();
+                let ref_type = stream_ref.get_stream_type(stream_type);
+                if !(stream == stream_name && ref_type == stream_type)
                     && let Some(settings) =
-                        infra::schema::get_settings(org_id, stream, stream_type).await
+                        infra::schema::get_settings(org_id, &stream, ref_type).await
                 {
                     let max_query_range = settings.max_query_range;
                     if max_query_range > 0
@@ -1045,7 +1048,7 @@ async fn prepare_alert(
                     {
                         return Err(AlertError::PeriodExceedsMaxQueryRange {
                             max_query_range_hours: max_query_range,
-                            stream_name: stream_name.to_owned(),
+                            stream_name: stream,
                         });
                     }
                 }
@@ -3160,9 +3163,12 @@ async fn send_to_destination(
             match dest_type {
                 DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
                 DestinationType::Email(email) => {
+                    let (email, skipped) = org_member_email(&alert.org_id, email).await?;
                     // Same string for both parts: identical to the MIME this
                     // path emitted before the signature took two bodies.
-                    send_email_notification(&email_subject, email, msg.clone(), msg).await
+                    send_email_notification(&email_subject, &email, msg.clone(), msg)
+                        .await
+                        .map(|resp| note_skipped(resp, &skipped))
                 }
                 DestinationType::Sns(aws_sns) => {
                     send_sns_notification(&alert.name, aws_sns, msg).await
@@ -3199,14 +3205,16 @@ async fn send_to_destination(
                     },
                     DestinationType::Email(email),
                 ) => {
+                    let (email, skipped) = org_member_email(&alert.org_id, email).await?;
                     send_email_notification_with_inline_png(
                         &subject,
-                        email,
+                        &email,
                         text,
                         html,
                         ctx.chart_png.clone(),
                     )
                     .await
+                    .map(|resp| note_skipped(resp, &skipped))
                 }
                 (
                     RenderedMessage::Sns {
@@ -3229,6 +3237,7 @@ async fn send_to_destination(
 /// going through the alert template system.
 #[cfg(feature = "enterprise")]
 pub(crate) async fn dispatch_notification(
+    org_id: &str,
     dest_type: &DestinationType,
     subject: &str,
     msg: String,
@@ -3239,7 +3248,10 @@ pub(crate) async fn dispatch_notification(
         // split, so both parts carry the same string — byte-identical to the
         // MIME this path emitted before the signature took two bodies.
         DestinationType::Email(email) => {
-            send_email_notification(subject, email, msg.clone(), msg).await
+            let (email, skipped) = org_member_email(org_id, email).await?;
+            send_email_notification(subject, &email, msg.clone(), msg)
+                .await
+                .map(|resp| note_skipped(resp, &skipped))
         }
         DestinationType::Sns(aws_sns) => send_sns_notification(subject, aws_sns, msg).await,
     }
@@ -3264,6 +3276,7 @@ pub(crate) async fn dispatch_notification(
 /// itself, so the enterprise-only incident-notification call sites are
 /// untouched.
 pub(crate) async fn dispatch_test_message(
+    org_id: &str,
     dest_type: &DestinationType,
     title: &str,
     rendered: RenderedMessage,
@@ -3279,7 +3292,12 @@ pub(crate) async fn dispatch_test_message(
                 text,
             },
             DestinationType::Email(email),
-        ) => send_email_notification(&subject, email, text, html).await,
+        ) => {
+            let (email, skipped) = org_member_email(org_id, email).await?;
+            send_email_notification(&subject, &email, text, html)
+                .await
+                .map(|resp| note_skipped(resp, &skipped))
+        }
         (RenderedMessage::Http { body }, DestinationType::Sns(aws_sns)) => {
             send_sns_notification(title, aws_sns, body).await
         }
@@ -3290,6 +3308,26 @@ pub(crate) async fn dispatch_test_message(
             "Rendered message {rendered:?} does not match destination type {dest_type:?}"
         )),
     }
+}
+
+/// Narrows an email destination to org members and returns the skipped ones. [strong]
+async fn org_member_email(
+    org_id: &str,
+    email: &Email,
+) -> Result<(Email, Vec<String>), anyhow::Error> {
+    let (kept, skipped) = org_member_split(org_id, &email.recipients).await?;
+    Ok((members_to_send(kept, &skipped)?, skipped))
+}
+
+/// Email to the kept members, or an error naming the skipped when none is left. [pure]
+fn members_to_send(kept: Vec<String>, skipped: &[String]) -> Result<Email, anyhow::Error> {
+    if kept.is_empty() && !skipped.is_empty() {
+        return Err(anyhow::anyhow!(
+            "Email not sent: no recipient is part of this org (skipped: {})",
+            skipped.join(", ")
+        ));
+    }
+    Ok(Email { recipients: kept })
 }
 
 async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<String, anyhow::Error> {
@@ -5135,6 +5173,28 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn test_members_to_send() {
+        let to = |list: &[&str]| list.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        type Expected = Result<Vec<String>, String>;
+        let cases: Vec<(Vec<String>, Vec<String>, Expected)> = vec![
+            (to(&["a@x.com"]), vec![], Ok(to(&["a@x.com"]))),
+            (to(&["a@x.com"]), to(&["gone@x.com"]), Ok(to(&["a@x.com"]))),
+            (vec![], vec![], Ok(vec![])),
+            (
+                vec![],
+                to(&["gone@x.com", "left@x.com"]),
+                Err("Email not sent: no recipient is part of this org (skipped: gone@x.com, left@x.com)".to_string()),
+            ),
+        ];
+        for (kept, skipped, expected) in cases {
+            let got = members_to_send(kept, &skipped)
+                .map(|email| email.recipients)
+                .map_err(|e| e.to_string());
+            assert_eq!(got, expected, "skipped {skipped:?}");
+        }
+    }
 
     #[test]
     fn test_with_incident_notify_error() {
@@ -8431,6 +8491,52 @@ mod tests {
     async fn prepare_alert_saves_an_alert_with_nowhere_to_send() {
         let err = prepare_schedule(|a| a.trigger_condition.frequency = 60).await;
         assert!(reached_the_schema_lookup(&err), "{err:?}");
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_checks_a_joined_stream_range_by_its_own_type() {
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = "test_org_alert_save_join_range";
+        let logs_key = format!("{org_id}/{}/app", StreamType::Logs);
+        let traces_key = format!("{org_id}/{}/spans", StreamType::Traces);
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            logs_key.clone(),
+            SchemaCache::new(arrow_schema::Schema::new(vec![arrow_schema::Field::new(
+                "id",
+                DataType::Utf8,
+                true,
+            )])),
+        );
+        let settings = config::meta::stream::StreamSettings {
+            max_query_range: 1,
+            ..Default::default()
+        };
+        infra::schema::put_stream_settings_batch(vec![(
+            traces_key.clone(),
+            std::sync::Arc::new(settings),
+        )])
+        .await;
+
+        let mut alert = Alert::default();
+        alert.trigger_condition.frequency = 60;
+        alert.trigger_condition.period = 120;
+        alert.query_condition.query_type = QueryType::SQL;
+        alert.query_condition.sql = Some(
+            r#"SELECT a.id FROM "app" AS a JOIN "traces"."spans" AS b ON a.id = b.id"#.to_string(),
+        );
+        let res = prepare_alert(org_id, "app", "join", &mut alert, true, false).await;
+
+        STREAM_SCHEMAS_LATEST.write().await.remove(&logs_key);
+        infra::schema::remove_stream_settings(&traces_key).await;
+
+        assert!(
+            matches!(
+                &res,
+                Err(AlertError::PeriodExceedsMaxQueryRange { stream_name, .. }) if stream_name == "spans"
+            ),
+            "{res:?}"
+        );
     }
 
     #[tokio::test]

@@ -400,8 +400,19 @@ export const BADGE_GROUPS = {
       active: { variant: "success-soft" },
       draft: { variant: "default-soft" },
       paused: { variant: "warning-soft" },
-      degraded: { variant: "orange-soft" },
       archived: { variant: "default-soft" },
+    },
+  },
+
+  // No labelKeys: EvalJobList always passes the translated `label`.
+  evalJobHealth: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      healthy: { variant: "success-soft" },
+      degraded: { variant: "orange-soft" },
+      waitingforcredentials: { variant: "error-soft" },
+      norecentruns: { variant: "default-soft" },
     },
   },
 
@@ -1925,6 +1936,20 @@ export const BADGE_GROUPS = {
       beta: { variant: "primary-soft", label: raw("BETA") },
       ha: { variant: "primary-soft", label: raw("HA") },
       comingsoon: { variant: "default-soft", labelKey: "components.badge.featureFlag.comingsoon" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+  slackInstallStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      healthy: { variant: "success-soft", labelKey: "components.badge.slackInstallStatus.healthy" },
+      degraded: {
+        variant: "warning-soft",
+        labelKey: "components.badge.slackInstallStatus.degraded",
+      },
+      pending: { variant: "blue-soft", labelKey: "components.badge.slackInstallStatus.pending" },
+      revoked: { variant: "error-soft", labelKey: "components.badge.slackInstallStatus.revoked" },
     },
     fallback: { variant: "default-soft" },
   },

@@ -221,6 +221,7 @@ pub async fn token_validator(
                             user_role: None,
                             is_internal_user: false,
                             token_name: None,
+                            delegation: None,
                         })
                     }
                     Some(user) => {
@@ -242,6 +243,7 @@ pub async fn token_validator(
                                 user_role: Some(user_role),
                                 is_internal_user: !is_external,
                                 token_name: None,
+                                delegation: None,
                             })
                         } else {
                             Err(AuthError::Forbidden("Forbidden".to_string()))
