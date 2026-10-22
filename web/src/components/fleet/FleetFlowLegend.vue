@@ -16,7 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="rounded-surface border-border-default bg-surface-base flex flex-wrap items-center gap-1 border p-1 shadow-xs"
+    class="rounded-default border-border-default bg-surface-panel flex flex-wrap items-center gap-0.5 border p-0.5"
+    role="group"
+    :aria-label="t('fleet.flowIssues.legend')"
     data-test="fleet-flow-legend"
   >
     <OButton
@@ -24,17 +26,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :key="item.key"
       variant="ghost"
       size="xs"
-      :active="filter === item.key"
+      :class="shown(item.key) && counts[item.key] ? '' : 'text-text-muted'"
+      :aria-pressed="shown(item.key)"
+      :title="t('fleet.flowIssues.legendToggle')"
       :data-test="`fleet-flow-legend-${item.key}`"
-      @click="filter = filter === item.key ? null : item.key"
+      @click="toggle(item.key)"
     >
-      <span class="h-2 w-2 shrink-0 rounded-full" :class="SEVERITY_DOT[item.key]" />
-      {{ item.label }}
       <span
-        class="tabular-nums"
-        :class="filter === item.key ? 'opacity-80' : 'text-text-secondary'"
-        >{{ counts[item.key] ?? 0 }}</span
-      >
+        class="h-2 w-2 shrink-0 rounded-full"
+        :class="[SEVERITY_DOT[item.key], shown(item.key) && counts[item.key] ? '' : 'opacity-40']"
+      />
+      <span :class="shown(item.key) ? '' : 'line-through'">{{ item.label }}</span>
+      <span class="tabular-nums" :class="counts[item.key] ? 'text-text-secondary' : ''">{{
+        counts[item.key] ?? 0
+      }}</span>
     </OButton>
   </div>
 </template>
@@ -46,9 +51,14 @@ import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { SEVERITY_DOT, type PathSeverity } from "./flowIssues";
 
 const props = defineProps<{ counts: Partial<Record<PathSeverity, number>> }>();
-const filter = defineModel<PathSeverity | null>({ required: true });
+// The levels hidden from the map; empty hides nothing, so a fresh map shows everything.
+const hidden = defineModel<PathSeverity[]>({ required: true });
 
 const { t } = useI18nTyped();
+const shown = (key: PathSeverity) => !hidden.value.includes(key);
+const toggle = (key: PathSeverity) => {
+  hidden.value = shown(key) ? [...hidden.value, key] : hidden.value.filter((k) => k !== key);
+};
 
 const items = computed<{ key: PathSeverity; label: I18nText }[]>(() => [
   { key: "healthy", label: t("fleet.flowIssues.legendHealthy") },

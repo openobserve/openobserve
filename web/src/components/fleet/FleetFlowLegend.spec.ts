@@ -21,7 +21,7 @@ import FleetFlowLegend from "./FleetFlowLegend.vue";
 describe("FleetFlowLegend", () => {
   it("labels the info severity as outdated, since v1 has no release rings", () => {
     const w = mount(FleetFlowLegend, {
-      props: { counts: { info: 2 }, modelValue: null },
+      props: { counts: { info: 2 }, modelValue: [] },
       global: { plugins: [i18n] },
     });
     const info = w.find('[data-test="fleet-flow-legend-info"]').text();
@@ -31,7 +31,7 @@ describe("FleetFlowLegend", () => {
 
   it("shows the pipeline count per level, zero for a missing one, restricted only when present", () => {
     const w = mount(FleetFlowLegend, {
-      props: { counts: { error: 1, healthy: 3 }, modelValue: null },
+      props: { counts: { error: 1, healthy: 3 }, modelValue: [] },
       global: { plugins: [i18n] },
     });
     expect(w.find('[data-test="fleet-flow-legend-error"]').text()).toContain("1");
@@ -42,7 +42,7 @@ describe("FleetFlowLegend", () => {
 
   it("leads with Healthy in green, then Rolling out in blue", () => {
     const w = mount(FleetFlowLegend, {
-      props: { counts: { healthy: 1, progress: 1 }, modelValue: null },
+      props: { counts: { healthy: 1, progress: 1 }, modelValue: [] },
       global: { plugins: [i18n] },
     });
     const keys = w
@@ -57,15 +57,25 @@ describe("FleetFlowLegend", () => {
     );
   });
 
-  it("toggles a level filter on click", async () => {
+  it("hides and shows levels one by one; a hidden or empty level reads muted", async () => {
     const w = mount(FleetFlowLegend, {
-      props: { counts: { error: 1 }, modelValue: null },
+      props: { counts: { error: 1, healthy: 2 }, modelValue: [] },
       global: { plugins: [i18n] },
     });
+    expect(w.find('[data-test="fleet-flow-legend-warning"]').classes()).toContain(
+      "text-text-muted",
+    );
+    expect(w.find('[data-test="fleet-flow-legend-error"]').classes()).not.toContain(
+      "text-text-muted",
+    );
     await w.find('[data-test="fleet-flow-legend-error"]').trigger("click");
-    expect(w.emitted("update:modelValue")?.[0]).toEqual(["error"]);
-    await w.setProps({ modelValue: "error" });
+    expect(w.emitted("update:modelValue")?.[0]).toEqual([["error"]]);
+    await w.setProps({ modelValue: ["error"] });
+    expect(w.find('[data-test="fleet-flow-legend-error"]').classes()).toContain("text-text-muted");
+    await w.find('[data-test="fleet-flow-legend-healthy"]').trigger("click");
+    expect(w.emitted("update:modelValue")?.[1]).toEqual([["error", "healthy"]]);
+    await w.setProps({ modelValue: ["error", "healthy"] });
     await w.find('[data-test="fleet-flow-legend-error"]').trigger("click");
-    expect(w.emitted("update:modelValue")?.[1]).toEqual([null]);
+    expect(w.emitted("update:modelValue")?.[2]).toEqual([["healthy"]]);
   });
 });

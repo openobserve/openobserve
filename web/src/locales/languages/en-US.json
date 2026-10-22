@@ -25087,7 +25087,8 @@
       "fanOutNote": "Fan-out copies data to each exporter, so a line's width describes only itself.",
       "noFleets": "No fleets yet. Enroll collectors into a fleet to see its pipelines.",
       "emptyHint": "Select fleets and destinations to see their pipelines.",
-      "loadFailed": "Could not load the pipelines"
+      "loadFailed": "Could not load the pipelines",
+      "hiddenByLegend": "Every pipeline here is hidden by the legend. Switch a status back on to see it."
     },
     "collectorMetrics": {
       "tab": "Metrics",
@@ -25618,14 +25619,15 @@
       "noIssues": "No issues",
       "openConfig": "View config",
       "openFleet": "Open fleet",
-      "issuesOnly": "Issues only",
       "legendError": "Error",
       "legendWarning": "Warning",
       "legendInfo": "Outdated",
       "legendProgress": "Rolling out",
       "legendHealthy": "Healthy",
       "receiverRefused": "{signal}: {value} refused by receivers",
-      "receiverEvidence": "Refused by the {receiver} receiver"
+      "receiverEvidence": "Refused by the {receiver} receiver",
+      "legend": "Pipeline status",
+      "legendToggle": "Show or hide this status on the map"
     },
     "move": {
       "confirm": "Move",

@@ -288,13 +288,19 @@ describe("FleetFlowOverview lists and legend", () => {
     expect(fleetNodes()).toEqual(["f:edge"]);
   });
 
-  it("counts pipelines per level and filters the map by the clicked level", async () => {
+  it("counts pipelines per level and hides the levels switched off in the legend", async () => {
     serve(basePipelines());
     await mountOverview();
     expect(legend().props("counts")).toEqual({ error: 1, healthy: 2 });
-    legend().vm.$emit("update:modelValue", "error");
+    legend().vm.$emit("update:modelValue", ["healthy"]);
     await flushPromises();
     expect(fleetNodes()).toEqual(["f:prod"]);
+    expect(wrapper.find('[data-test="fleet-flow-overview-issues-only"]').exists()).toBe(false);
+    legend().vm.$emit("update:modelValue", ["healthy", "error"]);
+    await flushPromises();
+    expect(wrapper.find('[data-test="fleet-flow-overview-empty"]').text()).toContain(
+      "hidden by the legend",
+    );
   });
 
   it("counts a fleet's halted rollout as an error and its offline collectors as a warning", async () => {
@@ -320,16 +326,6 @@ describe("FleetFlowOverview lists and legend", () => {
     serve(payload);
     await mountOverview();
     expect(legend().props("counts")).toEqual({ error: 1, warning: 1, restricted: 1 });
-  });
-
-  it("keeps only pipelines with issues under issues only", async () => {
-    serve(basePipelines());
-    await mountOverview();
-    await wrapper
-      .findComponent<any>('[data-test="fleet-flow-overview-issues-only"]')
-      .vm.$emit("update:modelValue", true);
-    await flushPromises();
-    expect(fleetNodes()).toEqual(["f:prod"]);
   });
 });
 

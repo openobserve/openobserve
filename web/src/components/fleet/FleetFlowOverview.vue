@@ -36,55 +36,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="expanded ? 'max-lg:h-dvh' : ''"
       data-test="fleet-flow-overview-map"
     >
-      <div v-if="!forbidden" class="flex shrink-0 flex-col gap-2 p-3">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <div class="flex items-center gap-3">
-            <OToggleGroup
-              :model-value="telemetry"
-              mobile-dropdown
-              data-test="fleet-flow-overview-telemetry"
-              @update:model-value="(v) => (telemetry = v as FlowSignal)"
-            >
-              <OToggleGroupItem
-                v-for="opt in telemetryOptions"
-                :key="opt.value"
-                :value="opt.value"
-                size="sm"
-              >
-                {{ opt.label }}
-              </OToggleGroupItem>
-            </OToggleGroup>
-            <OSwitch
-              v-model="issuesOnly"
-              size="sm"
-              :label="t('fleet.flowIssues.issuesOnly')"
-              data-test="fleet-flow-overview-issues-only"
-            />
-          </div>
-          <div class="flex items-center gap-2">
-            <OToggleGroup
-              :model-value="timeWindow"
-              mobile-dropdown
-              data-test="fleet-flow-overview-window"
-              @update:model-value="(v) => (timeWindow = v as FlowWindow)"
-            >
-              <OToggleGroupItem v-for="w in windows" :key="w" :value="w" size="sm">
-                {{ raw(w) }}
-              </OToggleGroupItem>
-            </OToggleGroup>
-            <OButton
-              variant="outline"
-              size="icon-sm"
-              :icon-left="expanded ? 'close-fullscreen' : 'open-in-full'"
-              :aria-label="expandLabel"
-              data-test="fleet-flow-overview-expand"
-              @click="expanded = !expanded"
-            >
-              <OTooltip side="bottom" :content="expandLabel" />
-            </OButton>
-          </div>
+      <div v-if="!forbidden" class="flex shrink-0 flex-wrap items-center justify-between gap-2 p-3">
+        <OToggleGroup
+          :model-value="telemetry"
+          mobile-dropdown
+          data-test="fleet-flow-overview-telemetry"
+          @update:model-value="(v) => (telemetry = v as FlowSignal)"
+        >
+          <OToggleGroupItem
+            v-for="opt in telemetryOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+          >
+            {{ opt.label }}
+          </OToggleGroupItem>
+        </OToggleGroup>
+        <div class="flex items-center gap-2">
+          <OToggleGroup
+            :model-value="timeWindow"
+            mobile-dropdown
+            data-test="fleet-flow-overview-window"
+            @update:model-value="(v) => (timeWindow = v as FlowWindow)"
+          >
+            <OToggleGroupItem v-for="w in windows" :key="w" :value="w" size="sm">
+              {{ raw(w) }}
+            </OToggleGroupItem>
+          </OToggleGroup>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            :icon-left="expanded ? 'close-fullscreen' : 'open-in-full'"
+            :aria-label="expandLabel"
+            data-test="fleet-flow-overview-expand"
+            @click="expanded = !expanded"
+          >
+            <OTooltip side="bottom" :content="expandLabel" />
+          </OButton>
         </div>
-        <FleetFlowLegend v-model="severityFilter" class="self-start" :counts="legendCounts" />
       </div>
 
       <OBanner
@@ -153,6 +142,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <FleetFlowEdge v-bind="edgeProps" />
           </template>
         </VueFlow>
+
+        <FleetFlowLegend
+          v-if="canvasWidth && !forbidden"
+          v-model="hiddenSeverities"
+          class="absolute bottom-3 left-3 z-10"
+          :counts="legendCounts"
+        />
 
         <div
           v-if="canvasWidth && !forbidden"
@@ -238,7 +234,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OEmptyState
             size="block"
             preset="no-data"
-            :description="t('fleet.pipelines.emptyHint')"
+            :description="
+              hiddenByLegend ? t('fleet.pipelines.hiddenByLegend') : t('fleet.pipelines.emptyHint')
+            "
             hide-action
           />
         </div>
@@ -291,7 +289,6 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
@@ -417,8 +414,7 @@ const checkedDestinations = ref<string[]>([]);
 const fleetShown = (id: string) => !checkedFleets.value.length || checkedFleets.value.includes(id);
 const destinationShown = (id: string) =>
   !checkedDestinations.value.length || checkedDestinations.value.includes(id);
-const issuesOnly = ref(false);
-const severityFilter = ref<PathSeverity | null>(null);
+const hiddenSeverities = ref<PathSeverity[]>([]);
 type Selection = { kind: "pipeline" | "fleet" | "node"; id: string };
 const selection = ref<Selection | null>(null);
 const popover = ref({ x: 0, y: 0 });
@@ -495,14 +491,9 @@ const legendCounts = computed(() =>
 );
 
 const visible = computed(() =>
-  scoped.value.filter((p) => {
-    const sev = severityOf.value[p.id];
-    return (
-      (!severityFilter.value || severityFilter.value === sev) &&
-      (!issuesOnly.value || sev !== "healthy")
-    );
-  }),
+  scoped.value.filter((p) => !hiddenSeverities.value.includes(severityOf.value[p.id])),
 );
+const hiddenByLegend = computed(() => scoped.value.length > 0 && visible.value.length === 0);
 
 const fleetRate = (id: string) =>
   sumRates(pipelines.value.filter((p) => p.fleet === id).map((p) => p.out_rate));
