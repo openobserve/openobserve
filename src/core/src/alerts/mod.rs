@@ -32,6 +32,7 @@ use config::{
     utils::{
         base64,
         json::{Map, Value},
+        sql::quote_identifier,
     },
 };
 use search::utils::is_permissable_function_error;
@@ -1565,33 +1566,19 @@ fn build_aggregation_sql(
         build_having_expr(agg, data_type)?
     };
 
+    let col = quote_identifier(&agg.having.column);
     let func_expr = match agg.function {
-        AggFunction::Avg => format!("AVG(\"{}\")", agg.having.column),
-        AggFunction::Max => format!("MAX(\"{}\")", agg.having.column),
-        AggFunction::Min => format!("MIN(\"{}\")", agg.having.column),
-        AggFunction::Sum => format!("SUM(\"{}\")", agg.having.column),
-        AggFunction::Count => format!("COUNT(\"{}\")", agg.having.column),
-        AggFunction::Median => format!("MEDIAN(\"{}\")", agg.having.column),
-        AggFunction::P50 => format!(
-            "approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY \"{}\")",
-            agg.having.column
-        ),
-        AggFunction::P75 => format!(
-            "approx_percentile_cont(0.75) WITHIN GROUP (ORDER BY \"{}\")",
-            agg.having.column
-        ),
-        AggFunction::P90 => format!(
-            "approx_percentile_cont(0.9) WITHIN GROUP (ORDER BY \"{}\")",
-            agg.having.column
-        ),
-        AggFunction::P95 => format!(
-            "approx_percentile_cont(0.95) WITHIN GROUP (ORDER BY \"{}\")",
-            agg.having.column
-        ),
-        AggFunction::P99 => format!(
-            "approx_percentile_cont(0.99) WITHIN GROUP (ORDER BY \"{}\")",
-            agg.having.column
-        ),
+        AggFunction::Avg => format!("AVG({col})"),
+        AggFunction::Max => format!("MAX({col})"),
+        AggFunction::Min => format!("MIN({col})"),
+        AggFunction::Sum => format!("SUM({col})"),
+        AggFunction::Count => format!("COUNT({col})"),
+        AggFunction::Median => format!("MEDIAN({col})"),
+        AggFunction::P50 => format!("approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY {col})"),
+        AggFunction::P75 => format!("approx_percentile_cont(0.75) WITHIN GROUP (ORDER BY {col})"),
+        AggFunction::P90 => format!("approx_percentile_cont(0.9) WITHIN GROUP (ORDER BY {col})"),
+        AggFunction::P95 => format!("approx_percentile_cont(0.95) WITHIN GROUP (ORDER BY {col})"),
+        AggFunction::P99 => format!("approx_percentile_cont(0.99) WITHIN GROUP (ORDER BY {col})"),
     };
 
     let group = agg.group_by.as_deref().unwrap_or(&[]);
@@ -1620,12 +1607,12 @@ fn build_aggregation_sql(
     ))
 }
 
-/// Quoted identifiers; `Err` carries the first entry that is not a column of `schema`.
+/// Quoted, escaped identifiers; `Err` carries the first entry that is not a column of `schema`.
 fn quoted_group_by(schema: &Schema, group_by: &[String]) -> Result<Vec<String>, String> {
     group_by
         .iter()
         .map(|col| match schema.field_with_name(col) {
-            Ok(_) => Ok(format!("\"{col}\"")),
+            Ok(_) => Ok(quote_identifier(col)),
             Err(_) => Err(col.clone()),
         })
         .collect()
@@ -1692,11 +1679,11 @@ fn build_expr(
     field_alias: &str,
     field_type: &DataType,
 ) -> Result<String, anyhow::Error> {
-    let field_alias = if !field_alias.is_empty() {
-        field_alias
-    } else {
+    let field_alias = quote_identifier(if field_alias.is_empty() {
         cond.column.as_str()
-    };
+    } else {
+        field_alias
+    });
     // Null/empty checks take no value. On non-string columns "empty" can only
     // mean null, so the empty checks degrade to the null checks there.
     let is_string_type = matches!(
@@ -1704,20 +1691,20 @@ fn build_expr(
         DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View
     );
     match cond.operator {
-        Operator::IsNull => return Ok(format!("\"{field_alias}\" IS NULL")),
-        Operator::IsNotNull => return Ok(format!("\"{field_alias}\" IS NOT NULL")),
+        Operator::IsNull => return Ok(format!("{field_alias} IS NULL")),
+        Operator::IsNotNull => return Ok(format!("{field_alias} IS NOT NULL")),
         Operator::IsEmpty => {
             return Ok(if is_string_type {
-                format!("(\"{field_alias}\" IS NULL OR \"{field_alias}\" = '')")
+                format!("({field_alias} IS NULL OR {field_alias} = '')")
             } else {
-                format!("\"{field_alias}\" IS NULL")
+                format!("{field_alias} IS NULL")
             });
         }
         Operator::IsNotEmpty => {
             return Ok(if is_string_type {
-                format!("(\"{field_alias}\" IS NOT NULL AND \"{field_alias}\" != '')")
+                format!("({field_alias} IS NOT NULL AND {field_alias} != '')")
             } else {
-                format!("\"{field_alias}\" IS NOT NULL")
+                format!("{field_alias} IS NOT NULL")
             });
         }
         _ => {}
@@ -1733,17 +1720,17 @@ fn build_expr(
             // terminate the SQL string literal early.
             let val = val.replace('\'', "''");
             match cond.operator {
-                Operator::EqualTo => format!("\"{field_alias}\" = '{val}'"),
-                Operator::NotEqualTo => format!("\"{field_alias}\" != '{val}'"),
-                Operator::GreaterThan => format!("\"{field_alias}\" > '{val}'"),
+                Operator::EqualTo => format!("{field_alias} = '{val}'"),
+                Operator::NotEqualTo => format!("{field_alias} != '{val}'"),
+                Operator::GreaterThan => format!("{field_alias} > '{val}'"),
                 Operator::GreaterThanEquals => {
-                    format!("\"{field_alias}\" >= '{val}'")
+                    format!("{field_alias} >= '{val}'")
                 }
-                Operator::LessThan => format!("\"{field_alias}\" < '{val}'"),
-                Operator::LessThanEquals => format!("\"{field_alias}\" <= '{val}'"),
-                Operator::Contains => format!("str_match(\"{field_alias}\", '{val}')"),
+                Operator::LessThan => format!("{field_alias} < '{val}'"),
+                Operator::LessThanEquals => format!("{field_alias} <= '{val}'"),
+                Operator::Contains => format!("str_match({field_alias}, '{val}')"),
                 Operator::NotContains => {
-                    format!("\"{field_alias}\" NOT LIKE '%{val}%'")
+                    format!("{field_alias} NOT LIKE '%{val}%'")
                 }
                 // Null checks returned above; keep the dead arm panic-free.
                 _ => {
@@ -1792,15 +1779,15 @@ fn build_expr(
                     .to_string()
             };
             match cond.operator {
-                Operator::EqualTo => format!("\"{field_alias}\" = {val}"),
-                Operator::NotEqualTo => format!("\"{field_alias}\" != {val}"),
-                Operator::GreaterThan => format!("\"{field_alias}\" > {val}"),
+                Operator::EqualTo => format!("{field_alias} = {val}"),
+                Operator::NotEqualTo => format!("{field_alias} != {val}"),
+                Operator::GreaterThan => format!("{field_alias} > {val}"),
                 Operator::GreaterThanEquals => {
-                    format!("\"{field_alias}\" >= {val}")
+                    format!("{field_alias} >= {val}")
                 }
-                Operator::LessThan => format!("\"{field_alias}\" < {val}"),
+                Operator::LessThan => format!("{field_alias} < {val}"),
                 Operator::LessThanEquals => {
-                    format!("\"{field_alias}\" <= {val}")
+                    format!("{field_alias} <= {val}")
                 }
                 _ => {
                     return Err(anyhow::anyhow!(
@@ -1828,15 +1815,15 @@ fn build_expr(
                     })?
             };
             match cond.operator {
-                Operator::EqualTo => format!("\"{field_alias}\" = {val}"),
-                Operator::NotEqualTo => format!("\"{field_alias}\" != {val}"),
-                Operator::GreaterThan => format!("\"{field_alias}\" > {val}"),
+                Operator::EqualTo => format!("{field_alias} = {val}"),
+                Operator::NotEqualTo => format!("{field_alias} != {val}"),
+                Operator::GreaterThan => format!("{field_alias} > {val}"),
                 Operator::GreaterThanEquals => {
-                    format!("\"{field_alias}\" >= {val}")
+                    format!("{field_alias} >= {val}")
                 }
-                Operator::LessThan => format!("\"{field_alias}\" < {val}"),
+                Operator::LessThan => format!("{field_alias} < {val}"),
                 Operator::LessThanEquals => {
-                    format!("\"{field_alias}\" <= {val}")
+                    format!("{field_alias} <= {val}")
                 }
                 _ => {
                     return Err(anyhow::anyhow!(
@@ -1864,8 +1851,8 @@ fn build_expr(
                     })?
             };
             match cond.operator {
-                Operator::EqualTo => format!("\"{field_alias}\" = {val}"),
-                Operator::NotEqualTo => format!("\"{field_alias}\" != {val}"),
+                Operator::EqualTo => format!("{field_alias} = {val}"),
+                Operator::NotEqualTo => format!("{field_alias} != {val}"),
                 _ => {
                     return Err(anyhow::anyhow!(
                         "Column {} has data_type [{field_type}] and it does not supported operator [{:?}]",
@@ -3023,6 +3010,35 @@ mod tests {
     }
 
     #[test]
+    fn test_build_aggregation_sql_escapes_quotes_inside_schema_backed_identifiers() {
+        let tricky = "host\" FROM \"other\" --";
+        let schema = Schema::new(vec![
+            Field::new(tricky, DataType::Utf8, false),
+            Field::new("lat\"ency", DataType::Int64, false),
+        ]);
+        let mut agg = group_agg(&[tricky], false);
+        agg.having.column = "lat\"ency".to_string();
+        let sql = build_aggregation_sql("svc", &schema, &agg, "").unwrap();
+        assert_eq!(
+            sql,
+            "SELECT \"host\"\" FROM \"\"other\"\" --\", AVG(\"lat\"\"ency\") AS alert_agg_value, MIN(_timestamp) as zo_sql_min_time, MAX(_timestamp) AS zo_sql_max_time FROM \"svc\" GROUP BY \"host\"\" FROM \"\"other\"\" --\" HAVING \"alert_agg_value\" > 100"
+        );
+    }
+
+    #[test]
+    fn test_build_expr_escapes_quotes_inside_column_name() {
+        let cond = make_cond(
+            "lev\"el",
+            Operator::EqualTo,
+            Value::String("error".to_string()),
+        );
+        let expr = build_expr(&cond, "", &DataType::Utf8).unwrap();
+        assert_eq!(expr, "\"lev\"\"el\" = 'error'");
+        let expr = build_expr(&cond, "al\"ias", &DataType::Utf8).unwrap();
+        assert_eq!(expr, "\"al\"\"ias\" = 'error'");
+    }
+
+    #[test]
     fn test_build_aggregation_sql_empty_group_by_collapses_to_single_row() {
         let mut agg = group_agg(&[], false);
         let sql = build_aggregation_sql("svc", &agg_schema(), &agg, "").unwrap();
@@ -3044,6 +3060,11 @@ mod tests {
         assert_eq!(
             quoted_group_by(&schema, &["host".into(), "a".into(), "b".into()]),
             Err("a".to_string())
+        );
+        let quoted = Schema::new(vec![Field::new("a\"b", DataType::Utf8, false)]);
+        assert_eq!(
+            quoted_group_by(&quoted, &["a\"b".into()]),
+            Ok(vec!["\"a\"\"b\"".to_string()])
         );
     }
 
