@@ -373,6 +373,7 @@ function onCombine(built: { value: string; from: CompositePart[] }) {
 
         <template #cell-actions="{ row }">
           <OButton
+            :aria-label="t('common.delete')"
             variant="ghost"
             size="xs"
             data-test="synthetics-journey-step-locator-delete-btn"

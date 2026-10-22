@@ -147,6 +147,7 @@
                       <div class="flex items-center gap-2">
                         <span>{{ getMaskedLicenseKey() }}</span>
                         <OButton
+                          :aria-label="t('common.reveal')"
                           variant="ghost"
                           size="icon"
                           class="ms-2"

@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <OButton
+        :aria-label="t('common.close')"
         variant="ghost"
         size="icon"
         @click="closeSidebar"
@@ -665,7 +666,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   >
                     <span class="me-1 inline-flex shrink-0">
-                      <OButton variant="ghost" size="icon-xs-circle">
+                      <OButton
+                        :aria-label="
+                          action.operator === '='
+                            ? t('traces.applyAndSearchEquals')
+                            : t('traces.applyAndSearchNotEquals')
+                        "
+                        variant="ghost"
+                        size="icon-xs-circle"
+                      >
                         <OIcon color="currentColor" class="h-[0.7rem]! w-[0.7rem]! pb-[0.185rem]!">
                           <component :is="action.iconComponent" />
                         </OIcon>
@@ -716,7 +725,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                       >
                         <span class="me-1 inline-flex shrink-0">
-                          <OButton variant="ghost" size="icon-xs-circle">
+                          <OButton
+                            :aria-label="
+                              action.operator === '='
+                                ? t('traces.applyAndSearchEquals')
+                                : t('traces.applyAndSearchNotEquals')
+                            "
+                            variant="ghost"
+                            size="icon-xs-circle"
+                          >
                             <OIcon
                               color="currentColor"
                               class="h-[0.7rem]! w-[0.7rem]! pb-[0.185rem]!"

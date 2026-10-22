@@ -581,6 +581,15 @@
     }
   },
   "common": {
+    "dismiss": "Odrzuć",
+    "exitFullscreen": "Wyjdź z pełnego ekranu",
+    "moreActions": "Więcej akcji",
+    "moreOptions": "Więcej opcji",
+    "addFilter": "Dodaj filtr",
+    "view": "Zobacz",
+    "compare": "Porównaj",
+    "openInNewTab": "Otwórz w nowej karcie",
+    "send": "Wyślij",
     "copiedToClipboard": "Skopiowano do schowka",
     "customLogoAlt": "Logo organizacji",
     "dragToReorder": "Przeciągnij, aby zmienić kolejność",
@@ -13055,6 +13064,8 @@
     "traceFilters": "Filtry trace",
     "showTraces": "Pokaż trace",
     "applyAndSearch": "Zastosuj i wyszukaj",
+    "applyAndSearchEquals": "Zastosuj i wyszukaj (równa się)",
+    "applyAndSearchNotEquals": "Zastosuj i wyszukaj (nie równa się)",
     "timestamp": "Znacznik czasu",
     "noErrorPresent": "Brak błędu dla tego spanu",
     "noEventsPresent": "Brak zdarzeń dla tego spanu",
@@ -15120,6 +15131,7 @@
         "noDataAvailable": "Brak dostępnych danych",
         "copyInput": "Kopiuj wejście",
         "copyOutput": "Kopiuj wyjście",
+        "copyExpected": "Kopiuj oczekiwany wynik",
         "copied": "Skopiowano {type} do schowka",
         "copyFailed": "Nie udało się skopiować do schowka",
         "execution": "Wykonanie",
@@ -17681,6 +17693,7 @@
       "warning": "Ostrzeżenie"
     },
     "journey": {
+      "clearResults": "Wyczyść wyniki",
       "extract": {
         "action": "Wyodrębnij do subtestu",
         "title": "Wyodrębnij {count} krok do nowego testu | Wyodrębnij kroki ({count}) do nowego testu",

@@ -252,6 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ODropdown align="end">
                   <template #trigger>
                     <OButton
+                      :aria-label="t('common.moreActions')"
                       variant="ghost"
                       size="icon-sm"
                       icon-left="more-vert"
