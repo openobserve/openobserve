@@ -49,6 +49,7 @@ import type {
   TeamOverview,
   Unavailability,
 } from "@/ts/interfaces/oncall";
+import { holderStretches } from "@/utils/oncall";
 
 /// Derived from the service so a new filter cannot silently fall out of the key.
 type ResponseFilters = Omit<Parameters<typeof oncallService.listResponses>[0], "org_identifier">;
@@ -190,14 +191,40 @@ export const resolvedScheduleQuery = (
 ) =>
   queryOptions({
     queryKey: oncallKeys.resolvedSchedule(org, teamId, from, to, rotationId),
+    // Readers ask where the holder changes; the server also cuts where the roster under a cover does.
+    queryFn: async (): Promise<ResolvedSegment[]> =>
+      holderStretches(
+        (
+          await oncallService.resolvedSchedule({
+            org_identifier: org,
+            team_id: teamId,
+            from,
+            to,
+            rotation_id: rotationId,
+          })
+        ).data ?? [],
+      ),
+    staleTime: MEDIUM_STALE_TIME,
+  });
+
+/** The drawer's preview of an unsaved rotation, resolved by the server exactly as the calendar will be. */
+export const resolvedSchedulePreviewQuery = (
+  org: string,
+  teamId: string,
+  rotation: Rotation,
+  from: number,
+  to: number,
+) =>
+  queryOptions({
+    queryKey: oncallKeys.resolvedSchedulePreview(org, teamId, from, to, rotation),
     queryFn: async (): Promise<ResolvedSegment[]> =>
       (
-        await oncallService.resolvedSchedule({
+        await oncallService.previewResolvedSchedule({
           org_identifier: org,
           team_id: teamId,
+          rotation,
           from,
           to,
-          rotation_id: rotationId,
         })
       ).data ?? [],
     staleTime: MEDIUM_STALE_TIME,
