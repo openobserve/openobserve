@@ -52,7 +52,7 @@ pub struct RenderedContent {
     pub links: Vec<(String, String)>,
     /// ≤ `rows.max`, column-ordered per `RowsSpec`.
     pub rows: Vec<Vec<(String, String)>>,
-    /// Present when `RowsSpec.format` is set.
+    /// Present when `RowsSpec.enabled` is true and `RowsSpec.format` is set.
     pub row_lines: Option<Vec<String>>,
     pub severity: Option<AlertLevel>,
     /// Tokens with no context value.

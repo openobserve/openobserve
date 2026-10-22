@@ -118,17 +118,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           />
           <OButtonGroup v-show="store.state.printMode !== true">
-            <OButton
-              v-if="config.isEnterprise == 'true' && arePanelsLoading"
-              variant="outline-destructive"
-              size="icon-toolbar"
-              @click="cancelQuery"
-              data-test="dashboard-cancel-btn"
-              icon-left="cancel"
-            >
-              <OTooltip :content="t('panel.cancel')" />
-            </OButton>
             <!-- Wrapper mode: a child-mode tooltip would hover-bind only the icon, not the labelled button. -->
+            <OTooltip
+              v-if="config.isEnterprise == 'true' && arePanelsLoading"
+              :content="t('panel.cancel')"
+              :disabled="!isMobile"
+            >
+              <OButton
+                variant="cancel-query"
+                :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
+                @click="cancelQuery"
+                :aria-label="t('panel.cancel')"
+                data-test="dashboard-cancel-btn"
+                :icon-left="isMobile ? 'cancel' : undefined"
+              >
+                <!-- Both labels share one grid cell: Cancel keeps the Refresh width and still fits a longer translation. -->
+                <span v-if="!isMobile" class="grid items-center justify-items-center">
+                  <span
+                    class="invisible col-start-1 row-start-1 flex items-center gap-1.5"
+                    aria-hidden="true"
+                  >
+                    <OIcon name="refresh" size="sm" />{{ t("dashboard.viewDashboard.refresh") }}
+                  </span>
+                  <span class="col-start-1 row-start-1">{{ t("panel.cancel") }}</span>
+                </span>
+              </OButton>
+            </OTooltip>
             <OTooltip v-else :content="refreshTooltip" shortcut-id="dashboardRefresh">
               <OButton
                 :variant="refreshVariant"
@@ -1665,7 +1680,7 @@ export default defineComponent({
     });
 
     const refreshOptionsVariant = computed(() => {
-      if (config.isEnterprise == "true" && arePanelsLoading.value) return "outline-destructive";
+      if (config.isEnterprise == "true" && arePanelsLoading.value) return "cancel-query";
       return refreshVariant.value;
     });
 

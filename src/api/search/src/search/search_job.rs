@@ -181,19 +181,17 @@ pub async fn submit_job(
             }
         };
 
-        // Check permissions on stream
-        for stream_name in stream_names.iter() {
-            if let Some(res) = check_stream_permissions(
-                stream_name,
-                &org_id,
-                &user_id,
-                &stream_type,
-                StreamPermissionResourceType::Search,
-            )
-            .await
-            {
-                return res;
-            }
+        if let Some(res) = crate::search::check_sql_stream_permissions(
+            &req.query.sql,
+            &org_id,
+            &user_id,
+            stream_type,
+            StreamPermissionResourceType::Search,
+            &trace_id,
+        )
+        .await
+        {
+            return res;
         }
 
         if let Some(res) = check_cipher_key_permissions(&org_id, &user_id, &req.query.sql).await {
@@ -731,6 +729,17 @@ fn apply_pagination(response: SearchResponse, from: i64, size: i64) -> Response 
 #[cfg(feature = "enterprise")]
 async fn check_permissions(job: &JobModel, org_id: &str, user_id: &str) -> Option<Response> {
     let stream_type = StreamType::from(job.stream_type.as_str());
+    if let Ok(req) = json::from_str::<Request>(&job.payload) {
+        return crate::search::check_sql_stream_permissions(
+            &req.query.sql,
+            org_id,
+            user_id,
+            stream_type,
+            StreamPermissionResourceType::Search,
+            &job.trace_id,
+        )
+        .await;
+    }
     let stream_names: Vec<String> = json::from_str(&job.stream_names).unwrap();
     for stream_name in stream_names.iter() {
         if let Some(res) = check_stream_permissions(

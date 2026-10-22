@@ -82,6 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="alert-v3-input max-w-40"
               />
               <OButton
+                :aria-label="t('common.remove')"
                 variant="ghost"
                 size="icon-sm"
                 data-test="anomaly-filter-row-remove"

@@ -502,6 +502,10 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     delete_org_downtimes(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/downtimes: {e}"))?;
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::slack::store::delete_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/slack: {e}"))?;
     // timed_annotation_panels cascade from timed_annotations; both are deleted here
     // via the three-hop join: folders.org → dashboards.folder_id → timed_annotations.dashboard_id
     // Must run BEFORE dashboards::delete_by_org or the join finds no rows.
@@ -767,6 +771,7 @@ async fn emit_status_audit(org_id: &str, actor: &str, from: &str, to: &str) {
                 error_msg: None,
                 trace_id: None,
             },
+            delegated: None,
         })
         .await;
     }
@@ -1260,6 +1265,16 @@ mod tests {
         assert!(
             position_of("delete_org_downtimes(org_id)")
                 < position_of("folders::delete_by_org(org_id)")
+        );
+    }
+
+    #[test]
+    fn test_db_resources_deletes_the_orgs_slack_rows() {
+        let step = db_resources_step();
+        let call = position_of("enterprise::slack::store::delete_org(org_id)");
+        assert!(
+            step[..call].ends_with("#[cfg(feature = \"enterprise\")]\n    o2_enterprise::"),
+            "the Slack store exists only in enterprise builds"
         );
     }
 

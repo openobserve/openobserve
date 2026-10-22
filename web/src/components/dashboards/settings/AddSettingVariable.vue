@@ -434,6 +434,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div v-if="variableData.multiSelect" class="flex w-1/2">
                 <OButton
+                  :aria-label="t('common.add')"
                   variant="outline"
                   size="sm"
                   class="mt-3"

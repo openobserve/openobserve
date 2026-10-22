@@ -17,6 +17,7 @@
       </div>
       <div class="col-auto">
         <OButton
+          :aria-label="t('common.close')"
           data-test="associated-regex-patterns-close-btn"
           @click="$emit('closeDialog')"
           variant="ghost"
