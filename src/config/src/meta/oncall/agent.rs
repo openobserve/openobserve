@@ -18,7 +18,7 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use super::policy::Channel;
+use super::{confidence::ConfidenceGrade, policy::Channel};
 use crate::meta::alerts::priority::AlertPriority;
 
 /// Shortest triage hold a team may configure. The agent's pre-flight takes
@@ -89,13 +89,11 @@ pub struct SuspectChange {
     pub occurred_at: i64,
 }
 
-/// One re-runnable claim: the query, panel or commit behind a finding. A
-/// receipt, not an assertion — a responder who distrusts the agent still lands
-/// on the right panels.
+/// A verdict-cited evidence entry by number; no URL is stored, the UI builds the link.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct EvidenceLink {
+pub struct EvidenceRef {
+    pub number: u32,
     pub label: String,
-    pub url: String,
 }
 
 /// What the agent recommends the engine do about paging. A recommendation,
@@ -214,8 +212,9 @@ pub struct AnalysisVerdict {
     /// Identity-dimension paths, the same vocabulary routing uses.
     #[serde(default)]
     pub impacted_services: Vec<String>,
+    /// Up to five decisive entries; rows predating this field read it empty.
     #[serde(default)]
-    pub evidence_links: Vec<EvidenceLink>,
+    pub evidence: Vec<EvidenceRef>,
     pub page_recommendation: PageRecommendation,
     /// Candidates only; execution is out of scope.
     #[serde(default)]
@@ -256,6 +255,9 @@ pub struct AnalysisState {
     pub status: AnalysisStatus,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub verdict: Option<AnalysisVerdict>,
+    /// Code-graded confidence behind `verdict.confidence`; absent on older rows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grade: Option<ConfidenceGrade>,
     /// When the run was asked for. The hold is measured from this, not from the
     /// clock at a re-queue, so a node dying mid-TRIAGE resumes the same
     /// deadline.
@@ -321,9 +323,9 @@ pub struct L0Policy {
     /// How far one verdict may raise a severity, so a P4 cannot become a P1 in
     /// a single hop.
     pub max_promotion_steps: u8,
+    /// A `Downgrade` needs `medium` or `high` confidence to ride quieter channels.
     pub allow_downgrade: bool,
-    /// **Opt-in.** Until a team enables it, a Suppress verdict is recorded as a
-    /// recommendation and the page still goes out.
+    /// Opt-in; when enabled only a `high`-confidence Suppress silences the page.
     pub allow_suppress: bool,
 }
 
@@ -619,12 +621,10 @@ pub enum VerdictOutcome {
     Page {
         severity: AlertPriority,
         promoted_from: Option<AlertPriority>,
-        /// A `Downgrade` the team allows: this firing rides a quieter channel
-        /// set. The recorded severity is `severity`, unchanged.
+        /// Quieter channel set for this firing; the recorded severity is unchanged.
         quieter_channels: bool,
     },
-    /// No page at all. The record is still written, the verdict still lands on
-    /// the timeline, and the firing still appears in the team's digest.
+    /// No page; the record, timeline verdict and digest entry are still written.
     Suppress,
     /// The page has already gone out. The verdict rides as one ledger-deduped
     /// follow-up on non-interrupting channels. Also the P4/P5 outcome, where
@@ -663,6 +663,19 @@ fn hold_deadline(l0: &L0Policy, analysis: &AnalysisState, now: i64) -> i64 {
     analysis.requested_at.unwrap_or(now) + l0.triage_budget_micros()
 }
 
+/// An allowed recommendation refused because the confidence band was too weak.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ConfidenceRefusal {
+    pub action: PageAction,
+    pub confidence: Confidence,
+}
+
+impl std::fmt::Display for ConfidenceRefusal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} refused: confidence {}", self.action, self.confidence)
+    }
+}
+
 /// The verdict-application decision — pure over `(policy.l0, analysis,
 /// severity, now)`. `severity` is the firing's recorded severity, not the
 /// suggestion.
@@ -672,6 +685,26 @@ pub fn apply_verdict(
     severity: AlertPriority,
     now: i64,
 ) -> VerdictOutcome {
+    decide_verdict(l0, analysis, severity, now).0
+}
+
+/// Why [`apply_verdict`] refused on confidence; `None` when the gate never weighed it.
+pub fn confidence_refusal(
+    l0: &L0Policy,
+    analysis: &AnalysisState,
+    severity: AlertPriority,
+    now: i64,
+) -> Option<ConfidenceRefusal> {
+    decide_verdict(l0, analysis, severity, now).1
+}
+
+/// Shared by both public fns so the timeline never explains a refusal the engine did not make.
+fn decide_verdict(
+    l0: &L0Policy,
+    analysis: &AnalysisState,
+    severity: AlertPriority,
+    now: i64,
+) -> (VerdictOutcome, Option<ConfidenceRefusal>) {
     let verdict = analysis.verdict.as_ref();
     let decision = ratchet(
         severity,
@@ -684,7 +717,7 @@ pub fn apply_verdict(
         _ => None,
     };
 
-    match l0.mode_for(severity) {
+    let outcome = match l0.mode_for(severity) {
         // No agent ran, so no verdict — and therefore no promotion — can ever reach this arm in
         // practice; kept exhaustive and inert rather than reachable by construction.
         L0Mode::Off => VerdictOutcome::FollowUp { severity },
@@ -711,40 +744,66 @@ pub fn apply_verdict(
             let Some(verdict) = verdict else {
                 // No verdict is on its way, so `Failed` and `Skipped` do not wait out a budget.
                 if analysis.status.may_still_answer() && now < deadline {
-                    return VerdictOutcome::Hold { until: deadline };
+                    return (VerdictOutcome::Hold { until: deadline }, None);
                 }
-                return VerdictOutcome::FailOpen { severity };
+                return (VerdictOutcome::FailOpen { severity }, None);
             };
             // A promotion IS a page, so it re-enters the ladder whenever it lands, hold included.
             if let Some((from, to)) = promotion {
-                return VerdictOutcome::Page {
-                    severity: to,
-                    promoted_from: Some(from),
-                    quieter_channels: false,
-                };
+                return (
+                    VerdictOutcome::Page {
+                        severity: to,
+                        promoted_from: Some(from),
+                        quieter_channels: false,
+                    },
+                    None,
+                );
             }
             // A verdict landing on the deadline races a page already decided, and the page wins.
             let arrived = analysis.completed_at.unwrap_or(now);
             if arrived >= deadline {
-                return VerdictOutcome::FollowUp { severity };
+                return (VerdictOutcome::FollowUp { severity }, None);
             }
-            match verdict.page_recommendation.action {
-                PageAction::Suppress if l0.allow_suppress => VerdictOutcome::Suppress,
-                PageAction::Downgrade => VerdictOutcome::Page {
-                    severity,
-                    promoted_from: None,
-                    // A choice about one notification; the recorded severity is untouched.
-                    quieter_channels: l0.allow_downgrade,
-                },
-                // A Suppress the team has not opted into is advice: the page still goes out.
-                PageAction::Page | PageAction::Suppress => VerdictOutcome::Page {
-                    severity,
-                    promoted_from: None,
-                    quieter_channels: false,
-                },
-            }
+            let action = verdict.page_recommendation.action;
+            let confidence = verdict.confidence;
+            // Never `>=`: the enum declares `High` first, so a derived order would rank `Low` above
+            // it.
+            let refused = match action {
+                PageAction::Suppress => l0.allow_suppress && confidence != Confidence::High,
+                // Refused only where the team allows downgrades: otherwise policy sent the page.
+                PageAction::Downgrade => l0.allow_downgrade && confidence == Confidence::Low,
+                PageAction::Page => false,
+            };
+            let outcome = match action {
+                PageAction::Suppress if l0.allow_suppress && confidence == Confidence::High => {
+                    VerdictOutcome::Suppress
+                }
+                PageAction::Downgrade
+                    if matches!(confidence, Confidence::High | Confidence::Medium) =>
+                {
+                    VerdictOutcome::Page {
+                        severity,
+                        promoted_from: None,
+                        // A choice about one notification; the recorded severity is untouched.
+                        quieter_channels: l0.allow_downgrade,
+                    }
+                }
+                // Unpermitted or under-confident actions are advice only.
+                PageAction::Page | PageAction::Downgrade | PageAction::Suppress => {
+                    VerdictOutcome::Page {
+                        severity,
+                        promoted_from: None,
+                        quieter_channels: false,
+                    }
+                }
+            };
+            return (
+                outcome,
+                refused.then_some(ConfidenceRefusal { action, confidence }),
+            );
         }
-    }
+    };
+    (outcome, None)
 }
 
 /// Whether a severity pages a human at all under §1's table. L0's own table,
@@ -869,61 +928,6 @@ pub fn metrics_for(
     moved
 }
 
-// §2.2 — the parser contract
-
-/// A report and whatever verdict it carried. `report` is the input unchanged in
-/// every case: a malformed verdict can never lose a report or a page.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParsedReport<'a> {
-    pub report: &'a str,
-    pub verdict: Option<AnalysisVerdict>,
-}
-
-/// Split an agent report into the markdown that is stored and the verdict the
-/// ladder consumes. The verdict is a fenced ` ```json verdict ` block at the
-/// end. Parse failure or an absent block is no verdict — never an error, never
-/// a reason to drop the report.
-pub fn parse_report(rca_content: &str) -> ParsedReport<'_> {
-    ParsedReport {
-        // The input, unchanged, in every case: a malformed verdict can never lose a report.
-        report: rca_content,
-        verdict: last_verdict_block(rca_content).and_then(|b| {
-            serde_json::from_str(&b)
-                .inspect_err(|e| log::warn!("[ONCALL] L0 verdict block did not parse: {e}"))
-                .ok()
-        }),
-    }
-}
-
-/// The body of the last ` ```json verdict ` fence. The last one, because an
-/// agent that re-ran and emitted a second block must not leave the reader
-/// guessing which one the ladder used.
-fn last_verdict_block(rca_content: &str) -> Option<String> {
-    let mut found: Option<String> = None;
-    let mut open: Option<Vec<&str>> = None;
-    for line in rca_content.lines() {
-        match &mut open {
-            None => {
-                // A report may fence ordinary JSON that is not a recommendation.
-                if let Some(info) = line.trim().strip_prefix("```")
-                    && info.split_whitespace().collect::<Vec<_>>() == ["json", "verdict"]
-                {
-                    open = Some(Vec::new());
-                }
-            }
-            Some(body) => {
-                if line.trim_start().starts_with("```") {
-                    found = Some(body.join("\n"));
-                    open = None;
-                } else {
-                    body.push(line);
-                }
-            }
-        }
-    }
-    found
-}
-
 // §5 — what the notifications carry
 
 /// The channels a follow-up verdict update may use. An allowlist: a denylist of
@@ -988,9 +992,14 @@ pub fn verdict_lines(analysis: &AnalysisState, decision: &SeverityDecision) -> V
         return Vec::new();
     };
 
+    let band = analysis
+        .grade
+        .as_ref()
+        .map(ConfidenceGrade::reason_line)
+        .unwrap_or_else(|| verdict.confidence.to_string());
     let mut lines = vec![format!(
-        "probable cause: {} ({})",
-        verdict.probable_cause, verdict.confidence
+        "probable cause: {} ({band})",
+        verdict.probable_cause
     )];
     if let Some(change) = &verdict.suspect_change {
         let who = change
@@ -1009,8 +1018,8 @@ pub fn verdict_lines(analysis: &AnalysisState, decision: &SeverityDecision) -> V
             verdict.impacted_services.join(", ")
         ));
     }
-    for link in &verdict.evidence_links {
-        lines.push(format!("· {} — {}", link.label, link.url));
+    for evidence in &verdict.evidence {
+        lines.push(format!("· [{}] {}", evidence.number, evidence.label));
     }
     lines.push(format!(
         "recommendation: {} — {}",
@@ -1154,9 +1163,9 @@ mod tests {
                 occurred_at: FIRED_AT - 6 * 3_600 * SECOND,
             }),
             impacted_services: vec!["production/openobserve".into()],
-            evidence_links: vec![EvidenceLink {
-                label: "fd ratio per pod".into(),
-                url: "https://o2.example/short/x7h3k2".into(),
+            evidence: vec![EvidenceRef {
+                number: 1,
+                label: "[1] Log query · production/openobserve · fd ratio per pod".into(),
             }],
             page_recommendation: PageRecommendation {
                 action,
@@ -1176,6 +1185,7 @@ mod tests {
         AnalysisState {
             status: AnalysisStatus::Pending,
             verdict: None,
+            grade: None,
             requested_at: Some(requested_at),
             completed_at: None,
         }
@@ -1185,6 +1195,7 @@ mod tests {
         AnalysisState {
             status: AnalysisStatus::Complete,
             verdict: Some(v),
+            grade: None,
             requested_at: Some(requested_at),
             completed_at: Some(at),
         }
@@ -1194,6 +1205,7 @@ mod tests {
         AnalysisState {
             status,
             verdict: None,
+            grade: None,
             requested_at: Some(requested_at),
             completed_at: None,
         }
@@ -2130,6 +2142,7 @@ mod tests {
         let unrequested = AnalysisState {
             status: AnalysisStatus::Pending,
             verdict: None,
+            grade: None,
             requested_at: None,
             completed_at: None,
         };
@@ -2294,6 +2307,124 @@ mod tests {
                 apply_verdict(&p, &state, P3, at),
                 want,
                 "downgrade={downgrade} suppress={suppress} action={action}"
+            );
+        }
+    }
+
+    /// Suppress needs `high`, downgrade needs `medium`+; below that the page goes out normally.
+    #[test]
+    fn test_suppress_and_downgrade_are_gated_on_the_confidence_band() {
+        let at = FIRED_AT + 4 * SECOND;
+        let page = |quieter: bool| VerdictOutcome::Page {
+            severity: P3,
+            promoted_from: None,
+            quieter_channels: quieter,
+        };
+        // (allow_suppress, action, confidence, expected outcome, expected refusal text)
+        let cases: [(bool, PageAction, Confidence, VerdictOutcome, Option<&str>); 8] = [
+            (
+                true,
+                PageAction::Suppress,
+                Confidence::High,
+                VerdictOutcome::Suppress,
+                None,
+            ),
+            (
+                true,
+                PageAction::Suppress,
+                Confidence::Medium,
+                page(false),
+                Some("suppress refused: confidence medium"),
+            ),
+            (
+                true,
+                PageAction::Suppress,
+                Confidence::Low,
+                page(false),
+                Some("suppress refused: confidence low"),
+            ),
+            (
+                false,
+                PageAction::Suppress,
+                Confidence::High,
+                page(false),
+                None,
+            ),
+            (
+                false,
+                PageAction::Suppress,
+                Confidence::Low,
+                page(false),
+                None,
+            ),
+            (
+                true,
+                PageAction::Downgrade,
+                Confidence::High,
+                page(true),
+                None,
+            ),
+            (
+                true,
+                PageAction::Downgrade,
+                Confidence::Medium,
+                page(true),
+                None,
+            ),
+            (
+                true,
+                PageAction::Downgrade,
+                Confidence::Low,
+                page(false),
+                Some("downgrade refused: confidence low"),
+            ),
+        ];
+        for (suppress, action, confidence, want, refusal) in cases {
+            let p = raw(
+                L0Mode::Parallel,
+                L0Mode::Gate,
+                L0Mode::Gate,
+                L0Mode::Only,
+                90,
+                true,
+                2,
+                true,
+                suppress,
+            );
+            let mut v = verdict(action, None);
+            v.confidence = confidence;
+            let state = complete(FIRED_AT, at, v);
+            let label = format!("suppress={suppress} action={action} confidence={confidence}");
+            assert_eq!(apply_verdict(&p, &state, P3, at), want, "{label}");
+            assert_eq!(
+                confidence_refusal(&p, &state, P3, at).map(|r| r.to_string()),
+                refusal.map(str::to_string),
+                "{label}"
+            );
+        }
+    }
+
+    /// No refusal without a verdict, for a verdict past the hold, or outside `gate`.
+    #[test]
+    fn test_no_confidence_refusal_without_a_timely_gated_verdict() {
+        let p = everything_enabled();
+        let at = FIRED_AT + 4 * SECOND;
+        let late = FIRED_AT + 200 * SECOND;
+        let mut low = verdict(PageAction::Suppress, None);
+        low.confidence = Confidence::Low;
+        assert_eq!(confidence_refusal(&p, &pending(FIRED_AT), P3, at), None);
+        assert_eq!(confidence_refusal(&p, &pending(FIRED_AT), P3, late), None);
+        assert_eq!(
+            confidence_refusal(&p, &complete(FIRED_AT, late, low.clone()), P3, late),
+            None,
+            "a verdict after the deadline refuses nothing"
+        );
+        for mode in [L0Mode::Off, L0Mode::Parallel, L0Mode::Only] {
+            let p = raw(mode, mode, mode, mode, 90, true, 2, true, true);
+            assert_eq!(
+                confidence_refusal(&p, &complete(FIRED_AT, at, low.clone()), P3, at),
+                None,
+                "{mode:?}"
             );
         }
     }
@@ -2582,6 +2713,7 @@ mod tests {
                     &AnalysisState {
                         status: AnalysisStatus::Complete,
                         verdict: None,
+                        grade: None,
                         requested_at: Some(FIRED_AT),
                         completed_at: Some(FIRED_AT + 4 * SECOND),
                     },
@@ -2984,217 +3116,6 @@ mod tests {
         }
     }
 
-    // §2.2 — the parser contract
-
-    fn report_with(block: &str) -> String {
-        format!(
-            "# RCA for inc_9\n\nOpen file descriptors climbed on 3 of 8 queriers.\n\n```json verdict\n{block}\n```\n"
-        )
-    }
-
-    const GOLDEN_VERDICT: &str = r#"{
-  "probable_cause": "fd leak introduced by querier v0.14.2",
-  "confidence": "high",
-  "suspect_change": {
-    "kind": "deploy",
-    "reference": "v0.14.2",
-    "author": "dana",
-    "occurred_at": 1699978400000000
-  },
-  "impacted_services": ["production/openobserve"],
-  "evidence_links": [
-    { "label": "fd ratio per pod", "url": "https://o2.example/short/x7h3k2" }
-  ],
-  "page_recommendation": {
-    "action": "page",
-    "severity_suggestion": "P2",
-    "reason": "predicted FD exhaustion in ~22 min; slope onset correlates with v0.14.2 deploy"
-  },
-  "proposed_actions": [
-    { "title": "Restart q-4, q-6, q-7", "kind": "restart", "detail": "buys time" }
-  ],
-  "report_ref": "inc_9/rca/1"
-}"#;
-
-    /// The happy path, field by field. Every field is a line on the responder's
-    /// card, and one the parser drops disappears silently at 3am.
-    #[test]
-    fn test_a_valid_verdict_block_parses_every_field() {
-        let content = report_with(GOLDEN_VERDICT);
-        let parsed = parse_report(&content);
-        assert_eq!(parsed.report, content, "the report is stored untouched");
-        let v = parsed.verdict.expect("a valid block must parse");
-        assert_eq!(v.probable_cause, "fd leak introduced by querier v0.14.2");
-        assert_eq!(v.confidence, Confidence::High);
-        let change = v
-            .suspect_change
-            .expect("the suspect change is the 'what changed' answer");
-        assert_eq!(change.kind, ChangeKind::Deploy);
-        assert_eq!(change.reference, "v0.14.2");
-        assert_eq!(change.author.as_deref(), Some("dana"));
-        assert_eq!(change.occurred_at, 1_699_978_400_000_000);
-        assert_eq!(
-            v.impacted_services,
-            vec!["production/openobserve".to_string()]
-        );
-        assert_eq!(v.evidence_links.len(), 1);
-        assert_eq!(v.evidence_links[0].url, "https://o2.example/short/x7h3k2");
-        assert_eq!(v.page_recommendation.action, PageAction::Page);
-        assert_eq!(v.page_recommendation.severity_suggestion, Some(P2));
-        assert!(v.page_recommendation.reason.contains("22 min"));
-        assert_eq!(v.proposed_actions.len(), 1);
-        assert_eq!(v.proposed_actions[0].kind, ActionKind::Restart);
-        assert_eq!(v.report_ref, "inc_9/rca/1");
-    }
-
-    /// §2.2: a malformed verdict can never lose a report or a page. Every way a
-    /// model can get the block wrong, and in each the markdown still saves and
-    /// the firing still falls through to the fail-open page.
-    #[test]
-    fn test_a_malformed_verdict_block_loses_neither_the_report_nor_the_page() {
-        let broken = [
-            ("truncated json", "{ \"probable_cause\": \"fd leak\","),
-            ("not json at all", "the cause is a file descriptor leak"),
-            ("empty block", ""),
-            ("json but not a verdict", "{ \"summary\": \"fd leak\" }"),
-            (
-                "missing page_recommendation",
-                "{ \"probable_cause\": \"x\", \"confidence\": \"high\", \"report_ref\": \"r\" }",
-            ),
-            (
-                "unknown confidence band",
-                "{ \"probable_cause\": \"x\", \"confidence\": \"very high\", \"page_recommendation\": { \"action\": \"page\", \"reason\": \"r\" }, \"report_ref\": \"r\" }",
-            ),
-            (
-                "unknown action",
-                "{ \"probable_cause\": \"x\", \"confidence\": \"high\", \"page_recommendation\": { \"action\": \"ignore\", \"reason\": \"r\" }, \"report_ref\": \"r\" }",
-            ),
-            ("a json array", "[1, 2, 3]"),
-        ];
-        for (name, block) in broken {
-            let content = report_with(block);
-            let parsed = parse_report(&content);
-            assert_eq!(parsed.report, content, "{name}: the report was altered");
-            assert_eq!(parsed.verdict, None, "{name}: garbage parsed as a verdict");
-        }
-    }
-
-    #[test]
-    fn test_an_unknown_action_kind_reads_as_other_and_keeps_the_verdict() {
-        let block = "{ \"probable_cause\": \"x\", \"confidence\": \"high\", \"page_recommendation\": { \"action\": \"suppress\", \"reason\": \"r\" }, \"proposed_actions\": [{ \"title\": \"t\", \"kind\": \"config_change\", \"detail\": \"d\" }], \"report_ref\": \"r\" }";
-        let content = report_with(block);
-        let v = parse_report(&content)
-            .verdict
-            .expect("an invented action kind must not drop the verdict");
-        assert_eq!(v.page_recommendation.action, PageAction::Suppress);
-        assert_eq!(v.proposed_actions[0].kind, ActionKind::Other);
-    }
-
-    /// The deployment that has RCA switched off, and the model that forgot the
-    /// section. Neither is an error; both are "no verdict".
-    #[test]
-    fn test_a_report_with_no_verdict_block_is_stored_unchanged() {
-        for content in [
-            "",
-            "# RCA\n\nNo idea.\n",
-            "# RCA\n\n```json\n{\"probable_cause\":\"x\"}\n```\n",
-            "# RCA\n\n```verdict\nnot fenced as json verdict\n```\n",
-        ] {
-            let parsed = parse_report(content);
-            assert_eq!(parsed.report, content);
-            assert_eq!(
-                parsed.verdict, None,
-                "a plain json fence is not the verdict contract: {content:?}"
-            );
-        }
-    }
-
-    /// "cause unknown" is a first-class value the prompt prefers to
-    /// confabulation. A parser treating it as a failure would turn the agent's
-    /// honesty into a dropped verdict.
-    #[test]
-    fn test_an_unknown_cause_verdict_parses_and_still_recommends_a_page() {
-        let content = report_with(
-            r#"{
-  "probable_cause": "cause unknown",
-  "confidence": "low",
-  "impacted_services": [],
-  "evidence_links": [{ "label": "error rate", "url": "https://o2.example/short/aa" }],
-  "page_recommendation": { "action": "page", "reason": "no cause established; paging" },
-  "report_ref": "inc_9/rca/2"
-}"#,
-        );
-        let v = parse_report(&content)
-            .verdict
-            .expect("unknown cause is legal");
-        assert_eq!(v.probable_cause, "cause unknown");
-        assert_eq!(v.confidence, Confidence::Low);
-        assert_eq!(v.page_recommendation.action, PageAction::Page);
-        assert_eq!(v.page_recommendation.severity_suggestion, None);
-        assert!(
-            !v.evidence_links.is_empty(),
-            "it still says where it looked"
-        );
-        assert!(v.suspect_change.is_none());
-        assert!(v.proposed_actions.is_empty());
-    }
-
-    /// The field accepts the forms a model writes. `"P2"` is what the prompt
-    /// asks for; the bare integer is the API's own spelling, and dropping it
-    /// would be a promotion that never happened.
-    #[test]
-    fn test_the_severity_suggestion_accepts_the_form_a_model_writes() {
-        for (spelling, want) in [
-            ("\"P2\"", Some(P2)),
-            ("\"p2\"", Some(P2)),
-            ("2", Some(P2)),
-            ("\"P1\"", Some(P1)),
-            ("null", None),
-        ] {
-            let content = report_with(&format!(
-                "{{ \"probable_cause\": \"x\", \"confidence\": \"high\", \"page_recommendation\": {{ \"action\": \"page\", \"severity_suggestion\": {spelling}, \"reason\": \"r\" }}, \"report_ref\": \"r\" }}"
-            ));
-            let v = parse_report(&content)
-                .verdict
-                .unwrap_or_else(|| panic!("{spelling} must parse"));
-            assert_eq!(
-                v.page_recommendation.severity_suggestion, want,
-                "{spelling}"
-            );
-        }
-    }
-
-    /// A severity outside the scale is not a severity. Rejecting the whole
-    /// verdict is deliberate: half a verdict has its paging recommendation read
-    /// from a value nobody checked, and §6 already handles "no verdict".
-    #[test]
-    fn test_a_severity_suggestion_outside_the_scale_rejects_the_whole_verdict() {
-        for bad in ["\"P9\"", "0", "6", "\"critical\"", "-1", "\"\""] {
-            let content = report_with(&format!(
-                "{{ \"probable_cause\": \"x\", \"confidence\": \"high\", \"page_recommendation\": {{ \"action\": \"page\", \"severity_suggestion\": {bad}, \"reason\": \"r\" }}, \"report_ref\": \"r\" }}"
-            ));
-            let parsed = parse_report(&content);
-            assert_eq!(parsed.verdict, None, "{bad} must not parse");
-            assert_eq!(parsed.report, content, "{bad}: the report was altered");
-        }
-    }
-
-    /// Idempotence at the parser. The verdict is the report's final section, so
-    /// an agent that re-ran and emitted a second block resolves to the last.
-    #[test]
-    fn test_the_last_verdict_block_in_a_report_is_the_one_that_counts() {
-        let first = "{ \"probable_cause\": \"first\", \"confidence\": \"low\", \"page_recommendation\": { \"action\": \"page\", \"reason\": \"r\" }, \"report_ref\": \"r\" }";
-        let second = "{ \"probable_cause\": \"second\", \"confidence\": \"high\", \"page_recommendation\": { \"action\": \"page\", \"reason\": \"r\" }, \"report_ref\": \"r\" }";
-        let content = format!("{}{}", report_with(first), report_with(second));
-        let parsed = parse_report(&content);
-        assert_eq!(parsed.report, content);
-        assert_eq!(
-            parsed.verdict.unwrap().probable_cause,
-            "second",
-            "the verdict is the report's final section"
-        );
-    }
-
     // §5 — what the notifications carry
 
     /// §5.2: the follow-up rides chat, push and email and does not re-fire
@@ -3482,7 +3403,7 @@ mod tests {
             confidence: Confidence::Low,
             suspect_change: None,
             impacted_services: vec![],
-            evidence_links: vec![],
+            evidence: vec![],
             page_recommendation: PageRecommendation {
                 action: PageAction::Page,
                 severity_suggestion: None,
@@ -3524,6 +3445,7 @@ mod tests {
         let skipped = AnalysisState {
             status: AnalysisStatus::Skipped,
             verdict: None,
+            grade: None,
             requested_at: None,
             completed_at: None,
         };
@@ -3578,5 +3500,77 @@ mod tests {
         ] {
             assert_eq!(serde_json::to_string(&m).unwrap(), format!("\"{want}\""));
         }
+    }
+
+    /// Evidence lines print `· [n] <label>` without a URL; a grade replaces the bare band.
+    #[test]
+    fn test_verdict_lines_print_numbered_evidence_and_the_reason_line() {
+        use crate::meta::oncall::confidence::{GradeReason, SignalClass};
+        let mut v = verdict(PageAction::Page, None);
+        v.confidence = Confidence::Medium;
+        v.evidence = vec![EvidenceRef {
+            number: 1,
+            label: "PromQL · prom_checkout · orders pool at 100/100".into(),
+        }];
+        let mut state = complete(FIRED_AT, FIRED_AT + SECOND, v);
+        let unchanged = SeverityDecision::Unchanged { current: P3 };
+        let lines = verdict_lines(&state, &unchanged);
+        assert!(
+            lines.contains(&"· [1] PromQL · prom_checkout · orders pool at 100/100".to_string()),
+            "{lines:?}"
+        );
+        assert!(lines.iter().all(|l| !l.contains("http")), "{lines:?}");
+        assert_eq!(
+            lines[0],
+            "probable cause: fd leak introduced by querier v0.14.2 (medium)"
+        );
+
+        state.grade = Some(ConfidenceGrade {
+            band: Confidence::Medium,
+            claimed: Confidence::High,
+            graded: Confidence::Medium,
+            reasons: vec![
+                GradeReason::DecisiveClass,
+                GradeReason::SuspectChangeNotRead,
+            ],
+            decisive_classes: vec![SignalClass::Metrics],
+            ruled_out: vec![],
+            unverified: vec![],
+            subject_id: Some("h1".into()),
+            lead_author: None,
+            causes: vec![],
+        });
+        let lines = verdict_lines(&state, &unchanged);
+        assert_eq!(
+            lines[0],
+            // One decisive class is already medium: the suspect-change cap lowered nothing.
+            "probable cause: fd leak introduced by querier v0.14.2 (medium · claimed high · decisive: metrics)"
+        );
+
+        // The grade round-trips; `{"status":"skipped"}` stays exact (pinned above).
+        let back: AnalysisState =
+            serde_json::from_str(&serde_json::to_string(&state).unwrap()).unwrap();
+        assert_eq!(back, state);
+    }
+
+    /// An old row with `evidence_links` reads with an empty `evidence` list.
+    #[test]
+    fn test_an_old_row_with_evidence_links_reads_with_no_evidence() {
+        let old = serde_json::json!({
+            "status": "complete",
+            "verdict": {
+                "probable_cause": "fd leak",
+                "confidence": "high",
+                "impacted_services": [],
+                "evidence_links": [{"label": "fd ratio", "url": "https://example.com/x"}],
+                "page_recommendation": {"action": "page", "reason": "r"},
+                "report_ref": "inc_9/rca/1"
+            }
+        });
+        let state: AnalysisState = serde_json::from_value(old).unwrap();
+        let v = state.verdict.unwrap();
+        assert!(v.evidence.is_empty());
+        assert_eq!(v.confidence, Confidence::High);
+        assert_eq!(state.grade, None);
     }
 }
