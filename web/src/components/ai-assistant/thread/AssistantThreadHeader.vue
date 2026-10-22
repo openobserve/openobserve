@@ -41,7 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :aria-describedby="describedBy"
         :aria-busy="renamePending ? 'true' : undefined"
         :class="[
-          'flex min-w-0 items-center gap-1.5 text-sm font-medium',
+          'flex items-center gap-1.5 text-sm font-medium',
+          renamable ? 'min-w-6 max-md:min-w-11 pointer-coarse:min-w-11' : 'min-w-0',
           density === 'dense' && 'max-md:max-w-[14rem]',
           renamePending ? 'text-text-secondary' : 'text-text-heading',
         ]"
@@ -53,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="sm"
           :disabled="renamePending"
-          class="h-auto! min-w-0 justify-start! px-1! font-medium"
+          class="h-auto! min-h-6 min-w-6 justify-start! px-1! font-medium max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
           data-test="assistant-thread-title-button"
           @click="startRename"
         >
@@ -106,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="max-md:min-h-11 pointer-coarse:min-h-11"
               data-test="assistant-thread-history"
             >
-              <span class="@max-[20rem]:sr-only">{{ t("assistant.thread.chats") }}</span>
+              <span class="@max-[24rem]:sr-only">{{ t("assistant.thread.chats") }}</span>
               <OTooltip :content="t('assistant.thread.chats')" shortcut-id="assistantHistory" />
             </OButton>
           </template>

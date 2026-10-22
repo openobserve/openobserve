@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 // Shared Playwright setup: AI endpoint mocks, config gating patch, backend rewrite, login.
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -19,8 +19,15 @@ import {
   overageStatus,
   sharedChat,
 } from "./mocks.mjs";
+import { MODE, enforceMode, isStack, mockOnly } from "./modes.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
+
+// Loaded only for stack runs, so mock-mode scripts outside the Playwright runner never import the test module.
+const stackTest = isStack() ? (await import("@playwright/test")).test : null;
+
+/** Captures, axe reports and telemetry exports of a run; the nightly workflows upload this folder. */
+export const OUT = join(here, "out");
 
 // CI serves UI and API from one origin (ZO_BASE_URL); O2_VITE_DEV points at a Vite dev server whose bundle talks to O2_API_ORIGIN.
 const VITE_DEV = !!process.env.O2_VITE_DEV;
@@ -54,6 +61,9 @@ const json = (route, body, status = 200) =>
     body: JSON.stringify(body),
   });
 
+// Keys the harness itself touches in a stack run; `then` because an async function's return value is probed for it.
+const STACK_SAFE_KEYS = new Set(["overrides", "then", "toJSON", "constructor"]);
+
 // The server's share requests are deny_unknown_fields; hide_attachments exists only where /config advertises it.
 const CREATE_SHARE_FIELDS = ["mode", "visibility", "expires_in_secs", "redact_tools"];
 const UPDATE_SHARE_FIELDS = ["mode", "expires_in_secs", "refresh_snapshot", "redact_tools"];
@@ -62,7 +72,7 @@ const unknownShareFields = (body, allowed, state) =>
 
 /** Mutable per-context mock state; knobs past the first block are no-ops until their WP fills them in (99 §5). */
 export function createMockState(overrides = {}) {
-  return {
+  const state = {
     chats: CHATS.map((c) => ({ ...c })),
     shares: SHARES.map((s) => ({ ...s })),
     overage: overageStatus(),
@@ -142,6 +152,33 @@ export function createMockState(overrides = {}) {
     probeDelayMs: 0,
     ...overrides,
   };
+  // Stack modes cannot honour a knob, so installMocks skips flows that set any.
+  Object.defineProperty(state, "overrides", { value: Object.keys(overrides), enumerable: false });
+  return isStack() ? mockOnlyState(state) : state;
+}
+
+/** In a stack mode, reading or writing any mock knob or request log skips the flow instead of asserting against nothing. */
+function mockOnlyState(state) {
+  const guard = (key) => {
+    if (typeof key === "symbol" || STACK_SAFE_KEYS.has(key)) return;
+    try {
+      stackTest.info();
+    } catch {
+      // Scripts outside the Playwright runner have no flow to skip.
+      return;
+    }
+    stackTest.skip(true, `the mock state "${key}" is mock-only; ${MODE} asserts structure against the real server`);
+  };
+  return new Proxy(state, {
+    get(target, key, receiver) {
+      guard(key);
+      return Reflect.get(target, key, receiver);
+    },
+    set(target, key, value, receiver) {
+      guard(key);
+      return Reflect.set(target, key, value, receiver);
+    },
+  });
 }
 
 /** Response headers with CORS collapsed to single values (the backend can emit them twice). */
@@ -506,6 +543,13 @@ function offForOrg(state) {
 
 /** Installs the streaming shim and all HTTP mocks on a browser context. */
 export async function installMocks(context, state = createMockState()) {
+  await enforceMode();
+  if (isStack()) {
+    if (state.overrides?.length) await mockOnly(`the mock knobs ${state.overrides.join(", ")}`);
+    // Telemetry capture is client-side, so stack runs still assert events; nothing else is faked.
+    await context.addInitScript({ content: "window.__O2_TELEMETRY_SINK__ = true;" });
+    return state;
+  }
   const shim = readFileSync(join(here, "stream-shim.js"), "utf8");
   await context.addInitScript({
     content:
@@ -536,11 +580,13 @@ function browserKnobs(state) {
 
 /** Flips browser-side knobs on a loaded page (the init script only reads them at load). */
 export async function setKnobs(page, knobs) {
+  await mockOnly(`the browser knobs ${Object.keys(knobs).join(", ")}`);
   await page.evaluate((k) => Object.assign(window.__o2mock.knobs, k), knobs);
 }
 
 /** Sets the scenario for the next chat_stream call (see SCENARIOS / HTTP_SCENARIOS). */
 export async function nextScenario(page, name, { speed = 1 } = {}) {
+  await mockOnly(`the scenario "${name}"`);
   await page.evaluate(([n, s]) => {
     window.__o2mock.next = n;
     window.__o2mock.speed = s;
@@ -554,7 +600,10 @@ async function requireViteDev() {
   test.skip(true, "edition rewrite needs the Vite dev server");
 }
 
-async function rewriteEdition(context, replacements) {
+async function rewriteEdition(context, replacements, servedBy) {
+  // A stack run of the matching edition is already that build; any other stack cannot fake it.
+  if (MODE === servedBy) return;
+  await mockOnly("the edition rewrite");
   await requireViteDev();
   await context.route(/\/web\/src\/aws-exports\.ts/, async (route) => {
     const response = await route.fetch();
@@ -566,7 +615,7 @@ async function rewriteEdition(context, replacements) {
 
 /** Rewrites the served aws-exports module so the bundle believes it is a Cloud build (call after login, then reload). */
 export async function forceCloudBuild(context) {
-  await rewriteEdition(context, [[/isCloud: [^,]+,/, 'isCloud: "true",']]);
+  await rewriteEdition(context, [[/isCloud: [^,]+,/, 'isCloud: "true",']], "stack-cloud");
 }
 
 /** Rewrites the served aws-exports module so the bundle believes it is an OSS build (G0). */
@@ -574,7 +623,7 @@ export async function forceOssBuild(context) {
   await rewriteEdition(context, [
     [/isCloud: [^,]+,/, 'isCloud: "false",'],
     [/isEnterprise: [^,]+,/, 'isEnterprise: "false",'],
-  ]);
+  ], "stack-oss");
 }
 
 /** Sets the assistant_v2 flag for every page of the context (`window.__O2_ASSISTANT_V2__`, read by flags.ts). */
@@ -590,6 +639,7 @@ export async function setOnline(page, online) {
 
 /** The next AI request answers 401 once. */
 export function expireSession(state) {
+  if (isStack()) return mockOnly("an expired session");
   state.expireNext = true;
 }
 
@@ -603,6 +653,13 @@ export async function captureTelemetry(page) {
   return page.evaluate(() => window.__o2telemetry ?? []);
 }
 
+export async function exportTelemetry(page, flow) {
+  const events = await captureTelemetry(page);
+  mkdirSync(join(OUT, "telemetry"), { recursive: true });
+  writeFileSync(join(OUT, "telemetry", `${flow}.json`), JSON.stringify({ mode: MODE, flow, events }, null, 2));
+  return events;
+}
+
 /** The text of every role="status" region, in DOM order. */
 export async function readAnnouncements(page) {
   return page.locator('[role="status"]').allTextContents();
@@ -610,6 +667,7 @@ export async function readAnnouncements(page) {
 
 /** Signs in as the root user, or as `as` (a user `createUser` made). */
 export async function login(page, as = { user: ENV.user, pass: ENV.pass }) {
+  await enforceMode();
   if (!as.user || !as.pass) throw new Error("Set ZO_ROOT_USER_EMAIL and ZO_ROOT_USER_PASSWORD (as for every tests/ui-testing suite).");
   await page.goto(`${ENV.appUrl}/login`, { waitUntil: "domcontentloaded" });
   const internal = page.locator('[data-test="login-as-internal-user"]');
@@ -660,4 +718,11 @@ export async function createTwoColumnDashboard(title) {
   const dashboard = { ...fixture, title, tabs: [{ ...fixture.tabs[0], panels }] };
   const created = await rootApi("POST", `/api/${ENV.org}/dashboards?folder=default`, dashboard);
   return created.v5.dashboardId;
+}
+
+export async function deleteDashboard(id) {
+  // The delete answers with an empty body, which rootApi's JSON parse rejects after the dashboard is gone.
+  await rootApi("DELETE", `/api/${ENV.org}/dashboards/${id}?folder=default`).catch((error) => {
+    if (!(error instanceof SyntaxError)) throw error;
+  });
 }

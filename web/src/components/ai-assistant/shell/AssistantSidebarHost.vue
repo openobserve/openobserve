@@ -105,13 +105,13 @@ const FLOATING_CLASSES = [
 
 const LANDSCAPE_PHONE_REM = 30;
 
-/** True when the focused rect lies entirely under the floating card (`95` §6; round 2 X-27). */
+/** True when any part of the focused rect lies under the floating card, so a focused control is never even partly hidden. */
 export function coveredBy(target: DOMRect, card: DOMRect): boolean {
   return (
-    target.left >= card.left &&
-    target.right <= card.right &&
-    target.top >= card.top &&
-    target.bottom <= card.bottom
+    target.left < card.right &&
+    target.right > card.left &&
+    target.top < card.bottom &&
+    target.bottom > card.top
   );
 }
 </script>
@@ -344,7 +344,7 @@ function writeInsetEnd(): void {
   );
 }
 
-// A focused page control hidden under the floating card pins the card for this open.
+// A focused page control even partly under the floating card pins the card for this open.
 function onMainFocus(event: FocusEvent): void {
   const card = column.value;
   const target = event.target;

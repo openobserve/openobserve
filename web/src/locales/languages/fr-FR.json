@@ -19655,7 +19655,10 @@
     "pagination": {
       "pagination": "Pagination",
       "previousPage": "Page précédente",
-      "nextPage": "Page suivante"
+      "nextPage": "Page suivante",
+      "firstPage": "Première page",
+      "lastPage": "Dernière page",
+      "recordsPerPage": "Enregistrements par page"
     },
     "select": {
       "more": "plus",

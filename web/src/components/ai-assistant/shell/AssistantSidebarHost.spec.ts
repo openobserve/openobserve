@@ -301,6 +301,27 @@ describe("AssistantSidebarHost", () => {
     expect(column()!.style.display).toBe("none");
   });
 
+  it("pins the floating card for this open when a focused control lies even partly under it", async () => {
+    const { open, invoker } = await setup();
+    open("floating");
+    await flushPromises();
+    vi.spyOn(column()!, "getBoundingClientRect").mockReturnValue({
+      left: 900,
+      right: 1280,
+      top: 40,
+      bottom: 800,
+    } as DOMRect);
+    vi.spyOn(invoker.value!, "getBoundingClientRect").mockReturnValue({
+      left: 880,
+      right: 905,
+      top: 100,
+      bottom: 130,
+    } as DOMRect);
+    invoker.value!.focus();
+    await flushPromises();
+    expect(column()!.dataset.mode).toBe("pinned");
+  });
+
   it("pins the floating card for this open when a focused control lies entirely under it", async () => {
     const { open, store, invoker } = await setup();
     open("floating");
@@ -410,9 +431,11 @@ describe("AssistantSidebarHost", () => {
     expect(document.activeElement).toBe(outside);
   });
 
-  it("judges coverage by the whole rect", () => {
+  it("counts any overlap as covered and a rect that only touches the card's edge as clear", () => {
     const card = { left: 10, right: 20, top: 0, bottom: 50 } as DOMRect;
     expect(coveredBy({ left: 12, right: 18, top: 5, bottom: 10 } as DOMRect, card)).toBe(true);
-    expect(coveredBy({ left: 5, right: 18, top: 5, bottom: 10 } as DOMRect, card)).toBe(false);
+    expect(coveredBy({ left: 5, right: 11, top: 5, bottom: 10 } as DOMRect, card)).toBe(true);
+    expect(coveredBy({ left: 0, right: 10, top: 5, bottom: 10 } as DOMRect, card)).toBe(false);
+    expect(coveredBy({ left: 12, right: 18, top: 50, bottom: 60 } as DOMRect, card)).toBe(false);
   });
 });

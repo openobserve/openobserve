@@ -117,6 +117,14 @@ describe("ToolsetsTab", () => {
     expect(w.find('[data-test="settings-assistant-mcp-link"]').exists()).toBe(true);
   });
 
+  it("draws the MCP link in the darker link step, which keeps AA on any theme colour", async () => {
+    const { w } = await mountTab();
+    wrapper = w;
+    const link = w.get('[data-test="settings-assistant-mcp-link"]').classes();
+    expect(link).toContain("text-text-link-hover");
+    expect(link).not.toContain("text-text-link");
+  });
+
   it("marks both rows of a name clash and an unguarded CLI toolset", async () => {
     const { w } = await mountTab();
     wrapper = w;

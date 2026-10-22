@@ -61,7 +61,7 @@ test.describe("assistant sharing", () => {
     }, PNG_BASE64);
   }
 
-  test("SHARE-01 one click shares an org snapshot with tool data hidden and copies the link", async ({
+  test("SHARE-01 one click shares an org snapshot with tool data hidden and copies the link", { tag: ["@mock", "@stack-ee"] }, async ({
     context,
     page,
   }) => {
@@ -84,7 +84,7 @@ test.describe("assistant sharing", () => {
     expect(shareCreates()).toHaveLength(1);
   });
 
-  test("SHARE-04 showing tool data on a public link asks once", async ({ context, page }) => {
+  test("SHARE-04 showing tool data on a public link asks once", { tag: ["@mock"] }, async ({ context, page }) => {
     await start(context, page);
     await openOnLogs(page);
     await answered(page);
@@ -109,7 +109,7 @@ test.describe("assistant sharing", () => {
     await expect(confirm).toHaveCount(0);
   });
 
-  test("SHARE-05 Update snapshot is blocked while an answer runs", async ({ context, page }) => {
+  test("SHARE-05 Update snapshot is blocked while an answer runs", { tag: ["@mock"] }, async ({ context, page }) => {
     await start(context, page);
     await openOnLogs(page);
     await answered(page);
@@ -128,7 +128,7 @@ test.describe("assistant sharing", () => {
     );
   });
 
-  test("SHARE-06 Continue in my chats forks under a continued title", async ({ context, page }) => {
+  test("SHARE-06 Continue in my chats forks under a continued title", { tag: ["@mock", "@stack-ee"] }, async ({ context, page }) => {
     // With none of the links listed as mine, the reader is not the owner and is offered Continue.
     await start(context, page, { shares: [] });
     await page.goto(sharedUrl("tok-snap-vrl"), { waitUntil: "domcontentloaded" });
@@ -141,7 +141,7 @@ test.describe("assistant sharing", () => {
     await expect(page).toHaveURL(new RegExp(`/assistant/${state.chats[0].session_id}`));
   });
 
-  test("SHARE-07 the shared page shows no billing and no controls", async ({ context, page }) => {
+  test("SHARE-07 the shared page shows no billing and no controls", { tag: ["@mock"] }, async ({ context, page }) => {
     await start(context, page);
     await page.goto(sharedUrl("tok-live-checkout-5xx"), { waitUntil: "domcontentloaded" });
     const shared = page.locator('[data-test="assistant-shared-page"]');
@@ -156,7 +156,7 @@ test.describe("assistant sharing", () => {
     await expect(shared.locator('[data-test*="credit"], [data-test*="meter"], [data-test*="cost"]')).toHaveCount(0);
   });
 
-  test("GATE-07 an editor sees Share disabled with the reason", async ({ context, page }) => {
+  test("GATE-07 an editor sees Share disabled with the reason", { tag: ["@mock", "@stack-ee", "@stack-cloud"] }, async ({ context, page }) => {
     await start(context, page, () => member({ role: "editor" }));
     await openOnLogs(page);
     await answered(page);
@@ -168,7 +168,7 @@ test.describe("assistant sharing", () => {
     expect(shareCreates()).toHaveLength(0);
   });
 
-  test("GATE-08 an org link without permission names the state with Ask an admin and no Retry", async ({
+  test("GATE-08 an org link without permission names the state with Ask an admin and no Retry", { tag: ["@mock", "@stack-ee"] }, async ({
     context,
     page,
   }) => {
@@ -180,7 +180,7 @@ test.describe("assistant sharing", () => {
     await expect(page.locator('[data-test="assistant-shared-state-retry"]')).toHaveCount(0);
   });
 
-  test("SEC-09 a public link defaults to an expiry within the cap and hides tool data and attachments", async ({
+  test("SEC-09 a public link defaults to an expiry within the cap and hides tool data and attachments", { tag: ["@mock"] }, async ({
     context,
     page,
   }) => {
@@ -206,7 +206,7 @@ test.describe("assistant sharing", () => {
     expect(body.expires_in_secs).toBeLessThanOrEqual(30 * 24 * 60 * 60);
   });
 
-  test("SEC-12 attachments are never shared silently when the server cannot hide them", async ({ context, page }) => {
+  test("SEC-12 attachments are never shared silently when the server cannot hide them", { tag: ["@mock"] }, async ({ context, page }) => {
     await start(context, page);
     await openOnLogs(page);
     await pasteImage(page);
@@ -228,7 +228,7 @@ test.describe("assistant sharing", () => {
     expect((await posted).postDataJSON()).not.toHaveProperty("hide_attachments");
   });
 
-  test("SEC-13 a signed-out reader loads no assistant runtime and signs in back to the page", async ({ browser }) => {
+  test("SEC-13 a signed-out reader loads no assistant runtime and signs in back to the page", { tag: ["@mock"] }, async ({ browser }) => {
     harness = await loadHarness();
     state = harness.createMockState();
     const reader = await browser.newContext();
@@ -260,7 +260,7 @@ test.describe("assistant sharing", () => {
     await reader.close();
   });
 
-  test("SEC-13 no share token reaches the assistant telemetry", async ({ context, page }) => {
+  test("SEC-13 no share token reaches the assistant telemetry", { tag: ["@mock"] }, async ({ context, page }) => {
     await start(context, page);
     await page.goto(sharedUrl("tok-live-checkout-5xx"), { waitUntil: "domcontentloaded" });
     await expect(page.locator('[data-test="assistant-shared-title"]')).toBeVisible({ timeout: 30_000 });

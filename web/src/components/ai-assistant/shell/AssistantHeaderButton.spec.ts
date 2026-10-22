@@ -270,9 +270,23 @@ describe("AssistantHeaderButton light", () => {
     store.state.sessions[b].turn = { state: "awaiting_approval", callId: "c1" };
     await flushPromises();
     expect(button(wrapper).attributes("data-state")).toBe("needs_you");
-    expect(button(wrapper).attributes("aria-label")).toBe("O2 Assistant, needs you");
+    expect(button(wrapper).attributes("aria-label")).toBe("O2 Assistant, needs you, 1 waiting");
     expect(tooltip(wrapper)).toBe("Waiting for your approval");
     expect(wrapper.find('[data-test="assistant-header-status-light"]').text()).toBe("1");
+  });
+
+  it("names the visible needs-you count so the label matches the content", async () => {
+    const { wrapper, store } = setup();
+    for (const title of ["Delete alerts", "Mute monitors"]) {
+      const sid = session(store, title);
+      store.state.sessions[sid].turn = { state: "awaiting_approval", callId: title };
+    }
+    await flushPromises();
+    const count = wrapper.get('[data-test="assistant-header-status-light"]').text();
+    expect(count).toBe("2");
+    expect(button(wrapper).attributes("aria-label")).toBe(
+      `O2 Assistant, needs you, ${count} waiting`,
+    );
   });
 
   it("uses the one consent key when the decision is about paid usage", async () => {

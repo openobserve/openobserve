@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <router-link
             v-if="row.scope === 'chat' && row.chat_id"
-            class="text-text-link hover:text-text-link-hover text-xs underline"
+            class="text-text-link-hover text-xs underline hover:no-underline"
             :to="{ name: 'assistant', params: { chatId: row.chat_id } }"
             :data-test="`settings-assistant-grant-${row.id}-chat`"
             >{{ t("assistant.grants.openChat") }}</router-link

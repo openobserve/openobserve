@@ -44,7 +44,7 @@ test.describe("assistant consent card", () => {
     assistant = new AssistantPage(page);
   });
 
-  test("CONS-01 an admin enables once the box is ticked, and the same turn id is resent once", async ({ page }) => {
+  test("CONS-01 an admin enables once the box is ticked, and the same turn id is resent once", { tag: ["@mock", "@stack-cloud"] }, async ({ page }) => {
     await ask(page);
     await expect(field("org")).toHaveText("Enable paid AI usage for default?");
     await expect(field("consequence")).toContainText("every AI request from anyone in default is billed");
@@ -68,7 +68,7 @@ test.describe("assistant consent card", () => {
     expect(steps).toEqual(expect.arrayContaining(["shown", "enabled"]));
   });
 
-  test("CONS-02 Cancel writes nothing and gives the prompt back, the note clearing on the next keystroke", async ({ page }) => {
+  test("CONS-02 Cancel writes nothing and gives the prompt back, the note clearing on the next keystroke", { tag: ["@mock"] }, async ({ page }) => {
     await ask(page);
     await field("cancel").click();
     await expect(card()).toHaveCount(0);
@@ -82,7 +82,7 @@ test.describe("assistant consent card", () => {
     await expect(assistant.outcome()).toHaveCount(0);
   });
 
-  test("CONS-03 Manage in Billing opens a new tab and is never a decline", async ({ context, page }) => {
+  test("CONS-03 Manage in Billing opens a new tab and is never a decline", { tag: ["@mock"] }, async ({ context, page }) => {
     await ask(page);
     const opened = context.waitForEvent("page");
     await field("view-billing").click();
@@ -92,7 +92,7 @@ test.describe("assistant consent card", () => {
     expect(puts()).toHaveLength(0);
   });
 
-  test("CONS-04 a member gets Ask an admin instead of Enable", async ({ page }) => {
+  test("CONS-04 a member gets Ask an admin instead of Enable", { tag: ["@mock", "@stack-cloud"] }, async ({ page }) => {
     await ask(page, "consent_member");
     await expect(field("checkbox")).toHaveCount(0);
     await expect(field("enable")).toHaveCount(0);
@@ -103,7 +103,7 @@ test.describe("assistant consent card", () => {
     );
   });
 
-  test("CONS-05 a failed PUT says so inline and keeps the card", async ({ page }) => {
+  test("CONS-05 a failed PUT says so inline and keeps the card", { tag: ["@mock"] }, async ({ page }) => {
     state.consentPutStatus = 500;
     await ask(page);
     await field("checkbox").click();
@@ -113,7 +113,7 @@ test.describe("assistant consent card", () => {
     await expect(card()).toBeVisible();
   });
 
-  test("CONS-06 a second 412 on the resend is a refusal with the prompt back, never a second card", async ({ page }) => {
+  test("CONS-06 a second 412 on the resend is a refusal with the prompt back, never a second card", { tag: ["@mock"] }, async ({ page }) => {
     await ask(page, "consent_twice");
     await field("checkbox").click();
     await field("enable").click();
@@ -125,7 +125,7 @@ test.describe("assistant consent card", () => {
     await expect(assistant.composer()).toHaveValue("why did checkout 5xx spike?");
   });
 
-  test("CONS-07 closing the container cancels the card: nothing written, no dialog, the draft kept", async ({ page }) => {
+  test("CONS-07 closing the container cancels the card: nothing written, no dialog, the draft kept", { tag: ["@mock"] }, async ({ page }) => {
     await ask(page);
     await assistant.close();
     await expect(page.locator('[data-test="paid-overage-consent-dialog"]')).toHaveCount(0);
@@ -151,7 +151,7 @@ test.describe("assistant consent card", () => {
     await assistant.open("header");
   }
 
-  test("CONS-08 an org switch cancels the card before the switch, and no PUT reaches the old org", async ({ page }) => {
+  test("CONS-08 an org switch cancels the card before the switch, and no PUT reaches the old org", { tag: ["@mock"] }, async ({ page }) => {
     const second = await harness.ensureOrg("e2e_assistant_lifecycle");
     await ask(page);
     await assistant.close();
@@ -163,7 +163,7 @@ test.describe("assistant consent card", () => {
     expect(puts()).toHaveLength(0);
   });
 
-  test("CONS-08 an org switch while Enable is on its way waits for its answer: paid usage stays on, nothing is sent, the prompt comes back", async ({ page }) => {
+  test("CONS-08 an org switch while Enable is on its way waits for its answer: paid usage stays on, nothing is sent, the prompt comes back", { tag: ["@mock"] }, async ({ page }) => {
     const second = await harness.ensureOrg("e2e_assistant_lifecycle");
     state.consentPutDelayMs = 2_500;
     await ask(page);
@@ -185,7 +185,7 @@ test.describe("assistant consent card", () => {
     expect(await requests(page)).toHaveLength(1);
   });
 
-  test("CONS-09 a grant in another tab resolves this card and resends its own turn", async ({ context, page }) => {
+  test("CONS-09 a grant in another tab resolves this card and resends its own turn", { tag: ["@mock"] }, async ({ context, page }) => {
     await ask(page);
     const other = await context.newPage();
     const second = new AssistantPage(other);
@@ -203,7 +203,7 @@ test.describe("assistant consent card", () => {
     await other.close();
   });
 
-  test("CONS-10 Escape inside the card cancels it and the panel stays open", async ({ page }) => {
+  test("CONS-10 Escape inside the card cancels it and the panel stays open", { tag: ["@mock"] }, async ({ page }) => {
     await ask(page);
     await field("checkbox").focus();
     await page.keyboard.press("Escape");

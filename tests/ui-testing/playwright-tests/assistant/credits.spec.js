@@ -79,7 +79,7 @@ test.describe("assistant credits", () => {
       await page.reload();
     });
 
-    test("the strip meter reads every mode honestly", async ({ page }) => {
+    test("the strip meter reads every mode honestly", { tag: ["@mock"] }, async ({ page }) => {
       const rows = [
         {
           usage: usage("free", 412),
@@ -153,7 +153,7 @@ test.describe("assistant credits", () => {
       ).toBeVisible();
     });
 
-    test("the meter never vanishes when its reads fail", async ({ page }) => {
+    test("the meter never vanishes when its reads fail", { tag: ["@mock"] }, async ({ page }) => {
       state.usageStatus = 500;
       state.overage = mocks.overageStatus({ effective: true, enabled: true });
       await openOn(page);
@@ -171,7 +171,7 @@ test.describe("assistant credits", () => {
       await expect(meterPart("retry")).toBeVisible();
     });
 
-    test("the meter re-reads when a turn completes", async ({ page }) => {
+    test("the meter re-reads when a turn completes", { tag: ["@mock"] }, async ({ page }) => {
       state.usage = usage("free", 412);
       await openOn(page);
       await expect(meterPart("text")).toHaveText("412 of 1,000");
@@ -182,7 +182,7 @@ test.describe("assistant credits", () => {
       });
     });
 
-    test("the 70 % notice shows once and its dismiss holds across reloads and tabs", async ({
+    test("the 70 % notice shows once and its dismiss holds across reloads and tabs", { tag: ["@mock"] }, async ({
       context,
       page,
     }) => {
@@ -219,7 +219,7 @@ test.describe("assistant credits", () => {
       await second.close();
     });
 
-    test("a 402 offers the one action the role and billing state allow, and gives the prompt back", async ({
+    test("a 402 offers the one action the role and billing state allow, and gives the prompt back", { tag: ["@mock"] }, async ({
       context,
       page,
     }) => {
@@ -329,7 +329,7 @@ test.describe("assistant credits", () => {
       ).toHaveLength(0);
     });
 
-    test("a known exhausted meter predicts the refusal without blocking Send", async ({
+    test("a known exhausted meter predicts the refusal without blocking Send", { tag: ["@mock"] }, async ({
       page,
     }) => {
       state.usage = usage("exhausted", 1000);
@@ -341,7 +341,7 @@ test.describe("assistant credits", () => {
       ).toHaveText("AI credits are used up for default.");
     });
 
-    test("a failed turn on Cloud is never called free", async ({ page }) => {
+    test("a failed turn on Cloud is never called free", { tag: ["@mock"] }, async ({ page }) => {
       state.usage = usage("free", 412);
       await openOn(page);
       await assistant.send("why did checkout 5xx spike?", "error");
@@ -358,7 +358,7 @@ test.describe("assistant credits", () => {
     });
   });
 
-  test("no meter and no usage request off Cloud", async ({ page }) => {
+  test("no meter and no usage request off Cloud", { tag: ["@mock"] }, async ({ page }) => {
     state.usage = usage("free", 412);
     await openOn(page);
     await expect(assistant.composer()).toBeVisible();

@@ -110,7 +110,7 @@ test.describe("assistant lifecycle", () => {
     secondOrg = await harness.ensureOrg(SECOND_ORG);
   });
 
-  test("XTAB-05 sign-out in B asks first, cancels A's answer and A stops without a reload", async ({
+  test("XTAB-05 sign-out in B asks first, cancels A's answer and A stops without a reload", { tag: ["@mock", "@stack-ee"] }, async ({
     context,
     page,
   }) => {
@@ -142,7 +142,7 @@ test.describe("assistant lifecycle", () => {
     expect(await page.evaluate(() => window.__e2eNoReload)).toBe(true);
   });
 
-  test("XTAB-07 recall and width are read-merge-write across two tabs", async ({ context, page }) => {
+  test("XTAB-07 recall and width are read-merge-write across two tabs", { tag: ["@mock"] }, async ({ context, page }) => {
     const a = await openLogs(page);
     const [tabB] = await harness.twoTabs(context);
     const b = await openLogs(tabB);
@@ -176,7 +176,7 @@ test.describe("assistant lifecycle", () => {
     await expect(a.resizeHandle()).toHaveAttribute("aria-valuenow", width);
   });
 
-  test("LIFE-01 org switch → Keep: the answer keeps running in its org and never shows in the next one", async ({
+  test("LIFE-01 org switch → Keep: the answer keeps running in its org and never shows in the next one", { tag: ["@mock", "@stack-ee"] }, async ({
     page,
   }) => {
     const a = await openLogs(page);
@@ -200,7 +200,7 @@ test.describe("assistant lifecycle", () => {
     await expect(a.transcript()).toContainText("why 5xx in default?");
   });
 
-  test("LIFE-02 org switch → Stop cancels the running answer and nothing streams on", async ({ page }) => {
+  test("LIFE-02 org switch → Stop cancels the running answer and nothing streams on", { tag: ["@mock"] }, async ({ page }) => {
     const a = await openLogs(page);
     await startTurn(a, "why 5xx before switching?");
     await a.close();
@@ -218,7 +218,7 @@ test.describe("assistant lifecycle", () => {
     expect(await page.evaluate(() => window.__o2mock.requests.length)).toBe(streams);
   });
 
-  test("XTAB-08 sign-out reaches a tab in another org: it cancels its own answer and the ledger empties", async ({
+  test("XTAB-08 sign-out reaches a tab in another org: it cancels its own answer and the ledger empties", { tag: ["@mock", "@stack-ee"] }, async ({
     context,
     page,
   }) => {
@@ -245,7 +245,7 @@ test.describe("assistant lifecycle", () => {
     expect((await readLedger(page)).entries).toEqual([]);
   });
 
-  test("XTAB-11 sign-out cancels a turn that started before the tab opened, from the ledger alone", async ({
+  test("XTAB-11 sign-out cancels a turn that started before the tab opened, from the ledger alone", { tag: ["@mock"] }, async ({
     context,
     page,
   }) => {
@@ -275,7 +275,7 @@ test.describe("assistant lifecycle", () => {
     expect(fromB.some((c) => c.url.includes("stale-sid"))).toBe(false);
   });
 
-  test("SHELL-10 floating never covers the panel it explains; a left-column panel still opens floating", async ({
+  test("SHELL-10 floating never covers the panel it explains; a left-column panel still opens floating", { tag: ["@mock", "@stack-ee"] }, async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 900 });

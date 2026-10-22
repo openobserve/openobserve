@@ -19655,7 +19655,10 @@
     "pagination": {
       "pagination": "تقسيم الصفحات",
       "previousPage": "الصفحة السابقة",
-      "nextPage": "الصفحة التالية"
+      "nextPage": "الصفحة التالية",
+      "firstPage": "الصفحة الأولى",
+      "lastPage": "الصفحة الأخيرة",
+      "recordsPerPage": "السجلات لكل صفحة"
     },
     "select": {
       "more": "المزيد",

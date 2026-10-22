@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "regions": {
+    "turn": "assistant-status-region",
+    "container": "assistant-container-status",
+    "header": "assistant-header-status-region",
+    "composer": "assistant-composer-status"
+  },
+  "transient": ["^Connecting…$", "^Listing streams$", "^Reading schema for .+$", "^Querying .+$"],
+  "cases": {
+    "load": {},
+    "open": { "turn": ["O2 Assistant opened."] },
+    "done": { "turn": ["Sending…", "Writing the answer", "Done"] },
+    "failed": { "turn": ["Sending…", "Failed. The AI provider failed: overloaded. Retry available."] },
+    "stopped": { "turn": ["Sending…", "Stopping…", "Stopped"] },
+    "refused": { "turn": ["Sending…", "Not sent. Too many answers are running. Wait for one to finish. Retry available."] },
+    "approval": {
+      "turn": [
+        "Sending…",
+        "Writing the answer",
+        "Waiting for your approval: Delete 1 alert. Expires in 10 minutes. Press Control I to review it."
+      ]
+    },
+    "consent": { "turn": ["Sending…", "Waiting for your decision on paid usage for default. Press Control I to review it."] },
+    "consent-cancelled": { "turn": ["Not sent. Paid usage wasn't enabled. Your message wasn't sent."] },
+    "closed": { "container": ["O2 Assistant closed."] },
+    "double-read": { "turn": ["O2 Assistant opened.", "Sending…", "Writing the answer", "Done"] }
+  }
+}

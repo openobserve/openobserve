@@ -113,7 +113,7 @@ test.describe("assistant history", () => {
     ["(b) browser-only with Delete on sign-out purges", { persistence: false }, true, false],
     ["(c) browser-only without it keeps the chats and says so", { persistence: false }, false, true],
   ]) {
-    test(`LIFE-03 sign-out with nothing running ${label}`, async ({ context, page }) => {
+    test(`LIFE-03 sign-out with nothing running ${label}`, { tag: ["@mock"] }, async ({ context, page }) => {
       await start(context, page, overrides);
       await openOnLogs(page);
       await answered(page, "why did checkout throw 5xx?");
@@ -145,7 +145,7 @@ test.describe("assistant history", () => {
     });
   }
 
-  test("SEC-08 a second user signing in on the same browser sees none of the first user's chats, drafts or recall", async ({
+  test("SEC-08 a second user signing in on the same browser sees none of the first user's chats, drafts or recall", { tag: ["@mock", "@stack-ee"] }, async ({
     context,
     page,
   }) => {
@@ -169,7 +169,7 @@ test.describe("assistant history", () => {
     await expect(assistant.history().locator('[data-test="assistant-history-kept"]')).toHaveCount(0);
   });
 
-  test("GATE-09 without server history the list says it is saved in this browser only and never asks the server", async ({
+  test("GATE-09 without server history the list says it is saved in this browser only and never asks the server", { tag: ["@mock", "@stack-ee", "@responsive"] }, async ({
     context,
     page,
   }) => {
@@ -188,7 +188,7 @@ test.describe("assistant history", () => {
     expect(state.log.filter((line) => /^GET \/api\/[^/]+\/ai\/chats/.test(line))).toEqual([]);
   });
 
-  test("HIST-01 the list warns near the cap and the 101st chat removes the oldest with a notice", async ({
+  test("HIST-01 the list warns near the cap and the 101st chat removes the oldest with a notice", { tag: ["@mock"] }, async ({
     context,
     page,
   }) => {
@@ -215,7 +215,7 @@ test.describe("assistant history", () => {
     expect(titles).toContain("Checkout 5xx spike in prod");
   });
 
-  test("HIST-02 a delete the server refuses puts the row back and says so", async ({ context, page }) => {
+  test("HIST-02 a delete the server refuses puts the row back and says so", { tag: ["@mock"] }, async ({ context, page }) => {
     await start(context, page, { deleteStatus: 500 });
     await openOnLogs(page);
     await assistant.openHistory();
@@ -232,7 +232,7 @@ test.describe("assistant history", () => {
     expect(state.log.some((line) => /^DELETE \/api\/[^/]+\/ai\/chats\//.test(line))).toBe(true);
   });
 
-  test("HIST-03 opening a chat deleted on another device says so and offers a new chat", async ({
+  test("HIST-03 opening a chat deleted on another device says so and offers a new chat", { tag: ["@mock", "@stack-ee"] }, async ({
     context,
     page,
   }) => {
@@ -249,7 +249,7 @@ test.describe("assistant history", () => {
     await expect(assistant.composer()).toBeVisible();
   });
 
-  test("HIST-04 browser chats move to the account, failures stay in the browser and only moved ones leave it", async ({
+  test("HIST-04 browser chats move to the account, failures stay in the browser and only moved ones leave it", { tag: ["@mock"] }, async ({
     context,
     page,
   }) => {
@@ -279,7 +279,7 @@ test.describe("assistant history", () => {
 
   const search = () => assistant.history().locator('[data-test="assistant-history-search"] input');
 
-  test("DOD-03 with server search the list asks the server with q and shows only its answer", async ({
+  test("DOD-03 with server search the list asks the server with q and shows only its answer", { tag: ["@mock"] }, async ({
     context,
     page,
   }) => {
@@ -298,7 +298,7 @@ test.describe("assistant history", () => {
     );
   });
 
-  test("DOD-03 without server search the list filters what it loaded and never sends q", async ({ context, page }) => {
+  test("DOD-03 without server search the list filters what it loaded and never sends q", { tag: ["@mock"] }, async ({ context, page }) => {
     await start(context, page);
     await openOnLogs(page);
     await assistant.openHistory();
@@ -307,7 +307,7 @@ test.describe("assistant history", () => {
     expect(state.log.some((line) => /^GET \/api\/[^/]+\/ai\/chats\?.*\bq=/.test(line))).toBe(false);
   });
 
-  test("DOD-03 with server pins a pin is stored on the server and lists under Pinned on another device", async ({
+  test("DOD-03 with server pins a pin is stored on the server and lists under Pinned on another device", { tag: ["@mock"] }, async ({
     browser,
     context,
     page,
@@ -333,7 +333,7 @@ test.describe("assistant history", () => {
     await device.close();
   });
 
-  test("DOD-03 with list markers another device's running and waiting chats light their rows and the header", async ({
+  test("DOD-03 with list markers another device's running and waiting chats light their rows and the header", { tag: ["@mock"] }, async ({
     context,
     page,
   }) => {
@@ -354,7 +354,7 @@ test.describe("assistant history", () => {
     await expect(assistant.headerButton).toHaveAttribute("data-state", "needs_you", { timeout: 15_000 });
   });
 
-  test("PERF-04 a chat saves at most once per 3 s plus once as each turn ends, and never sends the transcript back", async ({
+  test("PERF-04 a chat saves at most once per 3 s plus once as each turn ends, and never sends the transcript back", { tag: ["@mock"] }, async ({
     context,
     page,
   }) => {
@@ -381,7 +381,7 @@ test.describe("assistant history", () => {
     expect(state.log.filter((line) => /^(PUT|POST|PATCH) \/api\/[^/]+\/ai\/chats(\/[^/]+)?$/.test(line))).toEqual([]);
   });
 
-  test("PERF-06 opening and closing 50 times and opening 30 long chats keeps the heap within 10 %", async ({
+  test("PERF-06 opening and closing 50 times and opening 30 long chats keeps the heap within 10 %", { tag: ["@mock"] }, async ({
     context,
     page,
   }) => {

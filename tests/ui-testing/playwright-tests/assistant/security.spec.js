@@ -43,7 +43,7 @@ test.describe("assistant security", () => {
     return assistant.answer();
   }
 
-  test("SEC-01 a planted image beacon is dropped and nothing leaves for evil.example", async ({ page }) => {
+  test("SEC-01 a planted image beacon is dropped and nothing leaves for evil.example", { tag: ["@mock"] }, async ({ page }) => {
     const answer = await payloadAnswer(page);
     await expect(answer).toContainText("Image from an external site removed");
     await expect(answer.locator("img")).toHaveCount(0);
@@ -51,7 +51,7 @@ test.describe("assistant security", () => {
     expect(beacons).toEqual([]);
   });
 
-  test("SEC-02 unsafe links render as text and external links open in a new tab", async ({ page }) => {
+  test("SEC-02 unsafe links render as text and external links open in a new tab", { tag: ["@mock"] }, async ({ page }) => {
     const answer = await payloadAnswer(page);
     // Link cards are typed routes of their own; the rendered Markdown is what may hold only external links.
     const hrefs = await answer.locator('[data-test="assistant-block-text"] a').evaluateAll((links) =>
@@ -64,7 +64,7 @@ test.describe("assistant security", () => {
     await expect(answer.locator('a[href*="logout"], a[href*="shared"], a[href^="javascript"], a[href^="data"]')).toHaveCount(0);
   });
 
-  test("SEC-03 a navigation frame from the agent never navigates; it is offered as one link card", async ({ page }) => {
+  test("SEC-03 a navigation frame from the agent never navigates; it is offered as one link card", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     // The logs page writes its own time range into the URL once it loads; only a change after that is the agent's.
     await expect.poll(() => page.url(), { timeout: 15_000 }).not.toContain("from=NaN");
@@ -78,7 +78,7 @@ test.describe("assistant security", () => {
     await expect(assistant.transcript().getByText("Always allow")).toHaveCount(0);
   });
 
-  test("SEC-04 raw HTML in an answer is stripped to its text and its handler never runs", async ({ page }) => {
+  test("SEC-04 raw HTML in an answer is stripped to its text and its handler never runs", { tag: ["@mock"] }, async ({ page }) => {
     const answer = await payloadAnswer(page);
     await expect(answer).toContainText("same tab");
     await expect(answer).not.toContainText("onerror");
@@ -87,7 +87,7 @@ test.describe("assistant security", () => {
     expect(await page.evaluate(() => window.__pwned)).toBeUndefined();
   });
 
-  test("SEC-06 Details copy holds ids and codes, never the prompt or context", async ({ context, page }) => {
+  test("SEC-06 Details copy holds ids and codes, never the prompt or context", { tag: ["@mock"] }, async ({ context, page }) => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await openOnLogs(page);
     await harness.nextScenario(page, "error");
@@ -100,7 +100,7 @@ test.describe("assistant security", () => {
     expect(text).not.toContain("e2e_automate");
   });
 
-  test("SEC-07 every assistant surface is masked for session replay and the title never names a chat", async ({ page }) => {
+  test("SEC-07 every assistant surface is masked for session replay and the title never names a chat", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await harness.nextScenario(page, "complete");
     await assistant.send("why 5xx?");

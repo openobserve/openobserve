@@ -597,6 +597,9 @@ export const STEP_ANNOUNCE_MS = 3_000;
 
 // Every mounted shell sees one history outcome; only the first visible one speaks it.
 const historySpoken = new WeakMap<object, number>();
+
+// The last focus request a shell took, so a shell mounting after the open serves it once and a remount never refocuses.
+const focusServed = new WeakMap<object, number>();
 </script>
 
 <script setup lang="ts">
@@ -1619,11 +1622,45 @@ watch(
   () => store.focusRequest.value?.seq,
   async (seq) => {
     if (seq === undefined || !visible.value) return;
+    focusServed.set(store, seq);
     openedByUser.value = true;
     await nextTick();
     focusEntry();
   },
 );
+
+// A late request is served only while it is the latest and focus has not moved on; a rejected one is retired so no remount replays it.
+function lateRequestVerdict(seq: number): "serve" | "retire" | "skip" {
+  const request = store.focusRequest.value;
+  if (!request || request.seq !== seq || focusServed.get(store) === seq || !visible.value)
+    return "skip";
+  if (request.superseded) return "retire";
+  const active = document.activeElement;
+  if (!active || active === document.body || root.value?.contains(active)) return "serve";
+  return active === request.from?.deref() ? "serve" : "retire";
+}
+
+// Records the verdict and says whether to serve; only a visible shell retires, so a hidden placement never voids the visible one's request.
+function takeLateRequest(seq: number): boolean {
+  const verdict = lateRequestVerdict(seq);
+  if (verdict !== "skip") focusServed.set(store, seq);
+  return verdict === "serve";
+}
+
+// The host chunk can load after a click or chord already opened it, so no seq change is left for the watcher above.
+onMounted(async () => {
+  const seq = store.focusRequest.value?.seq;
+  if (seq === undefined) return;
+  if (lateRequestVerdict(seq) !== "serve") {
+    takeLateRequest(seq);
+    return;
+  }
+  await nextTick();
+  if (!takeLateRequest(seq)) return;
+  openedByUser.value = true;
+  focusEntry();
+  region.value?.announce(t("assistant.announce.opened", { product }));
+});
 
 // Only an open that asked for focus is the user's; a restore or a silent route enter says nothing.
 let seqWhenHidden = store.focusRequest.value?.seq;

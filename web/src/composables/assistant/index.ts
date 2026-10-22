@@ -58,6 +58,7 @@ export {
   runEscapeLadder,
   runHistoryTarget,
   stopLadderEscape,
+  useAssistantOpenChord,
   useAssistantShortcuts,
 } from "./shortcuts";
 export { refreshPageContext, useAssistantContext } from "./context/useAssistantContext";

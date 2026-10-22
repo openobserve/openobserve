@@ -69,10 +69,10 @@ const props = withDefaults(defineProps<AssistantStatusDotProps>(), {
 });
 
 const shape = computed(() => assistantSignalShape[props.state]);
-// Forced colours drop fills and box-shadow rings, so a border keeps every shape visible in system colour.
+// Forced colours drop fills and box-shadow rings, so a half-width border repaints a dot solid and keeps it unlike the hollow working ring.
 const dotRing = computed(() =>
   props.placement === "corner"
-    ? "ring-surface-base ring-2 forced-colors:border"
-    : "forced-colors:border",
+    ? "ring-surface-base ring-2 forced-colors:border-4"
+    : "forced-colors:border-4",
 );
 </script>

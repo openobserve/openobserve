@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <router-link
           v-if="row.chat === false"
-          class="text-text-link hover:text-text-link-hover underline max-md:inline-flex max-md:min-h-11 max-md:items-center"
+          class="text-text-link-hover underline hover:no-underline max-md:inline-flex max-md:min-h-11 max-md:items-center"
           :to="{
             name: 'editRole',
             params: { role_name: row.role },
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #total>{{ access.data.value.total }}</template>
         <template #link>
           <router-link
-            class="text-text-link hover:text-text-link-hover underline"
+            class="text-text-link-hover underline hover:no-underline"
             :to="{ name: 'roles', query: { org_identifier: page.org.value } }"
             data-test="settings-assistant-role-access-all"
             >{{ t("assistant.settings.access.roles.allRoles") }}</router-link

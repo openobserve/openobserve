@@ -56,7 +56,7 @@ test.describe("assistant honest turns", () => {
     assistant = new AssistantPage(page);
   });
 
-  test("SMOKE-02 v2 happy path from the header to done", async ({ page }) => {
+  test("SMOKE-02 v2 happy path from the header to done", { tag: ["@mock", "@stack-ee", "@responsive"] }, async ({ page }) => {
     await openOnLogs(page);
     await expect(assistant.sidebar).toBeVisible();
     await ask(page, "complete");
@@ -70,7 +70,7 @@ test.describe("assistant honest turns", () => {
     expect(ended.at(-1)?.properties.outcome).toBe("done");
   });
 
-  test("TEL-01 the funnel fires in order with joinable ids", async ({ page }) => {
+  test("TEL-01 the funnel fires in order with joinable ids", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "complete");
     await expect(assistant.answer().locator("h2")).toBeVisible();
@@ -83,7 +83,7 @@ test.describe("assistant honest turns", () => {
     expect(new Set(turnEvents.map((e) => e.properties.turn_id)).size).toBe(1);
   });
 
-  test("TEL-03 the legacy names fire for one release and never call an empty turn an answer", async ({ page }) => {
+  test("TEL-03 the legacy names fire for one release and never call an empty turn an answer", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "complete");
     await expect(assistant.answer().locator("h2")).toBeVisible();
@@ -95,7 +95,7 @@ test.describe("assistant honest turns", () => {
     expect((await events(page)).filter((e) => e.name === "ai_assistant_answer_completed")).toHaveLength(1);
   });
 
-  test("TURN-01 real steps, no filler phrases, elapsed after 5 s", async ({ page }) => {
+  test("TURN-01 real steps, no filler phrases, elapsed after 5 s", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "slow");
     const seen = new Set();
@@ -116,7 +116,7 @@ test.describe("assistant honest turns", () => {
     for (const phrase of FILLER) await expect(page.getByText(phrase)).toHaveCount(0);
   });
 
-  test("TURN-02 a stall is named in the warning tone and Stop is emphasised", async ({ page }) => {
+  test("TURN-02 a stall is named in the warning tone and Stop is emphasised", { tag: ["@mock"] }, async ({ page }) => {
     test.setTimeout(90_000);
     await openOnLogs(page);
     await ask(page, "keepalive_stall");
@@ -128,7 +128,7 @@ test.describe("assistant honest turns", () => {
     await expect(assistant.container().locator('[data-test="assistant-stop"]')).toHaveClass(/secondary/);
   });
 
-  test("TURN-03 Stop keeps findings and cancels on the server", async ({ page }) => {
+  test("TURN-03 Stop keeps findings and cancels on the server", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "slow");
     await waitForSteps(page, 2);
@@ -148,7 +148,7 @@ test.describe("assistant honest turns", () => {
     await expect(assistant.composer()).toHaveValue("Continue");
   });
 
-  test("TURN-04 an unconfirmed cancel says the server may still be finishing", async ({ page }) => {
+  test("TURN-04 an unconfirmed cancel says the server may still be finishing", { tag: ["@mock"] }, async ({ page }) => {
     await page.addInitScript(() => (window.__O2MOCK_KNOBS__ = { ...(window.__O2MOCK_KNOBS__ || {}), cancelStatus: 500 }));
     await openOnLogs(page);
     await harness.setKnobs(page, { cancelStatus: 500 });
@@ -160,7 +160,7 @@ test.describe("assistant honest turns", () => {
     expect(stop?.properties.server_cancel_ms).toBeNull();
   });
 
-  test("TURN-05 a drop mid-stream fails by name and keeps the partial text", async ({ page }) => {
+  test("TURN-05 a drop mid-stream fails by name and keeps the partial text", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "drop_mid_stream");
     await expect(assistant.outcome()).toHaveAttribute("data-code", "stream_dropped");
@@ -171,9 +171,9 @@ test.describe("assistant honest turns", () => {
   });
 
   // The engine reads B-03 from a capability the runtime does not wire until WP-18 (`tailEnabled` dep of turnEngine.ts).
-  test.fixme("TURN-06 a drop with the tail reconnects, catches up and finishes (B-03, WP-18)", async () => {});
+  test.fixme("TURN-06 a drop with the tail reconnects, catches up and finishes (B-03, WP-18)", { tag: ["@mock", "@stack-ee"] }, async () => {});
 
-  test("TURN-14 a stream whose ids repeat by design shows the whole answer and ends done (D2, WP-18)", async ({ page }) => {
+  test("TURN-14 a stream whose ids repeat by design shows the whole answer and ends done (D2, WP-18)", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "server_ids", "Reply with exactly: alpha beta gamma. Then a second sentence: delta epsilon.");
     await expect(assistant.answer()).toContainText("alpha beta gamma. Then a second sentence: delta epsilon.");
@@ -183,7 +183,7 @@ test.describe("assistant honest turns", () => {
     await expect.poll(async () => (await events(page)).find((e) => e.name === "ai_turn_ended")?.properties.outcome).toBe("done");
   });
 
-  test("TURN-07 an empty turn is not an answer", async ({ page }) => {
+  test("TURN-07 an empty turn is not an answer", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "empty_turn");
     await expect(assistant.outcome()).toContainText("The assistant didn't answer.");
@@ -192,7 +192,7 @@ test.describe("assistant honest turns", () => {
     );
   });
 
-  test("TURN-08 answered but not saved keeps the answer and offers Retry save", async ({ page }) => {
+  test("TURN-08 answered but not saved keeps the answer and offers Retry save", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "persistence_failed");
     await expect(assistant.outcome()).toHaveAttribute("data-kind", "doneNotSaved");
@@ -202,7 +202,7 @@ test.describe("assistant honest turns", () => {
     await expect(assistant.composer()).toBeFocused();
   });
 
-  test("TURN-09 an oversized frame fails by name and the tab stays responsive", async ({ page }) => {
+  test("TURN-09 an oversized frame fails by name and the tab stays responsive", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "oversized_frame");
     await expect(assistant.outcome()).toHaveAttribute("data-code", "stream_oversized");
@@ -210,7 +210,7 @@ test.describe("assistant honest turns", () => {
     await expect(assistant.composer()).toHaveValue("still typing");
   });
 
-  test("TURN-10 an owner race restores once with the same turn id", async ({ page }) => {
+  test("TURN-10 an owner race restores once with the same turn id", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "owner_race_no_code");
     await expect(assistant.transcript()).toContainText("This chat moved to another server and continued.", {
@@ -221,7 +221,7 @@ test.describe("assistant honest turns", () => {
     expect(requests[0]).toBe(requests[1]);
   });
 
-  test("TURN-11 a provider error is a tinted block with Retry and Details holding code and trace", async ({ page }) => {
+  test("TURN-11 a provider error is a tinted block with Retry and Details holding code and trace", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "error");
     const outcome = assistant.outcome();
@@ -243,21 +243,21 @@ test.describe("assistant honest turns", () => {
     expect(Number(params.get("to"))).toBeGreaterThan(Number(params.get("from")));
   });
 
-  test("TURN-12 an unknown frame is counted and ignored", async ({ page }) => {
+  test("TURN-12 an unknown frame is counted and ignored", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "garbage_body");
     await expect(assistant.transcript()).not.toHaveAttribute("aria-busy", "true", { timeout: 20_000 });
     expect((await events(page)).some((e) => e.name === "ai_frame_unknown")).toBe(true);
   });
 
-  test("TURN-13 a cancel from elsewhere ends with no action", async ({ page }) => {
+  test("TURN-13 a cancel from elsewhere ends with no action", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "cancelled_frame");
     await expect(assistant.outcome()).toContainText("This answer was stopped from another tab.");
     await expect(assistant.outcomeAction()).toHaveCount(0);
   });
 
-  test("B-02 lifecycle frames read honestly: provider retry, compaction and a policy refusal", async ({ page }) => {
+  test("B-02 lifecycle frames read honestly: provider retry, compaction and a policy refusal", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "retrying_frame");
     await expect(assistant.status()).toContainText(/Retrying the AI provider in \d+ s · attempt 2/);
@@ -274,7 +274,7 @@ test.describe("assistant honest turns", () => {
     await expect(assistant.transcript()).not.toHaveAttribute("aria-busy", "true");
   });
 
-  test("SHELL-04 a turn survives a closed container and reads unread", async ({ page }) => {
+  test("SHELL-04 a turn survives a closed container and reads unread", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "slow");
     await expect(assistant.status()).toBeVisible();
@@ -286,7 +286,7 @@ test.describe("assistant honest turns", () => {
     expect(await cancels(page)).toEqual([]);
   });
 
-  test("Go to answer focuses the latest answer from the strip and from Ctrl+↑", async ({ page }) => {
+  test("Go to answer focuses the latest answer from the strip and from Ctrl+↑", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "complete");
     await expect(assistant.answer().locator("h2")).toBeVisible();
@@ -296,7 +296,7 @@ test.describe("assistant honest turns", () => {
     await assistant.composer().press("Control+ArrowUp");
     await expect(assistant.answer()).toBeFocused();
   });
-  test("HT-08 a wheel up during a fast stream is never pulled back, and Jump to latest follows again", async ({ page }) => {
+  test("HT-08 a wheel up during a fast stream is never pulled back, and Jump to latest follows again", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "long_answer", "why 5xx?", { speed: 0.5 });
     const log = assistant.transcript();
@@ -329,7 +329,7 @@ test.describe("assistant honest turns", () => {
     await expect(jump).toHaveCount(0);
   });
 
-  test("HT-08 Jump to latest during a stream that grows in steps keeps following through its smooth scroll", async ({ page }) => {
+  test("HT-08 Jump to latest during a stream that grows in steps keeps following through its smooth scroll", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "long_answer", "why 5xx?", { speed: 0.1 });
     const log = assistant.transcript();
@@ -345,7 +345,7 @@ test.describe("assistant honest turns", () => {
     await expect.poll(() => log.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight)).toBeLessThan(3);
   });
 
-  test("HT-08 a turn that ends while following leaves the view at the bottom", async ({ page }) => {
+  test("HT-08 a turn that ends while following leaves the view at the bottom", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "long_answer", "why 5xx?", { speed: 0.5 });
     const log = assistant.transcript();
@@ -357,7 +357,7 @@ test.describe("assistant honest turns", () => {
     await expect(assistant.container().locator('[data-test="assistant-scroll-latest"]')).toHaveCount(0);
   });
 
-  test("EB-09 Regenerate shows the new attempt as version 2 and gives focus to the composer", async ({ page }) => {
+  test("EB-09 Regenerate shows the new attempt as version 2 and gives focus to the composer", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "complete");
     await expect(assistant.answer().locator("h2")).toBeVisible();
@@ -369,7 +369,7 @@ test.describe("assistant honest turns", () => {
     await expect(assistant.transcript().locator("article[data-turn-id]")).toHaveCount(1);
   });
 
-  test("EB-09 AC 6 Copy as Markdown sources the SQL fence and ends with the stamp", async ({ context, page }) => {
+  test("EB-09 AC 6 Copy as Markdown sources the SQL fence and ends with the stamp", { tag: ["@mock"] }, async ({ context, page }) => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await openOnLogs(page);
     await ask(page, "complete");
@@ -382,7 +382,7 @@ test.describe("assistant honest turns", () => {
     expect(text).toMatch(/Evaluated \d\d:\d\d–\d\d:\d\d \S+ · 1 query$/);
   });
 
-  test("SHELL-08 at 375 the sheet keeps the composer and the last message above an emulated keyboard", async ({ page }) => {
+  test("SHELL-08 at 375 the sheet keeps the composer and the last message above an emulated keyboard", { tag: ["@mock", "@responsive"] }, async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await openOnLogs(page);
     await expect(assistant.sheet).toHaveAttribute("aria-modal", "false");

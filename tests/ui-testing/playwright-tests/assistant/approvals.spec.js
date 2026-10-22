@@ -46,7 +46,7 @@ test.describe("assistant approval cards", () => {
     assistant = new AssistantPage(page);
   });
 
-  test("APPR-01 a delete card is safe by default: Enter in the composer never decides, Deny is the default", async ({ page }) => {
+  test("APPR-01 a delete card is safe by default: Enter in the composer never decides, Deny is the default", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
     await ask(page, "confirmation");
     const card = assistant.approval();
     await expect(card).toHaveAttribute("role", "group");
@@ -71,7 +71,7 @@ test.describe("assistant approval cards", () => {
     await expect(assistant.composer()).toBeFocused();
   });
 
-  test("APPR-02 the result comes from /confirm item by item", async ({ page }) => {
+  test("APPR-02 the result comes from /confirm item by item", { tag: ["@mock"] }, async ({ page }) => {
     await ask(page, "confirmation_batch");
     await harness.setKnobs(page, { confirmFail: ["checkout-latency-old"] });
     await expect(assistant.container().locator('[data-test="assistant-plan-block"]')).toContainText(
@@ -94,7 +94,7 @@ test.describe("assistant approval cards", () => {
     await expect(timeline).toContainText("5 actions in this chat");
   });
 
-  test("APPR-03 a lost decision never claims nothing changed: a decline goes again, an approve reads unknown", async ({ page }) => {
+  test("APPR-03 a lost decision never claims nothing changed: a decline goes again, an approve reads unknown", { tag: ["@mock"] }, async ({ page }) => {
     await ask(page, "confirmation");
     await harness.setKnobs(page, { confirmStatus: 500 });
     await deny().click();
@@ -118,7 +118,7 @@ test.describe("assistant approval cards", () => {
     );
   });
 
-  test("APPR-04 a permission card states its expiry, declines itself at zero and asks again in place", async ({ page }) => {
+  test("APPR-04 a permission card states its expiry, declines itself at zero and asks again in place", { tag: ["@mock"] }, async ({ page }) => {
     test.setTimeout(90_000);
     await ask(page, "permission_card", "list the pods");
     await expect(region()).toContainText("Waiting for your approval: Allow bash. Expires in 2");
@@ -141,7 +141,7 @@ test.describe("assistant approval cards", () => {
     expect(resent.messages.at(-1).content).toBe("Ask me again: Allow bash");
   });
 
-  test("APPR-05 Reply declines with the text and sends it as the next turn naming the card", async ({ page }) => {
+  test("APPR-05 Reply declines with the text and sends it as the next turn naming the card", { tag: ["@mock"] }, async ({ page }) => {
     await ask(page, "permission_card", "list the pods");
     await assistant.approval().locator('[data-test="assistant-approval-reply"]').click();
     await expect(assistant.composer()).toHaveAttribute("placeholder", "Reply to the assistant");
@@ -159,7 +159,7 @@ test.describe("assistant approval cards", () => {
     expect(reply.messages.at(-1).content).toBe("use the staging namespace");
   });
 
-  test("APPR-06 the decision posts on the session it was asked in, after the chat moved to the full view", async ({ page }) => {
+  test("APPR-06 the decision posts on the session it was asked in, after the chat moved to the full view", { tag: ["@mock"] }, async ({ page }) => {
     await ask(page, "confirmation");
     const sid = (await requests(page))[0].headers["x-o2-assistant-session-id"];
     await assistant.container().locator('[data-test="assistant-shell-open-in-full-view"]').click();
@@ -170,7 +170,7 @@ test.describe("assistant approval cards", () => {
     expect((await confirmations(page))[0].url).toContain(`/ai/confirm/${sid}`);
   });
 
-  test("APPR-07 a reload shows the decision as a record, never a live card", async ({ page }) => {
+  test("APPR-07 a reload shows the decision as a record, never a live card", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
     await ask(page, "confirmation");
     const sid = (await requests(page))[0].headers["x-o2-assistant-session-id"];
     await approve().click();
@@ -183,7 +183,7 @@ test.describe("assistant approval cards", () => {
     await expect(assistant.approval()).toHaveCount(0);
   });
 
-  test("APPR-07 a reload keeps the decision as a record when the server history has no card", async ({ page }) => {
+  test("APPR-07 a reload keeps the decision as a record when the server history has no card", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
     state.historyDropsCards = true;
     await ask(page, "confirmation");
     const sid = (await requests(page))[0].headers["x-o2-assistant-session-id"];
@@ -198,7 +198,7 @@ test.describe("assistant approval cards", () => {
     await expect(assistant.approvalResult().getByRole("button", { name: "Ask again" })).toHaveCount(0);
   });
 
-  test("APPR-08 a change made without a review step is surfaced with the object", async ({ page }) => {
+  test("APPR-08 a change made without a review step is surfaced with the object", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await assistant.send("raise the threshold", "resource_changed_unreviewed");
     const notice = assistant.container().locator('[data-test="assistant-unreviewed-change"]');
@@ -208,7 +208,7 @@ test.describe("assistant approval cards", () => {
     await expect(open).toHaveAttribute("target", "_blank");
   });
 
-  test("XTAB-03 a chat whose card another tab holds waits with Stop and keeps Send locked until it is resolved", async ({ page }) => {
+  test("XTAB-03 a chat whose card another tab holds waits with Stop and keeps Send locked until it is resolved", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await assistant.send("why 5xx?", "complete");
     await expect(assistant.composerState()).toHaveAttribute("data-state", "empty", { timeout: 30_000 });
@@ -241,7 +241,7 @@ test.describe("assistant approval cards", () => {
     await expect.poll(async () => (await requests(page)).length).toBe(2);
   });
 
-  test("A11Y-03 a keyboard-only turn through an approval and a consent card keeps focus and speaks each result once", async ({ page }) => {
+  test("A11Y-03 a keyboard-only turn through an approval and a consent card keeps focus and speaks each result once", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
     test.setTimeout(90_000);
     await page.goto(logsUrl(), { waitUntil: "domcontentloaded" });
     await expect(assistant.headerButton).toHaveAttribute("data-state", "idle", { timeout: 30_000 });
@@ -311,7 +311,7 @@ test.describe("assistant approval cards", () => {
     await expect.poll(() => spokenTimes("Paid AI usage enabled. Sending your message.")).toBe(1);
   });
 
-  test("SHELL-13 a card never takes focus from the composer; Ctrl+I and Review request reach Deny, with no trap", async ({ page }) => {
+  test("SHELL-13 a card never takes focus from the composer; Ctrl+I and Review request reach Deny, with no trap", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
     await ask(page, "confirmation");
     await expect(assistant.composer()).toBeFocused();
     await expect(region()).toContainText("Press Control I to review it.");

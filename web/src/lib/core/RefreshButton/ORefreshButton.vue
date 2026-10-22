@@ -112,7 +112,12 @@ function handleClick(e: MouseEvent) {
     >
       {{ relativeTime || t("refreshButton.justNow") }}
     </span>
-    <OTooltip :content="exactTime" :shortcut-id="shortcutId" />
+    <!-- With no previous sibling the child-mode tooltip climbs past display:contents to the button, so hover and focus anywhere on it open the tooltip. -->
+    <span style="display: contents"
+      ><OTooltip :content="exactTime" :shortcut-id="shortcutId"
+    /></span>
+    <!-- The name wherever the age is not shown, so the button's name always matches its visible text. -->
+    <span :class="lastRunAt ? 'sr-only md:hidden' : 'sr-only'">{{ exactTime }}</span>
   </OButton>
 
   <div v-else class="inline-flex items-center gap-1.5">

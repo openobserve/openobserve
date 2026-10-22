@@ -62,7 +62,7 @@ test.describe("assistant editors and width", () => {
     assistant = new AssistantPage(page);
   });
 
-  test("SHELL-03 Escape in a docked chat closes the chat only; the dialog and its SQL stay, and × closes it too", async ({
+  test("SHELL-03 Escape in a docked chat closes the chat only; the dialog and its SQL stay, and × closes it too", { tag: ["@mock", "@stack-ee"] }, async ({
     page,
   }) => {
     const dialog = await openAlertQueryDialog(page);
@@ -87,7 +87,7 @@ test.describe("assistant editors and width", () => {
     expect(await sqlInEditor(page)).toBe(before);
   });
 
-  test("EVID-02 Insert as diff in the docked alert editor: preview, Accept, label, Revert; nothing runs or saves", async ({
+  test("EVID-02 Insert as diff in the docked alert editor: preview, Accept, label, Revert; nothing runs or saves", { tag: ["@mock", "@stack-ee"] }, async ({
     page,
   }) => {
     const dialog = await openAlertQueryDialog(page);
@@ -126,7 +126,7 @@ test.describe("assistant editors and width", () => {
     await expect(dialog).toBeVisible();
   });
 
-  test("EVID-02 Reject leaves the editor byte-identical and Escape in the bar rejects", async ({
+  test("EVID-02 Reject leaves the editor byte-identical and Escape in the bar rejects", { tag: ["@mock", "@stack-ee"] }, async ({
     page,
   }) => {
     const dialog = await openAlertQueryDialog(page);
@@ -149,7 +149,7 @@ test.describe("assistant editors and width", () => {
     await expect(assistant.aiLabel()).toHaveCount(0);
   });
 
-  test("SHELL-09 a docked chat never navigates: the link card renders and the route stays", async ({
+  test("SHELL-09 a docked chat never navigates: the link card renders and the route stays", { tag: ["@mock", "@stack-ee"] }, async ({
     page,
   }) => {
     await openAlertQueryDialog(page);
@@ -165,7 +165,7 @@ test.describe("assistant editors and width", () => {
     expect(after).toBe(opened);
   });
 
-  test("SHELL-06 the editor closed mid-turn: the turn keeps running and the previous placement returns", async ({
+  test("SHELL-06 the editor closed mid-turn: the turn keeps running and the previous placement returns", { tag: ["@mock"] }, async ({
     page,
   }) => {
     await page.goto(url("/alerts/add"), { waitUntil: "domcontentloaded" });
@@ -189,7 +189,7 @@ test.describe("assistant editors and width", () => {
     expect(closed.map((e) => e.properties.reason)).toContain("host_closed");
   });
 
-  test("SHELL-07 the drag handle stores a width that survives a reload; a page that needs its width opens floating", async ({
+  test("SHELL-07 the drag handle stores a width that survives a reload; a page that needs its width opens floating", { tag: ["@mock"] }, async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -239,7 +239,7 @@ test.describe("assistant editors and width", () => {
     await expect(host).toHaveAttribute("data-mode", "floating");
   });
 
-  test("DOOR-07 a log field's regex hand-off opens one assistant: the regex drawer's dock, prefilled", async ({
+  test("DOOR-07 a log field's regex hand-off opens one assistant: the regex drawer's dock, prefilled", { tag: ["@mock"] }, async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -273,7 +273,7 @@ test.describe("assistant editors and width", () => {
     expect(await page.evaluate(() => window.__o2mock.requests.length)).toBe(0);
   });
 
-  test("SHELL-11 on a phone the docked proposal is reviewable: peek, the bar in view, Reject focused, then half @responsive", async ({
+  test("SHELL-11 on a phone the docked proposal is reviewable: peek, the bar in view, Reject focused, then half @responsive", { tag: ["@mock", "@responsive"] }, async ({
     page,
   }) => {
     await page.setViewportSize({ width: 375, height: 812 });

@@ -24,7 +24,7 @@ test.describe("SMOKE-01 legacy assistant with the flag off", () => {
     assistant = new AssistantPage(page);
   });
 
-  test("header button opens the legacy sidebar and a complete turn answers", async ({ page }) => {
+  test("header button opens the legacy sidebar and a complete turn answers", { tag: ["@mock"] }, async ({ page }) => {
     await page.goto(logsUrl(), { waitUntil: "domcontentloaded" });
     await expect(assistant.legacy.headerButton).toBeVisible();
     await assistant.openLegacy();
@@ -40,7 +40,7 @@ test.describe("SMOKE-01 legacy assistant with the flag off", () => {
     await expect(assistant.v2Ids()).toHaveCount(0);
   });
 
-  test("a docked host (regex pattern editor) opens its embedded chat", async ({ page }) => {
+  test("a docked host (regex pattern editor) opens its embedded chat", { tag: ["@mock"] }, async ({ page }) => {
     await page.goto(`${harness.ENV.appUrl}/settings/regex_patterns?org_identifier=${harness.ENV.org}`, {
       waitUntil: "domcontentloaded",
     });
@@ -51,7 +51,7 @@ test.describe("SMOKE-01 legacy assistant with the flag off", () => {
     await expect(assistant.v2Ids()).toHaveCount(0);
   });
 
-  test("the logs NL bar sends through chat_stream", async ({ page }) => {
+  test("the logs NL bar sends through chat_stream", { tag: ["@mock"] }, async ({ page }) => {
     await page.goto(logsUrl(), { waitUntil: "domcontentloaded" });
     await assistant.legacy.nlToggle.click();
     await expect(assistant.legacy.nlInput).toBeVisible();
@@ -79,7 +79,7 @@ test.describe("SMOKE-01 legacy header across editions @edition", () => {
     assistant = new AssistantPage(page);
   });
 
-  test("an OSS build locks the header button instead of opening the chat @edition", async ({ context, page }) => {
+  test("an OSS build locks the header button instead of opening the chat @edition", { tag: ["@mock"] }, async ({ context, page }) => {
     await harness.forceOssBuild(context);
     await page.goto(`${harness.ENV.appUrl}/logs?org_identifier=${harness.ENV.org}`, {
       waitUntil: "domcontentloaded",
@@ -91,7 +91,7 @@ test.describe("SMOKE-01 legacy header across editions @edition", () => {
     await expect(assistant.v2Ids()).toHaveCount(0);
   });
 
-  test("a Cloud build opens the legacy sidebar from the header @edition", async ({ context, page }) => {
+  test("a Cloud build opens the legacy sidebar from the header @edition", { tag: ["@mock"] }, async ({ context, page }) => {
     await harness.forceCloudBuild(context);
     await page.goto(`${harness.ENV.appUrl}/logs?org_identifier=${harness.ENV.org}`, {
       waitUntil: "domcontentloaded",
