@@ -62,6 +62,7 @@ pub async fn put(template: Template) -> Result<Template, Error> {
     put_with(client, template).await
 }
 
+/// Upserts the row owned by the template's org; the shared default row is never the target.
 pub async fn put_with<C: ConnectionTrait>(db: &C, template: Template) -> Result<Template, Error> {
     let title = match &template.template_type {
         TemplateType::Email { title } => Some(title.to_string()),
@@ -95,6 +96,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Option<Template>, Error> {
     get_with(client, org_id, name).await
 }
 
+/// Returns the org's own row, falling back to the shared default org.
 pub async fn get_with<C: ConnectionTrait>(
     db: &C,
     org_id: &str,
@@ -132,6 +134,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<bool, Error> {
     delete_with(client, org_id, name).await
 }
 
+/// Deletes the row owned by `org_id`; returns whether a row was removed.
 pub async fn delete_with<C: ConnectionTrait>(
     db: &C,
     org_id: &str,

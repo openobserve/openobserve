@@ -312,7 +312,10 @@ async fn check_not_in_use(org_id: &str, name: &str) -> Result<(), TemplateError>
 
 // A `default` template is shared by every org, so its references are checked across all orgs.
 fn references_from(org_id: &str, cache_key: &str) -> bool {
-    org_id == DEFAULT_ORG || cache_key.starts_with(&format!("{org_id}/"))
+    org_id == DEFAULT_ORG
+        || cache_key
+            .strip_prefix(org_id)
+            .is_some_and(|rest| rest.starts_with('/'))
 }
 
 #[cfg(test)]

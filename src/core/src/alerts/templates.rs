@@ -61,7 +61,7 @@ pub(crate) fn resolve_kind(
 }
 
 // Only root may reach a shared `default` template through another org's path.
-pub(crate) fn update_org(
+pub(crate) fn write_org(
     path_org: &str,
     existing_org: &str,
     is_root: bool,
@@ -113,7 +113,7 @@ pub async fn save(
             if create {
                 return Err(TemplateError::AlreadyExists);
             }
-            template.org_id = update_org(&template.org_id, &existing.org_id, is_root)?;
+            template.org_id = write_org(&template.org_id, &existing.org_id, is_root)?;
             Some(existing)
         }
         Err(_) => {
@@ -179,7 +179,9 @@ pub async fn delete(org_id: &str, name: &str, is_root: bool) -> Result<(), Templ
     if !is_root && is_reserved_template_name(name) {
         return Err(TemplateError::PrebuiltReadOnly(name.to_string()));
     }
-    db::alerts::templates::delete(org_id, name).await?;
+    let existing = db::alerts::templates::get(org_id, name).await?;
+    let owner = write_org(org_id, &existing.org_id, is_root)?;
+    db::alerts::templates::delete(&owner, name).await?;
     remove_ownership(org_id, "templates", Authz::new(name)).await;
     Ok(())
 }
@@ -439,13 +441,13 @@ mod tests {
     }
 
     #[test]
-    fn test_update_org_keeps_the_path_org_for_non_root() {
-        assert_eq!(update_org("acme", "acme", false).unwrap(), "acme");
+    fn test_write_org_keeps_the_path_org_for_non_root() {
+        assert_eq!(write_org("acme", "acme", false).unwrap(), "acme");
         assert!(matches!(
-            update_org("acme", DEFAULT_ORG, false),
+            write_org("acme", DEFAULT_ORG, false),
             Err(TemplateError::NotFound)
         ));
-        assert_eq!(update_org("acme", DEFAULT_ORG, true).unwrap(), DEFAULT_ORG);
+        assert_eq!(write_org("acme", DEFAULT_ORG, true).unwrap(), DEFAULT_ORG);
     }
 
     #[tokio::test]
@@ -473,6 +475,21 @@ mod tests {
         mine.org_id = DEFAULT_ORG.to_string();
         let err = save(name, mine, None, true, false).await.unwrap_err();
         assert!(matches!(err, TemplateError::AlreadyExists), "{err}");
+    }
+
+    #[tokio::test]
+    async fn test_delete_non_root_of_a_default_template_is_not_found() {
+        let name = "tpl_scope_shared_delete";
+        let shared = Template {
+            org_id: DEFAULT_ORG.to_string(),
+            name: name.to_string(),
+            body: "shared".to_string(),
+            template_type: TemplateType::Http,
+            ..Default::default()
+        };
+        common::infra::config::ALERTS_TEMPLATES.insert(format!("{DEFAULT_ORG}/{name}"), shared);
+        let err = delete("tpl_scope_acme", name, false).await.unwrap_err();
+        assert!(matches!(err, TemplateError::NotFound), "{err}");
     }
 
     #[test]
