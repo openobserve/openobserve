@@ -100,7 +100,14 @@
               <OTooltip :content="updatedExact" />
             </span>
           </div>
-          <ODropdown v-if="rangeOptions.length > 1" side="bottom" align="end">
+          <!-- One picker for range and timezone, as the app's own date-time picker. -->
+          <OPopover
+            v-model:open="rangeMenuOpen"
+            side="bottom"
+            align="end"
+            :aria-label="t('common.selectDateRange')"
+            content-class="p-1"
+          >
             <template #trigger>
               <OButton
                 variant="outline"
@@ -113,26 +120,36 @@
                 {{ selectedRange ? rangeLabel(selectedRange) : "" }}
               </OButton>
             </template>
-            <ODropdownItem
-              v-for="option in rangeOptions"
-              :key="option.key"
-              :data-test="`dashboards-public-dashboard-preset-${option.key}`"
-              @select="selectRange(option.key)"
-            >
-              {{ rangeLabel(option) }}
-            </ODropdownItem>
-          </ODropdown>
-          <OSelect
-            :model-value="viewerTimezone"
-            :options="timezoneOptions"
-            searchable
-            size="sm"
-            width="sm"
-            class="max-md:hidden"
-            :aria-label="t('logStream.timezone')"
-            data-test="dashboards-public-dashboard-timezone"
-            @update:model-value="setTimezone"
-          />
+            <div class="flex w-72 flex-col">
+              <template v-if="rangeOptions.length > 1">
+                <OButton
+                  v-for="option in rangeOptions"
+                  :key="option.key"
+                  variant="ghost"
+                  size="sm"
+                  block
+                  :data-test="`dashboards-public-dashboard-preset-${option.key}`"
+                  @click="pickRange(option.key)"
+                >
+                  <span class="flex-1 text-start">{{ rangeLabel(option) }}</span>
+                  <template v-if="option.key === selectedKey" #icon-right>
+                    <OIcon name="check" size="sm" />
+                  </template>
+                </OButton>
+                <OSeparator class="my-1" />
+              </template>
+              <div class="px-2 pb-2">
+                <OSelect
+                  :model-value="viewerTimezone"
+                  :options="timezoneOptions"
+                  searchable
+                  :label="t('logStream.timezone')"
+                  data-test="dashboards-public-dashboard-timezone"
+                  @update:model-value="setTimezone"
+                />
+              </div>
+            </div>
+          </OPopover>
           <ThemeSwitcher bordered />
         </template>
       </OPageHeader>
@@ -222,6 +239,7 @@ import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue"
 import PoweredByOpenObserve from "@/components/common/PoweredByOpenObserve.vue";
 import KioskCountdownRing from "@/components/dashboards/kiosk/KioskCountdownRing.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import { useLocalTimezone } from "@/utils/storage";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -232,8 +250,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ThemeSwitcher from "@/components/ThemeSwitcher.vue";
 import publicDashboardsService from "@/services/public_dashboards";
 import { formatInTimeZone } from "date-fns-tz";
@@ -326,6 +342,12 @@ const timezoneOptions = [
   { label: raw("UTC"), value: "UTC" },
   ...Intl.supportedValuesOf("timeZone").map((tz) => ({ label: raw(tz), value: tz })),
 ];
+
+const rangeMenuOpen = ref(false);
+const pickRange = (key: string) => {
+  rangeMenuOpen.value = false;
+  selectRange(key);
+};
 
 const setTimezone = (tz: unknown) => {
   if (typeof tz !== "string" || !tz) return;

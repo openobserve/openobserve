@@ -37,8 +37,7 @@ import service from "@/services/public_dashboards";
 import PublicDashboard from "@/views/Dashboards/PublicDashboard.vue";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import KioskCountdownRing from "@/components/dashboards/kiosk/KioskCountdownRing.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 
@@ -90,14 +89,14 @@ const mountWithPicker = () =>
       provide: { store },
       stubs: {
         OPageHeader: { template: "<div><slot name='actions' /></div>" },
-        ODropdown: { template: "<div><slot /></div>" },
+        OPopover: { template: "<div><slot /></div>" },
       },
     },
   });
 const pickRange = (w: VueWrapper, key: string) =>
   w
-    .findComponent<typeof ODropdownItem>(`[data-test="dashboards-public-dashboard-preset-${key}"]`)
-    .vm.$emit("select");
+    .findComponent<typeof OButton>(`[data-test="dashboards-public-dashboard-preset-${key}"]`)
+    .vm.$emit("click");
 const okSnapshot = (data: unknown) => ({
   status: 200,
   data: { rev: "a", panels: { p1: { state: { state: "ok" }, data } } },
@@ -515,7 +514,7 @@ describe("PublicDashboard viewer", () => {
       store.state.timezone = "UTC";
       (service.getConfig as any).mockResolvedValue({ data: CONFIG, status: 200 });
       (service.getData as any).mockResolvedValue({ status: 200, data: okBody("a") });
-      const w = mountWithActions();
+      const w = mountWithPicker();
       await flushPromises();
       const select = w.findComponent({ name: "OSelect" });
       expect(select.props("modelValue")).toBe("UTC");
@@ -694,23 +693,25 @@ describe("PublicDashboard viewer", () => {
     expect(service.getConfig).toHaveBeenCalledTimes(2);
   });
 
-  it("offers the time range picker only when viewers can switch", async () => {
+  it("lists ranges in the picker only when viewers can switch, and always offers the timezone", async () => {
     (service.getConfig as any).mockResolvedValue({ data: CONFIG, status: 200 });
     (service.getData as any).mockResolvedValue({
       status: 200,
       data: { panels: { p1: { state: { state: "ok" }, data: [] } } },
     });
-    const editable = mountWithActions();
+    const editable = mountWithPicker();
     await flushPromises();
-    expect(editable.findComponent(ODropdown).exists()).toBe(true);
+    expect(has(editable, "dashboards-public-dashboard-preset-r3600")).toBe(true);
+    expect(has(editable, "dashboards-public-dashboard-timezone")).toBe(true);
 
     (service.getConfig as any).mockResolvedValue({
       data: { ...CONFIG, ranges: [{ key: "r3600", type: "relative", secs: 3600 }] },
       status: 200,
     });
-    const fixed = mountWithActions();
+    const fixed = mountWithPicker();
     await flushPromises();
-    expect(fixed.findComponent(ODropdown).exists()).toBe(false);
+    expect(has(fixed, "dashboards-public-dashboard-preset-r3600")).toBe(false);
+    expect(has(fixed, "dashboards-public-dashboard-timezone")).toBe(true);
   });
 
   it("passes frozen values to the grid as read-only constants in their own scope", async () => {
