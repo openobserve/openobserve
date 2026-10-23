@@ -113,80 +113,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <OFormInput name="brand_name" :label="t('statusPages.fields.brandName')" />
 
-                  <!-- Logo and accent colour are one branding decision, so they
-                       share a row; grid-cols-1 keeps them stacked until the
-                       config pane is wide enough for two readable columns. -->
+                  <!-- Logo, favicon and accent colour are one branding decision, so they share a grid. -->
                   <div
                     class="grid grid-cols-1 items-start gap-x-6 gap-y-5 sm:grid-cols-2"
                     data-test="status-page-branding-row"
                   >
-                    <!-- Logo — mirrors the field-level lock pattern used for
-                         Notices/Custom Domains dropdown items in StatusPagesList,
-                         adapted to an input: a disabled control plus a lock icon
-                         and tooltip rather than a disabled menu item. -->
-                    <div class="flex min-w-0 flex-col gap-1.5" data-test="status-page-logo-field">
-                      <div class="flex items-center gap-1.5">
-                        <span class="text-text-label text-sm font-medium">{{
-                          t("statusPages.fields.logo")
-                        }}</span>
-                        <OIcon
-                          v-if="!logoUploadEnabled"
-                          name="lock"
-                          size="xs"
-                          class="text-warning-600"
-                          aria-hidden="true"
-                          data-test="status-page-logo-lock"
-                        />
-                      </div>
+                    <StatusPageImageField
+                      :label="t('statusPages.fields.logo')"
+                      :upload-label="t('statusPages.fields.logoUpload')"
+                      :clear-label="
+                        usingOrgLogoDefault
+                          ? t('statusPages.fields.logoRevertToOrg')
+                          : t('statusPages.fields.logoRemove')
+                      "
+                      :note="
+                        orgLogoOverrideEnabled && usingOrgLogoDefault
+                          ? t('statusPages.fields.logoUsingOrgDefault')
+                          : undefined
+                      "
+                      :image="previewValues.logo_img"
+                      :locked="!logoUploadEnabled"
+                      data-test="status-page-logo"
+                      @select="(value) => onImageSelected('logo_img', value)"
+                      @clear="clearLogo"
+                      @locked="openUpgradeDialog"
+                    />
 
-                      <p
-                        v-if="orgLogoOverrideEnabled && usingOrgLogoDefault"
-                        class="text-text-secondary text-xs"
-                      >
-                        {{ t("statusPages.fields.logoUsingOrgDefault") }}
-                      </p>
-
-                      <div v-if="logoPreview" class="flex min-w-0 items-center gap-2">
-                        <img
-                          :src="logoPreview"
-                          :alt="t('statusPages.fields.logo')"
-                          data-test="status-page-logo-preview"
-                          class="max-h-9 max-w-37.5 object-contain"
-                        />
-                        <OButton
-                          v-if="logoUploadEnabled"
-                          type="button"
-                          variant="ghost-destructive"
-                          size="icon-xs-sq"
-                          icon-left="close"
-                          data-test="status-page-logo-clear"
-                          @click="clearLogo"
-                        >
-                          <OTooltip
-                            side="bottom"
-                            :content="
-                              usingOrgLogoDefault
-                                ? t('statusPages.fields.logoRevertToOrg')
-                                : t('statusPages.fields.logoRemove')
-                            "
-                          />
-                        </OButton>
-                      </div>
-                      <div
-                        v-else
-                        class="contents"
-                        @click.capture="!logoUploadEnabled ? onLockedLogoClick($event) : undefined"
-                      >
-                        <OFile
-                          class="min-w-0"
-                          :model-value="null"
-                          :placeholder="t('statusPages.fields.logoUpload')"
-                          accept=".png, .jpg, .jpeg, .gif, .svg, image/*"
-                          data-test="status-page-logo-upload"
-                          @update:model-value="onLogoFileSelected"
-                        />
-                      </div>
-                    </div>
+                    <StatusPageImageField
+                      :label="t('statusPages.fields.favicon')"
+                      :upload-label="t('statusPages.fields.faviconUpload')"
+                      :clear-label="t('statusPages.fields.faviconRemove')"
+                      :image="previewValues.favicon_img"
+                      :locked="!logoUploadEnabled"
+                      square
+                      data-test="status-page-favicon"
+                      @select="(value) => onImageSelected('favicon_img', value)"
+                      @clear="form.setFieldValue('favicon_img', '')"
+                      @locked="openUpgradeDialog"
+                    />
 
                     <OFormColor
                       name="accent_color"
@@ -357,6 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :brand-name="previewValues.brand_name"
               :accent-color="previewValues.accent_color"
               :logo-img="previewValues.logo_img"
+              :favicon-img="previewValues.favicon_img"
               :visibility="previewValues.visibility"
               :show-uptime-percent="previewValues.show_uptime_percent"
               :show-timeline-bars="previewValues.show_timeline_bars"
@@ -392,11 +357,10 @@ import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
-import OFile from "@/lib/forms/File/OFile.vue";
 import type { FileValue } from "@/lib/forms/File/OFile.types";
 import StatusPagePreview from "./StatusPagePreview.vue";
+import StatusPageImageField from "./StatusPageImageField.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import { getFoldersListByType } from "@/utils/commons";
@@ -442,11 +406,6 @@ const logoUploadEnabled = computed(
   () => config.isCloud === "true" || config.isEnterprise === "true",
 );
 const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
-function onLockedLogoClick(event: MouseEvent) {
-  event.preventDefault();
-  event.stopPropagation();
-  openUpgradeDialog();
-}
 
 // Self-hosted enterprise only, never cloud: the org-wide logo (Settings →
 // General) is an on-prem-org concept, so defaulting/overriding a status
@@ -479,6 +438,7 @@ const emptyDefaults = (): EditStatusPageForm => ({
   brand_name: "",
   accent_color: "",
   logo_img: "",
+  favicon_img: "",
   visibility: "draft",
   password: "",
   noindex: false,
@@ -501,6 +461,7 @@ function defaultsFromPage(p: StatusPageListItem): EditStatusPageForm {
     brand_name: p.brand_name ?? "",
     accent_color: p.accent_color ?? "",
     logo_img: hasOwnLogo ? p.logo_img : orgLogoImg.value,
+    favicon_img: p.favicon_img ?? "",
     visibility: visibilityToMode(p.visibility),
     password: "",
     noindex: p.noindex,
@@ -526,15 +487,11 @@ const previewValues = form.useStore((s: any) => ({
   brand_name: s.values.brand_name ?? "",
   accent_color: s.values.accent_color ?? "",
   logo_img: s.values.logo_img ?? "",
+  favicon_img: s.values.favicon_img ?? "",
   visibility: s.values.visibility ?? "draft",
   show_uptime_percent: !!s.values.show_uptime_percent,
   show_timeline_bars: !!s.values.show_timeline_bars,
 }));
-
-const logoPreview = computed(() => {
-  const v = previewValues.value.logo_img;
-  return v ? `data:image;base64,${v}` : "";
-});
 
 function readFileAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -550,7 +507,7 @@ function readFileAsBase64(file: File): Promise<string> {
   });
 }
 
-async function onLogoFileSelected(value: FileValue) {
+async function onImageSelected(field: "logo_img" | "favicon_img", value: FileValue) {
   if (!logoUploadEnabled.value) {
     openUpgradeDialog();
     return;
@@ -559,10 +516,10 @@ async function onLogoFileSelected(value: FileValue) {
   if (!file) return;
   try {
     const base64 = await readFileAsBase64(file);
-    usingOrgLogoDefault.value = false;
-    form.setFieldValue("logo_img", base64);
+    if (field === "logo_img") usingOrgLogoDefault.value = false;
+    form.setFieldValue(field, base64);
   } catch (err) {
-    console.error("[status-pages] failed to read logo file", err);
+    console.error("[status-pages] failed to read image file", err);
     toast({ variant: "error", message: t("statusPages.fields.logoReadFailed") });
   }
 }
@@ -668,6 +625,7 @@ async function saveSettings(values: EditStatusPageForm) {
     // Still on the org default: persist nothing page-specific so a later org
     // logo change keeps following through, rather than freezing today's copy.
     logo_img: usingOrgLogoDefault.value ? "" : values.logo_img,
+    favicon_img: values.favicon_img,
     visibility: modeToVisibility(values.visibility),
     noindex: values.noindex,
     show_uptime_percent: values.show_uptime_percent,

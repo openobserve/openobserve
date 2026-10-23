@@ -15,8 +15,8 @@
 
 //! The public serving plane. Registered in `basic_routes` — no auth
 //! middleware, no OpenFGA, and per the chart_render contract (its module doc)
-//! nothing here may search, hit storage, or make cross-node calls: two
-//! indexed point-reads against the meta store, nothing else.
+//! nothing here may search, hit storage, or make cross-node calls: indexed
+//! point-reads against the meta store, nothing else.
 //!
 //! Every route answers from the sharded in-process TTL cache and reads the
 //! meta store only on a miss; a password page's payload bypasses the cache (R-7).
@@ -107,16 +107,12 @@ pub struct AuthBody {
 }
 
 impl PublicEntry {
-    fn new(page: &entity::status_pages::Model, snap: entity::status_page_snapshots::Model) -> Self {
-        let body = format!(
-            "{{\"name\":{},\"brand_name\":{},\"accent_color\":{},\"logo_img\":{},\"current\":{},\"history\":{}}}",
-            serde_json::to_string(&page.name).unwrap_or_else(|_| "\"\"".into()),
-            serde_json::to_string(&page.brand_name).unwrap_or_else(|_| "null".into()),
-            serde_json::to_string(&page.accent_color).unwrap_or_else(|_| "null".into()),
-            serde_json::to_string(&page.logo_img).unwrap_or_else(|_| "null".into()),
-            snap.current,
-            snap.history
-        );
+    fn new(
+        page: &entity::status_pages::Model,
+        logo: Option<String>,
+        snap: entity::status_page_snapshots::Model,
+    ) -> Self {
+        let body = snapshot_body(page, logo, &snap.current, &snap.history);
         Self {
             body,
             noindex: page.noindex,
@@ -448,7 +444,10 @@ async fn load(slug: &str) -> Cached {
     match page.visibility {
         2 => Cached::Password,
         1 => match table::get_snapshot(conn, &page.id).await.ok().flatten() {
-            Some(snap) => Cached::Public(Arc::new(PublicEntry::new(&page, snap))),
+            Some(snap) => {
+                let logo = page_logo(&page).await;
+                Cached::Public(Arc::new(PublicEntry::new(&page, logo, snap)))
+            }
             None => Cached::Unbuilt,
         },
         _ => Cached::Missing,
@@ -477,12 +476,7 @@ async fn serve_password_page(slug: &str, headers: &HeaderMap) -> Response {
     let Some(snap) = table::get_snapshot(conn, &page.id).await.ok().flatten() else {
         return not_found();
     };
-    let body = format!(
-        "{{\"name\":{},\"current\":{},\"history\":{}}}",
-        serde_json::to_string(&page.name).unwrap_or_else(|_| "\"\"".into()),
-        snap.current,
-        snap.history
-    );
+    let body = snapshot_body(&page, page_logo(&page).await, &snap.current, &snap.history);
     Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, "application/json")
@@ -491,6 +485,46 @@ async fn serve_password_page(slug: &str, headers: &HeaderMap) -> Response {
         .header("X-Robots-Tag", "noindex")
         .body(Body::from(body))
         .unwrap_or_else(|_| not_found())
+}
+
+/// The visitor JSON; an unlocked password page carries the same branding as a public one.
+fn snapshot_body(
+    page: &entity::status_pages::Model,
+    logo: Option<String>,
+    current: &str,
+    history: &str,
+) -> String {
+    let json = |v: &Option<String>| serde_json::to_string(v).unwrap_or_else(|_| "null".into());
+    format!(
+        "{{\"name\":{},\"brand_name\":{},\"accent_color\":{},\"logo_img\":{},\"favicon_img\":{},\"current\":{},\"history\":{}}}",
+        serde_json::to_string(&page.name).unwrap_or_else(|_| "\"\"".into()),
+        json(&page.brand_name),
+        json(&page.accent_color),
+        json(&logo),
+        json(&page.favicon_img),
+        current,
+        history
+    )
+}
+
+/// A page with no logo of its own shows the org logo, which is what its editor previews.
+async fn page_logo(page: &entity::status_pages::Model) -> Option<String> {
+    if page.logo_img.is_some() {
+        return page.logo_img.clone();
+    }
+    org_logo().await
+}
+
+#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+async fn org_logo() -> Option<String> {
+    o2_enterprise::enterprise::common::settings::get_logo()
+        .await
+        .filter(|s| !s.is_empty())
+}
+
+#[cfg(not(all(feature = "enterprise", not(feature = "cloud"))))]
+async fn org_logo() -> Option<String> {
+    None
 }
 
 /// No `Domain=` attribute, deliberately: a host-only cookie is scoped to whichever host issued it,
@@ -867,6 +901,42 @@ mod tests {
         );
         assert_eq!(unlock_cookie(&headers), Some("tok"));
         assert_eq!(unlock_cookie(&HeaderMap::new()), None);
+    }
+
+    #[test]
+    fn visitor_json_carries_branding_and_a_separate_favicon() {
+        let page = entity::status_pages::Model {
+            id: "p1".into(),
+            org_id: "org".into(),
+            name: "Internal".into(),
+            slug: "abc".into(),
+            description: None,
+            visibility: 2,
+            password_hash: None,
+            noindex: true,
+            show_uptime_percent: true,
+            show_timeline_bars: true,
+            show_response_time: false,
+            confirm_failures: 2,
+            confirm_recovery: 2,
+            confirm_after_secs: None,
+            brand_name: Some("Acme".into()),
+            accent_color: Some("#112233".into()),
+            logo_img: None,
+            favicon_img: Some("FAV".into()),
+            tracking_since: None,
+            owner: None,
+            created_at: 1,
+            updated_at: 1,
+        };
+        let body = snapshot_body(&page, Some("LOGO".into()), "{}", "[]");
+        let v: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(v["name"], "Internal");
+        assert_eq!(v["brand_name"], "Acme");
+        assert_eq!(v["accent_color"], "#112233");
+        assert_eq!(v["logo_img"], "LOGO");
+        assert_eq!(v["favicon_img"], "FAV");
+        assert_eq!(v["history"], serde_json::json!([]));
     }
 
     #[cfg(feature = "enterprise")]
