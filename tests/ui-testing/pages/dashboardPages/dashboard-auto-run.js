@@ -246,6 +246,19 @@ export default class DashboardAutoRun {
     await expect(this.refreshBtn).toHaveAttribute("data-o2-variant", variant);
   }
 
+  async expectRefreshLabel(text) {
+    await expect(this.refreshBtn).toContainText(text);
+  }
+
+  async expectRefreshOptionsVariant(variant) {
+    await expect(this.refreshOptionsBtn).toHaveAttribute("data-o2-variant", variant);
+  }
+
+  async waitForRefreshIdle() {
+    // The Refresh button is :disabled="arePanelsLoading", so enabled means the dashboard settled.
+    await expect(this.refreshBtn).toBeEnabled({ timeout: 30000 });
+  }
+
   async expectRefreshNotPending() {
     await expect(this.refreshBtn).not.toHaveAttribute("data-o2-variant", "pending");
   }
