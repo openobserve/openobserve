@@ -447,7 +447,7 @@ async fn process_stream(job: StreamJob, settings: &Settings, now: i64) {
     };
     let cols = Columns::from_schema(&schema);
     if !cols.has_required() {
-        log::warn!(
+        log::debug!(
             "[ServiceGraph] {org}/{stream}: schema lacks service_name or span_kind, skipped"
         );
         return;

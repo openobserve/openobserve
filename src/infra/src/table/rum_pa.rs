@@ -21,9 +21,10 @@ use sea_orm::{
     sea_query::{Expr, OnConflict},
 };
 
-use super::entity::{rum_pa_funnels, rum_pa_named_events, rum_pa_tombstones};
+use super::entity::{rum_pa_app_settings, rum_pa_funnels, rum_pa_named_events, rum_pa_tombstones};
 pub use super::entity::{
-    rum_pa_funnels::Model as FunnelRow, rum_pa_named_events::Model as NamedEventRow,
+    rum_pa_app_settings::Model as AppSettingsRow, rum_pa_funnels::Model as FunnelRow,
+    rum_pa_named_events::Model as NamedEventRow,
 };
 use crate::db::get_orm_client_rw;
 
@@ -36,7 +37,7 @@ pub const MAX_NAME_KEY_CHARS: usize = 128;
 /// Passes of a replicated upsert whose insert lost a race to a same-id row committed meanwhile.
 const UPSERT_PASSES: u32 = 3;
 
-/// The row fields replication and conflict handling read on both tables.
+/// The row fields replication and conflict handling read on every table.
 pub trait PaRow: Clone + Send + Sync {
     fn id(&self) -> &str;
     fn org_id(&self) -> &str;
@@ -118,7 +119,41 @@ impl PaRow for FunnelRow {
     }
 }
 
-/// One of the two tables, with the columns they share.
+impl PaRow for AppSettingsRow {
+    fn id(&self) -> &str {
+        &self.id
+    }
+
+    fn org_id(&self) -> &str {
+        &self.org_id
+    }
+
+    fn app(&self) -> &str {
+        &self.app
+    }
+
+    fn name(&self) -> &str {
+        &self.app
+    }
+
+    fn version(&self) -> i32 {
+        self.version
+    }
+
+    fn updated_at(&self) -> i64 {
+        self.updated_at
+    }
+
+    fn updated_by(&self) -> &str {
+        &self.updated_by
+    }
+
+    fn rename(&mut self, _name: String, _name_key: String) {
+        unreachable!("settings rows share an id per app, so they never clash by name")
+    }
+}
+
+/// One of the PA tables, with the columns they share.
 pub trait PaTable: EntityTrait<Model = Self::Row> {
     type Row: PaRow
         + sea_orm::FromQueryResult
@@ -159,8 +194,21 @@ impl PaTable for rum_pa_funnels::Entity {
     const UPDATED_AT: Self::Column = rum_pa_funnels::Column::UpdatedAt;
 }
 
+impl PaTable for rum_pa_app_settings::Entity {
+    type Row = AppSettingsRow;
+    type Active = rum_pa_app_settings::ActiveModel;
+    const KIND: &'static str = "app_settings";
+    const ID: Self::Column = rum_pa_app_settings::Column::Id;
+    const ORG_ID: Self::Column = rum_pa_app_settings::Column::OrgId;
+    const APP: Self::Column = rum_pa_app_settings::Column::App;
+    const NAME_KEY: Self::Column = rum_pa_app_settings::Column::App;
+    const VERSION: Self::Column = rum_pa_app_settings::Column::Version;
+    const UPDATED_AT: Self::Column = rum_pa_app_settings::Column::UpdatedAt;
+}
+
 pub type NamedEvents = rum_pa_named_events::Entity;
 pub type Funnels = rum_pa_funnels::Entity;
+pub type AppSettings = rum_pa_app_settings::Entity;
 type Tombstones = rum_pa_tombstones::Entity;
 
 /// What a replicated upsert did on this replica.
@@ -357,7 +405,7 @@ pub async fn create_tables_for_tests(db: &sea_orm::DatabaseConnection) -> Result
     super::migration::create_rum_pa_tables(db).await
 }
 
-/// Removes both tables' rows for an org in one transaction.
+/// Removes every PA table's rows for an org in one transaction.
 pub async fn delete_by_org(org_id: &str) -> Result<(), DbErr> {
     apply_delete_org(get_orm_client_rw().await, org_id).await
 }
@@ -378,6 +426,22 @@ pub async fn apply_upsert<T: PaTable, C: ConnectionTrait + TransactionTrait>(
     Err(DbErr::Custom(format!(
         "rum_pa {}: a concurrent insert of the same id won {UPSERT_PASSES} times",
         row.id()
+    )))
+}
+
+/// Writes a replicated settings row unless the stored one is at least as new.
+pub async fn apply_settings_upsert<C: ConnectionTrait + TransactionTrait>(
+    db: &C,
+    row: AppSettingsRow,
+) -> Result<Applied, DbErr> {
+    for _ in 0..UPSERT_PASSES {
+        if let Some(applied) = settings_upsert_once(db, row.clone()).await? {
+            return Ok(applied);
+        }
+    }
+    Err(DbErr::Custom(format!(
+        "rum_pa {}: a concurrent write of the same settings won {UPSERT_PASSES} times",
+        row.id
     )))
 }
 
@@ -416,6 +480,10 @@ pub async fn apply_delete_org<C: ConnectionTrait + TransactionTrait>(
         .await?;
     NamedEvents::delete_many()
         .filter(rum_pa_named_events::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    AppSettings::delete_many()
+        .filter(rum_pa_app_settings::Column::OrgId.eq(org_id))
         .exec(&txn)
         .await?;
     Tombstones::delete_many()
@@ -500,6 +568,45 @@ async fn upsert_once<T: PaTable, C: ConnectionTrait + TransactionTrait>(
     }
     txn.commit().await?;
     Ok(Some(applied))
+}
+
+/// `None` when a write committed between the read and the guarded write; the next pass sees it.
+async fn settings_upsert_once<C: ConnectionTrait + TransactionTrait>(
+    db: &C,
+    row: AppSettingsRow,
+) -> Result<Option<Applied>, DbErr> {
+    use rum_pa_app_settings::Column;
+    let txn = db.begin().await?;
+    lock_id::<AppSettings, _>(&txn, &row.id).await?;
+    let stored = AppSettings::find()
+        .filter(Column::Id.eq(row.id.as_str()))
+        .one(&txn)
+        .await?;
+    let written = match stored {
+        Some(stored) if !newer(&row, &stored) => return Ok(Some(Applied::Stale)),
+        Some(stored) => {
+            AppSettings::update_many()
+                .set(row.into_active_model().reset_all())
+                .filter(Column::Id.eq(stored.id.as_str()))
+                .filter(Column::Version.eq(stored.version))
+                .filter(Column::UpdatedAt.eq(stored.updated_at))
+                .exec(&txn)
+                .await?
+                .rows_affected
+        }
+        None => {
+            AppSettings::insert(row.into_active_model())
+                .on_conflict(OnConflict::column(Column::Id).do_nothing().to_owned())
+                .exec_without_returning(&txn)
+                .await?
+        }
+    };
+    if written == 0 {
+        txn.rollback().await?;
+        return Ok(None);
+    }
+    txn.commit().await?;
+    Ok(Some(Applied::Written))
 }
 
 /// Queues the replicated writes of one id on Postgres; SQLite's single writer already does.
@@ -627,7 +734,7 @@ fn loser_name<R: PaRow>(row: &R, attempt: u32) -> String {
 
 #[cfg(test)]
 mod tests {
-    use sea_orm::{ConnectOptions, Database, DatabaseConnection};
+    use sea_orm::{ConnectOptions, Database, DatabaseConnection, IdenStatic};
 
     use super::*;
 
@@ -657,22 +764,14 @@ mod tests {
     }
 
     fn funnel(id: &str, name: &str) -> FunnelRow {
-        FunnelRow {
-            id: id.into(),
-            org_id: "acme".into(),
-            app: "web".into(),
-            name: name.into(),
-            name_key: name_key(name),
-            description: None,
-            definition: serde_json::json!({"s": [["p", "/"], ["p", "/a"]], "u": "sessions", "w": "session"}),
-            sql: "SELECT 1".into(),
-            event_ids: serde_json::json!([]),
-            version: 1,
-            created_by: "a@x.io".into(),
-            updated_by: "a@x.io".into(),
-            created_at: 10,
-            updated_at: 10,
-        }
+        serde_json::from_value(serde_json::json!({
+            "id": id, "org_id": "acme", "app": "web", "name": name, "name_key": name_key(name),
+            "description": null,
+            "definition": {"s": [["p", "/"], ["p", "/a"]], "u": "sessions", "w": "session"},
+            "sql": "SELECT 1", "event_ids": [], "version": 1, "created_by": "a@x.io",
+            "updated_by": "a@x.io", "created_at": 10, "updated_at": 10
+        }))
+        .unwrap()
     }
 
     fn edit(row: &NamedEventRow, version: i32, updated_at: i64, by: &str) -> NamedEventRow {
@@ -683,6 +782,41 @@ mod tests {
             rules: serde_json::json!([{"t": "view", "op": "eq", "value": format!("/v{version}/{by}")}]),
             ..row.clone()
         }
+    }
+
+    fn settings(id: &str, app: &str) -> AppSettingsRow {
+        AppSettingsRow {
+            id: id.into(),
+            org_id: "acme".into(),
+            app: app.into(),
+            bots: true,
+            sessions: serde_json::json!([]),
+            pages: serde_json::json!([]),
+            version: 1,
+            created_by: "a@x.io".into(),
+            updated_by: "a@x.io".into(),
+            created_at: 10,
+            updated_at: 10,
+        }
+    }
+
+    fn settings_edit(
+        row: &AppSettingsRow,
+        version: i32,
+        updated_at: i64,
+        by: &str,
+    ) -> AppSettingsRow {
+        AppSettingsRow {
+            version,
+            updated_at,
+            updated_by: by.into(),
+            pages: serde_json::json!([{"op": "eq", "value": format!("/v{version}/{by}")}]),
+            ..row.clone()
+        }
+    }
+
+    async fn all_settings(db: &DatabaseConnection) -> Vec<AppSettingsRow> {
+        AppSettings::find().all(db).await.unwrap()
     }
 
     async fn events(db: &DatabaseConnection, app: &str) -> Vec<NamedEventRow> {
@@ -1263,5 +1397,119 @@ mod tests {
             .map(|r| r.name)
             .collect();
         assert_eq!(web, ["signup"], "the rival rename was rolled back");
+    }
+
+    #[tokio::test]
+    async fn p1_r6_a_settings_row_round_trips_through_its_table() {
+        let db = db().await;
+        let row = settings("s1", "web");
+        insert::<AppSettings, _>(&db, row.clone()).await.unwrap();
+        assert_eq!(
+            get::<AppSettings, _>(&db, "acme", "web", "s1")
+                .await
+                .unwrap(),
+            Some(row)
+        );
+    }
+
+    #[test]
+    fn p1_r7_app_settings_kind_is_app_settings() {
+        assert_eq!(<AppSettings as PaTable>::KIND, "app_settings");
+    }
+
+    #[test]
+    fn p1_r7_app_settings_list_in_app_order() {
+        assert_eq!(<AppSettings as PaTable>::NAME_KEY.as_str(), "app");
+    }
+
+    #[test]
+    fn p1_r7_a_settings_row_is_named_by_its_app() {
+        assert_eq!(settings("s1", "web").name(), "web");
+    }
+
+    #[tokio::test]
+    async fn p1_r8_a_settings_upsert_inserts_an_absent_row() {
+        let db = db().await;
+        let row = settings("s1", "web");
+        apply_settings_upsert(&db, row.clone()).await.unwrap();
+        assert_eq!(all_settings(&db).await, [row]);
+    }
+
+    #[tokio::test]
+    async fn p1_r8_the_newer_settings_version_wins_whichever_arrives_second() {
+        let base = settings("s1", "web");
+        let v2 = settings_edit(&base, 2, 20, "a@x.io");
+        let v3 = settings_edit(&base, 3, 15, "a@x.io");
+        for order in [[&v2, &v3], [&v3, &v2]] {
+            let db = db().await;
+            for row in order {
+                apply_settings_upsert(&db, row.clone()).await.unwrap();
+            }
+            assert_eq!(all_settings(&db).await, std::slice::from_ref(&v3));
+        }
+    }
+
+    #[tokio::test]
+    async fn p1_r8_an_older_or_repeated_settings_upsert_keeps_one_row() {
+        let db = db().await;
+        let base = settings("s1", "web");
+        let v2 = settings_edit(&base, 2, 20, "a@x.io");
+        apply_settings_upsert(&db, v2.clone()).await.unwrap();
+        apply_settings_upsert(&db, v2.clone()).await.unwrap();
+        apply_settings_upsert(&db, base).await.unwrap();
+        assert_eq!(all_settings(&db).await, [v2]);
+    }
+
+    #[tokio::test]
+    async fn p1_r8_an_equal_settings_version_breaks_the_tie_on_updated_at_then_updated_by() {
+        let base = settings("s1", "web");
+        let early = settings_edit(&base, 2, 20, "z@x.io");
+        let late = settings_edit(&base, 2, 30, "a@x.io");
+        let by_b = settings_edit(&base, 2, 30, "b@x.io");
+        for order in [[&early, &late, &by_b], [&by_b, &late, &early]] {
+            let db = db().await;
+            for row in order {
+                apply_settings_upsert(&db, row.clone()).await.unwrap();
+            }
+            assert_eq!(all_settings(&db).await, std::slice::from_ref(&by_b));
+        }
+    }
+
+    #[tokio::test]
+    async fn p1_r8_a_settings_row_for_an_app_longer_than_a_name_is_stored_unchanged() {
+        let db = db().await;
+        let row = settings("s1", &"a".repeat(200));
+        assert!(!name_fits(&row.app));
+        apply_settings_upsert(&db, row.clone()).await.unwrap();
+        assert_eq!(all_settings(&db).await, [row]);
+    }
+
+    #[tokio::test]
+    async fn p1_r7_a_settings_upsert_writes_no_tombstone() {
+        let db = db().await;
+        let base = settings("s1", "web");
+        apply_settings_upsert(&db, base.clone()).await.unwrap();
+        apply_settings_upsert(&db, settings_edit(&base, 2, 20, "a@x.io"))
+            .await
+            .unwrap();
+        assert!(Tombstones::find().all(&db).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn p1_r9_an_org_delete_removes_its_app_settings_only() {
+        let db = db().await;
+        insert::<AppSettings, _>(&db, settings("s1", "web"))
+            .await
+            .unwrap();
+        insert::<AppSettings, _>(&db, settings("s2", "ios"))
+            .await
+            .unwrap();
+        let kept = AppSettingsRow {
+            org_id: "keep".into(),
+            ..settings("s3", "web")
+        };
+        insert::<AppSettings, _>(&db, kept.clone()).await.unwrap();
+        apply_delete_org(&db, "acme").await.unwrap();
+        assert_eq!(all_settings(&db).await, [kept]);
     }
 }

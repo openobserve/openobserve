@@ -47,7 +47,7 @@ use crate::{
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("status" = Option<String>, Query, description = "Filter by status (draft, active, paused, degraded, archived)"),
+        ("status" = Option<String>, Query, description = "Filter by status (draft, active, paused, archived)"),
     ),
     responses(
         (status = 200, body = inline(ListEvalJobsResponseBody)),
@@ -80,7 +80,8 @@ pub async fn list_eval_jobs(
 
     match eval_jobs::list_jobs(&org_id, query.status.as_deref(), permitted_objects).await {
         Ok(list) => {
-            let body: ListEvalJobsResponseBody = list.into();
+            let mut body: ListEvalJobsResponseBody = list.into();
+            enrich_with_health(&mut body.list).await;
             MetaHttpResponse::json(body)
         }
         Err(err) => err.into(),
@@ -262,7 +263,7 @@ pub async fn delete_eval_job(Path((org_id, job_id)): Path<(String, String)>) -> 
     tag = "EvalJobs",
     operation_id = "ActivateEvalJob",
     summary = "Activate eval job",
-    description = "Transitions an eval job to the active state. Allowed from draft, paused or degraded.",
+    description = "Transitions an eval job to the active state. Allowed from draft or paused.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -302,7 +303,7 @@ pub async fn activate_eval_job(
     tag = "EvalJobs",
     operation_id = "PauseEvalJob",
     summary = "Pause eval job",
-    description = "Transitions an active or degraded eval job to the paused state.",
+    description = "Transitions an active eval job to the paused state.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -335,7 +336,7 @@ pub async fn pause_eval_job(Path((org_id, job_id)): Path<(String, String)>) -> R
     tag = "EvalJobs",
     operation_id = "ResumeEvalJob",
     summary = "Resume eval job",
-    description = "Resumes a paused or degraded eval job by transitioning it back to active.",
+    description = "Resumes a paused eval job by transitioning it back to active.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -440,6 +441,33 @@ pub async fn manual_eval_job(
     match eval_jobs::manual_evaluate(&org_id, &job_id, body, author).await {
         Ok(resp) => MetaHttpResponse::json(resp),
         Err(err) => err.into(),
+    }
+}
+
+/// Best-effort: a health lookup failure must not take down the jobs list.
+async fn enrich_with_health(list: &mut [EvalJobResponseBody]) {
+    // Archived jobs are no longer measured, so their last row would read as current.
+    let ids: Vec<String> = list
+        .iter()
+        .filter(|job| matches!(job.status.as_str(), "active" | "paused"))
+        .map(|job| job.id.clone())
+        .collect();
+    if ids.is_empty() {
+        return;
+    }
+    let states = match infra::table::eval_job_states::get_many(&ids).await {
+        Ok(states) => states,
+        Err(e) => {
+            log::warn!("[EvalJobHealth] failed to load eval job health for list: {e}");
+            return;
+        }
+    };
+    let mut by_id: std::collections::HashMap<String, _> = states
+        .into_iter()
+        .map(|state| (state.job_id.clone(), state))
+        .collect();
+    for job in list.iter_mut() {
+        job.health = by_id.remove(&job.id).map(Into::into);
     }
 }
 

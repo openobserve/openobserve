@@ -252,7 +252,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
     </div>
-    <SavedFunnelDialogs ref="dialogs" :events="events" :events-ready="eventsReady" />
+    <SavedFunnelDialogs
+      ref="dialogs"
+      :events="events"
+      :events-ready="eventsReady"
+      :compile-sql="compileSql"
+    />
   </div>
 </template>
 
@@ -290,6 +295,7 @@ import {
   type NamedEvent,
   type SavedFunnel,
 } from "@/utils/rum/productAnalyticsModel";
+import { funnelSql, storedFunnelScope, type FunnelDef } from "@/utils/rum/productAnalyticsQueries";
 
 defineOptions({ name: "SavedFunnelsPage", beforeRouteEnter: forwardFunnelLink });
 
@@ -356,6 +362,15 @@ const lastUpdatedAt = computed(() =>
 const canWrite = computed(() => permission.value === "write");
 const openedId = computed(() => pa.openedFunnel.value?.id ?? null);
 const readOnlyTip = computed(() => t("rum.analytics.saved.readOnly"));
+
+// The sql the builder would save for `d`, without the page scope, so a copy matches what the funnel remembers.
+const compileSql = (d: FunnelDef): string | null =>
+  !pa.rulesReady.value || (d.unit === "users" && !pa.identitySql.value)
+    ? null
+    : funnelSql(storedFunnelScope(pa.scope.value), pa.identitySql.value, d, {
+        events: events.value,
+        sample: 1,
+      });
 
 const rows = computed(() => {
   const term = filter.value.trim().toLowerCase();

@@ -861,10 +861,6 @@ impl UsageType {
     pub fn is_remote_pipeline(&self) -> bool {
         matches!(self, UsageType::RemotePipeline)
     }
-
-    pub fn is_incident(&self) -> bool {
-        matches!(self, UsageType::NewIncident | UsageType::IncidentReAnalysis)
-    }
 }
 
 impl std::fmt::Display for UsageType {
@@ -2315,16 +2311,6 @@ mod tests {
         assert!(!UsageType::Pipeline.is_remote_pipeline());
         assert!(!UsageType::Bulk.is_remote_pipeline());
         assert!(!UsageType::Search.is_remote_pipeline());
-    }
-
-    #[test]
-    fn test_usage_type_is_incident() {
-        assert!(UsageType::NewIncident.is_incident());
-        assert!(UsageType::IncidentReAnalysis.is_incident());
-
-        assert!(!UsageType::Bulk.is_incident());
-        assert!(!UsageType::Search.is_incident());
-        assert!(!UsageType::Pipeline.is_incident());
     }
 
     #[test]

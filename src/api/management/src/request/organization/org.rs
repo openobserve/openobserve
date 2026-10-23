@@ -213,24 +213,33 @@ pub async fn organizations(
     tag = "Organizations",
     operation_id = "GetAllOrganizations",
     summary = "Get all organizations (meta only)",
-    description = "Retrieves a comprehensive list of all organizations in the system with detailed information including subscription types, trial periods, and creation dates. Only accessible through the '_meta' organization for administrative purposes.",
+    description = "Retrieves a comprehensive list of all organizations in the system with detailed information including subscription types, trial periods, and creation dates. Only accessible through the '_meta' organization, and only to the root user or a member of '_meta'.",
     security(
         ("Authorization"= [])
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(AllOrganizationResponse)),
+        (status = 403, description = "The caller is neither the root user nor a member of '_meta'", content_type = "application/json", body = Object),
     ),
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn all_organizations(
+    Headers(user_email): Headers<UserEmail>,
     Path(org_id): Path<String>,
     Query(query): Query<HashMap<String, String>>,
 ) -> Response {
     let org = org_id;
     if org != "_meta" {
         return MetaHttpResponse::unauthorized("not authorized to access this resource");
+    }
+    let allowed = is_root_user(&user_email.user_id)
+        || openobserve_core::users::get_user(Some(config::META_ORG_ID), &user_email.user_id)
+            .await
+            .is_some();
+    if !allowed {
+        return MetaHttpResponse::forbidden("Not allowed");
     }
 
     let mut orgs = vec![];
@@ -1852,5 +1861,92 @@ mod tests {
         .await;
 
         assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[cfg(feature = "cloud")]
+    async fn add_member(org: &str, email: &str, role: config::meta::user::UserRole) {
+        use config::meta::user::UserType;
+        use infra::table::users::UserRecord;
+
+        infra::table::users::add(UserRecord {
+            email: email.to_string(),
+            first_name: "Org".to_string(),
+            last_name: "Lister".to_string(),
+            password: String::new(),
+            salt: String::new(),
+            is_root: false,
+            password_ext: None,
+            user_type: UserType::Internal,
+            created_at: 0,
+            updated_at: 0,
+            must_reset_password: false,
+            password_reset_reason: None,
+            flagged_at: None,
+            password_updated_at: None,
+        })
+        .await
+        .unwrap();
+        infra::table::org_users::add(org, email, role, "lister-token", None)
+            .await
+            .unwrap();
+    }
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn only_root_or_a_meta_member_lists_every_organization() {
+        use common::infra::config::ORG_USERS;
+        use config::meta::{organization::OrganizationType, user::UserRole};
+        use infra::table::org_users::OrgUserRecord;
+
+        for key in [
+            "O2_STRIPE_SECRET_KEY",
+            "O2_STRIPE_WEBHOOK_SECRET",
+            "O2_AZURE_TENANT_ID",
+            "O2_AZURE_CLIENT_ID",
+            "O2_AZURE_CLIENT_SECRET",
+        ] {
+            // SAFETY: placeholders the Cloud config demands before it loads; no test reads them.
+            unsafe { std::env::set_var(key, "test-placeholder") };
+        }
+        infra::db::create_table().await.unwrap();
+        infra::db_init().await.unwrap();
+        infra::table::migrate().await.unwrap();
+        o2_enterprise::enterprise::cloud::migrate().await.unwrap();
+        for org in [config::META_ORG_ID, "acme-lister"] {
+            let _ = infra::table::organizations::add(org, org, OrganizationType::Custom).await;
+        }
+        let root = "org-list-root@example.com";
+        let meta_member = "org-list-meta-viewer@example.com";
+        let org_member = "org-list-acme-admin@example.com";
+        ORG_USERS.insert(
+            format!("{}/{root}", config::DEFAULT_ORG),
+            OrgUserRecord {
+                email: root.to_string(),
+                org_id: config::DEFAULT_ORG.to_string(),
+                role: UserRole::Root,
+                token: String::new(),
+                rum_token: None,
+                created_at: 0,
+                allow_static_token: true,
+            },
+        );
+        add_member(config::META_ORG_ID, meta_member, UserRole::Viewer).await;
+        add_member("acme-lister", org_member, UserRole::Admin).await;
+
+        for (email, expected) in [
+            (org_member, StatusCode::FORBIDDEN),
+            (meta_member, StatusCode::OK),
+            (root, StatusCode::OK),
+        ] {
+            let response = all_organizations(
+                Headers(UserEmail {
+                    user_id: email.to_string(),
+                }),
+                Path(config::META_ORG_ID.to_string()),
+                Query(HashMap::new()),
+            )
+            .await;
+            assert_eq!(response.status(), expected, "{email}");
+        }
     }
 }

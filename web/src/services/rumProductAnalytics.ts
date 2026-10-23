@@ -16,14 +16,15 @@
 import type { AxiosResponse } from "axios";
 import http from "./http";
 import type {
-  NamedActionRule,
-  NamedEventRule,
+  AppSettings,
+  NamedRule,
+  PutAppSettingsBody,
   SavedFunnelBody,
 } from "@/utils/rum/productAnalyticsModel";
 
 export interface NamedEventBody {
   name: string;
-  rules: (NamedEventRule | NamedActionRule)[];
+  rules: NamedRule[];
 }
 export interface FunnelRef {
   id: string;
@@ -86,6 +87,13 @@ const rumProductAnalytics = {
   ): Promise<AxiosResponse<unknown>> => http().put(funnels(org, id), body, inApp(app)),
   deleteFunnel: (org: string, app: string, id: string): Promise<AxiosResponse> =>
     http().delete(funnels(org, id), inApp(app)),
+  getAppSettings: (org: string, app: string): Promise<AxiosResponse<AppSettings>> =>
+    http().get(`${base(org)}/settings`, inApp(app)),
+  putAppSettings: (
+    org: string,
+    app: string,
+    body: PutAppSettingsBody,
+  ): Promise<AxiosResponse<AppSettings>> => http().put(`${base(org)}/settings`, body, inApp(app)),
 };
 
 export default rumProductAnalytics;

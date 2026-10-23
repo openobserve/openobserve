@@ -224,6 +224,12 @@ mod m20261012_000001_create_alert_calibration_configs;
 mod m20261013_000001_create_oncall_phone_verifications;
 mod m20261013_000002_create_org_telephony;
 mod m20261015_000001_reports_add_last_run_columns;
+mod m20261016_000001_create_rca_runs;
+mod m20261016_000001_create_rum_pa_app_settings;
+mod m20261017_000001_add_rca_run_progress_columns;
+mod m20261018_000001_create_rca_steering;
+mod m20261018_000001_create_slack_tables;
+mod m20261020_000001_create_eval_job_states_tables;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -362,7 +368,16 @@ pub(crate) async fn create_rum_pa_tables(db: &sea_orm::DatabaseConnection) -> Re
         .await?;
     m20261008_000001_add_name_to_rum_pa_tombstones::Migration
         .up(&manager)
+        .await?;
+    m20261016_000001_create_rum_pa_app_settings::Migration
+        .up(&manager)
         .await
+}
+
+/// Apply only the Slack app tables, idempotently, for tests in any crate.
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) async fn create_slack_tables<C: sea_orm::ConnectionTrait>(db: &C) -> Result<(), DbErr> {
+    m20261018_000001_create_slack_tables::create_all(db).await
 }
 
 pub struct Migrator;
@@ -577,6 +592,12 @@ impl MigratorTrait for Migrator {
             Box::new(m20261013_000001_create_oncall_phone_verifications::Migration),
             Box::new(m20261013_000002_create_org_telephony::Migration),
             Box::new(m20261015_000001_reports_add_last_run_columns::Migration),
+            Box::new(m20261016_000001_create_rum_pa_app_settings::Migration),
+            Box::new(m20261020_000001_create_eval_job_states_tables::Migration),
+            Box::new(m20261018_000001_create_slack_tables::Migration),
+            Box::new(m20261016_000001_create_rca_runs::Migration),
+            Box::new(m20261017_000001_add_rca_run_progress_columns::Migration),
+            Box::new(m20261018_000001_create_rca_steering::Migration),
         ]
     }
 }
@@ -645,6 +666,12 @@ mod tests {
         (107, "m20261007_000002_add_redact_tools_to_ai_chat_shares"),
         (108, "m20261013_000002_create_org_telephony"),
         (109, "m20261015_000001_reports_add_last_run_columns"),
+        (110, "m20261016_000001_create_rum_pa_app_settings"),
+        (111, "m20261020_000001_create_eval_job_states_tables"),
+        (112, "m20261018_000001_create_slack_tables"),
+        (113, "m20261016_000001_create_rca_runs"),
+        (114, "m20261017_000001_add_rca_run_progress_columns"),
+        (115, "m20261018_000001_create_rca_steering"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -779,11 +806,60 @@ mod tests {
                 "m20260923_000001_create_ai_chat_sessions",
                 "m20261007_000001_create_ai_chat_turns",
             ),
+            (
+                "m20251204_000001_create_alert_incidents_table",
+                "m20261016_000001_create_rca_runs",
+            ),
+            (
+                "m20261016_000001_create_rca_runs",
+                "m20261017_000001_add_rca_run_progress_columns",
+            ),
+            (
+                "m20261016_000001_create_rca_runs",
+                "m20261018_000001_create_rca_steering",
+            ),
         ] {
             assert!(
                 position(earlier) < position(later),
                 "{later} must be registered after {earlier}"
             );
         }
+    }
+
+    const APP_SETTINGS_MIGRATION: &str = "m20261016_000001_create_rum_pa_app_settings";
+
+    #[test]
+    fn p1_r4_app_settings_migration_is_registered_after_alert_dedup_scope() {
+        let names: Vec<String> = Migrator::migrations()
+            .into_iter()
+            .map(|migration| migration.name().to_string())
+            .collect();
+        let at = |name: &str| names.iter().position(|n| n == name);
+        let settings =
+            at(APP_SETTINGS_MIGRATION).expect("the app-settings migration is registered");
+        let dedup = at("m20261007_000001_scope_alert_dedup_state_by_org").unwrap();
+        assert!(dedup < settings);
+    }
+
+    #[test]
+    fn p1_r5_schema_version_110_covers_the_app_settings_migration() {
+        assert!(VERSION_COVERAGE.contains(&(110, APP_SETTINGS_MIGRATION)));
+    }
+
+    #[tokio::test]
+    async fn p1_r4_the_rum_pa_test_helper_also_builds_app_settings() {
+        let mut opts = sea_orm::ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = sea_orm::Database::connect(opts).await.unwrap();
+        create_rum_pa_tables(&db).await.unwrap();
+        create_rum_pa_tables(&db).await.unwrap();
+        let manager = SchemaManager::new(&db);
+        assert!(manager.has_table("rum_pa_app_settings").await.unwrap());
+        assert!(
+            manager
+                .has_column("rum_pa_funnels", "rules_hash")
+                .await
+                .unwrap()
+        );
     }
 }

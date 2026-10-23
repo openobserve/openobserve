@@ -17,21 +17,21 @@ use std::time::Duration;
 
 use axum::{
     Router,
-    extract::{DefaultBodyLimit, FromRequestParts, Path, Request},
-    http::{Method, StatusCode, Uri, header},
+    extract::{DefaultBodyLimit, FromRequestParts, Path, RawPathParams, Request},
+    http::{Method, StatusCode, Uri, header, request::Parts},
     middleware::{self, Next},
     response::{IntoResponse, Redirect, Response},
     routing::{delete, get, patch, post, put},
 };
 use config::get_config;
-use openobserve_api_common::X_O2_ASSISTANT_SESSION_ID;
+use openobserve_api_common::{X_O2_ASSISTANT_SESSION_ID, X_O2_ASSISTANT_TURN_ID};
 use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
 #[cfg(feature = "profiling")]
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, ingest_rejections,
     kv, metrics_usage, model_pricing, organization, query_history, rum_analytics, service_accounts,
-    short_url, slos, sourcemaps, status, status_pages, stream, synthetics, users,
+    short_url, slack, slos, sourcemaps, status, status_pages, stream, synthetics, users,
 };
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::{cloud, organization::billing_group};
@@ -39,7 +39,7 @@ use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, 
 use openobserve_api_search::{
     profiles as profiles_query, promql, rum as rum_query, search, traces,
 };
-use openobserve_core::auth::AuthExtractor;
+use openobserve_core::auth::{AuthExtractor, org_from_path, routed_path};
 use tower_http::{
     cors::{AllowOrigin, CorsLayer},
     decompression::RequestDecompressionLayer,
@@ -52,9 +52,10 @@ use {
     axum::body::{Body, to_bytes},
     config::utils::time::now_micros,
     o2_enterprise::enterprise::common::{
-        auditor::{AuditMessage, Protocol, ResponseMeta},
+        auditor::{AuditMessage, DelegatedAudit, Protocol, ResponseMeta},
         config::get_config as get_o2_config,
     },
+    openobserve_api_common::auth::delegation::DelegatedCaller,
     openobserve_api_management::request::{
         ai, alert_calibration, annotation_queues, annotations, anomaly_detection, datasets,
         discovery, domain_management, eval_jobs, experiments, gen_ai, keys, license, oncall,
@@ -72,8 +73,8 @@ use crate::{
     common::meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
     handler::http::{
         auth::validator::{
-            RequestData, oo_validator, validator_aws, validator_gcp, validator_proxy_url,
-            validator_rum,
+            AuthError, RequestData, oo_validator, validator_aws, validator_gcp,
+            validator_proxy_url, validator_rum,
         },
         router::middlewares::{
             blocked_orgs_middleware, ingest_rejections_middleware, password_policy_middleware,
@@ -119,6 +120,7 @@ pub fn cors_layer() -> CorsLayer {
             header::HeaderName::from_static("x-openobserve-parent-id"),
             header::HeaderName::from_static("x-openobserve-sampling-priority"),
             X_O2_ASSISTANT_SESSION_ID,
+            X_O2_ASSISTANT_TURN_ID,
         ])
         // Restrict CORS to the configured web_url origin, plus any extra origins in
         // ZO_CORS_ALLOWED_ORIGINS (comma-separated).  mirror_request() + allow_credentials(true)
@@ -256,6 +258,23 @@ fn attach_mcp_www_authenticate(_org_id: &str, resp: Response) -> Response {
     resp
 }
 
+/// Whether the router bound `{org_id}` to a segment other than the one the auth layers check.
+async fn routed_org_differs(parts: &mut Parts) -> bool {
+    let Ok(params) = RawPathParams::from_request_parts(parts, &()).await else {
+        return false;
+    };
+    let Some((_, routed_org)) = params.iter().find(|(name, _)| *name == "org_id") else {
+        return false;
+    };
+    // The nest strip drops an empty `{org_id}` segment from the URI: nothing to compare.
+    if routed_org.is_empty() {
+        return false;
+    }
+    let path_columns: Vec<&str> = routed_path(parts.uri.path()).split('/').collect();
+    // The router hands over the decoded param, so compare it with the decoded segment.
+    !urlencoding::decode(org_from_path(&path_columns)).is_ok_and(|org| org == routed_org)
+}
+
 /// Authentication middleware for API routes.
 ///
 /// Pair it with `password_policy_middleware` layered inside it on every router that uses it: this
@@ -272,6 +291,10 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
     // Extract auth info from request (synchronous now, no await)
     let (mut parts, body) = request.into_parts();
     let uri = req_data.uri.clone();
+    // The auth layers check one org, so the handler must serve that same org.
+    if routed_org_differs(&mut parts).await {
+        return AuthError::Forbidden("Unauthorized Access".to_string()).into_response();
+    }
     let auth_info = match AuthExtractor::from_request_parts(&mut parts, &()).await {
         Ok(info) => info,
         Err(e) => return maybe_add_mcp_www_authenticate(&uri, e.into_response()),
@@ -293,6 +316,10 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
                     header::CONTENT_TYPE,
                     header::HeaderValue::from_static("application/x-www-form-urlencoded"),
                 );
+            }
+
+            if let Some(caller) = result.delegation {
+                parts.extensions.insert(caller);
             }
 
             let mut response = next.run(Request::from_parts(parts, body)).await;
@@ -414,6 +441,9 @@ fn is_secret_write(method: &Method, path: &str) -> bool {
     if method == Method::PUT && segments.ends_with(&["prompts", "settings", "secret"]) {
         return true;
     }
+    if let Some(slack) = slack_path(&segments) {
+        return is_slack_secret_write(method, slack);
+    }
     let Some(tasks) = segments.iter().position(|segment| *segment == "tasks") else {
         return false;
     };
@@ -422,6 +452,57 @@ fn is_secret_write(method: &Method, path: &str) -> bool {
         || task_path
             .iter()
             .any(|segment| matches!(*segment, "auth" | "headers" | "signing"))
+}
+
+/// The segments after `{org}/slack/`: the audit layer runs below `/api` and the base URI.
+#[cfg(any(feature = "enterprise", test))]
+fn slack_path<'a>(segments: &'a [&'a str]) -> Option<&'a [&'a str]> {
+    let segments = match segments {
+        ["api", rest @ ..] if rest.get(1) == Some(&"slack") => rest,
+        _ => segments,
+    };
+    (segments.get(1) == Some(&"slack")).then(|| &segments[2..])
+}
+
+/// Slack bodies that carry an OAuth code, a connect ticket or app credentials.
+#[cfg(any(feature = "enterprise", test))]
+fn is_slack_secret_write(method: &Method, slack: &[&str]) -> bool {
+    matches!(
+        (method, slack),
+        (
+            &Method::POST,
+            ["install", "exchange"]
+                | ["installations"]
+                | ["connection", "confirm"]
+                | ["link-requests", "confirm"]
+                | ["installations", _, "connection"]
+        ) | (&Method::PUT, ["installations", _, "credentials"])
+    )
+}
+
+/// The path as `audit_middleware` sees it, already below `/api` and the base URI.
+#[cfg(any(feature = "enterprise", test))]
+fn audited_path(uri: &Uri) -> String {
+    let path = uri.path();
+    path.strip_prefix('/').unwrap_or(path).to_string()
+}
+
+/// A delegated `/ai/chat` is audited like a Slack `chat_stream` turn: no question text.
+#[cfg(feature = "enterprise")]
+fn delegated_chat_audit_body(
+    method: &Method,
+    path: &str,
+    delegated: bool,
+    slack_event: Option<&str>,
+    body: &[u8],
+) -> Option<String> {
+    let is_chat = method == Method::POST && path.split('/').skip(1).eq(["ai", "chat"]);
+    (delegated && is_chat).then(|| {
+        openobserve_api_management::request::ai::chat::slack_audit_body(
+            serde_json::from_slice(body).unwrap_or_default(),
+            slack_event,
+        )
+    })
 }
 
 /// The request body as the audit trail may store it.
@@ -515,8 +596,7 @@ fn is_secret_field(name: &str) -> bool {
 pub async fn audit_middleware(request: Request, next: Next) -> Response {
     let http_method = request.method().clone();
     let method = http_method.to_string();
-    let path = request.uri().path();
-    let path = path.strip_prefix("/").unwrap_or(path).to_string();
+    let path = audited_path(request.uri());
     let path_columns = path.split('/').collect::<Vec<&str>>();
 
     let ingestion_path = if path.starts_with("api/") {
@@ -558,6 +638,20 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
             .get(header::CONTENT_TYPE)
             .and_then(|v| v.to_str().ok())
             .map(str::to_string);
+        let slack_event = request
+            .headers()
+            .get(openobserve_api_management::request::ai::chat::SLACK_EVENT_HEADER)
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_string);
+
+        let delegated =
+            request
+                .extensions()
+                .get::<DelegatedCaller>()
+                .map(|caller| DelegatedAudit {
+                    link_id: caller.link_id.clone(),
+                    jti: caller.jti.clone(),
+                });
 
         // Extract body
         let (parts, body) = request.into_parts();
@@ -585,13 +679,27 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
         response.headers_mut().remove(ERROR_HEADER);
 
         if response.status().is_success() || response.status().is_redirection() {
-            let body = audit_body(&http_method, &path, content_type.as_deref(), request_body);
+            let slack_chat = delegated_chat_audit_body(
+                &http_method,
+                &path,
+                delegated.is_some(),
+                slack_event.as_deref(),
+                &request_body,
+            );
+            let protocol = if slack_chat.is_some() {
+                Protocol::Slack
+            } else {
+                Protocol::Http
+            };
+            let body = slack_chat.unwrap_or_else(|| {
+                audit_body(&http_method, &path, content_type.as_deref(), request_body)
+            });
 
             audit(AuditMessage {
                 user_email,
                 org_id,
                 _timestamp: now_micros(),
-                protocol: Protocol::Http,
+                protocol,
                 response_meta: ResponseMeta {
                     http_method: method,
                     http_path: config::axum::middlewares::mask_share_tokens(&path),
@@ -601,6 +709,7 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
                     error_msg,
                     trace_id: None,
                 },
+                delegated,
             })
             .await;
         }
@@ -813,6 +922,24 @@ pub fn basic_routes() -> Router {
             alerts::external_events::MAX_BODY_BYTES,
         ));
 
+    // Slack signs these requests; ENT verifies the signature, so they stay out of auth_middleware.
+    router = router
+        .route(
+            "/api/slack/events",
+            post(slack::inbound::events)
+                .layer(DefaultBodyLimit::max(slack::inbound::MAX_BODY_BYTES)),
+        )
+        .route(
+            "/api/slack/commands",
+            post(slack::inbound::commands)
+                .layer(DefaultBodyLimit::max(slack::inbound::MAX_BODY_BYTES)),
+        )
+        .route(
+            "/api/slack/interactions",
+            post(slack::inbound::interactions)
+                .layer(DefaultBodyLimit::max(slack::inbound::MAX_BODY_BYTES)),
+        );
+
     // Public status pages — unauthenticated by design, like chart_render
     // above: existence and visibility are checked inside the handler, and the
     // handlers are pure meta-store point-reads (no search, storage, or
@@ -944,8 +1071,8 @@ pub fn service_routes() -> Router {
     #[cfg(not(feature = "enterprise"))]
     let server = cfg.common.instance_name_short.to_string();
 
-    // Downtimes live in their own table to keep this function under the line limit.
-    let mut router = Router::new().merge(downtime_routes());
+    // Downtimes and Slack live in their own tables to keep this function under the line limit.
+    let mut router = Router::new().merge(downtime_routes()).merge(slack_routes());
     // Full UI configuration — authenticated counterpart of the unauthenticated
     // `/config` bootstrap in config_routes()
     router = router.route("/{org_id}/config", get(status::zo_config));
@@ -1220,7 +1347,14 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/incidents/external-alerts/{external_alert_id}/payload", get(alerts::incidents::get_external_alert_payload))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}", get(alerts::incidents::get_incident))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca", post(alerts::incidents::trigger_incident_rca).delete(alerts::incidents::cancel_incident_rca))
-        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/history", get(alerts::incidents::get_incident_rca_history))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs", get(alerts::incidents::list_incident_rca_runs))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/live_stream", get(alerts::incidents::get_incident_rca_live_stream))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}", get(alerts::incidents::get_incident_rca_run))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/thread", get(alerts::incidents::get_incident_rca_thread))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/steer", post(alerts::incidents::steer_incident_rca_run))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/steering", get(alerts::incidents::get_incident_rca_steering))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/resume", post(alerts::incidents::resume_incident_rca_run))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/summary", get(alerts::incidents::get_incident_rca_summary))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/update", patch(alerts::incidents::update_incident))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events", get(alerts::incidents::get_incident_events))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events/comment", post(alerts::incidents::post_incident_comment))
@@ -1341,7 +1475,8 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/rum/analytics/named_events/{id}", get(rum_analytics::get_named_event).put(rum_analytics::update_named_event).delete(rum_analytics::delete_named_event))
         .route("/{org_id}/rum/analytics/named_events/{id}/funnels", get(rum_analytics::named_event_funnels))
         .route("/{org_id}/rum/analytics/funnels", get(rum_analytics::list_funnels).post(rum_analytics::create_funnel))
-        .route("/{org_id}/rum/analytics/funnels/{id}", get(rum_analytics::get_funnel).put(rum_analytics::update_funnel).delete(rum_analytics::delete_funnel));
+        .route("/{org_id}/rum/analytics/funnels/{id}", get(rum_analytics::get_funnel).put(rum_analytics::update_funnel).delete(rum_analytics::delete_funnel))
+        .route("/{org_id}/rum/analytics/settings", get(rum_analytics::get_app_settings).put(rum_analytics::put_app_settings));
 
     #[cfg(feature = "enterprise")]
     {
@@ -1560,8 +1695,7 @@ pub fn service_routes() -> Router {
 
             // Query manager
             .route("/{org_id}/query_manager/status", get(search::query_manager::query_status))
-            .route("/{org_id}/query_manager/cancel", put(search::query_manager::cancel_multiple_query))
-            .route("/{org_id}/query_manager/{query_id}/cancel", delete(search::query_manager::cancel_query))
+            .route("/{org_id}/query_manager/cancel", put(search::query_manager::cancel_query))
 
             // search inspector
             .route("/{org_id}/search/profile", get(search::search_inspector::get_search_profile))
@@ -2039,6 +2173,10 @@ fn oncall_routes(router: Router) -> Router {
             get(oncall::get_resolved_schedule),
         )
         .route(
+            "/{org_id}/oncall/teams/{team_id}/resolved-schedule/preview",
+            post(oncall::preview_resolved_schedule),
+        )
+        .route(
             "/{org_id}/oncall/teams/{team_id}/policy",
             get(oncall::get_policy).put(oncall::set_policy),
         )
@@ -2201,6 +2339,40 @@ fn oncall_routes(router: Router) -> Router {
                 .put(oncall::put_telephony)
                 .delete(oncall::delete_telephony),
         )
+}
+
+/// Slack install and settings routes (section 7.2); the paths match the ENT `SLACK_ROUTE_ROWS`.
+#[rustfmt::skip]
+pub fn slack_routes() -> Router {
+    use slack::{installations as inst, links as lnk, settings as set};
+    Router::new()
+        .route("/{org_id}/slack/link-requests/confirm", post(lnk::confirm))
+        .route("/{org_id}/slack/link-requests/{request_id}/start", post(lnk::start))
+        .route("/{org_id}/slack/link-requests/{request_id}/resend", post(lnk::resend))
+        .route("/{org_id}/slack/links/me", get(lnk::links_me))
+        .route("/{org_id}/slack/links/{link_id}", delete(lnk::delete_link))
+        .route("/{org_id}/slack/links", get(lnk::list_links))
+        .route("/{org_id}/slack/install/start", post(inst::install_start))
+        .route("/{org_id}/slack/install/exchange", post(inst::install_exchange))
+        .route("/{org_id}/slack/prerequisites", get(inst::prerequisites))
+        .route("/{org_id}/slack/connectivity", post(inst::connectivity))
+        .route("/{org_id}/slack/manifest", get(inst::manifest))
+        .route("/{org_id}/slack/connection/confirm", post(inst::connection_confirm))
+        .route("/{org_id}/slack/installations", get(inst::list_installations).post(inst::create_installation))
+        .route("/{org_id}/slack/installations/{installation_id}", delete(inst::uninstall))
+        .route("/{org_id}/slack/installations/{installation_id}/install-url", post(inst::install_url))
+        .route("/{org_id}/slack/installations/{installation_id}/credentials", put(inst::update_credentials))
+        .route("/{org_id}/slack/installations/{installation_id}/test", post(inst::test_installation))
+        .route("/{org_id}/slack/installations/{installation_id}/connection/start", post(inst::connection_start))
+        .route("/{org_id}/slack/installations/{installation_id}/connection", post(inst::connect).delete(inst::disconnect))
+        .route("/{org_id}/slack/installations/{installation_id}/linking", get(set::get_linking).put(set::put_linking))
+        .route("/{org_id}/slack/installations/{installation_id}/links/matches", get(set::link_matches))
+        .route("/{org_id}/slack/installations/{installation_id}/link-all", post(set::link_all))
+        .route("/{org_id}/slack/installations/{installation_id}/channels", get(set::channels))
+        .route("/{org_id}/slack/installations/{installation_id}/channel-defaults", get(set::channel_defaults))
+        .route("/{org_id}/slack/installations/{installation_id}/channel-defaults/{channel_id}", get(set::get_channel_default).put(set::put_channel_default).delete(set::delete_channel_default))
+        .route("/{org_id}/slack/installations/{installation_id}/help-contact", get(set::get_help_contact).put(set::put_help_contact))
+        .route("/{org_id}/slack/installations/{installation_id}/org-access", get(inst::get_org_access).put(inst::put_org_access))
 }
 
 /// Create other service routes (AWS, GCP, RUM)
@@ -2477,6 +2649,297 @@ mod tests {
         ));
     }
 
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn every_slack_route_reaches_its_oss_stub() {
+        let routes = [
+            (Method::POST, "/default/slack/install/start"),
+            (Method::POST, "/default/slack/install/exchange"),
+            (Method::GET, "/default/slack/prerequisites"),
+            (Method::POST, "/default/slack/connectivity"),
+            (Method::GET, "/default/slack/manifest"),
+            (Method::POST, "/default/slack/connection/confirm"),
+            (Method::GET, "/default/slack/installations"),
+            (Method::POST, "/default/slack/installations"),
+            (Method::DELETE, "/default/slack/installations/I1"),
+            (Method::POST, "/default/slack/installations/I1/install-url"),
+            (Method::PUT, "/default/slack/installations/I1/credentials"),
+            (Method::POST, "/default/slack/installations/I1/test"),
+            (
+                Method::POST,
+                "/default/slack/installations/I1/connection/start",
+            ),
+            (Method::POST, "/default/slack/installations/I1/connection"),
+            (Method::DELETE, "/default/slack/installations/I1/connection"),
+            (Method::GET, "/default/slack/installations/I1/linking"),
+            (Method::PUT, "/default/slack/installations/I1/linking"),
+            (Method::GET, "/default/slack/installations/I1/links/matches"),
+            (Method::POST, "/default/slack/installations/I1/link-all"),
+            (Method::GET, "/default/slack/installations/I1/channels"),
+            (
+                Method::GET,
+                "/default/slack/installations/I1/channel-defaults",
+            ),
+            (
+                Method::GET,
+                "/default/slack/installations/I1/channel-defaults/C1",
+            ),
+            (
+                Method::PUT,
+                "/default/slack/installations/I1/channel-defaults/C1",
+            ),
+            (
+                Method::DELETE,
+                "/default/slack/installations/I1/channel-defaults/C1",
+            ),
+            (Method::GET, "/default/slack/installations/I1/help-contact"),
+            (Method::PUT, "/default/slack/installations/I1/help-contact"),
+            (Method::GET, "/_meta/slack/installations/I1/org-access"),
+            (Method::PUT, "/_meta/slack/installations/I1/org-access"),
+            (Method::POST, "/default/slack/link-requests/R1/start"),
+            (Method::POST, "/default/slack/link-requests/confirm"),
+            (Method::POST, "/default/slack/link-requests/R1/resend"),
+            (Method::GET, "/default/slack/links/me"),
+            (Method::DELETE, "/default/slack/links/L1"),
+            (Method::GET, "/default/slack/links"),
+        ];
+        for (method, path) in routes {
+            let req = Request::builder()
+                .method(method.clone())
+                .uri(path)
+                .header("user_id", "root@example.com")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from("{}"))
+                .unwrap();
+            let response = slack_routes().oneshot(req).await.unwrap();
+            assert_eq!(response.status(), StatusCode::FORBIDDEN, "{method} {path}");
+        }
+        let req = Request::builder()
+            .method(Method::PATCH)
+            .uri("/default/slack/installations")
+            .body(Body::empty())
+            .unwrap();
+        let response = slack_routes().oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+    }
+
+    /// Requests whose body or query axum's extractors refuse, one per extractor shape.
+    fn slack_requests_the_extractors_refuse() -> Vec<Request<Body>> {
+        let mut requests = Vec::new();
+        for (method, path) in [
+            (Method::POST, "/default/slack/install/start"),
+            (Method::POST, "/default/slack/installations"),
+            (Method::PUT, "/default/slack/installations/I1/credentials"),
+            (Method::PUT, "/default/slack/installations/I1/linking"),
+            (Method::PUT, "/_meta/slack/installations/I1/org-access"),
+            (Method::POST, "/default/slack/link-requests/confirm"),
+        ] {
+            for (content_type, body) in [("application/json", "{not json"), ("text/plain", "{}")] {
+                requests.push(
+                    Request::builder()
+                        .method(method.clone())
+                        .uri(path)
+                        .header("user_id", "root@example.com")
+                        .header(header::CONTENT_TYPE, content_type)
+                        .body(Body::from(body))
+                        .unwrap(),
+                );
+            }
+        }
+        requests.push(
+            Request::builder()
+                .uri("/default/slack/manifest?channel_history=maybe")
+                .header("user_id", "root@example.com")
+                .body(Body::empty())
+                .unwrap(),
+        );
+        requests
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn a_bad_body_or_query_is_still_not_supported_in_the_oss_build() {
+        for req in slack_requests_the_extractors_refuse() {
+            let what = format!("{} {}", req.method(), req.uri());
+            let response = slack_routes().oneshot(req).await.unwrap();
+            assert_eq!(response.status(), StatusCode::FORBIDDEN, "{what}");
+            let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let json: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(json["message"], "Not Supported", "{what}");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_bad_body_or_query_is_404_while_slack_is_off() {
+        for req in slack_requests_the_extractors_refuse() {
+            let what = format!("{} {}", req.method(), req.uri());
+            let response = slack_routes().oneshot(req).await.unwrap();
+            assert_eq!(response.status(), StatusCode::NOT_FOUND, "{what}");
+            let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let json: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(
+                json,
+                serde_json::json!({"code": 404, "message": "Slack is not enabled"}),
+                "{what}"
+            );
+        }
+    }
+
+    #[test]
+    fn slack_secret_writes_are_redacted() {
+        for (method, path) in [
+            (Method::POST, "org/slack/install/exchange"),
+            (Method::POST, "org/slack/installations"),
+            (Method::PUT, "org/slack/installations/I1/credentials"),
+            (Method::POST, "org/slack/connection/confirm"),
+            (Method::POST, "org/slack/installations/I1/connection"),
+            (Method::POST, "org/slack/link-requests/confirm"),
+            (Method::POST, "api/org/slack/installations"),
+            (Method::POST, "api/slack/installations"),
+        ] {
+            assert!(is_secret_write(&method, path), "{method} {path}");
+            assert_eq!(
+                audited(method, path, r#"{"code":"c-1","state":"s-1"}"#),
+                "[REDACTED: secret write]"
+            );
+        }
+        for (method, path) in [
+            (Method::GET, "org/slack/installations"),
+            (Method::POST, "org/slack/install/start"),
+            (Method::POST, "org/slack/installations/I1/connection/start"),
+            (Method::DELETE, "org/slack/installations/I1/connection"),
+            (Method::POST, "org/slack/installations/I1/link-all"),
+            (Method::PUT, "org/slack/installations/I1/linking"),
+            (Method::PUT, "_meta/slack/installations/I1/org-access"),
+            (Method::GET, "org/slack/installations/I1/credentials"),
+            (Method::POST, "org/slack/link-requests/R1/start"),
+            (Method::POST, "org/slack/link-requests/R1/resend"),
+            (Method::POST, "org/streams/slack/installations"),
+            (Method::POST, "slack/installations"),
+        ] {
+            assert!(!is_secret_write(&method, path), "{method} {path}");
+        }
+    }
+
+    /// What `audit_middleware` would store, seen from inside the `/api` and base-URI nesting.
+    async fn audited_through_the_router(
+        base: &str,
+        method: Method,
+        uri: &str,
+        body: &str,
+    ) -> String {
+        let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let record = {
+            let seen = seen.clone();
+            move |request: Request<Body>, next: Next| {
+                let seen = seen.clone();
+                async move {
+                    let path = audited_path(request.uri());
+                    let method = request.method().clone();
+                    let (parts, body) = request.into_parts();
+                    let bytes = axum::body::to_bytes(body, usize::MAX).await.unwrap();
+                    seen.lock()
+                        .unwrap()
+                        .push(audit_body(&method, &path, None, bytes.to_vec()));
+                    next.run(Request::from_parts(parts, Body::from(bytes)))
+                        .await
+                }
+            }
+        };
+        let api = Router::new().nest("/api", slack_routes().layer(middleware::from_fn(record)));
+        let app = if base.is_empty() {
+            api
+        } else {
+            Router::new().nest(base, api)
+        };
+        let req = Request::builder()
+            .method(method)
+            .uri(uri)
+            .header("user_id", "root@example.com")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(body.to_string()))
+            .unwrap();
+        app.oneshot(req).await.unwrap();
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.len(), 1, "{uri} reached the audit layer once");
+        seen[0].clone()
+    }
+
+    #[tokio::test]
+    async fn a_slack_secret_write_is_redacted_as_the_audit_layer_sees_it() {
+        let secret =
+            r#"{"code":"c-1","state":"s-1","client_secret":"cs-1","signing_secret":"ss-1"}"#;
+        for (base, method, uri) in [
+            ("", Method::POST, "/api/default/slack/install/exchange"),
+            ("", Method::POST, "/api/default/slack/installations"),
+            (
+                "",
+                Method::PUT,
+                "/api/default/slack/installations/I1/credentials",
+            ),
+            ("", Method::POST, "/api/default/slack/connection/confirm"),
+            (
+                "",
+                Method::POST,
+                "/api/default/slack/installations/I1/connection",
+            ),
+            ("", Method::POST, "/api/default/slack/link-requests/confirm"),
+            (
+                "/o2",
+                Method::POST,
+                "/o2/api/default/slack/install/exchange",
+            ),
+            (
+                "/o2",
+                Method::PUT,
+                "/o2/api/api/slack/installations/I1/credentials",
+            ),
+        ] {
+            let stored = audited_through_the_router(base, method.clone(), uri, secret).await;
+            assert_eq!(stored, "[REDACTED: secret write]", "{method} {uri}");
+        }
+        let start = audited_through_the_router(
+            "",
+            Method::POST,
+            "/api/default/slack/install/start",
+            r#"{"source":"settings"}"#,
+        )
+        .await;
+        assert_eq!(start, r#"{"source":"settings"}"#);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_delegated_chat_is_audited_without_the_question() {
+        let body = br#"{"messages":[{"role":"user","content":"why is checkout slow?"}],"context":{"currentPage":"slack"}}"#;
+        let stored =
+            delegated_chat_audit_body(&Method::POST, "org/ai/chat", true, Some("T0:C0:Ev1"), body)
+                .expect("a delegated /ai/chat gets the Slack record");
+        assert!(!stored.contains("checkout"), "{stored}");
+        let json: Value = serde_json::from_str(&stored).unwrap();
+        assert_eq!(json["messages"], "[REDACTED: slack]");
+        assert_eq!(json["slack_event"], "T0:C0:Ev1");
+        assert_eq!(json["context"]["currentPage"], "slack");
+        for (method, path, delegated) in [
+            (Method::POST, "org/ai/chat", false),
+            (Method::POST, "org/ai/chat_stream", true),
+            (Method::POST, "org/ai/chats", true),
+            (Method::GET, "org/ai/chat", true),
+            (Method::POST, "org/streams/ai/chat", true),
+        ] {
+            assert_eq!(
+                delegated_chat_audit_body(&method, path, delegated, None, body),
+                None,
+                "{method} {path} delegated={delegated}"
+            );
+        }
+    }
+
     fn audited(method: Method, path: &str, body: &str) -> String {
         audit_body(&method, path, None, body.as_bytes().to_vec())
     }
@@ -2602,6 +3065,48 @@ mod tests {
             audited(Method::POST, "api/org/settings/logo", "png"),
             "cG5n"
         );
+    }
+
+    #[tokio::test]
+    async fn the_routed_org_must_be_the_org_the_auth_layers_check() {
+        async fn guard(request: axum::extract::Request, next: Next) -> Response {
+            let (mut parts, body) = request.into_parts();
+            if routed_org_differs(&mut parts).await {
+                return StatusCode::FORBIDDEN.into_response();
+            }
+            next.run(Request::from_parts(parts, body)).await
+        }
+        let app = Router::new()
+            .route("/v2/{org_id}/alerts", get(|| async { "ok" }))
+            .route("/v2/{org_id}/folders/{folder_type}", get(|| async { "ok" }))
+            .route("/{org_id}/kv/{key}", get(|| async { "ok" }))
+            .layer(middleware::from_fn(guard));
+        for (uri, expected) in [
+            ("/v2/acme/alerts", StatusCode::OK),
+            ("/acme/kv/note", StatusCode::OK),
+            ("/acme%20labs/kv/note", StatusCode::OK),
+            ("/v2/acme%2Dlabs/alerts", StatusCode::OK),
+            ("/v2/kv/note", StatusCode::OK),
+            ("/v2/kv/folders", StatusCode::FORBIDDEN),
+        ] {
+            let request = Request::get(uri).body(Body::empty()).unwrap();
+            let status = app.clone().oneshot(request).await.unwrap().status();
+            assert_eq!(status, expected, "{uri}");
+        }
+        let nested = Router::new().nest(
+            "/api",
+            Router::new()
+                .route("/{org_id}/kv/{key}", get(|| async { "ok" }))
+                .layer(middleware::from_fn(guard)),
+        );
+        for (uri, expected) in [
+            ("/api//kv/note", StatusCode::OK),
+            ("/api/acme/kv/note", StatusCode::OK),
+        ] {
+            let request = Request::get(uri).body(Body::empty()).unwrap();
+            let status = nested.clone().oneshot(request).await.unwrap().status();
+            assert_eq!(status, expected, "{uri}");
+        }
     }
 
     #[tokio::test]
@@ -3645,15 +4150,6 @@ mod tests {
     }
 
     #[test]
-    fn test_cors_web_url_trailing_slash_stripped() {
-        // Caller trims trailing slashes on web_url before calling us.
-        assert!(is_origin_allowed(
-            b"https://app.example.com",
-            "https://app.example.com"
-        ));
-    }
-
-    #[test]
     fn test_cors_prefix_bypass_denied() {
         // https://app.example.com.evil.com must NOT match https://app.example.com
         assert!(!is_origin_allowed(
@@ -3699,6 +4195,47 @@ mod tests {
     fn test_cors_empty_web_url_allows_all() {
         // Empty web_url is permissive (dev mode)
         assert!(is_origin_allowed(b"https://any.origin.com", ""));
+    }
+
+    #[tokio::test]
+    async fn test_cors_preflight_allows_assistant_chat_headers() {
+        // One header missing from the allow-list fails the preflight and the POST is never sent.
+        let app = Router::new()
+            .route(
+                "/default/ai/chat_stream",
+                axum::routing::post(|| async { "ok" }),
+            )
+            .layer(cors_layer());
+        let req = Request::builder()
+            .method(Method::OPTIONS)
+            .uri("/default/ai/chat_stream")
+            .header(header::ORIGIN, "http://localhost:8081")
+            .header(header::ACCESS_CONTROL_REQUEST_METHOD, "POST")
+            .header(
+                header::ACCESS_CONTROL_REQUEST_HEADERS,
+                "content-type,traceparent,x-o2-assistant-session-id,x-o2-assistant-turn-id",
+            )
+            .body(Body::empty())
+            .unwrap();
+
+        let response = app.oneshot(req).await.unwrap();
+        let allowed = response
+            .headers()
+            .get(header::ACCESS_CONTROL_ALLOW_HEADERS)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        for name in [
+            "content-type",
+            "traceparent",
+            X_O2_ASSISTANT_SESSION_ID.as_str(),
+            X_O2_ASSISTANT_TURN_ID.as_str(),
+        ] {
+            assert!(
+                allowed.split(',').any(|h| h.trim() == name),
+                "{name} missing from access-control-allow-headers: {allowed}"
+            );
+        }
     }
 
     #[test]
@@ -3914,6 +4451,86 @@ mod tests {
         assert_eq!(post.status(), StatusCode::METHOD_NOT_ALLOWED);
     }
 
+    #[tokio::test]
+    async fn rca_steer_route_refuses_put_and_delete() {
+        const STEER_PATH: &str =
+            "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/steer";
+        assert!(
+            service_routes_registrations().contains(&format!(
+                r#".route("{STEER_PATH}",post(alerts::incidents::steer_incident_rca_run))"#
+            )),
+            "the steer path must be registered in service_routes() for POST only"
+        );
+        let app = Router::new().route(STEER_PATH, post(alerts::incidents::steer_incident_rca_run));
+        for method in ["PUT", "DELETE"] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method(method)
+                        .uri("/v2/myorg/alerts/incidents/inc1/rca/runs/run1/steer")
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                response.status(),
+                StatusCode::METHOD_NOT_ALLOWED,
+                "{method}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn rca_resume_route_takes_only_post() {
+        const RESUME_PATH: &str =
+            "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/resume";
+        let registrations = service_routes_registrations();
+        assert!(
+            registrations.contains(&format!(
+                r#".route("{RESUME_PATH}",post(alerts::incidents::resume_incident_rca_run))"#
+            )),
+            "the resume path must be registered in service_routes() for POST only"
+        );
+
+        let app = Router::new().route(
+            RESUME_PATH,
+            post(alerts::incidents::resume_incident_rca_run),
+        );
+        for (method, uri) in [
+            (
+                "GET",
+                "/v2/myorg/alerts/incidents/inc1/rca/runs/run1/resume",
+            ),
+            (
+                "PUT",
+                "/v2/myorg/alerts/incidents/inc1/rca/runs/run1/resume",
+            ),
+            (
+                "DELETE",
+                "/v2/myorg/alerts/incidents/inc1/rca/runs/run1/resume",
+            ),
+        ] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method(method)
+                        .uri(uri)
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                response.status(),
+                StatusCode::METHOD_NOT_ALLOWED,
+                "{method} {uri}"
+            );
+        }
+    }
+
     fn node_request(user_id: &str) -> Request<Body> {
         Request::builder()
             .uri("/metrics")
@@ -3948,5 +4565,261 @@ mod tests {
         );
         let response = node_routes().oneshot(node_request(root)).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    /// Every (method, template) the `/api` tree serves, parsed from this file's production code.
+    fn api_routes() -> std::collections::BTreeMap<String, std::collections::BTreeSet<String>> {
+        let src = include_str!("mod.rs");
+        let (production, _) = src.split_once("\n#[cfg(test)]\nmod tests {").unwrap();
+        let section = |from: &str, to: &str| {
+            let start = production.find(from).unwrap();
+            let end = start + production[start..].find(to).unwrap();
+            &production[start..end]
+        };
+        let api_tree = [
+            section("fn ai_chat_routes(", "pub fn other_service_routes("),
+            section("fn es_compat_routes(", "\n}\n"),
+        ];
+        let methods =
+            regex::Regex::new(r"(?:^|[\s(.,])(get|post|put|delete|patch|head)\(").unwrap();
+        let mut routes =
+            std::collections::BTreeMap::<String, std::collections::BTreeSet<String>>::new();
+        for text in api_tree {
+            for (at, _) in text.match_indices(".route(") {
+                let args = &text[at + ".route(".len()..];
+                let mut depth = 1;
+                let end = args
+                    .char_indices()
+                    .find(|(_, c)| {
+                        depth += match c {
+                            '(' => 1,
+                            ')' => -1,
+                            _ => 0,
+                        };
+                        depth == 0
+                    })
+                    .unwrap()
+                    .0;
+                let args = &args[..end];
+                let template = args.split('"').nth(1).unwrap().to_string();
+                let found: Vec<String> = methods
+                    .captures_iter(args)
+                    .map(|c| c[1].to_uppercase())
+                    .collect();
+                assert!(!found.is_empty(), "no method parsed for {template}");
+                routes.entry(template).or_default().extend(found);
+            }
+        }
+        routes
+    }
+
+    fn template_segments(template: &str) -> Vec<&str> {
+        template.trim_start_matches('/').split('/').collect()
+    }
+
+    fn is_param(segment: &str) -> bool {
+        segment.starts_with('{')
+    }
+
+    fn neutral_path(template: &str) -> String {
+        template_segments(template)
+            .iter()
+            .map(|s| if is_param(s) { "zz" } else { s })
+            .collect::<Vec<_>>()
+            .join("/")
+    }
+
+    /// The route axum dispatches to: at the first differing segment a literal beats a parameter.
+    fn owner<'a>(templates: &[&'a str], path: &[&str]) -> Option<&'a str> {
+        let matches = |t: &&str| {
+            let segs = template_segments(t);
+            segs.len() == path.len() && segs.iter().zip(path).all(|(s, p)| is_param(s) || s == p)
+        };
+        templates.iter().copied().filter(matches).max_by(|a, b| {
+            let rank = |t: &str| -> Vec<bool> {
+                template_segments(t).iter().map(|s| !is_param(s)).collect()
+            };
+            rank(a).cmp(&rank(b))
+        })
+    }
+
+    #[test]
+    fn assistant_scope_is_exactly_these_router_routes() {
+        use openobserve_api_common::auth::delegation::in_assistant_scope;
+
+        let mut allowed = Vec::new();
+        for (template, methods) in api_routes() {
+            for method in methods {
+                let m = Method::from_bytes(method.as_bytes()).unwrap();
+                if in_assistant_scope(&m, &neutral_path(&template)) {
+                    allowed.push(format!("{method} {template}"));
+                }
+            }
+        }
+        let expected = [
+            "GET /v2/{org_id}/alerts",
+            "GET /v2/{org_id}/alerts/history",
+            "GET /v2/{org_id}/alerts/incidents",
+            "GET /v2/{org_id}/alerts/incidents/stats",
+            "GET /v2/{org_id}/alerts/incidents/{incident_id}",
+            "GET /v2/{org_id}/alerts/incidents/{incident_id}/events",
+            "GET /v2/{org_id}/alerts/incidents/{incident_id}/rca/runs",
+            "GET /v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}",
+            "GET /v2/{org_id}/alerts/tags",
+            "GET /v2/{org_id}/alerts/{alert_id}",
+            "GET /v2/{org_id}/alerts/{alert_id}/groups",
+            "GET /v2/{org_id}/alerts/{alert_id}/groups/transitions",
+            "GET /v2/{org_id}/folders/{folder_type}",
+            "GET /v2/{org_id}/folders/{folder_type}/name/{folder_name}",
+            "GET /v2/{org_id}/folders/{folder_type}/{folder_id}",
+            "GET /{org_id}/dashboards",
+            "GET /{org_id}/dashboards/{dashboard_id}",
+            "GET /{org_id}/functions",
+            "GET /{org_id}/mcp",
+            "GET /{org_id}/oncall/incidents/{incident_id}/responses",
+            "GET /{org_id}/oncall/responses",
+            "GET /{org_id}/oncall/responses/{response_id}",
+            "GET /{org_id}/oncall/responses/{response_id}/escalation",
+            "GET /{org_id}/oncall/responses/{response_id}/history",
+            "GET /{org_id}/oncall/teams",
+            "GET /{org_id}/oncall/teams/{team_id}",
+            "GET /{org_id}/oncall/teams/{team_id}/members",
+            "GET /{org_id}/oncall/teams/{team_id}/on-call",
+            "GET /{org_id}/oncall/teams/{team_id}/overrides",
+            "GET /{org_id}/oncall/teams/{team_id}/overview",
+            "GET /{org_id}/oncall/teams/{team_id}/resolved-schedule",
+            "GET /{org_id}/oncall/teams/{team_id}/schedule",
+            "GET /{org_id}/prometheus/api/v1/query",
+            "GET /{org_id}/prometheus/api/v1/query_range",
+            "GET /{org_id}/streams",
+            "GET /{org_id}/streams/{stream_name}/schema",
+            "GET /{org_id}/{stream_name}/_around",
+            "GET /{org_id}/{stream_name}/_values",
+            "GET /{org_id}/{stream_name}/traces/latest",
+            "GET /{org_id}/{stream_name}/traces/latest_stream",
+            "GET /{org_id}/{stream_name}/traces/session",
+            "GET /{org_id}/{stream_name}/traces/session/details",
+            "GET /{org_id}/{stream_name}/traces/time_range",
+            "GET /{org_id}/{stream_name}/traces/user",
+            "GET /{org_id}/{stream_name}/traces/{trace_id}/dag",
+            "GET /{org_id}/{stream_name}/traces/{trace_id}/details",
+            "PATCH /v2/{org_id}/alerts/incidents/{incident_id}/update",
+            "POST /v2/{org_id}/alerts/incidents/{incident_id}/events/comment",
+            "POST /v2/{org_id}/downtimes",
+            "POST /v2/{org_id}/downtimes/{downtime_id}/cancel",
+            "POST /{org_id}/_search",
+            "POST /{org_id}/ai/chat",
+            "POST /{org_id}/ai/chat_stream",
+            "POST /{org_id}/ai/chats/{session_id}/cancel",
+            "POST /{org_id}/ai/confirm/{session_id}",
+            "POST /{org_id}/ai/feedback",
+            "POST /{org_id}/mcp",
+            "POST /{org_id}/oncall/responses/{response_id}/acknowledge",
+            "POST /{org_id}/oncall/responses/{response_id}/resolve",
+            "POST /{org_id}/oncall/responses/{response_id}/snooze",
+            "POST /{org_id}/prometheus/api/v1/query",
+            "POST /{org_id}/prometheus/api/v1/query_range",
+            "POST /{org_id}/{stream_name}/_around",
+        ];
+        allowed.sort();
+        let mut expected: Vec<String> = expected.iter().map(|s| s.to_string()).collect();
+        expected.sort();
+        assert_eq!(allowed, expected);
+    }
+
+    /// A pattern parameter must not admit a path that axum hands to a more specific route.
+    #[test]
+    fn assistant_scope_agrees_with_axum_dispatch() {
+        use openobserve_api_common::auth::delegation::in_assistant_scope;
+
+        let routes = api_routes();
+        let templates: Vec<&str> = routes.keys().map(String::as_str).collect();
+        let mut wrong = Vec::new();
+        for r in &templates {
+            for a in &templates {
+                let (rs, as_) = (template_segments(r), template_segments(a));
+                if rs.len() != as_.len() {
+                    continue;
+                }
+                let merged: Option<Vec<&str>> = rs
+                    .iter()
+                    .zip(&as_)
+                    .map(|(x, y)| match (is_param(x), is_param(y)) {
+                        (false, false) => (x == y).then_some(*x),
+                        (false, true) => Some(*x),
+                        (true, false) => Some(*y),
+                        (true, true) => Some("zz"),
+                    })
+                    .collect();
+                let Some(path) = merged else { continue };
+                let Some(owner) = owner(&templates, &path) else {
+                    continue;
+                };
+                for method in &routes[owner] {
+                    let m = Method::from_bytes(method.as_bytes()).unwrap();
+                    let joined = path.join("/");
+                    if in_assistant_scope(&m, &joined)
+                        != in_assistant_scope(&m, &neutral_path(owner))
+                    {
+                        wrong.push(format!("{method} {joined} dispatches to {owner}"));
+                    }
+                }
+            }
+        }
+        wrong.sort();
+        wrong.dedup();
+        assert!(
+            wrong.is_empty(),
+            "add the literal to RESERVED_STREAM_SLOTS in api/common auth/delegation.rs: {wrong:#?}"
+        );
+    }
+
+    // Router-role pods merge basic_routes the same way, so this covers both node shapes.
+    #[tokio::test]
+    async fn slack_inbound_routes_need_no_o2_auth_and_cap_the_body_at_1_mib() {
+        let app = Router::new()
+            .merge(basic_routes())
+            .nest("/api", service_routes());
+        for path in [
+            "/api/slack/events",
+            "/api/slack/commands",
+            "/api/slack/interactions",
+        ] {
+            let req = Request::builder()
+                .method(Method::POST)
+                .uri(path)
+                .body(Body::from("{}"))
+                .unwrap();
+            let resp = app.clone().oneshot(req).await.unwrap();
+            assert_eq!(resp.status(), StatusCode::NOT_FOUND, "{path}");
+            let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let body: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(body["message"], "Slack is not enabled", "{path}");
+
+            let big = vec![b' '; slack::inbound::MAX_BODY_BYTES + 1];
+            let req = Request::builder()
+                .method(Method::POST)
+                .uri(path)
+                .body(Body::from(big))
+                .unwrap();
+            let status = app.clone().oneshot(req).await.unwrap().status();
+            assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE, "{path}");
+        }
+    }
+
+    #[tokio::test]
+    async fn an_org_named_slack_still_reaches_its_own_routes() {
+        let app = Router::new()
+            .merge(basic_routes())
+            .nest("/api", service_routes());
+        let req = Request::builder()
+            .method(Method::GET)
+            .uri("/api/slack/streams")
+            .body(Body::empty())
+            .unwrap();
+        let status = app.oneshot(req).await.unwrap().status();
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
     }
 }

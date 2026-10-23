@@ -50,13 +50,14 @@
 //! let resource_attributes = /* ... */;
 //! let events = /* ... */;
 //!
-//! processor.process_span_with_pricing(
+//! processor.process_span_with_pricing_and_agent_mapping(
 //!     &mut span_attributes,
 //!     &resource_attributes,
 //!     Some("openai"),
 //!     &events,
 //!     &[], // pass org pricing entries here in production
 //!     span_start_nanos, // span.start_time_unix_nano from OTLP payload
+//!     &GenAiAgentMappingConfig::default(),
 //! );
 //! ```
 //!
@@ -78,7 +79,15 @@
 //! let resource_attrs = HashMap::new();
 //! let events = vec![];
 //!
-//! processor.process_span_with_pricing(&mut span_attrs, &resource_attrs, Some("openai"), &events, &[], 0);
+//! processor.process_span_with_pricing_and_agent_mapping(
+//!     &mut span_attrs,
+//!     &resource_attrs,
+//!     Some("openai"),
+//!     &events,
+//!     &[],
+//!     0,
+//!     &GenAiAgentMappingConfig::default(),
+//! );
 //!
 //! // Result: span_attrs now contains:
 //! // - observation_type: "GENERATION"
@@ -105,7 +114,6 @@ pub mod processor;
 pub use extractors::{
     ScopeInfo, is_generation_or_embedding, is_llm_trace, map_to_gen_ai_operation_name,
 };
-pub use pricing::calculate_cost;
 pub use processor::OtelIngestionProcessor;
 
 #[cfg(test)]

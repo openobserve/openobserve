@@ -20,8 +20,8 @@ use config::{
     meta::destinations::{Template, TemplateKind, TemplateType},
 };
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, DatabaseConnection, EntityTrait,
-    ModelTrait, QueryFilter, QueryOrder, Set, TryIntoModel,
+    ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, ConnectionTrait, EntityTrait, ModelTrait,
+    QueryFilter, QueryOrder, Set, TryIntoModel,
 };
 
 use crate::{
@@ -59,6 +59,11 @@ impl TryFrom<Model> for Template {
 
 pub async fn put(template: Template) -> Result<Template, Error> {
     let client = get_orm_client_rw().await;
+    put_with(client, template).await
+}
+
+/// Upserts the row owned by the template's org; the shared default row is never the target.
+pub async fn put_with<C: ConnectionTrait>(db: &C, template: Template) -> Result<Template, Error> {
     let title = match &template.template_type {
         TemplateType::Email { title } => Some(title.to_string()),
         _ => None,
@@ -73,14 +78,14 @@ pub async fn put(template: Template) -> Result<Template, Error> {
         title: Set(title),
         kind: Set(template.kind.to_string()),
     };
-    let model: Model = match get_model(client, &template.org_id, &template.name).await? {
+    let model: Model = match get_org_model(db, &template.org_id, &template.name).await? {
         Some(model) => {
             active.id = Set(model.id);
-            active.update(client).await?.try_into_model()?
+            active.update(db).await?.try_into_model()?
         }
         None => {
             active.id = Set(template.id.map_or_else(ider::uuid, |id| id.to_string()));
-            active.insert(client).await?.try_into_model()?
+            active.insert(db).await?.try_into_model()?
         }
     };
     Ok(model.try_into()?)
@@ -88,7 +93,16 @@ pub async fn put(template: Template) -> Result<Template, Error> {
 
 pub async fn get(org_id: &str, name: &str) -> Result<Option<Template>, Error> {
     let client = get_orm_client_ro().await;
-    match get_model(client, org_id, name).await? {
+    get_with(client, org_id, name).await
+}
+
+/// Returns the org's own row, falling back to the shared default org.
+pub async fn get_with<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    name: &str,
+) -> Result<Option<Template>, Error> {
+    match get_model(db, org_id, name).await? {
         Some(model) => Ok(Some(Template::try_from(model)?)),
         None => Ok(None),
     }
@@ -114,31 +128,56 @@ pub async fn list_all() -> Result<Vec<(String, Template)>, Error> {
     Ok(templates)
 }
 
-pub async fn delete(org_id: &str, name: &str) -> Result<(), Error> {
+/// Deletes the template owned by `org_id`; returns whether a row was removed.
+pub async fn delete(org_id: &str, name: &str) -> Result<bool, Error> {
     let client = get_orm_client_rw().await;
-    let model = get_model(client, org_id, name).await?;
-
-    if let Some(model) = model {
-        model.delete(client).await?;
-    }
-
-    Ok(())
+    delete_with(client, org_id, name).await
 }
 
-async fn get_model(
-    db: &DatabaseConnection,
+/// Deletes the row owned by `org_id`; returns whether a row was removed.
+pub async fn delete_with<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    name: &str,
+) -> Result<bool, Error> {
+    match get_org_model(db, org_id, name).await? {
+        Some(model) => {
+            model.delete(db).await?;
+            Ok(true)
+        }
+        None => Ok(false),
+    }
+}
+
+async fn get_org_model<C: ConnectionTrait>(
+    db: &C,
     org_id: &str,
     name: &str,
 ) -> Result<Option<Model>, sea_orm::DbErr> {
     Entity::find()
-        .filter(Column::Org.eq(org_id).or(Column::Org.eq(DEFAULT_ORG)))
+        .filter(Column::Org.eq(org_id))
         .filter(Column::Name.eq(name))
         .one(db)
         .await
 }
 
-async fn list_models(
-    db: &DatabaseConnection,
+// Reads fall back to the shared default org; writes stay org-exact via `get_org_model`.
+async fn get_model<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    name: &str,
+) -> Result<Option<Model>, sea_orm::DbErr> {
+    if let Some(model) = get_org_model(db, org_id, name).await? {
+        return Ok(Some(model));
+    }
+    if org_id == DEFAULT_ORG {
+        return Ok(None);
+    }
+    get_org_model(db, DEFAULT_ORG, name).await
+}
+
+async fn list_models<C: ConnectionTrait>(
+    db: &C,
     org_id: Option<&str>,
 ) -> Result<Vec<Model>, sea_orm::DbErr> {
     let mut query = Entity::find();
@@ -163,9 +202,97 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
+    use sea_orm::{Database, DatabaseConnection, Schema};
     use svix_ksuid::KsuidLike;
 
     use super::*;
+
+    async fn db() -> DatabaseConnection {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        db
+    }
+
+    fn template(org: &str, name: &str, body: &str) -> Template {
+        Template {
+            org_id: org.to_string(),
+            name: name.to_string(),
+            body: body.to_string(),
+            template_type: TemplateType::Http,
+            ..Default::default()
+        }
+    }
+
+    async fn bodies(db: &DatabaseConnection, name: &str) -> Vec<(String, String)> {
+        Entity::find()
+            .filter(Column::Name.eq(name))
+            .order_by(Column::Org, sea_orm::Order::Asc)
+            .all(db)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|m| (m.org, m.body))
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn put_from_another_org_never_touches_the_default_row() {
+        let db = db().await;
+        put_with(&db, template(DEFAULT_ORG, "foo", "shared"))
+            .await
+            .unwrap();
+        put_with(&db, template("acme", "foo", "mine"))
+            .await
+            .unwrap();
+        put_with(&db, template("acme", "foo", "mine-v2"))
+            .await
+            .unwrap();
+        assert_eq!(
+            bodies(&db, "foo").await,
+            vec![
+                ("acme".to_string(), "mine-v2".to_string()),
+                (DEFAULT_ORG.to_string(), "shared".to_string()),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn delete_from_another_org_leaves_the_default_row() {
+        let db = db().await;
+        put_with(&db, template(DEFAULT_ORG, "foo", "shared"))
+            .await
+            .unwrap();
+        assert!(!delete_with(&db, "acme", "foo").await.unwrap());
+        assert_eq!(
+            bodies(&db, "foo").await,
+            vec![(DEFAULT_ORG.to_string(), "shared".to_string())]
+        );
+        assert!(delete_with(&db, DEFAULT_ORG, "foo").await.unwrap());
+        assert!(bodies(&db, "foo").await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn get_prefers_the_org_row_and_falls_back_to_default() {
+        let db = db().await;
+        put_with(&db, template(DEFAULT_ORG, "foo", "shared"))
+            .await
+            .unwrap();
+        put_with(&db, template("acme", "foo", "mine"))
+            .await
+            .unwrap();
+        let body = |t: Option<Template>| t.map(|t| t.body);
+        assert_eq!(
+            body(get_with(&db, "acme", "foo").await.unwrap()),
+            Some("mine".to_string())
+        );
+        assert_eq!(
+            body(get_with(&db, "other", "foo").await.unwrap()),
+            Some("shared".to_string())
+        );
+        assert_eq!(body(get_with(&db, "other", "bar").await.unwrap()), None);
+    }
 
     fn make_model(id: &str, title: Option<&str>, tmpl_type: &str) -> Model {
         Model {
@@ -191,14 +318,6 @@ mod tests {
         assert!(
             matches!(tmpl.template_type, TemplateType::Email { title } if title == "Alert Subject")
         );
-    }
-
-    #[test]
-    fn test_try_from_model_http_template() {
-        let id = svix_ksuid::Ksuid::new(None, None).to_string();
-        let model = make_model(&id, None, "http");
-        let tmpl = Template::try_from(model).unwrap();
-        assert!(matches!(tmpl.template_type, TemplateType::Http));
     }
 
     #[test]

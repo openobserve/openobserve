@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createRouter, createWebHistory, type Router } from "vue-router";
 import { createStore } from "vuex";
@@ -42,6 +42,7 @@ import { MAX_EVENTS_PER_APP, MAX_KEY_LENGTH } from "@/utils/rum/productAnalytics
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import { rumPaApiMock as api } from "@/utils/rum/__fixtures__/namedEventsApiMock";
 import NamedEventEditor from "./NamedEventEditor.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 
 const store = createStore({
   state: {
@@ -518,5 +519,169 @@ describe("NamedEventEditor (AC-44)", () => {
     await new Promise((r) => setTimeout(r, 450));
     await flushPromises();
     expect(q("rum-analytics-named-events-preview")?.textContent).toBe("Matched 1 session in range");
+  });
+
+  describe("pa gap fixes: rule kinds, ops and preview", () => {
+    const svc = api.service as unknown as Record<string, Mock>;
+    const DAY_US = 86_400_000_000;
+
+    const mountWith = async (query: Record<string, string>, state?: Record<string, unknown>) => {
+      router = createRouter({
+        history: createWebHistory(),
+        routes: [
+          { path: "/pa/events", name: PA_ROUTES.events, component: Stub },
+          { path: "/pa/events/new", name: PA_ROUTES.eventNew, component: NamedEventEditor },
+          { path: "/logs", name: "logs", component: Stub },
+        ],
+      });
+      await router.push({ name: PA_ROUTES.events, query });
+      await router.push({ name: PA_ROUTES.eventNew, query, state });
+      wrapper = mount(
+        { template: "<router-view />" },
+        { global: { plugins: [router, store] }, attachTo: document.body },
+      );
+      await vi.waitFor(() => expect(useNamedEvents().loading.value).toBe(false));
+      await settle();
+    };
+    const withDraft = (rules: unknown[]) =>
+      mountWith(SCOPE, namedEventHandoffState({ draft: { name: "Draft", rules: rules as never } }));
+    const selectsIn = (dt: string) =>
+      wrapper!
+        .findAllComponents(OFormSelect)
+        .filter((c) => c.element instanceof Element && !!c.element.closest(`[data-test="${dt}"]`));
+    const optionLabels = (c: { props: (k: string) => unknown }) =>
+      ((c.props("options") as { label: unknown }[] | undefined) ?? []).map((o) => String(o.label));
+    const waitPreview = async () => {
+      await new Promise((r) => setTimeout(r, 450));
+      await flushPromises();
+      await settle();
+    };
+    const previewCall = () =>
+      vi
+        .mocked(searchService.search)
+        .mock.calls.map(
+          (c) => c[0].query.query as { sql: string; start_time: number; end_time: number },
+        )
+        .filter((b) => b.sql.includes("e0_sessions"))
+        .at(-1);
+
+    beforeEach(() => {
+      svc.getAppSettings = vi.fn(async (_org: string, app: string) => ({
+        data: {
+          id: "settingsid00000000000000001",
+          app,
+          bots: true,
+          builtinBots: {
+            version: 1,
+            families: ["HeadlessChrome", "PhantomJS", "Spider"],
+            devices: ["Spider"],
+          },
+          sessions: [],
+          pages: [],
+          version: 1,
+          rulesHash: "0123456789abcdef",
+          createdBy: "admin@x.com",
+          createdAt: 1,
+          updatedBy: "admin@x.com",
+          updatedAt: 1,
+        },
+      }));
+      usePerformance().performanceState.data.streams._rumdata = {
+        name: "_rumdata",
+        schema: {
+          user_agent_user_agent_family: { name: "user_agent_user_agent_family" },
+          user_agent_device_family: { name: "user_agent_device_family" },
+          view_url: { name: "view_url" },
+          view_referrer: { name: "view_referrer" },
+          error_message: { name: "error_message" },
+        },
+      };
+    });
+    afterEach(() => {
+      delete svc.getAppSettings;
+    });
+
+    it("P7-R14: the rule kind offers Page, Click and Error", async () => {
+      await mountAt(PA_ROUTES.eventNew);
+      const kinds = q("rum-analytics-named-events-rule-0-kind")?.textContent ?? "";
+      expect(kinds).toContain("Page");
+      expect(kinds).toContain("Click");
+      expect(kinds).toContain("Error");
+    });
+
+    it("P7-R14: a Page rule's ops add URL parameter and Referrer host", async () => {
+      await mountAt(PA_ROUTES.eventNew);
+      const labels = selectsIn("rum-analytics-named-events-rule-0").flatMap(optionLabels);
+      expect(labels).toEqual(expect.arrayContaining(["URL parameter", "Referrer host"]));
+    });
+
+    it("P7-R14: a Click rule offers starts with, contains and regex", async () => {
+      await withDraft([{ t: "action", targets: ["save-btn"] }]);
+      const ops = selectsIn("rum-analytics-named-events-rule-0").find((c) => {
+        const l = optionLabels(c).join("|");
+        return /starts with/i.test(l) && /contains/i.test(l) && /regex/i.test(l);
+      });
+      expect(ops).toBeDefined();
+    });
+
+    it("P7-R14: an Error rule offers message contains", async () => {
+      await withDraft([{ t: "error", op: "contains", value: "Failed to fetch" }]);
+      const kinds = q("rum-analytics-named-events-rule-0-kind")?.textContent ?? "";
+      expect(kinds).toContain("Error");
+      const labels = selectsIn("rum-analytics-named-events-rule-0").flatMap(optionLabels);
+      expect(labels.some((l) => /contains/i.test(l))).toBe(true);
+    });
+
+    it("P7-R14: the preview applies the app's exclusions", async () => {
+      await withDraft([{ t: "view", op: "eq", value: "/web/logs" }]);
+      await waitPreview();
+      expect(previewCall()?.sql).toContain("NOT IN ('HeadlessChrome', 'PhantomJS', 'Spider')");
+    });
+
+    it("P7-R14: the preview counts the past 7 days whatever the scope's range", async () => {
+      await mountWith(
+        { ...SCOPE, period: "30d" },
+        namedEventHandoffState({
+          draft: { name: "Draft", rules: [{ t: "view", op: "eq", value: "/web/logs" }] },
+        }),
+      );
+      await waitPreview();
+      const call = previewCall()!;
+      expect([7 * DAY_US, 14 * DAY_US]).toContain(call.end_time - call.start_time);
+    });
+
+    it("P7-R14: a URL parameter rule that matches nothing says so and links to Logs on _rumdata", async () => {
+      vi.mocked(searchService.search).mockResolvedValue({
+        data: { hits: [{ e0_sessions: 0 }] },
+      } as never);
+      await withDraft([{ t: "view", op: "param", name: "new_user_login", value: "true" }]);
+      await waitPreview();
+      const editor = q("rum-analytics-event-editor")!;
+      expect(editor.textContent).toContain("No view in the past 7 days carries this parameter");
+      const link = [...editor.querySelectorAll("a")].find((a) => /logs/i.test(a.textContent ?? ""));
+      expect(link).toBeDefined();
+      const rawHref = link!.getAttribute("href") ?? "";
+      const href = decodeURIComponent(rawHref);
+      const hrefParams = [...new URLSearchParams(rawHref.split("?")[1] ?? "").values()];
+      link!.click();
+      await settle();
+      const routed =
+        router.currentRoute.value.name === "logs"
+          ? Object.values(router.currentRoute.value.query).map(String)
+          : [];
+      // Logs links may carry the query base64-encoded, so each value is also read decoded.
+      const decoded = (v: string) => {
+        try {
+          return atob(v.replace(/-/g, "+").replace(/_/g, "/"));
+        } catch {
+          return "";
+        }
+      };
+      const carried = [href, ...hrefParams.map(decoded), ...routed, ...routed.map(decoded)].join(
+        "\n",
+      );
+      expect(carried).toContain("_rumdata");
+      expect(carried).toContain("new_user_login");
+    });
   });
 });

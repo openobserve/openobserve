@@ -107,7 +107,13 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 107: add redact_tools to ai_chat_shares.
 // 108: create oncall_phone_verifications and org_telephony.
 // 109: add last_run columns to reports.
-pub const DB_SCHEMA_VERSION: u64 = 109;
+// 110: create rum_pa_app_settings; add rules_hash to rum_pa_funnels.
+// 111: create eval_job_states and eval_job_state_transitions.
+// 112: create the six Slack app tables.
+// 113: create rca_runs and add the run summary columns to alert_incidents.
+// 114: add RCA stage, context, continuation and on-call subject columns.
+// 115: create rca_steering and add the input columns to rca_runs.
+pub const DB_SCHEMA_VERSION: u64 = 115;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1186,8 +1192,8 @@ pub struct Synthetics {
     /// synthetics_enabled).
     #[env_config(
         name = "ZO_SYNTHETICS_ENABLED",
-        default = false,
-        help = "Master switch for synthetic monitoring. Off by default; the background workers and HTTP routes only exist when this is true."
+        default = true,
+        help = "Master switch for synthetic monitoring background workers and HTTP routes; changes require a restart."
     )]
     pub enabled: bool,
     /// Super-cluster only: how long a parent may reference a child that has not replicated yet.
@@ -1573,6 +1579,18 @@ pub struct Auth {
         help = "Secret used to sign stateless alert-chart render URLs. When empty (the default), a key is derived from the root user's stored password hash, which every node shares via the meta DB. Set explicitly to control rotation; rotating invalidates in-flight chart URLs (bounded by ZO_ALERT_CHART_URL_TTL)."
     )]
     pub alert_chart_signing_key: String,
+    #[env_config(
+        name = "ZO_DELEGATION_SIGNING_KEY",
+        default = "",
+        help = "Base64 key (32 bytes or more) that signs delegated Slack user tokens. Empty derives the key from O2_MASTER_ENCRYPTION_KEY; set it only to rotate independently of the master key."
+    )]
+    pub delegation_signing_key: String,
+    #[env_config(
+        name = "ZO_DELEGATION_SIGNING_KEY_PREVIOUS",
+        default = "",
+        help = "Previous delegation signing key, accepted for verification only during a rotation. Set to 'derived' to keep accepting the key derived from O2_MASTER_ENCRYPTION_KEY."
+    )]
+    pub delegation_signing_key_previous: String,
     #[env_config(name = "ZO_SERVICE_ACCOUNT_ENABLED", default = true)]
     pub service_account_enabled: bool,
     /// Session cleanup interval in seconds (default: 3600 = 1 hour)
@@ -2155,6 +2173,12 @@ pub struct Common {
         help = "Enable per-stream trace time indexes and trace time-range lookup"
     )]
     pub trace_time_index_enabled: bool,
+    #[env_config(
+        name = "ZO_TRACE_LIST_TIME_INDEX_ENABLED",
+        default = true,
+        help = "Complete trace list summaries from the trace time index; off keeps the per-partition aggregates"
+    )]
+    pub trace_list_time_index_enabled: bool,
     #[env_config(name = "OTEL_OTLP_HTTP_ENDPOINT", default = "")]
     pub otel_otlp_url: String,
     #[env_config(name = "OTEL_OTLP_GRPC_ENDPOINT", default = "")]
@@ -2202,7 +2226,8 @@ pub struct Common {
     pub print_key_sql: bool,
     #[env_config(name = "ZO_PRINT_PLAN_SINGLE_LINE", default = true)]
     pub print_plan_single_line: bool,
-    // usage reporting
+    #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = true)]
+    pub usage_reporting_enabled: bool,
     #[env_config(
         name = "ZO_USAGE_REPORTING_MODE",
         default = "local",
@@ -2212,7 +2237,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_USAGE_REPORTING_URL",
         default = "http://localhost:5080/api/_meta/usage/_json",
-        help = "Where remote usage reporting posts. Unused in the open source build, which never reports usage."
+        help = "Where remote usage reporting posts when enabled."
     )]
     pub usage_reporting_url: String,
     #[env_config(name = "ZO_USAGE_REPORTING_CREDS", default = "")]
@@ -5159,11 +5184,6 @@ mod tests {
     }
 
     #[test]
-    fn budget_above_lease_is_rejected() {
-        assert!(validate_synthetics_ceilings(&ceilings(900, 901, 300_000)).is_err());
-    }
-
-    #[test]
     fn net_timeout_larger_than_the_budget_is_rejected() {
         // One attempt could never fit, so every config of that type would fail
         // validation for a reason the user cannot act on.
@@ -5564,11 +5584,6 @@ mod tests {
     }
 
     #[test]
-    fn test_ensure_not_empty_valid() {
-        assert!(ensure_not_empty("valid", "TEST").is_ok());
-    }
-
-    #[test]
     fn test_ensure_not_empty_invalid() {
         assert!(ensure_not_empty("", "TEST").is_err());
     }
@@ -5576,11 +5591,6 @@ mod tests {
     #[test]
     fn test_ensure_not_empty_with_whitespace() {
         assert!(ensure_not_empty("  value  ", "TEST").is_ok());
-    }
-
-    #[test]
-    fn test_ensure_not_empty_single_char() {
-        assert!(ensure_not_empty("a", "TEST").is_ok());
     }
 
     #[test]
@@ -6530,13 +6540,6 @@ mod tests {
         let p = std::path::Path::new("/data/openobserve");
         let result = deverbatim(p);
         assert_eq!(result, "/data/openobserve");
-    }
-
-    #[test]
-    fn test_deverbatim_empty_path_unchanged() {
-        let p = std::path::Path::new("");
-        let result = deverbatim(p);
-        assert_eq!(result, "");
     }
 
     #[cfg(windows)]

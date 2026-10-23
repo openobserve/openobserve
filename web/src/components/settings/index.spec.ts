@@ -325,6 +325,24 @@ describe("SettingsIndex", () => {
       ]);
     });
 
+    it("AC-12.5 puts the Integrations group with Slack right after Destinations", () => {
+      mockStore.state.zoConfig = { service_streams_enabled: true, slack_enabled: true } as any;
+      const wrapper = createWrapper();
+      const labels = (wrapper.vm.sectionGroups as any[]).map((g: any) => g.label);
+      expect(labels.indexOf("Integrations")).toBe(labels.indexOf("Destinations") + 1);
+    });
+
+    it("AC-1.4 shows no Slack rail item on Cloud while Slack is disabled", () => {
+      mockStore.state.zoConfig = {
+        service_streams_enabled: true,
+        slack_enabled: false,
+        slack_disabled_reason: "flag",
+      } as any;
+      const wrapper = createWrapper();
+      const items = (wrapper.vm.sectionGroups as any[]).flatMap((g: any) => g.items);
+      expect(items.find((i: any) => i.key === "slack")?.visible).toBe(false);
+    });
+
     it("should contain a Synthetics group", () => {
       const wrapper = createWrapper();
       const groups = wrapper.vm.sectionGroups as any[];

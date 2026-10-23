@@ -283,6 +283,61 @@ describe("usePanelDrilldown", () => {
     expect(api.crossLinksData.value).toEqual({ stream_links: [], org_links: [] });
   });
 
+  describe("cross-link drilldown", () => {
+    const mockStreamLink = (url: string) =>
+      resultSchemaMock.mockResolvedValue({
+        data: {
+          cross_links: {
+            stream_links: [{ name: "Link", url, fields: [{ name: "f", alias: "f" }] }],
+            org_links: [],
+          },
+        },
+      });
+
+    const clickAndOpenCrossLink = async () => {
+      const deps = makeDeps();
+      deps.panelSchema.value.config.drilldown = [];
+      const api = usePanelDrilldown(deps as any);
+      await api.onChartClick({
+        componentType: "series",
+        event: { offsetX: 1, offsetY: 1 },
+        dataIndex: 0,
+        seriesName: "s",
+        value: ["x", 1],
+      });
+      await api.openDrilldown(0);
+    };
+
+    it.each([
+      "javascript:alert(document.domain)",
+      " JaVaScRiPt:alert(1)",
+      "data:text/html,<script>alert(1)</script>",
+      "${field.__value}",
+    ])("never opens a stored cross-link that does not resolve to http(s): %s", async (url) => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      mockStreamLink(url);
+
+      await clickAndOpenCrossLink();
+
+      expect(openSpy).not.toHaveBeenCalled();
+      openSpy.mockRestore();
+    });
+
+    it("opens an http(s) cross-link without handing the new tab an opener", async () => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      mockStreamLink("https://jaeger.example.com/trace/${field.__value}");
+
+      await clickAndOpenCrossLink();
+
+      expect(openSpy).toHaveBeenCalledWith(
+        "https://jaeger.example.com/trace/",
+        "_blank",
+        "noopener,noreferrer",
+      );
+      openSpy.mockRestore();
+    });
+  });
+
   // ── Table cell → Logs drilldown ──────────────────────────────────────────
   // The drillable-columns watcher parses SQL via a dynamically-imported parser.
   // Under parallel test load that import can take longer than a few microtask

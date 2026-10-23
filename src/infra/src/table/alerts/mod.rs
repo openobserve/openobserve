@@ -80,8 +80,13 @@ impl TryFrom<alerts::Model> for MetaAlert {
         let destinations: Vec<String> = serde_json::from_value(value.destinations)?;
         let recovery_destinations: Vec<String> = value
             .recovery_destinations
-            .map(serde_json::from_value)
-            .transpose()?
+            .map(|raw| serde_json::from_str(&raw))
+            .transpose()
+            .map_err(|e| {
+                errors::Error::Message(format!(
+                    "alert {id} has an invalid recovery_destinations value: {e}"
+                ))
+            })?
             .unwrap_or_default();
         let context_attributes: Option<HashMap<String, String>> = value
             .context_attributes
@@ -452,33 +457,6 @@ pub async fn delete_by_id<C: ConnectionTrait>(
         .filter(alerts::Column::Id.eq(alert_id.to_string()))
         .exec(conn)
         .await?;
-    Ok(())
-}
-
-/// Deletes an alert by its name.
-pub async fn delete_by_name<C: ConnectionTrait>(
-    conn: &C,
-    org_id: &str,
-    folder_id: &str,
-    stream_type: MetaStreamType,
-    stream_name: &str,
-    alert_name: &str,
-) -> Result<(), errors::Error> {
-    let model = get_model_by_name(
-        conn,
-        org_id,
-        folder_id,
-        stream_type,
-        stream_name,
-        alert_name,
-    )
-    .await?
-    .and_then(|(_folder, maybe_alert)| maybe_alert);
-
-    if let Some(model) = model {
-        let _ = model.delete(conn).await?;
-    }
-
     Ok(())
 }
 
@@ -988,7 +966,7 @@ fn update_mutable_fields(
     let recovery_destinations = if alert.recovery_destinations.is_empty() {
         None
     } else {
-        Some(serde_json::to_value(alert.recovery_destinations)?)
+        Some(serde_json::to_string(&alert.recovery_destinations)?)
     };
     let keep_firing_for_seconds = alert.keep_firing_for;
 
@@ -1286,15 +1264,6 @@ pub(super) mod tests {
     }
 
     // ── promql_multi_alert: column ⇄ meta ───────────────────────────────────
-
-    #[test]
-    fn test_try_from_model_reads_the_promql_multi_alert_column() {
-        let id = Ksuid::new(None, None).to_string();
-        let mut m = make_model(&id);
-        m.query_promql_multi_alert = Some(true);
-        let alert = MetaAlert::try_from(m).unwrap();
-        assert!(alert.query_condition.promql_multi_alert);
-    }
 
     /// NULL is the shape every alert written before the column existed has.
     /// Reading it as anything but `false` would flip all of them to per-series

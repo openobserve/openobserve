@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex items-center">
                 <div class="w-21.75">
                   <OFormInput
+                    :aria-label="t('alerts.silenceNotification')"
                     name="trigger_condition.silence"
                     type="number"
                     min="0"
@@ -90,6 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex items-center gap-2">
                 <div class="w-21.75">
                   <OFormInput
+                    :aria-label="t('alerts.summary.pendingPeriod')"
                     name="_ui.pendingPeriod"
                     type="number"
                     min="0"
@@ -100,6 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OFormInput>
                 </div>
                 <OSelect
+                  :aria-label="t('common.timeUnit')"
                   class="max-w-25 min-w-20"
                   :model-value="pendingPeriodUnit"
                   :options="pendingPeriodUnitOptions"
@@ -156,6 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex items-center">
                 <div class="w-21.75">
                   <OFormInput
+                    :aria-label="t('alerts.period')"
                     name="trigger_condition.period"
                     type="number"
                     min="1"
@@ -198,6 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex items-center">
                 <div class="w-21.75">
                   <OFormInput
+                    :aria-label="t('alerts.silenceNotification')"
                     name="trigger_condition.silence"
                     type="number"
                     min="0"
@@ -243,6 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex items-center gap-2">
                 <div class="w-21.75">
                   <OFormInput
+                    :aria-label="t('alerts.summary.pendingPeriod')"
                     name="_ui.pendingPeriod"
                     type="number"
                     min="0"
@@ -253,6 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OFormInput>
                 </div>
                 <OSelect
+                  :aria-label="t('common.timeUnit')"
                   class="max-w-25 min-w-20"
                   :model-value="pendingPeriodUnit"
                   :options="pendingPeriodUnitOptions"
@@ -309,7 +316,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
             <OTooltip :content="t('alerts.alertSettings.createsIncidentTooltip')" side="right" />
           </div>
-          <OFormSwitch name="creates_incident" data-test="alert-creates-incident-toggle" />
+          <OFormSwitch
+            name="creates_incident"
+            :aria-label="t('alerts.alertSettings.createsIncident')"
+            data-test="alert-creates-incident-toggle"
+          />
         </div>
 
         <!-- Scheduled only: realtime, composite and anomaly alerts keep no episode, so neither field can act. -->
@@ -332,6 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    delivered, so it cannot be turned on. It can still be turned off. -->
               <OFormSwitch
                 name="notify_on_recovery"
+                :aria-label="t('alerts.alertSettings.notifyOnRecovery')"
                 :disabled="notifiesNobody && !formData?.notify_on_recovery"
                 data-test="alert-notify-on-recovery-toggle"
               />
@@ -378,6 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex items-center">
               <div class="w-21.75">
                 <OFormInput
+                  :aria-label="t('alerts.alertSettings.keepFiringFor')"
                   name="keep_firing_for"
                   type="number"
                   min="0"

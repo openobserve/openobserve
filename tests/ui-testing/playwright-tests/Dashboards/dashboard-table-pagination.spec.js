@@ -1066,7 +1066,7 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     await deleteDashboard(page, dashboardName);
   });
 
-  test("should display pagination controls in PromQL table with legend filter", async ({
+  test("should render the pagination footer in PromQL table with legend filter", async ({
     page,
   }) => {
     const dashboardName = generateUniqueDashboardName();
@@ -1122,8 +1122,7 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     await page.keyboard.press('Escape'); // Dismiss any Monaco autocomplete suggestions
 
     // Apply
-    await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dashboardPanelActions.waitForChartToRender();
+    await pm.dashboardPanelActions.applyAndWaitForPromQLQuery();
 
     // Open config panel and enable pagination
     await pm.dashboardPanelConfigs.openConfigPanel();
@@ -1135,28 +1134,16 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     await pm.dashboardPanelConfigs.setRowsPerPage("10");
 
     // Apply changes and wait for table data to load
-    await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dashboardPanelActions.waitForChartToRender();
+    await pm.dashboardPanelActions.applyAndWaitForPromQLQuery();
 
     // Wait for the table to render with data rows
     // TenstackTable does NOT render the pagination container when rows are empty
     const tablePanel = pm.dashboardPanelActions.dashboardTable;
     await tablePanel.waitFor({ state: "visible", timeout: 15000 });
 
-    // Wait for table rows - if first attempt returns no data, re-apply to retry the query
-    // Rows render directly in tbody, keyed data-test="o2-table-row-<index>"
+    // Rows render directly in tbody, keyed data-test="o2-table-row-<index>"; data is required for pagination to render
     const tableRows = tablePanel.locator('tbody tr[data-test^="o2-table-row-"]');
-    let hasRows = await tableRows.first().waitFor({ state: "visible", timeout: 15000 }).then(() => true).catch(() => false);
-
-    if (!hasRows) {
-      testLogger.warn('No table rows on first attempt - re-applying query to retry');
-      await pm.dashboardPanelActions.applyDashboardBtn();
-      await pm.dashboardPanelActions.waitForChartToRender();
-      hasRows = await tableRows.first().waitFor({ state: "visible", timeout: 15000 }).then(() => true).catch(() => false);
-    }
-
-    // Data is required for pagination to render - fail clearly if still no data
-    expect(hasRows, 'PromQL query "cpu_usage{}" must return data rows for pagination test - check metrics ingestion').toBe(true);
+    await expect(tableRows.first(), 'PromQL query "cpu_usage{}" must return data rows for pagination test - check metrics ingestion').toBeVisible({ timeout: 15000 });
 
     // Wait for the table bottom container which holds all pagination controls
     // (PromQL with legend uses a custom bottom slot that also has this data-test)
@@ -1167,17 +1154,10 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     const rowsPerPageText = pm.dashboardPanelConfigs.tableRowsPerPageLabel;
     await expect(rowsPerPageText).toBeVisible({ timeout: 10000 });
 
-    // Wait for row count to show actual data in format "X-Y of Z"
-    await page.waitForFunction(
-      () => {
-        const el = document.querySelector('[data-test="dashboard-table-row-count"]');
-        return el && /\d+-\d+\s+of\s+\d+/.test(el.textContent ?? "");
-      },
-      { timeout: 15000 }
-    );
     const paginationInfo = pm.dashboardPanelConfigs.tableRowCount;
+    await expect(paginationInfo).toHaveText(/^\s*\d+-\d+\s+of\s+\d+\s*$/, { timeout: 15000 });
 
-    // Verify pagination shows correct format (e.g., "1-10 of X" or "1-N of N" if fewer records)
+    // Only the footer's presence and range shape are checked; the page-size count is wrong today (#15544) and its fix adds the exact assertion.
     const paginationText = await paginationInfo.textContent();
     expect(paginationText.trim()).toMatch(/^\d+-\d+\s+of\s+\d+$/);
 

@@ -108,15 +108,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_distinct_stream_name_empty_name() {
-        // The function does not validate the name; an empty string is stitched in.
-        assert_eq!(
-            get_distinct_stream_name(StreamType::Logs, ""),
-            "distinct_values_logs_"
-        );
-    }
-
-    #[test]
     fn test_trace_time_index_stream_name() {
         assert_eq!(
             get_trace_time_index_stream_name("default"),

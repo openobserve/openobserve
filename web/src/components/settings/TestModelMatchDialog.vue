@@ -51,6 +51,59 @@
             {{ t("modelPricing.localTimeHint", { range: testAtTimeLocalHint }) }}
           </OText>
         </div>
+
+        <div class="flex flex-col gap-1.5" data-test="test-match-attributes">
+          <OText variant="label">{{ t("modelPricing.testAttributesLabel") }}</OText>
+          <OText variant="meta">{{ t("modelPricing.testAttributesHint") }}</OText>
+          <div
+            v-for="(attr, aIdx) in testAttributes"
+            :key="aIdx"
+            class="flex items-end gap-1.5"
+            :data-test="`test-match-attribute-row-${aIdx}`"
+          >
+            <OInput
+              v-model="attr.key"
+              :label="t('modelPricing.testAttributeKey')"
+              :placeholder="
+                t('modelPricing.ruleKeysPlaceholder', {
+                  example: raw('openai.response.service_tier'),
+                })
+              "
+              size="sm"
+              class="min-w-0 flex-1"
+              :data-test="`test-match-attribute-key-${aIdx}`"
+            />
+            <OInput
+              v-model="attr.value"
+              :label="t('modelPricing.testAttributeValue')"
+              :placeholder="t('modelPricing.ruleValuesPlaceholder', { example: raw('flex') })"
+              size="sm"
+              class="min-w-0 flex-1"
+              :data-test="`test-match-attribute-value-${aIdx}`"
+            />
+            <OButton
+              variant="ghost"
+              size="icon-xs-sq"
+              type="button"
+              :aria-label="t('modelPricing.testRemoveAttribute')"
+              :data-test="`test-match-attribute-remove-${aIdx}`"
+              @click="removeAttribute(aIdx)"
+            >
+              <OIcon name="close" size="xs" />
+              <OTooltip :side-offset="4" :content="t('modelPricing.testRemoveAttribute')" />
+            </OButton>
+          </div>
+          <OButton
+            variant="outline"
+            size="sm-action"
+            type="button"
+            class="self-start"
+            data-test="test-match-attribute-add"
+            @click="addAttribute"
+          >
+            {{ t("modelPricing.testAddAttribute") }}
+          </OButton>
+        </div>
       </div>
 
       <!-- ── Vertical divider ── -->
@@ -125,12 +178,27 @@
           <!-- Match Found -->
           <div v-else key="match" class="flex flex-col gap-3" data-test="test-match-result">
             <!-- Match status -->
-            <OBanner variant="success" icon="check-circle" inline-actions>
+            <OBanner
+              :variant="isApproximateMatch ? 'warning' : 'success'"
+              :icon="isApproximateMatch ? 'warning' : 'check-circle'"
+              inline-actions
+            >
               <div class="text-compact font-bold">
-                {{ t("modelPricing.matchFound") }}
+                {{
+                  isApproximateMatch
+                    ? t("modelPricing.approximateMatchFound")
+                    : t("modelPricing.matchFound")
+                }}
               </div>
               <div class="mt-0.5 text-xs opacity-70">
                 <OCode truncate>{{ testResult.matched.name }}</OCode>
+              </div>
+              <div
+                v-if="isApproximateMatch"
+                class="mt-0.5 text-xs opacity-70"
+                data-test="test-match-approximate"
+              >
+                {{ t("modelPricing.approximateMatchDesc", { modelName: testModelName }) }}
               </div>
               <template #actions>
                 <OTag
@@ -203,8 +271,20 @@
                     }}</span>
                   </div>
                   <div
+                    v-for="(rule, rIdx) in matchedTierRules"
+                    :key="rIdx"
                     class="text-2xs mt-0.5 opacity-50"
-                    v-if="!matchedTierDef?.condition && !matchedTierWindows.length"
+                    data-test="test-match-tier-rule"
+                  >
+                    <OCode>{{ formatTierRule(rule, t) }}</OCode>
+                  </div>
+                  <div
+                    class="text-2xs mt-0.5 opacity-50"
+                    v-if="
+                      !matchedTierDef?.condition &&
+                      !matchedTierWindows.length &&
+                      !matchedTierRules.length
+                    "
                   >
                     {{ t("modelPricing.defaultPricingTier") }}
                   </div>
@@ -249,13 +329,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onBeforeUnmount } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import modelPricingService from "@/services/model_pricing";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCode from "@/lib/core/Code/OCode.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -265,6 +347,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OTime from "@/lib/forms/Time/OTime.vue";
 import {
   operatorSymbol,
+  formatTierRule,
   formatUtcWindows,
   formatUtcWindowsInTz,
   utcMinuteToTzHhmm,
@@ -290,20 +373,45 @@ const testModelName = ref("");
 // Optional `HH:MM` UTC time-of-day to test at; empty = "right now". Lets a
 // peak / off-peak tier be exercised without waiting for its window.
 const testAtTime = ref("");
+// Blank keys are not sent, so a half-typed row never changes the result.
+const testAttributes = ref<Array<{ key: string; value: string }>>([]);
+
+function addAttribute() {
+  testAttributes.value = [...testAttributes.value, { key: "", value: "" }];
+}
+
+function removeAttribute(idx: number) {
+  testAttributes.value = testAttributes.value.filter((_, i) => i !== idx);
+}
+
+function attributesPayload(): Record<string, string> | undefined {
+  const out: Record<string, string> = {};
+  for (const attr of testAttributes.value) {
+    const key = attr.key.trim();
+    if (key) out[key] = attr.value.trim();
+  }
+  return Object.keys(out).length ? out : undefined;
+}
 
 // Reset on open. Focus is OInput's `autofocus`, not a ref call — OInput is
 // `<script setup>` with no defineExpose, so it has no focus() to reach for.
 watch(internalValue, (val) => {
   if (val) {
     testResult.value = null;
+    hasRun.value = false;
     testModelName.value = "";
     testAtTime.value = "";
+    testAttributes.value = [];
   }
 });
 
 // ── Backend test API ──────────────────────────────────────────────────────────
 
 const testResult = ref<any>(null);
+// Kept apart from testResult so a failed call does not stop later automatic reruns.
+const hasRun = ref(false);
+let requestSeq = 0;
+let attributeTimer: ReturnType<typeof setTimeout> | undefined;
 
 // The instant the backend resolves `valid_from` and any recurring UTC window
 // (peak / off-peak rates) against: today at the chosen UTC time, or "right now"
@@ -324,6 +432,7 @@ function testTimestampMicros(): number {
 }
 
 async function callTestApi() {
+  const seq = ++requestSeq;
   if (!testModelName.value) {
     testResult.value = null;
     return;
@@ -333,10 +442,11 @@ async function callTestApi() {
       model_name: testModelName.value,
       usage: undefined,
       timestamp: testTimestampMicros(),
+      attributes: attributesPayload(),
     });
-    testResult.value = res.data;
+    if (seq === requestSeq) testResult.value = res.data;
   } catch {
-    testResult.value = null;
+    if (seq === requestSeq) testResult.value = null;
   }
 }
 
@@ -345,19 +455,33 @@ const testing = ref(false);
 async function runTest() {
   if (!testModelName.value) return;
   testing.value = true;
+  hasRun.value = true;
   await callTestApi();
   testing.value = false;
 }
 
 watch(testModelName, (val) => {
-  if (!val) testResult.value = null;
+  if (!val) {
+    testResult.value = null;
+    hasRun.value = false;
+  }
 });
 
 // A shown result answers "what applies at the tested time" — keep it honest by
 // re-running when that time changes rather than displaying a stale tier.
 watch(testAtTime, () => {
-  if (testResult.value !== null && testModelName.value) callTestApi();
+  if (hasRun.value && testModelName.value) callTestApi();
 });
+// Watching the serialized payload ignores edits that do not change what is sent; the debounce avoids a request per keystroke.
+watch(
+  () => JSON.stringify(attributesPayload() ?? {}),
+  () => {
+    clearTimeout(attributeTimer);
+    if (!hasRun.value || !testModelName.value) return;
+    attributeTimer = setTimeout(callTestApi, 300);
+  },
+);
+onBeforeUnmount(() => clearTimeout(attributeTimer));
 
 // ── Derived display values ────────────────────────────────────────────────────
 
@@ -375,6 +499,9 @@ function sortedPriceEntries(prices: Record<string, number>): [string, number][] 
 
 const winnerSource = computed(() => testResult.value?.matched?.source || null);
 
+// The pattern matched only part of the model name, so the price may belong to another model.
+const isApproximateMatch = computed(() => testResult.value?.match_kind === "approximate");
+
 const matchFlowSteps = computed(() => [
   { key: "org", label: t("settings.testModelMatchDialog.stepYourOrg"), icon: "person" },
   { key: "meta_org", label: t("settings.testModelMatchDialog.stepGlobal"), icon: "corporate-fare" },
@@ -385,6 +512,9 @@ const matchedTierDef = computed(() => {
   const result = testResult.value;
   if (!result?.matched) return null;
   const tiers: any[] = result.matched.tiers || [];
+  if (Number.isInteger(result.tier_index) && tiers[result.tier_index]) {
+    return tiers[result.tier_index];
+  }
   return tiers.find((t: any) => (t.name || "Default") === result.tier) || tiers[0] || null;
 });
 
@@ -400,6 +530,8 @@ const pricingRows = computed(() => {
 const matchedTierWindows = computed<Array<{ start_minute: number; end_minute: number }>>(
   () => matchedTierDef.value?.utc_windows ?? [],
 );
+
+const matchedTierRules = computed<any[]>(() => matchedTierDef.value?.rules ?? []);
 
 // "· 06:30–09:30, 11:30–15:30 IST" — the matched tier's hours in the user's
 // timezone. Empty when the user's timezone is UTC (nothing to convert).

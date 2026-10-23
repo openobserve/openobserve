@@ -117,6 +117,8 @@ export class IamPage {
 
     async gotoIamPage() {
         await this.iamPageMenu.click();
+        // An org switch issued before this navigation commits reuses the old path and cancels it.
+        await expect(this.page).toHaveURL(/\/iam/, { timeout: 15000 });
     }
 
 

@@ -16,6 +16,7 @@
 // macOS ld cannot encode compact-unwind offsets once __eh_frame exceeds 16MB;
 // harmless for a binary this size (only slows panic unwinding), so silence it.
 #![allow(linker_messages)]
+#![recursion_limit = "256"]
 
 #[cfg(test)]
 mod tests {
@@ -2563,13 +2564,8 @@ mod tests {
         let trigger = trigger.unwrap();
         assert!(trigger.next_run_at > now && trigger.retries == 0);
 
-        let res = db::alerts::alert::delete_by_name(
-            "e2e",
-            config::meta::stream::StreamType::Logs,
-            "olympics_schema",
-            "test_alert_wrong_sql",
-        )
-        .await;
+        let res =
+            db::alerts::alert::delete_by_id(infra::db::get_orm_client_rw().await, "e2e", id).await;
         assert!(res.is_ok());
     }
 
