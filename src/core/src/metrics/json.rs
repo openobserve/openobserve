@@ -128,9 +128,6 @@ async fn buffer_record(
     if let Some(v) = record.get_mut(NAME_LABEL) {
         *v = json::Value::String(stream_name.clone());
     }
-    if ingest::reject_long_stream(org_id, &stream_name).is_some() {
-        return Ok(false);
-    }
 
     // check stream if it is deleting
     let is_deleting = match lookups.deleting.get(&stream_name) {
@@ -185,7 +182,10 @@ async fn buffer_record(
 
     if !lookups.schemas.contains_key(&stream_name) {
         let mut schema = infra::schema::get(org_id, &stream_name, StreamType::Metrics).await?;
-        if schema == Schema::empty() {
+        // a too-long stream gets no schema; its records are rejected per stream after the pipelines
+        if schema == Schema::empty()
+            && !schema::is_stream_key_too_long(org_id, StreamType::Metrics, &stream_name)
+        {
             let metadata = family_metadata(&stream_name, metric_type);
             schema = schema.with_metadata(metadata);
             db::schema::merge(
@@ -446,10 +446,10 @@ pub async fn ingest(
         }
     }
 
-    // warn if any records were skipped due to streams being deleted or named too long
+    // warn if any records were skipped due to streams being deleted
     if skipped_records > 0 {
         log::warn!(
-            "[METRICS:JSON] Skipped {skipped_records} records due to streams being deleted or named too long, org_id: {org_id}"
+            "[METRICS:JSON] Skipped {skipped_records} records due to streams being deleted, org_id: {org_id}"
         );
     }
 

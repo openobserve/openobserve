@@ -271,6 +271,8 @@ pub async fn handle_otlp_request(
     // check if stream is deleting from cache
     let mut stream_delete_status: HashMap<String, bool> = HashMap::new();
     let mut skipped_records: u32 = 0;
+    // a metric can repeat across resources and scopes, so each stream is checked once a batch
+    let mut stream_too_long: HashMap<String, Option<String>> = HashMap::new();
 
     for resource_metric in &request.resource_metrics {
         if resource_metric.scope_metrics.is_empty() {
@@ -368,9 +370,12 @@ pub async fn handle_otlp_request(
                 if records.is_empty() {
                     continue;
                 }
-                if let Some(message) = ingest::reject_long_stream(org_id, &metric_name) {
+                let rejection = stream_too_long
+                    .entry(metric_name.clone())
+                    .or_insert_with(|| ingest::reject_long_stream(org_id, &metric_name));
+                if let Some(message) = rejection {
                     partial_success.rejected_data_points += records.point_count() as i64;
-                    partial_success.error_message = message;
+                    partial_success.error_message = message.clone();
                     continue;
                 }
 

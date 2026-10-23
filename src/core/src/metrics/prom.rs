@@ -142,11 +142,13 @@ pub async fn remote_write(
     // check if stream is deleting from cache
     let mut stream_delete_status: HashMap<String, bool> = HashMap::new();
     let mut skipped_records: u32 = 0;
+    // checked per series before the columnar append, so cached to count each stream once a batch
+    let mut stream_too_long: HashMap<String, bool> = HashMap::new();
 
     // parse metadata
     for item in request.metadata {
         let metric_name = format_stream_name(item.metric_family_name.to_string());
-        if ingest::reject_long_stream(org_id, &metric_name).is_some() {
+        if schema::is_stream_key_too_long(org_id, StreamType::Metrics, &metric_name) {
             continue;
         }
         let schema = infra::schema::get(org_id, &metric_name, StreamType::Metrics)
@@ -378,6 +380,18 @@ pub async fn remote_write(
 
         if is_deleting {
             skipped_records += 1;
+            continue;
+        }
+
+        let too_long = match stream_too_long.get(&metric_name) {
+            Some(v) => *v,
+            None => {
+                let flag = ingest::reject_long_stream(org_id, &metric_name).is_some();
+                stream_too_long.insert(metric_name.clone(), flag);
+                flag
+            }
+        };
+        if too_long {
             continue;
         }
 
