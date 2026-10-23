@@ -48,6 +48,10 @@ use crate::grpc_search::{grpc_search, grpc_search_partition};
 // 4. after run on partition, write result to s3
 // 6. when all partition is done, write data to s3, then update `search_jobs` table
 pub async fn run(id: i64) -> Result<(), anyhow::Error> {
+    // Jobs stay pending while search is blocked, so none is claimed only to be released again.
+    if !o2_enterprise::enterprise::license::search_allowed() {
+        return Ok(());
+    }
     // 1. get the oldest job from `search_jobs` table, and set status to running
     let job = match get_job().await? {
         Some(job) => job,
@@ -111,6 +115,12 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
         for partition_job in partition_jobs.iter() {
             // check if the job is still running
             check_status(id, &job.id, &job.org_id).await?;
+            // Not failed: the job keeps its finished partitions and resumes after its heartbeat
+            // lapses.
+            if let Some(reason) = job_pause_reason(&job.org_id, &job.stream_names) {
+                log::warn!("[SEARCH JOB {id}] job_id: {}, paused: {reason}", job.id);
+                return Ok(());
+            }
             let res = run_partition_job(id, &job, partition_job, req.clone(), need).await;
             let total = match res {
                 Ok(total) => total,
@@ -410,6 +420,22 @@ async fn check_status(id: i64, job_id: &str, org_id: &str) -> Result<(), anyhow:
     Ok(())
 }
 
+/// Why a job's search may not run now, `None` when it may.
+fn job_pause_reason(org_id: &str, stream_names: &str) -> Option<String> {
+    if org_id == config::META_ORG_ID {
+        return None;
+    }
+    let streams: Vec<String> = json::from_str(stream_names).unwrap_or_default();
+    let verdict = if streams.is_empty() {
+        crate::check_search_allowed(org_id, None)
+    } else {
+        streams
+            .iter()
+            .try_for_each(|stream| crate::check_search_allowed(org_id, Some(stream)))
+    };
+    verdict.err().map(|e| e.to_string())
+}
+
 pub async fn merge_response(
     jobs: Vec<PartitionJob>,
     limit: i64,
@@ -584,5 +610,65 @@ mod tests {
         ));
         assert!(!is_search_job_result_path("/result/x.result.json"));
         assert!(!is_search_job_result_path("result/x.parquet"));
+    }
+
+    #[tokio::test]
+    async fn job_pause_reason_follows_the_gate() {
+        use o2_enterprise::enterprise::license::{TEST_STATICS_LOCK, close_search_gate_for_tests};
+
+        let cases = [
+            ("acme", r#"["logs"]"#),
+            ("acme", r#"["_o2_ai_chat_events"]"#),
+            ("acme", r#"["triggers"]"#),
+            ("_meta", r#"["logs"]"#),
+            ("acme", "garbage"),
+        ];
+        let gate = close_search_gate_for_tests(TEST_STATICS_LOCK.lock().await);
+        let paused: Vec<bool> = cases
+            .iter()
+            .map(|(org, streams)| job_pause_reason(org, streams).is_some())
+            .collect();
+        assert_eq!(paused, [true, false, true, false, true]);
+        assert!(
+            job_pause_reason("acme", r#"["logs"]"#)
+                .unwrap()
+                .contains("Search is temporarily disabled")
+        );
+        drop(gate);
+        let _held = TEST_STATICS_LOCK.lock().await;
+        for (org, streams) in cases {
+            assert_eq!(job_pause_reason(org, streams), None, "{org} {streams}");
+        }
+    }
+
+    fn run_body() -> &'static str {
+        let source = include_str!("search_jobs.rs");
+        let start = source.find("pub async fn run(").unwrap();
+        &source[start..start + source[start..].find("\n}\n").unwrap()]
+    }
+
+    #[test]
+    fn worker_checks_the_licence_before_claiming_a_job() {
+        let body = run_body();
+        let check = body
+            .find("search_allowed()")
+            .expect("run must check the licence");
+        assert!(check < body.find("get_job()").unwrap());
+    }
+
+    #[test]
+    fn worker_checks_the_licence_before_each_partition() {
+        let body = run_body();
+        let loop_start = body.find("for partition_job in").unwrap();
+        let pause = loop_start
+            + body[loop_start..]
+                .find("job_pause_reason(")
+                .expect("each partition must check the licence");
+        let run = loop_start + body[loop_start..].find("run_partition_job(").unwrap();
+        assert!(pause < run);
+        assert!(
+            !body[pause..run].contains("set_job_error_message"),
+            "a paused job must not be marked failed"
+        );
     }
 }
