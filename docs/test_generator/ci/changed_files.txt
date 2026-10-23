@@ -1,0 +1,2 @@
+tests/ui-testing/pages/logsPages/logsToolbarPinsPage.js
+tests/ui-testing/playwright-tests/Logs/logsToolbarPins.spec.js
