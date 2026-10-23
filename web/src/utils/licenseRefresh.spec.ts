@@ -58,13 +58,18 @@ describe("license refresh messages", () => {
       ).text,
     ).toBe("A renewed license is available. Update O2_LICENSE_KEY to use it.");
   });
-  it("uses the renewed expiry", () => {
+  it.each([
+    ["en-US", "Nov 2, 2027"],
+    ["de", "2. Nov. 2027"],
+  ])("uses the renewed expiry in %s", (locale, date) => {
     expect(
       refreshMessage(
         { outcome: "renewed", renewed: { license_id: "new", expires_at: 1825113600000000 } },
         gt,
+        undefined,
+        locale,
       ).text,
-    ).toContain("Nov 2, 2027");
+    ).toContain(date);
   });
   it("recognizes empty old-node bodies", () => {
     expect(isOldNodeBody("")).toBe(true);
