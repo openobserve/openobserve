@@ -48,7 +48,8 @@ WRITTEN_NON_NULL_COLUMNS = {
 def _entity_files() -> list[Path]:
     files = []
     for root in ENTITY_DIRS:
-        files += sorted((root / "entity").glob("*.rs")) + sorted(root.glob("*.rs"))
+        # Hand-written table modules first: the code uses them, `entity/` can hold stale codegen copies.
+        files += sorted(root.glob("*.rs")) + sorted((root / "entity").glob("*.rs"))
     return [f for f in files if "DeriveEntityModel" in f.read_text()]
 
 
