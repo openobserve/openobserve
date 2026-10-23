@@ -30,7 +30,7 @@ use super::{
     alerts::{create, get_by_id, list, update},
     entity::{alerts, folders},
     folders::folder_type_into_i16,
-    migration::apply_alert_recovery_destinations_migrations_for_test,
+    migration::add_alert_recovery_destinations_for_test,
 };
 
 const ORG: &str = "org-a";
@@ -39,7 +39,6 @@ const FOLDER: &str = "folder-a";
 struct PostgresSchema {
     admin: DatabaseConnection,
     db: DatabaseConnection,
-    dsn: String,
     name: String,
 }
 
@@ -59,16 +58,6 @@ impl PostgresSchema {
             .execute_unprepared(&format!(r#"CREATE SCHEMA "{name}""#))
             .await
             .unwrap();
-        let db = Self::open(&dsn, &name).await;
-        Some(Self {
-            admin,
-            db,
-            dsn,
-            name,
-        })
-    }
-
-    async fn open(dsn: &str, name: &str) -> DatabaseConnection {
         // One connection, so the search_path below applies to every query the test runs.
         let mut options = ConnectOptions::new(dsn);
         options.max_connections(1).min_connections(1);
@@ -76,16 +65,7 @@ impl PostgresSchema {
         db.execute_unprepared(&format!(r#"SET search_path TO "{name}""#))
             .await
             .unwrap();
-        db
-    }
-
-    /// A column retype invalidates the connection's cached plans, as a node restart would.
-    async fn reconnect(&mut self) {
-        let fresh = Self::open(&self.dsn, &self.name).await;
-        std::mem::replace(&mut self.db, fresh)
-            .close()
-            .await
-            .unwrap();
+        Some(Self { admin, db, name })
     }
 
     async fn cleanup(self) {
@@ -110,9 +90,7 @@ async fn create_tables(db: &DatabaseConnection) {
     db.execute_unprepared("ALTER TABLE alerts DROP COLUMN recovery_destinations")
         .await
         .unwrap();
-    apply_alert_recovery_destinations_migrations_for_test(db)
-        .await
-        .unwrap();
+    add_alert_recovery_destinations_for_test(db).await.unwrap();
     folders::Entity::insert(folders::ActiveModel {
         id: Set(Ksuid::new(None, None).to_string()),
         org: Set(ORG.to_string()),
@@ -173,7 +151,6 @@ async fn raw_value(db: &DatabaseConnection, id: Ksuid) -> Option<String> {
     row.try_get("", "recovery_destinations").unwrap()
 }
 
-/// `sql_value` is a SQL literal, so it also lands in a json/jsonb column without a cast.
 async fn set_raw_value(db: &DatabaseConnection, id: Ksuid, sql_value: &str) {
     db.execute_unprepared(&format!(
         "UPDATE alerts SET recovery_destinations = {sql_value} WHERE id = '{id}'"
@@ -282,49 +259,4 @@ async fn postgres_round_trips_on_the_shipped_text_column() {
     create_tables(&pg.db).await;
     assert_all(&pg.db).await;
     pg.cleanup().await;
-}
-
-#[tokio::test]
-async fn postgres_json_workaround_columns_return_to_text_with_their_contents() {
-    for workaround in ["json", "jsonb"] {
-        let Some(mut pg) = PostgresSchema::connect().await else {
-            return;
-        };
-        create_tables(&pg.db).await;
-        let id = create(
-            &pg.db,
-            ORG,
-            FOLDER,
-            new_alert("kept", &["dest_recover"]),
-            false,
-        )
-        .await
-        .unwrap()
-        .id
-        .unwrap();
-        pg.db
-            .execute_unprepared(&format!(
-                "ALTER TABLE alerts ALTER COLUMN recovery_destinations TYPE {workaround} USING recovery_destinations::{workaround}"
-            ))
-            .await
-            .unwrap();
-        pg.reconnect().await;
-        assert_eq!(column_type(&pg.db).await, workaround);
-        let err = get_by_id(&pg.db, ORG, id).await.unwrap_err().to_string();
-        assert!(err.contains("recovery_destinations"), "{workaround}: {err}");
-
-        apply_alert_recovery_destinations_migrations_for_test(&pg.db)
-            .await
-            .unwrap();
-        pg.reconnect().await;
-
-        let db = &pg.db;
-        assert_eq!(column_type(db).await, "text", "{workaround}");
-        assert_eq!(stored(db, id).await, vec!["dest_recover"], "{workaround}");
-        let mut cleared = get_by_id(db, ORG, id).await.unwrap().unwrap().1;
-        cleared.recovery_destinations = vec![];
-        update(db, ORG, None, cleared).await.unwrap();
-        assert_eq!(raw_value(db, id).await, None, "{workaround}");
-        pg.cleanup().await;
-    }
 }
