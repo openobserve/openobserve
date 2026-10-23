@@ -276,8 +276,20 @@ test.describe("Share Link Test Cases", () => {
     // Share stays disabled until a run has produced results, so a fixed sleep can click a still-disabled button.
     await expect(shareButton).toBeEnabled({ timeout: 60000 });
 
+    let release;
+    const held = new Promise((resolve) => (release = resolve));
+    await page.route('**/api/*/short', async (route) => {
+      await held;
+      await route.continue();
+    });
+
     await shareButton.click();
+    // ShareButton sets isLoading before awaiting the short-URL POST and OButton renders that as aria-busy; the held response is what makes the state observable.
+    await expect(shareButton).toHaveAttribute('aria-busy', 'true');
+    release();
+
     await pm.logsPage.expectShareLinkSuccessNotification();
+    await page.unroute('**/api/*/short');
 
     testLogger.info('Loading state test completed');
   });
