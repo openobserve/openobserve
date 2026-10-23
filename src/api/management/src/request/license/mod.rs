@@ -149,7 +149,7 @@ where
                 use_all_org: route.use_all_org,
                 use_self_context: route.use_self_context,
                 use_self_parent: route.use_self_parent,
-                feature: None,
+                feature: route.feature,
             },
             role,
         )
