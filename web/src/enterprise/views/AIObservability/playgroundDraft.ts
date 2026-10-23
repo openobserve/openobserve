@@ -13,6 +13,7 @@ import type {
   PlaygroundRequestMessage,
   PlaygroundScoreResult,
 } from "@/services/llm-playground.service";
+import { TEMPLATE_VARIABLE_NAME_SOURCE } from "@/services/llm-datasets.service";
 
 /** Golden answers feed scorers only. Binding one into a task prompt would leak
  *  the answer into the question, so this token is never substituted. */
@@ -70,6 +71,8 @@ export interface PlaygroundSample {
   /** Zero-based position in the dataset, for Prev/Next. */
   index: number;
   total: number;
+  /** Field variables this sample wrote into `vars`, so the next sample can drop them. */
+  fields?: string[];
 }
 
 export interface PlaygroundProvenance {
@@ -172,7 +175,7 @@ function claimId(id: string): void {
 
 // ── template variables ────────────────────────────────────────────
 
-const VARIABLE_PATTERN = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
+const VARIABLE_PATTERN = new RegExp(`\\{\\{\\s*(${TEMPLATE_VARIABLE_NAME_SOURCE})\\s*\\}\\}`, "g");
 
 /** Every distinct `{{token}}` across a variant's messages, in first-seen order. */
 export function extractVariantVars(variant: PlaygroundVariant): string[] {
@@ -210,6 +213,18 @@ export function renderTemplate(text: string, vars: Record<string, string>): stri
     if (name === EXPECTED_OUTPUT_TOKEN) return "";
     return vars[name] ?? "";
   });
+}
+
+/** Drops the previous row's fields, sets the new ones, then `input` last so no field can shadow it. */
+export function withSampledVars(
+  vars: Record<string, string>,
+  previousFields: readonly string[],
+  fields: Record<string, string>,
+  input: string,
+): Record<string, string> {
+  const kept = { ...vars };
+  for (const name of previousFields) delete kept[name];
+  return { ...kept, ...fields, input };
 }
 
 // ── labels ────────────────────────────────────────────────────────

@@ -22,7 +22,6 @@ pub mod cipher_keys;
 pub mod compactor_manual_jobs;
 pub mod dashboards;
 pub mod destinations;
-pub mod distinct_value_fields;
 pub mod downtime_notifications;
 pub mod downtimes;
 pub mod enrichment_table_urls;

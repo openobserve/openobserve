@@ -6,6 +6,7 @@
 const crypto = require('crypto');
 const testLogger = require('./test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
+const { ingestBase } = require('./ingest-url.js');
 
 /**
  * Generate a random hex string of specified byte length
@@ -267,7 +268,7 @@ async function ingestTraces(page, traceCount = 10, options = {}) {
     traceIds.push(traceData.resourceSpans[0].scopeSpans[0].spans[0].traceId);
 
     try {
-      const response = await page.request.post(`${baseUrl}/api/${orgId}/v1/traces`, {
+      const response = await page.request.post(`${ingestBase(baseUrl)}/api/${orgId}/v1/traces`, {
         headers,
         data: traceData
       });
@@ -342,7 +343,7 @@ async function ingestSequencedErrorSpans(page, streamName, count) {
     spans.push(span(`err-op-${seq}`, start, i + 1, 2));
     spans.push(span(`ok-op-${seq}`, start + 2000000000n, 1, 1));
   }
-  const response = await page.request.post(`${baseUrl}/api/${orgId}/v1/traces`, {
+  const response = await page.request.post(`${ingestBase(baseUrl)}/api/${orgId}/v1/traces`, {
     headers: { ...getAuthHeaders(), 'stream-name': streamName },
     data: {
       resourceSpans: [{

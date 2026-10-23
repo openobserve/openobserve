@@ -15497,6 +15497,7 @@
         "userPromptLabel": "使用者訊息",
         "userPromptPlaceholder": "使用 {'{{ input }}'} 參照資料集欄位。",
         "variablesLabel": "插入變數：",
+        "expectedOutputScorersOnly": "{token} · 僅限評分器",
         "scorersPlaceholder": "選擇評分器",
         "scorersHelp": "評分器版本目前已固定 — 之後的評分器編輯絕不會變更此實驗的分數。",
         "scorersEmpty": "沒有可用的評分器。請先在「評估」下建立一個。",
@@ -15807,6 +15808,7 @@
         "fallbackTitle": "資料集",
         "meta": "{count} 個項目 · 已更新 {updated}",
         "loadError": "載入資料集失敗",
+        "tryInPlayground": "在 Playground 中試用",
         "tabs": {
           "items": "項目",
           "experiments": "實驗"
@@ -16341,6 +16343,7 @@
       "scoreSkippedNoReference": "已略過 — 沒有預期輸出",
       "removeExpected": "移除預期輸出",
       "expectedLeakWarning": "{token} 在任務提示中永遠不會出現 — 黃金答案僅提供給評分器。",
+      "unresolvedVariablesWarning": "{tokens} 沒有值 — 執行時會傳送空值。",
       "chipInsert": "按一下在游標處插入",
       "variant": "變體 {label}",
       "variantLimit": "測試台最多容納 {max} 個變體。",
