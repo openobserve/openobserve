@@ -22,7 +22,7 @@ use super::*;
 
 /// Every route `search_routes_with` registers, as (method, template, handler).
 #[rustfmt::skip]
-const GATED: [(&str, &str, &str); 46] = [
+const GATED: [(&str, &str, &str); 49] = [
     ("POST", "/{org_id}/_search_multi", "search::multi_streams::search_multi"),
     ("POST", "/{org_id}/_search_multi_stream", "search::multi_streams::search_multi_stream"),
     ("POST", "/{org_id}/_search_partition_multi", "search::multi_streams::_search_partition_multi"),
@@ -31,6 +31,8 @@ const GATED: [(&str, &str, &str); 46] = [
     ("GET", "/{org_id}/prometheus/api/v1/label/{label_name}/values", "promql::label_values"),
     ("POST", "/v2/{org_id}/downtimes/resources", "downtimes::downtime_resources"),
     ("POST", "/v2/{org_id}/downtimes/values", "downtimes::downtime_values"),
+    ("PATCH", "/v2/{org_id}/alerts/{alert_id}/trigger", "alerts::trigger_alert"),
+    ("PATCH", "/v2/{org_id}/alerts/{alert_id}/retrain", "alerts::retrain_alert"),
     ("GET", "/{org_id}/db_monitoring/databases", "db_monitoring::handler::get_dbm_databases"),
     ("GET", "/{org_id}/db_monitoring/queries", "db_monitoring::handler::get_dbm_queries"),
     ("GET", "/{org_id}/db_monitoring/query/history", "db_monitoring::handler::get_dbm_query_history"),
@@ -69,6 +71,7 @@ const GATED: [(&str, &str, &str); 46] = [
     ("GET", "/{org_id}/experiments/{experiment_id}/rows/{row_id}", "experiments::get_experiment_row"),
     ("GET", "/{org_id}/discovery", "discovery::list_discovery_items"),
     ("GET", "/{org_id}/tasks/{entity_id}/stats", "remote_tasks::get_remote_task_stats"),
+    ("POST", "/{org_id}/eval_jobs/{job_id}/manual_eval", "eval_jobs::manual_eval_job"),
 ];
 
 /// Modules whose every registered handler reads data through search.
@@ -81,7 +84,9 @@ const FULLY_GATED_MODULES: [&str; 5] = [
 ];
 
 /// Modules that hold gated and ungated handlers side by side.
-const MIXED_MODULES: [&str; 9] = [
+const MIXED_MODULES: [&str; 11] = [
+    "alerts",
+    "eval_jobs",
     "search::search_job",
     "anomaly_detection",
     "experiments",
@@ -96,6 +101,24 @@ const MIXED_MODULES: [&str; 9] = [
 /// Each ungated handler of a mixed module, with why it stays open.
 #[rustfmt::skip]
 const UNGATED_SIBLINGS: &[(&str, &str)] = &[
+    ("alerts::clone_alert", "alert bookkeeping, no search"),
+    ("alerts::create_alert", "alert bookkeeping, no search"),
+    ("alerts::delete_alert", "alert bookkeeping, no search"),
+    ("alerts::delete_alert_bulk", "alert bookkeeping, no search"),
+    ("alerts::enable_alert", "alert bookkeeping; evaluation is background work"),
+    ("alerts::enable_alert_bulk", "alert bookkeeping; evaluation is background work"),
+    ("alerts::export_alert", "alert bookkeeping, no search"),
+    ("alerts::generate_sql", "writes SQL text, runs no query"),
+    ("alerts::get_alert", "alert bookkeeping, no search"),
+    ("alerts::get_composite_references", "stored composite definitions, no search"),
+    ("alerts::get_composite_timeline", "stored child-alert states, no search"),
+    ("alerts::list_alert_group_transitions", "stored group state, no search"),
+    ("alerts::list_alert_groups", "stored group state, no search"),
+    ("alerts::list_alert_tags", "alert bookkeeping, no search"),
+    ("alerts::list_alerts", "alert bookkeeping, no search"),
+    ("alerts::move_alerts", "alert bookkeeping, no search"),
+    ("alerts::update_alert", "alert bookkeeping, no search"),
+    ("alerts::validate_composite_alert", "evaluates stored child-alert states, no search"),
     ("annotation_queues::archive_annotation_queue_items", "queue bookkeeping, no search"),
     ("annotation_queues::clear_annotation_queue_items", "queue bookkeeping, no search"),
     ("annotation_queues::create_annotation_queue", "queue bookkeeping, no search"),
@@ -133,6 +156,15 @@ const UNGATED_SIBLINGS: &[(&str, &str)] = &[
     ("downtimes::move_downtimes", "downtime bookkeeping, no search"),
     ("downtimes::preview_downtime", "inventory match only"),
     ("downtimes::update_downtime", "downtime bookkeeping, no search"),
+    ("eval_jobs::activate_eval_job", "job bookkeeping; scoring runs in the background executor"),
+    ("eval_jobs::archive_eval_job", "job bookkeeping, no search"),
+    ("eval_jobs::create_eval_job", "job bookkeeping, no search"),
+    ("eval_jobs::delete_eval_job", "job bookkeeping, no search"),
+    ("eval_jobs::get_eval_job", "job bookkeeping, no search"),
+    ("eval_jobs::list_eval_jobs", "job bookkeeping, no search"),
+    ("eval_jobs::pause_eval_job", "job bookkeeping, no search"),
+    ("eval_jobs::resume_eval_job", "job bookkeeping; scoring runs in the background executor"),
+    ("eval_jobs::update_eval_job", "job bookkeeping, no search"),
     ("experiments::cancel_experiment", "stops work, no search"),
     ("experiments::clear_experiment_baseline", "experiment bookkeeping, no search"),
     ("experiments::clone_experiment", "experiment bookkeeping; runs score as background eval work"),
@@ -215,6 +247,23 @@ const OPERATIONAL_READS: [&str; 22] = [
     "/{org_id}/anomaly_detection/history",
     "/v2/{org_id}/alerts/incidents/{incident_id}",
     "/{org_id}/search_jobs/{job_id}",
+];
+
+/// Background functions that run a search, each with the one `src/api` dir allowed to call it.
+const BACKGROUND_SEARCH_FNS: [(&str, Option<&str>); 10] = [
+    ("evaluate_scheduled(", None),
+    ("run_alert_count_query(", None),
+    ("fetch_series(", None),
+    ("partitioned_search::", None),
+    ("slo::job::", None),
+    ("slo::reconcile::", None),
+    ("search_slices_page(", None),
+    ("red_insights::", None),
+    ("SearchAdapter", None),
+    (
+        "run_dbm_search(",
+        Some("api/management/src/request/db_monitoring/"),
+    ),
 ];
 
 const SEARCH_ENTRY: &str = r"(?:search_service|SearchService|crate::search|core_promql::search)::(?:cache::)?(?:search|search_multi|search_partition|search_partition_multi)\(|\bgrpc_search(?:_partition)?\(|process_search_stream_request(?:_multi)?\(|eval_jobs::search::execute|execute_training_query\(";
@@ -379,6 +428,35 @@ fn search_call_files() -> BTreeSet<String> {
         }
     }
     hits
+}
+
+/// Every production `.rs` file under `src/api`, by path relative to `src`.
+fn api_sources() -> Vec<(String, String)> {
+    let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let mut pending = vec![src.join("api")];
+    let mut found = Vec::new();
+    while let Some(path) = pending.pop() {
+        if path.is_dir() {
+            pending.extend(std::fs::read_dir(&path).unwrap().map(|e| e.unwrap().path()));
+            continue;
+        }
+        let rel = path
+            .strip_prefix(&src)
+            .unwrap()
+            .to_string_lossy()
+            .replace('\\', "/");
+        if !rel.ends_with(".rs") || rel.ends_with("router/search_gate_tests.rs") {
+            continue;
+        }
+        let text = std::fs::read_to_string(&path).unwrap();
+        let production = text
+            .split("\n#[cfg(test)]\nmod tests")
+            .next()
+            .unwrap()
+            .to_string();
+        found.push((rel, production));
+    }
+    found
 }
 
 fn caller_source(file: &str) -> String {
@@ -551,6 +629,19 @@ fn every_search_call_site_is_classified() {
             Caller::Background(reason) | Caller::Helper(reason) | Caller::Exempt(reason) => {
                 assert!(!reason.is_empty(), "{file}")
             }
+        }
+    }
+}
+
+#[test]
+fn no_api_handler_reaches_a_background_search() {
+    for (file, text) in api_sources() {
+        for (needle, allowed) in BACKGROUND_SEARCH_FNS {
+            let permitted = allowed.is_some_and(|dir| file.starts_with(dir));
+            assert!(
+                permitted || !text.contains(needle),
+                "{file} calls the background search {needle}; gate its route or classify it"
+            );
         }
     }
 }

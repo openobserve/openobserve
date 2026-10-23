@@ -1401,8 +1401,6 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/bulk", delete(alerts::delete_alert_bulk))
         .route("/v2/{org_id}/alerts/{alert_id}/enable", patch(alerts::enable_alert))
         .route("/v2/{org_id}/alerts/bulk/enable", post(alerts::enable_alert_bulk))
-        .route("/v2/{org_id}/alerts/{alert_id}/trigger", patch(alerts::trigger_alert))
-        .route("/v2/{org_id}/alerts/{alert_id}/retrain", patch(alerts::retrain_alert))
         .route("/v2/{org_id}/alerts/{alert_id}/clone", post(alerts::clone_alert))
         .route("/v2/{org_id}/alerts/generate_sql", post(alerts::generate_sql))
         .route("/v2/{org_id}/alerts/move", patch(alerts::move_alerts))
@@ -1721,7 +1719,6 @@ pub fn service_routes() -> Router {
                 .route("/{org_id}/eval_jobs/{job_id}/pause", post(eval_jobs::pause_eval_job))
                 .route("/{org_id}/eval_jobs/{job_id}/resume", post(eval_jobs::resume_eval_job))
                 .route("/{org_id}/eval_jobs/{job_id}/archive", post(eval_jobs::archive_eval_job))
-                .route("/{org_id}/eval_jobs/{job_id}/manual_eval", post(eval_jobs::manual_eval_job))
                 .route("/{org_id}/eval_jobs/{job_id}", get(eval_jobs::get_eval_job).put(eval_jobs::update_eval_job).delete(eval_jobs::delete_eval_job));
         }
     }
@@ -2167,6 +2164,9 @@ fn search_routes_with(llm_eval: bool) -> Router {
         .route("/{org_id}/prometheus/api/v1/label/{label_name}/values", get(promql::label_values))
         .route("/v2/{org_id}/downtimes/resources", post(downtimes::downtime_resources))
         .route("/v2/{org_id}/downtimes/values", post(downtimes::downtime_values))
+        // A manual trigger of an anomaly alert runs detection now, and a retrain trains now.
+        .route("/v2/{org_id}/alerts/{alert_id}/trigger", patch(alerts::trigger_alert))
+        .route("/v2/{org_id}/alerts/{alert_id}/retrain", patch(alerts::retrain_alert))
 
         // Database Monitoring — its own top-level module, not under /traces.
         // The path segment must stay `db_monitoring` to match the OFGA resource
@@ -2231,6 +2231,7 @@ fn search_routes_with(llm_eval: bool) -> Router {
                 .route("/{org_id}/experiments/{experiment_id}/rows/{row_id}", get(experiments::get_experiment_row))
                 .route("/{org_id}/discovery", get(discovery::list_discovery_items))
                 .route("/{org_id}/tasks/{entity_id}/stats", get(remote_tasks::get_remote_task_stats))
+                .route("/{org_id}/eval_jobs/{job_id}/manual_eval", post(eval_jobs::manual_eval_job))
         } else {
             router
         }
