@@ -137,7 +137,8 @@ export const queryClient = new QueryClient({
 // static edge to fieldValueStore would load its real dependency graph before
 // spec-level mocks can attach.
 const clearFieldValueReadCache = (): void => {
-  void import("@/composables/fieldValueStore").then((m) => m.clearReadCache());
+  // Best-effort: a chunk deleted by a deploy must not surface as an unhandled rejection.
+  void import("@/composables/fieldValueStore").then((m) => m.clearReadCache()).catch(() => {});
 };
 
 export const purgeOrgQueries = (org: string, nextOrg?: string): void => {
