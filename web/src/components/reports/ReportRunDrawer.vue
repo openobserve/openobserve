@@ -218,11 +218,10 @@ const orgId = useOrgId();
 
 const timezone = computed(() => props.report?.timezone || undefined);
 
-const inReportZone = (us: number) =>
-  raw(
-    formatTimestampInTimezone(us, RUN_TIME_FORMAT, timezone.value ?? "UTC") +
-      (timezone.value ? ` (${timezone.value})` : ""),
-  );
+const inReportZone = (us: number) => {
+  const zone = timezone.value ?? "UTC";
+  return raw(`${formatTimestampInTimezone(us, RUN_TIME_FORMAT, zone)} (${zone})`);
+};
 
 const title = computed(() =>
   props.run

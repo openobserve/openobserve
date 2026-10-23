@@ -142,6 +142,13 @@ describe("ReportRunDrawer", () => {
     );
   });
 
+  it("labels the scheduled time as UTC when no report timezone is known", () => {
+    const w = mountDrawer({ run: run() });
+    expect(w.find('[data-test="reports-reportrundrawer-scheduled-for"]').text()).toBe(
+      "Sat 11 Oct, 06:30 (UTC)",
+    );
+  });
+
   it("shows unknown recipients for retained legacy rows", () => {
     const w = mountDrawer({
       run: run({ recipient_count: null }),
