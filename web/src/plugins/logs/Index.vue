@@ -1143,7 +1143,11 @@ export default defineComponent({
     // Logs has no beforeunload guard; the URL is what restoreUrlQueryParams reads back after the language reload.
     const persistQueryForReload = async (): Promise<void> => {
       const query = generateURLQuery(false);
-      if (query.type === "search_history_re_apply" || query.type === "search_scheduler") {
+      if (
+        query.type === "search_history_re_apply" ||
+        query.type === "search_scheduler" ||
+        query.type === "rca_evidence_query"
+      ) {
         delete query.type;
       }
       await router.replace({ query });
@@ -1469,9 +1473,14 @@ export default defineComponent({
       return searchObj.meta.logsVisualizeToggle === "logs";
     }
 
-    // Search History and the AI chat only re-apply the query; the scheduler also runs it.
+    // Search History and the AI chat only re-apply the query; the scheduler and RCA
+    // evidence links also run it.
     const RE_APPLY_QUERY_TYPES = ["search_history_re_apply", "ai_chat_query"];
-    const URL_DRIVEN_QUERY_TYPES = [...RE_APPLY_QUERY_TYPES, "search_scheduler"];
+    const URL_DRIVEN_QUERY_TYPES = [
+      ...RE_APPLY_QUERY_TYPES,
+      "search_scheduler",
+      "rca_evidence_query",
+    ];
 
     const isRouteChanged = () => {
       // Not kept alive: this fresh mount never fires the type watchers, so the cached searchObj would bury the URL query (#14283).

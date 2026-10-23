@@ -77,6 +77,22 @@ describe("OnCallTeamForm", () => {
     oncall.setSchedule.mockResolvedValue({ data: {} } as any);
   });
 
+  // E2: the rotation editor's handover phrases stay out of the standalone shift-length labels.
+  it("labels the shift lengths on their own, without the handover phrases", async () => {
+    const wrapper = render();
+    await flushPromises();
+    const shift = wrapper
+      .findAllComponents({ name: "OFormSelect" })
+      .find((select: any) => select.props("name") === "shift_micros")!;
+    expect((shift.props("options") as any[]).map((o) => o.label)).toEqual([
+      "8 hours",
+      "12 hours",
+      "Daily",
+      "Weekly",
+      "Every 2 weeks",
+    ]);
+  });
+
   /// The design asks for one form (architecture/02 §4): a team that cannot page
   /// anybody is not a created team, and it used to take three more screens.
   it("creates the team, its members and its rotation from one submit", async () => {

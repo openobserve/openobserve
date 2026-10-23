@@ -268,7 +268,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="text-sm font-semibold" :class="stepLabelClass">
                   {{ t("ingestion.parametersToEnterInAwsWizard") }}
                 </div>
-                <OButton variant="ghost" size="icon-circle-sm" @click="showParamHelper = false">
+                <OButton
+                  :aria-label="t('common.close')"
+                  variant="ghost"
+                  size="icon-circle-sm"
+                  @click="showParamHelper = false"
+                >
                   <OIcon name="close" size="sm" />
                 </OButton>
               </div>
