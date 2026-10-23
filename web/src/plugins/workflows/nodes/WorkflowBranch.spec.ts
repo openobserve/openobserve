@@ -546,8 +546,11 @@ describe("WorkflowBranch HTTP request field group (AC-UI-32)", () => {
     expect(values).toContain("meta_event_type");
     expect(values).toContain("meta_trigger_source");
     expect(values.filter((v: string) => v.startsWith("data"))).toEqual([]);
-    expect(fields.map((f: any) => String(f.label))).toContain(
+    expect(fields.map((f: any) => String(f.label))).not.toContain(
       i18n.global.t("workflow.http.fieldGroupBodyHint"),
     );
+    expect(
+      createWrapper().find('[data-test="workflow-condition-http-body-hint"]').text(),
+    ).toContain(i18n.global.t("workflow.http.fieldGroupBodyHint"));
   });
 });

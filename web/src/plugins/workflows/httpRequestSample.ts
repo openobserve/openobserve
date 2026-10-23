@@ -55,6 +55,17 @@ export function httpRequestPayloadFields(queryKeys: readonly string[] = []): Wor
   return [...HTTP_REQUEST_PAYLOAD_FIELDS, ...queryKeys.map((key) => field(`meta.query.${key}`))];
 }
 
+/** True when a JSON input's first record is an HTTP request (`meta.trigger_source = "http"`). */
+export function isHttpRequestInput(text: string | undefined): boolean {
+  return httpRequestMeta(text) !== null;
+}
+
+/** The query keys of a JSON HTTP request input, so the field pickers can offer `meta.query.<key>`. */
+export function httpQueryKeys(text: string | undefined): string[] {
+  const query = httpRequestMeta(text)?.query;
+  return query && typeof query === "object" && !Array.isArray(query) ? Object.keys(query) : [];
+}
+
 /** What every step of an HTTP run receives (`payload.rs` build_input); `received_at` is in µs. */
 export function buildHttpRequestSample(
   opts: { trigger_id?: string; run_id?: string; received_at?: number; data?: unknown[] } = {},
@@ -73,4 +84,19 @@ export function buildHttpRequestSample(
       data: opts.data ?? [{ service: "checkout", deploy_id: "d-4821", reason: "canary failed" }],
     },
   ];
+}
+
+function httpRequestMeta(text: string | undefined): Record<string, unknown> | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text ?? "");
+  } catch {
+    return null;
+  }
+  const first: unknown = Array.isArray(parsed) ? parsed[0] : null;
+  const meta: unknown =
+    first && typeof first === "object" ? (first as { meta?: unknown }).meta : undefined;
+  if (!meta || typeof meta !== "object") return null;
+  const record = meta as Record<string, unknown>;
+  return record.trigger_source === "http" ? record : null;
 }

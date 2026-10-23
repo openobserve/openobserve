@@ -108,6 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           optional
         />
       </div>
+      <WorkflowHttpFieldHint v-if="httpOn" />
 
       <OButton variant="dashed" size="sm" data-test="workflow-branch-add-case" @click="addCase">
         <OIcon name="add" size="xs" />
@@ -149,6 +150,8 @@ import {
 import { conditionFieldOptions } from "@/plugins/workflows/triggers";
 import { workflowHooksEnabled } from "@/plugins/workflows/httpEndpoint";
 import { httpEditorState } from "@/plugins/workflows/httpEndpointUi";
+import { httpQueryKeys } from "@/plugins/workflows/httpRequestSample";
+import WorkflowHttpFieldHint from "./WorkflowHttpFieldHint.vue";
 
 // The else arm's handle is fixed: `branchHandleRank` sorts it last on the canvas,
 // and a case can never claim it (case handles are always `case-N`).
@@ -171,12 +174,11 @@ const tips: I18nText[] = [
 // Field options come from the CURRENT trigger's kind, exactly as WorkflowCondition
 // does; with no trigger we offer nothing rather than a wrong set.
 const kind = currentTriggerKind();
+const httpOn = computed(
+  () => workflowHooksEnabled(store.state.zoConfig) && httpEditorState.endpointOn,
+);
 const fields = computed(() =>
-  conditionFieldOptions(
-    kind,
-    workflowHooksEnabled(store.state.zoConfig) && httpEditorState.endpointOn,
-    t,
-  ),
+  conditionFieldOptions(kind, httpOn.value, t, httpQueryKeys(workflowObj.testRun.input)),
 );
 
 const saved = workflowObj.currentSelectedNodeData?.data?.cases;

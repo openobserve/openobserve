@@ -52,21 +52,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OText variant="body-strong">{{ title }}</OText>
         <OText variant="meta" as="p">{{ lead }}</OText>
       </div>
-      <ORadioGroup v-model="overlap" orientation="vertical" :label="title">
-        <ORadio
-          v-for="option in OVERLAP_OPTIONS"
-          :key="option.value"
-          :value="option.value"
-          :label="t(option.labelKey)"
-          :data-test="`workflow-http-rotate-overlap-${option.value}`"
+      <template v-if="current">
+        <ORadioGroup v-model="overlap" orientation="vertical" :label="title">
+          <ORadio
+            v-for="option in OVERLAP_OPTIONS"
+            :key="option.value"
+            :value="option.value"
+            :label="t(option.labelKey)"
+            :data-test="`workflow-http-rotate-overlap-${option.value}`"
+          />
+        </ORadioGroup>
+        <OBanner
+          variant="info"
+          dense
+          data-test="workflow-http-rotate-consequence"
+          :content="consequence"
         />
-      </ORadioGroup>
-      <OBanner
-        variant="info"
-        dense
-        data-test="workflow-http-rotate-consequence"
-        :content="consequence"
-      />
+      </template>
       <OBanner
         v-if="error"
         variant="error-soft"
@@ -88,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm-action"
           :loading="pending"
           data-test="workflow-http-rotate-confirm"
-          @click="emit('confirm', overlap)"
+          @click="emit('confirm', current ? overlap : 0)"
         >
           {{ isSigned ? t("workflow.http.rotateConfirmSigned") : t("workflow.http.rotateConfirm") }}
         </OButton>
@@ -117,6 +119,7 @@ const TIME_FORMAT = "MMM D, HH:mm";
 
 const props = defineProps<{
   mode: HttpAuthMode;
+  /** The active credential; undefined after it was revoked, when Rotate only mints a new one. */
   current: HttpCredential | undefined;
   /** A credential is retiring, so the server refuses a second rotation. */
   disabled: boolean;
@@ -144,8 +147,13 @@ const formatTime = (us: number) =>
   raw(formatTimestampInTimezone(us, TIME_FORMAT, store.state.timezone));
 
 const lead = computed(() => {
-  const prefix = raw(props.current?.display_prefix ?? "");
-  const used = props.current?.last_used_at;
+  if (!props.current) {
+    return isSigned.value
+      ? t("workflow.http.rotateLeadNoneSigned")
+      : t("workflow.http.rotateLeadNone");
+  }
+  const prefix = raw(props.current.display_prefix);
+  const used = props.current.last_used_at;
   if (!used) {
     return isSigned.value
       ? t("workflow.http.rotateLeadUnusedSigned", { prefix })

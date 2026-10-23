@@ -24,7 +24,10 @@ import workflows, {
   type HttpTriggerAbsent,
   type HttpTriggerConfig,
 } from "@/services/workflows";
-import { copyToClipboard } from "@/utils/clipboard";
+import zoConfigService from "@/services/config";
+import { copyPendingText, copyToClipboard } from "@/utils/clipboard";
+import i18n from "@/locales";
+import { HttpEndpointError, httpErrorText } from "./httpEndpointUi";
 import { buildHttpRequestSample } from "./httpRequestSample";
 import { useWorkflowHttpEndpoint } from "./useWorkflowHttpEndpoint";
 
@@ -38,13 +41,18 @@ vi.mock("@/services/workflows", async (importOriginal) => {
       rotateHttpCredential: vi.fn(),
       revokeHttpCredential: vi.fn(),
       revealHttpCredentialSecret: vi.fn(),
+      getWorkflowRun: vi.fn(),
     },
     dryRunHook: vi.fn(),
   });
 });
-vi.mock("@/utils/clipboard", () => ({ copyToClipboard: vi.fn() }));
+vi.mock("@/utils/clipboard", () => ({ copyToClipboard: vi.fn(), copyPendingText: vi.fn() }));
+vi.mock("@/services/config", () => ({
+  default: { get_config: vi.fn(), get_config_full: vi.fn() },
+}));
 
 const api = vi.mocked(workflows);
+const orgConfig = vi.mocked(zoConfigService.get_config_full);
 const TOKEN = "o2wh_FRESHLYMINTEDTOKENVALUE0000001";
 const ROW_VALUE = "o2wh_ROWVALUEREVEALEDFROMTHETABLE01";
 const permissions = { edit: true, test: true, reveal: true };
@@ -149,6 +157,11 @@ describe("useWorkflowHttpEndpoint", () => {
     store.state.currentuser = { role: "admin" };
     api.getHttpTrigger.mockResolvedValue(config());
     vi.mocked(copyToClipboard).mockResolvedValue(true);
+    vi.mocked(copyPendingText).mockImplementation(async (text) => {
+      await text;
+      return true;
+    });
+    orgConfig.mockResolvedValue({ data: { is_org_admin: true } } as never);
   });
 
   afterEach(() => {
@@ -317,17 +330,40 @@ describe("useWorkflowHttpEndpoint", () => {
       expect(endpoint.phase.value).toBe("unsaved");
     });
 
-    it("an unsaved workflow may create only with credential access", async () => {
+    it("an unsaved workflow may create when the selected org makes the user an admin", async () => {
       const { endpoint } = await mountEndpoint({ id: null });
-      expect(endpoint.canTurnOn.value).toBe(true);
 
-      store.state.currentuser = { role: "editor" };
-      await nextTick();
+      expect(orgConfig).toHaveBeenCalledWith("acme");
+      expect(endpoint.canTurnOn.value).toBe(true);
+    });
+
+    it("the login-time role does not decide for the selected org; OpenFGA allows", async () => {
+      store.state.currentuser = { role: "admin" };
+      orgConfig.mockResolvedValue({ data: { is_org_admin: false } } as never);
+      const { endpoint } = await mountEndpoint({ id: null });
       expect(endpoint.canTurnOn.value).toBe(false);
 
       store.state.zoConfig = { ...store.state.zoConfig, rbac_enabled: true };
       await nextTick();
       expect(endpoint.canTurnOn.value).toBe(true);
+    });
+
+    it("a 403 on create after the draft save keeps the draft and names the reason", async () => {
+      api.putHttpTrigger.mockRejectedValue({
+        response: { status: 403, data: { message: "Admin or Root role required to create" } },
+      });
+      const beforeCreate = vi.fn(async (id: Ref<string | null>) => {
+        id.value = "wf9";
+        return true;
+      });
+      const { endpoint, workflowId } = await mountEndpoint({ id: null, beforeCreate });
+
+      const err = await endpoint.turnOn().catch((e: unknown) => e);
+
+      expect(err).toBeInstanceOf(HttpEndpointError);
+      expect((err as HttpEndpointError).key).toBe("workflow.http.createForbidden");
+      expect(workflowId.value).toBe("wf9");
+      expect(api.deleteHttpTrigger).not.toHaveBeenCalled();
     });
 
     it("creating needs reveal permission; switching back on needs only edit", async () => {
@@ -470,8 +506,34 @@ describe("useWorkflowHttpEndpoint", () => {
 
       expect(endpoint.rotateBlocked.value).toBe(true);
       expect(endpoint.canRotate.value).toBe(false);
-      await endpoint.rotate(0);
+      await expect(endpoint.rotate(0)).rejects.toMatchObject({
+        key: "workflow.http.rotateBlocked",
+      });
       expect(api.rotateHttpCredential).not.toHaveBeenCalled();
+    });
+
+    it("rotate with no live credential mints a new one", async () => {
+      api.getHttpTrigger.mockResolvedValue(
+        config({ credentials: [credential({ state: "revoked" })] }),
+      );
+      api.rotateHttpCredential.mockResolvedValue({ ...credential({ id: "c2" }), secret: TOKEN });
+      const { endpoint } = await mountEndpoint();
+
+      expect(endpoint.activeCredential.value).toBeUndefined();
+      expect(endpoint.canRotate.value).toBe(true);
+      await endpoint.rotate(0);
+
+      expect(api.rotateHttpCredential).toHaveBeenCalledTimes(1);
+      expect(endpoint.revealedSecret.value).toBe(TOKEN);
+    });
+
+    it("rotate without an endpoint fails with a translated reason", async () => {
+      api.getHttpTrigger.mockResolvedValue(absent());
+      const { endpoint } = await mountEndpoint();
+
+      await expect(endpoint.rotate(0)).rejects.toMatchObject({
+        key: "workflow.http.errorNotConfigured",
+      });
     });
 
     it("a retiring credential past its expiry no longer blocks rotate and is not live", async () => {
@@ -570,15 +632,32 @@ describe("useWorkflowHttpEndpoint", () => {
       expect(endpoint.revealedCredentials.value).toEqual({});
     });
 
-    it("copy without show fetches, copies and keeps nothing", async () => {
+    it("copy without show hands the clipboard the pending fetch inside the click", async () => {
       const { endpoint } = await mountEndpoint();
 
-      await expect(endpoint.copyCredential("c1")).resolves.toBe(true);
+      const copying = endpoint.copyCredential("c1");
 
+      expect(copyPendingText).toHaveBeenCalledTimes(1);
+      await expect(copying).resolves.toBe(true);
+      await expect(vi.mocked(copyPendingText).mock.calls[0][0]).resolves.toBe(ROW_VALUE);
+      expect(copyToClipboard).not.toHaveBeenCalled();
       expect(api.revealHttpCredentialSecret).toHaveBeenCalledTimes(1);
-      expect(vi.mocked(copyToClipboard).mock.calls[0][0]).toBe(ROW_VALUE);
       expect(endpoint.revealedCredentials.value).toEqual({});
       expect(cachesHold(ROW_VALUE)).toBe(false);
+    });
+
+    it("copy without show rejects when the fetch fails and returns false when the copy fails", async () => {
+      const { endpoint } = await mountEndpoint();
+      api.revealHttpCredentialSecret.mockRejectedValueOnce({
+        response: { status: 403, data: { message: "denied" } },
+      });
+      await expect(endpoint.copyCredential("c1")).rejects.toBeTruthy();
+
+      vi.mocked(copyPendingText).mockImplementationOnce(async (text) => {
+        await text;
+        return false;
+      });
+      await expect(endpoint.copyCredential("c1")).resolves.toBe(false);
     });
 
     it("copy of a shown value copies it without fetching again", async () => {
@@ -697,33 +776,59 @@ describe("useWorkflowHttpEndpoint", () => {
   });
 
   describe("run test", () => {
-    it("Run test closes the panel and opens the Test dialog preset to HTTP request", async () => {
+    const lastCall = { run_id: "r9", status: "succeeded" as const, received_at: 1_700_000_000 };
+
+    it("Run test without an HTTP call opens the Test dialog with the generated sample", async () => {
       const { endpoint } = await mountEndpoint();
 
       expect(endpoint.canRunTest.value).toBe(true);
       expect(endpoint.runTestHint.value).toBe("workflow.http.runTestHint");
-      expect(endpoint.runTest()).toEqual({
+      expect(await endpoint.runTest("t1")).toEqual({
         kind: "open_test",
         seed: buildHttpRequestSample({ trigger_id: "test" }),
+      });
+      expect(api.getWorkflowRun).not.toHaveBeenCalled();
+    });
+
+    it("seeds the Test dialog with the latest HTTP run's trigger input", async () => {
+      const records = [
+        { meta: { trigger_source: "http", query: { env: "a" } }, data: [{ id: 7 }] },
+      ];
+      api.getHttpTrigger.mockResolvedValue(config({ last_call: lastCall }));
+      api.getWorkflowRun.mockResolvedValue({
+        data: { data: { output_map: { t1: records }, input_map: { t1: [{ other: 1 }] } } },
+      } as never);
+      const { endpoint } = await mountEndpoint();
+
+      expect(await endpoint.runTest("t1")).toEqual({
+        kind: "open_test",
+        seed: records,
+        runAt: lastCall.received_at,
+      });
+      expect(api.getWorkflowRun).toHaveBeenCalledWith({
+        org_identifier: "acme",
+        id: "wf1",
+        run_id: "r9",
       });
     });
 
-    it("seeds the Test dialog with the latest HTTP run input when there is one", async () => {
-      const latest = [{ meta: { trigger_source: "http" }, data: [{ id: 7 }] }];
+    it("falls back to the sample when the run holds no input or cannot be read", async () => {
+      const sample = { kind: "open_test", seed: buildHttpRequestSample({ trigger_id: "test" }) };
+      api.getHttpTrigger.mockResolvedValue(config({ last_call: lastCall }));
+      api.getWorkflowRun.mockResolvedValueOnce({ data: { data: { output_map: {} } } } as never);
       const { endpoint } = await mountEndpoint();
+      expect(await endpoint.runTest("t1")).toEqual(sample);
 
-      expect(endpoint.runTest(latest)).toEqual({ kind: "open_test", seed: latest });
-      expect(endpoint.runTest([])).toEqual({
-        kind: "open_test",
-        seed: buildHttpRequestSample({ trigger_id: "test" }),
-      });
+      api.getWorkflowRun.mockRejectedValueOnce({ response: { status: 404 } });
+      expect(await endpoint.runTest("t1")).toEqual(sample);
+      expect(await endpoint.runTest(undefined)).toEqual(sample);
     });
 
     it("list context replaces Run test with Open the workflow", async () => {
       const { endpoint } = await mountEndpoint({ context: "list" });
 
       expect(endpoint.runTestHint.value).toBe("workflow.http.runTestHintList");
-      expect(endpoint.runTest()).toEqual({
+      expect(await endpoint.runTest("t1")).toEqual({
         kind: "open_workflow",
         hint: "workflow.http.runTestHintList",
       });
@@ -745,6 +850,33 @@ describe("useWorkflowHttpEndpoint", () => {
       );
       const noTest = await mountEndpoint({ id: "wf3" });
       expect(noTest.endpoint.canRunTest.value).toBe(false);
+    });
+
+    it("no endpoint and no live credential fail with translated reasons", async () => {
+      api.getHttpTrigger.mockResolvedValueOnce(absent());
+      const off = await mountEndpoint();
+      await expect(off.endpoint.sendTest("{}")).rejects.toMatchObject({
+        key: "workflow.http.errorNotConfigured",
+      });
+
+      api.getHttpTrigger.mockResolvedValueOnce(
+        config({ credentials: [credential({ state: "revoked" })] }),
+      );
+      const none = await mountEndpoint({ id: "wf2" });
+      await expect(none.endpoint.sendTest("{}")).rejects.toMatchObject({
+        key: "workflow.http.errorNoLiveCredential",
+      });
+    });
+
+    it("error text is the server message, a translated reason, or the unknown-error copy", () => {
+      const t = i18n.global.t as unknown as Parameters<typeof httpErrorText>[1];
+      expect(String(httpErrorText({ response: { data: { message: "boom" } } }, t))).toBe("boom");
+      expect(
+        String(httpErrorText(new HttpEndpointError("workflow.http.errorNotConfigured"), t)),
+      ).toBe(i18n.global.t("workflow.http.errorNotConfigured"));
+      expect(String(httpErrorText(new Error("Failed to fetch"), t))).toBe(
+        i18n.global.t("common.unknownError"),
+      );
     });
 
     it("both run test hints exist in en-US", async () => {

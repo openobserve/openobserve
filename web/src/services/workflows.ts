@@ -161,12 +161,6 @@ export interface DryRunResult {
 
 export type OverlapSeconds = 0 | 3600 | 86400 | 604800;
 
-export interface WorkflowTestResult {
-  errors: Record<string, unknown>;
-  inputs: Record<string, unknown[]>;
-  outputs: Record<string, unknown[]>;
-}
-
 export interface HttpTriggerRef {
   org_identifier: string;
   id: string;
@@ -185,9 +179,6 @@ export interface WorkflowHttpTriggerApi {
   revealHttpCredentialSecret(
     args: HttpTriggerRef & { credential_id: string },
   ): Promise<HttpCredentialSecret>;
-  testHttpTrigger(
-    args: HttpTriggerRef & { data: unknown[]; from_node?: string; run_destinations?: boolean },
-  ): Promise<WorkflowTestResult>;
 }
 
 const HOOK_REASON_CODES: ReadonlySet<string> = new Set<HookReasonCode | "unauthorized">([
@@ -258,9 +249,6 @@ const httpTriggerApi: WorkflowHttpTriggerApi = {
   // Sent with `Cache-Control: no-store`; callers read it once and drop it (AC-WEB-10).
   revealHttpCredentialSecret: async ({ credential_id, ...target }) =>
     (await http().get(`${triggerUrl(target)}/credentials/${credential_id}/secret`)).data,
-
-  testHttpTrigger: async ({ data, from_node, run_destinations = false, ...target }) =>
-    (await http().post(`${triggerUrl(target)}/test`, { data, from_node, run_destinations })).data,
 };
 
 const workflows = {

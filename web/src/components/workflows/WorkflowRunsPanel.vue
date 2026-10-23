@@ -324,7 +324,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useQuery } from "@tanstack/vue-query";
 import { workflowHttpTriggerQuery } from "@/services/workflows.queries";
-import type { WorkflowHistoryRow } from "@/services/workflows";
+import type { HookRunStatus, WorkflowHistoryRow } from "@/services/workflows";
 import {
   RUN_SOURCE_LABEL_KEYS,
   isHttpRun,
@@ -462,6 +462,14 @@ const filterOptions = computed(() => {
   ];
 });
 
+// The shared timeline's outcome vocabulary; a run that never started is neither a success nor a failure.
+const TIMELINE_STATUS: Record<HookRunStatus, string> = {
+  succeeded: "success",
+  failed: "error",
+  queued: "pending",
+  running: "pending",
+  expired: "skipped",
+};
 const SOURCE_ICONS: Record<RunSource, IconName> = {
   http: "webhook",
   alert_fired: triggerDef("alert_fired").icon,
@@ -492,10 +500,10 @@ const rows = computed(() =>
 const rowClass = (row: any) =>
   row.run_id && row.run_id === props.selectedRunId ? "bg-select-item-hover-bg!" : "";
 
-// Feed the shared timeline: one bar per run, coloured by success/error.
+// Feed the shared timeline: one bar per run, coloured by its stored status.
 const timelineHistory = computed(() =>
-  workflowObj.runsHistory.list.map((r: any) => ({
-    status: r.status === "failed" ? "error" : "success",
+  (workflowObj.runsHistory.list as WorkflowHistoryRow[]).map((r) => ({
+    status: TIMELINE_STATUS[r.status],
     timestamp: r.start_time,
   })),
 );
@@ -539,7 +547,7 @@ const plainColumns = computed<OTableColumnDef[]>(() => [
   {
     id: "duration",
     header: t("workflow.history.duration"),
-    accessorFn: (row: any) => row.end_time - row.start_time,
+    accessorFn: (row: WorkflowHistoryRow) => row.end_time - row.start_time,
     sortable: true,
     size: 72,
     maxSize: 72,
@@ -548,7 +556,7 @@ const plainColumns = computed<OTableColumnDef[]>(() => [
   {
     id: "status",
     header: t("workflow.history.status"),
-    accessorFn: (row: any) => row.status,
+    accessorFn: (row: WorkflowHistoryRow) => row.status,
     sortable: true,
     size: 80,
     maxSize: 80,
@@ -558,7 +566,7 @@ const plainColumns = computed<OTableColumnDef[]>(() => [
   {
     id: "event_type",
     header: t("workflow.history.runType"),
-    accessorFn: (row: any) => (isTestRun(row) ? "test" : "live"),
+    accessorFn: (row: WorkflowHistoryRow) => (isTestRun(row) ? "test" : "live"),
     sortable: true,
     size: 44,
     maxSize: 44,
@@ -567,37 +575,36 @@ const plainColumns = computed<OTableColumnDef[]>(() => [
   actionsColumn(56),
 ]);
 
-// The 32rem panel minus its padding and border, with no index column: the source in words is what the filter's views are scanned by.
 const sourceColumns = computed<OTableColumnDef[]>(() => [
   fixedColumn("start_time", t("workflow.history.started"), 112, {
     accessorKey: "start_time",
   }),
   fixedColumn("source", t("workflow.history.source"), 112, {
-    accessorFn: (row: any) => runSourceOf(row),
+    accessorFn: (row: WorkflowHistoryRow) => runSourceOf(row),
   }),
   fixedColumn("status", t("workflow.history.status"), 96, {
-    accessorFn: (row: any) => row.status,
+    accessorFn: (row: WorkflowHistoryRow) => row.status,
   }),
   fixedColumn("duration", t("workflow.history.duration"), 88, {
-    accessorFn: (row: any) => row.end_time - row.start_time,
+    accessorFn: (row: WorkflowHistoryRow) => row.end_time - row.start_time,
   }),
   actionsColumn(56),
 ]);
 
-// The 46rem panel under the HTTP filter; Duration and Source drop because the filter implies them.
+// Duration and Source drop under the HTTP filter because the filter implies them.
 const httpColumns = computed<OTableColumnDef[]>(() => [
   fixedColumn("received", t("workflow.history.received"), 140, {
     accessorKey: "_timestamp",
   }),
   fixedColumn("status", t("workflow.history.status"), 140, {
-    accessorFn: (row: any) => row.status,
+    accessorFn: (row: WorkflowHistoryRow) => row.status,
   }),
   fixedColumn("run_id", t("workflow.history.run"), 80, { accessorKey: "run_id" }),
   fixedColumn("caller", t("workflow.history.caller"), 148, {
-    accessorFn: (row: any) => row.http_request?.credential_prefix ?? "",
+    accessorFn: (row: WorkflowHistoryRow) => row.http_request?.credential_prefix ?? "",
   }),
   fixedColumn("idempotency_key", t("workflow.history.idempotencyKey"), 160, {
-    accessorFn: (row: any) => row.http_request?.idempotency_key ?? "",
+    accessorFn: (row: WorkflowHistoryRow) => row.http_request?.idempotency_key ?? "",
   }),
   actionsColumn(48),
 ]);

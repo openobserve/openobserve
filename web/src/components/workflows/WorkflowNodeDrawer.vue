@@ -837,6 +837,7 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import WorkflowRunSwitcher from "./WorkflowRunSwitcher.vue";
 import WorkflowRunHttpOutcome from "./WorkflowRunHttpOutcome.vue";
+import { DEFAULT_TRIGGER_KIND } from "@/plugins/workflows/triggers";
 import WorkflowRunRequestFacts from "./WorkflowRunRequestFacts.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { HttpRequestFacts, WorkflowHistoryRow } from "@/services/workflows";
@@ -1002,7 +1003,9 @@ const canRetryFromHere = computed(
 
 // ── HTTP request run on the read-only trigger (request facts, failure line) ──
 const loadedRunIsHttp = computed(() => !!loadedRunRow.value && isHttpRun(loadedRunRow.value));
-const httpTriggerRecords = computed<any[] | null>(() => {
+const httpTriggerRecords = computed<
+  { meta?: { headers?: Record<string, string>; received_at?: unknown } }[] | null
+>(() => {
   if (!loadedRunIsHttp.value) return null;
   const recs = nodeTestOutput(nodeId.value) || nodeTestInput(nodeId.value);
   return recs && recs.length ? recs : null;
@@ -1028,7 +1031,9 @@ const httpFailedStep = computed(() => {
   );
   const step = id ? stepTree.value.find((s) => s.id === id) : null;
   if (!id || !step) return null;
-  const node = (workflowObj.currentSelectedWorkflow?.nodes || []).find((n: any) => n.id === id);
+  const nodes: { id: string; data?: { node_type?: string } }[] =
+    workflowObj.currentSelectedWorkflow?.nodes || [];
+  const node = nodes.find((n) => n.id === id);
   const message = errors[id]?.errors?.[0]?.[0];
   return {
     step: { id, label: step.label, isFunction: node?.data?.node_type === "function" },
@@ -1044,6 +1049,7 @@ const httpRunOutcome = computed(() => {
     receivedAt: httpReceivedAt.value,
     failedStep: httpFailedStep.value?.step ?? null,
     error: httpFailedStep.value?.error ?? null,
+    triggerKind: currentTriggerKind() ?? DEFAULT_TRIGGER_KIND,
   };
 });
 // The request block sits above Output, so the pane scrolls rather than squeezing the event to a few lines.

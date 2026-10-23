@@ -8,6 +8,10 @@ const seed = require('../../pages/workflowsPages/workflowFolderSeed.js');
 
 const uniq = () => `${Date.now().toString(36).slice(-5)}${Math.random().toString(36).slice(2, 5)}`;
 const MASK = '•';
+// Secrets are compared inside booleans, so a failing assertion never prints one into the report or trace.
+const sameValue = (value, secret) => value === secret;
+const shownInFull = (value, secret) =>
+  !value.includes(MASK) && value.length === secret.length && value.startsWith(secret.slice(0, 5));
 
 test.describe(
   'Workflows HTTP endpoint',
@@ -57,13 +61,13 @@ test.describe(
       const { secret, url } = await http.activeSecret(wf.id);
       const masked = await http.tokenOnScreen();
       expect(masked).toContain(MASK);
-      expect(masked).not.toContain(secret);
+      expect(masked.includes(secret), 'the masked token holds the plaintext').toBe(false);
       expect(await http.urlOnScreen()).toContain(url);
 
       await http.revealToken();
-      await expect.poll(() => http.tokenOnScreen()).toBe(secret);
+      await expect.poll(async () => shownInFull(await http.tokenOnScreen(), secret)).toBe(true);
       await http.copyToken();
-      await expect.poll(() => http.clipboardText()).toBe(secret);
+      await expect.poll(async () => sameValue(await http.clipboardText(), secret)).toBe(true);
 
       const result = await http.sendDryRun();
       expect(result).toContain('200');
@@ -169,10 +173,12 @@ test.describe(
 
       // Both tokens stay viewable from their rows while the old one retires.
       await page.locator(http.credShow(old.id)).click();
-      await expect(page.locator(http.credValue(old.id))).toContainText(old.secret);
+      await expect
+        .poll(async () => (await page.locator(http.credValue(old.id)).innerText()).includes(old.secret))
+        .toBe(true);
 
       const fresh = await http.activeSecret(wf.id);
-      expect(fresh.secret).not.toBe(old.secret);
+      expect(sameValue(fresh.secret, old.secret), 'rotate minted the same value').toBe(false);
       expect((await http.invokeHook(old.url, { token: old.secret, dryRun: true })).status).toBe(200);
       expect((await http.invokeHook(old.url, { token: fresh.secret, dryRun: true })).status).toBe(200);
 
@@ -181,6 +187,18 @@ test.describe(
       expect((await http.invokeHook(old.url, { token: old.secret, dryRun: true })).status).toBe(401);
       expect((await http.invokeHook(old.url, { token: fresh.secret, dryRun: true })).status).toBe(200);
       await expect(page.locator(http.rotate)).not.toHaveAttribute('aria-disabled', 'true');
+
+      // A leaked token is revoked first; Rotate must still mint a working one.
+      await http.finishReveal();
+      await http.revokeCredential(fresh.id);
+      expect((await http.invokeHook(old.url, { token: fresh.secret, dryRun: true })).status).toBe(401);
+      const { lead, overlapOptions } = await http.rotateWithoutCredential();
+      expect(lead).toContain('No token is active');
+      expect(overlapOptions).toBe(0);
+      await expect(page.locator(http.revealBanner)).toBeVisible();
+      const minted = await http.activeSecret(wf.id);
+      expect(minted.id === fresh.id).toBe(false);
+      expect((await http.invokeHook(old.url, { token: minted.secret, dryRun: true })).status).toBe(200);
     });
 
     test('HTTP-05: rejected calls show their reasons in the panel', async ({ page }) => {

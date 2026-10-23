@@ -167,6 +167,7 @@ import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { workflowHooksEnabled } from "@/plugins/workflows/httpEndpoint";
 import { httpPreviewSample, type PayloadFrom } from "@/plugins/workflows/httpEndpointUi";
+import { isHttpRequestInput } from "@/plugins/workflows/httpRequestSample";
 
 import {
   workflowObj,
@@ -190,19 +191,31 @@ const props = defineProps<{
   /** Prefills the input (latest HTTP run, or the HTTP sample from the endpoint panel). */
   seed?: unknown[];
   payloadFrom?: PayloadFrom;
+  /** Received time (µs) of the HTTP run `seed` came from; unset for a generated sample. */
+  seedRunAt?: number;
 }>();
 
 const { t } = useI18nTyped();
 const store = useStore();
 
 const hooksOn = computed(() => workflowHooksEnabled(store.state.zoConfig));
-const payloadChoice = ref<PayloadFrom>(props.payloadFrom ?? "trigger");
-const payloadFromOptions = computed(() => [
-  { label: t(triggerDef(currentTriggerKind()).labelKey), value: "trigger" },
-  { label: t("workflow.http.payloadHttp"), value: "http" },
-]);
+// "trigger" stands for a kind without variants; a kind with variants offers each variant key.
+const HTTP_CHOICE: PayloadFrom = "http";
+const KIND_CHOICE: PayloadFrom = "trigger";
+const kindVariants = triggerDef(currentTriggerKind()).sampleVariants ?? [];
+const firstKindChoice = kindVariants[0]?.key ?? KIND_CHOICE;
+const startsAsHttp =
+  props.payloadFrom === HTTP_CHOICE ||
+  (!props.payloadFrom && isHttpRequestInput(workflowObj.testRun.input));
+const payloadChoice = ref<string>(startsAsHttp ? HTTP_CHOICE : firstKindChoice);
+const payloadFromOptions = computed(() => {
+  const kindOptions = kindVariants.length
+    ? kindVariants.map((v) => ({ label: v.labelKey ? t(v.labelKey) : raw(v.key), value: v.key }))
+    : [{ label: t(triggerDef(currentTriggerKind()).labelKey), value: KIND_CHOICE }];
+  return [...kindOptions, { label: t("workflow.http.payloadHttp"), value: HTTP_CHOICE }];
+});
 // Every Test runs the in-memory graph; only the seeded payload changes.
-const payloadSelection = computed<PayloadFrom>({
+const payloadSelection = computed<string>({
   get: () => payloadChoice.value,
   set: (v) => {
     payloadChoice.value = v;
@@ -224,8 +237,10 @@ const edges = computed<any[]>(() => workflowObj.currentSelectedWorkflow?.edges |
 onMounted(() => {
   if (props.seed?.length) {
     workflowObj.testRun.input = JSON.stringify(props.seed, null, 2);
-    workflowObj.testRun.inputSource = "sample";
-    workflowObj.testRun.inputRunLabel = "";
+    workflowObj.testRun.inputSource = props.seedRunAt ? "run" : "sample";
+    workflowObj.testRun.inputRunLabel = props.seedRunAt
+      ? timestampToTimezoneDate(Math.floor(props.seedRunAt / 1000), store.state.timezone)
+      : "";
   } else if (!workflowObj.testRun.input) {
     seedSample();
   }
@@ -374,10 +389,14 @@ const run = async () => {
 };
 
 function seedSample() {
-  workflowObj.testRun.input =
-    hooksOn.value && payloadChoice.value === "http"
-      ? JSON.stringify(httpPreviewSample("test"), null, 2)
-      : buildTriggerSampleText(currentTriggerKind());
+  const variant = kindVariants.find((v) => v.key === payloadChoice.value);
+  if (hooksOn.value && payloadChoice.value === HTTP_CHOICE) {
+    workflowObj.testRun.input = JSON.stringify(httpPreviewSample("test"), null, 2);
+  } else if (variant) {
+    workflowObj.testRun.input = JSON.stringify(variant.build(), null, 2);
+  } else {
+    workflowObj.testRun.input = buildTriggerSampleText(currentTriggerKind());
+  }
   workflowObj.testRun.inputSource = "sample";
   workflowObj.testRun.inputRunLabel = "";
 }

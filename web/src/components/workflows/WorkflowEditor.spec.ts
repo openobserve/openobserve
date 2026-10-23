@@ -80,7 +80,7 @@ vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }))
 vi.mock("@/plugins/workflows/WorkflowCanvas.vue", () => stub("WorkflowCanvas"));
 vi.mock("./WorkflowNodeDrawer.vue", () => stub("WorkflowNodeDrawer"));
 vi.mock("./WorkflowTestDialog.vue", () =>
-  stub("WorkflowTestDialog", { props: ["seed", "payloadFrom"] }),
+  stub("WorkflowTestDialog", { props: ["seed", "payloadFrom", "seedRunAt"] }),
 );
 vi.mock("./WorkflowHttpEndpointPanel.vue", () =>
   stub("WorkflowHttpEndpointPanel", {
@@ -93,6 +93,7 @@ vi.mock("./WorkflowHttpEndpointPanel.vue", () =>
       "workflowEnabled",
       "context",
       "beforeCreate",
+      "triggerNodeId",
     ],
     emits: ["update:open", "run-test"],
   }),
@@ -2188,13 +2189,33 @@ describe("WorkflowEditor HTTP endpoint", () => {
     await button(wrapper).trigger("click");
     const seed = [{ meta: { trigger_source: "http", trigger_id: "test" }, data: [] }];
     await panel(wrapper).vm.$emit("update:open", false);
-    await panel(wrapper).vm.$emit("run-test", seed);
+    await panel(wrapper).vm.$emit("run-test", seed, 42);
     await flushPromises();
     expect(panel(wrapper).props("open")).toBe(false);
+    expect(panel(wrapper).props("triggerNodeId")).toBe("t1");
     expect(workflowObj.testRun.show).toBe(true);
     const dialog = wrapper.findComponent({ name: "WorkflowTestDialog" });
     expect(dialog.props("seed")).toEqual(seed);
     expect(dialog.props("payloadFrom")).toBe("http");
+    expect(dialog.props("seedRunAt")).toBe(42);
+  });
+
+  it("a Run test that fails validation leaves no HTTP seed for the next Test", async () => {
+    await openSaved();
+    const edges = workflowObj.currentSelectedWorkflow.edges;
+    workflowObj.currentSelectedWorkflow.edges = [];
+    await panel(wrapper).vm.$emit("run-test", [{ meta: { trigger_source: "http" } }], 42);
+    await flushPromises();
+    expect(workflowObj.testRun.show).toBe(false);
+
+    workflowObj.currentSelectedWorkflow.edges = edges;
+    await wrapper.find('[data-test="workflow-editor-test"]').trigger("click");
+    await flushPromises();
+    expect(workflowObj.testRun.show).toBe(true);
+    const dialog = wrapper.findComponent({ name: "WorkflowTestDialog" });
+    expect(dialog.props("seed")).toBeUndefined();
+    expect(dialog.props("payloadFrom")).toBeUndefined();
+    expect(dialog.props("seedRunAt")).toBeUndefined();
   });
 
   it("the picker shows the HTTP cue and only enabled kinds", async () => {

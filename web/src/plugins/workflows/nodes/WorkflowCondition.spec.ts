@@ -242,15 +242,42 @@ describe("WorkflowCondition HTTP request field group (AC-UI-32)", () => {
     workflowObj.currentSelectedWorkflow.nodes = [];
   });
 
-  it("offers the HTTP group with the body hint while the endpoint is on", () => {
+  it("offers the HTTP group with the body and repeated-key hints on their own line", () => {
     httpEditorState.endpointOn = true;
-    const fields = createWrapper().findComponent({ name: "ConditionBuilder" }).props("fields");
-    const values = fields.map((f: any) => f.value);
+    const wrapper = createWrapper();
+    const fields: { value: string; label: unknown }[] = wrapper
+      .findComponent({ name: "ConditionBuilder" })
+      .props("fields");
+    const values = fields.map((f) => f.value);
     expect(values).toContain("meta_alert_name");
     expect(values).toContain("meta_trigger_source");
-    expect(values.filter((v: string) => v.startsWith("data"))).toEqual([]);
-    expect(fields.map((f: any) => String(f.label))).toContain(
+    expect(values.filter((v) => v.startsWith("data"))).toEqual([]);
+    expect(fields.map((f) => String(f.label))).not.toContain(
       i18n.global.t("workflow.http.fieldGroupBodyHint"),
+    );
+    const hint = wrapper.find('[data-test="workflow-condition-http-body-hint"]');
+    expect(hint.text()).toContain(i18n.global.t("workflow.http.fieldGroupBodyHint"));
+    expect(hint.text()).toContain(i18n.global.t("workflow.http.fieldGroupQueryHint"));
+    expect(i18n.global.t("workflow.http.fieldGroupQueryHint")).toContain(
+      "repeated keys arrive as a list and never match",
+    );
+  });
+
+  it("offers meta.query keys from the HTTP test input", () => {
+    httpEditorState.endpointOn = true;
+    workflowObj.testRun.input = JSON.stringify([
+      { meta: { trigger_source: "http", query: { env: "prod" } }, data: [] },
+    ]);
+    const fields: { value: string }[] = createWrapper()
+      .findComponent({ name: "ConditionBuilder" })
+      .props("fields");
+    workflowObj.testRun.input = "";
+    expect(fields.map((f) => f.value)).toContain("meta_query_env");
+  });
+
+  it("shows no HTTP hint while the endpoint is off", () => {
+    expect(createWrapper().find('[data-test="workflow-condition-http-body-hint"]').exists()).toBe(
+      false,
     );
   });
 

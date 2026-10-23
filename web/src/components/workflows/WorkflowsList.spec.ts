@@ -95,7 +95,13 @@ vi.mock("@/components/workflows/WorkflowHttpEndpointPanel.vue", () => ({
   },
 }));
 
-vi.mock("@/utils/clipboard", () => ({ copyToClipboard: vi.fn(async () => true) }));
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: vi.fn(async () => true),
+  copyPendingText: vi.fn(async (text: Promise<string>) => {
+    await text;
+    return true;
+  }),
+}));
 
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
@@ -104,7 +110,7 @@ import store from "@/test/unit/helpers/store";
 import WorkflowsList from "./WorkflowsList.vue";
 import workflowService from "@/services/workflows";
 import { queryClient } from "@/composables/query/queryClient";
-import { copyToClipboard } from "@/utils/clipboard";
+import { copyPendingText } from "@/utils/clipboard";
 
 const t = (k: string, v?: any) => i18n.global.t(k, v ?? {});
 const listWorkflows = workflowService.listWorkflows as any;
@@ -1255,9 +1261,23 @@ describe("WorkflowsList HTTP endpoint", () => {
     await w.find('[data-test="workflow-list-workflow-1-copy-endpoint"]').trigger("click");
     await flushPromises();
     expect(getHttpTrigger).toHaveBeenCalledWith({ org_identifier: expect.any(String), id: "wf-1" });
-    expect(vi.mocked(copyToClipboard).mock.calls[0][0]).toBe("https://o2/h/1");
+    await expect(vi.mocked(copyPendingText).mock.calls[0][0]).resolves.toBe("https://o2/h/1");
     expect(mockToast).toHaveBeenCalledWith(
       expect.objectContaining({ message: t("toastMessages.workflows.endpointUrlCopied") }),
+    );
+  });
+
+  it("Copy endpoint URL toasts an error when the clipboard refuses the write", async () => {
+    getHttpTrigger.mockResolvedValue({ configured: true, url: "https://o2/h/1" });
+    vi.mocked(copyPendingText).mockImplementationOnce(async (text) => {
+      await text;
+      return false;
+    });
+    const w = await load([makeWorkflow(1, { http_endpoint_enabled: true })]);
+    await w.find('[data-test="workflow-list-workflow-1-copy-endpoint"]').trigger("click");
+    await flushPromises();
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "error", message: t("common.copyError") }),
     );
   });
 
