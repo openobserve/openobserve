@@ -178,6 +178,8 @@ jobs:
           export ZO_META_STORE=postgres
           export ZO_META_POSTGRES_DSN=postgres://postgres:password@localhost:5432/postgres
           export ZO_TEXT_DATA_TYPE=text
+          # Lets reports save without Chrome/SMTP; nothing in this job renders one.
+          export ZO_REPORT_SERVER_URL=http://localhost:5082
           export ZO_MEM_PERSIST_INTERVAL=1
           export ZO_MAX_FILE_RETENTION_TIME=1
           export ZO_FILE_PUSH_INTERVAL=1

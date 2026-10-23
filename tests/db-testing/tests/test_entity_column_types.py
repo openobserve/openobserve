@@ -36,6 +36,11 @@ ENTERPRISE_CLOUD_COLUMNS = {
     ("trial_quota_usage", "period"),
 }
 
+# Nullable in the migration but always written as a String by the app, so no NULL reaches the decoder.
+WRITTEN_NON_NULL_COLUMNS = {
+    ("org_ingestion_tokens", "description"),
+}
+
 
 def _entity_files() -> list[Path]:
     files = []
@@ -126,7 +131,7 @@ def test_entity_nullability_matches_postgres(db_cursor, table, columns):
     for column, _, optional, actual in _checked(table, columns, schema):
         if actual is None:
             continue
-        if actual[1] and not optional:
+        if actual[1] and not optional and (table, column) not in WRITTEN_NON_NULL_COLUMNS:
             mismatches.append(f"{column}: column allows NULL, entity field is not Option and cannot decode it")
         elif optional and not actual[1]:
             mismatches.append(f"{column}: entity field is Option, column is NOT NULL so saving None fails")
