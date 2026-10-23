@@ -3,6 +3,7 @@ import { mount } from "@vue/test-utils";
 import { h, nextTick, reactive } from "vue";
 import OToggleGroup from "./OToggleGroup.vue";
 import OToggleGroupItem from "./OToggleGroupItem.vue";
+import { TOOLTIP_TRIGGER_ATTR } from "@/lib/overlay/Tooltip/OTooltip.types";
 
 // OToggleGroupItem requires a ToggleGroupRoot context — mount inside OToggleGroup
 function mountItem(
@@ -46,6 +47,23 @@ describe("OToggleGroupItem", () => {
     const wrapper = mountItem({ value: "x" }, { default: () => h("span", "A") });
     const btn = wrapper.find("button");
     expect(btn.classes().join(" ")).toContain("bg-toggle-item-bg");
+  });
+
+  it.each([
+    ["focusable", { focusableUnavailable: true }],
+    ["plain", {}],
+  ])("binds a disabled %s item's tooltip to the wrapper that receives the hover", (_, extra) => {
+    const wrapper = mountItem({ value: "x", disabled: true, tooltip: "Why", ...extra });
+    const trigger = wrapper.find(`[${TOOLTIP_TRIGGER_ATTR}]`);
+    expect(trigger.element.tagName).toBe("SPAN");
+    expect(trigger.classes()).toContain("cursor-not-allowed");
+    wrapper.unmount();
+  });
+
+  it("binds an enabled item's tooltip to its button", () => {
+    const wrapper = mountItem({ value: "x", tooltip: "Why" });
+    expect(wrapper.find(`[${TOOLTIP_TRIGGER_ATTR}]`).element.tagName).toBe("BUTTON");
+    wrapper.unmount();
   });
 
   it("sets data-disabled when disabled=true", () => {

@@ -46,6 +46,7 @@
         class="mb-1.5 flex items-center gap-2"
       >
         <OSelect
+          :aria-label="t('search.selectStream')"
           data-test="log-search-index-list-select-stream"
           v-model="searchObj.meta.selectedTraceStream"
           :options="tracesStreams"

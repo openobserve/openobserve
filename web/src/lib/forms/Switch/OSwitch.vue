@@ -2,8 +2,9 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { SwitchProps, SwitchEmits, SwitchSlots } from "./OSwitch.types";
-import { computed, ref, useAttrs, useId, useSlots, watch } from "vue";
+import { computed, onMounted, ref, useAttrs, useId, useSlots, watch } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -11,11 +12,9 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 
 // Forward tabindex to the switch control; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
-const inputAriaLabel = computed(() => $attrs["aria-label"] as string | undefined);
-const wrapperAttrs = computed(() => {
-  const { tabindex: _tabindex, "aria-label": _ariaLabel, ...rest } = $attrs;
-  return rest;
-});
+const split = computed(() => splitControlAttrs($attrs));
+const wrapperAttrs = computed(() => split.value.wrapperAttrs);
+const controlAttrs = computed(() => split.value.controlAttrs);
 
 const props = withDefaults(defineProps<SwitchProps>(), {
   size: "md",
@@ -98,6 +97,12 @@ const labelId = computed(() => `${buttonId.value}-label`);
 const hasLabel = computed(
   () => Boolean(slots.label) || props.label !== undefined || Boolean(slots.tooltip),
 );
+onMounted(() =>
+  warnIfUnlabelled(
+    "OSwitch",
+    hasLabel.value || Boolean($attrs["aria-label"] || $attrs["aria-labelledby"]),
+  ),
+);
 </script>
 
 <template>
@@ -118,11 +123,11 @@ const hasLabel = computed(
       role="switch"
       :aria-checked="isChecked"
       :aria-labelledby="hasLabel ? labelId : undefined"
-      :aria-label="hasLabel ? undefined : inputAriaLabel"
       :data-state="isChecked ? 'checked' : 'unchecked'"
       :data-test="parentDataTest ? `${parentDataTest}-btn` : undefined"
       :disabled="disabled"
       :tabindex="inputTabindex"
+      v-bind="controlAttrs"
       :class="[
         'relative inline-flex shrink-0 rounded-full',
         'items-center border-2 p-0.5',

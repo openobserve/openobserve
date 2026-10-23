@@ -16,6 +16,7 @@
       :org="org"
       signal="traces"
       snippet-kind="config"
+      config-tool="OpenTelemetry Collector"
       @copy-command="copyHttpConfig"
     />
   </div>

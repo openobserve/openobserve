@@ -130,6 +130,21 @@ describe("OScheduleTimeline", () => {
     expect(w.find("[data-test='o2-schedule-timeline-now']").exists()).toBe(expected);
   });
 
+  // A stack of day rows shares one clock time, but "now" is on one day only.
+  it("draws the now marker on the named track only", () => {
+    const w = mount(OScheduleTimeline, {
+      props: {
+        tracks: [track({ key: "mon" }), track({ key: "tue" })],
+        nowOffset: 0.5,
+        nowTrackKey: "tue",
+      },
+    });
+    expect(w.findAll("[data-test='o2-schedule-timeline-now']")).toHaveLength(1);
+    expect(
+      w.find("[data-test='o2-schedule-track-tue'] [data-test='o2-schedule-timeline-now']").exists(),
+    ).toBe(true);
+  });
+
   it("lets a caller replace a band through the #band slot", () => {
     const w = mount(OScheduleTimeline, {
       props: { tracks: [track()] },

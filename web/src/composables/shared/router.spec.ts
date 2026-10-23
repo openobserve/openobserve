@@ -316,6 +316,29 @@ describe("useRoutes (router.ts)", () => {
       });
     });
 
+    it("W-S12 forgets a kept Slack link request in /logout beforeEnter", async () => {
+      const { rememberLinkRequest, recallLinkRequest } = await import("@/utils/slackLink");
+      rememberLinkRequest("req-1.sig", null);
+      const { parentRoutes } = useRoutes();
+      const logoutRoute = parentRoutes.find((r: any) => r.path === "/logout");
+
+      const originalLocation = window.location;
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        writable: true,
+        value: { href: "" },
+      });
+
+      logoutRoute.beforeEnter({}, {}, vi.fn());
+      expect(recallLinkRequest()).toBeNull();
+
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        writable: true,
+        value: originalLocation,
+      });
+    });
+
     it("should call useLocalCurrentUser in /logout beforeEnter", async () => {
       const { useLocalCurrentUser } = await import("@/utils/zincutils");
       const { parentRoutes } = useRoutes();
@@ -436,6 +459,25 @@ describe("useRoutes (router.ts)", () => {
       expect(callbackRoute.name).toBe("slackOAuthCallback");
       expect(callbackRoute.component).toBeDefined();
       expect(enTitle(callbackRoute.meta.titleKey)).toBe("Connecting Slack");
+    });
+  });
+
+  describe("parentRoutes — Slack link pages", () => {
+    it.each([
+      ["/slack/link", "slackLink", "Link Slack account"],
+      ["/slack/link/callback", "slackLinkCallback", "Linking Slack account"],
+      ["/slack/connect/callback", "slackConnectCallback", "Signing in with Slack"],
+    ])("AC-9.6 %s is a titled route that needs a session", async (path, name, title) => {
+      const { parentRoutes } = useRoutes();
+      const route = parentRoutes.find((r: any) => r.path === path);
+
+      expect(route).toBeDefined();
+      expect(route.name).toBe(name);
+      expect(enTitle(route.meta.titleKey)).toBe(title);
+      expect(route.meta.public).toBeUndefined();
+      expect(route.beforeEnter).toBeUndefined();
+      const view = await route.component();
+      expect(view.default).toBeDefined();
     });
   });
 
@@ -2234,9 +2276,9 @@ describe("useRoutes (router.ts)", () => {
   // 23. Edge cases
   // =========================================================================
   describe("Edge Cases", () => {
-    it("should have exactly 6 parentRoutes", () => {
+    it("should have exactly 9 parentRoutes", () => {
       const { parentRoutes } = useRoutes();
-      expect(parentRoutes).toHaveLength(6);
+      expect(parentRoutes).toHaveLength(9);
     });
 
     it("should have unique paths in parentRoutes", () => {

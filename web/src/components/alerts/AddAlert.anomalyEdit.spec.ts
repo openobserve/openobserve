@@ -89,6 +89,8 @@ vi.mock("@/services/reodotdev_analytics", () => ({ useReo: () => ({ track: vi.fn
 
 import AddAlert from "@/components/alerts/AddAlert.vue";
 import anomalyService from "@/services/anomaly_detection";
+import { queryClient } from "@/composables/query/queryClient";
+import { anomalyKeys } from "@/services/anomaly_detection.querykeys";
 
 const stubs = {
   QueryConfig: true,
@@ -162,6 +164,30 @@ describe("AddAlert — editing an anomaly seeds its stream", () => {
 
     expect(wrapper.vm.form.state.values.stream_name).toBe("k8s_logs");
     expect(wrapper.vm.form.state.values.stream_type).toBe("logs");
+  });
+
+  it("refreshes training metadata through the cache without replacing manual drafts", async () => {
+    wrapper = await mountAnomalyEdit();
+    wrapper.vm.anomalyConfig.band_width = "";
+    wrapper.vm.anomalyConfig.custom_sql = "unsaved query";
+    vi.mocked(anomalyService.get).mockResolvedValue({
+      data: anomalyConfig({
+        status: "ready",
+        is_trained: true,
+        current_model_version: 2,
+        band_k: 4.2345,
+        band_width: null,
+        custom_sql: "saved query",
+      }),
+    } as any);
+    await queryClient.invalidateQueries({
+      queryKey: anomalyKeys.all(store.state.selectedOrganization.identifier),
+    });
+    await flushPromises();
+    expect(wrapper.vm.anomalyConfig.band_k).toBe(4.2345);
+    expect(wrapper.vm.anomalyConfig.status).toBe("ready");
+    expect(wrapper.vm.anomalyConfig.band_width).toBe("");
+    expect(wrapper.vm.anomalyConfig.custom_sql).toBe("unsaved query");
   });
 
   it("loads the stream list for the anomaly's stream type", async () => {
