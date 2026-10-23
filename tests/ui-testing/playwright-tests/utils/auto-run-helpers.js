@@ -15,6 +15,7 @@
 
 // Shared helpers for the Logs Auto Run specs (item 2): request classification, fixtures, stats.
 const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
+const { ingestBase } = require('./ingest-url.js');
 
 const MINUTE_US = 60 * 1_000_000;
 
@@ -62,7 +63,7 @@ function trackSearches(page) {
 async function ingestRows(request, org, stream, rows) {
   const headers = { ...getAuthHeaders(), 'Content-Type': 'application/json' };
   for (let i = 0; i < rows.length; i += 2000) {
-    const response = await request.post(`${apiBase()}/api/${org}/${stream}/_json`, {
+    const response = await request.post(`${ingestBase(apiBase())}/api/${org}/${stream}/_json`, {
       headers,
       data: rows.slice(i, i + 2000),
     });

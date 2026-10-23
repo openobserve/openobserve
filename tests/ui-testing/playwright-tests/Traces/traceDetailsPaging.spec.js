@@ -5,6 +5,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
 const { generateHexId } = require('../utils/trace-ingestion.js');
+const { ingestBase } = require('../utils/ingest-url.js');
 
 const BASE = (process.env.ZO_BASE_URL || 'http://localhost:5080').replace(/\/$/, '');
 const ORG = getOrgIdentifier() || 'default';
@@ -38,7 +39,7 @@ async function ingestLargeTrace(page) {
       status: { code: 1 },
     };
   });
-  const res = await page.request.post(`${BASE}/api/${ORG}/v1/traces`, {
+  const res = await page.request.post(`${ingestBase(BASE)}/api/${ORG}/v1/traces`, {
     headers: AUTH_HEADERS,
     data: {
       resourceSpans: [{

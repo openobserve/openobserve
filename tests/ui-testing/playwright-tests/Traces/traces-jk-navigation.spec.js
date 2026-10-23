@@ -21,6 +21,7 @@ const {
 } = require("../utils/enhanced-baseFixtures.js");
 const { getAuthHeaders } = require("../utils/cloud-auth.js");
 const PageManager = require("../../pages/page-manager.js");
+const { ingestBase } = require('../utils/ingest-url.js');
 
 const ORG = `jktraces${Date.now()}`;
 const STREAM = "jk_traces";
@@ -76,7 +77,7 @@ function span(
 }
 
 async function ingestSpans(request, spans) {
-  const response = await request.post(`${apiBase()}/api/${ORG}/v1/traces`, {
+  const response = await request.post(`${ingestBase(apiBase())}/api/${ORG}/v1/traces`, {
     headers: {
       ...getAuthHeaders(),
       "stream-name": STREAM,

@@ -4,6 +4,7 @@ const PageManager = require('../../../pages/page-manager.js');
 const { getHeaders, getIngestionUrl, sendRequest } = require('../../utils/data-ingestion.js');
 const logData = require("../../../fixtures/log.json");
 const { getOrgIdentifier, getAuthHeaders, refreshCloudConfig } = require('../../utils/cloud-auth.js');
+const { ingestBase } = require('../../utils/ingest-url.js');
 
 /**
  * Alerts Regression Bugs Test Suite
@@ -644,7 +645,7 @@ async function ingestMetricsData(page) {
   const orgId = getOrgIdentifier();
   const streamName = 'e2e_test_cpu_usage';
   const baseUrl = process.env.INGESTION_URL || process.env.ZO_BASE_URL || 'http://localhost:5080';
-  const ingestionUrl = `${baseUrl}/api/${orgId}/ingest/metrics/_json`;
+  const ingestionUrl = `${ingestBase(baseUrl)}/api/${orgId}/ingest/metrics/_json`;
 
   // Cloud ingestion authenticates with the per-org passcode (email:passcode), NOT the
   // Dex login password. getAuthHeaders() returns passcode Basic-auth on cloud and

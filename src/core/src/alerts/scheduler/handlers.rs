@@ -78,6 +78,14 @@ pub(crate) struct AnomalyRunRecord {
     pub(crate) end_us: i64,
 }
 
+/// What a report trigger does after a failed attempt.
+#[derive(Debug, PartialEq, Eq)]
+enum RetryOutcome {
+    Retry,
+    Reschedule,
+    FinishOnce,
+}
+
 /// Returns `false` on a failed write; the per-group caller MUST check it or it dispatches stale.
 #[must_use]
 async fn persist_alert_run_state(
@@ -4773,19 +4781,24 @@ async fn handle_report_triggers(
     };
 
     if trigger.retries >= max_retries {
-        // It has been tried the maximum time, just update the
-        // next_run_at to the next expected trigger time
         log::info!(
             "[SCHEDULER trace_id {scheduler_trace_id}] This report trigger: {org_id}/{report_name} has passed maximum retries, skipping to next run",
             org_id = new_trigger.org,
             report_name = report_name
         );
         trigger_data_stream.status = RunOutcome::Skipped;
-        trigger_data_stream.error = Some(format!(
-            "max retries ({max_retries}) reached, run not attempted"
-        ));
+        let finish_once = report_retry_outcome(run_once, trigger.retries, max_retries)
+            == RetryOutcome::FinishOnce;
+        trigger_data_stream.error = Some(if finish_once {
+            format!("max retries ({max_retries}) reached, one-time report paused")
+        } else {
+            format!("max retries ({max_retries}) reached, run not attempted")
+        });
         // Not stored as the last run: the failure that exhausted the retries stays on the list.
         publish_triggers_usage(trigger_data_stream);
+        if finish_once {
+            finish_run_once(conn, report_id, &mut new_trigger, &scheduler_trace_id).await?;
+        }
         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
@@ -4805,35 +4818,7 @@ async fn handle_report_triggers(
             );
             // Report generation successful, update the trigger
             if run_once {
-                new_trigger.status = db::scheduler::TriggerStatus::Completed;
-                // Get the report again from db to pause it
-                match infra::table::reports::get_by_id(conn, report_id).await? {
-                    Some((folder, mut old_report)) => {
-                        // Pause the report as this is the last run
-                        if old_report.enabled {
-                            // Disable the report
-                            old_report.enabled = false;
-                        }
-                        let result = db::dashboards::reports::update_without_updating_trigger(
-                            conn,
-                            &folder.folder_id,
-                            None,
-                            old_report,
-                        )
-                        .await;
-                        if result.is_err() {
-                            log::error!(
-                                "[SCHEDULER trace_id {scheduler_trace_id}] Failed to update report: {org_id}/{report_name} after trigger: {}",
-                                result.err().unwrap()
-                            );
-                        }
-                    }
-                    None => {
-                        log::error!(
-                            "[SCHEDULER trace_id {scheduler_trace_id}] Report not found: {org_id}/{report_id} while updating run_once state"
-                        );
-                    }
-                }
+                finish_run_once(conn, report_id, &mut new_trigger, &scheduler_trace_id).await?;
             }
             db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
             log::debug!(
@@ -4844,31 +4829,99 @@ async fn handle_report_triggers(
             log::error!(
                 "[SCHEDULER trace_id {scheduler_trace_id}] Error sending report to subscribers: org_id: {org_id}, error: {e}"
             );
-            if trigger.retries + 1 >= max_retries && !run_once {
-                // It has been tried the maximum time, just update the
-                // next_run_at to the next expected trigger time
-                log::debug!(
-                    "[SCHEDULER trace_id {scheduler_trace_id}] This report trigger: {org_id}/{report_name} has reached maximum possible retries"
-                );
-                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-            } else {
-                // Otherwise update its status only
-                db::scheduler::update_status(
-                    &new_trigger.org,
-                    new_trigger.module,
-                    &new_trigger.module_key,
-                    db::scheduler::TriggerStatus::Waiting,
-                    trigger.retries + 1,
-                    None,
-                    true,
-                    &query_trace_id,
-                )
-                .await?;
+            match report_retry_outcome(run_once, trigger.retries, max_retries) {
+                RetryOutcome::Retry => {
+                    db::scheduler::update_status(
+                        &new_trigger.org,
+                        new_trigger.module,
+                        &new_trigger.module_key,
+                        db::scheduler::TriggerStatus::Waiting,
+                        trigger.retries + 1,
+                        None,
+                        true,
+                        &query_trace_id,
+                    )
+                    .await?;
+                }
+                RetryOutcome::Reschedule => {
+                    log::debug!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] This report trigger: {org_id}/{report_name} has reached maximum possible retries"
+                    );
+                    db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                }
+                RetryOutcome::FinishOnce => {
+                    // Kept off the last run so the failure that exhausted the retries stays listed.
+                    publish_triggers_usage(exhausted_once_row(
+                        TriggerData {
+                            next_run_at: new_trigger.next_run_at,
+                            ..base_row()
+                        },
+                        max_retries,
+                    ));
+                    finish_run_once(conn, report_id, &mut new_trigger, &scheduler_trace_id).await?;
+                    db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                }
             }
         }
     }
 
     Ok(())
+}
+
+/// Marks a one-time report's trigger Completed and pauses the report.
+async fn finish_run_once(
+    conn: &sea_orm::DatabaseConnection,
+    report_id: &str,
+    new_trigger: &mut db::scheduler::Trigger,
+    scheduler_trace_id: &str,
+) -> Result<(), anyhow::Error> {
+    new_trigger.status = db::scheduler::TriggerStatus::Completed;
+    let org_id = &new_trigger.org;
+    let Some((folder, mut report)) = infra::table::reports::get_by_id(conn, report_id).await?
+    else {
+        log::error!(
+            "[SCHEDULER trace_id {scheduler_trace_id}] Report not found: {org_id}/{report_id} while updating run_once state"
+        );
+        return Ok(());
+    };
+    report.enabled = false;
+    let report_name = report.name.clone();
+    if let Err(e) = db::dashboards::reports::update_without_updating_trigger(
+        conn,
+        &folder.folder_id,
+        None,
+        report,
+    )
+    .await
+    {
+        log::error!(
+            "[SCHEDULER trace_id {scheduler_trace_id}] Failed to update report: {org_id}/{report_name} after trigger: {e}"
+        );
+    }
+    Ok(())
+}
+
+/// The Skipped row for a one-time report whose retries ran out, published right after the
+/// failure that exhausted them. History identifies a run by `_timestamp` and `retries`, and both
+/// rows share the handler's start time, so this row counts as the attempt that was not made.
+fn exhausted_once_row(mut row: TriggerData, max_retries: i32) -> TriggerData {
+    row.status = RunOutcome::Skipped;
+    row.error = Some(format!(
+        "max retries ({max_retries}) reached, one-time report paused"
+    ));
+    row.retries = row.retries.saturating_add(1);
+    row
+}
+
+/// `retries` counts the attempts that failed before this one.
+fn report_retry_outcome(run_once: bool, retries: i32, max_retries: i32) -> RetryOutcome {
+    if retries.saturating_add(1) < max_retries {
+        RetryOutcome::Retry
+    } else if run_once {
+        RetryOutcome::FinishOnce
+    } else {
+        RetryOutcome::Reschedule
+    }
 }
 
 /// Next run and frequency in seconds of a report schedule; a week out if it cannot be evaluated.
@@ -7788,6 +7841,53 @@ mod tests {
                 "{frequency:?} @ {tz_offset}"
             );
         }
+    }
+
+    #[test]
+    fn report_retry_outcome_finishes_a_one_time_report_when_retries_run_out() {
+        use RetryOutcome::*;
+        assert_eq!(report_retry_outcome(true, 0, 3), Retry);
+        assert_eq!(report_retry_outcome(false, 1, 3), Retry);
+        assert_eq!(report_retry_outcome(true, 2, 3), FinishOnce);
+        assert_eq!(report_retry_outcome(false, 2, 3), Reschedule);
+        assert_eq!(report_retry_outcome(true, 3, 3), FinishOnce);
+        for max_retries in [0, 1] {
+            for retries in [0, 1, i32::MAX] {
+                assert_ne!(report_retry_outcome(true, retries, max_retries), Retry);
+                assert_ne!(report_retry_outcome(false, retries, max_retries), Retry);
+            }
+        }
+    }
+
+    #[test]
+    fn exhausted_once_row_does_not_collide_with_the_failure_before_it() {
+        let failure = TriggerData {
+            _timestamp: 10,
+            retries: 2,
+            status: RunOutcome::Error,
+            error: Some("smtp down".to_string()),
+            ..Default::default()
+        };
+        let skipped = exhausted_once_row(failure.clone(), 3);
+        assert_eq!(skipped._timestamp, failure._timestamp);
+        assert_ne!(skipped.retries, failure.retries);
+        assert_eq!(skipped.retries, 3);
+        assert_eq!(skipped.status, RunOutcome::Skipped);
+        assert_eq!(
+            skipped.error.as_deref(),
+            Some("max retries (3) reached, one-time report paused")
+        );
+        assert_eq!(
+            exhausted_once_row(
+                TriggerData {
+                    retries: i32::MAX,
+                    ..Default::default()
+                },
+                3
+            )
+            .retries,
+            i32::MAX
+        );
     }
 
     #[test]
