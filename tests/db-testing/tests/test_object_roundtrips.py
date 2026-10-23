@@ -78,7 +78,7 @@ class TestReportRoundtrip:
         report = {
             "name": name,
             "title": "db-testing report",
-            "org_id": "default",
+            "orgId": "default",
             "description": "db-testing report ✓",
             "message": "weekly numbers",
             "enabled": False,

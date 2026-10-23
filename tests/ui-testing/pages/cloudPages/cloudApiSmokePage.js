@@ -96,7 +96,8 @@ class CloudApiSmokePage {
             deduplication: { enabled: true, fingerprint_fields: ['level'], time_window_minutes: 30 },
             notify_on_recovery: true,
             recovery_destinations: [destination],
-            pending_period_sec: 60,
+            // Realtime alerts reject a pending period.
+            pending_period_sec: realtime ? 0 : 60,
             keep_firing_for: 60,
         };
     }

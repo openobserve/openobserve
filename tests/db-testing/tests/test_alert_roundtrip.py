@@ -34,7 +34,8 @@ def _alert_payload(name: str, stream: str, dest: str, *, realtime: bool = False)
         "deduplication": {"enabled": True, "fingerprint_fields": ["level"], "time_window_minutes": 30},
         "notify_on_recovery": True,
         "recovery_destinations": [dest],
-        "pending_period_sec": 60,
+        # Realtime alerts reject a pending period.
+        "pending_period_sec": 0 if realtime else 60,
         "keep_firing_for": 60,
     }
 
@@ -179,5 +180,6 @@ class TestCompositeAlertRoundtrip:
         assert stored["context_attributes"] == {"service": "db-testing"}
         assert stored["tags"] == ["env:test", "kind:composite"]
 
-        stored["description"] = "db-testing composite updated"
-        assert _update(api, row["alert_id"], stored)["description"] == "db-testing composite updated"
+        # Composite saves reject read-only fields (e.g. `id`) that a read returns.
+        update = {**composite, "description": "db-testing composite updated"}
+        assert _update(api, row["alert_id"], update)["description"] == "db-testing composite updated"
