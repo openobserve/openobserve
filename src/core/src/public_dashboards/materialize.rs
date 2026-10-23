@@ -399,7 +399,7 @@ pub fn assemble(
             &live, window, &run, prior, retainable, now, eff_secs, jitter,
         );
     }
-    let first_error = run.panels.iter().find_map(|p| p.error.clone());
+    let first_error = first_error(&run);
     let prior_header = prior.map(|p| p.stored.header.clone());
 
     let prior_panels = prior.and_then(|p| p.body.as_ref()).map(|b| &b.panels);
@@ -464,6 +464,8 @@ pub fn assemble(
         BuildKind::Partial
     } else {
         header.fail_streak = 0;
+        // A withheld panel's cause, for the publisher only; it is no failure and backs nothing off.
+        header.last_error = first_error;
         BuildKind::Complete
     };
     Assembled {
@@ -801,8 +803,7 @@ fn whole_failure(
     }
     let failed = run.panels.iter().filter(|p| p.class == Class::Transient);
     header.incomplete_count = u16::try_from(failed.count()).unwrap_or(u16::MAX);
-    let first_error = run.panels.iter().find_map(|p| p.error.clone());
-    fail(&mut header, live, now, eff_secs, jitter, first_error);
+    fail(&mut header, live, now, eff_secs, jitter, first_error(run));
     header.published_by = live.published_by.clone();
     Assembled {
         header,
@@ -810,6 +811,17 @@ fn whole_failure(
         body,
         kind: BuildKind::Failed,
     }
+}
+
+/// A transient error first, since that is what the backoff retries; else any panel's cause.
+fn first_error(run: &Run) -> Option<String> {
+    let of = |transient: bool| {
+        run.panels
+            .iter()
+            .filter(|p| (p.class == Class::Transient) == transient)
+            .find_map(|p| p.error.clone())
+    };
+    of(true).or_else(|| of(false))
 }
 
 fn build_error(intent: String) -> PanelResult {

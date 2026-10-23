@@ -19,7 +19,7 @@ pub mod access;
 mod authz_check;
 mod defaults;
 pub mod flight;
-mod formula;
+pub mod formula;
 pub mod intent;
 mod mask;
 pub mod materialize;
@@ -456,17 +456,19 @@ impl Ctx<'_> {
     }
 
     /// A denial withholds the panel; an authorizer that did not answer only fails this build.
+    /// `cause` is the publisher-facing reason of a denial; the viewer sees only `reason`.
     fn refused(
         &self,
         panel: &Panel,
         manifest: ManifestPanel,
         reason: NotAvailableReason,
+        cause: Option<String>,
     ) -> PanelRun {
         if reason == NotAvailableReason::BuildError {
             let error = "the authorizer did not answer".to_string();
             return self.panel_failed(panel, manifest, error);
         }
-        PanelRun::not_available(&panel.id, Class::Denied, reason, manifest, None)
+        PanelRun::not_available(&panel.id, Class::Denied, reason, manifest, cause)
     }
 
     fn panel_failed(&self, panel: &Panel, manifest: ManifestPanel, error: String) -> PanelRun {
@@ -1689,7 +1691,7 @@ async fn run_sql_panel(
             );
         }
         let target = (q.fields.stream_type, q.fields.stream.as_str());
-        record_sources(&mut manifest, "sql", &base, target);
+        let unparsed = record_sources(&mut manifest, "sql", &base, target);
         if let Err(reason) = ctx
             .search
             .authorize(
@@ -1702,7 +1704,7 @@ async fn run_sql_panel(
             )
             .await
         {
-            return ctx.refused(panel, manifest, reason);
+            return ctx.refused(panel, manifest, reason, unparsed);
         }
         if let Some(vrl) = q
             .vrl_function_query
@@ -1737,7 +1739,7 @@ async fn run_sql_panel(
                 )
                 .await
             {
-                return ctx.refused(panel, manifest, reason);
+                return ctx.refused(panel, manifest, reason, None);
             }
         }
         let shifts = time_shifts(q, ctx.end, false);
@@ -1866,7 +1868,7 @@ async fn run_promql_panel(
     }
     for run in &runs {
         let target = (run.q.fields.stream_type, run.q.fields.stream.as_str());
-        record_sources(&mut manifest, "promql", &run.expr, target);
+        let unparsed = record_sources(&mut manifest, "promql", &run.expr, target);
         if let Err(reason) = ctx
             .search
             .authorize(
@@ -1879,7 +1881,7 @@ async fn run_promql_panel(
             )
             .await
         {
-            return ctx.refused(panel, manifest, reason);
+            return ctx.refused(panel, manifest, reason, unparsed);
         }
     }
     let mut out = Collected {
@@ -2411,20 +2413,26 @@ fn template_texts(panel: &Panel) -> Vec<String> {
         .collect()
 }
 
-/// Records the streams and cipher keys a query reads, denied or not, for the deadline check.
+/// Records a query's streams and cipher keys for the deadline check; returns its parse error.
 fn record_sources(
     manifest: &mut ManifestPanel,
     query_type: &str,
     text: &str,
     target: (StreamType, &str),
-) {
+) -> Option<String> {
     // An unparseable query proves no stream, so the deadline never restores its panel.
-    match query_streams(query_type, text, target.0) {
-        Ok(streams) => manifest
-            .sources
-            .extend(streams.into_iter().map(|(s, t)| (t, s))),
-        Err(_) => manifest.unparsed = true,
-    }
+    let unparsed = match query_streams(query_type, text, target.0) {
+        Ok(streams) => {
+            manifest
+                .sources
+                .extend(streams.into_iter().map(|(s, t)| (t, s)));
+            None
+        }
+        Err(e) => {
+            manifest.unparsed = true;
+            Some(format!("query does not parse: {e}"))
+        }
+    };
     manifest
         .sources
         .sort_by(|a, b| (a.0.as_str(), &a.1).cmp(&(b.0.as_str(), &b.1)));
@@ -2437,6 +2445,7 @@ fn record_sources(
         manifest.cipher_keys.sort();
         manifest.cipher_keys.dedup();
     }
+    unparsed
 }
 
 fn public_meta(full: &serde_json::Value) -> serde_json::Value {
@@ -4528,6 +4537,56 @@ mod tests {
             assert_eq!(run.class, class, "{reason:?}");
             assert_eq!(search.calls.load(Ordering::SeqCst), 0, "{reason:?}");
         }
+    }
+
+    #[tokio::test]
+    async fn an_unparseable_sql_panel_names_its_cause_in_the_publishers_status_only() {
+        let search = FakeSearch {
+            hits: 1,
+            refuse: Some((NotAvailableReason::Unauthorized, "FRM")),
+            ..Default::default()
+        };
+        let run = run_one(
+            &search,
+            typed_panel("p", "table", "sql", "SELEC * FRM", None),
+        )
+        .await;
+        assert_eq!(run.class, Class::Denied, "a parse error stays structural");
+        assert_eq!(
+            run.result.state,
+            PanelState::NotAvailable {
+                reason: NotAvailableReason::Unauthorized
+            }
+        );
+        let (mut link, ..) = ctx_parts();
+        link.id = ider::uuid();
+        link.time_ranges = Some(json!([{ "type": "relative", "secs": 3600 }]).to_string());
+        let live = materialize::Live {
+            dashboard_updated_at: 1,
+            link_rev: 1,
+            settings_rev: 0,
+            published_by: link.published_by.clone(),
+        };
+        let run = Run {
+            panels: vec![run],
+            ..Default::default()
+        };
+        let mut a =
+            materialize::assemble(live, (10, 20), run, None, &BTreeSet::new(), 20, 0, 300, 0.0);
+        assert_eq!(a.kind, materialize::BuildKind::Complete);
+        let h = &a.header;
+        assert_eq!(
+            (h.fail_streak, h.next_retry_at, h.last_error_at),
+            (0, None, None)
+        );
+        let key = store::key(&link.org_id, &link.id, "r3600");
+        store::write(&key, &mut a.header, &a.manifest, a.body.as_ref())
+            .await
+            .unwrap();
+        let status = materialize::range_status(&link, false).await;
+        store::evict(&key).await;
+        let error = status[0].last_error.as_deref().unwrap_or_default();
+        assert!(error.starts_with("query does not parse: "), "{error:?}");
     }
 
     #[tokio::test]
