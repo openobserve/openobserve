@@ -269,15 +269,13 @@ test.describe("Share Link Test Cases", () => {
 
     testLogger.info('Testing share link loading state');
 
-    // Select stream and refresh
     await pm.logsPage.selectStream(TEST_STREAM);
     await pm.logsPage.clickRefresh();
-    await page.waitForTimeout(3000);
 
-    // Get the share button
     const shareButton = pm.logsPage.getShareLinkButtonLocator();
+    // Share stays disabled until a run has produced results, so a fixed sleep can click a still-disabled button.
+    await expect(shareButton).toBeEnabled({ timeout: 60000 });
 
-    // Click and wait for success notification
     await shareButton.click();
     await pm.logsPage.expectShareLinkSuccessNotification();
 
