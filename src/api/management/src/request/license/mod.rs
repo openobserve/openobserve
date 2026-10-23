@@ -22,9 +22,8 @@ use db::license;
 use o2_enterprise::enterprise::license::{
     BelowHwm, LICENSE_DB_KEY, License, LicenseDecision, LicenseStatus, RefreshBusy, RefreshReport,
     RefreshStatus, Rollback, RollbackReason, Waiver, check_license, click_refresh, gate_and_raise,
-    get_license, ingestion_limit_exceeded_count, ingestion_used, judge_paste, license_expired,
-    license_status, load_rev_hwm, paste_superseded, pasted_key_supersedes_env, refresh_status,
-    rev_hwm_warning, rotate_instance_key, undo_raise,
+    get_license, judge_paste, load_rev_hwm, paste_superseded, pasted_key_supersedes_env,
+    refresh_status, rev_hwm_warning, rotate_instance_key, undo_raise,
 };
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::{AuthExtractor, UserEmail};
@@ -49,6 +48,8 @@ struct LicenseResponse {
     decision: LicenseDecision,
     base: LicenseDecision,
     evaluated_at: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    input: Option<o2_enterprise::enterprise::license::LicenseInput>,
     env_key_active: bool,
     /// Whether the loaded key is the `O2_LICENSE_KEY` one, i.e. no pasted key superseded it.
     env_key_in_use: bool,
@@ -444,7 +445,12 @@ pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
     let o2_cfg = o2_enterprise::enterprise::common::config::get_config();
 
     // Any authenticated user may call this; viewer_license_fields trims the response by role.
-    let (key, license) = match get_license().await {
+    let (loaded, status, ingestion_used) =
+        o2_enterprise::enterprise::license::license_snapshot().await;
+    let expired = loaded
+        .as_ref()
+        .is_some_and(|(_, l)| l.expires_at <= chrono::Utc::now().timestamp_micros());
+    let (key, license) = match loaded {
         Some((k, l)) => (Some(k), Some(l)),
         None => (None, None),
     };
@@ -464,20 +470,21 @@ pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
         license,
     );
 
-    let (waivers, decision, base, evaluated_at) =
-        license_status_fields(license_status().await, is_root);
+    let input = status.input.clone();
+    let (waivers, decision, base, evaluated_at) = license_status_fields(status, is_root);
 
     let res = LicenseResponse {
         key,
         license,
         installation_id,
-        expired: license_expired().await,
-        ingestion_exceeded: ingestion_limit_exceeded_count(),
-        ingestion_used: ingestion_used() * 100.0, // convert to percentage
+        expired,
+        ingestion_exceeded: decision.exceeded_days as u8,
+        ingestion_used: ingestion_used * 100.0,
         waivers,
         decision,
         base,
         evaluated_at,
+        input,
         env_key_active: env_key_active(&o2_cfg.common.license_key),
         env_key_in_use,
         // check_permissions ignores is_external
@@ -653,6 +660,7 @@ mod tests {
         );
         let mut status = status_fixture();
         status.waivers[0].installation_id = Some(INSTANCE_ID.into());
+        let input = status.input.clone();
         let (waivers, decision, base, evaluated_at) = license_status_fields(status, is_root);
         json::to_string(&LicenseResponse {
             key,
@@ -665,6 +673,7 @@ mod tests {
             decision,
             base,
             evaluated_at,
+            input,
             env_key_active: false,
             env_key_in_use: false,
             can_update_license: is_license_admin,
@@ -811,6 +820,7 @@ mod tests {
     fn test_license_response_carries_decision_and_waivers() {
         let mut status = status_fixture();
         status.evaluated_at = 1_792_000_000_000_000;
+        let input = status.input.clone();
         let (waivers, decision, base, evaluated_at) = license_status_fields(status, false);
         let json = json::to_value(&LicenseResponse {
             key: None,
@@ -823,6 +833,7 @@ mod tests {
             decision,
             base,
             evaluated_at,
+            input,
             env_key_active: false,
             env_key_in_use: false,
             can_update_license: false,
@@ -963,6 +974,7 @@ mod tests {
             decision: LicenseDecision::default(),
             base: LicenseDecision::default(),
             evaluated_at: 0,
+            input: None,
             env_key_active: true,
             env_key_in_use: true,
             can_update_license: false,
