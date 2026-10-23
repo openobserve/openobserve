@@ -68,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :value="run.start_time"
                 unit="us"
                 mode="absolute"
+                :format="RUN_TIME_LONG"
                 :timezone="store.state.timezone"
                 :empty-label="raw('—')"
               />
@@ -132,6 +133,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import { RUN_TIME_LONG } from "@/plugins/workflows/runStatus";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { isTestRun, useTestRunVisibility } from "@/plugins/workflows/useWorkflowCanvas";
 import { workflowObj, loadRunsHistory } from "@/plugins/workflows/useWorkflowCanvas";

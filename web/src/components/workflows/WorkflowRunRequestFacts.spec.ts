@@ -49,7 +49,11 @@ const mountFacts = (props: Record<string, unknown> = {}) =>
       plugins: [i18n, store],
       stubs: {
         OTable: TableStub,
-        OTimeCell: { name: "OTimeCell", props: ["value", "unit", "mode"], template: "<time />" },
+        OTimeCell: {
+          name: "OTimeCell",
+          props: ["value", "unit", "mode", "format"],
+          template: "<time />",
+        },
       },
     },
   });
@@ -75,6 +79,7 @@ describe("WorkflowRunRequestFacts", () => {
     expect(text).toContain("application/json");
     expect(text).toContain("68 B");
     expect(w.findComponent({ name: "OTimeCell" }).props("value")).toBe(1_792_575_542_418_000);
+    expect(w.findComponent({ name: "OTimeCell" }).props("format")).toBe("MMM d, yyyy HH:mm");
   });
 
   it("shows — for a fact the ledger does not hold", () => {

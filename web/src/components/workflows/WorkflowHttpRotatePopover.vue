@@ -15,24 +15,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OButton
+  <!-- Wrapper mode: a child tooltip after icon-left anchors to the icon alone -->
+  <OTooltip
     v-if="disabled"
-    variant="outline"
-    size="sm-action"
-    icon-left="refresh"
-    disabled
-    focusable-unavailable
-    data-test="workflow-http-rotate"
+    :content="isSigned ? t('workflow.http.rotateBlockedSigned') : t('workflow.http.rotateBlocked')"
+    side="top"
+    data-test="workflow-http-rotate-blocked-tooltip"
   >
-    {{ t("workflow.http.rotate") }}
-    <OTooltip
-      :content="
-        isSigned ? t('workflow.http.rotateBlockedSigned') : t('workflow.http.rotateBlocked')
-      "
-      side="top"
-      data-test="workflow-http-rotate-blocked-tooltip"
-    />
-  </OButton>
+    <OButton
+      variant="outline"
+      size="sm-action"
+      icon-left="refresh"
+      disabled
+      focusable-unavailable
+      data-test="workflow-http-rotate"
+    >
+      {{ t("workflow.http.rotate") }}
+    </OButton>
+  </OTooltip>
   <OPopover v-else v-model:open="open" side="bottom" align="end" :aria-label="title">
     <template #trigger>
       <OButton

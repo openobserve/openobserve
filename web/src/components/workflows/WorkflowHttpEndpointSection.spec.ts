@@ -28,6 +28,7 @@ import {
   OPopoverStub,
   OSwitchStub,
   OTooltipStub,
+  hoverAndWait,
   RouterLinkStub,
   fullPermissions,
   httpAbsent,
@@ -60,7 +61,10 @@ const api = vi.mocked(workflows);
 const t = (k: string, v?: Record<string, unknown>) => i18n.global.t(k, v ?? {});
 const mounted: VueWrapper[] = [];
 
-const mountSection = async (props: Record<string, unknown> = {}) => {
+const mountSection = async (
+  props: Record<string, unknown> = {},
+  stubs: Record<string, unknown> = {},
+) => {
   const wrapper = mount(WorkflowHttpEndpointSection, {
     props: {
       workflowId: "wf1",
@@ -77,8 +81,10 @@ const mountSection = async (props: Record<string, unknown> = {}) => {
         OSwitch: OSwitchStub,
         OTooltip: OTooltipStub,
         RouterLink: RouterLinkStub,
+        ...stubs,
       },
     },
+    attachTo: document.body,
   });
   mounted.push(wrapper);
   await flushPromises();
@@ -179,6 +185,17 @@ describe("WorkflowHttpEndpointSection", () => {
       );
       expect(byTest(w, "workflow-http-meta").text()).toBe(t("workflow.http.onMeta"));
       expect(reveal.text()).not.toContain(HTTP_TOKEN);
+    });
+
+    it("sets the header in the token hint in monospace", async () => {
+      const w = await mountSection();
+      await byTest(w, "workflow-http-toggle").trigger("click");
+      await flushPromises();
+      const hint = byTest(w, "workflow-http-secret-hint");
+      expect(hint.find(".font-mono").text()).toBe("Authorization: Bearer <token>");
+      expect(hint.text()).toBe(
+        t("workflow.http.tokenHint", { header: "Authorization: Bearer <token>" }),
+      );
     });
 
     it("the eye shows the token and copy copies the real token", async () => {
@@ -305,6 +322,11 @@ describe("WorkflowHttpEndpointSection", () => {
       expect(result.text()).toContain(t("workflow.http.dryRunAccepted"));
       expect(result.text()).toContain(t("workflow.http.dryRunMeta", { size: "68 B" }));
       expect(byTest(w, "workflow-http-test-input").text()).toContain("trigger_source");
+      const blocks = w.findAllComponents({ name: "OCodeBlock" });
+      expect(blocks).toHaveLength(3);
+      for (const block of blocks) expect(block.props("padded")).toBe(true);
+      // A long header value must wrap, not run past the panel edge.
+      expect(blocks.find((b) => b.props("lang") === "json")?.props("wrap")).toBe(true);
       expect(vi.mocked(dryRunHook).mock.calls[0][0]).toMatchObject({
         url: httpConfig().url,
         auth: { mode: "token", token: HTTP_TOKEN },
@@ -433,6 +455,18 @@ describe("WorkflowHttpEndpointSection", () => {
       expect(status.classes()).toContain("text-status-negative");
     });
 
+    it("dates the last call like the mockups", async () => {
+      api.getHttpTrigger.mockResolvedValue(
+        httpConfig({
+          last_call: { run_id: "r-9", status: "failed", received_at: 1_792_575_542_000_000 },
+        }),
+      );
+      const w = await mountSection();
+      const line = byTest(w, "workflow-http-last-call").text();
+      expect(line).toContain("Oct 21, 09:39");
+      expect(line).not.toContain("2026-10-21");
+    });
+
     it("a succeeded last call reads positive", async () => {
       api.getHttpTrigger.mockResolvedValue(
         httpConfig({ last_call: { run_id: "r-9", status: "succeeded", received_at: 1 } }),
@@ -526,6 +560,12 @@ describe("WorkflowHttpEndpointSection", () => {
       expect(seed[0].meta.trigger_id).toBe("test");
     });
 
+    it("opens the Run test tooltip on hover over the whole button, not only its icon", async () => {
+      const w = await mountSection({}, { OTooltip: false });
+      await hoverAndWait(byTest(w, "workflow-http-run-test").element);
+      expect(document.body.textContent).toContain(t("workflow.http.runTestHint"));
+    });
+
     it("list context replaces Run test with Open the workflow", async () => {
       const w = await mountSection({ context: "list" });
       expect(byTest(w, "workflow-http-run-test").exists()).toBe(false);
@@ -568,6 +608,16 @@ describe("WorkflowHttpEndpointSection", () => {
 
   describe("advanced and delete", () => {
     // OFormInput drops native min/max on purpose (OFormInput.spec), so the schema owns both caps.
+    // The xs field squeezed its label and help text into three lines.
+    it("the limit fields are wide enough for their label and help text on one line", async () => {
+      const w = await mountSection();
+      await byTest(w, "workflow-http-advanced").find("button").trigger("click");
+      await flushPromises();
+      const inputs = w.findAllComponents({ name: "OFormInput" });
+      expect(inputs.map((c) => c.props("name"))).toEqual(["maxBodyKib", "rateLimit"]);
+      for (const input of inputs) expect(input.props("width")).toBe("md");
+    });
+
     it("rate field max is the org budget", async () => {
       api.getHttpTrigger.mockResolvedValue(httpConfig({ org_rate_limit_per_minute: 600 }));
       const w = await mountSection();

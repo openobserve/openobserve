@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :code="code"
       :code-masked="masked"
       :lang="LANG_IDS[lang]"
+      padded
       :reveal-tooltip="t('ingestion.setupCard.revealToken')"
       :hide-tooltip="t('ingestion.setupCard.hideToken')"
       wrap

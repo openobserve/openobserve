@@ -17,7 +17,12 @@ import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import { OPopoverStub, OTooltipStub, httpCredential } from "@/test/unit/helpers/workflowHttp";
+import {
+  OPopoverStub,
+  OTooltipStub,
+  hoverAndWait,
+  httpCredential,
+} from "@/test/unit/helpers/workflowHttp";
 import WorkflowHttpRotatePopover from "./WorkflowHttpRotatePopover.vue";
 
 const t = (k: string, v?: Record<string, unknown>) => i18n.global.t(k, v ?? {});
@@ -38,6 +43,23 @@ const mountPopover = (props: Record<string, unknown> = {}) =>
 const byTest = (w: ReturnType<typeof mountPopover>, id: string) => w.find(`[data-test="${id}"]`);
 
 describe("WorkflowHttpRotatePopover", () => {
+  it("opens the blocked tooltip on hover over the whole Rotate button, not only its icon", async () => {
+    const w = mount(WorkflowHttpRotatePopover, {
+      props: {
+        mode: "token",
+        current: httpCredential(),
+        disabled: true,
+        pending: false,
+        error: null,
+      },
+      global: { plugins: [i18n, store], stubs: { OPopover: OPopoverStub } },
+      attachTo: document.body,
+    });
+    await hoverAndWait(byTest(w, "workflow-http-rotate").element);
+    expect(document.body.textContent).toContain(t("workflow.http.rotateBlocked"));
+    w.unmount();
+  });
+
   it("defaults to 24 hours", async () => {
     const w = mountPopover();
     await byTest(w, "workflow-http-rotate").trigger("click");

@@ -105,7 +105,7 @@ const globalCfg = {
   plugins: [i18n, store],
   stubs: {
     OTable: OTableStub,
-    OTimeCell: stub("OTimeCell", ["value", "unit", "mode", "timezone", "emptyLabel"]),
+    OTimeCell: stub("OTimeCell", ["value", "unit", "mode", "timezone", "emptyLabel", "format"]),
     OBadge: stub("OBadge", ["variant", "size"]),
     OTag: {
       name: "OTag",
@@ -1087,6 +1087,54 @@ describe("WorkflowRunsPanel — stored statuses and HTTP request runs", () => {
     expect(rowIds(w)).not.toContain("retry-1");
   });
 
+  it("dates Started and Received like the mockups (Oct 21, 09:39)", async () => {
+    const w = await mountHttp();
+    const started = w
+      .find('[data-run="alert-1"] .c-start_time')
+      .findComponent({ name: "OTimeCell" });
+    expect(started.props("format")).toBe("MMM d, HH:mm");
+    await setFilter(w, "http_request");
+    const received = w
+      .find('[data-run="0193f2c4-dddd"] .c-received')
+      .findComponent({ name: "OTimeCell" });
+    expect(received.props("format")).toBe("MMM d, HH:mm");
+  });
+
+  // Measured in the built UI: a 32rem panel leaves the table 494 px, and OTable floors the actions column at 84.
+  it("names the source layout so the page can give it a 32rem panel its columns fit", async () => {
+    const w = await mountHttp();
+    expect(w.emitted("layout")?.at(-1)).toEqual(["source"]);
+    const cols = w.findComponent(CellTable as any).props("columns") as any[];
+    const total = cols.reduce(
+      (sum, c) => sum + (c.id === "actions" ? Math.max(c.size, 84) : c.size),
+      0,
+    );
+    expect(total).toBeLessThanOrEqual(494);
+    const size = (id: string) => cols.find((c) => c.id === id).size;
+    // Content measured in the built UI: Started 90, Source 92, Running chip 68, Duration header and sort icon 72, plus 16-22 px padding.
+    expect(size("start_time")).toBeGreaterThanOrEqual(112);
+    expect(size("source")).toBeGreaterThanOrEqual(112);
+    expect(size("status")).toBeGreaterThanOrEqual(96);
+    // The Duration header with its sort icon, and a "14m 52s" value.
+    expect(size("duration")).toBeGreaterThanOrEqual(88);
+    await setFilter(w, "http_request");
+    expect(w.emitted("layout")?.at(-1)).toEqual(["http"]);
+  });
+
+  it("a reason line wraps under its chip instead of cutting off", async () => {
+    const w = await mountHttp();
+    expect(w.find('[data-test="workflow-run-reason-0193f25e-bbbb"]').classes()).toContain(
+      "whitespace-normal",
+    );
+  });
+
+  it("a run that never started or has not finished shows no duration", async () => {
+    const w = await mountHttp();
+    for (const id of ["0193f2e8-aaaa", "0193f25e-bbbb"])
+      expect(w.find(`[data-run="${id}"] .c-duration`).text()).toBe("—");
+    expect(w.find('[data-run="alert-1"] .c-duration').text()).not.toBe("—");
+  });
+
   it("a kind filter keeps that kind's runs only", async () => {
     const w = await mountHttp();
     await setFilter(w, "alert_fired");
@@ -1168,7 +1216,7 @@ describe("WorkflowRunsPanel — stored statuses and HTTP request runs", () => {
       );
     expect(w.findComponent(CellTable as any).props("showIndex")).toBe(false);
     // The panel inner width is its rem width minus p-2 padding and the 1px border.
-    expect(total()).toBeLessThanOrEqual(420);
+    expect(total()).toBeLessThanOrEqual(494);
     await setFilter(w, "http_request");
     expect(total()).toBeLessThanOrEqual(716);
   });

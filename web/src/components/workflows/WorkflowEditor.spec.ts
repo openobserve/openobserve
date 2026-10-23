@@ -132,6 +132,7 @@ import WorkflowEditor from "./WorkflowEditor.vue";
 import workflowService from "@/services/workflows";
 import analytics from "@/services/product_analytics";
 import { queryClient } from "@/composables/query/queryClient";
+import { hoverAndWait } from "@/test/unit/helpers/workflowHttp";
 import { enabledTriggers } from "@/plugins/workflows/triggers";
 import { httpEditorState, resetHttpEditorState } from "@/plugins/workflows/httpEndpointUi";
 import useWorkflowCanvas, {
@@ -2108,6 +2109,19 @@ describe("WorkflowEditor HTTP endpoint", () => {
     await openSaved({ nodes: incident });
     expect(button(wrapper).exists()).toBe(true);
     expect(panel(wrapper).props("kind")).toBe("incident_event");
+  });
+
+  it("opens the button tooltip on hover over the whole button, not only its icon", async () => {
+    hydrateWorkflow(savedGraph());
+    mockRouter.currentRoute.value = { query: { id: "wf-1" } };
+    getHttpTrigger.mockResolvedValue({ configured: false, permissions: endpoint().permissions });
+    wrapper = mount(WorkflowEditor, {
+      global: { plugins: [i18n, store], stubs: { ...globalStubs, OButton: false } },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    await hoverAndWait(button(wrapper).element);
+    expect(document.body.textContent).toContain(t("workflow.http.editorButtonTooltip"));
   });
 
   it("sits between History and Test", async () => {

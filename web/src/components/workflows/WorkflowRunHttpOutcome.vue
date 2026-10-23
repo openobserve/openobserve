@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :value="receivedAt"
           unit="us"
           mode="absolute"
+          :format="RUN_TIME_LONG"
           :timezone="store.state.timezone"
           :empty-label="dash"
         />
@@ -86,7 +87,12 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { HookRunStatus } from "@/services/workflows";
-import { RUN_REASON_KEYS, hasStoredRunData, type RunReason } from "@/plugins/workflows/runStatus";
+import {
+  RUN_REASON_KEYS,
+  RUN_TIME_LONG,
+  hasStoredRunData,
+  type RunReason,
+} from "@/plugins/workflows/runStatus";
 
 const props = defineProps<{
   status: HookRunStatus;

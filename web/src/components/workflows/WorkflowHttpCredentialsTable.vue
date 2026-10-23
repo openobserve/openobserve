@@ -41,13 +41,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`workflow-http-credential-${row.id}-value`"
             data-o2-privacy="mask"
           >
-            <OCodeCell
+            <span
               v-if="revealed[row.id]"
-              :value="revealed[row.id]"
-              :tooltip="false"
-              :copy="false"
-              class="break-all"
-            />
+              class="text-compact font-mono break-all whitespace-normal"
+              :data-test="`workflow-http-credential-${row.id}-shown`"
+              >{{ revealed[row.id] }}</span
+            >
             <span v-else class="text-compact font-mono">{{ row.display_prefix }}</span>
             <OText
               v-if="revealError[row.id]"
@@ -62,12 +61,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-created_at="{ row }">
-          <OTimeCell :value="row.created_at" unit="us" mode="absolute" :timezone="timezone" />
-        </template>
-
-        <template #cell-created_by="{ row }">
-          <div class="flex min-w-0 flex-col items-start gap-1">
-            <span class="break-all">{{ row.created_by }}</span>
+          <div
+            class="flex min-w-0 flex-col items-start gap-0.5"
+            :data-test="`workflow-http-credential-${row.id}-created`"
+          >
+            <OTimeCell
+              :value="row.created_at"
+              unit="us"
+              mode="absolute"
+              :format="RUN_TIME_SHORT"
+              :timezone="timezone"
+            />
+            <OUserCell :value="row.created_by" />
             <OTag
               v-if="!row.creator_in_org"
               variant="default-soft"
@@ -83,6 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :value="row.last_used_at"
             unit="us"
             mode="absolute"
+            :format="RUN_TIME_SHORT"
             :timezone="timezone"
             :empty-label="t('workflow.http.never')"
           />
@@ -206,8 +212,8 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
@@ -215,6 +221,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { HttpAuthMode, HttpCredential } from "@/services/workflows";
 import { isLiveCredential } from "@/plugins/workflows/useWorkflowHttpEndpoint";
+import { RUN_TIME_SHORT } from "@/plugins/workflows/runStatus";
 
 const HOUR_US = 3_600_000_000;
 
@@ -248,49 +255,50 @@ const copyLabel = computed(() =>
   isSigned.value ? t("workflow.http.copySecret") : t("workflow.http.copyToken"),
 );
 
-const columns = computed<OTableColumnDef<HttpCredential>[]>(() => [
+const allColumns = computed<OTableColumnDef<HttpCredential>[]>(() => [
   {
     id: "value",
     header: isSigned.value ? t("workflow.http.colSecret") : t("workflow.http.colToken"),
     accessorKey: "display_prefix",
     size: 200,
+    minSize: 140,
     meta: { align: "left", flex: true, cellOverflowTooltip: false },
   },
   {
     id: "created_at",
     header: t("workflow.http.colCreated"),
     accessorKey: "created_at",
-    size: 130,
-    meta: { align: "left" },
-  },
-  {
-    id: "created_by",
-    header: t("workflow.http.colCreatedBy"),
-    accessorKey: "created_by",
-    size: 200,
+    size: 156,
     meta: { align: "left" },
   },
   {
     id: "last_used_at",
     header: t("workflow.http.colLastUsed"),
     accessorKey: "last_used_at",
-    size: 130,
+    size: 104,
     meta: { align: "left" },
   },
   {
     id: "state",
     header: t("workflow.http.colStatus"),
     accessorKey: "state",
-    size: 120,
+    size: 112,
     meta: { align: "left" },
   },
   {
     id: "actions",
     header: t("workflow.http.colActions"),
-    size: 150,
+    // Rigid and clipped on the left: a retiring row's Show, Copy and "Revoke now" need 174 px.
+    size: 176,
     meta: { align: "right" },
   },
 ]);
+// Without Show or Revoke every row has no action, so the column would be an empty header.
+const columns = computed(() =>
+  props.canEdit || props.canReveal
+    ? allColumns.value
+    : allColumns.value.filter((c) => c.id !== "actions"),
+);
 
 const isLive = (c: HttpCredential) => isLiveCredential(c);
 

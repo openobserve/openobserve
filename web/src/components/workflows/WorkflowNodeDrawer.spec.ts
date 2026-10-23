@@ -1599,6 +1599,7 @@ describe("WorkflowNodeDrawer", () => {
 
       const chip = wrapper.find('[data-test="workflow-ndv-run-label"]');
       expect(chip.findComponent({ name: "OTimeCell" }).exists()).toBe(true);
+      expect(chip.findComponent({ name: "OTimeCell" }).props("format")).toBe("MMM d, yyyy HH:mm");
     });
 
     // Opening a run without visiting the Runs page first leaves runsHistory empty, so

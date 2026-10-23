@@ -63,7 +63,7 @@ const globalCfg = {
     OIcon: stub("OIcon", ["name", "size"]),
     OBadge: stub("OBadge", ["variant", "size"]),
     OTooltip: stub("OTooltip", ["side", "content", "maxWidth"]),
-    OTimeCell: stub("OTimeCell", ["value", "unit", "mode", "timezone", "emptyLabel"]),
+    OTimeCell: stub("OTimeCell", ["value", "unit", "mode", "timezone", "emptyLabel", "format"]),
     ORefreshButton: stub("ORefreshButton", ["lastRunAt", "loading"]),
     OButton: stub("OButton", ["variant", "size", "iconLeft", "loading"]),
   },
@@ -117,6 +117,14 @@ describe("WorkflowRunSwitcher — test runs in the History dropdown", () => {
 
   // The regression risk: a draft's history is almost entirely test runs, and
   // that is exactly what its author wants to see.
+  it("dates each run like the run chip (Oct 21, 2026 09:39)", async () => {
+    workflowObj.currentSelectedWorkflow.isDraft = false;
+    workflowObj.runsHistory.list = [REAL_RUN("r1")] as any;
+    const wrapper = mountSwitcher();
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "OTimeCell" }).props("format")).toBe("MMM d, yyyy HH:mm");
+  });
+
   it("shows test runs on a DRAFT", async () => {
     workflowObj.currentSelectedWorkflow.isDraft = true;
     workflowObj.runsHistory.list = [TEST_RUN("t1"), REAL_RUN("r1")] as any;

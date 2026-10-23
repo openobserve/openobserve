@@ -204,6 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :value="loadedRunRow?.start_time"
                         unit="us"
                         mode="absolute"
+                        :format="RUN_TIME_LONG"
                         :timezone="store.state.timezone"
                         :empty-label="raw('—')"
                       />
@@ -845,7 +846,12 @@ import {
   openHttpPanel,
   usesHttpPayload,
 } from "@/plugins/workflows/httpEndpointUi";
-import { firstFailedStep, hasStoredRunData, runReasonOf } from "@/plugins/workflows/runStatus";
+import {
+  RUN_TIME_LONG,
+  firstFailedStep,
+  hasStoredRunData,
+  runReasonOf,
+} from "@/plugins/workflows/runStatus";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
 import { branchPathCounts, forwardedRunCount, isNoMatchRun } from "./nodeRunOutcome";
 import WorkflowTrigger from "@/plugins/workflows/nodes/WorkflowTrigger.vue";

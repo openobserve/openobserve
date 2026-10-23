@@ -32,7 +32,11 @@ const mountOutcome = (props: Record<string, unknown>) =>
     global: {
       plugins: [i18n, store],
       stubs: {
-        OTimeCell: { name: "OTimeCell", props: ["value", "unit", "mode"], template: "<time />" },
+        OTimeCell: {
+          name: "OTimeCell",
+          props: ["value", "unit", "mode", "format"],
+          template: "<time />",
+        },
         OButton: {
           name: "OButton",
           emits: ["click"],
@@ -75,6 +79,11 @@ describe("WorkflowRunHttpOutcome", () => {
       "This request waited more than 1 hour in the queue and was never run.",
     );
     expect(w.find('[data-test="workflow-run-error"]').exists()).toBe(false);
+  });
+
+  it("dates the received request like the run chip", () => {
+    const w = mountOutcome({ status: "expired", reason: "expired" });
+    expect(w.findComponent({ name: "OTimeCell" }).props("format")).toBe("MMM d, yyyy HH:mm");
   });
 
   it("worker-lost run shows the error banner telling the user to check destinations", () => {

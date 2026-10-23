@@ -47,15 +47,50 @@ const mountTable = (props: Record<string, unknown> = {}) =>
 const byTest = (w: ReturnType<typeof mountTable>, id: string) => w.find(`[data-test="${id}"]`);
 
 describe("WorkflowHttpCredentialsTable", () => {
-  it("lists Token, Created, Created by, Last used, Status", () => {
+  it("lists Token, Created, Last used, Status", () => {
     const w = mountTable();
     const text = byTest(w, "workflow-http-credentials").text();
-    for (const key of ["colToken", "colCreated", "colCreatedBy", "colLastUsed", "colStatus"]) {
+    for (const key of ["colToken", "colCreated", "colLastUsed", "colStatus"]) {
       expect(text).toContain(t(`workflow.http.${key}`));
     }
     expect(text).toContain(t("workflow.http.never"));
     expect(text).toContain(t("workflow.http.active"));
     expect(text).toContain("a@example.com");
+  });
+
+  // Measured in the built UI at 1920 px: the xl drawer leaves the table 707 px inside its frame.
+  it("fits every column inside the xl panel, so nothing scrolls sideways", () => {
+    const w = mountTable();
+    const columns = w.findComponent({ name: "OTable" }).props("columns") as {
+      size?: number;
+      minSize?: number;
+      meta?: { flex?: boolean };
+    }[];
+    const needed = columns.reduce(
+      (sum, c) => sum + (c.meta?.flex ? (c.minSize ?? 48) : (c.size ?? 150)),
+      0,
+    );
+    expect(needed).toBeLessThanOrEqual(707);
+  });
+
+  it("shows when and by whom in one Created cell, with times as in the mockups", () => {
+    const w = mountTable({
+      credentials: [httpCredential({ last_used_at: 1_792_575_690_000_000 })],
+    });
+    const columns = w.findComponent({ name: "OTable" }).props("columns") as { id: string }[];
+    expect(columns.map((c) => c.id)).toEqual([
+      "value",
+      "created_at",
+      "last_used_at",
+      "state",
+      "actions",
+    ]);
+    const created = byTest(w, "workflow-http-credential-c1-created");
+    expect(created.text()).toContain("Oct 21, 09:39");
+    expect(created.text()).toContain("a@example.com");
+    const text = byTest(w, "workflow-http-credentials").text();
+    expect(text).toContain("Oct 21, 09:41");
+    expect(text).not.toContain("2026-10-21");
   });
 
   it("signed mode names the column Secret", () => {
@@ -88,6 +123,18 @@ describe("WorkflowHttpCredentialsTable", () => {
     expect(w.emitted("hide")?.[0]).toEqual(["c1"]);
   });
 
+  // A cut value cannot be compared with the caller's copy, so the shown value wraps in full.
+  it("a shown value wraps in full instead of cutting with an ellipsis", () => {
+    const w = mountTable({ revealed: { c1: HTTP_ROW_VALUE } });
+    const cell = byTest(w, "workflow-http-credential-c1-value");
+    expect(cell.findComponent({ name: "OTruncatedText" }).exists()).toBe(false);
+    const value = cell.find('[data-test="workflow-http-credential-c1-shown"]');
+    expect(value.text()).toBe(HTTP_ROW_VALUE);
+    expect(value.classes()).toEqual(
+      expect.arrayContaining(["break-all", "whitespace-normal", "font-mono"]),
+    );
+  });
+
   it("Copy copies the real value without showing it", async () => {
     const w = mountTable();
     await byTest(w, "workflow-http-credential-c1-copy").trigger("click");
@@ -102,6 +149,16 @@ describe("WorkflowHttpCredentialsTable", () => {
     expect(byTest(w, "workflow-http-credential-reveal-denied").text()).toBe(
       t("workflow.http.revealDenied"),
     );
+  });
+
+  // Measured in the built UI: Show 28 + Copy 28 + "Revoke now" 88 + two 4 px gaps + 8 + 12 cell padding.
+  it("sizes the actions column for Show, Copy and Revoke now, so the retiring row's Show is not clipped", () => {
+    const w = mountTable();
+    const columns = w.findComponent({ name: "OTable" }).props("columns") as {
+      id: string;
+      size?: number;
+    }[];
+    expect(columns.find((c) => c.id === "actions")?.size).toBeGreaterThanOrEqual(174);
   });
 
   it("a retiring row reveals until it expires", () => {
@@ -132,6 +189,14 @@ describe("WorkflowHttpCredentialsTable", () => {
     );
     await byTest(w, "workflow-http-credential-c1-revoke-confirm").trigger("click");
     expect(w.emitted("revoke")?.[0]).toEqual(["c1"]);
+  });
+
+  it("drops the empty Actions column when the user can neither show nor revoke", () => {
+    const ids = (w: ReturnType<typeof mountTable>) =>
+      (w.findComponent({ name: "OTable" }).props("columns") as { id: string }[]).map((c) => c.id);
+    expect(ids(mountTable({ canEdit: false, canReveal: false }))).not.toContain("actions");
+    expect(ids(mountTable({ canEdit: false, canReveal: true }))).toContain("actions");
+    expect(ids(mountTable({ canEdit: true, canReveal: false }))).toContain("actions");
   });
 
   it("revoke is hidden without edit", () => {

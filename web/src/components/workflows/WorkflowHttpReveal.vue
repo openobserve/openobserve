@@ -35,13 +35,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :code="secret"
         :code-masked="maskedSecret"
         lang="text"
+        padded
         :reveal-tooltip="t('ingestion.setupCard.revealToken')"
         :hide-tooltip="t('ingestion.setupCard.hideToken')"
         :copy-message="isSigned ? t('workflow.http.secretCopied') : t('workflow.http.tokenCopied')"
         data-test="workflow-http-token"
         data-o2-privacy="mask"
       />
-      <OText variant="meta" as="p">{{ secretHint }}</OText>
+      <OText variant="meta" as="p" data-test="workflow-http-secret-hint">
+        <i18n-t
+          :keypath="isSigned ? 'workflow.http.secretHint' : 'workflow.http.tokenHint'"
+          tag="span"
+          scope="global"
+        >
+          <template #header>
+            <OText variant="mono">{{ BEARER_HEADER }}</OText>
+          </template>
+          <template #headers>
+            <OText variant="mono">{{ SIGNATURE_HEADERS }}</OText>
+          </template>
+        </i18n-t>
+      </OText>
     </div>
 
     <WorkflowHttpSnippets
@@ -102,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           default-open
           data-test="workflow-http-test-input"
         >
-          <OCodeBlock :code="inputText" lang="json" />
+          <OCodeBlock :code="inputText" lang="json" padded wrap />
         </OCollapsible>
       </template>
     </div>
@@ -143,6 +157,9 @@ import {
 import type { EndpointContext } from "@/plugins/workflows/useWorkflowHttpEndpoint";
 import WorkflowHttpSnippets from "./WorkflowHttpSnippets.vue";
 import WorkflowHttpUrl from "./WorkflowHttpUrl.vue";
+
+const BEARER_HEADER = "Authorization: Bearer <token>";
+const SIGNATURE_HEADERS = "webhook-id, webhook-timestamp, webhook-signature";
 
 const props = defineProps<{
   context: EndpointContext;
@@ -198,13 +215,6 @@ const secretLabel = computed(() => {
     return rotated.value ? t("workflow.http.newSecretLabel") : t("workflow.http.secretLabel");
   return rotated.value ? t("workflow.http.newTokenLabel") : t("workflow.http.tokenLabel");
 });
-const secretHint = computed(() =>
-  isSigned.value
-    ? t("workflow.http.secretHint", {
-        headers: raw("webhook-id, webhook-timestamp, webhook-signature"),
-      })
-    : t("workflow.http.tokenHint", { header: raw("Authorization: Bearer <token>") }),
-);
 
 const accepted = computed(() => !!result.value && result.value.status < 300);
 const refusedByState = computed(

@@ -160,24 +160,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </button>
           </template>
         </WorkflowRunSwitcher>
-        <OButton
+        <!-- Wrapper mode: a child tooltip after icon-left anchors to the icon alone -->
+        <OTooltip
           v-if="showHttpButton"
-          variant="outline"
-          size="sm-action"
-          icon-left="webhook"
-          data-test="workflow-editor-http-endpoint"
-          @click="httpEditorState.panelOpen = true"
+          side="bottom"
+          :content="httpTooltip"
+          :disabled="!httpTooltip"
         >
-          {{ t("workflow.http.editorButton") }}
-          <OTag
-            v-if="httpChip"
-            :variant="httpChip === 'success' ? 'success-soft' : 'warning-soft'"
-            size="sm"
-            :label="t('workflow.http.editorButtonOn')"
-            data-test="workflow-editor-http-endpoint-chip"
-          />
-          <OTooltip v-if="httpTooltip" side="bottom" :content="httpTooltip" />
-        </OButton>
+          <OButton
+            variant="outline"
+            size="sm-action"
+            icon-left="webhook"
+            data-test="workflow-editor-http-endpoint"
+            @click="httpEditorState.panelOpen = true"
+          >
+            {{ t("workflow.http.editorButton") }}
+            <OTag
+              v-if="httpChip"
+              :variant="httpChip === 'success' ? 'success-soft' : 'warning-soft'"
+              size="sm"
+              :label="t('workflow.http.editorButtonOn')"
+              data-test="workflow-editor-http-endpoint-chip"
+            />
+          </OButton>
+        </OTooltip>
         <OButton
           variant="outline"
           size="sm-action"

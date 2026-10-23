@@ -17,6 +17,11 @@ import type { I18nKey } from "@/types/i18n";
 import type { HttpRequestFacts, WorkflowHistoryRow } from "@/services/workflows";
 import { runSourceOf, type RunSource } from "./httpEndpoint";
 
+/** date-fns pattern for times in run lists and the HTTP endpoint panel ("Oct 21, 09:39"). */
+export const RUN_TIME_SHORT = "MMM d, HH:mm";
+/** date-fns pattern for one run's chip and request facts ("Oct 21, 2026 09:39"). */
+export const RUN_TIME_LONG = "MMM d, yyyy HH:mm";
+
 /** Why a run never executed or never finished; drives the second line under its status chip. */
 export type RunReason = "expired" | "worker_lost" | "workflow_disabled" | "run_timeout";
 
