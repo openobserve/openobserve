@@ -26,7 +26,11 @@ import {
   triggerTypeForKind,
   enabledTriggers,
   buildTriggerSampleText,
+  conditionFieldOptions,
 } from "./triggers";
+import i18n from "@/locales";
+import type { TranslateFn } from "@/types/i18n";
+import { HTTP_REQUEST_PAYLOAD_FIELDS } from "./httpRequestSample";
 import { INCIDENT_EVENT_TYPES, INCIDENT_COMMON_KEYS } from "./incidentSample";
 import { ALERT_PAYLOAD_FIELDS } from "./alertFields";
 import { INCIDENT_PAYLOAD_FIELDS } from "./incidentFields";
@@ -129,5 +133,46 @@ describe("trigger registry", () => {
         expect(meta.event_type).toBe(v.key);
       }
     });
+  });
+});
+
+describe("conditionFieldOptions (AC-UI-32)", () => {
+  const t = i18n.global.t as unknown as TranslateFn;
+
+  it("is the kind's own list while the endpoint is off", () => {
+    expect(conditionFieldOptions("alert_fired", false, t)).toBe(ALERT_PAYLOAD_FIELDS);
+    expect(conditionFieldOptions("incident_event", false, t)).toBe(INCIDENT_PAYLOAD_FIELDS);
+    expect(conditionFieldOptions(undefined, true, t)).toEqual([]);
+  });
+
+  it("adds the HTTP request group after the kind's fields; the hints are not options", () => {
+    const options = conditionFieldOptions("alert_fired", true, t);
+    expect(options[0]).toMatchObject({
+      header: true,
+      label: t("workflow.triggerKind.alertFired.label"),
+    });
+    expect(options.slice(1, 1 + ALERT_PAYLOAD_FIELDS.length)).toEqual(ALERT_PAYLOAD_FIELDS);
+    const groupAt = 1 + ALERT_PAYLOAD_FIELDS.length;
+    expect(options[groupAt]).toMatchObject({ header: true, label: t("workflow.http.fieldGroup") });
+    expect(options.slice(groupAt + 1)).toEqual(HTTP_REQUEST_PAYLOAD_FIELDS);
+    expect(options.map((o) => String(o.label))).not.toContain(
+      t("workflow.http.fieldGroupBodyHint"),
+    );
+  });
+
+  it("offers meta.query.<key> for each query key it is given", () => {
+    const values = conditionFieldOptions("alert_fired", true, t, ["env"]).map((o) => o.value);
+    expect(values.slice(-1)).toEqual(["meta_query_env"]);
+  });
+
+  it("offers meta.trigger_source and never a data.* field", () => {
+    const options = conditionFieldOptions("incident_event", true, t);
+    const values = options.filter((o) => !o.header).map((o) => o.value);
+    expect(values).toContain("meta_trigger_source");
+    expect(values).toContain("meta_headers_content-type");
+    expect(values.filter((v) => v.startsWith("data"))).toEqual([]);
+    expect(options.filter((o) => !o.header).map((o) => String(o.label))).toContain(
+      "meta.trigger_source",
+    );
   });
 });

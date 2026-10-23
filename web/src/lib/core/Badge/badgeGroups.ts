@@ -1967,6 +1967,19 @@ export const BADGE_GROUPS = {
     },
     fallback: { variant: "default-soft" },
   },
+  // Workflow run status as the history API stores it; rendered as given, never derived from `error`.
+  hookRunStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      queued: { variant: "warning-soft", labelKey: "workflow.history.statusQueued" },
+      running: { variant: "blue-soft", labelKey: "workflow.history.statusRunning" },
+      succeeded: { variant: "success-soft", labelKey: "workflow.history.success" },
+      failed: { variant: "error-soft", labelKey: "workflow.history.failed" },
+      expired: { variant: "default-soft", labelKey: "workflow.history.statusExpired" },
+    },
+    fallback: { variant: "default-soft" },
+  },
 } satisfies Record<string, BadgeGroupConfig>;
 
 export type BadgeGroupName = keyof typeof BADGE_GROUPS;

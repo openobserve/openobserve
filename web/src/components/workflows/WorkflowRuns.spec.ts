@@ -96,8 +96,8 @@ const OButtonStub = {
 };
 const RunsPanelStub = {
   name: "WorkflowRunsPanel",
-  props: ["orgId", "workflowId", "workflowName", "selectedRunId"],
-  emits: ["select-run"],
+  props: ["orgId", "workflowId", "workflowName", "selectedRunId", "triggerFilter"],
+  emits: ["select-run", "update:triggerFilter", "layout"],
   template: `<div class="runs-panel" />`,
 };
 const stub = (name: string) => ({ name, template: `<div class="${name}" />` });
@@ -302,6 +302,25 @@ describe("WorkflowRuns", () => {
     expect(panel(wrapper).props("selectedRunId")).toBe("");
     // Test never navigates away — it stays on the runs page.
     expect(mockRouter.push).not.toHaveBeenCalled();
+  });
+
+  it("widens the runs panel for the source and HTTP layouts", async () => {
+    const wrapper = await mountRuns();
+    const box = () => wrapper.find('[data-test="workflow-runs-panel"]').classes();
+    expect(box()).toContain("w-[27.5rem]");
+    panel(wrapper).vm.$emit("layout", "source");
+    await flushPromises();
+    expect(box()).toContain("w-[32rem]");
+    expect(box()).not.toContain("w-[27.5rem]");
+    panel(wrapper).vm.$emit("layout", "http");
+    await flushPromises();
+    expect(box()).toContain("w-[46rem]");
+    expect(box()).toContain("max-w-[60%]");
+    expect(box()).not.toContain("w-[27.5rem]");
+    expect(box()).toContain("max-lg:w-full");
+    panel(wrapper).vm.$emit("layout", "plain");
+    await flushPromises();
+    expect(box()).toContain("w-[27.5rem]");
   });
 
   it("back returns to the workflows list", async () => {

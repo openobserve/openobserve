@@ -64,6 +64,8 @@ pub mod sourcemaps;
 pub mod system_settings;
 pub mod user;
 #[cfg(feature = "enterprise")]
+pub mod workflow_http_triggers;
+#[cfg(feature = "enterprise")]
 pub mod workflows;
 
 use infra_db::{Event, NEED_WATCH, NO_NEED_WATCH, get_coordinator};

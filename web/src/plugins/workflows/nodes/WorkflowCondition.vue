@@ -100,11 +100,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
     </ConditionBuilder>
+    <WorkflowHttpFieldHint v-if="httpOn" />
   </div>
 </template>
 
 <script lang="ts" setup>
-import { ref } from "vue";
+import { computed, ref } from "vue";
+import { useStore } from "vuex";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -116,9 +118,14 @@ import {
   currentTriggerKind,
   setNodeIncomplete,
 } from "@/plugins/workflows/useWorkflowCanvas";
-import { triggerDef } from "@/plugins/workflows/triggers";
+import { conditionFieldOptions } from "@/plugins/workflows/triggers";
+import { workflowHooksEnabled } from "@/plugins/workflows/httpEndpoint";
+import { httpEditorState } from "@/plugins/workflows/httpEndpointUi";
+import { httpQueryKeys } from "@/plugins/workflows/httpRequestSample";
+import WorkflowHttpFieldHint from "./WorkflowHttpFieldHint.vue";
 
 const { t } = useI18nTyped();
+const store = useStore();
 
 // The guidelines, as data — rendered in BOTH the inline first-run box and the
 // recall tooltip, so the copy lives in one place. The null/empty value hints
@@ -142,7 +149,12 @@ const dismissGuidelines = () => {
 // With no trigger (it was deleted), we offer nothing rather than a wrong set —
 // the user can still type any column via allow-custom-columns.
 const kind = currentTriggerKind();
-const fields = kind ? triggerDef(kind).conditionFields : [];
+const httpOn = computed(
+  () => workflowHooksEnabled(store.state.zoConfig) && httpEditorState.endpointOn,
+);
+const fields = computed(() =>
+  conditionFieldOptions(kind, httpOn.value, t, httpQueryKeys(workflowObj.testRun.input)),
+);
 const savedConditions = workflowObj.currentSelectedNodeData?.data?.conditions ?? null;
 
 const builder = ref<any>(null);

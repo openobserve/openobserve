@@ -56,6 +56,7 @@ vi.mock("@/components/flow/forms/ConditionBuilder.vue", () => ({
 import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
 import { ALERT_PAYLOAD_FIELDS } from "@/plugins/workflows/alertFields";
 import { INCIDENT_PAYLOAD_FIELDS } from "@/plugins/workflows/incidentFields";
+import { httpEditorState, resetHttpEditorState } from "@/plugins/workflows/httpEndpointUi";
 import WorkflowCondition from "./WorkflowCondition.vue";
 
 // The condition's field options come from the CURRENT trigger's kind, so seed a
@@ -227,5 +228,67 @@ describe("WorkflowCondition", () => {
   it("renders the builder as optional (incomplete rule = placeholder)", () => {
     const wrapper = createWrapper();
     expect(wrapper.findComponent({ name: "ConditionBuilder" }).props("optional")).toBe(true);
+  });
+});
+
+describe("WorkflowCondition HTTP request field group (AC-UI-32)", () => {
+  beforeEach(() => {
+    seedTrigger("alert_fired");
+    store.state.zoConfig = { ...store.state.zoConfig, workflow_hooks_enabled: true };
+  });
+  afterEach(() => {
+    resetHttpEditorState();
+    store.state.zoConfig = { ...store.state.zoConfig, workflow_hooks_enabled: false };
+    workflowObj.currentSelectedWorkflow.nodes = [];
+  });
+
+  it("offers the HTTP group with the body and repeated-key hints on their own line", () => {
+    httpEditorState.endpointOn = true;
+    const wrapper = createWrapper();
+    const fields: { value: string; label: unknown }[] = wrapper
+      .findComponent({ name: "ConditionBuilder" })
+      .props("fields");
+    const values = fields.map((f) => f.value);
+    expect(values).toContain("meta_alert_name");
+    expect(values).toContain("meta_trigger_source");
+    expect(values.filter((v) => v.startsWith("data"))).toEqual([]);
+    expect(fields.map((f) => String(f.label))).not.toContain(
+      i18n.global.t("workflow.http.fieldGroupBodyHint"),
+    );
+    const hint = wrapper.find('[data-test="workflow-condition-http-body-hint"]');
+    expect(hint.text()).toContain(i18n.global.t("workflow.http.fieldGroupBodyHint"));
+    expect(hint.text()).toContain(i18n.global.t("workflow.http.fieldGroupQueryHint"));
+    expect(i18n.global.t("workflow.http.fieldGroupQueryHint")).toContain(
+      "repeated keys arrive as a list and never match",
+    );
+  });
+
+  it("offers meta.query keys from the HTTP test input", () => {
+    httpEditorState.endpointOn = true;
+    workflowObj.testRun.input = JSON.stringify([
+      { meta: { trigger_source: "http", query: { env: "prod" } }, data: [] },
+    ]);
+    const fields: { value: string }[] = createWrapper()
+      .findComponent({ name: "ConditionBuilder" })
+      .props("fields");
+    workflowObj.testRun.input = "";
+    expect(fields.map((f) => f.value)).toContain("meta_query_env");
+  });
+
+  it("shows no HTTP hint while the endpoint is off", () => {
+    expect(createWrapper().find('[data-test="workflow-condition-http-body-hint"]').exists()).toBe(
+      false,
+    );
+  });
+
+  it("keeps the kind's list while the endpoint is off or hooks are off (regression guard)", () => {
+    expect(createWrapper().findComponent({ name: "ConditionBuilder" }).props("fields")).toEqual(
+      ALERT_PAYLOAD_FIELDS,
+    );
+    httpEditorState.endpointOn = true;
+    store.state.zoConfig = { ...store.state.zoConfig, workflow_hooks_enabled: false };
+    expect(createWrapper().findComponent({ name: "ConditionBuilder" }).props("fields")).toEqual(
+      ALERT_PAYLOAD_FIELDS,
+    );
   });
 });

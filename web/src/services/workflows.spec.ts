@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi } from "vitest";
-import workflows from "@/services/workflows";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import workflows, { dryRunHook } from "@/services/workflows";
+import { signWebhook } from "@/plugins/workflows/httpSigning";
 import http from "@/services/http";
 import analytics from "@/services/product_analytics";
 
@@ -706,16 +707,22 @@ describe("workflows service", () => {
   });
 
   describe("service surface", () => {
-    it("exposes exactly the 10 workflow endpoints", () => {
+    it("exposes exactly the 17 workflow endpoints", () => {
       expect(Object.keys(workflows).sort()).toEqual([
         "createWorkflow",
+        "deleteHttpTrigger",
         "deleteWorkflow",
         "enableWorkflow",
+        "getHttpTrigger",
         "getWorkflowHistory",
         "getWorkflowRun",
         "listWorkflows",
         "promoteWorkflow",
+        "putHttpTrigger",
         "retryWorkflow",
+        "revealHttpCredentialSecret",
+        "revokeHttpCredential",
+        "rotateHttpCredential",
         "testWorkflow",
         "updateWorkflow",
       ]);
@@ -815,5 +822,228 @@ describe("workflows service", () => {
 
       expect(analytics.track).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("workflows HTTP endpoint transport", () => {
+  let api: Record<"get" | "post" | "put" | "patch" | "delete", ReturnType<typeof vi.fn>>;
+  const target = { org_identifier: "acme", id: "wf1" };
+  const permissions = { edit: true, test: true, reveal: false };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api = { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() };
+    (http as any).mockReturnValue(api);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("calls the http_trigger routes with the right verbs and paths", async () => {
+    api.get.mockResolvedValue({ data: { id: "t1" } });
+    api.put.mockResolvedValue({ data: { id: "t1", secret: "o2wh_x" } });
+    api.delete.mockResolvedValue({ data: null });
+    api.post.mockResolvedValue({ data: { id: "c2", secret: "o2wh_y" } });
+
+    await workflows.getHttpTrigger(target);
+    await workflows.putHttpTrigger({ ...target, payload: { enabled: true, auth_mode: "token" } });
+    await workflows.deleteHttpTrigger(target);
+    await workflows.rotateHttpCredential({ ...target, overlap_seconds: 3600 });
+    await workflows.revokeHttpCredential({ ...target, credential_id: "c1" });
+    await workflows.revealHttpCredentialSecret({ ...target, credential_id: "c1" });
+
+    expect(api.get.mock.calls).toEqual([
+      ["/api/acme/workflows/wf1/http_trigger"],
+      ["/api/acme/workflows/wf1/http_trigger/credentials/c1/secret"],
+    ]);
+    expect(api.put.mock.calls).toEqual([
+      ["/api/acme/workflows/wf1/http_trigger", { enabled: true, auth_mode: "token" }],
+    ]);
+    expect(api.delete.mock.calls).toEqual([
+      ["/api/acme/workflows/wf1/http_trigger"],
+      ["/api/acme/workflows/wf1/http_trigger/credentials/c1"],
+    ]);
+    expect(api.post.mock.calls).toEqual([
+      ["/api/acme/workflows/wf1/http_trigger/credentials", { overlap_seconds: 3600 }],
+    ]);
+  });
+
+  it("unwraps a 200 body and marks it configured", async () => {
+    api.get.mockResolvedValue({ data: { id: "t1", enabled: true } });
+
+    await expect(workflows.getHttpTrigger(target)).resolves.toEqual({
+      id: "t1",
+      enabled: true,
+      configured: true,
+    });
+  });
+
+  it("a 404 not_configured resolves to configured:false with what the caller may do", async () => {
+    api.get.mockRejectedValue({
+      response: {
+        status: 404,
+        data: {
+          code: 404,
+          message: "No HTTP endpoint is configured for this workflow",
+          error_detail: "not_configured",
+          permissions,
+          org_rate_limit_per_minute: 1200,
+          secrets_encrypted_at_rest: false,
+        },
+      },
+    });
+
+    await expect(workflows.getHttpTrigger(target)).resolves.toEqual({
+      configured: false,
+      permissions,
+      org_rate_limit_per_minute: 1200,
+      secrets_encrypted_at_rest: false,
+    });
+  });
+
+  it("any other 404 still rejects", async () => {
+    const err = { response: { status: 404, data: { error_detail: "workflow_not_found" } } };
+    api.get.mockRejectedValue(err);
+
+    await expect(workflows.getHttpTrigger(target)).rejects.toBe(err);
+  });
+
+  it("putHttpTrigger keeps the flattened secret beside the config", async () => {
+    api.put.mockResolvedValue({ data: { id: "t1", enabled: true, secret: "o2wh_abc" } });
+
+    await expect(
+      workflows.putHttpTrigger({ ...target, payload: { enabled: true, auth_mode: "token" } }),
+    ).resolves.toEqual({ id: "t1", enabled: true, secret: "o2wh_abc", configured: true });
+  });
+
+  const jsonResponse = (status: number, body: unknown) =>
+    ({ status, text: async () => JSON.stringify(body) }) as unknown as Response;
+
+  it("dryRunHook uses fetch with credentials omitted, not the app client", async () => {
+    const input = { meta: { trigger_source: "http" }, data: [{ a: 1 }] };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse(200, { dry_run: true, accepted: true, input }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await dryRunHook({
+      url: "https://o2.example.com/api/v2/acme/workflows/hooks/t1",
+      auth: { mode: "token", token: "o2wh_secret" },
+      body: '{"a":1}',
+      contentType: "application/json",
+    });
+
+    expect(http).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("https://o2.example.com/api/v2/acme/workflows/hooks/t1");
+    expect(init).toMatchObject({ method: "POST", credentials: "omit", body: '{"a":1}' });
+    expect(init.headers).toEqual({
+      "Content-Type": "application/json",
+      "X-O2-Dry-Run": "true",
+      Authorization: "Bearer o2wh_secret",
+    });
+    expect(result).toEqual({ status: 200, reason: null, input, bodyBytes: 7 });
+  });
+
+  it("a 401 from dryRunHook does not dispatch logout", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          jsonResponse(401, { code: 401, message: "Unauthorized", error_detail: "unauthorized" }),
+        ),
+    );
+
+    const result = await dryRunHook({
+      url: "/api/v2/acme/workflows/hooks/t1",
+      auth: { mode: "token", token: "o2wh_wrong" },
+      body: "{}",
+      contentType: "application/json",
+    });
+
+    expect(http).not.toHaveBeenCalled();
+    expect(result).toEqual({ status: 401, reason: "unauthorized", input: null, bodyBytes: 2 });
+  });
+
+  it("dryRunHook maps a refusal reason and counts the body in bytes", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(jsonResponse(403, { error_detail: "workflow_not_published" })),
+    );
+
+    const result = await dryRunHook({
+      url: "/h",
+      auth: { mode: "token", token: "o2wh_t" },
+      body: '{"name":"é"}',
+      contentType: "application/json",
+    });
+
+    expect(result).toEqual({
+      status: 403,
+      reason: "workflow_not_published",
+      input: null,
+      bodyBytes: 13,
+    });
+  });
+
+  it("dryRunHook leaves an unknown reason or a non-JSON body as no reason", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ status: 502, text: async () => "<html>bad gateway</html>" }),
+    );
+
+    const result = await dryRunHook({
+      url: "/h",
+      auth: { mode: "token", token: "o2wh_t" },
+      body: "{}",
+      contentType: "application/json",
+    });
+
+    expect(result).toEqual({ status: 502, reason: null, input: null, bodyBytes: 2 });
+  });
+
+  it("dryRunHook signs a signed-mode request with the webhook headers", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { input: null }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(Date, "now").mockReturnValue(1614265330_000);
+    const secret = "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw";
+    const body = '{"test": 2432232314}';
+
+    await dryRunHook({
+      url: "/h",
+      auth: { mode: "signature", secret },
+      body,
+      contentType: "application/json",
+    });
+
+    const headers = fetchMock.mock.calls[0][1].headers;
+    expect(headers.Authorization).toBeUndefined();
+    expect(headers["webhook-id"]).toMatch(/^msg_[0-9a-f]{24}$/);
+    expect(headers["webhook-timestamp"]).toBe("1614265330");
+    expect(headers["webhook-signature"]).toBe(
+      await signWebhook(secret, headers["webhook-id"], 1614265330, body),
+    );
+  });
+
+  it("dryRunHook never logs the token", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(401, {})));
+    const spies = (["log", "info", "warn", "error", "debug"] as const).map((level) =>
+      vi.spyOn(console, level).mockImplementation(() => {}),
+    );
+
+    await dryRunHook({
+      url: "/h",
+      auth: { mode: "token", token: "o2wh_never_logged" },
+      body: "{}",
+      contentType: "application/json",
+    });
+
+    for (const spy of spies) {
+      expect(JSON.stringify(spy.mock.calls)).not.toContain("o2wh_never_logged");
+    }
   });
 });

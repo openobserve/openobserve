@@ -108,6 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           optional
         />
       </div>
+      <WorkflowHttpFieldHint v-if="httpOn" />
 
       <OButton variant="dashed" size="sm" data-test="workflow-branch-add-case" @click="addCase">
         <OIcon name="add" size="xs" />
@@ -131,7 +132,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref } from "vue";
+import { computed, ref } from "vue";
+import { useStore } from "vuex";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -145,7 +147,11 @@ import {
   currentTriggerKind,
   setNodeIncomplete,
 } from "@/plugins/workflows/useWorkflowCanvas";
-import { triggerDef } from "@/plugins/workflows/triggers";
+import { conditionFieldOptions } from "@/plugins/workflows/triggers";
+import { workflowHooksEnabled } from "@/plugins/workflows/httpEndpoint";
+import { httpEditorState } from "@/plugins/workflows/httpEndpointUi";
+import { httpQueryKeys } from "@/plugins/workflows/httpRequestSample";
+import WorkflowHttpFieldHint from "./WorkflowHttpFieldHint.vue";
 
 // The else arm's handle is fixed: `branchHandleRank` sorts it last on the canvas,
 // and a case can never claim it (case handles are always `case-N`).
@@ -158,6 +164,7 @@ interface CaseRow {
 }
 
 const { t } = useI18nTyped();
+const store = useStore();
 
 const tips: I18nText[] = [
   t("workflow.node.branchNoteFirstMatch"),
@@ -167,7 +174,12 @@ const tips: I18nText[] = [
 // Field options come from the CURRENT trigger's kind, exactly as WorkflowCondition
 // does; with no trigger we offer nothing rather than a wrong set.
 const kind = currentTriggerKind();
-const fields = kind ? triggerDef(kind).conditionFields : [];
+const httpOn = computed(
+  () => workflowHooksEnabled(store.state.zoConfig) && httpEditorState.endpointOn,
+);
+const fields = computed(() =>
+  conditionFieldOptions(kind, httpOn.value, t, httpQueryKeys(workflowObj.testRun.input)),
+);
 
 const saved = workflowObj.currentSelectedNodeData?.data?.cases;
 

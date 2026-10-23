@@ -15,8 +15,8 @@
 
 use config::meta::pipeline::components::{Edge, Node};
 use sea_orm::{
-    ColumnTrait, Condition, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set,
-    TransactionTrait, prelude::Expr, sea_query::Func,
+    ColumnTrait, Condition, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect,
+    Set, TransactionTrait, prelude::Expr, sea_query::Func,
 };
 use serde::{Deserialize, Serialize};
 
@@ -453,6 +453,38 @@ pub async fn delete_workflow(id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+pub async fn delete_all_for_org_in<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+) -> Result<u64, anyhow::Error> {
+    let mut deleted = workflow_errors::Entity::delete_many()
+        .filter(workflow_errors::Column::OrgId.eq(org_id))
+        .exec(db)
+        .await?
+        .rows_affected;
+    deleted += workflow_run_data::Entity::delete_many()
+        .filter(workflow_run_data::Column::OrgId.eq(org_id))
+        .exec(db)
+        .await?
+        .rows_affected;
+    deleted += workflow_associations::Entity::delete_many()
+        .filter(workflow_associations::Column::OrgId.eq(org_id))
+        .exec(db)
+        .await?
+        .rows_affected;
+    deleted += workflow_drafts::Entity::delete_many()
+        .filter(workflow_drafts::Column::OrgId.eq(org_id))
+        .exec(db)
+        .await?
+        .rows_affected;
+    deleted += workflows::Entity::delete_many()
+        .filter(workflows::Column::OrgId.eq(org_id))
+        .exec(db)
+        .await?
+        .rows_affected;
+    Ok(deleted)
+}
+
 pub async fn delete_all_errors_older_than(
     ts: i64,
 ) -> Result<Vec<WorkflowRunErrors>, anyhow::Error> {
@@ -852,5 +884,24 @@ pub async fn promote_draft_to_workflow(org_id: &str, draft: Workflow) -> Result<
         return Err(anyhow::anyhow!(e));
     }
 
+    Ok(())
+}
+
+#[cfg(any(test, feature = "test-utils"))]
+pub async fn create_tables_for_tests(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), sea_orm::DbErr> {
+    let backend = db.get_database_backend();
+    let schema = sea_orm::Schema::new(backend);
+    for mut table in [
+        schema.create_table_from_entity(workflows::Entity),
+        schema.create_table_from_entity(workflow_drafts::Entity),
+        schema.create_table_from_entity(workflow_errors::Entity),
+        schema.create_table_from_entity(workflow_associations::Entity),
+        schema.create_table_from_entity(workflow_run_data::Entity),
+    ] {
+        table.if_not_exists();
+        db.execute(backend.build(&table)).await?;
+    }
     Ok(())
 }

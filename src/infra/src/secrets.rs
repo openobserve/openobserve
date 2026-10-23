@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Encrypted, write-only secrets for outbound LLM integrations.
+//! Encrypted secrets for outbound integrations and workflow HTTP triggers.
 //!
 //! Versioned Remote Task and Remote Scorer configuration stores only a stable
 //! `secret_ref`. This module owns the mutable value behind that reference and
@@ -44,6 +44,7 @@ pub enum SecretOwnerKind {
     Task,
     Scorer,
     PromptWebhook,
+    WorkflowTrigger,
 }
 
 impl SecretOwnerKind {
@@ -52,6 +53,7 @@ impl SecretOwnerKind {
             Self::Task => "task",
             Self::Scorer => "scorer",
             Self::PromptWebhook => "prompt_webhook",
+            Self::WorkflowTrigger => "workflow_trigger",
         }
     }
 }
@@ -227,6 +229,7 @@ fn metadata(model: &Model) -> Result<SecretMetadata, SecretError> {
             "task" => SecretOwnerKind::Task,
             "scorer" => SecretOwnerKind::Scorer,
             "prompt_webhook" => SecretOwnerKind::PromptWebhook,
+            "workflow_trigger" => SecretOwnerKind::WorkflowTrigger,
             other => {
                 return Err(SecretError::Malformed(format!(
                     "unknown secret owner kind '{other}'"
@@ -345,6 +348,50 @@ pub async fn insert_prepared<C: ConnectionTrait>(
 ) -> Result<WrittenSecret, SecretError> {
     table::insert(db, prepared.active).await?;
     Ok(prepared.written)
+}
+
+/// A prepared signing row with placeholder ciphertext, for tests without an org DEK.
+#[cfg(any(test, feature = "test-utils"))]
+pub fn prepared_for_tests(
+    org_id: &str,
+    owner_kind: SecretOwnerKind,
+    owner_id: &str,
+) -> PreparedSecret {
+    let now = now_ms();
+    let metadata = SecretMetadata {
+        secret_ref: ider::generate(),
+        owner_kind,
+        owner_id: owner_id.to_string(),
+        purpose: SecretPurpose::Signing,
+        key_id: Some(generate_key_id()),
+        state: CURRENT.to_string(),
+        last_verified_at: None,
+        grace_expires_at: None,
+        created_at: now,
+        updated_at: now,
+    };
+    let active = ActiveModel {
+        id: Set(ider::generate()),
+        secret_ref: Set(metadata.secret_ref.clone()),
+        org_id: Set(org_id.to_string()),
+        owner_kind: Set(owner_kind.as_str().to_string()),
+        owner_id: Set(metadata.owner_id.clone()),
+        purpose: Set(SecretPurpose::Signing.as_str().to_string()),
+        key_id: Set(metadata.key_id.clone()),
+        state: Set(CURRENT.to_string()),
+        ciphertext: Set("test-ciphertext".to_string()),
+        last_verified_at: Set(None),
+        grace_expires_at: Set(None),
+        created_at: Set(now),
+        updated_at: Set(now),
+    };
+    PreparedSecret {
+        active,
+        written: WrittenSecret {
+            metadata,
+            material: generate_signing_material(),
+        },
+    }
 }
 
 /// Replace an auth credential in place. The stable reference and Task/Scorer
@@ -666,6 +713,34 @@ mod tests {
     #[test]
     fn grace_period_never_exceeds_twenty_four_hours() {
         assert_eq!(MAX_GRACE_MS, 86_400_000);
+    }
+
+    #[test]
+    fn workflow_trigger_owner_kind_round_trips() {
+        let kind = SecretOwnerKind::WorkflowTrigger;
+        assert_eq!(kind.as_str(), "workflow_trigger");
+        assert_eq!(
+            serde_json::to_string(&kind).unwrap(),
+            "\"workflow_trigger\""
+        );
+        let row = Model {
+            id: "value-1".to_string(),
+            secret_ref: "secret-1".to_string(),
+            org_id: "acme".to_string(),
+            owner_kind: kind.as_str().to_string(),
+            owner_id: "cred-1".to_string(),
+            purpose: SecretPurpose::Signing.as_str().to_string(),
+            key_id: Some("key-1".to_string()),
+            state: CURRENT.to_string(),
+            ciphertext: "encrypted".to_string(),
+            last_verified_at: None,
+            grace_expires_at: None,
+            created_at: 1,
+            updated_at: 1,
+        };
+        let safe = metadata(&row).expect("the owner kind parses back");
+        assert_eq!(safe.owner_kind, kind);
+        assert_eq!(safe.owner_id, "cred-1");
     }
 
     #[test]

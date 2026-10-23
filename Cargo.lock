@@ -8402,6 +8402,7 @@ dependencies = [
  "tikv-jemalloc-ctl",
  "time",
  "tokio",
+ "tokio-util",
  "tonic",
  "tracing",
  "tracing-opentelemetry",
@@ -13080,6 +13081,7 @@ checksum = "494815d09bf52b5548659851081238f0ca39ff638363907596da739561c62c52"
 dependencies = [
  "bytes",
  "futures-core",
+ "futures-io",
  "futures-sink",
  "libc",
  "pin-project-lite",

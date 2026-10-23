@@ -75,6 +75,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OBanner>
       </div>
 
+      <div v-if="hooksOn" class="flex flex-col gap-1">
+        <OSelect
+          v-model="payloadSelection"
+          :label="t('workflow.test.payloadFrom')"
+          :options="payloadFromOptions"
+          data-test="workflow-test-payload-from"
+        />
+        <OText variant="meta" as="p">{{ t("workflow.test.payloadFromHint") }}</OText>
+      </div>
+
       <!-- Sample input editor — fills the remaining drawer height -->
       <div class="flex min-h-0 flex-1 flex-col gap-1">
         <div class="flex items-center justify-between">
@@ -155,9 +165,13 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { workflowHooksEnabled } from "@/plugins/workflows/httpEndpoint";
+import { httpPreviewSample, type PayloadFrom } from "@/plugins/workflows/httpEndpointUi";
+import { isHttpRequestInput } from "@/plugins/workflows/httpRequestSample";
 
 import {
   workflowObj,
+  triggerDef,
   nodeMeta,
   executeTestRun,
   flowOrderedNodeIds,
@@ -173,8 +187,41 @@ import {
   persistTestData,
 } from "@/plugins/workflows/useWorkflowCanvas";
 
+const props = defineProps<{
+  /** Prefills the input (latest HTTP run, or the HTTP sample from the endpoint panel). */
+  seed?: unknown[];
+  payloadFrom?: PayloadFrom;
+  /** Received time (µs) of the HTTP run `seed` came from; unset for a generated sample. */
+  seedRunAt?: number;
+}>();
+
 const { t } = useI18nTyped();
 const store = useStore();
+
+const hooksOn = computed(() => workflowHooksEnabled(store.state.zoConfig));
+// "trigger" stands for a kind without variants; a kind with variants offers each variant key.
+const HTTP_CHOICE: PayloadFrom = "http";
+const KIND_CHOICE: PayloadFrom = "trigger";
+const kindVariants = triggerDef(currentTriggerKind()).sampleVariants ?? [];
+const firstKindChoice = kindVariants[0]?.key ?? KIND_CHOICE;
+const startsAsHttp =
+  props.payloadFrom === HTTP_CHOICE ||
+  (!props.payloadFrom && isHttpRequestInput(workflowObj.testRun.input));
+const payloadChoice = ref<string>(startsAsHttp ? HTTP_CHOICE : firstKindChoice);
+const payloadFromOptions = computed(() => {
+  const kindOptions = kindVariants.length
+    ? kindVariants.map((v) => ({ label: v.labelKey ? t(v.labelKey) : raw(v.key), value: v.key }))
+    : [{ label: t(triggerDef(currentTriggerKind()).labelKey), value: KIND_CHOICE }];
+  return [...kindOptions, { label: t("workflow.http.payloadHttp"), value: HTTP_CHOICE }];
+});
+// Every Test runs the in-memory graph; only the seeded payload changes.
+const payloadSelection = computed<string>({
+  get: () => payloadChoice.value,
+  set: (v) => {
+    payloadChoice.value = v;
+    seedSample();
+  },
+});
 
 const running = ref(false);
 // v-model:open — closing the dialog (X / overlay) clears the flag.
@@ -188,10 +235,14 @@ const edges = computed<any[]>(() => workflowObj.currentSelectedWorkflow?.edges |
 
 // Seed the sample payload the first time the dialog opens (persisted after).
 onMounted(() => {
-  if (!workflowObj.testRun.input) {
-    workflowObj.testRun.input = buildTriggerSampleText(currentTriggerKind());
-    workflowObj.testRun.inputSource = "sample";
-    workflowObj.testRun.inputRunLabel = "";
+  if (props.seed?.length) {
+    workflowObj.testRun.input = JSON.stringify(props.seed, null, 2);
+    workflowObj.testRun.inputSource = props.seedRunAt ? "run" : "sample";
+    workflowObj.testRun.inputRunLabel = props.seedRunAt
+      ? timestampToTimezoneDate(Math.floor(props.seedRunAt / 1000), store.state.timezone)
+      : "";
+  } else if (!workflowObj.testRun.input) {
+    seedSample();
   }
   // State persisted before this flag existed carries no value; pin it ON so the
   // safe default is explicit rather than inferred from undefined.
@@ -337,13 +388,21 @@ const run = async () => {
     });
 };
 
-const seedSample = () => {
-  workflowObj.testRun.input = buildTriggerSampleText(currentTriggerKind());
+function seedSample() {
+  const variant = kindVariants.find((v) => v.key === payloadChoice.value);
+  if (hooksOn.value && payloadChoice.value === HTTP_CHOICE) {
+    workflowObj.testRun.input = JSON.stringify(httpPreviewSample("test"), null, 2);
+  } else if (variant) {
+    workflowObj.testRun.input = JSON.stringify(variant.build(), null, 2);
+  } else {
+    workflowObj.testRun.input = buildTriggerSampleText(currentTriggerKind());
+  }
   workflowObj.testRun.inputSource = "sample";
   workflowObj.testRun.inputRunLabel = "";
-};
+}
 
 const resetSample = () => seedSample();
+
 const revertInput = () => seedSample();
 
 // The editor re-emits its own value on mount/format, so only a real text change

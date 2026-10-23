@@ -30,13 +30,16 @@ use tower::{Layer, Service};
 const SHARE_TOKEN_PREFIX: usize = 6;
 
 /// Request headers whose value is a credential and is never written to the log.
-const REDACTED_REQUEST_HEADERS: [&str; 5] = [
+const REDACTED_REQUEST_HEADERS: [&str; 6] = [
     "authorization",
     "proxy-authorization",
     "cookie",
     "x-api-key",
     "x-o2-mcp",
+    "webhook-signature",
 ];
+/// Workflow hook credentials; a URL value starting with one, in any case or encoding, is cut.
+const HOOK_CREDENTIAL_PREFIXES: [&str; 2] = ["o2wh_", "whsec_"];
 
 /// The access log format: `common`, `json`, or a custom one (%a %t %r %s %b %U %T %D %{Header}i/o).
 pub fn get_http_access_log_format() -> String {
@@ -306,8 +309,12 @@ pub fn mask_log_url(url: &str) -> String {
     mask_slack_callback_query(&mask_share_tokens(url))
 }
 
-/// `path` (or a URL) with every chat share token, a bearer credential, cut to a short prefix.
+/// `path` (or a URL) with every chat share token and hook credential cut to a short prefix.
 pub fn mask_share_tokens(path: &str) -> String {
+    mask_hook_credentials(&mask_chat_share_tokens(path))
+}
+
+fn mask_chat_share_tokens(path: &str) -> String {
     let segments: Vec<&str> = path.split('/').collect();
     let mut masked = Vec::with_capacity(segments.len());
     for (i, segment) in segments.iter().enumerate() {
@@ -326,6 +333,61 @@ pub fn mask_share_tokens(path: &str) -> String {
         masked.push(format!("{prefix}…{rest}"));
     }
     masked.join("/")
+}
+
+/// Cuts a hook credential that starts a path segment or a query value, up to its delimiter.
+fn mask_hook_credentials(url: &str) -> String {
+    let mut masked = String::with_capacity(url.len());
+    let mut rest = url;
+    let mut at_boundary = true;
+    while let Some(c) = rest.chars().next() {
+        if let Some(len) = at_boundary.then(|| credential_prefix_len(rest)).flatten() {
+            masked.push_str(&rest[..len]);
+            masked.push('…');
+            let end = rest.find(['/', '?', '&', '#']).unwrap_or(rest.len());
+            rest = &rest[end..];
+            at_boundary = false;
+            continue;
+        }
+        masked.push(c);
+        at_boundary = matches!(c, '/' | '?' | '&' | '=');
+        rest = &rest[c.len_utf8()..];
+    }
+    masked
+}
+
+/// Raw length of the start of `value` that decodes to a hook credential prefix, if it does.
+fn credential_prefix_len(value: &str) -> Option<usize> {
+    let raw = value.as_bytes();
+    let mut decoded = Vec::new();
+    let mut used = 0;
+    while used < raw.len() {
+        let escaped = (raw[used] == b'%')
+            .then(|| Some((hex_digit(*raw.get(used + 1)?)? << 4) | hex_digit(*raw.get(used + 2)?)?))
+            .flatten();
+        let (byte, width) = escaped.map_or((raw[used], 1), |byte| (byte, 3));
+        decoded.push(byte.to_ascii_lowercase());
+        used += width;
+        if HOOK_CREDENTIAL_PREFIXES
+            .iter()
+            .any(|p| p.as_bytes() == decoded)
+        {
+            return Some(used);
+        }
+        if !HOOK_CREDENTIAL_PREFIXES
+            .iter()
+            .any(|p| p.as_bytes().starts_with(&decoded))
+        {
+            return None;
+        }
+    }
+    None
+}
+
+fn hex_digit(byte: u8) -> Option<u8> {
+    char::from(byte)
+        .to_digit(16)
+        .and_then(|digit| u8::try_from(digit).ok())
 }
 
 /// A Slack callback's `code` and `state` are one-time OAuth secrets the SPA sends as Referer.
@@ -392,6 +454,75 @@ mod tests {
         ] {
             assert_eq!(mask_share_tokens(untouched), untouched);
         }
+    }
+
+    #[test]
+    fn hook_tokens_in_path_and_query_are_masked() {
+        let token = "o2wh_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcde";
+        let secret = "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw";
+        for (url, masked) in [
+            (
+                format!("/api/v2/acme/workflows/hooks/{token}"),
+                "/api/v2/acme/workflows/hooks/o2wh_…".to_string(),
+            ),
+            (
+                format!("/api/v2/acme/workflows/hooks/t1?token={token}&k=v"),
+                "/api/v2/acme/workflows/hooks/t1?token=o2wh_…&k=v".to_string(),
+            ),
+            (
+                format!("/api/v2/acme/workflows/hooks/t1/runs/r1?s={secret}#x"),
+                "/api/v2/acme/workflows/hooks/t1/runs/r1?s=whsec_…#x".to_string(),
+            ),
+            (format!("/x/{secret}/y"), "/x/whsec_…/y".to_string()),
+        ] {
+            assert_eq!(mask_log_url(&url), masked);
+            assert_eq!(mask_share_tokens(&url), masked);
+            assert!(!mask_share_tokens(&url).contains(&token[5..]));
+            assert!(!mask_share_tokens(&url).contains(&secret[6..]));
+        }
+        for untouched in [
+            "/api/v2/acme/workflows/hooks/t1?key=o2wh",
+            "/api/v2/acme/workflows/hooks/xo2wh_abc",
+            "/api/v2/acme/workflows/hooks/t1?v=awhsec_x",
+        ] {
+            assert_eq!(mask_share_tokens(untouched), untouched);
+        }
+    }
+
+    #[test]
+    fn encoded_or_uppercase_hook_credentials_are_masked() {
+        let tail = "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcde";
+        for (url, masked) in [
+            (
+                format!("/api/v2/acme/workflows/hooks/t1?token=o2wh%5F{tail}&k=v"),
+                "/api/v2/acme/workflows/hooks/t1?token=o2wh%5F…&k=v",
+            ),
+            (
+                format!("/api/v2/acme/workflows/hooks/t1?s=WHSEC%5f{tail}"),
+                "/api/v2/acme/workflows/hooks/t1?s=WHSEC%5f…",
+            ),
+            (
+                format!("/api/v2/acme/workflows/hooks/O2WH_{tail}"),
+                "/api/v2/acme/workflows/hooks/O2WH_…",
+            ),
+            (
+                format!("/api/v2/acme/workflows/hooks/t1?v=%6F2wh_{tail}"),
+                "/api/v2/acme/workflows/hooks/t1?v=%6F2wh_…",
+            ),
+        ] {
+            assert_eq!(mask_log_url(&url), masked);
+            assert!(!mask_share_tokens(&url).contains(tail), "{url}");
+        }
+        assert_eq!(
+            mask_share_tokens("/api/v2/acme/workflows/hooks/t1?v=o2wh%5"),
+            "/api/v2/acme/workflows/hooks/t1?v=o2wh%5"
+        );
+    }
+
+    #[test]
+    fn webhook_signature_header_is_redacted() {
+        assert!(REDACTED_REQUEST_HEADERS.contains(&"webhook-signature"));
+        assert!(REDACTED_REQUEST_HEADERS.contains(&"authorization"));
     }
 
     #[test]

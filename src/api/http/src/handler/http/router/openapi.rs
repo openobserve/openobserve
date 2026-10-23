@@ -857,6 +857,13 @@ pub struct ApiDoc;
     openobserve_api_management::request::workflows::enable_workflow,
     openobserve_api_management::request::workflows::get_workflow_history,
     openobserve_api_management::request::workflows::promote_draft,
+    openobserve_api_management::request::workflows::http_trigger::get_http_trigger,
+    openobserve_api_management::request::workflows::http_trigger::put_http_trigger,
+    openobserve_api_management::request::workflows::http_trigger::delete_http_trigger,
+    openobserve_api_management::request::workflows::http_trigger::rotate_http_credential,
+    openobserve_api_management::request::workflows::http_trigger::revoke_http_credential,
+    openobserve_api_management::request::workflows::http_trigger::reveal_http_credential_secret,
+    openobserve_api_management::request::workflows::http_trigger::test_http_trigger,
 ))]
 #[openapi(components(schemas(
     openobserve_api_management::models::experiments::ExperimentResultRowSortBody,
@@ -1140,6 +1147,22 @@ mod tests {
         ("/api/{org_id}/workflows/{id}/enable", "put"),
         ("/api/{org_id}/workflows/{id}/history", "get"),
         ("/api/{org_id}/workflows/promote/{id}", "post"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "get"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "put"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "delete"),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials",
+            "post",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}",
+            "delete",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}/secret",
+            "get",
+        ),
+        ("/api/{org_id}/workflows/{id}/http_trigger/test", "post"),
     ];
 
     /// Canonical `ApiGroupOperation` values; anything else is an alias or drops the route.
@@ -1161,6 +1184,33 @@ mod tests {
         ("/api/{org_id}/workflows/{id}/enable", "put", "update"),
         ("/api/{org_id}/workflows/{id}/history", "get", "get"),
         ("/api/{org_id}/workflows/promote/{id}", "post", "update"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "get", "get"),
+        ("/api/{org_id}/workflows/{id}/http_trigger", "put", "update"),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger",
+            "delete",
+            "delete",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials",
+            "post",
+            "update",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}",
+            "delete",
+            "delete",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}/secret",
+            "get",
+            "get",
+        ),
+        (
+            "/api/{org_id}/workflows/{id}/http_trigger/test",
+            "post",
+            "create",
+        ),
     ];
 
     const SLACK_OPERATIONS: &[(&str, &str)] = &[
@@ -1794,6 +1844,9 @@ mod tests {
     fn workflows_document_the_statuses_their_handlers_return() {
         let base = "/api/{org_id}/workflows";
         let by_id = "/api/{org_id}/workflows/{id}";
+        let http_trigger = "/api/{org_id}/workflows/{id}/http_trigger";
+        let credentials = "/api/{org_id}/workflows/{id}/http_trigger/credentials";
+        let credential = "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}";
         assert_documented_statuses(&[
             (base, "post", &["200", "400", "403", "500"]),
             (base, "get", &["200", "403", "500"]),
@@ -1808,7 +1861,7 @@ mod tests {
             (
                 "/api/{org_id}/workflows/{id}/trigger",
                 "post",
-                &["200", "400"],
+                &["200", "400", "409"],
             ),
             (
                 "/api/{org_id}/workflows/{id}/errors/{run_id}",
@@ -1834,6 +1887,29 @@ mod tests {
                 "/api/{org_id}/workflows/promote/{id}",
                 "post",
                 &["201", "400", "403", "500"],
+            ),
+            (http_trigger, "get", &["200", "404", "500"]),
+            (
+                http_trigger,
+                "put",
+                &["200", "201", "400", "403", "404", "500"],
+            ),
+            (http_trigger, "delete", &["204", "404", "500"]),
+            (
+                credentials,
+                "post",
+                &["201", "400", "403", "404", "409", "500"],
+            ),
+            (credential, "delete", &["204", "404", "500"]),
+            (
+                "/api/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}/secret",
+                "get",
+                &["200", "403", "404", "500"],
+            ),
+            (
+                "/api/{org_id}/workflows/{id}/http_trigger/test",
+                "post",
+                &["200", "400", "404", "500"],
             ),
         ]);
     }

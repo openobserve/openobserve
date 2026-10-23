@@ -21,10 +21,11 @@
 
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 
-const { mockList, mockToast, mockRetry } = vi.hoisted(() => ({
+const { mockList, mockToast, mockRetry, mockGetHttp } = vi.hoisted(() => ({
   mockList: vi.fn().mockResolvedValue({ data: [] }),
   mockToast: vi.fn(),
   mockRetry: vi.fn().mockResolvedValue({ data: {} }),
+  mockGetHttp: vi.fn().mockResolvedValue({ configured: false }),
 }));
 
 vi.mock("@/services/workflows", async (importOriginal) => {
@@ -33,6 +34,7 @@ vi.mock("@/services/workflows", async (importOriginal) => {
     default: {
       getWorkflowHistory: (...a: any[]) => mockList(...a),
       retryWorkflow: (...a: any[]) => mockRetry(...a),
+      getHttpTrigger: (...a: any[]) => mockGetHttp(...a),
     },
   });
 });
@@ -103,8 +105,13 @@ const globalCfg = {
   plugins: [i18n, store],
   stubs: {
     OTable: OTableStub,
-    OTimeCell: stub("OTimeCell", ["value", "unit", "mode", "timezone", "emptyLabel"]),
+    OTimeCell: stub("OTimeCell", ["value", "unit", "mode", "timezone", "emptyLabel", "format"]),
     OBadge: stub("OBadge", ["variant", "size"]),
+    OTag: {
+      name: "OTag",
+      props: ["type", "value", "size", "label", "variant", "icon"],
+      template: `<b class="o-tag">{{ value }}</b>`,
+    },
     OButton: stub("OButton", ["variant", "size", "iconLeft", "loading"]),
     OTooltip: stub("OTooltip", ["side", "content"]),
     DateTime: DateTimeStub,
@@ -284,8 +291,22 @@ describe("test runs are filtered out of run history by default", () => {
   const toggle = (w: any) => w.find('[data-test="workflow-runs-show-test"]');
 
   const mixed = [
-    { run_id: "real", event_type: "AlertFired", start_time: 1, end_time: 2, error: null },
-    { run_id: "test", event_type: "Test", start_time: 3, end_time: 4, error: null },
+    {
+      run_id: "real",
+      event_type: "AlertFired",
+      start_time: 1,
+      end_time: 2,
+      error: null,
+      status: "succeeded",
+    },
+    {
+      run_id: "test",
+      event_type: "Test",
+      start_time: 3,
+      end_time: 4,
+      error: null,
+      status: "succeeded",
+    },
   ];
 
   beforeEach(() => {
@@ -349,6 +370,7 @@ describe("run error text names nodes readably", () => {
     start_time: 1,
     end_time: 2,
     error: "errors in nodes: 2d127ed5-b02a-48ab-8839-10f9d58de3f6",
+    status: "failed",
   };
 
   // The reason renders in the status cell's tooltip, so drive that cell and read
@@ -398,7 +420,7 @@ describe("run error text names nodes readably", () => {
 
   // No error, no tooltip — a successful run must not carry an empty explanation.
   it("renders no reason tooltip on a run that did not fail", async () => {
-    expect(await errorText({ ...errRun, error: null })).toBe("");
+    expect(await errorText({ ...errRun, error: null, status: "succeeded" })).toBe("");
   });
 });
 
@@ -413,6 +435,7 @@ describe("WorkflowRunsPanel — retry row action", () => {
     end_time: 2000,
     error: "errors in nodes: abc",
     event_type: "AlertFired",
+    status: "failed",
     ...over,
   });
 
@@ -452,7 +475,7 @@ describe("WorkflowRunsPanel — retry row action", () => {
   });
 
   it("does NOT offer retry on a successful run", async () => {
-    const w = await rowsFor([run({ error: "" })]);
+    const w = await rowsFor([run({ error: "", status: "succeeded" })]);
     expect(w.find('[data-test="workflow-run-retry-r-1"]').exists()).toBe(false);
   });
 
@@ -788,6 +811,7 @@ describe("WorkflowRunsPanel — a failure still explains itself", () => {
     end_time: 2000,
     error: "boom in node abc",
     event_type: "AlertFired",
+    status: "failed",
   };
 
   beforeEach(() => {
@@ -830,5 +854,383 @@ describe("WorkflowRunsPanel — a failure still explains itself", () => {
     const tip = w.findComponent({ name: "OTooltip" });
     expect(tip.exists()).toBe(true);
     expect(String(tip.props("content"))).toContain("boom in node");
+  });
+});
+
+// ── Stored statuses and HTTP request runs (AC-WEB-06, AC-UI-10) ────────────────
+describe("WorkflowRunsPanel — stored statuses and HTTP request runs", () => {
+  const facts = (over: Record<string, any> = {}) => ({
+    credential_prefix: "o2wh_4fK9…oI4k",
+    caller_ip: "203.0.113.24",
+    idempotency_key: "deploy-d-4821",
+    content_type: "application/json",
+    body_bytes: 68,
+    status: "failed",
+    error: null,
+    ...over,
+  });
+  const row = (over: Record<string, any>) => ({
+    start_time: 1000,
+    end_time: 2000,
+    _timestamp: 1000,
+    error: null,
+    status: "succeeded",
+    event_type: "AlertFired",
+    ...over,
+  });
+  const httpRows = [
+    row({
+      run_id: "0193f2e8-aaaa",
+      event_type: "Webhook",
+      status: "queued",
+      http_request: facts({ status: "queued", idempotency_key: "deploy-d-4825" }),
+    }),
+    row({
+      run_id: "0193f25e-bbbb",
+      event_type: "Webhook",
+      status: "expired",
+      http_request: facts({ status: "expired", idempotency_key: null, caller_ip: "198.51.100.7" }),
+    }),
+    row({
+      run_id: "0193f1f9-cccc",
+      event_type: "Webhook",
+      status: "failed",
+      error: "worker_lost",
+      http_request: facts({ error: "worker_lost", idempotency_key: "deploy-d-4818" }),
+    }),
+    row({
+      run_id: "0193f2c4-dddd",
+      event_type: "Webhook",
+      status: "failed",
+      error: "FunctionNode JS error",
+      http_request: facts({ error: "node_errored" }),
+    }),
+    row({ run_id: "alert-1", event_type: "AlertFired" }),
+    row({ run_id: "retry-1", event_type: "Retry" }),
+  ];
+
+  // Renders every declared column's cell slot so each cell is assertable.
+  const CellTable = {
+    ...OTableStub,
+    template: `<div class="o-table">
+      <slot name="empty" v-if="!data || data.length === 0" />
+      <div v-for="r in data" :key="r.run_id" class="o-row" :data-run="r.run_id">
+        <span v-for="c in columns" :key="c.id" :class="'c-' + c.id">
+          <slot :name="'cell-' + c.id" :row="r" :value="r[c.accessorKey]" />
+        </span>
+      </div>
+    </div>`,
+  };
+  const ToggleGroupStub = {
+    name: "OToggleGroup",
+    props: ["modelValue", "type", "mobileDropdown"],
+    emits: ["update:modelValue"],
+    template: `<div class="o-toggle" v-bind="$attrs"><slot /></div>`,
+  };
+  const ToggleItemStub = {
+    name: "OToggleGroupItem",
+    props: ["value", "size", "iconLeft"],
+    template: `<span class="o-toggle-item" v-bind="$attrs"><slot /></span>`,
+  };
+  const SearchStub = {
+    name: "OSearchInput",
+    props: ["modelValue", "placeholder", "size", "clearable"],
+    emits: ["update:modelValue"],
+    template: `<input class="o-search" v-bind="$attrs" />`,
+  };
+  const EmptyStub = {
+    name: "OEmptyState",
+    props: ["preset", "title", "description", "actionLabel", "icon", "size", "filtered"],
+    emits: ["action"],
+    template: `<div class="o-empty" v-bind="$attrs">{{ title }}</div>`,
+  };
+
+  const mounted: any[] = [];
+  const mountHttp = async (list: any[] = httpRows) => {
+    mockList.mockResolvedValue({ data: list });
+    const w = mount(WorkflowRunsPanel, {
+      props: { orgId: "default", workflowId: "wf-http" },
+      global: {
+        ...globalCfg,
+        stubs: {
+          ...globalCfg.stubs,
+          OTable: CellTable,
+          OToggleGroup: ToggleGroupStub,
+          OToggleGroupItem: ToggleItemStub,
+          OSearchInput: SearchStub,
+          OEmptyState: EmptyStub,
+          OTooltip: {
+            name: "OTooltip",
+            props: ["side", "content", "maxWidth"],
+            template: `<i><slot /></i>`,
+          },
+        },
+      },
+    });
+    mounted.push(w);
+    await flushPromises();
+    return w;
+  };
+  const colIds = (w: any) =>
+    (w.findComponent(CellTable as any).props("columns") as any[]).map((c) => c.id);
+  const rowIds = (w: any) =>
+    (w.findComponent(CellTable as any).props("data") as any[]).map((r) => r.run_id);
+  const setFilter = async (w: any, value: string) => {
+    w.findComponent(ToggleGroupStub as any).vm.$emit("update:modelValue", value);
+    await flushPromises();
+  };
+  const filter = (w: any) => w.find('[data-test="workflow-runs-trigger-filter"]');
+
+  beforeEach(() => {
+    mockList.mockClear();
+    mockRetry.mockClear();
+    mockGetHttp.mockReset();
+    mockGetHttp.mockResolvedValue({ configured: false });
+    (store.state as any).zoConfig.workflow_hooks_enabled = true;
+    workflowObj.runsHistory = {
+      list: [],
+      fetchedAt: 0,
+      params: { start: 0, end: 0 },
+      loading: false,
+    };
+    workflowObj.currentSelectedWorkflow = {
+      ...workflowObj.currentSelectedWorkflow,
+      id: "wf-http",
+      isDraft: false,
+      http_endpoint_enabled: false,
+      nodes: [
+        {
+          id: "trig",
+          data: { node_type: "workflow_trigger", trigger_kind: "alert_fired" },
+        },
+      ],
+    };
+  });
+
+  afterEach(() => {
+    while (mounted.length) mounted.pop().unmount();
+    delete (store.state as any).zoConfig.workflow_hooks_enabled;
+  });
+
+  it("status comes from the stored status field", async () => {
+    const w = await mountHttp([row({ run_id: "s-1", status: "succeeded", error: "warning text" })]);
+    expect(w.find('[data-run="s-1"] .c-status .o-tag').text()).toBe("succeeded");
+  });
+
+  it("an errored row stored as succeeded renders Failed (server-normalised fixture)", async () => {
+    const w = await mountHttp([row({ run_id: "s-2", status: "failed", error: "boom" })]);
+    const tag = w.find('[data-run="s-2"] .c-status').findComponent({ name: "OTag" });
+    expect(tag.props("type")).toBe("hookRunStatus");
+    expect(tag.props("value")).toBe("failed");
+  });
+
+  it("feeds the timeline from the stored status", async () => {
+    const w = await mountHttp([
+      row({ run_id: "t-1", status: "failed", error: null }),
+      row({ run_id: "t-2", status: "succeeded", error: "x" }),
+      row({ run_id: "t-3", status: "queued", error: null }),
+      row({ run_id: "t-4", status: "running", error: null }),
+      row({ run_id: "t-5", status: "expired", error: null }),
+      row({ run_id: "t-6", status: "failed", error: "worker_lost" }),
+    ]);
+    const hist = w.findComponent({ name: "WorkflowExecutionTimeline" }).props("history") as {
+      status: string;
+    }[];
+    expect(hist.map((h) => h.status)).toEqual([
+      "error",
+      "success",
+      "pending",
+      "pending",
+      "skipped",
+      "error",
+    ]);
+  });
+
+  it("hides the trigger filter on a workflow that never had an endpoint", async () => {
+    const w = await mountHttp([row({ run_id: "alert-1" })]);
+    expect(filter(w).exists()).toBe(false);
+    expect(colIds(w)).toContain("event_type");
+  });
+
+  it("hides the trigger filter while hooks are off on the server", async () => {
+    delete (store.state as any).zoConfig.workflow_hooks_enabled;
+    const w = await mountHttp();
+    expect(filter(w).exists()).toBe(false);
+    expect(mockGetHttp.mock.calls.filter((c) => c[0]?.id === "wf-http")).toHaveLength(0);
+  });
+
+  it("shows All triggers / the kind / HTTP request once the workflow had HTTP runs", async () => {
+    const w = await mountHttp();
+    expect(filter(w).exists()).toBe(true);
+    for (const id of ["all", "alert_fired", "http_request"])
+      expect(w.find(`[data-test="workflow-runs-trigger-filter-${id}"]`).exists()).toBe(true);
+    expect(w.find('[data-test="workflow-runs-trigger-filter-alert_fired"]').text()).toBe(
+      "Alert fired",
+    );
+  });
+
+  it("shows the trigger filter for an endpoint that exists but has no runs in range", async () => {
+    mockGetHttp.mockResolvedValue({ configured: true, enabled: false });
+    const w = await mountHttp([row({ run_id: "alert-1" })]);
+    expect(mockGetHttp.mock.calls.some((c) => c[0]?.id === "wf-http")).toBe(true);
+    expect(filter(w).exists()).toBe(true);
+  });
+
+  it("names each run's source in words under All triggers", async () => {
+    const w = await mountHttp();
+    expect(colIds(w)).toContain("source");
+    expect(colIds(w)).not.toContain("event_type");
+    expect(w.find('[data-run="0193f2c4-dddd"] .c-source').text()).toBe("HTTP request");
+    expect(w.find('[data-run="alert-1"] .c-source').text()).toBe("Alert fired");
+  });
+
+  it("the HTTP filter swaps the columns and widens the panel", async () => {
+    const w = await mountHttp();
+    await setFilter(w, "http_request");
+    expect(colIds(w)).toEqual([
+      "received",
+      "status",
+      "run_id",
+      "caller",
+      "idempotency_key",
+      "actions",
+    ]);
+    expect(w.emitted("update:triggerFilter")?.at(-1)).toEqual(["http_request"]);
+    expect(rowIds(w)).not.toContain("alert-1");
+    expect(rowIds(w)).not.toContain("retry-1");
+  });
+
+  it("dates Started and Received like the mockups (Oct 21, 09:39)", async () => {
+    const w = await mountHttp();
+    const started = w
+      .find('[data-run="alert-1"] .c-start_time')
+      .findComponent({ name: "OTimeCell" });
+    expect(started.props("format")).toBe("MMM d, HH:mm");
+    await setFilter(w, "http_request");
+    const received = w
+      .find('[data-run="0193f2c4-dddd"] .c-received')
+      .findComponent({ name: "OTimeCell" });
+    expect(received.props("format")).toBe("MMM d, HH:mm");
+  });
+
+  // Measured in the built UI: a 32rem panel leaves the table 494 px, and OTable floors the actions column at 84.
+  it("names the source layout so the page can give it a 32rem panel its columns fit", async () => {
+    const w = await mountHttp();
+    expect(w.emitted("layout")?.at(-1)).toEqual(["source"]);
+    const cols = w.findComponent(CellTable as any).props("columns") as any[];
+    const total = cols.reduce(
+      (sum, c) => sum + (c.id === "actions" ? Math.max(c.size, 84) : c.size),
+      0,
+    );
+    expect(total).toBeLessThanOrEqual(494);
+    const size = (id: string) => cols.find((c) => c.id === id).size;
+    // Content measured in the built UI: Started 90, Source 92, Running chip 68, Duration header and sort icon 72, plus 16-22 px padding.
+    expect(size("start_time")).toBeGreaterThanOrEqual(112);
+    expect(size("source")).toBeGreaterThanOrEqual(112);
+    expect(size("status")).toBeGreaterThanOrEqual(96);
+    // The Duration header with its sort icon, and a "14m 52s" value.
+    expect(size("duration")).toBeGreaterThanOrEqual(88);
+    await setFilter(w, "http_request");
+    expect(w.emitted("layout")?.at(-1)).toEqual(["http"]);
+  });
+
+  it("a reason line wraps under its chip instead of cutting off", async () => {
+    const w = await mountHttp();
+    expect(w.find('[data-test="workflow-run-reason-0193f25e-bbbb"]').classes()).toContain(
+      "whitespace-normal",
+    );
+  });
+
+  it("a run that never started or has not finished shows no duration", async () => {
+    const w = await mountHttp();
+    for (const id of ["0193f2e8-aaaa", "0193f25e-bbbb"])
+      expect(w.find(`[data-run="${id}"] .c-duration`).text()).toBe("—");
+    expect(w.find('[data-run="alert-1"] .c-duration').text()).not.toBe("—");
+  });
+
+  it("a kind filter keeps that kind's runs only", async () => {
+    const w = await mountHttp();
+    await setFilter(w, "alert_fired");
+    expect(rowIds(w)).toEqual(["alert-1"]);
+  });
+
+  it("shows the caller as the credential prefix over the caller IP, and — for a missing key", async () => {
+    const w = await mountHttp();
+    await setFilter(w, "http_request");
+    const caller = w.find('[data-run="0193f25e-bbbb"] .c-caller').text();
+    expect(caller).toContain("o2wh_4fK9…oI4k");
+    expect(caller).toContain("198.51.100.7");
+    expect(w.find('[data-run="0193f25e-bbbb"] .c-idempotency_key').text()).toBe("—");
+    expect(w.find('[data-run="0193f2c4-dddd"] .c-run_id').text()).toContain("0193f2c4");
+    expect(w.find('[data-run="0193f2c4-dddd"] .c-run_id').text()).not.toContain("dddd");
+  });
+
+  it("expired rows show never ran, worker-lost rows say they are not re-run", async () => {
+    const w = await mountHttp();
+    expect(w.find('[data-test="workflow-run-reason-0193f25e-bbbb"]').text()).toBe(
+      "never ran · queued over 1 h",
+    );
+    expect(w.find('[data-test="workflow-run-reason-0193f1f9-cccc"]').text()).toBe(
+      "worker lost · not re-run",
+    );
+    expect(w.find('[data-test="workflow-run-reason-0193f2c4-dddd"]').exists()).toBe(false);
+  });
+
+  it("retry is hidden for never-executed runs", async () => {
+    const w = await mountHttp();
+    expect(w.find('[data-test="workflow-run-retry-0193f25e-bbbb"]').exists()).toBe(false);
+    expect(w.find('[data-test="workflow-run-retry-0193f1f9-cccc"]').exists()).toBe(false);
+    expect(w.find('[data-test="workflow-run-retry-0193f2e8-aaaa"]').exists()).toBe(false);
+    expect(w.find('[data-test="workflow-run-retry-0193f2c4-dddd"]').exists()).toBe(true);
+  });
+
+  it("search under the HTTP filter matches a run id prefix or an idempotency key", async () => {
+    const w = await mountHttp();
+    expect(w.find('[data-test="workflow-runs-search"]').exists()).toBe(false);
+    await setFilter(w, "http_request");
+    const search = w.findComponent(SearchStub as any);
+    expect(search.attributes("data-test")).toBe("workflow-runs-search");
+    search.vm.$emit("update:modelValue", "DEPLOY-D-4825");
+    await flushPromises();
+    expect(rowIds(w)).toEqual(["0193f2e8-aaaa"]);
+    search.vm.$emit("update:modelValue", "0193f2c4");
+    await flushPromises();
+    expect(rowIds(w)).toEqual(["0193f2c4-dddd"]);
+  });
+
+  it("an empty HTTP filter says so and offers all triggers back", async () => {
+    mockGetHttp.mockResolvedValue({ configured: true, enabled: true });
+    const w = await mountHttp([row({ run_id: "alert-1" })]);
+    await setFilter(w, "http_request");
+    const empty = w.findComponent(EmptyStub as any);
+    expect(empty.attributes("data-test")).toBe("workflow-runs-http-empty");
+    expect(empty.props("title")).toBe("No HTTP requests in this time range");
+    expect(empty.props("actionLabel")).toBe("Show all triggers");
+    empty.vm.$emit("action");
+    await flushPromises();
+    expect(w.emitted("update:triggerFilter")?.at(-1)).toEqual(["all"]);
+    expect(rowIds(w)).toEqual(["alert-1"]);
+  });
+
+  // OTable reads show-index once at setup, so a layout change has to remount it.
+  it("remounts the table when the column set changes", async () => {
+    const w = await mountHttp();
+    const before = w.findComponent(CellTable as any).vm;
+    await setFilter(w, "http_request");
+    expect(w.findComponent(CellTable as any).vm).not.toBe(before);
+  });
+
+  it("the Source and HTTP column sets fit their panel widths", async () => {
+    const w = await mountHttp();
+    const total = () =>
+      (w.findComponent(CellTable as any).props("columns") as any[]).reduce(
+        (sum, c) => sum + (c.size ?? 0),
+        0,
+      );
+    expect(w.findComponent(CellTable as any).props("showIndex")).toBe(false);
+    // The panel inner width is its rem width minus p-2 padding and the 1px border.
+    expect(total()).toBeLessThanOrEqual(494);
+    await setFilter(w, "http_request");
+    expect(total()).toBeLessThanOrEqual(716);
   });
 });

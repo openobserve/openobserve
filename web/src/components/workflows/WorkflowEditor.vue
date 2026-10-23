@@ -160,6 +160,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </button>
           </template>
         </WorkflowRunSwitcher>
+        <!-- Wrapper mode: a child tooltip after icon-left anchors to the icon alone -->
+        <OTooltip
+          v-if="showHttpButton"
+          side="bottom"
+          :content="httpTooltip"
+          :disabled="!httpTooltip"
+        >
+          <OButton
+            variant="outline"
+            size="sm-action"
+            icon-left="webhook"
+            data-test="workflow-editor-http-endpoint"
+            @click="httpEditorState.panelOpen = true"
+          >
+            {{ t("workflow.http.editorButton") }}
+            <OTag
+              v-if="httpChip"
+              :variant="httpChip === 'success' ? 'success-soft' : 'warning-soft'"
+              size="sm"
+              :label="t('workflow.http.editorButtonOn')"
+              data-test="workflow-editor-http-endpoint-chip"
+            />
+          </OButton>
+        </OTooltip>
         <OButton
           variant="outline"
           size="sm-action"
@@ -254,6 +278,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :search-placeholder="t('workflow.node.stepSearchPlaceholder')"
       :no-match-text="t('workflow.node.stepNoMatch')"
       test-prefix="workflow-step"
+      :footnote="pickerFootnote"
+      footnote-icon="webhook"
+      footnote-test-id="workflow-step-picker-http-cue"
       @pick="onStepPick"
       @close="closeStepPicker"
     />
@@ -267,7 +294,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          current graph (sent whole, no save needed). Results render as ✓ / error
          badges on the canvas nodes, and open in the results dock (T4) — clicking a
          node badge selects that step in the dock rather than opening an overlay. -->
-    <WorkflowTestDialog v-if="workflowObj.testRun.show" />
+    <WorkflowTestDialog
+      v-if="workflowObj.testRun.show"
+      :seed="testSeed"
+      :payload-from="testPayloadFrom"
+      :seed-run-at="testSeedRunAt"
+    />
+
+    <WorkflowHttpEndpointPanel
+      v-if="hooksOn"
+      :open="httpEditorState.panelOpen"
+      :workflow-id="workflowObj.currentSelectedWorkflow.id || null"
+      :workflow-name="workflowObj.currentSelectedWorkflow.name || ''"
+      :kind="httpKind"
+      :is-draft-only="!!workflowObj.currentSelectedWorkflow.isDraft"
+      :workflow-enabled="workflowObj.currentSelectedWorkflow.enabled !== false"
+      context="editor"
+      :before-create="persistDraft"
+      :trigger-node-id="httpTriggerNodeId"
+      @update:open="httpEditorState.panelOpen = $event"
+      @run-test="onHttpRunTest"
+    />
 
     <!-- Link-to-alerts prompt — shown once, right after a workflow is created, so
          the user can attach it to existing alerts without leaving for the alert
@@ -306,7 +353,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, ref } from "vue";
+import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
+import { useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter, onBeforeRouteLeave, type RouteLocationRaw } from "vue-router";
 import { useStore } from "vuex";
@@ -318,7 +366,16 @@ import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import WorkflowHttpEndpointPanel from "./WorkflowHttpEndpointPanel.vue";
+import { workflowHttpTriggerQuery } from "@/services/workflows.queries";
+import { workflowHooksEnabled } from "@/plugins/workflows/httpEndpoint";
+import {
+  httpEditorState,
+  resetHttpEditorState,
+  type PayloadFrom,
+} from "@/plugins/workflows/httpEndpointUi";
 
 import WorkflowCanvas from "@/plugins/workflows/WorkflowCanvas.vue";
 import WorkflowNodeDrawer from "./WorkflowNodeDrawer.vue";
@@ -338,6 +395,7 @@ import useWorkflowCanvas, {
   triggerDef,
   triggerTypeForKind,
   currentTriggerKind,
+  currentTriggerNodeId,
   serializeWorkflow,
   markWorkflowDirty,
   reachableFrom,
@@ -500,6 +558,48 @@ const onStepPick = (item: any) => {
 };
 
 const orgId = () => store.state.selectedOrganization.identifier as string;
+
+// ── HTTP endpoint ───────────────────────────────────────────────────────────
+const hooksOn = computed(() => workflowHooksEnabled(store.state.zoConfig));
+const httpKind = computed(() => currentTriggerKind());
+const httpTriggerNodeId = computed(() => currentTriggerNodeId());
+const httpTrigger = useQuery(() =>
+  workflowHttpTriggerQuery(
+    orgId(),
+    hooksOn.value ? workflowObj.currentSelectedWorkflow.id || "" : "",
+  ),
+);
+const httpEndpointOn = computed(() => {
+  const data = httpTrigger.data.value;
+  return hooksOn.value && !!data?.configured && data.enabled;
+});
+watch(httpEndpointOn, (on) => (httpEditorState.endpointOn = on), { immediate: true });
+const showHttpButton = computed(() => hooksOn.value && !workflowObj.readOnly);
+// A draft or paused workflow refuses calls, so its chip warns instead of reading live.
+const httpChip = computed<"success" | "warning" | null>(() => {
+  if (!httpEndpointOn.value) return null;
+  const wf = workflowObj.currentSelectedWorkflow;
+  return wf.isDraft || wf.enabled === false ? "warning" : "success";
+});
+const httpTooltip = computed(() => {
+  if (httpChip.value === "warning") return t("workflow.http.editorButtonRefused");
+  return httpChip.value ? undefined : t("workflow.http.editorButtonTooltip");
+});
+const pickerFootnote = computed(() =>
+  isTriggerStep.value && hooksOn.value ? t("workflow.http.pickerCue") : undefined,
+);
+const testSeed = ref<unknown[] | undefined>(undefined);
+const testPayloadFrom = ref<PayloadFrom | undefined>(undefined);
+const testSeedRunAt = ref<number | undefined>(undefined);
+watch(
+  () => workflowObj.testRun.show,
+  (show) => {
+    if (show) return;
+    testSeed.value = undefined;
+    testPayloadFrom.value = undefined;
+    testSeedRunAt.value = undefined;
+  },
+);
 
 // Start a fresh workflow on an EMPTY canvas. It used to pre-place an Alert
 // Trigger node here; the canvas now shows a "Choose a Trigger" start node that
@@ -934,6 +1034,16 @@ const onTest = () => {
   workflowObj.testRun.show = true;
 };
 
+// The panel closes first, so the Test drawer is the only overlay (AC-UI-34); the seed is set only once the graph validates.
+const onHttpRunTest = (seed: unknown[], runAt?: number) => {
+  httpEditorState.panelOpen = false;
+  if (!validate({ requireName: false, allowOrphans: true })) return;
+  testSeed.value = seed;
+  testPayloadFrom.value = "http";
+  testSeedRunAt.value = runAt;
+  workflowObj.testRun.show = true;
+};
+
 // History → the dedicated read-only Runs inspection view (separate surface).
 const openRuns = () => {
   router.push({
@@ -1014,5 +1124,6 @@ const switchEditorRun = async (runId: string) => {
 onBeforeUnmount(() => {
   window.removeEventListener("beforeunload", beforeUnloadHandler);
   resetWorkflowData();
+  resetHttpEditorState();
 });
 </script>
