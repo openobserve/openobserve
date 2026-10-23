@@ -162,11 +162,9 @@ test.describe("Logs Query Builder - Tab Navigation", () => {
         await pm.logsPage.clickLogsToggle();
         await page.waitForLoadState('domcontentloaded');
 
-        // Monaco remounts on the Build->Logs switch so the model passes through empty; poll the assertion rather than reading once after a wait.
-        await expect.poll(
-            async () => (await pm.logsPage.getQueryEditorText()).toLowerCase(),
-            { timeout: 30000, intervals: [300, 500, 800, 1200] }
-        ).toContain('e2e_automate');
+        // Monaco remounts on the Build->Logs switch so the model passes through empty, and a bare read returns null then.
+        const queryText = await pm.logsPage.getQueryEditorTextWhenReady('e2e_automate', 30000);
+        expect(queryText.toLowerCase()).toContain('e2e_automate');
 
         testLogger.info('Build tab preserves query state - PASSED');
     });

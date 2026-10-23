@@ -403,8 +403,11 @@ test.describe("Logs J/K navigation (item 4a)", () => {
         await route.continue();
       });
       await logs.pressLogRowKey("j");
-      // The loading banner is transient: a page-2 response that lands before the assert runs leaves it gone, so gate on the drawer instead.
+      await expect(page.locator(logs.logDetailPageLoading)).toBeVisible();
       await expect(page.locator(logs.logDetailNextBtn)).toBeVisible();
+      await expect(page.locator(logs.logDetailDialog)).toContainText(
+        "Loading page 2…",
+      );
       await page.keyboard.press("Escape");
       await expect(page.locator(logs.logDetailDialog)).toBeHidden();
       release();

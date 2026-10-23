@@ -82,8 +82,6 @@ test.describe("FTS Default Column Selection testcases", () => {
     // than failing the whole test on a single slow response.
     let resultsReady = false;
     for (let attempt = 1; attempt <= 3 && !resultsReady; attempt++) {
-      // The Run button doubles as Cancel while a search is in flight, so a blind re-click cancels the attempt this loop is waiting on.
-      await pm.logsPage.waitForRunQueryButton(30000).catch(() => {});
       await pm.logsPage.clickSearchBarRefreshButton();
       // The results body can render before the FTS default column resolves, so gate on the FTS header too.
       resultsReady = await pm.logsPage
@@ -342,7 +340,6 @@ test.describe("FTS Default Column Selection testcases", () => {
     // Run a search so the watcher re-resolves FTS for the new stream.
     let resultsReady = false;
     for (let attempt = 1; attempt <= 3 && !resultsReady; attempt++) {
-      await pm.logsPage.waitForRunQueryButton(30000).catch(() => {});
       await pm.logsPage.clickSearchBarRefreshButton();
       // The results body can render before the FTS default column re-resolves, so gate on the FTS header too.
       resultsReady = await pm.logsPage
@@ -391,7 +388,6 @@ test.describe("FTS Default Column Selection testcases", () => {
     // the FTS default re-resolves.
     let resultsReady = false;
     for (let attempt = 1; attempt <= 3 && !resultsReady; attempt++) {
-      await pm.logsPage.waitForRunQueryButton(30000).catch(() => {});
       await pm.logsPage.clickSearchBarRefreshButton();
       resultsReady = await pm.logsPage
         .waitForSearchResults(20000)
