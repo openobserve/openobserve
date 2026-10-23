@@ -45,17 +45,21 @@ function relativeUnit(secs: number) {
 }
 
 // The year shows only when it isn't the current one, so recent windows stay short.
-function shortDate(micros: number, timezone: string): string {
-  const ms = micros / 1000;
-  const sameYear =
-    formatInTimeZone(ms, timezone, "yyyy") === formatInTimeZone(Date.now(), timezone, "yyyy");
-  return formatInTimeZone(ms, timezone, sameYear ? "d MMM" : "d MMM yyyy");
+/** A window in a printed dashboard's form, `2026/10/19 15:35 - 2026/10/19 15:37`; dates only when short. */
+export function printedWindow(
+  startMs: number,
+  endMs: number,
+  timezone: string,
+  dateOnly = false,
+): string {
+  const pattern = dateOnly ? "yyyy/MM/dd" : "yyyy/MM/dd HH:mm";
+  return `${formatInTimeZone(startMs, timezone, pattern)} - ${formatInTimeZone(endMs, timezone, pattern)}`;
 }
 
-/** `2w`, `3mo`, or `1 Sept → 30 Sept` for the chips and list columns. */
+/** `2w`, `3mo`, or `2026/09/01 - 2026/09/30` for the chips and list columns. */
 export function shortRange(range: PublicLinkRange, timezone: string): string {
   if (range.type === "absolute") {
-    return `${shortDate(range.start, timezone)} → ${shortDate(range.end, timezone)}`;
+    return printedWindow(range.start / 1000, range.end / 1000, timezone, true);
   }
   const unit = relativeUnit(range.secs);
   return `${range.secs / unit.secs}${unit.short}`;
@@ -64,8 +68,7 @@ export function shortRange(range: PublicLinkRange, timezone: string): string {
 /** `Past 2 weeks`, or the full start and end with times. */
 export function longRange(range: PublicLinkRange, t: TranslateFn, timezone: string): I18nText {
   if (range.type === "absolute") {
-    const fmt = (micros: number) => formatInTimeZone(micros / 1000, timezone, "d MMM yyyy, HH:mm");
-    return raw(`${fmt(range.start)} → ${fmt(range.end)}`);
+    return raw(printedWindow(range.start / 1000, range.end / 1000, timezone));
   }
   const unit = relativeUnit(range.secs);
   const n = range.secs / unit.secs;
@@ -248,7 +251,7 @@ export function publicLinkColumns(
         ]
       : []),
     col("status", t("dashboard.publicLinks.status"), 120, "status"),
-    col("ranges", t("dashboard.publicLinks.timeRanges"), 190),
+    col("ranges", t("dashboard.publicLinks.timeRanges"), 250),
     col("expires", t("dashboard.publicLinks.expires"), 115, "expires_at"),
     col(
       "last_viewed",

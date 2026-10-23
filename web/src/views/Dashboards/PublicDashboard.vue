@@ -250,7 +250,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import { durationFormatter } from "@/utils/formatters";
 import type { PublicLinkRange } from "@/services/public_dashboards_admin";
 import { sortRanges } from "@/components/dashboards/PublicLinkForm.schema";
-import { longRange } from "@/components/dashboards/publicLinkDisplay";
+import { longRange, printedWindow } from "@/components/dashboards/publicLinkDisplay";
 import {
   clockOffsetMs,
   createPoller,
@@ -416,7 +416,7 @@ const currentTimeObj = computed(() => {
 });
 
 const clockTime = (micros: number): string =>
-  new Date(micros / 1000).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  formatInTimeZone(micros / 1000, viewerTimezone.value, "HH:mm");
 
 // Under an hour reads m:ss; longer waits read as hours and minutes.
 const countdown = (ms: number): string => {
@@ -549,22 +549,16 @@ const pickerShowsWindow = computed(
   () => rangeOptions.value.length > 1 && selectedRange.value?.type === "absolute",
 );
 
-// A printed dashboard's time-range form, so every window on this page reads alike.
-function printedWindow(startMs: number, endMs: number): I18nText {
-  const fmt = (ms: number) => formatInTimeZone(ms, viewerTimezone.value, "yyyy/MM/dd HH:mm");
-  return raw(`${fmt(startMs)} - ${fmt(endMs)}`);
-}
-
 function rangeLabel(range: PublicLinkRange): I18nText {
-  return range.type === "absolute"
-    ? printedWindow(range.start / 1000, range.end / 1000)
-    : longRange(range, t, viewerTimezone.value);
+  return longRange(range, t, viewerTimezone.value);
 }
 
 // The window the shown body covers; the zone is in the picker beside it.
 const windowLabel = computed<I18nText | "">(() => {
   if (!shownWindow.value) return "";
-  return printedWindow(shownWindow.value.startMs, shownWindow.value.endMs);
+  return raw(
+    printedWindow(shownWindow.value.startMs, shownWindow.value.endMs, viewerTimezone.value),
+  );
 });
 
 // The data's age, as the TV strip shows it; the exact time is in its tooltip.

@@ -19,9 +19,12 @@ import {
   attentionReason,
   displayStatus,
   lifecycleStatus,
+  longRange,
+  printedWindow,
   publicLinkColumns,
   publicLinkSearchTerm,
   publicLinkUrl,
+  shortRange,
   takeOverError,
 } from "@/components/dashboards/publicLinkDisplay";
 import type {
@@ -31,6 +34,22 @@ import type {
 } from "@/services/public_dashboards_admin";
 
 const link = { slug: "abc" } as PublicLink;
+
+describe("absolute range labels", () => {
+  const abs = {
+    type: "absolute" as const,
+    start: 1_792_400_100_000_000,
+    end: 1_792_400_220_000_000,
+  };
+
+  it("use a printed dashboard's form, dates only in the chips", () => {
+    expect(printedWindow(abs.start / 1000, abs.end / 1000, "UTC")).toBe(
+      "2026/10/19 08:55 - 2026/10/19 08:57",
+    );
+    expect(shortRange(abs, "UTC")).toBe("2026/10/19 - 2026/10/19");
+    expect(longRange(abs, gt, "UTC")).toBe("2026/10/19 08:55 - 2026/10/19 08:57");
+  });
+});
 
 describe("publicLinkUrl", () => {
   afterEach(() => window.history.replaceState(null, "", "/"));
