@@ -360,8 +360,12 @@ async fn preview_key(pasted: &License, loaded: Option<&License>, is_root: bool) 
         Ok(hwm) => hwm,
         Err(e) => return MetaHttpResponse::internal_error(e),
     };
-    let (outcome, message) = verdict_outcome(&judge_paste(&hwm, pasted));
-    let hwm_rev = hwm.get(&pasted.license_id).map(|e| e.rev);
+    let verdict = match judge_paste(&hwm, pasted) {
+        Ok(verdict) => verdict,
+        Err(e) => return MetaHttpResponse::internal_error(e),
+    };
+    let (outcome, message) = verdict_outcome(&verdict);
+    let hwm_rev = hwm.entry(&pasted.license_id).ok().flatten().map(|e| e.rev);
     MetaHttpResponse::json(key_check_response(
         outcome, message, hwm_rev, loaded, pasted, is_root,
     ))
@@ -455,7 +459,7 @@ pub async fn store_license(
     }
 
     match gate_and_raise(&req.key).await {
-        Ok(Ok(())) => {}
+        Ok(Ok(_)) => {}
         Ok(Err(r)) => return (StatusCode::CONFLICT, Json(rollback_body(&r))).into_response(),
         Err(e) => return MetaHttpResponse::internal_error(e),
     }
@@ -495,7 +499,7 @@ pub async fn refresh_license_limits(Headers(user_email): Headers<UserEmail>) -> 
 #[cfg(test)]
 mod tests {
     use config::utils::{base64, json};
-    use o2_enterprise::enterprise::license::{BelowHwm, Block, KeySource};
+    use o2_enterprise::enterprise::license::{BelowHwm, Block, KeySource, LICENSE_REV_HWM_KEY};
 
     use super::*;
 
@@ -1055,6 +1059,81 @@ mod tests {
         assert!(!query("http://o2/api/license?dry_run=false"));
         assert!(query("http://o2/api/license?dry_run=true"));
         assert!(!StoreLicenseQuery::default().dry_run);
+    }
+
+    // every store test shares the one meta DB and its two license keys
+    static STORE_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+    const STORE_ROOT: &str = "lw-store-root@store.test";
+
+    async fn store_setup() -> tokio::sync::MutexGuard<'static, ()> {
+        let guard = STORE_LOCK.lock().await;
+        config::cache_instance_id(INSTANCE_ID);
+        infra::db::create_table().await.unwrap();
+        join(config::DEFAULT_ORG, STORE_ROOT, UserRole::Root);
+        let db = infra::db::get_db().await;
+        for key in [LICENSE_DB_KEY, LICENSE_REV_HWM_KEY] {
+            let _ = db.delete(key, false, false, None).await;
+        }
+        guard
+    }
+
+    async fn stored(key: &str) -> Option<json::Value> {
+        let raw = infra::db::get_db()
+            .await
+            .get_if_exists(key)
+            .await
+            .unwrap()?;
+        Some(json::from_slice(&raw).unwrap_or_else(|_| json::json!(String::from_utf8_lossy(&raw))))
+    }
+
+    async fn body_of(resp: Response) -> (StatusCode, json::Value) {
+        let status = resp.status();
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (
+            status,
+            json::from_slice(&bytes).unwrap_or(json::Value::Null),
+        )
+    }
+
+    async fn paste(license: License, dry_run: bool) -> (StatusCode, json::Value) {
+        body_of(
+            store_license(
+                Headers(UserEmail {
+                    user_id: STORE_ROOT.to_string(),
+                }),
+                axum::extract::Query(StoreLicenseQuery { dry_run }),
+                axum::Json(SaveLicenseRequest {
+                    key: license,
+                    raw_key: "eyJ.store-test.key".to_string(),
+                }),
+            )
+            .await,
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn store_fails_closed_on_an_unreadable_hwm_entry() {
+        let _store = store_setup().await;
+        let unreadable = br#"{"lic-1":{"rev":"x"},"lic-2":{"rev":3}}"#;
+        infra::db::get_db()
+            .await
+            .put(LICENSE_REV_HWM_KEY, unreadable.to_vec().into(), false, None)
+            .await
+            .unwrap();
+        for dry_run in [true, false] {
+            let (status, body) = paste(lic("lic-1", 9), dry_run).await;
+            assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "{body}");
+            let message = body["message"].as_str().unwrap_or_default();
+            assert!(message.contains("unreadable"), "{body}");
+        }
+        assert_eq!(stored(LICENSE_DB_KEY).await, None);
+        assert_eq!(
+            stored(LICENSE_REV_HWM_KEY).await,
+            Some(json::from_slice(unreadable).unwrap())
+        );
     }
 
     // a watcher fills these caches on a running node; a miss here would go to the database
