@@ -130,9 +130,9 @@ const stubs = {
   },
   ConfirmDialog: {
     name: "ConfirmDialog",
-    props: ["modelValue"],
+    props: ["modelValue", "title", "message"],
     emits: ["update:ok"],
-    template: "<div v-if='modelValue' data-test='confirm-stub' />",
+    template: "<div v-if='modelValue' data-test='confirm-stub'>{{ title }} {{ message }}</div>",
   },
   OInnerLoading: { name: "OInnerLoading", template: "<div />" },
   OText: { name: "OText", template: "<span><slot /></span>" },
@@ -182,13 +182,13 @@ const stubs = {
   },
 };
 
-async function renderOpen(rotationCount = 0) {
+async function renderOpen(primaryRotationName = "") {
   const wrapper = mount(OnCallSchedulePresets, {
     props: {
       teamId: "team_1",
       members: [],
       timezone: "UTC",
-      rotationCount,
+      primaryRotationName,
       open: true,
       "onUpdate:open": () => {},
     },
@@ -357,7 +357,7 @@ describe("OnCallSchedulePresets", () => {
   /// Absent beats empty: an un-overridden catch-all must not be sent as an
   /// empty group, which the server would read as "nobody covers the rest".
   it("applies without ceremony when the team has no schedule to lose", async () => {
-    const wrapper = await renderOpen(0);
+    const wrapper = await renderOpen();
     await nameGroups(wrapper);
     await wrapper.find('[data-test="oncall-presets-apply"]').trigger("click");
     await flushPromises();
@@ -374,7 +374,7 @@ describe("OnCallSchedulePresets", () => {
   /// sentence written for the person who left the field blank. The one blank
   /// field is also marked, not just named in a banner underneath everything.
   it("blocks apply and flags the field when a required group name is blank", async () => {
-    const wrapper = await renderOpen(0);
+    const wrapper = await renderOpen();
     await wrapper
       .findComponent('[data-test="oncall-preset-field-groups-0-name"]')
       .vm.$emit("update:modelValue", "APAC");
@@ -403,7 +403,7 @@ describe("OnCallSchedulePresets", () => {
   /// axum extraction rejected it with "missing field `members`" instead of a
   /// sentence written for the person who left the picker on "Nobody yet".
   it("blocks apply and flags the field when a required group has nobody assigned", async () => {
-    const wrapper = await renderOpen(0);
+    const wrapper = await renderOpen();
     await wrapper
       .findComponent('[data-test="oncall-preset-field-groups-0-name"]')
       .vm.$emit("update:modelValue", "APAC");
@@ -428,7 +428,7 @@ describe("OnCallSchedulePresets", () => {
   /// pointer to the form rather than naming just the first offender — but
   /// every offending field is still marked, not only the first one found.
   it("flags every offending field and shows a general message when several are blank", async () => {
-    const wrapper = await renderOpen(0);
+    const wrapper = await renderOpen();
     await wrapper.find('[data-test="oncall-presets-apply"]').trigger("click");
     await flushPromises();
 
@@ -448,17 +448,25 @@ describe("OnCallSchedulePresets", () => {
     ).toBe(true);
   });
 
-  /// A full replace of a working schedule gets a confirm; replacing nothing
-  /// is a click tax.
-  it("confirms before replacing an existing schedule, and says how much", async () => {
-    const wrapper = await renderOpen(2);
-    expect(wrapper.text()).toContain("2 existing rotations");
+  /// The server swaps only the primary rotation's rules, so the note and the confirm name it and promise nothing wider.
+  it("confirms before replacing the primary rotation's rules, and names it", async () => {
+    const wrapper = await renderOpen("Day crew");
+    expect(wrapper.text()).toContain(
+      "Applying replaces the shift rules of Day crew. Its name, the other rotations, covers and absences stay.",
+    );
 
     await wrapper.find('[data-test="oncall-presets-apply"]').trigger("click");
     await flushPromises();
 
     expect(service.applySchedulePreset).not.toHaveBeenCalled();
-    expect(wrapper.find('[data-test="confirm-stub"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="confirm-stub"]').text()).toBe(
+      "Replace the shift rules of Day crew? The preset replaces the shift rules of Day crew. Its name stays, so escalation levels keep pointing at it. Other rotations, covers and absences are kept.",
+    );
+  });
+
+  it("says applying creates a rotation when the team has none", async () => {
+    const wrapper = await renderOpen();
+    expect(wrapper.text()).toContain("This team has no rotations yet — applying creates one.");
   });
 
   /// Sixteen named-field rejections server-side, each written for the person
@@ -467,7 +475,7 @@ describe("OnCallSchedulePresets", () => {
     service.applySchedulePreset.mockRejectedValue({
       response: { data: { message: "regions 2 and 3 overlap at minute 480" } },
     });
-    const wrapper = await renderOpen(0);
+    const wrapper = await renderOpen();
     await nameGroups(wrapper);
     await wrapper.find('[data-test="oncall-presets-apply"]').trigger("click");
     await flushPromises();
@@ -489,7 +497,7 @@ describe("OnCallSchedulePresets", () => {
       },
       message: "Request failed with status code 422",
     });
-    const wrapper = await renderOpen(0);
+    const wrapper = await renderOpen();
     await nameGroups(wrapper);
     await wrapper.find('[data-test="oncall-presets-apply"]').trigger("click");
     await flushPromises();

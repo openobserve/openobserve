@@ -209,7 +209,9 @@ const pillSide = (offset: number) => (offset > 0.85 ? "-translate-x-full -ms-1.5
              Gutter mode only — lane mode draws one full-height line over every
              track instead, from the overlay below. -->
           <span
-            v-if="now !== null && !laneHeaders"
+            v-if="
+              now !== null && !laneHeaders && (nowTrackKey == null || nowTrackKey === track.key)
+            "
             class="bg-accent absolute inset-y-0 z-1 w-px"
             :style="inlineStart(now)"
             :role="nowLabel ? 'img' : undefined"

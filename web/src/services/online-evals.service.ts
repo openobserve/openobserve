@@ -8,7 +8,7 @@
 import http from "@/services/http";
 import analytics from "./product_analytics";
 
-export type EvalJobStatus = "draft" | "active" | "paused" | "degraded" | "archived";
+export type EvalJobStatus = "draft" | "active" | "paused" | "archived";
 export type EvalTargetScope = "span" | "trace" | "session";
 export type SamplingMode = "rate" | "all" | "count";
 export type ConfigurableSamplingMode = "rate" | "all";
@@ -154,6 +154,8 @@ export interface EvalJob {
   created_at?: number;
   updatedAt?: number;
   updated_at?: number;
+  /** Persisted health state; absent until the backend first evaluates the job. */
+  health?: EvalJobHealth | null;
 }
 
 export interface ExtraMetadataField {
@@ -252,6 +254,33 @@ export interface ManualEvalJobResult {
   targetScope: EvalTargetScope;
   targetId: string;
   tasksCreated: number;
+}
+
+export type EvalJobHealthState =
+  "healthy" | "degraded" | "waiting_for_credentials" | "no_recent_runs";
+
+export interface EvalJobLastError {
+  /** e.g. provider_auth, rate_limited, timeout, provider_5xx, parse_error,
+   *  mapping_error, scorer_missing, execution_error */
+  kind: string;
+  message: string;
+  /** Microseconds since epoch. */
+  at: number;
+}
+
+/** Persisted health state for one job; never changes the job's status. */
+export interface EvalJobHealth {
+  state: EvalJobHealthState;
+  /** When `state` last changed, microseconds since epoch. */
+  since: number;
+  /** When the backend last measured this job, microseconds since epoch. */
+  evaluatedAt: number;
+  recentRuns: number;
+  recentErrors: number;
+  scores24h: number;
+  /** Microseconds since epoch. */
+  lastSuccessAt?: number | null;
+  lastError?: EvalJobLastError | null;
 }
 
 const unwrapList = <T>(response: any, key = "list"): T[] => {

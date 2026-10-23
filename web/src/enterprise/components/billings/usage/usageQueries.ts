@@ -37,6 +37,8 @@ export interface DrilldownSection {
   groupBy: string;
   /** Extra filter beyond the event, e.g. excluding searches that came from alerts. */
   where: string;
+  /** Fields a row must not carry to count here; one the stream never recorded is empty on every row, so it is left out. */
+  nullFields?: string[];
   /** AI credit and synthetics step events write a count into `size`, not megabytes. */
   unit?: "mb" | "count";
   /** Header of the quantity column when `size` is a count. */
@@ -57,7 +59,8 @@ function sinceClause(since?: number): string {
 
 function sectionWhere(orgId: string, spec: SectionSpec): string {
   const extra = spec.where ? ` and ${spec.where}` : "";
-  return `org_id = '${escapeLiteral(orgId)}' and event = '${escapeLiteral(spec.event)}'${extra}`;
+  const nulls = (spec.nullFields ?? []).map((field) => ` and ${field} is null`).join("");
+  return `org_id = '${escapeLiteral(orgId)}' and event = '${escapeLiteral(spec.event)}'${extra}${nulls}`;
 }
 
 /** Every breakdown returns the same two columns, so one table renders all of them. */
@@ -111,11 +114,13 @@ export const DRILLDOWNS: Partial<Record<MeterKey, DrilldownSection[]>> = {
       id: "user",
       labelKey: "billing.usageV2.byUser",
       columnKey: "billing.usageV2.colUser",
-      requiredFields: ["user_email", "alert_name", "dashboard_name", "derived_stream_key"],
+      requiredFields: ["user_email"],
       event: "Search",
       expression: "user_email",
       groupBy: "user_email",
-      where: "alert_name is null and dashboard_name is null and derived_stream_key is null",
+      where: "",
+      // Searches that came from an alert, a dashboard or a scheduled pipeline are not a user's.
+      nullFields: ["alert_name", "dashboard_name", "derived_stream_key"],
     }),
     section({
       id: "alert",
@@ -328,7 +333,14 @@ export function availableSections(
   schemaFields: Set<string>,
 ): DrilldownSection[] {
   if (!schemaFields.size) return sections;
-  return sections.filter((section) =>
-    section.requiredFields.every((field) => schemaFields.has(field)),
-  );
+  return sections
+    .filter((item) => item.requiredFields.every((field) => schemaFields.has(field)))
+    .map((item) =>
+      item.nullFields
+        ? section({
+            ...item,
+            nullFields: item.nullFields.filter((field) => schemaFields.has(field)),
+          })
+        : item,
+    );
 }

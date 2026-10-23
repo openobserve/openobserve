@@ -46,17 +46,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @open-unfold="openUnfold"
       >
         <template #report>
-          <!-- The analysis tab already offers copy and download, so the embedded report's toolbar is hidden. -->
-          <IncidentRCAAnalysis
-            class="[&_[data-test=rca-toolbar]]:hidden"
-            :has-existing-rca="true"
-            :rca-loading="false"
-            :formatted-rca-content="rcaHtml"
-            :is-dark-mode="isDark"
-            @copy-report="notInDemo"
-            @download-report="notInDemo"
-            @trigger-rca="notInDemo"
-          />
+          <div class="flex flex-1 flex-col overflow-hidden">
+            <div
+              class="rounded-default bg-surface-base border-border-default flex-1 overflow-auto border p-3"
+            >
+              <RcaReportContent :html="rcaHtml" :is-dark-mode="isDark" />
+            </div>
+          </div>
         </template>
       </AutoObserveAnalysis>
       <AutoObserveUnfoldGraph
@@ -325,7 +321,7 @@ import { useTheme } from "@/composables/useTheme";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
-import IncidentRCAAnalysis from "@/components/alerts/IncidentRCAAnalysis.vue";
+import RcaReportContent from "@/components/alerts/rca/RcaReportContent.vue";
 import IncidentAlertTriggersTable from "@/components/alerts/IncidentAlertTriggersTable.vue";
 import type { IncidentAlert } from "@/services/incidents";
 import OCard from "@/lib/core/Card/OCard.vue";
@@ -430,8 +426,6 @@ const triggers = computed<IncidentAlert[]>(() => {
     })),
   );
 });
-
-const notInDemo = () => toast({ variant: "info", message: t("autoobserve.notInDemo") });
 
 const escapeHtml = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
