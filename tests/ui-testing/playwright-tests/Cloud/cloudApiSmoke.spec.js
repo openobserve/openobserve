@@ -13,7 +13,7 @@ const { test, expect } = require("@playwright/test");
 const testLogger = require("../utils/test-logger.js");
 const { CloudApiSmokePage } = require("../../pages/cloudPages/cloudApiSmokePage.js");
 
-// Shared seed stream, kept between runs like e2e_automate; only this shard writes to its org.
+// Shared seed stream for this file; cleanup.spec.js deletes it before each run.
 const STREAM = "cloud_api_smoke";
 
 test.describe("Cloud API smoke", () => {
@@ -53,18 +53,20 @@ test.describe("Cloud API smoke", () => {
         testLogger.step("Read it back");
         const stored = await smoke.getAlert(created.alertId);
         const recovery = realtime ? [] : [created.destination];
-        expect(stored.recovery_destinations ?? []).toEqual(recovery);
+        expect(stored.recovery_destinations).toEqual(recovery);
         expect(stored.context_attributes).toEqual({ team: "qa" });
         expect(stored.tags).toEqual(["cloud-api-smoke"]);
         expect(stored.deduplication.fingerprint_fields).toEqual(["level"]);
-        expect(stored.trigger_condition.warning_threshold ?? null).toBe(realtime ? null : 2);
+        // The API omits an unset warning threshold rather than sending null.
+        if (realtime) expect(stored.trigger_condition).not.toHaveProperty("warning_threshold");
+        else expect(stored.trigger_condition.warning_threshold).toBe(2);
 
         testLogger.step("Update it and read it back again");
         stored.description = "cloud api smoke updated";
         await smoke.updateAlert(created.alertId, stored);
         const updated = await smoke.getAlert(created.alertId);
         expect(updated.description).toBe("cloud api smoke updated");
-        expect(updated.recovery_destinations ?? []).toEqual(recovery);
+        expect(updated.recovery_destinations).toEqual(recovery);
       }
     );
   }
@@ -85,15 +87,21 @@ test.describe("Cloud API smoke", () => {
       testLogger.step("Clear recovery destinations, tags, context, runbook and dedup");
       await smoke.updateAlert(created.alertId, smoke.clearedAlert(await smoke.getAlert(created.alertId)));
       const cleared = await smoke.getAlert(created.alertId);
-      expect(cleared.recovery_destinations ?? []).toEqual([]);
-      expect(cleared.tags ?? []).toEqual([]);
-      expect(cleared.runbook_url ?? null).toBeNull();
+      expect(cleared.recovery_destinations).toEqual([]);
+      expect(cleared.context_attributes).toEqual({});
+      // The API omits empty tags, an unset runbook and disabled dedup instead of sending empties.
+      expect(cleared).not.toHaveProperty("tags");
+      expect(cleared).not.toHaveProperty("runbook_url");
+      expect(cleared).not.toHaveProperty("deduplication");
 
       testLogger.step("Fill them again");
       await smoke.updateAlert(created.alertId, { ...cleared, ...payload });
       const refilled = await smoke.getAlert(created.alertId);
       expect(refilled.recovery_destinations).toEqual([created.destination]);
       expect(refilled.tags).toEqual(["cloud-api-smoke"]);
+      expect(refilled.context_attributes).toEqual({ team: "qa" });
+      expect(refilled.deduplication.fingerprint_fields).toEqual(["level"]);
+      expect(refilled.runbook_url).toBe("https://example.com/runbooks/cloud-api-smoke");
     }
   );
 

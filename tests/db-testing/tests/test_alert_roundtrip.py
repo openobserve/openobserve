@@ -89,7 +89,7 @@ def _update(api, alert_id: str, alert: dict) -> dict:
 
 
 def _assert_filled(stored: dict, dest: str, *, recovery: bool = True) -> None:
-    assert stored.get("recovery_destinations", []) == ([dest] if recovery else [])
+    assert stored["recovery_destinations"] == ([dest] if recovery else [])
     assert stored["destinations"] == [dest]
     assert stored["context_attributes"] == {"team": "qa", "service": "db-testing"}
     assert stored["tags"] == ["roundtrip", "service:db-testing"]
@@ -104,7 +104,9 @@ class TestAlertRoundtrip:
         alert_id = _create(api, created_alerts, _realtime(payload) if realtime else payload)
         stored = _read(api, alert_id)
         _assert_filled(stored, destination, recovery=not realtime)
-        if not realtime:
+        if realtime:
+            assert "warning_threshold" not in stored["trigger_condition"]
+        else:
             assert stored["trigger_condition"]["warning_threshold"] == 2
 
         stored["description"] = "db-testing roundtrip updated"
@@ -129,15 +131,14 @@ class TestAlertRoundtrip:
         alert_id = _create(api, created_alerts, _alert_payload(unique_name("rt_clear"), test_stream, destination))
         stored = _read(api, alert_id)
 
-        for field, empty in (("recovery_destinations", []), ("tags", []), ("context_attributes", {})):
-            stored[field] = empty
+        stored.update(recovery_destinations=[], tags=[], context_attributes={}, deduplication={"enabled": False})
         stored.pop("runbook_url")
-        stored.pop("deduplication")
         cleared = _update(api, alert_id, stored)
-        assert cleared.get("recovery_destinations", []) == []
-        assert cleared.get("tags", []) == []
-        assert cleared.get("context_attributes") in ({}, None)
-        assert cleared.get("runbook_url") is None
+        assert cleared["recovery_destinations"] == []
+        assert cleared["context_attributes"] == {}
+        # The API omits empty tags, an unset runbook and disabled dedup instead of sending empties.
+        for absent in ("tags", "runbook_url", "deduplication"):
+            assert absent not in cleared, f"{absent} must be cleared, got {cleared[absent]!r}"
 
         filled = _alert_payload(cleared["name"], test_stream, destination)
         refill = {k: filled[k] for k in ("recovery_destinations", "tags", "context_attributes", "runbook_url", "deduplication")}

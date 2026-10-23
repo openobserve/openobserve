@@ -120,8 +120,8 @@ class CloudApiSmokePage {
     }
 
     clearedAlert(stored) {
-        const { runbook_url: _runbook, deduplication: _dedup, ...rest } = stored;
-        return { ...rest, recovery_destinations: [], tags: [], context_attributes: {} };
+        const { runbook_url: _runbook, ...rest } = stored;
+        return { ...rest, recovery_destinations: [], tags: [], context_attributes: {}, deduplication: { enabled: false } };
     }
 
     // ===== DASHBOARDS =====

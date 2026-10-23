@@ -21,6 +21,8 @@ PG_TYPES = {
     "f64": {"double precision"},
     "f32": {"real"},
     "Vec<u8>": {"bytea"},
+    "DateTime": {"timestamp without time zone"},
+    "DateTimeWithTimeZone": {"timestamp with time zone"},
 }
 
 TABLE_RE = re.compile(r'#\[sea_orm\([^\]]*table_name\s*=\s*"([^"]+)"')
@@ -28,6 +30,7 @@ MODEL_RE = re.compile(r"pub struct Model\s*\{(.*?)\n\}", re.S)
 FIELD_RE = re.compile(r"^\s*pub\s+(?:r#)?(\w+)\s*:\s*([^,]+),", re.M)
 ATTR_RE = re.compile(r"#\[sea_orm\(((?:(?!#\[).)*?)\)\]\s*$", re.S)
 COLUMN_NAME_RE = re.compile(r'column_name\s*=\s*"([^"]+)"')
+ACTIVE_ENUM_RE = re.compile(r'#\[sea_orm\(rs_type\s*=\s*"([^"]+)"[^\]]*\)\]\s*pub enum (\w+)')
 CFG_RE = re.compile(r'#\[cfg\((not\()?feature\s*=\s*"([^"]+)"\)?\)\]')
 
 # Columns whose migrations live in o2-enterprise's cloud migrator, so only a cloud build adds them.
@@ -104,7 +107,18 @@ def _checked(table: str, columns, schema):
         yield column, rust_type, optional, schema.get(column)
 
 
+def _active_enums() -> dict[str, str]:
+    """DeriveActiveEnum name -> the Rust type it is stored as."""
+    enums = {}
+    for root in ENTITY_DIRS:
+        for path in sorted((root / "entity").glob("*.rs")) + sorted(root.glob("*.rs")):
+            for rs_type, name in ACTIVE_ENUM_RE.findall(path.read_text()):
+                enums[name] = rs_type
+    return enums
+
+
 ENTITIES = _entities()
+ACTIVE_ENUMS = _active_enums()
 
 
 def test_entity_sources_were_found():
@@ -116,10 +130,12 @@ def test_entity_column_types_match_postgres(db_cursor, table, columns):
     schema = _schema(db_cursor, table)
     mismatches = []
     for column, rust_type, _, actual in _checked(table, columns, schema):
-        expected = PG_TYPES.get(rust_type)
-        if actual is None:
+        expected = PG_TYPES.get(ACTIVE_ENUMS.get(rust_type, rust_type))
+        if expected is None:
+            mismatches.append(f"{column}: entity type {rust_type} has no Postgres mapping; add it to PG_TYPES")
+        elif actual is None:
             mismatches.append(f"{column}: entity has it, table does not")
-        elif expected is not None and actual[0] not in expected:
+        elif actual[0] not in expected:
             mismatches.append(f"{column}: entity {rust_type} needs {sorted(expected)}, table has {actual[0]}")
     assert not mismatches, f"{table} entity and Postgres schema disagree:\n  " + "\n  ".join(mismatches)
 
