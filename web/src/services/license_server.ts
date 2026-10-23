@@ -6,6 +6,8 @@ const licenseServer = {
     const url = `/api/license`;
     return http().get(url);
   },
+  check_license: (licenseKey: string) =>
+    http().post<unknown>("/api/license?dry_run=true", { key: licenseKey }),
   update_license: (licenseKey: string) => {
     const url = `/api/license`;
     return http()

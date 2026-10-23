@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { queryOptions } from "@tanstack/vue-query";
+import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import licenseServer from "./license_server";
 import { licenseKeys } from "./license_server.querykeys";
 
@@ -23,4 +23,16 @@ export const licenseQuery = () =>
     queryKey: licenseKeys.get(),
     queryFn: async () => (await licenseServer.get_license()).data,
     staleTime: 0,
+  });
+
+export const checkLicenseMutation = () =>
+  mutationOptions({
+    mutationFn: (key: string) => licenseServer.check_license(key),
+    meta: { silentError: true },
+  });
+
+export const updateLicenseMutation = () =>
+  mutationOptions({
+    mutationFn: (key: string) => licenseServer.update_license(key),
+    meta: { invalidates: [licenseKeys.get()], silentError: true },
   });

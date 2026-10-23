@@ -80,6 +80,7 @@ vi.mock("@/services/license_server", async (importOriginal) => {
     default: {
       get_license: vi.fn(),
       update_license: vi.fn(),
+      check_license: vi.fn(),
       refresh_license_limits: vi.fn(),
     },
   });
@@ -555,6 +556,187 @@ describe("License.vue", () => {
       expect(setConfig).not.toHaveBeenCalled();
     });
 
+    it("a rev_rollback 409 shows both issue dates inline", async () => {
+      vi.mocked(licenseServer.update_license).mockRejectedValue({
+        response: {
+          status: 409,
+          data: {
+            code: 409,
+            reason: "rev_rollback",
+            message: "older",
+            license_id: "lic_1",
+            loaded_rev: Date.UTC(2026, 9, 20) * 1000,
+            pasted_rev: Date.UTC(2026, 9, 14) * 1000,
+          },
+        },
+      });
+      wrapper.vm.licenseKey = "new-license-key";
+      await wrapper.vm.updateLicense();
+      await flushPromises();
+      expect(wrapper.find('[data-test="license-key-check-banner"]').text()).toContain(
+        "Oct 20, 2026",
+      );
+      expect(wrapper.find('[data-test="license-key-check-banner"]').text()).toContain(
+        "Oct 14, 2026",
+      );
+      expect(mockToast).not.toHaveBeenCalled();
+    });
+    it("Check key calls check_license and never update_license", async () => {
+      vi.mocked(licenseServer.check_license).mockResolvedValue(
+        createAxiosResponse({
+          dry_run: true,
+          outcome: "accept",
+          license_id: "lic_1",
+          message: "",
+          same_license: true,
+          loaded_rev: 1,
+          pasted_rev: 2,
+          waivers_added: [],
+          waivers_removed: [],
+        }),
+      );
+      wrapper.vm.showUpdateForm = true;
+      await flushPromises();
+      await wrapper
+        .find('textarea[data-test="update-license-key-input-field"]')
+        .setValue("checked-key");
+      await wrapper.find('[data-test="check-update-license-btn"]').trigger("click");
+      await flushPromises();
+      expect(licenseServer.check_license).toHaveBeenCalledWith("checked-key");
+      expect(licenseServer.update_license).not.toHaveBeenCalled();
+      expect(wrapper.text()).toContain("same waivers");
+    });
+    it("draft edits discard a pending preview and block accidental updates", async () => {
+      let resolve: (response: AxiosResponse) => void = () => {};
+      vi.mocked(licenseServer.check_license).mockImplementation(
+        () => new Promise((r) => (resolve = r)),
+      );
+      wrapper.vm.showUpdateForm = true;
+      await flushPromises();
+      const field = wrapper.find('textarea[data-test="update-license-key-input-field"]');
+      await field.setValue("first-key");
+      await wrapper.find('[data-test="check-update-license-btn"]').trigger("click");
+      await field.setValue("second-key");
+      await wrapper.vm.updateLicense({ licenseKey: "second-key" });
+      expect(licenseServer.update_license).not.toHaveBeenCalled();
+      resolve(
+        createAxiosResponse({
+          dry_run: true,
+          outcome: "accept",
+          license_id: "lic_1",
+          message: "",
+          same_license: true,
+          loaded_rev: 1,
+          pasted_rev: 2,
+          waivers_added: [],
+          waivers_removed: [],
+        }),
+      );
+      await flushPromises();
+      expect(wrapper.find('[data-test="license-key-check-banner"]').exists()).toBe(false);
+    });
+    it("editing a completed preview clears it", async () => {
+      vi.mocked(licenseServer.check_license).mockResolvedValue(
+        createAxiosResponse({
+          dry_run: true,
+          outcome: "accept",
+          license_id: "lic_1",
+          message: "",
+          same_license: true,
+          loaded_rev: 1,
+          pasted_rev: 2,
+          waivers_added: [],
+          waivers_removed: [],
+        }),
+      );
+      wrapper.vm.showUpdateForm = true;
+      await flushPromises();
+      const field = wrapper.find('textarea[data-test="update-license-key-input-field"]');
+      await field.setValue("first-key");
+      await wrapper.find('[data-test="check-update-license-btn"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="license-key-check-banner"]').exists()).toBe(true);
+      await field.setValue("second-key");
+      expect(wrapper.find('[data-test="license-key-check-banner"]').exists()).toBe(false);
+    });
+    it("an accept preview lists added and removed waivers", async () => {
+      const waiver = {
+        id: "added",
+        type: "search_unblock",
+        starts_at: 1,
+        ends_at: Date.UTC(2026, 9, 30) * 1000,
+        note: "Added waiver",
+      };
+      vi.mocked(licenseServer.check_license).mockResolvedValue(
+        createAxiosResponse({
+          dry_run: true,
+          outcome: "accept",
+          license_id: "lic_1",
+          message: "",
+          same_license: true,
+          loaded_rev: 1,
+          pasted_rev: 2,
+          waivers_added: [waiver],
+          waivers_removed: [{ ...waiver, id: "removed", note: "Removed waiver" }],
+        }),
+      );
+      wrapper.vm.showUpdateForm = true;
+      await flushPromises();
+      await wrapper
+        .find('textarea[data-test="update-license-key-input-field"]')
+        .setValue("checked-key");
+      await wrapper.find('[data-test="check-update-license-btn"]').trigger("click");
+      await flushPromises();
+      const text = wrapper.find('[data-test="license-key-check"]').text();
+      expect(text).toContain("Added (1)");
+      expect(text).toContain("Removed (1)");
+      expect(text).toContain("Added waiver");
+      expect(text).toContain("Removed waiver");
+    });
+    it("a 409 without a rev reason still toasts the server message", async () => {
+      vi.mocked(licenseServer.update_license).mockRejectedValue({
+        response: {
+          status: 409,
+          data: { code: 409, reason: "future_reason", message: "Generic conflict" },
+        },
+      });
+      await wrapper.vm.updateLicense({ licenseKey: "checked-key" });
+      await flushPromises();
+      expect(mockToast.mock.calls.at(-1)?.[0].message).toContain("Generic conflict");
+    });
+    for (const status of [400, 403]) {
+      it(`a failed check (${status}) appears inline`, async () => {
+        vi.mocked(licenseServer.check_license).mockRejectedValue({
+          response: { status, data: { message: "the license key could not be decoded." } },
+        });
+        wrapper.vm.showUpdateForm = true;
+        await flushPromises();
+        await wrapper
+          .find('textarea[data-test="update-license-key-input-field"]')
+          .setValue("checked-key");
+        await wrapper.find('[data-test="check-update-license-btn"]').trigger("click");
+        await flushPromises();
+        expect(wrapper.find('[data-test="license-key-check-error"]').text()).toContain(
+          status === 403 ? "permission" : "could not be decoded",
+        );
+        expect(licenseServer.update_license).not.toHaveBeenCalled();
+      });
+    }
+    it("a malformed preview is shown as a failed check", async () => {
+      vi.mocked(licenseServer.check_license).mockResolvedValue(
+        createAxiosResponse({ outcome: "accept" }),
+      );
+      wrapper.vm.showUpdateForm = true;
+      await flushPromises();
+      await wrapper
+        .find('textarea[data-test="update-license-key-input-field"]')
+        .setValue("checked-key");
+      await wrapper.find('[data-test="check-update-license-btn"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="license-key-check-error"]').text()).toContain(
+        "Couldn’t check this key",
+      );
+    });
     it("a 409 from the env key shows the server message", async () => {
       vi.mocked(licenseServer.update_license).mockRejectedValue({
         response: { status: 409, data: { message: "Remove O2_LICENSE_KEY first" } },

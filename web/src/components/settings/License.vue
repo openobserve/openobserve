@@ -38,19 +38,14 @@
               <div class="mb-3 text-base font-medium">
                 {{ t("about.enter_license_key") }}
               </div>
-              <OForm
-                ref="noLicenseForm"
-                :schema="licenseSchema"
-                :default-values="licenseDefaults"
-                @submit="updateLicense"
-                v-slot="{ isSubmitting }"
-              >
+              <OForm ref="noLicenseForm" :form="noLicenseDraft" v-slot="{ isSubmitting }">
                 <OFormTextarea
                   data-test="no-license-key-input"
                   name="licenseKey"
+                  :disabled="updating"
                   :rows="8"
                   :placeholder="t('about.paste_license_placeholder')"
-                  style="min-height: 12.5rem"
+                  class="min-h-50"
                 />
                 <div v-if="isLicenseKeyAutoFilled" class="mt-2 mb-3">
                   <div
@@ -60,6 +55,25 @@
                     <span class="text-sm">{{ t("about.license_auto_filled") }}</span>
                   </div>
                 </div>
+                <LicenseKeyCheck :result="result" :refusal="refusal" />
+                <OBanner
+                  v-if="checkError"
+                  variant="error-soft"
+                  icon="cancel"
+                  class="my-3"
+                  data-test="license-key-check-error"
+                  >{{ t("about.key_check_failed", { message: checkError }) }}</OBanner
+                >
+                <OButton
+                  data-test="check-no-license-btn"
+                  variant="outline"
+                  size="sm-action"
+                  class="me-2 mt-2"
+                  :loading="checking"
+                  :disabled="isSubmitting || updating"
+                  @click="checkLicense(false)"
+                  >{{ t("about.check_license_key") }}</OButton
+                >
                 <OButton
                   data-test="no-license-update-btn"
                   variant="primary"
@@ -67,6 +81,7 @@
                   class="mt-2"
                   type="submit"
                   :loading="isSubmitting"
+                  :disabled="checking || updating"
                 >
                   {{ t("about.update_license") }}
                 </OButton>
@@ -239,19 +254,14 @@
               <div class="mb-2 text-base font-medium">
                 {{ t("about.update_license_key") }}
               </div>
-              <OForm
-                ref="updateLicenseForm"
-                :schema="licenseSchema"
-                :default-values="licenseDefaults"
-                @submit="updateLicense"
-                v-slot="{ isSubmitting }"
-              >
+              <OForm ref="updateLicenseForm" :form="updateLicenseDraft" v-slot="{ isSubmitting }">
                 <OFormTextarea
                   data-test="update-license-key-input"
                   name="licenseKey"
+                  :disabled="updating"
                   :rows="6"
                   :placeholder="t('about.paste_new_license_placeholder')"
-                  style="min-height: 9.375rem"
+                  class="min-h-37.5"
                 />
                 <div v-if="isLicenseKeyAutoFilled" class="mt-2 mb-3">
                   <div
@@ -261,7 +271,16 @@
                     <span class="text-sm">{{ t("about.license_auto_filled") }}</span>
                   </div>
                 </div>
-                <div class="flex gap-2">
+                <LicenseKeyCheck :result="result" :refusal="refusal" />
+                <OBanner
+                  v-if="checkError"
+                  variant="error-soft"
+                  icon="cancel"
+                  class="my-3"
+                  data-test="license-key-check-error"
+                  >{{ t("about.key_check_failed", { message: checkError }) }}</OBanner
+                >
+                <div class="flex flex-wrap gap-2">
                   <OButton
                     data-test="cancel-update-license-btn"
                     variant="outline"
@@ -271,16 +290,27 @@
                     @click="
                       showUpdateForm = false;
                       licenseKey = '';
+                      clearKeyCheck();
                     "
                   >
                     {{ t("common.cancel") }}
                   </OButton>
+                  <OButton
+                    data-test="check-update-license-btn"
+                    variant="outline"
+                    size="sm-action"
+                    :loading="checking"
+                    :disabled="isSubmitting || updating"
+                    @click="checkLicense(true)"
+                    >{{ t("about.check_license_key") }}</OButton
+                  >
                   <OButton
                     data-test="confirm-update-license-btn"
                     variant="primary"
                     size="sm-action"
                     type="submit"
                     :loading="isSubmitting"
+                    :disabled="checking || updating"
                   >
                     {{ t("about.update_license") }}
                   </OButton>
@@ -485,11 +515,24 @@
 </template>
 
 <script lang="ts">
-import { licenseQuery } from "@/services/license_server.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import {
+  isRevRefusal,
+  isKeyCheckResult,
+  type KeyCheckResult,
+  type RevRefusal,
+} from "@/utils/licenseWaivers";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import LicenseKeyCheck from "./LicenseKeyCheck.vue";
+import {
+  licenseQuery,
+  checkLicenseMutation,
+  updateLicenseMutation,
+} from "@/services/license_server.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, ref, onMounted, computed, watch, defineAsyncComponent } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
-import licenseServer from "@/services/license_server";
 import { useStore } from "vuex";
 import DOMPurify from "dompurify";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
@@ -521,6 +564,8 @@ export default defineComponent({
     LicensePeriod,
     LicenseStatusCard,
     LicenseWaiversCard,
+    LicenseKeyCheck,
+    OBanner,
     RenderDashboardCharts,
     OButton,
     ODialog,
@@ -540,6 +585,20 @@ export default defineComponent({
     const refreshing = ref(false);
     const licenseData = ref<any>({});
     const licenseKey = ref("");
+    const result = ref<KeyCheckResult | null>(null);
+    const refusal = ref<RevRefusal | null>(null);
+    const checkError = ref("");
+    const checking = ref(false);
+    const updating = ref(false);
+    const checkMutation = useMutation(checkLicenseMutation());
+    const updateMutation = useMutation(updateLicenseMutation());
+    let draftVersion = 0;
+    const clearKeyCheck = () => {
+      draftVersion++;
+      result.value = null;
+      refusal.value = null;
+      checkError.value = "";
+    };
     const showUpdateForm = ref(false);
     const showLicenseKeyModal = ref(false);
     const isLicenseKeyAutoFilled = ref(false);
@@ -548,26 +607,65 @@ export default defineComponent({
     const usageDashboardData = ref<any>(null);
     const dashboardRenderKey = ref(0);
 
-    // Schema-driven validation replaces the `:disabled="!licenseKey.trim()"`
-    // gate. The same licenseKey is entered in two mutually-exclusive cards, each
-    // wrapped in its own <OForm> that OWNS the field (by name). `licenseKey` is
-    // only the shared INCOMING working value (auto-filled from URL, cleared on
-    // save/cancel) — bridged one-way into whichever form is mounted via the
-    // watch below; the typed value is read back from the submit payload, never
-    // from this ref. Options-API: schema/defaults MUST be returned from setup().
     const licenseSchema = makeLicenseSchema(t);
-    const noLicenseForm = ref<any>(null);
-    const updateLicenseForm = ref<any>(null);
-    const licenseDefaults = computed((): LicenseForm => ({ licenseKey: licenseKey.value }));
-
-    // Bridge programmatic licenseKey changes (URL auto-fill, cancel/clear) into
-    // whichever card's form is mounted. Use form.reset (NOT setFieldValue) so the
-    // field re-seeds AND submit state resets (submissionAttempts → 0) — no
-    // post-save "required" flash on the v-show'd update card when clearing to "".
-    watch(licenseKey, (v) => {
-      noLicenseForm.value?.form?.reset({ licenseKey: v ?? "" });
-      updateLicenseForm.value?.form?.reset({ licenseKey: v ?? "" });
+    const noLicenseForm = ref(null);
+    const updateLicenseForm = ref(null);
+    const noLicenseDraft = useOForm<LicenseForm>({
+      defaultValues: { licenseKey: "" },
+      schema: licenseSchema,
+      onSubmit: (value) => updateLicense(value),
     });
+    const updateLicenseDraft = useOForm<LicenseForm>({
+      defaultValues: { licenseKey: "" },
+      schema: licenseSchema,
+      onSubmit: (value) => updateLicense(value),
+    });
+    const noLicenseKey = noLicenseDraft.useStore((state) => state.values.licenseKey);
+    const updateLicenseKey = updateLicenseDraft.useStore((state) => state.values.licenseKey);
+    const licenseDefaults = computed((): LicenseForm => ({ licenseKey: licenseKey.value }));
+    watch([noLicenseKey, updateLicenseKey], clearKeyCheck, { flush: "sync" });
+    watch(
+      licenseKey,
+      (value) => {
+        clearKeyCheck();
+        noLicenseDraft.reset({ licenseKey: value });
+        updateLicenseDraft.reset({ licenseKey: value });
+      },
+      { flush: "sync" },
+    );
+
+    const checkLicense = async (hasLicense: boolean) => {
+      if (checking.value || updating.value) return;
+      const form = hasLicense ? updateLicenseDraft : noLicenseDraft;
+      const key = form.state.values.licenseKey.trim();
+      if (!key) {
+        await form.handleSubmit();
+        return;
+      }
+      clearKeyCheck();
+      const version = draftVersion;
+      checking.value = true;
+      try {
+        const response = await checkMutation.mutateAsync(key);
+        if (version !== draftVersion) return;
+        if (!isKeyCheckResult(response.data)) throw new Error(t("about.key_check_malformed"));
+        result.value = response.data;
+      } catch (error) {
+        if (version !== draftVersion) return;
+        const failure = error as {
+          response?: { status?: number; data?: { message?: string } };
+          message?: string;
+        };
+        checkError.value =
+          failure.response?.status === 403
+            ? t("about.key_check_forbidden")
+            : failure.response?.data?.message ||
+              failure.message ||
+              t("settings.licensePage.unexpectedError");
+      } finally {
+        checking.value = false;
+      }
+    };
 
     // Only the first load may swap the page for the spinner; later reloads would unmount the form.
     const loadLicenseData = async ({ background = false } = {}) => {
@@ -594,14 +692,14 @@ export default defineComponent({
       if (data) licenseData.value = data as typeof licenseData.value;
     };
 
-    // @submit handler — fires only once the schema passes (licenseKey required +
-    // trim), so the `:disabled` gate is gone (R3). Still callable directly with
-    // no args (reads the shared working ref); OForm awaits it so the inline Save
-    // button's spinner spans the request.
     const updateLicense = async (value?: LicenseForm) => {
+      if (checking.value || updating.value) return;
+      clearKeyCheck();
+      const version = draftVersion;
+      updating.value = true;
       const key = (value?.licenseKey ?? licenseKey.value ?? "").trim();
       try {
-        await licenseServer.update_license(key);
+        await updateMutation.mutateAsync(key);
         toast({
           variant: "success",
           message: t("about.license_updated_success"),
@@ -619,7 +717,12 @@ export default defineComponent({
         await reloadLicenseData();
         scheduleReload(adoptRefetchedLicense);
       } catch (error) {
-        const e = error as { response?: { data?: { message?: string } } };
+        const e = error as { response?: { status?: number; data?: { message?: string } } };
+        if (version !== draftVersion) return;
+        if (e.response?.status === 409 && isRevRefusal(e.response.data)) {
+          refusal.value = e.response.data;
+          return;
+        }
         console.error("Error updating license:", error);
         toast({
           variant: "error",
@@ -629,6 +732,8 @@ export default defineComponent({
               (e?.response?.data?.message || t("settings.licensePage.unexpectedError")),
           ),
         });
+      } finally {
+        updating.value = false;
       }
     };
 
@@ -1027,6 +1132,15 @@ export default defineComponent({
       showUpdateForm,
       showLicenseKeyModal,
       updateLicense,
+      checkLicense,
+      clearKeyCheck,
+      result,
+      refusal,
+      checkError,
+      checking,
+      updating,
+      noLicenseDraft,
+      updateLicenseDraft,
       // Form wiring (Options-API: schema/defaults MUST be returned so :schema
       // resolves and validation runs).
       licenseSchema,

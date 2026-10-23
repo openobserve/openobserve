@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { TranslateFn, I18nText } from "@/types/i18n";
+
 export interface LicenseWaiver {
   id: string;
   type: string;
@@ -21,6 +23,36 @@ export interface LicenseWaiver {
   ends_at: number;
   installation_id?: string;
   note: string;
+}
+
+export type RevReason = "rev_rollback" | "rev_conflict" | "superseded";
+
+export interface RevRefusal {
+  code: 409;
+  reason: RevReason;
+  message: string;
+  license_id: string;
+  loaded_rev: number | null;
+  pasted_rev: number;
+}
+
+export interface KeyCheckResult {
+  dry_run: true;
+  outcome: "accept" | RevReason | "env_key_conflict";
+  message: string;
+  license_id: string;
+  same_license: boolean;
+  loaded_rev: number | null;
+  pasted_rev: number;
+  waivers_added: LicenseWaiver[];
+  waivers_removed: LicenseWaiver[];
+}
+
+export interface RevHwmWarning {
+  source: "env" | "db";
+  license_id: string;
+  loaded_rev: number;
+  hwm_rev: number;
 }
 
 export type LicenseBlock = "usage_over_limit" | "report_failure" | "lv_verdict" | "unknown";
@@ -114,4 +146,106 @@ export function activeSearchUnblock(
   return knownWaivers(ws)
     .filter((w) => w.type === "search_unblock" && waiverStatus(w, nowUs) === "active")
     .sort((a, b) => b.ends_at - a.ends_at)[0];
+}
+
+export function issuedOn(rev: number, locale: string): string {
+  if (!rev) return "";
+  return new Intl.DateTimeFormat(locale, {
+    timeZone: "UTC",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(rev / 1000));
+}
+
+export function isRevRefusal(data: unknown): data is RevRefusal {
+  if (!data || typeof data !== "object") return false;
+  return (
+    "code" in data &&
+    data.code === 409 &&
+    "reason" in data &&
+    ["rev_rollback", "rev_conflict", "superseded"].includes(String(data.reason)) &&
+    "message" in data &&
+    typeof data.message === "string" &&
+    "license_id" in data &&
+    typeof data.license_id === "string" &&
+    "loaded_rev" in data &&
+    (data.loaded_rev === null || isRevision(data.loaded_rev)) &&
+    "pasted_rev" in data &&
+    isRevision(data.pasted_rev)
+  );
+}
+
+export function isKeyCheckResult(data: unknown): data is KeyCheckResult {
+  if (!data || typeof data !== "object") return false;
+  return (
+    "dry_run" in data &&
+    data.dry_run === true &&
+    "outcome" in data &&
+    ["accept", "rev_rollback", "rev_conflict", "superseded", "env_key_conflict"].includes(
+      String(data.outcome),
+    ) &&
+    "message" in data &&
+    typeof data.message === "string" &&
+    "license_id" in data &&
+    typeof data.license_id === "string" &&
+    "same_license" in data &&
+    typeof data.same_license === "boolean" &&
+    "loaded_rev" in data &&
+    (data.loaded_rev === null || isRevision(data.loaded_rev)) &&
+    "pasted_rev" in data &&
+    isRevision(data.pasted_rev) &&
+    "waivers_added" in data &&
+    isWaiverList(data.waivers_added) &&
+    "waivers_removed" in data &&
+    isWaiverList(data.waivers_removed)
+  );
+}
+
+export function waiverKindLabel(w: LicenseWaiver, t: TranslateFn): I18nText {
+  if (w.type === "search_unblock") return t("about.waiver_kind_search_unblock");
+  if (w.limit?.typ === "Unlimited") return t("about.waiver_kind_ingestion_unlimited");
+  return t("about.waiver_kind_ingestion_limit", { limit: w.limit?.value ?? 0 });
+}
+
+export function waiverWindowLabel(w: LicenseWaiver, locale: string, t: TranslateFn): I18nText {
+  if (w.type === "search_unblock")
+    return t("about.waiver_window_until", { end: formatUtc(w.ends_at, locale, true) });
+  return t("about.waiver_window_days", {
+    start: formatUtc(w.starts_at, locale, false),
+    end: formatUtc(lastCoveredDayUs(w), locale, false),
+  });
+}
+
+function isRevision(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+}
+
+function isWaiverList(value: unknown): value is LicenseWaiver[] {
+  return (
+    Array.isArray(value) &&
+    value.every((w: unknown) => {
+      if (!w || typeof w !== "object") return false;
+      return (
+        "id" in w &&
+        typeof w.id === "string" &&
+        "type" in w &&
+        typeof w.type === "string" &&
+        "note" in w &&
+        typeof w.note === "string" &&
+        "starts_at" in w &&
+        isRevision(w.starts_at) &&
+        "ends_at" in w &&
+        isRevision(w.ends_at) &&
+        (!("limit" in w) ||
+          w.limit === undefined ||
+          (w.limit !== null &&
+            typeof w.limit === "object" &&
+            "typ" in w.limit &&
+            ["Unlimited", "PerDayCount"].includes(String(w.limit.typ)) &&
+            "value" in w.limit &&
+            typeof w.limit.value === "number"))
+      );
+    })
+  );
 }

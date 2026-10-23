@@ -21,6 +21,8 @@ import {
   bannerSignature,
   boundaryDelayMs,
   formatUtc,
+  issuedOn,
+  isRevRefusal,
   knownWaivers,
   lastCoveredDayUs,
   licenseBannerState,
@@ -143,5 +145,35 @@ describe("boundaryDelayMs", () => {
 
   it("clamps a far boundary to the longest timeout a browser honours", () => {
     expect(boundaryDelayMs(40 * DAY_US, 0)).toBe(MAX_TIMEOUT_MS);
+  });
+});
+
+describe("license revision protection", () => {
+  it("issuedOn formats µs as a UTC date", () => {
+    expect(issuedOn(Date.UTC(2026, 9, 20) * 1000, "en-US")).toBe("Oct 20, 2026");
+  });
+  it("issuedOn(0) is empty", () => expect(issuedOn(0, "en-US")).toBe(""));
+  it("issuedOn round-trips 1760918400000000 without precision loss", () => {
+    expect(issuedOn(JSON.parse("1760918400000000"), "en-US")).toBe("Oct 20, 2025");
+  });
+  it("isRevRefusal accepts the 409 body and rejects the env body", () => {
+    const body = {
+      code: 409,
+      reason: "rev_rollback",
+      license_id: "lic_1",
+      message: "older",
+      loaded_rev: 9,
+      pasted_rev: 0,
+    };
+    expect(isRevRefusal(body)).toBe(true);
+    for (const invalid of [
+      null,
+      {},
+      { ...body, reason: "env_key_conflict" },
+      { ...body, code: "409" },
+      { ...body, loaded_rev: "9" },
+      { ...body, pasted_rev: null },
+    ])
+      expect(isRevRefusal(invalid)).toBe(false);
   });
 });

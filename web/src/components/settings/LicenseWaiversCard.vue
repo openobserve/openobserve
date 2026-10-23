@@ -36,11 +36,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #cell-waiver="{ row }">
           <span class="flex items-center gap-2" :data-test="`license-waiver-row-${row.id}`">
-            <span>{{ kindLabel(row) }}</span>
+            <span>{{ waiverKindLabel(row, t) }}</span>
             <OTag type="licenseWaiverStatus" :value="waiverStatus(row, nowUs)" />
           </span>
         </template>
-        <template #cell-window="{ row }">{{ windowLabel(row) }}</template>
+        <template #cell-window="{ row }">{{ waiverWindowLabel(row, locale, t) }}</template>
       </OTable>
     </OCardSection>
   </OCard>
@@ -56,9 +56,9 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import {
   boundaryDelayMs,
-  formatUtc,
+  waiverKindLabel,
+  waiverWindowLabel,
   knownWaivers,
-  lastCoveredDayUs,
   waiverStatus,
   type LicenseWaiver,
 } from "@/utils/licenseWaivers";
@@ -102,20 +102,4 @@ const columns = computed<OTableColumnDef[]>(() => [
     meta: { autoWidth: true, fillRemaining: true },
   },
 ]);
-
-function kindLabel(w: LicenseWaiver): string {
-  if (w.type === "search_unblock") return t("about.waiver_kind_search_unblock");
-  if (w.limit?.typ === "Unlimited") return t("about.waiver_kind_ingestion_unlimited");
-  return t("about.waiver_kind_ingestion_limit", { limit: w.limit?.value ?? 0 });
-}
-
-function windowLabel(w: LicenseWaiver): string {
-  if (w.type === "search_unblock") {
-    return t("about.waiver_window_until", { end: formatUtc(w.ends_at, locale.value, true) });
-  }
-  return t("about.waiver_window_days", {
-    start: formatUtc(w.starts_at, locale.value, false),
-    end: formatUtc(lastCoveredDayUs(w), locale.value, false),
-  });
-}
 </script>
