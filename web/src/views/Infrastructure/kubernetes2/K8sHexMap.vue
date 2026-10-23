@@ -42,6 +42,7 @@ import type { MapEntity, MapGroup } from "./kubernetesQueries";
 import { isLabelGroup, type MapFill } from "./kubernetesUrlState";
 import {
   fillClass,
+  isFailing,
   type FillClass,
   type GroupHeader,
   type MapRow,
@@ -71,6 +72,7 @@ const CLASSES: readonly FillClass[] = [
   "ok",
   "warning",
   "error",
+  "noReq",
   "noData",
 ];
 
@@ -83,12 +85,22 @@ const CLASS_TOKEN: Record<FillClass, `--${string}`> = {
   ok: "--color-status-positive",
   warning: "--color-status-warning-text",
   error: "--color-status-negative",
+  noReq: "--color-surface-subtle",
   noData: "--color-surface-subtle",
 };
 
 const GLYPH: Record<StatusClass, string> = { error: "✕", warning: "!", ok: "✓" };
 
 const NO_DATA = CLASSES.indexOf("noData");
+
+const NO_REQ = CLASSES.indexOf("noReq");
+
+const MARK_MIN_UNIT = 9;
+
+// eslint-disable-next-line local/no-hardcoded-px -- canvas geometry
+const MARK_FONT = "700 11px sans-serif";
+
+const HATCH_PX = 6;
 
 const HEX_SCALE = 0.9;
 
@@ -253,6 +265,7 @@ const hexData = computed(() => {
         CLASSES.indexOf(cls),
         Number(row.key === props.selectedKey),
         Number(lit.size > 0 && !lit.has(cls)),
+        Number(isFailing(row)),
       ];
     }),
   );
@@ -429,11 +442,32 @@ function headerTexts(
   return out;
 }
 
+// A canvas pattern, because a zrender fill cannot take a CSS gradient.
+function hatchFill(stroke: string, base: string) {
+  const canvas = document.createElement("canvas");
+  canvas.width = HATCH_PX;
+  canvas.height = HATCH_PX;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return base;
+  ctx.fillStyle = base;
+  ctx.fillRect(0, 0, HATCH_PX, HATCH_PX);
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, HATCH_PX);
+  ctx.lineTo(HATCH_PX, 0);
+  ctx.stroke();
+  return { type: "pattern", image: canvas, repeat: "repeat" } as unknown as string;
+}
+
 function buildOptions() {
   const { width, height } = plot.value;
   const state = view.value;
   if (!state || !width || !height) return {};
   const palette = CLASSES.map((c) => chartColor(CLASS_TOKEN[c]));
+  palette[NO_REQ] = hatchFill(chartColor("--color-border-strong"), palette[NO_REQ]);
+  const markColor = chartColor("--color-text-inverse");
+  const markOnPale = chartColor(CLASS_TOKEN.error);
   const accent = chartColor("--color-accent");
   const border = chartColor("--color-border-control");
   const card = {
@@ -498,18 +532,41 @@ function buildOptions() {
           const unit = api.size([1, 1])[0] * HEX_SCALE;
           const cls = api.value(2);
           const selected = api.value(3) === 1;
-          return {
+          const opacity = api.value(4) === 1 ? DIMMED : 1;
+          const hex = {
             type: "polygon",
             shape: { points: hexPoints(cx, cy, unit) },
             z2: selected ? 10 : 0,
             cursor: "pointer",
             style: {
               fill: palette[cls],
-              stroke: selected ? accent : cls === NO_DATA ? border : undefined,
-              lineWidth: selected ? 2.5 : cls === NO_DATA ? 1 : 0,
-              opacity: api.value(4) === 1 ? DIMMED : 1,
+              stroke: selected ? accent : cls === NO_DATA || cls === NO_REQ ? border : undefined,
+              lineWidth: selected ? 2.5 : cls === NO_DATA || cls === NO_REQ ? 1 : 0,
+              opacity,
             },
             emphasis: { style: { stroke: accent, lineWidth: 2 } },
+          };
+          if (api.value(5) !== 1 || unit < MARK_MIN_UNIT) return hex;
+          return {
+            type: "group",
+            children: [
+              hex,
+              {
+                type: "text",
+                silent: true,
+                x: cx,
+                y: cy,
+                z2: selected ? 11 : 1,
+                style: {
+                  text: "!",
+                  fill: cls === NO_DATA || cls === NO_REQ ? markOnPale : markColor,
+                  font: MARK_FONT,
+                  align: "center",
+                  verticalAlign: "middle",
+                  opacity,
+                },
+              },
+            ],
           };
         },
       },

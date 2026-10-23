@@ -159,13 +159,13 @@ describe("useKubernetesInventory", () => {
   describe("per-view sets (§7.2) plus CL and NS1", () => {
     const CL_IDS = [...CLUSTER_QUERIES];
     it.each([
-      ["pods", 17 + 6, ["W:Pod", "O:pod"]],
-      ["cluster", 10 + 6, ["W:*"]],
-      ["workloads", 16 + 6, ["E"]],
-      ["hpas", 5 + 6, ["W:HorizontalPodAutoscaler"]],
-      ["replicasets", 5 + 6, ["W:ReplicaSet"]],
-      ["nodes", 9 + 6, ["W:Node", "O:node"]],
-      ["events", 0 + 6, ["E"]],
+      ["pods", 17 + 7, ["W:Pod", "O:pod"]],
+      ["cluster", 10 + 7, ["W:*"]],
+      ["workloads", 16 + 7, ["E"]],
+      ["hpas", 5 + 7, ["W:HorizontalPodAutoscaler"]],
+      ["replicasets", 5 + 7, ["W:ReplicaSet"]],
+      ["nodes", 9 + 7, ["W:Node", "O:node"]],
+      ["events", 0 + 7, ["E"]],
     ] as const)("%s sends %i PromQL and %j", async (view, count, sqlNames) => {
       const { inv } = await setup({ view });
       await inv.load();
@@ -283,7 +283,12 @@ describe("useKubernetesInventory", () => {
       await inv.load();
       const sent = sentQueries();
       expect(
-        sent.find((q) => q.includes("kube_pod_status_phase") && !q.startsWith("count")),
+        sent.find(
+          (q) =>
+            q.includes("kube_pod_status_phase") &&
+            !q.startsWith("count") &&
+            !q.startsWith("label_replace"),
+        ),
       ).toContain('kube_pod_status_phase{k8s_cluster="prod"}');
       expect(sent.find((q) => q.includes("k8s_pod_cpu_usage") && !q.startsWith("count"))).toContain(
         'k8s_pod_cpu_usage{k8s_cluster_name="prod"}',
@@ -317,7 +322,7 @@ describe("useKubernetesInventory", () => {
       await inv.load();
       expect(inv.pageError.value).toContain("boom");
       expect(inv.inventory.value.pods).toEqual([]);
-      expect(sentIds().filter((id) => !id.startsWith("CL"))).toEqual([]);
+      expect(sentIds().filter((id) => !id.startsWith("CL") && id !== "CST")).toEqual([]);
     });
 
     it("shows the page error when CL succeeds but every sent view request fails, despite sparse empties", async () => {

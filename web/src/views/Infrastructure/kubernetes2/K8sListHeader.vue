@@ -20,11 +20,14 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import type { StatusChipDef, StatusChipId } from "./kubernetesStatusChips";
 
 const props = withDefaults(
   defineProps<{
@@ -42,6 +45,8 @@ const props = withDefaults(
     search?: string;
     searchPlaceholder?: I18nText;
     searchable?: boolean;
+    statusChips?: StatusChipDef[];
+    statusFilter?: StatusChipId;
   }>(),
   {
     countLabel: undefined,
@@ -55,12 +60,15 @@ const props = withDefaults(
     search: "",
     searchPlaceholder: undefined,
     searchable: true,
+    statusChips: () => [],
+    statusFilter: "all",
   },
 );
 
 const emit = defineEmits<{
   "update:namespaces": [value: string[]];
   "update:search": [value: string];
+  "update:statusFilter": [value: StatusChipId];
   clear: [];
 }>();
 
@@ -72,6 +80,10 @@ const filterOpen = ref(false);
 const filtered = computed(() => props.filtered || !!props.search || props.namespaces.length > 0);
 
 const options = computed(() => props.namespaceOptions.map((ns) => ({ label: raw(ns), value: ns })));
+
+const onStatus = (value: unknown) => {
+  if (value) emit("update:statusFilter", String(value) as StatusChipId);
+};
 
 const onNamespaces = (value: unknown) =>
   emit("update:namespaces", (Array.isArray(value) ? value : []).map(String));
@@ -121,6 +133,23 @@ const onNamespaces = (value: unknown) =>
         >{{ chip }}</OTag
       >
     </div>
+    <OToggleGroup
+      v-if="statusChips.length"
+      :model-value="statusFilter"
+      mobile-dropdown
+      data-test="k8s2-status-chips"
+      @update:model-value="onStatus"
+    >
+      <OToggleGroupItem
+        v-for="chip in statusChips"
+        :key="chip.id"
+        :value="chip.id"
+        size="sm"
+        :data-test="`k8s2-status-chip-${chip.id}`"
+        >{{ t(chip.label) }}
+        <span class="text-text-secondary ms-1 tabular-nums">{{ raw(String(chip.count)) }}</span>
+      </OToggleGroupItem>
+    </OToggleGroup>
     <div class="ms-auto flex min-w-0 items-center gap-2">
       <OSelect
         v-if="namespaced"
