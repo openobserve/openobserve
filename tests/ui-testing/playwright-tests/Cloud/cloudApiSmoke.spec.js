@@ -13,6 +13,7 @@ const { test, expect } = require("@playwright/test");
 const testLogger = require("../utils/test-logger.js");
 const { CloudApiSmokePage } = require("../../pages/cloudPages/cloudApiSmokePage.js");
 
+// Shared seed stream, kept between runs like e2e_automate; only this shard writes to its org.
 const STREAM = "cloud_api_smoke";
 
 test.describe("Cloud API smoke", () => {
