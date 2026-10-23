@@ -46,6 +46,8 @@ mod file_list_dump;
 pub(crate) mod files;
 mod flatten_compactor;
 #[cfg(feature = "enterprise")]
+mod fleet_inventory;
+#[cfg(feature = "enterprise")]
 mod incidents;
 mod leader;
 #[cfg(feature = "enterprise")]
@@ -654,6 +656,56 @@ pub async fn init() -> Result<(), anyhow::Error> {
             // An ack token is single-use, and single-use on one node only is not single-use.
             o2_enterprise::enterprise::oncall::token::mark_spent(tag, expires_at);
         }));
+    }
+    // Every node: the validator, which reads the token cache, runs wherever HTTP is served.
+    #[cfg(feature = "enterprise")]
+    if openobserve_core::fleet::enabled() {
+        use o2_enterprise::enterprise::fleet::{
+            apply_event,
+            enrollment::{ENROLLMENT, RECONCILE_INTERVAL_SECS},
+            inventory::FLEET_CALLBACKS,
+        };
+        // Subscribed before the reads below, so an event committed during them still arrives.
+        let events = infra::coordinator::fleet::subscribe()
+            .await
+            .expect("fleet watch failed");
+        // A dropped subscription would silently stop revokes, deletes and assignments arriving.
+        tokio::task::spawn(async move {
+            let mut events = Some(events);
+            loop {
+                let subscribed = match events.take() {
+                    Some(events) => Ok(events),
+                    None => infra::coordinator::fleet::subscribe().await,
+                };
+                let watched = match subscribed {
+                    Ok(events) => {
+                        infra::coordinator::fleet::run(events, |event| {
+                            tokio::spawn(apply_event(event));
+                        })
+                        .await
+                    }
+                    Err(e) => Err(e.into()),
+                };
+                log::error!("[FLEET] fleet watch ended ({watched:?}), re-subscribing");
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            }
+        });
+        let rw = infra::db::get_orm_client_rw().await;
+        ENROLLMENT
+            .hydrate_with(rw)
+            .await
+            .expect("fleet token cache load failed");
+        FLEET_CALLBACKS
+            .desired()
+            .hydrate_with(rw)
+            .await
+            .expect("fleet desired configurations load failed");
+        spawn_pausable_job!("fleet_token_reconcile", RECONCILE_INTERVAL_SECS, {
+            ENROLLMENT.reconcile().await;
+        });
+        spawn_pausable_job!("fleet_desired_reconcile", RECONCILE_INTERVAL_SECS, {
+            FLEET_CALLBACKS.reconcile_desired().await;
+        });
     }
     // org_settings_watch already started above for all nodes including routers
     // Watch needed on queriers (UI APIs) and on whichever node role is the configured
@@ -1408,6 +1460,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
     llm_secret_cleanup::run();
     #[cfg(feature = "enterprise")]
     prompt_webhook_delivery::run();
+    #[cfg(feature = "enterprise")]
+    if openobserve_core::fleet::enabled() {
+        o2_enterprise::enterprise::fleet::opamp::run_sweep();
+    }
+    #[cfg(feature = "enterprise")]
+    fleet_inventory::run();
 
     if LOCAL_NODE.is_compactor() {
         tokio::task::spawn(file_list_dump::run());
