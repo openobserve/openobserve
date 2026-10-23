@@ -530,7 +530,8 @@
       "connectDataSourcePopup.spec.js",
       "splunk-hec-ingestion-window.spec.js",
       "enrichment.spec.js",
-      "schema.spec.js"
+      "schema.spec.js",
+      "ingestion-setup-card-tracing.spec.js"
     ],
     "disabled": []
   },
