@@ -348,6 +348,8 @@ test.describe("dashboard UI testcases", () => {
 
     // Create a new dashboard and add a panel
     await pm.dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
+    await pm.dashboardSetting.enableDynamicFilters();
     await pm.dashboardCreate.addPanel();
     await pm.dashboardPanelActions.addPanelName(panelName);
 

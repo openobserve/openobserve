@@ -18,6 +18,8 @@ import { calculateGridPositions } from "../../calculateGridForSubPlot";
 import { getSeriesColor } from "../../colorPalette";
 import { chartColor } from "@/utils/chartTheme";
 import { type SQLContext } from "../shared/types";
+import { gaugeDialRange } from "../../thresholds";
+import { createSeriesOverrideLookup, gaugeOverrideTooltip } from "../../seriesOverrides";
 
 /**
  * Applies chart-specific options for: gauge
@@ -38,6 +40,7 @@ export function applyGaugeChart(ctx: SQLContext): void {
     getAxisDataFromKey,
   } = ctx;
 
+  const seriesOverrides = createSeriesOverrideLookup(panelSchema?.config);
   const key1 = yAxisKeys[0];
   const yAxisValue = getAxisDataFromKey(key1);
   // used for gauge name
@@ -97,8 +100,11 @@ export function applyGaugeChart(ctx: SQLContext): void {
   options.series = gaugeData.map((it: any, index: any) => {
     return {
       ...defaultSeriesProps,
-      min: panelSchema?.queries[0]?.config?.min || 0,
-      max: panelSchema?.queries[0]?.config?.max || 100,
+      ...gaugeDialRange(
+        panelSchema?.queries[0]?.config?.min,
+        panelSchema?.queries[0]?.config?.max,
+        seriesOverrides.unitArgs(gaugeNames[index] ?? "").unit,
+      ),
 
       //which grid will be used
       gridIndex: index,
@@ -137,12 +143,8 @@ export function applyGaugeChart(ctx: SQLContext): void {
           detail: {
             formatter: function (value: any) {
               try {
-                const unitValue = getUnitValue(
-                  value,
-                  panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom,
-                  panelSchema.config?.decimals,
-                );
+                const unit = seriesOverrides.unitArgs(gaugeNames[index] ?? "");
+                const unitValue = getUnitValue(value, unit.unit, unit.unitCustom, unit.decimals);
                 return unitValue.value + unitValue.unit;
               } catch (error) {
                 return value ?? "";
@@ -151,6 +153,7 @@ export function applyGaugeChart(ctx: SQLContext): void {
           },
           itemStyle: {
             color:
+              seriesOverrides.get(gaugeNames[index] ?? "")?.color ??
               getSeriesColor(
                 panelSchema?.config?.color,
                 gaugeNames[index] ?? "",
@@ -159,10 +162,12 @@ export function applyGaugeChart(ctx: SQLContext): void {
                 chartMax,
                 store.state.theme,
                 panelSchema?.config?.color?.colorBySeries,
-              ) ?? null,
+              ) ??
+              null,
           },
         },
       ],
+      ...gaugeOverrideTooltip(seriesOverrides, gaugeNames[index] ?? ""),
       detail: {
         valueAnimation: true,
         offsetCenter: [0, 0],
