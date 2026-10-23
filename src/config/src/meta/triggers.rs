@@ -124,6 +124,13 @@ pub struct Trigger {
     pub data: String,
 }
 
+impl Trigger {
+    /// The due time, or `None` once the trigger is Completed and will not run again.
+    pub fn pending_next_run_at(&self) -> Option<i64> {
+        (self.status != TriggerStatus::Completed).then_some(self.next_run_at)
+    }
+}
+
 impl MemorySize for Trigger {
     fn mem_size(&self) -> usize {
         std::mem::size_of::<Trigger>()
@@ -239,6 +246,20 @@ impl ScheduledTriggerData {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_completed_trigger_has_no_pending_next_run() {
+        let waiting = Trigger {
+            next_run_at: 42,
+            ..Default::default()
+        };
+        assert_eq!(waiting.pending_next_run_at(), Some(42));
+        let completed = Trigger {
+            status: TriggerStatus::Completed,
+            ..waiting
+        };
+        assert_eq!(completed.pending_next_run_at(), None);
+    }
 
     #[test]
     fn test_trigger_module_display() {
