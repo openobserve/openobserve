@@ -1196,6 +1196,20 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn an_identical_paste_that_stored_its_key_keeps_the_hwm() {
+        let _store = store_setup().await;
+        gate_and_raise(&lic("lic-1", 5)).await.unwrap().unwrap();
+        let first = store_gated(&lic("lic-1", 9), || async {
+            let _ = store_gated(&lic("lic-1", 9), || async { Ok(()) }).await;
+            Err(infra::errors::Error::Message("disk full".to_string()))
+        })
+        .await;
+        assert_eq!(first.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let hwm = load_rev_hwm().await.unwrap();
+        assert_eq!(hwm.entry("lic-1").unwrap().map(|e| e.rev), Some(9));
+    }
+
+    #[tokio::test]
     async fn store_dry_run_writes_neither_the_key_nor_the_hwm() {
         let _store = store_setup().await;
         let (status, body) = paste(lic("lic-1", 9), true).await;
