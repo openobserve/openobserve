@@ -25,7 +25,9 @@ use common::meta::http::HttpResponse as MetaHttpResponse;
 use config::meta::public_dashboards::{PublicDashboardConfig, TakeOverRequest};
 use infra::table::entity::public_dashboards::Model as PublicDashboard;
 use openobserve_api_common::extractors::Headers;
-use openobserve_core::public_dashboards::{Conflict, Forbidden, Invalid, LINK_NOT_FOUND};
+use openobserve_core::public_dashboards::{
+    Conflict, Forbidden, Invalid, LINK_NOT_FOUND, PublicLinkView, hide_unreadable_slugs,
+};
 
 use crate::service::auth::UserEmail;
 #[cfg(feature = "enterprise")]
@@ -106,6 +108,42 @@ async fn edit_access_gate(
     None
 }
 
+/// Whether the caller can GET the dashboard, checked as `edit_access_gate` checks PUT.
+#[cfg(feature = "enterprise")]
+async fn can_read_dashboard(
+    org_id: &str,
+    user_id: &str,
+    dashboard_id: String,
+    folder_id: Option<String>,
+) -> bool {
+    // A deleted dashboard has no folder to check against, so its slug stays hidden.
+    let Some(folder_id) = folder_id else {
+        return false;
+    };
+    check_permissions(
+        &dashboard_id,
+        org_id,
+        user_id,
+        "dashboards",
+        "GET",
+        Some(&folder_id),
+        false,
+        true,
+        false,
+    )
+    .await
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn can_read_dashboard(
+    _org_id: &str,
+    _user_id: &str,
+    _dashboard_id: String,
+    _folder_id: Option<String>,
+) -> bool {
+    true
+}
+
 /// The link only when it belongs to this org and dashboard, else the response to return.
 pub(super) async fn load_link(
     org_id: &str,
@@ -119,8 +157,33 @@ pub(super) async fn load_link(
     }
 }
 
-async fn view_response(ctx: &str, org_id: &str, link: PublicDashboard) -> Response {
-    match openobserve_core::public_dashboards::views(org_id, vec![link]).await {
+/// The views with each slug hidden unless `reader` may GET its dashboard; None skips the check.
+async fn views_for(
+    org_id: &str,
+    reader: Option<&str>,
+    links: Vec<PublicDashboard>,
+) -> Result<Vec<PublicLinkView>, anyhow::Error> {
+    let mut views = openobserve_core::public_dashboards::views(org_id, links).await?;
+    hide_for_reader(&mut views, org_id, reader).await;
+    Ok(views)
+}
+
+async fn hide_for_reader(views: &mut [PublicLinkView], org_id: &str, reader: Option<&str>) {
+    if let Some(user_id) = reader {
+        hide_unreadable_slugs(views, |dashboard_id, folder_id| {
+            can_read_dashboard(org_id, user_id, dashboard_id, folder_id)
+        })
+        .await;
+    }
+}
+
+async fn view_response(
+    ctx: &str,
+    org_id: &str,
+    reader: Option<&str>,
+    link: PublicDashboard,
+) -> Response {
+    match views_for(org_id, reader, vec![link]).await {
         Ok(mut v) => match v.pop() {
             Some(view) => MetaHttpResponse::json(view),
             None => MetaHttpResponse::not_found(LINK_NOT_FOUND),
@@ -129,31 +192,43 @@ async fn view_response(ctx: &str, org_id: &str, link: PublicDashboard) -> Respon
     }
 }
 
-async fn list_response(ctx: &str, org_id: &str, links: Vec<PublicDashboard>) -> Response {
-    match openobserve_core::public_dashboards::views(org_id, links).await {
-        Ok(list) => MetaHttpResponse::json(serde_json::json!({ "list": list })),
+async fn list_response(
+    ctx: &str,
+    org_id: &str,
+    user_id: &str,
+    links: Vec<PublicDashboard>,
+) -> Response {
+    match views_for(org_id, Some(user_id), links).await {
+        Ok(list) => list_body(list),
         Err(e) => map_err(ctx, e),
     }
 }
 
-/// GET /{org_id}/public_dashboards — every public link in the org.
-pub async fn list_org(Path(org_id): Path<String>) -> Response {
+fn list_body(list: Vec<PublicLinkView>) -> Response {
+    MetaHttpResponse::json(serde_json::json!({ "list": list }))
+}
+
+/// GET /{org_id}/public_dashboards — every public link in the org; slugs only where readable.
+pub async fn list_org(Path(org_id): Path<String>, Headers(user): Headers<UserEmail>) -> Response {
     if let Some(r) = feature_gate() {
         return r;
     }
     match openobserve_core::public_dashboards::list(&org_id).await {
-        Ok(links) => list_response("list_org", &org_id, links).await,
+        Ok(links) => list_response("list_org", &org_id, &user.user_id, links).await,
         Err(e) => map_err("list_org", e),
     }
 }
 
 /// GET /{org_id}/dashboards/{dashboard_id}/public_links — this dashboard's links, newest first.
-pub async fn list(Path((org_id, dashboard_id)): Path<(String, String)>) -> Response {
+pub async fn list(
+    Path((org_id, dashboard_id)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
+) -> Response {
     if let Some(r) = feature_gate() {
         return r;
     }
     match openobserve_core::public_dashboards::list_for_dashboard(&org_id, &dashboard_id).await {
-        Ok(links) => list_response("list", &org_id, links).await,
+        Ok(links) => list_response("list", &org_id, &user.user_id, links).await,
         Err(e) => map_err("list", e),
     }
 }
@@ -185,7 +260,7 @@ pub async fn create(
         Err(e) => return map_err("create", e),
     };
     match load_link(&org_id, &dashboard_id, &created.id).await {
-        Ok(link) => view_response("create", &org_id, link).await,
+        Ok(link) => view_response("create", &org_id, None, link).await,
         Err(r) => r,
     }
 }
@@ -193,12 +268,13 @@ pub async fn create(
 /// GET /{org_id}/dashboards/{dashboard_id}/public_links/{link_id}
 pub async fn get(
     Path((org_id, dashboard_id, link_id)): Path<(String, String, String)>,
+    Headers(user): Headers<UserEmail>,
 ) -> Response {
     if let Some(r) = feature_gate() {
         return r;
     }
     match load_link(&org_id, &dashboard_id, &link_id).await {
-        Ok(link) => view_response("get", &org_id, link).await,
+        Ok(link) => view_response("get", &org_id, Some(&user.user_id), link).await,
         Err(r) => r,
     }
 }
@@ -223,7 +299,7 @@ pub async fn update(
         return MetaHttpResponse::bad_request(msg);
     }
     match openobserve_core::public_dashboards::update_link(link, body, &user.user_id).await {
-        Ok(link) => view_response("update", &org_id, link).await,
+        Ok(link) => view_response("update", &org_id, None, link).await,
         Err(e) => map_err("update", e),
     }
 }
@@ -244,7 +320,7 @@ pub async fn pause(
         Err(r) => return r,
     };
     match openobserve_core::public_dashboards::pause_link(link, &user.user_id).await {
-        Ok(link) => view_response("pause", &org_id, link).await,
+        Ok(link) => view_response("pause", &org_id, None, link).await,
         Err(e) => map_err("pause", e),
     }
 }
@@ -265,7 +341,7 @@ pub async fn resume(
         Err(r) => return r,
     };
     match openobserve_core::public_dashboards::resume_link(link, &user.user_id).await {
-        Ok(link) => view_response("resume", &org_id, link).await,
+        Ok(link) => view_response("resume", &org_id, None, link).await,
         Err(e) => map_err("resume", e),
     }
 }
@@ -293,7 +369,7 @@ pub async fn take_over(
     )
     .await
     {
-        Ok(link) => view_response("take_over", &org_id, link).await,
+        Ok(link) => view_response("take_over", &org_id, None, link).await,
         Err(e) => map_err("take_over", e),
     }
 }
@@ -314,7 +390,7 @@ pub async fn refresh(
         Err(r) => return r,
     };
     match openobserve_core::public_dashboards::refresh_now(link).await {
-        Ok(link) => view_response("refresh", &org_id, link).await,
+        Ok(link) => view_response("refresh", &org_id, None, link).await,
         Err(e) => map_err("refresh", e),
     }
 }
@@ -367,6 +443,66 @@ mod tests {
             map_err("create", other).status(),
             StatusCode::INTERNAL_SERVER_ERROR
         );
+    }
+
+    fn views(dashboards: &[(&str, Option<&str>)]) -> Vec<PublicLinkView> {
+        dashboards
+            .iter()
+            .map(|(dash, folder)| {
+                let link: PublicDashboard = serde_json::from_value(serde_json::json!({
+                    "id": dash, "org_id": "o", "folder_id": "f", "dashboard_id": dash,
+                    "slug": format!("slug-{dash}"), "name": "n", "visibility": 1,
+                    "refresh_secs": 300, "dashboard_version": 8, "published_by": "p@x",
+                    "enabled": true, "created_by": "p@x", "created_at": 1, "updated_at": 1,
+                    "rev": 1, "access_count": 0
+                }))
+                .unwrap();
+                let label = folder.map(|f| infra::table::dashboards::DashboardLabel {
+                    title: "t".into(),
+                    folder_id: f.into(),
+                    folder_name: "f".into(),
+                });
+                openobserve_core::public_dashboards::view(link, label.as_ref(), false, 1)
+            })
+            .collect()
+    }
+
+    async fn list_json(list: Vec<PublicLinkView>) -> serde_json::Value {
+        let body = axum::body::to_bytes(list_body(list).into_body(), 1 << 20)
+            .await
+            .unwrap();
+        serde_json::from_slice(&body).unwrap()
+    }
+
+    #[tokio::test]
+    async fn the_list_shows_a_null_slug_where_the_caller_cannot_get_the_dashboard() {
+        let mut list = views(&[("open", Some("f1")), ("secret", Some("f2"))]);
+        hide_unreadable_slugs(&mut list, |dash, _| async move { dash == "open" }).await;
+        let json = list_json(list).await;
+        assert_eq!(json["list"][0]["slug"], "slug-open");
+        let hidden = json["list"][1].as_object().unwrap();
+        assert_eq!(hidden.get("slug"), Some(&serde_json::Value::Null));
+        assert_eq!(hidden["dashboard_title"], "t");
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn without_enterprise_every_reader_keeps_every_slug() {
+        let mut list = views(&[("a", Some("f1")), ("gone", None)]);
+        hide_for_reader(&mut list, "o", Some("viewer@x")).await;
+        let json = list_json(list).await;
+        assert_eq!(json["list"][0]["slug"], "slug-a");
+        assert_eq!(json["list"][1]["slug"], "slug-gone");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_reader_never_sees_the_slug_of_a_deleted_dashboard_but_an_editor_does() {
+        let mut list = views(&[("gone", None)]);
+        hide_for_reader(&mut list, "o", None).await;
+        assert_eq!(list[0].slug.as_deref(), Some("slug-gone"));
+        hide_for_reader(&mut list, "o", Some("viewer@x")).await;
+        assert_eq!(list[0].slug, None);
     }
 
     /// `edit_access_gate` answers 403 in Enterprise; take_over returns it untouched before any

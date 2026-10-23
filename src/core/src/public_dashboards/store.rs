@@ -44,6 +44,8 @@ const MAGIC: &[u8; 4] = b"O2PD";
 pub const FORMAT_VERSION: u16 = 4;
 /// Magic, version and the header length.
 const PREFIX_LEN: usize = 4 + 2 + 4;
+/// A longer header is a corrupt file, never an allocation of up to 4 GiB.
+const MAX_HEADER_LEN: usize = 16 << 20;
 
 /// Seeded from the clock, so an incarnation is never reused, not even across a restart.
 static INCARNATION: LazyLock<AtomicU64> =
@@ -228,7 +230,9 @@ pub fn header_len(prefix: &[u8]) -> Result<usize, anyhow::Error> {
         version == FORMAT_VERSION,
         "unknown format version {version}"
     );
-    Ok(u32::from_le_bytes(prefix[6..10].try_into()?) as usize)
+    let len = u32::from_le_bytes(prefix[6..10].try_into()?) as usize;
+    anyhow::ensure!(len <= MAX_HEADER_LEN, "header length {len} is corrupt");
+    Ok(len)
 }
 
 pub fn decode(bytes: &Bytes) -> Result<Stored, anyhow::Error> {
@@ -504,6 +508,24 @@ mod tests {
     async fn gate16_a_broken_file_on_disk_is_a_miss_and_is_evicted() {
         let key = key("o", &config::ider::uuid(), "r60");
         public_dashboards_replace(&key, 1, Bytes::from_static(b"not a result file"))
+            .await
+            .unwrap();
+        assert!(read_header(&key).await.is_none());
+        assert!(disk::get(&key, None).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn a_header_length_past_the_cap_is_a_corrupt_file_and_is_evicted() {
+        let key = key("o", &config::ider::uuid(), "r60");
+        let mut huge = encode(&Header::default(), &manifest(), &[])
+            .unwrap()
+            .to_vec();
+        huge[6..10].copy_from_slice(&u32::MAX.to_le_bytes());
+        assert!(header_len(&huge).is_err());
+        let mut at_cap = huge.clone();
+        at_cap[6..10].copy_from_slice(&u32::try_from(MAX_HEADER_LEN).unwrap().to_le_bytes());
+        assert_eq!(header_len(&at_cap).unwrap(), MAX_HEADER_LEN);
+        public_dashboards_replace(&key, 1, Bytes::from(huge))
             .await
             .unwrap();
         assert!(read_header(&key).await.is_none());

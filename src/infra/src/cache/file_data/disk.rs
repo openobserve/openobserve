@@ -125,6 +125,10 @@ static TRASH_ID: AtomicUsize = AtomicUsize::new(0);
 #[cfg(test)]
 static FAIL_TMP_WRITES: Lazy<std::sync::Mutex<std::collections::HashSet<String>>> =
     Lazy::new(Default::default);
+/// Temp files whose write panics partway, to drive the join-error cleanup in tests.
+#[cfg(test)]
+static PANIC_TMP_WRITES: Lazy<std::sync::Mutex<std::collections::HashSet<String>>> =
+    Lazy::new(Default::default);
 
 pub static LOADING_FROM_DISK_NUM: Lazy<AtomicUsize> = Lazy::new(|| AtomicUsize::new(0));
 pub static LOADING_FROM_DISK_DONE: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
@@ -695,6 +699,11 @@ fn write_public_dashboard_tmp(tmp: &str, data: &[u8]) -> std::io::Result<()> {
             f.write_all(&data[..data.len() / 2])?;
             return Err(std::io::Error::other("injected write failure"));
         }
+        #[cfg(test)]
+        if PANIC_TMP_WRITES.lock().unwrap().contains(tmp) {
+            f.write_all(&data[..data.len() / 2])?;
+            panic!("injected write panic");
+        }
         f.write_all(data)?;
         f.sync_all()
     };
@@ -1109,7 +1118,14 @@ pub async fn public_dashboards_replace(
     }
     let tmp = format!("{path}.{incarnation}.tmp");
     let tmp_path = tmp.clone();
-    tokio::task::spawn_blocking(move || write_public_dashboard_tmp(&tmp_path, &data)).await??;
+    match tokio::task::spawn_blocking(move || write_public_dashboard_tmp(&tmp_path, &data)).await {
+        Ok(written) => written?,
+        Err(e) => {
+            // A panic skipped the write's own cleanup.
+            _ = tokio::fs::remove_file(&tmp).await;
+            return Err(e.into());
+        }
+    }
     let old = RESULT_FILES[idx]
         .write()
         .await
@@ -2974,7 +2990,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_public_dashboard_write_that_fails_midway_twice_leaves_no_temp_and_the_old_file() {
+    async fn a_public_dashboard_write_that_fails_or_panics_midway_leaves_no_temp_and_the_old_file()
+    {
         let _serial = PUBLIC_DASHBOARD_TESTS.lock().await;
         let (_, key) = public_key("r3600");
         public_dashboards_replace(&key, 1, Bytes::from_static(b"old contents"))
@@ -2989,6 +3006,11 @@ mod tests {
             FAIL_TMP_WRITES.lock().unwrap().remove(&tmp);
             assert!(replaced.is_err(), "attempt {incarnation}");
         }
+        let tmp = format!("{path}.4.tmp");
+        PANIC_TMP_WRITES.lock().unwrap().insert(tmp.clone());
+        let replaced = public_dashboards_replace(&key, 4, Bytes::from(vec![7u8; 64])).await;
+        PANIC_TMP_WRITES.lock().unwrap().remove(&tmp);
+        assert!(replaced.is_err(), "a panicked write");
         let dir = Path::new(&path).parent().unwrap();
         let temps: Vec<_> = std::fs::read_dir(dir)
             .unwrap()

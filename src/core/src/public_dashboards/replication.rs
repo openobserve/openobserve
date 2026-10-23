@@ -30,7 +30,11 @@ use sea_orm::ConnectionTrait;
 /// How often the housekeeping job retries failed emits.
 pub const OUTBOX_RETRY_SECS: i64 = 60;
 /// Outbox entries one retry pass sends at most.
-const OUTBOX_BATCH: u64 = 100;
+const OUTBOX_BATCH: usize = 100;
+/// Entries one pass reads, so entries still backing off do not crowd out the due ones.
+const OUTBOX_SCAN: u64 = 1000;
+/// The longest wait between two retries of one entry.
+const OUTBOX_MAX_BACKOFF_SECS: i64 = 3600;
 
 /// Whether link rows replicate: Enterprise with the super cluster on, the guard dashboards use.
 pub fn enabled() -> bool {
@@ -109,13 +113,17 @@ where
     F: Fn(PublicDashboard) -> Fut,
     Fut: Future<Output = Result<(), anyhow::Error>>,
 {
-    let due = match pd_table::outbox_list_due(db, now, OUTBOX_BATCH).await {
-        Ok(due) => due,
+    let listed = match pd_table::outbox_list_due(db, now, OUTBOX_SCAN).await {
+        Ok(listed) => listed,
         Err(e) => {
             log::error!("[public_dashboards] reading the outbox failed: {e}");
             return 0;
         }
     };
+    let due = listed
+        .into_iter()
+        .filter(|e| outbox_due(e.attempts, e.updated_at, now))
+        .take(OUTBOX_BATCH);
     let mut sent = 0;
     for entry in due {
         let row = match pd_table::get(db, &entry.link_id).await {
@@ -136,7 +144,15 @@ where
                 pd_table::outbox_delete(db, &row.id, row.rev).await
             }
             Err(e) => {
-                log::warn!("[public_dashboards] outbox retry of {}: {e}", row.id);
+                let attempts = entry.attempts.saturating_add(1);
+                if reaches_max_backoff(attempts) {
+                    log::error!(
+                        "[public_dashboards] replicating link {} failed {attempts} times; retrying hourly: {e}",
+                        row.id
+                    );
+                } else {
+                    log::warn!("[public_dashboards] outbox retry of {}: {e}", row.id);
+                }
                 pd_table::outbox_bump_attempts(db, &row.id, now).await
             }
         };
@@ -145,6 +161,26 @@ where
         }
     }
     sent
+}
+
+/// The wait after `attempts` failed retries: none for the first, then doubling up to an hour.
+fn outbox_backoff_secs(attempts: i32) -> i64 {
+    let Ok(doublings) = u32::try_from(attempts.saturating_sub(2)) else {
+        return 0;
+    };
+    (OUTBOX_RETRY_SECS << doublings.min(16)).min(OUTBOX_MAX_BACKOFF_SECS)
+}
+
+/// Whether an entry is due; half a period of slack, so a pass that runs a little early still sends.
+fn outbox_due(attempts: i32, updated_at: i64, now: i64) -> bool {
+    let slack = OUTBOX_RETRY_SECS / 2;
+    now.saturating_sub(updated_at) >= (outbox_backoff_secs(attempts) - slack) * 1_000_000
+}
+
+/// True for the one failure count at which the wait first reaches its hourly maximum.
+fn reaches_max_backoff(attempts: i32) -> bool {
+    outbox_backoff_secs(attempts) == OUTBOX_MAX_BACKOFF_SECS
+        && outbox_backoff_secs(attempts.saturating_sub(1)) < OUTBOX_MAX_BACKOFF_SECS
 }
 
 #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
@@ -303,6 +339,48 @@ pub(crate) mod tests {
         pd_table::outbox_put(&db, "gone", 3, 1).await.unwrap();
         assert_eq!(retry_outbox_on(&db, queue.emitter(), now_micros()).await, 1);
         assert!(queued(&db).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn failed_retries_back_off_up_to_an_hour_and_log_once_at_the_cap() {
+        let db = db().await;
+        let t0 = 1_000_000_000_000;
+        pd_table::outbox_put(&db, "l", 1, t0).await.unwrap();
+        pd_table::insert_capped(&db, &link("l"), 10, 10, false)
+            .await
+            .unwrap();
+        let queue = Queue::default();
+        queue.down.store(true, Ordering::SeqCst);
+        // The first two failures retry on the next passes, as before.
+        retry_outbox_on(&db, queue.emitter(), t0).await;
+        retry_outbox_on(&db, queue.emitter(), t0).await;
+        assert_eq!(queued(&db).await[0].2, 2);
+        // Then the wait doubles from the retry period: 60 s, then 120 s.
+        let sec = 1_000_000;
+        retry_outbox_on(&db, queue.emitter(), t0 + 29 * sec).await;
+        assert_eq!(queued(&db).await[0].2, 2, "not due yet");
+        retry_outbox_on(&db, queue.emitter(), t0 + 60 * sec).await;
+        assert_eq!(queued(&db).await[0].2, 3);
+        retry_outbox_on(&db, queue.emitter(), t0 + 120 * sec).await;
+        assert_eq!(queued(&db).await[0].2, 3, "not due yet");
+        retry_outbox_on(&db, queue.emitter(), t0 + 180 * sec).await;
+        assert_eq!(queued(&db).await[0].2, 4);
+        // A delivery still clears it once the queue is back.
+        queue.down.store(false, Ordering::SeqCst);
+        assert_eq!(
+            retry_outbox_on(&db, queue.emitter(), t0 + 420 * sec).await,
+            1
+        );
+        assert!(queued(&db).await.is_empty());
+
+        let waits: Vec<i64> = (0..=10).map(outbox_backoff_secs).collect();
+        assert_eq!(
+            waits,
+            [0, 0, 60, 120, 240, 480, 960, 1920, 3600, 3600, 3600]
+        );
+        assert_eq!(outbox_backoff_secs(i32::MAX), OUTBOX_MAX_BACKOFF_SECS);
+        let capped: Vec<i32> = (0..1000).filter(|a| reaches_max_backoff(*a)).collect();
+        assert_eq!(capped, [8], "the cap is logged once");
     }
 
     #[test]

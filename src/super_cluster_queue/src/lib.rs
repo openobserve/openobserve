@@ -102,7 +102,7 @@ async fn incident_msg(msg: Message) -> infra::errors::Result<()> {
     }
 }
 
-/// The `dashboard` key carries two payloads; older regions skip byte 95, a public link row.
+/// The `dashboard` key carries two payloads; older regions skip byte 96, a public link row.
 async fn dashboard_msg(msg: Message) -> infra::errors::Result<()> {
     match msg.message_type {
         MessageType::PublicDashboardsTable => public_dashboards::process(msg).await,

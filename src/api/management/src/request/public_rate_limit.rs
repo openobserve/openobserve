@@ -16,7 +16,7 @@
 //! Fixed-window per-IP limiter shared by the unauthenticated public planes.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     sync::Mutex,
     time::{Duration, Instant},
 };
@@ -33,7 +33,8 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 pub const UNKNOWN_IP: &str = "unknown";
 const MAX_KEYS: usize = 65_536;
 
-/// Hit counts per key in fixed windows, holding at most a fixed number of keys.
+/// Hit counts per key in fixed windows, holding at most a fixed number of keys; a full map evicts
+/// the oldest window.
 pub struct Counters {
     max_keys: usize,
     state: Mutex<CounterState>,
@@ -47,7 +48,7 @@ impl Counters {
         }
     }
 
-    /// Counts one hit for `key`; true past its budget, or for a new key while the map is full.
+    /// Counts one hit for `key`; true past its budget.
     pub fn over_budget(&self, key: &str, window: Duration, max: u32) -> bool {
         self.over_budget_at(key, window, max, Instant::now())
     }
@@ -72,26 +73,29 @@ impl Counters {
             .swept_at
             .is_none_or(|at| now.duration_since(at) >= window)
         {
-            state
-                .hits
-                .retain(|_, (_, at)| now.duration_since(*at) < window);
+            let CounterState { hits, order, .. } = &mut *state;
+            hits.retain(|_, (_, at)| now.duration_since(*at) < window);
+            order.retain(|(k, at)| hits.get(k).is_some_and(|e| e.1 == *at));
             state.swept_at = Some(now);
         }
-        let full = state.hits.len() >= self.max_keys;
-        match state.hits.get_mut(key) {
-            Some(entry) => {
-                if now.duration_since(entry.1) >= window {
-                    *entry = (0, now);
-                }
-                entry.0 = entry.0.saturating_add(1);
-                entry.0 > max
+        if let Some(entry) = state.hits.get_mut(key) {
+            let renewed = now.duration_since(entry.1) >= window;
+            if renewed {
+                *entry = (0, now);
             }
-            None if full => true,
-            None => {
-                state.hits.insert(key.to_owned(), (1, now));
-                max == 0
+            entry.0 = entry.0.saturating_add(1);
+            let over = entry.0 > max;
+            if renewed {
+                state.order.push_back((key.to_owned(), now));
             }
+            return over;
         }
+        if state.hits.len() >= self.max_keys {
+            state.evict_oldest();
+        }
+        state.hits.insert(key.to_owned(), (1, now));
+        state.order.push_back((key.to_owned(), now));
+        max == 0
     }
 }
 
@@ -104,7 +108,20 @@ impl Default for Counters {
 #[derive(Default)]
 struct CounterState {
     hits: HashMap<String, (u32, Instant)>,
+    // Window starts in arrival order; an entry whose start no longer matches `hits` is stale.
+    order: VecDeque<(String, Instant)>,
     swept_at: Option<Instant>,
+}
+
+impl CounterState {
+    fn evict_oldest(&mut self) {
+        while let Some((key, at)) = self.order.pop_front() {
+            if self.hits.get(&key).is_some_and(|e| e.1 == at) {
+                self.hits.remove(&key);
+                return;
+            }
+        }
+    }
 }
 
 /// The client's address for logs: the ingress-resolved `RealIp`, or [`UNKNOWN_IP`].
@@ -137,17 +154,25 @@ mod tests {
     }
 
     #[test]
-    fn a_full_map_refuses_new_keys_until_the_window_sweeps_them() {
+    fn a_full_map_admits_a_new_key_by_evicting_the_oldest() {
         let counters = Counters::new(2);
         let window = Duration::from_secs(60);
         let t0 = Instant::now();
-        assert!(!counters.over_budget_at("a", window, 5, t0));
-        assert!(!counters.over_budget_at("b", window, 5, t0));
-        assert!(counters.over_budget_at("c", window, 5, t0));
-        assert!(!counters.over_budget_at("a", window, 5, t0));
-        let later = t0 + window;
-        assert!(!counters.over_budget_at("c", window, 5, later));
-        assert_eq!(counters.state.lock().unwrap().hits.len(), 1);
+        assert!(!counters.over_budget_at("a", window, 1, t0));
+        assert!(!counters.over_budget_at("b", window, 1, t0 + Duration::from_secs(1)));
+        assert!(!counters.over_budget_at("c", window, 1, t0 + Duration::from_secs(2)));
+        {
+            let state = counters.state.lock().unwrap();
+            assert_eq!(state.hits.len(), 2);
+            assert!(!state.hits.contains_key("a"), "the oldest key is evicted");
+            assert!(state.hits.contains_key("b") && state.hits.contains_key("c"));
+        }
+        assert!(
+            counters.over_budget_at("b", window, 1, t0 + Duration::from_secs(3)),
+            "a kept key keeps its count"
+        );
+        assert!(!counters.over_budget_at("a", window, 1, t0 + Duration::from_secs(4)));
+        assert!(!counters.state.lock().unwrap().hits.contains_key("b"));
     }
 
     #[tokio::test]

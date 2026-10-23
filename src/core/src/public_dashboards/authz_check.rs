@@ -25,7 +25,7 @@ use infra::table::entity::public_dashboards::Model as PublicDashboard;
 
 use super::{
     AuthorizerProbe,
-    flight::{Built, Failure, Flights, Kind, Outcome, Start, Wait},
+    flight::{Built, Failure, Flight, Flights, Kind, Outcome, Start, Wait},
     materialize::Engine,
     store::{self, Header, ManifestPanel, PanelOutcome, Stored},
 };
@@ -65,23 +65,51 @@ pub async fn under_flight(
         Start::Follower(f) if f.kind == Kind::AuthCheck => {
             from_wait(f.wait(timeout, u32::MAX).await)
         }
-        Start::Follower(_) | Start::Capacity => {
-            let Some(stored) = read_own(key, link).await else {
-                return Checked::Missing;
-            };
-            match recheck(engine, link, &stored, now).await {
-                Ok(header) => Checked::Once(Built {
-                    body: decode_body(&stored),
-                    header,
-                    stored: false,
-                }),
-                Err(Failure::NotServable) => {
-                    store::evict(key).await;
-                    Checked::NotServable
+        Start::Follower(f) => check_once(engine, key, link, now, Some(&f)).await,
+        Start::Capacity => check_once(engine, key, link, now, None).await,
+    }
+}
+
+/// Checks without a rewrite; under a build's flight one passing recheck serves the flight's life.
+async fn check_once(
+    engine: &'static dyn Engine,
+    key: &str,
+    link: &PublicDashboard,
+    now: i64,
+    build: Option<&Flight>,
+) -> Checked {
+    let Some(stored) = read_own(key, link).await else {
+        return Checked::Missing;
+    };
+    let rechecked = match build {
+        Some(flight) => {
+            let mut cached = flight.recheck.lock().await;
+            match cached.as_ref() {
+                Some((incarnation, header)) if *incarnation == stored.header.incarnation => {
+                    Ok(header.clone())
                 }
-                Err(_) => Checked::Unavailable,
+                _ => {
+                    let out = recheck(engine, link, &stored, now).await;
+                    if let Ok(header) = &out {
+                        *cached = Some((stored.header.incarnation, header.clone()));
+                    }
+                    out
+                }
             }
         }
+        None => recheck(engine, link, &stored, now).await,
+    };
+    match rechecked {
+        Ok(header) => Checked::Once(Built {
+            body: decode_body(&stored),
+            header,
+            stored: false,
+        }),
+        Err(Failure::NotServable) => {
+            store::evict(key).await;
+            Checked::NotServable
+        }
+        Err(_) => Checked::Unavailable,
     }
 }
 

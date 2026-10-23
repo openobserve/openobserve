@@ -325,7 +325,8 @@ pub struct PublishResult {
 pub struct PublicLinkView {
     pub id: String,
     pub name: String,
-    pub slug: String,
+    /// Null when the caller cannot read the link's dashboard.
+    pub slug: Option<String>,
     pub dashboard_id: String,
     pub dashboard_title: Option<String>,
     pub folder_id: Option<String>,
@@ -707,40 +708,75 @@ where
     links
         .into_iter()
         .map(|link| {
-            let label = labels.get(&link.dashboard_id);
-            let status = PublicLinkStatus::derive(
-                &PublicLinkState {
-                    dashboard_exists: label.is_some(),
-                    enabled: link.enabled,
-                    expires_at: link.expires_at,
-                    access_count: link.access_count,
-                },
-                now,
+            let (label, publisher_left) = (
+                labels.get(&link.dashboard_id),
+                left.contains(&link.published_by),
             );
-            PublicLinkView {
-                dashboard_title: label.map(|l| l.title.clone()),
-                folder_id: label.map(|l| l.folder_id.clone()),
-                folder_name: label.map(|l| l.folder_name.clone()),
-                status,
-                enabled: link.enabled,
-                time_range: time_ranges(&link),
-                frozen_variables: parse_frozen_vars(link.frozen_variables.as_deref()),
-                refresh_secs: link.refresh_secs,
-                expires_at: link.expires_at,
-                publisher_left: left.contains(&link.published_by),
-                published_by: link.published_by,
-                updated_by: link.updated_by,
-                created_at: link.created_at,
-                updated_at: link.updated_at,
-                last_accessed_at: link.last_accessed_at,
-                access_count: link.access_count,
-                id: link.id,
-                name: link.name,
-                slug: link.slug,
-                dashboard_id: link.dashboard_id,
-            }
+            view(link, label, publisher_left, now)
         })
         .collect()
+}
+
+/// One link as the admin API shows it, slug included; `label` is its dashboard, None once deleted.
+pub fn view(
+    link: PublicDashboard,
+    label: Option<&DashboardLabel>,
+    publisher_left: bool,
+    now: i64,
+) -> PublicLinkView {
+    let status = PublicLinkStatus::derive(
+        &PublicLinkState {
+            dashboard_exists: label.is_some(),
+            enabled: link.enabled,
+            expires_at: link.expires_at,
+            access_count: link.access_count,
+        },
+        now,
+    );
+    PublicLinkView {
+        dashboard_title: label.map(|l| l.title.clone()),
+        folder_id: label.map(|l| l.folder_id.clone()),
+        folder_name: label.map(|l| l.folder_name.clone()),
+        status,
+        enabled: link.enabled,
+        time_range: time_ranges(&link),
+        frozen_variables: parse_frozen_vars(link.frozen_variables.as_deref()),
+        refresh_secs: link.refresh_secs,
+        expires_at: link.expires_at,
+        publisher_left,
+        published_by: link.published_by,
+        updated_by: link.updated_by,
+        created_at: link.created_at,
+        updated_at: link.updated_at,
+        last_accessed_at: link.last_accessed_at,
+        access_count: link.access_count,
+        id: link.id,
+        name: link.name,
+        slug: Some(link.slug),
+        dashboard_id: link.dashboard_id,
+    }
+}
+
+/// Clears the slug of each view whose dashboard `can_read` refuses, asking once per dashboard.
+pub async fn hide_unreadable_slugs<F, Fut>(views: &mut [PublicLinkView], can_read: F)
+where
+    F: Fn(String, Option<String>) -> Fut,
+    Fut: std::future::Future<Output = bool>,
+{
+    let mut readable: HashMap<String, bool> = HashMap::new();
+    for view in views.iter_mut() {
+        let allowed = match readable.get(&view.dashboard_id) {
+            Some(allowed) => *allowed,
+            None => {
+                let allowed = can_read(view.dashboard_id.clone(), view.folder_id.clone()).await;
+                readable.insert(view.dashboard_id.clone(), allowed);
+                allowed
+            }
+        };
+        if !allowed {
+            view.slug = None;
+        }
+    }
 }
 
 /// A live link of this org and dashboard only, read from the primary as every edit starts here.
@@ -3684,6 +3720,49 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_view_hides_the_slug_only_where_the_caller_cannot_read_the_dashboard() {
+        let label = |folder: &str| DashboardLabel {
+            title: "t".into(),
+            folder_id: folder.into(),
+            folder_name: "f".into(),
+        };
+        let labels: HashMap<String, DashboardLabel> =
+            [("open".into(), label("f1")), ("secret".into(), label("f2"))].into();
+        let links: Vec<PublicDashboard> = [("a", "open"), ("b", "secret"), ("c", "secret")]
+            .iter()
+            .map(|(id, dash)| PublicDashboard {
+                dashboard_id: dash.to_string(),
+                ..replication::tests::link(id)
+            })
+            .collect();
+        let mut views = views_with(links, &labels, |_| async { Ok(true) }).await;
+        assert!(
+            views.iter().all(|v| v.slug.is_some()),
+            "the builder keeps every slug"
+        );
+        let asked = std::sync::Mutex::new(Vec::new());
+        hide_unreadable_slugs(&mut views, |dash, folder| {
+            asked.lock().unwrap().push((dash.clone(), folder));
+            async move { dash == "open" }
+        })
+        .await;
+        let slugs: Vec<Option<&str>> = views.iter().map(|v| v.slug.as_deref()).collect();
+        assert_eq!(slugs, [Some("slug-a"), None, None]);
+        assert_eq!(
+            asked.into_inner().unwrap(),
+            [
+                ("open".to_string(), Some("f1".to_string())),
+                ("secret".to_string(), Some("f2".to_string()))
+            ],
+            "one check per dashboard, with its folder"
+        );
+        let hidden = serde_json::to_value(&views[1]).unwrap();
+        assert_eq!(hidden["slug"], serde_json::Value::Null);
+        assert!(hidden.as_object().unwrap().contains_key("slug"));
+        assert_eq!(hidden["dashboard_title"], json!("t"));
+    }
+
+    #[tokio::test]
     async fn after_a_takeover_the_next_read_serves_nothing_from_the_old_publishers_file() {
         let (db, link) = leavers_link().await;
         let (engine, dash) = two_stream_engine(&link);
@@ -3877,6 +3956,50 @@ mod tests {
         );
         assert!(store::read_header(&key).await.is_none());
         assert_eq!(engine.authz_calls.load(Ordering::SeqCst), authz);
+    }
+
+    #[tokio::test]
+    async fn readers_past_the_deadline_recheck_once_per_build_holding_the_key() {
+        let (_db, link) = leavers_link().await;
+        let (engine, dash) = two_stream_engine(&link);
+        let range = materialize::tests::rel(3600);
+        let key = store::key(&link.org_id, &link.id, &range.key());
+        let now = now_micros();
+        let flights = materialize::tests::flights(8, 1);
+        materialize::tests::read_at(engine, flights, &link, &dash, range, now).await;
+        materialize::tests::settle(flights).await;
+        let later = now + authz_check::AUTH_DEADLINE_MICROS + 1;
+        let hold = |busy: &'static flight::Flights| {
+            let started = busy.start(&key, &link.org_id, flight::Kind::Build, |_| async {
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                Err(flight::Failure::Panic)
+            });
+            assert!(matches!(started, flight::Start::Leader(_)));
+        };
+        let busy = materialize::tests::flights(8, 1);
+        hold(busy);
+        let before = engine.authz_calls.load(Ordering::SeqCst);
+        for _ in 0..3 {
+            let checked = authz_check::under_flight(engine, busy, &key, &link, later).await;
+            assert!(
+                matches!(checked, authz_check::Checked::Once(_)),
+                "{checked:?}"
+            );
+        }
+        let per_check = engine.authz_calls.load(Ordering::SeqCst) - before;
+        assert!(per_check > 0, "the first reader rechecks");
+        let other = materialize::tests::flights(8, 1);
+        hold(other);
+        let checked = authz_check::under_flight(engine, other, &key, &link, later).await;
+        assert!(
+            matches!(checked, authz_check::Checked::Once(_)),
+            "{checked:?}"
+        );
+        assert_eq!(
+            engine.authz_calls.load(Ordering::SeqCst) - before,
+            2 * per_check,
+            "three reads under one build recheck once; another build rechecks again"
+        );
     }
 
     #[tokio::test]

@@ -36,7 +36,7 @@ use futures::{
     FutureExt,
     future::{BoxFuture, Shared},
 };
-use tokio::sync::{OwnedSemaphorePermit, Semaphore, oneshot};
+use tokio::sync::{Mutex, OwnedSemaphorePermit, Semaphore, oneshot};
 
 use super::store::Header;
 
@@ -85,6 +85,8 @@ pub struct Flight {
     waiters: AtomicU32,
     estimate_secs: AtomicU64,
     progress_milli: AtomicU32,
+    /// A deadline recheck readers ran while this flight held the key, by file incarnation.
+    pub(super) recheck: Mutex<Option<(u64, Header)>>,
 }
 
 impl Flight {
@@ -201,6 +203,7 @@ impl Flights {
             waiters: AtomicU32::new(0),
             estimate_secs: AtomicU64::new(0),
             progress_milli: AtomicU32::new(0),
+            recheck: Mutex::new(None),
         });
         drop(vacant.insert(flight.clone()));
         let key = key.to_string();
