@@ -115,9 +115,8 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
         for partition_job in partition_jobs.iter() {
             // check if the job is still running
             check_status(id, &job.id, &job.org_id).await?;
-            // Not failed: the job keeps its finished partitions and resumes after its heartbeat
-            // lapses.
-            if let Some(reason) = job_pause_reason(&job.org_id, &job.stream_names) {
+            // not failed: finished partitions stay, and the stale-job reset requeues it
+            if let Some(reason) = job_pause_reason() {
                 log::warn!("[SEARCH JOB {id}] job_id: {}, paused: {reason}", job.id);
                 return Ok(());
             }
@@ -420,20 +419,14 @@ async fn check_status(id: i64, job_id: &str, org_id: &str) -> Result<(), anyhow:
     Ok(())
 }
 
-/// Why a job's search may not run now, `None` when it may.
-fn job_pause_reason(org_id: &str, stream_names: &str) -> Option<String> {
-    if org_id == config::META_ORG_ID {
-        return None;
-    }
-    let streams: Vec<String> = json::from_str(stream_names).unwrap_or_default();
-    let verdict = if streams.is_empty() {
-        crate::check_search_allowed(org_id, None)
-    } else {
-        streams
-            .iter()
-            .try_for_each(|stream| crate::check_search_allowed(org_id, Some(stream)))
-    };
-    verdict.err().map(|e| e.to_string())
+/// Why a job waits for search to be allowed again, `None` when it may run.
+fn job_pause_reason() -> Option<String> {
+    // installation-wide like the claim check, so `_meta` and operational-stream jobs wait too (A7)
+    (!o2_enterprise::enterprise::license::search_allowed()).then(|| {
+        crate::search_blocked_message(
+            o2_enterprise::enterprise::license::current_license_id().as_deref(),
+        )
+    })
 }
 
 pub async fn merge_response(
@@ -613,34 +606,91 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn job_pause_reason_follows_the_gate() {
+    async fn job_pause_reason_follows_the_installation_gate() {
         use o2_enterprise::enterprise::license::close_search_gate_for_tests;
 
-        let cases = [
-            ("acme", r#"["logs"]"#),
-            ("acme", r#"["_o2_ai_chat_events"]"#),
-            ("acme", r#"["triggers"]"#),
-            ("_meta", r#"["logs"]"#),
-            ("acme", "garbage"),
-        ];
         let gate = close_search_gate_for_tests().await;
-        let paused: Vec<bool> = cases
-            .iter()
-            .map(|(org, streams)| job_pause_reason(org, streams).is_some())
-            .collect();
-        assert_eq!(paused, [true, false, true, false, true]);
+        let reason = job_pause_reason().expect("every job waits while search is blocked");
         assert!(
-            job_pause_reason("acme", r#"["logs"]"#)
-                .unwrap()
-                .contains("Search is temporarily disabled")
+            reason.contains("Search is temporarily disabled"),
+            "{reason}"
         );
         drop(gate);
         let _held = o2_enterprise::enterprise::license::TEST_STATICS_LOCK
             .lock()
             .await;
-        for (org, streams) in cases {
-            assert_eq!(job_pause_reason(org, streams), None, "{org} {streams}");
+        assert_eq!(job_pause_reason(), None);
+    }
+
+    #[tokio::test]
+    async fn a_paused_job_resumes_with_its_finished_partitions() {
+        use o2_enterprise::enterprise::license::close_search_gate_for_tests;
+
+        infra::db::create_table().await.unwrap();
+        let id = submit(
+            "p1b3-paused",
+            "acme",
+            "u@paused.test",
+            "logs",
+            r#"["logs"]"#,
+            "{}",
+            0,
+            10,
+        )
+        .await
+        .unwrap();
+        // the table may hold older pending jobs from earlier runs, which are claimed first
+        while let Some(claimed) = get_job().await.unwrap() {
+            if claimed.id == id {
+                break;
+            }
         }
+        set_partition_num(&id, 2).await.unwrap();
+        submit_partitions(&id, &[[0, 5], [5, 10]]).await.unwrap();
+        set_partition_job_finish(&id, 0, "result/paused/0.result.json")
+            .await
+            .unwrap();
+
+        check_running_jobs(config::utils::time::now_micros() + 1)
+            .await
+            .unwrap();
+        let reset = get(&id, "acme").await.unwrap();
+        assert_eq!(
+            (reset.status, reset.error_message, reset.ended_at),
+            (0, None, None)
+        );
+        {
+            let _gate = close_search_gate_for_tests().await;
+            run(1).await.unwrap();
+            assert_eq!(
+                get(&id, "acme").await.unwrap().status,
+                0,
+                "claimed while blocked"
+            );
+        }
+
+        let mut resumed = None;
+        while let Some(claimed) = get_job().await.unwrap() {
+            if claimed.id == id {
+                resumed = Some(claimed);
+                break;
+            }
+        }
+        let resumed = resumed.expect("the reset job is claimable again");
+        assert_eq!(resumed.partition_num, Some(2));
+        let partitions = get_partition_jobs(&id).await.unwrap();
+        let mut state: Vec<(i64, Option<String>)> = partitions
+            .iter()
+            .map(|p| (p.partition_id, p.result_path.clone()))
+            .collect();
+        state.sort();
+        assert_eq!(
+            state,
+            [
+                (0, Some("result/paused/0.result.json".to_string())),
+                (1, None)
+            ]
+        );
     }
 
     fn run_body() -> &'static str {
