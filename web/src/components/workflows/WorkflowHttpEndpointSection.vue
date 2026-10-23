@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :value="lastCall.received_at"
                 unit="us"
                 mode="absolute"
+                :format="RUN_TIME_SHORT"
                 :timezone="store.state.timezone"
               />
             </template>
@@ -195,6 +196,7 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import { RUN_TIME_SHORT } from "@/plugins/workflows/runStatus";
 import {
   useWorkflowHttpEndpoint,
   type EndpointContext,

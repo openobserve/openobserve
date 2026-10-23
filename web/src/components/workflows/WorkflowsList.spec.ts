@@ -489,6 +489,14 @@ describe("WorkflowsList", () => {
       ).toEqual(["#", "name", "description", "trigger", "updated_at", "actions"]);
     });
 
+    // Measured in the built UI: the Incident Event tag 94 + gap 4 + HTTP tag 63 + 16 cell padding.
+    it("sizes Trigger for an Incident Event tag and the HTTP tag side by side", async () => {
+      wrapper = mountList();
+      await flushPromises();
+      const trigger = (table(wrapper).props("columns") as any[]).find((c) => c.id === "trigger");
+      expect(trigger.size).toBeGreaterThanOrEqual(177);
+    });
+
     it("marks the actions column as an action column", async () => {
       wrapper = mountList();
       await flushPromises();

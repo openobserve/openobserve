@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="number"
           :label="t('workflow.http.maxBody')"
           :help-text="t('workflow.http.maxBodyHint')"
-          width="xs"
+          width="md"
           data-test="workflow-http-max-body"
         />
         <OFormInput
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="number"
           :label="t('workflow.http.rateLimit')"
           :help-text="t('workflow.http.rateLimitHint', { org: orgBudget })"
-          width="xs"
+          width="md"
           data-test="workflow-http-rate-limit"
         />
         <OBanner
