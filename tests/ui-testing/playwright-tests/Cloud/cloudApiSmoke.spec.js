@@ -52,18 +52,19 @@ test.describe("Cloud API smoke", () => {
 
         testLogger.step("Read it back");
         const stored = await smoke.getAlert(created.alertId);
-        expect(stored.recovery_destinations).toEqual([created.destination]);
+        const recovery = realtime ? [] : [created.destination];
+        expect(stored.recovery_destinations ?? []).toEqual(recovery);
         expect(stored.context_attributes).toEqual({ team: "qa" });
         expect(stored.tags).toEqual(["cloud-api-smoke"]);
         expect(stored.deduplication.fingerprint_fields).toEqual(["level"]);
-        expect(stored.trigger_condition.warning_threshold).toBe(2);
+        expect(stored.trigger_condition.warning_threshold ?? null).toBe(realtime ? null : 2);
 
         testLogger.step("Update it and read it back again");
         stored.description = "cloud api smoke updated";
         await smoke.updateAlert(created.alertId, stored);
         const updated = await smoke.getAlert(created.alertId);
         expect(updated.description).toBe("cloud api smoke updated");
-        expect(updated.recovery_destinations).toEqual([created.destination]);
+        expect(updated.recovery_destinations ?? []).toEqual(recovery);
       }
     );
   }

@@ -69,7 +69,7 @@ class CloudApiSmokePage {
     }
 
     alertPayload(name, stream, destination, { realtime = false } = {}) {
-        return {
+        const payload = {
             name,
             stream_type: 'logs',
             stream_name: stream,
@@ -96,10 +96,13 @@ class CloudApiSmokePage {
             deduplication: { enabled: true, fingerprint_fields: ['level'], time_window_minutes: 30 },
             notify_on_recovery: true,
             recovery_destinations: [destination],
-            // Realtime alerts reject a pending period.
-            pending_period_sec: realtime ? 0 : 60,
+            pending_period_sec: 60,
             keep_firing_for: 60,
         };
+        if (!realtime) return payload;
+        // Realtime alerts reject pending, warning, recovery and keep-firing settings.
+        const { warning_threshold: _w, notify_on_warning: _n, ...trigger } = payload.trigger_condition;
+        return { ...payload, trigger_condition: trigger, pending_period_sec: 0, notify_on_recovery: false, recovery_destinations: [], keep_firing_for: 0 };
     }
 
     async createAlert(payload) {

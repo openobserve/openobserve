@@ -6,12 +6,12 @@ from conftest import unique_name
 LONG_TEXT = "Überwachung ✓ 監視 " * 120
 
 
-def _alert_payload(name: str, stream: str, dest: str, *, realtime: bool = False) -> dict:
+def _alert_payload(name: str, stream: str, dest: str) -> dict:
     return {
         "name": name,
         "stream_type": "logs",
         "stream_name": stream,
-        "is_real_time": realtime,
+        "is_real_time": False,
         "query_condition": {
             "type": "custom",
             "conditions": {"version": 2, "conditions": {"filterType": "group", "logicalOperator": "AND", "conditions": []}},
@@ -34,10 +34,17 @@ def _alert_payload(name: str, stream: str, dest: str, *, realtime: bool = False)
         "deduplication": {"enabled": True, "fingerprint_fields": ["level"], "time_window_minutes": 30},
         "notify_on_recovery": True,
         "recovery_destinations": [dest],
-        # Realtime alerts reject a pending period.
-        "pending_period_sec": 0 if realtime else 60,
+        "pending_period_sec": 60,
         "keep_firing_for": 60,
     }
+
+
+def _realtime(payload: dict) -> dict:
+    # Realtime alerts reject pending, warning, recovery and keep-firing settings (alert.rs validate).
+    payload.update(is_real_time=True, pending_period_sec=0, notify_on_recovery=False, recovery_destinations=[], keep_firing_for=0)
+    payload["trigger_condition"].pop("warning_threshold")
+    payload["trigger_condition"].pop("notify_on_warning")
+    return payload
 
 
 def _grouped(payload: dict) -> dict:
@@ -81,8 +88,8 @@ def _update(api, alert_id: str, alert: dict) -> dict:
     return _read(api, alert_id)
 
 
-def _assert_filled(stored: dict, dest: str) -> None:
-    assert stored["recovery_destinations"] == [dest]
+def _assert_filled(stored: dict, dest: str, *, recovery: bool = True) -> None:
+    assert stored.get("recovery_destinations", []) == ([dest] if recovery else [])
     assert stored["destinations"] == [dest]
     assert stored["context_attributes"] == {"team": "qa", "service": "db-testing"}
     assert stored["tags"] == ["roundtrip", "service:db-testing"]
@@ -93,15 +100,17 @@ def _assert_filled(stored: dict, dest: str) -> None:
 class TestAlertRoundtrip:
     @pytest.mark.parametrize("realtime", [False, True], ids=["scheduled", "realtime"])
     def test_alert_with_every_optional_field_saves_reads_and_updates(self, api, destination, test_stream, created_alerts, realtime):
-        alert_id = _create(api, created_alerts, _alert_payload(unique_name("rt_alert"), test_stream, destination, realtime=realtime))
+        payload = _alert_payload(unique_name("rt_alert"), test_stream, destination)
+        alert_id = _create(api, created_alerts, _realtime(payload) if realtime else payload)
         stored = _read(api, alert_id)
-        _assert_filled(stored, destination)
-        assert stored["trigger_condition"]["warning_threshold"] == 2
+        _assert_filled(stored, destination, recovery=not realtime)
+        if not realtime:
+            assert stored["trigger_condition"]["warning_threshold"] == 2
 
         stored["description"] = "db-testing roundtrip updated"
         updated = _update(api, alert_id, stored)
         assert updated["description"] == "db-testing roundtrip updated"
-        _assert_filled(updated, destination)
+        _assert_filled(updated, destination, recovery=not realtime)
 
         resp = api("GET", "alerts", v2=True)
         assert resp.status_code == 200, f"list: {resp.status_code} {resp.text}"
