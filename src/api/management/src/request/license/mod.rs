@@ -20,9 +20,10 @@ use axum::{
 use config::{meta::user::UserRole, utils::str::mask_license_key};
 use db::license;
 use o2_enterprise::enterprise::license::{
-    LICENSE_DB_KEY, License, LicenseDecision, LicenseStatus, Rollback, RollbackReason, Waiver,
-    check_license, gate_and_raise, get_license, ingestion_limit_exceeded_count, ingestion_used,
-    judge_paste, license_expired, license_status, load_rev_hwm, pasted_key_supersedes_env,
+    BelowHwm, LICENSE_DB_KEY, License, LicenseDecision, LicenseStatus, Rollback, RollbackReason,
+    Waiver, check_license, gate_and_raise, get_license, ingestion_limit_exceeded_count,
+    ingestion_used, judge_paste, license_expired, license_status, load_rev_hwm,
+    pasted_key_supersedes_env, rev_hwm_warning,
 };
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::{AuthExtractor, UserEmail};
@@ -52,6 +53,7 @@ struct LicenseResponse {
     env_key_in_use: bool,
     /// Whether `POST /license/refresh` would pass both its route check and its handler check.
     can_update_license: bool,
+    rev_hwm_warning: Option<BelowHwm>,
 }
 
 pub struct SaveLicenseRequest {
@@ -410,6 +412,7 @@ pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
             openobserve_core::authz::check_permissions(&email.user_id, auth, role, false)
         })
         .await,
+        rev_hwm_warning: rev_hwm_warning(),
     };
     MetaHttpResponse::json(res)
 }
@@ -492,7 +495,7 @@ pub async fn refresh_license_limits(Headers(user_email): Headers<UserEmail>) -> 
 #[cfg(test)]
 mod tests {
     use config::utils::{base64, json};
-    use o2_enterprise::enterprise::license::Block;
+    use o2_enterprise::enterprise::license::{BelowHwm, Block, KeySource};
 
     use super::*;
 
@@ -573,6 +576,7 @@ mod tests {
             env_key_active: false,
             env_key_in_use: false,
             can_update_license: is_license_admin,
+            rev_hwm_warning: None,
         })
         .unwrap()
     }
@@ -729,8 +733,10 @@ mod tests {
             env_key_active: false,
             env_key_in_use: false,
             can_update_license: false,
+            rev_hwm_warning: None,
         })
         .unwrap();
+        assert!(json["rev_hwm_warning"].is_null());
         assert_eq!(json["evaluated_at"], 1_792_000_000_000_000_i64);
         assert_eq!(json["decision"]["search_allowed"], true);
         assert_eq!(json["decision"]["exceeded_days"], 4);
@@ -801,6 +807,48 @@ mod tests {
         assert!(!env_key_in_use("", None));
     }
 
+    fn response_with_warning(source: KeySource) -> json::Value {
+        json::to_value(&LicenseResponse {
+            key: None,
+            license: None,
+            installation_id: String::new(),
+            expired: false,
+            ingestion_used: 0.0,
+            ingestion_exceeded: 0,
+            waivers: Vec::new(),
+            decision: LicenseDecision::default(),
+            base: LicenseDecision::default(),
+            evaluated_at: 0,
+            env_key_active: source == KeySource::Env,
+            env_key_in_use: source == KeySource::Env,
+            can_update_license: false,
+            rev_hwm_warning: Some(BelowHwm {
+                source,
+                license_id: "lic-1".into(),
+                loaded_rev: 1_760_400_000_000_000,
+                hwm_rev: 1_760_918_400_000_000,
+            }),
+        })
+        .unwrap()
+    }
+
+    #[test]
+    fn license_response_carries_rev_hwm_warning() {
+        let json = response_with_warning(KeySource::Env);
+        let warning = &json["rev_hwm_warning"];
+        assert_eq!(warning["source"], "env");
+        assert_eq!(warning["license_id"], "lic-1");
+        assert_eq!(warning["loaded_rev"], 1_760_400_000_000_000_i64);
+        assert_eq!(warning["hwm_rev"], 1_760_918_400_000_000_i64);
+    }
+
+    #[test]
+    fn get_reports_the_db_source_warning() {
+        let json = response_with_warning(KeySource::Db);
+        assert_eq!(json["rev_hwm_warning"]["source"], "db");
+        assert_eq!(json["env_key_in_use"], false);
+    }
+
     #[test]
     fn test_license_response_carries_env_key_active() {
         let json = json::to_value(&LicenseResponse {
@@ -817,6 +865,7 @@ mod tests {
             env_key_active: true,
             env_key_in_use: true,
             can_update_license: false,
+            rev_hwm_warning: None,
         })
         .unwrap();
         assert_eq!(json["env_key_active"], true);
