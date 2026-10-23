@@ -1171,6 +1171,63 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn store_dry_run_writes_neither_the_key_nor_the_hwm() {
+        let _store = store_setup().await;
+        let (status, body) = paste(lic("lic-1", 9), true).await;
+        assert_eq!(
+            (status, body["outcome"].as_str()),
+            (StatusCode::OK, Some("accept"))
+        );
+        assert_eq!(stored(LICENSE_DB_KEY).await, None);
+        assert_eq!(stored(LICENSE_REV_HWM_KEY).await, None);
+        gate_and_raise(&lic("lic-1", 9)).await.unwrap().unwrap();
+        let hwm = stored(LICENSE_REV_HWM_KEY).await;
+        for rev in [5, 12] {
+            let (status, _) = paste(lic("lic-1", rev), true).await;
+            assert_eq!(status, StatusCode::OK);
+        }
+        assert_eq!(stored(LICENSE_REV_HWM_KEY).await, hwm);
+        assert_eq!(stored(LICENSE_DB_KEY).await, None);
+    }
+
+    #[tokio::test]
+    async fn store_refuses_a_lower_rev_through_the_real_gate() {
+        let _store = store_setup().await;
+        gate_and_raise(&lic("lic-1", 9)).await.unwrap().unwrap();
+        let (status, body) = paste(lic("lic-1", 5), false).await;
+        assert_eq!(status, StatusCode::CONFLICT, "{body}");
+        assert_eq!(
+            (
+                body["code"].as_u64(),
+                body["reason"].as_str(),
+                body["loaded_rev"].as_i64(),
+                body["pasted_rev"].as_i64()
+            ),
+            (Some(409), Some("rev_rollback"), Some(9), Some(5))
+        );
+        assert_eq!(stored(LICENSE_DB_KEY).await, None);
+    }
+
+    #[tokio::test]
+    async fn store_runs_the_gate_before_the_key_is_stored() {
+        let _store = store_setup().await;
+        let seen = std::sync::Mutex::new(None);
+        let _ = store_gated(&lic("lic-1", 9), || async {
+            let hwm = load_rev_hwm().await.unwrap();
+            *seen.lock().unwrap() = Some(hwm.entry("lic-1").unwrap().map(|e| e.rev));
+            Ok(())
+        })
+        .await;
+        assert_eq!(seen.into_inner().unwrap(), Some(Some(9)));
+        gate_and_raise(&lic("lic-1", 12)).await.unwrap().unwrap();
+        let refused = store_gated(&lic("lic-1", 10), || async {
+            panic!("a refused key is never stored")
+        })
+        .await;
+        assert_eq!(refused.status(), StatusCode::CONFLICT);
+    }
+
     // a watcher fills these caches on a running node; a miss here would go to the database
     fn join(org_id: &str, email: &str, role: UserRole) {
         common::infra::config::USERS.insert(
