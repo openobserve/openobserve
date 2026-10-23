@@ -27,8 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Segments come from the SERVER (`resolved-schedule`), not from rotation
   arithmetic on this side: restrictions, the winning layer and covers all change
   who is on at a given instant, and a preview that recomputed them here would
-  eventually disagree with the engine that pages people. The editor's own
-  preview still resolves locally, because it has to draw a draft nobody saved.
+  eventually disagree with the engine that pages people.
 
   A span with nobody in it is a segment like any other, which is what makes a
   gap impossible to miss rather than something inferred from a hole.
@@ -350,8 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
-import { useStore } from "vuex";
+import { computed, ref, watch } from "vue";
 
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useOnCallClock } from "@/composables/useOnCallClock";
@@ -376,10 +374,15 @@ import type { ResolvedSegment, Rotation, TimeWindow } from "@/ts/interfaces/onca
 import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import type { I18nKey, I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { formatInZone, formatMinuteOfDay, MINUTES_PER_DAY, rotationMembers } from "@/utils/oncall";
+import {
+  formatInZone,
+  formatMinuteOfDay,
+  MINUTES_PER_DAY,
+  rotationMembers,
+  zonedMidnight,
+} from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
-import { queryClient } from "@/composables/query/queryClient";
-import { orgUsersQuery } from "@/services/users.queries";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
 
 const props = withDefaults(
   defineProps<{
@@ -424,31 +427,11 @@ const window = defineModel<{ from: number; to: number }>("window", { required: t
 
 const { t } = useI18nTyped();
 const { isMobile } = useBreakpoint();
-const store = useStore();
 
 const nowMicros = useOnCallClock();
 
-/// Fetched for band labels only: a bar drawn at a few percent of the window's
-/// width has no room for an email, and at a dozen members "o2q-apac1…" and
-/// "o2q-apac2…" clip to the same illegible prefix. The aria-label keeps the
-/// full email regardless — this is a display-only lookup.
-const orgUsers = ref<{ email: string; first_name?: string; last_name?: string }[]>([]);
-
-function nameOf(email: string): string {
-  const user = orgUsers.value.find((u) => u.email.toLowerCase() === email.toLowerCase());
-  const name = [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim();
-  return name || email;
-}
-
-onMounted(async () => {
-  try {
-    const orgId = store.state.selectedOrganization.identifier;
-    orgUsers.value = await queryClient.fetchQuery(orgUsersQuery(orgId));
-  } catch {
-    // Labels fall back to the raw email, which is what they showed before.
-    orgUsers.value = [];
-  }
-});
+// Band labels only: a narrow bar has no room for an email; the aria-label keeps the full address.
+const { nameOf } = useOrgUserNames();
 
 /// The lane dots, spelled out rather than built from the index: Tailwind reads
 /// class names as literal text, so a template-built `bg-schedule-band-${n}-...`
@@ -488,13 +471,12 @@ function onRangeChange(value: unknown) {
 
 const days = computed(() => RANGES.find((r) => r.key === rangeKey.value)?.days ?? 7);
 
-/// Anchored to the start of the local day so the axis ticks land on midnights
-/// rather than on whatever minute the page was opened.
-const from = computed(() => {
-  const dayStart = Math.floor(nowMicros.value / MICROS_PER_DAY) * MICROS_PER_DAY;
-  return dayStart + offsetDays.value * MICROS_PER_DAY;
-});
-const to = computed(() => from.value + days.value * MICROS_PER_DAY);
+/// Anchored to the start of the TEAM's day so the axis ticks land on its
+/// midnights rather than on whatever minute the page was opened.
+const from = computed(() => zonedMidnight(nowMicros.value, props.timezone, offsetDays.value));
+const to = computed(() =>
+  zonedMidnight(nowMicros.value, props.timezone, offsetDays.value + days.value),
+);
 const span = computed(() => to.value - from.value);
 
 // The parent owns the fetch; this only says which window it should ask for.
@@ -587,7 +569,12 @@ function nextHandover(rotationId: string): number | null {
       segment.from <= nowMicros.value &&
       segment.to > nowMicros.value,
   );
-  return current?.to ?? null;
+  return current && endsInWindow(current) ? current.to : null;
+}
+
+// A segment ending where the fetch stopped was cut there, so its end says nothing about a handover.
+function endsInWindow(segment: ResolvedSegment): boolean {
+  return segment.to < to.value;
 }
 
 /// Everything the lane header says about a rotation, computed once per lane.
@@ -716,11 +703,13 @@ const tracks = computed<ScheduleTrack[]>(() =>
         let label: I18nText = raw(whoLabel);
         if (who && segment.override_id) {
           label = t("oncall.schedBandOverride", { who: raw(whoLabel) });
-        } else if (who && isNow) {
+        } else if (who && isNow && endsInWindow(segment)) {
           label = t("oncall.schedBandOnNow", {
             who: raw(whoLabel),
             when: raw(fmt(segment.to, { weekday: "short", hour: "2-digit", minute: "2-digit" })),
           });
+        } else if (who && isNow) {
+          label = t("oncall.schedBandOnNowOpen", { who: raw(whoLabel) });
         }
 
         return {
@@ -759,10 +748,10 @@ const tracks = computed<ScheduleTrack[]>(() =>
 /// called out, because every other instant on the chart is read relative to it.
 const axisTicks = computed<ScheduleAxisTick[]>(() => {
   const step = days.value > 7 ? 2 : 1;
-  const today = Math.floor(nowMicros.value / MICROS_PER_DAY) * MICROS_PER_DAY;
+  const today = zonedMidnight(nowMicros.value, props.timezone);
   const ticks: ScheduleAxisTick[] = [];
   for (let day = 0; day < days.value; day += step) {
-    const at = from.value + day * MICROS_PER_DAY;
+    const at = zonedMidnight(from.value, props.timezone, day);
     ticks.push({
       offset: share(at),
       label: raw(fmt(at, { day: "numeric" })),

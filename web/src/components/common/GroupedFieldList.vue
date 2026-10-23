@@ -33,6 +33,8 @@
             >
           </div>
           <OButton
+            :aria-label="groupName"
+            :aria-expanded="expandGroupRows[row.group] !== false"
             v-if="(groupFieldCount[row.group] ?? 0) > 0"
             variant="ghost"
             size="icon"

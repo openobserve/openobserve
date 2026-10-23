@@ -36,15 +36,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSkeleton type="text" class="h-4 w-2/3" />
       </div>
 
-      <!-- eslint-disable-next-line vue/no-v-html -- sanitized by DOMPurify below -->
+      <!-- eslint-disable-next-line vue/no-v-html -- sanitized by renderRcaReport -->
       <div v-else class="report-body text-text-body text-sm" v-html="rendered"></div>
     </OCardSection>
   </OCard>
 </template>
 
 <script setup lang="ts">
-import DOMPurify from "dompurify";
-import { marked } from "marked";
 import { computed } from "vue";
 
 import OCard from "@/lib/core/Card/OCard.vue";
@@ -54,30 +52,15 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OnCallResponseReport } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { renderRcaReport } from "@/utils/incidents/rcaReportMarkdown";
 
 const props = defineProps<{ report: OnCallResponseReport | null; loading?: boolean }>();
 
 const { t } = useI18nTyped();
 
-// The same tag set the incident drawer allows, so one report reads the same
-// whichever subject carried it.
-const ALLOWED_TAGS =
-  "h1 h2 h3 h4 p ul ol li strong em code pre table thead tbody tr th td blockquote hr div span".split(
-    " ",
-  );
-
-const rendered = computed(() => {
-  const body = props.report?.report;
-  if (!body) return "";
-  // The verdict block is machine input that the card above already renders as
-  // a sentence; showing the raw JSON again would bury the report's own prose.
-  const prose = body.replace(/```json\s+verdict[\s\S]*?```/g, "").trim();
-  return DOMPurify.sanitize(marked.parse(prose, { async: false }) as string, {
-    ALLOWED_TAGS,
-    ALLOWED_ATTR: ["id"],
-    KEEP_CONTENT: true,
-  });
-});
+// The incident drawer's renderer, so one report reads the same whichever subject
+// carried it, with the same code escaping, link policy and verdict-fence removal.
+const rendered = computed(() => (props.report?.report ? renderRcaReport(props.report.report) : ""));
 </script>
 
 <style scoped>
@@ -95,38 +78,43 @@ const rendered = computed(() => {
 
 /* Capped at the page title's own 16px: a heading ramp taller than the page title
    reads as a different application embedded in the card. */
-.report-body :deep(h1) {
+.report-body :deep(.rca-h1) {
   font-size: var(--text-base);
 }
-.report-body :deep(h2) {
+.report-body :deep(.rca-h2) {
   font-size: var(--text-sm);
 }
 /* Body size, not smaller: a subsection heading below the prose it introduces
    reads as a label. Weight and the margins below carry the distinction. */
-.report-body :deep(h3),
-.report-body :deep(h4) {
+.report-body :deep(.rca-h3),
+.report-body :deep(.rca-h4) {
   font-size: var(--text-sm);
 }
-.report-body :deep(h1),
-.report-body :deep(h2),
-.report-body :deep(h3),
-.report-body :deep(h4) {
+/* The shared renderer emits the drawer's section chrome (centred title, tinted
+   section band); the card reads as plain prose, so it is flattened here. */
+.report-body :deep(.rca-h1),
+.report-body :deep(.rca-h2),
+.report-body :deep(.rca-h3),
+.report-body :deep(.rca-h4) {
   color: var(--color-text-heading);
   font-weight: 600;
   line-height: 1.4;
+  text-align: left;
+  padding: 0;
+  border: 0;
+  background: none;
 }
 
 /* A section break and a subsection break must not look the same. */
-.report-body :deep(h1),
-.report-body :deep(h2) {
+.report-body :deep(.rca-h1),
+.report-body :deep(.rca-h2) {
   margin: 2rem 0 0.5rem;
 }
-.report-body :deep(h3),
-.report-body :deep(h4) {
+.report-body :deep(.rca-h3),
+.report-body :deep(.rca-h4) {
   margin: 1rem 0 0.25rem;
 }
-.report-body :deep(h1:first-child),
-.report-body :deep(h2:first-child) {
+.report-body :deep(.rca-report-content > :first-child) {
   margin-top: 0;
 }
 
@@ -168,6 +156,13 @@ const rendered = computed(() => {
   background: none;
   border-radius: 0;
   padding: 0;
+}
+/* The shared renderer boxes each code block; the card's `pre` is the box, so the wrapper goes flat. */
+.report-body :deep(.rca-code-block) {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
 }
 
 .report-body :deep(table) {

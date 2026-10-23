@@ -238,7 +238,7 @@ export default class DashboardAutoRun {
   }
 
   async expectRefreshNotPending() {
-    await expect(this.refreshBtn).not.toHaveAttribute("data-o2-variant", "warning");
+    await expect(this.refreshBtn).not.toHaveAttribute("data-o2-variant", "pending");
   }
 
   async expectViewRefreshVariant(variant) {
@@ -246,7 +246,7 @@ export default class DashboardAutoRun {
   }
 
   async expectViewRefreshNotPending() {
-    await expect(this.viewRefreshBtn).not.toHaveAttribute("data-o2-variant", "warning");
+    await expect(this.viewRefreshBtn).not.toHaveAttribute("data-o2-variant", "pending");
   }
 
   async expectRefreshTooltip(text) {

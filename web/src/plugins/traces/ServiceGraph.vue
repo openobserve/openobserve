@@ -1621,13 +1621,7 @@ export default defineComponent({
             ? props.timeRange
             : getEffectiveTimeRange(searchObj.data.datetime);
 
-        // Topology, node kinds, edges and latency all come from the
-        // pre-aggregated _o2_service_graph stream via /topology/current. The
-        // backend hourly job (processor + build_topology) computes the complete,
-        // classified topology — queue consumers, collision handling, GenAI
-        // agent/tool/model edges — incrementally per window, so reading it here
-        // is a cheap small-stream read that scales to TB-level trace volumes
-        // (we do NOT re-scan raw traces per load). The UI is a thin renderer.
+        // /topology/current reads the rollup metrics, so a load never re-scans raw traces.
         const streamName =
           selectedStreamFilter.value && selectedStreamFilter.value !== "all"
             ? selectedStreamFilter.value

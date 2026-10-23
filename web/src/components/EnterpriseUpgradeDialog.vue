@@ -27,7 +27,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- Close Button -->
       <div class="text-text-secondary hover:text-text-body absolute top-4 right-4 z-100">
-        <OButton variant="ghost" size="icon" @click="showDialog = false">
+        <OButton
+          :aria-label="t('common.close')"
+          variant="ghost"
+          size="icon"
+          @click="showDialog = false"
+        >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="14"

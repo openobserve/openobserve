@@ -34,6 +34,7 @@ use config::{
         cluster::{NodeStatus, Role, RoleGroup},
         function::ZoFunction,
         search::{HashFileRequest, HashFileResponse},
+        slack::DisabledReason,
         user::UserRole,
     },
     stats::{CacheStats, CacheStatsAsync},
@@ -225,6 +226,7 @@ struct ConfigResponse<'a> {
     query_values_default_num: i64,
     alert_preview_timerange_minutes: i64,
     incidents_enabled: bool,
+    incidents_rca_enabled: bool,
     downtimes_enabled: bool,
     alert_calibration_enabled: bool,
     service_streams_enabled: bool,
@@ -234,6 +236,9 @@ struct ConfigResponse<'a> {
     composite_alerts_available: bool,
     synthetics_enabled: bool,
     oncall_enabled: bool,
+    slack_enabled: bool,
+    /// The same reason for every org, null when on.
+    slack_disabled_reason: Option<DisabledReason>,
     /// Enterprise-only private locations; the UI gates their views on this flag.
     synthetics_private_locations_enabled: bool,
     /// Server-side step cap (`ZO_SYNTHETICS_BROWSER_MAX_STEPS`); the UI budget must follow it.
@@ -480,6 +485,11 @@ pub async fn zo_config(
         o2cfg.ai.enabled && o2cfg.ai.has_agent_target() && o2cfg.ai.chat_persistence_enabled
     );
     let incidents_enabled = enterprise_value!(false, o2cfg.incidents.enabled);
+    // Incident analysis needs RCA on and an agent to answer.
+    let incidents_rca_enabled = enterprise_value!(
+        false,
+        o2cfg.incidents.enabled && o2cfg.incidents.rca_enabled && o2cfg.ai.has_agent_target()
+    );
     let downtimes_enabled = enterprise_value!(false, o2cfg.downtimes.enabled);
     let alert_calibration_enabled = enterprise_value!(false, o2cfg.alert_calibration.enabled);
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
@@ -495,6 +505,10 @@ pub async fn zo_config(
     let synthetics_recorder_extension_url = &cfg.synthetics.recorder_extension_url;
     let synthetics_browser_max_steps = cfg.synthetics.browser_max_steps;
     let oncall_enabled = enterprise_value!(false, o2cfg.oncall.enabled);
+    let slack_disabled_reason = enterprise_value!(
+        Some(DisabledReason::Edition),
+        o2_enterprise::enterprise::slack::disabled_reason(&org_id)
+    );
 
     #[cfg(feature = "cloud")]
     let build_type = "cloud";
@@ -609,6 +623,7 @@ pub async fn zo_config(
         query_values_default_num: cfg.limit.query_values_default_num,
         alert_preview_timerange_minutes: cfg.limit.alert_preview_timerange_minutes,
         incidents_enabled,
+        incidents_rca_enabled,
         downtimes_enabled,
         alert_calibration_enabled,
         service_streams_enabled,
@@ -618,6 +633,8 @@ pub async fn zo_config(
         composite_alerts_available,
         synthetics_enabled,
         oncall_enabled,
+        slack_enabled: slack_disabled_reason.is_none(),
+        slack_disabled_reason,
         synthetics_private_locations_enabled,
         synthetics_browser_max_steps,
         synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
@@ -1022,6 +1039,7 @@ pub async fn config_reload(Headers(user_email): Headers<UserEmail>) -> impl Into
             error_msg: None,
             trace_id: None,
         },
+        delegated: None,
     })
     .await;
     (
@@ -1142,6 +1160,7 @@ pub async fn redirect(
             error_msg: None,
             trace_id: None,
         },
+        delegated: None,
     };
 
     let state_cookie = cookies.get(LOGIN_STATE_COOKIE).map(|c| c.value());
@@ -1393,6 +1412,7 @@ pub async fn refresh_token_with_dex(
             error_msg: None,
             trace_id: None,
         },
+        delegated: None,
     };
 
     let token = if let Some(cookie) = cookies.get("auth_tokens") {
@@ -1683,6 +1703,7 @@ pub async fn logout(
                 error_msg: None,
                 trace_id: None,
             },
+            delegated: None,
         })
         .await;
     }
@@ -2476,6 +2497,43 @@ mod tests {
         assert_eq!(
             json["ingest_allowed_in_future"],
             cfg.limit.ingest_allowed_in_future
+        );
+    }
+
+    #[tokio::test]
+    async fn test_zo_config_reports_slack_per_org() {
+        let reason = if cfg!(feature = "enterprise") {
+            "flag"
+        } else {
+            "edition"
+        };
+        for org in ["default", "acme_eu", "_meta"] {
+            let response = zo_config(Path(org.to_string()), None).await.into_response();
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            assert_eq!(json["slack_enabled"], false, "{org}: {json}");
+            assert_eq!(json["slack_disabled_reason"], reason, "{org}: {json}");
+            assert_ne!(json["slack_disabled_reason"], "allowlist", "{org}: {json}");
+            assert!(json.get("slack_home_region").is_none(), "{org}: {json}");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_zo_config_serves_incidents_rca_enabled() {
+        let o2cfg = o2_enterprise::enterprise::common::config::get_config();
+        let response = zo_config(Path("default".to_string()), None)
+            .await
+            .into_response();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(
+            json["incidents_rca_enabled"],
+            o2cfg.incidents.enabled && o2cfg.incidents.rca_enabled && o2cfg.ai.has_agent_target()
         );
     }
 }
