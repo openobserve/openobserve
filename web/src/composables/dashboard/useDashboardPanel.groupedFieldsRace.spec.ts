@@ -13,23 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// updateGroupedFields coalesces concurrent calls. It used to do that by
-// returning straight away, which made `await updateGroupedFields()` a lie for
-// the second caller: it resolved before any field had been loaded.
-//
-// Both Build-tab entry points then do the same thing (BuildQueryPage.vue:339
-// and :425):
-//
-//     await updateGroupedFields();
-//     const generatedQuery = await makeAutoSQLQuery();
-//     if (generatedQuery !== undefined) emit("queryGenerated", generatedQuery);
-//
-// and makeAutoSQLQuery returns undefined when groupedFields is empty. So the
-// coalesced caller emitted no query, and nothing regenerated one afterwards —
-// the logs query editor stayed empty for the life of the page. In CI that was
-// ~half of all runs of the three "SQL ON ..." tests in
-// logsQueryBuilder-editor.spec.js, each burning the full 60s wait twice before
-// passing on a third attempt against a fresh page.
+// A coalesced caller that resolves before groupedFields is written makes the makeAutoSQLQuery() after it a no-op.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { flushPromises } from "@vue/test-utils";
@@ -61,8 +45,7 @@ const STREAM = {
   ],
 };
 
-// A unique page key per test: useDashboardPanelData is a singleton per key, so
-// a shared one leaks groupedFields between tests and hides the empty state.
+// Unique key per test: useDashboardPanelData is a singleton per key and leaks groupedFields.
 let keyN = 0;
 const panelWithStream = () => {
   const p = useDashboardPanelData(`grouped-fields-race-${++keyN}`, ((k: string) => k) as any);
@@ -88,8 +71,6 @@ describe("updateGroupedFields — a coalesced caller waits for the fields", () =
     const second = p.updateGroupedFields().then(() => (secondSettled = true));
 
     await flushPromises();
-    // Before the fix this was already true: the guard returned a resolved
-    // promise, so the caller moved on to makeAutoSQLQuery() with no fields.
     expect(secondSettled).toBe(false);
 
     releaseSchema(STREAM);
@@ -103,8 +84,7 @@ describe("updateGroupedFields — a coalesced caller waits for the fields", () =
     mockGetStream.mockImplementationOnce(() => new Promise((resolve) => (releaseSchema = resolve)));
 
     const first = p.updateGroupedFields();
-    // What the second caller can see at the moment its await returns — this is
-    // exactly what makeAutoSQLQuery() reads next.
+    // What makeAutoSQLQuery() would read at the moment the coalesced await returns.
     const fieldsAtResolve = p
       .updateGroupedFields()
       .then(() => p.dashboardPanelData.meta.streamFields.groupedFields.length);

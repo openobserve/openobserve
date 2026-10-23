@@ -286,18 +286,13 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
   // Track if updateGroupedFields is currently running to prevent race conditions
   let isUpdatingGroupedFields = false;
   let pendingUpdateGroupedFields = false;
-  // Settles when the run in flight has written groupedFields, so a coalesced
-  // caller can wait for it instead of resolving early.
+  // Settles once the run in flight has written groupedFields.
   let inFlightGroupedFields: Promise<void> | null = null;
   let settleInFlightGroupedFields: (() => void) | null = null;
 
   // Helper function to update grouped fields
   const updateGroupedFields = async () => {
-    // Coalesce, but do NOT resolve before the fields land. Callers run
-    // `await updateGroupedFields()` and then `makeAutoSQLQuery()`, which returns
-    // silently when groupedFields is empty and so emits no query at all. That
-    // left the Build-tab query editor empty for good: the coalesced re-run below
-    // repopulates the fields, but nothing regenerates the query afterwards.
+    // Resolving before groupedFields lands makes the caller's next makeAutoSQLQuery() a silent no-op.
     if (isUpdatingGroupedFields) {
       pendingUpdateGroupedFields = true;
       await inFlightGroupedFields;
@@ -306,8 +301,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
 
     isUpdatingGroupedFields = true;
     pendingUpdateGroupedFields = false;
-    // Only ever resolved, never rejected: a coalesced caller did not throw
-    // before this change and must not start throwing now.
+    // Only ever resolved, so a coalesced caller never inherits this run's rejection.
     inFlightGroupedFields = new Promise<void>((resolve) => {
       settleInFlightGroupedFields = resolve;
     });
