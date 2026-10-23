@@ -86,8 +86,9 @@ pub struct Model {
     /// Send a recovery notification when this alert stops firing. NULL means
     /// the alert predates the feature, which is the same as `false`.
     pub notify_on_recovery: Option<bool>,
-    /// JSON array of destination names. NULL = the recovery follows the firing's own destinations.
-    pub recovery_destinations: Option<Json>,
+    /// JSON array of destination names as text; NULL = follow the firing's destinations.
+    #[sea_orm(column_type = "Text", nullable)]
+    pub recovery_destinations: Option<String>,
     /// How long the condition must stay clear before the episode recovers.
     /// NULL or 0 recovers on the first clear evaluation.
     pub keep_firing_for_seconds: Option<i64>,

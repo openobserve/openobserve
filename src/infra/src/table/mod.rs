@@ -26,6 +26,8 @@ pub mod alert_calibration;
 pub mod alert_composites;
 pub mod alert_eval_intervals;
 pub mod alert_incidents;
+#[cfg(test)]
+mod alert_recovery_destinations_tests;
 pub mod alert_states;
 pub mod alerts;
 pub mod anomaly_detection;

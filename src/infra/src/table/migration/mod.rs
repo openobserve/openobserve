@@ -230,6 +230,7 @@ mod m20261017_000001_add_rca_run_progress_columns;
 mod m20261018_000001_create_rca_steering;
 mod m20261018_000001_create_slack_tables;
 mod m20261020_000001_create_eval_job_states_tables;
+mod m20261023_000001_alter_alert_recovery_destinations_to_text;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -355,6 +356,20 @@ pub(crate) async fn create_alert_calibration_configs_for_test(
 ) -> Result<(), DbErr> {
     m20261012_000001_create_alert_calibration_configs::Migration
         .up(&SchemaManager::new(db))
+        .await
+}
+
+/// Applies the shipped `recovery_destinations` migration, then the json/jsonb-to-text one.
+#[cfg(test)]
+pub(crate) async fn apply_alert_recovery_destinations_migrations_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    let manager = SchemaManager::new(db);
+    m20260928_000001_add_alert_recovery_destinations::Migration
+        .up(&manager)
+        .await?;
+    m20261023_000001_alter_alert_recovery_destinations_to_text::Migration
+        .up(&manager)
         .await
 }
 
@@ -598,6 +613,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261016_000001_create_rca_runs::Migration),
             Box::new(m20261017_000001_add_rca_run_progress_columns::Migration),
             Box::new(m20261018_000001_create_rca_steering::Migration),
+            Box::new(m20261023_000001_alter_alert_recovery_destinations_to_text::Migration),
         ]
     }
 }
@@ -672,6 +688,10 @@ mod tests {
         (113, "m20261016_000001_create_rca_runs"),
         (114, "m20261017_000001_add_rca_run_progress_columns"),
         (115, "m20261018_000001_create_rca_steering"),
+        (
+            116,
+            "m20261023_000001_alter_alert_recovery_destinations_to_text",
+        ),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -817,6 +837,10 @@ mod tests {
             (
                 "m20261016_000001_create_rca_runs",
                 "m20261018_000001_create_rca_steering",
+            ),
+            (
+                "m20260928_000001_add_alert_recovery_destinations",
+                "m20261023_000001_alter_alert_recovery_destinations_to_text",
             ),
         ] {
             assert!(
