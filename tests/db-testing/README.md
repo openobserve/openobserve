@@ -58,7 +58,6 @@ tests/db-testing/
    export ZO_META_POSTGRES_DSN=postgres://postgres:password@localhost:5432/postgres
    export ZO_ROOT_USER_EMAIL=root@example.com
    export ZO_ROOT_USER_PASSWORD=Complexpass#123
-   export ZO_REPORT_SERVER_URL=http://localhost:5082  # lets reports save without Chrome/SMTP
    target/debug/openobserve
    ```
 
