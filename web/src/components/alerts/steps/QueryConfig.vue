@@ -356,6 +356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @update:model-value="onLogGroupByChange"
                         />
                         <OButton
+                          :aria-label="t('common.remove')"
                           variant="ghost"
                           size="icon-circle-sm"
                           class="text-icon-color hover:text-status-error-text"
@@ -731,6 +732,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @update:model-value="syncMetricGroupByToProps"
                         />
                         <OButton
+                          :aria-label="t('common.remove')"
                           variant="ghost"
                           size="icon-circle-sm"
                           class="text-icon-color hover:text-status-error-text"

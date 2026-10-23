@@ -122,6 +122,7 @@
                 </div>
               </ODropdown>
               <OButton
+                :aria-label="t('common.remove')"
                 variant="ghost"
                 size="icon-chip"
                 class="!w-4"

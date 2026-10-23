@@ -27,6 +27,17 @@ describe("badgeGroups", () => {
     expect(r.icon).toBeUndefined();
   });
 
+  it("resolves licenseWaiverStatus", () => {
+    expect(resolveBadge("licenseWaiverStatus", "active").variant).toBe("success-soft");
+    expect(resolveBadge("licenseWaiverStatus", "scheduled").variant).toBe("blue-soft");
+    const past = resolveBadge("licenseWaiverStatus", "past");
+    expect(past.variant).toBe("default-soft");
+    expect(past.labelKey).toBe("components.badge.licenseWaiverStatus.past");
+    const ended = resolveBadge("licenseWaiverStatus", "ended");
+    expect(ended.variant).toBe("default-soft");
+    expect(ended.labelKey).toBe("components.badge.licenseWaiverStatus.ended");
+  });
+
   it("resolves downtimeStatus to dot mode with an amber active state", () => {
     expect(resolveBadge("downtimeStatus", "active").variant).toBe("warning-soft");
     expect(resolveBadge("downtimeStatus", "scheduled").variant).toBe("blue-soft");
@@ -320,5 +331,21 @@ describe("alertStatus: waiting", () => {
     const r = resolveBadge("alertStatus", "waiting");
     expect(r.labelKey).toBe("components.badge.alertStatus.waiting");
     expect(r.variant).toBe("default-soft");
+  });
+});
+
+describe("slackInstallStatus", () => {
+  it("AC-12.4 maps every installation status to a coloured, translated badge", () => {
+    const expected = {
+      healthy: "success-soft",
+      degraded: "warning-soft",
+      pending: "blue-soft",
+      revoked: "error-soft",
+    };
+    for (const [status, variant] of Object.entries(expected)) {
+      const r = resolveBadge("slackInstallStatus", status);
+      expect(r.variant).toBe(variant);
+      expect(r.labelKey).toBe(`components.badge.slackInstallStatus.${status}`);
+    }
   });
 });

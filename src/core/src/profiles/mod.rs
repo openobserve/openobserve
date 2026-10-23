@@ -19,7 +19,11 @@ mod otlp_json_compat;
 pub mod query;
 mod validation;
 
-use std::{collections::HashMap, io::BufReader, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    io::BufReader,
+    sync::Arc,
+};
 
 use axum::{http, response::Response as HttpResponse};
 use bytes::Bytes;
@@ -317,8 +321,6 @@ pub async fn handle_otlp_request(
         for scope_profile in &resource_profile.scope_profiles {
             for profile in &scope_profile.profiles {
                 let (records, rejected_samples) = build_sample_records(
-                    org_id,
-                    &stream_name,
                     resource_profile,
                     scope_profile,
                     profile,
@@ -559,10 +561,7 @@ fn export_service_response(
 ///
 /// Observations whose `_timestamp` falls outside `[min_ts, max_ts]` (microseconds)
 /// are skipped; the returned `rejected` count mirrors traces' retention filter.
-#[allow(clippy::too_many_arguments)]
 fn build_sample_records(
-    org_id: &str,
-    stream_name: &str,
     resource_profile: &ResourceProfiles,
     scope_profile: &ScopeProfiles,
     profile: &Profile,
@@ -677,7 +676,8 @@ fn build_sample_records(
 
     let mut records = Vec::with_capacity(profile.samples.len());
     let mut rejected = 0_i64;
-    for (sample_idx, sample) in profile.samples.iter().enumerate() {
+    let mut timed_instances = HashSet::new();
+    for sample in &profile.samples {
         let (stack, frame_count) = resolve_stack(sample.stack_index, dictionary);
         let (trace_id, span_id) = resolve_link(sample.link_index, dictionary);
         let (thread_id, thread_name, cpu_logical_number, sample_tags) =
@@ -693,7 +693,7 @@ fn build_sample_records(
             continue;
         };
 
-        for (obs_idx, (timestamp, value)) in observations.into_iter().enumerate() {
+        for (timestamp, value) in observations {
             if timestamp < min_ts {
                 log::error!(
                     "[PROFILES:OTLP] skipping observation with timestamp older than allowed retention period, profile_id: {profile_id}"
@@ -755,19 +755,31 @@ fn build_sample_records(
                 record.insert(key.clone(), value.clone());
             }
 
-            // `stack` is excluded: redaction runs later, so its digest would outlive the text.
-            let event_id = format!(
-                "{:x}",
-                md5::compute(format!(
-                    "{org_id}/{stream_name}/{timestamp}/{profile_id}/{sample_idx}/{obs_idx}/{value}"
-                ))
-            );
-            record.insert("event_id".to_string(), json::Value::String(event_id));
+            // One row per process carries the profiled time so per-instance rates count it once.
+            if profile.duration_nano > 0 && timed_instances.insert(instance_identity(&record)) {
+                record.insert(
+                    query::PROFILE_DURATION_COLUMN.to_string(),
+                    json::Value::Number((profile.duration_nano as i64).into()),
+                );
+            }
 
             records.push(record);
         }
     }
     (records, rejected)
+}
+
+fn instance_identity(record: &json::Map<String, json::Value>) -> Vec<String> {
+    query::INSTANCE_KEY_COLUMNS
+        .iter()
+        .map(|col| {
+            record
+                .get(*col)
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string()
+        })
+        .collect()
 }
 
 /// Expand one OTLP Sample into `(timestamp_micros, value)` observations.
@@ -1253,6 +1265,7 @@ mod tests {
                 unit_strindex: 2,
             }),
             time_unix_nano: ok_ts_nano,
+            duration_nano: 5_000_000_000,
             samples: vec![Sample {
                 stack_index: 1,
                 // First observation is out of window; later ones must still be kept.
@@ -1265,8 +1278,6 @@ mod tests {
         let min_ts = now - 5 * 3600 * 1_000_000;
         let max_ts = now + 24 * 3600 * 1_000_000;
         let (records, rejected) = build_sample_records(
-            "default",
-            "default",
             &ResourceProfiles::default(),
             &ScopeProfiles::default(),
             &profile,
@@ -1281,6 +1292,89 @@ mod tests {
         assert_eq!(
             records[0].get(TIMESTAMP_COL_NAME).and_then(|v| v.as_i64()),
             Some((ok_ts_nano / 1000) as i64)
+        );
+        // The rejected observation must not swallow the profiled-time marker.
+        assert_eq!(
+            records[0]
+                .get(query::PROFILE_DURATION_COLUMN)
+                .and_then(|v| v.as_i64()),
+            Some(5_000_000_000)
+        );
+        assert!(!records[1].contains_key(query::PROFILE_DURATION_COLUMN));
+    }
+
+    #[test]
+    fn build_sample_records_marks_profiled_time_once_per_process() {
+        let pid_attr = |value_strindex: i32| KeyValueAndUnit {
+            key_strindex: 3,
+            value: Some(AnyValue {
+                value: Some(any_value::Value::StringValueStrindex(value_strindex)),
+            }),
+            ..Default::default()
+        };
+        let dictionary = ProfilesDictionary {
+            string_table: ["", "cpu", "nanoseconds", "process.pid", "11", "22"]
+                .map(String::from)
+                .to_vec(),
+            attribute_table: vec![KeyValueAndUnit::default(), pid_attr(4), pid_attr(5)],
+            ..Default::default()
+        };
+        let sample = |attr: i32, value: i64| Sample {
+            values: vec![value],
+            attribute_indices: vec![attr],
+            ..Default::default()
+        };
+        let now = now_micros();
+        let profile = Profile {
+            sample_type: Some(ValueType {
+                type_strindex: 1,
+                unit_strindex: 2,
+            }),
+            time_unix_nano: (now as u64).saturating_mul(1000),
+            duration_nano: 5_000_000_000,
+            samples: vec![sample(1, 10), sample(1, 20), sample(2, 30)],
+            ..Default::default()
+        };
+        let build = |profile: &Profile| {
+            build_sample_records(
+                &ResourceProfiles::default(),
+                &ScopeProfiles::default(),
+                profile,
+                Some(&dictionary),
+                now - 3_600_000_000,
+                now + 3_600_000_000,
+            )
+            .0
+        };
+
+        let records = build(&profile);
+        let timed: Vec<(Option<&str>, Option<i64>)> = records
+            .iter()
+            .map(|r| {
+                (
+                    r.get("process_pid").and_then(|v| v.as_str()),
+                    r.get(query::PROFILE_DURATION_COLUMN)
+                        .and_then(|v| v.as_i64()),
+                )
+            })
+            .collect();
+        assert_eq!(
+            timed,
+            vec![
+                (Some("11"), Some(5_000_000_000)),
+                (Some("11"), None),
+                (Some("22"), Some(5_000_000_000)),
+            ]
+        );
+
+        let untimed = Profile {
+            duration_nano: 0,
+            ..profile
+        };
+        assert!(
+            build(&untimed)
+                .iter()
+                .all(|r| !r.contains_key(query::PROFILE_DURATION_COLUMN))
         );
     }
 
@@ -1790,8 +1884,6 @@ mod tests {
         };
         let scope = ScopeProfiles::default();
         let (records, rejected) = build_sample_records(
-            "default",
-            "default",
             &resource,
             &scope,
             &profile,
@@ -1915,8 +2007,6 @@ mod tests {
         let resource = &request.resource_profiles[0];
         let scope = &resource.scope_profiles[0];
         let (records, rejected) = build_sample_records(
-            "default",
-            "default",
             resource,
             scope,
             &scope.profiles[0],
@@ -1949,8 +2039,6 @@ mod tests {
         let resource = &request.resource_profiles[0];
         let scope = &resource.scope_profiles[0];
         let (records, rejected) = build_sample_records(
-            "default",
-            "default",
             resource,
             scope,
             &scope.profiles[0],
@@ -1987,8 +2075,6 @@ mod tests {
         let resource = &request.resource_profiles[0];
         let scope = &resource.scope_profiles[0];
         let (records, rejected) = build_sample_records(
-            "default",
-            "default",
             resource,
             scope,
             &scope.profiles[0],
@@ -2107,8 +2193,6 @@ mod tests {
         };
 
         let (records, rejected) = build_sample_records(
-            "default",
-            "default",
             &resource,
             &scope,
             &profile,
@@ -2208,8 +2292,6 @@ mod tests {
         };
 
         let (records, rejected) = build_sample_records(
-            "default",
-            "default",
             &resource,
             &ScopeProfiles::default(),
             &profile,
@@ -2307,8 +2389,6 @@ mod tests {
         let min_ts = now - 5 * 3600 * 1_000_000;
         let max_ts = now + 24 * 3600 * 1_000_000;
         let (records, rejected) = build_sample_records(
-            "default",
-            "default",
             &ResourceProfiles::default(),
             &ScopeProfiles::default(),
             &profile,

@@ -204,6 +204,12 @@ export class LogsToolbarPinsPage {
     testLogger.debug(`Toggled toolbar pin: ${key}`);
   }
 
+  /** Clicks a pin toggle directly, keeping the More menu open for follow-up reads. */
+  async clickPinToggle(key) {
+    await this.page.locator(this.pinToggle[key]).click();
+    testLogger.debug(`Clicked toolbar pin toggle: ${key}`);
+  }
+
   // ===== STATE READS =====
 
   async readPins() {
@@ -262,6 +268,12 @@ export class LogsToolbarPinsPage {
       this.pinTitle.pinned,
     );
     await this.closeMoreMenu();
+  }
+
+  /** Asserts a pin toggle's title while the More menu is open — the only rendered
+   * pin-state signal for controls whose pinned button never reaches the DOM. */
+  async expectPinToggleTitle(key, title) {
+    await expect(this.page.locator(this.pinToggle[key])).toHaveAttribute('title', title);
   }
 
   async expectTracesPinState(key, pinned) {

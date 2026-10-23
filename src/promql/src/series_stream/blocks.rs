@@ -1941,6 +1941,54 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn not_equal_empty_skips_null_label_series_in_a_mixed_file() {
+        let data = file(&[
+            (1, 10, 1.0, Some("default")),
+            (2, 10, 2.0, None),
+            (2, 20, 3.0, None),
+            (3, 10, 4.0, Some("traces")),
+        ]);
+        let index = metrics_index::block::decode_file(
+            &data.1,
+            &ParentMetadata {
+                rows: 4,
+                compressed_size: 123,
+            },
+            &["group".into()],
+        )
+        .unwrap();
+        let matchers = parsed_matchers(r#"m{group!=""}"#);
+        assert_eq!(
+            metrics_index::matching_blocks(&index, &matchers).unwrap(),
+            vec![0, 2]
+        );
+
+        let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
+        let prepared = prepare(
+            &fixture.scan([data.0.clone()]),
+            &matchers,
+            columns(),
+            &intervals(),
+            100,
+            20,
+            &eval(),
+        )
+        .await
+        .unwrap();
+        let mut values = Vec::new();
+        for partition in prepared {
+            let mut stream = BlockSeriesStream::new(partition);
+            while stream.advance().await.unwrap().is_some() {
+                let mut samples = Vec::new();
+                stream.consume(&mut samples).await.unwrap();
+                values.extend(samples.iter().map(|sample| sample.value));
+            }
+        }
+        values.sort_by(f64::total_cmp);
+        assert_eq!(values, [1.0, 4.0]);
+    }
+
+    #[tokio::test]
     async fn new_label_selects_only_new_schema_file() {
         let old = file(&[(1, 10, 1.0, Some("old"))]);
         let source = batch(&[(2, 10, 3.0, Some("new")), (2, 20, 4.0, Some("new"))]);

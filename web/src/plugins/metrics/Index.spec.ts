@@ -148,6 +148,7 @@ const createWrapper = (props: Record<string, any> = {}) => {
         // Heavy async / complex children
         PanelEditor: {
           template: "<div class='panel-editor' data-test='panel-editor'><slot /></div>",
+          name: "PanelEditor",
           methods: { runQuery: vi.fn() },
         },
         DateTimePickerDashboard: {
@@ -776,6 +777,56 @@ describe("Metrics Index — disable ref and loading state", () => {
     await flushPromises();
     const btn = wrapper.find('[data-test="metrics-apply"]');
     expect(btn.attributes("disabled")).toBeFalsy();
+  });
+
+  it("is not pending on a fresh mount, even when load-time watchers rewrite the panel", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+    const vm = wrapper.vm as any;
+    const runButton = () => wrapper.find('[data-test="metrics-apply"]');
+    try {
+      vm.chartData = JSON.parse(JSON.stringify(vm.dashboardPanelData.data));
+      vm.dashboardPanelData.data.queries[0].query = "up{}";
+      await nextTick();
+      expect(runButton().attributes("data-o2-variant")).toBe("primary");
+      expect(runButton().attributes("data-run-pending")).toBeUndefined();
+    } finally {
+      vm.dashboardPanelData.data.queries[0].query = "";
+    }
+  });
+
+  it("goes pending only for an edit after the user's first input, and clears on the next run", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+    const vm = wrapper.vm as any;
+    const runButton = () => wrapper.find('[data-test="metrics-apply"]');
+    mockValidatePanel.mockImplementation(() => {});
+    try {
+      vm.runQuery();
+      vm.dashboardPanelData.data.queries[0].query = "up{}";
+      await nextTick();
+      expect(runButton().attributes("data-o2-variant")).toBe("primary");
+
+      window.dispatchEvent(new Event("pointerdown"));
+      await nextTick();
+      expect(runButton().attributes("data-o2-variant")).toBe("primary");
+
+      vm.dashboardPanelData.data.queries[0].query = "rate(up[5m])";
+      await nextTick();
+      expect(runButton().attributes("data-o2-variant")).toBe("pending");
+      expect(runButton().attributes("aria-label")).toBe("search.runQueryPendingLabel");
+
+      vm.disable = true;
+      await nextTick();
+      expect(runButton().attributes("data-o2-variant")).toBe("primary");
+      vm.disable = false;
+
+      vm.runQuery();
+      await nextTick();
+      expect(runButton().attributes("data-o2-variant")).toBe("primary");
+    } finally {
+      vm.dashboardPanelData.data.queries[0].query = "";
+    }
   });
 
   it("run-query button becomes disabled when disable is true", async () => {

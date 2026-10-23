@@ -430,6 +430,17 @@ impl Writer {
         Ok(())
     }
 
+    /// [Self::write_batch] that skips the write queue and flushes the WAL to the OS before it
+    /// returns (and fsyncs it when fsync is on), so the caller may treat the ack as durable
+    /// against a process kill.
+    pub async fn write_batch_synced(&self, entries: Vec<Entry>) -> Result<()> {
+        if entries.is_empty() {
+            return Ok(());
+        }
+        let processed_batch = self.preprocess_batch(entries)?;
+        self.consume_processed(processed_batch, true).await
+    }
+
     fn preprocess_batch(&self, mut entries: Vec<Entry>) -> Result<crate::ProcessedBatch> {
         // data_size == 0 is treated as an empty entry downstream
         for entry in entries.iter_mut() {

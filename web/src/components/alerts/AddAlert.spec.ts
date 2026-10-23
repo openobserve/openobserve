@@ -960,6 +960,49 @@ describe("AddAlert (OForm owner)", () => {
       expect(payload.anomaly_config.alert_budget_per_day).toBeNull();
     });
 
+    it.each([3.25, 4.234, "", "invalid", "Infinity", 0.5, 10.5])(
+      "validates a real sensitivity draft %j before saving its payload",
+      async (draft) => {
+        wrapper = mountAlert(
+          {},
+          {
+            global: {
+              provide: { store },
+              plugins: [i18n, router],
+              stubs: { ...stubs, AnomalyDetectionConfig: false, QueryEditor: true },
+            },
+          },
+        );
+        await flushPromises();
+        const form = wrapper.vm.form;
+        form.setFieldValue("is_real_time", "anomaly");
+        await flushPromises();
+        form.setFieldValue("name", "anom_alert");
+        form.setFieldValue("stream_type", "logs");
+        form.setFieldValue("stream_name", "_rundata");
+        await flushPromises();
+        wrapper.vm.anomalyConfig.alert_enabled = false;
+        await wrapper.find('[data-test="anomaly-sensitivity-tier-4"]').trigger("click");
+        await wrapper.find('[data-test="anomaly-sensitivity-level"] input').setValue(String(draft));
+        await flushPromises();
+
+        await wrapper.vm.handleSave();
+        await flushPromises();
+
+        if (typeof draft === "number" && draft >= 1 && draft <= 10) {
+          expect(anomalyDetectionService.create).toHaveBeenCalledTimes(1);
+          const [, payload] = (anomalyDetectionService.create as any).mock.calls[0];
+          expect(payload.anomaly_config.band_width).toBe(draft);
+          expect(typeof payload.anomaly_config.band_width).toBe("number");
+        } else {
+          expect(anomalyDetectionService.create).not.toHaveBeenCalled();
+          expect(wrapper.find('[data-test="anomaly-sensitivity-error"]').text()).toBe(
+            "Enter a band width from 1 to 10.",
+          );
+        }
+      },
+    );
+
     it("budget mode sends alert_budget_per_day and omits threshold — the API rejects both", async () => {
       // While a budget is set, `threshold` is controller-derived state; a
       // payload carrying both is rejected server-side.

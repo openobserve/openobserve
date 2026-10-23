@@ -923,7 +923,7 @@ async fn compute_tail(
 // ─── Search harnesses ────────────────────────────────────────────────────────
 
 /// Run one read over the `_o2_db_stats` summary stream (read as
-/// `StreamType::Logs`, exactly like `_o2_service_graph` — design §5.3).
+/// `StreamType::Logs`, exactly like `_agent_signals` — design §5.3).
 /// Returns empty when the stream does not exist yet.
 pub(super) async fn run_stats_search(
     org_id: &str,

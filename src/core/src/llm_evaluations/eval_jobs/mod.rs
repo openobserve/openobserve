@@ -44,7 +44,7 @@ pub enum EvalJobError {
     #[error("Job not found")]
     NotFound,
 
-    #[error("Invalid status '{0}'. Must be one of: draft, active, paused, degraded, archived")]
+    #[error("Invalid status '{0}'. Must be one of: draft, active, paused, archived")]
     InvalidStatus(String),
 
     #[error("Invalid status transition from '{from}' to '{to}'")]
@@ -285,10 +285,10 @@ pub async fn prepare_job_update(
 pub async fn store_job_update(
     mut job: table::online_eval_jobs::OnlineEvalJob,
 ) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
-    // If the job is currently bound to a pipeline (active/paused/degraded),
+    // If the job is currently bound to a pipeline (active/paused),
     // re-reconcile so span pipelines pick up changes, or are torn down when
     // switching to trace/session scope.
-    if matches!(job.status.as_str(), "active" | "paused" | "degraded") {
+    if matches!(job.status.as_str(), "active" | "paused") {
         job.pipeline_id = reconciler::reconcile(&job)
             .await
             .map_err(|e| EvalJobError::ReconcilerError(e.to_string()))?;
@@ -344,6 +344,10 @@ pub async fn delete_job(org_id: &str, job_id: &str) -> Result<(), EvalJobError> 
         .map_err(|e| EvalJobError::ReconcilerError(e.to_string()))?;
 
     table::online_eval_jobs::delete(job_id).await?;
+    // A leftover health row is never listed, so its cleanup must not fail the delete.
+    if let Err(e) = table::eval_job_states::delete_by_job(job_id).await {
+        log::warn!("[EvalJobHealth] failed to delete health state for job {job_id}: {e}");
+    }
     remove_ownership(org_id, "eval_jobs", Authz::new(job_id)).await;
     publish_eval_job_delete(org_id, job_id).await;
     Ok(())

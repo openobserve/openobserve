@@ -850,11 +850,13 @@ export interface ResolvedSegment {
    * by layer. Not the rotation: that is `rotation_id`, and every segment in one
    * response shares it.
    *
-   * Null on a gap, where no rule won and therefore none named anybody.
+   * Null on a gap no rule covers; a gap left by an away rostered member keeps its rule.
    */
   rotation?: string | null;
   /** Present when a cover took this span from the rotation. */
   override_id?: string | null;
+  /** Whom the roster puts on here before absences and covers; present only when it differs from `user_email`. */
+  scheduled_email?: string | null;
 }
 
 /** `GET /oncall/teams/{id}/load`. Who has been carrying the pager. */
@@ -1207,6 +1209,7 @@ export type RefusalReason =
   | "no_provider"
   | "no_phone"
   | "number_rejected"
+  | "number_not_allowed"
   | "provider_unavailable";
 
 /** The 400/429/503 body of a refused send or confirm; `message` is the English API text. */

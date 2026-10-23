@@ -40,6 +40,10 @@ const props = defineProps<{
   docUrl?: string;
   guideName?: string;
   snippetKind?: "command" | "config";
+  /** The tool whose config holds the password, for a config guide's invalid-credentials fix. */
+  configTool?: string;
+  /** The block the bar re-copies; a config defaults to its last block, after any install command. */
+  copySnippet?: "first" | "last";
   signal?: StreamSignal;
   targetStream?: string;
 }>();
@@ -82,7 +86,8 @@ const copyPageSnippet = () => {
       '[data-test^="ingestion-"][data-test$="-code-block-copy-btn"]',
     ) ?? [],
   );
-  const button = props.snippetKind === "config" ? buttons[buttons.length - 1] : buttons[0];
+  const which = props.copySnippet ?? (props.snippetKind === "config" ? "last" : "first");
+  const button = which === "last" ? buttons[buttons.length - 1] : buttons[0];
   button?.click();
 };
 
@@ -102,6 +107,7 @@ const SlotWithBar = () => {
     guideName: props.guideName ?? "",
     docUrl,
     snippetKind: props.snippetKind ?? "command",
+    ...(props.configTool ? { configTool: props.configTool } : {}),
     onCopyCommand: copyPageSnippet,
   });
   if (!org.value) return nodes;

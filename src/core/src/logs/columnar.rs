@@ -47,7 +47,10 @@ use crate::{
     },
 };
 
-/// Builds a `_json` request's records straight into Arrow columns of the stream's current schema.
+/// The field `_bulk` sets from an action line's `_id`.
+const BULK_ID_COL: &str = "_id";
+
+/// Builds `_json` or `_bulk` records straight into Arrow columns of the stream's current schema.
 pub struct JsonColumnar {
     stream_name: String,
     buckets: ColumnarBuckets,
@@ -58,6 +61,9 @@ pub struct JsonColumnar {
     time_range: (i64, i64),
     dbm_enabled: bool,
     input_bytes: usize,
+    /// The action `_id` of each accepted `_bulk` record, for its response item.
+    bulk_ids: Vec<Option<String>>,
+    bulk_id_col: Option<usize>,
 }
 
 impl JsonColumnar {
@@ -110,6 +116,10 @@ impl JsonColumnar {
         self.buckets.rows()
     }
 
+    pub fn flatten_level(&self) -> u32 {
+        self.flatten_level
+    }
+
     /// What `estimate_json_bytes` counts over the accepted records as the client sent them.
     pub fn input_bytes(&self) -> usize {
         self.input_bytes
@@ -152,6 +162,27 @@ impl JsonColumnar {
             .collect()
     }
 
+    /// Takes one `_bulk` data line under its action's `_id`; `false` leaves it to the JSON path.
+    pub fn parse_bulk_line(&mut self, line: &[u8], doc_id: Option<&str>) -> bool {
+        if doc_id.is_some() && self.bulk_id_col.is_none() {
+            return false;
+        }
+        let mut de = serde_json::Deserializer::from_slice(line);
+        let mut state = RecordState::new(self);
+        let accepted = match Record(&mut state).deserialize(&mut de) {
+            Ok(input_bytes) => de.end().is_ok() && state.finish_bulk(input_bytes, doc_id),
+            Err(_) => false,
+        };
+        if accepted {
+            self.bulk_ids.push(doc_id.map(str::to_string));
+        }
+        accepted
+    }
+
+    pub fn take_bulk_ids(&mut self) -> Vec<Option<String>> {
+        std::mem::take(&mut self.bulk_ids)
+    }
+
     pub fn into_entries(self, org_id: &str) -> Result<Vec<ingester::Entry>> {
         let schema = self.buckets.schema();
         let mut columns = self.buckets.filled_columns();
@@ -160,7 +191,7 @@ impl JsonColumnar {
             .into_entries(org_id, &self.stream_name, Some(columns))
     }
 
-    fn for_schema(
+    pub(super) fn for_schema(
         stream_name: &str,
         schema: &Schema,
         flatten_level: u32,
@@ -175,11 +206,12 @@ impl JsonColumnar {
         let ts_col = fields
             .iter()
             .position(|f| f.name() == TIMESTAMP_COL_NAME && f.data_type() == &DataType::Int64)?;
-        let col_index = fields
+        let col_index: hashbrown::HashMap<String, usize> = fields
             .iter()
             .enumerate()
             .map(|(idx, f)| (f.name().clone(), idx))
             .collect();
+        let bulk_id_col = col_index.get(BULK_ID_COL).copied();
         Some(Self {
             stream_name: stream_name.to_string(),
             buckets: ColumnarBuckets::new(StreamType::Logs, schema),
@@ -190,6 +222,8 @@ impl JsonColumnar {
             time_range,
             dbm_enabled,
             input_bytes: 0,
+            bulk_ids: Vec::new(),
+            bulk_id_col,
         })
     }
 
@@ -364,6 +398,8 @@ struct RecordState<'c, 'de> {
     null_marks: Vec<u32>,
     serial: u32,
     nested_top: bool,
+    /// Whether the record has a top-level key spelled exactly `_timestamp`.
+    raw_timestamp: bool,
     fallback: bool,
 }
 
@@ -385,6 +421,7 @@ impl<'c, 'de> RecordState<'c, 'de> {
             null_marks: vec![0; columns],
             serial: 0,
             nested_top: false,
+            raw_timestamp: false,
             fallback: false,
         }
     }
@@ -405,6 +442,7 @@ impl<'c, 'de> RecordState<'c, 'de> {
         self.null_bytes = 0;
         self.containers.clear();
         self.nested_top = false;
+        self.raw_timestamp = false;
         self.fallback = false;
     }
 
@@ -539,6 +577,40 @@ impl<'c, 'de> RecordState<'c, 'de> {
         true
     }
 
+    /// `finish` after `_bulk`'s own step: check `_timestamp` as sent, set the action's `_id`.
+    fn finish_bulk(&mut self, input_bytes: usize, doc_id: Option<&str>) -> bool {
+        // the JSON path reads a record's own `_id` back into its response item
+        if let Some(col) = self.columnar.bulk_id_col
+            && (self.marks[col] == self.serial || self.null_marks[col] == self.serial)
+        {
+            return false;
+        }
+        // `_bulk` reads the literal key, so a key that only flattens into `_timestamp` differs
+        if self.fallback || self.raw_timestamp != self.timestamp.is_some() {
+            return false;
+        }
+        // `{}` counts 2 bytes, yet once `_bulk` adds entries the object counts 1 plus theirs
+        let mut input_bytes = if input_bytes == 2 { 1 } else { input_bytes };
+        let (min_ts, max_ts) = self.columnar.time_range;
+        let leaf = self.timestamp.take();
+        let parsed = leaf.as_ref().map(Leaf::timestamp);
+        let Ok((timestamp, _)) = super::bulk::resolve_bulk_timestamp(parsed, min_ts, max_ts) else {
+            return false;
+        };
+        input_bytes = match leaf {
+            Some(leaf) => input_bytes - leaf.json_bytes(),
+            None => input_bytes + estimate_json_entry_bytes(TIMESTAMP_COL_NAME, 0),
+        } + timestamp.json_bytes();
+        self.timestamp = Some(Leaf::Num(Num::I64(timestamp)));
+        if let Some(id) = doc_id {
+            self.path.clear();
+            self.path.push_str(BULK_ID_COL);
+            let bytes = self.push_leaf(Leaf::Str(Cow::Owned(id.to_string())));
+            input_bytes += estimate_json_entry_bytes(BULK_ID_COL, bytes);
+        }
+        self.finish(input_bytes)
+    }
+
     /// Flattens an object at `depth` into leaves, returning its `estimate_json_bytes` size.
     fn read_object<A: MapAccess<'de>>(
         &mut self,
@@ -584,6 +656,8 @@ impl<'c, 'de> RecordState<'c, 'de> {
             let parent = self.path.len();
             if depth > 0 {
                 self.path.push('_');
+            } else if name == TIMESTAMP_COL_NAME {
+                self.raw_timestamp = true;
             }
             push_formatted_key(&mut self.path, &name);
             let value_bytes = map.next_value_seed(FieldSeed {
@@ -838,7 +912,7 @@ mod tests {
 
     use arrow::record_batch::RecordBatch;
     use arrow_schema::Field;
-    use config::utils::record_batch_ext::convert_json_to_record_batch;
+    use config::utils::{record_batch_ext::convert_json_to_record_batch, time::now_micros};
 
     use super::*;
 
@@ -858,13 +932,41 @@ mod tests {
     fn json_path(schema: &Schema, body: &str, flatten_level: u32) -> (RecordBatch, usize, usize) {
         let records: Vec<json::Value> =
             json::from_str(body).unwrap_or_else(|_| vec![json::from_str(body).unwrap()]);
+        json_records_path(schema, records, flatten_level, RANGE)
+    }
+
+    /// What the JSON path writes for `_bulk`'s data `line` once `_bulk` has prepared it.
+    fn bulk_json_path(
+        schema: &Schema,
+        line: &str,
+        doc_id: Option<&str>,
+        range: (i64, i64),
+    ) -> (RecordBatch, usize, usize) {
+        let json::Value::Object(mut record) = json::from_str(line).unwrap() else {
+            panic!("{line} is not an object");
+        };
+        crate::logs::bulk::prepare_bulk_record(&mut record, doc_id, range.0, range.1)
+            .unwrap_or_else(|e| panic!("_bulk rejects {line}: {e}"));
+        json_records_path(schema, vec![json::Value::Object(record)], 3, range)
+    }
+
+    fn json_records_path(
+        schema: &Schema,
+        records: Vec<json::Value>,
+        flatten_level: u32,
+        range: (i64, i64),
+    ) -> (RecordBatch, usize, usize) {
         let (mut rows, mut json_size, mut input_bytes) = (Vec::new(), 0, 0);
         let mut seen = std::collections::HashSet::new();
         for record in records {
             input_bytes += estimate_json_bytes(&record);
-            let (value, _) =
-                crate::logs::ingest::prepare_record(record, flatten_level, RANGE.0, RANGE.1)
-                    .unwrap_or_else(|_| panic!("the JSON path rejects a record of {body}"));
+            let (value, _) = crate::logs::ingest::prepare_record(
+                record.clone(),
+                flatten_level,
+                range.0,
+                range.1,
+            )
+            .unwrap_or_else(|_| panic!("the JSON path rejects {record}"));
             json_size += estimate_json_bytes(&value);
             for (key, v) in value.as_object().unwrap() {
                 if crate::ingestion::inferred_column_type(key, v).is_some() {
@@ -1034,6 +1136,145 @@ mod tests {
             // both columns are in the request's batch schema, null where a bucket lacks them
             assert_eq!(batch.num_columns(), 3);
         }
+    }
+
+    fn bulk_schema() -> Schema {
+        let mut fields = logs_schema().fields().to_vec();
+        fields.push(Arc::new(Field::new(BULK_ID_COL, DataType::Utf8, true)));
+        Schema::new(fields)
+    }
+
+    /// A window around now, for records `_bulk` stamps with the current time.
+    fn now_range() -> (i64, i64) {
+        let now = now_micros();
+        (now - 3_600_000_000, now + 3_600_000_000)
+    }
+
+    fn without_timestamp(batch: &RecordBatch) -> RecordBatch {
+        let mut batch = batch.clone();
+        batch.remove_column(batch.schema().index_of(TIMESTAMP_COL_NAME).unwrap());
+        batch
+    }
+
+    fn assert_bulk_same_as_json_path(
+        schema: &Schema,
+        line: &str,
+        doc_id: Option<&str>,
+        range: (i64, i64),
+    ) {
+        let (expected, json_size, input_bytes) = bulk_json_path(schema, line, doc_id, range);
+        let mut columnar = JsonColumnar::for_schema("logs", schema, 3, range, true).unwrap();
+        assert!(
+            columnar.parse_bulk_line(line.as_bytes(), doc_id),
+            "{line} fell back"
+        );
+        assert_eq!(columnar.input_bytes(), input_bytes, "input bytes of {line}");
+        assert_eq!(columnar.take_bulk_ids(), vec![doc_id.map(str::to_string)]);
+        let entries = columnar.into_entries("org").unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].data_size, json_size, "json size of {line}");
+        let batch = entries[0].batch.as_ref().unwrap();
+        if line.contains(TIMESTAMP_COL_NAME) {
+            assert_eq!(batch, &expected, "{line}");
+        } else {
+            // both paths stamp the current time, a few microseconds apart
+            assert_eq!(
+                without_timestamp(batch),
+                without_timestamp(&expected),
+                "{line}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_bulk_line_matches_the_bulk_json_path() {
+        let schema = bulk_schema();
+        let lines = [
+            format!(r#"{{"_timestamp":{TS},"level":"info","k8s":{{"pod.name":"p-1"}}}}"#),
+            format!(r#"{{"_timestamp":"{TS}","Level":"warn","status":-3,"message":null}}"#),
+            format!(
+                r#"{{"_timestamp":{},"ratio":0.5,"tags":["a",1]}}"#,
+                TS / 1_000_000
+            ),
+            format!(r#"{{"_timestamp":{TS},"_original":"skip me","ok":true}}"#),
+        ];
+        for line in &lines {
+            for doc_id in [None, Some("doc-1"), Some(r#"a "quoted" \ id"#)] {
+                assert_bulk_same_as_json_path(&schema, line, doc_id, RANGE);
+            }
+        }
+        // `_bulk` stamps a record that has no `_timestamp`
+        for line in [
+            r#"{"level":"info","bytes":7}"#,
+            "{}",
+            r#"{"_original":"x"}"#,
+        ] {
+            for doc_id in [None, Some("doc-2")] {
+                assert_bulk_same_as_json_path(&schema, line, doc_id, now_range());
+            }
+        }
+    }
+
+    #[test]
+    fn test_bulk_line_hands_back_what_bulk_must_decide() {
+        let schema = bulk_schema();
+        let lines = [
+            // the record's own `_id` would name its response item
+            format!(r#"{{"_timestamp":{TS},"_id":"own"}}"#),
+            format!(r#"{{"_timestamp":{TS},"_id":null,"level":"a"}}"#),
+            // `_bulk` reads only the literal `_timestamp` key, and rejects what it cannot parse
+            format!(r#"{{"_Timestamp":{TS},"level":"a"}}"#),
+            r#"{"_timestamp":null,"level":"a"}"#.to_string(),
+            r#"{"_timestamp":{},"level":"a"}"#.to_string(),
+            r#"{"_timestamp":true,"level":"a"}"#.to_string(),
+            r#"{"_timestamp":0,"level":"a"}"#.to_string(),
+            format!(r#"{{"_timestamp":{},"level":"a"}}"#, TS - 7_200_000_000),
+            format!(r#"{{"_timestamp":{},"level":"a"}}"#, TS + 7_200_000_000),
+            // what `_json` hands back too
+            format!(r#"{{"_timestamp":{TS},"new_field":"x"}}"#),
+            format!(r#"{{"_timestamp":{TS},"status":"200"}}"#),
+            "[1]".to_string(),
+            r#""text""#.to_string(),
+            format!(r#"{{"_timestamp":{TS}}} x"#),
+            format!(r#"{{"_timestamp":{TS},"level":"#),
+        ];
+        for line in &lines {
+            for doc_id in [None, Some("doc-1")] {
+                let mut columnar =
+                    JsonColumnar::for_schema("logs", &schema, 3, RANGE, true).unwrap();
+                assert!(!columnar.parse_bulk_line(line.as_bytes(), doc_id), "{line}");
+                assert_eq!(columnar.rows(), 0, "{line}");
+                assert!(columnar.take_bulk_ids().is_empty(), "{line}");
+                assert_eq!(columnar.input_bytes(), 0, "{line}");
+            }
+        }
+        // invalid UTF-8 is left to the JSON path, which repairs it
+        let mut columnar = JsonColumnar::for_schema("logs", &schema, 3, RANGE, true).unwrap();
+        let line = [br#"{"_timestamp":1,"level":""#.as_slice(), b"\xff\"}"].concat();
+        assert!(!columnar.parse_bulk_line(&line, None));
+        // an action `_id` needs a string `_id` column to land in
+        let mut columnar =
+            JsonColumnar::for_schema("logs", &logs_schema(), 3, RANGE, true).unwrap();
+        let line = format!(r#"{{"_timestamp":{TS},"level":"a"}}"#);
+        assert!(!columnar.parse_bulk_line(line.as_bytes(), Some("doc-1")));
+        assert!(columnar.parse_bulk_line(line.as_bytes(), None));
+    }
+
+    #[test]
+    fn test_bulk_lines_keep_their_action_ids_in_order() {
+        let schema = bulk_schema();
+        let mut columnar = JsonColumnar::for_schema("logs", &schema, 3, RANGE, true).unwrap();
+        let ok = format!(r#"{{"_timestamp":{TS},"level":"a"}}"#);
+        let new_field = format!(r#"{{"_timestamp":{TS},"nope":1}}"#);
+        assert!(columnar.parse_bulk_line(ok.as_bytes(), Some("1")));
+        assert!(!columnar.parse_bulk_line(new_field.as_bytes(), Some("2")));
+        assert!(columnar.parse_bulk_line(ok.as_bytes(), None));
+        assert!(columnar.parse_bulk_line(ok.as_bytes(), Some("3")));
+        assert_eq!(columnar.rows(), 3);
+        assert_eq!(
+            columnar.take_bulk_ids(),
+            vec![Some("1".to_string()), None, Some("3".to_string())]
+        );
     }
 
     #[test]
