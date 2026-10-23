@@ -192,3 +192,14 @@ it("shows the fetched successor and expiry beside the last refresh", () => {
   });
   expect(w.text()).toContain("renewed license fetched (lic_new, expires Nov 2, 2027)");
 });
+
+it("blocked status explains how long the current license keeps working", () => {
+  const w = card({ registration: "blocked" }, { licenseExpiresAt: Date.UTC(2027, 4, 10) * 1000 });
+  expect(w.text()).toContain("the current license keeps working until May 10, 2027");
+});
+
+it("turned-off status retains the last refresh time", () => {
+  const w = card({ mode: "disabled" });
+  expect(w.text()).toContain("Last refreshed");
+  expect(w.text()).toContain("Oct 23, 09:41 UTC");
+});

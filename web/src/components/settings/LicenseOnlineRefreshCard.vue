@@ -9,7 +9,7 @@
         </ODescriptionItem>
         <ODescriptionItem
           :stacked="isMobile"
-          v-if="showKey"
+          v-if="showKey || (refresh.mode === 'disabled' && refresh.last_success_at)"
           :label="t('about.online_last_refreshed')"
         >
           <span>{{ lastRefreshed }}</span>
@@ -159,6 +159,7 @@ const props = defineProps<{
   canUpdate: boolean;
   envKeyActive: boolean;
   isRoot: boolean;
+  licenseExpiresAt?: number;
 }>();
 const emit = defineEmits<{ "add-license-key": []; refreshed: [] }>();
 const { t, locale } = useI18nTyped();
@@ -180,13 +181,15 @@ const badgeVariant = computed(() =>
         : "default-outline",
 );
 const statusHint = computed(() =>
-  props.refresh.mode === "airgapped"
-    ? t("about.online_airgapped")
-    : props.refresh.mode === "online" && props.refresh.registration === "registered"
-      ? t("about.online_with_host", { host: props.refresh.server_host })
-      : props.refresh.registration === "key_conflict"
-        ? t("about.online_key_conflict")
-        : "",
+  props.refresh.registration === "blocked" && props.licenseExpiresAt
+    ? t("about.online_blocked_until", { date: issuedOn(props.licenseExpiresAt, locale.value) })
+    : props.refresh.mode === "airgapped"
+      ? t("about.online_airgapped")
+      : props.refresh.mode === "online" && props.refresh.registration === "registered"
+        ? t("about.online_with_host", { host: props.refresh.server_host })
+        : props.refresh.registration === "key_conflict"
+          ? t("about.online_key_conflict")
+          : "",
 );
 const showKey = computed(() => props.refresh.mode === "online");
 const shortKey = computed(() => {
