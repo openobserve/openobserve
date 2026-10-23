@@ -1309,7 +1309,7 @@
       "runFirst": "Run your query first",
       "usesEditedQuery": "Uses your edited query (not run yet)",
       "usesUnrunQuery": "Uses your query (not run yet)",
-      "downloadsShownResults": "Downloads the shown results, not your edit",
+      "downloadsShownResults": "Downloads every row of your last run, not your edit",
       "downloadsLastRun": "Uses the query that last ran, not your edit"
     },
     "noFtsRecovery": {
