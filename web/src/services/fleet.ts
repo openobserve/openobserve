@@ -161,8 +161,18 @@ export interface FleetToken {
 }
 
 export interface FleetTokenList {
+  total: number;
   items: FleetToken[];
 }
+
+/** One page of a list endpoint; the server caps `limit` at its maximum page size. */
+export interface FleetPage {
+  offset: number;
+  limit: number;
+}
+
+const paged = (path: string, page?: FleetPage) =>
+  page ? `${path}?offset=${page.offset}&limit=${page.limit}` : path;
 
 export interface FleetCreateTokenRequest {
   name: string;
@@ -460,8 +470,8 @@ const fleetPath = (orgId: string, id: string) =>
   `/api/${orgId}/fleet/fleets/${encodeURIComponent(id)}`;
 
 const api = {
-  listCollectors: (orgId: string) =>
-    http().get<FleetCollectorList>(`/api/${orgId}/fleet/collectors`),
+  listCollectors: (orgId: string, page?: FleetPage) =>
+    http().get<FleetCollectorList>(paged(`/api/${orgId}/fleet/collectors`, page)),
   getCollector: (orgId: string, id: string) =>
     http().get<FleetCollectorDetail>(collectorPath(orgId, id)),
   renameCollector: (orgId: string, id: string, name: string) =>
@@ -472,13 +482,16 @@ const api = {
   redeliverCollector: (orgId: string, id: string) =>
     http().post<{ revision: number }>(`${collectorPath(orgId, id)}/redeliver`),
   summary: (orgId: string) => http().get<FleetSummary>(`/api/${orgId}/fleet/summary`),
-  listTokens: (orgId: string) => http().get<FleetTokenList>(`/api/${orgId}/fleet/tokens`),
+  listTokens: (orgId: string, page?: FleetPage) =>
+    http().get<FleetTokenList>(paged(`/api/${orgId}/fleet/tokens`, page)),
   createToken: (orgId: string, body: FleetCreateTokenRequest) =>
     http().post<FleetCreatedToken>(`/api/${orgId}/fleet/tokens`, body),
   revokeToken: (orgId: string, id: string) =>
     http().post<FleetToken>(`/api/${orgId}/fleet/tokens/${encodeURIComponent(id)}/revoke`),
-  listConfigs: (orgId: string) =>
-    http().get<{ items: FleetConfigItem[] }>(`/api/${orgId}/fleet/configs`),
+  listConfigs: (orgId: string, page?: FleetPage) =>
+    http().get<{ items: FleetConfigItem[]; total: number }>(
+      paged(`/api/${orgId}/fleet/configs`, page),
+    ),
   getConfig: (orgId: string, id: string) => http().get<FleetConfigDetail>(configPath(orgId, id)),
   createConfig: (orgId: string, body: { id: string; description: string; yaml: string }) =>
     http().post<FleetConfigDetail>(`/api/${orgId}/fleet/configs`, body),
@@ -494,8 +507,10 @@ const api = {
     http().post<{ issues: FleetConfigIssues }>(`/api/${orgId}/fleet/configs/validate`, body),
   deleteConfig: (orgId: string, id: string) => http().delete(configPath(orgId, id)),
   listAudit: (orgId: string) => http().get<FleetAuditList>(`/api/${orgId}/fleet/audit`),
-  listRollouts: (orgId: string) =>
-    http().get<{ items: FleetRollout[]; total?: number }>(`/api/${orgId}/fleet/rollouts`),
+  listRollouts: (orgId: string, page?: FleetPage) =>
+    http().get<{ items: FleetRollout[]; total: number }>(
+      paged(`/api/${orgId}/fleet/rollouts`, page),
+    ),
   getRollout: (orgId: string, id: string) => http().get<FleetRollout>(rolloutPath(orgId, id)),
   resumeRollout: (orgId: string, id: string) =>
     http().post<FleetRollout>(`${rolloutPath(orgId, id)}/resume`),
@@ -503,8 +518,8 @@ const api = {
     http().post<FleetRollout>(`${rolloutPath(orgId, id)}/skip`, { collector_ids: collectorIds }),
   rollbackRollout: (orgId: string, id: string) =>
     http().post<FleetRollout>(`${rolloutPath(orgId, id)}/rollback`),
-  listFleets: (orgId: string) =>
-    http().get<{ items: Fleet[]; total?: number }>(`/api/${orgId}/fleet/fleets`),
+  listFleets: (orgId: string, page?: FleetPage) =>
+    http().get<{ items: Fleet[]; total: number }>(paged(`/api/${orgId}/fleet/fleets`, page)),
   createFleet: (orgId: string, name: string) =>
     http().post<Fleet>(`/api/${orgId}/fleet/fleets`, { name }),
   renameFleet: (orgId: string, id: string, name: string) =>
