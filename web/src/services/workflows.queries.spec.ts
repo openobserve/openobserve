@@ -24,7 +24,6 @@ import {
   revealHttpCredentialSecretMutation,
   revokeHttpCredentialMutation,
   rotateHttpCredentialMutation,
-  testHttpTriggerMutation,
   workflowHttpTriggerQuery,
 } from "./workflows.queries";
 import { workflowKeys } from "./workflows.querykeys";
@@ -64,6 +63,10 @@ describe("workflow HTTP endpoint declarations", () => {
     ]);
     expect(options.queryKey).toEqual(workflowKeys.httpTrigger(org, id));
     expect(options.staleTime).toBe(NORMAL_STALE_TIME);
+  });
+
+  it("refetches on every mount, so a reopened panel never shows an old last call", () => {
+    expect(workflowHttpTriggerQuery(org, id).refetchOnMount).toBe("always");
   });
 
   it("is enabled only when org and id are set", () => {
@@ -147,13 +150,8 @@ describe("workflow HTTP endpoint declarations", () => {
     ]);
   });
 
-  it("testHttpTrigger invalidates the runs", async () => {
-    api.post.mockResolvedValue({ data: { errors: {}, inputs: {}, outputs: {} } });
-    const spy = vi.spyOn(queryClient, "invalidateQueries");
-
-    await runMutation(testHttpTriggerMutation(org, id), { data: [] });
-
-    expect(invalidatedKeys(spy)).toEqual([workflowKeys.runsOf(org, id)]);
+  it("declares no HTTP trigger test mutation; the Test dialog runs /workflows/test", () => {
+    expect(Object.keys(declarations)).not.toContain("testHttpTriggerMutation");
   });
 
   it("the writes the section renders a failure for are silent", () => {
@@ -193,7 +191,6 @@ describe("workflow HTTP endpoint declarations", () => {
       deleteHttpTriggerMutation(org, id),
       rotateHttpCredentialMutation(org, id),
       revokeHttpCredentialMutation(org, id),
-      testHttpTriggerMutation(org, id),
       revealHttpCredentialSecretMutation(org, id),
     ]) {
       expect(options).not.toHaveProperty("persister");

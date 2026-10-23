@@ -183,7 +183,6 @@ const { t } = useI18nTyped();
 const { resetWorkflowData } = useWorkflowCanvas(t);
 
 const router = useRouter();
-// Each column set's sizes are budgeted against its panel width; the panel has no horizontal scroll.
 const PANEL_WIDTH = {
   plain: "w-[27.5rem] max-w-[46%]",
   source: "w-[32rem] max-w-[50%]",

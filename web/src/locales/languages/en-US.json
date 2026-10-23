@@ -4657,7 +4657,14 @@
       "rotateLeadUnused": "A new token is created now. Keep {prefix} (never used) working for",
       "rotateLeadUnusedSigned": "A new signing secret is created now. Keep {prefix} (never used) working for",
       "fieldGroup": "HTTP request",
-      "fieldGroupBodyHint": "Fields inside the request body need a Function step first"
+      "fieldGroupBodyHint": "Fields inside the request body need a Function step first",
+      "fieldGroupQueryHint": "Query parameters are meta.query.<key>; repeated keys arrive as a list and never match",
+      "rotateLeadNone": "No token is active, so callers can't authenticate. A new token is created now.",
+      "rotateLeadNoneSigned": "No signing secret is active, so callers can't authenticate. A new signing secret is created now.",
+      "createForbidden": "You can't create endpoint credentials in this organization.",
+      "errorNotConfigured": "This workflow has no HTTP endpoint.",
+      "errorNoLiveCredential": "No credential is active. Rotate to create one.",
+      "errorNotAllowed": "You don't have permission to do this."
     }
   },
   "pipeline": {

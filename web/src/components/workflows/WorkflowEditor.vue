@@ -298,6 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="workflowObj.testRun.show"
       :seed="testSeed"
       :payload-from="testPayloadFrom"
+      :seed-run-at="testSeedRunAt"
     />
 
     <WorkflowHttpEndpointPanel
@@ -310,6 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :workflow-enabled="workflowObj.currentSelectedWorkflow.enabled !== false"
       context="editor"
       :before-create="persistDraft"
+      :trigger-node-id="httpTriggerNodeId"
       @update:open="httpEditorState.panelOpen = $event"
       @run-test="onHttpRunTest"
     />
@@ -393,6 +395,7 @@ import useWorkflowCanvas, {
   triggerDef,
   triggerTypeForKind,
   currentTriggerKind,
+  currentTriggerNodeId,
   serializeWorkflow,
   markWorkflowDirty,
   reachableFrom,
@@ -559,6 +562,7 @@ const orgId = () => store.state.selectedOrganization.identifier as string;
 // ── HTTP endpoint ───────────────────────────────────────────────────────────
 const hooksOn = computed(() => workflowHooksEnabled(store.state.zoConfig));
 const httpKind = computed(() => currentTriggerKind());
+const httpTriggerNodeId = computed(() => currentTriggerNodeId());
 const httpTrigger = useQuery(() =>
   workflowHttpTriggerQuery(
     orgId(),
@@ -586,12 +590,14 @@ const pickerFootnote = computed(() =>
 );
 const testSeed = ref<unknown[] | undefined>(undefined);
 const testPayloadFrom = ref<PayloadFrom | undefined>(undefined);
+const testSeedRunAt = ref<number | undefined>(undefined);
 watch(
   () => workflowObj.testRun.show,
   (show) => {
     if (show) return;
     testSeed.value = undefined;
     testPayloadFrom.value = undefined;
+    testSeedRunAt.value = undefined;
   },
 );
 
@@ -1028,12 +1034,14 @@ const onTest = () => {
   workflowObj.testRun.show = true;
 };
 
-// The panel closes first, so the Test drawer is the only overlay (AC-UI-34).
-const onHttpRunTest = (seed: unknown[]) => {
+// The panel closes first, so the Test drawer is the only overlay (AC-UI-34); the seed is set only once the graph validates.
+const onHttpRunTest = (seed: unknown[], runAt?: number) => {
   httpEditorState.panelOpen = false;
+  if (!validate({ requireName: false, allowOrphans: true })) return;
   testSeed.value = seed;
   testPayloadFrom.value = "http";
-  onTest();
+  testSeedRunAt.value = runAt;
+  workflowObj.testRun.show = true;
 };
 
 // History → the dedicated read-only Runs inspection view (separate surface).

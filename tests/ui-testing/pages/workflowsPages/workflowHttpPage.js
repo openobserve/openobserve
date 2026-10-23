@@ -242,6 +242,18 @@ class WorkflowHttpPage {
     return consequence;
   }
 
+  /** Rotate with no live credential: the popover offers no overlap, confirm mints a new one. */
+  async rotateWithoutCredential() {
+    await this.page.locator(this.rotate).click({ timeout: PANEL_TIMEOUT_MS });
+    const popover = this.page.locator(this.rotatePopover);
+    await popover.waitFor({ state: 'visible', timeout: PANEL_TIMEOUT_MS });
+    const lead = (await popover.innerText()).replace(/\s+/g, ' ');
+    const overlapOptions = await this.page.locator(this.rotateOverlap(3600)).count();
+    await this.page.locator(this.rotateConfirm).click({ timeout: PANEL_TIMEOUT_MS });
+    await this.page.locator(this.revealBanner).waitFor({ state: 'visible', timeout: PANEL_TIMEOUT_MS });
+    return { lead, overlapOptions };
+  }
+
   async revokeCredential(credentialId) {
     await this.page.locator(this.credRevoke(credentialId)).click({ timeout: PANEL_TIMEOUT_MS });
     await this.page.locator(this.credRevokeConfirm(credentialId)).click({ timeout: PANEL_TIMEOUT_MS });

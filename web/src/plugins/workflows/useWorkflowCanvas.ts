@@ -41,7 +41,7 @@ import { getTruncatedConditions } from "@/utils/conditionPreview";
 import { convertV0ToV2, convertV1BEToV2, convertV1ToV2 } from "@/utils/alerts/alertDataTransforms";
 import { DEFAULT_TRIGGER_KIND, triggerTypeForKind } from "./triggers";
 import { hasStoredRunData, runReasonOf, type RunOutcomeFields } from "./runStatus";
-import workflowService from "@/services/workflows";
+import workflowService, { type WorkflowHistoryRow } from "@/services/workflows";
 import { workflowRunsQuery } from "@/services/workflows.queries";
 import { workflowKeys } from "@/services/workflows.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
@@ -724,6 +724,12 @@ export const currentTriggerKind = (): string | undefined => {
     (n: any) => n.data?.node_type === "workflow_trigger",
   );
   return trigger?.data?.trigger_kind || trigger?.meta?.trigger_kind;
+};
+
+export const currentTriggerNodeId = (): string | undefined => {
+  const nodes: { id: string; data?: { node_type?: string } }[] =
+    workflowObj.currentSelectedWorkflow?.nodes || [];
+  return nodes.find((n) => n.data?.node_type === "workflow_trigger")?.id;
 };
 
 // ── Shared graph helpers ─────────────────────────────────────────────────────
@@ -1632,7 +1638,9 @@ export const loadWorkflowRun = async (opts: {
   runId: string;
 }): Promise<{ ok: boolean; error?: string }> => {
   const wf = workflowObj.currentSelectedWorkflow;
-  const row = workflowObj.runsHistory.list.find((r: any) => r.run_id === opts.runId);
+  const row = (workflowObj.runsHistory.list as WorkflowHistoryRow[]).find(
+    (r) => r.run_id === opts.runId,
+  );
   if (row && !hasStoredRunData(row)) {
     workflowObj.testRun.result = {
       errors: {},
