@@ -2,9 +2,9 @@
 // E2E tests for the IN-PAGE Service Graph / Services Catalog tabs on the
 // Traces page toolbar. Clicking a tab switches the view inline — the URL stays
 // on /traces and gains ?tab=service-graph / ?tab=services-catalog, and the
-// shared search context (stream, time range) carries implicitly. The rail
-// flyout is a separate access path that navigates to the standalone routes
-// (/traces/service-graph, /traces/services) — dual semantics, both covered.
+// shared search context (stream, time range) carries implicitly. Since #13852
+// the rail flyout reaches the same in-page views; /traces/service-graph and
+// /traces/services survive only as legacy redirects.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');

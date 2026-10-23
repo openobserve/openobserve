@@ -24,11 +24,7 @@ export class TracesPage {
     // Source: web/src/plugins/traces/SearchBar.vue
     this.searchToggle = '[data-test="traces-search-mode-traces-btn"]';
     this.spansToggle = '[data-test="traces-search-mode-spans-btn"]';
-    // Service Graph and Services are reachable two ways with different
-    // semantics: (a) the Traces rail tile's hover flyout navigates to the
-    // standalone routes (/traces/service-graph, /traces/services), and
-    // (b) toolbar tabs on the Traces page switch the view IN-PAGE — the URL
-    // stays on /traces and gains ?tab=. Keep both paths covered.
+    // Since #13852 the rail flyout and the toolbar tabs both open the in-page ?tab= view; the standalone routes are legacy redirects.
     this.tracesRailTile = '[data-test="nav-group-traces"]';
     // #13852: flyout child id is `nav-group-item-${child.name}-${child.tab}` (ONavGroup.vue:336).
     this.serviceMapsNavItem = '[data-test="nav-group-item-traces-service-graph"]';
@@ -108,7 +104,6 @@ export class TracesPage {
     this.serviceGraphChart = '[data-test="service-graph-chart"]';
     this.serviceGraphRefreshButton = '[data-test="service-graph-refresh-btn"]';
     // Standalone Service Graph page (rail-flyout route /traces/service-graph).
-    this.serviceGraphPage = '[data-test="service-graph-page"]';
 
     // ===== DRILL DOWN AND RED CHART SELECTORS (VERIFIED against Vue source) =====
     this.insightsButton = '[data-test="insights-button"]';
@@ -550,11 +545,6 @@ export class TracesPage {
   }
 
   // Standalone Service Graph page rendered from the rail flyout route.
-  async expectStandaloneServiceGraphPageVisible() {
-    await expect(this.page.locator(this.serviceGraphPage))
-      .toBeVisible({ timeout: 10000 });
-  }
-
   async refreshServiceGraph() {
     await this.page.locator(this.serviceGraphRefreshButton).click();
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
