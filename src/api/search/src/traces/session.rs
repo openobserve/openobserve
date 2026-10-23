@@ -120,7 +120,8 @@ pub async fn get_latest_sessions(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
+        // the request's SQL or filter may read streams other than the one it names
+        if let Err(e) = search_service::check_search_allowed(&org_id, None) {
             return MetaHttpResponse::too_many_requests(e.to_string());
         }
     }
