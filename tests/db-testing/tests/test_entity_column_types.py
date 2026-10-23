@@ -30,6 +30,13 @@ MODEL_RE = re.compile(r"pub struct Model\s*\{(.*?)\n\}", re.S)
 FIELD_RE = re.compile(r"^\s*pub\s+(?:r#)?(\w+)\s*:\s*([^,]+),", re.M)
 ATTR_RE = re.compile(r"#\[sea_orm\(((?:(?!#\[).)*?)\)\]\s*$", re.S)
 COLUMN_NAME_RE = re.compile(r'column_name\s*=\s*"([^"]+)"')
+CFG_GATED_RE = re.compile(r"#\[cfg\(feature\s*=")
+
+# Columns whose migrations live in o2-enterprise's cloud migrator, so this build never adds them.
+ENTERPRISE_CLOUD_COLUMNS = {
+    ("trial_quota_usage", "usage_limit"),
+    ("trial_quota_usage", "period"),
+}
 
 
 def _entity_files() -> list[Path]:
@@ -39,8 +46,14 @@ def _entity_files() -> list[Path]:
 
 def _columns(model_body: str) -> list[tuple[str, str]]:
     columns = []
+    prev_end = 0
     for m in FIELD_RE.finditer(model_body):
         name, rust_type = m.group(1), m.group(2).strip()
+        gated = CFG_GATED_RE.search(model_body[prev_end : m.start()])
+        prev_end = m.end()
+        # A feature-gated field is not compiled into this build, so it is never decoded here.
+        if gated:
+            continue
         attr = ATTR_RE.search(model_body[: m.start()])
         if attr:
             renamed = COLUMN_NAME_RE.search(attr.group(1))
@@ -82,6 +95,8 @@ def test_entity_column_types_match_postgres(db_cursor, table, columns):
     for column, rust_type in columns:
         expected = PG_TYPES.get(rust_type)
         if expected is None:
+            continue
+        if (table, column) in ENTERPRISE_CLOUD_COLUMNS:
             continue
         if column not in actual:
             mismatches.append(f"{column}: entity has it, table does not")

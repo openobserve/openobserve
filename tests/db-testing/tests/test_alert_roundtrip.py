@@ -8,6 +8,9 @@ import uuid
 import pytest
 import requests
 
+# The SSRF guard refuses loopback and private destination URLs.
+WEBHOOK_URL = "https://example.com/o2-db-testing"
+
 
 def _name(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:8]}"
@@ -37,7 +40,7 @@ def destination(api, ingest_test_data):
     resp = api(
         "POST",
         "alerts/destinations",
-        json={"name": dest, "url": "http://localhost:0/sink", "method": "post", "template": template, "headers": {}, "skip_tls_verify": False},
+        json={"name": dest, "url": WEBHOOK_URL, "method": "post", "template": template, "headers": {}, "skip_tls_verify": False},
     )
     assert resp.status_code == 200, f"destination create: {resp.status_code} {resp.text}"
 
