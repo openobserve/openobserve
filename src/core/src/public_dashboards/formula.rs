@@ -72,6 +72,31 @@ pub fn query_refs(configs: &[Value]) -> Vec<Option<String>> {
         .collect()
 }
 
+/// Legend fallbacks once formulas are stripped: input letters, a formula's ref or "Formula".
+pub fn viewer_legend_fallbacks(configs: &[Value]) -> Vec<Option<String>> {
+    if !configs.iter().any(is_formula) {
+        return vec![None; configs.len()];
+    }
+    let named = |cfg: &Value, key: &str| {
+        cfg.get(key)
+            .and_then(Value::as_str)
+            .is_some_and(|s| !s.is_empty())
+    };
+    configs
+        .iter()
+        .zip(query_refs(configs))
+        .map(|(cfg, letter)| {
+            if named(cfg, "promql_legend") || named(cfg, "promql_legend_fallback") {
+                None
+            } else if is_formula(cfg) {
+                Some(letter.unwrap_or_else(|| "Formula".to_string()))
+            } else {
+                letter
+            }
+        })
+        .collect()
+}
+
 /// `substituteFormula`: each letter becomes its input's text in parentheses.
 pub fn substitute(
     formula: &str,

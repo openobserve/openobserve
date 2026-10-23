@@ -42,6 +42,7 @@ use infra::table::{
 use openobserve_core::public_dashboards::{
     self as core_pd, ENGINE, access,
     flight::FLIGHTS,
+    formula,
     materialize::{self, MIN_RETRY_SECS, ReadRequest, Served},
     store,
 };
@@ -430,8 +431,39 @@ fn project_layout(dash: &Dashboard) -> (String, serde_json::Value) {
         return (String::new(), serde_json::Value::Null);
     };
     let mut layout = serde_json::to_value(&v8.tabs).unwrap_or(serde_json::Value::Null);
+    name_formula_legends(&mut layout);
     strip_secrets(&mut layout);
     (v8.title.clone(), layout)
+}
+
+/// Gives formula panels a legend fallback, which the viewer would otherwise take from the formula.
+fn name_formula_legends(layout: &mut serde_json::Value) {
+    let panels = layout
+        .as_array_mut()
+        .into_iter()
+        .flatten()
+        .filter_map(|tab| tab.get_mut("panels")?.as_array_mut())
+        .flatten();
+    for panel in panels {
+        let Some(queries) = panel.get_mut("queries").and_then(|q| q.as_array_mut()) else {
+            continue;
+        };
+        let configs: Vec<serde_json::Value> = queries
+            .iter()
+            .map(|q| q.get("config").cloned().unwrap_or_default())
+            .collect();
+        for (query, name) in queries
+            .iter_mut()
+            .zip(formula::viewer_legend_fallbacks(&configs))
+        {
+            if let (Some(name), Some(cfg)) = (
+                name,
+                query.get_mut("config").and_then(|c| c.as_object_mut()),
+            ) {
+                cfg.insert("promql_legend_fallback".into(), name.into());
+            }
+        }
+    }
 }
 
 /// Drops every key that can carry query text, filter literals or stream internals.
@@ -547,6 +579,70 @@ mod tests {
             "{s}"
         );
         assert!(s.contains("\"promql_legend\":\"rev\""), "{s}");
+    }
+
+    #[test]
+    fn a_formula_panel_keeps_legend_names_without_its_formula() {
+        let query = |config: serde_json::Value| {
+            serde_json::json!({
+                "query": "up", "customQuery": true,
+                "fields": { "stream": "m", "stream_type": "metrics", "x": [], "y": [],
+                            "filter": { "filterType": "group", "logicalOperator": "AND", "conditions": [] } },
+                "config": config
+            })
+        };
+        let panel = |id: &str, queries: Vec<serde_json::Value>| {
+            serde_json::json!({
+                "id": id, "type": "line", "title": id, "description": "",
+                "config": { "show_legends": true, "legends_position": null },
+                "queryType": "promql", "queries": queries
+            })
+        };
+        let formula = "A / sum(private_revenue{customer=\"internal\"})";
+        let dash = Dashboard {
+            version: 8,
+            v8: Some(
+                serde_json::from_value(serde_json::json!({ "title": "t", "tabs": [{
+                    "tabId": "t1", "name": "", "panels": [
+                        panel("f", vec![
+                            query(serde_json::json!({ "promql_legend": "" })),
+                            query(serde_json::json!({ "promql_legend": "{pod}" })),
+                            query(serde_json::json!({ "promql_legend": "", "formula": formula })),
+                        ]),
+                        panel("plain", vec![query(serde_json::json!({ "promql_legend": "" }))]),
+                    ]
+                }]}))
+                .unwrap(),
+            ),
+            ..Default::default()
+        };
+        let (_, layout) = project_layout(&dash);
+        let configs = |panel: usize| -> Vec<serde_json::Value> {
+            layout[0]["panels"][panel]["queries"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|q| q["config"]["promql_legend_fallback"].clone())
+                .collect()
+        };
+        assert_eq!(
+            configs(0),
+            [
+                serde_json::json!("A"),
+                serde_json::Value::Null,
+                serde_json::json!("Formula")
+            ]
+        );
+        assert_eq!(
+            configs(1),
+            [serde_json::Value::Null],
+            "no formula, no change"
+        );
+        let s = layout.to_string();
+        assert!(
+            !s.contains("formula") && !s.contains("private_revenue"),
+            "{s}"
+        );
     }
 
     #[test]
