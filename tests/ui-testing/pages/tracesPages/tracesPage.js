@@ -28,7 +28,6 @@ export class TracesPage {
     this.tracesRailTile = '[data-test="nav-group-traces"]';
     // #13852: flyout child id is `nav-group-item-${child.name}-${child.tab}` (ONavGroup.vue:336).
     this.serviceMapsNavItem = '[data-test="nav-group-item-traces-service-graph"]';
-    this.servicesCatalogNavItem = '[data-test="nav-group-item-servicesCatalog"]';
     this.serviceGraphTabToggle = '[data-test="traces-service-graph-toggle"]';
     this.servicesCatalogTabToggle = '[data-test="traces-search-mode-services-catalog-btn"]';
     // Inline-safe selectors (defined in the inner components, so they work for
@@ -103,7 +102,6 @@ export class TracesPage {
     // Service Graph (Enterprise)
     this.serviceGraphChart = '[data-test="service-graph-chart"]';
     this.serviceGraphRefreshButton = '[data-test="service-graph-refresh-btn"]';
-    // Standalone Service Graph page (rail-flyout route /traces/service-graph).
 
     // ===== DRILL DOWN AND RED CHART SELECTORS (VERIFIED against Vue source) =====
     this.insightsButton = '[data-test="insights-button"]';
@@ -544,7 +542,7 @@ export class TracesPage {
       .toHaveAttribute('data-state', 'on', { timeout: 10000 });
   }
 
-  // Standalone Service Graph page rendered from the rail flyout route.
+  // Refresh the in-page Service Graph view.
   async refreshServiceGraph() {
     await this.page.locator(this.serviceGraphRefreshButton).click();
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
