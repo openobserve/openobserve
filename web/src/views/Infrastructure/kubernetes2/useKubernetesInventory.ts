@@ -684,6 +684,7 @@ export function useKubernetesInventory(
     failed,
     forbidden,
     clusters,
+    clusterResults,
     metricClusters,
     effectiveCluster,
     inventory,

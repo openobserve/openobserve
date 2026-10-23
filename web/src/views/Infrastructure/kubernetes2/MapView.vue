@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
@@ -72,17 +73,22 @@ import {
   type MapObjects,
 } from "./mapFilter";
 
-const props = defineProps<{
-  state: K8sUrlState;
-  pods: PodRow[];
-  nodes: NodeRow[];
-  namespaceOptions: string[];
-  anchorMissing: string | null;
-  objects: MapObjects;
-  forbidden: boolean;
-  loading: boolean;
-  lastUpdatedAt: number | null;
-}>();
+const props = withDefaults(
+  defineProps<{
+    state: K8sUrlState;
+    pods: PodRow[];
+    nodes: NodeRow[];
+    namespaceOptions: string[];
+    anchorMissing: string | null;
+    objects: MapObjects;
+    forbidden: boolean;
+    loading: boolean;
+    lastUpdatedAt: number | null;
+    // Ids of the queries that failed this load; P8 is requests, P9 is limits.
+    failedQueries?: string[];
+  }>(),
+  { failedQueries: () => [] },
+);
 
 const emit = defineEmits<{
   update: [patch: Partial<K8sUrlState>];
@@ -118,6 +124,7 @@ const SWATCH: Record<FillClass, string> = {
   ok: "bg-status-positive",
   warning: "bg-status-warning-text",
   error: "bg-status-negative",
+  noReq: "bg-hatched border border-border-default",
   noData: "bg-surface-subtle border border-border-default",
 };
 
@@ -133,6 +140,17 @@ const NOT_OK_TEXT: Record<string, I18nKey> = {
 const { t } = useI18nTyped();
 
 const highlight = ref<FillClass[]>([]);
+
+const dismissed = ref(new Set<string>());
+
+const notices = computed(() =>
+  (
+    [
+      { id: "P9", text: t("infra.k8s2.mapLimitsUnavailable") },
+      { id: "P8", text: t("infra.k8s2.mapRequestsUnavailable") },
+    ] as const
+  ).filter((n) => isPods.value && props.failedQueries.includes(n.id) && !dismissed.value.has(n.id)),
+);
 
 const isPods = computed(() => props.state.entity === "pods");
 
@@ -240,7 +258,12 @@ const legend = computed(() => {
   }
   return legendClasses(fill).map((cls, i) => ({
     cls,
-    label: STATUS_LABEL[cls] ? t(STATUS_LABEL[cls]) : raw(ranges[i]),
+    label:
+      cls === "noReq"
+        ? noReqLabel(fill)
+        : STATUS_LABEL[cls]
+          ? t(STATUS_LABEL[cls])
+          : raw(ranges[i]),
     count: counts.get(cls) ?? 0,
   }));
 });
@@ -302,6 +325,12 @@ watch(
     highlight.value = [];
   },
 );
+
+function noReqLabel(fill: MapFill): I18nText {
+  return fill === "cpuLim" || fill === "memLim"
+    ? t("infra.k8s2.mapNoLimit")
+    : t("infra.k8s2.mapNoRequest");
+}
 
 function countOf(count: number): I18nText {
   return isPods.value
@@ -400,6 +429,10 @@ function clearLabelsText(): I18nText {
     : t("infra.k8s2.mapResetGrouping");
 }
 
+function dismiss(id: string) {
+  dismissed.value = new Set(dismissed.value).add(id);
+}
+
 function showList() {
   emit("navigate", listTarget(props.state));
 }
@@ -414,6 +447,32 @@ function linkText(g: RowGroup): I18nText {
     class="flex h-full min-h-0 flex-col gap-2 p-3 max-md:overflow-y-auto"
     data-test="k8s2-map-view"
   >
+    <OBanner
+      v-for="n in notices"
+      :key="n.id"
+      variant="warning"
+      dense
+      inline-actions
+      :content="n.text"
+      :data-test="`k8s2-map-notice-${n.id}`"
+    >
+      <template #actions>
+        <OButton
+          variant="outline"
+          size="xs"
+          :data-test="`k8s2-map-notice-retry-${n.id}`"
+          @click="emit('refresh')"
+          >{{ t("infra.k8s2.mapRetry") }}</OButton
+        >
+        <OButton
+          variant="ghost"
+          size="xs"
+          :data-test="`k8s2-map-notice-dismiss-${n.id}`"
+          @click="dismiss(n.id)"
+          >{{ t("infra.k8s2.mapDismiss") }}</OButton
+        >
+      </template>
+    </OBanner>
     <K8sListHeader
       :title="t('infra.k8s2.mapTitle')"
       :count="rows.length"
