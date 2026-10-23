@@ -768,8 +768,8 @@ pub async fn values_http2_stream(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&values_req.stream_name))
-        {
+        // the request's SQL or filter may read streams other than the one it names
+        if let Err(e) = search_service::check_search_allowed(&org_id, None) {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
                 axum::Json(MetaHttpResponse::error(
