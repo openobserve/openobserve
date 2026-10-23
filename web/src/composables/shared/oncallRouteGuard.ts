@@ -15,10 +15,13 @@
 
 import store from "@/stores";
 import { routeGuard } from "@/utils/zincutils";
+import { featureState } from "@/utils/featureGate";
 
 /** Redirects home only on an explicit `oncall_enabled: false`, since a cold load has not read /config yet. */
 export const oncallRouteGuard = (to: any, from: any, next: any) => {
-  if (store.state.zoConfig?.oncall_enabled === false) {
+  // A locked license also reports `oncall_enabled` false, yet its page still renders, locked.
+  const locked = featureState(store.state.zoConfig?.features, "oncall") === "locked";
+  if (!locked && store.state.zoConfig?.oncall_enabled === false) {
     next("/");
     return;
   }

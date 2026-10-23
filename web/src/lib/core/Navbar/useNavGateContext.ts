@@ -54,6 +54,7 @@ const ALL_GATES_OPEN: NavGateContext = {
   downtimesEnabled: true,
   alertCalibrationEnabled: true,
   hiddenMenus: new Set<string>(),
+  features: {},
 };
 
 export function useNavGateContext(): ComputedRef<NavGateContext> {
@@ -80,6 +81,7 @@ export function useNavGateContext(): ComputedRef<NavGateContext> {
       alertCalibrationEnabled: z.alert_calibration_enabled === true,
       // Raw split (no trim) to match how pages test custom_hide_menus.
       hiddenMenus: new Set((z.custom_hide_menus ?? "").split(",")),
+      features: z.features ?? {},
     };
   });
 }

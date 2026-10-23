@@ -262,6 +262,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </OButton>
           </template>
+          <OButton
+            v-else-if="aiAssistantState === 'locked'"
+            variant="ghost"
+            size="icon-toolbar"
+            icon-left="lock"
+            data-test="menu-link-ai-locked"
+            @click="openLockedAiAssistant"
+          >
+            <OTooltip
+              side="bottom"
+              align="center"
+              :content="t('featureLock.title', { feature: t('menu.aiAssistant') })"
+            />
+          </OButton>
 
           <!-- THEME SWITCHER: Toggle between light and dark mode -->
           <ThemeSwitcher class="max-md:hidden"></ThemeSwitcher>
@@ -517,6 +531,7 @@ import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import { isGateOpen, useNavGateContext } from "@/lib/core/Navbar/useNavGateContext";
 
 import { getImageURL } from "@/utils/zincutils";
+import { featureLockedPath, menuState } from "@/utils/featureGate";
 import { chartColor } from "@/utils/chartTheme";
 
 export default defineComponent({
@@ -722,8 +737,16 @@ export default defineComponent({
         rbac: props.store.state.zoConfig?.rbac_enabled !== false,
       }),
     );
+    // The license map applies once the edition allows the assistant.
+    const aiAssistantState = computed(() =>
+      menuState(
+        props.store.state.zoConfig?.features,
+        "ai_assistant",
+        Boolean(props.store.state.zoConfig.ai_enabled),
+      ),
+    );
     const aiButtonVisible = computed(
-      () => !aiAccess.value.allowed || Boolean(props.store.state.zoConfig.ai_enabled),
+      () => !aiAccess.value.allowed || aiAssistantState.value === "enabled",
     );
 
     // The edition gate and the org's runtime switch both have to pass, as for Settings › Slack.
@@ -782,6 +805,13 @@ export default defineComponent({
         return;
       }
       emit("toggleAIChat");
+    };
+
+    const openLockedAiAssistant = () => {
+      router.push({
+        path: featureLockedPath("ai_assistant"),
+        query: { org_identifier: props.store.state.selectedOrganization?.identifier },
+      });
     };
 
     const openSlack = () => {
@@ -860,6 +890,8 @@ export default defineComponent({
       homeUrl,
       goToAbout,
       toggleAIChat,
+      aiAssistantState,
+      openLockedAiAssistant,
       aiAccess,
       aiButtonVisible,
       linkedAccountsVisible,

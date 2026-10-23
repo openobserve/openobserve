@@ -95,6 +95,7 @@ pub enum SetFrom {
 #[serde(rename_all = "snake_case")]
 pub enum DisabledReason {
     Edition,
+    License,
     Flag,
     MasterKey,
     SuperCluster,

@@ -117,6 +117,45 @@
                       </OBadge>
                     </td>
                   </tr>
+                  <tr
+                    v-for="row in featureRows"
+                    :key="row.testId"
+                    class="border-table-row-divider border-b border-solid"
+                    :data-test="row.testId"
+                  >
+                    <td
+                      class="border-table-row-divider border-e border-solid px-3 py-2 leading-[1.2] font-bold"
+                    >
+                      {{ row.label }}
+                    </td>
+                    <td class="px-3 py-2 leading-[1.2]">
+                      <!-- absent list is a pre-entitlement license, which unlocks every feature -->
+                      <OBadge v-if="!row.features">
+                        {{ t("about.all_features") }}
+                      </OBadge>
+                      <span v-else-if="row.features.length === 0" class="text-text-muted">
+                        {{ t("about.no_features") }}
+                      </span>
+                      <OCollapsible
+                        v-else
+                        :data-test="`${row.testId}-collapsible`"
+                        :default-open="row.defaultOpen"
+                        :label="
+                          t(
+                            'about.feature_count',
+                            { count: row.features.length },
+                            row.features.length,
+                          )
+                        "
+                      >
+                        <div class="flex flex-wrap gap-1 pt-2">
+                          <OBadge v-for="feature in row.features" :key="feature">
+                            {{ raw(feature) }}
+                          </OBadge>
+                        </div>
+                      </OCollapsible>
+                    </td>
+                  </tr>
                   <tr class="border-table-row-divider border-b border-solid">
                     <td
                       class="border-table-row-divider border-e border-solid px-3 py-2 leading-[1.2] font-bold"
@@ -506,6 +545,8 @@ import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import { featureState, type FeatureStates } from "@/utils/featureGate";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useLicenseRefresh } from "@/composables/useLicenseRefresh";
@@ -532,6 +573,7 @@ export default defineComponent({
     OFormTextarea,
     OCard,
     OCardSection,
+    OCollapsible,
   },
   setup() {
     const { t } = useI18nTyped();
@@ -755,6 +797,45 @@ export default defineComponent({
         return (decision.blocks ?? []).includes("usage_over_limit");
       }
       return licenseData.value.ingestion_exceeded > limitBreachAllowedCount.value;
+    });
+
+    const featureRows = computed(() => {
+      const license = licenseData.value.license;
+      const states: FeatureStates = store.state.zoConfig?.features ?? {};
+      const additional: string[] | null = license?.features ? [...license.features].sort() : null;
+      const rows = [
+        {
+          testId: "settings-license-additional-features",
+          label: t("about.additional_features"),
+          features: additional,
+          defaultOpen: (additional?.length ?? 0) <= 10,
+        },
+      ];
+      if (!additional) return rows;
+      const definition: Record<string, { gate?: boolean; plumbing?: boolean }> | undefined =
+        license.feature_definition?.features;
+      const free = definition
+        ? Object.keys(definition).filter((key) => !definition[key].gate || definition[key].plumbing)
+        : Object.keys(states).filter((key) => states[key] === "enabled");
+      const visibleFree = free
+        .filter((key) => featureState(states, key) !== "hidden" && !additional.includes(key))
+        .sort();
+      const locked = Object.keys(states).filter((key) => states[key] === "locked");
+      rows.push(
+        {
+          testId: "settings-license-free-features",
+          label: t("about.free_features"),
+          features: visibleFree,
+          defaultOpen: false,
+        },
+        {
+          testId: "settings-license-locked-features",
+          label: t("about.locked_features"),
+          features: locked.sort(),
+          defaultOpen: false,
+        },
+      );
+      return rows;
     });
 
     const ingestionUsagePercent = computed(() => {
@@ -1054,6 +1135,7 @@ export default defineComponent({
       generateUsageDashboard,
       limitBreachAllowedCount,
       pausedOverLimit,
+      featureRows,
       DOMPurify,
     };
   },

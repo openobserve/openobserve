@@ -41,7 +41,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div v-else-if="forbidden" class="flex flex-1 items-center justify-center">
-      <OEmptyState size="hero" preset="no-access" data-test="discovered-services-forbidden" />
+      <OEmptyState
+        v-if="Array.isArray(forbidden)"
+        size="hero"
+        preset="no-access"
+        :title="t('featureLock.toastTitle')"
+        :description="
+          forbidden.length
+            ? t('featureLock.toastMessage', { features: raw(forbidden.join(', ')) })
+            : t('featureLock.toastMessageGeneric')
+        "
+        data-test="discovered-services-license-denied"
+      />
+      <OEmptyState
+        v-else
+        size="hero"
+        preset="no-access"
+        data-test="discovered-services-forbidden"
+      />
     </div>
 
     <!-- Empty State -->
@@ -511,6 +528,7 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 
 defineEmits<{
   (e: "navigate-to-configuration"): void;
@@ -541,7 +559,7 @@ interface ServiceGroup {
 const store = useStore();
 
 const loading = ref(true);
-const forbidden = ref(false);
+const forbidden = ref<ForbiddenState>(false);
 const refreshing = ref(false);
 const resetting = ref(false);
 const error = ref<string | null>(null);
@@ -823,7 +841,7 @@ const loadServices = async (isRefresh = false) => {
     }));
   } catch (err: any) {
     console.error("Failed to load services:", err);
-    forbidden.value = err?.response?.status === 403;
+    forbidden.value = forbiddenState(err);
     if (!forbidden.value) {
       error.value = err?.message || t("settings.discoveredServices.failedToLoadServices");
     }

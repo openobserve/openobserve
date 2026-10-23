@@ -10,6 +10,7 @@ import type {
 } from "./OCheckbox.types";
 import { CHECKBOX_GROUP_KEY } from "./OCheckbox.types";
 import { computed, inject } from "vue";
+import { useLockedDisabled } from "@/composables/useFeatureLock";
 
 const props = withDefaults(defineProps<CheckboxProps>(), {
   size: "md",
@@ -60,7 +61,7 @@ const checked = computed((): boolean | "indeterminate" => {
   return Boolean(props.modelValue);
 });
 
-const isDisabled = computed(() => props.disabled || (groupContext?.disabled ?? false));
+const isDisabled = useLockedDisabled(() => props.disabled || (groupContext?.disabled ?? false));
 
 const dataState = computed<"checked" | "unchecked" | "indeterminate">(() => {
   if (checked.value === "indeterminate") return "indeterminate";

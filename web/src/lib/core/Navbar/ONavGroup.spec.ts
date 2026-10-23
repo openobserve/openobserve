@@ -1283,6 +1283,79 @@ describe("ONavGroup", () => {
     });
   });
 
+  describe("license feature state of a child", () => {
+    const workflowsChild: SubnavChild = {
+      titleKey: "menu.workflows",
+      icon: "schema",
+      name: "workflows",
+      feature: "workflows",
+    };
+
+    async function mountWithFeature(state?: "enabled" | "locked" | "hidden") {
+      const featureStore = createStore({
+        state: () => ({
+          theme: "light",
+          zoConfig: { features: state ? { workflows: state } : {} },
+          organizationData: {},
+          selectedOrganization: { identifier: "default" },
+        }),
+      });
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/", name: "home", component: { template: "<div />" } },
+          { path: "/streams", name: "logstreams", component: { template: "<div />" } },
+          { path: "/pipelines", name: "pipelines", component: { template: "<div />" } },
+          { path: "/workflows", name: "workflows", component: { template: "<div />" } },
+          {
+            path: "/feature-locked/:feature",
+            name: "featureLocked",
+            component: { template: "<div />" },
+          },
+        ],
+      });
+      router.push("/");
+      await router.isReady();
+      wrapper = mount(ONavGroup, {
+        props: {
+          groupKey: "data",
+          title: "Data",
+          icon: "database",
+          children: [...children, workflowsChild],
+          parentItem: { link: "/streams", title: "Data", icon: "database", name: "logstreams" },
+        },
+        global: {
+          plugins: [router, featureStore, i18n],
+          stubs: { MenuLink: menuLinkStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+      await hoverOpen();
+      return router;
+    }
+
+    it("shows a locked child with a lock and opens its own page, which renders locked", async () => {
+      const router = await mountWithFeature("locked");
+      const item = flyout().get('[data-test="nav-group-item-workflows-locked"]');
+      expect(item.element.tagName).toBe("DIV");
+      expect(flyout().find('[data-test="nav-group-item-workflows-lock"]').exists()).toBe(true);
+      await item.trigger("click");
+      await flushPromises();
+      expect(router.currentRoute.value.fullPath).toBe("/workflows?org_identifier=default");
+    });
+
+    it("drops a hidden child", async () => {
+      await mountWithFeature("hidden");
+      expect(flyout().find('[data-test="nav-group-item-workflows"]').exists()).toBe(false);
+      expect(flyout().find('[data-test="nav-group-item-workflows-locked"]').exists()).toBe(false);
+    });
+
+    it("renders an enabled or unsent feature as a normal link", async () => {
+      await mountWithFeature();
+      expect(flyout().find('[data-test="nav-group-item-workflows"]').exists()).toBe(true);
+      expect(flyout().find('[data-test="nav-group-item-workflows-locked"]').exists()).toBe(false);
+    });
+  });
+
   // K1: a pointer still travelling inside the exit-to-flyout triangle neither opens a neighbour nor closes the flyout.
   describe("safe triangle (K1, AC-1)", () => {
     let now = 0;

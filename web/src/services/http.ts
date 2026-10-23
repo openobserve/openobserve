@@ -18,9 +18,14 @@ import type { AxiosInstance } from "axios";
 import axios from "axios";
 import config from "../aws-exports";
 import { useLocalUserInfo, useLocalCurrentUser } from "@/utils/zincutils";
-import { addUnauthorizedError } from "@/composables/useUnauthorizedErrorGrouper";
+import {
+  addLicenseDeniedError,
+  addUnauthorizedError,
+} from "@/composables/useUnauthorizedErrorGrouper";
 import { usePasswordReset } from "@/composables/usePasswordReset";
 import { isPasswordResetError } from "@/utils/passwordResetErrors";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
+import { isLockedFeatureDenial, markLockedDenial } from "@/composables/useFeatureLock";
 
 declare module "axios" {
   interface AxiosRequestConfig {
@@ -123,6 +128,13 @@ const http = ({ headers } = {} as any) => {
         usePasswordReset().open(error.response.data.reason);
         // A blocked page fires many requests behind an undismissable dialog; one toast per rejection would stack.
         return new Promise(() => {});
+      }
+      // Ahead of the status switch: a license denial must not read as a missing RBAC permission.
+      const deniedFeatures = licenseDeniedFeatures(error);
+      if (deniedFeatures) {
+        if (isLockedFeatureDenial(deniedFeatures)) markLockedDenial(error);
+        addLicenseDeniedError(deniedFeatures);
+        return Promise.reject(error);
       }
       if (error && error.response && error.response.status) {
         switch (error.response.status) {

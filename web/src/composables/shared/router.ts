@@ -24,6 +24,7 @@ import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from "vue-rout
 import config from "@/aws-exports";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import store from "@/stores";
+import { featureState } from "@/utils/featureGate";
 import { hasMetricsEditorParams } from "@/utils/metrics/metricsEditorParams";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import { forgetLinkRequest } from "@/utils/slackLink";
@@ -125,6 +126,10 @@ const dbmEnterpriseGuard = (to: any, from: any, next: any) => {
   routeGuard(to, from, next);
 };
 
+// A locked license also turns the feature's runtime flag off, yet its page still renders, locked.
+const isLicenseLocked = (key: string): boolean =>
+  featureState(store.state.zoConfig?.features, key) === "locked";
+
 // `=== false`, not falsy: a cold load with `/config` still in flight must not bounce.
 const downtimesRouteGuard = (to: any, from: any, next: any) => {
   const zoConfig = store.state.zoConfig;
@@ -132,7 +137,7 @@ const downtimesRouteGuard = (to: any, from: any, next: any) => {
   if (
     isOss ||
     (config.isEnterprise !== "true" && config.isCloud !== "true") ||
-    zoConfig?.downtimes_enabled === false
+    (zoConfig?.downtimes_enabled === false && !isLicenseLocked("downtimes"))
   ) {
     next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
     return;
@@ -146,7 +151,7 @@ const alertCalibrationRouteGuard = (to: any, from: any, next: any) => {
   if (
     zoConfig?.build_type === "opensource" ||
     (config.isEnterprise !== "true" && config.isCloud !== "true") ||
-    zoConfig?.alert_calibration_enabled === false
+    (zoConfig?.alert_calibration_enabled === false && !isLicenseLocked("alert_insights"))
   ) {
     next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
     return;
@@ -685,6 +690,19 @@ const useRoutes = () => {
       },
     },
     {
+      // Every build: locked nav entries land here, including on OSS where the feature has no route.
+      path: "feature-locked/:feature",
+      name: "featureLocked",
+      component: () => import("@/components/common/FeatureLocked.vue"),
+      meta: {
+        titleKey: "featureLock.routeTitle",
+        allowOnEmptyData: true,
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
       path: "dashboards",
       name: "dashboards",
       component: Dashboards,
@@ -962,6 +980,7 @@ const useRoutes = () => {
       component: () => import("@/components/alerts/ExternalAlertSourcesList.vue"),
       meta: {
         titleKey: "alert_sources.header",
+        licenseFeature: "incidents",
       },
       beforeEnter(to: any, from: any, next: any) {
         const store = (window as any).store;
@@ -977,21 +996,21 @@ const useRoutes = () => {
       path: "alert-calibration",
       name: "alertCalibration",
       component: () => import("@/components/alert_calibration/AlertCalibrationDashboard.vue"),
-      meta: { titleKey: "menu.alertCalibration" },
+      meta: { titleKey: "menu.alertCalibration", licenseFeature: "alert_insights" },
       beforeEnter: alertCalibrationRouteGuard,
     },
     {
       path: "alert-calibration/runs",
       name: "alertCalibrationRuns",
       component: () => import("@/components/alert_calibration/AlertCalibrationDigests.vue"),
-      meta: { titleKey: "menu.alertCalibration" },
+      meta: { titleKey: "menu.alertCalibration", licenseFeature: "alert_insights" },
       beforeEnter: alertCalibrationRouteGuard,
     },
     {
       path: "alert-calibration/settings",
       name: "alertCalibrationSettings",
       component: () => import("@/components/alert_calibration/AlertCalibrationSettings.vue"),
-      meta: { titleKey: "menu.alertCalibration" },
+      meta: { titleKey: "menu.alertCalibration", licenseFeature: "alert_insights" },
       beforeEnter: alertCalibrationRouteGuard,
     },
     {
@@ -999,7 +1018,7 @@ const useRoutes = () => {
       name: "alertCalibrationDigest",
       component: () => import("@/components/alert_calibration/AlertCalibrationDigestDetail.vue"),
       props: true,
-      meta: { titleKey: "menu.alertCalibration" },
+      meta: { titleKey: "menu.alertCalibration", licenseFeature: "alert_insights" },
       beforeEnter: alertCalibrationRouteGuard,
     },
     {
@@ -1008,6 +1027,7 @@ const useRoutes = () => {
       component: () => import("@/components/alerts/downtimes/DowntimeList.vue"),
       meta: {
         titleKey: "menu.downtimes",
+        licenseFeature: "downtimes",
       },
       beforeEnter(to: any, from: any, next: any) {
         downtimesRouteGuard(to, from, next);
@@ -1020,6 +1040,7 @@ const useRoutes = () => {
       component: () => import("@/components/alerts/downtimes/AddDowntime.vue"),
       meta: {
         titleKey: "alerts.downtimes.newTitle",
+        licenseFeature: "downtimes",
       },
       beforeEnter(to: any, from: any, next: any) {
         downtimesRouteGuard(to, from, next);
@@ -1031,6 +1052,7 @@ const useRoutes = () => {
       component: () => import("@/components/alerts/downtimes/AddDowntime.vue"),
       meta: {
         titleKey: "alerts.downtimes.editTitle",
+        licenseFeature: "downtimes",
       },
       beforeEnter(to: any, from: any, next: any) {
         downtimesRouteGuard(to, from, next);
@@ -1042,6 +1064,7 @@ const useRoutes = () => {
       component: () => import("@/components/alerts/downtimes/DowntimeDetail.vue"),
       meta: {
         titleKey: "alerts.downtimes.detailTitle",
+        licenseFeature: "downtimes",
       },
       beforeEnter(to: any, from: any, next: any) {
         downtimesRouteGuard(to, from, next);

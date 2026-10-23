@@ -15,6 +15,7 @@
 
 import type { ComputedRef, InjectionKey } from "vue";
 import type { I18nKey, I18nText } from "@/types/i18n";
+import type { FeatureStates } from "@/utils/featureGate";
 
 export interface NavItem {
   title: I18nText;
@@ -33,6 +34,8 @@ export interface NavItem {
    */
   locked?: boolean;
   lockedMessage?: I18nText;
+  /** The license marks the feature locked: a lock badge, but the link still opens the locked page. */
+  licenseLocked?: boolean;
 }
 
 /**
@@ -101,6 +104,8 @@ export interface SubnavChild {
   gate?: string;
   /** Shows the shared "Beta" tag (see BetaBadge.vue) next to this child's label. */
   beta?: boolean;
+  /** License feature key; `locked` keeps a lock badge on a link to the locked page, `hidden` drops the child. */
+  feature?: string;
   /**
    * Set at RENDER time (ONavGroup.vue), not in the static NAV_GROUPS/NAV_SUBNAV
    * tables: when `gate` corresponds to a registered `FeatureKey`
@@ -132,6 +137,8 @@ export interface NavGateContext {
   alertCalibrationEnabled: boolean;
   /** Raw `custom_hide_menus` entries (split on ",") — matches how pages test it. */
   hiddenMenus: Set<string>;
+  /** `/config` `features` map (enabled / locked / hidden per license feature). */
+  features: FeatureStates;
 }
 
 /**

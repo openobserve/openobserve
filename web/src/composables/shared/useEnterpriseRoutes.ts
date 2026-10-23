@@ -15,6 +15,7 @@
 
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
+import { featureState, withLicenseFeature } from "@/utils/featureGate";
 import store from "@/stores";
 import {
   withFeatureGate as withFeatureGateBase,
@@ -30,6 +31,10 @@ const withFeatureGate: typeof withFeatureGateBase = (key, guard, getContext) =>
     guard,
     getContext ?? (() => buildFeatureGateContext(store.state.zoConfig)),
   );
+
+// A locked license also turns the feature's legacy flag off, yet its page still renders, locked.
+const isLicenseLocked = (feature: string): boolean =>
+  featureState(store.state.zoConfig?.features, feature) === "locked";
 
 // Synthetics routes are gated on the backend /config flag `synthetics_enabled`
 // (`ZO_SYNTHETICS_ENABLED`), not on the build: synthetics ships in OSS. Direct URL
@@ -66,7 +71,7 @@ const privateLocationRouteGuard = (to: any, from: any, next: any) => {
 // never flashes in) — the two are not meant to match. Same split as
 // syntheticsRouteGuard above.
 const workflowsRouteGuard = (to: any, from: any, next: any) => {
-  if (store.state.zoConfig?.workflows_enabled === false) {
+  if (!isLicenseLocked("workflows") && store.state.zoConfig?.workflows_enabled === false) {
     next("/");
     return;
   }
@@ -291,7 +296,7 @@ const useEnterpriseRoutes = () => {
   // `withFeatureGate`) when the edition doesn't unlock them, instead of
   // landing on the real page or a 404.
   // On-call is configured before any data flows, so every route here stays open on an empty org.
-  routes.push(
+  const oncallRoutes = [
     {
       path: "oncall/responses",
       name: "onCallResponses",
@@ -359,10 +364,11 @@ const useEnterpriseRoutes = () => {
       meta: { titleKey: "oncall.routingTitle", allowOnEmptyData: true },
       beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
     },
-  );
+  ];
+  routes.push(...oncallRoutes.map((route) => withLicenseFeature("oncall", route)));
 
   routes.push(
-    {
+    withLicenseFeature("incidents", {
       path: "incidents",
       name: "incidentList",
       component: IncidentList,
@@ -370,8 +376,8 @@ const useEnterpriseRoutes = () => {
         titleKey: "menu.incidents",
       },
       beforeEnter: withFeatureGate("incidents", routeGuard),
-    },
-    {
+    }),
+    withLicenseFeature("incidents", {
       path: "incidents/:id",
       name: "incidentDetail",
       component: () => import("@/components/alerts/IncidentDetailDrawer.vue"),
@@ -379,7 +385,7 @@ const useEnterpriseRoutes = () => {
         titleKey: "routeTitles.incidentDetail",
       },
       beforeEnter: withFeatureGate("incidents", routeGuard),
-    },
+    }),
   );
 
   if (config.isEnterprise == "true") {
@@ -400,41 +406,43 @@ const useEnterpriseRoutes = () => {
 
   // Workflows — enterprise/cloud only (FD3). List is the parent; the editor
   // renders in its <router-view> for add/edit.
-  routes.push({
-    path: "workflows",
-    name: "workflows",
-    component: WorkflowsList,
-    meta: {
-      titleKey: "menu.workflows",
-    },
-    beforeEnter: withFeatureGate("workflows", workflowsRouteGuard),
-    children: [
-      {
-        path: "add",
-        name: "createWorkflow",
-        component: WorkflowEditor,
-        meta: { titleKey: "workflow.create" },
-        beforeEnter: withFeatureGate("workflows", workflowsRouteGuard),
+  routes.push(
+    withLicenseFeature("workflows", {
+      path: "workflows",
+      name: "workflows",
+      component: WorkflowsList,
+      meta: {
+        titleKey: "menu.workflows",
       },
-      {
-        path: "edit",
-        name: "workflowEditor",
-        component: WorkflowEditor,
-        meta: { titleKey: "workflow.editMode" },
-        beforeEnter: withFeatureGate("workflows", workflowsRouteGuard),
-      },
-      {
-        // Dedicated READ-ONLY run-inspection surface (master-detail). Separate
-        // from the editor so viewing a past run never drops the user into the
-        // builder; deep-linkable by ?run_id.
-        path: "runs",
-        name: "workflowRuns",
-        component: WorkflowRuns,
-        meta: { titleKey: "workflow.runs.title" },
-        beforeEnter: withFeatureGate("workflows", workflowsRouteGuard),
-      },
-    ],
-  });
+      beforeEnter: withFeatureGate("workflows", workflowsRouteGuard),
+      children: [
+        {
+          path: "add",
+          name: "createWorkflow",
+          component: WorkflowEditor,
+          meta: { titleKey: "workflow.create" },
+          beforeEnter: withFeatureGate("workflows", workflowsRouteGuard),
+        },
+        {
+          path: "edit",
+          name: "workflowEditor",
+          component: WorkflowEditor,
+          meta: { titleKey: "workflow.editMode" },
+          beforeEnter: withFeatureGate("workflows", workflowsRouteGuard),
+        },
+        {
+          // Dedicated READ-ONLY run-inspection surface (master-detail). Separate
+          // from the editor so viewing a past run never drops the user into the
+          // builder; deep-linkable by ?run_id.
+          path: "runs",
+          name: "workflowRuns",
+          component: WorkflowRuns,
+          meta: { titleKey: "workflow.runs.title" },
+          beforeEnter: withFeatureGate("workflows", workflowsRouteGuard),
+        },
+      ],
+    }),
+  );
   routes[0].children.push(
     ...[
       {

@@ -1468,6 +1468,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
             use_all_org: false,
             use_self_context: false,
             use_self_parent: false,
+            feature: None,
         };
 
         let result = oo_validator(&req_data, &auth_info).await;
@@ -1556,6 +1557,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
             use_all_org: false,
             use_self_context: false,
             use_self_parent: false,
+            feature: None,
         };
 
         let result = oo_validator(&req_data, &auth_info).await;
@@ -1996,6 +1998,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
             use_all_org: false,
             use_self_context: false,
             use_self_parent: false,
+            feature: None,
         };
         assert!(
             oo_validator(&req_data, &plain).await.is_err(),

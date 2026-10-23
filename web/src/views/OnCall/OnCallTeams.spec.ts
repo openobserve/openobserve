@@ -68,7 +68,16 @@ const stubs = {
   // draws rather than a column-def function OTable never calls.
   OTable: {
     name: "OTable",
-    props: ["data", "columns", "error", "currentPage", "pageSize", "sortBy", "sortOrder"],
+    props: [
+      "data",
+      "columns",
+      "error",
+      "forbidden",
+      "currentPage",
+      "pageSize",
+      "sortBy",
+      "sortOrder",
+    ],
     emits: ["update:currentPage", "update:pageSize", "update:sortBy", "update:sortOrder"],
     template: `<div>
       <slot name='toolbar' />
@@ -528,6 +537,18 @@ describe("OnCallTeams", () => {
 
     expect(wrapper.find('[data-test="oncall-teams-not-available"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="oncall-teams-empty"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-teams-error"]').exists()).toBe(false);
+  });
+
+  it("shows a license denial as the license state, not an error with retry", async () => {
+    service.listTeams.mockRejectedValueOnce({
+      response: { status: 403, data: { code: 40001, error_detail: "oncall", message: "denied" } },
+    });
+    const wrapper = render();
+    await flushPromises();
+
+    const table = wrapper.findComponent({ name: "OTable" });
+    expect(table.props("forbidden")).toEqual(["oncall"]);
     expect(wrapper.find('[data-test="oncall-teams-error"]').exists()).toBe(false);
   });
 

@@ -18,5 +18,7 @@ import "vue-router";
 declare module "vue-router" {
   interface RouteMeta {
     allowOnEmptyData?: boolean;
+    /** License feature key the page needs; a `locked` key renders the page with every control disabled. */
+    licenseFeature?: string;
   }
 }

@@ -3,6 +3,7 @@
 .history
 /.idea/
 .vscode/
+/.zed/
 
 # ---------- node / web ----------
 node_modules/

@@ -25,6 +25,7 @@ pub mod destinations;
 pub mod downtimes;
 pub mod enrichment_table;
 pub mod eval_job_health;
+pub mod feature;
 pub mod folder;
 pub mod function;
 pub mod gen_ai;

@@ -5,6 +5,7 @@ import type { InputProps, InputEmits, InputSlots } from "./OInput.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
 import { useI18nTyped } from "@/types/i18n";
+import { useLockedDisabled } from "@/composables/useFeatureLock";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useAttrs, useId, watch } from "vue";
 
 const { t } = useI18nTyped();
@@ -46,6 +47,8 @@ const props = withDefaults(defineProps<InputProps>(), {
 const emit = defineEmits<InputEmits>();
 
 defineSlots<InputSlots>();
+
+const isDisabled = useLockedDisabled(() => props.disabled);
 
 // useId() must be called at setup top-level — not inside computed — otherwise
 // each re-evaluation produces a new id, breaking the <label :for> association.
@@ -268,7 +271,7 @@ const wrapperClasses = computed(() => [
     : "border-input-border hover:border-input-border-hover focus-within:border-input-border-focus focus-within:ring-[0.125rem] focus-within:ring-focus-ring-accent",
   /* Disabled inputs get a muted bg + dashed border so they read as obviously
      inactive at a glance. */
-  props.disabled
+  isDisabled.value
     ? "bg-input-disabled-bg border-input-disabled-border cursor-not-allowed border-dashed"
     : "",
   props.readonly ? "border-input-border bg-input-bg" : "",
@@ -284,7 +287,7 @@ const wrapperClasses = computed(() => [
       :for="inputId"
       :class="[
         'o-input-label text-compact flex items-center gap-1 leading-tight',
-        props.disabled
+        isDisabled
           ? 'text-input-label-text-disabled font-normal'
           : 'text-input-label-text font-medium',
       ]"
@@ -335,7 +338,7 @@ const wrapperClasses = computed(() => [
         :value="String(modelValue ?? '')"
         :name="name"
         :placeholder="placeholder"
-        :disabled="disabled"
+        :disabled="isDisabled"
         :readonly="readonly"
         :aria-required="required || undefined"
         :aria-invalid="hasError || undefined"
@@ -378,7 +381,7 @@ const wrapperClasses = computed(() => [
         :type="effectiveType"
         :name="name"
         :placeholder="placeholder"
-        :disabled="disabled"
+        :disabled="isDisabled"
         :readonly="readonly"
         :aria-required="required || undefined"
         :autofocus="autofocus"

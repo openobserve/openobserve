@@ -12,6 +12,7 @@ import ORadio from "../Radio/ORadio.vue";
 import OCheckboxGroup from "../Checkbox/OCheckboxGroup.vue";
 import OCheckbox from "../Checkbox/OCheckbox.vue";
 import { computed, useAttrs } from "vue";
+import { useLockedDisabled } from "@/composables/useFeatureLock";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 defineOptions({ inheritAttrs: false });
@@ -33,6 +34,8 @@ const props = withDefaults(defineProps<OptionGroupProps>(), {
 const emit = defineEmits<OptionGroupEmits>();
 
 defineSlots<OptionGroupSlots>();
+
+const isDisabled = useLockedDisabled(() => props.disabled);
 
 const effectiveError = computed(() => props.errorMessage || (props.error ? " " : null) || null);
 
@@ -69,7 +72,7 @@ function handleCheckbox(val: (string | number)[]) {
       v-if="$slots.label || label || $slots.tooltip"
       :class="[
         'o-input-label text-compact flex items-center gap-1 leading-tight',
-        disabled
+        isDisabled
           ? 'text-input-label-text-disabled font-normal'
           : 'text-input-label-text font-medium',
       ]"
@@ -89,7 +92,7 @@ function handleCheckbox(val: (string | number)[]) {
     <ORadioGroup
       v-if="type === 'radio'"
       :model-value="radioValue"
-      :disabled="disabled"
+      :disabled="isDisabled"
       :orientation="orientation"
       :name="name"
       :label="label"
@@ -102,7 +105,7 @@ function handleCheckbox(val: (string | number)[]) {
         :data-test-value="String(opt.value)"
         :value="opt.value"
         :label="opt.label"
-        :disabled="disabled || opt.disabled"
+        :disabled="isDisabled || opt.disabled"
         :size="size"
       />
     </ORadioGroup>
@@ -110,7 +113,7 @@ function handleCheckbox(val: (string | number)[]) {
     <OCheckboxGroup
       v-else
       :model-value="checkboxValue"
-      :disabled="disabled"
+      :disabled="isDisabled"
       @update:model-value="handleCheckbox"
     >
       <div :class="optionLayoutClasses">
@@ -121,7 +124,7 @@ function handleCheckbox(val: (string | number)[]) {
           :data-test-value="String(opt.value)"
           :value="opt.value as string"
           :label="opt.label"
-          :disabled="disabled || opt.disabled"
+          :disabled="isDisabled || opt.disabled"
           :size="size"
         />
       </div>

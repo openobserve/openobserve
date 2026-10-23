@@ -13,10 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { readonly, ref } from "vue";
 import { toast, toastRecords, updateToast } from "@/lib/feedback/Toast/useToast";
 import type { ToastDetail } from "@/lib/feedback/Toast/OToast.types";
 import { copyToClipboard } from "@/utils/clipboard";
 import { gt, raw, type I18nKey, type I18nText } from "@/types/i18n";
+import { isLockedFeatureDenial } from "@/composables/useFeatureLock";
 
 // Friendly name overrides. Keys, not text — this map is module scope, so it is
 // translated at display time in extractResourceInfo().
@@ -162,8 +164,9 @@ function flushGroupedToast(): void {
     onDismiss: onToastDismissed,
   });
 
-  // Capture the record ID of the toast we just pushed
-  activeToastId = toastRecords[toastRecords.length - 1]?.id ?? null;
+  // Found by its own dismiss hook: a toast that was never pushed must not adopt another one's record.
+  activeToastId = toastRecords.find((r) => r.open && r.onDismiss === onToastDismissed)?.id ?? null;
+  if (activeToastId === null) accumulatedErrors = [];
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -190,6 +193,25 @@ export function addUnauthorizedError(responseUrl: string): void {
     debounceTimer = null;
     flushGroupedToast();
   }, 300);
+}
+
+// null while closed; denials arriving while open join the same dialog.
+const licenseDenied = ref<string[] | null>(null);
+
+/** Open the license-denial dialog (403 + 40001), kept apart from the RBAC access toast. */
+export function addLicenseDeniedError(features: string[]): void {
+  // The locked page's own banner already names its feature; any other missing feature still opens the dialog.
+  if (isLockedFeatureDenial(features)) return;
+  licenseDenied.value = [...new Set([...(licenseDenied.value ?? []), ...features])];
+}
+
+export function useLicenseDeniedDialog() {
+  return {
+    features: readonly(licenseDenied),
+    close: () => {
+      licenseDenied.value = null;
+    },
+  };
 }
 
 /**

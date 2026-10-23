@@ -151,6 +151,55 @@ describe("MainLayout — Product Analytics menu entry", () => {
     expect(tileNames(entries)).not.toContain("productAnalytics");
   });
 
+  describe("license-gated entries", () => {
+    afterEach(() => {
+      delete store.state.zoConfig.features;
+    });
+
+    it("keeps a locked feature on the rail with a lock, pointing at its own page", async () => {
+      store.state.zoConfig.features = { incidents: "locked" };
+      const incidents = (await railItems()).find((l) => l.name === "incidentList");
+      expect(incidents).toMatchObject({
+        link: "/incidents",
+        locked: false,
+        licenseLocked: true,
+      });
+    });
+
+    it("locks the page whose route needs a locked feature, and only while it is locked", async () => {
+      router.addRoute({
+        path: "/locked-probe",
+        name: "lockedProbe",
+        component: StubDiv,
+        meta: { licenseFeature: "workflows" },
+      });
+      await router.push("/locked-probe");
+      store.state.zoConfig.features = { workflows: "locked" };
+      await railItems();
+      expect((wrapper!.vm as any).lockedFeature).toBe("workflows");
+      store.state.zoConfig.features = { workflows: "enabled" };
+      await flushPromises();
+      expect((wrapper!.vm as any).lockedFeature).toBeNull();
+      await router.push("/");
+      router.removeRoute("lockedProbe");
+    });
+
+    it("keeps a license-locked Downtimes entry, though its flag is off, pointing at its page", async () => {
+      store.state.zoConfig.downtimes_enabled = false;
+      store.state.zoConfig.features = { downtimes: "locked" };
+      const downtimes = (await railItems()).find((l) => l.name === "downtimes");
+      expect(downtimes).toMatchObject({ link: "/downtimes", licenseLocked: true });
+      delete store.state.zoConfig.downtimes_enabled;
+    });
+
+    it("leaves a hidden or unsent feature off the rail", async () => {
+      store.state.zoConfig.features = { workflows: "hidden" };
+      const names = (await railItems()).map((l) => l.name);
+      expect(names).not.toContain("workflows");
+      expect(names).not.toContain("incidentList");
+    });
+  });
+
   it("uses only registered icons on the Experience tile and its children", async () => {
     const experience = NAV_GROUPS.find((g) => g.key === "experience")!;
     for (const icon of [experience.icon, ...experience.children.map((c) => c.icon)]) {

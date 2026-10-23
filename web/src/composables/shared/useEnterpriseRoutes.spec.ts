@@ -658,6 +658,48 @@ describe("useEnterpriseRoutes.ts", () => {
     });
   });
 
+  describe("license-locked features", () => {
+    const find = (routes: any[], name: string): any =>
+      routes.flatMap((r) => [r, ...(r.children ?? [])]).find((r) => r.name === name);
+
+    beforeEach(async () => {
+      const config = await import("@/aws-exports");
+      config.default.isEnterprise = "true";
+    });
+
+    it.each([
+      ["workflows", "workflows"],
+      ["workflowRuns", "workflows"],
+      ["onCallTeams", "oncall"],
+      ["onCallTeamDetail", "oncall"],
+      ["incidentList", "incidents"],
+      ["incidentDetail", "incidents"],
+    ])("tags %s, child routes included, with meta.licenseFeature %s", (name, feature) => {
+      expect(find(useEnterpriseRoutes(), name).meta.licenseFeature).toBe(feature);
+    });
+
+    it.each([
+      ["workflows", { workflows_enabled: false }],
+      ["onCallTeams", { oncall_enabled: false }],
+      ["incidentList", {}],
+    ])("lets a locked %s through to its own page", async (name, flags) => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      const feature = find(useEnterpriseRoutes(), name).meta.licenseFeature;
+      store.state.zoConfig = { ...flags, features: { [feature]: "locked" } };
+      const next = vi.fn();
+      find(useEnterpriseRoutes(), name).beforeEnter({ query: {} }, {}, next);
+      expect(routeGuard).toHaveBeenCalled();
+      expect(next).toHaveBeenCalledWith();
+    });
+
+    it("still sends a hidden feature whose legacy flag is off home", () => {
+      store.state.zoConfig = { workflows_enabled: false, features: { workflows: "hidden" } };
+      const next = vi.fn();
+      find(useEnterpriseRoutes(), "workflows").beforeEnter({ query: {} }, {}, next);
+      expect(next).toHaveBeenCalledWith("/");
+    });
+  });
+
   describe("Route Structure Validation", () => {
     // Test 50: Should have valid route structure for all basic routes
     it("should have valid route structure for all basic routes", () => {

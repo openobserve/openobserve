@@ -1,4 +1,19 @@
 {
+  "featureLock": {
+    "routeTitle": "Not in your license",
+    "title": "{feature} is not included in your license",
+    "description": "Your administrator can add it by updating the license, or contact sales to get a license that includes it.",
+    "thisFeature": "This feature",
+    "viewLicense": "View license",
+    "contactSales": "Contact sales",
+    "locked": "Requires a license",
+    "toastTitle": "Not included in your license",
+    "toastMessage": "Your license does not include: {features}. Ask your administrator to update the license.",
+    "toastMessageGeneric": "Your license does not include this feature. Ask your administrator to update the license.",
+    "dialogScope": "Only these features are blocked; everything else keeps working.",
+    "bannerMessage": "This feature is locked. It needs the {feature} feature in your license.",
+    "headerLocked": "Locked: needs {feature}"
+  },
   "emptyState": {
     "illustrations": {
       "noHistoryYet": "No history yet",
@@ -2742,6 +2757,12 @@
     "contact_name": "Contact Name",
     "contact_email": "Contact Email",
     "environment_type": "Environment Type",
+    "additional_features": "Additional features",
+    "free_features": "Free features",
+    "locked_features": "Locked features",
+    "feature_count": "{count} feature | {count} features",
+    "all_features": "All features",
+    "no_features": "None",
     "request_new_license": "Request new License",
     "add_new_license_key": "Add New License Key",
     "refresh_license_limits": "Refresh License Limits",

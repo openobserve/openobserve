@@ -348,6 +348,7 @@ import { getAlertSourceStatus } from "@/utils/alertSourceStatus";
 import { formatTimeAgoUs } from "@/utils/synthetics/format";
 import { copyToClipboard } from "@/utils/clipboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
 import { COL } from "@/lib/core/Table/OTable.types";
 import type { AlertSourceIntegration } from "@/ts/interfaces/alertSources";
@@ -427,7 +428,7 @@ export default defineComponent({
       // Request in flight with rows still on screen — the refresh button's
       // spinner. `loading` is the skeleton, for a cold read only.
       fetching: false,
-      forbidden: false,
+      forbidden: false as ForbiddenState,
       lastUpdatedAt: null as number | null,
       filterQuery: "",
       showAddDrawer: false,
@@ -626,7 +627,7 @@ export default defineComponent({
         this.lastUpdatedAt =
           queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? Date.now();
       } catch (e: any) {
-        this.forbidden = e?.response?.status === 403;
+        this.forbidden = forbiddenState(e);
         // The grouped access toast already reports a 403; a second red toast adds nothing.
         if (!this.forbidden) {
           toast({ variant: "error", message: this.t("alert_sources.error") });
