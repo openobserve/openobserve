@@ -429,6 +429,18 @@ describe("AnnotationSettings", () => {
     expect(wrapper!.find('[data-test="dashboard-annotation-source-stream"]').exists()).toBe(true);
   });
 
+  it("leaves Custom SQL empty instead of pre-filling invalid SQL when no stream is picked yet", async () => {
+    vi.mocked(getDashboard).mockResolvedValue(dashboardWith());
+    await mountSettings();
+    await wrapper!.find('[data-test="dashboard-annotation-source-add"]').trigger("click");
+    await flushPromises();
+
+    await switchMode("sql");
+    expect(
+      (wrapper!.find('[data-test="query-editor-stub"]').element as HTMLTextAreaElement).value,
+    ).toBe("");
+  });
+
   it("includes the end-time field in the Custom SQL pre-fill", async () => {
     vi.mocked(getDashboard).mockResolvedValue(dashboardWith([calendarEvents]));
     await mountSettings();
@@ -697,7 +709,8 @@ describe("AnnotationSettings", () => {
     expect(searchService.search).not.toHaveBeenCalled();
   });
 
-  it("flags a custom query without _timestamp at Run", async () => {
+  it("accepts a custom query whose rows return _timestamp, even though the SQL text never names it", async () => {
+    // The server adds _timestamp to a plain SELECT, so the actual rows decide this — not the SQL text.
     vi.mocked(getDashboard).mockResolvedValue(dashboardWith([deploys]));
     vi.mocked(searchService.search).mockResolvedValue({
       data: { hits: [{ _timestamp: 1_700_000_000_000_000, title: "maint" }] },
@@ -713,9 +726,46 @@ describe("AnnotationSettings", () => {
     await wrapper!.find('[data-test="dashboard-annotation-source-run"]').trigger("click");
     await flushPromises();
 
+    expect(wrapper!.text()).not.toContain("does not return _timestamp");
+  });
+
+  it("flags a custom query whose zero-row response's own columns omit _timestamp", async () => {
+    vi.mocked(getDashboard).mockResolvedValue(dashboardWith([deploys]));
+    vi.mocked(searchService.search).mockResolvedValue({
+      data: { hits: [], columns: ["title"] },
+    } as never);
+    await mountSettings();
+    await wrapper!.find('[data-test="dashboard-annotation-source-edit-deploys"]').trigger("click");
+    await flushPromises();
+    await switchMode("sql");
+    form()
+      .findComponent({ name: "QueryEditor" })
+      .vm.$emit("update:query", `SELECT title FROM "pt_change_calendar"`);
+    await flushPromises();
+    await wrapper!.find('[data-test="dashboard-annotation-source-run"]').trigger("click");
+    await flushPromises();
+
     expect(wrapper!.text()).toContain(
       "The query does not return _timestamp, so its rows cannot be placed on the time axis.",
     );
+  });
+
+  it("does not block on the timestamp check for a zero-row response with no column list, showing the no-rows hint instead", async () => {
+    vi.mocked(getDashboard).mockResolvedValue(dashboardWith([deploys]));
+    vi.mocked(searchService.search).mockResolvedValue({ data: { hits: [] } } as never);
+    await mountSettings();
+    await wrapper!.find('[data-test="dashboard-annotation-source-edit-deploys"]').trigger("click");
+    await flushPromises();
+    await switchMode("sql");
+    form()
+      .findComponent({ name: "QueryEditor" })
+      .vm.$emit("update:query", `SELECT title FROM "pt_change_calendar"`);
+    await flushPromises();
+    await wrapper!.find('[data-test="dashboard-annotation-source-run"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper!.text()).not.toContain("does not return _timestamp");
+    expect(wrapper!.text()).toContain("No rows in the current time range.");
   });
 
   it("blocks Save while a missing field stands, and allows it once fixed", async () => {
@@ -768,10 +818,31 @@ describe("AnnotationSettings", () => {
     ).toBe("true");
   });
 
-  it("blocks Save when a Custom SQL query never names _timestamp", async () => {
+  it("saves a Custom SQL query whose rows return _timestamp, even though the SQL text never names it", async () => {
     vi.mocked(getDashboard).mockResolvedValue(dashboardWith([deploys]));
     vi.mocked(searchService.search).mockResolvedValue({
-      data: { hits: [{ _timestamp: 1_700_000_000_000_000, title: "maint" }] },
+      // deploys' title is "{service}"; the row must carry it for the preview to have no other problem.
+      data: { hits: [{ _timestamp: 1_700_000_000_000_000, service: "checkout" }] },
+    } as never);
+    await mountSettings();
+    await wrapper!.find('[data-test="dashboard-annotation-source-edit-deploys"]').trigger("click");
+    await flushPromises();
+    await switchMode("sql");
+    form()
+      .findComponent({ name: "QueryEditor" })
+      .vm.$emit("update:query", `SELECT service FROM "pt_change_calendar"`);
+    await flushPromises();
+
+    await submit();
+    await vi.waitFor(() => expect(updateDashboard).toHaveBeenCalledTimes(1));
+
+    expect(wrapper!.text()).not.toContain("does not return _timestamp");
+  });
+
+  it("blocks Save when a Custom SQL query's zero-row response's own columns omit _timestamp", async () => {
+    vi.mocked(getDashboard).mockResolvedValue(dashboardWith([deploys]));
+    vi.mocked(searchService.search).mockResolvedValue({
+      data: { hits: [], columns: ["title"] },
     } as never);
     await mountSettings();
     await wrapper!.find('[data-test="dashboard-annotation-source-edit-deploys"]').trigger("click");

@@ -95,6 +95,8 @@ export interface AnnotationSourceQueryInput {
 export interface AnnotationSourceQueryResult {
   rows: AnnotationRow[];
   sql: string;
+  /** The search response's own column list, when it sent one (e.g. absent on an empty result). */
+  columns: string[] | null;
 }
 
 interface SourceRunState {
@@ -170,7 +172,11 @@ export const runAnnotationSourceQuery = async (
     },
     "dashboards",
   );
-  return { rows: response?.data?.hits ?? [], sql };
+  return {
+    rows: response?.data?.hits ?? [],
+    sql,
+    columns: Array.isArray(response?.data?.columns) ? response.data.columns : null,
+  };
 };
 
 /** Runs each enabled source once per dashboard load, never per panel, and hands panels their markers. */
@@ -228,6 +234,14 @@ export const useDashboardAnnotationSources = (options: {
   );
 
   const sourcesKey = computed(() => JSON.stringify(enabledSources.value));
+
+  // A value key, not the raw object: a new object with the same start/end must not re-query.
+  const timeRangeKey = computed(() => {
+    const range = options.timeRange();
+    const start = range?.start_time?.getTime?.();
+    const end = range?.end_time?.getTime?.();
+    return Number.isFinite(start) && Number.isFinite(end) ? `${start}-${end}` : "";
+  });
 
   // A referenced variable the manager has not committed yet would reach the query as a literal `$name`.
   const hasUncommittedVariable = (
@@ -326,7 +340,7 @@ export const useDashboardAnnotationSources = (options: {
     loading.value = false;
   };
 
-  watch([sourcesKey, () => options.timeRange(), variablesKey], run, { immediate: true });
+  watch([sourcesKey, timeRangeKey, variablesKey], run, { immediate: true });
 
   onBeforeUnmount(() => {
     generation++;

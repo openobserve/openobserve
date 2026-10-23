@@ -139,6 +139,38 @@ describe("OTemplateInput", { timeout: 20_000 }, () => {
     expect(list()).toBeNull();
   });
 
+  it("closes the list on Escape without the keystroke bubbling to an ancestor (e.g. a drawer)", async () => {
+    mountHost();
+    await type("{{ba");
+    expect(list()).not.toBeNull();
+    const onAncestorKeydown = vi.fn();
+    document.addEventListener("keydown", onAncestorKeydown);
+    let escape: KeyboardEvent;
+    try {
+      escape = press("Escape");
+      await flushPromises();
+      expect(onAncestorKeydown).not.toHaveBeenCalled();
+    } finally {
+      document.removeEventListener("keydown", onAncestorKeydown);
+    }
+    expect(escape.defaultPrevented).toBe(true);
+    expect(list()).toBeNull();
+  });
+
+  it("leaves Escape alone when the list is closed", async () => {
+    mountHost();
+    await type("plain");
+    const onAncestorKeydown = vi.fn();
+    document.addEventListener("keydown", onAncestorKeydown);
+    try {
+      const escape = press("Escape");
+      expect(escape.defaultPrevented).toBe(false);
+      expect(onAncestorKeydown).toHaveBeenCalledTimes(1);
+    } finally {
+      document.removeEventListener("keydown", onAncestorKeydown);
+    }
+  });
+
   it("with delimiter=single, opens the list on a lone { and inserts a single-brace token", async () => {
     mountHost({ delimiter: "single" });
     await type("https://{ba/path", 11);

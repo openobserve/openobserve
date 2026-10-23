@@ -507,19 +507,27 @@ describe("summarizeAnnotationPreview", () => {
     expect(summary.missingFields).toEqual(["ver"]);
   });
 
-  it("flags a custom query that never names _timestamp", () => {
-    const sql = (query: string) =>
-      summarizeAnnotationPreview(source({ mode: "sql", query, title: "{title}" }), [
-        { _timestamp: 1_700_000_000_000_000, title: "x" },
-      ]).timestampMissing;
-    expect(sql(`SELECT title FROM "cal"`)).toBe(true);
-    expect(sql(`SELECT _timestamp, title FROM "cal"`)).toBe(false);
-    expect(sql(`SELECT * FROM "cal"`)).toBe(false);
-    expect(sql(`SELECT t.* FROM "cal" t`)).toBe(false);
-    expect(sql(`SELECT title, * FROM "cal"`)).toBe(false);
-    // count(*) and arithmetic are a literal *, not a wildcard select, so _timestamp is still missing.
-    expect(sql(`SELECT count(*) AS n FROM "cal"`)).toBe(true);
-    expect(sql(`SELECT a * b AS n FROM "cal"`)).toBe(true);
+  it("trusts rows with a usable _timestamp over the SQL text, even when the text never names it", () => {
+    // The server adds _timestamp to a plain SELECT; the SQL text must not be what blocks this.
+    const summary = summarizeAnnotationPreview(
+      source({ mode: "sql", query: `SELECT title FROM "cal"`, title: "{title}" }),
+      [{ _timestamp: 1_700_000_000_000_000, title: "x" }],
+    );
+    expect(summary.timestampMissing).toBe(false);
+  });
+
+  it("uses the response's column list to decide a zero-row Custom SQL result", () => {
+    const base = source({ mode: "sql", query: `SELECT title FROM "cal"`, title: "{title}" });
+    expect(
+      summarizeAnnotationPreview(base, [], [], [], ["_timestamp", "title"]).timestampMissing,
+    ).toBe(false);
+    expect(summarizeAnnotationPreview(base, [], [], [], ["title"]).timestampMissing).toBe(true);
+  });
+
+  it("does not block on the timestamp check when the server sent no column list for a zero-row result", () => {
+    const base = source({ mode: "sql", query: `SELECT title FROM "cal"`, title: "{title}" });
+    expect(summarizeAnnotationPreview(base, [], [], [], null).timestampMissing).toBe(false);
+    expect(summarizeAnnotationPreview(base, []).timestampMissing).toBe(false);
   });
 
   it("flags truncation when the query returns exactly the preview row cap", () => {

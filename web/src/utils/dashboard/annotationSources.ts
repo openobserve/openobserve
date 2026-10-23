@@ -277,9 +277,6 @@ export const sqlSelectAliases = (sql: string | null | undefined): string[] => {
   return aliases;
 };
 
-// A query names `_timestamp` or selects `*`/`t.*`; a bare `*` inside count(*) or `a*b` does not.
-const sqlReturnsTimestamp = (sql: string) => /\b_timestamp\b|(?:select\s+|[,.]\s*)\*/i.test(sql);
-
 /** Normalises a row time (micro/milli/seconds epoch or an ISO string) to microseconds. */
 export const toMicroseconds = (value: unknown): number | null => {
   if (value === null || value === undefined || value === "") return null;
@@ -345,6 +342,7 @@ export const summarizeAnnotationPreview = (
   rows: AnnotationRow[],
   variables: AnnotationVariable[] = [],
   knownFields: string[] = [],
+  resultColumns: string[] | null = null,
 ): AnnotationPreviewSummary => {
   const markers = annotationRowsToMarkers(source, rows, variables);
   const inRows = (field: string) =>
@@ -358,9 +356,11 @@ export const summarizeAnnotationPreview = (
     ...extractTemplateFields(source.description),
   ].filter((field, index, all) => all.indexOf(field) === index);
   const endField = source.endTimeField?.trim();
+  // The actual result decides this, never the SQL text; with no rows, fall back to the response's own columns, when the server sent any.
   const timestampMissing =
-    (source.mode === "sql" && !sqlReturnsTimestamp(getAnnotationSourceSql(source))) ||
-    (rows.length > 0 && markers.length === 0);
+    rows.length > 0
+      ? markers.length === 0
+      : resultColumns !== null && !resultColumns.includes(TIMESTAMP_COLUMN);
   return {
     rows: markers.map((marker) => ({
       time: marker.start_time,

@@ -287,6 +287,11 @@ const onPanelsUpdate = (value: unknown) => {
   setField("panels", isEveryPanel ? [] : next);
 };
 
+// OSelect's clear emits `undefined` for a single-select; the save path trims unconditionally.
+const onEndTimeFieldUpdate = (value: unknown) => {
+  setField("endTimeField", typeof value === "string" ? value : "");
+};
+
 onMounted(async () => {
   await loadStreams(values.value.streamType);
   await loadFields(fieldsStream.value, values.value.streamType);
@@ -318,7 +323,8 @@ const builderSql = () =>
 const onModeChange = (next: unknown) => {
   if ((next !== "builder" && next !== "sql") || next === mode.value) return;
   if (next === "sql") {
-    setField("query", builderSql());
+    // No stream means no valid FROM target, so pre-filling would hand the editor broken SQL.
+    if (values.value.stream.trim()) setField("query", builderSql());
     setField("mode", "sql");
     confirmDiscardSql.value = false;
     return;
@@ -410,6 +416,7 @@ const runCheck = async (): Promise<"ok" | "problems"> => {
       result.rows,
       variables,
       schemaFields.value ?? [],
+      result.columns,
     );
     preview.value = summary;
     return annotationPreviewHasProblems(summary) ? "problems" : "ok";
@@ -656,23 +663,35 @@ const title = computed(() =>
                 />
               </template>
             </OFormTemplateInput>
-            <OFormSelect
-              name="endTimeField"
-              :label="t('dashboard.annotationSources.endTimeField')"
-              :placeholder="t('dashboard.annotationSources.endTimeFieldNone')"
-              :options="fieldOptions"
-              searchable
-              :creatable="!fieldNames.length"
-              clearable
-              data-test="dashboard-annotation-source-end-time-field"
-            >
-              <template #tooltip>
-                <OTooltip
-                  :content="t('dashboard.annotationSources.endTimeFieldHelp')"
-                  max-width="15.625rem"
-                />
+            <component :is="form.Field" name="endTimeField">
+              <template #default="{ field }">
+                <OSelect
+                  :model-value="field.state.value"
+                  :label="t('dashboard.annotationSources.endTimeField')"
+                  :placeholder="t('dashboard.annotationSources.endTimeFieldNone')"
+                  :options="fieldOptions"
+                  :error="field.state.meta.errors.length > 0"
+                  :error-message="
+                    field.state.meta.errors.length > 0
+                      ? raw(firstFieldError(field.state.meta.errors))
+                      : undefined
+                  "
+                  searchable
+                  :creatable="!fieldNames.length"
+                  clearable
+                  data-test="dashboard-annotation-source-end-time-field"
+                  @update:model-value="onEndTimeFieldUpdate"
+                  @blur="field.handleBlur"
+                >
+                  <template #tooltip>
+                    <OTooltip
+                      :content="t('dashboard.annotationSources.endTimeFieldHelp')"
+                      max-width="15.625rem"
+                    />
+                  </template>
+                </OSelect>
               </template>
-            </OFormSelect>
+            </component>
             <component :is="form.Field" name="panels">
               <template #default="{ field }">
                 <OSelect

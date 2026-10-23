@@ -215,12 +215,23 @@ describe("useDashboardAnnotationSources", () => {
     expect(markersOf("p4")).toBe("");
   });
 
-  it("re-runs on a new time window and on a changed variable, but not on an unrelated one", async () => {
+  it("does not re-query for a new time-range object carrying the same start/end", async () => {
+    // A fresh object with equal values was the original cause of a double initial query.
     mountDashboard({ dashboard, timeRange, variables });
     await flushPromises();
     expect(search).toHaveBeenCalledTimes(2);
 
     timeRange.value = range();
+    await flushPromises();
+    expect(search).toHaveBeenCalledTimes(2);
+  });
+
+  it("re-runs on a new time window and on a changed variable, but not on an unrelated one", async () => {
+    mountDashboard({ dashboard, timeRange, variables });
+    await flushPromises();
+    expect(search).toHaveBeenCalledTimes(2);
+
+    timeRange.value = { start_time: new Date(START + 1), end_time: new Date(END + 1) };
     await flushPromises();
     expect(search).toHaveBeenCalledTimes(4);
 
@@ -368,7 +379,7 @@ describe("useDashboardAnnotationSources", () => {
     const { wrapper } = mountDashboard({ dashboard, timeRange, variables });
     await flushPromises();
 
-    timeRange.value = range();
+    timeRange.value = { start_time: new Date(START + 1), end_time: new Date(END + 1) };
     await flushPromises();
     expect(calls).toBe(2);
 

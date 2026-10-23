@@ -274,14 +274,32 @@ describe("OTemplateTextarea", { timeout: 20_000 }, () => {
       await type("plain");
       expect(press("Enter").defaultPrevented).toBe(false);
       expect(press("Tab").defaultPrevented).toBe(false);
-      expect(press("Escape").defaultPrevented).toBe(false);
+      // Closed: Escape must still reach an ancestor listener (e.g. a drawer's own close handler).
+      const onAncestorKeydown = vi.fn();
+      document.addEventListener("keydown", onAncestorKeydown);
+      try {
+        const escape = press("Escape");
+        expect(escape.defaultPrevented).toBe(false);
+        expect(onAncestorKeydown).toHaveBeenCalledTimes(1);
+      } finally {
+        document.removeEventListener("keydown", onAncestorKeydown);
+      }
     });
 
-    it("closes on Escape and swallows that keystroke", async () => {
+    it("closes on Escape and swallows that keystroke, without reaching an ancestor drawer", async () => {
       mountHost();
       await type("{{");
-      const escape = press("Escape");
-      await flushPromises();
+      // Open: Escape must not also reach a listening ancestor (e.g. the settings drawer).
+      const onAncestorKeydown = vi.fn();
+      document.addEventListener("keydown", onAncestorKeydown);
+      let escape: KeyboardEvent;
+      try {
+        escape = press("Escape");
+        await flushPromises();
+        expect(onAncestorKeydown).not.toHaveBeenCalled();
+      } finally {
+        document.removeEventListener("keydown", onAncestorKeydown);
+      }
       expect(escape.defaultPrevented).toBe(true);
       expect(list()).toBeNull();
     });

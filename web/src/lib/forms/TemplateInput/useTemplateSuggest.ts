@@ -215,7 +215,9 @@ export function useTemplateSuggest<T extends TemplateSuggestion>(
       event.preventDefault();
       accept(matches.value[highlightedIndex.value].name);
     } else if (event.key === "Escape") {
+      // Only the list closes; an ancestor (e.g. a drawer) must not also react to this Escape.
       event.preventDefault();
+      event.stopPropagation();
       close();
     }
   }
