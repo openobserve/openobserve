@@ -252,7 +252,7 @@ const neverRefreshed = computed(
 const outcome = computed(() => {
   if (busy.value) return { variant: "info" as const, text: t("about.online_refreshing_detail") };
   if (result.value) {
-    const message = refreshMessage(result.value.body, t, result.value.status);
+    const message = refreshMessage(result.value.body, t, result.value.status, locale.value);
     return rotated.value && message.variant === "success"
       ? { ...message, text: t("about.online_rotated") }
       : message;
@@ -265,6 +265,8 @@ const outcome = computed(() => {
           props.refresh.successor_available ?? props.refresh.last_outcome.successor_available,
       },
       t,
+      undefined,
+      locale.value,
     );
   if (props.refresh.mode !== "online") return refreshMessage({ error: props.refresh.mode }, t);
   return null;

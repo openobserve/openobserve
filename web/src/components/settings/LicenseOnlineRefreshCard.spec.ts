@@ -53,6 +53,34 @@ describe("LicenseOnlineRefreshCard", () => {
     expect(refresh).not.toHaveBeenCalled();
     expect(rotate).not.toHaveBeenCalled();
   });
+  it.each(["saved", "clicked"])(
+    "formats the %s renewal date with the app locale",
+    async (source) => {
+      const DateTimeFormat = Intl.DateTimeFormat;
+      const formatter = vi
+        .spyOn(Intl, "DateTimeFormat")
+        .mockImplementation(function (locale, options) {
+          return new DateTimeFormat(locale ?? "en-GB", options);
+        });
+      try {
+        const body = {
+          outcome: "renewed",
+          renewed: { license_id: "new", expires_at: 1825113600000000 },
+        };
+        refresh.mockResolvedValue({ ok: true, body });
+        const w = card(source === "saved" ? { last_outcome: body } : {});
+        if (source === "clicked") {
+          await w.get('[data-test="license-online-refresh"]').trigger("click");
+          await flushPromises();
+        }
+        expect(w.get('[data-test="license-online-outcome"]').text()).toBe(
+          "A renewed license was applied. It now expires on Nov 2, 2027.",
+        );
+      } finally {
+        formatter.mockRestore();
+      }
+    },
+  );
   it("in progress shows spinner text and blocks duplicate requests", async () => {
     let done: (v: unknown) => void = () => {};
     refresh.mockImplementation(() => new Promise((r) => (done = r)));

@@ -1,5 +1,6 @@
 import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
 import type { RefreshBody } from "@/ts/interfaces/licenseRefresh";
+import { issuedOn } from "@/utils/licenseWaivers";
 export type { RefreshBody, RefreshStatus } from "@/ts/interfaces/licenseRefresh";
 
 export interface RefreshMessage {
@@ -63,6 +64,7 @@ export function refreshMessage(
   body: RefreshBody | undefined,
   t: TranslateFn,
   status?: number,
+  locale = "en-US",
 ): RefreshMessage {
   if (status === 403) return { variant: "error", text: t("about.refresh_needs_permission") };
   if (isOldNodeBody(body)) return { variant: "info", text: t("about.online_old_node") };
@@ -108,14 +110,7 @@ export function refreshMessage(
     };
   }
   if (body?.outcome === "renewed") {
-    const date = body.renewed
-      ? new Intl.DateTimeFormat(undefined, {
-          timeZone: "UTC",
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        }).format(body.renewed.expires_at / 1000)
-      : null;
+    const date = body.renewed ? issuedOn(body.renewed.expires_at, locale) : null;
     return {
       variant: "success",
       text: date ? t("about.online_renewed_date", { date }) : t("about.online_renewed"),

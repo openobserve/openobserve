@@ -188,12 +188,19 @@ describe("LicenseSearchBanner", () => {
     expect(w.get('[data-test="license-banner-refresh"]').text()).toBe("Refresh now");
   });
   it("renewed outcome shows the new expiry inline even after config unpauses search", async () => {
+    const DateTimeFormat = Intl.DateTimeFormat;
+    vi.spyOn(Intl, "DateTimeFormat").mockImplementation(function (locale, options) {
+      return new DateTimeFormat(locale ?? "en-GB", options);
+    });
     vi.mocked(licenseServer.refresh_license_limits).mockResolvedValue({
       data: { outcome: "renewed", renewed: { license_id: "new", expires_at: 1825113600000000 } },
     } as never);
     const w = await mountBanner(PAUSED);
     await w.get('[data-test="license-banner-refresh"]').trigger("click");
     await flushPromises();
+    expect(w.get('[data-test="license-banner-outcome"]').text()).toBe(
+      "A renewed license was applied. It now expires on Nov 2, 2027.",
+    );
     store.commit("setConfig", { meta_org: META, license_search_allowed: true });
     await flushPromises();
     expect(w.get('[data-test="license-banner-outcome"]').text()).toContain(

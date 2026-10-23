@@ -91,7 +91,7 @@ const readDismissed = () => {
 };
 const dismissed = ref(readDismissed());
 const outcome = computed(() =>
-  result.value ? refreshMessage(result.value.body, t, result.value.status) : null,
+  result.value ? refreshMessage(result.value.body, t, result.value.status, locale.value) : null,
 );
 const visible = computed(
   () =>

@@ -104,7 +104,7 @@ const refreshing = ref(false);
 const refreshResult = ref<RefreshResult>();
 const outcome = computed(() =>
   refreshResult.value
-    ? refreshMessage(refreshResult.value.body, t, refreshResult.value.status)
+    ? refreshMessage(refreshResult.value.body, t, refreshResult.value.status, locale.value)
     : null,
 );
 const refreshNow = async () => {

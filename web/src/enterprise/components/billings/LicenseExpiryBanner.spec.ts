@@ -52,9 +52,32 @@ afterEach(() => {
 describe("LicenseExpiryBanner", () => {
   it("online with update rights shows Refresh now copy", async () => {
     const { w } = await mountBanner();
+    expect(w.text()).toContain("Your license expires on Nov 2, 2026.");
     expect(w.text()).toContain("Click Refresh now to check for a renewed license.");
     expect(w.get('[data-test="license-expiry-refresh"]').text()).toBe("Refresh now");
     expect(refresh).not.toHaveBeenCalled();
+  });
+  it("formats the renewed expiry with the app locale instead of the browser default", async () => {
+    const DateTimeFormat = Intl.DateTimeFormat;
+    const formatter = vi
+      .spyOn(Intl, "DateTimeFormat")
+      .mockImplementation(function (locale, options) {
+        return new DateTimeFormat(locale ?? "en-GB", options);
+      });
+    try {
+      refresh.mockResolvedValue({
+        ok: true,
+        body: { outcome: "renewed", renewed: { license_id: "new", expires_at: 1825113600000000 } },
+      });
+      const { w } = await mountBanner();
+      await w.get('[data-test="license-expiry-refresh"]').trigger("click");
+      await flushPromises();
+      expect(w.get('[data-test="license-expiry-outcome"]').text()).toBe(
+        "A renewed license was applied. It now expires on Nov 2, 2027.",
+      );
+    } finally {
+      formatter.mockRestore();
+    }
   });
   it("online without rights asks an administrator", async () => {
     const { w } = await mountBanner({ canUpdate: false });
