@@ -19,9 +19,9 @@ use sea_orm::entity::prelude::*;
 #[sea_orm(table_name = "fleet_collectors")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
-    pub org_id: String,
-    #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub org_id: String,
     pub name: Option<String>,
     pub hostname: Option<String>,
     pub ip: Option<String>,

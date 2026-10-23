@@ -243,8 +243,8 @@ fn collectors_table() -> TableCreateStatement {
     table
         .table(C::Table)
         .if_not_exists()
-        .col(ColumnDef::new(C::OrgId).string().not_null())
-        .col(ColumnDef::new(C::Id).string_len(36).not_null());
+        .col(ColumnDef::new(C::Id).string_len(36).not_null())
+        .col(ColumnDef::new(C::OrgId).string().not_null());
     for column in [
         C::Name,
         C::Hostname,
