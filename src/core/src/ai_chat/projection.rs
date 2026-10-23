@@ -15,11 +15,16 @@
 
 //! Port of o2-ai's `project_events`; model names are not redacted (unknown here).
 
-use std::{collections::HashMap, sync::LazyLock};
+use std::collections::HashMap;
 
-use config::utils::json::{Map, Value, json};
+use config::{
+    meta::oncall::confidence::strip_call_ref,
+    utils::{
+        json::{Map, Value, json},
+        redact::redact_internal_details,
+    },
+};
 use o2_enterprise::enterprise::ai::chat::batcher::DurableEvent;
-use regex::{NoExpand, Regex};
 
 const PLACEHOLDER_TITLE_PREFIXES: [&str; 2] = ["New session - ", "Child session - "];
 const INJECTED_KEY: &str = "o2_injected";
@@ -32,7 +37,7 @@ const STREAM_HOLDBACK_WORDS: usize = 3;
 const STREAM_CARRY_MAX: usize = 4096;
 const STREAM_HOLDBACK: usize = 48;
 
-const SESSION_ARG: &str = "_o2_session";
+pub(crate) const SESSION_ARG: &str = "_o2_session";
 const NAVIGATION_TOOL: &str = "create_navigation";
 const FIRST_PARTY_MCP_PREFIX: &str = "o2_";
 const O2_DELETE_TOOL: &str = "o2_delete";
@@ -43,7 +48,8 @@ const TEST_FUNCTION_MAX_OUTPUT_RESULTS: usize = 5;
 const ERROR_DUMP_CHARS: usize = 500;
 const FIRST_ERR_CHARS: usize = 200;
 
-const HIDDEN_TOOLS: [&str; 19] = [
+/// Tools no projection shows; the sentinels at the end are RCA thread structure.
+pub(crate) const HIDDEN_TOOLS: [&str; 25] = [
     "tool_search",
     "convert_time_to_microseconds",
     "calculate_time_range",
@@ -63,6 +69,12 @@ const HIDDEN_TOOLS: [&str; 19] = [
     "todowrite",
     "todoread",
     "skill",
+    "record_step",
+    "submit_report",
+    "record_hypothesis",
+    "record_blind_spot",
+    "ask_responders",
+    "acknowledge_steering",
 ];
 
 const TOOL_DESCRIPTIONS: [(&str, &str); 37] = [
@@ -115,35 +127,6 @@ const PERMISSION_REJECTION_MARKERS: [&str; 5] = [
     "rejected the permission",
     "not allowed to access",
 ];
-
-// Order matters: paths collapse before the bare-word runtime rule rewrites them.
-static INTERNAL_PATTERNS: LazyLock<Vec<(Regex, &'static str)>> = LazyLock::new(|| {
-    [
-        (r"/data/opencode-workspaces[\w./-]*", "[internal path]"),
-        (r"/home/appuser[\w./-]*", "[internal path]"),
-        (r"~?/\.config/opencode[\w./-]*", "[internal path]"),
-        (r"\bnats://[\w.:@-]+", "[internal endpoint]"),
-        (
-            r"\bhttps?://(?:127\.0\.0\.1|localhost|0\.0\.0\.0)(?::\d+)?[\w./-]*",
-            "[internal endpoint]",
-        ),
-        (
-            r"(?i)\b(?:the\s+)?opencode(?:\s+(?:runtime|server|agent))?\b",
-            "the agent runtime",
-        ),
-        (r"(?i)\bbubblewrap\b", "the sandbox"),
-        (r"(?i)\bbwrap\b", "the sandbox"),
-        (r"(?i)\bappuser\b", "the service account"),
-        (r"(?i)\bDataFusion\b", "the query engine"),
-        (
-            r"\b(?:arrow_schema|sqlparser|datafusion)::[\w:]+",
-            "the query engine",
-        ),
-    ]
-    .into_iter()
-    .map(|(pattern, replacement)| (Regex::new(pattern).expect("valid pattern"), replacement))
-    .collect()
-});
 
 /// A tool call as the live mapper remembers it until its result arrives.
 #[derive(Clone)]
@@ -471,17 +454,17 @@ impl Turn {
 
 /// The event log folded to each message's latest info and each part's final snapshot.
 #[derive(Default)]
-struct Folded {
-    title: Option<String>,
-    last_seq: i64,
-    infos: Map<String, Value>,
-    parts: HashMap<String, Map<String, Value>>,
+pub(crate) struct Folded {
+    pub(crate) title: Option<String>,
+    pub(crate) last_seq: i64,
+    pub(crate) infos: Map<String, Value>,
+    pub(crate) parts: HashMap<String, Map<String, Value>>,
     /// Message id to the `(min, max)` seq of the events about it.
-    spans: HashMap<String, (i64, i64)>,
+    pub(crate) spans: HashMap<String, (i64, i64)>,
 }
 
 impl Folded {
-    fn fold(events: &[DurableEvent]) -> Self {
+    pub(crate) fn fold(events: &[DurableEvent]) -> Self {
         let mut folded = Folded {
             last_seq: -1,
             ..Default::default()
@@ -721,13 +704,13 @@ fn generated_title(title: &Value) -> Option<String> {
     Some(stripped.to_string())
 }
 
-fn is_injected(part: &Map<String, Value>) -> bool {
+pub(crate) fn is_injected(part: &Map<String, Value>) -> bool {
     obj(part.get("metadata"))
         .and_then(|m| m.get(INJECTED_KEY))
         .is_some_and(|v| py_num_eq(v, 1))
 }
 
-fn strip_mcp_prefix(tool_name: &str) -> &str {
+pub(crate) fn strip_mcp_prefix(tool_name: &str) -> &str {
     match tool_name.split_once('_') {
         Some((prefix, rest)) if !rest.is_empty() && MCP_SERVER_PREFIXES.contains(&prefix) => rest,
         _ => tool_name,
@@ -1043,7 +1026,7 @@ fn add_test_function_details(
 }
 
 /// The response body inside an MCP content wrapper; `Null` when there is none.
-fn extract_mcp_response(result: &Map<String, Value>) -> Value {
+pub(crate) fn extract_mcp_response(result: &Map<String, Value>) -> Value {
     let Some(Value::Object(first)) = result
         .get("content")
         .and_then(Value::as_array)
@@ -1118,11 +1101,12 @@ fn scrub_event_text(mut event: Map<String, Value>) -> Map<String, Value> {
     event
 }
 
-fn coerce_tool_output(output: Option<&Value>, metadata: Value) -> Map<String, Value> {
+pub(crate) fn coerce_tool_output(output: Option<&Value>, metadata: Value) -> Map<String, Value> {
     let mut wrapped = Map::new();
     match output {
         Some(Value::Object(m)) => return m.clone(),
         Some(Value::String(text)) => {
+            let text = strip_call_ref(text);
             let stripped = py_strip(text);
             if (stripped.starts_with('{') || stripped.starts_with('['))
                 && let Ok(parsed) = config::utils::json::from_str::<Value>(stripped)
@@ -1133,7 +1117,7 @@ fn coerce_tool_output(output: Option<&Value>, metadata: Value) -> Map<String, Va
                 wrapped.insert("output".into(), parsed);
                 return wrapped;
             }
-            wrapped.insert("output".into(), Value::String(text.clone()));
+            wrapped.insert("output".into(), Value::String(text.to_string()));
             if truthy(&metadata) {
                 wrapped.insert("metadata".into(), metadata);
             }
@@ -1200,7 +1184,7 @@ fn is_permission_rejection(message: &str) -> bool {
     PERMISSION_REJECTION_MARKERS.iter().any(|m| low.contains(m))
 }
 
-fn extract_error_message(error: &Value) -> String {
+pub(crate) fn extract_error_message(error: &Value) -> String {
     match error {
         Value::String(s) => s.clone(),
         Value::Object(m) => {
@@ -1223,19 +1207,6 @@ fn extract_error_message(error: &Value) -> String {
         }
         other => py_str(other),
     }
-}
-
-/// Scrub internal-architecture details (runtime, paths, endpoints) from outbound text.
-fn redact_internal_details(text: &str) -> String {
-    let mut text = text.to_string();
-    for (pattern, replacement) in INTERNAL_PATTERNS.iter() {
-        if pattern.is_match(&text) {
-            text = pattern
-                .replace_all(&text, NoExpand(replacement))
-                .into_owned();
-        }
-    }
-    text
 }
 
 /// Char index up to which streamed text can be emitted without splitting a redacted term.
@@ -1262,7 +1233,7 @@ fn count_lines(text: &str) -> usize {
     text.matches('\n').count() + usize::from(!text.ends_with('\n'))
 }
 
-fn obj(value: Option<&Value>) -> Option<&Map<String, Value>> {
+pub(crate) fn obj(value: Option<&Value>) -> Option<&Map<String, Value>> {
     value.and_then(Value::as_object)
 }
 
@@ -1275,7 +1246,7 @@ fn truthy_key(value: Option<&Value>) -> Option<String> {
 }
 
 /// Python truthiness of a JSON value.
-fn truthy(value: &Value) -> bool {
+pub(crate) fn truthy(value: &Value) -> bool {
     match value {
         Value::Null => false,
         Value::Bool(b) => *b,
@@ -1477,6 +1448,19 @@ mod tests {
         }
     }
 
+    /// A `record_step` part is stored in full but projects to no tool frame.
+    #[test]
+    fn record_step_is_stored_but_never_projected() {
+        let (events, _) = load("record_step.json");
+        assert!(
+            events
+                .iter()
+                .any(|e| e.data.pointer("/part/tool") == Some(&json!("record_step")))
+        );
+        let projected = project(&events).to_string();
+        assert!(!projected.contains("record_step"), "{projected}");
+    }
+
     #[test]
     fn turns_carry_the_seq_range_of_their_events() {
         let (events, _) = load("structure.json");
@@ -1581,10 +1565,6 @@ mod tests {
         assert_eq!(
             strip_mcp_prefix("o2_correlate_streams"),
             "correlate_streams"
-        );
-        assert_eq!(
-            redact_internal_details("the opencode server at /home/appuser/x"),
-            "the agent runtime at [internal path]"
         );
     }
 }

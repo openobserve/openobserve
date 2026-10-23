@@ -79,6 +79,36 @@ const backgroundStreamMap = new Map<
 // Module scope: processStream resets isLoading only on the instance that started it, so a re-attached instance watches this to clear its spinner.
 const sessionStreamingState = reactive<Record<string, boolean>>({});
 
+// Keys an Ask hand-off context must never carry: they would scope the chat back to the RCA it came from (R-D9).
+const PINNED_CONTEXT_FORBIDDEN_KEYS: Record<string, true> = {
+  incident_id: true,
+  incidentId: true,
+  subject_id: true,
+  subjectId: true,
+  run_id: true,
+  attempt_id: true,
+  agent_type: true,
+};
+
+/** Copies a hand-off context without RCA scoping keys; null when nothing usable remains. */
+export const sanitizePinnedContext = (
+  context: Record<string, unknown> | null | undefined,
+): Record<string, unknown> | null => {
+  if (!context || typeof context !== "object" || Array.isArray(context)) return null;
+  const clean: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(context)) {
+    if (PINNED_CONTEXT_FORBIDDEN_KEYS[key] || key.startsWith("rca_")) continue;
+    clean[key] = value;
+  }
+  return Object.keys(clean).length > 0 ? clean : null;
+};
+
+// Module scope: the expanded overlay remounts O2AIChat, and the pin must follow the same chat across instances.
+// `chatId` is null until the hand-off chat is first saved, then bound to it.
+const pinnedChatContext = ref<{ context: Record<string, unknown>; chatId: number | null } | null>(
+  null,
+);
+
 // Keyed by turn controller: a Stop racing the stream's end, or a halt before the restore retry, must not count a turn twice.
 const answerOutcomeTracked = new WeakSet<AbortController>();
 
@@ -173,6 +203,35 @@ export function useChatStream(options: UseChatStreamOptions) {
   const currentSessionId = ref<string | null>(null);
   const lastTraceId = ref<string | null>(null); // OTEL trace_id from last workflow for feedback correlation
   const saveHistoryLoading = ref(false);
+
+  /** Pins an Ask hand-off context to the chat now open; RCA scoping keys are dropped. */
+  const setPinnedContext = (context: Record<string, unknown> | null | undefined) => {
+    const clean = sanitizePinnedContext(context);
+    pinnedChatContext.value = clean ? { context: clean, chatId: currentChatId.value } : null;
+  };
+
+  const clearPinnedContext = () => {
+    pinnedChatContext.value = null;
+  };
+
+  /** Keeps the pin only when `chatId` is the chat it belongs to; any other load drops it. */
+  const releasePinnedContextFor = (chatId: number | null) => {
+    const pin = pinnedChatContext.value;
+    if (pin && (pin.chatId === null || pin.chatId !== chatId)) pinnedChatContext.value = null;
+  };
+
+  // The hand-off chat gets its id on first save; bind the pin to it so a remount reloading that chat keeps it.
+  watch(currentChatId, (id) => {
+    const pin = pinnedChatContext.value;
+    if (pin && pin.chatId === null && id != null) pin.chatId = id;
+  });
+
+  const pinnedExplicitContext = () => {
+    const pin = pinnedChatContext.value;
+    if (!pin) return undefined;
+    if (pin.chatId !== null && pin.chatId !== currentChatId.value) return undefined;
+    return { ...pin.context };
+  };
 
   const pendingConfirmation = ref<{
     tool: string;
@@ -874,7 +933,7 @@ export function useChatStream(options: UseChatStreamOptions) {
         "",
         turnOrgId,
         turnController.signal,
-        undefined,
+        pinnedExplicitContext(),
         currentSessionId.value ?? undefined,
         hasImages ? messagesToSend : undefined,
         currentTurnId.value,
@@ -981,6 +1040,12 @@ export function useChatStream(options: UseChatStreamOptions) {
         err.status = response.status;
         err.errorBody = errorBody;
         throw err;
+      }
+
+      // fetchAiChat returns null when the request never got a response (network down, CORS
+      // refusal); reading `.body` of it would surface as a TypeError.
+      if (!response) {
+        throw new Error(t("aiAssistant.aiChat.requestFailed"));
       }
 
       // Announce before content arrives; silence hides that earlier tool results and file state were lost.
@@ -1091,7 +1156,7 @@ export function useChatStream(options: UseChatStreamOptions) {
       "",
       store.state.selectedOrganization.identifier,
       currentAbortController.value?.signal,
-      undefined,
+      pinnedExplicitContext(),
       currentSessionId.value ?? undefined,
       hasImages ? messagesToSend : undefined,
       currentTurnId.value,
@@ -1196,6 +1261,9 @@ export function useChatStream(options: UseChatStreamOptions) {
   );
 
   return {
+    setPinnedContext,
+    clearPinnedContext,
+    releasePinnedContextFor,
     isLoading,
     currentSessionId,
     lastTraceId,

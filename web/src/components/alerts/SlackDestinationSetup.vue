@@ -1,7 +1,10 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts">
-import { computed, inject, onBeforeUnmount, onMounted, ref, shallowRef } from "vue";
+import { computed, inject, onMounted, ref } from "vue";
+import { useMutation, useQuery } from "@tanstack/vue-query";
+import { useRouter } from "vue-router";
+import { useStore } from "vuex";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
@@ -13,21 +16,30 @@ import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 import type { RadioValue } from "@/lib/forms/Radio/ORadio.types";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
+import { useSlackOAuthPopup } from "@/composables/slack/useSlackOAuthPopup";
 import destinationService, { type SlackOAuthConnection } from "@/services/alert_destination";
-import { raw, useI18nTyped } from "@/types/i18n";
+import {
+  connectInstallationMutation,
+  installExchangeMutation,
+  installStartMutation,
+  slackInstallationsQuery,
+} from "@/services/slack.queries";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import type { InstallationSummary, SlackInstallExchangeResponse } from "@/types/slack";
 import { isValidSlackWebhookUrl } from "@/utils/prebuilt-templates/slack";
 import {
   buildSlackManifestUrl,
   slackManifestJson,
   SLACK_APP_NAME_MAX_LENGTH,
 } from "@/utils/slackManifest";
-import { isSlackOAuthCallbackMessage } from "@/utils/slackOAuth";
+import { statusOf } from "@/utils/slackLink";
+import { installerDomainDefault, readSlackOrgConfig } from "@/utils/slackSettings";
 import { isValidResourceName } from "@/utils/zincutils";
-import { toast } from "@/lib/feedback/Toast/useToast";
 import type { AddDestinationForm } from "./AddDestination.schema";
 import SlackWebhookFields from "./SlackWebhookFields.vue";
 
 type FormState = { values: AddDestinationForm };
+type ExchangeResult = SlackInstallExchangeResponse | SlackOAuthConnection;
 
 const props = defineProps<{
   orgIdentifier: string;
@@ -56,12 +68,27 @@ const slackTeamId = form.useStore((state: FormState) => state.values.slack_team_
 const slackTeamName = form.useStore((state: FormState) => state.values.slack_team_name);
 const slackChannelId = form.useStore((state: FormState) => state.values.slack_channel_id);
 
-const connecting = ref(false);
+const store = useStore();
+const router = useRouter();
 const manifestStep = ref(1);
-const oauthWindow = shallowRef<Window | null>(null);
-let popupWatcher: number | undefined;
-let popupCloseGraceTimer: number | undefined;
-const POPUP_CLOSE_GRACE_MS = 1_000;
+const slackState = computed(() => readSlackOrgConfig(store.state.zoConfig));
+// Set once install/start answers 403 (no slack_integration PUT) or 404 (Slack turned off since sign-in).
+const appUnavailable = ref(false);
+const appPath = computed(() => props.isCloud && slackState.value.enabled && !appUnavailable.value);
+const popupPath = ref<"app" | "webhook">("webhook");
+const formInstallation = ref<InstallationSummary | null>(null);
+
+const installStart = useMutation(() =>
+  installStartMutation(props.orgIdentifier, { silentForbidden: true }),
+);
+const installExchange = useMutation(() => installExchangeMutation(props.orgIdentifier));
+const connectInstallation = useMutation(() => connectInstallationMutation(props.orgIdentifier));
+// upgrade_candidates needs Admin LIST, so a member without it gets no banner and no toast.
+const installations = useQuery(() =>
+  Object.assign(slackInstallationsQuery(props.orgIdentifier, { silentForbidden: true }), {
+    enabled: appPath.value,
+  }),
+);
 
 const connected = computed(() => {
   const webhookUrl = credentials.value.webhookUrl;
@@ -103,24 +130,6 @@ const guidedMethod = computed<"oauth" | "manifest" | null>(() => {
 const manifestCode = computed(() => slackManifestJson(slackAppName.value));
 const manifestUrl = computed(() => buildSlackManifestUrl(slackAppName.value));
 
-const stopPopupWatcher = (): void => {
-  if (popupWatcher !== undefined) {
-    window.clearInterval(popupWatcher);
-    popupWatcher = undefined;
-  }
-};
-
-const releasePopup = (close: boolean): void => {
-  stopPopupWatcher();
-  if (popupCloseGraceTimer !== undefined) {
-    window.clearTimeout(popupCloseGraceTimer);
-    popupCloseGraceTimer = undefined;
-  }
-  if (close && oauthWindow.value && !oauthWindow.value.closed) oauthWindow.value.close();
-  oauthWindow.value = null;
-  connecting.value = false;
-};
-
 const clearSlackConnection = (): void => {
   form.setFieldValue("credentials.webhookUrl", "");
   form.setFieldValue("credentials.channel", "");
@@ -138,6 +147,7 @@ const setMethod = (value: RadioValue): void => {
   if (value !== guidedMethod.value && value !== "webhook") return;
   if (value === setupMethod.value) return;
   releasePopup(true);
+  formInstallation.value = null;
   clearSlackConnection();
   setManifestStep(1);
   form.setFieldValue("slack_setup_method", value);
@@ -153,83 +163,97 @@ const applyConnection = (connection: SlackOAuthConnection): void => {
   emit("flowChange");
 };
 
-const handleOAuthMessage = async (event: MessageEvent<unknown>): Promise<void> => {
-  if (
-    event.origin !== window.location.origin ||
-    event.source !== oauthWindow.value ||
-    !isSlackOAuthCallbackMessage(event.data)
-  ) {
-    return;
-  }
+const hasWebhookFields = (
+  result: ExchangeResult,
+): result is ExchangeResult & SlackOAuthConnection =>
+  "webhookUrl" in result && typeof result.webhookUrl === "string" && !!result.teamId;
 
-  const message = event.data;
-  releasePopup(true);
-  if ("error" in message) {
-    toast({ variant: "error", message: t("alert_destinations.slackOAuth.authorizationDenied") });
-    return;
+const startUrl = async (): Promise<string> => {
+  if (appPath.value) {
+    try {
+      const response = await installStart.mutateAsync("destination_form");
+      popupPath.value = "app";
+      return response.authorization_url;
+    } catch (error) {
+      const status = statusOf(error);
+      if (status !== 403 && status !== 404) throw error;
+      appUnavailable.value = true;
+    }
   }
+  popupPath.value = "webhook";
+  const response = await destinationService.startSlackOAuth({
+    org_identifier: props.orgIdentifier,
+  });
+  return String(response.data.authorizationUrl);
+};
 
-  connecting.value = true;
-  try {
-    const response = await destinationService.exchangeSlackOAuth({
-      org_identifier: props.orgIdentifier,
-      code: message.code,
-      state: message.state,
+const exchange = async ({
+  code,
+  state,
+}: {
+  code: string;
+  state: string;
+}): Promise<ExchangeResult> => {
+  if (popupPath.value === "app") return installExchange.mutateAsync({ code, state });
+  const response = await destinationService.exchangeSlackOAuth({
+    org_identifier: props.orgIdentifier,
+    code,
+    state,
+  });
+  return response.data;
+};
+
+const onConnected = (result: ExchangeResult): void => {
+  if (hasWebhookFields(result)) applyConnection(result);
+  formInstallation.value =
+    "installation" in result && result.installation && "linking" in result.installation
+      ? (result.installation as InstallationSummary)
+      : null;
+  if ("already_installed" in result) {
+    connectInstallation.mutate({
+      installationId: result.already_installed.installation_id,
+      body: { connect_ticket: result.connect_ticket },
     });
-    applyConnection(response.data);
-  } catch {
-    toast({ variant: "error", message: t("alert_destinations.slackOAuth.exchangeFailed") });
-  } finally {
-    connecting.value = false;
   }
 };
 
-const watchPopup = (popup: Window): void => {
-  stopPopupWatcher();
-  popupWatcher = window.setInterval(() => {
-    if (oauthWindow.value !== popup || !popup.closed) return;
-    stopPopupWatcher();
-    if (popupCloseGraceTimer !== undefined) return;
-    popupCloseGraceTimer = window.setTimeout(() => {
-      popupCloseGraceTimer = undefined;
-      if (oauthWindow.value !== popup) return;
-      oauthWindow.value = null;
-      connecting.value = false;
-      toast({ variant: "warning", message: t("alert_destinations.slackOAuth.popupClosed") });
-    }, POPUP_CLOSE_GRACE_MS);
-  }, 500);
-};
+const {
+  connecting,
+  open: openPopup,
+  release: releasePopup,
+} = useSlackOAuthPopup<ExchangeResult>({ start: startUrl, exchange, onSuccess: onConnected });
 
 const connectSlack = async (): Promise<void> => {
-  if (!props.isCloud || connecting.value) return;
-  const popup = window.open(
-    "",
-    "openobserve-slack-oauth",
-    "popup,width=720,height=760,resizable=yes,scrollbars=yes",
-  );
-  if (!popup) {
-    toast({
-      variant: "error",
-      message: t("alert_destinations.slackOAuth.popupBlocked", { product: raw("OpenObserve") }),
-    });
-    return;
-  }
-
-  connecting.value = true;
-  oauthWindow.value = popup;
-  watchPopup(popup);
-  try {
-    const response = await destinationService.startSlackOAuth({
-      org_identifier: props.orgIdentifier,
-    });
-    if (oauthWindow.value !== popup || popup.closed) return;
-    popup.location.href = String(response.data.authorizationUrl);
-    popup.focus();
-  } catch {
-    releasePopup(true);
-    toast({ variant: "error", message: t("alert_destinations.slackOAuth.startFailed") });
-  }
+  if (!props.isCloud) return;
+  await openPopup();
 };
+
+// Which app a Connect reaches is known only once install/start answers, so the copy waits for it.
+const consentNote = computed<I18nText>(() => {
+  if (!appPath.value) {
+    return t("alert_destinations.slackOAuth.permissionNote", { product: raw("OpenObserve") });
+  }
+  return popupPath.value === "app"
+    ? t("slackApp.connect.consent")
+    : t("slackApp.connect.consentPending", { product: raw("OpenObserve") });
+});
+
+const upgradeCandidate = computed(() => {
+  const data = installations.data.value;
+  if (!data || data.installations.length > 0) return null;
+  return data.upgrade_candidates?.[0] ?? null;
+});
+
+const linkingDomains = computed(() => {
+  const domains = formInstallation.value?.linking.domains ?? [];
+  return domains.length ? domains : installerDomainDefault(store.state.userInfo?.email ?? "");
+});
+const showLinkPeople = computed(
+  () => connected.value && formInstallation.value?.linking.source === "manual",
+);
+const slackSettingsHref = computed(
+  () => router.resolve({ name: "slack", query: { org_identifier: props.orgIdentifier } }).href,
+);
 
 const continueManifest = (): void => {
   if (!canContinueManifest.value) return;
@@ -244,17 +268,35 @@ onMounted(() => {
     form.setFieldValue("slack_setup_method", guidedMethod.value ?? "webhook");
   }
   emit("readinessChange", false);
-  window.addEventListener("message", handleOAuthMessage);
-});
-
-onBeforeUnmount(() => {
-  window.removeEventListener("message", handleOAuthMessage);
-  releasePopup(true);
 });
 </script>
 
 <template>
   <section class="flex w-full flex-col gap-4" data-test="slack-destination-setup">
+    <OBanner
+      v-if="!isCloud && isEnterprise && slackState.enabled"
+      variant="info"
+      dense
+      icon="forum"
+      inline-actions
+      data-test="slack-form-app-banner"
+    >
+      {{ t("alert_destinations.slackOAuth.selfHostedApp") }}
+      <template #actions>
+        <OButton
+          as="a"
+          :href="slackSettingsHref"
+          target="_blank"
+          rel="noopener noreferrer"
+          variant="ghost-primary"
+          size="xs"
+          icon-right="open-in-new"
+        >
+          {{ t("alert_destinations.slackOAuth.openSlackSettings") }}
+        </OButton>
+      </template>
+    </OBanner>
+
     <div>
       <div class="text-sm font-medium">
         {{ t("alert_destinations.slackOAuth.setupMethodLabel") }}
@@ -324,8 +366,42 @@ onBeforeUnmount(() => {
     </div>
 
     <template v-if="setupMethod === 'oauth' && isCloud">
+      <OBanner
+        v-if="upgradeCandidate && !connected"
+        variant="info"
+        icon="sync"
+        data-test="slack-form-upgrade-banner"
+      >
+        <div class="flex flex-col gap-0.5">
+          <span class="font-medium">{{ t("slackApp.connect.upgradeTitle") }}</span>
+          <span class="text-xs">
+            {{
+              t(
+                "slackApp.connect.upgradeDetail",
+                {
+                  team: upgradeCandidate.team_name,
+                  count: upgradeCandidate.destinations.length,
+                },
+                upgradeCandidate.destinations.length,
+              )
+            }}
+          </span>
+        </div>
+        <template #actions>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            :loading="connecting"
+            data-test="slack-form-upgrade-button"
+            @click="connectSlack"
+          >
+            {{ t("slackApp.connect.upgradeButton") }}
+          </OButton>
+        </template>
+      </OBanner>
+
       <OBanner variant="info" dense icon="verified-user" data-test="slack-oauth-permission-note">
-        {{ t("alert_destinations.slackOAuth.permissionNote", { product: raw("OpenObserve") }) }}
+        {{ consentNote }}
       </OBanner>
 
       <OBanner
@@ -341,6 +417,34 @@ onBeforeUnmount(() => {
             channel: channelName,
           })
         }}
+      </OBanner>
+
+      <OBanner
+        v-if="showLinkPeople"
+        variant="info"
+        dense
+        icon="groups"
+        inline-actions
+        data-test="slack-form-link-people"
+      >
+        {{
+          linkingDomains.length
+            ? t("alert_destinations.slackOAuth.linkPeople", { domains: linkingDomains.join(", ") })
+            : t("alert_destinations.slackOAuth.linkPeopleNoDomain")
+        }}
+        <template #actions>
+          <OButton
+            as="a"
+            :href="slackSettingsHref"
+            target="_blank"
+            rel="noopener noreferrer"
+            variant="ghost-primary"
+            size="xs"
+            icon-right="open-in-new"
+          >
+            {{ t("alert_destinations.slackOAuth.linkPeopleEdit") }}
+          </OButton>
+        </template>
       </OBanner>
 
       <OButton

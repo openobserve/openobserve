@@ -71,6 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OBadge>
           <div class="ms-1 flex">
             <OButton
+              :aria-label="t('common.previous')"
               variant="ghost"
               size="icon-xs"
               icon-left="chevron-left"
@@ -78,6 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="synthetics-run-detail-prev-btn"
             />
             <OButton
+              :aria-label="t('common.next')"
               variant="ghost"
               size="icon-xs"
               icon-left="chevron-right"

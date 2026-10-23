@@ -19,6 +19,7 @@ import { computed, inject, onBeforeUnmount, onMounted, ref, toRef, watch } from 
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -50,6 +51,8 @@ const props = withDefaults(
     guideName?: string;
     docUrl?: string;
     snippetKind?: "command" | "config";
+    /** The tool whose config holds the password, named in the invalid-credentials fix. */
+    configTool?: string;
     /** The guide's host or cluster input, when the user typed one. */
     sourceLabel?: string;
     /** `pill` renders the state pill and its one line only, for empty pages that link to the guide for diagnosis. */
@@ -67,6 +70,7 @@ const props = withDefaults(
     guideName: "",
     docUrl: undefined,
     snippetKind: "command",
+    configTool: "Fluent Bit",
     sourceLabel: undefined,
     display: "bar",
     waitingLabel: undefined,
@@ -94,10 +98,10 @@ const watcher = useFirstEventWatch(toRef(props, "org"), toRef(props, "signal"), 
   match: toRef(props, "match"),
   autoDiagnosis: computed(() => props.display !== "pill"),
 });
-const { state, result, diagnosis, startedAtMs, scope, troubleshooting } = watcher;
+const { state, result, diagnosis, startedAtMs, scope, troubleshooting, targetExists, deciding } =
+  watcher;
 
 const CLOCK_TICK_MS = 1000;
-const FLUENT_BIT = raw("Fluent Bit");
 
 // a reactive clock, so the elapsed time and the cadence shown move on their own
 const nowMs = ref(Date.now());
@@ -247,6 +251,9 @@ const idleStream = computed(() =>
 );
 const idleKey = computed<I18nKey>(() => {
   const config = props.snippetKind === "config";
+  if (!targetExists.value) {
+    return config ? "ingestion.firstEvent.idleNewConfig" : "ingestion.firstEvent.idleNew";
+  }
   if (!idleStream.value) {
     return config ? "ingestion.firstEvent.idleMatchesConfig" : "ingestion.firstEvent.idleMatches";
   }
@@ -310,8 +317,13 @@ const reasonText = (reason: keyof typeof REJECTION_REASON_KEYS) =>
 const invalidCredentialsFix = (token: I18nText | undefined): I18nText => {
   if (props.snippetKind === "config") {
     return token
-      ? t("ingestion.firstEvent.fixInvalidCredentialsConfig", { tool: FLUENT_BIT, token })
-      : t("ingestion.firstEvent.fixInvalidCredentialsConfigUnnamed", { tool: FLUENT_BIT });
+      ? t("ingestion.firstEvent.fixInvalidCredentialsConfig", {
+          tool: raw(props.configTool),
+          token,
+        })
+      : t("ingestion.firstEvent.fixInvalidCredentialsConfigUnnamed", {
+          tool: raw(props.configTool),
+        });
   }
   return token
     ? t("ingestion.firstEvent.fixInvalidCredentials", { token })
@@ -438,7 +450,34 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow });
 
 <template>
   <div
-    v-if="display === 'pill'"
+    v-if="deciding && display === 'pill'"
+    class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"
+    data-test="first-event-status"
+    data-state="deciding"
+    data-display="pill"
+  >
+    <OSkeleton class="h-5 w-28" />
+    <OSkeleton class="h-3.5 w-48" />
+  </div>
+  <div v-else-if="deciding" class="flex flex-col gap-2 text-sm">
+    <OBanner
+      variant="default"
+      inline-actions
+      dense
+      data-test="first-event-status"
+      data-state="deciding"
+    >
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <OSkeleton class="h-5 w-28" />
+        <OSkeleton class="h-3.5 w-56" />
+      </div>
+      <template #actions>
+        <OSkeleton class="h-8.5 w-24" />
+      </template>
+    </OBanner>
+  </div>
+  <div
+    v-else-if="display === 'pill'"
     class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"
     data-test="first-event-status"
     :data-state="state"

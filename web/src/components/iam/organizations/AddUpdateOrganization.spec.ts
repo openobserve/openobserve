@@ -229,6 +229,23 @@ describe("AddUpdateOrganization", () => {
       expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
     });
 
+    it("shows the server message verbatim without added quotes", async () => {
+      vi.spyOn(orgService, "create").mockRejectedValueOnce({
+        response: { data: { message: "Organization creation failed." } },
+      });
+      const wrapper = mountComp();
+
+      await getNameInput(wrapper).setValue("Err Org");
+      await submitForm(wrapper);
+
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "error",
+          message: "Organization creation failed.",
+        }),
+      );
+    });
+
     it("renames the organization in update mode", async () => {
       const wrapper = mountComp({ modelValue: { id: "123", name: "Acme" } });
       await getNameInput(wrapper).setValue("Acme Renamed");

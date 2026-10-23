@@ -611,6 +611,12 @@ pub struct PanelConfig {
     show_exemplars: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     axis_label_mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    heatmap_mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bucket_unit: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bucket_unit_custom: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -2012,6 +2018,8 @@ mod tests {
         assert!(!json.contains("panel_time_enabled"));
         assert!(!json.contains("panel_time_range"));
         assert!(!json.contains("show_exemplars"));
+        assert!(!json.contains("heatmap_mode"));
+        assert!(!json.contains("bucket_unit"));
     }
 
     #[test]
@@ -2078,5 +2086,50 @@ mod tests {
         assert_eq!(cfg.axis_label_mode, None);
         let json = serde_json::to_value(&cfg).unwrap();
         assert!(json.get("axis_label_mode").is_none());
+    }
+
+    #[test]
+    fn test_panel_config_heatmap_histogram_round_trip() {
+        for custom in [None, Some("req")] {
+            let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+                "show_legends": true,
+                "legends_position": null,
+                "base_map": null,
+                "map_view": null,
+                "heatmap_mode": "prometheus_histogram",
+                "bucket_unit": "seconds",
+                "bucket_unit_custom": custom
+            }))
+            .unwrap();
+            assert_eq!(cfg.heatmap_mode.as_deref(), Some("prometheus_histogram"));
+            assert_eq!(cfg.bucket_unit.as_deref(), Some("seconds"));
+            assert_eq!(cfg.bucket_unit_custom.as_deref(), custom);
+            let json = serde_json::to_value(&cfg).unwrap();
+            assert_eq!(
+                json["heatmap_mode"],
+                serde_json::json!("prometheus_histogram")
+            );
+            assert_eq!(json["bucket_unit"], serde_json::json!("seconds"));
+            let back: PanelConfig = serde_json::from_value(json).unwrap();
+            assert_eq!(back, cfg);
+        }
+    }
+
+    #[test]
+    fn test_panel_config_heatmap_histogram_absent_when_none() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": false,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null
+        }))
+        .unwrap();
+        assert_eq!(cfg.heatmap_mode, None);
+        assert_eq!(cfg.bucket_unit, None);
+        assert_eq!(cfg.bucket_unit_custom, None);
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert!(json.get("heatmap_mode").is_none());
+        assert!(json.get("bucket_unit").is_none());
+        assert!(json.get("bucket_unit_custom").is_none());
     }
 }

@@ -87,6 +87,7 @@
             :name-prefix="childNamePrefix(index)"
           />
           <OButton
+            :aria-label="t('common.remove')"
             data-test="alert-conditions-delete-condition-btn"
             size="icon-xs-circle"
             variant="ghost"

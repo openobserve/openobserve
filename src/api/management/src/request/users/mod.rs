@@ -699,6 +699,7 @@ pub async fn authentication(
             error_msg: None,
             trace_id: None,
         },
+        delegated: None,
     };
 
     let mut resp = SignInResponse::default();
@@ -896,6 +897,7 @@ pub async fn get_presigned_url(
                 error_msg: None,
                 trace_id: None,
             },
+            delegated: None,
         };
         audit(audit_message).await;
     }
@@ -937,6 +939,7 @@ pub async fn get_auth(
                 error_msg: None,
                 trace_id: None,
             },
+            delegated: None,
         };
 
         let (name, password) = {

@@ -310,6 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </div>
                             <div>
                               <OButton
+                                :aria-label="t('common.close')"
                                 data-test="add-stream-cancel-btn"
                                 variant="ghost"
                                 size="icon-sm"

@@ -25,17 +25,17 @@ const KIND_VARIABLE: &str = "variable";
 
 /// A check definition was created or updated.
 pub async fn emit_check_put(org_id: &str, synthetics_id: &str) -> Result<(), Error> {
-    emit_put(&check_key(org_id, synthetics_id)).await
+    super::emit_put(&check_key(org_id, synthetics_id)).await
 }
 
 /// A check definition was deleted.
 pub async fn emit_check_delete(org_id: &str, synthetics_id: &str) -> Result<(), Error> {
-    emit_delete(&check_key(org_id, synthetics_id)).await
+    super::emit_delete(&check_key(org_id, synthetics_id)).await
 }
 
 /// The location registry changed (add / update / remove).
 pub async fn emit_locations_changed() -> Result<(), Error> {
-    emit_put(&format!("{SYNTHETICS_WATCHER_PREFIX}{KIND_LOCATION}/all")).await
+    super::emit_put(&format!("{SYNTHETICS_WATCHER_PREFIX}{KIND_LOCATION}/all")).await
 }
 
 /// An org's probe tokens changed — created, enabled/disabled, or default moved.
@@ -43,11 +43,11 @@ pub async fn emit_locations_changed() -> Result<(), Error> {
 /// Disabling a token is revocation, so this is the event whose delivery latency
 /// is the fleet-wide revocation window.
 pub async fn emit_tokens_changed(org_id: &str) -> Result<(), Error> {
-    emit_put(&format!("{SYNTHETICS_WATCHER_PREFIX}{KIND_TOKEN}/{org_id}")).await
+    super::emit_put(&format!("{SYNTHETICS_WATCHER_PREFIX}{KIND_TOKEN}/{org_id}")).await
 }
 
 pub async fn emit_variables_changed(org_id: &str) -> Result<(), Error> {
-    emit_put(&format!(
+    super::emit_put(&format!(
         "{SYNTHETICS_WATCHER_PREFIX}{KIND_VARIABLE}/{org_id}"
     ))
     .await
@@ -55,23 +55,10 @@ pub async fn emit_variables_changed(org_id: &str) -> Result<(), Error> {
 
 /// An agent re-registered, so its capabilities may have changed.
 pub async fn emit_agent_changed(agent_id: &str) -> Result<(), Error> {
-    emit_put(&format!(
+    super::emit_put(&format!(
         "{SYNTHETICS_WATCHER_PREFIX}{KIND_AGENT}/{agent_id}"
     ))
     .await
-}
-
-async fn emit_put(key: &str) -> Result<(), Error> {
-    let cluster_coordinator = super::get_coordinator().await;
-    cluster_coordinator
-        .put(key, bytes::Bytes::from(""), true, None)
-        .await?;
-    Ok(())
-}
-
-async fn emit_delete(key: &str) -> Result<(), Error> {
-    let cluster_coordinator = super::get_coordinator().await;
-    cluster_coordinator.delete(key, false, true, None).await
 }
 
 fn check_key(org_id: &str, synthetics_id: &str) -> String {

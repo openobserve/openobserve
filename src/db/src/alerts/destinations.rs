@@ -45,8 +45,8 @@ pub enum DestinationError {
     InvalidSns,
     #[error("Email destination must have at least one email recipient")]
     EmptyEmail,
-    #[error("Email destination recipients must be part of this org")]
-    UserNotPermitted,
+    #[error("Email destination recipients must be part of this org: {0}")]
+    UserNotPermitted(String),
     #[error("Email destination must have SMTP configured")]
     SMTPUnavailable,
     #[error("Alert destination must have a template")]
@@ -89,7 +89,7 @@ pub async fn set(destination: Destination) -> Result<Destination, DestinationErr
         "{DESTINATION_WATCHER_PREFIX}{}/{}",
         saved.org_id, saved.name
     );
-    infra::coordinator::destinations::emit_put_event(&event_key).await?;
+    infra::coordinator::emit_put(&event_key).await?;
     // super cluster
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
@@ -119,7 +119,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
     // trigger watch event to update in-memory cache
     let event_key = format!("{DESTINATION_WATCHER_PREFIX}{org_id}/{name}");
     // in-cluster
-    infra::coordinator::destinations::emit_delete_event(&event_key).await?;
+    infra::coordinator::emit_delete(&event_key).await?;
     // super cluster
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()

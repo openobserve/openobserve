@@ -75,6 +75,7 @@ fn dataset_error_response(value: DatasetError) -> Response {
         | DatasetError::IdempotencyConflict) => MetaHttpResponse::conflict(error),
         error @ (DatasetError::MissingIfRowId(_)
         | DatasetError::DuplicateLogicalId(_)
+        | DatasetError::LogicalIdTooLong(_)
         | DatasetError::EmptyUpsert
         | DatasetError::UpsertTooLarge) => MetaHttpResponse::bad_request(error.to_string()),
         error @ DatasetError::MalformedStoredResponse(_) => {

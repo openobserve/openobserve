@@ -16,6 +16,7 @@
 // macOS ld cannot encode compact-unwind offsets once __eh_frame exceeds 16MB;
 // harmless for a binary this size (only slows panic unwinding), so silence it.
 #![allow(linker_messages)]
+#![recursion_limit = "256"]
 
 #[cfg(test)]
 mod tests {
