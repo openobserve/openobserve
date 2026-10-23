@@ -58,13 +58,11 @@ describe("useLicenseRefresh", () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it("toasts success and reloads license and config after the settle delay", async () => {
+  it("returns the body without toasting and reloads after the settle delay", async () => {
     vi.mocked(licenseServer.refresh_license_limits).mockResolvedValue({} as never);
     const ok = await useLicenseRefresh().refreshLicenseLimits();
-    expect(ok).toBe(true);
-    expect(toastMock).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "success", message: "about.license_refresh_success" }),
-    );
+    expect(ok).toEqual({ ok: true, body: undefined, status: undefined });
+    expect(toastMock).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(LICENSE_REFRESH_SETTLE_MS - 1);
     expect(dispatch).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
@@ -79,31 +77,38 @@ describe("useLicenseRefresh", () => {
     expect(fetchQuery).toHaveBeenCalledWith(expect.objectContaining({ queryKey: ["license"] }));
   });
 
-  it("a 403 toasts the permission message and schedules nothing", async () => {
+  it("a 403 returns its status and schedules nothing", async () => {
     vi.mocked(licenseServer.refresh_license_limits).mockRejectedValue({
       response: { status: 403, data: { message: "no" } },
     });
     const ok = await useLicenseRefresh().refreshLicenseLimits();
-    expect(ok).toBe(false);
-    expect(toastMock).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "error", message: "about.refresh_needs_permission" }),
-    );
+    expect(ok).toEqual({ ok: false, status: 403, body: { message: "no" } });
+    expect(toastMock).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(LICENSE_REFRESH_SETTLE_MS * 2);
     expect(dispatch).not.toHaveBeenCalled();
   });
 
-  it("other errors toast the server message", async () => {
+  it("returns HTTP failures for the caller to render inline", async () => {
     vi.mocked(licenseServer.refresh_license_limits).mockRejectedValue({
       response: { status: 500, data: { message: "boom" } },
     });
-    const ok = await useLicenseRefresh().refreshLicenseLimits();
-    expect(ok).toBe(false);
-    const arg = toastMock.mock.calls[0][0];
-    expect(arg.variant).toBe("error");
-    expect(arg.message).toContain("about.failed_to_refresh_license");
-    expect(arg.message).toContain("boom");
-    await vi.advanceTimersByTimeAsync(LICENSE_REFRESH_SETTLE_MS * 2);
-    expect(dispatch).not.toHaveBeenCalled();
+    expect(await useLicenseRefresh().refreshLicenseLimits()).toEqual({
+      ok: false,
+      status: 500,
+      body: { message: "boom" },
+    });
+    expect(toastMock).not.toHaveBeenCalled();
+  });
+  it("busy replies still schedule a local state reload", async () => {
+    vi.mocked(licenseServer.refresh_license_limits).mockRejectedValue({
+      response: {
+        status: 409,
+        data: { code: 409, reason: "refresh_in_progress", limits_refreshed: true },
+      },
+    });
+    expect((await useLicenseRefresh().refreshLicenseLimits()).status).toBe(409);
+    await vi.advanceTimersByTimeAsync(LICENSE_REFRESH_SETTLE_MS);
+    expect(dispatch).toHaveBeenCalledTimes(1);
   });
 
   it("a double click schedules exactly one reload", async () => {

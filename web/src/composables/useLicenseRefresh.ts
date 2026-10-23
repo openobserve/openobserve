@@ -16,15 +16,13 @@
 import { getCurrentScope, onScopeDispose } from "vue";
 import { useStore } from "vuex";
 import { queryClient } from "@/composables/query/queryClient";
-import { toast } from "@/lib/feedback/Toast/useToast";
 import { configFullQuery } from "@/services/config.queries";
 import licenseServer from "@/services/license_server";
 import { licenseQuery } from "@/services/license_server.queries";
-import { raw, useI18nTyped } from "@/types/i18n";
+import type { RefreshBody, RefreshResult } from "@/ts/interfaces/licenseRefresh";
 import { LICENSE_REFRESH_SETTLE_MS } from "@/utils/licenseWaivers";
 
 export function useLicenseRefresh() {
-  const { t } = useI18nTyped();
   const store = useStore();
 
   const reloadLicenseState = async () => {
@@ -55,7 +53,7 @@ export function useLicenseRefresh() {
     timer = undefined;
   };
 
-  // Clears the pending timer so repeated clicks collapse into one reload.
+  // Repeated clicks must collapse into one delayed state reload.
   const scheduleReload = (onSettled?: () => Promise<void> | void) => {
     clearTimer();
     timer = setTimeout(async () => {
@@ -67,27 +65,25 @@ export function useLicenseRefresh() {
 
   if (getCurrentScope()) onScopeDispose(clearTimer);
 
-  const refreshLicenseLimits = async (onSettled?: () => Promise<void> | void): Promise<boolean> => {
+  const runRefresh = async (
+    rotate: boolean,
+    onSettled?: () => Promise<void> | void,
+  ): Promise<RefreshResult> => {
     try {
-      await licenseServer.refresh_license_limits();
-      toast({ variant: "success", message: t("about.license_refresh_success") });
+      const response = await (rotate
+        ? licenseServer.rotate_key()
+        : licenseServer.refresh_license_limits());
       scheduleReload(onSettled);
-      return true;
+      return { ok: true, body: response.data, status: response.status };
     } catch (error) {
-      const e = error as { response?: { status?: number; data?: { message?: string } } };
-      console.error("Error refreshing license:", error);
-      const message =
-        e?.response?.status === 403
-          ? t("about.refresh_needs_permission")
-          : raw(
-              t("about.failed_to_refresh_license") +
-                " : " +
-                (e?.response?.data?.message || t("settings.licensePage.unexpectedError")),
-            );
-      toast({ variant: "error", message });
-      return false;
+      const e = error as { response?: { status?: number; data?: RefreshBody } };
+      if (e.response?.status === 409) scheduleReload(onSettled);
+      return { ok: false, body: e.response?.data, status: e.response?.status };
     }
   };
+  const refreshLicenseLimits = (onSettled?: () => Promise<void> | void) =>
+    runRefresh(false, onSettled);
+  const rotateInstanceKey = (onSettled?: () => Promise<void> | void) => runRefresh(true, onSettled);
 
-  return { refreshLicenseLimits, reloadLicenseState, scheduleReload };
+  return { refreshLicenseLimits, rotateInstanceKey, reloadLicenseState, scheduleReload };
 }
