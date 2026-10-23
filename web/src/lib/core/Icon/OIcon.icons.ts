@@ -178,6 +178,8 @@ import Title from "~icons/material-symbols/title";
 import TrendingUp from "~icons/material-symbols/trending-up";
 import Undo from "~icons/material-symbols/undo";
 import UnfoldMore from "~icons/material-symbols/unfold-more";
+import ZoomIn from "~icons/material-symbols/zoom-in";
+import ZoomOut from "~icons/material-symbols/zoom-out";
 import Upload from "~icons/material-symbols/upload";
 import VerifiedUser from "~icons/material-symbols/verified-user-outline";
 import Webhook from "~icons/material-symbols/webhook";
@@ -564,6 +566,8 @@ export const iconRegistry = {
   "trending-up": TrendingUp,
   undo: Undo,
   "unfold-more": UnfoldMore,
+  "zoom-in": ZoomIn,
+  "zoom-out": ZoomOut,
   upload: Upload,
   "verified-user": VerifiedUser,
   webhook: Webhook,

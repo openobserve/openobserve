@@ -27,12 +27,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    // seed before the macro's first sleep, which v1's first tick on this binary may outrun
-    if let Err(e) = db::agent_signals::seed_offset_from_v1().await {
-        log::warn!(
-            "[AGENT_SIGNALS::JOB] Seeding the offset from v1 failed, the first tick retries: {e}"
-        );
-    }
     log::info!("[AGENT_SIGNALS::JOB] Agent signals processor is enabled");
 
     spawn_pausable_job!(

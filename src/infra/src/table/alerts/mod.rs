@@ -80,8 +80,13 @@ impl TryFrom<alerts::Model> for MetaAlert {
         let destinations: Vec<String> = serde_json::from_value(value.destinations)?;
         let recovery_destinations: Vec<String> = value
             .recovery_destinations
-            .map(serde_json::from_value)
-            .transpose()?
+            .map(|raw| serde_json::from_str(&raw))
+            .transpose()
+            .map_err(|e| {
+                errors::Error::Message(format!(
+                    "alert {id} has an invalid recovery_destinations value: {e}"
+                ))
+            })?
             .unwrap_or_default();
         let context_attributes: Option<HashMap<String, String>> = value
             .context_attributes
@@ -961,7 +966,7 @@ fn update_mutable_fields(
     let recovery_destinations = if alert.recovery_destinations.is_empty() {
         None
     } else {
-        Some(serde_json::to_value(alert.recovery_destinations)?)
+        Some(serde_json::to_string(&alert.recovery_destinations)?)
     };
     let keep_firing_for_seconds = alert.keep_firing_for;
 

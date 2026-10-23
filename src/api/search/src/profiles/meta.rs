@@ -19,17 +19,17 @@ use axum::{
     http::HeaderMap,
     response::{IntoResponse, Response},
 };
-use config::meta::{stream::StreamType, traces::session::quote_identifier};
+use config::meta::traces::session::{quote_identifier, quote_sql_string};
 use hashbrown::HashMap;
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{auth::UserEmail, profiles::query::label_names_from_schema_fields};
 use serde::Serialize;
-use tracing::{Span, warn};
+use tracing::Span;
 use utoipa::ToSchema;
 
 use super::{
-    ProfilesSqlParams, check_stream_permission, hit_string, parse_time_range_from_params,
-    resolve_timeout, run_profiles_sql,
+    ProfilesSqlParams, check_stream_permission, hit_string, load_schema_field_names,
+    parse_time_range_from_params, resolve_timeout, run_profiles_sql,
 };
 use crate::common::utils::http::get_or_create_trace_id;
 
@@ -65,6 +65,7 @@ pub struct ProfilesMetaResponse {
         ("stream_name" = String, Path, description = "Profiles stream name"),
         ("start_time" = i64, Query, description = "Start time in microseconds"),
         ("end_time" = i64, Query, description = "End time in microseconds"),
+        ("service_name" = Option<String>, Query, description = "Limit profile_types to the types this service sent; services still lists every service"),
         ("timeout" = Option<i64>, Query, description = "Query timeout in seconds"),
     ),
     responses(
@@ -126,9 +127,16 @@ pub async fn get_profiles_meta(
             Ok(Vec::new())
         }
     };
+    let service_name = params
+        .get("service_name")
+        .map(|s| s.as_str())
+        .filter(|s| !s.is_empty());
+    // A stream without a service_name column has no rows for any one service.
+    let no_rows_for_service =
+        service_name.is_some() && !schema_fields.iter().any(|f| f == "service_name");
     let profile_types_fut = async {
-        if schema_fields.iter().any(|f| f == "profile_type") {
-            load_profile_types(&types_params, &stream, http_span.clone()).await
+        if schema_fields.iter().any(|f| f == "profile_type") && !no_rows_for_service {
+            load_profile_types(&types_params, &stream, service_name, http_span.clone()).await
         } else {
             Ok(Vec::new())
         }
@@ -184,32 +192,13 @@ async fn distinct_values(
     Ok(values)
 }
 
-async fn load_schema_field_names(org_id: &str, stream_name: &str) -> Vec<String> {
-    match infra::schema::get(org_id, stream_name, StreamType::Profiles).await {
-        Ok(schema) => schema
-            .fields()
-            .iter()
-            .map(|f| f.name().to_string())
-            .collect(),
-        Err(e) => {
-            warn!("profiles meta schema lookup failed: {e}");
-            Vec::new()
-        }
-    }
-}
-
 async fn load_profile_types(
     params: &ProfilesSqlParams<'_>,
     stream: &str,
+    service_name: Option<&str>,
     http_span: Span,
 ) -> Result<Vec<ProfileTypeMeta>, Response> {
-    let type_q = quote_identifier("profile_type");
-    let unit_q = quote_identifier("profile_unit");
-    let sql = format!(
-        "SELECT {type_q} AS profile_type, {unit_q} AS profile_unit \
-         FROM {stream} WHERE {type_q} IS NOT NULL \
-         GROUP BY profile_type, profile_unit ORDER BY profile_type"
-    );
+    let sql = profile_types_sql(stream, service_name);
     let response = run_profiles_sql(params, sql, 10_000, http_span).await?;
     let mut out = Vec::new();
     let mut seen = hashbrown::HashSet::new();
@@ -227,6 +216,25 @@ async fn load_profile_types(
     Ok(out)
 }
 
+fn profile_types_sql(stream: &str, service_name: Option<&str>) -> String {
+    let type_q = quote_identifier("profile_type");
+    let unit_q = quote_identifier("profile_unit");
+    let service_filter = service_name
+        .map(|svc| {
+            format!(
+                " AND {} = {}",
+                quote_identifier("service_name"),
+                quote_sql_string(svc)
+            )
+        })
+        .unwrap_or_default();
+    format!(
+        "SELECT {type_q} AS profile_type, {unit_q} AS profile_unit \
+         FROM {stream} WHERE {type_q} IS NOT NULL{service_filter} \
+         GROUP BY profile_type, profile_unit ORDER BY profile_type"
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -237,5 +245,17 @@ mod tests {
         assert_ne!(services, types);
         assert!(services.starts_with("req123"), "{services}");
         assert!(types.starts_with("req123"), "{types}");
+    }
+
+    #[test]
+    fn profile_types_sql_filters_by_service_only_when_given() {
+        let all = profile_types_sql(r#""default""#, None);
+        assert!(!all.contains("service_name"), "{all}");
+        let one = profile_types_sql(r#""default""#, Some("check'out"));
+        assert!(
+            one.contains(r#"AND "service_name" = 'check''out'"#),
+            "{one}"
+        );
+        assert!(one.contains("GROUP BY profile_type, profile_unit"), "{one}");
     }
 }
