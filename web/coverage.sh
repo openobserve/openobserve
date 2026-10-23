@@ -13,6 +13,7 @@ Usage: $0 [-h | --help] [<command>]
 
 Commands:
   check             Run frontend tests with coverage and verify thresholds
+  merge             Merge all four CI shard reports and verify thresholds
   html              Generate coverage report in HTML format
   show-env          Show the coverage thresholds
   test              Run tests with coverage
@@ -50,7 +51,26 @@ EOF
 cmd_check() {
     echo "Running frontend tests with coverage..."
     npm run test:unit:coverage
-    
+
+    cmd_verify
+}
+
+cmd_merge() {
+    for shard in 1 2 3 4; do
+        test -s ".vitest-reports/blob-$shard-4.json" || {
+            echo "Missing coverage shard $shard/4" >&2
+            return 1
+        }
+    done
+    if [ "$(find .vitest-reports -maxdepth 1 -type f | wc -l | tr -d ' ')" != "4" ]; then
+        echo "Expected exactly four coverage shards" >&2
+        return 1
+    fi
+    npm run test:unit:coverage -- --merge-reports .vitest-reports
+    cmd_verify
+}
+
+cmd_verify() {
     if [ -f "coverage/coverage-summary.json" ]; then
         echo "Checking coverage thresholds..."
         python3 <(
@@ -71,6 +91,9 @@ try:
         report = json.load(f)
     
     totals = report['total']
+
+    if any(totals[metric]['total'] <= 0 for metric in thresholds):
+        raise ValueError('Coverage summary is empty')
     
     exit_status = 0
     for metric, threshold in thresholds.items():
@@ -114,6 +137,10 @@ main() {
     check)
         shift
         cmd_check "$@"
+        ;;
+    merge)
+        shift
+        cmd_merge "$@"
         ;;
     test)
         shift
