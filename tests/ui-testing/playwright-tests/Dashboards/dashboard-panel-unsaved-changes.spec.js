@@ -21,6 +21,7 @@ import PageManager from "../../pages/page-manager.js";
 import {
   PANEL_DRAFT_RESTORE_DIALOG,
   answerPanelDraftRestore,
+  answerPanelLeaveIfShown,
   settlePanelLeave,
 } from "../../pages/dashboardPages/panel-leave-dialog.js";
 import { ingestion } from "./utils/dashIngestion.js";
@@ -129,8 +130,9 @@ async function keepNewPanelAsDraft(page, pm) {
 }
 
 /** Open Add Panel from the dashboard view and wait for the editor to settle. */
-async function openAddPanel(page, pm) {
-  await pm.dashboardCreate.addPanel();
+async function openAddPanel(page, pm, { hasPanels = false } = {}) {
+  if (hasPanels) await pm.dashboardCreate.addPanelToExistingDashboard();
+  else await pm.dashboardCreate.addPanel();
   await page.waitForURL((url) => url.pathname.includes("add_panel"), { timeout: 30000 });
   await waitForEditorSettled(page, pm);
 }
@@ -355,7 +357,7 @@ test.describe("Dashboard panel editor unsaved-changes guard", () => {
       await expect(page.locator('[data-test="dashboard-panel-add-draft-dot"]')).toHaveCount(0);
 
       // Saving cleared the draft, so the next Add Panel starts clean.
-      await openAddPanel(page, pm);
+      await openAddPanel(page, pm, { hasPanels: true });
       await expect(page.locator(PANEL_DRAFT_RESTORE_DIALOG)).toHaveCount(0);
       await expectDiscardWithoutPrompt(page, pm);
       testLogger.info("Draft kept, continued and saved", { panelName });
@@ -398,12 +400,14 @@ test.describe("Dashboard panel editor unsaved-changes guard", () => {
       let asked;
       try {
         await page.goBack();
-        asked = await settlePanelLeave(page, { choice: "discard" });
+        // The URL already shows the dashboard while the guard awaits the dialog, so wait on the dialog, not the URL.
+        asked = await answerPanelLeaveIfShown(page, { choice: "discard", timeout: 15000 });
       } finally {
         watcher.dispose();
       }
       expect(asked, "browser Back with edits opens the leave dialog").toBe(true);
       expect(watcher.messages, "browser Back never raises a native confirm").toEqual([]);
+      await page.waitForURL((url) => !url.pathname.includes("add_panel"), { timeout: 30000 });
 
       await openAddPanel(page, pm);
       await expect(page.locator(PANEL_DRAFT_RESTORE_DIALOG)).toHaveCount(0);
