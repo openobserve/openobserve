@@ -7709,7 +7709,6 @@
       "intro": "Herkese açık bağlantıya sahip olan herkes oturum açmadan bu gösterge panosunu görüntüleyebilir.",
       "editNote": "Bağlantının adresi aynı kalır. Değişiklikler bir sonraki güncellemede herkese açık sayfada görünür.",
       "name": "Ad",
-      "namePlaceholder": "örn. Acme — müşteri görünümü",
       "nameRequired": "Ad gereklidir",
       "nameTooLong": "Ad en fazla 256 karakter olmalıdır",
       "untitled": "Adsız bağlantı",

@@ -7709,7 +7709,6 @@
       "intro": "Toute personne disposant d'un lien public peut consulter ce tableau de bord sans se connecter.",
       "editNote": "L'adresse du lien reste inchangée. Les modifications apparaissent sur la page publique lors de sa prochaine mise à jour.",
       "name": "Nom",
-      "namePlaceholder": "ex. : Acme — vue client",
       "nameRequired": "Le nom est obligatoire",
       "nameTooLong": "Le nom doit comporter au maximum 256 caractères",
       "untitled": "Lien sans titre",

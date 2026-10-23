@@ -7709,7 +7709,6 @@
       "intro": "Iedereen met een openbare link kan dit dashboard bekijken zonder in te loggen.",
       "editNote": "Het adres van de link blijft hetzelfde. Wijzigingen verschijnen bij de volgende update op de openbare pagina.",
       "name": "Naam",
-      "namePlaceholder": "bijv. Acme — klantweergave",
       "nameRequired": "Naam is verplicht",
       "nameTooLong": "Naam mag maximaal 256 tekens bevatten",
       "untitled": "Naamloze link",

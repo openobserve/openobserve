@@ -7709,7 +7709,6 @@
       "intro": "Każdy, kto ma link publiczny, może wyświetlić ten pulpit bez logowania.",
       "editNote": "Adres linku pozostaje taki sam. Zmiany pojawią się na stronie publicznej przy jej następnej aktualizacji.",
       "name": "Nazwa",
-      "namePlaceholder": "np. Acme — widok klienta",
       "nameRequired": "Nazwa jest wymagana",
       "nameTooLong": "Nazwa może mieć maksymalnie 256 znaków",
       "untitled": "Link bez nazwy",

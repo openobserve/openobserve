@@ -7709,7 +7709,6 @@
       "intro": "Jeder mit einem öffentlichen Link kann dieses Dashboard ohne Anmeldung ansehen.",
       "editNote": "Die Adresse des Links bleibt gleich. Änderungen erscheinen bei der nächsten Aktualisierung auf der öffentlichen Seite.",
       "name": "Name",
-      "namePlaceholder": "z. B. Acme — Kundenansicht",
       "nameRequired": "Name ist erforderlich",
       "nameTooLong": "Der Name darf höchstens 256 Zeichen lang sein",
       "untitled": "Unbenannter Link",

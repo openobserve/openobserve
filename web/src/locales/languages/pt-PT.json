@@ -7709,7 +7709,6 @@
       "intro": "Qualquer pessoa com um link público pode visualizar este painel sem fazer login.",
       "editNote": "O endereço do link permanece o mesmo. As alterações aparecem na página pública na próxima atualização.",
       "name": "Nome",
-      "namePlaceholder": "ex.: Acme — visão do cliente",
       "nameRequired": "O nome é obrigatório",
       "nameTooLong": "O nome deve ter no máximo 256 caracteres",
       "untitled": "Link sem título",

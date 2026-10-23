@@ -7709,7 +7709,6 @@
       "intro": "Cualquier persona con un enlace público puede ver este dashboard sin iniciar sesión.",
       "editNote": "La dirección del enlace no cambia. Los cambios aparecerán en la página pública en su próxima actualización.",
       "name": "Nombre",
-      "namePlaceholder": "p. ej. Acme — vista del cliente",
       "nameRequired": "El nombre es obligatorio",
       "nameTooLong": "El nombre debe tener como máximo 256 caracteres",
       "untitled": "Enlace sin título",

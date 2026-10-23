@@ -7704,7 +7704,6 @@
       "intro": "任何擁有公開連結的人都能在無需登入的情況下檢視此儀表板。",
       "editNote": "連結的網址保持不變。變更會於公開頁面下次更新時顯示。",
       "name": "名稱",
-      "namePlaceholder": "例如：Acme — 客戶檢視",
       "nameRequired": "名稱為必填",
       "nameTooLong": "名稱最多只能有 256 個字元",
       "untitled": "未命名連結",

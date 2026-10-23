@@ -7709,7 +7709,6 @@
       "intro": "任何拥有公开链接的人无需登录即可查看此仪表盘。",
       "editNote": "链接地址保持不变。更改将在公开页面下次更新时显示。",
       "name": "名称",
-      "namePlaceholder": "例如：Acme — 客户视图",
       "nameRequired": "名称为必填项",
       "nameTooLong": "名称最多为 256 个字符",
       "untitled": "未命名链接",

@@ -7709,7 +7709,6 @@
       "intro": "Bất kỳ ai có liên kết công khai đều có thể xem bảng điều khiển này mà không cần đăng nhập.",
       "editNote": "Địa chỉ của liên kết không thay đổi. Các thay đổi sẽ xuất hiện trên trang công khai ở lần cập nhật tiếp theo.",
       "name": "Tên",
-      "namePlaceholder": "ví dụ: Acme — chế độ xem của khách hàng",
       "nameRequired": "Tên là bắt buộc",
       "nameTooLong": "Tên không được vượt quá 256 ký tự",
       "untitled": "Liên kết chưa đặt tên",
