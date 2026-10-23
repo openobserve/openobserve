@@ -52,6 +52,9 @@ static INCARNATION: LazyLock<AtomicU64> =
 /// Keys whose next writes fail, to drive the write-failure paths in tests.
 #[cfg(test)]
 pub static FAIL_WRITES: LazyLock<dashmap::DashSet<String>> = LazyLock::new(Default::default);
+/// Keys whose writes with a body are refused as too large for the result cache, in tests.
+#[cfg(test)]
+pub static REFUSE_BODIES: LazyLock<dashmap::DashSet<String>> = LazyLock::new(Default::default);
 
 /// The public header: what may be served from the file and when it is due.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -327,6 +330,11 @@ pub async fn write_raw(
     header.last_read_at = now_micros();
     #[cfg(test)]
     anyhow::ensure!(!FAIL_WRITES.contains(key), "injected write failure");
+    #[cfg(test)]
+    anyhow::ensure!(
+        body_zst.is_empty() || !REFUSE_BODIES.contains(key),
+        disk::PublicDashboardTooLarge
+    );
     let bytes = encode(header, manifest, &body_zst)?;
     public_dashboards_replace(key, header.incarnation, bytes).await?;
     Ok(header.incarnation)

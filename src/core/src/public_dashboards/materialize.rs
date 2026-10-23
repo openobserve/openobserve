@@ -39,7 +39,10 @@ use config::{
     },
 };
 use dashmap::DashMap;
-use infra::table::entity::public_dashboards::Model as PublicDashboard;
+use infra::{
+    cache::file_data::disk::PublicDashboardTooLarge,
+    table::entity::public_dashboards::Model as PublicDashboard,
+};
 
 use super::{
     AuthorizerProbe, authz_check,
@@ -196,7 +199,7 @@ impl BuildKind {
     }
 }
 
-/// A classified build, ready to write; a failed build has no body of its own.
+/// A classified build, ready to write; a failed build carries the prior body, if any, re-retained.
 #[derive(Clone, Debug)]
 pub struct Assembled {
     pub header: Header,
@@ -390,43 +393,14 @@ pub fn assemble(
         .panels
         .iter()
         .any(|p| matches!(p.class, Class::Fresh | Class::Partial | Class::Truncated));
-    let first_error = run.panels.iter().find_map(|p| p.error.clone());
     let transient = run.panels.iter().any(|p| p.class == Class::Transient);
-    let prior_header = prior.map(|p| p.stored.header.clone());
-    let denied: Vec<WithheldPanel> = run
-        .panels
-        .iter()
-        .filter(|p| p.class == Class::Denied)
-        .map(|p| WithheldPanel {
-            panel_id: p.id.clone(),
-            reason: NotAvailableReason::Unauthorized,
-        })
-        .collect();
-
     if transient && !ran {
-        let mut header = prior_header.unwrap_or_else(|| Header {
-            dashboard_updated_at: live.dashboard_updated_at,
-            link_rev: live.link_rev,
-            settings_rev: live.settings_rev,
-            window_start: window.0,
-            window_end: window.1,
-            auth_checked_at: now,
-            ..Default::default()
-        });
-        for w in denied {
-            if !header.is_withheld(&w.panel_id) {
-                header.withheld_panels.push(w);
-            }
-        }
-        fail(&mut header, &live, now, eff_secs, jitter, first_error);
-        header.published_by = live.published_by;
-        return Assembled {
-            header,
-            manifest: prior.map(|p| p.stored.manifest.clone()).unwrap_or_default(),
-            body: None,
-            kind: BuildKind::Failed,
-        };
+        return whole_failure(
+            &live, window, &run, prior, retainable, now, eff_secs, jitter,
+        );
     }
+    let first_error = run.panels.iter().find_map(|p| p.error.clone());
+    let prior_header = prior.map(|p| p.stored.header.clone());
 
     let prior_panels = prior.and_then(|p| p.body.as_ref()).map(|b| &b.panels);
     let mut header = Header {
@@ -470,34 +444,20 @@ pub fn assemble(
                 let old_manifest = prior.and_then(|pr| pr.stored.manifest.panels.get(&p.id));
                 match retain(old, old_manifest, &p, retainable, now, max_age) {
                     Some((result, m)) => {
-                        header.retained_count += 1;
                         p.result = result;
                         p.manifest = m;
                     }
                     None => {
-                        p.result = PanelResult::not_available(NotAvailableReason::BuildError);
-                        p.result.intent = p.manifest.intent.clone();
+                        p.result = build_error(p.manifest.intent.clone());
                         p.manifest.outcome = PanelOutcome::Failed;
                     }
                 }
             }
         }
-        if matches!(p.result.state, PanelState::NotAvailable { .. }) {
-            header.unavailable_count += 1;
-        }
         manifest.panels.insert(p.id.clone(), p.manifest);
         panels.insert(p.id, p.result);
     }
-    header.panel_count = u16::try_from(panels.len()).unwrap_or(u16::MAX);
-    header.panels = panels
-        .iter()
-        .map(|(id, p)| PanelSummary {
-            id: id.clone(),
-            intent: p.intent.clone(),
-            state: p.state.clone(),
-            built_at: p.built_at,
-        })
-        .collect();
+    summarize(&mut header, &panels);
     let kind = if header.incomplete_count > 0 {
         header.attempted_revs = prior_header.as_ref().and_then(|h| h.attempted_revs);
         fail(&mut header, &live, now, eff_secs, jitter, first_error);
@@ -610,7 +570,8 @@ pub async fn build(
         Ok(_) => return not_servable(&key, Some(&org)).await,
         Err(e) => log::warn!("public dashboard revision re-read for {key} failed: {e}"),
     }
-    let out = persist(&key, assembled, prior.as_ref()).await;
+    let prior_header = prior.as_ref().map(|p| &p.stored.header);
+    let out = persist(&key, assembled, prior_header, eff).await;
     metrics::PUBLIC_DASHBOARD_BUILD_SECONDS
         .with_label_values(&[&org])
         .observe(started.elapsed().as_secs_f64());
@@ -771,6 +732,111 @@ fn fail(
     header.attempted_revs = Some(live.as_array());
 }
 
+/// No panel ran: the prior body keeps only the panels a partial failure would retain.
+#[allow(clippy::too_many_arguments)]
+fn whole_failure(
+    live: &Live,
+    window: (i64, i64),
+    run: &Run,
+    prior: Option<&Prior>,
+    retainable: &BTreeSet<String>,
+    now: i64,
+    eff_secs: i64,
+    jitter: f64,
+) -> Assembled {
+    let max_age = max_age_micros();
+    let mut header = prior.map_or_else(
+        || Header {
+            dashboard_updated_at: live.dashboard_updated_at,
+            link_rev: live.link_rev,
+            settings_rev: live.settings_rev,
+            window_start: window.0,
+            window_end: window.1,
+            auth_checked_at: now,
+            ..Default::default()
+        },
+        |p| p.stored.header.clone(),
+    );
+    let mut manifest = prior.map(|p| p.stored.manifest.clone()).unwrap_or_default();
+    for p in run.panels.iter().filter(|p| p.class == Class::Denied) {
+        if !header.is_withheld(&p.id) {
+            header.withheld_panels.push(WithheldPanel {
+                panel_id: p.id.clone(),
+                reason: NotAvailableReason::Unauthorized,
+            });
+        }
+    }
+    let body = prior.and_then(|p| p.body.clone()).map(|mut body| {
+        for (id, old) in &mut body.panels {
+            let failed = run
+                .panels
+                .iter()
+                .find(|p| p.id == *id && p.class == Class::Transient);
+            let kept = failed.and_then(|p| {
+                retain(
+                    Some(&*old),
+                    manifest.panels.get(id),
+                    p,
+                    retainable,
+                    now,
+                    max_age,
+                )
+            });
+            if let Some((result, m)) = kept {
+                *old = result;
+                manifest.panels.insert(id.clone(), m);
+            } else if matches!(old.state, PanelState::Ok { .. }) {
+                // The old intent keeps an edited panel masked as changed, not as a build error.
+                *old = build_error(std::mem::take(&mut old.intent));
+                if let Some(m) = manifest.panels.get_mut(id) {
+                    m.outcome = PanelOutcome::Failed;
+                }
+            }
+        }
+        body
+    });
+    match body.as_ref() {
+        Some(b) => summarize(&mut header, &b.panels),
+        None => header.built_at = None,
+    }
+    let failed = run.panels.iter().filter(|p| p.class == Class::Transient);
+    header.incomplete_count = u16::try_from(failed.count()).unwrap_or(u16::MAX);
+    let first_error = run.panels.iter().find_map(|p| p.error.clone());
+    fail(&mut header, live, now, eff_secs, jitter, first_error);
+    header.published_by = live.published_by.clone();
+    Assembled {
+        header,
+        manifest,
+        body,
+        kind: BuildKind::Failed,
+    }
+}
+
+fn build_error(intent: String) -> PanelResult {
+    let mut result = PanelResult::not_available(NotAvailableReason::BuildError);
+    result.intent = intent;
+    result
+}
+
+/// The header's per-panel summaries and counts of the body's panels.
+fn summarize(header: &mut Header, panels: &BTreeMap<String, PanelResult>) {
+    let count = |f: fn(&PanelState) -> bool| {
+        u16::try_from(panels.values().filter(|p| f(&p.state)).count()).unwrap_or(u16::MAX)
+    };
+    header.panel_count = u16::try_from(panels.len()).unwrap_or(u16::MAX);
+    header.retained_count = count(|s| matches!(s, PanelState::Ok { retained: true, .. }));
+    header.unavailable_count = count(|s| matches!(s, PanelState::NotAvailable { .. }));
+    header.panels = panels
+        .iter()
+        .map(|(id, p)| PanelSummary {
+            id: id.clone(),
+            intent: p.intent.clone(),
+            state: p.state.clone(),
+            built_at: p.built_at,
+        })
+        .collect();
+}
+
 /// A failed panel's prior data, kept with an unchanged intent, young data, passing sources.
 fn retain(
     old: Option<&PanelResult>,
@@ -850,31 +916,32 @@ async fn read_prior(key: &str) -> Option<Prior> {
 }
 
 /// Writes the build; on failure waiters still get it, the old file goes and the key backs off.
-async fn persist(key: &str, assembled: Assembled, prior: Option<&Prior>) -> Outcome {
+async fn persist(
+    key: &str,
+    assembled: Assembled,
+    prior: Option<&Header>,
+    eff_secs: i64,
+) -> Outcome {
     let org = key.split('/').nth(1).unwrap_or_default().to_string();
     let Assembled {
         mut header,
         manifest,
         body,
-        kind,
+        mut kind,
     } = assembled;
+    let mut written = store::write(key, &mut header, &manifest, body.as_ref()).await;
+    let mut body = body.map(Arc::new);
+    if written
+        .as_ref()
+        .is_err_and(|e| e.is::<PublicDashboardTooLarge>())
+    {
+        header = refused(header, kind, prior, eff_secs);
+        (body, kind) = (None, BuildKind::Failed);
+        written = store::write(key, &mut header, &Manifest::default(), None).await;
+    }
     metrics::PUBLIC_DASHBOARD_BUILDS_TOTAL
         .with_label_values(&[&org, kind.label()])
         .inc();
-    let (written, body) = match body {
-        Some(b) => (
-            store::write(key, &mut header, &manifest, Some(&b)).await,
-            Some(Arc::new(b)),
-        ),
-        None => {
-            let old_zst = prior.map(|p| p.stored.body_zst.clone()).unwrap_or_default();
-            let old_body = prior.and_then(|p| p.body.clone()).map(Arc::new);
-            (
-                store::write_raw(key, &mut header, &manifest, old_zst).await,
-                old_body,
-            )
-        }
-    };
     match written {
         Ok(_) => {
             WRITE_BACKOFF.remove(key);
@@ -906,6 +973,29 @@ async fn persist(key: &str, assembled: Assembled, prior: Option<&Prior>) -> Outc
                 stored: false,
             })
         }
+    }
+}
+
+/// A build whose body the cache refused, as a body-less failed file that backs off.
+fn refused(mut header: Header, kind: BuildKind, prior: Option<&Header>, eff_secs: i64) -> Header {
+    // A partial or whole failure already backed off for this attempt.
+    if kind == BuildKind::Complete {
+        let now = header.built_at.unwrap_or_else(now_micros);
+        header.fail_streak = prior.map_or(0, |h| h.fail_streak);
+        header.attempted_revs = prior.and_then(|h| h.attempted_revs);
+        let live = Live::of(&header);
+        let jitter = rand::random_range(0.0..=0.2);
+        fail(&mut header, &live, now, eff_secs, jitter, None);
+    }
+    header.last_error = Some(PublicDashboardTooLarge.to_string());
+    Header {
+        built_at: None,
+        panels: vec![],
+        panel_count: 0,
+        retained_count: 0,
+        unavailable_count: 0,
+        size_bytes: 0,
+        ..header
     }
 }
 
@@ -1249,6 +1339,7 @@ pub(super) mod tests {
     use super::{super::store::ExecutedQuery, *};
 
     const MIN: i64 = 60 * SECOND;
+    const HOUR: i64 = 60 * MIN;
     const DAY_SECS: i64 = 86_400;
 
     /// An in-process engine: panels end as `classes` says; `denied` streams and tables are refused.
@@ -1693,12 +1784,46 @@ pub(super) mod tests {
             body: Some(ResultBody::default()),
             kind: BuildKind::Complete,
         };
-        let built = persist(&key, assembled, None).await.unwrap();
+        let built = persist(&key, assembled, None, 60).await.unwrap();
         assert!(!built.stored);
         assert!(built.body.is_some(), "current waiters still get the result");
         let held = WRITE_BACKOFF.get(&key).unwrap().clone();
         assert!(!held.has_body());
         assert!(held.next_retry_at.unwrap() > now_micros());
+    }
+
+    #[tokio::test]
+    async fn a_result_the_cache_refuses_is_a_failed_build_that_backs_off() {
+        let link = link(json!([{ "type": "relative", "secs": 3600 }]));
+        let dash = dashboard(&[("p1", "s1")]);
+        let engine = fake(&link, &dash);
+        let flights = flights(8, 1);
+        let now = now_micros();
+        data(&read_at(engine, flights, &link, &dash, rel(3600), now).await);
+        let key = store::key(&link.org_id, &link.id, "r3600");
+        store::REFUSE_BODIES.insert(key.clone());
+        data(&read_at(engine, flights, &link, &dash, rel(3600), now + 6 * MIN).await);
+        settle(flights).await;
+        let h = header(&link, &rel(3600)).await;
+        assert!(!h.has_body(), "the old data is not served past the failure");
+        assert_eq!(
+            h.last_error.as_deref(),
+            Some("result larger than the result cache")
+        );
+        assert_eq!(h.fail_streak, 1);
+        let retry_at = h.next_retry_at.unwrap();
+        assert!(retry_at > now + 6 * MIN);
+        let served = read_at(engine, flights, &link, &dash, rel(3600), now + 6 * MIN).await;
+        assert!(matches!(served, Served::Cooldown(_)), "{served:?}");
+        assert_eq!(engine.builds.load(Ordering::SeqCst), 2);
+        // Past the backoff the next build is refused again and the backoff grows.
+        let served = read_at(engine, flights, &link, &dash, rel(3600), retry_at + SECOND).await;
+        store::REFUSE_BODIES.remove(&key);
+        assert!(matches!(served, Served::Cooldown(_)), "{served:?}");
+        let again = header(&link, &rel(3600)).await;
+        assert_eq!(engine.builds.load(Ordering::SeqCst), 3);
+        assert_eq!((again.fail_streak, again.has_body()), (2, false));
+        assert!(again.next_retry_at.unwrap() >= retry_at + SECOND + 60 * SECOND);
     }
 
     #[tokio::test]
@@ -2045,6 +2170,105 @@ pub(super) mod tests {
         assert!(resp.last_error_at.is_some() && resp.next_retry_at.is_some());
         let h = header(&link, &rel(3600)).await;
         assert_eq!((h.retained_count, h.incomplete_count), (1, 1));
+    }
+
+    #[tokio::test]
+    async fn gate11_a_link_whose_every_rebuild_fails_stops_serving_at_the_age_limit() {
+        for ids in [&["p1"][..], &["p1", "p2"]] {
+            let panels: Vec<(&str, &str)> = ids.iter().map(|id| (*id, "s1")).collect();
+            let link = link(json!([{ "type": "relative", "secs": 3600 }]));
+            let dash = dashboard(&panels);
+            let engine = fake(&link, &dash);
+            let flights = flights(8, 1);
+            let now = now_micros();
+            data(&read_at(engine, flights, &link, &dash, rel(3600), now).await);
+            let failing = ids.iter().map(|id| (id.to_string(), Class::Transient));
+            engine.classes.lock().unwrap().extend(failing);
+            data(&read_at(engine, flights, &link, &dash, rel(3600), now + 6 * MIN).await);
+            settle(flights).await;
+            let h = header(&link, &rel(3600)).await;
+            let n = u16::try_from(ids.len()).unwrap();
+            assert_eq!(
+                (h.retained_count, h.incomplete_count, h.fail_streak),
+                (n, n, 1)
+            );
+            assert_eq!(
+                h.built_at,
+                Some(now),
+                "the whole failure keeps the build time"
+            );
+            let resp =
+                data(&read_at(engine, flights, &link, &dash, rel(3600), now + 6 * MIN).await)
+                    .clone();
+            assert!(!resp.refreshing, "the backoff holds");
+            for id in ids {
+                assert_eq!(
+                    resp.panels[*id].state,
+                    PanelState::Ok {
+                        retained: true,
+                        error_since: Some(now + 6 * MIN),
+                        partial: false,
+                        truncated: false,
+                    },
+                    "{ids:?}"
+                );
+                assert_eq!(build_no(&resp, id), 1);
+            }
+            let late = now + 25 * HOUR;
+            let resp = data(&read_at(engine, flights, &link, &dash, rel(3600), late).await).clone();
+            assert!(resp.refreshing);
+            for id in ids {
+                assert_eq!(
+                    reason(&resp, id),
+                    Some(NotAvailableReason::TooOld),
+                    "{ids:?}"
+                );
+                assert!(resp.panels[*id].data.is_empty());
+            }
+            settle(flights).await;
+            // The next failure finds the data too old to retain and withholds it.
+            let resp = data(&read_at(engine, flights, &link, &dash, rel(3600), late).await).clone();
+            for id in ids {
+                assert_eq!(
+                    reason(&resp, id),
+                    Some(NotAvailableReason::BuildError),
+                    "{ids:?}"
+                );
+            }
+            assert_eq!(header(&link, &rel(3600)).await.retained_count, 0);
+        }
+    }
+
+    #[tokio::test]
+    async fn gate11_an_absolute_result_ages_only_once_a_failed_rebuild_retains_it() {
+        let mut link = link(json!([{ "type": "absolute", "start": 0, "end": 3_600_000_000_i64 }]));
+        let range = TimeRange::Absolute {
+            start: 0,
+            end: 3_600_000_000,
+        };
+        let dash = dashboard(&[("p1", "s1")]);
+        let engine = fake(&link, &dash);
+        let flights = flights(8, 1);
+        let now = now_micros();
+        data(&read_at(engine, flights, &link, &dash, range, now).await);
+        let late = now + 25 * HOUR;
+        let resp = data(&read_at(engine, flights, &link, &dash, range, late).await).clone();
+        assert_eq!((reason(&resp, "p1"), build_no(&resp, "p1")), (None, 1));
+        settle(flights).await;
+        assert_eq!(engine.builds.load(Ordering::SeqCst), 1, "never rebuilt");
+        // "Refresh now" fails wholly: the 25-hour-old result cannot be retained.
+        link.rev += 1;
+        engine.link.lock().unwrap().rev = link.rev;
+        engine
+            .classes
+            .lock()
+            .unwrap()
+            .insert("p1".into(), Class::Transient);
+        data(&read_at(engine, flights, &link, &dash, range, late + MIN).await);
+        settle(flights).await;
+        let resp = data(&read_at(engine, flights, &link, &dash, range, late + MIN).await).clone();
+        assert_eq!(reason(&resp, "p1"), Some(NotAvailableReason::BuildError));
+        assert!(resp.panels["p1"].data.is_empty());
     }
 
     #[tokio::test]
