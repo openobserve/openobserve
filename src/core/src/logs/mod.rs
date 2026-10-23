@@ -51,7 +51,7 @@ use crate::{
     common::meta::stream::SchemaRecords,
     ingestion::{
         PartitionMemo, TriggerAlertData, evaluate_trigger, resolve_batch_schema,
-        schema_records_to_entries, write_entries,
+        schema_records_to_entries, write_entries, write_entries_synced,
     },
 };
 
@@ -598,15 +598,13 @@ async fn write_logs(
                 status.successful += 1;
             }
             IngestionStatus::Bulk(bulk_res) => {
-                bulk::add_record_status(
-                    stream_name.to_string(),
-                    doc_id,
-                    "".to_string(),
-                    None,
-                    bulk_res,
-                    None,
-                    None,
-                );
+                if !cfg.common.bulk_api_response_errors_only {
+                    bulk_res.items.push(bulk::success_item(
+                        "index".to_string(),
+                        stream_name,
+                        doc_id.unwrap_or_default(),
+                    ));
+                }
             }
         }
     }
@@ -617,13 +615,19 @@ async fn write_logs(
     }
     let writer =
         ingester::get_writer(thread_id, org_id, StreamType::Logs.as_str(), stream_name).await;
-    let req_stats = write_entries(
-        &writer,
-        stream_name,
-        entries,
-        !cfg.common.wal_fsync_disabled,
-    )
-    .await?;
+    // A chat-events ack lets the writer advance its watermark in the DB, so those bytes must
+    // reach the OS before the ack: a kill after it must not lose them.
+    let req_stats = if stream_name == config::meta::self_reporting::ai_chat::AI_CHAT_EVENTS_STREAM {
+        write_entries_synced(&writer, stream_name, entries).await?
+    } else {
+        write_entries(
+            &writer,
+            stream_name,
+            entries,
+            !cfg.common.wal_fsync_disabled,
+        )
+        .await?
+    };
 
     // only one trigger per request
     if !triggers.is_empty() {
@@ -636,10 +640,14 @@ async fn write_logs(
 fn columnar_entries(
     org_id: &str,
     status: &mut IngestionStatus,
-    columnar: columnar::JsonColumnar,
+    mut columnar: columnar::JsonColumnar,
 ) -> Result<Vec<ingester::Entry>> {
-    if let IngestionStatus::Record(status) = status {
-        status.successful += columnar.rows() as u32;
+    match status {
+        IngestionStatus::Record(status) => status.successful += columnar.rows() as u32,
+        IngestionStatus::Bulk(bulk_res) => {
+            let doc_ids = columnar.take_bulk_ids();
+            bulk::add_success_items(columnar.stream_name(), doc_ids, bulk_res);
+        }
     }
     columnar.into_entries(org_id)
 }

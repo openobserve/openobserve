@@ -23,6 +23,7 @@ import usersService from "@/services/users";
 import store from "@/test/unit/helpers/store";
 import type { ResolvedSegment, Rotation } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
+import { toZonedInputValue } from "@/utils/oncall";
 
 vi.mock("@/services/users", () => ({ default: { orgUsers: vi.fn() } }));
 
@@ -124,7 +125,7 @@ function render(over: Record<string, unknown> = {}) {
       "onUpdate:window": () => {},
       ...over,
     } as any,
-    global: { plugins: [i18n], stubs },
+    global: { plugins: [i18n, store], stubs },
   });
 }
 
@@ -340,6 +341,30 @@ describe("OnCallScheduleTimeline", () => {
     expect(emitted?.length).toBeTruthy();
     const [{ from, to }] = emitted!.at(-1) as [{ from: number; to: number }];
     expect(to - from).toBe(7 * DAY);
+  });
+
+  // A4: days are the team's, so a Kolkata team's columns begin at its midnight, not UTC's.
+  it("starts the window and every day column at the team's midnight", () => {
+    const wrapper = render({ timezone: "Asia/Kolkata" });
+    const [{ from }] = wrapper.emitted("update:window")!.at(-1) as [{ from: number; to: number }];
+    const now = Date.now() * 1000;
+    expect(from <= now && now < from + DAY).toBe(true);
+    const ticks = wrapper.findComponent({ name: "OScheduleTimeline" }).props("axisTicks") as any[];
+    const span = 7 * DAY;
+    for (const tick of ticks) {
+      expect(toZonedInputValue(from + tick.offset * span, "Asia/Kolkata")).toMatch(/T00:00$/);
+    }
+  });
+
+  // A4: a segment running past the fetched window was cut there, so its end is not a handover.
+  it("says nothing about a handover the window cut off", () => {
+    const wrapper = render({ segments: [seg({ from: start - DAY, to: start + 30 * DAY })] });
+    expect(wrapper.find('[data-test="oncall-lane-cadence-rot_primary"]').text()).not.toContain(
+      "hands over",
+    );
+    const [band] = tracksOf(wrapper)[0].bands;
+    expect(String(band.label)).toContain("on now");
+    expect(String(band.label)).not.toContain("until");
   });
 
   /// Changing the range must move the window, or the control is decoration.
@@ -620,6 +645,7 @@ describe("OnCallScheduleTimeline", () => {
 
   // The org's users are the IAM list's own cache entry, so a revisit of the Schedule tab costs nothing.
   it("serves the org's users to a remount from the cache", async () => {
+    vi.mocked(usersService.orgUsers).mockClear();
     vi.mocked(usersService.orgUsers).mockResolvedValue({
       data: { data: [{ email: "ana@o2.ai", first_name: "Ana" }] },
     } as any);

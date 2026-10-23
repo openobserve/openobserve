@@ -78,6 +78,15 @@ describe("parseDateRangeString", () => {
       });
     });
 
+    it("accepts an hour-only offset (+HH), which date-fns renders for whole-hour zones", () => {
+      // 08:33:06-05 is the same instant as 13:33:06Z.
+      expect(parseDateRangeString("2026-07-21T08:33:06-05 - 2026-07-21T10:33:06-05")).toEqual({
+        type: "timestamp",
+        startMicros: 1784640786000000,
+        endMicros: 1784647986000000,
+      });
+    });
+
     it("without an offset, resolves to the picker-timezone-dependent absolute shape", () => {
       expect(parseDateRangeString("2026-07-21T13:33:06 - 2026-07-21T15:33:06")).toEqual({
         type: "absolute",
@@ -396,6 +405,17 @@ describe("parseSingleDateTime", () => {
       expect(parseSingleDateTime("Jul 22, 2026 06:40:28.008 -0500")).toEqual({
         type: "timestamp",
         micros: 1784720428008000,
+      });
+    });
+
+    it("with an hour-only offset, as formatToHuman renders it in a whole-hour zone", () => {
+      expect(parseSingleDateTime("Jul 22, 2026 01:40:28.008 -05")).toEqual({
+        type: "timestamp",
+        micros: 1784702428008000,
+      });
+      expect(parseSingleDateTime("Jul 22, 2026 08:40:28.008 +02")).toEqual({
+        type: "timestamp",
+        micros: 1784702428008000,
       });
     });
 
