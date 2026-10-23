@@ -635,9 +635,9 @@ export default class DashboardPanelConfigs {
    * Open the Column Formatting dialog, add the first field, force it numeric so the
    * unit applies, select a unit, then save. Strictly data-test driven.
    * @param {Object} options
-   * @param {string} [options.unitName] - Unit label to select (e.g. "Bytes", "Milliseconds")
+   * @param {string} [options.unitName] - Unit label to select (e.g. "Bytes (1024)", "Milliseconds (ms)")
    */
-  async configureOverrideWithUnit({ unitName = "Bytes" } = {}) {
+  async configureOverrideWithUnit({ unitName = "Bytes (1024)" } = {}) {
     await this.openOverrideConfig();
     await this.addFirstOverrideField();
 

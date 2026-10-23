@@ -731,6 +731,20 @@ describe("AppSessions.vue", () => {
     });
   });
 
+  describe("Missing session stream", () => {
+    it("settles without an unhandled rejection when the stream is not found", async () => {
+      const unhandled = vi.fn();
+      process.on("unhandledRejection", unhandled);
+      mockStreams.getStream.mockRejectedValueOnce(new Error("Stream '_rumdata' not found"));
+
+      await expect(wrapper.vm.getStreamFields()).resolves.toBe(true);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      process.off("unhandledRejection", unhandled);
+      expect(unhandled).not.toHaveBeenCalled();
+    });
+  });
+
   describe("Data Processing", () => {
     it("should process session data correctly", async () => {
       const hits = [

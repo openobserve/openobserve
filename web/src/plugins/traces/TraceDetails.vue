@@ -2547,7 +2547,10 @@ export default defineComponent({
         analytics.track("trace_details_loaded", { mode: props.mode });
       } catch (error) {
         if (generation !== loadGeneration) return;
-        console.error("Error fetching trace details:", error);
+        // A 401 is the expired session the global handler is already logging the user out of.
+        if ((error as { response?: { status?: number } })?.response?.status !== 401) {
+          console.error("Error fetching trace details:", error);
+        }
         showTraceDetailsError();
       } finally {
         if (generation === loadGeneration) {

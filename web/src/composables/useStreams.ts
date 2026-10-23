@@ -32,7 +32,17 @@ const withResponse = (err: Error, source: any): Error =>
 
 // A cancelled fetch stays a CancelledError so callers can ignore superseded requests.
 const toStreamError = (e: any): Error =>
-  e instanceof CancelledError ? e : withResponse(new Error(e.message), e);
+  e instanceof CancelledError
+    ? e
+    : withResponse(
+        new Error(
+          e?.response?.data?.message ||
+            e?.message ||
+            (typeof e === "string" && e) ||
+            "Stream request failed",
+        ),
+        e,
+      );
 
 const useStreams = (t: TranslateFn) => {
   const store = useStore();

@@ -1273,7 +1273,7 @@ export default defineComponent({
           store.dispatch("setSelectedOrganization", tempDefaultOrg);
         }
 
-        if (Object.keys(selectedOrg.value).length == 0 && store.state.organizations.length > 0) {
+        if (Object.keys(selectedOrg.value).length == 0 && store.state.organizations?.length > 0) {
           let data = withDisambiguatedOrgLabels(store.state.organizations)[0];
           let optiondata = {
             label: data.name,
