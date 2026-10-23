@@ -15502,6 +15502,7 @@
         "userPromptLabel": "Wiadomość użytkownika",
         "userPromptPlaceholder": "Odwołuj się do pól zbioru danych przez {'{{ input }}'}.",
         "variablesLabel": "Wstaw zmienną:",
+        "expectedOutputScorersOnly": "{token} · tylko scorery",
         "scorersPlaceholder": "Wybierz ewaluatory",
         "scorersHelp": "Wersje ewaluatorów są teraz przypięte — późniejsze zmiany ewaluatorów nigdy nie zmienią wyników tego eksperymentu.",
         "scorersEmpty": "Brak dostępnych ewaluatorów. Najpierw utwórz ewaluator w sekcji Oceń.",
@@ -15812,6 +15813,7 @@
         "fallbackTitle": "Zbiór danych",
         "meta": "Elementy: {count} · zaktualizowano {updated}",
         "loadError": "Nie udało się załadować zbioru danych",
+        "tryInPlayground": "Wypróbuj w Playground",
         "tabs": {
           "items": "Elementy",
           "experiments": "Eksperymenty"
@@ -16346,6 +16348,7 @@
       "scoreSkippedNoReference": "Pominięto — brak oczekiwanego wyniku",
       "removeExpected": "Usuń oczekiwane wyjście",
       "expectedLeakWarning": "Token {token} nigdy nie jest dostępny w promptach zadań — złote odpowiedzi trafiają tylko do ewaluatorów.",
+      "unresolvedVariablesWarning": "Brak wartości dla {tokens} — przy uruchomieniu zostanie wysłane puste.",
       "chipInsert": "Kliknij, aby wstawić w miejscu kursora",
       "variant": "Wariant {label}",
       "variantLimit": "Maksymalna liczba wariantów w środowisku: {max}.",
