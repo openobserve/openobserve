@@ -16,7 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OBanner v-if="visible" bar :variant="variant" :icon="icon" data-test="license-search-banner">
-    {{ message }}
+    <div>
+      <div v-if="!outcome || outcome.variant !== 'success'">{{ message }}</div>
+      <div v-if="outcome" data-test="license-banner-outcome" aria-live="polite">
+        {{ outcome.text }}
+      </div>
+      <div v-if="outcome?.hint" class="mt-1 text-xs">{{ outcome.hint }}</div>
+    </div>
 
     <template #actions>
       <div class="flex flex-wrap items-center gap-3">
@@ -34,12 +40,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="banner-dismiss"
           size="sm"
           data-test="license-banner-refresh"
-          @click="refreshLicenseLimits()"
+          :loading="refreshing"
+          @click="refreshNow"
         >
-          {{ t("about.refresh_license_limits") }}
+          {{ t("about.refresh_now") }}
         </OButton>
         <OButton
-          v-if="!isPaused"
+          v-if="!isPaused || outcome?.variant === 'success'"
           variant="banner-dismiss"
           size="sm"
           data-test="license-banner-details"
@@ -71,6 +78,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { licenseQuery } from "@/services/license_server.queries";
 import { useI18nTyped } from "@/types/i18n";
+import { refreshMessage } from "@/utils/licenseRefresh";
+import type { RefreshResult } from "@/ts/interfaces/licenseRefresh";
 import { copyToClipboard } from "@/utils/clipboard";
 import {
   activeSearchUnblock,
@@ -91,6 +100,22 @@ const store = useStore();
 const router = useRouter();
 const { refreshLicenseLimits, reloadLicenseState } = useLicenseRefresh();
 const { isMetaOrg } = useIsMetaOrg();
+const refreshing = ref(false);
+const refreshResult = ref<RefreshResult>();
+const outcome = computed(() =>
+  refreshResult.value
+    ? refreshMessage(refreshResult.value.body, t, refreshResult.value.status)
+    : null,
+);
+const refreshNow = async () => {
+  if (refreshing.value || !canUpdateLicense.value || !isMetaOrg.value) return;
+  refreshing.value = true;
+  try {
+    refreshResult.value = await refreshLicenseLimits();
+  } finally {
+    refreshing.value = false;
+  }
+};
 
 const readDismissed = (): string | null => {
   try {
@@ -109,7 +134,10 @@ const state = computed<LicenseBannerState>(() =>
 );
 const isPaused = computed(() => state.value.kind === "paused");
 const visible = computed(
-  () => state.value.kind !== "none" && dismissedSignature.value !== bannerSignature(state.value),
+  () =>
+    isMetaOrg.value &&
+    (state.value.kind !== "none" || !!refreshResult.value) &&
+    dismissedSignature.value !== bannerSignature(state.value),
 );
 
 const license = useQuery(() => ({
@@ -125,10 +153,12 @@ const licenseId = computed(() => licenseData.value?.license?.license_id ?? "");
 const canUpdateLicense = computed(() => licenseData.value?.can_update_license === true);
 
 const variant = computed(() => {
+  if (outcome.value?.variant === "success") return "success";
   if (state.value.kind === "paused") return "error";
   return state.value.kind === "restored" && state.value.endsSoon ? "warning" : "success";
 });
 const icon = computed(() => {
+  if (outcome.value?.variant === "success") return "check-circle";
   if (state.value.kind === "paused") return "error";
   return state.value.kind === "restored" && state.value.endsSoon ? "schedule" : "check-circle";
 });
@@ -161,6 +191,7 @@ const restoredMessage = computed(() => {
 const message = computed(() => (isPaused.value ? pausedMessage.value : restoredMessage.value));
 
 const dismiss = () => {
+  refreshResult.value = undefined;
   const signature = bannerSignature(state.value);
   dismissedSignature.value = signature;
   try {
@@ -231,7 +262,10 @@ watch([() => store.state.zoConfig, isMetaOrg], armBoundaryTimer, { immediate: tr
 watch(
   () => store.state.selectedOrganization?.identifier,
   (org, prev) => {
-    if (prev && org !== prev && isMetaOrg.value) reloadLicenseState();
+    if (prev && org !== prev) {
+      refreshResult.value = undefined;
+      if (isMetaOrg.value) reloadLicenseState();
+    }
   },
 );
 
