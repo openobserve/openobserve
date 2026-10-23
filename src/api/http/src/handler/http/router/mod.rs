@@ -2357,7 +2357,13 @@ fn oncall_routes(router: Router) -> Router {
 // Private and before the next `pub fn`, so the ROUTE_PERMISSIONS router scrape still reads it.
 #[cfg(feature = "enterprise")]
 fn fleet_routes(router: Router) -> Router {
-    let fleet = Router::new()
+    router.merge(fleet_router())
+}
+
+// Its own router, so the gate layer covers exactly the fleet routes.
+#[cfg(feature = "enterprise")]
+fn fleet_router() -> Router {
+    Router::new()
         .route("/{org_id}/v1/opamp", get(opamp::serve).post(opamp::serve))
         .route("/{org_id}/fleet/collectors", get(fleet::list_collectors))
         .route(
@@ -2450,8 +2456,7 @@ fn fleet_routes(router: Router) -> Router {
             "/{org_id}/fleet/settings",
             get(fleet::get_settings).put(fleet::update_settings),
         )
-        .route_layer(middleware::from_fn(fleet_gate));
-    router.merge(fleet)
+        .route_layer(middleware::from_fn(fleet_gate))
 }
 
 /// §17: with `O2_FLEET_ENABLED` off, OpAMP answers 503 and management reads work but writes do not.
