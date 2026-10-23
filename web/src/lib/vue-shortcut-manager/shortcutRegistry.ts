@@ -152,6 +152,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
   },
   { titleKey: "shortcuts.modules.reports", pages: ["shortcuts.pages.reports"] },
   { titleKey: "shortcuts.modules.synthetics", pages: ["shortcuts.pages.syntheticsJourney"] },
+  { titleKey: "shortcuts.modules.kubernetes", pages: ["shortcuts.pages.kubernetes"] },
   {
     titleKey: "shortcuts.modules.iam",
     title: "IAM",
@@ -613,6 +614,21 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         id: "pipelinesRowDelete",
         display: "del / ⌫",
         descriptionKey: "shortcuts.actions.tableRowDelete",
+      },
+    ],
+  },
+
+  // ── Kubernetes ──────────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.kubernetes",
+    scope: "kubernetes",
+    shortcuts: [
+      {
+        id: "k8sPalette",
+        keyForWindows: "ctrl+k",
+        keyForMac: "meta+k",
+        descriptionKey: "shortcuts.actions.k8sPalette",
+        allowInInput: true,
       },
     ],
   },

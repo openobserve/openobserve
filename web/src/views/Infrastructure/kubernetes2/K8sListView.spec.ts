@@ -18,6 +18,7 @@ import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import OTable from "@/lib/core/Table/OTable.vue";
 import K8sListView from "./K8sListView.vue";
+import { TONE_PILL } from "./k8sTone";
 import { buildInventory, type Series } from "./kubernetesModel";
 import type { QueryId } from "./kubernetesQueries";
 import { parseEvents } from "./kubernetesEvents";
@@ -352,5 +353,65 @@ describe("K8sListView", () => {
       const cell = wrapper.find(`[data-test="k8s2-cell-message-${events()[0].key}"]`);
       expect(cell.classes()).toContain("text-status-error-text");
     });
+  });
+
+  it("counts pod status chips over the namespace selection and filters by the chosen one", async () => {
+    await mountList({});
+    const chip = (id: string) => wrapper.find(`[data-test="k8s2-status-chip-${id}"]`);
+    expect(chip("all").text()).toContain("3");
+    expect(chip("running").text()).toContain("0");
+    expect(chip("pending").text()).toContain("1");
+    await chip("pending").trigger("click");
+    await flushPromises();
+    expect(order()).toEqual(["db"]);
+    await chip("all").trigger("click");
+    await flushPromises();
+    expect(order()).toHaveLength(3);
+  });
+
+  it("shows no status chips on views without them", async () => {
+    await mountList({ view: "nodes", rows: [] });
+    expect(wrapper.find('[data-test="k8s2-status-chips"]').exists()).toBe(false);
+  });
+
+  it("renders the status column as an icon pill with the tone variant", async () => {
+    await mountList({}, {});
+    const pills = wrapper.findAll('[data-test^="k8s2-cell-status-"]');
+    expect(pills).toHaveLength(3);
+    for (const pill of pills) expect(pill.find("svg").exists()).toBe(true);
+    const pending = wrapper.find('[data-test="k8s2-cell-status-prod/data/db"]');
+    const soft = TONE_PILL.warning.variant.replace("-soft", "");
+    expect(pending.classes()).toContain(`bg-badge-${soft}-soft-bg`);
+  });
+
+  it("shows a no-request state in the CPU cell of a pod that sets no CPU request", async () => {
+    const p = { namespace: "shop", pod: "web", uid: "web" };
+    const rows = buildInventory(
+      results({
+        P1: [ksm({ ...p, phase: "Running" })],
+        P10: [ksm({ ...p, container: "app", image: "web:1" })],
+        P8: [ksm({ ...p, container: "app", resource: "memory" }, 1024)],
+        K1: [
+          {
+            metric: { k8s_cluster_name: "prod", k8s_namespace_name: "shop", k8s_pod_name: "web" },
+            value: 0.5,
+          },
+        ],
+      }),
+    ).pods;
+    await mountList({ rows });
+    const none = wrapper.find('[data-test="k8s2-usage-none-cpu-prod/shop/web"]');
+    expect(none.exists()).toBe(true);
+    expect(none.text()).toBe("No request");
+  });
+
+  it("emits action from the row menu and opens the row for Details", async () => {
+    await mountList({});
+    await wrapper.find('[data-test="k8s2-row-menu-trigger"]').trigger("click");
+    await flushPromises();
+    (document.body.querySelector('[data-test="k8s2-row-menu-details"]') as HTMLElement).click();
+    await flushPromises();
+    expect(wrapper.emitted("action")?.[0]?.[0]).toBe("details");
+    expect(wrapper.emitted("open")).toHaveLength(1);
   });
 });

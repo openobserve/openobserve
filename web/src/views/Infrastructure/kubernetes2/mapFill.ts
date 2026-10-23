@@ -31,7 +31,7 @@ export type BucketClass = "b1" | "b2" | "b3" | "b4" | "b5";
 
 export type StatusClass = "ok" | "warning" | "error";
 
-export type FillClass = BucketClass | StatusClass | "noData";
+export type FillClass = BucketClass | StatusClass | "noReq" | "noData";
 
 export type NumericFill = Exclude<MapFill, "status">;
 
@@ -85,6 +85,15 @@ export const FILL_EDGES: Record<NumericFill, readonly number[]> = {
   cpu: LIMIT_EDGES,
   memory: LIMIT_EDGES,
   restarts: [1, 2, 6, 21],
+};
+
+type RatioFill = "cpuReq" | "memReq" | "cpuLim" | "memLim";
+
+const SET_FILLS: Record<RatioFill, "cpu" | "memory"> = {
+  cpuReq: "cpu",
+  memReq: "memory",
+  cpuLim: "cpu",
+  memLim: "memory",
 };
 
 const BUCKETS: readonly BucketClass[] = ["b1", "b2", "b3", "b4", "b5"];
@@ -147,12 +156,25 @@ export function statusClass(row: MapRow): StatusClass | "noData" {
   return known ? "ok" : "noData";
 }
 
+// A pod that reports usage but has no request or limit to divide by is not "no data".
+function unset(row: MapRow, fill: MapFill) {
+  if (row.kind !== "pod" || !(fill in SET_FILLS)) return false;
+  return (SET_FILLS[fill as RatioFill] === "cpu" ? row.cpuCores : row.memoryBytes) != null;
+}
+
 export function fillClass(row: MapRow, fill: MapFill): FillClass {
-  return fill === "status" ? statusClass(row) : bucketOf(fillValue(row, fill), FILL_EDGES[fill]);
+  if (fill === "status") return statusClass(row);
+  const value = fillValue(row, fill);
+  return value == null && unset(row, fill) ? "noReq" : bucketOf(value, FILL_EDGES[fill]);
+}
+
+export function isFailing(row: MapRow) {
+  return row.kind === "pod" && severityOf(row.warnings) === "error";
 }
 
 export function legendClasses(fill: MapFill): FillClass[] {
-  return fill === "status" ? ["ok", "warning", "error", "noData"] : [...BUCKETS, "noData"];
+  if (fill === "status") return ["ok", "warning", "error", "noData"];
+  return fill in SET_FILLS ? [...BUCKETS, "noReq", "noData"] : [...BUCKETS, "noData"];
 }
 
 export function bucketRanges(fill: NumericFill): string[] {

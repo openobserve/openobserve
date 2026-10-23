@@ -24,6 +24,7 @@ import {
   fillClass,
   fillValue,
   groupRows,
+  isFailing,
   legendClasses,
   listTarget,
   MAX_LABEL_GROUPS,
@@ -160,13 +161,22 @@ describe("mapFill buckets (AC 43)", () => {
     expect([fillValue(n, "cpu"), fillValue(n, "memory")]).toEqual([7, 8]);
   });
 
-  it("a pod with no request or no usage is No data, never the coldest bucket", () => {
-    expect(fillClass(pod({ cpuPctOfRequest: null }), "cpuReq")).toBe("noData");
+  it("a pod with usage but no request is No request set, with no usage is No data, never the coldest bucket", () => {
+    expect(fillClass(pod({ cpuCores: 0.1, cpuPctOfRequest: null }), "cpuReq")).toBe("noReq");
+    expect(fillClass(pod({ memoryBytes: 5, memoryPctOfLimit: null }), "memLim")).toBe("noReq");
+    expect(fillClass(pod({ cpuCores: null, cpuPctOfRequest: null }), "cpuReq")).toBe("noData");
     expect(fillClass(pod({ restarts: null }), "restarts")).toBe("noData");
   });
 
-  it("the legend lists five buckets plus No data, or the four status categories", () => {
-    expect(legendClasses("memLim")).toEqual(["b1", "b2", "b3", "b4", "b5", "noData"]);
+  it("marks only pods with an error warning as failing", () => {
+    const error = { key: "x", severity: "error" } as any;
+    expect(isFailing(pod({ warnings: [error] }))).toBe(true);
+    expect(isFailing(pod())).toBe(false);
+  });
+
+  it("the legend lists five buckets plus No request/No data, or the four status categories", () => {
+    expect(legendClasses("memLim")).toEqual(["b1", "b2", "b3", "b4", "b5", "noReq", "noData"]);
+    expect(legendClasses("restarts")).toEqual(["b1", "b2", "b3", "b4", "b5", "noData"]);
     expect(legendClasses("status")).toEqual(["ok", "warning", "error", "noData"]);
   });
 });

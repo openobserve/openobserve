@@ -16,7 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -253,6 +255,23 @@ const allTabs = computed<Tab[]>(() => {
 
 const tabs = computed(() => allTabs.value.filter((tab) => tab.streams.every(props.hasStream)));
 
+const missing = computed(() => allTabs.value.filter((tab) => !tabs.value.includes(tab)));
+
+const unavailable = computed(() => {
+  if (!missing.value.length) return null;
+  const streams = [
+    ...new Set(missing.value.flatMap((tab) => tab.streams.filter((s) => !props.hasStream(s)))),
+  ];
+  return t(
+    "infra.k8s2.drawerMetricsUnavailable",
+    {
+      metrics: raw(missing.value.map((tab) => String(tab.label)).join(", ")),
+      streams: raw(streams.join(", ")),
+    },
+    streams.length,
+  );
+});
+
 const selected = ref<string | null>(null);
 
 const active = computed(() => tabs.value.find((tab) => tab.id === selected.value) ?? tabs.value[0]);
@@ -279,8 +298,12 @@ const chartKey = computed(
 </script>
 
 <template>
-  <div v-if="active" class="flex flex-col gap-2" data-test="k8s2-drawer-section-metrics">
+  <div v-if="allTabs.length" class="flex flex-col gap-2" data-test="k8s2-drawer-section-metrics">
+    <OText variant="card-title" as="h3" class="border-border-default border-b pb-1">{{
+      t("infra.k8s2.drawerMetricsTitle")
+    }}</OText>
     <OToggleGroup
+      v-if="active"
       :model-value="active.id"
       class="self-start"
       data-test="k8s2-drawer-metric-tabs"
@@ -295,7 +318,7 @@ const chartKey = computed(
         >{{ tab.label }}</OToggleGroupItem
       >
     </OToggleGroup>
-    <div class="h-50 min-w-0" data-test="k8s2-drawer-chart">
+    <div v-if="active" class="h-50 min-w-0" data-test="k8s2-drawer-chart">
       <PanelSchemaRenderer
         :key="chartKey"
         :panel-schema="schema"
@@ -305,5 +328,13 @@ const chartKey = computed(
         search-type="ui"
       />
     </div>
+    <p
+      v-if="unavailable"
+      class="text-text-secondary flex items-start gap-1 text-xs"
+      data-test="k8s2-drawer-metrics-unavailable"
+    >
+      <OIcon name="info" size="sm" class="mt-0.5 shrink-0" />
+      <span>{{ unavailable }}</span>
+    </p>
   </div>
 </template>

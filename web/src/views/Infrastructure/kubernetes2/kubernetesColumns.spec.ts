@@ -236,6 +236,39 @@ describe("kubernetesColumns", () => {
     expect(taints.meta.tip?.(node)).toBe("a:NoSchedule\nb=v:NoExecute");
   });
 
+  it("shows a node's internal IP as the name sub-line, and nothing when it is unknown", () => {
+    const [withIp, bare] = buildInventory(
+      results({
+        N1: [
+          ksm({ node: "n1", condition: "Ready", status: "true" }),
+          ksm({ node: "n2", condition: "Ready", status: "true" }),
+        ],
+        N3: [ksm({ node: "n1", internal_ip: "10.0.0.7" })],
+      }),
+    ).nodes;
+    const name = colOf("nodes", "name");
+    expect(name.meta.sub?.(withIp)).toBe("10.0.0.7");
+    expect(name.meta.sub?.(bare)).toBeNull();
+    expect(colOf("pods", "name").meta.sub).toBeUndefined();
+  });
+
+  it("renders the pod IP and the cronjob schedule as mono cells with a dash when absent", () => {
+    const pod = buildInventory(
+      results({
+        P1: [ksm({ namespace: "shop", pod: "web", uid: "u", phase: "Running" })],
+        P6: [ksm({ namespace: "shop", pod: "web", uid: "u", node: "n1", pod_ip: "10.0.0.5" })],
+      }),
+    ).pods[0];
+    const ip = colOf("pods", "ip");
+    expect(ip.meta.render).toBe("mono");
+    expect(ip.meta.text?.(pod)).toBe("10.0.0.5");
+    expect(ip.meta.text?.({ ...pod, ip: null })).toBe("—");
+    const schedule = colOf("cronjobs", "schedule");
+    expect(schedule.meta.render).toBe("mono");
+    expect(schedule.meta.text?.({ schedule: "0 2 * * *" })).toBe("0 2 * * *");
+    expect(schedule.meta.text?.({ schedule: null })).toBe("—");
+  });
+
   it("shows Deployment Pods as available/replicas and the derived-conditions tooltip", () => {
     const dep = buildInventory(
       results({
