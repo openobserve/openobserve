@@ -34,13 +34,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import type { I18nKey } from "@/types/i18n";
+import type { I18nKey, TranslateFn } from "@/types/i18n";
 import { buildTestSample } from "./testSample";
 import { buildIncidentSample, INCIDENT_EVENT_TYPES, INCIDENT_COMMON_KEYS } from "./incidentSample";
 import { ALERT_PAYLOAD_FIELDS } from "./alertFields";
 import type { WorkflowFieldOption } from "./alertFields";
 import { INCIDENT_PAYLOAD_FIELDS } from "./incidentFields";
 import { buildAlertResolvedSample, ALERT_RESOLVED_PAYLOAD_FIELDS } from "./alertResolvedSample";
+import { HTTP_REQUEST_PAYLOAD_FIELDS } from "./httpRequestSample";
 
 // A selectable variant of a trigger's sample payload. When a kind defines more
 // than one (e.g. an incident's lifecycle event_types), the trigger drawer shows
@@ -208,3 +209,29 @@ export const enabledTriggers = (): WorkflowTriggerDef[] =>
 /** Pretty-printed sample payload a kind emits — seeds the read-only reference. */
 export const buildTriggerSampleText = (kind?: string): string =>
   JSON.stringify(triggerDef(kind).buildSample(), null, 2);
+
+const fieldHeader = (label: WorkflowFieldOption["label"], value: string): WorkflowFieldOption => ({
+  label,
+  value,
+  type: "",
+  header: true,
+});
+
+/** Condition / Branch field options: the kind's fields, plus the HTTP request group while the endpoint is on. */
+export function conditionFieldOptions(
+  kind: string | undefined,
+  httpOn: boolean,
+  t: TranslateFn,
+): WorkflowFieldOption[] {
+  if (!kind) return [];
+  const def = triggerDef(kind);
+  if (!httpOn) return def.conditionFields;
+  return [
+    fieldHeader(t(def.labelKey), "__kind_fields__"),
+    ...def.conditionFields,
+    fieldHeader(t("workflow.http.fieldGroup"), "__http_fields__"),
+    ...HTTP_REQUEST_PAYLOAD_FIELDS,
+    // `data` is an array a Condition cannot reach into, so body fields need a Function first.
+    fieldHeader(t("workflow.http.fieldGroupBodyHint"), "__http_body_hint__"),
+  ];
+}

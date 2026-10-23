@@ -55,6 +55,7 @@ vi.mock("@/services/workflows", async (importOriginal) => {
       listWorkflows: vi.fn(),
       deleteWorkflow: vi.fn(),
       enableWorkflow: vi.fn(),
+      getHttpTrigger: vi.fn(),
     },
   });
 });
@@ -77,12 +78,33 @@ vi.mock("@/components/workflows/WorkflowView.vue", () => ({
   },
 }));
 
+vi.mock("@/components/workflows/WorkflowHttpEndpointPanel.vue", () => ({
+  default: {
+    name: "WorkflowHttpEndpointPanel",
+    props: [
+      "open",
+      "workflowId",
+      "workflowName",
+      "kind",
+      "isDraftOnly",
+      "workflowEnabled",
+      "context",
+    ],
+    emits: ["update:open"],
+    template: '<div data-test="http-panel-stub" :data-open="String(open)" />',
+  },
+}));
+
+vi.mock("@/utils/clipboard", () => ({ copyToClipboard: vi.fn(async () => true) }));
+
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import WorkflowsList from "./WorkflowsList.vue";
 import workflowService from "@/services/workflows";
+import { queryClient } from "@/composables/query/queryClient";
+import { copyToClipboard } from "@/utils/clipboard";
 
 const t = (k: string, v?: any) => i18n.global.t(k, v ?? {});
 const listWorkflows = workflowService.listWorkflows as any;
@@ -1159,5 +1181,84 @@ describe("WorkflowsList", () => {
       expect(saved.filterQuery).toBe("abc");
       expect(saved.pageSize).toBe(100);
     });
+  });
+});
+
+describe("WorkflowsList HTTP endpoint", () => {
+  let wrapper: any = null;
+  const getHttpTrigger = (workflowService as any).getHttpTrigger;
+  const panel = (w: any) => w.findComponent({ name: "WorkflowHttpEndpointPanel" });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetListViewState();
+    queryClient.clear();
+    store.state.zoConfig = { ...store.state.zoConfig, workflow_hooks_enabled: true };
+  });
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    store.state.zoConfig = { ...store.state.zoConfig, workflow_hooks_enabled: false };
+  });
+
+  const load = async (list: any[]) => {
+    listWorkflows.mockResolvedValue({ data: list });
+    wrapper = mountList();
+    await flushPromises();
+    return wrapper;
+  };
+
+  it("shows the HTTP tag on any kind with an endpoint", async () => {
+    const incident = {
+      id: "t1",
+      data: { node_type: "workflow_trigger", trigger_kind: "incident_event" },
+    };
+    const w = await load([
+      makeWorkflow(1, { http_endpoint_enabled: true }),
+      makeWorkflow(2, { http_endpoint_enabled: true, nodes: [incident] }),
+      makeWorkflow(3, { http_endpoint_enabled: true, is_draft: true }),
+      makeWorkflow(4),
+    ]);
+    expect(w.findAll('[data-test="workflow-list-http-tag"]')).toHaveLength(3);
+  });
+
+  it("has no HTTP tab", async () => {
+    const w = await load([makeWorkflow(1, { http_endpoint_enabled: true })]);
+    expect(w.find('[data-test="workflow-list-tab-http_request"]').exists()).toBe(false);
+  });
+
+  it("HTTP endpoint… opens the panel on any row", async () => {
+    const w = await load([makeWorkflow(1), makeWorkflow(2, { is_draft: true, enabled: false })]);
+    await w.find('[data-test="workflow-list-workflow-2-http-endpoint"]').trigger("click");
+    expect(panel(w).props()).toMatchObject({
+      open: true,
+      workflowId: "wf-2",
+      workflowName: "workflow-2",
+      isDraftOnly: true,
+      workflowEnabled: false,
+      context: "list",
+    });
+  });
+
+  it("Copy endpoint URL fetches the http_trigger query and copies its url", async () => {
+    getHttpTrigger.mockResolvedValue({ configured: true, url: "https://o2/h/1" });
+    const w = await load([makeWorkflow(1, { http_endpoint_enabled: true }), makeWorkflow(2)]);
+    expect(w.find('[data-test="workflow-list-workflow-2-copy-endpoint"]').exists()).toBe(false);
+    await w.find('[data-test="workflow-list-workflow-1-copy-endpoint"]').trigger("click");
+    await flushPromises();
+    expect(getHttpTrigger).toHaveBeenCalledWith({ org_identifier: expect.any(String), id: "wf-1" });
+    expect(vi.mocked(copyToClipboard).mock.calls[0][0]).toBe("https://o2/h/1");
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({ message: t("toastMessages.workflows.endpointUrlCopied") }),
+    );
+  });
+
+  it("shows no HTTP tag, HTTP endpoint item or Copy endpoint URL when hooks are off", async () => {
+    store.state.zoConfig = { ...store.state.zoConfig, workflow_hooks_enabled: false };
+    const w = await load([makeWorkflow(1, { http_endpoint_enabled: true })]);
+    expect(w.find('[data-test="workflow-list-http-tag"]').exists()).toBe(false);
+    expect(w.find('[data-test="workflow-list-workflow-1-http-endpoint"]').exists()).toBe(false);
+    expect(w.find('[data-test="workflow-list-workflow-1-copy-endpoint"]').exists()).toBe(false);
+    expect(panel(w).exists()).toBe(false);
   });
 });

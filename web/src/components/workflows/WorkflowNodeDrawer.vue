@@ -564,7 +564,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </button>
           </div>
           <WorkflowConfigSummary v-if="canvasReadOnly" :key="nodeId" />
-          <component v-else-if="bodyComponent" :is="bodyComponent" :key="nodeId" ref="bodyRef" />
+          <component
+            v-else-if="bodyComponent"
+            :is="bodyComponent"
+            :key="nodeId"
+            ref="bodyRef"
+            @open-http-endpoint="openHttpEndpoint"
+          />
           <div
             v-else
             data-test="workflow-ndv-config-placeholder"
@@ -834,6 +840,11 @@ import WorkflowRunRequestFacts from "./WorkflowRunRequestFacts.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { HttpRequestFacts, WorkflowHistoryRow } from "@/services/workflows";
 import { isHttpRun } from "@/plugins/workflows/httpEndpoint";
+import {
+  httpPreviewSample,
+  openHttpPanel,
+  usesHttpPayload,
+} from "@/plugins/workflows/httpEndpointUi";
 import { firstFailedStep, hasStoredRunData, runReasonOf } from "@/plugins/workflows/runStatus";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
 import { branchPathCounts, forwardedRunCount, isNoMatchRun } from "./nodeRunOutcome";
@@ -1199,6 +1210,7 @@ const isTriggerNode = (node: any) => node?.data?.node_type === "workflow_trigger
 const defaultTriggerSample = computed<any[]>(() => {
   const kind = currentTriggerKind();
   if (!kind) return [];
+  if (usesHttpPayload()) return httpPreviewSample();
   try {
     return triggerDef(kind).buildSample() || [];
   } catch {
@@ -1711,5 +1723,11 @@ const onConfirmDelete = () => {
 // so no dirty guard is needed here.
 const onOpenChange = async (open: boolean) => {
   if (!open) await commitAndClose();
+};
+
+// One overlay per flow: the step dialog closes through its normal path before the panel opens.
+const openHttpEndpoint = async () => {
+  await commitAndClose();
+  openHttpPanel();
 };
 </script>
