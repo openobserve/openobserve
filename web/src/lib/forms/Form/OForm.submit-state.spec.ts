@@ -75,7 +75,7 @@ describe("OForm awaited submit state", () => {
     expect(overlayState.value).toBe(false);
   });
 
-  it("releases the overlay button when the form unmounts mid-submit", async () => {
+  it("releases the overlay's submit state when unmounted mid-submit", async () => {
     const d = deferred();
     const overlayState = ref(false);
     const wrapper = mount(OForm, {
@@ -91,5 +91,6 @@ describe("OForm awaited submit state", () => {
     expect(overlayState.value).toBe(false);
     d.resolve();
     await flushPromises();
+    expect(overlayState.value).toBe(false);
   });
 });

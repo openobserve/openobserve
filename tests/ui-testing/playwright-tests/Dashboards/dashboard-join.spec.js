@@ -38,6 +38,7 @@ const { getAuthHeaders, getOrgIdentifier } = require("../utils/cloud-auth.js");
 const testAppUsers = require("../../../test-data/joins/test_app_users.json");
 const testSessions = require("../../../test-data/joins/test_sessions.json");
 const testWebRequests = require("../../../test-data/joins/test_web_requests.json");
+const { ingestBase } = require('../utils/ingest-url.js');
 
 const generateDashboardName = (testId) => `Joins_Test_${testId}`;
 const generateStreamNames = (testId) => ({
@@ -62,7 +63,7 @@ const navigateToDashboards = async (page) => {
 const ingestJoinTestData = async (streamName, data) => {
   const orgId = getOrgIdentifier();
   const headers = getAuthHeaders();
-  const url = `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
+  const url = `${ingestBase(process.env.INGESTION_URL)}/api/${orgId}/${streamName}/_json`;
   const fetchResponse = await fetch(url, {
     method: "POST",
     headers,

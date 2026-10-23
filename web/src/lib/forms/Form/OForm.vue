@@ -1,7 +1,7 @@
 <script setup lang="ts" generic="T extends Record<string, unknown>">
 // Copyright 2026 OpenObserve Inc.
 
-import { provide, inject, watch, onBeforeUnmount } from "vue";
+import { provide, inject, onBeforeUnmount, watch } from "vue";
 import { FORM_CONTEXT_KEY, FORM_SUBMIT_STATE_KEY } from "./OForm.types";
 import { useOForm } from "./useOForm";
 
@@ -85,7 +85,7 @@ if (overlaySubmitting) {
     },
     { immediate: true },
   );
-  // A form removed mid-submit (e.g. the overlay switches view on save) stops driving the button.
+  // A form unmounted mid-submit (a dialog swapping to its success view) never reports the end.
   onBeforeUnmount(() => {
     overlaySubmitting.value = false;
   });

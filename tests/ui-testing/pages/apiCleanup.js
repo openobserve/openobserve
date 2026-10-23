@@ -3,6 +3,7 @@ const https = require('https');
 const fetch = require('node-fetch');
 const testLogger = require('../playwright-tests/utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment } = require('../playwright-tests/utils/cloud-auth.js');
+const { ingestBase } = require('../playwright-tests/utils/ingest-url.js');
 
 // node-fetch v2 keep-alive pooling + gzip decompression is the root cause of
 // "Premature close" / ECONNRESET flakiness in CI.
@@ -260,7 +261,7 @@ class APICleanup {
      */
     async seedAlertsInFolder(folderId, count, prefix) {
         const streamName = `${prefix}_stream`;
-        await this._fetch(`${this.baseUrl}/api/${this.org}/${streamName}/_json`, {
+        await this._fetch(`${ingestBase(this.baseUrl)}/api/${this.org}/${streamName}/_json`, {
             method: 'POST',
             headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
             body: JSON.stringify([{ message: 'e2e pagination seed row' }])
@@ -3380,7 +3381,7 @@ class APICleanup {
             const record = data[i];
 
             try {
-                const response = await this._fetch(`${process.env.INGESTION_URL}/api/${this.org}/${streamName}/_json`, {
+                const response = await this._fetch(`${ingestBase(process.env.INGESTION_URL)}/api/${this.org}/${streamName}/_json`, {
                     method: 'POST',
                     headers: {
                         'Authorization': this.authHeader,

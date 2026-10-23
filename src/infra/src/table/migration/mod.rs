@@ -209,6 +209,7 @@ mod m20260928_000001_add_alert_recovery_destinations;
 mod m20261001_000001_add_anomaly_band_settings;
 mod m20261003_000001_create_rum_pa_tables;
 mod m20261004_000001_create_query_history;
+mod m20261005_000001_create_fleet;
 mod m20261006_000001_create_ai_chat_shares;
 mod m20261007_000001_create_ai_chat_turns;
 mod m20261007_000001_scope_alert_dedup_state_by_org;
@@ -262,6 +263,24 @@ pub(crate) async fn create_search_queue_schema_for_test(
     m20261021_000002_add_search_type_to_search_queue::Migration
         .up(&manager)
         .await
+}
+
+#[cfg(any(test, feature = "test-utils"))]
+pub async fn create_fleet_collectors_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    use sea_orm::ConnectionTrait;
+
+    let manager = SchemaManager::new(db);
+    m20261005_000001_create_fleet::Migration
+        .up(&manager)
+        .await?;
+    // Folder rows are what fleet writes lock, so the fleet tests need the shared table too.
+    let backend = db.get_database_backend();
+    let mut folders =
+        sea_orm::Schema::new(backend).create_table_from_entity(super::entity::folders::Entity);
+    db.execute(backend.build(folders.if_not_exists())).await?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -630,6 +649,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261017_000001_add_rca_run_progress_columns::Migration),
             Box::new(m20261018_000001_create_rca_steering::Migration),
             Box::new(m20261021_000001_status_pages_add_favicon_img::Migration),
+            Box::new(m20261005_000001_create_fleet::Migration),
             Box::new(m20261021_000001_create_public_dashboards::Migration),
             Box::new(m20261021_000002_add_search_type_to_search_queue::Migration),
         ]
@@ -707,8 +727,9 @@ mod tests {
         (114, "m20261017_000001_add_rca_run_progress_columns"),
         (115, "m20261018_000001_create_rca_steering"),
         (116, "m20261021_000001_status_pages_add_favicon_img"),
-        (117, "m20261021_000001_create_public_dashboards"),
-        (118, "m20261021_000002_add_search_type_to_search_queue"),
+        (117, "m20261005_000001_create_fleet"),
+        (118, "m20261021_000001_create_public_dashboards"),
+        (119, "m20261021_000002_add_search_type_to_search_queue"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

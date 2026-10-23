@@ -52,14 +52,17 @@ use {
     audit::audit,
     axum::body::{Body, to_bytes},
     config::utils::time::now_micros,
-    o2_enterprise::enterprise::common::{
-        auditor::{AuditMessage, DelegatedAudit, Protocol, ResponseMeta},
-        config::get_config as get_o2_config,
+    o2_enterprise::enterprise::{
+        common::{
+            auditor::{AuditMessage, DelegatedAudit, Protocol, ResponseMeta},
+            config::get_config as get_o2_config,
+        },
+        fleet::opamp,
     },
     openobserve_api_common::auth::delegation::DelegatedCaller,
     openobserve_api_management::request::{
         ai, alert_calibration, annotation_queues, annotations, anomaly_detection, datasets,
-        discovery, domain_management, eval_jobs, experiments, gen_ai, keys, license, oncall,
+        discovery, domain_management, eval_jobs, experiments, fleet, gen_ai, keys, license, oncall,
         playground, prompts, providers, remote_tasks, score_configs, scorers, service_streams,
         workflows,
     },
@@ -89,6 +92,10 @@ pub mod middlewares;
 pub mod openapi;
 
 use common::meta::http::ERROR_HEADER;
+
+/// How long a refused agent waits before reconnecting while fleet management is off.
+#[cfg(feature = "enterprise")]
+const FLEET_RETRY_AFTER_SECS: &str = "60";
 
 /// Create CORS layer for axum
 pub fn cors_layer() -> CorsLayer {
@@ -516,6 +523,12 @@ fn audit_body(method: &Method, path: &str, content_type: Option<&str>, body: Vec
     use base64::Engine as _;
     if is_secret_write(method, path) {
         return "[REDACTED: secret write]".to_string();
+    }
+    #[cfg(feature = "enterprise")]
+    if let Some(body) =
+        o2_enterprise::enterprise::fleet::audit::redact_config_write(method, path, &body)
+    {
+        return body;
     }
     if path.ends_with("/settings/logo") {
         return base64::engine::general_purpose::STANDARD.encode(&body);
@@ -1752,7 +1765,7 @@ pub fn service_routes() -> Router {
 
     #[cfg(feature = "enterprise")]
     {
-        router = router
+        router = fleet_routes(router)
             // Search jobs
             .route("/{org_id}/search_jobs", get(search::search_job::list_status).post(search::search_job::submit_job))
             .route("/{org_id}/search_jobs/{job_id}", get(search::search_job::get_status).delete(search::search_job::delete_job))
@@ -2406,6 +2419,141 @@ fn oncall_routes(router: Router) -> Router {
                 .put(oncall::put_telephony)
                 .delete(oncall::delete_telephony),
         )
+}
+
+// Private and before the next `pub fn`, so the ROUTE_PERMISSIONS router scrape still reads it.
+#[cfg(feature = "enterprise")]
+fn fleet_routes(router: Router) -> Router {
+    router.merge(fleet_router())
+}
+
+// Its own router, so the gate layer covers exactly the fleet routes.
+#[cfg(feature = "enterprise")]
+fn fleet_router() -> Router {
+    Router::new()
+        .route("/{org_id}/v1/opamp", get(opamp::serve).post(opamp::serve))
+        .route("/{org_id}/fleet/collectors", get(fleet::list_collectors))
+        .route(
+            "/{org_id}/fleet/collectors/{id}",
+            get(fleet::get_collector)
+                .patch(fleet::rename_collector)
+                .delete(fleet::delete_collector),
+        )
+        .route(
+            "/{org_id}/fleet/collectors/{id}/restart",
+            post(fleet::restart_collector),
+        )
+        .route(
+            "/{org_id}/fleet/collectors/{id}/redeliver",
+            post(fleet::redeliver_collector),
+        )
+        .route(
+            "/{org_id}/fleet/fleets",
+            get(fleet::list_fleets).post(fleet::create_fleet),
+        )
+        .route("/{org_id}/fleet/fleets/move", post(fleet::move_collectors))
+        .route(
+            "/{org_id}/fleet/fleets/{fleet_id}",
+            get(fleet::get_fleet)
+                .patch(fleet::rename_fleet)
+                .delete(fleet::delete_fleet),
+        )
+        .route(
+            "/{org_id}/fleet/fleets/{fleet_id}/settings",
+            get(fleet::get_fleet_settings).put(fleet::put_fleet_settings),
+        )
+        .route(
+            "/{org_id}/fleet/fleets/{fleet_id}/desired",
+            put(fleet::set_desired),
+        )
+        .route(
+            "/{org_id}/fleet/fleets/{fleet_id}/desired/preview",
+            post(fleet::preview_desired),
+        )
+        .route(
+            "/{org_id}/fleet/tokens",
+            get(fleet::list_tokens).post(fleet::create_token),
+        )
+        .route(
+            "/{org_id}/fleet/tokens/{id}/revoke",
+            post(fleet::revoke_token),
+        )
+        .route(
+            "/{org_id}/fleet/configs",
+            get(fleet::list_configs).post(fleet::create_config),
+        )
+        .route(
+            "/{org_id}/fleet/configs/validate",
+            post(fleet::validate_config),
+        )
+        .route(
+            "/{org_id}/fleet/configs/{id}",
+            get(fleet::get_config).delete(fleet::delete_config),
+        )
+        .route(
+            "/{org_id}/fleet/configs/{id}/draft",
+            put(fleet::save_config_draft),
+        )
+        .route(
+            "/{org_id}/fleet/configs/{id}/versions",
+            post(fleet::publish_config_version),
+        )
+        .route(
+            "/{org_id}/fleet/configs/{id}/versions/{version}",
+            get(fleet::get_config_version),
+        )
+        .route("/{org_id}/fleet/rollouts", get(fleet::list_rollouts))
+        .route("/{org_id}/fleet/rollouts/{id}", get(fleet::get_rollout))
+        .route(
+            "/{org_id}/fleet/rollouts/{id}/resume",
+            post(fleet::resume_rollout),
+        )
+        .route(
+            "/{org_id}/fleet/rollouts/{id}/skip",
+            post(fleet::skip_rollout),
+        )
+        .route(
+            "/{org_id}/fleet/rollouts/{id}/rollback",
+            post(fleet::rollback_rollout),
+        )
+        .route("/{org_id}/fleet/summary", get(fleet::summary))
+        .route("/{org_id}/fleet/pipelines", get(fleet::get_pipelines))
+        .route("/{org_id}/fleet/audit", get(fleet::list_audit))
+        .route(
+            "/{org_id}/fleet/settings",
+            get(fleet::get_settings).put(fleet::update_settings),
+        )
+        .route_layer(middleware::from_fn(fleet_gate))
+}
+
+/// §17: with `O2_FLEET_ENABLED` off, OpAMP answers 503 and management reads work but writes do not.
+#[cfg(feature = "enterprise")]
+async fn fleet_gate(request: Request, next: Next) -> Response {
+    if openobserve_core::fleet::enabled() || request.method() == Method::GET && !is_opamp(&request)
+    {
+        return next.run(request).await;
+    }
+    let mut response = (
+        StatusCode::SERVICE_UNAVAILABLE,
+        "fleet management is disabled",
+    )
+        .into_response();
+    if is_opamp(&request) {
+        response.headers_mut().insert(
+            header::RETRY_AFTER,
+            header::HeaderValue::from_static(FLEET_RETRY_AFTER_SECS),
+        );
+    }
+    response
+}
+
+#[cfg(feature = "enterprise")]
+fn is_opamp(request: &Request) -> bool {
+    request
+        .uri()
+        .path()
+        .trim_end_matches('/')
+        .ends_with("/v1/opamp")
 }
 
 /// Slack install and settings routes (section 7.2); the paths match the ENT `SLACK_ROUTE_ROWS`.

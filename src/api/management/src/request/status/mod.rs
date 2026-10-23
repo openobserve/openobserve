@@ -223,6 +223,7 @@ struct ConfigResponse<'a> {
     incidents_enabled: bool,
     incidents_rca_enabled: bool,
     downtimes_enabled: bool,
+    fleet_enabled: bool,
     alert_calibration_enabled: bool,
     service_streams_enabled: bool,
     model_pricing_enabled: bool,
@@ -525,6 +526,7 @@ pub async fn zo_config(
         o2cfg.incidents.enabled && o2cfg.incidents.rca_enabled && o2cfg.ai.has_agent_target()
     );
     let downtimes_enabled = enterprise_value!(false, o2cfg.downtimes.enabled);
+    let fleet_enabled = enterprise_value!(false, openobserve_core::fleet::enabled());
     let alert_calibration_enabled = enterprise_value!(false, o2cfg.alert_calibration.enabled);
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
     // Enterprise builds have it unless O2_ANOMALY_DETECTION_DISABLED turns it off.
@@ -647,6 +649,7 @@ pub async fn zo_config(
         incidents_enabled,
         incidents_rca_enabled,
         downtimes_enabled,
+        fleet_enabled,
         alert_calibration_enabled,
         service_streams_enabled,
         model_pricing_enabled: cfg.common.model_pricing_enabled,
