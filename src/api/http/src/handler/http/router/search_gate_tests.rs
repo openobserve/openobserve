@@ -695,6 +695,33 @@ async fn an_operational_stream_in_the_path_does_not_open_the_gate() {
 
 #[cfg(feature = "enterprise")]
 #[tokio::test]
+async fn closed_gate_leaves_the_ungated_search_job_reads_open() {
+    use o2_enterprise::enterprise::license::close_search_gate_for_tests;
+
+    let _gate = close_search_gate_for_tests().await;
+    // the table without its auth layers, which would answer 401 before any route
+    let app = service_route_table();
+    for (method, uri, gated) in [
+        (Method::GET, "/acme/search_jobs", false),
+        (Method::GET, "/acme/search_jobs/j1", false),
+        (Method::POST, "/acme/search_jobs", true),
+    ] {
+        let request = axum::http::Request::builder()
+            .method(method.clone())
+            .uri(uri)
+            .body(Body::empty())
+            .unwrap();
+        let status = app.clone().oneshot(request).await.unwrap().status();
+        assert_eq!(
+            status == StatusCode::TOO_MANY_REQUESTS,
+            gated,
+            "{method} {uri}: {status}"
+        );
+    }
+}
+
+#[cfg(feature = "enterprise")]
+#[tokio::test]
 async fn meta_org_passes_the_closed_gate() {
     use o2_enterprise::enterprise::license::close_search_gate_for_tests;
 

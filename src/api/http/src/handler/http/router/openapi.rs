@@ -1210,7 +1210,7 @@ mod tests {
     const ROUTER_SOURCE: &str = include_str!("mod.rs");
 
     #[cfg(feature = "enterprise")]
-    const SERVICE_ROUTES_SIGNATURE: &str = "pub fn service_routes(";
+    const SERVICE_ROUTES_SIGNATURE: &str = "fn service_route_table(";
 
     #[cfg(feature = "enterprise")]
     const SEARCH_ROUTES_SIGNATURE: &str = "fn search_routes_with(";

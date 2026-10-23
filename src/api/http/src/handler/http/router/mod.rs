@@ -1166,18 +1166,11 @@ fn alert_calibration_routes(router: Router) -> Router {
 
 #[rustfmt::skip]
 pub fn service_routes() -> Router {
-    let cfg = get_config();
+    with_service_layers(service_route_table())
+}
 
-    // Set server header
-    #[cfg(feature = "enterprise")]
-    let server = format!(
-        "{}-{}",
-        get_o2_config().super_cluster.region,
-        cfg.common.instance_name_short
-    );
-    #[cfg(not(feature = "enterprise"))]
-    let server = cfg.common.instance_name_short.to_string();
-
+/// The `/api` route table before the auth, audit and org layers wrap it.
+fn service_route_table() -> Router {
     // Downtimes and Slack live in their own tables to keep this function under the line limit.
     let mut router = public_dashboard_admin_routes(
         Router::new()
@@ -2082,6 +2075,22 @@ pub fn service_routes() -> Router {
                 delete(billing_group::remove_member),
             );
     }
+
+    router
+}
+
+fn with_service_layers(router: Router) -> Router {
+    let cfg = get_config();
+
+    // Set server header
+    #[cfg(feature = "enterprise")]
+    let server = format!(
+        "{}-{}",
+        get_o2_config().super_cluster.region,
+        cfg.common.instance_name_short
+    );
+    #[cfg(not(feature = "enterprise"))]
+    let server = cfg.common.instance_name_short.to_string();
 
     // Snappy preprocessing sits outside RequestDecompressionLayer, which rejects snappy with 415.
     router
@@ -4680,8 +4689,8 @@ mod tests {
     /// `service_routes()` minus comments, whitespace and wrap commas.
     fn service_routes_registrations() -> String {
         let source = include_str!("mod.rs");
-        let start = source.find("pub fn service_routes() -> Router {").unwrap();
-        let end = start + source[start..].find("\npub fn ").unwrap();
+        let start = source.find("fn service_route_table() -> Router {").unwrap();
+        let end = start + source[start..].find("\n}\n").unwrap();
         let mut body = String::new();
         let mut rest = &source[start..end];
         while let Some(at) = rest.find("/*") {
