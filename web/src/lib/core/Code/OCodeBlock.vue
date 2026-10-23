@@ -47,6 +47,7 @@ const CODE_INSET = "0.75rem";
 const MASK_CHAR = "\u2022";
 
 const props = withDefaults(defineProps<CodeBlockProps>(), {
+  sensitive: false,
   wrap: false,
   copyable: true,
   lineNumbers: false,
@@ -100,7 +101,7 @@ const displayCode = computed(() =>
 const highlightCache = new Map<string, string>();
 const highlightOne = (code: string, lang?: string): string => {
   const key = `${lang ?? ""}\u0000${code}`;
-  const cached = highlightCache.get(key);
+  const cached = props.sensitive ? undefined : highlightCache.get(key);
   if (cached !== undefined) return cached;
   let out: string;
   try {
@@ -111,7 +112,7 @@ const highlightOne = (code: string, lang?: string): string => {
   } catch {
     out = code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
-  highlightCache.set(key, out);
+  if (!props.sensitive) highlightCache.set(key, out);
   return out;
 };
 // Highlights the DISPLAYED code (masked or real) — copy still uses the real `code`.

@@ -90,6 +90,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OText>
         </OPopover>
       </div>
+
+      <WorkflowHttpExample />
     </template>
 
     <OBanner
@@ -198,6 +200,7 @@ import type { EndpointContext } from "@/plugins/workflows/useWorkflowHttpEndpoin
 import { httpErrorText, useHttpEndpoint } from "@/plugins/workflows/httpEndpointUi";
 import WorkflowHttpAdvanced from "./WorkflowHttpAdvanced.vue";
 import WorkflowHttpCredentialsTable from "./WorkflowHttpCredentialsTable.vue";
+import WorkflowHttpExample from "./WorkflowHttpExample.vue";
 import WorkflowHttpRejections from "./WorkflowHttpRejections.vue";
 import WorkflowHttpRotatePopover from "./WorkflowHttpRotatePopover.vue";
 import WorkflowHttpUrl from "./WorkflowHttpUrl.vue";

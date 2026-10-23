@@ -4067,11 +4067,23 @@
       "reasonRunTimeout": "timed out after 15 min",
       "allTriggers": "All triggers",
       "triggerFilter": "Trigger",
-      "received": "Received",
       "run": "Run",
-      "caller": "Caller",
-      "idempotencyKey": "Idempotency key",
-      "searchHttpRuns": "Run ID or idempotency key"
+      "searchRuns": "Search run ID, idempotency key or alert",
+      "sourceDetails": "Source details",
+      "detailsWithKey": "{ip} · key {key}",
+      "detailsNoKey": "{ip} · no idempotency key",
+      "retryOf": "Retry of {run}",
+      "openRun": "Open run",
+      "alertFiredEmptyTitle": "No alert-fired runs in this time range",
+      "incidentEventEmptyTitle": "No incident-event runs in this time range",
+      "filterEmptyTitle": "No matching runs in this time range",
+      "filterEmptyDimmed": "The other runs are still on the timeline, dimmed.",
+      "searchEmptyTitle": "No runs match this search",
+      "searchEmptyAction": "Clear search",
+      "timelineNow": "now",
+      "timelineAgoMinutes": "−{n}m",
+      "timelineAgoHours": "−{n}h",
+      "timelineAgoDays": "−{n}d"
     },
     "edit": "Edit",
     "view": "View",
@@ -4666,7 +4678,13 @@
       "createForbidden": "You can't create endpoint credentials in this organization.",
       "errorNotConfigured": "This workflow has no HTTP endpoint.",
       "errorNoLiveCredential": "No credential is active. Rotate to create one.",
-      "errorNotAllowed": "You don't have permission to do this."
+      "errorNotAllowed": "You don't have permission to do this.",
+      "copyCredentialChanged": "Credential changed. Copy again.",
+      "exampleRequest": "Example request",
+      "exampleActiveToken": "Active token · {prefix}",
+      "exampleActiveSecret": "Active secret · {prefix}",
+      "exampleHintToken": "Copy includes the token. Paste into a terminal, or import into Postman or Insomnia (Import → Raw text).",
+      "exampleHintSigned": "Run in bash: it signs with openssl, then calls curl. Copy includes the secret. Import tools cannot sign."
     }
   },
   "pipeline": {
