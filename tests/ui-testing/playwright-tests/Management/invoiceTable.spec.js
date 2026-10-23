@@ -3,9 +3,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
 
-// Stripe returns invoice totals in the currency's minor unit (2 digits for
-// USD/EUR, 0 for JPY). The invoice table divides by 10 ** minorDigits and
-// formats with Intl.NumberFormat, so `total` must stay an integer here.
+// Stripe totals are integer minor units (2 digits USD/EUR, 0 JPY); the table divides by 10 ** minorDigits.
 const usdInvoice = {
     period_start: 1672531200,
     period_end: 1675209600,

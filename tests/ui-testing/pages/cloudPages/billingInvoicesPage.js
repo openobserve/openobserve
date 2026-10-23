@@ -3,10 +3,7 @@ const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js
 
 const baseUrl = () => process.env.ZO_BASE_URL.replace(/\/$/, '');
 
-// Page object for the Cloud-only billing invoice history table. The
-// invoice-history tab is Stripe-gated (billingProvider === 'stripe'); both
-// routes are stubbed so the suite runs on any Cloud org without a real Stripe
-// subscription.
+// The invoice tab is Stripe-gated, so both billing routes are stubbed to run on any Cloud org without a real subscription.
 class BillingInvoicesPage {
     constructor(page) {
         this.page = page;
@@ -15,9 +12,7 @@ class BillingInvoicesPage {
         this.rows = page.locator('[data-test="invoice-history-container"] tbody tr');
     }
 
-    // Stub list_subscription (provider: stripe) and list_invoice_history with the
-    // given invoice rows. Must be called before gotoInvoiceHistory so the routes
-    // are armed when Billing.vue / invoiceTable.vue issue their requests.
+    // Call before gotoInvoiceHistory: the routes must be armed before Billing.vue issues its requests.
     async stubBillingState(invoices) {
         await this.page.route(/\/billings\/list_subscription(\?.*)?$/, (route) =>
             route.fulfill({
