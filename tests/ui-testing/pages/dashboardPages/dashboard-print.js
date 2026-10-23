@@ -10,6 +10,8 @@ export default class DashboardPrintPage {
     this.printModeContainer = page.locator(".print-mode-container");
     this.backBtn = page.locator('[data-test="dashboard-back-btn"]');
     this.refreshBtn = page.locator('[data-test="dashboard-refresh-btn"]');
+    // Enterprise swaps Refresh for Cancel while panels load, so either one is the toolbar's run button.
+    this.runQueryBtn = this.refreshBtn.or(page.locator('[data-test="dashboard-cancel-btn"]'));
     this.gridStack = page.locator(".grid-stack");
     this.panelContainer = page.locator('[data-test="dashboard-panel-container"]');
     this.tablePanel = page.locator(
@@ -149,13 +151,13 @@ export default class DashboardPrintPage {
   async expectPrintChromeApplied() {
     await expect(this.printModeContainer).toHaveCount(1);
     await expect(this.backBtn).toBeHidden();
-    await expect(this.refreshBtn).toBeHidden();
+    await expect(this.runQueryBtn).toBeHidden();
   }
 
   async expectPrintChromeCleared() {
     await expect(this.printModeContainer).toHaveCount(0);
     await expect(this.backBtn).toBeVisible();
-    await expect(this.refreshBtn).toBeVisible();
+    await expect(this.runQueryBtn).toBeVisible();
   }
 
   async expectPrintModeContainerVisible() {

@@ -333,12 +333,27 @@ export default class DashboardactionPage {
 
   // The apply button stays enabled for ~100ms after the click, so waitForChartToRender alone can pass before the query starts and the table later resets to empty.
   async applyAndWaitForPromQLQuery() {
-    const promqlResponse = this.page.waitForResponse(
-      (res) => res.url().includes("/prometheus/api/v1/query_range"),
-      { timeout: 30000 }
-    );
+    // The streamed query_range body ends as ERR_ABORTED, so response.finished() never resolves; wait for either outcome.
+    const querySettled = new Promise((resolve, reject) => {
+      const onSettled = (req) => {
+        if (!req.url().includes("/prometheus/api/v1/query_range")) return;
+        cleanup();
+        resolve();
+      };
+      const timer = setTimeout(() => {
+        cleanup();
+        reject(new Error("PromQL query_range request did not settle within 30s"));
+      }, 30000);
+      const cleanup = () => {
+        clearTimeout(timer);
+        this.page.off("requestfinished", onSettled);
+        this.page.off("requestfailed", onSettled);
+      };
+      this.page.on("requestfinished", onSettled);
+      this.page.on("requestfailed", onSettled);
+    });
     await this.applyDashboardBtn();
-    await (await promqlResponse).finished();
+    await querySettled;
     await this.waitForChartToRender();
   }
 
