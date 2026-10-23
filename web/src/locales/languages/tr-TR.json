@@ -15502,6 +15502,7 @@
         "userPromptLabel": "Kullanıcı mesajı",
         "userPromptPlaceholder": "Veri kümesi alanlarına {'{{ input }}'} ile başvurun.",
         "variablesLabel": "Bir değişken ekleyin:",
+        "expectedOutputScorersOnly": "{token} · yalnızca puanlayıcılar",
         "scorersPlaceholder": "Puanlayıcıları seçin",
         "scorersHelp": "Puanlayıcı sürümleri artık sabitlendi — sonradan yapılan puanlayıcı düzenlemeleri bu deneyin puanlarını asla değiştirmez.",
         "scorersEmpty": "Kullanılabilir puanlayıcı yok. Önce Değerlendir altında bir tane oluşturun.",
@@ -15812,6 +15813,7 @@
         "fallbackTitle": "Veri Seti",
         "meta": "{count} öğe · {updated} güncellendi",
         "loadError": "Veri seti yüklenemedi",
+        "tryInPlayground": "Playground'da dene",
         "tabs": {
           "items": "Öğeler",
           "experiments": "Deneyler"
@@ -16346,6 +16348,7 @@
       "scoreSkippedNoReference": "Atlandı — beklenen çıktı yok",
       "removeExpected": "Beklenen çıktıyı kaldır",
       "expectedLeakWarning": "{token} görev istemlerinde asla bulunmaz — altın cevaplar yalnızca puanlayıcıları besler.",
+      "unresolvedVariablesWarning": "{tokens} için değer yok — çalıştırıldığında boş gönderilir.",
       "chipInsert": "İmlecin konumuna eklemek için tıklayın",
       "variant": "Varyant {label}",
       "variantLimit": "Kıyaslama alanı en fazla {max} varyant alabilir.",

@@ -15502,6 +15502,7 @@
         "userPromptLabel": "رسالة المستخدم",
         "userPromptPlaceholder": "مرجع حقول مجموعة البيانات باستخدام {'{{ input }}'}.",
         "variablesLabel": "أدخل متغيرا:",
+        "expectedOutputScorersOnly": "{token} · المُقيّمون فقط",
         "scorersPlaceholder": "اختر أدوات التقييم",
         "scorersHelp": "إصدارات أدوات التقييم مثبتة الآن — تعديلات أدوات التقييم لاحقًا لن تغيّر أبدًا درجات هذه التجربة.",
         "scorersEmpty": "لا توجد أدوات تقييم متاحة. أنشئ واحدة ضمن التقييم أولًا.",
@@ -15812,6 +15813,7 @@
         "fallbackTitle": "مجموعة البيانات",
         "meta": "العناصر: {count} · تحديث {updated}",
         "loadError": "فشل في تحميل مجموعة البيانات",
+        "tryInPlayground": "جرّب في Playground",
         "tabs": {
           "items": "العناصر",
           "experiments": "التجارب"
@@ -16346,6 +16348,7 @@
       "scoreSkippedNoReference": "تم التخطي — لا يوجد مخرج متوقّع",
       "removeExpected": "إزالة الإنتاج المتوقع",
       "expectedLeakWarning": "{token} لا يتوفر أبدًا في موجّهات المهام — الإجابات المرجعية تُمرَّر إلى أدوات التقييم فقط.",
+      "unresolvedVariablesWarning": "لا توجد قيمة لـ {tokens} — تُرسل فارغة عند التشغيل.",
       "chipInsert": "انقر للإدراج عند المؤشر",
       "variant": "النسخة المتغيرة {label}",
       "variantLimit": "يتسع المقعد لنسخ لا يزيد عددها على {max}.",

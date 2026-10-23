@@ -15502,6 +15502,7 @@
         "userPromptLabel": "用户消息",
         "userPromptPlaceholder": "使用 {'{{ input }}'} 引用数据集字段。",
         "variablesLabel": "插入变量：",
+        "expectedOutputScorersOnly": "{token} · 仅评分器",
         "scorersPlaceholder": "选择评分器",
         "scorersHelp": "评分器版本现已固定——后续对评分器的编辑绝不会改变此实验的评分。",
         "scorersEmpty": "没有可用的评分器。请先在“评估”下创建一个。",
@@ -15812,6 +15813,7 @@
         "fallbackTitle": "数据集",
         "meta": "{count} 个条目 · 更新于 {updated}",
         "loadError": "加载数据集失败",
+        "tryInPlayground": "在演练场中试用",
         "tabs": {
           "items": "条目",
           "experiments": "实验"
@@ -16346,6 +16348,7 @@
       "scoreSkippedNoReference": "已跳过 — 没有预期输出",
       "removeExpected": "移除预期输出",
       "expectedLeakWarning": "{token} 在任务提示中始终不可用 — 标准答案仅用于评分器。",
+      "unresolvedVariablesWarning": "{tokens} 没有值 — 运行时会发送空值。",
       "chipInsert": "点击以在光标处插入",
       "variant": "变体 {label}",
       "variantLimit": "试验场最多容纳 {max} 个变体。",
