@@ -25,9 +25,12 @@ import { orgKey } from "@/composables/query/keys";
 export const workflowKeys = {
   all: (org: string) => orgKey(org, "workflows"),
   list: (org: string) => orgKey(org, "workflows", "list"),
+  folders: (org: string) => orgKey(org, "workflows", "folder"),
   folder: (org: string, folderId: string) => orgKey(org, "workflows", "folder", folderId),
+  searches: (org: string) => orgKey(org, "workflows", "search"),
   search: (org: string, term: string) => orgKey(org, "workflows", "search", term),
   runsOf: (org: string, workflowId: string) => orgKey(org, "workflows", "runs", workflowId),
   runs: (org: string, workflowId: string, start: number, end: number) =>
     orgKey(org, "workflows", "runs", workflowId, `${start}-${end}`),
+  httpTrigger: (org: string, id: string) => orgKey(org, "workflows", "httpTrigger", id),
 };
