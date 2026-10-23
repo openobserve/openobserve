@@ -4,7 +4,8 @@ const { test, expect } = require('../utils/enhanced-baseFixtures.js');
 const { NavRailPage } = require('../../pages/generalPages/navRailPage.js');
 
 test.describe('nav rail keyboard', () => {
-  test.describe.configure({ mode: 'serial' });
+  // Parallel: no beforeAll/afterAll and no shared state, so nothing needs sequencing.
+  test.describe.configure({ mode: 'parallel' });
 
   test('AC-8: Tab leaves the flyout to content, Shift+Tab returns to the tile, Enter navigates and refocuses the tile, never body', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
