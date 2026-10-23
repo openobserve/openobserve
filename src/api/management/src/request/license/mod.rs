@@ -20,9 +20,9 @@ use axum::{
 use config::{meta::user::UserRole, utils::str::mask_license_key};
 use db::license;
 use o2_enterprise::enterprise::license::{
-    LICENSE_DB_KEY, License, LicenseDecision, LicenseStatus, Waiver, check_license, get_license,
-    ingestion_limit_exceeded_count, ingestion_used, license_expired, license_status,
-    pasted_key_supersedes_env,
+    LICENSE_DB_KEY, License, LicenseDecision, LicenseStatus, Rollback, RollbackReason, Waiver,
+    check_license, gate_and_raise, get_license, ingestion_limit_exceeded_count, ingestion_used,
+    judge_paste, license_expired, license_status, load_rev_hwm, pasted_key_supersedes_env,
 };
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::{AuthExtractor, UserEmail};
@@ -31,6 +31,9 @@ use serde::{Deserialize, Serialize};
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 const ENV_KEY_CONFLICT_MSG: &str = "This instance uses the license key in the O2_LICENSE_KEY environment variable, and that key stays in use. Only a newer key for the same license, such as one carrying new waivers, can be pasted over it. To use any other key, put it in O2_LICENSE_KEY and restart.";
+const ENV_KEY_CONFLICT: &str = "env_key_conflict";
+const KEY_ACCEPTED: &str = "accept";
+const KEY_ACCEPTED_MSG: &str = "This key can be applied.";
 
 #[derive(Serialize, Deserialize)]
 struct LicenseResponse {
@@ -74,6 +77,35 @@ impl<'de> Deserialize<'de> for SaveLicenseRequest {
             raw_key: helper.key,
         })
     }
+}
+
+#[derive(Deserialize, Default)]
+pub struct StoreLicenseQuery {
+    #[serde(default)]
+    pub dry_run: bool,
+}
+
+#[derive(Serialize)]
+struct RollbackBody {
+    code: u16,
+    message: String,
+    reason: &'static str,
+    license_id: String,
+    loaded_rev: Option<i64>,
+    pasted_rev: Option<i64>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct KeyCheckResponse {
+    dry_run: bool,
+    outcome: String,
+    message: String,
+    license_id: String,
+    same_license: bool,
+    loaded_rev: Option<i64>,
+    pasted_rev: i64,
+    waivers_added: Vec<Waiver>,
+    waivers_removed: Vec<Waiver>,
 }
 
 async fn check_license_permission(user_id: &str, method: &str) -> Result<(), anyhow::Error> {
@@ -223,6 +255,116 @@ fn env_key_in_use(env_key: &str, live_key: Option<&str>) -> bool {
     env_key_active(env_key) && live_key == Some(env_key)
 }
 
+fn rollback_body(r: &Rollback) -> RollbackBody {
+    let issued = issued_on(r.loaded_rev);
+    let when = if issued.is_empty() {
+        String::new()
+    } else {
+        format!(" (issued {issued})")
+    };
+    let message = match r.reason {
+        RollbackReason::RevRollback => {
+            format!("A newer key for this license is already applied{when}.")
+        }
+        RollbackReason::RevConflict => {
+            format!("A different key with the same revision is already applied{when}.")
+        }
+        RollbackReason::Superseded => {
+            "This license was replaced by another license. Paste a key for the new license."
+                .to_string()
+        }
+    };
+    RollbackBody {
+        code: StatusCode::CONFLICT.as_u16(),
+        message,
+        reason: r.reason.as_str(),
+        license_id: r.license_id.clone(),
+        loaded_rev: Some(r.loaded_rev),
+        pasted_rev: Some(r.pasted_rev),
+    }
+}
+
+fn env_conflict_body(pasted: &License) -> RollbackBody {
+    RollbackBody {
+        code: StatusCode::CONFLICT.as_u16(),
+        message: ENV_KEY_CONFLICT_MSG.to_string(),
+        reason: ENV_KEY_CONFLICT,
+        license_id: pasted.license_id.clone(),
+        loaded_rev: None,
+        pasted_rev: None,
+    }
+}
+
+// a waiver edited in place shows as removed and added, so the preview never hides a change
+fn waiver_diff(loaded: Option<&License>, pasted: &License) -> (Vec<Waiver>, Vec<Waiver>) {
+    let Some(loaded) = loaded.filter(|l| l.license_id == pasted.license_id) else {
+        return (pasted.waivers.clone(), Vec::new());
+    };
+    let missing_from = |from: &[Waiver], of: &[Waiver]| -> Vec<Waiver> {
+        of.iter().filter(|w| !from.contains(w)).cloned().collect()
+    };
+    (
+        missing_from(&loaded.waivers, &pasted.waivers),
+        missing_from(&pasted.waivers, &loaded.waivers),
+    )
+}
+
+// rev 0 marks a legacy key that carries no issue time
+fn issued_on(rev: i64) -> String {
+    if rev <= 0 {
+        return String::new();
+    }
+    chrono::DateTime::from_timestamp_micros(rev)
+        .map(|t| t.format("%Y-%m-%d").to_string())
+        .unwrap_or_default()
+}
+
+fn key_check_response(
+    outcome: &str,
+    message: String,
+    hwm_rev: Option<i64>,
+    loaded: Option<&License>,
+    pasted: &License,
+    is_root: bool,
+) -> KeyCheckResponse {
+    let loaded = loaded.filter(|l| l.license_id == pasted.license_id);
+    let (mut waivers_added, mut waivers_removed) = waiver_diff(loaded, pasted);
+    if !is_root {
+        hide_waiver_installations(&mut waivers_added);
+        hide_waiver_installations(&mut waivers_removed);
+    }
+    KeyCheckResponse {
+        dry_run: true,
+        outcome: outcome.to_string(),
+        message,
+        license_id: pasted.license_id.clone(),
+        same_license: loaded.is_some(),
+        loaded_rev: hwm_rev.or(loaded.map(|l| l.rev)),
+        pasted_rev: pasted.rev,
+        waivers_added,
+        waivers_removed,
+    }
+}
+
+fn verdict_outcome(verdict: &Result<(), Rollback>) -> (&'static str, String) {
+    match verdict {
+        Ok(()) => (KEY_ACCEPTED, KEY_ACCEPTED_MSG.to_string()),
+        Err(r) => (r.reason.as_str(), rollback_body(r).message),
+    }
+}
+
+async fn preview_key(pasted: &License, loaded: Option<&License>, is_root: bool) -> Response {
+    let hwm = match load_rev_hwm().await {
+        Ok(hwm) => hwm,
+        Err(e) => return MetaHttpResponse::internal_error(e),
+    };
+    let (outcome, message) = verdict_outcome(&judge_paste(&hwm, pasted));
+    let hwm_rev = hwm.get(&pasted.license_id).map(|e| e.rev);
+    MetaHttpResponse::json(key_check_response(
+        outcome, message, hwm_rev, loaded, pasted, is_root,
+    ))
+}
+
 pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
     let o2_cfg = o2_enterprise::enterprise::common::config::get_config();
 
@@ -274,6 +416,7 @@ pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
 
 pub async fn store_license(
     Headers(user_email): Headers<UserEmail>,
+    axum::extract::Query(q): axum::extract::Query<StoreLicenseQuery>,
     axum::Json(req): axum::Json<SaveLicenseRequest>,
 ) -> Response {
     let email = user_email.user_id;
@@ -284,18 +427,43 @@ pub async fn store_license(
     let o2_cfg = o2_enterprise::enterprise::common::config::get_config();
     let env_key = &o2_cfg.common.license_key;
     let env = License::load_from_str(env_key).ok();
+    let is_root = db::user::is_root_user(&email);
+    let loaded = get_license().await.map(|(_, l)| l);
     if env_key_conflict(env_key, env.as_ref(), &req.raw_key, &req.key) {
-        return MetaHttpResponse::conflict(ENV_KEY_CONFLICT_MSG);
+        if q.dry_run {
+            return MetaHttpResponse::json(key_check_response(
+                ENV_KEY_CONFLICT,
+                ENV_KEY_CONFLICT_MSG.to_string(),
+                None,
+                loaded.as_ref(),
+                &req.key,
+                is_root,
+            ));
+        }
+        return (StatusCode::CONFLICT, Json(env_conflict_body(&req.key))).into_response();
     }
 
     if let Err(e) = check_license(&req.raw_key, &req.key).await {
         return MetaHttpResponse::bad_request(e.to_string());
     };
 
+    if q.dry_run {
+        return preview_key(&req.key, loaded.as_ref(), is_root).await;
+    }
+
+    match gate_and_raise(&req.key).await {
+        Ok(Ok(())) => {}
+        Ok(Err(r)) => return (StatusCode::CONFLICT, Json(rollback_body(&r))).into_response(),
+        Err(e) => return MetaHttpResponse::internal_error(e),
+    }
+
     let db = infra::db::get_db().await;
-    db.put(LICENSE_DB_KEY, req.raw_key.into(), false, None)
+    if let Err(e) = db
+        .put(LICENSE_DB_KEY, req.raw_key.into(), false, None)
         .await
-        .unwrap();
+    {
+        return MetaHttpResponse::internal_error(e);
+    }
     match license::update().await {
         Ok(_) => (StatusCode::CREATED, Json("")).into_response(),
         Err(e) => MetaHttpResponse::internal_error(e),
@@ -653,6 +821,191 @@ mod tests {
         .unwrap();
         assert_eq!(json["env_key_active"], true);
         assert_eq!(json["env_key_in_use"], true);
+    }
+
+    fn rollback(reason: RollbackReason, loaded_rev: i64, pasted_rev: i64) -> Rollback {
+        Rollback {
+            reason,
+            license_id: "lic-1".into(),
+            loaded_rev,
+            pasted_rev,
+        }
+    }
+
+    fn waiver(id: &str, ends_at: i64) -> Waiver {
+        let mut w: Waiver = json::from_value(scoped_waiver_json(id, INSTANCE_ID)).unwrap();
+        w.ends_at = ends_at;
+        w
+    }
+
+    #[test]
+    fn rollback_body_names_both_revs_and_keeps_a_numeric_code() {
+        let body = json::to_value(rollback_body(&rollback(
+            RollbackReason::RevRollback,
+            1_760_918_400_000_000,
+            1_760_400_000_000_000,
+        )))
+        .unwrap();
+        assert_eq!(
+            body,
+            json::json!({
+                "code": 409,
+                "message": "A newer key for this license is already applied (issued 2025-10-20).",
+                "reason": "rev_rollback",
+                "license_id": "lic-1",
+                "loaded_rev": 1_760_918_400_000_000_i64,
+                "pasted_rev": 1_760_400_000_000_000_i64,
+            })
+        );
+        for (reason, name) in [
+            (RollbackReason::RevConflict, "rev_conflict"),
+            (RollbackReason::Superseded, "superseded"),
+        ] {
+            let body = json::to_value(rollback_body(&rollback(reason, 5, 5))).unwrap();
+            assert_eq!(
+                (body["code"].as_u64(), body["reason"].as_str()),
+                (Some(409), Some(name))
+            );
+        }
+    }
+
+    #[test]
+    fn rollback_body_for_rev_zero_has_no_date() {
+        let legacy = rollback_body(&rollback(
+            RollbackReason::RevRollback,
+            1_760_918_400_000_000,
+            0,
+        ));
+        assert_eq!(legacy.pasted_rev, Some(0));
+        assert!(!legacy.message.contains("1970"), "{}", legacy.message);
+        let undated = rollback_body(&rollback(RollbackReason::RevConflict, 0, 0));
+        assert!(!undated.message.contains("issued"), "{}", undated.message);
+        assert!(!undated.message.contains("1970"), "{}", undated.message);
+    }
+
+    #[test]
+    fn env_key_conflict_body_carries_its_reason() {
+        let body = json::to_value(env_conflict_body(&lic("lic-1", 3))).unwrap();
+        assert_eq!(body["code"], 409);
+        assert_eq!(body["reason"], "env_key_conflict");
+        assert_eq!(body["message"], ENV_KEY_CONFLICT_MSG);
+        assert_eq!(body["license_id"], "lic-1");
+        assert!(body["loaded_rev"].is_null() && body["pasted_rev"].is_null());
+    }
+
+    #[test]
+    fn waiver_diff_lists_added_and_removed_for_the_same_license() {
+        let mut loaded = lic("lic-1", 1);
+        loaded.waivers = vec![
+            waiver("wv_keep", 10),
+            waiver("wv_gone", 10),
+            waiver("wv_edit", 10),
+        ];
+        let mut pasted = lic("lic-1", 2);
+        pasted.waivers = vec![
+            waiver("wv_keep", 10),
+            waiver("wv_edit", 20),
+            waiver("wv_new", 10),
+        ];
+        let (added, removed) = waiver_diff(Some(&loaded), &pasted);
+        let ids = |ws: &[Waiver]| ws.iter().map(|w| w.id.clone()).collect::<Vec<_>>();
+        assert_eq!(ids(&added), ["wv_edit", "wv_new"]);
+        assert_eq!(ids(&removed), ["wv_gone", "wv_edit"]);
+        assert_eq!(added[0].ends_at, 20);
+        assert_eq!(removed[1].ends_at, 10);
+    }
+
+    #[test]
+    fn waiver_diff_for_another_license_lists_all_pasted_as_added() {
+        let loaded = lic("lic-1", 1);
+        let pasted = lic("lic-2", 1);
+        let (added, removed) = waiver_diff(Some(&loaded), &pasted);
+        assert_eq!(added, pasted.waivers);
+        assert!(removed.is_empty());
+        let (added, removed) = waiver_diff(None, &pasted);
+        assert_eq!((added.len(), removed.len()), (2, 0));
+    }
+
+    #[test]
+    fn key_check_response_hides_scoped_installations_for_non_root() {
+        let loaded = lic("lic-1", 1);
+        let mut pasted = lic("lic-1", 2);
+        pasted.waivers.push(waiver("wv_new", 10));
+        let check = |is_root| {
+            json::to_value(key_check_response(
+                "accept",
+                KEY_ACCEPTED_MSG.to_string(),
+                Some(1),
+                Some(&loaded),
+                &pasted,
+                is_root,
+            ))
+            .unwrap()
+        };
+        let viewer = check(false);
+        assert_eq!(viewer["waivers_added"][0]["id"], "wv_new");
+        assert!(viewer["waivers_added"][0]["installation_id"].is_null());
+        assert!(!viewer.to_string().contains(INSTANCE_ID), "{viewer}");
+        assert_eq!(
+            (
+                &viewer["dry_run"],
+                &viewer["same_license"],
+                &viewer["loaded_rev"],
+                &viewer["pasted_rev"]
+            ),
+            (
+                &json::json!(true),
+                &json::json!(true),
+                &json::json!(1),
+                &json::json!(2)
+            )
+        );
+        let root = check(true);
+        assert_eq!(root["waivers_added"][0]["installation_id"], INSTANCE_ID);
+        let other = json::to_value(key_check_response(
+            ENV_KEY_CONFLICT,
+            ENV_KEY_CONFLICT_MSG.to_string(),
+            None,
+            Some(&loaded),
+            &lic("lic-2", 1),
+            false,
+        ))
+        .unwrap();
+        assert_eq!(other["outcome"], "env_key_conflict");
+        assert_eq!(other["same_license"], false);
+        assert!(other["loaded_rev"].is_null());
+        assert_eq!(other["waivers_added"].as_array().map(Vec::len), Some(2));
+    }
+
+    #[test]
+    fn verdict_outcome_names_the_refusal() {
+        assert_eq!(verdict_outcome(&Ok(())).0, "accept");
+        let r = rollback(RollbackReason::RevRollback, 9, 5);
+        assert_eq!(
+            verdict_outcome(&Err(r.clone())),
+            ("rev_rollback", rollback_body(&r).message)
+        );
+    }
+
+    #[test]
+    fn issued_on_formats_a_rev_and_is_empty_for_zero() {
+        assert_eq!(issued_on(1_760_918_400_000_000), "2025-10-20");
+        assert_eq!(issued_on(0), "");
+        assert_eq!(issued_on(-5), "");
+    }
+
+    #[test]
+    fn dry_run_query_defaults_to_false() {
+        let query = |uri: &str| {
+            axum::extract::Query::<StoreLicenseQuery>::try_from_uri(&uri.parse().unwrap())
+                .unwrap()
+                .0
+                .dry_run
+        };
+        assert!(!query("http://o2/api/license"));
+        assert!(!query("http://o2/api/license?dry_run=false"));
+        assert!(query("http://o2/api/license?dry_run=true"));
+        assert!(!StoreLicenseQuery::default().dry_run);
     }
 
     // a watcher fills these caches on a running node; a miss here would go to the database
