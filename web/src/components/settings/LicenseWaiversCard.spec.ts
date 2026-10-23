@@ -53,7 +53,7 @@ describe("LicenseWaiversCard", () => {
     expect(text).toContain("Active");
     expect(text).toContain("until Oct 27, 00:00");
     expect(text).toContain("Migration freeze");
-    expect(text).toContain("These came with your license key.");
+    expect(text).toContain("These come with your license.");
     expect(w.find("[data-test=license-waiver-row-wv_1]").exists()).toBe(true);
   });
 
@@ -125,4 +125,14 @@ describe("LicenseWaiversCard", () => {
     ]);
     expect(w.find("[data-test=license-waivers-card]").text()).toContain("Unlimited ingestion");
   });
+});
+
+it("explains manual online delivery and air-gapped key delivery", () => {
+  const w = mount(LicenseWaiversCard, {
+    props: { waivers: [waiver({})] },
+    global: { plugins: [i18n] },
+  });
+  expect(w.text()).toContain(
+    "These come with your license. Online installs pick up changes when an administrator clicks Refresh now; air-gapped installs apply a new key from OpenObserve here.",
+  );
 });
