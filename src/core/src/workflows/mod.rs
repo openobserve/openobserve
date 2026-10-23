@@ -23,7 +23,7 @@ use config::meta::{
 use db::{
     self,
     authz::{remove_ownership, set_ownership},
-    workflows::{AssociationDeleteEvent, WorkflowTriggerType},
+    workflows::{AssociationDeleteEvent, NotFound, WorkflowTriggerType},
 };
 use infra::table::workflows::{
     self, Workflow, WorkflowAssociation, WorkflowError, WorkflowRunData, WorkflowRunErrors,
@@ -525,10 +525,7 @@ pub async fn move_workflows(
         .filter(|id| !found.contains(id))
         .collect();
     if !missing.is_empty() {
-        return Err(anyhow::anyhow!(
-            "workflows not found: {}",
-            missing.join(", ")
-        ));
+        return Err(NotFound(format!("workflows not found: {}", missing.join(", "))).into());
     }
 
     let mut slugs: HashMap<&str, Option<String>> = HashMap::new();

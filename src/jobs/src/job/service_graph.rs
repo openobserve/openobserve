@@ -23,7 +23,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         // (Ingester/querier/compactor/router nodes exit here.)
         if !LOCAL_NODE.is_scheduler() {
             log::info!(
-                "[SERVICE_GRAPH::JOB] Service graph processor disabled on non-scheduler node (role: {:?})",
+                "[SERVICE_GRAPH::JOB] Service graph rollup disabled on non-scheduler node (role: {:?})",
                 LOCAL_NODE.role
             );
             return Ok(());
@@ -31,25 +31,12 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
         if !get_o2_config().service_graph.enabled {
             log::info!(
-                "[SERVICE_GRAPH::JOB] Service graph jobs disabled by O2_SERVICE_GRAPH_ENABLED"
+                "[SERVICE_GRAPH::JOB] Service graph rollup disabled by O2_SERVICE_GRAPH_ENABLED"
             );
             return Ok(());
         }
 
-        log::info!("[SERVICE_GRAPH::JOB] Service graph processor is enabled");
-
-        spawn_pausable_job!(
-            "service_graph_processor",
-            get_o2_config().service_graph.processing_interval_secs,
-            {
-                log::debug!("[SERVICE_GRAPH::JOB] Running service graph processing");
-                if let Err(e) =
-                    openobserve_core::traces::service_graph::process_service_graph().await
-                {
-                    log::error!("[SERVICE_GRAPH::JOB] Processing failed: {e}");
-                }
-            }
-        );
+        log::info!("[SERVICE_GRAPH::JOB] Service graph rollup is enabled");
 
         spawn_pausable_job!(
             "service_graph_v4",

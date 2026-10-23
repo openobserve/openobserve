@@ -106,6 +106,11 @@ impl std::fmt::Display for WorkflowTriggerType {
     }
 }
 
+/// A referenced folder or workflow does not exist, so handlers answer 404 instead of 500.
+#[derive(Debug, thiserror::Error)]
+#[error("{0}")]
+pub struct NotFound(pub String);
+
 pub const WORKFLOWS_PREFIX: &str = "/workflows/";
 
 static CACHE: LazyLock<RwLock<HashMap<String, Workflow>>> =
@@ -162,7 +167,7 @@ pub async fn resolve_folder_pk(org_id: &str, folder_slug: &str) -> Result<String
 
     infra::table::folders::get_pk_by_name(org_id, slug, FolderType::Workflows)
         .await?
-        .ok_or_else(|| anyhow::anyhow!("folder not found: {slug}"))
+        .ok_or_else(|| NotFound(format!("folder not found: {slug}")).into())
 }
 
 /// Lists an org's workflows in one folder, or across the org when `folder_slug`
@@ -190,7 +195,7 @@ pub async fn move_workflows(
     // Normalized once so the existence check and the pk lookup cannot disagree.
     let dst_slug = normalize_folder_slug(dst_folder_slug);
     if !infra::table::folders::exists(org_id, dst_slug, FolderType::Workflows).await? {
-        return Err(anyhow::anyhow!("destination folder not found"));
+        return Err(NotFound("destination folder not found".to_string()).into());
     }
     let pk = resolve_folder_pk(org_id, dst_slug).await?;
     infra::table::workflows::move_to_folder(org_id, workflow_ids, &pk).await?;

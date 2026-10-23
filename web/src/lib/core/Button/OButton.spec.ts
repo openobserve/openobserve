@@ -134,6 +134,33 @@ describe("OButton", () => {
     expect(wrapper.classes().join(" ")).toContain("text-button-ghost-destructive-text");
   });
 
+  it("paints pending as a solid amber fill bordered in its own colour, never warning or the accent", () => {
+    const wrapper = mount(OButton, { props: { variant: "pending" } });
+    const classes = wrapper.classes();
+    expect(classes).toEqual(
+      expect.arrayContaining([
+        "bg-button-pending-bg",
+        "text-button-pending-text",
+        "border",
+        "border-button-pending-bg",
+        "enabled:hover:bg-button-pending-hover-bg",
+        "enabled:hover:border-button-pending-hover-bg",
+        "enabled:active:bg-button-pending-active-bg",
+        "enabled:active:border-button-pending-active-bg",
+        "focus-visible:ring-button-pending-focus-ring",
+        "rounded-default",
+      ]),
+    );
+    const paint = classes.filter((value) => /^(enabled:\w+:)?(bg|text|border)-/.test(value));
+    expect(paint.filter((value) => /warning|accent|primary/.test(value))).toEqual([]);
+  });
+
+  it("dims a disabled pending button like warning", () => {
+    const wrapper = mount(OButton, { props: { variant: "pending", disabled: true } });
+    expect(wrapper.classes()).toContain("disabled:opacity-60");
+    expect(wrapper.attributes("data-o2-variant")).toBe("pending");
+  });
+
   // Destination previews are fixed-light brand replicas: the label must use the
   // fixed brand foreground, not text-text-inverse, which turns near-black in dark mode.
   it.each([
@@ -377,6 +404,7 @@ describe("OButton", () => {
     "filter-exclude",
     "ghost-warning",
     "warning",
+    "pending",
     "ghost-neutral",
     "outline-destructive",
     "cancel-query",

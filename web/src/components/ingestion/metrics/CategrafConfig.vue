@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <IngestionContent>
+  <IngestionContent snippet-kind="config" config-tool="Categraf">
     <CredentialCodeBlock slug="categraf" :content="content" />
     <IngestionDocLink href="https://github.com/flashcatcloud/categraf">
       {{ t("ingestion.categrafDocLinkText") }}

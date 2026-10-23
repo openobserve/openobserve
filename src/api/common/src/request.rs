@@ -28,9 +28,29 @@ pub struct BulkDeleteResponse {
     pub err: Option<String>,
 }
 
+/// Rejects ranges the file_list layer refuses, which would otherwise surface as a search 500.
+pub fn validate_time_range(start_time: i64, end_time: i64) -> Result<(), &'static str> {
+    if start_time <= 0 {
+        return Err("start_time must be a positive Unix timestamp in microseconds");
+    }
+    if start_time >= end_time {
+        return Err("start_time must be before end_time");
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_validate_time_range() {
+        assert!(validate_time_range(1, 2).is_ok());
+        assert!(validate_time_range(0, 2).is_err());
+        assert!(validate_time_range(-5, 2).is_err());
+        assert!(validate_time_range(2, 2).is_err());
+        assert!(validate_time_range(3, 2).is_err());
+    }
 
     #[test]
     fn test_bulk_delete_response_default() {

@@ -1922,6 +1922,51 @@ mod tests {
         }
     }
 
+    // A non-root caller missing from the user/org cache must get 403, not a panic.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_uncached_user_is_forbidden_not_a_panic() {
+        let user = || {
+            Headers(UserEmail {
+                user_id: "uncached-promql-user@example.com".to_owned(),
+            })
+        };
+        let responses = [
+            query_get(
+                Path("default".to_owned()),
+                Query(serde_json::from_value(serde_json::json!({"query": "up"})).unwrap()),
+                user(),
+                HeaderMap::new(),
+            )
+            .await,
+            query_range_get(
+                Path("default".to_owned()),
+                Query(
+                    serde_json::from_value(serde_json::json!({
+                        "query": "up", "start": "1700000000", "end": "1700000600", "step": "60"
+                    }))
+                    .unwrap(),
+                ),
+                user(),
+                HeaderMap::new(),
+            )
+            .await,
+            series_get(
+                Path("default".to_owned()),
+                Query(config::meta::promql::RequestSeries {
+                    matcher: Some("up".to_owned()),
+                    start: None,
+                    end: None,
+                }),
+                user(),
+            )
+            .await,
+        ];
+        for (i, response) in responses.into_iter().enumerate() {
+            assert_eq!(response.status(), StatusCode::FORBIDDEN, "handler #{i}");
+        }
+    }
+
     #[test]
     fn test_validate_metadata_params_rejects_non_exact_metric_names() {
         for query in [
