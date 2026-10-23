@@ -3942,7 +3942,7 @@
     "delete": "Supprimer",
     "confirmDeleteHead": "Supprimer le flux",
     "confirmBatchDeleteHead": "Supprimer des flux",
-    "confirmDeleteMsg": "Êtes-vous sûr de vouloir supprimer ce Stream ?",
+    "confirmDeleteMsg": "Êtes-vous sûr de vouloir supprimer le Stream {name} ?",
     "confirmBatchDeleteMsg": "Êtes-vous sûr de vouloir supprimer les flux sélectionnés ?",
     "deleteAssociatedAlertsPipelines": "Supprimer tous les pipelines et alertes associés au flux",
     "cancel": "Annuler",
