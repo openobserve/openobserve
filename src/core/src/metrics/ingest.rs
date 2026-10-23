@@ -15,7 +15,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    sync::Arc,
+    sync::{Arc, LazyLock},
     time::Instant,
 };
 
@@ -37,6 +37,7 @@ use config::{
         time::now_micros,
     },
 };
+use dashmap::DashSet;
 use datafusion::arrow::datatypes::{DataType, Schema};
 use infra::{errors::Result, schema::SchemaCache};
 use ingestion_common::IngestUser;
@@ -56,6 +57,11 @@ use crate::{
 
 /// Stands in for the partition keys of a stream that has none.
 static NO_PARTITION_KEYS: Vec<StreamPartition> = Vec::new();
+/// Caps the remembered too-long streams so distinct junk names cannot grow it without bound.
+const LONG_STREAMS_LOGGED_CAP: usize = 1024;
+
+/// Too-long streams already logged, so a client resending them every scrape does not flood the log.
+static LONG_STREAMS_LOGGED: LazyLock<DashSet<String>> = LazyLock::new(DashSet::new);
 
 /// A stream's records waiting for its pipelines, each with the data its handler carries along.
 pub(super) type PipelineInputs<T> = HashMap<String, Vec<(json::Value, T)>>;
@@ -437,6 +443,19 @@ pub(super) async fn write_streams(
 }
 
 /// Records a successful request against `endpoint` in the HTTP metrics.
+/// The rejection message when a metrics stream's file_list key is too long to store.
+pub(super) fn reject_long_stream(org_id: &str, stream_name: &str) -> Option<String> {
+    let message = schema::check_stream_key_len(org_id, StreamType::Metrics, stream_name)
+        .err()?
+        .to_string();
+    if LONG_STREAMS_LOGGED.len() < LONG_STREAMS_LOGGED_CAP
+        && LONG_STREAMS_LOGGED.insert(format!("{org_id}/{stream_name}"))
+    {
+        log::warn!("[METRICS] {message}");
+    }
+    Some(message)
+}
+
 pub(super) fn observe_request(endpoint: &str, org_id: &str, start: &Instant) {
     let labels = [
         endpoint,
@@ -714,5 +733,14 @@ mod tests {
         let written: usize = partitions.values().map(|p| p.records.len()).sum();
         assert_eq!(partitions.len(), 4);
         assert_eq!(written, timestamps.len());
+    }
+
+    #[test]
+    fn test_reject_long_stream() {
+        assert!(reject_long_stream("org", "http_requests_total").is_none());
+        let name = "envoy_".repeat(50);
+        let message = reject_long_stream("org", &name).unwrap();
+        assert!(message.starts_with("Stream name too long"), "{message}");
+        assert!(LONG_STREAMS_LOGGED.contains(&format!("org/{name}")));
     }
 }

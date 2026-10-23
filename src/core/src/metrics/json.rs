@@ -128,6 +128,9 @@ async fn buffer_record(
     if let Some(v) = record.get_mut(NAME_LABEL) {
         *v = json::Value::String(stream_name.clone());
     }
+    if ingest::reject_long_stream(org_id, &stream_name).is_some() {
+        return Ok(false);
+    }
 
     // check stream if it is deleting
     let is_deleting = match lookups.deleting.get(&stream_name) {
@@ -443,10 +446,10 @@ pub async fn ingest(
         }
     }
 
-    // warn if any records were skipped due to streams being deleted
+    // warn if any records were skipped due to streams being deleted or named too long
     if skipped_records > 0 {
         log::warn!(
-            "[METRICS:JSON] Skipped {skipped_records} records due to streams being deleted, org_id: {org_id}"
+            "[METRICS:JSON] Skipped {skipped_records} records due to streams being deleted or named too long, org_id: {org_id}"
         );
     }
 
@@ -482,6 +485,14 @@ pub async fn ingest(
     let mut stream_data_buf: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
     for (stream_name, records) in records_by_stream {
+        if let Some(message) = ingest::reject_long_stream(org_id, &stream_name) {
+            let stream_status = stream_status_map
+                .entry(stream_name.clone())
+                .or_insert_with(|| StreamStatus::new(&stream_name));
+            stream_status.status.failed += records.len() as u32;
+            stream_status.status.error = message;
+            continue;
+        }
         // redacted before finish_rows, so the series hash covers the stored values
         #[cfg(feature = "vectorscan")]
         let records = {

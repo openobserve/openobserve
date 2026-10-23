@@ -146,6 +146,9 @@ pub async fn remote_write(
     // parse metadata
     for item in request.metadata {
         let metric_name = format_stream_name(item.metric_family_name.to_string());
+        if ingest::reject_long_stream(org_id, &metric_name).is_some() {
+            continue;
+        }
         let schema = infra::schema::get(org_id, &metric_name, StreamType::Metrics)
             .await
             .unwrap_or_else(|_| Schema::empty());
@@ -554,6 +557,9 @@ pub async fn remote_write(
 
     let step_start = std::time::Instant::now();
     for (stream_name, mut json_data) in json_data_by_stream {
+        if ingest::reject_long_stream(org_id, &stream_name).is_some() {
+            continue;
+        }
         #[cfg(feature = "vectorscan")]
         apply_redaction(org_id, &stream_name, &mut json_data).await;
         finish_identity_columns(&mut json_data);

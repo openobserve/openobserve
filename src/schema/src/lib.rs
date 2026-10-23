@@ -60,6 +60,9 @@ pub use watcher::{
 };
 
 const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
+const STREAM_NAME_TOO_LONG: &str = "stream_name_too_long";
+/// Longest `{org}/{stream_type}/{stream}` key the PostgreSQL file_list tables can store.
+pub const STREAM_KEY_MAX_LEN: usize = 256;
 /// Shared by both ingestion-window discard messages and the test for them.
 const WINDOW_DISCARD_MARKER: &str = " data can be ingested. Data discarded.";
 
@@ -115,6 +118,30 @@ pub fn check_request_columns_limit(
     Err(get_request_columns_limit_error(
         &format!("{org_id}/{stream_type}/{stream_name}"),
         num_fields,
+    ))
+}
+
+/// Rejects a stream whose file_list key cannot be stored, so its files would never be listed.
+pub fn check_stream_key_len(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> Result<(), anyhow::Error> {
+    // VARCHAR(n) counts characters, not bytes
+    let len = org_id.chars().count() + stream_type.as_str().len() + stream_name.chars().count() + 2;
+    if len <= STREAM_KEY_MAX_LEN {
+        return Ok(());
+    }
+    metrics::INGEST_ERRORS
+        .with_label_values(&[
+            org_id,
+            stream_type.as_str(),
+            stream_name,
+            STREAM_NAME_TOO_LONG,
+        ])
+        .inc();
+    Err(anyhow::anyhow!(
+        "Stream name too long: {org_id}/{stream_type}/{stream_name} is {len} characters, only {STREAM_KEY_MAX_LEN} accepted. Data discarded."
     ))
 }
 
@@ -494,6 +521,7 @@ pub async fn check_for_schema(
     record_ts: i64,
     is_derived: bool,
 ) -> Result<(SchemaEvolution, Option<Schema>)> {
+    check_stream_key_len(org_id, stream_type, stream_name)?;
     if !stream_schema_map.contains_key(stream_name) {
         let schema = infra::schema::get_cache(org_id, stream_name, stream_type).await?;
         stream_schema_map.insert(stream_name.to_string(), schema);
@@ -1309,6 +1337,42 @@ mod tests {
         .await
         .unwrap();
         assert!(!result.is_schema_changed);
+    }
+
+    #[test]
+    fn test_check_stream_key_len_boundary() {
+        // "org/metrics/" is 12 characters
+        let fits = "m".repeat(STREAM_KEY_MAX_LEN - 12);
+        assert!(check_stream_key_len("org", StreamType::Metrics, &fits).is_ok());
+        let over = format!("{fits}m");
+        let err = check_stream_key_len("org", StreamType::Metrics, &over).unwrap_err();
+        assert!(err.to_string().contains("is 257 characters"), "{err}");
+        // a multi-byte name is measured in characters, as the VARCHAR column is
+        let wide = "é".repeat(STREAM_KEY_MAX_LEN - 12);
+        assert!(check_stream_key_len("org", StreamType::Metrics, &wide).is_ok());
+    }
+
+    /// A stream whose files could never be listed must not get a schema, so no data is written.
+    #[tokio::test]
+    async fn test_check_for_schema_rejects_too_long_stream() {
+        let stream_name = "s".repeat(STREAM_KEY_MAX_LEN);
+        let record: json::Value = json::from_str(r#"{"a": 1}"#).unwrap();
+        let mut map: HashMap<String, SchemaCache> = HashMap::new();
+        let Err(err) = check_for_schema(
+            "org",
+            &stream_name,
+            StreamType::Logs,
+            &mut map,
+            vec![record.as_object().unwrap()],
+            1234234234234,
+            false,
+        )
+        .await
+        else {
+            panic!("a too-long stream got a schema");
+        };
+        assert!(err.to_string().starts_with("Stream name too long"), "{err}");
+        assert!(map.is_empty());
     }
 
     /// The loser of a create race must adopt the winner's schema, not keep its empty one.
