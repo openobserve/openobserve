@@ -30,10 +30,7 @@ export class TracesPage {
     // (b) toolbar tabs on the Traces page switch the view IN-PAGE — the URL
     // stays on /traces and gains ?tab=. Keep both paths covered.
     this.tracesRailTile = '[data-test="nav-group-traces"]';
-    // #13852 rerouted the rail flyout's children through the Traces page's ?tab=
-    // views, so the child id is `nav-group-item-${child.name}-${child.tab}`
-    // (ONavGroup.vue:336). The old standalone `nav-group-item-serviceGraph` no
-    // longer renders — verified against a live env: count 0 vs 1 for this one.
+    // #13852: flyout child id is `nav-group-item-${child.name}-${child.tab}` (ONavGroup.vue:336).
     this.serviceMapsNavItem = '[data-test="nav-group-item-traces-service-graph"]';
     this.servicesCatalogNavItem = '[data-test="nav-group-item-servicesCatalog"]';
     this.serviceGraphTabToggle = '[data-test="traces-service-graph-toggle"]';
@@ -462,16 +459,12 @@ export class TracesPage {
   }
 
   async switchToServiceMaps() {
-    // The rail flyout opens on a REST, not on the first hover event: a continuous
-    // scan across tiles opens nothing, and a rest opens within ~300ms (AC-2/AC-4 in
-    // navRailHoverIntent). Clicking straight after hover() therefore races the
-    // flyout — the click lands on the page underneath and the URL never changes.
-    // Wait for the item itself instead of guessing a delay.
+    // Flyout opens on a hover REST (~300ms), not the first hover — wait for the item before clicking.
     const item = this.page.locator(this.serviceMapsNavItem);
     await this.page.locator(this.tracesRailTile).hover();
     await item.waitFor({ state: 'visible', timeout: 10000 });
     await item.click();
-    await this.page.waitForURL(/\/traces\/service-graph/, { timeout: 10000 }).catch(() => {});
+    await this.page.waitForURL(/\/traces\?.*tab=service-graph/, { timeout: 10000 }).catch(() => {});
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 

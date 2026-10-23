@@ -95,10 +95,7 @@ test.describe("Traces toolbar tabs (in-page)", () => {
 
     await pm.tracesPage.switchToServiceMaps();
 
-    // #13852 rerouted the flyout through the Traces page's ?tab= views: the old
-    // /traces/service-graph path survives only as a legacy redirect, so the flyout
-    // lands on the in-page tab. Asserted against a live env, which answers
-    // /web/traces?org_identifier=...&tab=service-graph.
+    // #13852 rerouted the flyout through the in-page tab; /traces/service-graph is only a legacy redirect.
     expect(page.url()).toMatch(/tab=service-graph/);
     await pm.tracesPage.expectServiceGraphViewVisible();
     testLogger.info('Service Graph in-page view rendered from the rail flyout');
