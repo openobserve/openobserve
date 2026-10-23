@@ -1721,17 +1721,17 @@ mod tests {
             (
                 "/api/{org_id}/fleet/collectors/{id}",
                 "delete",
-                &["204", "403", "404", "409"][..],
+                &["204", "403", "404"][..],
             ),
             ("/api/{org_id}/fleet/fleets", "get", &["200", "403"][..]),
             (
                 "/api/{org_id}/fleet/fleets/{fleet_id}/desired",
                 "put",
-                &["201", "400", "403", "404", "409"][..],
+                &["200", "400", "403", "404", "409"][..],
             ),
             (
-                "/api/v2/{org_id}/fleets/move",
-                "patch",
+                "/api/{org_id}/fleet/fleets/move",
+                "post",
                 &["200", "400", "403", "404", "409"][..],
             ),
             ("/api/{org_id}/fleet/configs", "get", &["200", "403"][..]),
@@ -1786,11 +1786,6 @@ mod tests {
                 "get",
                 &["200", "403", "404"][..],
             ),
-            (
-                "/api/{org_id}/fleet/flow",
-                "get",
-                &["200", "400", "403"][..],
-            ),
         ] {
             for code in codes {
                 assert!(
@@ -1800,13 +1795,12 @@ mod tests {
             }
         }
         for (path, method) in [
-            ("/api/{org_id}/fleet/collectors/{id}", "patch"),
             ("/api/{org_id}/fleet/rollouts", "post"),
             ("/api/{org_id}/fleet/rollouts/{id}", "patch"),
-            ("/api/{org_id}/fleet/rollouts/{id}/rollback", "post"),
+            ("/api/{org_id}/fleet/rollouts/{id}/revert", "post"),
             ("/api/{org_id}/fleet/rollouts/{id}/pause", "post"),
-            ("/api/{org_id}/fleet/rollouts/{id}/resume", "post"),
             ("/api/{org_id}/fleet/rollouts/{id}/stop", "post"),
+            ("/api/{org_id}/fleet/flow", "get"),
         ] {
             assert!(spec["paths"][path][method].is_null(), "{method} {path}");
         }

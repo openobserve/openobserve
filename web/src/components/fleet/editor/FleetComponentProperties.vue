@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="newKey"
           :label="t('fleet.editor.settingKey')"
           size="sm"
-          placeholder="headers.Authorization"
+          :placeholder="raw('headers.Authorization')"
           :help-text="t('fleet.editor.settingKeyHint')"
           :error="Boolean(newKeyError)"
           :error-message="newKeyError ?? undefined"
