@@ -536,7 +536,6 @@
     "actual_folder": "Traces",
     "browser": "chrome",
     "run_files": [
-      "traces-toolbar-tabs.spec.js",
       "traces-autocomplete-filter-mode.spec.js",
       "service-catalog.spec.js",
       "tracesSearch.spec.js",
