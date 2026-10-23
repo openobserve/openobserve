@@ -339,7 +339,7 @@ impl Rum {
             site: cfg.rum.site.to_string(),
             service: cfg.rum.service.to_string(),
             env: cfg.rum.env.to_string(),
-            version: cfg.rum.version.to_string(),
+            version: config::VERSION.to_string(),
             organization_identifier: cfg.rum.organization_identifier.to_string(),
             api_version: cfg.rum.api_version.to_string(),
             insecure_http: cfg.rum.insecure_http,
@@ -2456,6 +2456,12 @@ mod tests {
         assert!(!rum.version.is_empty());
         assert!(!rum.organization_identifier.is_empty());
         assert!(!rum.api_version.is_empty());
+    }
+
+    #[test]
+    fn test_rum_from_cfg_uses_build_version() {
+        let rum = Rum::from_cfg(get_config());
+        assert_eq!(rum.version, config::VERSION);
     }
 
     #[cfg(feature = "enterprise")]

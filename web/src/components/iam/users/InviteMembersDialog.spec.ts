@@ -296,10 +296,11 @@ describe("InviteMembersDialog", () => {
       setEmail(wrapper, "new@example.com");
       await submitForm(wrapper);
 
-      expect(analytics.track).toHaveBeenCalledWith(
-        "Button Click",
-        expect.objectContaining({ button: "Invite User", user_org: ORG, page: "Users" }),
-      );
+      expect(analytics.track).toHaveBeenCalledWith("Button Click", {
+        button: "Invite User",
+        user_org: ORG,
+        page: "Users",
+      });
     });
 
     it("shows an error toast and stays open when invalid_members are returned", async () => {

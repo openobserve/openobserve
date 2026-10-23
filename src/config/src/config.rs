@@ -3560,8 +3560,6 @@ pub struct RUM {
     pub service: String,
     #[env_config(name = "ZO_RUM_ENV", default = "")]
     pub env: String,
-    #[env_config(name = "ZO_RUM_VERSION", default = "")]
-    pub version: String,
     #[env_config(name = "ZO_RUM_ORGANIZATION_IDENTIFIER", default = "")]
     pub organization_identifier: String,
     #[env_config(name = "ZO_RUM_API_VERSION", default = "")]
