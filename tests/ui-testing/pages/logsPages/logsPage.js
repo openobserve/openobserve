@@ -13589,13 +13589,6 @@ export class LogsPage {
         });
     }
 
-    /** Assert Escape moved focus out of both editor hosts. */
-    async expectFocusOutsideEditor() {
-        await expect
-            .poll(() => this.hasEditorFocus(), { timeout: 10000, intervals: [100, 250, 500] })
-            .toBe(false);
-    }
-
     /** Assert focus is still inside the editor (e.g. after widget-close or fullscreen collapse). */
     async expectFocusInsideEditor() {
         await expect

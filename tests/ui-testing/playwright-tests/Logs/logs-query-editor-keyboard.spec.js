@@ -102,7 +102,7 @@ test.describe("Query Editor Keyboard Accessibility testcases", () => {
   );
 
   test(
-    "should close the suggest widget on the first Escape and leave the editor on the second",
+    "should close the suggest widget on the first Escape and move focus to the next control on the second",
     {
       tag: ["@query-editor-keyboard-accessibility", "@logs", "@a11y", "@all"],
     },
@@ -113,13 +113,13 @@ test.describe("Query Editor Keyboard Accessibility testcases", () => {
       await pm.logsPage.expectSuggestWidgetHidden();
       await pm.logsPage.expectFocusInsideEditor();
       await page.keyboard.press("Escape");
-      await pm.logsPage.expectFocusOutsideEditor();
+      await pm.logsPage.expectFocusOnFollowingControl();
       testLogger.info("Test completed");
     },
   );
 
   test(
-    "should collapse a text selection on the first Escape and leave the editor on the second",
+    "should collapse a text selection on the first Escape and move focus to the next control on the second",
     {
       tag: ["@query-editor-keyboard-accessibility", "@logs", "@a11y", "@all"],
     },
@@ -132,7 +132,7 @@ test.describe("Query Editor Keyboard Accessibility testcases", () => {
       await pm.logsPage.expectEditorSelectionCollapsed();
       await pm.logsPage.expectFocusInsideEditor();
       await page.keyboard.press("Escape");
-      await pm.logsPage.expectFocusOutsideEditor();
+      await pm.logsPage.expectFocusOnFollowingControl();
       testLogger.info("Test completed");
     },
   );
