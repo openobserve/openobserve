@@ -80,6 +80,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}</span>
           </div>
         </ODropdownItem>
+        <ODropdownItem data-test="dashboard-import-ready-made" @select="openReadyMade">
+          <div class="flex w-full items-center gap-2">
+            <div class="flex min-w-0 flex-1 flex-col">
+              <span>{{ t("dashboard.readyMade.importItem") }}</span>
+              <span class="text-dropdown-item-text text-xs opacity-60">{{
+                readyMadeSourceList
+              }}</span>
+            </div>
+            <OTag
+              v-if="readyMadeRef?.hasDataFound"
+              variant="primary-soft"
+              size="xs"
+              class="shrink-0"
+              data-test="dashboard-import-ready-made-data-found"
+              >{{ t("dashboard.readyMade.dataFound") }}</OTag
+            >
+          </div>
+        </ODropdownItem>
         <ODropdownSeparator />
         <ODropdownItem
           v-for="migration in migrationOptions"
@@ -121,6 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Right: dashboards table -->
       <div class="h-full min-w-0 flex-1 max-md:h-auto max-md:min-h-0">
         <div class="bg-card-glass-bg flex h-full flex-col">
+          <ReadyMadeOffers ref="readyMadeRef" @installed="onReadyMadeInstalled" />
           <div
             v-show="showFirstData"
             class="shrink-0 px-5 pt-5 empty:hidden"
@@ -598,6 +617,10 @@ import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import analytics from "@/services/product_analytics";
 import { useFavoriteDashboards, FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import ReadyMadeOffers from "@/components/dashboards/readyMade/ReadyMadeOffers.vue";
+import { READY_MADE_SOURCES } from "@/composables/readyMade/catalog";
+import { joinReadyMadeNamesCapped } from "@/composables/readyMade/readyMadeMessages";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
@@ -669,10 +692,12 @@ export default defineComponent({
     FolderList,
     OToggleGroup,
     OToggleGroupItem,
+    OTag,
+    ReadyMadeOffers,
   },
   setup() {
     const store = useStore();
-    const { t } = useI18nTyped();
+    const { t, locale } = useI18nTyped();
     const dashboard = ref({});
     const showAddDashboardDialog = ref(false);
     const showAddDashboardFromGitHub = ref(false);
@@ -1285,10 +1310,26 @@ export default defineComponent({
       },
       { once: true },
     );
+    const readyMadeRef = ref<InstanceType<typeof ReadyMadeOffers> | null>(null);
     // Bound to the refresh button and post-write reloads: both must reach the
     // server. Without `force` this read was a cache hit, so the Refresh button
     // issued no request at all inside the tier's staleTime.
-    const refreshDashboards = () => getDashboards(true);
+    const refreshDashboards = () => {
+      // The offer banner is on this view too, so a refresh reaches its reads as well.
+      void readyMadeRef.value?.refresh(true);
+      return getDashboards(true);
+    };
+
+    const readyMadeSourceList = computed(() =>
+      joinReadyMadeNamesCapped(
+        READY_MADE_SOURCES.map((source) => source.name),
+        locale.value,
+        t,
+      ),
+    );
+    const openReadyMade = () => readyMadeRef.value?.openImport();
+    // Post-write reload: the new dashboards will not appear from a cache hit.
+    const onReadyMadeInstalled = () => getDashboards(true);
 
     const getDashboards = async (force = false) => {
       const dismiss = toast({
@@ -1930,6 +1971,10 @@ export default defineComponent({
       isFavorite,
       toggleFavorite,
       showFavoritesOnly,
+      readyMadeRef,
+      readyMadeSourceList,
+      openReadyMade,
+      onReadyMadeInstalled,
     };
   },
   methods: {

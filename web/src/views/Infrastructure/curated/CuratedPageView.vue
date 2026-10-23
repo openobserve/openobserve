@@ -39,8 +39,14 @@ import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue"
 import type { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { getConsumableRelativeTime } from "@/utils/date";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import analytics from "@/services/product_analytics";
+import { getReadyMadeSource } from "@/composables/readyMade/catalog";
+import { installReadyMade } from "@/composables/readyMade/installReadyMade";
+import { describeReadyMadeInstall } from "@/composables/readyMade/readyMadeMessages";
 import type { WorkloadId } from "@/composables/useWorkloadDetection";
 import { curatedPacks } from "./packs";
+import { kubernetesDashboardForPageTab } from "./packs/kubernetes.dashboardTargets";
 import { FLEET_DRILLDOWN_EVENT, FLEET_DRILLDOWN_TAB } from "./packs/kubernetes.page";
 import { useCuratedPage } from "./useCuratedPage";
 import type { HiddenGroupInfo, StaleGroupInfo } from "./resolve";
@@ -51,7 +57,7 @@ const props = defineProps<{ workload: WorkloadId }>();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
-const { t } = useI18nTyped();
+const { t, locale } = useI18nTyped();
 
 // No fallback: a packless route rendering another workload's manifest is a lie, not a degradation.
 const pack = curatedPacks[props.workload];
@@ -628,15 +634,87 @@ const singleClusterName = computed(() => {
 
 // The "no data" state and the phase-tile subtitle both render ON the tile (§6.3), so PanelContainer owns them.
 
-/** Navigation only — it creates, copies, imports and forks nothing (§6.5). */
-const openDashboardsList = () => {
+/** The picked window as the `period` or `from`/`to` keys a dashboard reads on open. */
+const windowParams = (): Record<string, string> => {
   const window = selectedWindow.value;
   // A relative window travels as its PERIOD, so the destination re-anchors it rather than inheriting our materialized bounds.
-  const query =
-    window.kind === "relative"
-      ? { org_identifier: orgId.value, period: window.period }
-      : { org_identifier: orgId.value, from: String(window.from), to: String(window.to) };
-  router.push({ name: "dashboards", query });
+  return window.kind === "relative"
+    ? { period: window.period }
+    : { from: String(window.from), to: String(window.to) };
+};
+
+/** Navigation only — it creates, copies, imports and forks nothing (§6.5). */
+const openDashboardsList = () => {
+  router.push({ name: "dashboards", query: { org_identifier: orgId.value, ...windowParams() } });
+};
+
+// ── Edit as dashboard ───────────────────────────────────────────────────────
+
+// Only Kubernetes has ready-made copies, and only a rendered page has picks to carry over.
+const showEditAsDashboard = computed(() => props.workload === "kubernetes" && !!dashboard.value);
+const editingAsDashboard = ref(false);
+const kubernetesSource = getReadyMadeSource("kubernetes");
+
+/** A tab's picks for the named variables, as the unsuffixed `var-` keys a dashboard applies to every scope. */
+const scopeParams = (
+  tabId: string | null,
+  names: readonly string[],
+): Record<string, string | string[]> => {
+  const params: Record<string, any> = variablesManager.value?.getUrlParams({ useLive: false }) ?? {
+    ...route.query,
+  };
+  const picked: Record<string, string | string[]> = {};
+  for (const name of names) {
+    // Pickers are tab-scoped, so a pick is keyed by its tab; a drilldown or hand-typed URL carries the bare key.
+    const value = (tabId ? params[`var-${name}.t.${tabId}`] : undefined) ?? params[`var-${name}`];
+    if (value !== undefined && value !== null && value !== "") picked[`var-${name}`] = value;
+  }
+  return picked;
+};
+
+const editAsDashboard = async () => {
+  if (editingAsDashboard.value) return;
+  editingAsDashboard.value = true;
+  const org = orgId.value;
+  // Read before the first await: the tab, window and picks at the click are the ones to mirror.
+  const target = kubernetesDashboardForPageTab(selectedTabId.value);
+  const picks = scopeParams(selectedTabId.value, target.variables);
+  const timeParams = windowParams();
+  try {
+    const result = await installReadyMade(org, "kubernetes", {
+      userId: store.state.userInfo?.email,
+    });
+    if (result.status === "error") {
+      const count = kubernetesSource.dashboards.length;
+      toast({
+        variant: "error",
+        message:
+          result.kind === "forbidden"
+            ? t("dashboard.readyMade.forbidden")
+            : t("ingestion.setupCard.readyMadeFailed", { name: kubernetesSource.name }, count),
+      });
+      return;
+    }
+    if (result.status === "created") {
+      analytics.track("dashboard_created");
+      toast({ variant: "success", message: describeReadyMadeInstall(result, t, locale.value) });
+    }
+    const copy =
+      result.dashboards.find((entry) => entry.key === target.key) ?? result.dashboards[0];
+    await router.push({
+      path: "/dashboards/view",
+      query: {
+        org_identifier: org,
+        dashboard: copy.dashboardId,
+        folder: copy.folderId,
+        tab: target.tabId,
+        ...timeParams,
+        ...picks,
+      },
+    });
+  } finally {
+    editingAsDashboard.value = false;
+  }
 };
 
 // ── Range, focus and org-switch triggers ────────────────────────────────────
@@ -697,7 +775,19 @@ watch(
 </script>
 
 <template>
-  <OPageLayout :title="t(manifest.titleKey)" :icon="manifest.icon" bleed>
+  <OPageLayout :title="t(manifest.titleKey)" :icon="manifest.icon" bleed overflow-first>
+    <template v-if="showEditAsDashboard" #actions-overflow>
+      <OButton
+        variant="outline"
+        size="sm"
+        icon-left="dashboard-customize"
+        :loading="editingAsDashboard"
+        data-test="curated-edit-as-dashboard"
+        @click="editAsDashboard"
+      >
+        {{ t("infra.curated.editAsDashboard") }}
+      </OButton>
+    </template>
     <template #actions>
       <div class="flex items-center gap-2">
         <DateTime

@@ -1,0 +1,630 @@
+{
+  "version": 8,
+  "dashboardId": "",
+  "title": "SQL Server / Overview",
+  "description": "Connections, batch requests, compilations, lock waits and buffer cache for SQL Server reporting through the OpenTelemetry sqlserver receiver.",
+  "role": "ready-made:sqlserver/overview:1",
+  "owner": "",
+  "created": "2026-10-15T00:00:00.000Z",
+  "tabs": [
+    {
+      "tabId": "default",
+      "name": "Overview",
+      "panels": [
+        {
+          "id": "mssql_note",
+          "type": "markdown",
+          "title": "",
+          "description": "",
+          "config": {
+            "show_legends": false,
+            "legends_position": null
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "",
+              "vrlFunctionQuery": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 192,
+            "h": 4,
+            "i": 0
+          },
+          "htmlContent": "",
+          "markdownContent": "Ready-made by OpenObserve. Charts fill in within a few minutes of new data. Edit or delete anything, including this note."
+        },
+        {
+          "id": "mssql_connections",
+          "type": "metric",
+          "title": "User connections",
+          "description": "Connected user sessions. Several SQL Server instances share one series unless the receiver's sqlserver.computer.name and sqlserver.instance.name resource attributes are enabled (off by default).",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(sqlserver_user_connection_count)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "sqlserver_user_connection_count",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 4,
+            "w": 64,
+            "h": 6,
+            "i": 1
+          }
+        },
+        {
+          "id": "mssql_batch_requests_rate",
+          "type": "metric",
+          "title": "Batch requests/s",
+          "description": "T-SQL batches received per second, averaged over 5 minutes. The receiver reports sqlserver.batch.request.rate as a running total despite its name, so the chart takes its rate(). Several SQL Server instances share one series unless the receiver's sqlserver.computer.name and sqlserver.instance.name resource attributes are enabled (off by default).",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(sqlserver_batch_request_rate[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "sqlserver_batch_request_rate",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 64,
+            "y": 4,
+            "w": 64,
+            "h": 6,
+            "i": 2
+          }
+        },
+        {
+          "id": "mssql_compilations_rate",
+          "type": "metric",
+          "title": "SQL compilations/s",
+          "description": "Query plans compiled per second, averaged over 5 minutes. The receiver reports sqlserver.batch.sql_compilation.rate as a running total despite its name, so the chart takes its rate(). Several SQL Server instances share one series unless the receiver's sqlserver.computer.name and sqlserver.instance.name resource attributes are enabled (off by default).",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(sqlserver_batch_sql_compilation_rate[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "sqlserver_batch_sql_compilation_rate",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 128,
+            "y": 4,
+            "w": 64,
+            "h": 6,
+            "i": 3
+          }
+        },
+        {
+          "id": "mssql_cache_hit_ratio",
+          "type": "metric",
+          "title": "Buffer cache hit ratio",
+          "description": "Share of page reads served from the buffer cache without going to disk. Several SQL Server instances share one series unless the receiver's sqlserver.computer.name and sqlserver.instance.name resource attributes are enabled (off by default).",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "percent",
+            "unit_custom": null,
+            "decimals": 2,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "avg(sqlserver_page_buffer_cache_hit_ratio)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "sqlserver_page_buffer_cache_hit_ratio",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 10,
+            "w": 64,
+            "h": 6,
+            "i": 4
+          }
+        },
+        {
+          "id": "mssql_lock_waits_rate",
+          "type": "metric",
+          "title": "Lock waits/s",
+          "description": "Lock requests per second that had to wait, averaged over 5 minutes. Near 0 is healthy. The receiver reports sqlserver.lock.wait.rate as a running total despite its name, so the chart takes its rate(). Several SQL Server instances share one series unless the receiver's sqlserver.computer.name and sqlserver.instance.name resource attributes are enabled (off by default).",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 3,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(sqlserver_lock_wait_rate[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "sqlserver_lock_wait_rate",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 64,
+            "y": 10,
+            "w": 64,
+            "h": 6,
+            "i": 5
+          }
+        },
+        {
+          "id": "mssql_recompilations_rate",
+          "type": "metric",
+          "title": "SQL recompilations/s",
+          "description": "Statements recompiled per second, averaged over 5 minutes. The receiver reports sqlserver.batch.sql_recompilation.rate as a running total despite its name, so the chart takes its rate(). Several SQL Server instances share one series unless the receiver's sqlserver.computer.name and sqlserver.instance.name resource attributes are enabled (off by default).",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 2,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(sqlserver_batch_sql_recompilation_rate[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "sqlserver_batch_sql_recompilation_rate",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 128,
+            "y": 10,
+            "w": 64,
+            "h": 6,
+            "i": 6
+          }
+        },
+        {
+          "id": "mssql_lock_waits",
+          "type": "line",
+          "title": "Lock waits/s",
+          "description": "Lock requests per second that had to wait for another session. Flat at 0 is healthy: no request waited for a lock. The receiver reports sqlserver.lock.wait.rate as a running total despite its name, so the chart takes its rate(). Several SQL Server instances share one series unless the receiver's sqlserver.computer.name and sqlserver.instance.name resource attributes are enabled (off by default).",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 3,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(sqlserver_lock_wait_rate[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "sqlserver_lock_wait_rate",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "lock waits"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 16,
+            "w": 96,
+            "h": 14,
+            "i": 7
+          }
+        },
+        {
+          "id": "mssql_recompilations",
+          "type": "line",
+          "title": "SQL recompilations/s",
+          "description": "Statements recompiled per second. Low and steady is expected; a jump follows schema changes, statistics updates or plan-cache pressure. The receiver reports sqlserver.batch.sql_recompilation.rate as a running total despite its name, so the chart takes its rate(). Several SQL Server instances share one series unless the receiver's sqlserver.computer.name and sqlserver.instance.name resource attributes are enabled (off by default).",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 2,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(sqlserver_batch_sql_recompilation_rate[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "sqlserver_batch_sql_recompilation_rate",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "recompilations"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 16,
+            "w": 96,
+            "h": 14,
+            "i": 8
+          }
+        },
+        {
+          "id": "mssql_batch_requests",
+          "type": "line",
+          "title": "Batch requests/s",
+          "description": "T-SQL batches received per second. The receiver reports sqlserver.batch.request.rate as a running total despite its name, so the chart takes its rate(). Several SQL Server instances share one series unless the receiver's sqlserver.computer.name and sqlserver.instance.name resource attributes are enabled (off by default).",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 2,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(sqlserver_batch_request_rate[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "sqlserver_batch_request_rate",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "batch requests"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 30,
+            "w": 96,
+            "h": 14,
+            "i": 9
+          }
+        },
+        {
+          "id": "mssql_compilations_vs_batches",
+          "type": "line",
+          "title": "Compilations vs batch requests/s",
+          "description": "Query plans compiled per second next to batches received. Compilations close to batch requests mean plans are rarely reused. The receiver reports both as running totals despite their names, so the chart takes their rate(). Several SQL Server instances share one series unless the receiver's sqlserver.computer.name and sqlserver.instance.name resource attributes are enabled (off by default).",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 2,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(sqlserver_batch_request_rate[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "sqlserver_batch_request_rate",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "batch requests"
+              }
+            },
+            {
+              "query": "sum(rate(sqlserver_batch_sql_compilation_rate[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "sqlserver_batch_sql_compilation_rate",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "compilations"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 30,
+            "w": 96,
+            "h": 14,
+            "i": 10
+          }
+        },
+        {
+          "id": "mssql_connections_over_time",
+          "type": "line",
+          "title": "User connections",
+          "description": "Connected user sessions over time. Several SQL Server instances share one series unless the receiver's sqlserver.computer.name and sqlserver.instance.name resource attributes are enabled (off by default).",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(sqlserver_user_connection_count)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "sqlserver_user_connection_count",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "user connections"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 44,
+            "w": 96,
+            "h": 16,
+            "i": 11
+          }
+        },
+        {
+          "id": "mssql_cache_hit_ratio_over_time",
+          "type": "line",
+          "title": "Buffer cache hit ratio",
+          "description": "Share of page reads served from the buffer cache. A lasting drop below about 95% means the server needs more memory for its working set. Several SQL Server instances share one series unless the receiver's sqlserver.computer.name and sqlserver.instance.name resource attributes are enabled (off by default).",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "percent",
+            "unit_custom": null,
+            "decimals": 2,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "avg(sqlserver_page_buffer_cache_hit_ratio)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "sqlserver_page_buffer_cache_hit_ratio",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "hit ratio"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 44,
+            "w": 96,
+            "h": 16,
+            "i": 12
+          }
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "list": [],
+    "showDynamicFilters": true
+  },
+  "defaultDatetimeDuration": {
+    "type": "relative",
+    "relativeTimePeriod": "15m",
+    "startTime": 0,
+    "endTime": 0
+  }
+}

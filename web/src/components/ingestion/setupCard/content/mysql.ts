@@ -18,6 +18,7 @@
 import { raw, type TranslateFn } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
+import { getReadyMadeSource } from "@/composables/readyMade/catalog";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
 import {
@@ -187,6 +188,14 @@ export default function mysqlCard(subs: CardSubstitutions, t: TranslateFn): Rich
           t("ingestion.setupCard.pillRowLocks"),
           t("ingestion.setupCard.pillHandlers"),
         ],
+        action: {
+          id: "open-ready-made-dashboard",
+          label: t("ingestion.setupCard.readyMadeOpenOne", {
+            name: getReadyMadeSource("mysql").name,
+          }),
+          icon: "dashboard",
+          showOnDetect: true,
+        },
       },
       // ── Database Monitoring (optional) ──────────────────────────────────
       // See postgres.ts for why these are separate from the metrics steps: the

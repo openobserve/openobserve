@@ -1,0 +1,920 @@
+{
+  "version": 8,
+  "dashboardId": "",
+  "title": "PostgreSQL / Overview",
+  "description": "Connections, transactions, row activity, I/O and size for PostgreSQL databases reporting through the OpenTelemetry postgresql receiver.",
+  "role": "ready-made:postgresql/overview:1",
+  "owner": "",
+  "created": "2026-10-12T00:00:00.000Z",
+  "tabs": [
+    {
+      "tabId": "default",
+      "name": "Overview",
+      "panels": [
+        {
+          "id": "pg_note",
+          "type": "markdown",
+          "title": "",
+          "description": "",
+          "config": {
+            "show_legends": false,
+            "legends_position": null
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "",
+              "vrlFunctionQuery": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 192,
+            "h": 4,
+            "i": 0
+          },
+          "htmlContent": "",
+          "markdownContent": "Ready-made by OpenObserve. Charts fill in within a few minutes of new data. Edit or delete anything, including this note."
+        },
+        {
+          "id": "pg_connections",
+          "type": "metric",
+          "title": "Connections",
+          "description": "Open connections to the selected databases.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(postgresql_backends{postgresql_database_name=~\"$database\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "postgresql_backends",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 4,
+            "w": 64,
+            "h": 6,
+            "i": 1
+          }
+        },
+        {
+          "id": "pg_connection_use",
+          "type": "metric",
+          "title": "Connection use",
+          "description": "Open connections to the selected databases as a share of the server's max_connections.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "percent",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "100 * sum(postgresql_backends{postgresql_database_name=~\"$database\"}) / max(postgresql_connection_max)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "postgresql_backends",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 64,
+            "y": 4,
+            "w": 64,
+            "h": 6,
+            "i": 2
+          }
+        },
+        {
+          "id": "pg_commits_rate",
+          "type": "metric",
+          "title": "Commits/s",
+          "description": "Committed transactions per second, averaged over 5 minutes.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(postgresql_commits{postgresql_database_name=~\"$database\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "postgresql_commits",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 128,
+            "y": 4,
+            "w": 64,
+            "h": 6,
+            "i": 3
+          }
+        },
+        {
+          "id": "pg_rollback_ratio",
+          "type": "metric",
+          "title": "Rollback ratio",
+          "description": "Rolled-back transactions as a share of all transactions, over 5 minutes. Near 0% on a healthy database.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "percent",
+            "unit_custom": null,
+            "decimals": 2,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "100 * sum(rate(postgresql_rollbacks{postgresql_database_name=~\"$database\"}[5m])) / (sum(rate(postgresql_commits{postgresql_database_name=~\"$database\"}[5m])) + sum(rate(postgresql_rollbacks{postgresql_database_name=~\"$database\"}[5m])))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "postgresql_rollbacks",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 10,
+            "w": 64,
+            "h": 6,
+            "i": 4
+          }
+        },
+        {
+          "id": "pg_rows_written_rate",
+          "type": "metric",
+          "title": "Rows written/s",
+          "description": "Rows inserted, updated and deleted per second, averaged over 5 minutes.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(postgresql_operations{postgresql_database_name=~\"$database\",operation=~\"^(ins|upd|del)$\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "postgresql_operations",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 64,
+            "y": 10,
+            "w": 64,
+            "h": 6,
+            "i": 5
+          }
+        },
+        {
+          "id": "pg_db_size",
+          "type": "metric",
+          "title": "Database size",
+          "description": "Disk space used by the selected databases.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "bytes",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(postgresql_db_size{postgresql_database_name=~\"$database\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "postgresql_db_size",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 128,
+            "y": 10,
+            "w": 64,
+            "h": 6,
+            "i": 6
+          }
+        },
+        {
+          "id": "pg_rollbacks",
+          "type": "line",
+          "title": "Rollbacks/s by database",
+          "description": "Transactions rolled back per second, per database. Flat at 0 is healthy: nothing was rolled back.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 4,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (postgresql_database_name)(rate(postgresql_rollbacks{postgresql_database_name=~\"$database\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "postgresql_rollbacks",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{postgresql_database_name}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 16,
+            "w": 96,
+            "h": 14,
+            "i": 7
+          }
+        },
+        {
+          "id": "pg_deadlocks",
+          "type": "line",
+          "title": "Deadlocks (per 5 min)",
+          "description": "Deadlocks detected in the previous 5 minutes, per database. Flat at 0 is healthy: no deadlocks. Needs `postgresql.deadlocks` / `postgresql.blks_hit` + `postgresql.blks_read` enabled in your collector config (off by default).",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (postgresql_database_name)(increase(postgresql_deadlocks{postgresql_database_name=~\"$database\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "postgresql_deadlocks",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{postgresql_database_name}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 16,
+            "w": 96,
+            "h": 14,
+            "i": 8
+          }
+        },
+        {
+          "id": "pg_commits_by_db",
+          "type": "line",
+          "title": "Commits/s by database",
+          "description": "Committed transactions per second, per database.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (postgresql_database_name)(rate(postgresql_commits{postgresql_database_name=~\"$database\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "postgresql_commits",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{postgresql_database_name}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 30,
+            "w": 96,
+            "h": 16,
+            "i": 9
+          }
+        },
+        {
+          "id": "pg_row_operations",
+          "type": "line",
+          "title": "Row operations/s",
+          "description": "Rows inserted (ins), updated (upd, of which hot_upd were HOT updates) and deleted (del) per second.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (operation)(rate(postgresql_operations{postgresql_database_name=~\"$database\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "postgresql_operations",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{operation}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 30,
+            "w": 96,
+            "h": 16,
+            "i": 10
+          }
+        },
+        {
+          "id": "pg_index_scans",
+          "type": "line",
+          "title": "Index scans/s (top 10 tables)",
+          "description": "Index scans per second on the 10 busiest tables.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "topk(10, sum by (postgresql_table_name)(rate(postgresql_index_scans{postgresql_database_name=~\"$database\"}[5m])))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "postgresql_index_scans",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{postgresql_table_name}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 46,
+            "w": 96,
+            "h": 16,
+            "i": 11
+          }
+        },
+        {
+          "id": "pg_blocks_read",
+          "type": "line",
+          "title": "Block reads/s by source",
+          "description": "Table, index and TOAST blocks read per second: *_hit came from the buffer cache, *_read from disk.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (source)(rate(postgresql_blocks_read{postgresql_database_name=~\"$database\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "postgresql_blocks_read",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{source}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 46,
+            "w": 96,
+            "h": 16,
+            "i": 12
+          }
+        },
+        {
+          "id": "pg_buffers_written",
+          "type": "line",
+          "title": "Buffers written/s",
+          "description": "Buffers written per second by checkpoints, the background writer and backends. Whole server, not filtered by database.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (source)(rate(postgresql_bgwriter_buffers_writes[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "postgresql_bgwriter_buffers_writes",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{source}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 62,
+            "w": 96,
+            "h": 16,
+            "i": 13
+          }
+        },
+        {
+          "id": "pg_checkpoints",
+          "type": "line",
+          "title": "Checkpoints (per 5 min)",
+          "description": "Checkpoints in the previous 5 minutes; many requested ones mean WAL fills up before the timeout. Whole server.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (type)(increase(postgresql_bgwriter_checkpoint_count[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "postgresql_bgwriter_checkpoint_count",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{type}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 62,
+            "w": 96,
+            "h": 16,
+            "i": 14
+          }
+        },
+        {
+          "id": "pg_connections_vs_max",
+          "type": "line",
+          "title": "Connections vs max",
+          "description": "Open connections to the selected databases against the server's max_connections.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(postgresql_backends{postgresql_database_name=~\"$database\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "postgresql_backends",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "connections"
+              }
+            },
+            {
+              "query": "max(postgresql_connection_max)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "postgresql_connection_max",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "max_connections"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 78,
+            "w": 96,
+            "h": 16,
+            "i": 15
+          }
+        },
+        {
+          "id": "pg_cache_hit_ratio",
+          "type": "line",
+          "title": "Cache hit ratio",
+          "description": "Share of block reads served from the buffer cache: blks_hit / (blks_hit + blks_read). Needs `postgresql.deadlocks` / `postgresql.blks_hit` + `postgresql.blks_read` enabled in your collector config (off by default).",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "percent",
+            "unit_custom": null,
+            "decimals": 2,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "100 * sum(rate(postgresql_blks_hit{postgresql_database_name=~\"$database\"}[5m])) / (sum(rate(postgresql_blks_hit{postgresql_database_name=~\"$database\"}[5m])) + sum(rate(postgresql_blks_read{postgresql_database_name=~\"$database\"}[5m])))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "postgresql_blks_hit",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "cache hit ratio"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 78,
+            "w": 96,
+            "h": 16,
+            "i": 16
+          }
+        },
+        {
+          "id": "pg_largest_tables",
+          "type": "table",
+          "title": "Largest tables",
+          "description": "The 10 tables using the most disk space.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "bytes",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": [],
+            "promql_table_mode": "all"
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "topk(10, sum by (postgresql_database_name, postgresql_table_name)(postgresql_table_size{postgresql_database_name=~\"$database\"}))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "postgresql_table_size",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 94,
+            "w": 96,
+            "h": 16,
+            "i": 17
+          }
+        },
+        {
+          "id": "pg_dead_rows",
+          "type": "table",
+          "title": "Dead rows (top 10 tables)",
+          "description": "Tables with the most dead rows waiting for vacuum.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": [],
+            "promql_table_mode": "all"
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "topk(10, sum by (postgresql_database_name, postgresql_table_name)(postgresql_rows{postgresql_database_name=~\"$database\",state=\"dead\"}))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "postgresql_rows",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 94,
+            "w": 96,
+            "h": 16,
+            "i": 18
+          }
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "list": [
+      {
+        "type": "query_values",
+        "name": "database",
+        "label": "Database",
+        "query_data": {
+          "stream_type": "metrics",
+          "stream": "postgresql_backends",
+          "field": "postgresql_database_name",
+          "max_record_size": 100,
+          "filter": []
+        },
+        "value": "",
+        "options": [],
+        "multiSelect": true,
+        "selectAllValueForMultiSelect": "all",
+        "scope": "global"
+      }
+    ],
+    "showDynamicFilters": true
+  },
+  "defaultDatetimeDuration": {
+    "type": "relative",
+    "relativeTimePeriod": "15m",
+    "startTime": 0,
+    "endTime": 0
+  }
+}

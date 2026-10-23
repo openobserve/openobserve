@@ -187,4 +187,21 @@ describe("useWorkloadDetection", () => {
       expect(a.states.value.hosts).toBe("detected");
     });
   });
+
+  describe("metricNames (ready-made detection reads the same list)", () => {
+    it("is null before the first read and after a failed one", async () => {
+      const { metricNames, refresh } = useWorkloadDetection();
+      expect(metricNames.value).toBeNull();
+      getStreams.mockImplementation(() => Promise.reject(new Error("down")));
+      await refresh();
+      expect(metricNames.value).toBeNull();
+    });
+
+    it("exposes the metrics names the last refresh read", async () => {
+      mockStreamLists({ metrics: ["redis_a", "redis_b"], logs: ["default"] });
+      const { metricNames, refresh } = useWorkloadDetection();
+      await refresh();
+      expect(metricNames.value).toEqual(["redis_a", "redis_b"]);
+    });
+  });
 });
