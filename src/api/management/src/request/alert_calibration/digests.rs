@@ -368,4 +368,9 @@ mod tests {
         assert!(Columns::Finding.not_written_yet(&field));
         assert!(!Columns::Finding.not_written_yet(&timeout));
     }
+
+    #[test]
+    fn operational_allowlist_names_match_their_writers() {
+        assert!(search_service::is_operational_stream(DIGEST_STREAM));
+    }
 }
