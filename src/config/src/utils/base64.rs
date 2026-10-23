@@ -33,6 +33,14 @@ pub fn decode_raw(s: impl AsRef<[u8]>) -> Result<Vec<u8>, Error> {
         .map_err(|e| Error::new(ErrorKind::InvalidData, format!("base64 decode error: {e}")))
 }
 
+/// Trimmed exactly as the validator trims it, so every prefix check sees the same password.
+pub fn basic_password(auth: &str) -> Option<String> {
+    let decoded = decode(auth.strip_prefix("Basic ")?.trim()).ok()?;
+    decoded
+        .split_once(':')
+        .map(|(_, password)| password.trim().to_string())
+}
+
 pub fn encode(s: &str) -> String {
     base64::engine::general_purpose::STANDARD.encode(s.as_bytes())
 }
@@ -52,6 +60,26 @@ pub fn decode_url(s: &str) -> Result<String, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn basic_password_is_trimmed_like_the_validator_trims_it() {
+        let basic = |credentials: &str| format!("Basic {}", encode(credentials));
+        assert_eq!(
+            basic_password(&basic("agent:o2ft_x")).as_deref(),
+            Some("o2ft_x")
+        );
+        assert_eq!(
+            basic_password(&basic("agent: o2ft_x")).as_deref(),
+            Some("o2ft_x")
+        );
+        assert_eq!(
+            basic_password(&basic("agent:o2ft_x\n")).as_deref(),
+            Some("o2ft_x")
+        );
+        assert_eq!(basic_password("Bearer o2ft_x"), None);
+        assert_eq!(basic_password("Basic %%%not-base64"), None);
+        assert_eq!(basic_password(&basic("no-colon")), None);
+    }
 
     #[test]
     fn test_decode() {

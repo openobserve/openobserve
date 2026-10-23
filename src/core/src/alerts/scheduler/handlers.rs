@@ -778,7 +778,38 @@ pub async fn handle_triggers(
         db::scheduler::TriggerModule::AlertCalibration => {
             super::calibration::handle_triggers(trace_id, trigger).await
         }
+        db::scheduler::TriggerModule::FleetRollout => handle_fleet_rollout_triggers(trigger).await,
     }
+}
+
+/// Region-local (D21): only `infra::scheduler`, which never replicates to other regions.
+#[cfg(feature = "enterprise")]
+async fn handle_fleet_rollout_triggers(
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    use o2_enterprise::enterprise::fleet::rollouts;
+
+    // §17: the flag off freezes rollouts; the unreleased claim lapses and the job comes back later.
+    if !crate::fleet::enabled() {
+        return Ok(());
+    }
+    // The tick re-arms or deletes its own job row, fenced by this claim.
+    rollouts::tick(&trigger, config::utils::time::now_micros()).await?;
+    Ok(())
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn handle_fleet_rollout_triggers(
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    // A row can survive a downgrade, so drop it rather than leave it retried forever.
+    infra::scheduler::delete(
+        &trigger.org,
+        db::scheduler::TriggerModule::FleetRollout,
+        &trigger.module_key,
+    )
+    .await?;
+    Ok(())
 }
 
 /// Dropped rather than re-armed once the ladder ends: a timer outliving it fires at nobody.
