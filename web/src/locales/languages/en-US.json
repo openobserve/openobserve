@@ -2813,6 +2813,7 @@
     "online_unchanged": "License is up to date",
     "online_rotated": "Installation key rotated.",
     "online_successor_fetched": "renewed license fetched ({id}, expires {date})",
+    "online_blocked_until": "the current license keeps working until {date}",
     "online_title": "Online refresh",
     "online_last_refreshed": "Last refreshed",
     "online_last_error": "Last error",

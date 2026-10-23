@@ -105,6 +105,7 @@
           <LicenseOnlineRefreshCard
             v-if="licenseData.refresh"
             :refresh="licenseData.refresh"
+            :license-expires-at="licenseData.license.expires_at"
             :can-update="licenseData.can_update_license === true"
             :env-key-active="!!licenseData.env_key_active"
             :is-root="!!licenseData.refresh.key_id || !!licenseData.refresh.stored_key"
