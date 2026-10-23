@@ -2088,3 +2088,12 @@ describe("MainLayout — AI Observability menu visibility (isAiObservabilityMenu
     });
   });
 });
+
+describe("license search banner mount", () => {
+  it("mounts LicenseSearchBanner only for self-hosted enterprise", () => {
+    const source = readFileSync(resolve(__dirname, "./MainLayout.vue"), "utf8");
+    expect(source).toMatch(
+      /<LicenseSearchBanner\s+v-if="config\.isEnterprise === 'true' && config\.isCloud === 'false'"\s*\/>/,
+    );
+  });
+});

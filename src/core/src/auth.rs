@@ -97,6 +97,11 @@ pub fn org_from_path<'a>(path_columns: &[&'a str]) -> &'a str {
     }
 }
 
+/// The license routes name no org, so a user lookup cannot take one from their path.
+pub fn is_license_path_without_org(path_columns: &[&str]) -> bool {
+    matches!(path_columns, ["license"] | ["license", "refresh"])
+}
+
 /// The path as the router matched it, below the mount prefixes axum has already stripped.
 pub fn routed_path(uri_path: &str) -> &str {
     uri_path.strip_prefix('/').unwrap_or(uri_path)
