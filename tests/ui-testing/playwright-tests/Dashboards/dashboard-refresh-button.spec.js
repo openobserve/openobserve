@@ -90,7 +90,7 @@ test.describe('Dashboard Refresh Button (primary variant & label)', { tag: ['@da
     testLogger.info('TC-RB-002 completed');
   });
 
-  test('TC-RB-003: a pending refresh turns both the Refresh button and its options trigger warning, then primary after Refresh', { tag: ['@P1'] }, async () => {
+  test('TC-RB-003: a pending refresh turns both the Refresh button and its options trigger pending, then primary after Refresh', { tag: ['@P1'] }, async () => {
     const autoRun = pm.dashboardAutoRun;
     await autoRun.pinAutoQuery(false);
     await autoRun.setStoredAutoRun('false');
@@ -103,8 +103,8 @@ test.describe('Dashboard Refresh Button (primary variant & label)', { tag: ['@da
     const base = await autoRun.settledRunCount('var');
 
     await autoRun.selectVariableValue('ns', first);
-    await autoRun.expectRefreshVariant('warning');
-    await autoRun.expectRefreshOptionsVariant('warning');
+    await autoRun.expectRefreshVariant('pending');
+    await autoRun.expectRefreshOptionsVariant('pending');
 
     await autoRun.clickRefresh();
     await autoRun.waitForRuns('var', base + 1);
