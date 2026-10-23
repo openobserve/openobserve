@@ -67,6 +67,7 @@ import { LoginPage } from "./generalPages/loginPage.js";
 import { IngestionPage } from "./generalPages/ingestionPage.js";
 import { CloudLoginPage } from "./cloudPages/cloudLoginPage.js";
 import { isCloudEnvironment } from "./cloudPages/cloud-env.js";
+import { BillingInvoicesPage } from "./cloudPages/billingInvoicesPage.js";
 import { IngestionConfigPage } from "./generalPages/ingestionConfigPage.js";
 import { RouteGuardPage } from "./generalPages/routeGuardPage.js";
 import { SplunkHecPage } from "./generalPages/splunkHecPage.js";
@@ -250,6 +251,7 @@ class PageManager {
     this.pipelinesPage = new PipelinesPage(page);
     this.pipelinesFormValidation = new PipelinesFormValidationPage(page);
     this.loginPage = isCloudEnvironment() ? new CloudLoginPage(page) : new LoginPage(page);
+    this.billingInvoicesPage = new BillingInvoicesPage(page);
     this.ingestionPage = new IngestionPage(page);
     this.routeGuardPage = new RouteGuardPage(page);
     this.ingestionConfigPage = new IngestionConfigPage(page);
