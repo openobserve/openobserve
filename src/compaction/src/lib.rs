@@ -209,6 +209,9 @@ pub async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
         let stream_type = StreamType::Metrics;
         let streams = stream_types.remove(&stream_type).unwrap_or_default();
         for stream_name in streams {
+            if schema::is_stream_key_too_long(&org_id, stream_type, &stream_name) {
+                continue; // add_job would fail on the file_list_jobs stream column
+            }
             let Some(node_name) =
                 get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
             else {
