@@ -20,10 +20,10 @@ use axum::{
 use config::{meta::user::UserRole, utils::str::mask_license_key};
 use db::license;
 use o2_enterprise::enterprise::license::{
-    BelowHwm, LICENSE_DB_KEY, License, LicenseDecision, LicenseStatus, Rollback, RollbackReason,
-    Waiver, check_license, gate_and_raise, get_license, ingestion_limit_exceeded_count,
-    ingestion_used, judge_paste, license_expired, license_status, load_rev_hwm,
-    pasted_key_supersedes_env, rev_hwm_warning, undo_raise,
+    BelowHwm, LICENSE_DB_KEY, License, LicenseDecision, LicenseStatus, RefreshBusy, RefreshReport,
+    Rollback, RollbackReason, Waiver, check_license, click_refresh, gate_and_raise, get_license,
+    ingestion_limit_exceeded_count, ingestion_used, judge_paste, license_expired, license_status,
+    load_rev_hwm, pasted_key_supersedes_env, rev_hwm_warning, undo_raise,
 };
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::{AuthExtractor, UserEmail};
@@ -54,6 +54,13 @@ struct LicenseResponse {
     /// Whether `POST /license/refresh` would pass both its route check and its handler check.
     can_update_license: bool,
     rev_hwm_warning: Option<BelowHwm>,
+}
+
+#[derive(Serialize)]
+struct RefreshBody {
+    limits_refreshed: bool,
+    #[serde(flatten)]
+    report: RefreshReport,
 }
 
 pub struct SaveLicenseRequest {
@@ -396,6 +403,28 @@ async fn preview_key(pasted: &License, loaded: Option<&License>, is_root: bool) 
     ))
 }
 
+fn refresh_response(
+    limits_refreshed: bool,
+    report: Result<RefreshReport, RefreshBusy>,
+) -> Response {
+    match report {
+        Ok(report) => MetaHttpResponse::json(RefreshBody {
+            limits_refreshed,
+            report,
+        }),
+        Err(RefreshBusy) => (
+            StatusCode::CONFLICT,
+            Json(serde_json::json!({
+                "code": 409,
+                "reason": "refresh_in_progress",
+                "message": "A license refresh is already running. Try again in a moment.",
+                "limits_refreshed": limits_refreshed,
+            })),
+        )
+            .into_response(),
+    }
+}
+
 pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
     let o2_cfg = o2_enterprise::enterprise::common::config::get_config();
 
@@ -499,17 +528,11 @@ pub async fn refresh_license_limits(Headers(user_email): Headers<UserEmail>) -> 
         return MetaHttpResponse::forbidden("Unauthorized Access to license");
     }
 
-    // check  if license is present. If not present, no point in refreshing
-    match get_license().await {
-        Some(_) => {}
-        None => return (StatusCode::OK, Json("")).into_response(),
-    };
-
-    // the nats handling flow will trigger limit refresh in all nodes
-    match license::update().await {
-        Ok(_) => (StatusCode::OK, Json("")).into_response(),
-        Err(e) => MetaHttpResponse::internal_error(e),
-    }
+    let limits_refreshed = get_license().await.is_some() && license::update().await.is_ok();
+    refresh_response(
+        limits_refreshed,
+        click_refresh(&email, || async { license::update().await }).await,
+    )
 }
 
 #[cfg(test)]
@@ -1096,7 +1119,16 @@ mod tests {
         infra::db::create_table().await.unwrap();
         join(config::DEFAULT_ORG, STORE_ROOT, UserRole::Root);
         let db = infra::db::get_db().await;
-        for key in [LICENSE_DB_KEY, LICENSE_REV_HWM_KEY] {
+        *o2_enterprise::enterprise::license::LICENSE
+            .get_or_init(|| tokio::sync::RwLock::new(None))
+            .write()
+            .await = None;
+        for key in [
+            LICENSE_DB_KEY,
+            LICENSE_REV_HWM_KEY,
+            o2_enterprise::enterprise::license::LICENSE_INSTANCE_KEY,
+            o2_enterprise::enterprise::license::LICENSE_REFRESH_STATE_KEY,
+        ] {
             let _ = db.delete(key, false, false, None).await;
         }
         guard
@@ -1137,6 +1169,125 @@ mod tests {
             .await,
         )
         .await
+    }
+
+    async fn load_refresh_license(environment: &str) {
+        let license = License::from_claims_for_tests(json::json!({
+            "version": 2,
+            "installation_id": INSTANCE_ID,
+            "license_id": "lic-online",
+            "active": true,
+            "created_at": 0,
+            "expires_at": i64::MAX,
+            "msv": "0.1.0",
+            "company": "acme",
+            "address": "",
+            "contact_name": "",
+            "contact_email": "",
+            "additional_emails": [],
+            "base_urls": [],
+            "limits": {},
+            "environment_type": environment,
+        }))
+        .unwrap();
+        *o2_enterprise::enterprise::license::LICENSE
+            .get_or_init(|| tokio::sync::RwLock::new(None))
+            .write()
+            .await = Some(("test-loaded-key".into(), license));
+    }
+
+    async fn refresh_as(email: &str) -> (StatusCode, json::Value) {
+        body_of(
+            refresh_license_limits(Headers(UserEmail {
+                user_id: email.into(),
+            }))
+            .await,
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn refresh_without_put_permission_is_403_and_makes_no_ls_request() {
+        let _store = store_setup().await;
+        load_refresh_license("online").await;
+        let (status, _) = refresh_as("no-license-permission@test").await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert_eq!(
+            stored(o2_enterprise::enterprise::license::LICENSE_INSTANCE_KEY).await,
+            None
+        );
+        assert_eq!(
+            stored(o2_enterprise::enterprise::license::LICENSE_REFRESH_STATE_KEY).await,
+            None
+        );
+    }
+
+    #[tokio::test]
+    async fn refresh_while_the_lock_is_held_is_409_refresh_in_progress_with_limits_refreshed() {
+        let _store = store_setup().await;
+        load_refresh_license("online").await;
+        let _held = o2_enterprise::enterprise::license::hold_refresh_lock_for_tests().await;
+        let (status, body) = refresh_as(STORE_ROOT).await;
+        assert_eq!(status, StatusCode::CONFLICT, "{body}");
+        assert_eq!(
+            body,
+            json::json!({
+                "code": 409,
+                "reason": "refresh_in_progress",
+                "message": "A license refresh is already running. Try again in a moment.",
+                "limits_refreshed": true,
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn airgapped_licence_refreshes_limits_and_reports_airgapped() {
+        let _store = store_setup().await;
+        load_refresh_license("airgapped").await;
+        let (status, body) = refresh_as(STORE_ROOT).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(body["limits_refreshed"], true);
+        assert_eq!(body["error"], "airgapped");
+        assert!(body["outcome"].is_null());
+    }
+
+    #[tokio::test]
+    async fn refresh_body_serialises_every_report_field() {
+        let _store = store_setup().await;
+        let (status, body) = refresh_as(STORE_ROOT).await;
+        assert_eq!(status, StatusCode::OK);
+        let fields = [
+            "limits_refreshed",
+            "outcome",
+            "error",
+            "detail",
+            "old_rev",
+            "new_rev",
+            "waivers_added",
+            "waivers_removed",
+            "renewed",
+            "successor_available",
+            "retry_after_s",
+            "rotate_requested",
+        ];
+        assert_eq!(body.as_object().map(|o| o.len()), Some(fields.len()));
+        for field in fields {
+            assert!(body.get(field).is_some(), "missing {field}: {body}");
+        }
+        assert!(body.get("stored").is_none());
+        assert!(body["outcome"].is_null());
+        assert_eq!(body["waivers_added"], 0);
+        assert_eq!(body["rotate_requested"], false);
+    }
+
+    #[tokio::test]
+    async fn no_licence_reports_no_license_and_no_lock() {
+        let _store = store_setup().await;
+        let _held = o2_enterprise::enterprise::license::hold_refresh_lock_for_tests().await;
+        let (status, body) = refresh_as(STORE_ROOT).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(body["limits_refreshed"], false);
+        assert_eq!(body["error"], "no_license");
     }
 
     #[tokio::test]
