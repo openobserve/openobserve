@@ -215,9 +215,7 @@ describe("PublicLinksPanel", () => {
     expect(
       w.find('[data-test="dashboards-public-links-panel-created-url"] input').element,
     ).toHaveProperty("value", `${window.location.origin}/web/public/dashboards/new-slug`);
-    expect(w.find('[data-test="dashboards-public-links-panel-created-build-note"]').text()).toBe(
-      "Opening the public page builds the first result. Viewers after that share it.",
-    );
+    expect(has(w, "dashboards-public-links-panel-created-build-note")).toBe(false);
 
     await w.find('[data-test="dashboards-public-links-panel-back-btn"]').trigger("click");
     expect(has(w, "dashboards-public-links-panel-created")).toBe(false);
@@ -1062,7 +1060,6 @@ describe("PublicLinksPanel", () => {
   });
 
   describe("v2 build state", () => {
-    const DAY = 86_400;
     const tenPanels = {
       tabs: [
         {
@@ -1074,14 +1071,6 @@ describe("PublicLinksPanel", () => {
           ],
         },
       ],
-    };
-    const threeRanges = {
-      ranges: [
-        { type: "relative" as const, secs: 3600 },
-        { type: "relative" as const, secs: DAY },
-        { type: "relative" as const, secs: 30 * DAY },
-      ],
-      default: { type: "relative" as const, secs: 3600 },
     };
     const rangeStatus = (key: string, over: Record<string, unknown> = {}) => ({
       key,
@@ -1105,72 +1094,14 @@ describe("PublicLinksPanel", () => {
       await submit(w);
       return w;
     };
-    const stateText = (w: ReturnType<typeof build>, key: string) =>
-      w.find(`[data-test="dashboards-public-links-panel-state-${key}"]`).text();
 
-    it("shows each range's state from the status call, telling not cached from never viewed", async () => {
-      const w = await createLink(
-        async () => ({
-          data: {
-            link_id: "l1",
-            access_count: 2,
-            last_accessed_at: 1,
-            ranges: [
-              rangeStatus("r3600"),
-              rangeStatus(`r${30 * DAY}`, {
-                state: "needs_attention",
-                unavailable_count: 1,
-                withheld_panels: [{ panel_id: "p3", reason: "too_large" }],
-              }),
-            ],
-          },
-        }),
-        link({ time_range: threeRanges, access_count: 0 }),
-      );
-      expect(admin.status).toHaveBeenCalledWith("default", "dash-1", "l1");
-      expect(stateText(w, "r3600")).toBe("Ready");
-      expect(stateText(w, `r${DAY}`)).toBe("Not cached, builds on the next view");
-      expect(stateText(w, `r${30 * DAY}`)).toBe("Needs attention");
-      const states = w.find('[data-test="dashboards-public-links-panel-created-states"]').text();
-      expect(states).toContain("10 of 10");
-      expect(states).toContain("9 of 10");
-    });
-
-    it("says when a failed range is tried next", async () => {
-      const retryAt = (Date.now() + 5 * 60_000) * 1000;
+    it("shows no per-range state table and asks no status after creating a link", async () => {
       const w = await createLink(async () => ({
-        data: {
-          link_id: "l1",
-          access_count: 2,
-          last_accessed_at: 1,
-          ranges: [
-            rangeStatus("r3600", {
-              state: "needs_attention",
-              last_error: "timeout",
-              next_retry_at: retryAt,
-            }),
-          ],
-        },
+        data: { link_id: "l1", access_count: 0, ranges: [] },
       }));
-      const nextTry = w.find('[data-test="dashboards-public-links-panel-next-try-r3600"]');
-      expect(nextTry.text()).toMatch(/^Next try at \d{2}:\d{2}$/);
-      expect(stateText(w, "r3600")).toContain("Needs attention");
-    });
-
-    it("says never viewed only for a link with no access history", async () => {
-      const w = await createLink(
-        async () => ({ data: { link_id: "l1", access_count: 0, ranges: [] } }),
-        link({ time_range: threeRanges, access_count: 0 }),
-      );
-      expect(stateText(w, "r3600")).toBe("Never viewed");
-    });
-
-    it("drops the state table quietly when the status call fails", async () => {
-      const w = await createLink(() => Promise.reject({ response: { status: 502 } }));
-      await flushPromises();
       expect(has(w, "dashboards-public-links-panel-created")).toBe(true);
       expect(has(w, "dashboards-public-links-panel-created-states")).toBe(false);
-      expect(notify.error).not.toHaveBeenCalled();
+      expect(admin.status).not.toHaveBeenCalled();
     });
 
     it("shows no save note on create or edit", async () => {
@@ -1183,16 +1114,6 @@ describe("PublicLinksPanel", () => {
       const edited = build({ editLinkId: "l1", variablesConfig: undefined });
       await flushPromises();
       expect(has(edited, "dashboards-public-links-panel-save-hint")).toBe(false);
-    });
-
-    it("names no refresh interval in the created view", async () => {
-      const w = await createLink(
-        async () => ({ data: { link_id: "l1", access_count: 0, ranges: [] } }),
-        link({ refresh_secs: 9000 }),
-      );
-      expect(w.find('[data-test="dashboards-public-links-panel-created-build-note"]').text()).toBe(
-        "Opening the public page builds the first result. Viewers after that share it.",
-      );
     });
 
     it("marks a link needing attention from the batch status, with its reason", async () => {
