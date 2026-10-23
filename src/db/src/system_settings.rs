@@ -171,7 +171,7 @@ pub async fn set(setting: &SystemSetting) -> Result<SystemSetting> {
 
     // Emit event to update cache on other cluster nodes
     let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, cache_k);
-    if let Err(e) = infra::coordinator::system_settings::emit_put_event(&event_key).await {
+    if let Err(e) = infra::coordinator::emit_put(&event_key).await {
         log::error!("Failed to emit system settings put event: {}", e);
     }
 
@@ -214,7 +214,7 @@ pub async fn delete(
 
     // Emit event to update cache on other cluster nodes
     let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, cache_k);
-    if let Err(e) = infra::coordinator::system_settings::emit_delete_event(&event_key).await {
+    if let Err(e) = infra::coordinator::emit_delete(&event_key).await {
         log::error!("Failed to emit system settings delete event: {}", e);
     }
 
@@ -244,7 +244,7 @@ pub async fn delete_org_settings(org_id: &str) -> Result<u64> {
     // Emit events without holding lock
     for key in &keys_to_remove {
         let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, key);
-        if let Err(e) = infra::coordinator::system_settings::emit_delete_event(&event_key).await {
+        if let Err(e) = infra::coordinator::emit_delete(&event_key).await {
             log::error!(
                 "Failed to emit system settings delete event for {}: {}",
                 key,
@@ -282,7 +282,7 @@ pub async fn delete_user_settings(org_id: &str, user_id: &str) -> Result<u64> {
     // Emit events without holding lock
     for key in &keys_to_remove {
         let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, key);
-        if let Err(e) = infra::coordinator::system_settings::emit_delete_event(&event_key).await {
+        if let Err(e) = infra::coordinator::emit_delete(&event_key).await {
             log::error!(
                 "Failed to emit system settings delete event for {}: {}",
                 key,

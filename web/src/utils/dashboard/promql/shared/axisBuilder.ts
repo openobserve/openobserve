@@ -17,6 +17,7 @@ import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
 import { getGridLineStyle } from "../../colorPalette";
 import { chartColor } from "@/utils/chartTheme";
 import { escapeHtml } from "@/utils/html";
+import { createSeriesOverrideLookup } from "../../seriesOverrides";
 import { TOOLTIP_SCROLL_STYLE } from "./types";
 
 /**
@@ -31,11 +32,14 @@ export function buildTooltip(
   triggerType: "axis" | "item" = "axis",
   store?: any,
   hoveredSeriesState?: any,
+  // Pie slices and plain h-bar categories carry the series identity in the item name.
+  seriesKey: "seriesName" | "name" = "seriesName",
 ): any {
   const config = panelSchema.config || {};
   const decimals = config.decimals ?? 2;
   const unit = config.unit;
   const unitCustom = config.unit_custom;
+  const seriesOverrides = createSeriesOverrideLookup(config);
 
   return {
     trigger: triggerType,
@@ -88,11 +92,20 @@ export function buildTooltip(
         if (param.seriesName) {
           const marker = param.marker || "";
           const value = param.value?.[1] ?? param.value;
+          const override = seriesOverrides.get(param[seriesKey]);
 
           // Apply unit formatting
-          const formattedValue = formatUnitValue(getUnitValue(value, unit, unitCustom, decimals));
+          const formattedValue = formatUnitValue(
+            getUnitValue(
+              value,
+              override?.unit ?? unit,
+              override?.unitCustom ?? unitCustom,
+              override?.decimals ?? decimals,
+            ),
+          );
+          const label = override?.displayName ?? param.seriesName;
 
-          const row = `${marker} ${escapeHtml(param.seriesName)}: ${escapeHtml(formattedValue)}`;
+          const row = `${marker} ${escapeHtml(label)}: ${escapeHtml(formattedValue)}`;
           tooltipItems.push(param.seriesName === hoveredName ? `<strong>${row}</strong>` : row);
         }
       });
