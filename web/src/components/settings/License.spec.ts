@@ -1275,6 +1275,121 @@ describe("License.vue", () => {
     });
   });
 
+  describe("License feature rows", () => {
+    const configFeatures = {
+      alerts: "enabled",
+      dashboards: "enabled",
+      sso: "enabled",
+      rbac: "locked",
+      ai: "locked",
+      pipelines: "hidden",
+    };
+    const featureDefinition = {
+      features: {
+        alerts: {},
+        dashboards: { gate: false },
+        sso: { gate: true },
+        rbac: { gate: true },
+        ai: { gate: true },
+        pipelines: { gate: false },
+        metering: { gate: true, plumbing: true },
+      },
+    };
+
+    const mountWith = async (
+      license: Record<string, unknown>,
+      features: object = configFeatures,
+    ) => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({
+          ...mockLicenseData,
+          license: { ...mockLicenseData.license, ...license },
+        }),
+      );
+      store = createStore({
+        state: { zoConfig: { license_server_url: "https://license.example.com", features } },
+      });
+      wrapper = mount(License, {
+        global: { plugins: [store, i18n], stubs: { LicensePeriod: true, ODialog: ODialogStub } },
+      });
+      await flushPromises();
+    };
+
+    const row = (name: string) => wrapper.find(`[data-test=settings-license-${name}-features]`);
+
+    it("splits the license into additional, free and locked rows", async () => {
+      await mountWith({ features: ["sso"], feature_definition: featureDefinition });
+
+      expect(row("additional").text()).toContain("Additional features");
+      expect(row("additional").text()).toContain("sso");
+      expect(row("free").text()).toContain("3 features");
+      expect(row("locked").text()).toContain("2 features");
+      const lists = Object.fromEntries(
+        wrapper.vm.featureRows.map((r: any) => [r.testId, r.features]),
+      );
+      expect(lists["settings-license-free-features"]).toEqual(["alerts", "dashboards", "metering"]);
+      expect(lists["settings-license-locked-features"]).toEqual(["ai", "rbac"]);
+    });
+
+    it("keeps free and locked rows collapsed until clicked", async () => {
+      await mountWith({ features: ["sso"], feature_definition: featureDefinition });
+
+      expect(row("free").text()).not.toContain("metering");
+      await row("free").find("button").trigger("click");
+      await flushPromises();
+      expect(row("free").text()).toContain("metering");
+    });
+
+    it("shows only all features for a license without a features list", async () => {
+      await mountWith({ feature_definition: featureDefinition });
+
+      expect(row("additional").text()).toContain("All features");
+      expect(row("free").exists()).toBe(false);
+      expect(row("locked").exists()).toBe(false);
+    });
+
+    it("falls back to the org config for free features without a feature definition", async () => {
+      await mountWith({ features: ["sso"] });
+
+      const free = wrapper.vm.featureRows.find(
+        (r: any) => r.testId === "settings-license-free-features",
+      );
+      expect(free.features).toEqual(["alerts", "dashboards"]);
+    });
+
+    it("shows none when no feature is locked", async () => {
+      await mountWith({ features: ["sso"] }, { alerts: "enabled", sso: "enabled" });
+
+      expect(row("locked").text()).toContain("None");
+    });
+
+    it("lists a licensed feature in row 1 even when the config hides it", async () => {
+      await mountWith({ features: ["sso", "pipelines"], feature_definition: featureDefinition });
+
+      expect(row("additional").text()).toContain("pipelines");
+      expect(row("free").text()).toContain("3 features");
+    });
+
+    it("shows an ungated licensed feature only in row 1", async () => {
+      await mountWith({ features: ["sso", "dashboards"], feature_definition: featureDefinition });
+
+      const lists = Object.fromEntries(
+        wrapper.vm.featureRows.map((r: any) => [r.testId, r.features]),
+      );
+      expect(lists["settings-license-additional-features"]).toEqual(["dashboards", "sso"]);
+      expect(lists["settings-license-free-features"]).toEqual(["alerts", "metering"]);
+    });
+
+    it("excludes licensed features from the config fallback", async () => {
+      await mountWith({ features: ["sso", "alerts"] });
+
+      const free = wrapper.vm.featureRows.find(
+        (r: any) => r.testId === "settings-license-free-features",
+      );
+      expect(free.features).toEqual(["dashboards"]);
+    });
+  });
+
   describe("Component Cleanup", () => {
     it("should cleanup properly on unmount", async () => {
       vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
