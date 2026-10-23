@@ -89,7 +89,8 @@ jobs:
 
             // Check if any text matches the pattern "Design at : <location>" or "Design at: <location>"
             const designPattern = /Design\s+at\s*:\s*.+/i;
-            const hasDesignComment = allTexts.some(text => designPattern.test(text));
+            // HTML comments are stripped so the PR template's own hint cannot satisfy the check.
+            const hasDesignComment = allTexts.some(text => designPattern.test(text.replace(/<!--[\s\S]*?-->/g, '')));
 
             console.log(`Total texts checked (PR body + comments): ${allTexts.length}`);
             console.log(`Has design comment: ${hasDesignComment}`);
