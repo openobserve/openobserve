@@ -1997,6 +1997,9 @@ test.describe("Logs Regression Bug Fixes", () => {
 
     await createBuilderSavedView(pm, page, savedViewName, 'line');
 
+    // The Logs-tab stream picker is hidden while the Build tab is open (issue repro step 3).
+    await pm.logsPage.clickLogsToggle();
+    await pm.logsPage.expectLogsTabSelected();
     await pm.logsPage.selectStream(otherStream);
     await pm.logsPage.expectLogsSearchIndexListContainsText(otherStream);
     testLogger.info(`Moved to ${otherStream} before applying the saved view`);
