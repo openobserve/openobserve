@@ -55,9 +55,7 @@ test.describe('nav rail keyboard', () => {
     await page.keyboard.press('Enter');
     // Wait for the route, not a fixed 800ms: SPA navigation outlasts that on a loaded env.
     const target = new URL(chosen, 'http://localhost').pathname;
-    await page
-      .waitForURL((u) => new URL(u).pathname === target, { timeout: 15000 })
-      .catch(() => {});
+    await page.waitForURL((u) => new URL(u).pathname === target, { timeout: 15000 });
     expect(new URL(page.url()).pathname).toBe(target);
     expect(await rail.openFlyoutKeys()).toEqual([]);
     active = await rail.activeElementDataTest();
@@ -72,7 +70,7 @@ test.describe('nav rail keyboard', () => {
     const chosen2 = await page.evaluate(() => document.activeElement.getAttribute('href'));
     await page.keyboard.press('Space');
     const target2 = new URL(chosen2, 'http://localhost').pathname;
-    await page.waitForURL((u) => new URL(u).pathname === target2, { timeout: 15000 }).catch(() => {});
+    await page.waitForURL((u) => new URL(u).pathname === target2, { timeout: 15000 });
     expect(new URL(page.url()).pathname).toBe(target2);
     expect(await rail.openFlyoutKeys()).toEqual([]);
     expect((await rail.activeElementDataTest())?.dataTest).toBe('menu-link-/alerts-item');
@@ -84,7 +82,7 @@ test.describe('nav rail keyboard', () => {
     expect(await rail.openFlyoutKeys()).toEqual(['data']);
     await page.keyboard.press('Shift+Tab');
     await page.keyboard.press('Enter');
-    await page.waitForURL((u) => new URL(u).pathname === '/web/streams', { timeout: 15000 }).catch(() => {});
+    await page.waitForURL((u) => new URL(u).pathname === '/web/streams', { timeout: 15000 });
     expect(new URL(page.url()).pathname).toBe('/web/streams');
     expect(await rail.openFlyoutKeys()).toEqual([]);
     expect((await rail.activeElementDataTest())?.tag).not.toBe('BODY');
@@ -101,7 +99,7 @@ test.describe('nav rail keyboard', () => {
     const href = await item.getAttribute('href');
     await item.click();
     const targetHref = new URL(href, 'http://localhost').pathname;
-    await page.waitForURL((u) => new URL(u).pathname === targetHref, { timeout: 15000 }).catch(() => {});
+    await page.waitForURL((u) => new URL(u).pathname === targetHref, { timeout: 15000 });
     expect(new URL(page.url()).pathname).toBe(targetHref);
     expect(await rail.openFlyoutKeys()).toEqual([]);
     const active = await rail.activeElementDataTest();
