@@ -7751,8 +7751,6 @@
       "removeRange": "Remove {range}",
       "refreshOnNextView": "Refresh on next view",
       "refreshQueuedToast": "The link refreshes on its next view",
-      "createHint": "Returns at once. Nothing is queried until someone opens the link.",
-      "saveHint": "Saving marks every result of this link stale. The next viewer triggers a rebuild.",
       "createdBuildNoteOnce": "Opening the public page builds the first result. Viewers after that share it.",
       "stateRange": "Range",
       "stateState": "State",

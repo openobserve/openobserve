@@ -7749,8 +7749,6 @@
       "removeRange": "Xóa {range}",
       "refreshOnNextView": "Làm mới ở lần xem tiếp theo",
       "refreshQueuedToast": "Liên kết sẽ làm mới ở lần xem tiếp theo",
-      "createHint": "Trả về ngay lập tức. Không có gì được truy vấn cho đến khi ai đó mở liên kết.",
-      "saveHint": "Lưu sẽ đánh dấu mọi kết quả của liên kết này là cũ. Người xem tiếp theo sẽ kích hoạt tạo lại.",
       "createdBuildNoteOnce": "Mở trang công khai sẽ tạo kết quả đầu tiên. Những người xem sau đó dùng chung kết quả này.",
       "stateRange": "Khoảng thời gian",
       "stateState": "Trạng thái",

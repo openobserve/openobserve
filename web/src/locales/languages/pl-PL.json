@@ -7749,8 +7749,6 @@
       "removeRange": "Usuń {range}",
       "refreshOnNextView": "Odśwież przy następnym wyświetleniu",
       "refreshQueuedToast": "Link odświeży się przy następnym wyświetleniu",
-      "createHint": "Zwraca natychmiast. Nic nie jest odpytywane, dopóki ktoś nie otworzy linku.",
-      "saveHint": "Zapisanie oznacza wszystkie wyniki tego linku jako nieaktualne. Następne wyświetlenie uruchomi przebudowę.",
       "createdBuildNoteOnce": "Otwarcie publicznej strony buduje pierwszy wynik. Kolejni wyświetlający współdzielą go.",
       "stateRange": "Zakres",
       "stateState": "Stan",

@@ -7749,8 +7749,6 @@
       "removeRange": "{range} entfernen",
       "refreshOnNextView": "Bei der nächsten Ansicht aktualisieren",
       "refreshQueuedToast": "Der Link wird bei seiner nächsten Ansicht aktualisiert",
-      "createHint": "Erfolgt sofort. Es wird nichts abgefragt, bis jemand den Link öffnet.",
-      "saveHint": "Beim Speichern werden alle Ergebnisse dieses Links als veraltet markiert. Der nächste Betrachter löst einen Neuaufbau aus.",
       "createdBuildNoteOnce": "Beim Öffnen der öffentlichen Seite wird das erste Ergebnis erstellt. Danach nutzen Betrachter es gemeinsam.",
       "stateRange": "Zeitbereich",
       "stateState": "Status",

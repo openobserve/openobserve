@@ -7749,8 +7749,6 @@
       "removeRange": "{range} 제거",
       "refreshOnNextView": "다음 조회 시 새로 고침",
       "refreshQueuedToast": "링크는 다음 조회 시 새로 고칩니다",
-      "createHint": "즉시 반환됩니다. 누군가 링크를 열기 전까지는 아무것도 쿼리되지 않습니다.",
-      "saveHint": "저장하면 이 링크의 모든 결과가 오래된 것으로 표시됩니다. 다음 조회자가 다시 빌드를 트리거합니다.",
       "createdBuildNoteOnce": "공개 페이지를 열면 첫 결과가 빌드됩니다. 이후 조회자는 이를 공유합니다.",
       "stateRange": "범위",
       "stateState": "상태",

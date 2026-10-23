@@ -7749,8 +7749,6 @@
       "removeRange": "{range} aralığını kaldır",
       "refreshOnNextView": "Sonraki görüntülemede yenile",
       "refreshQueuedToast": "Bağlantı bir sonraki görüntülemesinde yenilenir",
-      "createHint": "Hemen döner. Biri bağlantıyı açana kadar hiçbir sorgu çalıştırılmaz.",
-      "saveHint": "Kaydetmek, bu bağlantının tüm sonuçlarını eskimiş olarak işaretler. Bir sonraki görüntüleyen yeniden oluşturmayı tetikler.",
       "createdBuildNoteOnce": "Genel sayfayı açmak ilk sonucu oluşturur. Sonraki görüntüleyenler bunu paylaşır.",
       "stateRange": "Aralık",
       "stateState": "Durum",

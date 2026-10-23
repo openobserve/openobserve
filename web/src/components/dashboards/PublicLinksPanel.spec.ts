@@ -1083,13 +1083,16 @@ describe("PublicLinksPanel", () => {
       expect(notify.error).not.toHaveBeenCalled();
     });
 
-    it("says create runs no query", async () => {
+    it("shows no save note on create or edit", async () => {
       vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
-      const w = build({ variablesConfig: undefined });
+      const created = build({ variablesConfig: undefined });
       await flushPromises();
-      expect(w.find('[data-test="dashboards-public-links-panel-save-hint"]').text()).toBe(
-        "Returns at once. Nothing is queried until someone opens the link.",
-      );
+      expect(has(created, "dashboards-public-links-panel-save-hint")).toBe(false);
+
+      vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
+      const edited = build({ editLinkId: "l1", variablesConfig: undefined });
+      await flushPromises();
+      expect(has(edited, "dashboards-public-links-panel-save-hint")).toBe(false);
     });
 
     it("names no refresh interval in the created view", async () => {

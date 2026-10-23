@@ -340,9 +340,6 @@
           </div>
         </template>
       </div>
-      <div class="text-text-secondary text-xs" data-test="dashboards-public-links-panel-save-hint">
-        {{ editing ? t("dashboard.publicLinks.saveHint") : t("dashboard.publicLinks.createHint") }}
-      </div>
     </div>
 
     <div

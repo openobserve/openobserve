@@ -7749,8 +7749,6 @@
       "removeRange": "Rimuovi {range}",
       "refreshOnNextView": "Aggiorna alla prossima visualizzazione",
       "refreshQueuedToast": "Il link si aggiorna alla prossima visualizzazione",
-      "createHint": "Restituisce subito. Nessuna query viene eseguita finché qualcuno non apre il link.",
-      "saveHint": "Il salvataggio contrassegna come obsoleti tutti i risultati di questo link. La prossima visualizzazione ne avvia la ricostruzione.",
       "createdBuildNoteOnce": "L'apertura della pagina pubblica genera il primo risultato. I visitatori successivi lo condividono.",
       "stateRange": "Intervallo",
       "stateState": "Stato",

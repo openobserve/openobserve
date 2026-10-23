@@ -7744,8 +7744,6 @@
       "removeRange": "移除 {range}",
       "refreshOnNextView": "下次檢視時重新整理",
       "refreshQueuedToast": "此連結會在下次檢視時重新整理",
-      "createHint": "立即傳回。在有人開啟此連結之前，不會查詢任何資料。",
-      "saveHint": "儲存後，此連結的每項結果都會標記為過期。下一位檢視者會觸發重建。",
       "createdBuildNoteOnce": "開啟公開頁面時會建置第一份結果。之後的檢視者會共用這份結果。",
       "stateRange": "範圍",
       "stateState": "狀態",

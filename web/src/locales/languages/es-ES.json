@@ -7749,8 +7749,6 @@
       "removeRange": "Quitar {range}",
       "refreshOnNextView": "Actualizar en la próxima vista",
       "refreshQueuedToast": "El enlace se actualizará en su próxima vista",
-      "createHint": "Se devuelve de inmediato. No se consulta nada hasta que alguien abra el enlace.",
-      "saveHint": "Guardar marca como obsoletos todos los resultados de este enlace. El siguiente visitante activa una reconstrucción.",
       "createdBuildNoteOnce": "Abrir la página pública genera el primer resultado. Los visitantes posteriores lo comparten.",
       "stateRange": "Rango",
       "stateState": "Estado",

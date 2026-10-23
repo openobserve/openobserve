@@ -7749,8 +7749,6 @@
       "removeRange": "Supprimer {range}",
       "refreshOnNextView": "Actualiser à la prochaine consultation",
       "refreshQueuedToast": "Le lien sera actualisé à sa prochaine consultation",
-      "createHint": "Réponse immédiate. Aucune requête n'est exécutée tant que personne n'ouvre le lien.",
-      "saveHint": "L'enregistrement invalide tous les résultats de ce lien. Le prochain visiteur déclenche une reconstruction.",
       "createdBuildNoteOnce": "L'ouverture de la page publique génère le premier résultat. Les visiteurs suivants le partagent.",
       "stateRange": "Plage",
       "stateState": "État",

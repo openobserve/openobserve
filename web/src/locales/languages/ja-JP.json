@@ -7749,8 +7749,6 @@
       "removeRange": "{range} を削除",
       "refreshOnNextView": "次回表示時に更新",
       "refreshQueuedToast": "リンクは次回表示時に更新されます",
-      "createHint": "すぐに応答します。誰かがリンクを開くまでクエリは実行されません。",
-      "saveHint": "保存すると、このリンクのすべての結果が古いものとして扱われます。次に閲覧したときに再構築が実行されます。",
       "createdBuildNoteOnce": "公開ページを開くと最初の結果が構築されます。以降の閲覧者はそれを共有します。",
       "stateRange": "範囲",
       "stateState": "状態",

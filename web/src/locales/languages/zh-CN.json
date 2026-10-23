@@ -7749,8 +7749,6 @@
       "removeRange": "移除 {range}",
       "refreshOnNextView": "下次查看时刷新",
       "refreshQueuedToast": "该链接将在下次查看时刷新",
-      "createHint": "立即返回。在有人打开链接之前不会执行任何查询。",
-      "saveHint": "保存会将此链接的每个结果标记为过期。下一位查看者将触发重建。",
       "createdBuildNoteOnce": "打开公开页面时会构建首个结果。之后的查看者会共享该结果。",
       "stateRange": "时间范围",
       "stateState": "状态",
