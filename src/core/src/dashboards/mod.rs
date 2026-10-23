@@ -452,7 +452,7 @@ pub async fn get_dashboard(org_id: &str, dashboard_id: &str) -> Result<Dashboard
 }
 
 /// Given the current `home_dashboard` setting value, returns the new `folderId`
-/// to persist when `dashboard_id` is moved to `to_folder` — or `None` if the
+/// to persist when `dashboard_id` is moved to `to_folder` â or `None` if the
 /// setting does not pin this dashboard, or the folder is already correct.
 fn home_pin_move_target(
     value: &serde_json::Value,
@@ -476,7 +476,7 @@ fn home_pin_should_clear(value: &serde_json::Value, dashboard_id: &str) -> bool 
 
 /// Keep the org's pinned `home_dashboard` setting in sync when the pinned
 /// dashboard is moved: if the setting points at `dashboard_id`, update its
-/// `folderId` to `to_folder`. Best-effort — never fails the caller.
+/// `folderId` to `to_folder`. Best-effort â never fails the caller.
 async fn reconcile_home_dashboard_on_move(org_id: &str, dashboard_id: &str, to_folder: &str) {
     let setting = match system_settings::get(
         &SettingScope::Org,
@@ -519,7 +519,7 @@ async fn reconcile_home_dashboard_on_move(org_id: &str, dashboard_id: &str, to_f
 }
 
 /// Clear the org's pinned `home_dashboard` setting when the pinned dashboard is
-/// deleted. Best-effort — never fails the caller.
+/// deleted. Best-effort â never fails the caller.
 async fn reconcile_home_dashboard_on_delete(org_id: &str, dashboard_id: &str) {
     let setting = match system_settings::get(
         &SettingScope::Org,
@@ -611,6 +611,21 @@ pub async fn move_dashboard(
     let (curr_folder, dashboard) = table::dashboards::get_by_id(org_id, dashboard_id)
         .await?
         .ok_or(DashboardError::DashboardNotFound)?;
+    // No-op when the dashboard is already in the destination folder.
+    //
+    // Without this guard, moving a dashboard to its own folder succeeds at
+    // the API level but silently breaks OpenFGA permissions: the
+    // set_parent_relation call below writes a tuple that already exists
+    // (only logged as a failure), and the remove_parent_relation call then
+    // deletes the one tuple that existed, leaving the dashboard unlinked
+    // from its folder in OpenFGA. After that, any role-based access granted
+    // on the folder stops applying to the dashboard.
+    //
+    // Mirrors the same-folder early return in
+    // src/core/src/downtimes/access.rs::reparent().
+    if curr_folder.folder_id == to_folder {
+        return Ok(());
+    }
 
     #[cfg(feature = "enterprise")]
     if _check_openfga && get_openfga_config().enabled {
@@ -925,13 +940,13 @@ pub fn insert_panel(
             panel.layout = Some(compute_panel_layout(&tab.panels, None, None));
         }
         Some(layout) if layout.x == 0 && layout.y == 0 => {
-            // Position is (0,0) — auto-compute, but respect explicit w/h
+            // Position is (0,0) â auto-compute, but respect explicit w/h
             let override_w = if layout.w > 0 { Some(layout.w) } else { None };
             let override_h = if layout.h > 0 { Some(layout.h) } else { None };
             panel.layout = Some(compute_panel_layout(&tab.panels, override_w, override_h));
         }
         Some(layout) if layout.i == 0 => {
-            // Explicit position but missing i — assign next available
+            // Explicit position but missing i â assign next available
             let max_i = tab
                 .panels
                 .iter()
@@ -1241,7 +1256,7 @@ mod tests {
 
     #[test]
     fn test_compute_panel_layout_places_below_when_no_room() {
-        // Panel at x=0, y=0, w=192 — takes full row width
+        // Panel at x=0, y=0, w=192 â takes full row width
         let panels = vec![make_panel(1, 0, 0, 192, 18)];
         let layout = compute_panel_layout(&panels, None, None);
         // No room to the right, should place below (y = 0 + 18 = 18)
@@ -1252,7 +1267,7 @@ mod tests {
 
     #[test]
     fn test_compute_panel_layout_places_right_when_room() {
-        // Panel at x=0, y=0, w=96 — leaves room on the right
+        // Panel at x=0, y=0, w=96 â leaves room on the right
         let panels = vec![make_panel(1, 0, 0, 96, 18)];
         let layout = compute_panel_layout(&panels, Some(96), None);
         // Room to the right: x = 96, y = 0
