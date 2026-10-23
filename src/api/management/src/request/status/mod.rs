@@ -495,7 +495,7 @@ pub async fn zo_config(
     let sso_enabled = enterprise_value!(false, dex_cfg.dex_enabled, block_features);
     let native_login_enabled = enterprise_value!(true, dex_cfg.native_login_enabled);
     let service_account_enabled = cfg.auth.service_account_enabled;
-    let rbac_enabled = enterprise_value!(false, rbac_enabled_for_config(openfga_cfg.enabled).await);
+    let rbac_enabled = enterprise_value!(false, openfga_cfg.enabled);
     let super_cluster_enabled = enterprise_value!(false, o2cfg.super_cluster.enabled);
 
     #[cfg(feature = "enterprise")]
@@ -734,12 +734,6 @@ async fn search_inspector_permitted(org_id: &str, user_id: &str) -> bool {
         user.is_external,
     )
     .await
-}
-
-/// Same rule as `check_permissions`, so the UI never hides RBAC the backend enforces.
-#[cfg(feature = "enterprise")]
-async fn rbac_enabled_for_config(openfga_enabled: bool) -> bool {
-    openfga_enabled && !openobserve_core::authz::report_failure_lifts_rbac().await
 }
 
 async fn org_admin(org_id: &str, user_id: &str) -> bool {
@@ -2036,15 +2030,6 @@ mod tests {
     async fn with_downtimes_off_a_cache_reload_loads_no_downtime() {
         reload_downtimes(false).await.unwrap();
         assert!(db::downtimes::all_cached().is_empty());
-    }
-
-    #[cfg(feature = "enterprise")]
-    #[tokio::test]
-    async fn test_config_rbac_enabled_matches_enforcement_before_any_usage_report() {
-        assert!(block_feature_for_report_failure().await);
-        assert_eq!(last_reported_timestamp().await, 0);
-        assert!(rbac_enabled_for_config(true).await);
-        assert!(!rbac_enabled_for_config(false).await);
     }
 
     #[test]

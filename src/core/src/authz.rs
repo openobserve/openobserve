@@ -527,10 +527,6 @@ pub async fn check_permissions(
         return true;
     }
 
-    if report_failure_lifts_rbac().await {
-        return true;
-    }
-
     let object_str = auth_info.o2_type;
     log::debug!("Role of user {user_id} is {role:#?}");
     let role = if role == UserRole::Root {
@@ -582,19 +578,10 @@ pub async fn list_objects_for_user(
     db::authz::list_objects_for_user(org_id, user_id, permission, object_type).await
 }
 
-/// Off or lifted RBAC allows every read, as [`check_permissions`] answers.
+/// Off RBAC allows every read, as [`check_permissions`] answers.
 #[cfg(feature = "enterprise")]
 pub async fn rbac_enforced() -> bool {
-    o2_openfga::config::get_config().enabled && !report_failure_lifts_rbac().await
-}
-
-/// Never before the first usage report: an unloaded license also reads as a reporting failure.
-#[cfg(feature = "enterprise")]
-pub async fn report_failure_lifts_rbac() -> bool {
-    use o2_enterprise::enterprise::license::{
-        block_feature_for_report_failure, last_reported_timestamp,
-    };
-    block_feature_for_report_failure().await && last_reported_timestamp().await > 0
+    o2_openfga::config::get_config().enabled
 }
 
 #[cfg(any(feature = "enterprise", test))]
@@ -1347,13 +1334,28 @@ mod tests {
         }
     }
 
+    #[test]
+    fn rbac_is_never_lifted_by_a_report_failure() {
+        let source = include_str!("authz.rs");
+        let code = source
+            .split(concat!("#[cfg(test)]\nmod ", "tests {"))
+            .next()
+            .unwrap();
+        for needle in [
+            concat!("block_feature", "_for_report_failure"),
+            concat!("report_failure", "_lifts_rbac"),
+        ] {
+            assert!(!code.contains(needle), "authz.rs calls {needle}");
+        }
+    }
+
     #[cfg(feature = "enterprise")]
     #[tokio::test]
-    async fn report_failure_does_not_lift_rbac_before_any_report() {
+    async fn rbac_enforced_follows_only_the_openfga_switch() {
+        assert!(o2_enterprise::enterprise::license::block_feature_for_report_failure().await);
         assert_eq!(
-            o2_enterprise::enterprise::license::last_reported_timestamp().await,
-            0
+            rbac_enforced().await,
+            o2_openfga::config::get_config().enabled
         );
-        assert!(!report_failure_lifts_rbac().await);
     }
 }
