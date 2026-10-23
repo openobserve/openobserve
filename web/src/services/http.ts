@@ -25,6 +25,7 @@ import {
 import { usePasswordReset } from "@/composables/usePasswordReset";
 import { isPasswordResetError } from "@/utils/passwordResetErrors";
 import { licenseDeniedFeatures } from "@/utils/featureGate";
+import { isLockedFeatureDenial, markLockedDenial } from "@/composables/useFeatureLock";
 
 declare module "axios" {
   interface AxiosRequestConfig {
@@ -131,6 +132,7 @@ const http = ({ headers } = {} as any) => {
       // Ahead of the status switch: a license denial must not read as a missing RBAC permission.
       const deniedFeatures = licenseDeniedFeatures(error);
       if (deniedFeatures) {
+        if (isLockedFeatureDenial(deniedFeatures)) markLockedDenial(error);
         addLicenseDeniedError(deniedFeatures);
         return Promise.reject(error);
       }

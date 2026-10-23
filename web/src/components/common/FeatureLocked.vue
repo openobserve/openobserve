@@ -31,13 +31,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useRoute, useRouter } from "vue-router";
-import { useStore } from "vuex";
+import { useRoute } from "vue-router";
 import { useI18nTyped, type I18nKey } from "@/types/i18n";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { siteURL } from "@/constants/config";
+import { useFeatureLockActions } from "@/composables/useFeatureLock";
 
 // Label and icon mirror each feature's own nav entry.
 const FEATURES: Record<string, { labelKey: I18nKey; icon: IconName }> = {
@@ -50,22 +49,8 @@ const FEATURES: Record<string, { labelKey: I18nKey; icon: IconName }> = {
 
 const { t } = useI18nTyped();
 const route = useRoute();
-const router = useRouter();
-const store = useStore();
+const { hasLicensePage, openLicense, openContactSales } = useFeatureLockActions();
 
 const meta = computed(() => FEATURES[String(route.params.feature ?? "")]);
 const label = computed(() => (meta.value ? t(meta.value.labelKey) : t("featureLock.thisFeature")));
-// The license page only exists on enterprise builds.
-const hasLicensePage = computed(() => router.hasRoute("license"));
-
-const openLicense = () => {
-  router.push({
-    name: "license",
-    query: { org_identifier: store.state.selectedOrganization?.identifier },
-  });
-};
-
-const openContactSales = () => {
-  window.open(siteURL.contactSales, "_blank", "noopener");
-};
 </script>

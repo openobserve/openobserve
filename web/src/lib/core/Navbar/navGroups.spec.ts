@@ -850,6 +850,16 @@ describe("GATE_PREDICATES", () => {
     expect(GATE_PREDICATES.oncall(ctx())).toBe(false);
   });
 
+  it.each([
+    ["downtimes", "downtimes"],
+    ["alertCalibration", "alert_insights"],
+  ])("%s stays open while the license locks %s, though its flag is off", (gate, feature) => {
+    const ent = { isEnterprise: true };
+    expect(GATE_PREDICATES[gate](ctx({ ...ent, features: { [feature]: "locked" } }))).toBe(true);
+    expect(GATE_PREDICATES[gate](ctx({ ...ent, features: { [feature]: "hidden" } }))).toBe(false);
+    expect(GATE_PREDICATES[gate](ctx({ features: { [feature]: "locked" } }))).toBe(false);
+  });
+
   it("databaseMonitoring gates on the runtime flag ALONE — it is an OSS feature", () => {
     expect(GATE_PREDICATES.databaseMonitoring(ctx({ databaseMonitoring: true }))).toBe(true);
     // The point of the test: an OSS build with the flag on must still show it.

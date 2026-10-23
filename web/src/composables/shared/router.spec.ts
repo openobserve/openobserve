@@ -2442,6 +2442,50 @@ describe("useRoutes (router.ts)", () => {
     });
   });
 
+  describe("license-locked downtimes and alert insights", () => {
+    const enter = (name: string, zoConfig: Record<string, unknown>) => {
+      const previous = store.state.zoConfig;
+      store.state.zoConfig = zoConfig;
+      try {
+        const route = findRoute(useRoutes().homeChildRoutes, name);
+        const next = vi.fn();
+        route.beforeEnter({ query: { org_identifier: "acme" } }, {}, next);
+        return { route, next };
+      } finally {
+        store.state.zoConfig = previous;
+      }
+    };
+
+    beforeEach(() => {
+      config.isEnterprise = "true";
+    });
+
+    it.each([
+      ["downtimes", "downtimes", { downtimes_enabled: false }],
+      ["editDowntime", "downtimes", { downtimes_enabled: false }],
+      ["alertCalibration", "alert_insights", { alert_calibration_enabled: false }],
+      ["alertCalibrationRuns", "alert_insights", { alert_calibration_enabled: false }],
+    ])("opens a locked %s page, tagged %s, though its flag is off", (name, feature, flags) => {
+      const { route, next } = enter(name, { ...flags, features: { [feature]: "locked" } });
+      expect(route.meta.licenseFeature).toBe(feature);
+      expect(next).toHaveBeenCalledWith();
+    });
+
+    it("still sends a hidden downtimes page with its flag off to Alerts", () => {
+      const { next } = enter("downtimes", {
+        downtimes_enabled: false,
+        features: { downtimes: "hidden" },
+      });
+      expect(next).toHaveBeenCalledWith({ name: "alertList", query: { org_identifier: "acme" } });
+    });
+
+    it("tags Alert Sources with the incidents feature", () => {
+      expect(findRoute(useRoutes().homeChildRoutes, "alertSources").meta.licenseFeature).toBe(
+        "incidents",
+      );
+    });
+  });
+
   // the paywall predicate treats a matched beforeEnter as proof that routeGuard runs there.
   describe("paywall guard proxy (A-27)", () => {
     const EXPIRED_MICROS = (Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000;

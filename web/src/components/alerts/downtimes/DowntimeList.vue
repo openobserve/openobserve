@@ -502,6 +502,7 @@ import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { useOrgId } from "@/composables/query";
 import { queryClient } from "@/composables/query/queryClient";
 import { foldersQuery, optionalFoldersQuery } from "@/services/common.queries";
@@ -600,9 +601,10 @@ const truncated = computed(() => listQuery.data.value?.truncated === true);
 const loading = listQuery.isPending;
 const fetching = listQuery.isFetching;
 const lastUpdatedAt = listQuery.dataUpdatedAt;
-const forbidden = computed(() => {
+// A license denial carries its missing keys, so the table shows the license copy instead of the RBAC one.
+const forbidden = computed<ForbiddenState>(() => {
   const e: any = listQuery.error.value;
-  return e?.status === 403 || e?.response?.status === 403;
+  return forbiddenState(e) || e?.status === 403;
 });
 
 // A failed load must not read as "no downtimes yet" with a Create button.

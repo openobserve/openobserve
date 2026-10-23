@@ -57,10 +57,14 @@ export const GATE_PREDICATES: Record<string, (c: NavGateContext) => boolean> = {
   // isEnterprise conjunct at this level would take the four OSS tabs down with
   // them and hide the section from a build that still serves most of it.
   databaseMonitoring: (c) => c.databaseMonitoring,
-  // Enterprise/cloud plus `/config` `downtimes_enabled`, the same rule as the route guard.
-  downtimes: (c) => (c.isEnterprise || c.isCloud) && c.downtimesEnabled,
-  // Enterprise/cloud plus `/config` `alert_calibration_enabled`, the same rule as the route guard.
-  alertCalibration: (c) => (c.isEnterprise || c.isCloud) && c.alertCalibrationEnabled,
+  // Enterprise/cloud plus `/config` `downtimes_enabled`, the same rule as the route guard; a locked license keeps the entry to show the lock.
+  downtimes: (c) =>
+    (c.isEnterprise || c.isCloud) &&
+    (c.downtimesEnabled || featureState(c.features, "downtimes") === "locked"),
+  // Enterprise/cloud plus `/config` `alert_calibration_enabled`, the same rule as the route guard; a locked license keeps the entry.
+  alertCalibration: (c) =>
+    (c.isEnterprise || c.isCloud) &&
+    (c.alertCalibrationEnabled || featureState(c.features, "alert_insights") === "locked"),
 };
 
 /**

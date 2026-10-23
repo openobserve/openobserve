@@ -55,6 +55,15 @@ describe("enterprise routes: allowOnEmptyData", () => {
   );
 });
 
+describe("enterprise routes: ai_observability license", () => {
+  it.each(["/ai/llm-insights", "/ai/sessions"])(
+    "tags %s with meta.licenseFeature so a locked license renders it locked",
+    (path) => {
+      expect(resolveMeta(path).licenseFeature).toBe("ai_observability");
+    },
+  );
+});
+
 describe("enterprise routes: removed Paid Usage page", () => {
   it("sends old /billings/paid_usage links to Plans with their query", async () => {
     const { homeChildRoutes } = useEnvRoutes();

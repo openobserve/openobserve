@@ -121,21 +121,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'md:max-lg:min-w-32'
           "
         >
-          <h1
-            v-if="titleOverflow === 'visible'"
-            class="text-text-heading min-h-6 min-w-0 text-base! leading-[1.45]! font-semibold! tracking-[-0.02em]!"
-            :data-test="titleDataTest"
-          >
-            <slot name="title">{{ title }}</slot>
-          </h1>
-          <OTruncatedText
-            v-else
-            as="h1"
-            class="text-text-heading min-h-6 text-base! leading-[1.45]! font-semibold! tracking-[-0.02em]!"
-            :data-test="titleDataTest"
-          >
-            <slot name="title">{{ title }}</slot>
-          </OTruncatedText>
+          <div class="flex min-w-0 items-center gap-1.5">
+            <h1
+              v-if="titleOverflow === 'visible'"
+              class="text-text-heading min-h-6 min-w-0 text-base! leading-[1.45]! font-semibold! tracking-[-0.02em]!"
+              :data-test="titleDataTest"
+            >
+              <slot name="title">{{ title }}</slot>
+            </h1>
+            <OTruncatedText
+              v-else
+              as="h1"
+              class="text-text-heading min-h-6 min-w-0 text-base! leading-[1.45]! font-semibold! tracking-[-0.02em]!"
+              :data-test="titleDataTest"
+            >
+              <slot name="title">{{ title }}</slot>
+            </OTruncatedText>
+            <span
+              v-if="locked"
+              role="img"
+              :aria-label="lockedLabel"
+              class="text-warning-600 inline-flex shrink-0"
+              data-test="app-page-header-locked"
+            >
+              <OIcon name="lock" size="sm" />
+              <OTooltip :content="lockedLabel" />
+            </span>
+          </div>
           <!-- Fixed-height subtitle band: keeps the <h1> at an identical Y whether
              the subtitle is present or not, so the title doesn't appear to shift
              when navigating between views. Content is vertically centered. -->
@@ -228,7 +240,9 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { useFeatureLock } from "@/composables/useFeatureLock";
 import { PAGE_LAYOUT_SIDEBAR_KEY } from "@/lib/core/PageLayout/pageLayoutSidebar";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
@@ -281,6 +295,10 @@ const router = useRouter();
 const slots = useSlots();
 const { t } = useI18nTyped();
 const { isMobile } = useBreakpoint();
+const { locked, feature: lockedFeature } = useFeatureLock();
+const lockedLabel = computed(() =>
+  t("featureLock.headerLocked", { feature: raw(lockedFeature.value ?? "") }),
+);
 
 // The first header inside a sidebar layout carries its phone trigger, saving the layout a row.
 const layoutSidebar = inject(PAGE_LAYOUT_SIDEBAR_KEY, null);

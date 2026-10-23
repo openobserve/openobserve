@@ -21,6 +21,7 @@ import {
   forbiddenState,
   licenseDeniedFeatures,
   menuState,
+  withLicenseFeature,
 } from "./featureGate";
 
 const forbidden = (data: Record<string, unknown>) => ({ response: { status: 403, data } });
@@ -56,6 +57,23 @@ describe("menuState", () => {
 describe("featureLockedPath", () => {
   it("points at the shared upsell route", () => {
     expect(featureLockedPath("ai_assistant")).toBe("/feature-locked/ai_assistant");
+  });
+});
+
+describe("withLicenseFeature", () => {
+  it("tags the route and every child, keeping the meta already there", () => {
+    const route = withLicenseFeature("workflows", {
+      path: "workflows",
+      meta: { titleKey: "menu.workflows" },
+      children: [{ path: "add" }, { path: "runs", children: [{ path: "detail" }] }],
+    });
+    expect(route.meta).toEqual({ titleKey: "menu.workflows", licenseFeature: "workflows" });
+    expect(route.children?.[0].meta).toEqual({ licenseFeature: "workflows" });
+    expect(route.children?.[1].children?.[0].meta).toEqual({ licenseFeature: "workflows" });
+  });
+
+  it("adds no children to a leaf route", () => {
+    expect(withLicenseFeature("oncall", { path: "oncall" })).not.toHaveProperty("children");
   });
 });
 

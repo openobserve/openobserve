@@ -1333,15 +1333,14 @@ describe("ONavGroup", () => {
       return router;
     }
 
-    it("shows a locked child as inert and sends its click to the license page", async () => {
+    it("shows a locked child with a lock and opens its own page, which renders locked", async () => {
       const router = await mountWithFeature("locked");
       const item = flyout().get('[data-test="nav-group-item-workflows-locked"]');
       expect(item.element.tagName).toBe("DIV");
+      expect(flyout().find('[data-test="nav-group-item-workflows-lock"]').exists()).toBe(true);
       await item.trigger("click");
       await flushPromises();
-      expect(router.currentRoute.value.fullPath).toBe(
-        "/feature-locked/workflows?org_identifier=default",
-      );
+      expect(router.currentRoute.value.fullPath).toBe("/workflows?org_identifier=default");
     });
 
     it("drops a hidden child", async () => {

@@ -34,6 +34,8 @@ export interface NavItem {
    */
   locked?: boolean;
   lockedMessage?: I18nText;
+  /** The license marks the feature locked: a lock badge, but the link still opens the locked page. */
+  licenseLocked?: boolean;
 }
 
 /**
@@ -102,7 +104,7 @@ export interface SubnavChild {
   gate?: string;
   /** Shows the shared "Beta" tag (see BetaBadge.vue) next to this child's label. */
   beta?: boolean;
-  /** License feature key; `locked` routes to the upsell page, `hidden` drops the child. */
+  /** License feature key; `locked` keeps a lock badge on a link to the locked page, `hidden` drops the child. */
   feature?: string;
   /**
    * Set at RENDER time (ONavGroup.vue), not in the static NAV_GROUPS/NAV_SUBNAV

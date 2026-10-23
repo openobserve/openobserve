@@ -65,7 +65,7 @@ import {
 import type { Point } from "./hoverIntent";
 import { findContentFocusTarget } from "./railFocus";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
-import { featureLockedPath, featureState } from "@/utils/featureGate";
+import { featureState } from "@/utils/featureGate";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useTrialPaywall } from "@/composables/useTrialPaywall";
 import {
@@ -623,12 +623,10 @@ function onChildClick(event: MouseEvent, child: SubnavChild & { locked?: boolean
   if (child.locked) {
     event.preventDefault();
     close();
+    // A license-locked page renders its own locked state, so it opens like any other.
     const target =
       child.feature && licenseState(child) === "locked"
-        ? {
-            path: featureLockedPath(child.feature),
-            query: { org_identifier: orgIdentifier.value },
-          }
+        ? childTo(child)
         : { name: "enterpriseFeatures" };
     router.push(target).catch(() => {});
     return;

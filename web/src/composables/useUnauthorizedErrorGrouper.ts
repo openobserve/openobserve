@@ -18,6 +18,7 @@ import { toast, toastRecords, updateToast } from "@/lib/feedback/Toast/useToast"
 import type { ToastDetail } from "@/lib/feedback/Toast/OToast.types";
 import { copyToClipboard } from "@/utils/clipboard";
 import { gt, raw, type I18nKey, type I18nText } from "@/types/i18n";
+import { isLockedFeatureDenial } from "@/composables/useFeatureLock";
 
 // Friendly name overrides. Keys, not text — this map is module scope, so it is
 // translated at display time in extractResourceInfo().
@@ -163,8 +164,9 @@ function flushGroupedToast(): void {
     onDismiss: onToastDismissed,
   });
 
-  // Capture the record ID of the toast we just pushed
-  activeToastId = toastRecords[toastRecords.length - 1]?.id ?? null;
+  // Found by its own dismiss hook: a toast that was never pushed must not adopt another one's record.
+  activeToastId = toastRecords.find((r) => r.open && r.onDismiss === onToastDismissed)?.id ?? null;
+  if (activeToastId === null) accumulatedErrors = [];
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -198,6 +200,8 @@ const licenseDenied = ref<string[] | null>(null);
 
 /** Open the license-denial dialog (403 + 40001), kept apart from the RBAC access toast. */
 export function addLicenseDeniedError(features: string[]): void {
+  // The locked page's own banner already names its feature; any other missing feature still opens the dialog.
+  if (isLockedFeatureDenial(features)) return;
   licenseDenied.value = [...new Set([...(licenseDenied.value ?? []), ...features])];
 }
 
