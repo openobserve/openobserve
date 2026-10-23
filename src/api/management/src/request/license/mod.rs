@@ -21,9 +21,10 @@ use config::{meta::user::UserRole, utils::str::mask_license_key};
 use db::license;
 use o2_enterprise::enterprise::license::{
     BelowHwm, LICENSE_DB_KEY, License, LicenseDecision, LicenseStatus, RefreshBusy, RefreshReport,
-    Rollback, RollbackReason, Waiver, check_license, click_refresh, gate_and_raise, get_license,
-    ingestion_limit_exceeded_count, ingestion_used, judge_paste, license_expired, license_status,
-    load_rev_hwm, pasted_key_supersedes_env, rev_hwm_warning, undo_raise,
+    RefreshStatus, Rollback, RollbackReason, Waiver, check_license, click_refresh, gate_and_raise,
+    get_license, ingestion_limit_exceeded_count, ingestion_used, judge_paste, license_expired,
+    license_status, load_rev_hwm, pasted_key_supersedes_env, refresh_status, rev_hwm_warning,
+    rotate_instance_key, undo_raise,
 };
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::{AuthExtractor, UserEmail};
@@ -36,7 +37,7 @@ const ENV_KEY_CONFLICT: &str = "env_key_conflict";
 const KEY_ACCEPTED: &str = "accept";
 const KEY_ACCEPTED_MSG: &str = "This key can be applied.";
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 struct LicenseResponse {
     key: Option<String>,
     license: Option<License>,
@@ -54,6 +55,7 @@ struct LicenseResponse {
     /// Whether `POST /license/refresh` would pass both its route check and its handler check.
     can_update_license: bool,
     rev_hwm_warning: Option<BelowHwm>,
+    refresh: RefreshStatus,
 }
 
 #[derive(Serialize)]
@@ -403,6 +405,19 @@ async fn preview_key(pasted: &License, loaded: Option<&License>, is_root: bool) 
     ))
 }
 
+async fn viewer_refresh_status<F, Fut>(
+    is_root: bool,
+    is_license_admin: bool,
+    redact: bool,
+    status: F,
+) -> RefreshStatus
+where
+    F: FnOnce(bool, bool, bool) -> Fut,
+    Fut: std::future::Future<Output = RefreshStatus>,
+{
+    status(is_root, is_license_admin, is_root && !redact).await
+}
+
 fn refresh_response(
     limits_refreshed: bool,
     report: Result<RefreshReport, RefreshBusy>,
@@ -471,6 +486,13 @@ pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
         })
         .await,
         rev_hwm_warning: rev_hwm_warning(),
+        refresh: viewer_refresh_status(
+            is_root,
+            is_license_admin,
+            o2_cfg.common.redact_license_key,
+            refresh_status,
+        )
+        .await,
     };
     MetaHttpResponse::json(res)
 }
@@ -533,6 +555,16 @@ pub async fn refresh_license_limits(Headers(user_email): Headers<UserEmail>) -> 
         limits_refreshed,
         click_refresh(&email, || async { license::update().await }).await,
     )
+}
+
+pub async fn rotate_license_key(Headers(user_email): Headers<UserEmail>) -> Response {
+    let email = user_email.user_id;
+    if check_license_permission(&email, "PUT").await.is_err() {
+        return MetaHttpResponse::forbidden("Unauthorized Access to license");
+    }
+
+    let limits_refreshed = get_license().await.is_some() && license::update().await.is_ok();
+    refresh_response(limits_refreshed, rotate_instance_key(&email).await)
 }
 
 #[cfg(test)]
@@ -623,6 +655,7 @@ mod tests {
             env_key_in_use: false,
             can_update_license: is_license_admin,
             rev_hwm_warning: None,
+            refresh: refresh_status_fixture(),
         })
         .unwrap()
     }
@@ -780,6 +813,7 @@ mod tests {
             env_key_in_use: false,
             can_update_license: false,
             rev_hwm_warning: None,
+            refresh: refresh_status_fixture(),
         })
         .unwrap();
         assert!(json["rev_hwm_warning"].is_null());
@@ -919,6 +953,7 @@ mod tests {
             env_key_in_use: true,
             can_update_license: false,
             rev_hwm_warning: None,
+            refresh: refresh_status_fixture(),
         })
         .unwrap();
         assert_eq!(json["env_key_active"], true);
@@ -1288,6 +1323,150 @@ mod tests {
         assert_eq!(status, StatusCode::OK, "{body}");
         assert_eq!(body["limits_refreshed"], false);
         assert_eq!(body["error"], "no_license");
+    }
+
+    fn refresh_status_fixture() -> o2_enterprise::enterprise::license::RefreshStatus {
+        o2_enterprise::enterprise::license::RefreshStatus {
+            mode: "online",
+            server_host: "license.example".into(),
+            registration: o2_enterprise::enterprise::license::Registration::Registered,
+            key_id: Some("root-key-id".into()),
+            key_created: true,
+            key_at_rest: "plaintext",
+            rotate_recommended: false,
+            rotation_unsettled: true,
+            last_attempt_at: Some(10),
+            last_attempt_by: Some("license-admin@test".into()),
+            last_success_at: Some(9),
+            last_status: Some("updated".into()),
+            last_error: None,
+            last_error_detail: String::new(),
+            last_outcome: None,
+            successor_available: None,
+            stored_key: Some("fetched-key-fixture".into()),
+        }
+    }
+
+    async fn get_as(email: &str) -> (StatusCode, json::Value) {
+        body_of(
+            get_license_info(Headers(UserEmail {
+                user_id: email.into(),
+            }))
+            .await,
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn get_carries_refresh_without_counter_and_key_id_for_non_root() {
+        let _store = store_setup().await;
+        let db = infra::db::get_db().await;
+        db.put(
+            o2_enterprise::enterprise::license::LICENSE_INSTANCE_KEY,
+            json::to_vec(
+                &json::json!({"v": 1, "alg": "Ed25519", "key_id": "root-key-id",
+                "public_jwk": {"kty": "OKP", "crv": "Ed25519", "x": "test-public-key"},
+                "private": "test-private-fixture", "created_at": 1}),
+            )
+            .unwrap()
+            .into(),
+            false,
+            None,
+        )
+        .await
+        .unwrap();
+        db.put(
+            o2_enterprise::enterprise::license::LICENSE_REFRESH_STATE_KEY,
+            json::to_vec(&json::json!({"v": 1, "counter": 17,
+                "last_attempt_by": "license-admin@test"}))
+            .unwrap()
+            .into(),
+            false,
+            None,
+        )
+        .await
+        .unwrap();
+        let (status, root) = get_as(STORE_ROOT).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(root["refresh"]["key_id"], "root-key-id");
+        assert_eq!(root["refresh"]["last_attempt_by"], "license-admin@test");
+        let (status, viewer) = get_as("license-viewer@test").await;
+        assert_eq!(status, StatusCode::OK);
+        let refresh = &viewer["refresh"];
+        assert!(refresh.is_object(), "{viewer}");
+        assert!(refresh["key_id"].is_null());
+        assert!(refresh["last_attempt_by"].is_null());
+        assert!(refresh["stored_key"].is_null());
+        assert_eq!(refresh["key_created"], true);
+        assert!(refresh["rotation_unsettled"].is_boolean());
+        assert!(refresh.get("counter").is_none());
+        assert!(root["refresh"].get("counter").is_none());
+    }
+
+    #[tokio::test]
+    async fn stored_key_only_for_root_with_env_active_and_no_redaction() {
+        for is_root in [false, true] {
+            for is_admin in [false, true] {
+                for redact in [false, true] {
+                    for env_active in [false, true] {
+                        let status = viewer_refresh_status(
+                            is_root,
+                            is_admin,
+                            redact,
+                            |show_id, show_actor, show_key| async move {
+                                assert_eq!(show_id, is_root);
+                                assert_eq!(show_actor, is_admin);
+                                let mut status = refresh_status_fixture();
+                                status.stored_key =
+                                    status.stored_key.filter(|_| env_active && show_key);
+                                status
+                            },
+                        )
+                        .await;
+                        assert_eq!(
+                            status.stored_key.is_some(),
+                            is_root && env_active && !redact
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn rotate_key_needs_put_permission() {
+        let _store = store_setup().await;
+        load_refresh_license("online").await;
+        let (status, _) = body_of(
+            rotate_license_key(Headers(UserEmail {
+                user_id: "no-license-permission@test".into(),
+            }))
+            .await,
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert_eq!(
+            stored(o2_enterprise::enterprise::license::LICENSE_INSTANCE_KEY).await,
+            None
+        );
+    }
+
+    #[tokio::test]
+    async fn rotate_key_returns_409_while_locked() {
+        let _store = store_setup().await;
+        load_refresh_license("online").await;
+        let _held = o2_enterprise::enterprise::license::hold_refresh_lock_for_tests().await;
+        let (status, body) = body_of(
+            rotate_license_key(Headers(UserEmail {
+                user_id: STORE_ROOT.into(),
+            }))
+            .await,
+        )
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT, "{body}");
+        assert_eq!(body["code"], 409);
+        assert_eq!(body["reason"], "refresh_in_progress");
+        assert_eq!(body["limits_refreshed"], true);
     }
 
     #[tokio::test]

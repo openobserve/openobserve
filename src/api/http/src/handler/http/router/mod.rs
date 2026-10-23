@@ -1761,6 +1761,7 @@ fn service_route_table() -> Router {
             // License
             .route("/license", get(license::get_license_info).post(license::store_license))
             .route("/license/refresh", post(license::refresh_license_limits))
+            .route("/license/rotate_key", post(license::rotate_license_key))
 
             // Service streams
             .route("/{org_id}/service_streams", get(service_streams::list_services))
