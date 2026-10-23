@@ -36,3 +36,10 @@ export const updateLicenseMutation = () =>
     mutationFn: (key: string) => licenseServer.update_license(key),
     meta: { invalidates: [licenseKeys.get()], silentError: true },
   });
+
+export const refreshLicenseMutation = (rotate = false) =>
+  mutationOptions({
+    mutationFn: () =>
+      rotate ? licenseServer.rotate_key() : licenseServer.refresh_license_limits(),
+    meta: { invalidates: [licenseKeys.get()], silentError: true },
+  });

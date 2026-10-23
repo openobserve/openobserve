@@ -52,7 +52,11 @@ export function isOldNodeBody(body: unknown): body is "" {
 }
 
 export function statusLabel(status: string | null, t: TranslateFn): I18nText {
-  return t(STATUS_KEYS[status ?? ""] ?? "about.online_status_unknown");
+  return t(
+    Object.hasOwn(STATUS_KEYS, status ?? "")
+      ? STATUS_KEYS[status ?? ""]
+      : "about.online_status_unknown",
+  );
 }
 
 export function refreshMessage(
@@ -76,10 +80,15 @@ export function refreshMessage(
         : "error";
     return {
       variant,
-      text: t(ERROR_KEYS[body.error] ?? "about.online_error_internal", {
-        seconds: body.retry_after_s ?? 30,
-        limits: body.limits_refreshed === true ? t("about.online_limits_refreshed") : "",
-      }),
+      text: t(
+        Object.hasOwn(ERROR_KEYS, body.error)
+          ? ERROR_KEYS[body.error]
+          : "about.online_error_internal",
+        {
+          seconds: body.retry_after_s ?? 30,
+          limits: body.limits_refreshed === true ? t("about.online_limits_refreshed") : "",
+        },
+      ),
       ...(["timeout", "unreachable"].includes(body.error)
         ? { hint: t("about.online_proxy_hint") }
         : {}),

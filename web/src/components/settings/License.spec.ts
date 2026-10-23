@@ -499,17 +499,34 @@ describe("License.vue", () => {
     });
 
     it("text typed into the update form survives the immediate and scheduled reloads", async () => {
-      vi.mocked(licenseServer.refresh_license_limits).mockResolvedValue(createAxiosResponse({}));
+      const onlineData = {
+        ...mockLicenseData,
+        can_update_license: true,
+        refresh: {
+          mode: "online",
+          registration: "registered",
+          server_host: "license.openobserve.ai",
+          key_id: "synthetic-id",
+          last_success_at: null,
+          key_at_rest: "encrypted",
+          last_outcome: null,
+        },
+      };
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(onlineData));
+      vi.mocked(licenseServer.refresh_license_limits).mockResolvedValue(
+        createAxiosResponse({ outcome: "unchanged" }),
+      );
+      wrapper.vm.licenseData = onlineData;
       wrapper.vm.showUpdateForm = true;
       await flushPromises();
       const field = () => wrapper.find('textarea[data-test="update-license-key-input-field"]');
       await field().setValue("half-typed-key");
 
-      await wrapper.vm.reloadLicenseData();
+      await wrapper.get('[data-test="license-online-refresh"]').trigger("click");
       await flushPromises();
       expect(field().element.value).toBe("half-typed-key");
 
-      await wrapper.vm.reloadLicenseData();
+      await vi.advanceTimersByTimeAsync(LICENSE_REFRESH_SETTLE_MS);
       await flushPromises();
       expect(wrapper.text()).not.toContain("Loading license information");
       expect(field().element.value).toBe("half-typed-key");

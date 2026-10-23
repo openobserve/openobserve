@@ -17,13 +17,15 @@ import { getCurrentScope, onScopeDispose } from "vue";
 import { useStore } from "vuex";
 import { queryClient } from "@/composables/query/queryClient";
 import { configFullQuery } from "@/services/config.queries";
-import licenseServer from "@/services/license_server";
-import { licenseQuery } from "@/services/license_server.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { refreshLicenseMutation, licenseQuery } from "@/services/license_server.queries";
 import type { RefreshBody, RefreshResult } from "@/ts/interfaces/licenseRefresh";
 import { LICENSE_REFRESH_SETTLE_MS } from "@/utils/licenseWaivers";
 
 export function useLicenseRefresh() {
   const store = useStore();
+  const refreshMutation = useMutation(refreshLicenseMutation(), queryClient);
+  const rotateMutation = useMutation(refreshLicenseMutation(true), queryClient);
 
   const reloadLicenseState = async () => {
     const org = store.state.selectedOrganization?.identifier;
@@ -71,8 +73,8 @@ export function useLicenseRefresh() {
   ): Promise<RefreshResult> => {
     try {
       const response = await (rotate
-        ? licenseServer.rotate_key()
-        : licenseServer.refresh_license_limits());
+        ? rotateMutation.mutateAsync()
+        : refreshMutation.mutateAsync());
       scheduleReload(onSettled);
       return { ok: true, body: response.data, status: response.status };
     } catch (error) {

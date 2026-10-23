@@ -22,6 +22,11 @@ const toastMock = vi.fn();
 const fetchQuery = vi.fn();
 const invalidateQueries = vi.fn();
 
+vi.mock("@tanstack/vue-query", () => ({
+  useMutation: <T>(options: { mutationFn: () => Promise<T> }) => ({
+    mutateAsync: options.mutationFn,
+  }),
+}));
 vi.mock("vuex", () => ({
   useStore: () => ({ dispatch, state: { selectedOrganization: { identifier: "acme" } } }),
 }));
@@ -37,6 +42,7 @@ vi.mock("@/services/license_server", () => ({
 }));
 vi.mock("@/services/license_server.queries", () => ({
   licenseQuery: () => ({ queryKey: ["license"] }),
+  refreshLicenseMutation: () => ({ mutationFn: () => licenseServer.refresh_license_limits() }),
 }));
 vi.mock("@/services/config.queries", () => ({
   configFullQuery: (org: string) => ({ queryKey: ["config", org] }),

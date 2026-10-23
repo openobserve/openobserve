@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OBanner v-if="visible" bar :variant="variant" :icon="icon" data-test="license-search-banner">
     <div>
-      <div v-if="!outcome || outcome.variant !== 'success'">{{ message }}</div>
+      <div v-if="isPaused || !outcome || outcome.variant !== 'success'">{{ message }}</div>
       <div v-if="outcome" data-test="license-banner-outcome" aria-live="polite">
         {{ outcome.text }}
       </div>
@@ -153,13 +153,18 @@ const licenseId = computed(() => licenseData.value?.license?.license_id ?? "");
 const canUpdateLicense = computed(() => licenseData.value?.can_update_license === true);
 
 const variant = computed(() => {
-  if (outcome.value?.variant === "success") return "success";
   if (state.value.kind === "paused") return "error";
+  if (outcome.value) return outcome.value.variant;
   return state.value.kind === "restored" && state.value.endsSoon ? "warning" : "success";
 });
 const icon = computed(() => {
-  if (outcome.value?.variant === "success") return "check-circle";
   if (state.value.kind === "paused") return "error";
+  if (outcome.value)
+    return outcome.value.variant === "success"
+      ? "check-circle"
+      : outcome.value.variant === "info"
+        ? "info"
+        : "warning";
   return state.value.kind === "restored" && state.value.endsSoon ? "schedule" : "check-circle";
 });
 
