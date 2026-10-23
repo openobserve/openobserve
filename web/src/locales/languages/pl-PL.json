@@ -1773,6 +1773,7 @@
     "span": "span",
     "spans": "spany",
     "errorTraces": "trace błędów",
+    "slowTraceFilter": "Wolne (≥ {seconds} s)",
     "failedToFetchTraces": "Nie udało się pobrać danych trace. Spróbuj ponownie.",
     "seekToMoment": "Przejdź do tego momentu w sesji",
     "route": "Trasa",

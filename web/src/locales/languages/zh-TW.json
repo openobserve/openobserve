@@ -1773,6 +1773,7 @@
     "span": "span",
     "spans": "span",
     "errorTraces": "錯誤追蹤",
+    "slowTraceFilter": "慢 (≥ {seconds} 秒)",
     "failedToFetchTraces": "擷取追蹤資料失敗。請再試一次。",
     "seekToMoment": "跳至工作階段中的此刻",
     "route": "路由",
