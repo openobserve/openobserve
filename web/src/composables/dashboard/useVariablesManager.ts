@@ -23,6 +23,8 @@ import {
   type ScopedDependencyGraph,
 } from "@/utils/dashboard/variables/variablesDependencyUtils";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+import { isCustomQueryVariable } from "@/utils/dashboard/variables/queryVariableUtils";
+import type { VariableFilterGroup } from "@/utils/dashboard/variables/variableFilterGroupUtils";
 
 export const LIVE_COMMIT_DEBOUNCE_MS = 300;
 
@@ -38,14 +40,20 @@ export interface VariableConfig {
   query_data?: {
     stream_type?: string;
     stream?: string;
-    field: string;
+    field?: string;
     max_record_size?: number;
+    query_type?: "sql" | "promql";
+    custom_query?: boolean;
+    query?: string;
+    value_field?: string;
+    label_field?: string;
     filter?: Array<{
       name?: string;
       operator?: string;
       value?: string;
       filter?: string;
     }>;
+    filter_group?: VariableFilterGroup | null;
   };
   options?: Array<{
     label: I18nText;
@@ -88,6 +96,23 @@ export const getVariableKey = (
     return `${name}@panel@${panelId}`;
   }
 };
+
+// A custom query variable's "All" stands for the options its query lists, so that default still has to fetch.
+const fetchesForDefault = (variable: VariableConfig): boolean =>
+  variable.loadOptionsWithAllDefault === true ||
+  (isCustomQueryVariable(variable) && variable.selectAllValueForMultiSelect === "all");
+
+// Labels and "All" options of a custom query variable only come from its query, so a value set without a fetch still needs one.
+const needsQueryOptions = (variable: VariableRuntimeState): boolean =>
+  isCustomQueryVariable(variable) &&
+  !variable.isLoading &&
+  !variable.isVariableLoadingPending &&
+  !((variable as any).options?.length > 0);
+
+const holdsSelectAll = (variable: VariableRuntimeState): boolean =>
+  Array.isArray(variable.value)
+    ? variable.value.includes(SELECT_ALL_VALUE)
+    : variable.value === SELECT_ALL_VALUE;
 
 // Helper to expand variables for scopes
 const expandVariablesForScopes = (variables: VariableConfig[]): VariableRuntimeState[] => {
@@ -143,11 +168,15 @@ const expandVariablesForScopes = (variables: VariableConfig[]): VariableRuntimeS
     const hasCustomOrAllDefault =
       variable.type === "query_values" &&
       (variable.selectAllValueForMultiSelect === "custom" ||
-        variable.selectAllValueForMultiSelect === "all");
+        variable.selectAllValueForMultiSelect === "all") &&
+      !(isCustomQueryVariable(variable) && variable.selectAllValueForMultiSelect === "all");
+    // Saved options of a custom query variable are form leftovers; its options always come from the query.
+    const runtimeOverrides = isCustomQueryVariable(variable) ? { options: [] } : {};
 
     if (scope === "global") {
       expanded.push({
         ...variable,
+        ...runtimeOverrides,
         scope: "global",
         value: initialValue,
         isVariableLoadingPending: false,
@@ -160,6 +189,7 @@ const expandVariablesForScopes = (variables: VariableConfig[]): VariableRuntimeS
       variable.tabs.forEach((tabId) => {
         expanded.push({
           ...variable,
+          ...runtimeOverrides,
           scope: "tabs",
           tabId,
           value: initialValue,
@@ -172,6 +202,7 @@ const expandVariablesForScopes = (variables: VariableConfig[]): VariableRuntimeS
       variable.panels.forEach((panelId) => {
         expanded.push({
           ...variable,
+          ...runtimeOverrides,
           scope: "panels",
           panelId,
           value: initialValue,
@@ -560,7 +591,7 @@ export const useVariablesManager = (t: TranslateFn) => {
         // OPTION list empty, so the picker renders its select-all label over
         // nothing until the user's own interaction refetches it. Opt-in, because
         // every saved dashboard uses the "first" default and never hits this.
-        if (!hasCustomOrAllDefault || v.loadOptionsWithAllDefault === true) {
+        if (!hasCustomOrAllDefault || fetchesForDefault(v)) {
           v.isVariableLoadingPending = true;
         }
       }
@@ -603,7 +634,7 @@ export const useVariablesManager = (t: TranslateFn) => {
             parentVar.type === "textbox" ||
             parentVar.type === "dynamic_filters" ||
             (parentVar.type === "query_values" &&
-              parentVar.loadOptionsWithAllDefault !== true &&
+              !fetchesForDefault(parentVar) &&
               (parentVar.selectAllValueForMultiSelect === "custom" ||
                 parentVar.selectAllValueForMultiSelect === "all"));
 
@@ -812,6 +843,8 @@ export const useVariablesManager = (t: TranslateFn) => {
                 childVar.options = [];
                 // Mark as pending to trigger load
                 childVar.isVariableLoadingPending = true;
+              } else if (keepsLoadedChild && needsQueryOptions(childVar)) {
+                childVar.isVariableLoadingPending = true;
               }
             } else {
               // Non-query types are immediate
@@ -917,9 +950,11 @@ export const useVariablesManager = (t: TranslateFn) => {
           const hasCustomOrAllDefault =
             v.selectAllValueForMultiSelect === "custom" || v.selectAllValueForMultiSelect === "all";
 
-          if (canVariableLoad(v) && !hasCustomOrAllDefault) {
+          if (canVariableLoad(v) && (!hasCustomOrAllDefault || fetchesForDefault(v))) {
             v.isVariableLoadingPending = true;
           }
+        } else if (needsQueryOptions(v) && canVariableLoad(v)) {
+          v.isVariableLoadingPending = true;
         }
       });
     }
@@ -939,9 +974,11 @@ export const useVariablesManager = (t: TranslateFn) => {
           const hasCustomOrAllDefault =
             v.selectAllValueForMultiSelect === "custom" || v.selectAllValueForMultiSelect === "all";
 
-          if (canVariableLoad(v) && !hasCustomOrAllDefault) {
+          if (canVariableLoad(v) && (!hasCustomOrAllDefault || fetchesForDefault(v))) {
             v.isVariableLoadingPending = true;
           }
+        } else if (needsQueryOptions(v) && canVariableLoad(v)) {
+          v.isVariableLoadingPending = true;
         }
       });
     }
@@ -1109,7 +1146,24 @@ export const useVariablesManager = (t: TranslateFn) => {
 
     const allVars = getAllVariablesFlat();
     recordLoadedAgainst(restoredKeys.map((key) => findVariableByKey(key, allVars)));
+    hydrateRestoredCustomQueryVariables(restoredKeys, allVars);
     scheduleChildrenOfRestored(restoredKeys);
+  };
+
+  // A restored "All" holds panels until its options load; any restored custom query variable fetches for its labels.
+  const hydrateRestoredCustomQueryVariables = (
+    restoredKeys: string[],
+    allVars: VariableRuntimeState[],
+  ) => {
+    const restored = restoredKeys
+      .map((key) => findVariableByKey(key, allVars))
+      .filter((v): v is VariableRuntimeState => !!v && isCustomQueryVariable(v));
+    restored.forEach((v) => {
+      if (holdsSelectAll(v)) v.isVariablePartialLoaded = false;
+    });
+    restored.forEach((v) => {
+      if (needsQueryOptions(v) && canVariableLoad(v)) v.isVariableLoadingPending = true;
+    });
   };
 
   interface ParsedUrlKey {

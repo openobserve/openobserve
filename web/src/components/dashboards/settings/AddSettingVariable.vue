@@ -75,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="showLabelOnTop"
                 :options="variableTypes"
                 :label="t('dashboard.typeOfVariable')"
+                :help-text="selectedTypeDescription"
                 data-test="dashboard-variable-type-select"
               />
             </div>
@@ -99,27 +100,84 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div
-              class="mt-4 flex w-full justify-between text-base font-bold"
+              class="mt-4 flex w-full items-center justify-between"
               v-if="variableData.type !== 'dynamic_filters'"
             >
-              <span>{{ t("dashboard.extraOptions") }}</span>
+              <span class="text-base font-bold">{{ t("dashboard.extraOptions") }}</span>
+              <OToggleGroup
+                v-if="variableData.type == 'query_values'"
+                :model-value="isCustomQuery ? 'custom' : 'auto'"
+                data-test="dashboard-variable-query-mode"
+                @update:model-value="onQueryModeChange($event as string)"
+              >
+                <OToggleGroupItem
+                  value="auto"
+                  size="sm"
+                  data-test="dashboard-variable-query-mode-auto"
+                >
+                  <template #icon-left><OIcon name="build" size="xs" class="shrink-0" /></template>
+                  {{ t("dashboard.auto") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem
+                  value="custom"
+                  size="sm"
+                  data-test="dashboard-variable-query-mode-custom"
+                >
+                  <template #icon-left><OIcon name="code" size="xs" class="shrink-0" /></template>
+                  {{ t("dashboard.custom") }}
+                </OToggleGroupItem>
+              </OToggleGroup>
               <div v-if="variableData.type == 'custom' && variableData.multiSelect"></div>
             </div>
-            <div v-if="variableData.type == 'query_values'">
-              <!-- items-start (not items-end): a per-field validation error adds a
-                   line at the bottom of that select. Bottom-aligning would shove the
-                   error-free sibling down to stay flush; top-aligning keeps both
-                   inputs aligned and lets the error hang below. -->
-              <div class="flex items-start gap-x-4 max-md:flex-col max-md:gap-y-2">
-                <OFormSelect
-                  name="query_data.stream_type"
-                  :label="t('dashboard.selectStreamType')"
-                  required
-                  :options="streamTypeOptions"
-                  class="flex-1"
-                  @update:model-value="streamTypeUpdated($event)"
-                  data-test="dashboard-variable-stream-type-select"
-                />
+            <div v-if="variableData.type == 'query_values'" class="mt-3">
+              <OFormSelect
+                name="query_data.stream_type"
+                :label="t('dashboard.selectStreamType')"
+                required
+                :options="streamTypeOptions"
+                @update:model-value="streamTypeUpdated($event)"
+                data-test="dashboard-variable-stream-type-select"
+              />
+              <div
+                v-if="isMetricsStream"
+                class="mt-4 flex w-full flex-col items-start gap-2"
+                data-test="dashboard-variable-query-language-row"
+              >
+                <span
+                  id="dashboard-variable-query-language-label"
+                  class="o-input-label text-compact text-input-label-text leading-tight font-medium select-none"
+                  data-test="dashboard-variable-query-language-label"
+                  >{{ t("dashboard.queryVariable.queryLanguage") }}</span
+                >
+                <OToggleGroup
+                  :model-value="queryLanguage"
+                  aria-labelledby="dashboard-variable-query-language-label"
+                  data-test="dashboard-variable-query-language"
+                  @update:model-value="onQueryLanguageChange($event as string)"
+                >
+                  <OToggleGroupItem
+                    value="sql"
+                    size="sm"
+                    data-test="dashboard-variable-query-language-sql"
+                  >
+                    <template #icon-left
+                      ><OIcon name="database" size="xs" class="shrink-0"
+                    /></template>
+                    {{ t("panel.SQL") }}
+                  </OToggleGroupItem>
+                  <OToggleGroupItem
+                    value="promql"
+                    size="sm"
+                    data-test="dashboard-variable-query-language-promql"
+                  >
+                    <template #icon-left
+                      ><OIcon name="show-chart" size="xs" class="shrink-0"
+                    /></template>
+                    {{ t("panel.promQL") }}
+                  </OToggleGroupItem>
+                </OToggleGroup>
+              </div>
+              <div v-if="!isCustomQuery" class="mt-4 flex">
                 <OFormSelect
                   name="query_data.stream"
                   :label="t('dashboard.selectIndex')"
@@ -141,7 +199,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </OFormSelect>
               </div>
-              <div class="mt-4 flex">
+              <QueryVariableEditor
+                v-if="isCustomQuery"
+                ref="queryVariableEditorRef"
+                class="mt-4"
+                :dashboard-variables-list="dashboardVariablesList"
+              />
+              <div
+                v-if="isCustomQuery"
+                v-show="filterCycleError"
+                class="text-status-error-text mt-2"
+                data-test="dashboard-variable-query-cycle-error"
+              >
+                {{ filterCycleError }}
+              </div>
+              <div v-if="!isCustomQuery" class="mt-4 flex">
                 <OFormSelect
                   name="query_data.field"
                   :label="t('dashboard.selectField')"
@@ -162,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </OFormSelect>
               </div>
-              <div class="mt-4">
+              <div v-if="!isCustomQuery" class="mt-4">
                 <OFormInput
                   name="query_data.max_record_size"
                   type="number"
@@ -172,7 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #tooltip><OTooltip :content="t('dashboard.maxRecordSize')" /></template>
                 </OFormInput>
               </div>
-              <div class="mt-4">
+              <div v-if="!isCustomQuery" class="mt-4">
                 <div class="flex flex-row items-center gap-1.5">
                   <div data-test="dashboard-query-values-filter" class="text-base font-bold">
                     {{ t("dashboard.addSettingVariable.filters") }}
@@ -191,76 +263,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                   </OTooltip>
                 </div>
-                <div>
-                  <div
-                    class="mb-4 flex w-full min-w-0 flex-row items-start gap-x-2"
-                    v-for="(filter, index) in variableData.query_data.filter"
-                    :key="index"
-                  >
-                    <OFormSelect
-                      :name="`query_data.filter[${index}].name`"
-                      :options="data.currentFieldsList"
-                      labelKey="name"
-                      valueKey="name"
-                      searchable
-                      :placeholder="
-                        filter.name
-                          ? raw('')
-                          : t('dashboard.addSettingVariable.selectFieldPlaceholder')
-                      "
-                      @update:model-value="filterUpdated(index, $event)"
-                      data-test="dashboard-query-values-filter-name-selector"
-                      class="min-w-0 flex-2"
-                    >
-                      <template #empty>
-                        <span class="text-text-secondary italic">{{
-                          t("dashboard.noDataFound")
-                        }}</span>
-                      </template>
-                    </OFormSelect>
-                    <OFormSelect
-                      :name="`query_data.filter[${index}].operator`"
-                      class="operator min-w-0 flex-[1.5]"
-                      data-test="dashboard-query-values-filter-operator-selector"
-                      :options="filterOperatorOptions"
-                    />
-                    <OFormCombobox
-                      v-if="!['Is Null', 'Is Not Null'].includes(filter.operator)"
-                      :name="`query_data.filter[${index}].value`"
-                      :items="dashboardVariablesFilterItems"
-                      search-regex="(?:^|[^$])\$?(\w+)"
-                      :debounce="1000"
-                      class="min-w-0 flex-2"
-                      :placeholder="t('dashboard.addSettingVariable.enterValueCap')"
-                      :data-test="`dashboard-query-values-filter-value-selector-${index}`"
-                    />
-                    <!-- Fixed input-height wrapper keeps the delete button
-                         centered on the input row while the row is items-start
-                         (so per-field validation errors hang below without
-                         nudging the inputs/button out of alignment). -->
-                    <div class="flex h-[2.125rem] shrink-0 items-center">
-                      <OButton
-                        :aria-label="t('common.remove')"
-                        variant="ghost"
-                        size="icon"
-                        @click="removeFilter(index)"
-                        :data-test="`dashboard-variable-adhoc-close-${index}`"
-                        icon-left="close"
-                      >
-                      </OButton>
-                    </div>
-                  </div>
+                <div class="mt-2" data-test="dashboard-variable-filter-builder">
+                  <VariableFilterGroup
+                    :group="filterGroup"
+                    path="query_data.filter_group"
+                    test-key=""
+                    :depth="0"
+                    :field-options="data.currentFieldsList"
+                    :operator-options="
+                      queryLanguage === 'promql'
+                        ? promqlFilterOperatorOptions
+                        : filterOperatorOptions
+                    "
+                    :value-items="dashboardVariablesFilterItems"
+                    :promql="queryLanguage === 'promql'"
+                    :show-errors="filterSubmitAttempted"
+                  />
                 </div>
-                <div>
-                  <OButton
-                    variant="outline"
-                    size="sm"
-                    @click="addFilter"
-                    data-test="dashboard-add-filter-btn"
-                    icon-left="add"
-                  >
-                    {{ t("dashboard.addFilter") }}
-                  </OButton>
+                <div
+                  v-if="queryLanguage === 'promql'"
+                  class="text-text-secondary mt-2 text-xs"
+                  data-test="dashboard-variable-filter-promql-hint"
+                >
+                  {{ t("dashboard.queryVariable.promqlFiltersAndHint") }}
+                </div>
+                <div
+                  v-if="promqlFilterGroupInvalid"
+                  class="text-status-error-text mt-1 text-xs"
+                  data-test="dashboard-variable-filter-promql-error"
+                >
+                  {{ t("dashboard.queryVariable.promqlFiltersAndOnly") }}
                 </div>
 
                 <!-- show error if filter has cycle -->
@@ -523,6 +555,7 @@ import DashboardHeader from "./common/DashboardHeader.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm, type FormFieldPath } from "@/lib/forms/Form/useOForm";
@@ -542,7 +575,22 @@ import {
   isGraphHasCycle,
 } from "@/utils/dashboard/variables/variablesDependencyUtils";
 import { getScopeType } from "@/utils/dashboard/variables/variablesScopeUtils";
-import OFormCombobox from "@/lib/forms/Combobox/OFormCombobox.vue";
+import {
+  buildAutoPromqlQuery,
+  buildAutoSqlQuery,
+  PROMQL_FILTER_OPERATORS,
+  type QueryVariableLanguage,
+} from "@/utils/dashboard/variables/queryVariableUtils";
+import {
+  createFilterGroup,
+  filterGroupHasNesting,
+  filterGroupHasOr,
+  filterGroupToQueryData,
+  getVariableFilterGroup,
+  type VariableFilterGroup as VariableFilterGroupData,
+} from "@/utils/dashboard/variables/variableFilterGroupUtils";
+import QueryVariableEditor from "./QueryVariableEditor.vue";
+import VariableFilterGroup from "./VariableFilterGroup.vue";
 import useNotifications from "@/composables/useNotifications";
 import { useDashboardSaveConflict } from "@/composables/dashboard/useDashboardSaveConflict";
 import analytics from "@/services/product_analytics";
@@ -552,9 +600,11 @@ export default defineComponent({
   props: ["variableName", "dashboardVariablesList", "isFromAddPanel"],
   components: {
     DashboardHeader,
-    OFormCombobox,
+    QueryVariableEditor,
+    VariableFilterGroup,
     OButton,
     OFormToggleGroup,
+    OToggleGroup,
     OToggleGroupItem,
     OForm,
     OFormSelect,
@@ -590,7 +640,12 @@ export default defineComponent({
         stream: "",
         field: "",
         max_record_size: null,
-        filter: [],
+        filter_group: createFilterGroup("AND", []),
+        query_type: "sql",
+        custom_query: false,
+        query: "",
+        value_field: "",
+        label_field: "",
       },
       value: "",
       options: [{ label: raw(""), value: "", selected: true }],
@@ -629,6 +684,17 @@ export default defineComponent({
       { label: t("dashboard.filterOperators.isNull"), value: "Is Null" },
       { label: t("dashboard.filterOperators.isNotNull"), value: "Is Not Null" },
     ]);
+    const PROMQL_OPERATOR_LABELS: Record<string, string> = { re_match: "=~", re_not_match: "!~" };
+    const promqlFilterOperatorOptions = computed(() =>
+      filterOperatorOptions.value
+        .filter((option) => PROMQL_FILTER_OPERATORS.includes(option.value))
+        .map((option) => ({
+          ...option,
+          label: PROMQL_OPERATOR_LABELS[option.value]
+            ? raw(PROMQL_OPERATOR_LABELS[option.value])
+            : option.label,
+        })),
+    );
 
     const addSettingVariableSchema = makeAddSettingVariableSchema(t);
     const form = useOForm<AddSettingVariableForm>({
@@ -772,24 +838,32 @@ export default defineComponent({
     const saveConflict = useDashboardSaveConflict();
     // const model = ref(null)
     // const filteredStreams = ref([]);
-    const variableTypes = ref([
+    const variableTypes = computed(() => [
       {
         label: t("dashboard.queryValues"),
         value: "query_values",
+        subLabel: t("dashboard.queryVariable.typeQueryValuesDescription"),
       },
       {
         label: t("dashboard.constant"),
         value: "constant",
+        subLabel: t("dashboard.queryVariable.typeConstantDescription"),
       },
       {
         label: t("dashboard.textbox"),
         value: "textbox",
+        subLabel: t("dashboard.queryVariable.typeTextboxDescription"),
       },
       {
         label: t("dashboard.custom"),
         value: "custom",
+        subLabel: t("dashboard.queryVariable.typeCustomDescription"),
       },
     ]);
+
+    const selectedTypeDescription = computed(
+      () => variableTypes.value.find((type) => type.value === variableData.type)?.subLabel,
+    );
 
     const filterCycleError: any = ref("");
 
@@ -806,6 +880,58 @@ export default defineComponent({
       data.streamType.map((t: string) => ({ label: raw(t), value: t })),
     );
 
+    const isCustomQuery = computed(() => variableData.query_data?.custom_query === true);
+    const isMetricsStream = computed(() => variableData.query_data?.stream_type === "metrics");
+    const queryLanguage = computed<QueryVariableLanguage>(() =>
+      variableData.query_data?.query_type === "promql" ? "promql" : "sql",
+    );
+
+    const queryVariableEditorRef = ref<{ syncTypedQuery?: () => void } | null>(null);
+    // The other language's custom text, and the last auto prefill per language, for this form session.
+    const otherLanguageTexts: Partial<Record<QueryVariableLanguage, string>> = {};
+    const lastPrefills: Partial<Record<QueryVariableLanguage, string>> = {};
+
+    const autoQueryFor = (language: QueryVariableLanguage): string => {
+      const queryData = variableData.query_data;
+      if (!queryData?.stream || !queryData?.field) return "";
+      return language === "promql" ? buildAutoPromqlQuery(queryData) : buildAutoSqlQuery(queryData);
+    };
+
+    // A hand-edited text stays; an empty one or an untouched prefill follows the auto settings.
+    const keptOrPrefilled = (language: QueryVariableLanguage, text: string): string => {
+      if (text.trim() && text !== lastPrefills[language]) return text;
+      const prefill = autoQueryFor(language);
+      lastPrefills[language] = prefill;
+      return prefill;
+    };
+
+    // Synchronous on purpose: the text is in the form before the editor mounts, so it can never mount empty.
+    const onQueryModeChange = (mode: string) => {
+      if (!mode || (mode === "custom") === isCustomQuery.value) return;
+      queryVariableEditorRef.value?.syncTypedQuery?.();
+      if (mode === "auto") {
+        setFormField("query_data.custom_query", false);
+        return;
+      }
+      const text = keptOrPrefilled(queryLanguage.value, variableData.query_data?.query ?? "");
+      if (!variableData.query_data?.stream_type) setFormField("query_data.stream_type", "logs");
+      setFormField("query_data.query", text);
+      setFormField("query_data.custom_query", true);
+    };
+
+    const onQueryLanguageChange = (language: string) => {
+      if (!language || language === queryLanguage.value) return;
+      queryVariableEditorRef.value?.syncTypedQuery?.();
+      const next: QueryVariableLanguage = language === "promql" ? "promql" : "sql";
+      otherLanguageTexts[queryLanguage.value] = variableData.query_data?.query ?? "";
+      const stored = otherLanguageTexts[next] ?? "";
+      setFormField(
+        "query_data.query",
+        isCustomQuery.value ? keptOrPrefilled(next, stored) : stored,
+      );
+      setFormField("query_data.query_type", next);
+    };
+
     const handleCustomSelectAll = () => {
       // if all values are selected, then check customSelectAllModel = true
       if (variableData.options.every((option: any) => option.selected)) {
@@ -815,23 +941,16 @@ export default defineComponent({
       }
     };
 
-    const addFilter = () => {
-      formPush("query_data.filter", {
-        name: undefined,
-        operator: "=",
-        value: "",
-      });
-    };
-    // Defaults (multiSelect / hideOnDashboard / selectAllValueForMultiSelect /
-    // escapeSingleQuotes) are seeded by the schema defaults — no manual init.
-
-    const filterUpdated = (index: number, value: any) => {
-      setFormField(`query_data.filter[${index}].name`, value);
-    };
-
-    const removeFilter = (index: any) => {
-      formRemove("query_data.filter", index);
-    };
+    const filterGroup = computed<VariableFilterGroupData>(
+      () => variableData.query_data?.filter_group ?? createFilterGroup("AND", []),
+    );
+    const filterSubmitAttempted = form.useStore((s: any) => s.submissionAttempts > 0);
+    const promqlFilterGroupInvalid = computed(
+      () =>
+        queryLanguage.value === "promql" &&
+        !isCustomQuery.value &&
+        (filterGroupHasOr(filterGroup.value) || filterGroupHasNesting(filterGroup.value)),
+    );
 
     const editMode = ref(false);
 
@@ -842,21 +961,6 @@ export default defineComponent({
           setFormField("query_data.max_record_size", null);
         }
       },
-    );
-
-    // watch for filter changes and clear value for Is Null / Is Not Null operators
-    watch(
-      () => variableData?.query_data?.filter,
-      (newValue) => {
-        if (newValue && newValue.length > 0) {
-          newValue.forEach((filter: any, i: number) => {
-            if (["Is Null", "Is Not Null"].includes(filter.operator) && filter.value) {
-              setFormField(`query_data.filter[${i}].value`, "");
-            }
-          });
-        }
-      },
-      { deep: true },
     );
 
     // Map a saved variable (API shape, with tabs/panels) onto the form shape
@@ -883,7 +987,12 @@ export default defineComponent({
           stream: variable.query_data?.stream ?? "",
           field: variable.query_data?.field ?? "",
           max_record_size: variable.query_data?.max_record_size ?? null,
-          filter: variable.query_data?.filter ?? [],
+          filter_group: getVariableFilterGroup(variable.query_data),
+          query_type: variable.query_data?.query_type ?? "sql",
+          custom_query: variable.query_data?.custom_query === true,
+          query: variable.query_data?.query ?? "",
+          value_field: variable.query_data?.value_field ?? "",
+          label_field: variable.query_data?.label_field ?? "",
         },
         value: variable.value ?? "",
         options,
@@ -1112,6 +1221,9 @@ export default defineComponent({
       delete v.selectedPanels;
 
       if (v.type !== "query_values") delete v.query_data;
+      if (v.query_data) v.query_data = buildQueryDataPayload(v.query_data);
+      // A custom query's options come from its query; the form's placeholder option would show as a blank row.
+      if (v.query_data?.custom_query) v.options = [];
       if (v.type !== "query_values" && v.type !== "custom") {
         v.multiSelect = false;
         v.selectAllValueForMultiSelect = "";
@@ -1128,6 +1240,31 @@ export default defineComponent({
           mrs === "" || mrs === null || mrs === undefined || Number.isNaN(n) ? null : n;
       }
       return v;
+    };
+
+    // An auto SQL variable keeps the legacy shape; query keys are only saved for PromQL or a custom query.
+    const buildQueryDataPayload = (queryData: any) => {
+      const {
+        query_type,
+        custom_query,
+        query,
+        value_field,
+        label_field,
+        filter_group,
+        filter,
+        ...base
+      } = queryData;
+      // Only OR or nesting needs filter_group; anything else saves the legacy filter array unchanged.
+      const rest = {
+        ...base,
+        ...filterGroupToQueryData(getVariableFilterGroup({ filter, filter_group })),
+      };
+      const language = query_type === "promql" && rest.stream_type === "metrics" ? "promql" : "sql";
+      if (!custom_query) return language === "promql" ? { ...rest, query_type: language } : rest;
+      const payload: any = { ...rest, custom_query: true, query_type: language, query };
+      if (language === "sql" && value_field) payload.value_field = value_field;
+      if (language === "sql" && label_field) payload.label_field = label_field;
+      return payload;
     };
 
     const saveVariableApiCall = useLoading(async () => {
@@ -1328,6 +1465,8 @@ export default defineComponent({
       // wrong type's stream list. Programmatic callers (tests) pass no arg and
       // keep reading from the form.
       const streamType = newStreamType ?? variableData.query_data.stream_type;
+      // PromQL only reads metrics, so any other stream type goes back to SQL.
+      if (streamType !== "metrics") onQueryLanguageChange("sql");
 
       // reset the stream and field (cross-field setFieldValue)
       setFormField("query_data.stream", "");
@@ -1563,12 +1702,23 @@ export default defineComponent({
       t,
       raw,
       filterOperatorOptions,
+      filterGroup,
+      filterSubmitAttempted,
+      promqlFilterGroupInvalid,
       data,
       streamsFilterFn,
       fieldsFilterFn,
       streamsFilteredOptions,
       fieldsFilteredOptions,
       variableTypes,
+      selectedTypeDescription,
+      isCustomQuery,
+      isMetricsStream,
+      queryLanguage,
+      onQueryModeChange,
+      onQueryLanguageChange,
+      queryVariableEditorRef,
+      promqlFilterOperatorOptions,
       streamTypeUpdated,
       streamUpdated,
       onActivated,
@@ -1580,9 +1730,6 @@ export default defineComponent({
       close,
       title,
       onSubmit,
-      addFilter,
-      removeFilter,
-      filterUpdated,
       filterCycleError,
       dashboardVariablesFilterItems,
       mergedStreamOptionsWithLabel,

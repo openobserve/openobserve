@@ -9,7 +9,9 @@
 //   • name              → required + `^[a-zA-Z0-9_-]*$` regex
 //   • selectedTabs       → required when scope is "tabs" | "panels"
 //   • selectedPanels     → required when scope is "panels"
-//   • query_data.stream_type / stream / field → required when type === "query_values"
+//   • query_data.stream_type → required when type === "query_values"
+//   • query_data.stream / field + filter_group conditions → required for an auto query_values
+//   • query_data.query   → required for a custom query_values
 //   • value (constant)   → required+trim when type === "constant"
 //
 // Dynamic arrays are form-owned field-arrays; their row rules are enforced in
@@ -17,11 +19,81 @@
 // non-`custom`/non-`query_values` type's default rows never block submit.
 
 import { z } from "zod";
+import { PROMQL_FILTER_OPERATORS } from "@/utils/dashboard/variables/queryVariableUtils";
+import {
+  createFilterGroup,
+  filterGroupHasNesting,
+  filterGroupHasOr,
+  getFilterConditionIssues,
+  type VariableFilterCondition,
+  type VariableFilterGroup,
+  type VariableFilterIssue,
+} from "@/utils/dashboard/variables/variableFilterGroupUtils";
+
+export { FILTER_OPERATORS_WITHOUT_VALUE } from "@/utils/dashboard/variables/variableFilterGroupUtils";
 
 export const VARIABLE_NAME_REGEX = /^[a-zA-Z0-9_-]*$/;
 
-// Operators that do NOT need a value (the filter value field is hidden for them).
-export const FILTER_OPERATORS_WITHOUT_VALUE = ["Is Null", "Is Not Null"];
+const filterConditionSchema: z.ZodType<VariableFilterCondition> = z.object({
+  filterType: z.literal("condition"),
+  type: z.literal("condition"),
+  column: z
+    .object({
+      field: z.string().nullable().optional(),
+      streamAlias: z.string().nullable().optional(),
+    })
+    .nullable(),
+  operator: z.string().nullable().optional(),
+  value: z.string().nullable().optional(),
+  values: z.array(z.string()),
+  logicalOperator: z.string(),
+});
+
+const filterGroupSchema: z.ZodType<VariableFilterGroup> = z.lazy(() =>
+  z.object({
+    filterType: z.literal("group"),
+    logicalOperator: z.string(),
+    conditions: z.array(z.union([filterConditionSchema, filterGroupSchema])),
+  }),
+);
+
+const FILTER_ISSUE_PATHS: Record<VariableFilterIssue, string[]> = {
+  field: ["column", "field"],
+  operator: ["operator"],
+  promqlOperator: ["operator"],
+  value: ["value"],
+};
+
+const FILTER_ISSUE_MESSAGES: Record<VariableFilterIssue, string> = {
+  field: "dashboard.fieldRequired",
+  operator: "dashboard.operatorRequired",
+  promqlOperator: "dashboard.queryVariable.promqlOperatorUnsupported",
+  value: "dashboard.filterValueRequired",
+};
+
+const addFilterGroupIssues = (
+  group: VariableFilterGroup,
+  path: (string | number)[],
+  isPromql: boolean,
+  ctx: z.RefinementCtx,
+  t: (_key: string) => string,
+) => {
+  group.conditions.forEach((node, index) => {
+    const nodePath = [...path, "conditions", index];
+    if (node.filterType === "group") {
+      addFilterGroupIssues(node, nodePath, isPromql, ctx, t);
+      return;
+    }
+    getFilterConditionIssues(node, isPromql ? PROMQL_FILTER_OPERATORS : undefined).forEach(
+      (issue) =>
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [...nodePath, ...FILTER_ISSUE_PATHS[issue]],
+          message: t(FILTER_ISSUE_MESSAGES[issue]),
+        }),
+    );
+  });
+};
 
 export const makeAddSettingVariableSchema = (t: (_key: string) => string) =>
   z
@@ -49,8 +121,13 @@ export const makeAddSettingVariableSchema = (t: (_key: string) => string) =>
           field: z.string().optional().default(""),
           // number <input> emits string / null — keep loose, not validated.
           max_record_size: z.union([z.number(), z.string(), z.null()]).optional(),
-          // form-owned filter rows; row rules enforced in superRefine below.
-          filter: z.array(z.record(z.string(), z.any())).optional().default([]),
+          // form-owned filter tree; condition rules enforced in superRefine below.
+          filter_group: filterGroupSchema.optional().default(createFilterGroup("AND", [])),
+          query_type: z.string().optional().default("sql"),
+          custom_query: z.boolean().optional().default(false),
+          query: z.string().optional().default(""),
+          value_field: z.string().nullable().optional().default(""),
+          label_field: z.string().nullable().optional().default(""),
         })
         .optional()
         // Fully-shaped default: zod v4's .default() returns the value as-is
@@ -59,7 +136,12 @@ export const makeAddSettingVariableSchema = (t: (_key: string) => string) =>
           stream_type: "",
           stream: "",
           field: "",
-          filter: [],
+          filter_group: createFilterGroup("AND", []),
+          query_type: "sql",
+          custom_query: false,
+          query: "",
+          value_field: "",
+          label_field: "",
         }),
       value: z.string().optional().default(""),
       // form-owned custom option rows; row rules enforced in superRefine below.
@@ -89,14 +171,16 @@ export const makeAddSettingVariableSchema = (t: (_key: string) => string) =>
           message: t("dashboard.atLeastOnePanelRequired"),
         });
       }
-      if (val.type === "query_values") {
-        if (!val.query_data?.stream_type) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["query_data", "stream_type"],
-            message: t("dashboard.streamTypeRequired"),
-          });
-        }
+      const isAutoQuery = val.type === "query_values" && !val.query_data?.custom_query;
+      const isPromql = val.query_data?.query_type === "promql";
+      if (val.type === "query_values" && !val.query_data?.stream_type) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["query_data", "stream_type"],
+          message: t("dashboard.streamTypeRequired"),
+        });
+      }
+      if (isAutoQuery) {
         if (!val.query_data?.stream) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
@@ -112,6 +196,17 @@ export const makeAddSettingVariableSchema = (t: (_key: string) => string) =>
           });
         }
       }
+      if (
+        val.type === "query_values" &&
+        val.query_data?.custom_query &&
+        !String(val.query_data?.query ?? "").trim()
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["query_data", "query"],
+          message: t("dashboard.queryVariable.queryRequired"),
+        });
+      }
       if (val.type === "constant" && !String(val.value ?? "").trim()) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -120,33 +215,17 @@ export const makeAddSettingVariableSchema = (t: (_key: string) => string) =>
         });
       }
 
-      // Filter rows (only for query_values). name + operator required per row;
-      // value required for value-needing operators.
-      if (val.type === "query_values") {
-        (val.query_data?.filter ?? []).forEach((row: any, i: number) => {
-          if (!String(row?.name ?? "").trim()) {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              path: ["query_data", "filter", i, "name"],
-              message: t("dashboard.fieldRequired"),
-            });
-          }
-          if (!String(row?.operator ?? "").trim()) {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              path: ["query_data", "filter", i, "operator"],
-              message: t("dashboard.operatorRequired"),
-            });
-          }
-          const needsValue = !FILTER_OPERATORS_WITHOUT_VALUE.includes(String(row?.operator ?? ""));
-          if (needsValue && String(row?.value ?? "").length === 0) {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              path: ["query_data", "filter", i, "value"],
-              message: t("dashboard.filterValueRequired"),
-            });
-          }
-        });
+      // Filter conditions (only for an auto query_values), at any depth.
+      if (isAutoQuery && val.query_data?.filter_group) {
+        const group = val.query_data.filter_group;
+        addFilterGroupIssues(group, ["query_data", "filter_group"], isPromql, ctx, t);
+        if (isPromql && (filterGroupHasOr(group) || filterGroupHasNesting(group))) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["query_data", "filter_group"],
+            message: t("dashboard.queryVariable.promqlFiltersAndOnly"),
+          });
+        }
       }
 
       // Custom option rows (only for custom). label required; value required+trim.

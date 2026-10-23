@@ -1,4 +1,6 @@
 import { gt } from "@/types/i18n";
+import { isCustomQueryVariable } from "./queryVariableUtils";
+import { getVariableFilterValues, type VariableFilterGroup } from "./variableFilterGroupUtils";
 
 /**
  * Extract variable names from a string
@@ -55,22 +57,30 @@ export const buildVariablesDependencyGraph = (
     if (item.type == "query_values") {
       // Use a Set to collect all unique dependencies from stream, field, and filters
       const allDependencies = new Set<string>();
+      const isCustom = isCustomQueryVariable(item);
+
+      // A custom query reads only its own text; stream/field/filters are inactive auto settings.
+      if (isCustom) {
+        extractVariableNames(item.query_data?.query ?? "", variablesNameList).forEach(
+          (dep: string) => allDependencies.add(dep),
+        );
+      }
 
       // 1. Check stream field for variable references
-      if (item.query_data?.stream) {
+      if (item.query_data?.stream && !isCustom) {
         const streamDeps = extractVariableNames(item.query_data.stream, variablesNameList);
         streamDeps.forEach((dep: string) => allDependencies.add(dep));
       }
 
       // 2. Check field field for variable references
-      if (item.query_data?.field) {
+      if (item.query_data?.field && !isCustom) {
         const fieldDeps = extractVariableNames(item.query_data.field, variablesNameList);
         fieldDeps.forEach((dep: string) => allDependencies.add(dep));
       }
 
       // 3. Check filter values for variable references (existing logic)
-      for (let filter of item?.query_data?.filter ?? []) {
-        const filterDeps = extractVariableNames(filter.value, variablesNameList);
+      for (const value of isCustom ? [] : getVariableFilterValues(item?.query_data)) {
+        const filterDeps = extractVariableNames(value, variablesNameList);
         filterDeps.forEach((dep: string) => allDependencies.add(dep));
       }
 
@@ -192,10 +202,13 @@ interface VariableRuntimeState {
   query_data?: {
     stream?: string;
     field?: string;
+    query?: string;
+    custom_query?: boolean;
     filter?: Array<{
       filter?: string;
       value?: string;
     }>;
+    filter_group?: VariableFilterGroup | null;
   };
 }
 
@@ -343,23 +356,29 @@ export const buildScopedDependencyGraph = (
     if (variable.type === "query_values") {
       // Use a Set to collect all unique parent variable names
       const allParentNames = new Set<string>();
+      const isCustom = isCustomQueryVariable(variable);
+
+      if (isCustom) {
+        extractVariableNames(variable.query_data?.query ?? "").forEach((name) =>
+          allParentNames.add(name),
+        );
+      }
 
       // 1. Check stream field for variable references
-      if (variable.query_data?.stream) {
+      if (variable.query_data?.stream && !isCustom) {
         const streamParents = extractVariableNames(variable.query_data.stream);
         streamParents.forEach((name) => allParentNames.add(name));
       }
 
       // 2. Check field field for variable references
-      if (variable.query_data?.field) {
+      if (variable.query_data?.field && !isCustom) {
         const fieldParents = extractVariableNames(variable.query_data.field);
         fieldParents.forEach((name) => allParentNames.add(name));
       }
 
       // 3. Check filter values for variable references (existing logic)
-      const filters = variable.query_data?.filter || [];
-      filters.forEach((filter) => {
-        const filterString = filter.filter || filter.value || "";
+      const filterValues = isCustom ? [] : getVariableFilterValues(variable.query_data);
+      filterValues.forEach((filterString) => {
         const filterParents = extractVariableNames(filterString);
         filterParents.forEach((name) => allParentNames.add(name));
       });

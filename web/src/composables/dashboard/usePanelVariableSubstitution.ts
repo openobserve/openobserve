@@ -27,6 +27,10 @@ import {
 import { escapeSingleQuotes } from "@/utils/zincutils";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { MIN_PERCENTILE_SAMPLES } from "@/utils/metrics/metricDefaults";
+import {
+  isQueryVariableAllPending,
+  resolveQueryVariableValue,
+} from "@/utils/dashboard/variables/queryVariableUtils";
 
 const formatPanelVariableValue = (
   variable: any,
@@ -34,14 +38,15 @@ const formatPanelVariableValue = (
   queryType: any,
 ): string => {
   const escape = (value: any) => escapeSingleQuotes(String(value));
+  const resolved = resolveQueryVariableValue(variable);
 
-  if (!Array.isArray(variable.value)) {
+  if (!Array.isArray(resolved)) {
     // If no data found (null value), use SELECT_ALL_VALUE
-    return `${escape(variable.value === null ? SELECT_ALL_VALUE : variable.value)}`;
+    return `${escape(resolved === null ? SELECT_ALL_VALUE : resolved)}`;
   }
 
   // If no data found (empty array), use SELECT_ALL_VALUE
-  const values = variable.value.length === 0 ? [SELECT_ALL_VALUE] : variable.value;
+  const values = resolved.length === 0 ? [SELECT_ALL_VALUE] : resolved;
   const singleQuoted = values.map((value: any) => `'${escape(value)}'`).join(",") || "''";
   switch (format) {
     case "csv":
@@ -144,7 +149,8 @@ export const usePanelVariableSubstitution = ({
       const hasNeverBeenLoaded = !it.isVariablePartialLoaded;
 
       // Block only if: (null/empty value) AND (never been loaded)
-      const shouldBlock = (hasNullValue || hasEmptyArray) && hasNeverBeenLoaded;
+      const shouldBlock =
+        ((hasNullValue || hasEmptyArray) && hasNeverBeenLoaded) || isQueryVariableAllPending(it);
 
       log(`[areDependentVariablesStillLoading] Variable ${it.name}:`, {
         value: it.value,
@@ -195,7 +201,10 @@ export const usePanelVariableSubstitution = ({
     newDependentVariablesData.every((it: any) => {
       const oldValue = currentDependentVariablesData.find((it2: any) => it2.name == it.name);
       return it.multiSelect
-        ? areArraysEqual(asQueriedMultiValue(it.value), asQueriedMultiValue(oldValue?.value))
+        ? areArraysEqual(
+            asQueriedMultiValue(resolveQueryVariableValue(it)),
+            asQueriedMultiValue(oldValue ? resolveQueryVariableValue(oldValue) : undefined),
+          )
         : it.value == oldValue?.value && oldValue?.value != "";
     });
 

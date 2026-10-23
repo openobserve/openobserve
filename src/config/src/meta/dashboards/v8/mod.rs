@@ -790,6 +790,23 @@ pub struct QueryData {
     pub max_record_size: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub filter: Option<Vec<Filters>>,
+    /// AND/OR filter tree; saved instead of `filter` only when OR or nesting is used.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filter_group: Option<GroupType>,
+    /// Query language of the variable: "sql" (default) or "promql".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub query_type: Option<String>,
+    /// True when options come from the hand-written `query` instead of stream/field/filter.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub custom_query: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub query: Option<String>,
+    /// SQL result column used as the option value.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value_field: Option<String>,
+    /// SQL result column used as the option display label.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label_field: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -1854,5 +1871,208 @@ mod tests {
         assert_eq!(cfg.axis_label_mode, None);
         let json = serde_json::to_value(&cfg).unwrap();
         assert!(json.get("axis_label_mode").is_none());
+    }
+
+    fn dashboard_with_variables(list: serde_json::Value) -> Dashboard {
+        serde_json::from_value(serde_json::json!({
+            "version": 8,
+            "title": "Vars",
+            "description": "",
+            "variables": {"list": list}
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn test_query_values_custom_and_promql_round_trip() {
+        let promql = r#"label_values(up{cluster="$cluster"}, namespace)"#;
+        let custom_sql = serde_json::json!({
+            "stream_type": "logs",
+            "stream": "default",
+            "field": "service",
+            "max_record_size": null,
+            "custom_query": true,
+            "query_type": "sql",
+            "query": "SELECT DISTINCT service AS v, service_name AS l FROM default",
+            "value_field": "v",
+            "label_field": "l"
+        });
+        let custom_promql = serde_json::json!({
+            "stream_type": "metrics",
+            "stream": "",
+            "field": "",
+            "max_record_size": null,
+            "custom_query": true,
+            "query_type": "promql",
+            "query": promql
+        });
+        let auto_promql = serde_json::json!({
+            "stream_type": "metrics",
+            "stream": "up",
+            "field": "namespace",
+            "max_record_size": 20,
+            "filter": [{"name": "cluster", "operator": "=", "value": "$cluster"}],
+            "query_type": "promql"
+        });
+        let d = dashboard_with_variables(serde_json::json!([
+            {"type": "query_values", "name": "svc", "label": "Service", "query_data": custom_sql},
+            {"type": "query_values", "name": "ns", "label": "Namespace", "query_data": custom_promql},
+            {"type": "query_values", "name": "ns2", "label": "Namespace", "query_data": auto_promql}
+        ]));
+        let list = &d.variables.as_ref().unwrap().list;
+        let sql = list[0].query_data.as_ref().unwrap();
+        assert_eq!(sql.custom_query, Some(true));
+        assert_eq!(sql.query_type.as_deref(), Some("sql"));
+        assert_eq!(sql.value_field.as_deref(), Some("v"));
+        assert_eq!(sql.label_field.as_deref(), Some("l"));
+        let prom = list[1].query_data.as_ref().unwrap();
+        assert_eq!(prom.query.as_deref(), Some(promql));
+        let auto = list[2].query_data.as_ref().unwrap();
+        assert_eq!(auto.custom_query, None);
+        assert_eq!(auto.query_type.as_deref(), Some("promql"));
+
+        let json = serde_json::to_value(&d).unwrap();
+        let saved = &json["variables"]["list"];
+        assert_eq!(saved[0]["query_data"], custom_sql);
+        assert_eq!(saved[1]["query_data"], custom_promql);
+        assert_eq!(saved[2]["query_data"], auto_promql);
+        let back: Dashboard = serde_json::from_value(json).unwrap();
+        assert_eq!(back.variables, d.variables);
+    }
+
+    #[test]
+    fn test_query_values_variable_round_trip_omits_new_keys() {
+        let qd = serde_json::json!({
+            "stream_type": "logs",
+            "stream": "default",
+            "field": "k8s_namespace",
+            "max_record_size": 10
+        });
+        let d = dashboard_with_variables(serde_json::json!([
+            {"type": "query_values", "name": "ns", "label": "ns", "query_data": qd}
+        ]));
+        let json = serde_json::to_value(&d).unwrap();
+        assert_eq!(json["variables"]["list"][0]["query_data"], qd);
+    }
+
+    fn variable_filter_condition(
+        field: &str,
+        op: &str,
+        value: &str,
+        logic: &str,
+    ) -> serde_json::Value {
+        serde_json::json!({
+            "type": "condition",
+            "values": [],
+            "column": {"field": field, "streamAlias": null},
+            "operator": op,
+            "value": value,
+            "logicalOperator": logic,
+            "filterType": "condition"
+        })
+    }
+
+    #[test]
+    fn test_query_values_legacy_filter_array_round_trips_byte_identical() {
+        let qd = serde_json::json!({
+            "stream_type": "logs",
+            "stream": "default",
+            "field": "service",
+            "max_record_size": null,
+            "filter": [
+                {"name": "env", "operator": "=", "value": "$env"},
+                {"name": "region", "operator": "!=", "value": "us"}
+            ]
+        });
+        let d = dashboard_with_variables(serde_json::json!([
+            {"type": "query_values", "name": "svc", "label": "svc", "query_data": qd}
+        ]));
+        let parsed = d.variables.as_ref().unwrap().list[0]
+            .query_data
+            .as_ref()
+            .unwrap();
+        assert!(parsed.filter_group.is_none());
+        let json = serde_json::to_value(&d).unwrap();
+        assert_eq!(json["variables"]["list"][0]["query_data"], qd);
+        let raw = r#"{"stream_type":"logs","stream":"default","field":"service","max_record_size":null,"filter":[{"name":"env","operator":"=","value":"$env"}]}"#;
+        let typed: QueryData = serde_json::from_str(raw).unwrap();
+        assert_eq!(serde_json::to_string(&typed).unwrap(), raw);
+    }
+
+    #[test]
+    fn test_query_values_filter_group_round_trips() {
+        let qd = serde_json::json!({
+            "stream_type": "logs",
+            "stream": "default",
+            "field": "service",
+            "max_record_size": null,
+            "filter_group": {
+                "filterType": "group",
+                "logicalOperator": "AND",
+                "conditions": [
+                    variable_filter_condition("env", "=", "$env", "AND"),
+                    {
+                        "filterType": "group",
+                        "logicalOperator": "OR",
+                        "conditions": [
+                            variable_filter_condition("level", "=", "error", "AND"),
+                            variable_filter_condition("level", "=", "warn", "OR")
+                        ]
+                    }
+                ]
+            }
+        });
+        let d = dashboard_with_variables(serde_json::json!([
+            {"type": "query_values", "name": "svc", "label": "svc", "query_data": qd}
+        ]));
+        let parsed = d.variables.as_ref().unwrap().list[0]
+            .query_data
+            .as_ref()
+            .unwrap();
+        assert!(parsed.filter.is_none());
+        let group = parsed.filter_group.as_ref().unwrap();
+        assert_eq!(group.conditions.len(), 2);
+        assert!(
+            matches!(&group.conditions[1], PanelFilter::Group(g) if g.logical_operator == "OR")
+        );
+        let json = serde_json::to_value(&d).unwrap();
+        let saved = &json["variables"]["list"][0]["query_data"];
+        assert_eq!(saved, &qd);
+        assert!(saved.get("filter").is_none());
+        let back: Dashboard = serde_json::from_value(json).unwrap();
+        assert_eq!(back.variables, d.variables);
+    }
+
+    #[test]
+    fn test_query_values_with_both_or_neither_filter_shapes_parse() {
+        let both = serde_json::json!({
+            "stream_type": "logs",
+            "stream": "default",
+            "field": "service",
+            "filter": [{"name": "env", "operator": "=", "value": "prod"}],
+            "filter_group": {
+                "filterType": "group",
+                "logicalOperator": "AND",
+                "conditions": [variable_filter_condition("env", "=", "prod", "AND")]
+            }
+        });
+        let neither = serde_json::json!({
+            "stream_type": "logs",
+            "stream": "default",
+            "field": "service",
+            "max_record_size": null
+        });
+        let d = dashboard_with_variables(serde_json::json!([
+            {"type": "query_values", "name": "a", "label": "a", "query_data": both},
+            {"type": "query_values", "name": "b", "label": "b", "query_data": neither}
+        ]));
+        let list = &d.variables.as_ref().unwrap().list;
+        let a = list[0].query_data.as_ref().unwrap();
+        assert_eq!(a.filter.as_ref().map(Vec::len), Some(1));
+        assert_eq!(a.filter_group.as_ref().map(|g| g.conditions.len()), Some(1));
+        let b = list[1].query_data.as_ref().unwrap();
+        assert!(b.filter.is_none() && b.filter_group.is_none());
+        let json = serde_json::to_value(&d).unwrap();
+        assert_eq!(json["variables"]["list"][1]["query_data"], neither);
     }
 }

@@ -84,7 +84,8 @@ vi.mock("@/utils/query/sqlUtils", () => ({
   addLabelsToSQlQuery: vi.fn((query: string) => Promise.resolve(query)),
 }));
 
-vi.mock("@/utils/zincutils", () => ({
+vi.mock("@/utils/zincutils", async (importOriginal) => ({
+  splitQuotedString: (await importOriginal<typeof import("@/utils/zincutils")>()).splitQuotedString,
   b64EncodeUnicode: vi.fn((str: string) => btoa(str)),
   escapeSingleQuotes: vi.fn((str: string) => str.replace(/'/g, "''")),
   generateTraceContext: vi.fn(() => ({ traceId: "test-trace-id" })),
@@ -2790,6 +2791,80 @@ describe("VariablesValueSelector", () => {
       await vm.loadVariableOptions(spans);
 
       expect(capturedSql).toContain("WHERE a = 'xyz789' AND b = 'abc123' AND c = 'api', 'web'");
+    });
+
+    it("runs an OR filter_group as a parenthesised WHERE with multi-value IN", async () => {
+      const { addLabelsToSQlQuery } = await import("@/utils/query/sqlUtils");
+      const condition = (field: string, value: string, logicalOperator = "AND") => ({
+        filterType: "condition",
+        type: "condition",
+        column: { field },
+        operator: "=",
+        value,
+        values: [],
+        logicalOperator,
+      });
+      wrapper = createWrapper({
+        variablesConfig: {
+          list: [
+            { name: "env", type: "constant", label: "env", value: "prod" },
+            { name: "svc", type: "constant", label: "svc", value: "api" },
+            {
+              name: "spans",
+              type: "query_values",
+              label: "spans",
+              multiSelect: false,
+              query_data: {
+                field: "span_id",
+                stream: "default",
+                stream_type: "logs",
+                max_record_size: 10,
+                filter_group: {
+                  filterType: "group",
+                  logicalOperator: "AND",
+                  conditions: [
+                    condition("env", "$env"),
+                    {
+                      filterType: "group",
+                      logicalOperator: "AND",
+                      conditions: [condition("svc", "$svc"), condition("svc", "web", "OR")],
+                    },
+                  ],
+                },
+              },
+            },
+          ],
+        },
+        initialVariableValues: { value: {} },
+      });
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      const byName = (name: string) => vm.variablesData.values.find((v: any) => v.name === name);
+      ["env", "svc"].forEach((name) => {
+        byName(name).isVariablePartialLoaded = true;
+      });
+      byName("svc").value = ["api", "_o2_all_"];
+
+      let capturedSql = "";
+      mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(
+        (payload: any, handlers: any) => {
+          capturedSql = atob(payload.queryReq.sql);
+          handlers.complete(payload, { type: "end" });
+        },
+      );
+      vi.mocked(addLabelsToSQlQuery).mockClear();
+
+      const spans = byName("spans");
+      spans.isLoading = false;
+      spans.isVariablePartialLoaded = true;
+      spans.isVariableLoadingPending = false;
+      await vm.loadVariableOptions(spans);
+
+      expect(addLabelsToSQlQuery).not.toHaveBeenCalled();
+      expect(capturedSql).toContain(
+        `WHERE "env" = 'prod' AND ("svc" IN ('api', '_o2_all_') OR "svc" = 'web')`,
+      );
     });
   });
 
