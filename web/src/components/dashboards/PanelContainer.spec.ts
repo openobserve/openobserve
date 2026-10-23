@@ -1533,6 +1533,24 @@ describe("PanelContainer", () => {
 
         expect(wrapper.vm.confirmDeletePanelDialog).toBe(opens);
       });
+
+      it.each([["kiosk"], ["viewOnly"]])("ignores every hover shortcut in %s", async (prop) => {
+        const routerPushSpy = vi.spyOn(router, "push");
+        wrapper = createWrapper({ [prop]: true });
+        wrapper.vm.isCurrentlyHoveredPanel = true;
+
+        for (const key of ["Delete", "Backspace", "d", "e", "v", "i"]) {
+          window.dispatchEvent(new KeyboardEvent("keydown", { key }));
+        }
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.vm.confirmDeletePanelDialog).toBe(false);
+        expect(wrapper.vm.showViewPanel).toBe(false);
+        expect(wrapper.emitted("onViewPanel")).toBeUndefined();
+        expect(toastMock).not.toHaveBeenCalled();
+        expect(routerPushSpy).not.toHaveBeenCalled();
+        routerPushSpy.mockRestore();
+      });
     });
   });
 

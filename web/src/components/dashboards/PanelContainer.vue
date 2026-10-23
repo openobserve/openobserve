@@ -1281,6 +1281,7 @@ export default defineComponent({
     // Direct keydown listener — avoids ShortcutManager conflicts when many
     // panels are mounted at the same time. Only fires when this panel is hovered.
     const handlePanelKeydown = (e: KeyboardEvent) => {
+      if (props.viewOnly || props.kiosk) return;
       if (!isCurrentlyHoveredPanel.value) return;
       if (isInputFocused()) return;
       if (isLayoutEditing.value && !["v", "V", "i", "I"].includes(e.key)) return;
