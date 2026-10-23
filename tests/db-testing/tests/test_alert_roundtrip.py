@@ -33,7 +33,7 @@ def _alert_payload(name: str, stream: str, dest: str) -> dict:
         "runbook_url": "https://example.com/runbooks/roundtrip",
         "deduplication": {"enabled": True, "fingerprint_fields": ["level"], "time_window_minutes": 30},
         "notify_on_recovery": True,
-        # Regression for #15434 (fixed on main by #15574): a non-empty list forces the decode that broke on Postgres.
+        # Regression for #15434: a non-empty list forces the decode that broke on Postgres.
         "recovery_destinations": [dest],
         "pending_period_sec": 60,
         "keep_firing_for": 60,
