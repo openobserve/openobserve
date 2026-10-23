@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { mount, enableAutoUnmount } from "@vue/test-utils";
 import LicenseKeyCheck from "./LicenseKeyCheck.vue";
 import i18n from "@/locales";
@@ -92,5 +92,57 @@ describe("LicenseKeyCheck", () => {
     expect(text).toContain("until Oct 21, 00:00");
     expect(text).toContain("Migration note");
     expect(text).toContain("Removed note");
+  });
+});
+
+describe("LicenseKeyCheck waiver status clock", () => {
+  const now = Date.UTC(2026, 9, 20, 12);
+  const waiver = {
+    id: "clock",
+    type: "search_unblock",
+    starts_at: (now + 1000) * 1000,
+    ends_at: (now + 2000) * 1000,
+    note: "Clock boundary",
+  };
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    vi.setSystemTime(now);
+  });
+  afterEach(() => vi.useRealTimers());
+  it("refreshes status when a result arrives after its start boundary", async () => {
+    const w = render({ result: null, refusal: null });
+    await vi.advanceTimersByTimeAsync(1500);
+    await w.setProps({ result: { ...result, waivers_added: [waiver] } });
+    expect(w.find('[data-test="license-key-check-added"]').text()).toContain("Active");
+    expect(w.find('[data-test="license-key-check-added"]').text()).not.toContain("Scheduled");
+    w.unmount();
+  });
+  it("refreshes visible added and removed waivers at start and end boundaries", async () => {
+    const w = render({
+      result: {
+        ...result,
+        waivers_added: [waiver],
+        waivers_removed: [
+          {
+            ...waiver,
+            id: "removed",
+            type: "ingestion_limit",
+            limit: { typ: "PerDayCount", value: 400 },
+          },
+        ],
+      },
+      refusal: null,
+    });
+    const added = () => w.find('[data-test="license-key-check-added"]').text();
+    const removed = () => w.find('[data-test="license-key-check-removed"]').text();
+    expect(added()).toContain("Scheduled");
+    expect(removed()).toContain("Scheduled");
+    await vi.advanceTimersByTimeAsync(1001);
+    expect(added()).toContain("Active");
+    expect(removed()).toContain("Active");
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(added()).toContain("Ended");
+    expect(removed()).toContain("Past days");
+    w.unmount();
   });
 });
