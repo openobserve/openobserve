@@ -164,7 +164,7 @@ pub async fn sync_built_in_from_github(force_refresh: bool) -> Result<SyncResult
 
     // Emit coordinator event so all nodes refresh the _openobserve cache
     let event_key = format!("/model_pricing/{BUILT_IN_ORG}/_sync");
-    if let Err(e) = infra::coordinator::model_pricing::emit_put_event(&event_key).await {
+    if let Err(e) = infra::coordinator::emit_put(&event_key).await {
         log::error!("[model_pricing_sync] failed to emit sync event: {e}");
     }
 
