@@ -17,17 +17,20 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Json, Response},
 };
-use config::utils::str::mask_license_key;
+use config::{meta::user::UserRole, utils::str::mask_license_key};
 use db::license;
 use o2_enterprise::enterprise::license::{
-    LICENSE_DB_KEY, License, check_license, get_license, ingestion_limit_exceeded_count,
-    ingestion_used, license_expired,
+    LICENSE_DB_KEY, License, LicenseDecision, LicenseStatus, Waiver, check_license, get_license,
+    ingestion_limit_exceeded_count, ingestion_used, license_expired, license_status,
+    pasted_key_supersedes_env,
 };
 use openobserve_api_common::extractors::Headers;
-use openobserve_core::auth::UserEmail;
+use openobserve_core::auth::{AuthExtractor, UserEmail};
 use serde::{Deserialize, Serialize};
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+
+const ENV_KEY_CONFLICT_MSG: &str = "This instance uses the license key in the O2_LICENSE_KEY environment variable, and that key stays in use. Only a newer key for the same license, such as one carrying new waivers, can be pasted over it. To use any other key, put it in O2_LICENSE_KEY and restart.";
 
 #[derive(Serialize, Deserialize)]
 struct LicenseResponse {
@@ -37,6 +40,15 @@ struct LicenseResponse {
     expired: bool,
     ingestion_used: f64,
     ingestion_exceeded: u8,
+    waivers: Vec<Waiver>,
+    decision: LicenseDecision,
+    base: LicenseDecision,
+    evaluated_at: i64,
+    env_key_active: bool,
+    /// Whether the loaded key is the `O2_LICENSE_KEY` one, i.e. no pasted key superseded it.
+    env_key_in_use: bool,
+    /// Whether `POST /license/refresh` would pass both its route check and its handler check.
+    can_update_license: bool,
 }
 
 pub struct SaveLicenseRequest {
@@ -66,7 +78,7 @@ impl<'de> Deserialize<'de> for SaveLicenseRequest {
 
 async fn check_license_permission(user_id: &str, method: &str) -> Result<(), anyhow::Error> {
     use o2_openfga::meta::mapping::OFGA_MODELS;
-    use openobserve_core::{auth::AuthExtractor, users::get_user};
+    use openobserve_core::users::get_user;
 
     if !db::user::is_root_user(user_id) {
         let user = match get_user(Some("_meta"), user_id).await {
@@ -102,6 +114,52 @@ async fn check_license_permission(user_id: &str, method: &str) -> Result<(), any
     Ok(())
 }
 
+// root, else the handler's PUT check and the middleware's route check under its cached _meta role
+async fn can_update_license<F, Fut>(user_id: &str, handler_allows: bool, route_check: F) -> bool
+where
+    F: FnOnce(AuthExtractor, UserRole) -> Fut,
+    Fut: std::future::Future<Output = bool>,
+{
+    if db::user::is_root_user(user_id) {
+        return true;
+    }
+    // the middleware takes the _meta role from this cache; on a miss, no is the safe answer
+    let cached =
+        common::infra::config::ORG_USERS.get(&format!("{}/{user_id}", config::META_ORG_ID));
+    let Some(role) = cached.map(|u| u.role.clone()) else {
+        return false;
+    };
+    let Some(route) = refresh_route() else {
+        return false;
+    };
+    handler_allows
+        && route_check(
+            AuthExtractor {
+                auth: String::new(),
+                method: route.method,
+                o2_type: route.o2_type,
+                org_id: route.org_id,
+                bypass_check: false,
+                parent_id: route.parent_id,
+                use_all_org: route.use_all_org,
+                use_self_context: route.use_self_context,
+                use_self_parent: route.use_self_parent,
+            },
+            role,
+        )
+        .await
+}
+
+fn refresh_route() -> Option<o2_openfga::meta::route_permissions::ResolvedRoute> {
+    o2_openfga::meta::route_permissions::resolve_permission(
+        &["license", "refresh"],
+        "POST",
+        config::META_ORG_ID,
+        "",
+        None,
+    )
+}
+
 // license admins need the instance id to request a license, unless it doubles as the grpc token
 fn viewer_license_fields(
     is_root: bool,
@@ -114,6 +172,7 @@ fn viewer_license_fields(
     if !is_root && let Some(license) = license.as_mut() {
         license.installation_id.clear();
         license.validator_auth.clear();
+        hide_waiver_installations(&mut license.waivers);
     }
     let key = if redact_key || !is_root {
         key.map(|v| mask_license_key(&v))
@@ -130,6 +189,40 @@ fn viewer_license_fields(
     (key, license, installation_id)
 }
 
+fn license_status_fields(
+    status: LicenseStatus,
+    is_root: bool,
+) -> (Vec<Waiver>, LicenseDecision, LicenseDecision, i64) {
+    let mut waivers = status.waivers;
+    if !is_root {
+        hide_waiver_installations(&mut waivers);
+    }
+    (waivers, status.decision, status.base, status.evaluated_at)
+}
+
+// a scoped waiver names an installation id, which on token-less installs is the grpc token
+fn hide_waiver_installations(waivers: &mut [Waiver]) {
+    for w in waivers {
+        w.installation_id = None;
+    }
+}
+
+// same test as the enterprise key loader, so the UI and the 409 never disagree with it
+fn env_key_active(env_key: &str) -> bool {
+    !env_key.is_empty()
+}
+
+// an env key that does not parse fails the loader before it reads the db, so nothing supersedes it
+fn env_key_conflict(env_key: &str, env: Option<&License>, raw: &str, pasted: &License) -> bool {
+    env_key_active(env_key)
+        && env_key.trim() != raw.trim()
+        && !env.is_some_and(|env| pasted_key_supersedes_env(env, pasted))
+}
+
+fn env_key_in_use(env_key: &str, live_key: Option<&str>) -> bool {
+    env_key_active(env_key) && live_key == Some(env_key)
+}
+
 pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
     let o2_cfg = o2_enterprise::enterprise::common::config::get_config();
 
@@ -139,6 +232,7 @@ pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
         None => (None, None),
     };
 
+    let env_key_in_use = env_key_in_use(&o2_cfg.common.license_key, key.as_deref());
     let is_root = db::user::is_root_user(&email.user_id);
     let is_license_admin = is_root
         || check_license_permission(&email.user_id, "PUT")
@@ -153,6 +247,9 @@ pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
         license,
     );
 
+    let (waivers, decision, base, evaluated_at) =
+        license_status_fields(license_status().await, is_root);
+
     let res = LicenseResponse {
         key,
         license,
@@ -160,6 +257,17 @@ pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
         expired: license_expired().await,
         ingestion_exceeded: ingestion_limit_exceeded_count(),
         ingestion_used: ingestion_used() * 100.0, // convert to percentage
+        waivers,
+        decision,
+        base,
+        evaluated_at,
+        env_key_active: env_key_active(&o2_cfg.common.license_key),
+        env_key_in_use,
+        // check_permissions ignores is_external
+        can_update_license: can_update_license(&email.user_id, is_license_admin, |auth, role| {
+            openobserve_core::authz::check_permissions(&email.user_id, auth, role, false)
+        })
+        .await,
     };
     MetaHttpResponse::json(res)
 }
@@ -171,6 +279,13 @@ pub async fn store_license(
     let email = user_email.user_id;
     if check_license_permission(&email, "PUT").await.is_err() {
         return MetaHttpResponse::forbidden("Unauthorized Access to license");
+    }
+
+    let o2_cfg = o2_enterprise::enterprise::common::config::get_config();
+    let env_key = &o2_cfg.common.license_key;
+    let env = License::load_from_str(env_key).ok();
+    if env_key_conflict(env_key, env.as_ref(), &req.raw_key, &req.key) {
+        return MetaHttpResponse::conflict(ENV_KEY_CONFLICT_MSG);
     }
 
     if let Err(e) = check_license(&req.raw_key, &req.key).await {
@@ -209,11 +324,24 @@ pub async fn refresh_license_limits(Headers(user_email): Headers<UserEmail>) -> 
 #[cfg(test)]
 mod tests {
     use config::utils::{base64, json};
+    use o2_enterprise::enterprise::license::Block;
 
     use super::*;
 
     const INSTANCE_ID: &str = "license-instance-7f3a";
     const VALIDATOR_AUTH: &str = "dmFsaWRhdG9yOnMzY3JldA-auth";
+    const OTHER_INSTANCE_ID: &str = "license-instance-other-9c1d";
+
+    fn scoped_waiver_json(id: &str, installation_id: &str) -> json::Value {
+        json::json!({
+            "id": id,
+            "type": "search_unblock",
+            "starts_at": 0,
+            "ends_at": 1000,
+            "installation_id": installation_id,
+            "note": "",
+        })
+    }
 
     fn stored_license() -> (String, License) {
         let payload = json::json!({
@@ -232,6 +360,10 @@ mod tests {
             "limits": {},
             "validator_url": "https://validator.example",
             "validator_auth": VALIDATOR_AUTH,
+            "waivers": [
+                scoped_waiver_json("wv_here", INSTANCE_ID),
+                scoped_waiver_json("wv_other", OTHER_INSTANCE_ID),
+            ],
         });
         let segment = base64::encode(&payload.to_string())
             .replace('+', "-")
@@ -256,6 +388,9 @@ mod tests {
             Some(key),
             Some(license),
         );
+        let mut status = status_fixture();
+        status.waivers[0].installation_id = Some(INSTANCE_ID.into());
+        let (waivers, decision, base, evaluated_at) = license_status_fields(status, is_root);
         json::to_string(&LicenseResponse {
             key,
             license,
@@ -263,7 +398,54 @@ mod tests {
             expired: false,
             ingestion_used: 0.0,
             ingestion_exceeded: 0,
+            waivers,
+            decision,
+            base,
+            evaluated_at,
+            env_key_active: false,
+            env_key_in_use: false,
+            can_update_license: is_license_admin,
         })
+        .unwrap()
+    }
+
+    fn waiver_installation_ids(response: &str) -> Vec<json::Value> {
+        let response: json::Value = json::from_str(response).unwrap();
+        [&response["waivers"], &response["license"]["waivers"]]
+            .into_iter()
+            .flat_map(|ws| ws.as_array().cloned().unwrap_or_default())
+            .map(|w| w["installation_id"].clone())
+            .collect()
+    }
+
+    fn status_fixture() -> LicenseStatus {
+        json::from_value(json::json!({
+            "decision": {
+                "search_allowed": true,
+                "exceeded_days": 4,
+                "allowed_days": 3,
+                "limit_today_gb": 200.0,
+                "used_today_gb": 122.0,
+                "waiver_ids_applied": ["wv_1"],
+            },
+            "base": {
+                "search_allowed": false,
+                "blocks": ["usage_over_limit"],
+                "exceeded_days": 4,
+                "allowed_days": 3,
+                "limit_today_gb": 200.0,
+                "used_today_gb": 122.0,
+            },
+            "waivers": [{
+                "id": "wv_1",
+                "type": "search_unblock",
+                "starts_at": 0,
+                "ends_at": 1000,
+                "note": "Search restored while you fix the log storm",
+            }],
+            "waiver_source": "license_key",
+            "evaluated_at": 0,
+        }))
         .unwrap()
     }
 
@@ -297,6 +479,28 @@ mod tests {
         assert_eq!(root["installation_id"], INSTANCE_ID);
         assert_eq!(root["license"]["installation_id"], INSTANCE_ID);
         assert_eq!(root["license"]["validator_auth"], VALIDATOR_AUTH);
+    }
+
+    #[test]
+    fn test_waiver_installation_ids_are_visible_to_root_only() {
+        for (is_license_admin, token) in
+            [(false, "cluster-token-distinct"), (true, ""), (true, "x")]
+        {
+            let viewer = response_json_with_token(false, is_license_admin, token);
+            let ids = waiver_installation_ids(&viewer);
+            assert_eq!(ids.len(), 3, "{viewer}");
+            assert!(ids.iter().all(|id| id.is_null()), "{viewer}");
+            assert!(!viewer.contains(OTHER_INSTANCE_ID), "{viewer}");
+        }
+        let root = response_json(true, true);
+        assert_eq!(
+            waiver_installation_ids(&root),
+            vec![
+                json::json!(INSTANCE_ID),
+                json::json!(INSTANCE_ID),
+                json::json!(OTHER_INSTANCE_ID)
+            ]
+        );
     }
 
     #[test]
@@ -336,5 +540,204 @@ mod tests {
         }
         let (key, _) = stored_license();
         assert!(!admin.contains(&key));
+    }
+
+    #[test]
+    fn test_license_response_carries_decision_and_waivers() {
+        let mut status = status_fixture();
+        status.evaluated_at = 1_792_000_000_000_000;
+        let (waivers, decision, base, evaluated_at) = license_status_fields(status, false);
+        let json = json::to_value(&LicenseResponse {
+            key: None,
+            license: None,
+            installation_id: String::new(),
+            expired: false,
+            ingestion_used: 0.0,
+            ingestion_exceeded: 0,
+            waivers,
+            decision,
+            base,
+            evaluated_at,
+            env_key_active: false,
+            env_key_in_use: false,
+            can_update_license: false,
+        })
+        .unwrap();
+        assert_eq!(json["evaluated_at"], 1_792_000_000_000_000_i64);
+        assert_eq!(json["decision"]["search_allowed"], true);
+        assert_eq!(json["decision"]["exceeded_days"], 4);
+        assert_eq!(json["decision"]["allowed_days"], 3);
+        assert_eq!(json["decision"]["limit_today_gb"], 200.0);
+        assert_eq!(json["decision"]["waiver_ids_applied"][0], "wv_1");
+        assert_eq!(json["base"]["search_allowed"], false);
+        assert_eq!(json["base"]["blocks"][0], "usage_over_limit");
+        assert_eq!(json["waivers"][0]["type"], "search_unblock");
+    }
+
+    #[test]
+    fn test_blocks_and_unlimited_serialize_for_the_ui() {
+        let mut s = status_fixture();
+        s.decision.search_allowed = false;
+        s.decision.blocks = vec![Block::UsageOverLimit];
+        s.decision.limit_today_gb = None;
+        let d = json::to_value(license_status_fields(s, false).1).unwrap();
+        assert_eq!(d["blocks"][0], "usage_over_limit");
+        assert!(d["limit_today_gb"].is_null());
+    }
+
+    fn lic(license_id: &str, rev: i64) -> License {
+        let mut l = stored_license().1;
+        l.license_id = license_id.to_string();
+        l.rev = rev;
+        l
+    }
+
+    #[test]
+    fn test_env_key_conflict_only_when_env_set_and_different() {
+        let pasted = lic("lic-1", 0);
+        assert!(!env_key_conflict("", None, "eyJ.new", &pasted));
+        assert!(!env_key_conflict("eyJ.same", None, " eyJ.same ", &pasted));
+        assert!(env_key_conflict("eyJ.old", None, "eyJ.new", &pasted));
+    }
+
+    #[test]
+    fn test_a_newer_key_for_the_env_license_is_no_conflict() {
+        let env = lic("lic-1", 2);
+        let conflict =
+            |pasted: License| env_key_conflict("eyJ.old", Some(&env), "eyJ.new", &pasted);
+        assert!(!conflict(lic("lic-1", 3)));
+        assert!(conflict(lic("lic-1", 2)));
+        assert!(conflict(lic("lic-1", 1)));
+        assert!(conflict(lic("lic-2", 9)));
+    }
+
+    #[test]
+    fn test_env_key_is_active_exactly_when_the_loader_reads_it() {
+        let pasted = lic("lic-1", 0);
+        for (env_key, active) in [("", false), ("  ", true), ("eyJ.k", true)] {
+            assert_eq!(env_key_active(env_key), active, "{env_key:?}");
+            assert_eq!(
+                env_key_conflict(env_key, None, "eyJ.new", &pasted),
+                active,
+                "{env_key:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_env_key_in_use_only_while_it_is_the_loaded_key() {
+        assert!(env_key_in_use("eyJ.env", Some("eyJ.env")));
+        assert!(!env_key_in_use("eyJ.env", Some("eyJ.pasted")));
+        assert!(!env_key_in_use("eyJ.env", None));
+        assert!(!env_key_in_use("", Some("")));
+        assert!(!env_key_in_use("", None));
+    }
+
+    #[test]
+    fn test_license_response_carries_env_key_active() {
+        let json = json::to_value(&LicenseResponse {
+            key: None,
+            license: None,
+            installation_id: String::new(),
+            expired: false,
+            ingestion_used: 0.0,
+            ingestion_exceeded: 0,
+            waivers: Vec::new(),
+            decision: LicenseDecision::default(),
+            base: LicenseDecision::default(),
+            evaluated_at: 0,
+            env_key_active: true,
+            env_key_in_use: true,
+            can_update_license: false,
+        })
+        .unwrap();
+        assert_eq!(json["env_key_active"], true);
+        assert_eq!(json["env_key_in_use"], true);
+    }
+
+    // a watcher fills these caches on a running node; a miss here would go to the database
+    fn join(org_id: &str, email: &str, role: UserRole) {
+        common::infra::config::USERS.insert(
+            email.to_string(),
+            infra::table::users::UserRecord {
+                email: email.to_string(),
+                first_name: "F".to_string(),
+                last_name: "L".to_string(),
+                password: "hash".to_string(),
+                salt: "salt".to_string(),
+                is_root: role == UserRole::Root,
+                password_ext: None,
+                user_type: config::meta::user::UserType::Internal,
+                created_at: 0,
+                updated_at: 0,
+                must_reset_password: false,
+                password_reset_reason: None,
+                flagged_at: None,
+                password_updated_at: None,
+            },
+        );
+        common::infra::config::ORG_USERS.insert(
+            format!("{org_id}/{email}"),
+            infra::table::org_users::OrgUserRecord {
+                role,
+                token: "token".to_string(),
+                rum_token: None,
+                org_id: org_id.to_string(),
+                email: email.to_string(),
+                created_at: 0,
+                allow_static_token: true,
+            },
+        );
+    }
+
+    #[test]
+    fn test_the_update_flag_checks_the_route_the_middleware_checks() {
+        let route = refresh_route().expect("license/refresh is in the route table");
+        assert!(!route.bypass_check);
+        assert_eq!(route.method, "POST");
+        assert_eq!(route.org_id, config::META_ORG_ID);
+        assert_eq!(route.o2_type, "license:_meta");
+    }
+
+    #[tokio::test]
+    async fn test_root_may_update_the_license_whatever_the_checks_say() {
+        join("default", "lw-root@flag.test", UserRole::Root);
+        assert!(can_update_license("lw-root@flag.test", false, |_, _| async { false }).await);
+    }
+
+    #[tokio::test]
+    async fn test_the_route_check_gets_what_the_middleware_checks() {
+        join("_meta", "lw-editor@flag.test", UserRole::Editor);
+        let seen = std::sync::Mutex::new(None);
+        let allowed = can_update_license("lw-editor@flag.test", true, |auth, role| {
+            *seen.lock().unwrap() = Some((auth.method, auth.o2_type, auth.org_id, role));
+            async { true }
+        })
+        .await;
+        assert!(allowed);
+        let seen = seen.into_inner().unwrap().expect("route check ran");
+        assert_eq!(
+            seen,
+            (
+                "POST".to_string(),
+                "license:_meta".to_string(),
+                "_meta".to_string(),
+                UserRole::Editor
+            )
+        );
+    }
+
+    #[tokio::test]
+    async fn test_a_meta_member_the_route_check_denies_gets_no_refresh() {
+        join("_meta", "lw-viewer@flag.test", UserRole::Viewer);
+        assert!(!can_update_license("lw-viewer@flag.test", true, |_, _| async { false }).await);
+    }
+
+    #[tokio::test]
+    async fn test_no_refresh_without_the_handler_check_or_a_cached_meta_role() {
+        join("_meta", "lw-admin@flag.test", UserRole::Admin);
+        assert!(!can_update_license("lw-admin@flag.test", false, |_, _| async { true }).await);
+        join("lw-acme", "lw-member@flag.test", UserRole::Admin);
+        assert!(!can_update_license("lw-member@flag.test", true, |_, _| async { true }).await);
     }
 }

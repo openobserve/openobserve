@@ -74,6 +74,7 @@ const organizationObj = {
     cross_links: [],
     usage_stream_enabled: false,
     red_insights_enabled: false,
+    ai_rca_thread_tool_output: false,
   },
   isDataIngested: false,
   regexPatterns: [],

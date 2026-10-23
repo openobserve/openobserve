@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <IngestionContent :target-stream="targetStream">
+  <IngestionContent :target-stream="targetStream" snippet-kind="config" config-tool="Vector">
     <CredentialCodeBlock slug="vector" :content="content" />
   </IngestionContent>
 </template>

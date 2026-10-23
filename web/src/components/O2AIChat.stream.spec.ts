@@ -2043,6 +2043,22 @@ describe("O2AIChat SSE protocol", () => {
       expect(vm.chatMessages).toHaveLength(1);
     });
 
+    it("a request that never got a response (network, CORS) shows a real error, not a TypeError", async () => {
+      // fetchAiChat resolves null when fetch itself fails.
+      mockFetchAiChat.mockResolvedValueOnce(null);
+      vm.inputMessage = "hello";
+      await vm.sendMessage();
+      await flushPromises();
+
+      const reply = String(vm.chatMessages.at(-1).content);
+      expect(vm.chatMessages.at(-1).role).toBe("assistant");
+      expect(reply).toBe(
+        "Error: Could not reach the AI service. Check your connection and try again.",
+      );
+      expect(reply).not.toContain("Cannot read properties");
+      expect(vm.isLoading).toBe(false);
+    });
+
     it("a cancelled response renders nothing and clears loading", async () => {
       mockFetchAiChat.mockResolvedValueOnce({ cancelled: true });
       vm.inputMessage = "hello";

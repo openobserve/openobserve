@@ -160,7 +160,7 @@ const barVariantClass = computed(() => {
         bar
           ? center
             ? 'min-w-0 items-center'
-            : 'min-w-0 flex-1 items-center'
+            : 'min-w-0 flex-1 items-center max-md:min-w-48'
           : inlineActions
             ? 'min-w-0 flex-1 items-center max-md:min-w-48'
             : preserveWhitespace
