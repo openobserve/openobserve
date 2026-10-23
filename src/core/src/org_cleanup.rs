@@ -455,7 +455,8 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     // collide on the OSS build.
     use infra::table::{
         alert_calibration, alert_incidents, backfill_jobs, compactor_manual_jobs, dashboards,
-        destinations, distinct_values, enrichment_table_urls, enrichment_tables, folders,
+        destinations, distinct_values, enrichment_table_urls, enrichment_tables, fleet_collectors,
+        fleet_configs, fleet_rollouts, fleet_settings, fleet_tokens, fleets, folders,
         incident_events, kv_store, llm_prompts, org_storage_providers, org_telephony,
         query_history, rca_runs, rca_steering, re_pattern, re_pattern_stream_map, reports, rum_pa,
         search_queue, short_urls, slo, slo_backfill_jobs, slo_budget, slos, system_settings,
@@ -585,6 +586,37 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     org_telephony::delete(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_telephony: {e}"))?;
+    // Flushes skip orgs gone from the org cache; retention removes a row a racing flush re-adds.
+    let collector_ids = fleet_collectors::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/fleet_collectors: {e}"))?;
+    // Every node drops `admitted`, so a re-created org starts clean.
+    for id in collector_ids {
+        if let Err(e) = infra::coordinator::fleet::emit_collector_changed(org_id, &id).await {
+            log::error!("step_delete_db_resources/fleet_collectors: event for {id}: {e}");
+        }
+    }
+    let token_ids = fleet_tokens::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/fleet_tokens: {e}"))?;
+    // Each node's watcher finds the row gone and evicts the cached hash.
+    for token_id in token_ids {
+        if let Err(e) = infra::coordinator::fleet::emit_token_changed(org_id, &token_id).await {
+            log::error!("step_delete_db_resources/fleet_tokens: event for {token_id}: {e}");
+        }
+    }
+    fleet_configs::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/fleet_configs: {e}"))?;
+    fleet_rollouts::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/fleet_rollouts: {e}"))?;
+    fleet_settings::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/fleet_settings: {e}"))?;
+    fleets::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/fleets: {e}"))?;
     #[cfg(feature = "cloud")]
     trial_quota_usage::delete_by_org(org_id)
         .await

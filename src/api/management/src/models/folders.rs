@@ -47,7 +47,7 @@ pub struct ListFoldersResponseBody {
     pub list: Vec<Folder>,
 }
 
-/// Indicates the type of data that the folder can contain.
+/// Indicates the type of data that the folder can contain; fleets have their own API.
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum FolderType {
@@ -165,6 +165,11 @@ mod tests {
             config::meta::folder::FolderType::from(FolderType::Reports),
             config::meta::folder::FolderType::Reports
         );
+    }
+
+    #[test]
+    fn fleets_are_not_a_folders_api_type() {
+        assert!(serde_json::from_str::<FolderType>("\"fleets\"").is_err());
     }
 
     #[test]
