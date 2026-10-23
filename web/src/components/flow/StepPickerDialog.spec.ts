@@ -309,3 +309,28 @@ describe("StepPickerDialog", () => {
     });
   });
 });
+
+describe("StepPickerDialog footnote", () => {
+  it("renders the footnote under the cards when set", () => {
+    const w = mount(StepPickerDialog, {
+      props: {
+        items,
+        testPrefix: "workflow-step",
+        footnote: "Any workflow…",
+        footnoteIcon: "webhook",
+        footnoteTestId: "workflow-step-picker-http-cue",
+      },
+      global: globalConfig,
+    });
+    expect(w.find('[data-test="workflow-step-picker-http-cue"]').text()).toContain("Any workflow…");
+  });
+
+  it("renders nothing extra without one (the pipeline editor is unchanged)", () => {
+    const w = mount(StepPickerDialog, {
+      props: { items, testPrefix: "workflow-step" },
+      global: globalConfig,
+    });
+    expect(w.find('[data-test="workflow-step-picker-http-cue"]').exists()).toBe(false);
+    expect(w.find('[data-test$="-footnote"]').exists()).toBe(false);
+  });
+});

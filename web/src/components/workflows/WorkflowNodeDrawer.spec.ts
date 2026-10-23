@@ -111,7 +111,7 @@ vi.mock("@/components/CodeQueryEditor.vue", () => ({
 }));
 
 import { mount, flushPromises } from "@vue/test-utils";
-import { nextTick } from "vue";
+import { nextTick, watch } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import WorkflowNodeDrawer from "./WorkflowNodeDrawer.vue";
@@ -121,6 +121,7 @@ import useWorkflowCanvas, {
   clearNodeEditedInput,
 } from "@/plugins/workflows/useWorkflowCanvas";
 import workflowService from "@/services/workflows";
+import { httpEditorState, resetHttpEditorState } from "@/plugins/workflows/httpEndpointUi";
 
 const t = (k: string, v?: any) => i18n.global.t(k, v ?? {});
 
@@ -2125,5 +2126,65 @@ describe("WorkflowNodeDrawer — HTTP request run on the trigger step", () => {
     expect(wrapper.findComponent({ name: "WorkflowRunRequestFacts" }).exists()).toBe(false);
     expect(wrapper.findComponent({ name: "WorkflowRunHttpOutcome" }).exists()).toBe(false);
     expect(wrapper.find('[data-test="workflow-run-use-as-test-input"]').exists()).toBe(false);
+  });
+});
+
+describe("WorkflowNodeDrawer HTTP endpoint", () => {
+  let wrapper: any = null;
+  beforeEach(() => {
+    resetHttpEditorState();
+    workflowObj.testRun.result = null as any;
+    seedGraph();
+  });
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    resetHttpEditorState();
+    workflowObj.dialog.show = false;
+  });
+
+  it("link row closes the step dialog before opening the panel", async () => {
+    triggerSubmit.mockReturnValue({ trigger_kind: "alert_fired" });
+    openNode("trig", false);
+    wrapper = mountDrawer();
+    await flushPromises();
+    const seen: boolean[] = [];
+    const stop = watch(
+      () => httpEditorState.panelOpen,
+      (open) => {
+        if (open) seen.push(workflowObj.dialog.show);
+      },
+      { flush: "sync" },
+    );
+    wrapper.findComponent({ name: "WorkflowTrigger" }).vm.$emit("open-http-endpoint");
+    await flushPromises();
+    stop();
+    // A trigger body is read-only, so its normal close path commits nothing (commitAndClose).
+    expect(triggerSubmit).not.toHaveBeenCalled();
+    expect(workflowObj.dialog.show).toBe(false);
+    expect(seen).toEqual([false]);
+    expect(httpEditorState.panelOpen).toBe(true);
+  });
+
+  it("the trigger dialog keeps the kind title", async () => {
+    httpEditorState.endpointOn = true;
+    openNode("trig", false);
+    wrapper = mountDrawer();
+    await flushPromises();
+    expect(wrapper.find(".drawer-title").text()).not.toContain(t("workflow.http.panelTitle"));
+  });
+
+  it("the Input pane follows Payload from", async () => {
+    openNode("cond", false);
+    wrapper = mountDrawer();
+    await flushPromises();
+    expect(wrapper.text()).not.toContain('"trigger_source": "http"');
+    wrapper.unmount();
+    httpEditorState.endpointOn = true;
+    httpEditorState.payloadFrom = "http";
+    openNode("cond", false);
+    wrapper = mountDrawer();
+    await flushPromises();
+    expect(wrapper.text()).toContain('"trigger_source": "http"');
   });
 });

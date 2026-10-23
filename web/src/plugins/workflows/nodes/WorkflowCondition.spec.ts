@@ -56,6 +56,7 @@ vi.mock("@/components/flow/forms/ConditionBuilder.vue", () => ({
 import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
 import { ALERT_PAYLOAD_FIELDS } from "@/plugins/workflows/alertFields";
 import { INCIDENT_PAYLOAD_FIELDS } from "@/plugins/workflows/incidentFields";
+import { httpEditorState, resetHttpEditorState } from "@/plugins/workflows/httpEndpointUi";
 import WorkflowCondition from "./WorkflowCondition.vue";
 
 // The condition's field options come from the CURRENT trigger's kind, so seed a
@@ -227,5 +228,40 @@ describe("WorkflowCondition", () => {
   it("renders the builder as optional (incomplete rule = placeholder)", () => {
     const wrapper = createWrapper();
     expect(wrapper.findComponent({ name: "ConditionBuilder" }).props("optional")).toBe(true);
+  });
+});
+
+describe("WorkflowCondition HTTP request field group (AC-UI-32)", () => {
+  beforeEach(() => {
+    seedTrigger("alert_fired");
+    store.state.zoConfig = { ...store.state.zoConfig, workflow_hooks_enabled: true };
+  });
+  afterEach(() => {
+    resetHttpEditorState();
+    store.state.zoConfig = { ...store.state.zoConfig, workflow_hooks_enabled: false };
+    workflowObj.currentSelectedWorkflow.nodes = [];
+  });
+
+  it("offers the HTTP group with the body hint while the endpoint is on", () => {
+    httpEditorState.endpointOn = true;
+    const fields = createWrapper().findComponent({ name: "ConditionBuilder" }).props("fields");
+    const values = fields.map((f: any) => f.value);
+    expect(values).toContain("meta_alert_name");
+    expect(values).toContain("meta_trigger_source");
+    expect(values.filter((v: string) => v.startsWith("data"))).toEqual([]);
+    expect(fields.map((f: any) => String(f.label))).toContain(
+      i18n.global.t("workflow.http.fieldGroupBodyHint"),
+    );
+  });
+
+  it("keeps the kind's list while the endpoint is off or hooks are off (regression guard)", () => {
+    expect(createWrapper().findComponent({ name: "ConditionBuilder" }).props("fields")).toEqual(
+      ALERT_PAYLOAD_FIELDS,
+    );
+    httpEditorState.endpointOn = true;
+    store.state.zoConfig = { ...store.state.zoConfig, workflow_hooks_enabled: false };
+    expect(createWrapper().findComponent({ name: "ConditionBuilder" }).props("fields")).toEqual(
+      ALERT_PAYLOAD_FIELDS,
+    );
   });
 });
