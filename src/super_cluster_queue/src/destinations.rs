@@ -26,11 +26,11 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
     match dest_msg {
         DestinationMessage::Put { dest } => {
             infra::table::destinations::put(dest).await?;
-            infra::coordinator::destinations::emit_put_event(&event_key).await?;
+            infra::coordinator::emit_put(&event_key).await?;
         }
         DestinationMessage::Delete { org_id, dest_name } => {
             infra::table::destinations::delete(&org_id, &dest_name).await?;
-            infra::coordinator::destinations::emit_delete_event(&event_key).await?;
+            infra::coordinator::emit_delete(&event_key).await?;
         }
     }
     Ok(())

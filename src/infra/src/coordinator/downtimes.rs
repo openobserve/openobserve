@@ -21,18 +21,11 @@ pub const DOWNTIME_WATCHER_PREFIX: &str = "/downtimes/";
 
 /// Tells every node that this downtime row changed; the payload is empty, nodes reload the org.
 pub async fn emit_put_event(org: &str, id: &str) -> Result<(), Error> {
-    let cluster_coordinator = super::get_coordinator().await;
-    cluster_coordinator
-        .put(&downtime_key(org, id), bytes::Bytes::new(), true, None)
-        .await?;
-    Ok(())
+    super::emit_put(&downtime_key(org, id)).await
 }
 
 pub async fn emit_delete_event(org: &str, id: &str) -> Result<(), Error> {
-    let cluster_coordinator = super::get_coordinator().await;
-    cluster_coordinator
-        .delete(&downtime_key(org, id), false, true, None)
-        .await
+    super::emit_delete(&downtime_key(org, id)).await
 }
 
 pub async fn watch_events<OnPut, OnPutFut, OnDelete, OnDeleteFut>(
