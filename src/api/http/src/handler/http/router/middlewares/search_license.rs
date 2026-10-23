@@ -13,77 +13,64 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use axum::{extract::Request, middleware::Next, response::Response};
+#[cfg(feature = "enterprise")]
 use axum::{
-    extract::{FromRequestParts, RawPathParams, Request},
+    extract::{FromRequestParts, RawPathParams},
     http::request::Parts,
-    middleware::Next,
-    response::Response,
 };
+#[cfg(any(feature = "enterprise", test))]
 use common::meta::http::HttpResponse as MetaHttpResponse;
-use config::{META_ORG_ID, utils::base64};
+#[cfg(any(feature = "enterprise", test))]
+use config::META_ORG_ID;
 
 /// Answers the search handlers' licence 429 before a gated route reads any data.
 pub async fn search_license_middleware(request: Request, next: Next) -> Response {
-    let (mut parts, body) = request.into_parts();
-    if let Some(refused) = refusal(&mut parts).await {
-        return refused;
+    #[cfg(feature = "enterprise")]
+    if !o2_enterprise::enterprise::license::search_allowed() {
+        let (mut parts, body) = request.into_parts();
+        if let Some(refused) = refusal(&mut parts).await {
+            return refused;
+        }
+        return next.run(Request::from_parts(parts, body)).await;
     }
-    next.run(Request::from_parts(parts, body)).await
+    next.run(request).await
 }
 
+/// A path stream never exempts: the handler may read other streams through its SQL.
+#[cfg(feature = "enterprise")]
 async fn refusal(parts: &mut Parts) -> Option<Response> {
-    // Unreadable params fall through to the closed-gate answer for an unknown org and stream.
-    let (org_id, streams) = match RawPathParams::from_request_parts(parts, &()).await {
-        Ok(params) => (
-            param(&params, "org_id").unwrap_or_default().to_string(),
-            path_streams(&params),
-        ),
-        Err(_) => (String::new(), Vec::new()),
-    };
-    refusal_for(&org_id, &streams, search_service::check_search_allowed)
+    let params = RawPathParams::from_request_parts(parts, &()).await.ok();
+    let org_id = params
+        .as_ref()
+        .and_then(|params| {
+            params
+                .iter()
+                .find_map(|(key, value)| (key == "org_id").then_some(value))
+        })
+        .unwrap_or_default();
+    refusal_for(org_id, search_service::check_search_allowed)
 }
 
-fn param<'a>(params: &'a RawPathParams, name: &str) -> Option<&'a str> {
-    params
-        .iter()
-        .find_map(|(key, value)| (key == name).then_some(value))
-}
-
-fn path_streams(params: &RawPathParams) -> Vec<String> {
-    if let Some(stream) = param(params, "stream_name") {
-        return vec![stream.to_string()];
-    }
-    param(params, "stream_names")
-        .and_then(|encoded| base64::decode_url(encoded).ok())
-        .map(|names| names.split(',').map(str::to_string).collect())
-        .unwrap_or_default()
-}
-
+#[cfg(any(feature = "enterprise", test))]
 fn refusal_for(
     org_id: &str,
-    streams: &[String],
     gate: impl Fn(&str, Option<&str>) -> Result<(), infra::errors::Error>,
 ) -> Option<Response> {
     if org_id == META_ORG_ID {
         return None;
     }
-    let verdict = if streams.is_empty() {
-        gate(org_id, None)
-    } else {
-        streams
-            .iter()
-            .try_for_each(|stream| gate(org_id, Some(stream)))
-    };
-    verdict.err().map(MetaHttpResponse::too_many_requests)
+    gate(org_id, None)
+        .err()
+        .map(MetaHttpResponse::too_many_requests)
 }
 
 #[cfg(test)]
 mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    use axum::{Router, body::Body, http::StatusCode, routing::get};
+    use axum::http::StatusCode;
     use infra::errors::Error;
-    use tower::ServiceExt;
 
     use super::*;
 
@@ -97,10 +84,6 @@ mod tests {
         Err(Error::Message(BLOCKED.to_string()))
     }
 
-    fn names(streams: &[&str]) -> Vec<String> {
-        streams.iter().map(|s| s.to_string()).collect()
-    }
-
     async fn body_bytes(response: Response) -> Vec<u8> {
         axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
@@ -108,26 +91,14 @@ mod tests {
             .to_vec()
     }
 
-    async fn streams_at(encoded: &str) -> String {
-        let app = Router::new().route(
-            "/{org_id}/{stream_names}/_around_multi",
-            get(|params: RawPathParams| async move { path_streams(&params).join("|") }),
-        );
-        let request = axum::http::Request::get(format!("/acme/{encoded}/_around_multi"))
-            .body(Body::empty())
-            .unwrap();
-        String::from_utf8(body_bytes(app.oneshot(request).await.unwrap()).await).unwrap()
-    }
-
     #[test]
     fn open_gate_refuses_nothing() {
-        assert!(refusal_for("acme", &[], open).is_none());
-        assert!(refusal_for("acme", &names(&["logs"]), open).is_none());
+        assert!(refusal_for("acme", open).is_none());
     }
 
     #[tokio::test]
     async fn closed_gate_answers_the_search_handler_429() {
-        let refused = refusal_for("acme", &[], closed).unwrap();
+        let refused = refusal_for("acme", closed).unwrap();
         assert_eq!(refused.status(), StatusCode::TOO_MANY_REQUESTS);
         assert!(refused.headers().get("retry-after").is_none());
         let body = body_bytes(refused).await;
@@ -150,39 +121,21 @@ mod tests {
             calls.fetch_add(1, Ordering::SeqCst);
             closed(org, stream)
         };
-        assert!(refusal_for(META_ORG_ID, &names(&["logs"]), counting).is_none());
-        assert!(refusal_for(META_ORG_ID, &[], counting).is_none());
+        assert!(refusal_for(META_ORG_ID, counting).is_none());
         assert_eq!(calls.load(Ordering::SeqCst), 0);
     }
 
     #[test]
-    fn each_path_stream_reaches_the_gate() {
-        let only_triggers = |_: &str, stream: Option<&str>| match stream {
-            Some("triggers") => Ok(()),
-            _ => Err(Error::Message(BLOCKED.to_string())),
-        };
-        assert!(refusal_for("acme", &names(&["triggers"]), only_triggers).is_none());
-        assert!(refusal_for("acme", &names(&["logs"]), only_triggers).is_some());
-        assert!(refusal_for("acme", &names(&["triggers", "logs"]), only_triggers).is_some());
-    }
-
-    #[tokio::test]
-    async fn around_multi_stream_names_are_decoded() {
-        assert_eq!(
-            streams_at(&base64::encode_url("triggers,logs")).await,
-            "triggers|logs"
-        );
-    }
-
-    #[tokio::test]
-    async fn undecodable_stream_names_are_gated_as_unknown() {
-        assert_eq!(streams_at("!!not-base64!!").await, "");
+    fn the_gate_is_asked_about_the_org_and_never_a_stream() {
         let asked = std::sync::Mutex::new(Vec::new());
-        let recording = |_: &str, stream: Option<&str>| {
-            asked.lock().unwrap().push(stream.map(str::to_string));
-            closed("", None)
+        let recording = |org: &str, stream: Option<&str>| {
+            asked
+                .lock()
+                .unwrap()
+                .push((org.to_string(), stream.map(str::to_string)));
+            closed(org, stream)
         };
-        assert!(refusal_for("acme", &[], recording).is_some());
-        assert_eq!(*asked.lock().unwrap(), vec![None]);
+        assert!(refusal_for("acme", recording).is_some());
+        assert_eq!(*asked.lock().unwrap(), vec![("acme".to_string(), None)]);
     }
 }

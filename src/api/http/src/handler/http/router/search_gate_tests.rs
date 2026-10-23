@@ -591,6 +591,19 @@ async fn closed_gate_refuses_every_gated_route() {
 
 #[cfg(feature = "enterprise")]
 #[tokio::test]
+async fn an_operational_stream_in_the_path_does_not_open_the_gate() {
+    use o2_enterprise::enterprise::license::close_search_gate_for_tests;
+
+    let _gate = close_search_gate_for_tests().await;
+    let request = axum::http::Request::post("/acme/streams/_o2_ai_chat_events/patterns/extract")
+        .body(Body::empty())
+        .unwrap();
+    let response = search_routes_with(true).oneshot(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+}
+
+#[cfg(feature = "enterprise")]
+#[tokio::test]
 async fn meta_org_passes_the_closed_gate() {
     use o2_enterprise::enterprise::license::close_search_gate_for_tests;
 
