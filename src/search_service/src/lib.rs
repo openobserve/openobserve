@@ -1462,9 +1462,9 @@ mod tests {
     #[tokio::test]
     async fn check_search_allowed_passes_operational_streams_with_the_gate_closed() {
         use config::meta::self_reporting::usage::TRIGGERS_STREAM;
-        use o2_enterprise::enterprise::license::{TEST_STATICS_LOCK, close_search_gate_for_tests};
+        use o2_enterprise::enterprise::license::close_search_gate_for_tests;
 
-        let _gate = close_search_gate_for_tests(TEST_STATICS_LOCK.lock().await);
+        let _gate = close_search_gate_for_tests().await;
         for stream in OPERATIONAL_STREAMS {
             assert!(
                 check_search_allowed("acme", Some(stream)).is_ok(),

@@ -1914,9 +1914,9 @@ mod tests {
 
     #[tokio::test]
     async fn summary_is_skipped_while_search_is_blocked() {
-        use o2_enterprise::enterprise::license::{TEST_STATICS_LOCK, close_search_gate_for_tests};
+        use o2_enterprise::enterprise::license::close_search_gate_for_tests;
 
-        let _gate = close_search_gate_for_tests(TEST_STATICS_LOCK.lock().await);
+        let _gate = close_search_gate_for_tests().await;
         assert!(!summary_wanted(Some(true), "acme"));
     }
 }

@@ -558,9 +558,9 @@ fn every_search_call_site_is_classified() {
 #[cfg(feature = "enterprise")]
 #[tokio::test]
 async fn closed_gate_refuses_every_gated_route() {
-    use o2_enterprise::enterprise::license::{TEST_STATICS_LOCK, close_search_gate_for_tests};
+    use o2_enterprise::enterprise::license::close_search_gate_for_tests;
 
-    let _gate = close_search_gate_for_tests(TEST_STATICS_LOCK.lock().await);
+    let _gate = close_search_gate_for_tests().await;
     let app = search_routes_with(true);
     for (method, template, handler) in GATED {
         let request = axum::http::Request::builder()
@@ -592,9 +592,9 @@ async fn closed_gate_refuses_every_gated_route() {
 #[cfg(feature = "enterprise")]
 #[tokio::test]
 async fn meta_org_passes_the_closed_gate() {
-    use o2_enterprise::enterprise::license::{TEST_STATICS_LOCK, close_search_gate_for_tests};
+    use o2_enterprise::enterprise::license::close_search_gate_for_tests;
 
-    let _gate = close_search_gate_for_tests(TEST_STATICS_LOCK.lock().await);
+    let _gate = close_search_gate_for_tests().await;
     let request = axum::http::Request::post(format!("/{}/_search_multi", config::META_ORG_ID))
         .body(Body::empty())
         .unwrap();

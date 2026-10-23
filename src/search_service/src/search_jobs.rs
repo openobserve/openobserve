@@ -614,7 +614,7 @@ mod tests {
 
     #[tokio::test]
     async fn job_pause_reason_follows_the_gate() {
-        use o2_enterprise::enterprise::license::{TEST_STATICS_LOCK, close_search_gate_for_tests};
+        use o2_enterprise::enterprise::license::close_search_gate_for_tests;
 
         let cases = [
             ("acme", r#"["logs"]"#),
@@ -623,7 +623,7 @@ mod tests {
             ("_meta", r#"["logs"]"#),
             ("acme", "garbage"),
         ];
-        let gate = close_search_gate_for_tests(TEST_STATICS_LOCK.lock().await);
+        let gate = close_search_gate_for_tests().await;
         let paused: Vec<bool> = cases
             .iter()
             .map(|(org, streams)| job_pause_reason(org, streams).is_some())
@@ -635,7 +635,9 @@ mod tests {
                 .contains("Search is temporarily disabled")
         );
         drop(gate);
-        let _held = TEST_STATICS_LOCK.lock().await;
+        let _held = o2_enterprise::enterprise::license::TEST_STATICS_LOCK
+            .lock()
+            .await;
         for (org, streams) in cases {
             assert_eq!(job_pause_reason(org, streams), None, "{org} {streams}");
         }
