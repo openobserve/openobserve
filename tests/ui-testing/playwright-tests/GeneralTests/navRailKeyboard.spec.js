@@ -52,8 +52,12 @@ test.describe('nav rail keyboard', () => {
     await page.keyboard.press('ArrowDown');
     const chosen = await page.evaluate(() => document.activeElement.getAttribute('href'));
     await page.keyboard.press('Enter');
-    await page.waitForTimeout(800);
-    expect(new URL(page.url()).pathname).toBe(new URL(chosen, 'http://localhost').pathname);
+    // Wait for the route, not a fixed 800ms: SPA navigation outlasts that on a loaded env.
+    const target = new URL(chosen, 'http://localhost').pathname;
+    await page
+      .waitForURL((u) => new URL(u).pathname === target, { timeout: 15000 })
+      .catch(() => {});
+    expect(new URL(page.url()).pathname).toBe(target);
     expect(await rail.openFlyoutKeys()).toEqual([]);
     active = await rail.activeElementDataTest();
     expect(active?.tag).not.toBe('BODY');
@@ -66,8 +70,9 @@ test.describe('nav rail keyboard', () => {
     await page.keyboard.press('ArrowDown');
     const chosen2 = await page.evaluate(() => document.activeElement.getAttribute('href'));
     await page.keyboard.press('Space');
-    await page.waitForTimeout(800);
-    expect(new URL(page.url()).pathname).toBe(new URL(chosen2, 'http://localhost').pathname);
+    const target2 = new URL(chosen2, 'http://localhost').pathname;
+    await page.waitForURL((u) => new URL(u).pathname === target2, { timeout: 15000 }).catch(() => {});
+    expect(new URL(page.url()).pathname).toBe(target2);
     expect(await rail.openFlyoutKeys()).toEqual([]);
     expect((await rail.activeElementDataTest())?.dataTest).toBe('menu-link-/alerts-item');
 
@@ -78,7 +83,7 @@ test.describe('nav rail keyboard', () => {
     expect(await rail.openFlyoutKeys()).toEqual(['data']);
     await page.keyboard.press('Shift+Tab');
     await page.keyboard.press('Enter');
-    await page.waitForTimeout(800);
+    await page.waitForURL((u) => new URL(u).pathname === '/web/streams', { timeout: 15000 }).catch(() => {});
     expect(new URL(page.url()).pathname).toBe('/web/streams');
     expect(await rail.openFlyoutKeys()).toEqual([]);
     expect((await rail.activeElementDataTest())?.tag).not.toBe('BODY');
@@ -94,8 +99,9 @@ test.describe('nav rail keyboard', () => {
     const item = rail.flyoutItems('data').nth(1);
     const href = await item.getAttribute('href');
     await item.click();
-    await page.waitForTimeout(1200);
-    expect(new URL(page.url()).pathname).toBe(new URL(href, 'http://localhost').pathname);
+    const targetHref = new URL(href, 'http://localhost').pathname;
+    await page.waitForURL((u) => new URL(u).pathname === targetHref, { timeout: 15000 }).catch(() => {});
+    expect(new URL(page.url()).pathname).toBe(targetHref);
     expect(await rail.openFlyoutKeys()).toEqual([]);
     const active = await rail.activeElementDataTest();
     expect(active?.dataTest).not.toBe('menu-link-/streams-item');
