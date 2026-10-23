@@ -913,6 +913,8 @@ const getStreamFields = () => {
         // Feed full schema into autosuggestion (all fields, not just userDataSet subset)
         updateFieldKeywords(stream.schema);
       })
+      // An org that has not ingested RUM yet has no session stream; the field list stays empty.
+      .catch(() => {})
       .finally(() => {
         isLoading.value.pop();
         resolve(true);

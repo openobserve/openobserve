@@ -19,6 +19,7 @@ import { buildTooltip } from "./shared/axisBuilder";
 import { buildPieChartConfig } from "./shared/gridBuilder";
 import { getSeriesColor } from "../colorPalette";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
+import { createSeriesOverrideLookup } from "../seriesOverrides";
 
 /**
  * Converter for pie and donut charts
@@ -36,6 +37,7 @@ export class PieConverter implements PromQLChartConverter {
   ) {
     const chartType = panelSchema.type;
     const config = panelSchema.config || {};
+    const seriesOverrides = createSeriesOverrideLookup(config);
     const data: any[] = [];
 
     // Get aggregation function (default: last)
@@ -124,27 +126,24 @@ export class PieConverter implements PromQLChartConverter {
         label: {
           show: config.show_label !== false,
           formatter: (params: any) => {
+            const name = seriesOverrides.displayName(params.name);
+            const unit = seriesOverrides.unitArgs(params.name);
             // Custom formatter with unit support
             if (config.label_format) {
               // If custom format is provided, use it with unit formatting
               return config.label_format
-                .replace("{b}", params.name)
+                .replace("{b}", name)
                 .replace(
                   "{c}",
                   formatUnitValue(
-                    getUnitValue(params.value, config?.unit, config?.unit_custom, config?.decimals),
+                    getUnitValue(params.value, unit.unit, unit.unitCustom, unit.decimals),
                   ),
                 )
                 .replace("{d}", params.percent.toFixed(1));
             }
             // Default format: name: value (percentage%)
-            const unitValue = getUnitValue(
-              params.value,
-              config?.unit,
-              config?.unit_custom,
-              config?.decimals,
-            );
-            return `${params.name}: ${formatUnitValue(unitValue)} (${params.percent.toFixed(1)}%)`;
+            const unitValue = getUnitValue(params.value, unit.unit, unit.unitCustom, unit.decimals);
+            return `${name}: ${formatUnitValue(unitValue)} (${params.percent.toFixed(1)}%)`;
           },
           fontSize: config.label_font_size || 12,
         },
@@ -167,7 +166,7 @@ export class PieConverter implements PromQLChartConverter {
 
     const result = {
       series,
-      tooltip: buildTooltip(panelSchema, "item", store),
+      tooltip: buildTooltip(panelSchema, "item", store, undefined, "name"),
       // Legend config will be applied by applyLegendConfiguration in convertPromQLChartData
       // This ensures consistent behavior with SQL charts
     };

@@ -44,7 +44,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, computed, nextTick, reactive, onBeforeMount } from "vue";
+import {
+  ref,
+  watch,
+  onMounted,
+  computed,
+  nextTick,
+  reactive,
+  onBeforeMount,
+  onBeforeUnmount,
+} from "vue";
 import { isForecastHorizonValid } from "@/utils/alerts/forecastAlert";
 import { buildThresholdMarkLines, thresholdAxisBounds } from "@/utils/alerts/thresholdMarkLines";
 import {
@@ -52,7 +61,7 @@ import {
   getDefaultDashboardPanelData,
 } from "@/utils/alerts/aggregationPreviewQuery";
 import PanelSchemaRenderer from "../dashboards/PanelSchemaRenderer.vue";
-import { cloneDeep } from "lodash-es";
+import { cloneDeep, debounce } from "lodash-es";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import searchService from "@/services/search";
@@ -513,7 +522,10 @@ const fetchQuerySchema = async () => {
     // Discard stale error fallback if a newer request has started.
     if (requestId !== schemaRequestId.value) return;
 
-    console.error("Failed to fetch query schema:", error);
+    const status = (error as { response?: { status?: number } })?.response?.status ?? 0;
+    // A 4xx is the half-typed query the user is still editing, not an app fault.
+    if (status >= 400 && status < 500) console.warn("Failed to fetch query schema:", error);
+    else console.error("Failed to fetch query schema:", error);
     // Fallback to table view on error
     dashboardPanelData.data.type = "table";
     dashboardPanelData.data.queries[0].customQuery = true;
@@ -1469,6 +1481,37 @@ const refreshDataOnce = () => {
   refreshData();
 };
 
+// Checks run when the debounce fires, so they see the props as they are after the pause.
+const refreshFromProps = () => {
+  // Skip if editor is open - we'll refresh when it closes
+  if (props.isEditorOpen) {
+    return;
+  }
+
+  // Check if aggregation is enabled but required fields are missing
+  if (props.isAggregationEnabled && props.formData.query_condition?.aggregation) {
+    const hasColumn =
+      props.formData.query_condition.aggregation.having?.column &&
+      props.formData.query_condition.aggregation.having.column.trim() !== "";
+    const hasValue =
+      props.formData.query_condition.aggregation.having?.value !== undefined &&
+      props.formData.query_condition.aggregation.having.value !== null &&
+      props.formData.query_condition.aggregation.having.value !== "";
+
+    if (!hasColumn || !hasValue) {
+      return;
+    }
+  }
+
+  // Refresh if we have a valid query
+  if (props.query) {
+    refreshDataOnce();
+  }
+};
+
+// Typing a query fires this on every keystroke; each refresh is a result_schema call.
+const debouncedRefreshFromProps = debounce(refreshFromProps, 800);
+
 // Watch for changes to props and refresh chart data automatically
 watch(
   () => [
@@ -1483,34 +1526,19 @@ watch(
     props.selectedTab,
     props.isUsingBackendSql,
   ],
-  () => {
-    // Skip if editor is open - we'll refresh when it closes
-    if (props.isEditorOpen) {
+  (next, prev) => {
+    if (next[0] !== prev?.[0]) {
+      debouncedRefreshFromProps();
       return;
     }
-
-    // Check if aggregation is enabled but required fields are missing
-    if (props.isAggregationEnabled && props.formData.query_condition?.aggregation) {
-      const hasColumn =
-        props.formData.query_condition.aggregation.having?.column &&
-        props.formData.query_condition.aggregation.having.column.trim() !== "";
-      const hasValue =
-        props.formData.query_condition.aggregation.having?.value !== undefined &&
-        props.formData.query_condition.aggregation.having.value !== null &&
-        props.formData.query_condition.aggregation.having.value !== "";
-
-      if (!hasColumn || !hasValue) {
-        return;
-      }
-    }
-
-    // Refresh if we have a valid query
-    if (props.query) {
-      refreshDataOnce();
-    }
+    // Only typing needs the debounce; a stream, tab or threshold change must not show stale results.
+    debouncedRefreshFromProps.cancel();
+    refreshFromProps();
   },
   { deep: true },
 );
+
+onBeforeUnmount(() => debouncedRefreshFromProps.cancel());
 
 // Refresh data on mount if we already have a query
 onMounted(() => {
@@ -1535,7 +1563,12 @@ const resizeChart = async () => {
   // No need to do anything else - ResizeObserver handles it automatically
 };
 
-// Expose the real refreshData for explicit parent calls (bypasses the 200ms debounce).
-// The watcher internally still uses refreshDataOnce to prevent duplicate calls on rapid prop changes.
-defineExpose({ refreshData, resizeChart, evaluationStatus });
+// The parent sets props and then refreshes; the props change already queued a refresh this call replaces.
+const refreshDataFromParent = () => {
+  debouncedRefreshFromProps.cancel();
+  lastRefreshTime = Date.now();
+  refreshData();
+};
+
+defineExpose({ refreshData: refreshDataFromParent, resizeChart, evaluationStatus });
 </script>

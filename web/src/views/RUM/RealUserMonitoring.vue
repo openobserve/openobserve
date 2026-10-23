@@ -362,6 +362,8 @@ const getSessionReplayFields = () => {
           performanceState.data.streams["_sessionreplay"]["schema"][field.name] = field;
         });
       })
+      // An org without replay data has no _sessionreplay stream; it just stays absent.
+      .catch(() => {})
       .finally(() => {
         resolve(true);
         isLoading.value.pop();
@@ -382,6 +384,8 @@ const getRumDataFields = () => {
           performanceState.data.streams["_rumdata"]["schema"][field.name] = field;
         });
       })
+      // An org without RUM data has no _rumdata stream; it just stays absent.
+      .catch(() => {})
       .finally(() => {
         resolve(true);
         isLoading.value.pop();
