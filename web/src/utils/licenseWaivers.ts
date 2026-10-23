@@ -127,6 +127,22 @@ export function quotaPercent(d: LicenseDecision): number | null {
   return Math.round((d.used_today_gb / d.limit_today_gb) * 100);
 }
 
+export function licenseExpiryState(
+  zo: Record<string, unknown>,
+  env: string | undefined,
+  nowUs: number,
+): { kind: "none" } | { kind: "expiring"; untilUs: number; online: boolean } {
+  const untilUs = zo.license_expiry;
+  if (
+    typeof untilUs !== "number" ||
+    !Number.isFinite(untilUs) ||
+    untilUs <= nowUs ||
+    untilUs - nowUs > 30 * DAY_US
+  )
+    return { kind: "none" };
+  return { kind: "expiring", untilUs, online: env === "online" };
+}
+
 export function licenseBannerState(zo: Record<string, unknown>, nowUs: number): LicenseBannerState {
   if (zo.license_search_allowed === false) return { kind: "paused" };
   const until = zo.license_waiver_until;
