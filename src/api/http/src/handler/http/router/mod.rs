@@ -82,7 +82,7 @@ use crate::{
         },
         router::middlewares::{
             blocked_org_param, blocked_orgs_middleware, ingest_rejections_middleware,
-            password_policy_middleware, root_only_middleware,
+            password_policy_middleware, root_only_middleware, search_license_middleware,
         },
     },
 };
@@ -90,6 +90,8 @@ use crate::{
 pub mod decompression;
 pub mod middlewares;
 pub mod openapi;
+#[cfg(test)]
+mod search_gate_tests;
 
 use common::meta::http::ERROR_HEADER;
 
@@ -1177,8 +1179,12 @@ pub fn service_routes() -> Router {
     let server = cfg.common.instance_name_short.to_string();
 
     // Downtimes and Slack live in their own tables to keep this function under the line limit.
-    let mut router =
-        public_dashboard_admin_routes(Router::new().merge(downtime_routes()).merge(slack_routes()));
+    let mut router = public_dashboard_admin_routes(
+        Router::new()
+            .merge(downtime_routes())
+            .merge(slack_routes())
+            .merge(search_routes()),
+    );
     // Full UI configuration — authenticated counterpart of the unauthenticated
     // `/config` bootstrap in config_routes()
     router = router.route("/{org_id}/config", get(status::zo_config));
@@ -1283,7 +1289,6 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/{stream_name}/traces/session/details", get(traces::session::get_session_details))
         .route("/{org_id}/{stream_name}/traces/user", get(traces::user::get_latest_users))
         .route("/{org_id}/{stream_name}/traces/time_range", get(traces::time_index::get_trace_time_range))
-        .route("/{org_id}/{stream_name}/traces/{trace_id}/details", get(traces::details::get_trace_details))
         .route("/{org_id}/{stream_name}/traces/{trace_id}/dag", get(traces::dag::get_trace_dag))
 
         // Profiles query (ingest remains under /v1/profiles)
@@ -1292,43 +1297,6 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/{stream_name}/profiles/series", get(profiles_query::profiles_series_get).post(profiles_query::profiles_series))
         .route("/{org_id}/{stream_name}/profiles/merge", get(profiles_query::merge_profiles_get).post(profiles_query::merge_profiles))
         .route("/{org_id}/{stream_name}/profiles/diff", post(profiles_query::diff_profiles))
-
-        // Database Monitoring — its own top-level module, not under /traces.
-        // The path segment must stay `db_monitoring` to match the OFGA resource
-        // these routes authorize against (`db_monitoring:{org}`, see o2_openfga
-        // ROUTE_PERMISSIONS).
-        //
-        // Every route below is registered in both builds; the build-type gate
-        // lives in the handlers, three of which (deadlocks/blocking/
-        // table_health) are dual-implemented and answer 403 on OSS. Registering
-        // them in the enterprise-gated block instead would 404 them, losing the
-        // distinction between "not licensed" and "no such endpoint". Runtime
-        // off-switch is ZO_DB_MONITORING_ENABLED.
-        .route("/{org_id}/db_monitoring/databases", get(db_monitoring::handler::get_dbm_databases))
-        .route("/{org_id}/db_monitoring/queries", get(db_monitoring::handler::get_dbm_queries))
-        .route("/{org_id}/db_monitoring/query/history", get(db_monitoring::handler::get_dbm_query_history))
-        .route("/{org_id}/db_monitoring/query/endpoints", get(db_monitoring::handler::get_dbm_query_endpoints))
-        .route("/{org_id}/db_monitoring/samples", get(db_monitoring::handler::get_dbm_samples))
-        // Server-vantage events (read the canonical o2_dbm_* columns)
-        .route("/{org_id}/db_monitoring/deadlocks", get(db_monitoring::handler::get_dbm_deadlocks))
-        .route("/{org_id}/db_monitoring/blocking", get(db_monitoring::handler::get_dbm_blocking))
-        .route("/{org_id}/db_monitoring/activity", get(db_monitoring::handler::get_dbm_activity))
-        // `query/insights` returns the query-detail page's Logs-side pair in one
-        // round trip; `query/plans` and `query/server_metrics` are superseded by
-        // it (same sections, same envelopes) and stay registered for
-        // compatibility.
-        .route("/{org_id}/db_monitoring/query/insights", get(db_monitoring::handler::get_dbm_query_insights))
-        .route("/{org_id}/db_monitoring/query/plans", get(db_monitoring::handler::get_dbm_query_plans))
-        .route("/{org_id}/db_monitoring/query/server_metrics", get(db_monitoring::handler::get_dbm_query_server_metrics))
-        .route("/{org_id}/db_monitoring/server_queries", get(db_monitoring::handler::get_dbm_server_queries))
-        .route("/{org_id}/db_monitoring/server_samples", get(db_monitoring::handler::get_dbm_server_samples))
-        .route("/{org_id}/db_monitoring/table_health", get(db_monitoring::handler::get_dbm_table_health))
-        .route("/{org_id}/db_monitoring/instances", get(db_monitoring::handler::get_dbm_instances))
-        .route(
-            "/{org_id}/db_monitoring/instance_metrics",
-            get(db_monitoring::handler::get_dbm_instance_metrics),
-        )
-        .route("/{org_id}/db_monitoring/badges", get(db_monitoring::handler::get_dbm_badges))
 
         // LLM Model Pricing
         .route("/{org_id}/llm/models", get(model_pricing::list).post(model_pricing::create))
@@ -1349,7 +1317,6 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/prometheus/api/v1/metadata", get(promql::metadata))
         .route("/{org_id}/prometheus/api/v1/series", get(promql::series_get).post(promql::series_post))
         .route("/{org_id}/prometheus/api/v1/labels", get(promql::labels_get).post(promql::labels_post))
-        .route("/{org_id}/prometheus/api/v1/label/{label_name}/values", get(promql::label_values))
         .route("/{org_id}/prometheus/api/v1/format_query", get(promql::format_query_get).post(promql::format_query_post))
         .route("/{org_id}/prometheus/api/v1/parse_tree", post(promql::parse_tree))
 
@@ -1361,12 +1328,6 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/{stream_name}/_values", get(search::values))
         .route("/{org_id}/_search_history", post(search::search_history))
         .route("/{org_id}/result_schema", post(search::result_schema))
-
-        // Multi-stream search
-        .route("/{org_id}/_search_multi", post(search::multi_streams::search_multi))
-        .route("/{org_id}/_search_multi_stream", post(search::multi_streams::search_multi_stream))
-        .route("/{org_id}/_search_partition_multi", post(search::multi_streams::_search_partition_multi))
-        .route("/{org_id}/{stream_names}/_around_multi", get(search::multi_streams::around_multi))
 
         // HTTP/2 streaming
         .route("/{org_id}/_search_stream", post(search::search_stream::search_http2_stream))
@@ -1507,8 +1468,7 @@ pub fn service_routes() -> Router {
             // Anomaly Detection
             .route("/{org_id}/anomaly_detection", get(anomaly_detection::list_configs).post(anomaly_detection::create_config))
             .route("/{org_id}/anomaly_detection/{config_id}", get(anomaly_detection::get_config).put(anomaly_detection::update_config).delete(anomaly_detection::delete_config))
-            .route("/{org_id}/anomaly_detection/{config_id}/train", post(anomaly_detection::train_model).delete(anomaly_detection::cancel_training))
-            .route("/{org_id}/anomaly_detection/{config_id}/detect", post(anomaly_detection::detect_anomalies))
+            .route("/{org_id}/anomaly_detection/{config_id}/train", delete(anomaly_detection::cancel_training))
             .route("/{org_id}/anomaly_detection/{config_id}/history", get(anomaly_detection::get_detection_history))
             .route("/{org_id}/anomaly_detection/history", get(alerts::history::get_all_anomaly_history));
         router = alert_calibration_routes(router);
@@ -1619,21 +1579,11 @@ pub fn service_routes() -> Router {
                 )
                 .route(
                     "/{org_id}/annotation_queues/{queue_id}/items",
-                    post(annotation_queues::enqueue_annotation_queue_item)
-                        .delete(annotation_queues::clear_annotation_queue_items),
-                )
-                .route(
-                    "/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}",
-                    get(annotation_queues::get_annotation_queue_item),
+                    delete(annotation_queues::clear_annotation_queue_items),
                 )
                 .route(
                     "/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}/reviews",
-                    get(annotation_queues::list_annotation_queue_item_reviews)
-                        .post(annotation_queues::review_annotation_queue_item),
-                )
-                .route(
-                    "/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}/push_to_dataset",
-                    post(datasets::push_annotation_queue_item_to_dataset),
+                    post(annotation_queues::review_annotation_queue_item),
                 )
                 .route(
                     "/{org_id}/annotation_queues/{queue_id}/items/archive",
@@ -1655,9 +1605,7 @@ pub fn service_routes() -> Router {
                 )
                 .route(
                     "/{org_id}/datasets/{dataset_id}/items",
-                    get(datasets::list_dataset_items)
-                        .post(datasets::push_dataset_item)
-                        .put(datasets::upsert_dataset_items),
+                    get(datasets::list_dataset_items).put(datasets::upsert_dataset_items),
                 )
                 .route(
                     "/{org_id}/datasets/{dataset_id}/rows",
@@ -1684,25 +1632,13 @@ pub fn service_routes() -> Router {
                     get(experiments::list_experiments).post(experiments::create_experiment),
                 )
                 .route(
-                    "/{org_id}/experiments/compare",
-                    get(experiments::compare_experiments),
-                )
-                .route(
                     "/{org_id}/experiments/{experiment_id}",
-                    get(experiments::get_experiment).delete(experiments::delete_experiment),
+                    delete(experiments::delete_experiment),
                 )
                 .route(
                     "/{org_id}/experiments/{experiment_id}/baseline",
                     put(experiments::set_experiment_baseline)
                         .delete(experiments::clear_experiment_baseline),
-                )
-                .route(
-                    "/{org_id}/experiments/{experiment_id}/rows",
-                    get(experiments::list_experiment_result_rows),
-                )
-                .route(
-                    "/{org_id}/experiments/{experiment_id}/rows/{row_id}",
-                    get(experiments::get_experiment_row),
                 )
                 .route(
                     "/{org_id}/experiments/{experiment_id}/rows/{row_id}/trials/{trial_index}/retry",
@@ -1736,9 +1672,6 @@ pub fn service_routes() -> Router {
                 // On-demand human annotation from Discovery
                 .route("/{org_id}/annotations", post(annotations::annotate_target))
 
-                // LLM score-based Discovery
-                .route("/{org_id}/discovery", get(discovery::list_discovery_items))
-
                 // LLM Providers (Online Eval Phase 2)
                 .route("/{org_id}/providers", get(providers::list_providers).post(providers::create_provider))
                 .route("/{org_id}/providers/test", post(providers::test_provider_config))
@@ -1756,7 +1689,6 @@ pub fn service_routes() -> Router {
                 .route("/{org_id}/tasks/{entity_id}/signing/end_grace", post(remote_tasks::end_remote_task_signing_grace))
                 .route("/{org_id}/tasks/{entity_id}/signing", get(remote_tasks::get_remote_task_signing_status).delete(remote_tasks::revoke_remote_task_signing_secret))
                 .route("/{org_id}/tasks/{entity_id}/versions", get(remote_tasks::list_remote_task_versions))
-                .route("/{org_id}/tasks/{entity_id}/stats", get(remote_tasks::get_remote_task_stats))
                 .route("/{org_id}/tasks/{entity_id}/draft", get(remote_tasks::get_remote_task_draft).delete(remote_tasks::discard_remote_task_draft))
                 .route("/{org_id}/tasks/{entity_id}/test_connection", post(remote_tasks::publish_remote_task))
                 .route("/{org_id}/tasks/{entity_id}/test_run", post(remote_tasks::test_run_remote_task))
@@ -1798,11 +1730,9 @@ pub fn service_routes() -> Router {
     {
         router = fleet_routes(router)
             // Search jobs
-            .route("/{org_id}/search_jobs", get(search::search_job::list_status).post(search::search_job::submit_job))
+            .route("/{org_id}/search_jobs", get(search::search_job::list_status))
             .route("/{org_id}/search_jobs/{job_id}", get(search::search_job::get_status).delete(search::search_job::delete_job))
-            .route("/{org_id}/search_jobs/{job_id}/result", get(search::search_job::get_job_result))
             .route("/{org_id}/search_jobs/{job_id}/cancel", post(search::search_job::cancel_job))
-            .route("/{org_id}/search_jobs/{job_id}/retry", post(search::search_job::retry_job))
 
             // Query manager
             .route("/{org_id}/query_manager/status", get(search::query_manager::query_status))
@@ -1839,16 +1769,6 @@ pub fn service_routes() -> Router {
             // License
             .route("/license", get(license::get_license_info).post(license::store_license))
             .route("/license/refresh", post(license::refresh_license_limits))
-
-            // Topology
-            .route("/{org_id}/traces/service_graph/topology/current", get(traces::get_current_topology))
-            .route("/{org_id}/traces/service_graph/edge/history", get(traces::get_edge_history))
-            // Agent behavior signals (loop / failure / cost) — reads the _agent_signals stream
-            .route("/{org_id}/traces/agent_signals", get(traces::get_agent_signals))
-            .route("/{org_id}/traces/agent_signals/compare", post(traces::compare_agent_versions))
-
-            // Patterns
-            .route("/{org_id}/streams/{stream_name}/patterns/extract", post(patterns::extract_patterns))
 
             // Service streams
             .route("/{org_id}/service_streams", get(service_streams::list_services))
@@ -2199,8 +2119,6 @@ pub fn downtime_routes() -> Router {
     Router::new()
         .route("/v2/{org_id}/downtimes", get(downtimes::list_downtimes).post(downtimes::create_downtime))
         .route("/v2/{org_id}/downtimes/preview", post(downtimes::preview_downtime))
-        .route("/v2/{org_id}/downtimes/resources", post(downtimes::downtime_resources))
-        .route("/v2/{org_id}/downtimes/values", post(downtimes::downtime_values))
         .route("/v2/{org_id}/downtimes/move", patch(downtimes::move_downtimes))
         .route("/v2/{org_id}/downtimes/{downtime_id}", get(downtimes::get_downtime).put(downtimes::update_downtime).delete(downtimes::delete_downtime))
         .route("/v2/{org_id}/downtimes/{downtime_id}/cancel", post(downtimes::cancel_downtime))
@@ -2224,6 +2142,101 @@ fn report_routes() -> Router {
         .route("/v2/{org_id}/reports/{report_id}", get(dashboards::reports::get_report_v2).put(dashboards::reports::update_report_v2).delete(dashboards::reports::delete_report_v2))
         .route("/v2/{org_id}/reports/{report_id}/enable", patch(dashboards::reports::enable_report_v2))
         .route("/v2/{org_id}/reports/{report_id}/trigger", put(dashboards::reports::trigger_report_v2))
+}
+
+/// Routes that read customer data through search; the licence gate answers 429 while search is blocked.
+#[rustfmt::skip]
+fn search_routes() -> Router {
+    #[cfg(feature = "enterprise")]
+    let llm_eval = get_o2_config().llm_eval_config.enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let llm_eval = false;
+    search_routes_with(llm_eval)
+}
+
+#[rustfmt::skip]
+#[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
+fn search_routes_with(llm_eval: bool) -> Router {
+    let router = Router::new()
+        // Multi-stream search
+        .route("/{org_id}/_search_multi", post(search::multi_streams::search_multi))
+        .route("/{org_id}/_search_multi_stream", post(search::multi_streams::search_multi_stream))
+        .route("/{org_id}/_search_partition_multi", post(search::multi_streams::_search_partition_multi))
+        .route("/{org_id}/{stream_names}/_around_multi", get(search::multi_streams::around_multi))
+        .route("/{org_id}/{stream_name}/traces/{trace_id}/details", get(traces::details::get_trace_details))
+        .route("/{org_id}/prometheus/api/v1/label/{label_name}/values", get(promql::label_values))
+        .route("/v2/{org_id}/downtimes/resources", post(downtimes::downtime_resources))
+        .route("/v2/{org_id}/downtimes/values", post(downtimes::downtime_values))
+
+        // Database Monitoring — its own top-level module, not under /traces.
+        // The path segment must stay `db_monitoring` to match the OFGA resource
+        // these routes authorize against (`db_monitoring:{org}`, see o2_openfga
+        // ROUTE_PERMISSIONS).
+        //
+        // Every route below is registered in both builds; the build-type gate
+        // lives in the handlers, three of which (deadlocks/blocking/
+        // table_health) are dual-implemented and answer 403 on OSS. Registering
+        // them in the enterprise-gated block instead would 404 them, losing the
+        // distinction between "not licensed" and "no such endpoint". Runtime
+        // off-switch is ZO_DB_MONITORING_ENABLED.
+        .route("/{org_id}/db_monitoring/databases", get(db_monitoring::handler::get_dbm_databases))
+        .route("/{org_id}/db_monitoring/queries", get(db_monitoring::handler::get_dbm_queries))
+        .route("/{org_id}/db_monitoring/query/history", get(db_monitoring::handler::get_dbm_query_history))
+        .route("/{org_id}/db_monitoring/query/endpoints", get(db_monitoring::handler::get_dbm_query_endpoints))
+        .route("/{org_id}/db_monitoring/samples", get(db_monitoring::handler::get_dbm_samples))
+        // Server-vantage events (read the canonical o2_dbm_* columns)
+        .route("/{org_id}/db_monitoring/deadlocks", get(db_monitoring::handler::get_dbm_deadlocks))
+        .route("/{org_id}/db_monitoring/blocking", get(db_monitoring::handler::get_dbm_blocking))
+        .route("/{org_id}/db_monitoring/activity", get(db_monitoring::handler::get_dbm_activity))
+        // `query/insights` returns the query-detail page's Logs-side pair in one
+        // round trip; `query/plans` and `query/server_metrics` are superseded by
+        // it (same sections, same envelopes) and stay registered for
+        // compatibility.
+        .route("/{org_id}/db_monitoring/query/insights", get(db_monitoring::handler::get_dbm_query_insights))
+        .route("/{org_id}/db_monitoring/query/plans", get(db_monitoring::handler::get_dbm_query_plans))
+        .route("/{org_id}/db_monitoring/query/server_metrics", get(db_monitoring::handler::get_dbm_query_server_metrics))
+        .route("/{org_id}/db_monitoring/server_queries", get(db_monitoring::handler::get_dbm_server_queries))
+        .route("/{org_id}/db_monitoring/server_samples", get(db_monitoring::handler::get_dbm_server_samples))
+        .route("/{org_id}/db_monitoring/table_health", get(db_monitoring::handler::get_dbm_table_health))
+        .route("/{org_id}/db_monitoring/instances", get(db_monitoring::handler::get_dbm_instances))
+        .route(
+            "/{org_id}/db_monitoring/instance_metrics",
+            get(db_monitoring::handler::get_dbm_instance_metrics),
+        )
+        .route("/{org_id}/db_monitoring/badges", get(db_monitoring::handler::get_dbm_badges));
+    #[cfg(feature = "enterprise")]
+    let router = {
+        let router = router
+            .route("/{org_id}/anomaly_detection/{config_id}/train", post(anomaly_detection::train_model))
+            .route("/{org_id}/anomaly_detection/{config_id}/detect", post(anomaly_detection::detect_anomalies))
+            .route("/{org_id}/search_jobs", post(search::search_job::submit_job))
+            .route("/{org_id}/search_jobs/{job_id}/result", get(search::search_job::get_job_result))
+            .route("/{org_id}/search_jobs/{job_id}/retry", post(search::search_job::retry_job))
+            .route("/{org_id}/traces/service_graph/topology/current", get(traces::get_current_topology))
+            .route("/{org_id}/traces/service_graph/edge/history", get(traces::get_edge_history))
+            // Agent behavior signals (loop / failure / cost) — reads the _agent_signals stream
+            .route("/{org_id}/traces/agent_signals", get(traces::get_agent_signals))
+            .route("/{org_id}/traces/agent_signals/compare", post(traces::compare_agent_versions))
+            .route("/{org_id}/streams/{stream_name}/patterns/extract", post(patterns::extract_patterns));
+        if llm_eval {
+            router
+                .route("/{org_id}/annotation_queues/{queue_id}/items", post(annotation_queues::enqueue_annotation_queue_item))
+                .route("/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}", get(annotation_queues::get_annotation_queue_item))
+                .route("/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}/reviews", get(annotation_queues::list_annotation_queue_item_reviews))
+                .route("/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}/push_to_dataset", post(datasets::push_annotation_queue_item_to_dataset))
+                .route("/{org_id}/datasets/{dataset_id}/items", post(datasets::push_dataset_item))
+                .route("/{org_id}/experiments/compare", get(experiments::compare_experiments))
+                .route("/{org_id}/experiments/{experiment_id}", get(experiments::get_experiment))
+                .route("/{org_id}/experiments/{experiment_id}/rows", get(experiments::list_experiment_result_rows))
+                .route("/{org_id}/experiments/{experiment_id}/rows/{row_id}", get(experiments::get_experiment_row))
+                .route("/{org_id}/discovery", get(discovery::list_discovery_items))
+                .route("/{org_id}/tasks/{entity_id}/stats", get(remote_tasks::get_remote_task_stats))
+        } else {
+            router
+        }
+    };
+    // A route layer, not a layer: it must not reach the ungated methods merged onto the same paths.
+    router.route_layer(middleware::from_fn(search_license_middleware))
 }
 
 /// On-call management routes; the caller mounts them only when on-call is enabled.

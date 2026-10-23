@@ -17,8 +17,10 @@ mod ingest_rejections;
 mod org_blocking;
 mod password_policy;
 mod root_only;
+mod search_license;
 
 pub use ingest_rejections::ingest_rejections_middleware;
 pub use org_blocking::{blocked_org_param, blocked_orgs_middleware};
 pub use password_policy::password_policy_middleware;
 pub use root_only::root_only_middleware;
+pub use search_license::search_license_middleware;
