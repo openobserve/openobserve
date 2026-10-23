@@ -706,6 +706,110 @@ describe("useWorkflowHttpEndpoint", () => {
     });
   });
 
+  describe("example request copy", () => {
+    beforeEach(() => {
+      api.revealHttpCredentialSecret.mockResolvedValue({ ...credential(), secret: ROW_VALUE });
+    });
+
+    it("copies the curl call with the real secret through the audited reveal fetch", async () => {
+      const { endpoint } = await mountEndpoint();
+
+      const copying = endpoint.copyExample();
+
+      expect(copyPendingText).toHaveBeenCalledTimes(1);
+      await expect(copying).resolves.toBe(true);
+      const text = await vi.mocked(copyPendingText).mock.calls[0][0];
+      expect(text).toContain(`Authorization: Bearer ${ROW_VALUE}`);
+      expect(text).toContain(config().url);
+      expect(text).toContain('"service":"checkout"');
+      expect(api.revealHttpCredentialSecret).toHaveBeenCalledWith({
+        org_identifier: "acme",
+        id: "wf1",
+        credential_id: "c1",
+      });
+      expect(endpoint.revealedCredentials.value).toEqual({});
+      expect(cachesHold(ROW_VALUE)).toBe(false);
+    });
+
+    it.each(["mode", "rotate", "revoke"] as const)(
+      "rejects a pending example copy after %s changes the credential",
+      async (change) => {
+        let resolveSecret!: (value: HttpCredential & { secret: string }) => void;
+        api.revealHttpCredentialSecret.mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              resolveSecret = resolve;
+            }),
+        );
+        const { endpoint } = await mountEndpoint();
+        const copying = endpoint.copyExample();
+        const rejected = expect(copying).rejects.toMatchObject({
+          key: "workflow.http.copyCredentialChanged",
+        });
+        api.getHttpTrigger.mockResolvedValue(
+          config(
+            change === "mode"
+              ? { auth_mode: "signature" }
+              : {
+                  credentials: [
+                    credential(change === "rotate" ? { id: "c2" } : { state: "revoked" }),
+                  ],
+                },
+          ),
+        );
+        await endpoint.refresh();
+        await flushPromises();
+        resolveSecret({ ...credential(), secret: ROW_VALUE });
+        await rejected;
+        expect(copyToClipboard).not.toHaveBeenCalled();
+        expect(endpoint.revealedCredentials.value).toEqual({});
+      },
+    );
+
+    it("signs with the real secret in signed mode", async () => {
+      api.getHttpTrigger.mockResolvedValue(config({ auth_mode: "signature" }));
+      const { endpoint } = await mountEndpoint();
+
+      await endpoint.copyExample();
+
+      const text = await vi.mocked(copyPendingText).mock.calls[0][0];
+      expect(text).toContain(`SECRET='${ROW_VALUE}'`);
+      expect(text).toContain("openssl dgst -sha256");
+    });
+
+    it("reuses a shown value without fetching again", async () => {
+      const { endpoint } = await mountEndpoint();
+      await endpoint.revealCredential("c1");
+
+      await endpoint.copyExample();
+
+      expect(api.revealHttpCredentialSecret).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(copyToClipboard).mock.calls[0][0]).toContain(`Bearer ${ROW_VALUE}`);
+    });
+
+    it("without reveal permission copies placeholders and never calls the reveal route", async () => {
+      api.getHttpTrigger.mockResolvedValue(
+        config({ permissions: { edit: true, test: true, reveal: false } }),
+      );
+      const { endpoint } = await mountEndpoint();
+
+      await expect(endpoint.copyExample()).resolves.toBe(true);
+
+      expect(api.revealHttpCredentialSecret).not.toHaveBeenCalled();
+      expect(copyPendingText).not.toHaveBeenCalled();
+      expect(vi.mocked(copyToClipboard).mock.calls[0][0]).toContain("$O2_HOOK_TOKEN");
+    });
+
+    it("rejects when the reveal fetch fails, so the caller can say why", async () => {
+      api.revealHttpCredentialSecret.mockRejectedValueOnce({
+        response: { status: 403, data: { message: "denied" } },
+      });
+      const { endpoint } = await mountEndpoint();
+
+      await expect(endpoint.copyExample()).rejects.toBeTruthy();
+    });
+  });
+
   describe("send test request", () => {
     it("dry-runs the public URL with the revealed token", async () => {
       api.getHttpTrigger.mockResolvedValueOnce(absent());

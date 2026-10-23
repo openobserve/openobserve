@@ -49,7 +49,7 @@ import {
   rotateHttpCredentialMutation,
   workflowHttpTriggerQuery,
 } from "@/services/workflows.queries";
-import { DEFAULT_SAMPLE_BODY } from "./httpSnippets";
+import { DEFAULT_SAMPLE_BODY, buildSnippet } from "./httpSnippets";
 import { buildHttpRequestSample } from "./httpRequestSample";
 import { HttpEndpointError } from "./httpEndpointUi";
 
@@ -264,6 +264,33 @@ export function useWorkflowHttpEndpoint(args: UseWorkflowHttpEndpointArgs) {
     return copyPendingText(fetchSecret(credentialId));
   };
 
+  const copyExample = (): Promise<boolean> => {
+    const current = config.value;
+    if (!current) return Promise.resolve(false);
+    const build = (secret: string | null) =>
+      buildSnippet("curl", {
+        url: current.url,
+        mode: current.auth_mode,
+        secret,
+        sampleBody: DEFAULT_SAMPLE_BODY,
+      });
+    const active = activeCredential.value;
+    if (!permissions.value.reveal || !active) {
+      return copyToClipboard(build(null), gt, { silent: true });
+    }
+    const shown = revealedCredentials.value[active.id];
+    if (shown !== undefined) return copyToClipboard(build(shown), gt, { silent: true });
+    const mode = current.auth_mode;
+    return copyPendingText(
+      fetchSecret(active.id).then((secret) => {
+        if (config.value?.auth_mode !== mode || activeCredential.value?.id !== active.id) {
+          throw new HttpEndpointError("workflow.http.copyCredentialChanged");
+        }
+        return build(secret);
+      }),
+    );
+  };
+
   const putAndReveal = async (payload: PutHttpTriggerPayload, kind: RevealKind) => {
     const result = await put.mutateAsync(payload);
     takeSecret(result.secret, payload.auth_mode, kind, put.reset);
@@ -430,6 +457,7 @@ export function useWorkflowHttpEndpoint(args: UseWorkflowHttpEndpointArgs) {
     revealCredential,
     hideCredential,
     copyCredential,
+    copyExample,
     turnOn,
     turnOff,
     switchMode,

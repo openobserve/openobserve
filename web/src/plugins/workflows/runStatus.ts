@@ -86,13 +86,19 @@ export function matchesTriggerFilter(
 }
 
 export function matchesRunSearch(
-  row: { run_id: string; http_request?: Pick<HttpRequestFacts, "idempotency_key"> | null },
+  row: {
+    run_id: string;
+    http_request?: Partial<Pick<HttpRequestFacts, "idempotency_key" | "credential_prefix">> | null;
+  },
   query: string,
+  alertName?: string | null,
 ): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
   if (row.run_id.toLowerCase().startsWith(q)) return true;
-  return (row.http_request?.idempotency_key ?? "").toLowerCase().includes(q);
+  return [row.http_request?.idempotency_key, row.http_request?.credential_prefix, alertName].some(
+    (field) => (field ?? "").toLowerCase().includes(q),
+  );
 }
 
 export function shortRunId(runId: string): string {

@@ -120,6 +120,13 @@ describe("matchesRunSearch", () => {
     expect(matchesRunSearch(row, "")).toBe(true);
     expect(matchesRunSearch({ run_id: "x" }, "deploy")).toBe(false);
   });
+
+  it("matches the token prefix and the alert name anywhere", () => {
+    expect(matchesRunSearch(row, "4FK9")).toBe(true);
+    expect(matchesRunSearch({ run_id: "a-1" }, "5xx", "checkout_5xx_rate")).toBe(true);
+    expect(matchesRunSearch({ run_id: "a-1" }, "latency", "checkout_5xx_rate")).toBe(false);
+    expect(matchesRunSearch({ run_id: "a-1" }, "5xx", null)).toBe(false);
+  });
 });
 
 describe("formatting helpers", () => {
