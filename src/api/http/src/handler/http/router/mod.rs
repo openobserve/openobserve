@@ -73,6 +73,8 @@ use {
 use super::request::mcp;
 #[cfg(feature = "enterprise")]
 use super::request::ratelimit;
+#[cfg(feature = "enterprise")]
+use crate::handler::http::router::middlewares::search_license_middleware;
 use crate::{
     common::meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
     handler::http::{
@@ -82,7 +84,7 @@ use crate::{
         },
         router::middlewares::{
             blocked_org_param, blocked_orgs_middleware, ingest_rejections_middleware,
-            password_policy_middleware, root_only_middleware, search_license_middleware,
+            password_policy_middleware, root_only_middleware,
         },
     },
 };
@@ -2233,7 +2235,9 @@ fn search_routes_with(llm_eval: bool) -> Router {
         }
     };
     // A route layer, not a layer: it must not reach the ungated methods merged onto the same paths.
-    router.route_layer(middleware::from_fn(search_license_middleware))
+    #[cfg(feature = "enterprise")]
+    let router = router.route_layer(middleware::from_fn(search_license_middleware));
+    router
 }
 
 /// On-call management routes; the caller mounts them only when on-call is enabled.
