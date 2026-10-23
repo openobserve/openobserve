@@ -457,6 +457,7 @@ fn strip_secrets(v: &mut serde_json::Value) {
                 "custom_chart_content",
                 "drilldown",
                 "joins",
+                "formula",
             ] {
                 map.remove(key);
             }
@@ -521,6 +522,31 @@ mod tests {
         assert!(s.contains("keep me"), "{s}");
         assert!(s.contains("\"id\":\"p1\""), "{s}");
         assert!(s.contains("x_axis"), "{s}");
+    }
+
+    #[test]
+    fn strip_secrets_removes_promql_formulas_at_every_level() {
+        let formula = "A / sum(private_revenue{customer=\"internal\"})";
+        let mut v = serde_json::json!({
+            "formula": formula,
+            "tabs": [{
+                "panels": [{
+                    "id": "p1",
+                    "queries": [
+                        { "config": { "promql_legend": "rev", "formula": formula } },
+                        { "config": { "nested": { "formula": formula } } }
+                    ]
+                }]
+            }]
+        });
+        strip_secrets(&mut v);
+        let s = serde_json::to_string(&v).unwrap();
+        assert!(!s.contains("formula"), "{s}");
+        assert!(
+            !s.contains("private_revenue") && !s.contains("internal"),
+            "{s}"
+        );
+        assert!(s.contains("\"promql_legend\":\"rev\""), "{s}");
     }
 
     #[test]
