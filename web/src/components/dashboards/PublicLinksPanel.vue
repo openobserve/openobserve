@@ -1356,9 +1356,9 @@ watch(
   },
   { immediate: true },
 );
-// Each time the form opens, its pickers start again from the link or the dashboard.
+// Each opening of the form, the drawer included, starts its pickers from the current dashboard.
 watch(
-  () => (currentView.value === "form" ? formKey.value : null),
+  () => (open.value && currentView.value === "form" ? formKey.value : null),
   (session) => {
     if (session !== null) seedFormVariables();
   },

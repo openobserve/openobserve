@@ -223,6 +223,30 @@ describe("PublicLinksPanel", () => {
     expect(has(w, "dashboards-public-links-panel-created")).toBe(false);
   });
 
+  it("offers a variable added to the dashboard while the drawer was closed", async () => {
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
+    const w = build({ variablesConfig: { list: [{ name: "env", type: "constant", value: "" }] } });
+    await flushPromises();
+    const names = () =>
+      (
+        w.vm as unknown as { formVars: { variablesData: { global: Array<{ name: string }> } } }
+      ).formVars.variablesData.global.map((v) => v.name);
+    expect(names()).toEqual(["env"]);
+
+    await w.setProps({ modelValue: false });
+    await w.setProps({
+      variablesConfig: {
+        list: [
+          { name: "env", type: "constant", value: "" },
+          { name: "svc", type: "constant", value: "" },
+        ],
+      },
+    });
+    await w.setProps({ modelValue: true });
+    await flushPromises();
+    expect(names()).toEqual(["env", "svc"]);
+  });
+
   it("starts every opening with a clean form, even after a failed attempt", async () => {
     vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
     const w = build();
