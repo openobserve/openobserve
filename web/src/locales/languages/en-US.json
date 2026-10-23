@@ -4035,6 +4035,13 @@
       "success": "Success",
       "failed": "Failed",
       "testRun": "Test run",
+      "source": "Source",
+      "sourceHttp": "HTTP request",
+      "sourceAlertFired": "Alert fired",
+      "sourceIncidentEvent": "Incident event",
+      "sourceRetry": "Retry run",
+      "sourceManual": "Manual run",
+      "sourceOther": "Other",
       "runType": "Type",
       "testRunTooltip": "Started from the editor. Destination steps dispatch for real.",
       "showTestRuns": "Show {count} test run(s)",
@@ -4389,6 +4396,10 @@
       "outputFormatLabel": "Output Format",
       "tlsVerifyLabel": "TLS Verification",
       "tlsDisabled": "Disabled"
+    },
+    "http": {
+      "runTestHint": "Opens Test with an HTTP request payload",
+      "runTestHintList": "Open the workflow to run a test"
     }
   },
   "pipeline": {
