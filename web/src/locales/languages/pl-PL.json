@@ -23681,7 +23681,7 @@
     "phoneRefusalTooManyTries": "Zbyt wiele prób. Wyślij nowy kod.",
     "phoneRefusalNoCode": "Dla tego numeru nie oczekuje żaden kod. Wyślij nowy kod.",
     "phoneRefusalTooSoon": "Właśnie poprosiłeś o kod. Spróbuj ponownie za {wait}.",
-    "phoneRefusalUserDailyLimit": "Poprosiłeś o zbyt wiele kodów. Spróbuj ponownie za {wait}.",
+    "phoneRefusalUserDailyLimit": "Poproszono o zbyt wiele kodów. Spróbuj ponownie za {wait}.",
     "phoneRefusalNumberDailyLimit": "Na ten numer wysłano zbyt wiele kodów. Spróbuj ponownie za {wait}.",
     "phoneRefusalNoProvider": "Ta organizacja nie ma jeszcze dostawcy telefonii.",
     "phoneRefusalNoPhone": "Najpierw zapisz numer telefonu.",
