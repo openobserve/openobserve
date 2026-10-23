@@ -563,7 +563,7 @@ mod tests {
             .replace('/', "_")
             .replace('=', "");
         let key = format!("eyJhbGciOiJFUzI1NiJ9.{segment}.c2lnbmF0dXJl");
-        (key, json::from_value(payload).unwrap())
+        (key, License::from_claims_for_tests(payload).unwrap())
     }
 
     fn response_json(is_root: bool, is_license_admin: bool) -> String {
