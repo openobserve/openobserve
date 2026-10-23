@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { nextTick } from "vue";
 import type {
   HttpCredential,
   HttpTriggerAbsent,
@@ -110,6 +111,14 @@ export const RouterLinkStub = {
 };
 
 /** The real tooltip mounts its bubble only on hover; the stub keeps it in the DOM with its text. */
+/** Hover the element the way an entering pointer does, then wait past the tooltip's 700 ms open delay. */
+export const hoverAndWait = async (el: Element) => {
+  el.dispatchEvent(new MouseEvent("mouseenter"));
+  el.dispatchEvent(new MouseEvent("pointermove", { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 800));
+  await nextTick();
+};
+
 export const OTooltipStub = {
   name: "OTooltip",
   props: ["content", "side", "align", "maxWidth"],

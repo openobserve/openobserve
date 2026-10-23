@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :value="receivedAt"
           unit="us"
           mode="absolute"
+          :format="RUN_TIME_LONG"
           :timezone="store.state.timezone"
           :empty-label="dash"
         />
@@ -77,7 +78,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { HttpRequestFacts } from "@/services/workflows";
-import { bodySizeParts } from "@/plugins/workflows/runStatus";
+import { RUN_TIME_LONG, bodySizeParts } from "@/plugins/workflows/runStatus";
 
 const props = defineProps<{
   facts: HttpRequestFacts;

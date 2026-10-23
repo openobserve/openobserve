@@ -105,6 +105,15 @@ describe("WorkflowHttpEndpointPanel", () => {
     expect(drawer(bare).props("subTitle")).toBe("Restart failed deploy");
   });
 
+  it("an unnamed workflow reads Untitled Workflow in the subtitle, never a bare separator", async () => {
+    const w = await mountPanel({ workflowName: "" });
+    expect(drawer(w).props("subTitle")).toBe(
+      t("workflow.http.panelSubtitle", { name: "Untitled Workflow", kind: "Alert Fired" }),
+    );
+    const bare = await mountPanel({ workflowName: "  ", kind: undefined });
+    expect(drawer(bare).props("subTitle")).toBe("Untitled Workflow");
+  });
+
   it("kind note on alert and incident workflows only", async () => {
     const alert = await mountPanel();
     expect(byTest(alert, "workflow-http-kind-note").text()).toContain("Alert Fired");
@@ -117,6 +126,18 @@ describe("WorkflowHttpEndpointPanel", () => {
     expect(byTest(incident, "workflow-http-kind-note").text()).toContain("Incident Event");
     const none = await mountPanel({ kind: undefined });
     expect(byTest(none, "workflow-http-kind-note").exists()).toBe(false);
+  });
+
+  it("sets the field in monospace and pads the sample payload, as in the mockups", async () => {
+    const w = await mountPanel();
+    const note = byTest(w, "workflow-http-kind-note");
+    expect(note.find(".font-mono").text()).toBe('meta.trigger_source = "http"');
+    expect(note.text()).toContain(
+      'HTTP runs get the request instead (meta.trigger_source = "http"), so add a Condition if a step needs Alert Fired fields.',
+    );
+    await byTest(w, "workflow-http-kind-note-payload").trigger("click");
+    expect(w.findComponent({ name: "OCodeBlock" }).props("padded")).toBe(true);
+    expect(w.findComponent({ name: "OCodeBlock" }).props("wrap")).toBe(true);
   });
 
   it("unsaved workflow saves a draft then creates the endpoint", async () => {

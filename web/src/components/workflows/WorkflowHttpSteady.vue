@@ -106,21 +106,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ isSigned ? t("workflow.http.secretsTitle") : t("workflow.http.tokensTitle") }}
         </OText>
         <template v-if="canRunTest">
-          <OButton
+          <!-- Wrapper mode: a child tooltip after icon-left anchors to the icon alone -->
+          <OTooltip
             v-if="context === 'editor'"
-            variant="outline"
-            size="sm-action"
-            icon-left="science"
-            data-test="workflow-http-run-test"
-            @click="emit('run-test')"
+            :content="t(runTestHint)"
+            side="top"
+            data-test="workflow-http-run-test-tooltip"
           >
-            {{ t("workflow.http.runTest") }}
-            <OTooltip
-              :content="t(runTestHint)"
-              side="top"
-              data-test="workflow-http-run-test-tooltip"
-            />
-          </OButton>
+            <OButton
+              variant="outline"
+              size="sm-action"
+              icon-left="science"
+              data-test="workflow-http-run-test"
+              @click="emit('run-test')"
+            >
+              {{ t("workflow.http.runTest") }}
+            </OButton>
+          </OTooltip>
           <OText v-else variant="meta" data-test="workflow-http-run-test-list-hint">
             {{ t(runTestHint) }}
           </OText>
