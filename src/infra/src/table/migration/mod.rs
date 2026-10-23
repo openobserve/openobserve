@@ -358,15 +358,6 @@ pub(crate) async fn create_alert_calibration_configs_for_test(
         .await
 }
 
-#[cfg(test)]
-pub(crate) async fn add_alert_recovery_destinations_for_test(
-    db: &sea_orm::DatabaseConnection,
-) -> Result<(), DbErr> {
-    m20260928_000001_add_alert_recovery_destinations::Migration
-        .up(&SchemaManager::new(db))
-        .await
-}
-
 /// Apply only the RUM Product Analytics tables, idempotently, for tests in any crate.
 #[cfg(any(test, feature = "test-utils"))]
 pub(crate) async fn create_rum_pa_tables(db: &sea_orm::DatabaseConnection) -> Result<(), DbErr> {

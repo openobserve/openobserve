@@ -78,7 +78,16 @@ impl TryFrom<alerts::Model> for MetaAlert {
         // Transform database JSON values into intermediate types which can be
         // directly translated into service layer types.
         let destinations: Vec<String> = serde_json::from_value(value.destinations)?;
-        let recovery_destinations = parse_recovery_destinations(&id, value.recovery_destinations)?;
+        let recovery_destinations: Vec<String> = value
+            .recovery_destinations
+            .map(|raw| serde_json::from_str(&raw))
+            .transpose()
+            .map_err(|e| {
+                errors::Error::Message(format!(
+                    "alert {id} has an invalid recovery_destinations value: {e}"
+                ))
+            })?
+            .unwrap_or_default();
         let context_attributes: Option<HashMap<String, String>> = value
             .context_attributes
             .map(serde_json::from_value)
@@ -1037,21 +1046,6 @@ fn update_mutable_fields(
     alert_am.recovery_destinations = Set(recovery_destinations);
     alert_am.keep_firing_for_seconds = Set(Some(keep_firing_for_seconds));
     Ok(())
-}
-
-/// Parses the `recovery_destinations` text column; NULL means the recovery follows the firing.
-fn parse_recovery_destinations(
-    alert_id: &Ksuid,
-    raw: Option<String>,
-) -> Result<Vec<String>, errors::Error> {
-    let Some(raw) = raw else {
-        return Ok(vec![]);
-    };
-    serde_json::from_str(&raw).map_err(|e| {
-        errors::Error::Message(format!(
-            "alert {alert_id} has an invalid recovery_destinations value: {e}"
-        ))
-    })
 }
 
 /// Deletes all alerts belonging to the given org.
