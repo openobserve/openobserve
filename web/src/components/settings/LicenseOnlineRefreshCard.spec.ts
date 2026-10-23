@@ -203,3 +203,11 @@ it("turned-off status retains the last refresh time", () => {
   expect(w.text()).toContain("Last refreshed");
   expect(w.text()).toContain("Oct 23, 09:41 UTC");
 });
+
+it("shows the proxy hint once when a saved network error and click outcome overlap", async () => {
+  refresh.mockResolvedValue({ ok: true, body: { error: "timeout", limits_refreshed: true } });
+  const w = card({ last_error: "timeout", last_error_detail: "timed out" });
+  await w.get('[data-test="license-online-refresh"]').trigger("click");
+  await flushPromises();
+  expect(w.text().match(/Check outbound HTTPS/g)).toHaveLength(1);
+});
