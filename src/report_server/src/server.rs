@@ -5,6 +5,8 @@ use tokio::net::TcpListener;
 use crate::router::create_router;
 
 pub async fn spawn_server() -> Result<(), anyhow::Error> {
+    require_report_secret(&config::get_config().report_server.secret)?;
+
     // Locate or fetch chromium
     _ = config::get_chrome_launch_options().await;
 
@@ -89,6 +91,16 @@ fn report_server_ipv6_bind_addr(addr: &str) -> std::net::Ipv6Addr {
             std::net::Ipv6Addr::UNSPECIFIED
         }
     }
+}
+
+fn require_report_secret(secret: &str) -> Result<(), anyhow::Error> {
+    if secret.is_empty() {
+        log::error!("Missing ZO_REPORT_SERVER_SECRET env var");
+        return Err(anyhow::anyhow!(
+            "Please set ZO_REPORT_SERVER_SECRET to the same value on the report server and the main app"
+        ));
+    }
+    Ok(())
 }
 
 async fn shutdown_signal() {
@@ -179,6 +191,13 @@ mod tests {
             report_server_bind_addrs("127.0.0.1", 5082, false).unwrap(),
             vec![SocketAddr::from(([127, 0, 0, 1], 5082))]
         );
+    }
+
+    #[test]
+    fn test_empty_report_secret_refuses_to_start() {
+        let err = require_report_secret("").unwrap_err();
+        assert!(err.to_string().contains("ZO_REPORT_SERVER_SECRET"), "{err}");
+        assert!(require_report_secret("topsecret").is_ok());
     }
 
     #[test]

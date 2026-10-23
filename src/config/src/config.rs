@@ -1497,7 +1497,11 @@ pub struct ReportServer {
     pub addr: String,
     #[env_config(name = "ZO_REPORT_SERVER_HTTP_IPV6_ENABLED", default = false)]
     pub ipv6_enabled: bool,
-    #[env_config(name = "ZO_REPORT_SERVER_SECRET", default = "")]
+    #[env_config(
+        name = "ZO_REPORT_SERVER_SECRET",
+        default = "",
+        help = "Shared secret for the report server. The report server refuses to start without it; the main app and every installation that uses the same report server must set the same value."
+    )]
     pub secret: String,
 }
 

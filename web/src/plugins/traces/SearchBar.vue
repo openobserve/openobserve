@@ -802,7 +802,12 @@ export default defineComponent({
       _sqlOnQueryChange();
       updateAutoComplete(value);
       if (searchObj.meta.sqlMode == true) {
-        searchObj.data.parsedQuery = tracesParser.value?.astify(value);
+        try {
+          searchObj.data.parsedQuery = tracesParser.value?.astify(value);
+        } catch {
+          // Half-typed SQL does not parse; keep the last good parse until it does.
+          return;
+        }
         if (searchObj.data.parsedQuery?.from?.length > 0) {
           if (
             searchObj.data.parsedQuery.from[0].table !==

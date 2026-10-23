@@ -505,6 +505,8 @@ pub struct PanelConfig {
     bucket_unit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     bucket_unit_custom: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    thresholds: Option<Thresholds>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -635,6 +637,23 @@ pub enum Config {
         #[serde(skip_serializing_if = "Option::is_none")]
         rules: Option<Vec<ConditionalRule>>,
     },
+    Decimals {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        #[schema(value_type = Option<f64>)]
+        value: Option<OrdF64>,
+    },
+    DisplayName {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<String>,
+    },
+    SeriesColor {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<String>,
+    },
+    Thresholds {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<Thresholds>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -658,6 +677,31 @@ pub struct Value {
     unit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     custom_unit: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(default)]
+#[serde(rename_all = "camelCase")]
+pub struct Thresholds {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    show_as: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    base_color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    steps: Option<Vec<ThresholdStep>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(default)]
+#[serde(rename_all = "camelCase")]
+pub struct ThresholdStep {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    value: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    color: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -1907,5 +1951,165 @@ mod tests {
         assert!(json.get("heatmap_mode").is_none());
         assert!(json.get("bucket_unit").is_none());
         assert!(json.get("bucket_unit_custom").is_none());
+    }
+
+    #[test]
+    fn test_panel_config_thresholds_round_trip() {
+        for base_color in [None, Some("#22C55E")] {
+            let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+                "show_legends": true,
+                "legends_position": null,
+                "base_map": null,
+                "map_view": null,
+                "thresholds": {
+                    "mode": "absolute",
+                    "showAs": "color_line",
+                    "baseColor": base_color,
+                    "steps": [
+                        {"value": 500, "color": "#F59E0B"},
+                        {"value": 1000, "color": "#EF4444"}
+                    ]
+                }
+            }))
+            .unwrap();
+            let thresholds = cfg.thresholds.as_ref().unwrap();
+            assert_eq!(thresholds.mode.as_deref(), Some("absolute"));
+            assert_eq!(thresholds.show_as.as_deref(), Some("color_line"));
+            assert_eq!(thresholds.base_color.as_deref(), base_color);
+            let steps = thresholds.steps.as_ref().unwrap();
+            assert_eq!(steps.len(), 2);
+            assert_eq!(steps[0].value, Some(OrdF64::from(500.0)));
+            assert_eq!(steps[1].color.as_deref(), Some("#EF4444"));
+
+            // OrdF64 writes an integer step back as a float and a null baseColor is not written.
+            let mut expected = serde_json::json!({
+                "mode": "absolute",
+                "showAs": "color_line",
+                "steps": [
+                    {"value": 500.0, "color": "#F59E0B"},
+                    {"value": 1000.0, "color": "#EF4444"}
+                ]
+            });
+            if let Some(color) = base_color {
+                expected["baseColor"] = serde_json::json!(color);
+            }
+            let json = serde_json::to_value(&cfg).unwrap();
+            assert_eq!(json["thresholds"], expected);
+            let back: PanelConfig = serde_json::from_value(json).unwrap();
+            assert_eq!(back, cfg);
+        }
+    }
+
+    #[test]
+    fn test_panel_config_thresholds_absent_when_none() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": false,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null
+        }))
+        .unwrap();
+        assert_eq!(cfg.thresholds, None);
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert!(json.get("thresholds").is_none());
+    }
+
+    #[test]
+    fn test_override_config_series_entry_round_trip() {
+        let entry: OverrideConfig = serde_json::from_value(serde_json::json!({
+            "field": {"matchBy": "series_regex", "value": "/^checkout/i"},
+            "config": [
+                {"type": "unit", "value": {"unit": "milliseconds", "customUnit": ""}},
+                {"type": "decimals", "value": 2},
+                {"type": "display_name", "value": "Checkout API"},
+                {"type": "series_color", "value": "#EF4444"},
+                {"type": "thresholds", "value": {
+                    "mode": "absolute",
+                    "showAs": "color_line",
+                    "baseColor": null,
+                    "steps": [{"value": 800, "color": "#F59E0B"}]
+                }}
+            ]
+        }))
+        .unwrap();
+        let config = entry.config.as_ref().unwrap();
+        assert_eq!(config.len(), 5);
+        assert_eq!(
+            config[1],
+            Config::Decimals {
+                value: Some(OrdF64::from(2.0))
+            }
+        );
+        assert_eq!(
+            config[2],
+            Config::DisplayName {
+                value: Some("Checkout API".to_string())
+            }
+        );
+        assert_eq!(
+            config[3],
+            Config::SeriesColor {
+                value: Some("#EF4444".to_string())
+            }
+        );
+        assert!(
+            matches!(&config[4], Config::Thresholds { value: Some(t) } if t.base_color.is_none())
+        );
+
+        // OrdF64 writes integers back as floats and a null baseColor is not written.
+        let json = serde_json::to_value(&entry).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "field": {"matchBy": "series_regex", "value": "/^checkout/i"},
+                "config": [
+                    {"type": "unit", "value": {"unit": "milliseconds", "customUnit": ""}},
+                    {"type": "decimals", "value": 2.0},
+                    {"type": "display_name", "value": "Checkout API"},
+                    {"type": "series_color", "value": "#EF4444"},
+                    {"type": "thresholds", "value": {
+                        "mode": "absolute",
+                        "showAs": "color_line",
+                        "steps": [{"value": 800.0, "color": "#F59E0B"}]
+                    }}
+                ]
+            })
+        );
+        let back: OverrideConfig = serde_json::from_value(json).unwrap();
+        assert_eq!(back, entry);
+    }
+
+    #[test]
+    fn test_override_config_new_types_skip_unset_value() {
+        let cases = [
+            (Config::Decimals { value: None }, "decimals"),
+            (Config::DisplayName { value: None }, "display_name"),
+            (Config::SeriesColor { value: None }, "series_color"),
+            (Config::Thresholds { value: None }, "thresholds"),
+        ];
+        for (cfg, typ) in cases {
+            let json = serde_json::to_value(&cfg).unwrap();
+            assert_eq!(json, serde_json::json!({"type": typ}));
+        }
+    }
+
+    #[test]
+    fn test_override_config_table_entry_round_trips_unchanged() {
+        let input = serde_json::json!({
+            "field": {"matchBy": "name", "value": "status"},
+            "config": [
+                {"type": "unit", "value": {"unit": "bytes", "customUnit": ""}},
+                {"type": "unique_value_color", "autoColor": true},
+                {"type": "alignment", "value": "right"},
+                {"type": "text_color", "value": "#ffffff"},
+                {"type": "background_color", "value": "#000000"},
+                {"type": "field_type", "value": "number"},
+                {"type": "conditional_styles", "rules": [
+                    {"operator": ">", "threshold": 10.5, "bgColor": "#f00"}
+                ]}
+            ]
+        });
+        let entry: OverrideConfig = serde_json::from_value(input.clone()).unwrap();
+        assert_eq!(serde_json::to_value(&entry).unwrap(), input);
     }
 }

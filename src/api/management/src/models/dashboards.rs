@@ -307,6 +307,20 @@ impl From<(MetaFolder, MetaDashboard)> for ListDashboardsResponseBodyItem {
 mod tests {
     use super::*;
 
+    // The model drops a null `unit_custom` and always writes `base_map`/`map_view` as null.
+    fn without_nulls(value: &Value) -> Value {
+        match value {
+            Value::Object(map) => Value::Object(
+                map.iter()
+                    .filter(|(_, v)| !v.is_null())
+                    .map(|(k, v)| (k.clone(), without_nulls(v)))
+                    .collect(),
+            ),
+            Value::Array(items) => Value::Array(items.iter().map(without_nulls).collect()),
+            other => other.clone(),
+        }
+    }
+
     #[test]
     fn test_latest_dashboard_version_is_eight() {
         assert_eq!(LATEST_DASHBOARD_VERSION, 8);
@@ -438,6 +452,111 @@ mod tests {
         let config = &reloaded["tabs"][0]["panels"][0]["config"];
         for (key, expected) in fields.as_object().unwrap() {
             assert_eq!(&config[key], expected, "{key} was dropped");
+        }
+    }
+
+    #[test]
+    fn test_v8_panel_config_thresholds_and_series_override_entries_survive_save_and_reload() {
+        let json = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../web/src/assets/dashboards/host_metrics.dashboard.json"
+        ));
+        let mut value: Value = serde_json::from_str(json).unwrap();
+        let fields = serde_json::json!({
+            "thresholds": {
+                "mode": "absolute",
+                "showAs": "color_line",
+                "baseColor": "#22C55E",
+                "steps": [
+                    {"value": 500.0, "color": "#F59E0B"},
+                    {"value": 1000.0, "color": "#EF4444"}
+                ]
+            },
+            "override_config": [
+                {
+                    "field": {"matchBy": "series_regex", "value": "/^checkout/i"},
+                    "config": [
+                        {"type": "unit", "value": {"unit": "milliseconds", "customUnit": ""}},
+                        {"type": "decimals", "value": 2.0},
+                        {"type": "display_name", "value": "Checkout API"},
+                        {"type": "series_color", "value": "#EF4444"},
+                        {"type": "thresholds", "value": {"mode": "percentage", "showAs": "line", "steps": []}}
+                    ]
+                },
+                {
+                    "field": {"matchBy": "series", "value": "cart"},
+                    "config": [{"type": "series_color", "value": "#22C55E"}]
+                },
+                {
+                    "field": {"matchBy": "name", "value": "status"},
+                    "config": [{"type": "alignment", "value": "right"}]
+                }
+            ]
+        });
+        let config = value["tabs"][0]["panels"][0]["config"]
+            .as_object_mut()
+            .unwrap();
+        config.extend(fields.as_object().unwrap().clone());
+
+        let saved: MetaDashboard = serde_json::from_value::<DashboardRequestBody>(value)
+            .unwrap()
+            .into();
+        let stored = serde_json::to_value(saved.v8.unwrap()).unwrap();
+        let reloaded: v8::Dashboard = serde_json::from_value(stored.clone()).unwrap();
+        let reloaded = serde_json::to_value(reloaded).unwrap();
+
+        for (stage, dashboard) in [("stored", &stored), ("reloaded", &reloaded)] {
+            let config = &dashboard["tabs"][0]["panels"][0]["config"];
+            for (key, expected) in fields.as_object().unwrap() {
+                assert_eq!(&config[key], expected, "{key} changed in the {stage} JSON");
+            }
+        }
+    }
+
+    #[test]
+    fn test_v8_panel_config_omits_unset_thresholds_and_override_config() {
+        let json = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../web/src/assets/dashboards/host_metrics.dashboard.json"
+        ));
+        let body: DashboardRequestBody = serde_json::from_str(json).unwrap();
+        let saved: MetaDashboard = body.into();
+        let stored = serde_json::to_string(&saved.v8.unwrap()).unwrap();
+        for key in ["thresholds", "override_config"] {
+            let written_key = format!("\"{key}\":");
+            assert!(
+                !stored.contains(&written_key),
+                "{key} serialised while unset"
+            );
+        }
+    }
+
+    #[test]
+    fn test_v8_bundled_dashboard_panel_configs_are_stored_unchanged() {
+        let json = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../web/src/assets/dashboards/host_metrics.dashboard.json"
+        ));
+        let input: Value = serde_json::from_str(json).unwrap();
+        let body: DashboardRequestBody = serde_json::from_str(json).unwrap();
+        let saved: MetaDashboard = body.into();
+        let stored = serde_json::to_value(saved.v8.unwrap()).unwrap();
+
+        let input_tabs = input["tabs"].as_array().unwrap();
+        let stored_tabs = stored["tabs"].as_array().unwrap();
+        assert_eq!(stored_tabs.len(), input_tabs.len());
+        for (input_tab, stored_tab) in input_tabs.iter().zip(stored_tabs) {
+            let input_panels = input_tab["panels"].as_array().unwrap();
+            let stored_panels = stored_tab["panels"].as_array().unwrap();
+            assert_eq!(stored_panels.len(), input_panels.len());
+            for (input_panel, stored_panel) in input_panels.iter().zip(stored_panels) {
+                assert_eq!(
+                    without_nulls(&stored_panel["config"]),
+                    without_nulls(&input_panel["config"]),
+                    "stored config of panel {} differs from the file",
+                    input_panel["id"]
+                );
+            }
         }
     }
 
