@@ -344,6 +344,107 @@ describe("SettingsIndex.vue", () => {
     });
   });
 
+  describe("Slack (Integrations group)", () => {
+    const findSlack = (w: any) =>
+      w.vm.sectionGroups.flatMap((group: any) => group.items).find((i: any) => i.key === "slack");
+    const slackConfig = (enabled: boolean, reason: string | null = null) => ({
+      zoConfig: {
+        service_streams_enabled: true,
+        slack_enabled: enabled,
+        slack_disabled_reason: reason,
+      },
+    });
+
+    afterEach(() => {
+      config.isEnterprise = "false";
+      config.isCloud = "false";
+      mockRouter.currentRoute.value.name = "settings";
+    });
+
+    it("AC-12.5 puts an Integrations group holding Slack right after Destinations", () => {
+      config.isEnterprise = "true";
+      mockRouter.currentRoute.value.name = "general";
+      wrapper = createWrapper(slackConfig(true));
+      const labels = wrapper.vm.sectionGroups.map((g: any) => g.label);
+      expect(labels.indexOf("Integrations")).toBe(labels.indexOf("Destinations") + 1);
+      const group = wrapper.vm.sectionGroups.find((g: any) => g.label === "Integrations");
+      expect(group.items.map((i: any) => i.key)).toEqual(["slack"]);
+      expect(group.items[0].icon).toMatch(/^img:.*slack/);
+    });
+
+    it.each(["flag", "master_key", "super_cluster"])(
+      "AC-1.5 hides Slack on self-hosted enterprise for disabled reason %s",
+      (reason) => {
+        config.isEnterprise = "true";
+        wrapper = createWrapper(slackConfig(false, reason));
+        expect(findSlack(wrapper)?.visible).toBe(false);
+      },
+    );
+
+    it("AC-1.5 sends a self-hosted deep link to General while Slack is off", () => {
+      config.isEnterprise = "true";
+      mockRouter.currentRoute.value.name = "slack";
+      mockPush.mockClear();
+      wrapper = createWrapper(slackConfig(false, "flag"));
+      expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ path: "/settings/general" }));
+    });
+
+    it.each(["home_region_unset", "other_region", "allowlist"])(
+      "hides Slack for the removed reason %s",
+      (reason) => {
+        config.isEnterprise = "true";
+        wrapper = createWrapper(slackConfig(false, reason));
+        expect(findSlack(wrapper)?.visible).toBe(false);
+      },
+    );
+
+    it("AC-1.4 hides Slack on Cloud while it is disabled", () => {
+      config.isEnterprise = "true";
+      config.isCloud = "true";
+      wrapper = createWrapper(slackConfig(false, "flag"));
+      expect(findSlack(wrapper)?.visible).toBe(false);
+    });
+
+    it("shows Slack on Cloud once it is enabled", () => {
+      config.isEnterprise = "true";
+      config.isCloud = "true";
+      wrapper = createWrapper(slackConfig(true));
+      expect(findSlack(wrapper)?.visible).toBe(true);
+    });
+
+    it("AC-1.10 hides Slack in the open-source build", () => {
+      wrapper = createWrapper(slackConfig(false, "edition"));
+      expect(findSlack(wrapper)?.visible).toBe(false);
+    });
+
+    it("AC-1.11 sends a direct URL to a hidden Slack item back to General", () => {
+      config.isEnterprise = "true";
+      config.isCloud = "true";
+      mockRouter.currentRoute.value.name = "slack";
+      mockPush.mockClear();
+      wrapper = createWrapper(slackConfig(false, "flag"));
+      expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ path: "/settings/general" }));
+    });
+
+    it("waits for the org config before redirecting a Slack deep link", () => {
+      config.isEnterprise = "true";
+      mockRouter.currentRoute.value.name = "slack";
+      mockPush.mockClear();
+      wrapper = createWrapper({ zoConfig: {} });
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it("keeps a visible Slack route and renders it in the reading column", () => {
+      config.isEnterprise = "true";
+      mockRouter.currentRoute.value.name = "slack";
+      mockPush.mockClear();
+      wrapper = createWrapper(slackConfig(true));
+      expect(mockPush).not.toHaveBeenCalled();
+      expect(wrapper.vm.activeSection).toBe("slack");
+      expect(wrapper.vm.isConstrainedSection).toBe(true);
+    });
+  });
+
   describe("activeSection computed property", () => {
     it("should return general for general route", () => {
       mockRouter.currentRoute.value.name = "general";

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { orgKey } from "@/composables/query/keys";
+import { globalKey, orgKey } from "@/composables/query/keys";
 
 /**
  * Keys only, dependency-free apart from `orgKey`, so a write in another domain
@@ -34,4 +34,5 @@ export const organizationKeys = {
   domainRequests: (org: string) => orgKey(org, "organizations", "domainRequests"),
   billingGroupMembers: (org: string) => orgKey(org, "organizations", "billingGroupMembers"),
   adminOrgs: (org: string) => orgKey(org, "organizations", "adminOrgs"),
+  mine: () => globalKey("organizations", "mine"),
 };

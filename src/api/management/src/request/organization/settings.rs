@@ -483,6 +483,10 @@ fn apply_settings_payload(
     if merge_red_insights_enabled(data, settings.red_insights_enabled) {
         field_found = true;
     }
+    if let Some(ai_rca_thread_tool_output) = settings.ai_rca_thread_tool_output {
+        field_found = true;
+        data.ai_rca_thread_tool_output = ai_rca_thread_tool_output;
+    }
     if let Some(cross_links) = settings.cross_links {
         field_found = true;
         data.cross_links = cross_links;

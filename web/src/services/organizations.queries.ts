@@ -23,6 +23,23 @@ import billings from "./billings";
 import { organizationKeys } from "./organizations.querykeys";
 import { MEDIUM_STALE_TIME, NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 
+export interface CallerOrganization {
+  identifier: string;
+  name: string;
+  type?: string;
+}
+
+/** The caller's own orgs; pages outside MainLayout use it when no org is selected yet. */
+export const myOrganizationsQuery = () =>
+  queryOptions({
+    queryKey: organizationKeys.mine(),
+    queryFn: async () => {
+      const res = await organizations.list(0, 100, "id", false, "");
+      return (res.data as { data: CallerOrganization[] }).data;
+    },
+    staleTime: NORMAL_STALE_TIME,
+  });
+
 // Memory only: settings pages post this object back whole, so a disk copy could overwrite newer server values.
 export const orgSettingsQuery = (org: string) =>
   queryOptions({

@@ -22,10 +22,7 @@
   picture is redrawn on every keystroke; that lives in `.shape.ts` and degrades
   to "no picture" for an id this build has not met.
 
-  Applying is a FULL REPLACE of the team's rotations, so the footer counts what
-  is being replaced and a confirm stands between the button and a working
-  schedule. What comes back is an ordinary rotation set with nothing
-  preset-specific stored — a starting point, not a mode.
+  Applying replaces only the primary rotation's shift rules, keeping its id and name, so the confirm names it.
 -->
 <template>
   <ODrawer
@@ -301,7 +298,7 @@
             :loading="applying"
             :disabled="!chosen"
             data-test="oncall-presets-apply"
-            @click="rotationCount ? (confirmReplace = true) : apply()"
+            @click="primaryRotationName ? (confirmReplace = true) : apply()"
           >
             {{ t("oncall.save") }}
           </OButton>
@@ -310,12 +307,11 @@
     </template>
   </ODrawer>
 
-  <!-- Full replace, so the confirm names what is being replaced. Only when a
-       schedule exists: confirming the replacement of nothing is a click tax. -->
+  <!-- Only when a rotation exists: confirming the replacement of nothing is a click tax. -->
   <ConfirmDialog
     v-model="confirmReplace"
-    :title="t('oncall.presetsReplaceTitle')"
-    :message="t('oncall.presetsReplaceMessage')"
+    :title="t('oncall.presetsReplaceTitle', { name: raw(primaryRotationName) })"
+    :message="t('oncall.presetsReplaceMessage', { name: raw(primaryRotationName) })"
     :ok-label="t('oncall.save')"
     @update:ok="apply"
   />
@@ -371,8 +367,8 @@ const props = defineProps<{
   members: OnCallTeamMember[];
   /** The team's own zone — what an absent `timezone` resolves to server-side. */
   timezone: string;
-  /** How many rotations applying would replace. Zero skips the confirm. */
-  rotationCount: number;
+  /** The rotation whose shift rules applying replaces; empty skips the confirm. */
+  primaryRotationName: string;
 }>();
 const emit = defineEmits<{ applied: [] }>();
 const open = defineModel<boolean>("open", { required: true });
@@ -837,8 +833,8 @@ const defaultsSentence = computed<I18nText>(() => {
 });
 
 const replaceNote = computed<I18nText>(() =>
-  props.rotationCount
-    ? t("oncall.presetsReplaceNote", { count: props.rotationCount }, props.rotationCount)
+  props.primaryRotationName
+    ? t("oncall.presetsReplaceNote", { name: raw(props.primaryRotationName) })
     : t("oncall.presetsReplaceNone"),
 );
 

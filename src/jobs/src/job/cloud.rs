@@ -369,7 +369,7 @@ async fn check_all_orgs_ai_quota() {
         match openobserve_core::alerts::alert::send_email_notification(
             &subject,
             &email,
-            body.clone(),
+            Some(body.clone()),
             body,
         )
         .await
@@ -601,7 +601,7 @@ async fn check_external_contract_expiry() {
         match openobserve_core::alerts::alert::send_email_notification(
             &subject,
             &email,
-            body.clone(),
+            Some(body.clone()),
             body,
         )
         .await
@@ -999,7 +999,7 @@ async fn send_warning_email(
     match openobserve_core::alerts::alert::send_email_notification(
         &subject,
         &email,
-        body.clone(),
+        Some(body.clone()),
         body,
     )
     .await

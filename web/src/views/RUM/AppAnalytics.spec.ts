@@ -941,7 +941,8 @@ describe("AppAnalytics shell", () => {
   });
 });
 
-describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
+// Each test mounts the whole shell, which runs past the 5 s default on a loaded runner.
+describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, () => {
   let router: Router;
   let wrapper: VueWrapper | null = null;
   const settingsApi = api.service as unknown as Record<string, Mock>;
@@ -1022,6 +1023,8 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
     await new Promise((r) => setTimeout(r, 30));
     for (let i = 0; i < 5; i++) await flushPromises();
   };
+  // Save chains a PUT, a settings read and a summary re-run, so tests wait on the outcome, never on the clock.
+  const until = (check: () => void) => vi.waitFor(check, { timeout: 10000, interval: 20 });
 
   const mountAt = async (path: string, real = false) => {
     router = real ? realRouter() : makeRouter();
@@ -1043,6 +1046,9 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
       },
     );
     await settle();
+    await until(() =>
+      expect(["idle", "loading"]).not.toContain(useProductAnalytics().scopeStatus.value),
+    );
   };
 
   const chip = () =>
@@ -1061,7 +1067,22 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
     );
   const openDrawer = async () => {
     await chip()!.trigger("click");
+    await until(() => expect(drawer()).toBeDefined());
+  };
+  // Settling only after the replies have resolved keeps a negative check from passing before they are read.
+  const answered = async (re: RegExp) => {
+    await until(() => expect(searchCount(re)).toBeGreaterThan(0));
+    const { calls, results } = vi.mocked(searchService.search).mock;
+    await Promise.all(
+      results.filter((_, i) => re.test(calls[i][0].query.query.sql)).map((r) => r.value),
+    );
     await settle();
+  };
+  const uaAnswered = () => answered(UA_RE);
+  // The drawer closes only after the PUT and the settings reload, so no Save round leaks into the next test.
+  const saveDrawer = async (d: HTMLElement) => {
+    buttonIn(d, "Save")!.click();
+    await until(() => expect(drawer()).toBeUndefined());
   };
   const botSwitch = (d: HTMLElement) =>
     d.querySelector<HTMLElement>('[data-test="rum-analytics-exclusions-builtin-switch-btn"]')!;
@@ -1091,6 +1112,20 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
   const uaSearches = () =>
     vi.mocked(searchService.search).mock.calls.filter((c) => UA_RE.test(c[0].query.query.sql))
       .length;
+  const persistPuts = () => {
+    let stored = appSettings();
+    settingsApi.getAppSettings.mockImplementation(async () => ({ data: stored }));
+    settingsApi.putAppSettings.mockImplementation(
+      async (_o: string, _a: string, body: Record<string, unknown>) => {
+        stored = appSettings({
+          ...body,
+          version: Number(body.version) + 1,
+          rulesHash: "fedcba9876543210",
+        });
+        return { data: stored };
+      },
+    );
+  };
 
   beforeEach(() => {
     api.reset();
@@ -1153,7 +1188,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
   it("P7-R2: the chip says likely bot found when the Overview banner fires for a user agent", async () => {
     withHits([[UA_RE, BOT_UA]]);
     await mountAt("/product-analytics/overview?app=web&period=7d", true);
-    expect(chip()?.text()).toContain("likely bot found");
+    await until(() => expect(chip()?.text()).toContain("likely bot found"));
   });
 
   it("P7-R2: the App filters button shows a warning icon when it says likely bot found", async () => {
@@ -1161,6 +1196,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
       resetProductAnalytics();
       withHits([[UA_RE, rows]]);
       await mountAt("/product-analytics/overview?app=web&period=7d", true);
+      await uaAnswered();
       const btn = wrapper!.find('[data-test="rum-analytics-exclusions-chip"]');
       const out = {
         text: btn.text(),
@@ -1182,9 +1218,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
   it("P7-R2: no likely bot found without a banner", async () => {
     withHits([[UA_RE, [{ ua: "Chrome", dev: "Other", sessions: 1500 }]]]);
     await mountAt("/product-analytics/overview?app=web&period=7d", true);
-    expect(
-      vi.mocked(searchService.search).mock.calls.some((c) => UA_RE.test(c[0].query.query.sql)),
-    ).toBe(true);
+    await uaAnswered();
     expect(chip()?.text()).not.toContain("likely bot found");
   });
 
@@ -1194,16 +1228,15 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
     await openDrawer();
     const view = () =>
       document.querySelector<HTMLElement>('[data-test="rum-analytics-exclusions-view"]')!;
-    expect(view().textContent).toContain("Built-in bot rule 12,256");
+    await until(() => expect(view().textContent).toContain("Built-in bot rule 12,256"));
     expect(view().textContent).toContain("Saved rules 79");
     expect(view().textContent).toContain("Synthetic tests 7 · always excluded");
     expect(view().textContent).toContain("Include hidden sessions in this view");
     document
       .querySelector<HTMLElement>('[data-test="rum-analytics-app-filters-include-switch-btn"]')!
       .click();
-    await settle();
+    await until(() => expect(router.currentRoute.value.query.xall).toBe("1"));
     expect(useProductAnalytics().state.includeExcluded).toBe(true);
-    expect(router.currentRoute.value.query.xall).toBe("1");
   });
 
   it("while hidden sessions are included every tab shows the banner, and Hide hidden sessions drops xall", async () => {
@@ -1212,9 +1245,8 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
       document.querySelector<HTMLElement>('[data-test="rum-analytics-included-banner"]');
     expect(banner()?.textContent).toContain("hidden by app filters in this view only");
     buttonIn(document.body, "Hide hidden sessions")!.click();
-    await settle();
+    await until(() => expect(router.currentRoute.value.query.xall).toBeUndefined());
     expect(useProductAnalytics().state.includeExcluded).toBe(false);
-    expect(router.currentRoute.value.query.xall).toBeUndefined();
     expect(banner()).toBeNull();
   });
 
@@ -1224,7 +1256,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
       [/total_s/, [{ u: "staff@x.com", s: 40, total_s: 150, n_values: 50 }]],
     ]);
     await mountAt("/product-analytics/overview?app=web&period=7d", true);
-    expect(buttonIn(document.body, "Review app filters")).toBeDefined();
+    await until(() => expect(buttonIn(document.body, "Review app filters")).toBeDefined());
     expect(chip()?.text()).not.toContain("likely bot found");
   });
 
@@ -1235,7 +1267,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
     const d = drawer()!;
     expect(d).toBeDefined();
     expect(d.querySelector("[role='switch']")).not.toBeNull();
-    expect(d.textContent).toContain("12,256");
+    await until(() => expect(d.textContent).toContain("12,256"));
     expect(d.innerHTML).toContain("BuiltinListedFamily");
   });
 
@@ -1243,6 +1275,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
     withHits([[UA_RE, [{ ua: "Chrome", dev: "Other", sessions: 1500 }]]]);
     await mountAt("/product-analytics/overview?app=web&period=7d");
     await openDrawer();
+    await uaAnswered();
     expect(drawer()!.textContent).toContain("Nothing stands out in this range");
   });
 
@@ -1253,7 +1286,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
     await mountAt("/product-analytics/overview?app=web&period=7d");
     await openDrawer();
     const d = drawer()!;
-    expect(d.textContent).toMatch(/1,673 of 14,008 sessions remain/);
+    await until(() => expect(d.textContent).toMatch(/1,673 of 14,008 sessions remain/));
     expect(buttonIn(d, "Cancel")).toBeDefined();
     expect(buttonIn(d, "Save")).toBeDefined();
   });
@@ -1265,6 +1298,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
       await mountAt("/product-analytics/overview?app=web&period=7d");
       await openDrawer();
       const d = drawer()!;
+      await until(() => expect(previewLine(d)).toBeDefined());
       const line = previewLine(d);
       const out = {
         text: line.textContent ?? "",
@@ -1293,8 +1327,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
     const d = drawer()!;
     botSwitch(d).click();
     await settle();
-    buttonIn(d, "Save")!.click();
-    await settle();
+    await saveDrawer(d);
     expect(settingsApi.putAppSettings).toHaveBeenCalledTimes(1);
     const [org, app, body] = settingsApi.putAppSettings.mock.calls[0];
     expect([org, app]).toEqual(["org1", "web"]);
@@ -1306,22 +1339,25 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
     await openDrawer();
     const d = drawer()!;
     d.querySelector<HTMLElement>('[data-test="rum-analytics-exclusions-add-page"]')!.click();
-    await settle();
-    const input = document.querySelector<HTMLInputElement>(
-      '[data-test="rum-analytics-app-filter-page-picker-value"] input, input[data-test="rum-analytics-app-filter-page-picker-value"]',
-    )!;
+    const pageInput = () =>
+      document.querySelector<HTMLInputElement>(
+        '[data-test="rum-analytics-app-filter-page-picker-value"] input, input[data-test="rum-analytics-app-filter-page-picker-value"]',
+      );
+    await until(() => expect(pageInput()).not.toBeNull());
+    const input = pageInput()!;
     input.value = "/health";
     input.dispatchEvent(new Event("input"));
     await settle();
     document
       .querySelector<HTMLElement>('[data-test="rum-analytics-app-filter-page-picker-apply"]')!
       .click();
-    await settle();
-    expect(d.querySelector('[data-test="rum-analytics-exclusions-page-0"]')?.textContent).toContain(
-      "Page is /health",
+    await until(() =>
+      expect(
+        d.querySelector('[data-test="rum-analytics-exclusions-page-0"]')?.textContent,
+      ).toContain("Page is /health"),
     );
-    buttonIn(d, "Save")!.click();
-    await settle();
+    await saveDrawer(d);
+    expect(settingsApi.putAppSettings).toHaveBeenCalledTimes(1);
     const body = settingsApi.putAppSettings.mock.calls[0][2];
     expect(body).toMatchObject({ pages: [{ op: "eq", value: "/health" }] });
   });
@@ -1335,51 +1371,43 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
     await openDrawer();
     const d = drawer()!;
     d.querySelector<HTMLElement>('[data-test="rum-analytics-exclusions-rule-0-chip"]')!.click();
+    const apply = () =>
+      document.querySelector<HTMLElement>('[data-test="rum-analytics-funnel-field-picker-apply"]');
+    await until(() => expect(apply()).not.toBeNull());
+    apply()!.click();
     await settle();
-    document
-      .querySelector<HTMLElement>('[data-test="rum-analytics-funnel-field-picker-apply"]')!
-      .click();
-    await settle();
-    buttonIn(d, "Save")!.click();
-    await settle();
+    await saveDrawer(d);
+    expect(settingsApi.putAppSettings).toHaveBeenCalledTimes(1);
     expect(settingsApi.putAppSettings.mock.calls[0][2]).toMatchObject({ sessions: [rule] });
   });
 
   it("P6-R6: a drawer Save reloads the settings into scope.exclusions and re-runs the summary without re-probing apps", async () => {
-    let stored = appSettings();
-    settingsApi.getAppSettings.mockImplementation(async () => ({ data: stored }));
-    settingsApi.putAppSettings.mockImplementation(
-      async (_o: string, _a: string, body: Record<string, unknown>) => {
-        stored = appSettings({
-          ...body,
-          version: Number(body.version) + 1,
-          rulesHash: "fedcba9876543210",
-        });
-        return { data: stored };
-      },
-    );
+    persistPuts();
     await mountAt("/product-analytics/overview?app=web&period=7d");
+    await until(() => expect(searchCount(/va_rows/)).toBeGreaterThan(0));
     await openDrawer();
     const reads = settingsApi.getAppSettings.mock.calls.length;
     const probes = searchCount(/AS app, COUNT/);
-    const summaries = searchCount(/va_rows/);
+    const before = searchCount(/va_rows/);
     const d = drawer()!;
     botSwitch(d).click();
-    await settle();
-    buttonIn(d, "Save")!.click();
-    await settle();
-    expect(settingsApi.getAppSettings.mock.calls.length).toBeGreaterThan(reads);
+    // The drawer's preview runs the summary SQL too, so the baseline is taken after it.
+    await until(() => expect(searchCount(/va_rows/)).toBe(before + 1));
+    const summaries = searchCount(/va_rows/);
+    await saveDrawer(d);
+    await answered(/va_rows/);
     const scope = useProductAnalytics().scope.value as unknown as { exclusions: unknown };
     expect(scope.exclusions).toMatchObject({ bots: false, rulesHash: "fedcba9876543210" });
-    expect(searchCount(/AS app, COUNT/)).toBe(probes);
     expect(searchCount(/va_rows/)).toBeGreaterThan(summaries);
+    expect(settingsApi.getAppSettings.mock.calls.length).toBeGreaterThan(reads);
+    expect(searchCount(/AS app, COUNT/)).toBe(probes);
   });
 
   it("P7-R3: the drawer lists a bot-like user-agent suggestion", async () => {
     withHits([[UA_RE, BOT_UA]]);
     await mountAt("/product-analytics/overview?app=web&period=7d", true);
     await openDrawer();
-    expect(drawer()!.textContent).toContain("PingdomBot");
+    await until(() => expect(drawer()!.textContent).toContain("PingdomBot"));
     expect(drawer()!.textContent).not.toContain("Nothing stands out in this range");
   });
 
@@ -1412,11 +1440,12 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
     botSwitch(d).click();
     await settle();
     buttonIn(d, "Save")!.click();
-    await settle();
-    expect(settingsApi.putAppSettings).toHaveBeenCalledTimes(1);
-    expect(drawer()!.textContent).toContain(
-      "Reloaded with the latest app filters, re-apply your change",
+    await until(() =>
+      expect(drawer()!.textContent).toContain(
+        "Reloaded with the latest app filters, re-apply your change",
+      ),
     );
+    expect(settingsApi.putAppSettings).toHaveBeenCalledTimes(1);
     expect(hasValue(drawer()!, "@reloaded-only.example")).toBe(true);
   });
 
@@ -1433,9 +1462,9 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
     withHits([[UA_RE, BOT_UA]]);
     await mountAt("/product-analytics/overview?app=web&period=7d", true);
     expect(drawer()).toBeUndefined();
+    await until(() => expect(buttonIn(document.body, "Review app filters")).toBeDefined());
     buttonIn(document.body, "Review app filters")!.click();
-    await settle();
-    expect(drawer()).toBeDefined();
+    await until(() => expect(drawer()).toBeDefined());
   });
 
   it("P7-R10: Edit app filters on a deep link to an ignored Paths anchor opens the drawer", async () => {
@@ -1444,10 +1473,9 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
     }));
     const anchor = encodeDef(stepRefParam({ kind: "p", key: "/web/login" }));
     await mountAt(`/product-analytics/paths?app=web&period=7d&anchor=${anchor}`, true);
-    expect(body()).toContain("This page is hidden by the app filters");
+    await until(() => expect(body()).toContain("This page is hidden by the app filters"));
     buttonIn(document.body, "Edit app filters")!.click();
-    await settle();
-    expect(drawer()).toBeDefined();
+    await until(() => expect(drawer()).toBeDefined());
   });
 
   it("P7-R10: the Paths footnote naming the ignored pages links to the drawer", async () => {
@@ -1474,37 +1502,40 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
     expect(footnote).toBeDefined();
     expect(drawer()).toBeUndefined();
     footnote!.querySelector<HTMLElement>("button, a, [role='button']")!.click();
-    await settle();
-    expect(drawer()).toBeDefined();
+    await until(() => expect(drawer()).toBeDefined());
   });
 
   it("P6-R8: the user-agent query runs once for Overview and the drawer, survives a Save, and reruns after refresh", async () => {
+    persistPuts();
     withHits([[UA_RE, [{ ua: "Chrome", dev: "Other", sessions: 1500 }]]]);
     await mountAt("/product-analytics/overview?app=web&period=7d", true);
+    await uaAnswered();
     expect(uaSearches()).toBe(1);
     await openDrawer();
     expect(uaSearches()).toBe(1);
+    const before = searchCount(/va_rows/);
     const d = drawer()!;
     botSwitch(d).click();
-    await settle();
-    buttonIn(d, "Save")!.click();
-    await settle();
+    await until(() => expect(searchCount(/va_rows/)).toBe(before + 1));
+    const summaries = searchCount(/va_rows/);
+    await saveDrawer(d);
+    await answered(/va_rows/);
+    expect(searchCount(/va_rows/)).toBeGreaterThan(summaries);
     expect(settingsApi.putAppSettings).toHaveBeenCalledTimes(1);
     expect(uaSearches()).toBe(1);
     await useProductAnalytics().refresh();
-    await settle();
-    expect(uaSearches()).toBe(2);
+    await until(() => expect(uaSearches()).toBe(2));
   });
 
   it("P6-R8: resetProductAnalytics clears the user-agent suggestions, so the query runs again", async () => {
     withHits([[UA_RE, [{ ua: "Chrome", dev: "Other", sessions: 1500 }]]]);
     await mountAt("/product-analytics/overview?app=web&period=7d", true);
-    expect(uaSearches()).toBe(1);
+    await until(() => expect(uaSearches()).toBe(1));
     wrapper!.unmount();
     wrapper = null;
     resetProductAnalytics();
     await mountAt("/product-analytics/overview?app=web&period=7d", true);
-    expect(uaSearches()).toBe(2);
+    await until(() => expect(uaSearches()).toBe(2));
   });
 
   it("P7-R18: a failed settings read shows an error state in place of the views", async () => {

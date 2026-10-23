@@ -82,6 +82,22 @@
         </OFormSwitch>
       </div>
 
+      <div v-if="showRedInsights" data-test="settings-ai-rca-thread-tool-output" class="o2-input">
+        <div data-test="settings-incidents-heading" class="pt-4 pb-1 text-base font-bold">
+          {{ t("settings.incidentsHeading") }}
+        </div>
+        <OFormSwitch
+          data-test="settings-ai-rca-thread-tool-output-btn"
+          name="aiRcaThreadToolOutput"
+          :label="t('settings.aiRcaThreadToolOutputLabel')"
+          class="mt-2"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('settings.aiRcaThreadToolOutputHelp')" />
+          </template>
+        </OFormSwitch>
+      </div>
+
       <!-- Cross-Linking Configuration -->
       <template v-if="store.state.zoConfig?.enable_cross_linking">
         <OSeparator class="mt-6 mb-4" />
@@ -161,6 +177,7 @@ const organizationSettingsDefaults = computed((): OrganizationSettingsForm => {
     toggleIngestionLogs: s?.toggle_ingestion_logs ?? false,
     usageStreamEnabled: s?.usage_stream_enabled ?? false,
     redInsightsEnabled: s?.red_insights_enabled ?? false,
+    aiRcaThreadToolOutput: s?.ai_rca_thread_tool_output ?? false,
   };
 });
 
@@ -189,6 +206,7 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
     // A hidden enterprise-only field must not overwrite the stored one.
     if (showRedInsights) {
       payload.red_insights_enabled = value.redInsightsEnabled;
+      payload.ai_rca_thread_tool_output = value.aiRcaThreadToolOutput;
     }
 
     const crossLinksChanged =
@@ -205,7 +223,12 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
       toggle_ingestion_logs: value.toggleIngestionLogs,
       cross_links: crossLinks.value,
       usage_stream_enabled: value.usageStreamEnabled,
-      ...(showRedInsights ? { red_insights_enabled: value.redInsightsEnabled } : {}),
+      ...(showRedInsights
+        ? {
+            red_insights_enabled: value.redInsightsEnabled,
+            ai_rca_thread_tool_output: value.aiRcaThreadToolOutput,
+          }
+        : {}),
     };
 
     store.dispatch("setOrganizationSettings", updatedSettings);

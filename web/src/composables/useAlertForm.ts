@@ -32,10 +32,11 @@ import alertsService from "@/services/alerts";
 import searchService from "@/services/search";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import {
+  anomalyConfigQuery,
   saveAnomalyConfigMutation,
   triggerAnomalyTrainingMutation,
 } from "@/services/anomaly_detection.queries";
-import { useMutation } from "@tanstack/vue-query";
+import { useMutation, useQuery as useServerQuery } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query";
 import analytics from "@/services/product_analytics";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -576,6 +577,34 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   );
   const triggerAnomalyTraining = useMutation(() =>
     triggerAnomalyTrainingMutation(anomalyOrgId.value),
+  );
+
+  const anomalyModelQuery = useServerQuery(() => ({
+    ...anomalyConfigQuery(
+      anomalyOrgId.value,
+      String(router.currentRoute.value.params.anomaly_id ?? ""),
+    ),
+    enabled: anomalyEditMode.value,
+    refetchInterval: (query) => (query.state.data?.status === "training" ? 5000 : false),
+  }));
+  watch(
+    () => anomalyModelQuery.data.value,
+    (data) => {
+      if (!data) return;
+      // Refresh only model metadata so training cannot erase unsaved form fields.
+      for (const key of [
+        "status",
+        "is_trained",
+        "current_model_version",
+        "band_k",
+        "last_error",
+        "training_started_at",
+        "training_completed_at",
+        "notice_class",
+      ] as const) {
+        (anomalyConfig.value as Record<string, unknown>)[key] = data[key];
+      }
+    },
   );
 
   const anomalyStatusVariant = computed<BadgeVariant>(() => {

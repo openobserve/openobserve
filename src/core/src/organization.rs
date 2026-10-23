@@ -1299,6 +1299,13 @@ fn sre_agent_email(org_id: &str) -> String {
     format!("{O2_SRE_AGENT_EMAIL_PREFIX}{org_id}{O2_SRE_AGENT_EMAIL_SUFFIX}").to_lowercase()
 }
 
+/// Serializes [ensure_sys_rca_agent] on this node. Concurrent first analyses of a new org would
+/// otherwise both take the not-found branch, and one would delete the account the other was
+/// creating, failing its run with "SysRcaAgent SA not found".
+#[cfg(feature = "enterprise")]
+static ENSURE_SYS_RCA_AGENT: std::sync::LazyLock<tokio::sync::Mutex<()>> =
+    std::sync::LazyLock::new(|| tokio::sync::Mutex::new(()));
+
 /// Ensures the SysRcaAgent service account exists for the given org, creating it if needed.
 /// Idempotent: returns Ok(()) immediately if the account already exists.
 #[cfg(feature = "enterprise")]
@@ -1309,42 +1316,51 @@ pub async fn ensure_sys_rca_agent(org_id: &str) -> Result<(), anyhow::Error> {
     use crate::users::create_service_account_if_not_exists;
 
     let email = sre_agent_email(org_id);
+    // Held only while provisioning: the FGA calls below are idempotent and may be slow.
+    {
+        let _serial = ENSURE_SYS_RCA_AGENT.lock().await;
 
-    // Only create the DB record if the account doesn't exist yet.
-    match db::org_users::get(org_id, &email).await {
-        Ok(_) => {
-            // Account already exists, skip creation
-        }
-        Err(err) => {
-            // Only treat genuine "not found" errors as missing accounts
-            // Other DB errors should bubble up rather than triggering creation
-            if err.to_string().contains("User not found") {
-                // Drop any orphaned mixed-case row in `users` left over from a
-                // pre-fix run. `db::user::delete` is case-insensitive at the
-                // table layer and also fans out a cluster-wide invalidation so
-                // the in-mem user cache (and super_cluster) drop the stale row
-                // — `table::users::remove` would skip both. Safe to call
-                // unconditionally: we only reach this branch when there's no
-                // `org_users` row, meaning any matching `users` row is
-                // unreferenced.
-                db::user::delete(&email).await?;
-                create_service_account_if_not_exists(&email).await?;
+        // Only create the DB record if the account doesn't exist yet.
+        match db::org_users::get(org_id, &email).await {
+            Ok(_) => {
+                // Account already exists, skip creation
+            }
+            Err(err) => {
+                // Only treat genuine "not found" errors as missing accounts
+                // Other DB errors should bubble up rather than triggering creation
+                if err.to_string().contains("User not found") {
+                    // Drop an orphaned mixed-case row in `users` left over from a pre-fix run.
+                    // `db::user::delete` is case-insensitive at the table layer and also fans
+                    // out a cluster-wide invalidation so the in-mem user cache (and
+                    // super_cluster) drop the stale row — `table::users::remove` would skip
+                    // both. Only a row whose stored email differs in case is such an orphan:
+                    // a lowercase row is this account, possibly being created by a concurrent
+                    // call on another node, and deleting it (with its memberships) would break
+                    // that call.
+                    if db::user::get_user_record(&email)
+                        .await
+                        .is_ok_and(|user| user.email != email)
+                    {
+                        db::user::delete(&email).await?;
+                    }
+                    create_service_account_if_not_exists(&email).await?;
 
-                let token = generate_random_string(32);
-                let rum_token = format!("rum{}", generate_random_string(16));
+                    let token = generate_random_string(32);
+                    let rum_token = format!("rum{}", generate_random_string(16));
 
-                db::org_users::add_with_flags(
-                    org_id,
-                    &email,
-                    UserRole::SreAgent,
-                    &token,
-                    Some(rum_token),
-                    true,
-                )
-                .await?;
-            } else {
-                // Return the original error for non-"not found" failures
-                return Err(err);
+                    db::org_users::add_with_flags(
+                        org_id,
+                        &email,
+                        UserRole::SreAgent,
+                        &token,
+                        Some(rum_token),
+                        true,
+                    )
+                    .await?;
+                } else {
+                    // Return the original error for non-"not found" failures
+                    return Err(err);
+                }
             }
         }
     }

@@ -528,6 +528,8 @@ pub struct OrganizationSettingPayload {
     pub usage_stream_enabled: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub red_insights_enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ai_rca_thread_tool_output: Option<bool>,
     #[cfg(feature = "enterprise")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub claim_parser_function: Option<String>,
@@ -579,6 +581,9 @@ pub struct OrganizationSetting {
     pub usage_stream_enabled: bool,
     #[serde(default)]
     pub red_insights_enabled: bool,
+    /// Show raw tool input and output in incident investigation threads.
+    #[serde(default)]
+    pub ai_rca_thread_tool_output: bool,
     #[cfg(feature = "enterprise")]
     #[serde(default = "default_claim_parser_function")]
     pub claim_parser_function: String,
@@ -628,6 +633,7 @@ impl Default for OrganizationSetting {
             max_series_per_query: None,
             usage_stream_enabled: default_usage_stream_enabled(),
             red_insights_enabled: false,
+            ai_rca_thread_tool_output: false,
             #[cfg(feature = "enterprise")]
             claim_parser_function: default_claim_parser_function(),
             cross_links: Vec::new(),
@@ -1475,6 +1481,7 @@ mod tests {
             max_series_per_query: None,
             usage_stream_enabled: None,
             red_insights_enabled: None,
+            ai_rca_thread_tool_output: None,
             #[cfg(feature = "enterprise")]
             claim_parser_function: None,
             cross_links: None,
@@ -1560,6 +1567,7 @@ mod tests {
             max_series_per_query: None,
             usage_stream_enabled: false,
             red_insights_enabled: false,
+            ai_rca_thread_tool_output: false,
             #[cfg(feature = "enterprise")]
             claim_parser_function: String::new(),
             cross_links: vec![],
@@ -1597,6 +1605,7 @@ mod tests {
             max_series_per_query: Some(1000),
             usage_stream_enabled: false,
             red_insights_enabled: false,
+            ai_rca_thread_tool_output: false,
             #[cfg(feature = "enterprise")]
             claim_parser_function: String::new(),
             cross_links: vec![],

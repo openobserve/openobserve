@@ -178,6 +178,14 @@ fn workflow_delete_outcome(published_exists: bool, draft_exists: bool) -> Workfl
     }
 }
 
+fn lookup_error(e: anyhow::Error) -> Response {
+    if e.downcast_ref::<db::workflows::NotFound>().is_some() {
+        MetaHttpResponse::not_found(e)
+    } else {
+        MetaHttpResponse::internal_error(e)
+    }
+}
+
 /// CreateWorkflow
 
 #[utoipa::path(
@@ -201,9 +209,10 @@ fn workflow_delete_outcome(published_exists: bool, draft_exists: bool) -> Workfl
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 403, description = "No write access to the destination folder", content_type = "application/json", body = ()),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "create"})),
     )
 )]
 pub async fn save_workflow(
@@ -301,10 +310,13 @@ pub async fn save_workflow(
         ("search_substring" = Option<String>, Query, description = "Case-insensitive substring the workflow name or description must contain."),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(Object)),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<Object>),
+        (status = 403, description = "The caller's workflow listing was refused", content_type = "application/json", body = ()),
+        (status = 404, description = "The folder does not exist", content_type = "application/json", body = ()),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "list"})),
     )
 )]
 pub async fn list_workflows(
@@ -357,7 +369,7 @@ pub async fn list_workflows(
         match workflows::list_workflows(&org_id, permitted.clone(), folder, search_substring).await
         {
             Ok(workflows) => workflows,
-            Err(e) => return MetaHttpResponse::internal_error(e),
+            Err(e) => return lookup_error(e),
         };
 
     let mut ret = Vec::with_capacity(workflows.len());
@@ -389,7 +401,7 @@ pub async fn list_workflows(
 
     let drafts = match workflows::list_drafts(&org_id, permitted, folder).await {
         Ok(workflows) => workflows,
-        Err(e) => return MetaHttpResponse::internal_error(e),
+        Err(e) => return lookup_error(e),
     };
 
     // The draft rows come straight from the table rather than through the same
@@ -447,10 +459,11 @@ pub struct MoveWorkflowsRequestBody {
         (status = 200, description = "Moved"),
         (status = 400, description = "No workflow ids, too many ids, or an empty destination folder", content_type = "application/json", body = ()),
         (status = 403, description = "Forbidden"),
+        (status = 404, description = "A workflow or the destination folder does not exist", content_type = "application/json", body = ()),
         (status = 500, description = "Error", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "update"})),
     )
 )]
 pub async fn move_workflows(
@@ -511,7 +524,7 @@ pub async fn move_workflows(
         Ok(()) => MetaHttpResponse::ok("workflows moved"),
         Err(e) => {
             log::error!("[workflows] move_workflows: {e}");
-            MetaHttpResponse::internal_error(e)
+            lookup_error(e)
         }
     }
 }
@@ -529,13 +542,17 @@ pub async fn move_workflows(
     ),
     params(
         ("org_id" = String, Path, description = "Organization id"),
-        ("workflow_id" = String, Path, description = "Workflow id"),
+        ("id" = String, Path, description = "Workflow id"),
+        ("draft" = Option<bool>, Query, description = "Target the draft instead of the published workflow, defaults to false"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Object)),
+        (status = 400, description = "Workflow is still associated with entities", content_type = "application/json", body = ()),
+        (status = 404, description = "No published workflow with that id", content_type = "application/json", body = ()),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "delete"})),
     )
 )]
 pub async fn delete_workflows(
@@ -629,14 +646,17 @@ pub async fn delete_workflows(
     ),
     params(
         ("org_id" = String, Path, description = "Organization id"),
-        ("workflow_id" = String, Path, description = "Workflow id"),
+        ("id" = String, Path, description = "Workflow id"),
+        ("draft" = Option<bool>, Query, description = "Target the draft instead of the published workflow, defaults to false"),
     ),
     request_body(content = inline(Object), description = "Workflow data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Object)),
+        (status = 400, description = "Id mismatch, no such workflow or draft, or an invalid workflow", content_type = "application/json", body = ()),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "update"})),
     )
 )]
 pub async fn update_workflows(
@@ -773,6 +793,7 @@ pub async fn update_workflows(
     ),
     params(
         ("org_id" = String, Path, description = "Organization id"),
+        ("draft" = Option<bool>, Query, description = "Test as a draft, defaults to false"),
     ),
     request_body(content = inline(Object), description = "Workflow inputs", content_type = "application/json"),
     responses(
@@ -780,7 +801,7 @@ pub async fn update_workflows(
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "create"})),
     )
 )]
 pub async fn test_workflow(
@@ -842,13 +863,13 @@ pub async fn test_workflow(
         ("org_id" = String, Path, description = "Organization id"),
         ("id" = String, Path, description = "Workflow id"),
     ),
-    request_body(content = inline(Object), description = "Workflow inputs", content_type = "application/json"),
+    request_body(content = Vec<serde_json::Value>, description = "Workflow inputs, one JSON value per input event", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "create"})),
     )
 )]
 pub async fn trigger_workflow(
@@ -881,13 +902,15 @@ pub async fn trigger_workflow(
     params(
         ("org_id" = String, Path, description = "Organization id"),
         ("id" = String, Path, description = "Workflow id"),
+        ("run_id" = String, Path, description = "Workflow run id"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "get"})),
     )
 )]
 pub async fn get_workflow_errors(
@@ -953,7 +976,7 @@ pub async fn get_workflow_errors(
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "create"})),
     )
 )]
 pub async fn retry_workflow(
@@ -986,14 +1009,14 @@ pub async fn retry_workflow(
     params(
         ("org_id" = String, Path, description = "Organization id"),
         ("id" = String, Path, description = "Workflow id"),
+        ("value" = Option<bool>, Query, description = "true enables and false disables the workflow, defaults to true"),
     ),
-    request_body(content = inline(Object), description = "retry details", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "update"})),
     )
 )]
 pub async fn enable_workflow(
@@ -1029,13 +1052,16 @@ pub async fn enable_workflow(
     params(
         ("org_id" = String, Path, description = "Organization id"),
         ("id" = String, Path, description = "Workflow id"),
+        ("start_time" = Option<i64>, Query, description = "Start time in Unix timestamp microseconds, defaults to 7 days before now"),
+        ("end_time" = Option<i64>, Query, description = "End time in Unix timestamp microseconds, defaults to now"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<Object>),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "get"})),
     )
 )]
 pub async fn get_workflow_history(
@@ -1069,8 +1095,8 @@ pub async fn get_workflow_history(
     }
 
     // Validate time range
-    if start_time >= end_time {
-        return MetaHttpResponse::bad_request("start_time must be before end_time");
+    if let Err(msg) = openobserve_api_common::request::validate_time_range(start_time, end_time) {
+        return MetaHttpResponse::bad_request(msg);
     }
 
     let trace_id = get_or_create_trace_id(req.headers(), &tracing::Span::current());
@@ -1175,15 +1201,17 @@ pub async fn get_workflow_history(
     params(
         ("org_id" = String, Path, description = "Organization id"),
         ("id" = String, Path, description = "Workflow id"),
+        ("trigger_type" = Option<String>, Query, description = "Trigger type of the promoted workflow; IncidentEvent also associates it with incidents. Defaults to AlertFired"),
         ("folder" = Option<String>, Query, description = "Folder to publish into. The draft's own folder is used when absent."),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(Object)),
+        (status = 201, description = "Created", content_type = "application/json", body = inline(Object)),
         (status = 400, description = "No draft with that id, or the graph is still invalid", content_type = "application/json", body = ()),
         (status = 403, description = "No write access to the destination folder", content_type = "application/json", body = ()),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "post"})),
+        ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "update"})),
     )
 )]
 pub async fn promote_draft(
@@ -1296,6 +1324,14 @@ fn parse_workflow_history_key(key: &str) -> Option<(WorkflowTriggerType, String,
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn missing_folder_or_workflow_is_404_and_other_errors_stay_500() {
+        let missing = lookup_error(db::workflows::NotFound("folder not found: x".into()).into());
+        assert_eq!(missing.status(), StatusCode::NOT_FOUND);
+        let failed = lookup_error(anyhow::anyhow!("db down"));
+        assert_eq!(failed.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     #[test]
     fn history_key_parses_into_trigger_type_source_id_and_run_id() {

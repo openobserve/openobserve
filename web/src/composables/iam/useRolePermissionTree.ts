@@ -152,6 +152,11 @@ export const useRolePermissionTree = (deps: TreeDeps) => {
       resource.permission.AllowList.show = false;
       resource.permission.AllowGet.show = false;
     }
+    if (resource.resourceName === "slack_integration") {
+      // The model defines only ALL, LIST, PUT and DELETE: GET rows check LIST and POST rows check PUT.
+      resource.permission.AllowGet.show = false;
+      resource.permission.AllowPost.show = false;
+    }
     if (resource.resourceName === "prompt") {
       // Prompt deletion is archival and label deletion is a pointer update.
       resource.permission.AllowDelete.show = false;

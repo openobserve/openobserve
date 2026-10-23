@@ -70,6 +70,7 @@ import config from "@/aws-exports";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { getImageURL } from "@/utils/zincutils";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
+import { isSlackSettingsVisible, readSlackOrgConfig } from "@/utils/slackSettings";
 
 export default defineComponent({
   name: "AppSettings",
@@ -113,6 +114,7 @@ export default defineComponent({
       syntheticsLocations: "synthetics_locations",
       correlationSettings: "correlation_settings",
       genAiAgentMapping: "gen_ai_agent_mapping",
+      slack: "slack",
     };
 
     const settingsTab = ref(
@@ -131,8 +133,17 @@ export default defineComponent({
       "domain_management",
       "password_policy",
       "alert_calibration",
+      "slack",
     ]);
     const isConstrainedSection = computed(() => CONSTRAINED_SECTIONS.has(activeSection.value));
+
+    const slackVisible = computed(() => {
+      const edition = buildFeatureGateContext(store.state.zoConfig);
+      return (
+        checkFeatureAccess("slack", edition).allowed &&
+        isSlackSettingsVisible(edition, readSlackOrgConfig(store.state.zoConfig))
+      );
+    });
 
     const handleSettingsRouting = () => {
       const name = router.currentRoute.value.name;
@@ -171,12 +182,22 @@ export default defineComponent({
       }
       if (name === "orgDomainMapping" && config.isCloud !== "true") {
         toGeneral();
+        return;
+      }
+      // A cold load has no org config yet; redirecting then would bounce a valid deep link.
+      const slackConfigLoaded = typeof store.state.zoConfig?.slack_enabled === "boolean";
+      if (name === "slack" && slackConfigLoaded && !slackVisible.value) {
+        toGeneral();
       }
     };
 
     onBeforeMount(handleSettingsRouting);
     onActivated(handleSettingsRouting);
     onUpdated(handleSettingsRouting);
+
+    const slackIcon = computed(() =>
+      getImageURL(isDark.value ? "images/common/slack_dark.svg" : "images/common/slack.svg"),
+    );
 
     const regexIcon = computed(() =>
       getImageURL(
@@ -191,6 +212,7 @@ export default defineComponent({
       "General",
       "Access & Security",
       "Destinations",
+      "Integrations",
       "Data & AI",
       "Operations",
       "Synthetics",
@@ -341,6 +363,16 @@ export default defineComponent({
           lockedMessage: oncallAccess.message,
           dataTest: "telephony-settings-tab",
           group: "Destinations",
+        },
+        {
+          key: "slack",
+          label: t("settings.slackApp"),
+          description: t("settings.slackAppDesc"),
+          icon: `img:${slackIcon.value}`,
+          to: { name: "slack", query: { org_identifier: org } },
+          visible: slackVisible.value,
+          dataTest: "slack-settings-tab",
+          group: "Integrations",
         },
         {
           key: "storageSettings",
@@ -494,6 +526,7 @@ export default defineComponent({
         General: t("settings.groupGeneral"),
         "Access & Security": t("settings.groupAccessSecurity"),
         Destinations: t("settings.groupDestinations"),
+        Integrations: t("settings.groupIntegrations"),
         "Data & AI": t("settings.groupDataAI"),
         Operations: t("settings.groupOperations"),
         Synthetics: t("settings.groupSynthetics"),

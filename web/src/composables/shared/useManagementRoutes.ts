@@ -2,6 +2,7 @@ import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
 import { withFeatureGate } from "@/utils/enterpriseFeatures";
 import { oncallRouteGuard } from "./oncallRouteGuard";
+import { slackRouteGuard } from "./slackRouteGuard";
 
 const Settings = () => import("@/components/settings/index.vue");
 
@@ -155,6 +156,16 @@ const useManagementRoutes = () => {
       titleKey: "settings.genAiAgentMapping.title",
     },
     beforeEnter: withFeatureGate("genAiAgentMapping", routeGuard),
+  });
+  // Registered in every build; slackRouteGuard and the rail both hide it unless the org config turns Slack on.
+  routes[0].children.push({
+    path: "slack",
+    name: "slack",
+    component: () => import("@/components/settings/Slack.vue"),
+    meta: {
+      titleKey: "routeTitles.slackApp",
+    },
+    beforeEnter: slackRouteGuard,
   });
   // Alert Sources moved to a flat top-level route (router.ts, name
   // "alertSources") — no longer pushed here. It used to be conditional on
