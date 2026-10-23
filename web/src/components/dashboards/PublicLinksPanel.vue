@@ -301,7 +301,7 @@
         class="flex flex-col gap-1.5"
         data-test="dashboards-public-links-panel-variables"
       >
-        <div class="text-text-secondary text-xs">
+        <div class="text-input-label-text text-compact leading-tight font-medium">
           {{ t("dashboard.publicDashboard.defaultVariableValues") }}
         </div>
         <OBanner
