@@ -4820,14 +4820,13 @@ async fn handle_report_triggers(
                 }
                 RetryOutcome::FinishOnce => {
                     // Kept off the last run so the failure that exhausted the retries stays listed.
-                    publish_triggers_usage(TriggerData {
-                        next_run_at: new_trigger.next_run_at,
-                        status: RunOutcome::Skipped,
-                        error: Some(format!(
-                            "max retries ({max_retries}) reached, one-time report paused"
-                        )),
-                        ..base_row()
-                    });
+                    publish_triggers_usage(exhausted_once_row(
+                        TriggerData {
+                            next_run_at: new_trigger.next_run_at,
+                            ..base_row()
+                        },
+                        max_retries,
+                    ));
                     finish_run_once(conn, report_id, &mut new_trigger, &scheduler_trace_id).await?;
                     db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
                 }
@@ -4869,6 +4868,18 @@ async fn finish_run_once(
         );
     }
     Ok(())
+}
+
+/// The Skipped row for a one-time report whose retries ran out, published right after the
+/// failure that exhausted them. History identifies a run by `_timestamp` and `retries`, and both
+/// rows share the handler's start time, so this row counts as the attempt that was not made.
+fn exhausted_once_row(mut row: TriggerData, max_retries: i32) -> TriggerData {
+    row.status = RunOutcome::Skipped;
+    row.error = Some(format!(
+        "max retries ({max_retries}) reached, one-time report paused"
+    ));
+    row.retries = row.retries.saturating_add(1);
+    row
 }
 
 /// `retries` counts the attempts that failed before this one.
@@ -7815,6 +7826,37 @@ mod tests {
                 assert_ne!(report_retry_outcome(false, retries, max_retries), Retry);
             }
         }
+    }
+
+    #[test]
+    fn exhausted_once_row_does_not_collide_with_the_failure_before_it() {
+        let failure = TriggerData {
+            _timestamp: 10,
+            retries: 2,
+            status: RunOutcome::Error,
+            error: Some("smtp down".to_string()),
+            ..Default::default()
+        };
+        let skipped = exhausted_once_row(failure.clone(), 3);
+        assert_eq!(skipped._timestamp, failure._timestamp);
+        assert_ne!(skipped.retries, failure.retries);
+        assert_eq!(skipped.retries, 3);
+        assert_eq!(skipped.status, RunOutcome::Skipped);
+        assert_eq!(
+            skipped.error.as_deref(),
+            Some("max retries (3) reached, one-time report paused")
+        );
+        assert_eq!(
+            exhausted_once_row(
+                TriggerData {
+                    retries: i32::MAX,
+                    ..Default::default()
+                },
+                3
+            )
+            .retries,
+            i32::MAX
+        );
     }
 
     #[test]
