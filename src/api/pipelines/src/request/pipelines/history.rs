@@ -163,8 +163,8 @@ pub async fn get_pipeline_history(
     }
 
     // Validate time range
-    if start_time >= end_time {
-        return MetaHttpResponse::bad_request("start_time must be before end_time");
+    if let Err(msg) = openobserve_api_common::request::validate_time_range(start_time, end_time) {
+        return MetaHttpResponse::bad_request(msg);
     }
 
     // Validate and map sort_by field to SQL column name or expression

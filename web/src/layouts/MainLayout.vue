@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Operator-authored announcement bars (enterprise) -->
         <AnnouncementBanner v-if="config.isEnterprise === 'true'" />
         <PasswordExpiryBanner v-if="config.isEnterprise === 'true'" />
+        <LicenseSearchBanner v-if="config.isEnterprise === 'true' && config.isCloud === 'false'" />
       </div>
 
       <!-- Header component containing logo, navigation, and user controls -->
@@ -310,6 +311,7 @@ import PaidOverageConsentDialog from "@/components/PaidOverageConsentDialog.vue"
 import WebinarBanner from "@/components/WebinarBanner.vue";
 import AnnouncementBanner from "@/components/announcements/AnnouncementBanner.vue";
 import PasswordExpiryBanner from "@/components/common/PasswordExpiryBanner.vue";
+import LicenseSearchBanner from "@/enterprise/components/billings/LicenseSearchBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
 import { purgeOrgQueries, queryClient } from "@/composables/query/queryClient";
@@ -334,6 +336,7 @@ export default defineComponent({
     WebinarBanner,
     AnnouncementBanner,
     PasswordExpiryBanner,
+    LicenseSearchBanner,
     "keep-alive": KeepAlive,
     ONavbar,
     "router-view": RouterView,
@@ -454,6 +457,9 @@ export default defineComponent({
       text: string;
       autoSend: boolean;
       id: number;
+      chipName?: string;
+      newChat?: boolean;
+      context?: Record<string, unknown> | null;
     } | null>(null);
     let customOrganization = Object.prototype.hasOwnProperty.call(
       router.currentRoute.value.query,
@@ -1330,6 +1336,7 @@ export default defineComponent({
         org_storage_enabled: false,
         domain_org_mappings: [],
         red_insights_enabled: false,
+        ai_rca_thread_tool_output: false,
       };
 
       try {
@@ -1376,6 +1383,9 @@ export default defineComponent({
           domain_org_mappings: orgSettings?.data?.data?.domain_org_mappings ?? [],
           red_insights_enabled:
             orgSettings?.data?.data?.red_insights_enabled ?? defaultSettings.red_insights_enabled,
+          ai_rca_thread_tool_output:
+            orgSettings?.data?.data?.ai_rca_thread_tool_output ??
+            defaultSettings.ai_rca_thread_tool_output,
         });
 
         // Load the org's home dashboard (settings/v2 KV) alongside the legacy org
@@ -1586,20 +1596,43 @@ export default defineComponent({
       localStorage.removeItem("isFirstTimeLogin");
     };
 
+    /** `value` is a query string or `{ query, autoSend?, chipName?, newChat?, context? }`; a chip never auto-sends. */
     const sendToAiChat = (value: any, append: boolean = true, autoSend: boolean = false) => {
-      if (!store.state.isAiChatEnabled) {
+      const wasOpen = store.state.isAiChatEnabled;
+      if (!wasOpen) {
         store.dispatch("setIsAiChatEnabled", true);
       }
 
       // Support object payload { query, autoSend } from OverviewTab
       let text = value;
       let shouldAutoSend = autoSend;
+      let handoff: {
+        chipName: string;
+        newChat: boolean;
+        context: Record<string, unknown> | null;
+      } | null = null;
       if (value && typeof value === "object" && "query" in value) {
         text = value.query;
         shouldAutoSend = value.autoSend ?? false;
+        if (typeof value.chipName === "string" && value.chipName) {
+          handoff = {
+            chipName: value.chipName,
+            newChat: !!value.newChat,
+            context: value.context && typeof value.context === "object" ? value.context : null,
+          };
+        }
       }
 
       aiChatAppendMode.value = append;
+
+      if (handoff) {
+        // Named-chip hand-off: O2AIChat builds the chip itself, so the legacy "Log Entry" channel stays silent.
+        const payload = { text, autoSend: false, id: Date.now(), ...handoff };
+        // A chat opened just now mounts on the next render; deliver after it so its watcher sees the change.
+        if (wasOpen) aiChatPayload.value = payload;
+        else nextTick(() => (aiChatPayload.value = payload));
+        return;
+      }
 
       // Deliver text + autoSend atomically in a single object so O2AIChat
       // watcher always sees both values together — no timing race.

@@ -17,10 +17,10 @@ use bytes::Bytes;
 
 use crate::{
     self as db,
-    service_graph::{missing_as_none, mk_key as v1_offset_key, parse_v4_offset, put_once},
+    service_graph::{missing_as_none, parse_v4_offset},
 };
 
-/// Also the claim lock key, so a claim and the seed never interleave.
+/// Also the claim lock key.
 pub const OFFSET_KEY: &str = "/agent_signals/offset";
 
 /// Value is `<micros>;<node_uuid>`; a missing key is unset, any other read error propagates.
@@ -31,19 +31,6 @@ pub async fn get_offset() -> Result<(i64, String), anyhow::Error> {
 pub async fn set_offset(offset: i64, node: &str) -> Result<(), anyhow::Error> {
     let val = format!("{offset};{node}");
     Ok(db::put(OFFSET_KEY, val.into(), db::NO_NEED_WATCH, None).await?)
-}
-
-/// Write-once: resumes where the pass inside the v1 tick stopped instead of jumping to the present.
-pub async fn seed_offset_from_v1() -> Result<(), anyhow::Error> {
-    if missing_as_none(db::get(OFFSET_KEY).await)?.is_some() {
-        return Ok(());
-    }
-    let (v1_offset, _) = offset_from_read(db::get(&v1_offset_key()).await)?;
-    if v1_offset > 0 {
-        // no node travels with the seed, so the first ticking scheduler claims it
-        put_once(OFFSET_KEY, format!("{v1_offset};")).await?;
-    }
-    Ok(())
 }
 
 /// A failed read must not look like a fresh install, which would jump the cursor to the present.
@@ -75,9 +62,9 @@ mod tests {
             offset_from_read(stored).unwrap(),
             (1_700_000_000_000_000, "node-a".to_string())
         );
-        let seeded = Ok(Bytes::from("1700000000000000;"));
+        let no_node = Ok(Bytes::from("1700000000000000;"));
         assert_eq!(
-            offset_from_read(seeded).unwrap(),
+            offset_from_read(no_node).unwrap(),
             (1_700_000_000_000_000, String::new())
         );
     }

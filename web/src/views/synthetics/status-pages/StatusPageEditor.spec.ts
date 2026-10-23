@@ -155,6 +155,7 @@ function pageFixture() {
     brand_name: "",
     accent_color: "",
     logo_img: "",
+    favicon_img: "",
     visibility: 1,
     password_set: false,
     noindex: false,
@@ -199,6 +200,27 @@ describe("StatusPageEditor", () => {
       const row = wrapper.find('[data-test="status-page-branding-row"]');
       expect(row.find('[data-test="status-page-logo-preview"]').exists()).toBe(true);
       expect(row.find('[data-test="status-page-accent-color"]').exists()).toBe(true);
+    });
+
+    it("keeps the favicon apart from the logo", async () => {
+      mockGet.mockResolvedValue({ data: { ...pageFixture(), favicon_img: "AAABAAEA" } });
+      wrapper = makeWrapper();
+      await flushPromises();
+
+      const row = wrapper.find('[data-test="status-page-branding-row"]');
+      const favicon = row.find('[data-test="status-page-favicon-preview"]');
+      expect(favicon.attributes("src")).toBe("data:image/x-icon;base64,AAABAAEA");
+      expect(row.find('[data-test="status-page-logo-preview"]').exists()).toBe(false);
+      expect(row.find('[data-test="status-page-logo-upload"]').exists()).toBe(true);
+    });
+
+    it("previews an SVG logo with its real media type", async () => {
+      mockGet.mockResolvedValue({ data: { ...pageFixture(), logo_img: "PHN2ZyB4bWxucz0i" } });
+      wrapper = makeWrapper();
+      await flushPromises();
+
+      const logo = wrapper.find('[data-test="status-page-logo-preview"]');
+      expect(logo.attributes("src")).toBe("data:image/svg+xml;base64,PHN2ZyB4bWxucz0i");
     });
   });
 

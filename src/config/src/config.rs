@@ -110,7 +110,11 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 110: create rum_pa_app_settings; add rules_hash to rum_pa_funnels.
 // 111: create eval_job_states and eval_job_state_transitions.
 // 112: create the six Slack app tables.
-pub const DB_SCHEMA_VERSION: u64 = 112;
+// 113: create rca_runs and add the run summary columns to alert_incidents.
+// 114: add RCA stage, context, continuation and on-call subject columns.
+// 115: create rca_steering and add the input columns to rca_runs.
+// 116: add favicon_img to status_pages.
+pub const DB_SCHEMA_VERSION: u64 = 116;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

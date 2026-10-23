@@ -18,7 +18,7 @@ mod partitioned_search;
 
 #[cfg(feature = "enterprise")]
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{LazyLock, RwLock},
     time::{Duration, Instant},
 };
@@ -2802,10 +2802,20 @@ pub async fn execute_anomaly_query(
     // Resolved here rather than threaded through the enterprise query-executor boundary,
     // whose registered Fn signature is fixed and shared by every anomaly query path.
     let metadata = resolve_query_metadata(org_id, anomaly_id).await;
+    let stream_fields = match &metadata {
+        Some(m) => stream_field_names(org_id, anomaly_id, &m.stream_name, stream_type).await,
+        None => None,
+    };
     let trace_id = config::ider::generate_trace_id();
     let window = (start_time, end_time);
-    match partitioned_search::supported_grid(metadata.as_ref(), query_sql, stream_type, window) {
-        Ok(grid) => {
+    match partitioned_search::supported_query(
+        metadata.as_ref(),
+        query_sql,
+        stream_type,
+        window,
+        stream_fields.as_ref(),
+    ) {
+        Ok(query) => {
             partitioned_search::execute_supported(
                 org_id,
                 query_sql,
@@ -2813,7 +2823,7 @@ pub async fn execute_anomaly_query(
                 anomaly_id,
                 stream_type,
                 &trace_id,
-                grid,
+                query,
             )
             .await
         }
@@ -2905,6 +2915,25 @@ async fn resolve_query_metadata(
         cache.insert(key, (metadata.clone(), Instant::now()));
     }
     Some(metadata)
+}
+
+/// The stream's field names, or `None` when the schema cannot be read, which keeps the single call.
+#[cfg(feature = "enterprise")]
+async fn stream_field_names(
+    org_id: &str,
+    anomaly_id: &str,
+    stream_name: &str,
+    stream_type: &str,
+) -> Option<HashSet<String>> {
+    match infra::schema::get_cache(org_id, stream_name, StreamType::from(stream_type)).await {
+        Ok(cache) => Some(cache.fields_map().keys().cloned().collect()),
+        Err(e) => {
+            log::warn!(
+                "[anomaly_detection {anomaly_id}] could not read the schema of '{stream_name}': {e}"
+            );
+            None
+        }
+    }
 }
 
 /// Update-path hook; only bounds staleness on the serving node, the TTL covers the rest.
