@@ -121,6 +121,11 @@ static METRICS_RESULT_CACHE_EVICT_HOOK: OnceLock<fn(Vec<String>)> = OnceLock::ne
 
 static TRASH_ID: AtomicUsize = AtomicUsize::new(0);
 
+/// Temp files whose write fails partway, to drive the cleanup path in tests.
+#[cfg(test)]
+static FAIL_TMP_WRITES: Lazy<std::sync::Mutex<std::collections::HashSet<String>>> =
+    Lazy::new(Default::default);
+
 pub static LOADING_FROM_DISK_NUM: Lazy<AtomicUsize> = Lazy::new(|| AtomicUsize::new(0));
 pub static LOADING_FROM_DISK_DONE: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
 
@@ -677,6 +682,27 @@ async fn drop_public_dashboard_bodies(key: &str) {
     }
 }
 
+/// Writes and syncs a temp file; a failed write removes it, since only the startup scan would.
+fn write_public_dashboard_tmp(tmp: &str, data: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    let write = || {
+        if let Some(parent) = Path::new(tmp).parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let mut f = std::fs::File::create(tmp)?;
+        #[cfg(test)]
+        if FAIL_TMP_WRITES.lock().unwrap().contains(tmp) {
+            f.write_all(&data[..data.len() / 2])?;
+            return Err(std::io::Error::other("injected write failure"));
+        }
+        f.write_all(data)?;
+        f.sync_all()
+    };
+    write().inspect_err(|_| {
+        _ = std::fs::remove_file(tmp);
+    })
+}
+
 fn public_dashboards_memory_key(key: &str, incarnation: u64) -> String {
     format!("{key}#{incarnation}")
 }
@@ -1083,17 +1109,7 @@ pub async fn public_dashboards_replace(
     }
     let tmp = format!("{path}.{incarnation}.tmp");
     let tmp_path = tmp.clone();
-    let parent = Path::new(&path).parent().map(Path::to_path_buf);
-    tokio::task::spawn_blocking(move || -> std::io::Result<()> {
-        use std::io::Write;
-        if let Some(parent) = parent {
-            std::fs::create_dir_all(parent)?;
-        }
-        let mut f = std::fs::File::create(&tmp_path)?;
-        f.write_all(&data)?;
-        f.sync_all()
-    })
-    .await??;
+    tokio::task::spawn_blocking(move || write_public_dashboard_tmp(&tmp_path, &data)).await??;
     let old = RESULT_FILES[idx]
         .write()
         .await
@@ -2955,5 +2971,36 @@ mod tests {
         assert_eq!(files.cur_size, 90);
         assert_eq!(std::fs::read(&path).unwrap().len(), 30);
         assert!(!Path::new(&tmp_file).exists());
+    }
+
+    #[tokio::test]
+    async fn a_public_dashboard_write_that_fails_midway_twice_leaves_no_temp_and_the_old_file() {
+        let _serial = PUBLIC_DASHBOARD_TESTS.lock().await;
+        let (_, key) = public_key("r3600");
+        public_dashboards_replace(&key, 1, Bytes::from_static(b"old contents"))
+            .await
+            .unwrap();
+        let path = get_file_path(&key).unwrap();
+        for incarnation in [2, 3] {
+            let tmp = format!("{path}.{incarnation}.tmp");
+            FAIL_TMP_WRITES.lock().unwrap().insert(tmp.clone());
+            let replaced =
+                public_dashboards_replace(&key, incarnation, Bytes::from(vec![7u8; 64])).await;
+            FAIL_TMP_WRITES.lock().unwrap().remove(&tmp);
+            assert!(replaced.is_err(), "attempt {incarnation}");
+        }
+        let dir = Path::new(&path).parent().unwrap();
+        let temps: Vec<_> = std::fs::read_dir(dir)
+            .unwrap()
+            .filter_map(|e| e.ok()?.file_name().into_string().ok())
+            .filter(|name| name.ends_with(".tmp"))
+            .collect();
+        assert!(temps.is_empty(), "temp files left: {temps:?}");
+        assert_eq!(
+            get(&key, None).await.unwrap(),
+            Bytes::from_static(b"old contents")
+        );
+        assert_eq!(indexed_size(&key).await, Some(12));
+        public_dashboards_evict(&key).await.unwrap();
     }
 }
