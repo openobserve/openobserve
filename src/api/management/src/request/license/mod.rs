@@ -23,7 +23,7 @@ use o2_enterprise::enterprise::license::{
     BelowHwm, LICENSE_DB_KEY, License, LicenseDecision, LicenseStatus, Rollback, RollbackReason,
     Waiver, check_license, gate_and_raise, get_license, ingestion_limit_exceeded_count,
     ingestion_used, judge_paste, license_expired, license_status, load_rev_hwm,
-    pasted_key_supersedes_env, rev_hwm_warning,
+    pasted_key_supersedes_env, rev_hwm_warning, undo_raise,
 };
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::{AuthExtractor, UserEmail};
@@ -355,6 +355,31 @@ fn verdict_outcome(verdict: &Result<(), Rollback>) -> (&'static str, String) {
     }
 }
 
+// the gate raises the hwm before the key lands, so a failed store must lower it again
+async fn store_gated<F, Fut>(pasted: &License, put: F) -> Response
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = Result<(), infra::errors::Error>>,
+{
+    let raise = match gate_and_raise(pasted).await {
+        Ok(Ok(raise)) => raise,
+        Ok(Err(r)) => return (StatusCode::CONFLICT, Json(rollback_body(&r))).into_response(),
+        Err(e) => return MetaHttpResponse::internal_error(e),
+    };
+    if let Err(e) = put().await {
+        if let Some(raise) = raise
+            && let Err(undo) = undo_raise(&raise).await
+        {
+            log::error!("[LICENSE] could not undo the rev high-water mark raise : {undo}");
+        }
+        return MetaHttpResponse::internal_error(e);
+    }
+    match license::update().await {
+        Ok(_) => (StatusCode::CREATED, Json("")).into_response(),
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
+}
+
 async fn preview_key(pasted: &License, loaded: Option<&License>, is_root: bool) -> Response {
     let hwm = match load_rev_hwm().await {
         Ok(hwm) => hwm,
@@ -458,23 +483,14 @@ pub async fn store_license(
         return preview_key(&req.key, loaded.as_ref(), is_root).await;
     }
 
-    match gate_and_raise(&req.key).await {
-        Ok(Ok(_)) => {}
-        Ok(Err(r)) => return (StatusCode::CONFLICT, Json(rollback_body(&r))).into_response(),
-        Err(e) => return MetaHttpResponse::internal_error(e),
-    }
-
-    let db = infra::db::get_db().await;
-    if let Err(e) = db
-        .put(LICENSE_DB_KEY, req.raw_key.into(), false, None)
-        .await
-    {
-        return MetaHttpResponse::internal_error(e);
-    }
-    match license::update().await {
-        Ok(_) => (StatusCode::CREATED, Json("")).into_response(),
-        Err(e) => MetaHttpResponse::internal_error(e),
-    }
+    let raw_key = req.raw_key;
+    store_gated(&req.key, || async move {
+        infra::db::get_db()
+            .await
+            .put(LICENSE_DB_KEY, raw_key.into(), false, None)
+            .await
+    })
+    .await
 }
 
 pub async fn refresh_license_limits(Headers(user_email): Headers<UserEmail>) -> Response {
@@ -1133,6 +1149,25 @@ mod tests {
         assert_eq!(
             stored(LICENSE_REV_HWM_KEY).await,
             Some(json::from_slice(unreadable).unwrap())
+        );
+    }
+
+    #[tokio::test]
+    async fn a_failed_key_store_puts_the_hwm_back() {
+        let _store = store_setup().await;
+        gate_and_raise(&lic("lic-1", 5)).await.unwrap().unwrap();
+        let before = stored(LICENSE_REV_HWM_KEY).await;
+        let resp = store_gated(&lic("lic-1", 9), || async {
+            Err(infra::errors::Error::Message("disk full".to_string()))
+        })
+        .await;
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(stored(LICENSE_REV_HWM_KEY).await, before);
+        assert_eq!(stored(LICENSE_DB_KEY).await, None);
+        let (status, body) = paste(lic("lic-1", 5), true).await;
+        assert_eq!(
+            (status, body["outcome"].as_str()),
+            (StatusCode::OK, Some("accept"))
         );
     }
 
