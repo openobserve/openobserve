@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OText variant="meta" as="p">{{ fixText(row.reason) }}</OText>
         </div>
         <OButton
-          v-if="row.reason === 'rate_limited' && triggerLimit < orgBudget"
+          v-if="canRaise && row.reason === 'rate_limited' && triggerLimit < orgBudget"
           variant="ghost-primary"
           size="xs"
           class="shrink-0"
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("workflow.http.raiseLimit") }}
         </OButton>
         <OButton
-          v-else-if="row.reason === 'credential_in_url'"
+          v-else-if="canRotate && row.reason === 'credential_in_url'"
           variant="ghost-primary"
           size="xs"
           class="shrink-0"
@@ -153,6 +153,8 @@ interface RejectionRow extends HttpRejection {
 }
 
 const TIME_FORMAT = "MMM D, HH:mm";
+// The server resets a reason's window only when a new rejection merges (REJECTION_WINDOW_US).
+const REJECTION_WINDOW_US = 24 * 3_600_000_000;
 
 const props = defineProps<{
   rejections: Partial<Record<HookReasonCode, HttpRejection>>;
@@ -161,6 +163,8 @@ const props = defineProps<{
   maxBodyBytes: number;
   loading: boolean;
   error: boolean;
+  canRaise: boolean;
+  canRotate: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -174,12 +178,16 @@ const store = useStore();
 
 const open = ref(false);
 
-const rows = computed<RejectionRow[]>(() =>
-  (Object.entries(props.rejections) as [HookReasonCode, HttpRejection | undefined][])
-    .filter((entry): entry is [HookReasonCode, HttpRejection] => !!entry[1]?.count_24h)
+const rows = computed<RejectionRow[]>(() => {
+  const windowFloor = Date.now() * 1000 - REJECTION_WINDOW_US;
+  return (Object.entries(props.rejections) as [HookReasonCode, HttpRejection | undefined][])
+    .filter(
+      (entry): entry is [HookReasonCode, HttpRejection] =>
+        !!entry[1]?.count_24h && entry[1].window_start > windowFloor,
+    )
     .map(([reason, r]) => ({ ...r, reason, status: HOOK_REASON_STATUS[reason] }))
-    .sort((a, b) => b.count_24h - a.count_24h),
-);
+    .sort((a, b) => b.count_24h - a.count_24h);
+});
 const total = computed(() => rows.value.reduce((sum, r) => sum + r.count_24h, 0));
 // Walks the server's order, not the count order, so a tie names the first reason stored.
 const latest = computed(() => {

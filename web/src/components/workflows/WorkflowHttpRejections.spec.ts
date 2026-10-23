@@ -21,11 +21,16 @@ import type { HttpRejection } from "@/services/workflows";
 import WorkflowHttpRejections from "./WorkflowHttpRejections.vue";
 
 const t = (k: string, v?: Record<string, unknown>) => i18n.global.t(k, v ?? {});
-const rej = (count: number, last = 1_792_575_542_000_000): HttpRejection => ({
+const HOUR_US = 3_600_000_000;
+const rej = (
+  count: number,
+  last = 1_792_575_542_000_000,
+  windowStart = Date.now() * 1000 - HOUR_US,
+): HttpRejection => ({
   count_24h: count,
   last_at: last,
   last_ip: "10.0.0.7",
-  window_start: 1,
+  window_start: windowStart,
 });
 
 const mountRejections = (props: Record<string, unknown> = {}) =>
@@ -41,6 +46,8 @@ const mountRejections = (props: Record<string, unknown> = {}) =>
       maxBodyBytes: 1_048_576,
       loading: false,
       error: false,
+      canRaise: true,
+      canRotate: true,
       ...props,
     },
     global: { plugins: [i18n, store] },
@@ -94,6 +101,31 @@ describe("WorkflowHttpRejections", () => {
     await open(w);
     await byTest(w, "workflow-http-rejection-rotate").trigger("click");
     expect(w.emitted("rotate")).toHaveLength(1);
+  });
+
+  it("a window that started 24 h ago or more counts nothing", async () => {
+    const w = mountRejections({
+      rejections: {
+        invalid_token: rej(30, 1, Date.now() * 1000 - 25 * HOUR_US),
+        rate_limited: rej(2),
+      },
+    });
+    expect(byTest(w, "workflow-http-rejections-line").text()).toContain("2");
+    expect(byTest(w, "workflow-http-rejections-line").text()).not.toContain("30");
+    await open(w);
+    expect(byTest(w, "workflow-http-rejection-invalid_token").exists()).toBe(false);
+    const stale = mountRejections({
+      rejections: { invalid_token: rej(30, 1, Date.now() * 1000 - 25 * HOUR_US) },
+    });
+    expect(byTest(stale, "workflow-http-rejections-line").exists()).toBe(false);
+  });
+
+  it("hides Raise limit and Rotate from a user who cannot do them", async () => {
+    const w = mountRejections({ canRaise: false, canRotate: false });
+    await open(w);
+    expect(byTest(w, "workflow-http-rejection-rate_limited").exists()).toBe(true);
+    expect(byTest(w, "workflow-http-rejection-raise-limit").exists()).toBe(false);
+    expect(byTest(w, "workflow-http-rejection-rotate").exists()).toBe(false);
   });
 
   it("refresh refetches", async () => {

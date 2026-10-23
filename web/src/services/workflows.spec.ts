@@ -723,7 +723,6 @@ describe("workflows service", () => {
         "revealHttpCredentialSecret",
         "revokeHttpCredential",
         "rotateHttpCredential",
-        "testHttpTrigger",
         "testWorkflow",
         "updateWorkflow",
       ]);
@@ -854,7 +853,6 @@ describe("workflows HTTP endpoint transport", () => {
     await workflows.rotateHttpCredential({ ...target, overlap_seconds: 3600 });
     await workflows.revokeHttpCredential({ ...target, credential_id: "c1" });
     await workflows.revealHttpCredentialSecret({ ...target, credential_id: "c1" });
-    await workflows.testHttpTrigger({ ...target, data: [{ a: 1 }] });
 
     expect(api.get.mock.calls).toEqual([
       ["/api/acme/workflows/wf1/http_trigger"],
@@ -869,7 +867,6 @@ describe("workflows HTTP endpoint transport", () => {
     ]);
     expect(api.post.mock.calls).toEqual([
       ["/api/acme/workflows/wf1/http_trigger/credentials", { overlap_seconds: 3600 }],
-      ["/api/acme/workflows/wf1/http_trigger/test", { data: [{ a: 1 }], run_destinations: false }],
     ]);
   });
 
@@ -919,23 +916,6 @@ describe("workflows HTTP endpoint transport", () => {
     await expect(
       workflows.putHttpTrigger({ ...target, payload: { enabled: true, auth_mode: "token" } }),
     ).resolves.toEqual({ id: "t1", enabled: true, secret: "o2wh_abc", configured: true });
-  });
-
-  it("testHttpTrigger passes from_node and run_destinations through", async () => {
-    api.post.mockResolvedValue({ data: { errors: {}, inputs: {}, outputs: {} } });
-
-    await workflows.testHttpTrigger({
-      ...target,
-      data: [],
-      from_node: "n2",
-      run_destinations: true,
-    });
-
-    expect(api.post).toHaveBeenCalledWith("/api/acme/workflows/wf1/http_trigger/test", {
-      data: [],
-      from_node: "n2",
-      run_destinations: true,
-    });
   });
 
   const jsonResponse = (status: number, body: unknown) =>

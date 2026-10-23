@@ -100,13 +100,17 @@ const props = defineProps<{
   receivedAt: number | null;
   failedStep: { id: string; label: string; isFunction: boolean } | null;
   error: string | null;
+  /** The workflow's trigger kind; the guard hint names the fields that kind's steps read. */
+  triggerKind?: string;
 }>();
 const emit = defineEmits<{ (e: "open-step", nodeId: string): void }>();
 
 const { t } = useI18nTyped();
 const store = useStore();
 const dash = raw("—");
-const guardFields = raw("meta.alert_*");
+const guardFields = computed(() =>
+  raw(props.triggerKind === "incident_event" ? "meta.event_type" : "meta.alert_*"),
+);
 const guardCondition = raw("meta.trigger_source is empty");
 
 // A reason code doubles as the ledger error, so the shared "nothing stored" rule applies as is.

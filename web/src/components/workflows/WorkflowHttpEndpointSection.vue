@@ -203,6 +203,7 @@ import {
 } from "@/plugins/workflows/useWorkflowHttpEndpoint";
 import {
   HTTP_ENDPOINT_KEY,
+  HttpEndpointError,
   LAST_CALL_STATUS_KEYS,
   httpErrorText,
 } from "@/plugins/workflows/httpEndpointUi";
@@ -216,9 +217,11 @@ const props = defineProps<{
   workflowEnabled: boolean;
   context: EndpointContext;
   beforeCreate?: () => Promise<boolean>;
+  /** Run test reads the latest HTTP run's input from this step. */
+  triggerNodeId?: string;
 }>();
 
-const emit = defineEmits<{ (e: "run-test", seed: unknown[]): void }>();
+const emit = defineEmits<{ (e: "run-test", seed: unknown[], runAt?: number): void }>();
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -310,7 +313,10 @@ const turnOn = async () => {
   try {
     await endpoint.turnOn();
   } catch (err) {
-    actionError.value = t("workflow.http.turnOnFailed", { reason: httpErrorText(err, t) });
+    actionError.value =
+      err instanceof HttpEndpointError && err.key === "workflow.http.createForbidden"
+        ? t(err.key)
+        : t("workflow.http.turnOnFailed", { reason: httpErrorText(err, t) });
   }
 };
 
@@ -343,8 +349,8 @@ const confirmTurnOff = async () => {
   }
 };
 
-const onRunTest = () => {
-  const action = endpoint.runTest();
-  if (action.kind === "open_test") emit("run-test", action.seed);
+const onRunTest = async () => {
+  const action = await endpoint.runTest(props.triggerNodeId);
+  if (action.kind === "open_test") emit("run-test", action.seed, action.runAt);
 };
 </script>

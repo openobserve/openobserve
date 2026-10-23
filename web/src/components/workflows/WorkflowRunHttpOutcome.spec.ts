@@ -70,6 +70,17 @@ describe("WorkflowRunHttpOutcome", () => {
     );
   });
 
+  it("an incident workflow's guard hint names meta.event_type", () => {
+    const w = mountOutcome({
+      failedStep: { id: "fn-1", label: "Page", isFunction: true },
+      error: "FunctionNode JS error: TypeError",
+      triggerKind: "incident_event",
+    });
+    expect(w.find('[data-test="workflow-run-http-guard-hint"]').text()).toContain(
+      "If this step reads meta.event_type,",
+    );
+  });
+
   it("never-executed run shows the expired banner and the stored chip", () => {
     const w = mountOutcome({ status: "expired", reason: "expired" });
     const tag = w.findComponent({ name: "OTag" });

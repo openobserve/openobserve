@@ -126,6 +126,14 @@ export const OVERLAP_OPTIONS: { value: OverlapSeconds; labelKey: I18nKey }[] = [
   { value: 604800, labelKey: "workflow.http.overlapWeek" },
 ];
 
+/** A client-side refusal whose reason is an i18n key, so no English reaches the panel's copy. */
+export class HttpEndpointError extends Error {
+  constructor(public readonly key: I18nKey) {
+    super(key);
+    this.name = "HttpEndpointError";
+  }
+}
+
 export function openHttpPanel(): void {
   httpEditorState.panelOpen = true;
 }
@@ -152,10 +160,12 @@ export function useHttpEndpoint(): WorkflowHttpEndpoint {
   return endpoint;
 }
 
-/** The server's message when it sent one, else the generic unknown-error copy. */
+/** The server's message, a client refusal's translated reason, else the unknown-error copy. */
 export function httpErrorText(err: unknown, t: TranslateFn): I18nText {
-  const e = err as { response?: { data?: { message?: string } }; message?: string } | null;
-  return raw(e?.response?.data?.message ?? e?.message) || t("common.unknownError");
+  if (err instanceof HttpEndpointError) return t(err.key);
+  const message = (err as { response?: { data?: { message?: string } } } | null)?.response?.data
+    ?.message;
+  return message ? raw(message) : t("common.unknownError");
 }
 
 /** Whole mebibytes read as MiB, everything else through the run view's B / KiB formatter. */

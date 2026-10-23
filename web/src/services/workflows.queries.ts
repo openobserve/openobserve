@@ -80,6 +80,8 @@ export const workflowHttpTriggerQuery = (org: string, id: string) =>
     queryKey: workflowKeys.httpTrigger(org, id),
     queryFn: () => workflows.getHttpTrigger({ org_identifier: org, id }),
     staleTime: NORMAL_STALE_TIME,
+    // Last call, Last used and rejections change while the panel is closed.
+    refetchOnMount: "always",
     enabled: !!org && !!id,
   });
 
@@ -127,13 +129,6 @@ export const revokeHttpCredentialMutation = (org: string, id: string) =>
     mutationFn: (vars: { credential_id: string }) =>
       workflows.revokeHttpCredential({ org_identifier: org, id, ...vars }),
     meta: { invalidates: [workflowKeys.httpTrigger(org, id)], silentError: true },
-  });
-
-export const testHttpTriggerMutation = (org: string, id: string) =>
-  mutationOptions({
-    mutationFn: (vars: { data: unknown[]; from_node?: string; run_destinations?: boolean }) =>
-      workflows.testHttpTrigger({ org_identifier: org, id, ...vars }),
-    meta: { invalidates: [workflowKeys.runsOf(org, id)] },
   });
 
 // No meta.invalidates, no persister; the composable reads the value and calls reset() at once (AC-WEB-10).

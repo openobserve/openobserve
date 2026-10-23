@@ -44,6 +44,10 @@ vi.mock("@/services/workflows", async (importOriginal) => {
     dryRunHook: vi.fn(),
   });
 });
+const orgConfig = { is_org_admin: true };
+vi.mock("@/services/config", () => ({
+  default: { get_config: vi.fn(), get_config_full: vi.fn(async () => ({ data: orgConfig })) },
+}));
 
 const api = vi.mocked(workflows);
 const t = (k: string, v?: Record<string, unknown>) => i18n.global.t(k, v ?? {});
@@ -86,6 +90,7 @@ describe("WorkflowHttpEndpointPanel", () => {
     store.state.selectedOrganization = { ...store.state.selectedOrganization, identifier: "acme" };
     store.state.zoConfig = { ...store.state.zoConfig, rbac_enabled: false };
     store.state.currentuser = { role: "admin" };
+    orgConfig.is_org_admin = true;
     api.getHttpTrigger.mockResolvedValue(httpConfig());
   });
   afterEach(() => {
@@ -172,7 +177,7 @@ describe("WorkflowHttpEndpointPanel", () => {
   });
 
   it("without credential access the unsaved panel shows the admin line and no button", async () => {
-    store.state.currentuser = { role: "member" };
+    orgConfig.is_org_admin = false;
     const beforeCreate = vi.fn(async () => true);
     const w = await mountPanel({ workflowId: null, beforeCreate });
     expect(byTest(w, "workflow-http-needs-admin").text()).toBe(t("workflow.http.needsAdmin"));

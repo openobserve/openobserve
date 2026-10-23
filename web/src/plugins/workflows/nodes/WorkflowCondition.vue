@@ -100,6 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
     </ConditionBuilder>
+    <WorkflowHttpFieldHint v-if="httpOn" />
   </div>
 </template>
 
@@ -120,6 +121,8 @@ import {
 import { conditionFieldOptions } from "@/plugins/workflows/triggers";
 import { workflowHooksEnabled } from "@/plugins/workflows/httpEndpoint";
 import { httpEditorState } from "@/plugins/workflows/httpEndpointUi";
+import { httpQueryKeys } from "@/plugins/workflows/httpRequestSample";
+import WorkflowHttpFieldHint from "./WorkflowHttpFieldHint.vue";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -146,12 +149,11 @@ const dismissGuidelines = () => {
 // With no trigger (it was deleted), we offer nothing rather than a wrong set —
 // the user can still type any column via allow-custom-columns.
 const kind = currentTriggerKind();
+const httpOn = computed(
+  () => workflowHooksEnabled(store.state.zoConfig) && httpEditorState.endpointOn,
+);
 const fields = computed(() =>
-  conditionFieldOptions(
-    kind,
-    workflowHooksEnabled(store.state.zoConfig) && httpEditorState.endpointOn,
-    t,
-  ),
+  conditionFieldOptions(kind, httpOn.value, t, httpQueryKeys(workflowObj.testRun.input)),
 );
 const savedConditions = workflowObj.currentSelectedNodeData?.data?.conditions ?? null;
 

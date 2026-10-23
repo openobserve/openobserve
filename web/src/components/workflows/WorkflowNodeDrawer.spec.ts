@@ -2108,6 +2108,7 @@ describe("WorkflowNodeDrawer — HTTP request run on the trigger step", () => {
     const outcome = wrapper.findComponent({ name: "WorkflowRunHttpOutcome" });
     expect(outcome.exists()).toBe(true);
     expect(outcome.props("reason")).toBe("expired");
+    expect(outcome.props("triggerKind")).toBe("alert_fired");
     expect(wrapper.find('[data-test="workflow-ndv-no-run-data"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="workflow-node-retry-from"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="workflow-run-use-as-test-input"]').exists()).toBe(false);

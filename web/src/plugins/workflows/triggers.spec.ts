@@ -145,7 +145,7 @@ describe("conditionFieldOptions (AC-UI-32)", () => {
     expect(conditionFieldOptions(undefined, true, t)).toEqual([]);
   });
 
-  it("adds the HTTP request group after the kind's fields, ending with the body hint", () => {
+  it("adds the HTTP request group after the kind's fields; the hints are not options", () => {
     const options = conditionFieldOptions("alert_fired", true, t);
     expect(options[0]).toMatchObject({
       header: true,
@@ -154,11 +154,15 @@ describe("conditionFieldOptions (AC-UI-32)", () => {
     expect(options.slice(1, 1 + ALERT_PAYLOAD_FIELDS.length)).toEqual(ALERT_PAYLOAD_FIELDS);
     const groupAt = 1 + ALERT_PAYLOAD_FIELDS.length;
     expect(options[groupAt]).toMatchObject({ header: true, label: t("workflow.http.fieldGroup") });
-    expect(options.slice(groupAt + 1, -1)).toEqual(HTTP_REQUEST_PAYLOAD_FIELDS);
-    expect(options[options.length - 1]).toMatchObject({
-      header: true,
-      label: t("workflow.http.fieldGroupBodyHint"),
-    });
+    expect(options.slice(groupAt + 1)).toEqual(HTTP_REQUEST_PAYLOAD_FIELDS);
+    expect(options.map((o) => String(o.label))).not.toContain(
+      t("workflow.http.fieldGroupBodyHint"),
+    );
+  });
+
+  it("offers meta.query.<key> for each query key it is given", () => {
+    const values = conditionFieldOptions("alert_fired", true, t, ["env"]).map((o) => o.value);
+    expect(values.slice(-1)).toEqual(["meta_query_env"]);
   });
 
   it("offers meta.trigger_source and never a data.* field", () => {

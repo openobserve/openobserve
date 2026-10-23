@@ -1028,9 +1028,22 @@ describe("WorkflowRunsPanel — stored statuses and HTTP request runs", () => {
     const w = await mountHttp([
       row({ run_id: "t-1", status: "failed", error: null }),
       row({ run_id: "t-2", status: "succeeded", error: "x" }),
+      row({ run_id: "t-3", status: "queued", error: null }),
+      row({ run_id: "t-4", status: "running", error: null }),
+      row({ run_id: "t-5", status: "expired", error: null }),
+      row({ run_id: "t-6", status: "failed", error: "worker_lost" }),
     ]);
-    const hist = w.findComponent({ name: "WorkflowExecutionTimeline" }).props("history") as any[];
-    expect(hist.map((h) => h.status)).toEqual(["error", "success"]);
+    const hist = w.findComponent({ name: "WorkflowExecutionTimeline" }).props("history") as {
+      status: string;
+    }[];
+    expect(hist.map((h) => h.status)).toEqual([
+      "error",
+      "success",
+      "pending",
+      "pending",
+      "skipped",
+      "error",
+    ]);
   });
 
   it("hides the trigger filter on a workflow that never had an endpoint", async () => {

@@ -18,7 +18,9 @@ import {
   HTTP_HEADER_ALLOWLIST,
   HTTP_REQUEST_PAYLOAD_FIELDS,
   buildHttpRequestSample,
+  httpQueryKeys,
   httpRequestPayloadFields,
+  isHttpRequestInput,
 } from "./httpRequestSample";
 
 describe("buildHttpRequestSample", () => {
@@ -85,5 +87,25 @@ describe("HTTP_REQUEST_PAYLOAD_FIELDS", () => {
     expect(fields.slice(0, HTTP_REQUEST_PAYLOAD_FIELDS.length)).toEqual(
       HTTP_REQUEST_PAYLOAD_FIELDS,
     );
+  });
+});
+
+describe("reading an HTTP request input", () => {
+  const http = JSON.stringify([
+    { meta: { trigger_source: "http", query: { env: ["a", "b"], region: "eu" } }, data: [] },
+  ]);
+
+  it("httpQueryKeys lists the query keys of an HTTP input and nothing else", () => {
+    expect(httpQueryKeys(http)).toEqual(["env", "region"]);
+    expect(httpQueryKeys(JSON.stringify(buildHttpRequestSample()))).toEqual([]);
+    expect(httpQueryKeys(JSON.stringify([{ meta: { query: { a: 1 } } }]))).toEqual([]);
+    expect(httpQueryKeys("not json")).toEqual([]);
+    expect(httpQueryKeys(undefined)).toEqual([]);
+  });
+
+  it("isHttpRequestInput is true only for records stamped trigger_source http", () => {
+    expect(isHttpRequestInput(http)).toBe(true);
+    expect(isHttpRequestInput(JSON.stringify([{ meta: { alert_name: "x" } }]))).toBe(false);
+    expect(isHttpRequestInput("{")).toBe(false);
   });
 });

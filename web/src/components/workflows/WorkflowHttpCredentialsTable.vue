@@ -288,7 +288,6 @@ const allColumns = computed<OTableColumnDef<HttpCredential>[]>(() => [
   {
     id: "actions",
     header: t("workflow.http.colActions"),
-    // Rigid and clipped on the left: a retiring row's Show, Copy and "Revoke now" need 174 px.
     size: 176,
     meta: { align: "right" },
   },
