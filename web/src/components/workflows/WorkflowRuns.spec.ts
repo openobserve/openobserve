@@ -96,8 +96,8 @@ const OButtonStub = {
 };
 const RunsPanelStub = {
   name: "WorkflowRunsPanel",
-  props: ["orgId", "workflowId", "workflowName", "selectedRunId"],
-  emits: ["select-run"],
+  props: ["orgId", "workflowId", "workflowName", "selectedRunId", "triggerFilter"],
+  emits: ["select-run", "update:triggerFilter"],
   template: `<div class="runs-panel" />`,
 };
 const stub = (name: string) => ({ name, template: `<div class="${name}" />` });
@@ -302,6 +302,21 @@ describe("WorkflowRuns", () => {
     expect(panel(wrapper).props("selectedRunId")).toBe("");
     // Test never navigates away — it stays on the runs page.
     expect(mockRouter.push).not.toHaveBeenCalled();
+  });
+
+  it("widens the runs panel only under the HTTP request filter", async () => {
+    const wrapper = await mountRuns();
+    const box = () => wrapper.find('[data-test="workflow-runs-panel"]').classes();
+    expect(box()).toContain("w-[27.5rem]");
+    panel(wrapper).vm.$emit("update:triggerFilter", "http_request");
+    await flushPromises();
+    expect(box()).toContain("w-[46rem]");
+    expect(box()).toContain("max-w-[60%]");
+    expect(box()).not.toContain("w-[27.5rem]");
+    expect(box()).toContain("max-lg:w-full");
+    panel(wrapper).vm.$emit("update:triggerFilter", "alert_fired");
+    await flushPromises();
+    expect(box()).toContain("w-[27.5rem]");
   });
 
   it("back returns to the workflows list", async () => {
