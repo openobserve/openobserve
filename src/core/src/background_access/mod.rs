@@ -338,12 +338,13 @@ pub fn panel_sources_with(
         (QueryLanguage::Sql, StreamType::Logs)
     };
     let mut sources = Vec::new();
-    let queries = panel
+    let queries: Vec<&serde_json::Value> = panel
         .get("queries")
         .and_then(|q| q.as_array())
         .into_iter()
-        .flatten();
-    for query in queries {
+        .flatten()
+        .collect();
+    for query in &queries {
         let fields = query.get("fields");
         let stream_type = fields.map_or(fallback_type, |f| json_stream_type(f, fallback_type));
         if let Some(text) = query.get("query").and_then(|q| q.as_str()) {
@@ -377,7 +378,49 @@ pub fn panel_sources_with(
             }
         }
     }
+    if promql {
+        sources.extend(formula_sources(org_id, &queries, values, fill));
+    }
     sources
+}
+
+/// Each formula as the build expands it over its inputs' filled texts; a bad letter runs nothing.
+fn formula_sources(
+    org_id: &str,
+    queries: &[&serde_json::Value],
+    values: &HashMap<String, String>,
+    fill: impl Fn(&str, QueryLanguage) -> String,
+) -> Vec<QuerySource> {
+    use crate::public_dashboards::formula;
+
+    let configs: Vec<serde_json::Value> = queries
+        .iter()
+        .map(|q| q.get("config").cloned().unwrap_or_default())
+        .collect();
+    let texts: Vec<String> = queries
+        .iter()
+        .zip(&configs)
+        .map(|(q, cfg)| {
+            let text = cfg.get("formula").and_then(|v| v.as_str());
+            let text = text.or(q.get("query").and_then(|v| v.as_str()));
+            fill(text.unwrap_or_default(), QueryLanguage::PromQl)
+        })
+        .collect();
+    configs
+        .iter()
+        .zip(formula::expand(&configs, &texts))
+        .filter(|(cfg, _)| formula::is_formula(cfg))
+        .filter_map(|(_, expr)| expr.ok())
+        .flat_map(|expr| {
+            panel_query_sources(
+                org_id,
+                &expr,
+                QueryLanguage::PromQl,
+                StreamType::Metrics,
+                values,
+            )
+        })
+        .collect()
 }
 
 pub fn eval_job_sources(org_id: &str, stream_type: &str, stream: &str) -> Vec<QuerySource> {
@@ -1168,7 +1211,7 @@ fn panels_by_key(dashboard: &Value) -> HashMap<(String, String), &Value> {
     out
 }
 
-/// Every field [`panel_sources`] reads, so equal values read the same streams.
+/// Every field [`panel_sources`] or the build reads, so equal values read the same streams.
 #[cfg(feature = "enterprise")]
 fn panel_reads(panel: &Value) -> Value {
     let queries: Vec<Value> = panel
@@ -1183,6 +1226,9 @@ fn panel_reads(panel: &Value) -> Value {
                 query.pointer("/fields/stream"),
                 query.pointer("/fields/stream_type"),
                 query.get("joins"),
+                query.pointer("/config/formula"),
+                query.pointer("/config/ref"),
+                query.pointer("/config/hide"),
             ])
         })
         .collect();
@@ -1998,6 +2044,105 @@ mod tests {
                 .await
                 .is_ok()
         );
+    }
+
+    /// A PromQL panel whose hidden `up` feeds formula `formula`.
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    fn formula_dashboard(formula: &str) -> Dashboard {
+        let query = |text: &str, config: serde_json::Value| {
+            json!({
+                "query": text, "customQuery": true,
+                "fields": { "stream": "", "stream_type": "metrics", "x": [], "y": [],
+                            "filter": { "filterType": "group", "logicalOperator": "AND", "conditions": [] } },
+                "config": config
+            })
+        };
+        let panel = json!({
+            "id": "p1", "type": "line", "title": "p1", "description": "",
+            "config": { "show_legends": false, "legends_position": null },
+            "queryType": "promql",
+            "queries": [
+                query("up", json!({ "promql_legend": "", "ref": "A", "hide": true })),
+                query("", json!({ "promql_legend": "", "formula": formula })),
+            ]
+        });
+        Dashboard {
+            version: 8,
+            v8: Some(
+                serde_json::from_value(json!({
+                    "title": "d",
+                    "tabs": [{ "tabId": "t1", "name": "", "panels": [panel] }]
+                }))
+                .unwrap(),
+            ),
+            ..Default::default()
+        }
+    }
+
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    fn metrics_editor() -> String {
+        let user = format!("{}@example.com", config::ider::uuid());
+        let checker = crate::authz::fake_checker();
+        for name in ["up", "safe_metric"] {
+            checker.grant_read(
+                &user,
+                &crate::authz::TypedStream {
+                    org_id: "o1".to_string(),
+                    stream_type: StreamType::Metrics,
+                    name: name.to_string(),
+                },
+            );
+        }
+        user
+    }
+
+    /// The link's build expands the formula and runs it as the publisher, so the editor needs it.
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    #[tokio::test]
+    async fn a_formula_only_edit_is_checked_as_the_build_expands_it() {
+        let user = metrics_editor();
+        let stored = formula_dashboard("A * 2");
+        let link = || Ok(vec![public_link(json!({}))]);
+
+        let secret = formula_dashboard("A / sum(secret_metric)");
+        let resp = guard_with_links(&user, &stored, &secret, link())
+            .await
+            .unwrap_err();
+        assert_eq!(resp.status(), axum::http::StatusCode::FORBIDDEN);
+        let msg = message(resp).await;
+        assert!(msg.contains("secret_metric"), "{msg}");
+
+        let readable = formula_dashboard("A / sum(safe_metric)");
+        assert!(
+            guard_with_links(&user, &stored, &readable, link())
+                .await
+                .is_ok()
+        );
+    }
+
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    #[tokio::test]
+    async fn an_unchanged_formula_is_not_an_edit_but_a_ref_or_hide_change_is() {
+        let user = metrics_editor();
+        let stored = dashboard_json(&formula_dashboard("sum(secret_metric)")).unwrap();
+        let mut renamed = stored.clone();
+        renamed["title"] = json!("renamed");
+        let no_lookup = || async { panic!("an unchanged formula must not look up readers") };
+        assert!(
+            guard_edit("o1", &user, &stored, &renamed, no_lookup)
+                .await
+                .is_ok()
+        );
+
+        let queries = "/tabs/0/panels/0/queries";
+        for (field, value) in [("ref", json!("B")), ("hide", json!(false))] {
+            let mut edited = stored.clone();
+            edited.pointer_mut(queries).unwrap()[0]["config"][field] = value;
+            assert!(
+                !QueryEdits::between(&stored, &edited).is_empty(),
+                "{field} changes what the build sends"
+            );
+        }
     }
 
     /// A values-query stream is checked at its saved value, or the refusal names the variable.

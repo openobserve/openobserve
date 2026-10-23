@@ -72,6 +72,28 @@ pub fn query_refs(configs: &[Value]) -> Vec<Option<String>> {
         .collect()
 }
 
+/// Each query's text, a formula's letters replaced by its inputs'; hiding is the caller's.
+pub fn expand(configs: &[Value], texts: &[String]) -> Vec<Result<String, FormulaError>> {
+    let inputs: BTreeMap<String, Option<String>> = query_refs(configs)
+        .into_iter()
+        .zip(configs.iter().zip(texts))
+        .filter_map(|(letter, (cfg, text))| {
+            Some((letter?, (!is_formula(cfg)).then(|| text.clone())))
+        })
+        .collect();
+    configs
+        .iter()
+        .zip(texts)
+        .map(|(cfg, text)| {
+            if is_formula(cfg) {
+                substitute(text, &inputs)
+            } else {
+                Ok(text.clone())
+            }
+        })
+        .collect()
+}
+
 /// Legend fallbacks once formulas are stripped: input letters, a formula's ref or "Formula".
 pub fn viewer_legend_fallbacks(configs: &[Value]) -> Vec<Option<String>> {
     if !configs.iter().any(is_formula) {

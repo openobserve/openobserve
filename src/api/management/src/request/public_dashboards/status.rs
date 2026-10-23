@@ -20,10 +20,12 @@ use axum::{
     response::Response,
 };
 use common::meta::http::HttpResponse as MetaHttpResponse;
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::public_dashboards::status::{self, MAX_BATCH};
 use serde::Deserialize;
 
-use super::admin::{feature_gate, load_link, map_err};
+use super::admin::{feature_gate, hide_unreadable_status, load_link, map_err};
+use crate::service::auth::UserEmail;
 
 #[derive(Deserialize)]
 pub struct BatchParams {
@@ -33,6 +35,7 @@ pub struct BatchParams {
 /// GET /{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/status, with sources.
 pub async fn link(
     Path((org_id, dashboard_id, link_id)): Path<(String, String, String)>,
+    Headers(user): Headers<UserEmail>,
 ) -> Response {
     if let Some(r) = feature_gate() {
         return r;
@@ -41,10 +44,12 @@ pub async fn link(
         Ok(link) => link,
         Err(r) => return r,
     };
-    match status::reports(std::slice::from_ref(&link), true)
-        .await
-        .pop()
-    {
+    let links = std::slice::from_ref(&link);
+    let mut reports = status::reports(links, true).await;
+    if let Err(e) = hide_unreadable_status(&org_id, &user.user_id, links, &mut reports).await {
+        return map_err("status", e);
+    }
+    match reports.pop() {
         Some(report) => MetaHttpResponse::json(report),
         None => MetaHttpResponse::service_unavailable(
             "The server that holds this link's results did not answer. Try again.",
@@ -53,7 +58,11 @@ pub async fn link(
 }
 
 /// GET /{org_id}/public_dashboards/status?ids=a,b — no sources; unreachable owners left out.
-pub async fn batch(Path(org_id): Path<String>, Query(params): Query<BatchParams>) -> Response {
+pub async fn batch(
+    Path(org_id): Path<String>,
+    Headers(user): Headers<UserEmail>,
+    Query(params): Query<BatchParams>,
+) -> Response {
     if let Some(r) = feature_gate() {
         return r;
     }
@@ -65,7 +74,10 @@ pub async fn batch(Path(org_id): Path<String>, Query(params): Query<BatchParams>
         Ok(links) => links,
         Err(e) => return map_err("status_batch", e),
     };
-    let list = status::reports(&links, false).await;
+    let mut list = status::reports(&links, false).await;
+    if let Err(e) = hide_unreadable_status(&org_id, &user.user_id, &links, &mut list).await {
+        return map_err("status_batch", e);
+    }
     MetaHttpResponse::json(serde_json::json!({ "list": list }))
 }
 
@@ -107,8 +119,12 @@ mod tests {
     #[tokio::test]
     async fn gate14_an_oversized_batch_is_a_400_before_any_lookup() {
         let ids: Vec<String> = (0..51).map(|i| format!("l{i}")).collect();
+        let user = UserEmail {
+            user_id: "u@example.com".to_string(),
+        };
         let resp = batch(
             Path("o1".to_string()),
+            Headers(user),
             Query(BatchParams {
                 ids: Some(ids.join(",")),
             }),

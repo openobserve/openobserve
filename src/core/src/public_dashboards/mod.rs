@@ -2359,25 +2359,14 @@ fn plan_promql(
             vars.substitute(text, "promql", start, end)
         })
         .collect();
-    let inputs: BTreeMap<String, Option<String>> = formula::query_refs(&configs)
-        .into_iter()
-        .zip(configs.iter().zip(&texts))
-        .filter_map(|(letter, (cfg, text))| {
-            Some((letter?, (!formula::is_formula(cfg)).then(|| text.clone())))
-        })
-        .collect();
     configs
         .iter()
-        .zip(texts)
-        .map(|(cfg, text)| {
+        .zip(formula::expand(&configs, &texts))
+        .map(|(cfg, expr)| {
             if cfg.get("hide").and_then(|v| v.as_bool()) == Some(true) {
                 return Ok(None);
             }
-            let expr = if formula::is_formula(cfg) {
-                formula::substitute(&text, &inputs)?
-            } else {
-                text
-            };
+            let expr = expr?;
             // An empty query fails on the server, so it keeps its slot without a search.
             Ok(Some(expr).filter(|e| !e.trim().is_empty()))
         })

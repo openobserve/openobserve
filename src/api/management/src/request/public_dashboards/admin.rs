@@ -22,7 +22,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use common::meta::http::HttpResponse as MetaHttpResponse;
-use config::meta::public_dashboards::{PublicDashboardConfig, TakeOverRequest};
+use config::meta::public_dashboards::{LinkStatusReport, PublicDashboardConfig, TakeOverRequest};
 use infra::table::entity::public_dashboards::Model as PublicDashboard;
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::public_dashboards::{
@@ -175,6 +175,27 @@ async fn hide_for_reader(views: &mut [PublicLinkView], org_id: &str, reader: Opt
         })
         .await;
     }
+}
+
+/// Hides the status details of links whose dashboard `user_id` may not GET, as slugs are hidden.
+pub(super) async fn hide_unreadable_status(
+    org_id: &str,
+    user_id: &str,
+    links: &[PublicDashboard],
+    reports: &mut [LinkStatusReport],
+) -> Result<(), anyhow::Error> {
+    let ids: Vec<String> = links.iter().map(|l| l.dashboard_id.clone()).collect();
+    let labels = infra::table::dashboards::labels_by_ids(org_id, &ids).await?;
+    openobserve_core::public_dashboards::status::hide_unreadable_details(
+        reports,
+        links,
+        |dashboard_id| {
+            let folder_id = labels.get(&dashboard_id).map(|l| l.folder_id.clone());
+            can_read_dashboard(org_id, user_id, dashboard_id, folder_id)
+        },
+    )
+    .await;
+    Ok(())
 }
 
 async fn view_response(

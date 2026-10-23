@@ -15,7 +15,7 @@
 
 //! The publisher's status call, answered by the querier owning the slug over internal gRPC.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use config::{
     cluster::LOCAL_NODE,
@@ -105,6 +105,41 @@ pub async fn reports(links: &[PublicDashboard], with_sources: bool) -> Vec<LinkS
     links.iter().filter_map(|l| by_id.remove(&l.id)).collect()
 }
 
+/// Clears sources and error text of each report whose dashboard `can_read` refuses, as slugs are.
+pub async fn hide_unreadable_details<F, Fut>(
+    reports: &mut [LinkStatusReport],
+    links: &[PublicDashboard],
+    can_read: F,
+) where
+    F: Fn(String) -> Fut,
+    Fut: std::future::Future<Output = bool>,
+{
+    let dashboards: HashMap<&str, &str> = links
+        .iter()
+        .map(|l| (l.id.as_str(), l.dashboard_id.as_str()))
+        .collect();
+    let mut readable: HashMap<&str, bool> = HashMap::new();
+    for report in reports.iter_mut() {
+        let allowed = match dashboards.get(report.link_id.as_str()) {
+            None => false,
+            Some(&dashboard) => match readable.get(dashboard) {
+                Some(&allowed) => allowed,
+                None => {
+                    let allowed = can_read(dashboard.to_string()).await;
+                    readable.insert(dashboard, allowed);
+                    allowed
+                }
+            },
+        };
+        if !allowed {
+            for range in &mut report.ranges {
+                range.sources = None;
+                range.last_error = None;
+            }
+        }
+    }
+}
+
 /// The slug's owner on the Interactive ring, as the router routes; `None` is this node or no ring.
 async fn owner_of(slug: &str) -> Option<String> {
     let name =
@@ -184,6 +219,56 @@ mod tests {
         assert_eq!(ids(None), ["b"]);
         assert_eq!(ids(Some("q1")), ["d"]);
         assert_eq!(ids(Some("q2")), ["a", "c"]);
+    }
+
+    #[tokio::test]
+    async fn status_details_are_hidden_from_a_reader_of_neither_dashboard() {
+        use config::meta::{public_dashboards::RangeStatus, stream::StreamType};
+
+        let report = |id: &str| LinkStatusReport {
+            link_id: id.to_string(),
+            ranges: vec![RangeStatus {
+                key: "r3600".to_string(),
+                state: RangeState::NeedsAttention,
+                built_at: None,
+                withheld_panels: vec![],
+                unavailable_count: 0,
+                incomplete_count: 0,
+                last_error: Some("no read permission on logs/secret".to_string()),
+                next_retry_at: None,
+                sources: Some(BTreeMap::from([(
+                    "p1".to_string(),
+                    vec![(StreamType::Logs, "secret".to_string())],
+                )])),
+            }],
+            access_count: 0,
+            last_accessed_at: None,
+        };
+        let mut links: Vec<PublicDashboard> = ["a", "b", "c"].into_iter().map(link).collect();
+        links[1].dashboard_id = "hidden".to_string();
+        links[2].dashboard_id = "hidden".to_string();
+        let mut reports: Vec<_> = ["a", "b", "c", "unknown"].into_iter().map(report).collect();
+        let asked = std::sync::Mutex::new(Vec::new());
+        hide_unreadable_details(&mut reports, &links, |dashboard| {
+            asked.lock().unwrap().push(dashboard.clone());
+            async move { dashboard != "hidden" }
+        })
+        .await;
+        assert_eq!(
+            *asked.lock().unwrap(),
+            ["d", "hidden"],
+            "once per dashboard"
+        );
+        assert_eq!(
+            reports[0],
+            report("a"),
+            "a readable dashboard keeps its details"
+        );
+        for hidden in &reports[1..] {
+            let range = &hidden.ranges[0];
+            assert_eq!((&range.sources, &range.last_error), (&None, &None));
+            assert_eq!(range.state, RangeState::NeedsAttention);
+        }
     }
 
     #[tokio::test]

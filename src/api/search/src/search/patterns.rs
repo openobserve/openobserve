@@ -26,7 +26,9 @@ use {
     tokio::sync::mpsc,
 };
 
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+use crate::common::{
+    meta::http::HttpResponse as MetaHttpResponse, utils::http::client_search_type,
+};
 
 /// Extract patterns from search results
 ///
@@ -111,6 +113,9 @@ pub async fn extract_patterns(
             config::utils::time::validate_time_range(req.query.start_time, req.query.end_time)
         {
             return MetaHttpResponse::bad_request(msg);
+        }
+        if let Some(Err(e)) = req.search_type.map(client_search_type) {
+            return MetaHttpResponse::bad_request(e);
         }
 
         // Create audit context
