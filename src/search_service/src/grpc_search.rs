@@ -65,39 +65,34 @@ pub async fn grpc_search(
     let stream_type = stream_type.as_str();
     let in_req = in_req.clone();
     let timeout = in_req.timeout as u64;
-    let task = tokio::task::spawn(
-        async move {
-            let req = bytes::Bytes::from(json::to_string(&in_req)?).to_vec();
-            let mut request = tonic::Request::new(proto::cluster_rpc::SearchRequest {
-                trace_id: trace_id.to_string(),
-                org_id: org_id.to_string(),
-                stream_type: stream_type.to_string(),
-                user_id: user_id.clone(),
-                request: req,
-            });
-            let node = Arc::new(node) as _;
-            let mut client =
-                make_grpc_search_client(&trace_id, &mut request, &node, timeout).await?;
-            let response = match client.search(request).await {
-                Ok(res) => res.into_inner(),
-                Err(err) => {
-                    log::error!(
-                        "[trace_id: {trace_id}] search->grpc: node: {}, search err: {:?}",
-                        node.get_grpc_addr(),
-                        err
-                    );
-                    let err = ErrorCodes::from_json(err.message())?;
-                    return Err(Error::ErrorCode(err));
-                }
-            };
-            Ok(response)
-        }
-        .instrument(grpc_span),
-    );
-
-    let response = task
-        .await
-        .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))??;
+    // The caller owns the RPC so cancelling a usage check also cancels its search.
+    let response = async move {
+        let req = bytes::Bytes::from(json::to_string(&in_req)?).to_vec();
+        let mut request = tonic::Request::new(proto::cluster_rpc::SearchRequest {
+            trace_id: trace_id.to_string(),
+            org_id: org_id.to_string(),
+            stream_type: stream_type.to_string(),
+            user_id: user_id.clone(),
+            request: req,
+        });
+        let node = Arc::new(node) as _;
+        let mut client = make_grpc_search_client(&trace_id, &mut request, &node, timeout).await?;
+        let response = match client.search(request).await {
+            Ok(res) => res.into_inner(),
+            Err(err) => {
+                log::error!(
+                    "[trace_id: {trace_id}] search->grpc: node: {}, search err: {:?}",
+                    node.get_grpc_addr(),
+                    err
+                );
+                let err = ErrorCodes::from_json(err.message())?;
+                return Err(Error::ErrorCode(err));
+            }
+        };
+        Ok(response)
+    }
+    .instrument(grpc_span)
+    .await?;
     let response = json::from_slice::<search::Response>(&response.response)?;
 
     Ok(response)
