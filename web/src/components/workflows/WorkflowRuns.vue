@@ -125,13 +125,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="!panelCollapsed"
         data-test="workflow-runs-panel"
         class="rounded-surface border-border-default bg-surface-base mb-3 flex min-h-0 shrink-0 flex-col overflow-hidden border max-lg:h-96 max-lg:w-full max-lg:max-w-full"
-        :class="
-          runsTriggerFilter === 'http_request' ? 'w-[46rem] max-w-[60%]' : 'w-[27.5rem] max-w-[46%]'
-        "
+        :class="PANEL_WIDTH[runsLayout]"
       >
         <WorkflowRunsPanel
           ref="runsPanelRef"
-          v-model:trigger-filter="runsTriggerFilter"
+          @layout="runsLayout = $event"
           :org-id="orgId"
           :workflow-id="workflowId"
           :workflow-name="workflowName"
@@ -185,6 +183,13 @@ const { t } = useI18nTyped();
 const { resetWorkflowData } = useWorkflowCanvas(t);
 
 const router = useRouter();
+// Each column set's sizes are budgeted against its panel width; the panel has no horizontal scroll.
+const PANEL_WIDTH = {
+  plain: "w-[27.5rem] max-w-[46%]",
+  source: "w-[32rem] max-w-[50%]",
+  http: "w-[46rem] max-w-[60%]",
+} as const;
+
 const store = useStore();
 
 const orgId = computed(() => store.state.selectedOrganization.identifier as string);
@@ -199,8 +204,7 @@ const activeFolderId = computed(
 const workflowId = computed(() => (router.currentRoute.value.query.id as string) || "");
 const workflowName = computed(() => workflowObj.currentSelectedWorkflow?.name || "");
 const selectedRunId = ref<string>("");
-// The HTTP column set needs the wider panel; every other filter keeps the 27.5rem column.
-const runsTriggerFilter = ref("all");
+const runsLayout = ref<keyof typeof PANEL_WIDTH>("plain");
 
 // Steps this run executed that no longer exist in the workflow (deleted/edited
 // since). Their badges can't render, so the canvas alone would under-report the

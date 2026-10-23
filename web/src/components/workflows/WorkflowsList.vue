@@ -665,6 +665,8 @@ const columns = computed<OTableColumnDef<any>[]>(() => [
     sortable: true,
     resizable: true,
     hideable: true,
+    // Incident Event 94 + HTTP 63 + gap and padding, measured in the built UI.
+    size: 184,
     meta: { align: "left" },
   },
   {

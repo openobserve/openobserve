@@ -4523,7 +4523,6 @@
       "colToken": "Token",
       "colSecret": "Secret",
       "colCreated": "Created",
-      "colCreatedBy": "Created by",
       "colLastUsed": "Last used",
       "colStatus": "Status",
       "colActions": "Actions",

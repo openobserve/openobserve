@@ -26,7 +26,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex flex-col gap-4 p-4 text-left">
       <template v-if="kind">
         <OBanner variant="info" dense data-test="workflow-http-kind-note">
-          <span>{{ kindNote }}</span>
+          <i18n-t keypath="workflow.http.kindNote" tag="span" scope="global">
+            <template #kind>{{ kindLabel }}</template>
+            <template #field>
+              <OText variant="mono">{{ TRIGGER_SOURCE_FIELD }}</OText>
+            </template>
+          </i18n-t>
           <OButton
             variant="ghost-primary"
             size="xs"
@@ -45,6 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="showPayload"
           :code="samplePayload"
           lang="json"
+          padded
+          wrap
           data-test="workflow-http-kind-note-sample"
         />
       </template>
@@ -68,10 +75,13 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import { triggerDef } from "@/plugins/workflows/triggers";
 import { httpPreviewSample } from "@/plugins/workflows/httpEndpointUi";
 import type { EndpointContext } from "@/plugins/workflows/useWorkflowHttpEndpoint";
 import WorkflowHttpEndpointSection from "./WorkflowHttpEndpointSection.vue";
+
+const TRIGGER_SOURCE_FIELD = 'meta.trigger_source = "http"';
 
 const props = defineProps<{
   open: boolean;
@@ -94,16 +104,13 @@ const { t } = useI18nTyped();
 const showPayload = ref(false);
 
 const kindLabel = computed(() => (props.kind ? t(triggerDef(props.kind).labelKey) : raw("")));
+const displayName = computed(() =>
+  props.workflowName.trim() ? raw(props.workflowName) : t("workflow.namePlaceholder"),
+);
 const subtitle = computed(() =>
   props.kind
-    ? t("workflow.http.panelSubtitle", { name: props.workflowName, kind: kindLabel.value })
-    : raw(props.workflowName),
-);
-const kindNote = computed(() =>
-  t("workflow.http.kindNote", {
-    kind: kindLabel.value,
-    field: raw('meta.trigger_source = "http"'),
-  }),
+    ? t("workflow.http.panelSubtitle", { name: displayName.value, kind: kindLabel.value })
+    : displayName.value,
 );
 const samplePayload = computed(() => JSON.stringify(httpPreviewSample(), null, 2));
 

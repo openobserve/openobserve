@@ -171,6 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :value="row._timestamp"
               unit="us"
               mode="absolute"
+              :format="RUN_TIME_SHORT"
               :timezone="store.state.timezone"
               :empty-label="dash"
             />
@@ -181,13 +182,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :value="value"
               unit="us"
               mode="absolute"
+              :format="RUN_TIME_SHORT"
               :timezone="store.state.timezone"
               :empty-label="raw('—')"
             />
           </template>
 
           <template #cell-duration="{ row }">
-            {{ formatDuration(row.end_time - row.start_time) }}
+            {{ NO_DURATION.has(row.status) ? dash : formatDuration(row.end_time - row.start_time) }}
           </template>
 
           <!-- The reason rides on the Failed badge (as in the run switcher) rather
@@ -207,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 v-if="runReasonOf(row)"
                 :data-test="`workflow-run-reason-${row.run_id}`"
-                class="text-text-secondary text-2xs leading-tight"
+                class="text-text-secondary text-2xs leading-tight whitespace-normal"
               >
                 {{ reasonText(row) }}
               </span>
@@ -337,6 +339,7 @@ import {
   runReasonOf,
   shortRunId,
   triggerFilterSource,
+  RUN_TIME_SHORT,
   type RunTriggerFilter,
 } from "@/plugins/workflows/runStatus";
 import { triggerDef } from "@/plugins/workflows/triggers";
@@ -351,6 +354,11 @@ import {
   currentTriggerKind,
 } from "@/plugins/workflows/useWorkflowCanvas";
 
+type RunsLayout = "plain" | "source" | "http";
+
+// Nothing ran yet, or the run never started, so there is no duration to show.
+const NO_DURATION: ReadonlySet<string> = new Set(["queued", "running", "expired"]);
+
 const props = defineProps<{
   orgId: string;
   workflowId: string;
@@ -360,8 +368,8 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{
   (e: "select-run", runId: string): void;
+  (e: "layout", layout: RunsLayout): void;
 }>();
-// The Runs page widens the panel under the HTTP filter, so the choice is a model it can read.
 const triggerFilter = defineModel<RunTriggerFilter>("triggerFilter", { default: "all" });
 
 const { t } = useI18nTyped();
@@ -430,10 +438,12 @@ const showTriggerFilter = computed(
 );
 const activeFilter = computed(() => (showTriggerFilter.value ? triggerFilter.value : "all"));
 const isHttpFilter = computed(() => activeFilter.value === "http_request");
-const layout = computed<"plain" | "source" | "http">(() => {
+const layout = computed<RunsLayout>(() => {
   if (!showTriggerFilter.value) return "plain";
   return isHttpFilter.value ? "http" : "source";
 });
+// The Runs page sizes the panel for the column set it holds.
+watch(layout, (value) => emit("layout", value), { immediate: true });
 const search = ref("");
 
 const onFilterChange = (value: unknown) => {
@@ -557,18 +567,18 @@ const plainColumns = computed<OTableColumnDef[]>(() => [
   actionsColumn(56),
 ]);
 
-// The 27.5rem panel minus its padding and border, with no index column: the source in words is what the filter's views are scanned by.
+// The 32rem panel minus its padding and border, with no index column: the source in words is what the filter's views are scanned by.
 const sourceColumns = computed<OTableColumnDef[]>(() => [
   fixedColumn("start_time", t("workflow.history.started"), 112, {
     accessorKey: "start_time",
   }),
-  fixedColumn("source", t("workflow.history.source"), 108, {
+  fixedColumn("source", t("workflow.history.source"), 112, {
     accessorFn: (row: any) => runSourceOf(row),
   }),
-  fixedColumn("status", t("workflow.history.status"), 84, {
+  fixedColumn("status", t("workflow.history.status"), 96, {
     accessorFn: (row: any) => row.status,
   }),
-  fixedColumn("duration", t("workflow.history.duration"), 60, {
+  fixedColumn("duration", t("workflow.history.duration"), 88, {
     accessorFn: (row: any) => row.end_time - row.start_time,
   }),
   actionsColumn(56),
