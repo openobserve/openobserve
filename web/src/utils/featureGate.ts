@@ -39,8 +39,22 @@ export const menuState = (
   return enabledWhen ? "enabled" : "hidden";
 };
 
-/** Path of the shared upsell page; OSS builds never register the feature's own routes. */
+/** Path of the shared upsell page, for a locked feature that has no page of its own. */
 export const featureLockedPath = (key: string): string => `/feature-locked/${key}`;
+
+interface LicensedRoute {
+  meta?: Record<string, unknown>;
+  children?: LicensedRoute[];
+}
+
+/** Tags a route and its children with the license feature their page needs (`meta.licenseFeature`). */
+export const withLicenseFeature = <T extends LicensedRoute>(key: string, route: T): T => ({
+  ...route,
+  meta: { ...route.meta, licenseFeature: key },
+  ...(route.children
+    ? { children: route.children.map((child) => withLicenseFeature(key, child)) }
+    : {}),
+});
 
 /** A denied list's state: false, true for an RBAC 403, or the missing feature keys of a license 403. */
 export type ForbiddenState = boolean | string[];

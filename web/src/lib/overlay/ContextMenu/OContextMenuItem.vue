@@ -8,6 +8,7 @@ import { computed, useId } from "vue";
 import { ContextMenuItem } from "reka-ui";
 import OIcon from "../../core/Icon/OIcon.vue";
 import OShortcut from "../../core/Shortcut/OShortcut.vue";
+import { useLockedDisabled } from "@/composables/useFeatureLock";
 
 const props = withDefaults(defineProps<ContextMenuItemProps>(), {
   disabled: false,
@@ -19,7 +20,8 @@ const emit = defineEmits<ContextMenuItemEmits>();
 
 defineSlots<ContextMenuItemSlots>();
 
-const unavailable = computed(() => props.disabled && props.focusableUnavailable);
+const isDisabled = useLockedDisabled(() => props.disabled);
+const unavailable = computed(() => isDisabled.value && props.focusableUnavailable);
 const reasonId = `${useId()}-reason`;
 
 const variantClasses: Record<NonNullable<ContextMenuItemProps["variant"]>, string> = {
@@ -39,7 +41,7 @@ function onKeydown(event: KeyboardEvent) {
 }
 
 function onSelect(event: Event) {
-  if (props.disabled) {
+  if (isDisabled.value) {
     event.preventDefault();
     return;
   }
@@ -49,7 +51,7 @@ function onSelect(event: Event) {
 
 <template>
   <ContextMenuItem
-    :disabled="disabled && !focusableUnavailable"
+    :disabled="isDisabled && !focusableUnavailable"
     as-child
     :text-value="textValue"
     :class="[
@@ -67,7 +69,7 @@ function onSelect(event: Event) {
     @select="onSelect"
   >
     <div
-      :aria-disabled="disabled || undefined"
+      :aria-disabled="isDisabled || undefined"
       :aria-describedby="unavailable && description ? reasonId : undefined"
     >
       <slot name="icon-left">

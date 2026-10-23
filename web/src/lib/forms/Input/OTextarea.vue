@@ -4,6 +4,7 @@
 import type { TextareaProps, TextareaEmits, TextareaSlots } from "./OTextarea.types";
 import { computed, nextTick, onMounted, ref, useAttrs, useId, watch } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useLockedDisabled } from "@/composables/useFeatureLock";
 
 // Forward the consumer's `data-test` from <OTextarea data-test="…"> onto the
 // root wrapper so E2E selectors can scope to the specific field instance.
@@ -33,6 +34,8 @@ const props = withDefaults(defineProps<TextareaProps>(), {
 const emit = defineEmits<TextareaEmits>();
 
 defineSlots<TextareaSlots>();
+
+const isDisabled = useLockedDisabled(() => props.disabled);
 
 const _fallbackId = useId();
 const textareaId = computed(() => props.id ?? _fallbackId);
@@ -114,7 +117,7 @@ const wrapperClasses = computed(() => [
     : "border-input-border hover:border-input-border-hover focus-within:border-input-border-focus",
   /* Same opacity+dashed treatment as OInput so disabled textareas are
      visually obvious vs enabled ones. */
-  props.disabled
+  isDisabled.value
     ? "bg-input-disabled-bg border-input-disabled-border cursor-not-allowed border-dashed"
     : "",
 ]);
@@ -131,7 +134,7 @@ const wrapperClasses = computed(() => [
       :for="textareaId"
       :class="[
         'o-input-label text-compact flex items-center gap-1 leading-tight',
-        props.disabled
+        isDisabled
           ? 'text-input-label-text-disabled font-normal'
           : 'text-input-label-text font-medium',
       ]"
@@ -155,7 +158,7 @@ const wrapperClasses = computed(() => [
         :value="modelValue ?? ''"
         :name="name"
         :placeholder="placeholder"
-        :disabled="disabled"
+        :disabled="isDisabled"
         :readonly="readonly"
         :autofocus="autofocus"
         :maxlength="maxlength"
