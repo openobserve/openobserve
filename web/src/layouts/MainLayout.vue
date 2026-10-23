@@ -50,6 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <AnnouncementBanner v-if="config.isEnterprise === 'true'" />
         <PasswordExpiryBanner v-if="config.isEnterprise === 'true'" />
         <LicenseSearchBanner v-if="config.isEnterprise === 'true' && config.isCloud === 'false'" />
+        <LicenseExpiryBanner v-if="config.isEnterprise === 'true' && config.isCloud === 'false'" />
       </div>
 
       <!-- Header component containing logo, navigation, and user controls -->
@@ -322,6 +323,7 @@ import PaidOverageConsentDialog from "@/components/PaidOverageConsentDialog.vue"
 import WebinarBanner from "@/components/WebinarBanner.vue";
 import AnnouncementBanner from "@/components/announcements/AnnouncementBanner.vue";
 import PasswordExpiryBanner from "@/components/common/PasswordExpiryBanner.vue";
+import LicenseExpiryBanner from "@/enterprise/components/billings/LicenseExpiryBanner.vue";
 import LicenseSearchBanner from "@/enterprise/components/billings/LicenseSearchBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
@@ -348,6 +350,7 @@ export default defineComponent({
     AnnouncementBanner,
     PasswordExpiryBanner,
     LicenseSearchBanner,
+    LicenseExpiryBanner,
     "keep-alive": KeepAlive,
     ONavbar,
     "router-view": RouterView,

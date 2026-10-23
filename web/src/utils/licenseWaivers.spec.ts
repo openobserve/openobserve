@@ -26,6 +26,7 @@ import {
   knownWaivers,
   lastCoveredDayUs,
   licenseBannerState,
+  licenseExpiryState,
   quotaPercent,
   waiverStatus,
   type LicenseDecision,
@@ -176,4 +177,30 @@ describe("license revision protection", () => {
     ])
       expect(isRevRefusal(invalid)).toBe(false);
   });
+});
+
+describe("licenseExpiryState", () => {
+  const now = 1792713600000000;
+  it("includes the 30-day boundary for online licenses", () => {
+    expect(licenseExpiryState({ license_expiry: now + 30 * DAY_US }, "online", now)).toEqual({
+      kind: "expiring",
+      untilUs: now + 30 * DAY_US,
+      online: true,
+    });
+  });
+  it("marks airgapped licenses offline", () => {
+    expect(licenseExpiryState({ license_expiry: now + DAY_US }, "airgapped", now)).toEqual({
+      kind: "expiring",
+      untilUs: now + DAY_US,
+      online: false,
+    });
+  });
+  it.each([undefined, 0, now, now - 1, now + 31 * DAY_US])(
+    "hides missing, expired or distant expiries (%s)",
+    (expiry) => {
+      expect(licenseExpiryState({ license_expiry: expiry }, "online", now)).toEqual({
+        kind: "none",
+      });
+    },
+  );
 });
