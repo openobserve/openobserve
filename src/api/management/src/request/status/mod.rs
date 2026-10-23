@@ -2642,4 +2642,67 @@ mod tests {
             assert!(json.get(k).is_some(), "flatten must keep {k}");
         }
     }
+
+    #[cfg(feature = "enterprise")]
+    fn report_grace_license(now: i64, active: bool) -> o2_enterprise::enterprise::license::License {
+        serde_json::from_value(serde_json::json!({
+            "version":2,"license_id":"grace-authz","installation_id":"*","active":true,
+            "created_at":now-1_000_000,"expires_at":now+86_400_000_000i64,"msv":"0.0.0",
+            "company":"Test Co","address":"1 Test Way","contact_name":"Test User",
+            "contact_email":"test@example.com","additional_emails":[],"base_urls":[],
+            "limits":{"Ingestion":{"typ":"PerDayCount","value":100}},"company_id":"test",
+            "environment_type":"online","limit_breach_allowed_count":0,
+            "allow_search_after_limit_exceeded":false,"validator_url":"","validator_auth":"",
+            "no_usage_report_allowed_duration":1,
+            "waivers":[{"id":"g","type":"report_grace","starts_at":now-3_600_000_000i64,
+                "ends_at":if active {now+3_600_000_000i64} else {now-1}}]
+        }))
+        .unwrap()
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn report_grace_sso_availability_and_unauthenticated_refresh_denial() {
+        use o2_enterprise::enterprise::license::{
+            TEST_STATICS_LOCK, replace_license_for_tests, set_last_reported_timestamp_for_tests,
+        };
+        let held = TEST_STATICS_LOCK.lock().await;
+        let previous_ts = o2_enterprise::enterprise::license::last_reported_timestamp().await;
+        let now = chrono::Utc::now().timestamp_micros();
+        let previous = replace_license_for_tests(
+            &held,
+            Some(("grace".into(), report_grace_license(now, true))),
+        )
+        .await;
+        set_last_reported_timestamp_for_tests(&held, now - 86_400_000_000i64);
+        for active in [true, false] {
+            replace_license_for_tests(
+                &held,
+                Some(("grace".into(), report_grace_license(now, active))),
+            )
+            .await;
+            let response = zo_config_bootstrap().await.into_response();
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let config: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            assert_eq!(
+                config["sso_enabled"],
+                get_dex_config().dex_enabled && active
+            );
+            let denied =
+                refresh_token_with_dex(CookieJar::new(), Query(std::collections::HashMap::new()))
+                    .await;
+            assert_eq!(
+                denied.status(),
+                if active {
+                    StatusCode::UNAUTHORIZED
+                } else {
+                    StatusCode::FORBIDDEN
+                }
+            );
+        }
+        replace_license_for_tests(&held, previous).await;
+        set_last_reported_timestamp_for_tests(&held, previous_ts);
+    }
 }
