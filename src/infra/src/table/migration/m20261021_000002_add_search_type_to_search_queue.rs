@@ -29,7 +29,13 @@ impl MigrationTrait for Migration {
         if !manager.has_column("search_queue", "search_type").await? {
             manager.alter_table(add_column_stmt()).await?;
         }
-        manager.create_index(type_idx()).await?;
+        // A re-run checks first, as the other migrations do, instead of relying on IF NOT EXISTS.
+        if !manager
+            .has_index("search_queue", SEARCH_QUEUE_TYPE_IDX)
+            .await?
+        {
+            manager.create_index(type_idx()).await?;
+        }
         Ok(())
     }
 

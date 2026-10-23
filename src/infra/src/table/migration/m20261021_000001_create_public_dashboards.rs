@@ -21,6 +21,8 @@ use sea_orm_migration::prelude::*;
 const LINKS: &str = "public_dashboards";
 const SNAPSHOTS: &str = "public_dashboard_snapshots";
 const SETTINGS: &str = "public_dashboard_org_settings";
+const SLUG_IDX: &str = "public_dashboards_slug_idx";
+const ORG_DASHBOARD_IDX: &str = "public_dashboards_org_dashboard_idx";
 const DRAFT_MIGRATIONS: [&str; 6] = [
     "m20260907_000001_create_public_dashboards_tables",
     "m20260925_000001_add_name_to_public_dashboards",
@@ -45,8 +47,15 @@ impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager.create_table(create_links_stmt()).await?;
         reset_draft_schema(manager).await?;
-        manager.create_index(slug_idx()).await?;
-        manager.create_index(org_dashboard_idx()).await?;
+        // A re-run checks first, as the other migrations do, instead of relying on IF NOT EXISTS.
+        for (name, idx) in [
+            (SLUG_IDX, slug_idx()),
+            (ORG_DASHBOARD_IDX, org_dashboard_idx()),
+        ] {
+            if !manager.has_index(LINKS, name).await? {
+                manager.create_index(idx).await?;
+            }
+        }
         manager.create_table(create_org_settings_stmt()).await?;
         // A settings table left by the draft migrations predates the limit's setter column.
         if !manager.has_column(SETTINGS, "max_links_set_by").await? {
@@ -270,7 +279,7 @@ fn create_links_stmt() -> TableCreateStatement {
 fn slug_idx() -> IndexCreateStatement {
     sea_query::Index::create()
         .if_not_exists()
-        .name("public_dashboards_slug_idx")
+        .name(SLUG_IDX)
         .table(PublicDashboards::Table)
         .col(PublicDashboards::Slug)
         .unique()
@@ -280,7 +289,7 @@ fn slug_idx() -> IndexCreateStatement {
 fn org_dashboard_idx() -> IndexCreateStatement {
     sea_query::Index::create()
         .if_not_exists()
-        .name("public_dashboards_org_dashboard_idx")
+        .name(ORG_DASHBOARD_IDX)
         .table(PublicDashboards::Table)
         .col(PublicDashboards::OrgId)
         .col(PublicDashboards::DashboardId)
@@ -489,12 +498,9 @@ mod tests {
         );
         assert!(manager.has_table("public_dashboard_outbox").await.unwrap());
         assert!(!manager.has_table(SNAPSHOTS).await.unwrap());
-        assert!(
-            manager
-                .has_index(LINKS, "public_dashboards_slug_idx")
-                .await
-                .unwrap()
-        );
+        for idx in [SLUG_IDX, ORG_DASHBOARD_IDX] {
+            assert!(manager.has_index(LINKS, idx).await.unwrap(), "{idx}");
+        }
     }
 
     /// A database that ran the four draft migrations keeps its links and loses only their results.
