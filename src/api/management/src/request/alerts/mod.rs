@@ -73,6 +73,8 @@ use crate::{
     },
 };
 
+pub mod ack;
+pub mod auto_investigate;
 pub mod chart_render;
 pub mod dedup_stats;
 pub mod deduplication;
@@ -81,6 +83,7 @@ pub mod external_events;
 pub mod history;
 pub mod incident_integrations;
 pub mod incidents;
+pub mod mute;
 #[cfg(feature = "cloud")]
 pub mod slack_oauth;
 pub mod templates;
@@ -709,6 +712,9 @@ fn composite_list_item(
         referenced_by_composite_count: None,
         expression_summary: None,
         active_downtime: None,
+        firing_started_at: None,
+        ack: None,
+        incident: None,
         downtime_dimensions: Default::default(),
     })
 }
@@ -1512,10 +1518,12 @@ pub async fn list_alert_groups(Path((org_id, alert_id)): Path<(String, String)>)
         .and_then(|r| r.groups_observed)
         .and_then(|n| i32::try_from(n).ok());
     let group_cap = config::get_config().limit.alert_max_groups;
+    let acked = group_acks(&org_id, &alert_id, &groups).await;
 
     let list: Vec<AlertGroupResponseItem> = groups
         .into_iter()
         .map(|g| AlertGroupResponseItem {
+            ack: acked.get(&g.group_key).cloned(),
             labels: parse_group_labels(g.group_labels.as_deref()),
             group_key: g.group_key,
             group_labels: g.group_labels,
@@ -1526,6 +1534,7 @@ pub async fn list_alert_groups(Path((org_id, alert_id)): Path<(String, String)>)
             last_seen: g.last_seen,
             silenced_until: g.silenced_until,
             last_notified_level: g.last_notified_level.map(|l| l.to_string()),
+            firing_started_at: g.firing_started_at,
         })
         .collect();
 
@@ -3033,7 +3042,7 @@ pub async fn list_alerts(
     // Enrich with durable run state (Part IV of alerts.md). One batched query
     // over the page that is actually being returned — not per alert.
     let mut list = list;
-    enrich_with_run_state(&mut list).await;
+    enrich_with_run_state(&org_id, &mut list).await;
     enrich_with_composite_metadata(&org_id, &visibility, &mut list).await;
     crate::models::alerts::responses::fill_active_downtimes(&org_id, &mut list).await;
 
@@ -3294,7 +3303,29 @@ fn sort_merged_alert_list(
     }
 }
 
-async fn enrich_with_run_state(list: &mut [ListAlertsResponseBodyItem]) {
+/// Each group's ack in force on its current firing.
+async fn group_acks(
+    org_id: &str,
+    alert_id: &str,
+    groups: &[config::meta::alerts::state::AlertState],
+) -> std::collections::HashMap<String, config::meta::alerts::ack::AckView> {
+    if !groups.iter().any(|g| g.firing_started_at.is_some()) {
+        return Default::default();
+    }
+    let acks = infra::table::alert_acks::list_for_alert(org_id, alert_id)
+        .await
+        .unwrap_or_default();
+    let firing: std::collections::HashMap<&str, Option<i64>> = groups
+        .iter()
+        .map(|g| (g.group_key.as_str(), g.firing_started_at))
+        .collect();
+    acks.into_iter()
+        .filter(|a| a.in_force_for(firing.get(a.group_key.as_str()).copied().flatten()))
+        .map(|a| (a.group_key.clone(), a.view()))
+        .collect()
+}
+
+async fn enrich_with_run_state(org_id: &str, list: &mut [ListAlertsResponseBodyItem]) {
     if list.is_empty() {
         return;
     }
@@ -3330,6 +3361,82 @@ async fn enrich_with_run_state(list: &mut [ListAlertsResponseBodyItem]) {
             item.groups_firing = state.groups_firing.and_then(|n| i32::try_from(n).ok());
             item.groups_observed_is_lower_bound = state.groups_observed_is_lower_bound;
             item.groups_firing_is_lower_bound = state.groups_firing_is_lower_bound;
+            item.firing_started_at = state.firing_started_at;
+        }
+    }
+    enrich_with_acks(org_id, list, &by_id).await;
+    #[cfg(feature = "enterprise")]
+    enrich_with_incidents(org_id, list, &by_id).await;
+}
+
+/// The list's ack chips: one read of every listed alert's acks, matched to each firing.
+async fn enrich_with_acks(
+    org_id: &str,
+    list: &mut [ListAlertsResponseBodyItem],
+    rollups: &std::collections::HashMap<String, config::meta::alerts::state::AlertState>,
+) {
+    let ids: Vec<String> = list.iter().map(|i| i.alert_id.to_string()).collect();
+    let acks = match infra::table::alert_acks::list_for_alerts(org_id, &ids).await {
+        Ok(a) => a,
+        Err(e) => {
+            log::warn!("failed to load alert acks for list: {e}");
+            return;
+        }
+    };
+    let mut by_alert: std::collections::HashMap<String, Vec<config::meta::alerts::ack::AlertAck>> =
+        Default::default();
+    for a in acks {
+        by_alert.entry(a.alert_id.clone()).or_default().push(a);
+    }
+    for item in list.iter_mut() {
+        let id = item.alert_id.to_string();
+        let Some(acks) = by_alert.get(&id) else {
+            continue;
+        };
+        let mut firing: std::collections::HashMap<String, i64> = Default::default();
+        if let Some(started) = rollups.get(&id).and_then(|r| r.firing_started_at) {
+            firing.insert(
+                config::meta::alerts::state::ROLLUP_GROUP_KEY.to_string(),
+                started,
+            );
+        }
+        if acks.iter().any(|a| !a.group_key.is_empty()) {
+            let keys: Vec<String> = acks.iter().map(|a| a.group_key.clone()).collect();
+            if let Ok(rows) = infra::table::alert_states::firing_groups(&id, Some(&keys)).await {
+                firing.extend(rows);
+            }
+        }
+        item.ack = openobserve_core::alerts::ack::summary(acks, &firing);
+    }
+}
+
+/// The incident each firing alert's current episode belongs to (MK-1's Incident tile).
+#[cfg(feature = "enterprise")]
+async fn enrich_with_incidents(
+    org_id: &str,
+    list: &mut [ListAlertsResponseBodyItem],
+    rollups: &std::collections::HashMap<String, config::meta::alerts::state::AlertState>,
+) {
+    use crate::models::alerts::responses::AlertIncidentLink;
+
+    for item in list.iter_mut() {
+        let id = item.alert_id.to_string();
+        let Some(rollup) = rollups.get(&id).filter(|r| r.is_firing()) else {
+            continue;
+        };
+        let model = match rollup.episode_incident_id.as_deref() {
+            Some(incident_id) => infra::table::alert_incidents::get(org_id, incident_id).await,
+            None => {
+                infra::table::alert_incidents::find_open_incident_containing_alert(org_id, &id)
+                    .await
+            }
+        };
+        if let Ok(Some(m)) = model {
+            item.incident = Some(AlertIncidentLink {
+                id: m.id,
+                title: m.title,
+                status: m.status.parse().unwrap_or_default(),
+            });
         }
     }
 }

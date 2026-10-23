@@ -21,7 +21,7 @@
 export * from "./types";
 
 // Template configurations
-export { slackTemplate, slackConfig, slackDestinationType } from "./slack";
+export { slackTemplate, slackConfig, slackDestinationType, slackAppDestinationTile } from "./slack";
 export { discordTemplate, discordConfig, discordDestinationType } from "./discord";
 export { msteamsTemplate, msteamsConfig, msteamsDestinationType } from "./msteams";
 export { pagerdutyTemplate, pagerdutyConfig, pagerdutyDestinationType } from "./pagerduty";
@@ -29,14 +29,15 @@ export { servicenowTemplate, servicenowConfig, servicenowDestinationType } from 
 export { emailTemplate, emailConfig, emailDestinationType } from "./email";
 export { opsgenieTemplate, opsgenieConfig, opsgenieDestinationType } from "./opsgenie";
 
-import { slackConfig, slackDestinationType } from "./slack";
+import { slackAppDestinationTile, slackConfig, slackDestinationType } from "./slack";
 import { discordConfig, discordDestinationType } from "./discord";
 import { msteamsConfig, msteamsDestinationType } from "./msteams";
 import { pagerdutyConfig, pagerdutyDestinationType } from "./pagerduty";
 import { servicenowConfig, servicenowDestinationType } from "./servicenow";
 import { emailConfig, emailDestinationType } from "./email";
 import { opsgenieConfig, opsgenieDestinationType } from "./opsgenie";
-import { PrebuiltConfig, PrebuiltType } from "./types";
+import { gt } from "@/types/i18n";
+import { DestinationTile, PrebuiltConfig, PrebuiltType } from "./types";
 
 /**
  * All available prebuilt destination types
@@ -52,6 +53,23 @@ export const PREBUILT_DESTINATION_TYPES: PrebuiltType[] = [
   opsgenieDestinationType,
   servicenowDestinationType,
 ];
+
+/** The picker's tiles; the Slack app comes first while Slack is on for the org. */
+export function destinationTypeTiles(slackApp: boolean): DestinationTile[] {
+  const prebuilt: DestinationTile[] = PREBUILT_DESTINATION_TYPES.map((type) => ({
+    id: type.id,
+    name: type.name,
+    descriptionKey: type.descriptionKey,
+    icon: type.icon,
+    image: type.image,
+  }));
+  if (!slackApp) return prebuilt;
+  const webhook = prebuilt.find((tile) => tile.id === "slack");
+  if (webhook) {
+    webhook.tag = { label: gt("slackApp.destination.postOnly"), variant: "default-soft" };
+  }
+  return [slackAppDestinationTile, ...prebuilt];
+}
 
 /**
  * Configuration mapping for all prebuilt destination types

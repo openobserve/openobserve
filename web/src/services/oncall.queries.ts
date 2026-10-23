@@ -50,6 +50,7 @@ import type {
   Unavailability,
 } from "@/ts/interfaces/oncall";
 import { holderStretches } from "@/utils/oncall";
+import type { OncallTeamRoom } from "@/utils/slackAppDestination";
 
 /// Derived from the service so a new filter cannot silently fall out of the key.
 type ResponseFilters = Omit<Parameters<typeof oncallService.listResponses>[0], "org_identifier">;
@@ -66,6 +67,29 @@ export const oncallTeamsQuery = (org: string) =>
     queryKey: oncallKeys.teams(org),
     queryFn: async (): Promise<OnCallTeam[]> =>
       (await oncallService.listTeams({ org_identifier: org })).data ?? [],
+    staleTime: NORMAL_STALE_TIME,
+  });
+
+/** Each team's room destinations; only the Slack app form reads it, so the per-team reads stay off the common path. */
+export const oncallTeamRoomsQuery = (org: string) =>
+  queryOptions({
+    queryKey: oncallKeys.teamRooms(org),
+    queryFn: async (): Promise<OncallTeamRoom[]> => {
+      const teams = (await oncallService.listTeams({ org_identifier: org })).data ?? [];
+      return Promise.all(
+        teams.map(async (team) => {
+          const res = await oncallService.getTeamChannel({
+            org_identifier: org,
+            team_id: team.id,
+          });
+          return {
+            team_id: team.id,
+            team_name: team.name,
+            destinations: res.data?.destinations ?? [],
+          };
+        }),
+      );
+    },
     staleTime: NORMAL_STALE_TIME,
   });
 

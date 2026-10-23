@@ -141,10 +141,61 @@ fn reject_non_members(
     }
 }
 
+/// The stored row of a save, read so a row this node cannot decode is never overwritten.
+async fn existing(
+    org_id: &str,
+    name: &str,
+    create: bool,
+) -> Result<Option<Destination>, DestinationError> {
+    match db::alerts::destinations::get(org_id, name).await {
+        Ok(_) if create => Err(DestinationError::AlreadyExists),
+        Ok(found) => Ok(Some(found)),
+        Err(DestinationError::NotFound) => {
+            if infra::table::destinations::exists_row(org_id, name).await? {
+                return Err(super::slack_destination::newer_row(name));
+            }
+            if create {
+                Ok(None)
+            } else {
+                Err(DestinationError::NotFound)
+            }
+        }
+        Err(e) => Err(e),
+    }
+}
+
 pub async fn save(
+    name: &str,
+    destination: Destination,
+    create: bool,
+) -> Result<Destination, DestinationError> {
+    save_by(name, destination, create, "").await
+}
+
+/// [`save`] by `by`, who becomes the `updated_by` of a channel default a Slack app save fills.
+pub async fn save_by(
+    name: &str,
+    destination: Destination,
+    create: bool,
+    by: &str,
+) -> Result<Destination, DestinationError> {
+    save_in(
+        &super::slack_destination::LiveEnv,
+        name,
+        destination,
+        create,
+        by,
+    )
+    .await
+}
+
+/// [`save_by`] with the Slack and cluster reads a test can replace.
+pub async fn save_in(
+    env: &dyn super::slack_destination::SaveEnv,
     name: &str,
     mut destination: Destination,
     create: bool,
+    by: &str,
 ) -> Result<Destination, DestinationError> {
     // First validate the `destination` according to its `destination_type`
     match &mut destination.module {
@@ -187,6 +238,9 @@ pub async fn save(
                     return Err(DestinationError::InvalidSns);
                 }
             }
+            DestinationType::SlackApp(target) => {
+                super::slack_destination::validate_fields(target)?;
+            }
         },
         Module::Pipeline { endpoint, .. } => {
             if endpoint.url.is_empty() {
@@ -214,17 +268,9 @@ pub async fn save(
         return Err(DestinationError::InvalidName);
     }
 
-    match db::alerts::destinations::get(&destination.org_id, &destination.name).await {
-        Ok(_) => {
-            if create {
-                return Err(DestinationError::AlreadyExists);
-            }
-        }
-        Err(_) => {
-            if !create {
-                return Err(DestinationError::NotFound);
-            }
-        }
+    let previous = existing(&destination.org_id, &destination.name, create).await?;
+    if let Some(target) = super::slack_destination::slack_app_target(&destination) {
+        super::slack_destination::check_save(env, &destination, target, previous.as_ref()).await?;
     }
 
     // For prebuilt destinations, ensure template exists before saving destination
@@ -252,6 +298,7 @@ pub async fn save(
                 }
             }
             DestinationType::Sns(_) => None, // SNS doesn't have prebuilt templates yet
+            DestinationType::SlackApp(_) => template.is_none().then_some("slack"),
         };
 
         // If it's a prebuilt type and doesn't have a custom template, ensure prebuilt template
@@ -278,6 +325,9 @@ pub async fn save(
     let saved = db::alerts::destinations::set(destination).await?;
     if name.is_empty() {
         set_ownership(&saved.org_id, "destinations", Authz::new(&saved.name)).await;
+    }
+    if let Some(target) = super::slack_destination::slack_app_target(&saved) {
+        super::slack_destination::fill_channel_default(&saved.org_id, target, by).await;
     }
     Ok(saved)
 }
@@ -458,6 +508,17 @@ mod tests {
 
     fn addrs(list: &[&str]) -> Vec<String> {
         list.iter().map(|s| s.to_string()).collect()
+    }
+
+    /// Nothing else in this binary migrates the meta store `save` writes to.
+    async fn meta_store() {
+        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+        ONCE.get_or_init(|| async {
+            std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+            infra::db_init().await.expect("meta store");
+            infra::table::migrate().await.expect("migrations");
+        })
+        .await;
     }
 
     #[test]
@@ -833,6 +894,7 @@ mod tests {
     /// instead. Supersedes the old `test_alert_destination_requires_template`.
     #[tokio::test]
     async fn test_alert_destination_template_is_optional() {
+        meta_store().await;
         let org_id = "test_org_no_template";
 
         // Clean up any leftover state

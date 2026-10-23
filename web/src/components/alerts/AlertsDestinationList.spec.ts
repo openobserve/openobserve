@@ -20,9 +20,22 @@ vi.mock("@/services/alert_destination", async (importOriginal) => {
     default: {
       list: vi.fn(),
       delete: vi.fn(),
+      update: vi.fn(),
     },
   });
 });
+
+vi.mock("@/services/slack", () => ({ default: { listInstallations: vi.fn() } }));
+vi.mock("@/services/oncall", () => ({
+  default: {
+    listTeams: vi.fn(() => Promise.resolve({ data: [{ id: "t1", name: "payments" }] })),
+    getTeamChannel: vi.fn(() =>
+      Promise.resolve({
+        data: { team_id: "t1", destinations: ["oncall-room-slack"], source: "team" },
+      }),
+    ),
+  },
+}));
 
 vi.mock("@/services/alert_templates", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
@@ -65,6 +78,9 @@ import templateService from "@/services/alert_templates";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import slack from "@/services/slack";
+import { queryClient } from "@/composables/query/queryClient";
+import { installationView } from "@/test/unit/helpers/slack";
 
 // ── stubs ────────────────────────────────────────────────────────────────────
 
@@ -725,6 +741,128 @@ describe("AlertsDestinationList", () => {
       });
       expect(w.vm.templates).toEqual([]);
       w.unmount();
+    });
+  });
+
+  // ── Slack app rows (MK-6a, without Last send) ──────────────────────────────
+
+  describe("Slack app and Slack webhook rows", () => {
+    const HOOK = "https://hooks.slack.com/services/T0SAMPLE01/B000/xyz";
+    const appRow = (over: any = {}) => ({
+      name: "sre-prod-slack",
+      type: "slack_app",
+      template: "prebuilt_slack",
+      installation_id: "inst-1",
+      channel_id: "C9",
+      channel_name: "sre-prod",
+      buttons: true,
+      mention: "default",
+      refire_reuse_minutes: 30,
+      auto_investigate: "off",
+      shared_channel_confirmed: false,
+      oncall_room_confirmed: false,
+      ...over,
+    });
+    const hookRow = (name: string, team = "T0SAMPLE01") => ({
+      name,
+      type: "http",
+      url: HOOK,
+      method: "post",
+      template: "prebuilt_slack",
+      metadata: {
+        prebuilt_type: "slack",
+        slack_team_id: team,
+        slack_channel_id: "C1",
+        credential_channel: "#payments",
+      },
+    });
+    const previous = { url: HOOK, method: "post", skip_tls_verify: false, metadata: {} };
+    const zo = (store.state as any).zoConfig;
+    let slackWas: unknown;
+
+    beforeEach(async () => {
+      queryClient.clear();
+      slackWas = zo.slack_enabled;
+      zo.slack_enabled = true;
+      vi.mocked(slack.listInstallations).mockResolvedValue({
+        data: { installations: [installationView()] },
+      } as any);
+      (destinationService.update as any).mockResolvedValue({});
+      (destinationService.list as any).mockResolvedValue({
+        data: [
+          appRow(),
+          appRow({ name: "switched-slack", previous_webhook: previous }),
+          hookRow("payments-slack"),
+          hookRow("other-team-slack", "T0OTHER"),
+          hookRow("oncall-room-slack"),
+        ],
+      });
+      wrapper = mountComponent();
+      await flushPromises();
+      await flushPromises();
+    });
+
+    afterEach(() => {
+      zo.slack_enabled = slackWas;
+    });
+
+    const text = (test: string) => wrapper!.find(`[data-test="${test}"]`);
+
+    it("lists Slack app rows, tagged Slack app and Two-way, with #channel · workspace", () => {
+      expect((wrapper!.vm as any).visibleRows.map((r: any) => r.name)).toContain("sre-prod-slack");
+      expect(text("destination-type-badge-slack-app-sre-prod-slack").text()).toContain("Slack app");
+      expect(text("destination-type-two-way-sre-prod-slack").text()).toContain("Two-way");
+      expect(text("destination-url-sre-prod-slack").text()).toBe("#sre-prod · Acme Corp");
+      expect(text("destination-method-sre-prod-slack").text().trim()).toBe("");
+    });
+
+    it("has no Last send column", () => {
+      const table = wrapper!.findComponent({ name: "OTable" });
+      const ids = table.props("columns").map((c: any) => c.id);
+      expect(ids).not.toContain("last_send");
+      expect(wrapper!.text()).not.toContain("Last send");
+      const urlCol = table.props("columns").find((c: any) => c.id === "url");
+      expect(urlCol?.header).toBe("URL / recipients / channel");
+    });
+
+    it("labels webhook rows Slack webhook and offers the switch only for a connected team", () => {
+      expect(text("destination-type-badge-slack-webhook-payments-slack").text()).toContain(
+        "Slack webhook",
+      );
+      expect(text("destination-switch-to-app-payments-slack").exists()).toBe(true);
+      expect(text("destination-switch-to-app-other-team-slack").exists()).toBe(false);
+      expect(text("destination-switch-to-app-sre-prod-slack").exists()).toBe(false);
+      expect(text("destination-switch-to-app-oncall-room-slack").exists()).toBe(false);
+    });
+
+    it("switches a webhook row in place, keeping its name and webhook", async () => {
+      await text("destination-switch-to-app-payments-slack").trigger("click");
+      await flushPromises();
+      expect(destinationService.update).toHaveBeenCalledTimes(1);
+      const call = (destinationService.update as any).mock.calls[0][0];
+      expect(call).toMatchObject({
+        org_identifier: "default",
+        destination_name: "payments-slack",
+        data: {
+          name: "payments-slack",
+          type: "slack_app",
+          installation_id: "inst-1",
+          channel_id: "C1",
+          channel_name: "payments",
+          previous_webhook: { url: HOOK },
+        },
+      });
+    });
+
+    it("switches back only a row that kept its webhook", async () => {
+      expect(text("destination-switch-back-sre-prod-slack").exists()).toBe(false);
+      await text("destination-switch-back-switched-slack").trigger("click");
+      await flushPromises();
+      const call = (destinationService.update as any).mock.calls[0][0];
+      expect(call).toMatchObject({
+        destination_name: "switched-slack",
+        data: { name: "switched-slack", type: "http", url: HOOK },
+      });
     });
   });
 });

@@ -44,6 +44,7 @@ use config::{
     spawn_pausable_job,
     utils::time::now_micros,
 };
+use openobserve_core::alerts::lifecycle::{self, ClearKind};
 
 /// Start the sweep. Alert-manager nodes only, one leader at a time — the work
 /// is a whole-table scan of group state, and running it on every node would
@@ -241,7 +242,17 @@ async fn sweep_alert(
             .collect();
         let stale = opt_out_evictions(&tracked);
         let n = stale.len();
+        let firing: Vec<(String, i64)> = stale
+            .iter()
+            .filter_map(|key| Some((key.clone(), tracked.get(key)?.firing_started_at?)))
+            .collect();
         db::alerts::alert_states::delete_groups(alert_id, &stale).await?;
+        // A deleted alert already reported its clears when it was deleted.
+        if let Some(a) = alert {
+            let cleared =
+                lifecycle::deleted_clears(&firing, now_micros(), ClearKind::GroupUntracked);
+            lifecycle::on_all_cleared(&a.org_id, alert_id, &cleared).await;
+        }
         return Ok((0, 0, n));
     }
     let alert = alert.expect("still_multi implies the alert is cached");
@@ -291,6 +302,14 @@ async fn sweep_alert(
                     // ledger history at all (D65).
                     db::alerts::alert_states::persist(&update, None).await?;
                     resolved += 1;
+                    if let Some(c) = lifecycle::update_clear(
+                        Some(state),
+                        &update,
+                        now,
+                        ClearKind::ReaperResolved,
+                    ) {
+                        lifecycle::on_all_cleared(&alert.org_id, alert_id, &[c]).await;
+                    }
                 }
             }
             GroupFate::Reap => to_reap.push(state.group_key.clone()),

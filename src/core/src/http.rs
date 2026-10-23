@@ -150,6 +150,13 @@ pub fn destination_error_response(value: DestinationError) -> Response {
         DestinationError::InUse(_) => MetaHttpResponse::conflict(value),
         DestinationError::InfraError(err) => MetaHttpResponse::internal_error(err),
         DestinationError::NotFound => MetaHttpResponse::not_found(value),
+        DestinationError::SlackAppNeedsEnterprise => MetaHttpResponse::forbidden(value),
+        DestinationError::SlackApp(refusal) => {
+            use axum::response::IntoResponse;
+            let status = axum::http::StatusCode::from_u16(refusal.status)
+                .unwrap_or(axum::http::StatusCode::BAD_REQUEST);
+            (status, axum::Json(refusal.clone())).into_response()
+        }
         other_err => MetaHttpResponse::bad_request(other_err),
     }
 }

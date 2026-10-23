@@ -157,6 +157,66 @@ mod tests {
         assert!(process(msg).await.is_err());
     }
 
+    /// AC-P2.1.6
+    #[test]
+    fn a_state_message_from_an_older_region_has_no_firing_cycle_and_matches_no_ack() {
+        use config::meta::alerts::{
+            ack::AlertAck,
+            state::{AlertState, StateUpdate},
+        };
+
+        let mut state = AlertState::empty("alert-1", "");
+        state.firing_started_at = Some(1_000);
+        let mut value = config::utils::json::to_value(AlertStateMessage::Persist {
+            update: StateUpdate {
+                state: Some(state),
+                transition: None,
+            },
+            ledger: None,
+        })
+        .unwrap();
+        let text = value.to_string();
+        assert!(
+            text.contains("firing_started_at"),
+            "today's region sends it"
+        );
+        strip_key(&mut value, "firing_started_at");
+
+        let msg = Message::new(
+            "/alert_states/".to_string(),
+            Some(config::utils::json::to_vec(&value).unwrap().into()),
+            None,
+            false,
+            MessageType::AlertStatesTable,
+        );
+        let AlertStateMessage::Persist { update, .. } = msg.try_into().unwrap() else {
+            panic!("decoded as another variant");
+        };
+        let decoded = update.state.unwrap().firing_started_at;
+        assert_eq!(decoded, None);
+        let ack = AlertAck {
+            firing_started_at: 1_000,
+            ..Default::default()
+        };
+        assert!(
+            !ack.in_force_for(decoded),
+            "no ack may match an unknown firing"
+        );
+    }
+
+    fn strip_key(value: &mut config::utils::json::Value, key: &str) {
+        match value {
+            config::utils::json::Value::Object(map) => {
+                map.remove(key);
+                map.values_mut().for_each(|v| strip_key(v, key));
+            }
+            config::utils::json::Value::Array(items) => {
+                items.iter_mut().for_each(|v| strip_key(v, key));
+            }
+            _ => {}
+        }
+    }
+
     /// The one hazard this file exists to avoid.
     ///
     /// The publish lives one layer up, in `db`, because `infra` cannot reach
