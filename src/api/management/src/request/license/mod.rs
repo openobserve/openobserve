@@ -516,7 +516,8 @@ pub async fn refresh_license_limits(Headers(user_email): Headers<UserEmail>) -> 
 mod tests {
     use config::utils::{base64, json};
     use o2_enterprise::enterprise::license::{
-        BelowHwm, Block, KeySource, LICENSE_REV_HWM_KEY, set_rev_hwm_warning_for_tests,
+        BelowHwm, Block, KeySource, LICENSE_REV_HWM_KEY, TEST_STATICS_LOCK,
+        set_rev_hwm_warning_for_tests,
     };
 
     use super::*;
@@ -829,44 +830,10 @@ mod tests {
         assert!(!env_key_in_use("", None));
     }
 
-    fn response_with_warning(source: KeySource) -> json::Value {
-        json::to_value(&LicenseResponse {
-            key: None,
-            license: None,
-            installation_id: String::new(),
-            expired: false,
-            ingestion_used: 0.0,
-            ingestion_exceeded: 0,
-            waivers: Vec::new(),
-            decision: LicenseDecision::default(),
-            base: LicenseDecision::default(),
-            evaluated_at: 0,
-            env_key_active: source == KeySource::Env,
-            env_key_in_use: source == KeySource::Env,
-            can_update_license: false,
-            rev_hwm_warning: Some(BelowHwm {
-                source,
-                license_id: "lic-1".into(),
-                loaded_rev: 1_760_400_000_000_000,
-                hwm_rev: 1_760_918_400_000_000,
-            }),
-        })
-        .unwrap()
-    }
-
-    #[test]
-    fn license_response_carries_rev_hwm_warning() {
-        let json = response_with_warning(KeySource::Env);
-        let warning = &json["rev_hwm_warning"];
-        assert_eq!(warning["source"], "env");
-        assert_eq!(warning["license_id"], "lic-1");
-        assert_eq!(warning["loaded_rev"], 1_760_400_000_000_000_i64);
-        assert_eq!(warning["hwm_rev"], 1_760_918_400_000_000_i64);
-    }
-
-    #[tokio::test]
-    async fn get_reports_the_db_source_warning() {
-        let _store = store_setup().await;
+    async fn get_with_warning(
+        store: &tokio::sync::MutexGuard<'_, ()>,
+        source: KeySource,
+    ) -> json::Value {
         let get = || async {
             body_of(
                 get_license_info(Headers(UserEmail {
@@ -876,21 +843,40 @@ mod tests {
             )
             .await
         };
-        set_rev_hwm_warning_for_tests(Some(BelowHwm {
-            source: KeySource::Db,
-            license_id: "lic-1".into(),
-            loaded_rev: 1_760_400_000_000_000,
-            hwm_rev: 1_760_918_400_000_000,
-        }));
+        set_rev_hwm_warning_for_tests(
+            store,
+            Some(BelowHwm {
+                source,
+                license_id: "lic-1".into(),
+                loaded_rev: 1_760_400_000_000_000,
+                hwm_rev: 1_760_918_400_000_000,
+            }),
+        );
         let (status, body) = get().await;
-        set_rev_hwm_warning_for_tests(None);
+        set_rev_hwm_warning_for_tests(store, None);
         assert_eq!(status, StatusCode::OK, "{body}");
-        let warning = &body["rev_hwm_warning"];
+        let (_, cleared) = get().await;
+        assert!(cleared["rev_hwm_warning"].is_null(), "{cleared}");
+        body["rev_hwm_warning"].clone()
+    }
+
+    #[tokio::test]
+    async fn get_reports_the_env_source_warning() {
+        let store = store_setup().await;
+        let warning = get_with_warning(&store, KeySource::Env).await;
+        assert_eq!(warning["source"], "env");
+        assert_eq!(warning["license_id"], "lic-1");
+        assert_eq!(warning["loaded_rev"], 1_760_400_000_000_000_i64);
+        assert_eq!(warning["hwm_rev"], 1_760_918_400_000_000_i64);
+    }
+
+    #[tokio::test]
+    async fn get_reports_the_db_source_warning() {
+        let store = store_setup().await;
+        let warning = get_with_warning(&store, KeySource::Db).await;
         assert_eq!(warning["source"], "db");
         assert_eq!(warning["loaded_rev"], 1_760_400_000_000_000_i64);
         assert_eq!(warning["hwm_rev"], 1_760_918_400_000_000_i64);
-        let (_, body) = get().await;
-        assert!(body["rev_hwm_warning"].is_null(), "{body}");
     }
 
     #[test]
@@ -1101,12 +1087,11 @@ mod tests {
         assert!(!StoreLicenseQuery::default().dry_run);
     }
 
-    // every store test shares the one meta DB and its two license keys
-    static STORE_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
     const STORE_ROOT: &str = "lw-store-root@store.test";
 
+    // store tests share the meta DB and its license keys, and the hooks share the license statics
     async fn store_setup() -> tokio::sync::MutexGuard<'static, ()> {
-        let guard = STORE_LOCK.lock().await;
+        let guard = TEST_STATICS_LOCK.lock().await;
         config::cache_instance_id(INSTANCE_ID);
         infra::db::create_table().await.unwrap();
         join(config::DEFAULT_ORG, STORE_ROOT, UserRole::Root);

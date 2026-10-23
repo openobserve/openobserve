@@ -17,7 +17,7 @@
 
 use config::meta::user::UserRole;
 use o2_enterprise::enterprise::license::{
-    block_feature_for_report_failure, last_reported_timestamp,
+    TEST_STATICS_LOCK, block_feature_for_report_failure, last_reported_timestamp,
     set_last_reported_timestamp_for_tests,
 };
 use openobserve_core::{
@@ -37,8 +37,9 @@ async fn rbac_stays_enforced_when_usage_reporting_fails() {
     }
     o2_openfga::config::refresh_config().unwrap();
     assert!(o2_openfga::config::get_config().enabled);
+    let statics = TEST_STATICS_LOCK.lock().await;
     let now = chrono::Utc::now().timestamp_micros();
-    set_last_reported_timestamp_for_tests(now - 8 * DAY_MICROS);
+    set_last_reported_timestamp_for_tests(&statics, now - 8 * DAY_MICROS);
     assert!(block_feature_for_report_failure().await);
     assert!(last_reported_timestamp().await > 0);
 
