@@ -80,6 +80,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="flex min-h-0 flex-1 flex-col gap-2 p-2">
+      <!-- Offered only once the workflow has or had an endpoint; every other workflow keeps today's list. -->
+      <div v-if="showTriggerFilter" class="flex shrink-0 flex-wrap items-center gap-2">
+        <OToggleGroup
+          :model-value="activeFilter"
+          mobile-dropdown
+          data-test="workflow-runs-trigger-filter"
+          @update:model-value="onFilterChange"
+        >
+          <OToggleGroupItem
+            v-for="opt in filterOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+            :icon-left="opt.icon"
+            :data-test="`workflow-runs-trigger-filter-${opt.value}`"
+          >
+            {{ opt.label }}
+          </OToggleGroupItem>
+        </OToggleGroup>
+        <div v-if="isHttpFilter" class="min-w-0 flex-1 max-md:min-w-40">
+          <OSearchInput
+            v-model="search"
+            size="sm"
+            clearable
+            :placeholder="t('workflow.history.searchHttpRuns')"
+            data-test="workflow-runs-search"
+          />
+        </div>
+      </div>
+
       <!-- Run-frequency timeline (reused from AlertHistory for consistency). -->
       <WorkflowExecutionTimeline
         v-if="rows.length > 0"
@@ -90,7 +120,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <div class="alert-history-table min-h-0 flex-1">
+        <!-- Keyed by layout: OTable reads show-index once, so a column-set change needs a fresh table. -->
         <OTable
+          :key="layout"
           data-test="workflow-runs-table"
           :data="rows"
           :columns="columns"
@@ -101,9 +133,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="loading"
           :show-global-filter="false"
           :default-columns="false"
-          :show-index="true"
+          :show-index="layout === 'plain'"
           :enable-column-resize="true"
-          sort-by="start_time"
+          :sort-by="isHttpFilter ? 'received' : 'start_time'"
           sort-order="desc"
           width="100%"
           class="h-full w-full"
@@ -120,8 +152,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="workflow-runs-load-error"
                 @action="fetchHistory(true)"
               />
+              <OEmptyState
+                v-else-if="isHttpFilter"
+                size="inline"
+                icon="webhook"
+                :title="t('workflow.http.runsEmptyTitle')"
+                :description="t('workflow.http.runsEmptyBody')"
+                :action-label="t('workflow.http.runsEmptyAction')"
+                data-test="workflow-runs-http-empty"
+                @action="onFilterChange('all')"
+              />
               <NoData v-else />
             </div>
+          </template>
+
+          <template #cell-received="{ row }">
+            <OTimeCell
+              :value="row._timestamp"
+              unit="us"
+              mode="absolute"
+              :timezone="store.state.timezone"
+              :empty-label="dash"
+            />
           </template>
 
           <template #cell-start_time="{ value }">
@@ -142,15 +194,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                than a column: in a 27.5rem panel a dedicated Error column is blank
                on every healthy run and still too narrow to read a message in. -->
           <template #cell-status="{ row }">
-            <OBadge :variant="getStatusVariant(row.error ? 'failed' : 'success')" size="sm">
-              {{ row.error ? t("workflow.history.failed") : t("workflow.history.success") }}
-              <OTooltip
-                v-if="row.error"
-                side="left"
-                max-width="22rem"
-                :content="raw(String(humanizeNodeIds(row.error, t)))"
-              />
-            </OBadge>
+            <div class="flex min-w-0 flex-col items-start gap-0.5">
+              <span class="inline-flex">
+                <OTag type="hookRunStatus" :value="row.status" size="sm" />
+                <OTooltip
+                  v-if="row.status === 'failed' && row.error && !runReasonOf(row)"
+                  side="left"
+                  max-width="22rem"
+                  :content="raw(String(humanizeNodeIds(row.error, t)))"
+                />
+              </span>
+              <span
+                v-if="runReasonOf(row)"
+                :data-test="`workflow-run-reason-${row.run_id}`"
+                class="text-text-secondary text-2xs leading-tight"
+              >
+                {{ reasonText(row) }}
+              </span>
+            </div>
+          </template>
+
+          <template #cell-source="{ row }">
+            <span class="inline-flex min-w-0 items-center gap-1.5">
+              <OIcon :name="sourceIcon(row)" size="xs" class="text-text-secondary shrink-0" />
+              <OTruncatedText>{{ sourceLabel(row) }}</OTruncatedText>
+            </span>
+          </template>
+
+          <template #cell-run_id="{ row }">
+            <span class="font-mono">
+              {{ shortRunId(row.run_id) }}
+              <OTooltip side="left" :content="raw(row.run_id)" />
+            </span>
+          </template>
+
+          <template #cell-caller="{ row }">
+            <div class="flex min-w-0 flex-col leading-tight">
+              <OTruncatedText class="font-mono text-xs">
+                {{ row.http_request?.credential_prefix || dash }}
+              </OTruncatedText>
+              <OTruncatedText
+                v-if="row.http_request?.caller_ip"
+                class="text-text-secondary text-2xs"
+              >
+                {{ row.http_request.caller_ip }}
+              </OTruncatedText>
+            </div>
+          </template>
+
+          <template #cell-idempotency_key="{ row }">
+            <OTruncatedText class="font-mono">
+              {{ row.http_request?.idempotency_key || dash }}
+            </OTruncatedText>
           </template>
 
           <!-- A dot, not a badge: at 44px a worded badge is what clipped to "T".
@@ -209,7 +304,12 @@ import { useStore } from "vuex";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -220,6 +320,26 @@ import NoData from "@/components/shared/grid/NoData.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useQuery } from "@tanstack/vue-query";
+import { workflowHttpTriggerQuery } from "@/services/workflows.queries";
+import type { WorkflowHistoryRow } from "@/services/workflows";
+import {
+  RUN_SOURCE_LABEL_KEYS,
+  isHttpRun,
+  runSourceOf,
+  workflowHooksEnabled,
+  type RunSource,
+} from "@/plugins/workflows/httpEndpoint";
+import {
+  RUN_REASON_KEYS,
+  matchesRunSearch,
+  matchesTriggerFilter,
+  runReasonOf,
+  shortRunId,
+  triggerFilterSource,
+  type RunTriggerFilter,
+} from "@/plugins/workflows/runStatus";
+import { triggerDef } from "@/plugins/workflows/triggers";
 import {
   workflowObj,
   loadRunsHistory,
@@ -228,6 +348,7 @@ import {
   humanizeNodeIds,
   isRetryableRun,
   retryWorkflowRun,
+  currentTriggerKind,
 } from "@/plugins/workflows/useWorkflowCanvas";
 
 const props = defineProps<{
@@ -240,9 +361,12 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "select-run", runId: string): void;
 }>();
+// The Runs page widens the panel under the HTTP filter, so the choice is a model it can read.
+const triggerFilter = defineModel<RunTriggerFilter>("triggerFilter", { default: "all" });
 
 const { t } = useI18nTyped();
 const store = useStore();
+const dash = raw("—");
 
 // Loading + the runs list live in SHARED state (workflowObj.runsHistory) so the
 // NDV run switcher reuses the same fetch instead of re-hitting /history.
@@ -287,24 +411,70 @@ const formatDuration = (microseconds: number) => {
   return t("workflow.history.durationSeconds", { seconds });
 };
 
-// mirrors AlertHistory.getStatusVariant.
-const getStatusVariant = (status: string) => {
-  switch (status?.toLowerCase()) {
-    case "success":
-      return "success-outline";
-    case "failed":
-    case "error":
-      return "error-outline";
-    default:
-      return "default-outline";
-  }
-};
-
 // Shared with the editor's History dropdown so the two run-history surfaces cannot
 // disagree about what a published workflow should show.
 const { showTestRuns, testRunCount, visibleRuns } = useTestRunVisibility();
 
-const rows = computed(() => visibleRuns(workflowObj.runsHistory.list));
+const hooksOn = computed(() => workflowHooksEnabled(store.state.zoConfig));
+const endpoint = useQuery(() => ({
+  ...workflowHttpTriggerQuery(props.orgId, props.workflowId),
+  enabled: hooksOn.value && !!props.orgId && !!props.workflowId,
+}));
+// "Has or had": a configured endpoint (even one turned off) or HTTP runs still in the window.
+const showTriggerFilter = computed(
+  () =>
+    hooksOn.value &&
+    (endpoint.data.value?.configured === true ||
+      workflowObj.currentSelectedWorkflow?.http_endpoint_enabled === true ||
+      workflowObj.runsHistory.list.some(isHttpRun)),
+);
+const activeFilter = computed(() => (showTriggerFilter.value ? triggerFilter.value : "all"));
+const isHttpFilter = computed(() => activeFilter.value === "http_request");
+const layout = computed<"plain" | "source" | "http">(() => {
+  if (!showTriggerFilter.value) return "plain";
+  return isHttpFilter.value ? "http" : "source";
+});
+const search = ref("");
+
+const onFilterChange = (value: unknown) => {
+  if (typeof value === "string" && value) triggerFilter.value = value;
+};
+
+const filterOptions = computed(() => {
+  const kind = currentTriggerKind();
+  const kindSource = triggerFilterSource(kind);
+  return [
+    { value: "all", label: t("workflow.history.allTriggers"), icon: undefined },
+    ...(kind && kindSource
+      ? [{ value: kind, label: t(RUN_SOURCE_LABEL_KEYS[kindSource]), icon: undefined }]
+      : []),
+    { value: "http_request", label: t("workflow.history.sourceHttp"), icon: "webhook" },
+  ];
+});
+
+const SOURCE_ICONS: Record<RunSource, IconName> = {
+  http: "webhook",
+  alert_fired: triggerDef("alert_fired").icon,
+  incident_event: triggerDef("incident_event").icon,
+  test: "science",
+  retry: "replay",
+  manual: "person",
+  other: "bolt",
+};
+const sourceIcon = (row: WorkflowHistoryRow): IconName => SOURCE_ICONS[runSourceOf(row)];
+const sourceLabel = (row: WorkflowHistoryRow) => t(RUN_SOURCE_LABEL_KEYS[runSourceOf(row)]);
+const reasonText = (row: WorkflowHistoryRow) => {
+  const reason = runReasonOf(row);
+  return reason ? t(RUN_REASON_KEYS[reason]) : "";
+};
+
+const rows = computed(() =>
+  visibleRuns(workflowObj.runsHistory.list as WorkflowHistoryRow[]).filter(
+    (r) =>
+      matchesTriggerFilter(r, activeFilter.value) &&
+      (!isHttpFilter.value || matchesRunSearch(r, search.value)),
+  ),
+);
 
 // Highlight the run currently loaded on the canvas. `!` (important) so the tint
 // wins over OTable's default/hover row background — keeping the list and canvas
@@ -315,17 +485,38 @@ const rowClass = (row: any) =>
 // Feed the shared timeline: one bar per run, coloured by success/error.
 const timelineHistory = computed(() =>
   workflowObj.runsHistory.list.map((r: any) => ({
-    status: r.error ? "error" : "success",
+    status: r.status === "failed" ? "error" : "success",
     timestamp: r.start_time,
   })),
 );
+
+function fixedColumn(
+  id: string,
+  header: OTableColumnDef["header"],
+  size: number,
+  access: Pick<OTableColumnDef, "accessorKey" | "accessorFn">,
+): OTableColumnDef {
+  return { id, header, ...access, sortable: true, size, maxSize: size, meta: { align: "left" } };
+}
+
+function actionsColumn(size: number): OTableColumnDef {
+  return {
+    id: "actions",
+    header: t("workflow.actions"),
+    isAction: true,
+    pinned: "right",
+    size,
+    maxSize: size,
+    meta: { align: "center" },
+  };
+}
 
 // The panel is a fixed 27.5rem column, so these sizes are a budget: anything over
 // it silently pushes a column out of reach (the panel has no horizontal scroll).
 // Scanning order — when it ran, how long, whether it passed, was it a rehearsal —
 // comes first; Error is the diagnostic you open a row for, so it goes last and no
 // longer flexes, and Ended is derivable from Started + Duration so it is dropped.
-const columns = computed<OTableColumnDef[]>(() => [
+const plainColumns = computed<OTableColumnDef[]>(() => [
   {
     id: "start_time",
     header: t("workflow.history.started"),
@@ -347,7 +538,7 @@ const columns = computed<OTableColumnDef[]>(() => [
   {
     id: "status",
     header: t("workflow.history.status"),
-    accessorFn: (row: any) => (row.error ? "failed" : "success"),
+    accessorFn: (row: any) => row.status,
     sortable: true,
     size: 80,
     maxSize: 80,
@@ -363,16 +554,48 @@ const columns = computed<OTableColumnDef[]>(() => [
     maxSize: 44,
     meta: { align: "center" },
   },
-  {
-    id: "actions",
-    header: t("workflow.actions"),
-    isAction: true,
-    pinned: "right",
-    size: 56,
-    maxSize: 56,
-    meta: { align: "center" },
-  },
+  actionsColumn(56),
 ]);
+
+// The 27.5rem panel minus its padding and border, with no index column: the source in words is what the filter's views are scanned by.
+const sourceColumns = computed<OTableColumnDef[]>(() => [
+  fixedColumn("start_time", t("workflow.history.started"), 112, {
+    accessorKey: "start_time",
+  }),
+  fixedColumn("source", t("workflow.history.source"), 108, {
+    accessorFn: (row: any) => runSourceOf(row),
+  }),
+  fixedColumn("status", t("workflow.history.status"), 84, {
+    accessorFn: (row: any) => row.status,
+  }),
+  fixedColumn("duration", t("workflow.history.duration"), 60, {
+    accessorFn: (row: any) => row.end_time - row.start_time,
+  }),
+  actionsColumn(56),
+]);
+
+// The 46rem panel under the HTTP filter; Duration and Source drop because the filter implies them.
+const httpColumns = computed<OTableColumnDef[]>(() => [
+  fixedColumn("received", t("workflow.history.received"), 140, {
+    accessorKey: "_timestamp",
+  }),
+  fixedColumn("status", t("workflow.history.status"), 140, {
+    accessorFn: (row: any) => row.status,
+  }),
+  fixedColumn("run_id", t("workflow.history.run"), 80, { accessorKey: "run_id" }),
+  fixedColumn("caller", t("workflow.history.caller"), 148, {
+    accessorFn: (row: any) => row.http_request?.credential_prefix ?? "",
+  }),
+  fixedColumn("idempotency_key", t("workflow.history.idempotencyKey"), 160, {
+    accessorFn: (row: any) => row.http_request?.idempotency_key ?? "",
+  }),
+  actionsColumn(48),
+]);
+
+const columns = computed(() => {
+  if (layout.value === "http") return httpColumns.value;
+  return layout.value === "source" ? sourceColumns.value : plainColumns.value;
+});
 
 // `force` for the refresh and retry buttons; a mount or window change reads the cache.
 const fetchHistory = async (force = false) => {

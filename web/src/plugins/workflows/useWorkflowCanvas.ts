@@ -40,6 +40,7 @@ import { makeEdge } from "@/composables/flow/makeEdge";
 import { getTruncatedConditions } from "@/utils/conditionPreview";
 import { convertV0ToV2, convertV1BEToV2, convertV1ToV2 } from "@/utils/alerts/alertDataTransforms";
 import { DEFAULT_TRIGGER_KIND, triggerTypeForKind } from "./triggers";
+import { hasStoredRunData, runReasonOf, type RunOutcomeFields } from "./runStatus";
 import workflowService from "@/services/workflows";
 import { workflowRunsQuery } from "@/services/workflows.queries";
 import { workflowKeys } from "@/services/workflows.querykeys";
@@ -1533,18 +1534,20 @@ export const restoreTestData = (workflowId: string, opts?: { keepDocumentState?:
 // test_workflow and retry_run just record the run — so a Test and a failed Retry
 // both LOOK retryable in history but answer 400 "Errored run info not found".
 // Why a run cannot be retried, "" when it can — lets a disabled control say which.
+// A run that never executed or never finished stored no input, so its retry would be refused too.
 export const retryBlockedReason = (
-  run: { event_type?: string; error?: string } | null | undefined,
-): "" | "test" | "retry" | "succeeded" => {
+  run: ({ event_type?: string } & RunOutcomeFields) | null | undefined,
+): "" | "test" | "retry" | "succeeded" | "no_input" => {
   if (!run) return "succeeded";
   if (run.event_type === "Test") return "test";
   if (run.event_type === "Retry") return "retry";
-  if (!run.error) return "succeeded";
+  if (runReasonOf(run) || !hasStoredRunData(run)) return "no_input";
+  if (run.status !== "failed") return "succeeded";
   return "";
 };
 
 export const isRetryableRun = (
-  run: { event_type?: string; error?: string } | null | undefined,
+  run: ({ event_type?: string } & RunOutcomeFields) | null | undefined,
 ): boolean => retryBlockedReason(run) === "";
 
 // Replay a failed run server-side. The backend re-runs from the stored input map,
@@ -1556,7 +1559,7 @@ export const retryWorkflowRun = async (opts: {
   workflowId: string;
   runId: string;
   fromNode?: string;
-  run?: { event_type?: string; error?: string } | null;
+  run?: ({ event_type?: string } & RunOutcomeFields) | null;
 }): Promise<{ ok: boolean; error?: string }> => {
   if (opts.run !== undefined && !isRetryableRun(opts.run)) {
     return { ok: false, error: "" };
@@ -1629,6 +1632,21 @@ export const loadWorkflowRun = async (opts: {
   runId: string;
 }): Promise<{ ok: boolean; error?: string }> => {
   const wf = workflowObj.currentSelectedWorkflow;
+  const row = workflowObj.runsHistory.list.find((r: any) => r.run_id === opts.runId);
+  if (row && !hasStoredRunData(row)) {
+    workflowObj.testRun.result = {
+      errors: {},
+      inputs: {},
+      outputs: {},
+      ranNodeIds: [],
+      blockedNodeIds: [],
+      mode: "history",
+      runId: opts.runId,
+      ghostNodeIds: [],
+      source: "run",
+    };
+    return { ok: true };
+  }
   try {
     const res = await workflowService.getWorkflowRun({
       org_identifier: opts.orgId,
