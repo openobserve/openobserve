@@ -611,6 +611,21 @@ pub async fn move_dashboard(
     let (curr_folder, dashboard) = table::dashboards::get_by_id(org_id, dashboard_id)
         .await?
         .ok_or(DashboardError::DashboardNotFound)?;
+    // No-op when the dashboard is already in the destination folder.
+    //
+    // Without this guard, moving a dashboard to its own folder succeeds at
+    // the API level but silently breaks OpenFGA permissions: the
+    // set_parent_relation call below writes a tuple that already exists
+    // (only logged as a failure), and the remove_parent_relation call then
+    // deletes the one tuple that existed, leaving the dashboard unlinked
+    // from its folder in OpenFGA. After that, any role-based access granted
+    // on the folder stops applying to the dashboard.
+    //
+    // Mirrors the same-folder early return in
+    // src/core/src/downtimes/access.rs::reparent().
+    if curr_folder.folder_id == to_folder {
+        return Ok(());
+    }
 
     #[cfg(feature = "enterprise")]
     if _check_openfga && get_openfga_config().enabled {
