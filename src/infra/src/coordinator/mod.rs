@@ -18,6 +18,7 @@ pub mod alerts;
 pub mod dashboards;
 pub mod downtimes;
 pub mod events;
+pub mod fleet;
 pub mod ingest_rejection;
 pub mod oncall;
 pub mod org_status;

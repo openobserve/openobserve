@@ -51,6 +51,7 @@ pub enum FolderType {
     Workflows,
     Prompts = 5,
     Downtimes = 6,
+    Fleets = 7,
 }
 
 pub const DEFAULT_FOLDER: &str = "default";
