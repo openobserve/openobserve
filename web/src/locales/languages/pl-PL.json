@@ -1478,7 +1478,8 @@
     "trialPageNeedsPlanToast": "{page} wymaga planu. Wybierz plan na tej stronie, aby dalej z niego korzystać.",
     "trialChoosePlanToast": "Wybierz plan na tej stronie, aby dalej korzystać z {product}.",
     "trialFlyoutNote": "Twój okres próbny zakończył się. Strony z ikoną blokady wymagają planu.",
-    "linkedAccounts": "Powiązane konta"
+    "linkedAccounts": "Powiązane konta",
+    "fleet": "Zarządzanie flotą"
   },
   "profiles": {
     "title": "Profile",
@@ -3399,7 +3400,8 @@
       "k8sPresetSeeded": "Wstępnie wybrano dostęp tylko do odczytu dla {matched} z {total} strumieni metryk Kubernetes. Sprawdź przed zapisaniem.",
       "k8sPresetNoMatch": "Żaden z {total} strumieni metryk Kubernetes nie istnieje jeszcze w tej organizacji, więc nic nie zostało wstępnie wybrane.",
       "rumPresetSeeded": "Wstępnie wybrano dostęp do odczytu dla {matched} z {total} strumieni RUM, a także mapy źródeł i wszelkie uprawnienia do RUM Product Analytics. Sprawdź przed zapisaniem.",
-      "rumPresetNoMatch": "Żaden z {total} strumieni RUM jeszcze nie istnieje w tej organizacji, więc nic w nich nie zostało wstępnie wybrane; mapy źródeł i wszelkie uprawnienia do RUM Product Analytics zostały jednak przygotowane."
+      "rumPresetNoMatch": "Żaden z {total} strumieni RUM jeszcze nie istnieje w tej organizacji, więc nic w nich nie zostało wstępnie wybrane; mapy źródeł i wszelkie uprawnienia do RUM Product Analytics zostały jednak przygotowane.",
+      "moduleGroupFleet": "Flota"
     },
     "rolesPage": {
       "subtitle": "Role łączą uprawnienia — przypisz je do użytkowników, kont usługi lub grup, aby przyznać dostęp.",
@@ -5033,7 +5035,8 @@
     "clearAndContinue": "Wyczyść i kontynuuj",
     "cancel": "Anuluj",
     "ok": "OK",
-    "loading": "Ładowanie..."
+    "loading": "Ładowanie...",
+    "typeToConfirm": "Aby potwierdzić, wpisz {text} poniżej"
   },
   "ingestion": {
     "firstEvent": {
@@ -19475,7 +19478,8 @@
       "rum": "RUM",
       "runningQueries": "Uruchomione zapytania",
       "oncall": "Dyżur",
-      "synthetics": "Syntetyki"
+      "synthetics": "Syntetyki",
+      "fleet": "Flota"
     },
     "pages": {
       "global": "Globalne",
@@ -19528,7 +19532,9 @@
       "oncall": "Dyżur",
       "oncallDetail": "Strona dyżuru",
       "syntheticsJourney": "Ścieżka syntetyczna",
-      "downtimes": "Okna serwisowe"
+      "downtimes": "Okna serwisowe",
+      "fleetConfigEditor": "Edytor konfiguracji",
+      "fleetOverview": "Potoki floty"
     },
     "actions": {
       "openCheatsheet": "Otwórz ściągawkę skrótów klawiszowych",
@@ -19652,7 +19658,9 @@
       "tracesPrevRow": "Wybierz poprzedni trace",
       "tracesRowOpen": "Otwórz wybrany trace",
       "traceNextVisibleSpan": "Następny widoczny span",
-      "tracePrevVisibleSpan": "Poprzedni widoczny span"
+      "tracePrevVisibleSpan": "Poprzedni widoczny span",
+      "fleetEditorDeleteNode": "Usuń wybrany komponent",
+      "fleetFlowCloseDetails": "Zamknij szczegóły ścieżki lub zwiń mapę"
     }
   },
   "components": {

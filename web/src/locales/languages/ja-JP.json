@@ -1478,7 +1478,8 @@
     "trialPageNeedsPlanToast": "{page}にはプランが必要です。引き続き使用するには、このページでプランを選択してください。",
     "trialChoosePlanToast": "{product}を引き続き使用するには、このページでプランを選択してください。",
     "trialFlyoutNote": "トライアルが終了しました。ロックが付いたページにはプランが必要です。",
-    "linkedAccounts": "連携アカウント"
+    "linkedAccounts": "連携アカウント",
+    "fleet": "Fleet 管理"
   },
   "profiles": {
     "title": "プロファイル",
@@ -3399,7 +3400,8 @@
       "k8sPresetSeeded": "{total} 個の Kubernetes メトリクスストリームのうち {matched} 個に読み取りアクセスを事前選択しました。保存する前に確認してください。",
       "k8sPresetNoMatch": "この組織には {total} 個の Kubernetes メトリクスストリームがまだ存在しないため、何も事前選択されませんでした。",
       "rumPresetSeeded": "{total} 個の RUM ストリームのうち {matched} 個で読み取りアクセスを事前選択し、さらにソースマップと、RUM プロダクトアナリティクスの付与があればそれも選択しました。保存する前に確認してください。",
-      "rumPresetNoMatch": "{total} 個の RUM ストリームはいずれもこの組織にまだ存在しないため、それらに対して何も事前選択されませんでした。ソースマップと、RUM プロダクトアナリティクスの付与がある場合は引き続き設定されています。"
+      "rumPresetNoMatch": "{total} 個の RUM ストリームはいずれもこの組織にまだ存在しないため、それらに対して何も事前選択されませんでした。ソースマップと、RUM プロダクトアナリティクスの付与がある場合は引き続き設定されています。",
+      "moduleGroupFleet": "Fleet"
     },
     "rolesPage": {
       "subtitle": "ロールには権限がバンドルされています。ユーザー、サービスアカウント、またはグループに割り当ててアクセスを許可します。",
@@ -5033,7 +5035,8 @@
     "clearAndContinue": "クリアして続行",
     "cancel": "キャンセル",
     "ok": "OK",
-    "loading": "読み込み中..."
+    "loading": "読み込み中...",
+    "typeToConfirm": "確認するには、以下に {text} と入力してください"
   },
   "ingestion": {
     "firstEvent": {
@@ -19475,7 +19478,8 @@
       "rum": "RUM",
       "runningQueries": "クエリの実行",
       "oncall": "オンコール",
-      "synthetics": "合成モニタリング"
+      "synthetics": "合成モニタリング",
+      "fleet": "Fleet"
     },
     "pages": {
       "global": "グローバル",
@@ -19528,7 +19532,9 @@
       "oncall": "オンコール",
       "oncallDetail": "オンコールページ",
       "syntheticsJourney": "合成モニタリングジャーニー",
-      "downtimes": "ダウンタイム"
+      "downtimes": "ダウンタイム",
+      "fleetConfigEditor": "設定エディター",
+      "fleetOverview": "Fleet パイプライン"
     },
     "actions": {
       "openCheatsheet": "キーボードショートカットのチートシートを開く",
@@ -19652,7 +19658,9 @@
       "tracesPrevRow": "前のトレースを選択",
       "tracesRowOpen": "選択したトレースを開く",
       "traceNextVisibleSpan": "次の表示中のスパン",
-      "tracePrevVisibleSpan": "前の表示中のスパン"
+      "tracePrevVisibleSpan": "前の表示中のスパン",
+      "fleetEditorDeleteNode": "選択したコンポーネントを削除",
+      "fleetFlowCloseDetails": "パスの詳細を閉じるか、マップを折りたたむ"
     }
   },
   "components": {

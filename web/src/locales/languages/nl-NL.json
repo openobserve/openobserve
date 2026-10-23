@@ -1478,7 +1478,8 @@
     "trialPageNeedsPlanToast": "{page} heeft een plan nodig. Kies er een op deze pagina om deze te blijven gebruiken.",
     "trialChoosePlanToast": "Kies een plan op deze pagina om {product} te blijven gebruiken.",
     "trialFlyoutNote": "Je proefperiode is afgelopen. Pagina's met een slot hebben een plan nodig.",
-    "linkedAccounts": "Gekoppelde accounts"
+    "linkedAccounts": "Gekoppelde accounts",
+    "fleet": "Fleetbeheer"
   },
   "profiles": {
     "title": "Profielen",
@@ -3399,7 +3400,8 @@
       "k8sPresetSeeded": "Vooraf geselecteerde leestoegang op {matched} van {total} Kubernetes-metriekstreams. Controleer voordat u opslaat.",
       "k8sPresetNoMatch": "Geen van de {total} Kubernetes-metriekstreams bestaat nog in deze organisatie, dus er is niets vooraf geselecteerd.",
       "rumPresetSeeded": "Leestoegang vooraf geselecteerd op {matched} van {total} RUM-streams, plus source maps en eventuele RUM Product Analytics-toekenningen. Controleer voor het opslaan.",
-      "rumPresetNoMatch": "Geen van de {total} RUM-streams bestaat al in deze organisatie, dus er is niets vooraf op geselecteerd; source maps en eventuele RUM Product Analytics-toekenningen zijn wel klaargezet."
+      "rumPresetNoMatch": "Geen van de {total} RUM-streams bestaat al in deze organisatie, dus er is niets vooraf op geselecteerd; source maps en eventuele RUM Product Analytics-toekenningen zijn wel klaargezet.",
+      "moduleGroupFleet": "Fleet"
     },
     "rolesPage": {
       "subtitle": "Rollen bundelen machtigingen — wijs ze toe aan gebruikers, serviceaccounts of groepen om toegang te verlenen.",
@@ -5033,7 +5035,8 @@
     "clearAndContinue": "Wissen en doorgaan",
     "cancel": "Annuleer",
     "ok": "Oké",
-    "loading": "Bezig met laden..."
+    "loading": "Bezig met laden...",
+    "typeToConfirm": "Typ {text} hieronder om te bevestigen"
   },
   "ingestion": {
     "firstEvent": {
@@ -19475,7 +19478,8 @@
       "rum": "RUM",
       "runningQueries": "Zoekopdrachten uitvoeren",
       "oncall": "Piket",
-      "synthetics": "Synthetics"
+      "synthetics": "Synthetics",
+      "fleet": "Fleet"
     },
     "pages": {
       "global": "Globaal",
@@ -19528,7 +19532,9 @@
       "oncall": "Piket",
       "oncallDetail": "Piketoproep",
       "syntheticsJourney": "Synthetics-traject",
-      "downtimes": "Onderhoudsperiodes"
+      "downtimes": "Onderhoudsperiodes",
+      "fleetConfigEditor": "Configuratie-editor",
+      "fleetOverview": "Fleet-pipelines"
     },
     "actions": {
       "openCheatsheet": "Cheatsheet voor sneltoetsen openen",
@@ -19652,7 +19658,9 @@
       "tracesPrevRow": "Vorige trace selecteren",
       "tracesRowOpen": "Open de geselecteerde trace",
       "traceNextVisibleSpan": "Volgende zichtbare span",
-      "tracePrevVisibleSpan": "Vorige zichtbare span"
+      "tracePrevVisibleSpan": "Vorige zichtbare span",
+      "fleetEditorDeleteNode": "Het geselecteerde onderdeel verwijderen",
+      "fleetFlowCloseDetails": "Sluit de padinformatie of klap de kaart dicht"
     }
   },
   "components": {

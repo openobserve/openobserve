@@ -1478,7 +1478,8 @@
     "trialPageNeedsPlanToast": "{page} richiede un piano. Scegline uno in questa pagina per continuare a usarlo.",
     "trialChoosePlanToast": "Scegli un piano in questa pagina per continuare a usare {product}.",
     "trialFlyoutNote": "La tua prova è terminata. Le pagine con un lucchetto richiedono un piano.",
-    "linkedAccounts": "Account collegati"
+    "linkedAccounts": "Account collegati",
+    "fleet": "Gestione della flotta"
   },
   "profiles": {
     "title": "Profili",
@@ -3399,7 +3400,8 @@
       "k8sPresetSeeded": "Accesso in lettura preselezionato su {matched} di {total} stream di metriche Kubernetes. Verifica prima di salvare.",
       "k8sPresetNoMatch": "Nessuno dei {total} stream di metriche Kubernetes esiste ancora in questa organizzazione, quindi non è stato preselezionato nulla.",
       "rumPresetSeeded": "Accesso in sola lettura preselezionato su {matched} di {total} stream RUM, più le source map e qualsiasi autorizzazione RUM Product Analytics. Rivedi prima di salvare.",
-      "rumPresetNoMatch": "Nessuno dei {total} stream RUM esiste ancora in questa organizzazione, quindi non è stato preselezionato nulla su di essi; le source map e qualsiasi autorizzazione RUM Product Analytics sono state comunque predisposte."
+      "rumPresetNoMatch": "Nessuno dei {total} stream RUM esiste ancora in questa organizzazione, quindi non è stato preselezionato nulla su di essi; le source map e qualsiasi autorizzazione RUM Product Analytics sono state comunque predisposte.",
+      "moduleGroupFleet": "Flotta"
     },
     "rolesPage": {
       "subtitle": "I ruoli raggruppano le autorizzazioni: assegnali a utenti, account di servizio o gruppi per concedere l'accesso.",
@@ -5033,7 +5035,8 @@
     "clearAndContinue": "Cancella e continua",
     "cancel": "Annulla",
     "ok": "Ok",
-    "loading": "Caricamento..."
+    "loading": "Caricamento...",
+    "typeToConfirm": "Per confermare, digita {text} qui sotto"
   },
   "ingestion": {
     "firstEvent": {
@@ -19475,7 +19478,8 @@
       "rum": "RUM",
       "runningQueries": "Interrogazioni in esecuzione",
       "oncall": "Reperibilità",
-      "synthetics": "Synthetics"
+      "synthetics": "Synthetics",
+      "fleet": "Flotta"
     },
     "pages": {
       "global": "Globale",
@@ -19528,7 +19532,9 @@
       "oncall": "Reperibilità",
       "oncallDetail": "Notifica di reperibilità",
       "syntheticsJourney": "Percorso Synthetics",
-      "downtimes": "Downtime"
+      "downtimes": "Downtime",
+      "fleetConfigEditor": "Editor configurazione",
+      "fleetOverview": "Pipeline della flotta"
     },
     "actions": {
       "openCheatsheet": "Apri il cheatsheet delle scorciatoie da tastiera",
@@ -19652,7 +19658,9 @@
       "tracesPrevRow": "Seleziona la traccia precedente",
       "tracesRowOpen": "Apri la traccia selezionata",
       "traceNextVisibleSpan": "Span visibile successivo",
-      "tracePrevVisibleSpan": "Span visibile precedente"
+      "tracePrevVisibleSpan": "Span visibile precedente",
+      "fleetEditorDeleteNode": "Rimuovi il componente selezionato",
+      "fleetFlowCloseDetails": "Chiudi i dettagli del percorso o comprimi la mappa"
     }
   },
   "components": {

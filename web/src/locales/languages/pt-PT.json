@@ -1478,7 +1478,8 @@
     "trialPageNeedsPlanToast": "{page} precisa de um plano. Escolha um nesta página para continuar a usar.",
     "trialChoosePlanToast": "Escolha um plano nesta página para continuar a usar o {product}.",
     "trialFlyoutNote": "O seu período de teste terminou. Páginas com um cadeado precisam de um plano.",
-    "linkedAccounts": "Contas associadas"
+    "linkedAccounts": "Contas associadas",
+    "fleet": "Gestão de frotas"
   },
   "profiles": {
     "title": "Perfis",
@@ -3399,7 +3400,8 @@
       "k8sPresetSeeded": "Acesso de leitura pré-selecionado em {matched} de {total} streams de métricas do Kubernetes. Reveja antes de guardar.",
       "k8sPresetNoMatch": "Nenhum dos {total} streams de métricas do Kubernetes existe ainda nesta organização, pelo que nada foi pré-selecionado.",
       "rumPresetSeeded": "Acesso de leitura pré-selecionado em {matched} de {total} streams de RUM, além de mapas de origem e qualquer concessão de Análise de Produto do RUM. Reveja antes de guardar.",
-      "rumPresetNoMatch": "Nenhum dos {total} streams de RUM existe ainda nesta organização, pelo que nada foi pré-selecionado neles; os mapas de origem e quaisquer concessões de Análise de Produto do RUM foram, ainda assim, preparados."
+      "rumPresetNoMatch": "Nenhum dos {total} streams de RUM existe ainda nesta organização, pelo que nada foi pré-selecionado neles; os mapas de origem e quaisquer concessões de Análise de Produto do RUM foram, ainda assim, preparados.",
+      "moduleGroupFleet": "Frota"
     },
     "rolesPage": {
       "subtitle": "As funções agrupam permissões — atribua-as a utilizadores, contas de serviço ou grupos para conceder acesso.",
@@ -5033,7 +5035,8 @@
     "clearAndContinue": "Limpar & Continuar",
     "cancel": "Cancelar",
     "ok": "Ok",
-    "loading": "A carregar..."
+    "loading": "A carregar...",
+    "typeToConfirm": "Para confirmar, escreva {text} abaixo"
   },
   "ingestion": {
     "firstEvent": {
@@ -19475,7 +19478,8 @@
       "rum": "RUM",
       "runningQueries": "Consultas em execução",
       "oncall": "Piquete",
-      "synthetics": "Sintéticos"
+      "synthetics": "Sintéticos",
+      "fleet": "Frota"
     },
     "pages": {
       "global": "Global",
@@ -19528,7 +19532,9 @@
       "oncall": "Piquete",
       "oncallDetail": "Acionamento de piquete",
       "syntheticsJourney": "Jornada de Sintéticos",
-      "downtimes": "Janelas de manutenção"
+      "downtimes": "Janelas de manutenção",
+      "fleetConfigEditor": "Editor de configuração",
+      "fleetOverview": "Pipelines da frota"
     },
     "actions": {
       "openCheatsheet": "Abrir o guia rápido de atalhos de teclado",
@@ -19652,7 +19658,9 @@
       "tracesPrevRow": "Selecionar o trace anterior",
       "tracesRowOpen": "Abrir o trace selecionado",
       "traceNextVisibleSpan": "Próximo span visível",
-      "tracePrevVisibleSpan": "Span visível anterior"
+      "tracePrevVisibleSpan": "Span visível anterior",
+      "fleetEditorDeleteNode": "Remover o componente selecionado",
+      "fleetFlowCloseDetails": "Fechar os detalhes do caminho ou recolher o mapa"
     }
   },
   "components": {

@@ -1478,7 +1478,8 @@
     "trialPageNeedsPlanToast": "{page} 需要方案。請在此頁面選擇一個方案以繼續使用。",
     "trialChoosePlanToast": "請在此頁面選擇方案，以繼續使用 {product}。",
     "trialFlyoutNote": "您的試用期已結束。上鎖的頁面需要方案。",
-    "linkedAccounts": "已連結帳戶"
+    "linkedAccounts": "已連結帳戶",
+    "fleet": "機群管理"
   },
   "profiles": {
     "title": "效能剖析",
@@ -3399,7 +3400,8 @@
       "k8sPresetSeeded": "已預先選取 {total} 個 Kubernetes 指標串流中 {matched} 個的讀取權限。儲存前請先檢閱。",
       "k8sPresetNoMatch": "此組織中尚不存在這 {total} 個 Kubernetes 指標串流，因此未預先選取任何項目。",
       "rumPresetSeeded": "已預先選取 {total} 個 RUM 串流中 {matched} 個的讀取權限,以及來源對應檔和任何 RUM 產品分析授權。儲存前請先檢閱。",
-      "rumPresetNoMatch": "此組織中尚無 {total} 個 RUM 串流中的任何一個,因此未在其上預先選取任何項目;來源對應檔和任何 RUM 產品分析授權仍已暫存。"
+      "rumPresetNoMatch": "此組織中尚無 {total} 個 RUM 串流中的任何一個,因此未在其上預先選取任何項目;來源對應檔和任何 RUM 產品分析授權仍已暫存。",
+      "moduleGroupFleet": "機群"
     },
     "rolesPage": {
       "subtitle": "角色會綑綁多個權限——將角色指派給使用者、服務帳戶或群組，即可授予存取權限。",
@@ -5033,7 +5035,8 @@
     "clearAndContinue": "清除並繼續",
     "cancel": "取消",
     "ok": "確定",
-    "loading": "載入中..."
+    "loading": "載入中...",
+    "typeToConfirm": "若要確認，請在下方輸入 {text}"
   },
   "ingestion": {
     "firstEvent": {
@@ -19470,7 +19473,8 @@
       "rum": "RUM",
       "runningQueries": "執行中的查詢",
       "oncall": "值班",
-      "synthetics": "合成監控"
+      "synthetics": "合成監控",
+      "fleet": "機群"
     },
     "pages": {
       "global": "全域",
@@ -19523,7 +19527,9 @@
       "oncall": "值班",
       "oncallDetail": "值班頁面",
       "syntheticsJourney": "合成監控旅程",
-      "downtimes": "停機時間"
+      "downtimes": "停機時間",
+      "fleetConfigEditor": "設定編輯器",
+      "fleetOverview": "機群管線"
     },
     "actions": {
       "openCheatsheet": "開啟鍵盤快捷鍵速查表",
@@ -19647,7 +19653,9 @@
       "tracesPrevRow": "選取上一筆追蹤",
       "tracesRowOpen": "開啟選取的追蹤",
       "traceNextVisibleSpan": "下一個可見的 Span",
-      "tracePrevVisibleSpan": "上一個可見的 Span"
+      "tracePrevVisibleSpan": "上一個可見的 Span",
+      "fleetEditorDeleteNode": "移除選取的元件",
+      "fleetFlowCloseDetails": "關閉路徑詳細資料或收合地圖"
     }
   },
   "components": {

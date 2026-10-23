@@ -1478,7 +1478,8 @@
     "trialPageNeedsPlanToast": "{page} cần một gói dịch vụ. Hãy chọn một gói trên trang này để tiếp tục sử dụng.",
     "trialChoosePlanToast": "Hãy chọn một gói trên trang này để tiếp tục sử dụng {product}.",
     "trialFlyoutNote": "Bản dùng thử của bạn đã kết thúc. Các trang có biểu tượng khóa cần một gói dịch vụ.",
-    "linkedAccounts": "Tài khoản liên kết"
+    "linkedAccounts": "Tài khoản liên kết",
+    "fleet": "Quản lý Fleet"
   },
   "profiles": {
     "title": "Profiles",
@@ -3399,7 +3400,8 @@
       "k8sPresetSeeded": "Đã chọn sẵn quyền đọc trên {matched} trong {total} stream chỉ số Kubernetes. Hãy xem lại trước khi lưu.",
       "k8sPresetNoMatch": "Chưa có stream chỉ số Kubernetes nào trong số {total} stream tồn tại trong tổ chức này, nên không có gì được chọn sẵn.",
       "rumPresetSeeded": "Đã chọn trước quyền đọc trên {matched} trong {total} stream RUM, cùng với source map và mọi quyền RUM Product Analytics. Xem lại trước khi lưu.",
-      "rumPresetNoMatch": "Chưa có stream RUM nào trong số {total} stream tồn tại trong tổ chức này, nên không có gì được chọn trước trên chúng; source map và mọi quyền RUM Product Analytics vẫn được đưa vào ở trạng thái chờ."
+      "rumPresetNoMatch": "Chưa có stream RUM nào trong số {total} stream tồn tại trong tổ chức này, nên không có gì được chọn trước trên chúng; source map và mọi quyền RUM Product Analytics vẫn được đưa vào ở trạng thái chờ.",
+      "moduleGroupFleet": "Fleet"
     },
     "rolesPage": {
       "subtitle": "Vai trò gói quyền — gán chúng cho Người dùng, Tài khoản dịch vụ hoặc Nhóm để cấp quyền truy cập.",
@@ -5033,7 +5035,8 @@
     "clearAndContinue": "Xóa & Tiếp tục",
     "cancel": "Hủy",
     "ok": "OK",
-    "loading": "Đang tải..."
+    "loading": "Đang tải...",
+    "typeToConfirm": "Để xác nhận, hãy nhập {text} bên dưới"
   },
   "ingestion": {
     "firstEvent": {
@@ -19475,7 +19478,8 @@
       "rum": "RUM",
       "runningQueries": "Truy vấn đang chạy",
       "oncall": "Trực",
-      "synthetics": "Synthetics"
+      "synthetics": "Synthetics",
+      "fleet": "Fleet"
     },
     "pages": {
       "global": "Toàn cục",
@@ -19528,7 +19532,9 @@
       "oncall": "Trực",
       "oncallDetail": "Thông báo trực",
       "syntheticsJourney": "Hành trình Synthetics",
-      "downtimes": "Thời gian bảo trì"
+      "downtimes": "Thời gian bảo trì",
+      "fleetConfigEditor": "Trình chỉnh sửa cấu hình",
+      "fleetOverview": "Pipeline của Fleet"
     },
     "actions": {
       "openCheatsheet": "Mở bảng phím tắt",
@@ -19652,7 +19658,9 @@
       "tracesPrevRow": "Chọn trace trước",
       "tracesRowOpen": "Mở trace đã chọn",
       "traceNextVisibleSpan": "Span hiển thị tiếp theo",
-      "tracePrevVisibleSpan": "Span hiển thị trước"
+      "tracePrevVisibleSpan": "Span hiển thị trước",
+      "fleetEditorDeleteNode": "Xóa thành phần đã chọn",
+      "fleetFlowCloseDetails": "Đóng chi tiết đường dẫn hoặc thu gọn bản đồ"
     }
   },
   "components": {

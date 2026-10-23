@@ -1478,7 +1478,8 @@
     "trialPageNeedsPlanToast": "{page} için bir plan gerekli. Kullanmaya devam etmek için bu sayfadan bir plan seçin.",
     "trialChoosePlanToast": "{product} kullanmaya devam etmek için bu sayfadan bir plan seçin.",
     "trialFlyoutNote": "Deneme süreniz sona erdi. Kilit simgesi olan sayfalar için bir plan gerekir.",
-    "linkedAccounts": "Bağlı hesaplar"
+    "linkedAccounts": "Bağlı hesaplar",
+    "fleet": "Filo yönetimi"
   },
   "profiles": {
     "title": "Profiller",
@@ -3399,7 +3400,8 @@
       "k8sPresetSeeded": "{total} Kubernetes metrik akışından {matched} tanesinde okuma erişimi önceden seçildi. Kaydetmeden önce gözden geçirin.",
       "k8sPresetNoMatch": "{total} Kubernetes metrik akışının hiçbiri henüz bu kuruluşta yok, bu nedenle hiçbir şey önceden seçilmedi.",
       "rumPresetSeeded": "{total} RUM akışından {matched} tanesinde önceden seçilmiş okuma erişimi, ayrıca kaynak haritaları ve mevcut tüm RUM Ürün Analitiği izinleri. Kaydetmeden önce gözden geçirin.",
-      "rumPresetNoMatch": "Bu kuruluşta {total} RUM akışının hiçbiri henüz mevcut değil, bu yüzden bunlarda hiçbir şey önceden seçilmedi; kaynak haritaları ve mevcut tüm RUM Ürün Analitiği izinleri yine de hazırlandı."
+      "rumPresetNoMatch": "Bu kuruluşta {total} RUM akışının hiçbiri henüz mevcut değil, bu yüzden bunlarda hiçbir şey önceden seçilmedi; kaynak haritaları ve mevcut tüm RUM Ürün Analitiği izinleri yine de hazırlandı.",
+      "moduleGroupFleet": "Filo"
     },
     "rolesPage": {
       "subtitle": "Rol paketi izinleri — erişim vermek için bunları Kullanıcılara, Hizmet Hesaplarına veya Gruplara atayın.",
@@ -5033,7 +5035,8 @@
     "clearAndContinue": "Temizle ve Devam Et",
     "cancel": "İptal",
     "ok": "Tamam.",
-    "loading": "Yükleniyor..."
+    "loading": "Yükleniyor...",
+    "typeToConfirm": "Onaylamak için aşağıya {text} yazın"
   },
   "ingestion": {
     "firstEvent": {
@@ -19475,7 +19478,8 @@
       "rum": "ROM",
       "runningQueries": "Çalışan Sorgular",
       "oncall": "Nöbet",
-      "synthetics": "Sentetikler"
+      "synthetics": "Sentetikler",
+      "fleet": "Filo"
     },
     "pages": {
       "global": "Küresel",
@@ -19528,7 +19532,9 @@
       "oncall": "Nöbet",
       "oncallDetail": "Nöbet çağrısı",
       "syntheticsJourney": "Sentetikler yolculuğu",
-      "downtimes": "Bakım pencereleri"
+      "downtimes": "Bakım pencereleri",
+      "fleetConfigEditor": "Yapılandırma düzenleyicisi",
+      "fleetOverview": "Filo işlem hatları"
     },
     "actions": {
       "openCheatsheet": "Klavye kısayolları özet sayfasını aç",
@@ -19652,7 +19658,9 @@
       "tracesPrevRow": "Önceki izi seç",
       "tracesRowOpen": "Seçili izi aç",
       "traceNextVisibleSpan": "Sonraki görünür Span",
-      "tracePrevVisibleSpan": "Önceki görünür Span"
+      "tracePrevVisibleSpan": "Önceki görünür Span",
+      "fleetEditorDeleteNode": "Seçili bileşeni kaldır",
+      "fleetFlowCloseDetails": "Yol ayrıntılarını kapat veya haritayı daralt"
     }
   },
   "components": {

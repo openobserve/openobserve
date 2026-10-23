@@ -1478,7 +1478,8 @@
     "trialPageNeedsPlanToast": "{page} يحتاج إلى خطة. اختر واحدة في هذه الصفحة لمواصلة استخدامه.",
     "trialChoosePlanToast": "اختر خطة في هذه الصفحة لمواصلة استخدام {product}.",
     "trialFlyoutNote": "انتهت فترة التجربة الخاصة بك. الصفحات التي تحمل قفلًا تحتاج إلى خطة.",
-    "linkedAccounts": "الحسابات المرتبطة"
+    "linkedAccounts": "الحسابات المرتبطة",
+    "fleet": "إدارة الأسطول"
   },
   "profiles": {
     "title": "التوصيف",
@@ -3399,7 +3400,8 @@
       "k8sPresetSeeded": "تم تحديد صلاحية قراءة مسبقًا على {matched} من {total} من تدفقات مقاييس Kubernetes. راجعها قبل الحفظ.",
       "k8sPresetNoMatch": "لا يوجد أي من تدفقات مقاييس Kubernetes البالغ عددها {total} في هذه المؤسسة بعد، لذا لم يتم تحديد أي شيء مسبقًا.",
       "rumPresetSeeded": "تم تحديد وصول القراءة مسبقًا على {matched} من أصل {total} من تدفقات RUM، بالإضافة إلى خرائط المصدر وأي منحة لتحليلات منتج RUM. راجع قبل الحفظ.",
-      "rumPresetNoMatch": "لا يوجد أي من تدفقات RUM البالغ عددها {total} في هذه المؤسسة بعد، لذلك لم يتم تحديد أي شيء مسبقًا عليها؛ لا تزال خرائط المصدر وأي منح لتحليلات منتج RUM مجهزة."
+      "rumPresetNoMatch": "لا يوجد أي من تدفقات RUM البالغ عددها {total} في هذه المؤسسة بعد، لذلك لم يتم تحديد أي شيء مسبقًا عليها؛ لا تزال خرائط المصدر وأي منح لتحليلات منتج RUM مجهزة.",
+      "moduleGroupFleet": "الأسطول"
     },
     "rolesPage": {
       "subtitle": "تقوم الأدوار بتجميع الأذونات — تعيينها للمستخدمين أو حسابات الخدمة أو المجموعات لمنح الوصول.",
@@ -5033,7 +5035,8 @@
     "clearAndContinue": "مسح ومتابعة",
     "cancel": "إلغاء",
     "ok": "حسنا",
-    "loading": "جار التحميل..."
+    "loading": "جار التحميل...",
+    "typeToConfirm": "للتأكيد، اكتب {text} أدناه"
   },
   "ingestion": {
     "firstEvent": {
@@ -19475,7 +19478,8 @@
       "rum": "RUM",
       "runningQueries": "الاستعلامات الجارية",
       "oncall": "المناوبة",
-      "synthetics": "المراقبة الاصطناعية"
+      "synthetics": "المراقبة الاصطناعية",
+      "fleet": "الأسطول"
     },
     "pages": {
       "global": "عالمي",
@@ -19528,7 +19532,9 @@
       "oncall": "المناوبة",
       "oncallDetail": "صفحة المناوبة",
       "syntheticsJourney": "رحلة المراقبة الاصطناعية",
-      "downtimes": "فترات الصيانة"
+      "downtimes": "فترات الصيانة",
+      "fleetConfigEditor": "محرر الإعدادات",
+      "fleetOverview": "مسارات معالجة الأسطول"
     },
     "actions": {
       "openCheatsheet": "فتح ورقة مرجعية لاختصارات لوحة المفاتيح",
@@ -19652,7 +19658,9 @@
       "tracesPrevRow": "تحديد التتبع السابق",
       "tracesRowOpen": "فتح التتبع المحدد",
       "traceNextVisibleSpan": "Span المرئي التالي",
-      "tracePrevVisibleSpan": "Span المرئي السابق"
+      "tracePrevVisibleSpan": "Span المرئي السابق",
+      "fleetEditorDeleteNode": "إزالة المكوّن المحدد",
+      "fleetFlowCloseDetails": "إغلاق تفاصيل المسار أو طي الخريطة"
     }
   },
   "components": {

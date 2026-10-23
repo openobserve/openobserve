@@ -1478,7 +1478,8 @@
     "trialPageNeedsPlanToast": "{page} nécessite un plan. Choisissez-en un sur cette page pour continuer à l'utiliser.",
     "trialChoosePlanToast": "Choisissez un plan sur cette page pour continuer à utiliser {product}.",
     "trialFlyoutNote": "Votre essai est terminé. Les pages avec un cadenas nécessitent un plan.",
-    "linkedAccounts": "Comptes liés"
+    "linkedAccounts": "Comptes liés",
+    "fleet": "Gestion de flotte"
   },
   "profiles": {
     "title": "Profils",
@@ -3399,7 +3400,8 @@
       "k8sPresetSeeded": "Accès en lecture présélectionné sur {matched} des {total} flux de métriques Kubernetes. Vérifiez avant d'enregistrer.",
       "k8sPresetNoMatch": "Aucun des {total} flux de métriques Kubernetes n'existe encore dans cette organisation, rien n'a donc été présélectionné.",
       "rumPresetSeeded": "Accès en lecture présélectionné sur {matched} des {total} flux RUM, ainsi que sur les source maps et toute autorisation Product Analytics RUM. Vérifiez avant d'enregistrer.",
-      "rumPresetNoMatch": "Aucun des {total} flux RUM n'existe encore dans cette organisation, donc rien n'a été présélectionné sur ceux-ci ; les source maps et toute autorisation Product Analytics RUM ont tout de même été préparées."
+      "rumPresetNoMatch": "Aucun des {total} flux RUM n'existe encore dans cette organisation, donc rien n'a été présélectionné sur ceux-ci ; les source maps et toute autorisation Product Analytics RUM ont tout de même été préparées.",
+      "moduleGroupFleet": "Flotte"
     },
     "rolesPage": {
       "subtitle": "Les rôles regroupent des autorisations : attribuez-les à des utilisateurs, à des comptes de service ou à des groupes pour accorder l'accès.",
@@ -5033,7 +5035,8 @@
     "clearAndContinue": "Effacer et continuer",
     "cancel": "Annuler",
     "ok": "Ok",
-    "loading": "Chargement en cours..."
+    "loading": "Chargement en cours...",
+    "typeToConfirm": "Pour confirmer, saisissez {text} ci-dessous"
   },
   "ingestion": {
     "firstEvent": {
@@ -19475,7 +19478,8 @@
       "rum": "RHUM",
       "runningQueries": "Exécution de requêtes",
       "oncall": "Astreinte",
-      "synthetics": "Synthétiques"
+      "synthetics": "Synthétiques",
+      "fleet": "Flotte"
     },
     "pages": {
       "global": "Mondial",
@@ -19528,7 +19532,9 @@
       "oncall": "Astreinte",
       "oncallDetail": "Notification d'astreinte",
       "syntheticsJourney": "Parcours synthétique",
-      "downtimes": "Périodes de maintenance"
+      "downtimes": "Périodes de maintenance",
+      "fleetConfigEditor": "Éditeur de configuration",
+      "fleetOverview": "Pipelines de flotte"
     },
     "actions": {
       "openCheatsheet": "Ouvrir un aide-mémoire sur les raccourcis clavier",
@@ -19652,7 +19658,9 @@
       "tracesPrevRow": "Sélectionner la trace précédente",
       "tracesRowOpen": "Ouvrir la trace sélectionnée",
       "traceNextVisibleSpan": "Span visible suivant",
-      "tracePrevVisibleSpan": "Span visible précédent"
+      "tracePrevVisibleSpan": "Span visible précédent",
+      "fleetEditorDeleteNode": "Supprimer le composant sélectionné",
+      "fleetFlowCloseDetails": "Fermer les détails du chemin ou réduire la carte"
     }
   },
   "components": {

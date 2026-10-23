@@ -1478,7 +1478,8 @@
     "trialPageNeedsPlanToast": "{page} benötigt einen Plan. Wählen Sie einen auf dieser Seite, um sie weiter zu nutzen.",
     "trialChoosePlanToast": "Wählen Sie einen Plan auf dieser Seite, um {product} weiter zu nutzen.",
     "trialFlyoutNote": "Ihre Testphase ist beendet. Seiten mit einem Schloss benötigen einen Plan.",
-    "linkedAccounts": "Verknüpfte Konten"
+    "linkedAccounts": "Verknüpfte Konten",
+    "fleet": "Fleet-Verwaltung"
   },
   "profiles": {
     "title": "Profile",
@@ -3399,7 +3400,8 @@
       "k8sPresetSeeded": "Vorausgewählter Lesezugriff auf {matched} von {total} Kubernetes-Metrik-Streams. Vor dem Speichern überprüfen.",
       "k8sPresetNoMatch": "Keiner der {total} Kubernetes-Metrik-Streams existiert bisher in dieser Organisation, daher wurde nichts vorausgewählt.",
       "rumPresetSeeded": "Vorausgewählter Lesezugriff auf {matched} von {total} RUM-Streams, plus Source Maps und etwaige RUM-Product-Analytics-Berechtigungen. Vor dem Speichern prüfen.",
-      "rumPresetNoMatch": "Keiner der {total} RUM-Streams existiert bisher in dieser Organisation, daher wurde auf ihnen nichts vorausgewählt; Source Maps und etwaige RUM-Product-Analytics-Berechtigungen wurden dennoch vorbereitet."
+      "rumPresetNoMatch": "Keiner der {total} RUM-Streams existiert bisher in dieser Organisation, daher wurde auf ihnen nichts vorausgewählt; Source Maps und etwaige RUM-Product-Analytics-Berechtigungen wurden dennoch vorbereitet.",
+      "moduleGroupFleet": "Fleet"
     },
     "rolesPage": {
       "subtitle": "Rollen bündeln Berechtigungen — weisen Sie sie Benutzern, Dienstkonten oder Gruppen zu, um Zugriff zu gewähren.",
@@ -5033,7 +5035,8 @@
     "clearAndContinue": "Leeren und fortfahren",
     "cancel": "Abbrechen",
     "ok": "OK",
-    "loading": "Wird geladen..."
+    "loading": "Wird geladen...",
+    "typeToConfirm": "Zur Bestätigung {text} unten eingeben"
   },
   "ingestion": {
     "firstEvent": {
@@ -19475,7 +19478,8 @@
       "rum": "RUM",
       "runningQueries": "Abfragen ausführen",
       "oncall": "On-Call",
-      "synthetics": "Synthetics"
+      "synthetics": "Synthetics",
+      "fleet": "Fleet"
     },
     "pages": {
       "global": "Weltweit",
@@ -19528,7 +19532,9 @@
       "oncall": "On-Call",
       "oncallDetail": "On-Call-Alarmierung",
       "syntheticsJourney": "Synthetics-Journey",
-      "downtimes": "Wartungsfenster"
+      "downtimes": "Wartungsfenster",
+      "fleetConfigEditor": "Konfigurationseditor",
+      "fleetOverview": "Fleet-Pipelines"
     },
     "actions": {
       "openCheatsheet": "Cheatsheet mit Tastenkombinationen öffnen",
@@ -19652,7 +19658,9 @@
       "tracesPrevRow": "Vorherigen Trace auswählen",
       "tracesRowOpen": "Ausgewählten Trace öffnen",
       "traceNextVisibleSpan": "Nächster sichtbarer Span",
-      "tracePrevVisibleSpan": "Vorheriger sichtbarer Span"
+      "tracePrevVisibleSpan": "Vorheriger sichtbarer Span",
+      "fleetEditorDeleteNode": "Ausgewählte Komponente entfernen",
+      "fleetFlowCloseDetails": "Pfaddetails schließen oder die Karte einklappen"
     }
   },
   "components": {
