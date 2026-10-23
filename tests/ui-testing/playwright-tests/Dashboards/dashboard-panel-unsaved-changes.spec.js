@@ -130,7 +130,7 @@ async function keepNewPanelAsDraft(page, pm) {
 
 /** Open Add Panel from the dashboard view and wait for the editor to settle. */
 async function openAddPanel(page, pm) {
-  await pm.dashboardCreate.addPanel();
+  await pm.dashboardCreate.addPanelSmart();
   await page.waitForURL((url) => url.pathname.includes("add_panel"), { timeout: 30000 });
   await waitForEditorSettled(page, pm);
 }
