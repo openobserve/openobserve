@@ -1,6 +1,7 @@
 import { expect } from "playwright/test";
 import logData from "../../../fixtures/log.json";
 import testLogger from '../../utils/test-logger.js';
+import { safeWaitForNetworkIdle } from '../../utils/wait-helpers.js';
 import { SELECTORS } from "../../../pages/dashboardPages/dashboard-selectors.js";
 
 // Function to wait for the dashboard page to load
@@ -386,6 +387,41 @@ export async function cleanupTestDashboard(page, pm, dashboardName) {
   await deleteDashboard(page, dashboardName);
 
   testLogger.info('Test dashboard cleanup complete', { dashboardName });
+}
+
+/** Best-effort dashboard delete under a time budget, so a slow deployment cannot fail a test that already passed. */
+export async function cleanupDashboardWithinBudget(page, dashboardName, budgetMs = 90000) {
+  if (!dashboardName) return;
+  const warn = (error) =>
+    testLogger.warn('Cleanup failed for test dashboard', { dashboardName, error });
+  const remove = async () => {
+    page.once('dialog', (dialog) => dialog.accept().catch(() => {}));
+    const org = (process.env.ORGNAME || '').trim();
+    await page
+      .goto(`${process.env.ZO_BASE_URL}/web/dashboards?org_identifier=${org}`, { timeout: 30000 })
+      .catch(() => {});
+    await waitForDashboardPage(page).catch(() => {});
+    await deleteDashboard(page, dashboardName);
+  };
+  let timer;
+  const budget = new Promise((resolve) => {
+    timer = setTimeout(() => {
+      warn(`exceeded the ${budgetMs}ms cleanup budget`);
+      resolve();
+    }, budgetMs);
+  });
+  await Promise.race([remove().catch((e) => warn(e.message)), budget]);
+  clearTimeout(timer);
+}
+
+/** Wait for the panel editor's load-time work to finish, so the next input counts as a user edit. */
+export async function waitForPanelEditorSettled(page, pm) {
+  await pm.dashboardPanelActions.getPanelSaveBtn().waitFor({ state: 'visible', timeout: 30000 });
+  await pm.dashboardPanelActions
+    .getFieldListSearchInput()
+    .waitFor({ state: 'visible', timeout: 30000 })
+    .catch(() => {});
+  await safeWaitForNetworkIdle(page, { timeout: 10000 });
 }
 
 /**

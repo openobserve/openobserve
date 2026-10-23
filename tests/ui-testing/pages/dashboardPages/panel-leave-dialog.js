@@ -89,11 +89,7 @@ export async function answerPanelDraftRestore(page, { choice = "fresh", timeout 
   return true;
 }
 
-/**
- * Press Escape on the leave dialog, which keeps the user in the editor.
- *
- * @param {import('@playwright/test').Page} page
- */
+/** Escape on the leave dialog cancels the navigation and keeps the editor open. */
 export async function dismissPanelLeave(page, { timeout = 15000 } = {}) {
   const dialog = page.locator(PANEL_LEAVE_DIALOG);
   await dialog.waitFor({ state: "visible", timeout });
@@ -101,11 +97,7 @@ export async function dismissPanelLeave(page, { timeout = 15000 } = {}) {
   await dialog.waitFor({ state: "hidden", timeout });
 }
 
-/**
- * Press Escape on the restore dialog: the editor opens fresh but the stored draft is kept.
- *
- * @param {import('@playwright/test').Page} page
- */
+/** Escape on the restore dialog opens the editor fresh but keeps the stored draft. */
 export async function dismissPanelDraftRestore(page, { timeout = 15000 } = {}) {
   const dialog = page.locator(PANEL_DRAFT_RESTORE_DIALOG);
   await dialog.waitFor({ state: "visible", timeout });
@@ -113,42 +105,30 @@ export async function dismissPanelDraftRestore(page, { timeout = 15000 } = {}) {
   await dialog.waitFor({ state: "hidden", timeout });
 }
 
-/** @param {import('@playwright/test').Page} page */
 export function getPanelDraftDot(page) {
   return page.locator(PANEL_DRAFT_DOT);
 }
 
-/** @param {import('@playwright/test').Page} page */
 export function getEditPanelDraftDot(page) {
   return page.locator(EDIT_PANEL_DRAFT_DOT);
 }
 
-/** @param {import('@playwright/test').Page} page */
 export function getAddPanelDraftDot(page) {
   return page.locator(ADD_PANEL_DRAFT_DOT);
 }
 
-/** @param {import('@playwright/test').Page} page */
 export function getPanelDraftRestoreDialog(page) {
   return page.locator(PANEL_DRAFT_RESTORE_DIALOG);
 }
 
-/** @param {import('@playwright/test').Page} page */
 export function getPanelDraftChangedOnServerBanner(page) {
   return page.locator(PANEL_DRAFT_CHANGED_ON_SERVER);
 }
 
-/** @param {import('@playwright/test').Page} page */
 export function getPanelLeaveDialog(page) {
   return page.locator(PANEL_LEAVE_DIALOG);
 }
 
-/**
- * Number of panel drafts this browser holds in localStorage.
- *
- * @param {import('@playwright/test').Page} page
- * @returns {Promise<number>}
- */
 export async function countStoredPanelDrafts(page) {
   return page.evaluate(
     (prefix) => Object.keys(window.localStorage).filter((k) => k.startsWith(prefix)).length,
@@ -156,13 +136,7 @@ export async function countStoredPanelDrafts(page) {
   );
 }
 
-/**
- * Stand in for a teammate's save: alter the stored drafts' snapshot of the server
- * panel so the editor sees the server copy as changed since the draft was made.
- *
- * @param {import('@playwright/test').Page} page
- * @returns {Promise<number>} how many drafts were altered
- */
+/** Stands in for a teammate's save by altering each stored draft's snapshot of the server panel. */
 export async function markStoredDraftsAsStale(page) {
   return page.evaluate((prefix) => {
     let changed = 0;

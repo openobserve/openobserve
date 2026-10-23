@@ -2,7 +2,6 @@
 
 const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
 const testLogger = require("../utils/test-logger.js");
-const { safeWaitForNetworkIdle } = require("../utils/wait-helpers.js");
 import PageManager from "../../pages/page-manager.js";
 import {
   answerPanelDraftRestore,
@@ -20,86 +19,19 @@ import {
 } from "../../pages/dashboardPages/panel-leave-dialog.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import {
-  waitForDashboardPage,
-  deleteDashboard,
+  cleanupDashboardWithinBudget,
+  waitForPanelEditorSettled,
   addSimplePanel,
   setupTestDashboard,
 } from "./utils/dashCreation.js";
-
-const CLEANUP_BUDGET_MS = 90000;
-const EDIT_FIELD = "kubernetes_namespace_name";
-
-const uniqueSuffix = () => `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-
-const inEditor = (url) => url.pathname.includes("add_panel");
-
-/** Wait until the panel editor has finished its load-time work, so the next input is a real edit. */
-async function waitForEditorSettled(page, pm) {
-  await pm.dashboardPanelActions.getPanelSaveBtn().waitFor({ state: "visible", timeout: 30000 });
-  await pm.dashboardPanelActions
-    .getFieldListSearchInput()
-    .waitFor({ state: "visible", timeout: 30000 })
-    .catch(() => {});
-  await safeWaitForNetworkIdle(page, { timeout: 10000 });
-}
-
-/** Create a dashboard holding one saved line panel, ending on the dashboard view. */
-async function createDashboardWithPanel(page, pm, panelName) {
-  const name = `Dashboard_Drafts_${uniqueSuffix()}`;
-  await setupTestDashboard(page, pm, name);
-  await addSimplePanel(pm, panelName);
-  await expect(pm.dashboardPanelActions.getEditPanelDropdown(panelName)).toBeVisible({
-    timeout: 30000,
-  });
-  return name;
-}
-
-/** Open a saved panel's editor; answers nothing, so a restore dialog stays up. */
-async function openSavedPanelEditor(page, pm, panelName) {
-  await pm.dashboardPanelEdit.editPanel(panelName);
-  await page.waitForURL(inEditor, { timeout: 30000 });
-}
-
-/** Open a saved panel, add a breakdown field, and wait for autosave to store the draft. */
-async function editSavedPanel(page, pm, panelName) {
-  await openSavedPanelEditor(page, pm, panelName);
-  await waitForEditorSettled(page, pm);
-  await pm.chartTypeSelector.searchAndAddField(EDIT_FIELD, "b");
-  await expect.poll(() => countStoredPanelDrafts(page), { timeout: 15000 }).toBe(1);
-}
-
-/** Click Discard and finish leaving with the given leave-dialog choice. */
-async function leaveEditor(page, pm, choice) {
-  await pm.dashboardPanelActions.getPanelDiscardBtn().click();
-  const asked = await settlePanelLeave(page, { choice });
-  expect(asked, "leaving with edits opens the in-app leave dialog").toBe(true);
-}
-
-/** Return to the dashboard list and delete the test dashboard. */
-async function removeDashboard(page, name) {
-  page.once("dialog", (dialog) => dialog.accept().catch(() => {}));
-  const org = (process.env.ORGNAME || "").trim();
-  await page
-    .goto(`${process.env.ZO_BASE_URL}/web/dashboards?org_identifier=${org}`, { timeout: 30000 })
-    .catch(() => {});
-  await waitForDashboardPage(page).catch(() => {});
-  await deleteDashboard(page, name);
-}
-
-/** Best-effort teardown under a hard budget, so a slow deployment cannot fail a passed test. */
-async function cleanupDashboard(page, name) {
-  if (!name) return;
-  const warn = (error) => testLogger.warn("Cleanup failed for test dashboard", { name, error });
-  let timer;
-  const budget = new Promise((resolve) => {
-    timer = setTimeout(() => {
-      warn(`exceeded the ${CLEANUP_BUDGET_MS}ms cleanup budget`);
-      resolve();
-    }, CLEANUP_BUDGET_MS);
-  });
-  await Promise.race([removeDashboard(page, name).catch((e) => warn(e.message)), budget]);
-  clearTimeout(timer);
-}
+import {
+  createDashboardWithPanel,
+  editSavedPanel,
+  isInPanelEditor,
+  leaveEditor,
+  openSavedPanelEditor,
+  uniqueDashboardName,
+} from "./utils/dashPanelDrafts.js";
 
 test.describe("Dashboard panel drafts", () => {
   test.describe.configure({ mode: "parallel" });
@@ -117,7 +49,7 @@ test.describe("Dashboard panel drafts", () => {
   });
 
   test.afterEach(async ({ page }) => {
-    await cleanupDashboard(page, dashboardName);
+    await cleanupDashboardWithinBudget(page, dashboardName);
   });
 
   test(
@@ -147,7 +79,7 @@ test.describe("Dashboard panel drafts", () => {
       });
 
       await pm.dashboardPanelActions.savePanel();
-      await page.waitForURL((url) => !inEditor(url), { timeout: 30000 });
+      await page.waitForURL((url) => !isInPanelEditor(url), { timeout: 30000 });
       await expect(getPanelDraftDot(page)).toHaveCount(0);
       expect(await countStoredPanelDrafts(page)).toBe(0);
       testLogger.info("Saved-panel draft continued and saved", { panelName });
@@ -189,12 +121,12 @@ test.describe("Dashboard panel drafts", () => {
     "Save in the leave dialog saves a new panel and leaves no draft",
     { tag: ["@dashboard-panel-drafts", "@all", "@dashboards", "@P1"] },
     async ({ page }) => {
-      dashboardName = `Dashboard_Drafts_${uniqueSuffix()}`;
+      dashboardName = uniqueDashboardName("Dashboard_Drafts");
       await setupTestDashboard(page, pm, dashboardName);
       const panelName = pm.dashboardPanelActions.generateUniquePanelName("leavesave");
 
       await addSimplePanel(pm, panelName, { save: false });
-      await page.waitForURL(inEditor, { timeout: 30000 });
+      await page.waitForURL(isInPanelEditor, { timeout: 30000 });
       await leaveEditor(page, pm, "save");
 
       await expect(pm.dashboardPanelActions.getEditPanelDropdown(panelName)).toBeVisible({
@@ -240,7 +172,7 @@ test.describe("Dashboard panel drafts", () => {
 
       await openSavedPanelEditor(page, pm, panelName);
       await dismissPanelDraftRestore(page);
-      await waitForEditorSettled(page, pm);
+      await waitForPanelEditorSettled(page, pm);
       await expect(pm.chartTypeSelector.getBreakdownItem(1)).toHaveCount(0);
 
       // Nothing was edited this session, so leaving does not ask and the kept draft survives.
@@ -259,12 +191,12 @@ test.describe("Dashboard panel drafts", () => {
     "Ctrl/Cmd+S saves a new panel and keeps the editor open",
     { tag: ["@dashboard-panel-drafts", "@all", "@dashboards", "@P1"] },
     async ({ page }) => {
-      dashboardName = `Dashboard_Drafts_${uniqueSuffix()}`;
+      dashboardName = uniqueDashboardName("Dashboard_Drafts");
       await setupTestDashboard(page, pm, dashboardName);
       const panelName = pm.dashboardPanelActions.generateUniquePanelName("shortcut");
 
       await addSimplePanel(pm, panelName, { save: false });
-      await page.waitForURL(inEditor, { timeout: 30000 });
+      await page.waitForURL(isInPanelEditor, { timeout: 30000 });
       await pm.dashboardPanelActions.saveAndKeepEditingWithShortcut();
       await expect(page).toHaveURL(/add_panel.*panelId=/);
 

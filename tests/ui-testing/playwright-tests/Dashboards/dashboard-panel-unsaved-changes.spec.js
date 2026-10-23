@@ -16,22 +16,20 @@
 
 const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
 const testLogger = require("../utils/test-logger.js");
-const { safeWaitForNetworkIdle } = require("../utils/wait-helpers.js");
 import PageManager from "../../pages/page-manager.js";
 import {
-  PANEL_DRAFT_RESTORE_DIALOG,
+  getAddPanelDraftDot,
+  getPanelDraftRestoreDialog,
   answerPanelDraftRestore,
   settlePanelLeave,
 } from "../../pages/dashboardPages/panel-leave-dialog.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import {
-  waitForDashboardPage,
-  deleteDashboard,
+  cleanupDashboardWithinBudget,
+  waitForPanelEditorSettled,
   addSimplePanel,
   setupTestDashboard,
 } from "./utils/dashCreation.js";
-
-const CLEANUP_BUDGET_MS = 90000;
 
 const uniqueSuffix = () => `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
@@ -53,22 +51,6 @@ function captureDialogs(page, { accept = false } = {}) {
   return { messages, dispose: () => page.off("dialog", handler) };
 }
 
-/**
- * Wait until the panel editor has finished its own load-time work. Interacting
- * before this settles would arm the baseline mid-load, which is precisely the
- * state the fix classifies as "not a user edit".
- */
-async function waitForEditorSettled(page, pm) {
-  await pm.dashboardPanelActions
-    .getPanelSaveBtn()
-    .waitFor({ state: "visible", timeout: 30000 });
-  await pm.dashboardPanelActions
-    .getFieldListSearchInput()
-    .waitFor({ state: "visible", timeout: 30000 })
-    .catch(() => {});
-  await safeWaitForNetworkIdle(page, { timeout: 10000 });
-}
-
 /** Create a dashboard holding one saved line panel, ending on the dashboard view. */
 async function createDashboardWithPanel(page, pm, panelName) {
   const dashboardName = `Dashboard_Unsaved_${uniqueSuffix()}`;
@@ -85,7 +67,7 @@ async function createDashboardWithPanel(page, pm, panelName) {
 async function openSavedPanelEditor(page, pm, panelName) {
   await pm.dashboardPanelEdit.editPanel(panelName);
   await page.waitForURL((url) => url.pathname.includes("add_panel"), { timeout: 30000 });
-  await waitForEditorSettled(page, pm);
+  await waitForPanelEditorSettled(page, pm);
 }
 
 /** Click Discard and assert the editor closed without ever asking to confirm. */
@@ -132,45 +114,7 @@ async function keepNewPanelAsDraft(page, pm) {
 async function openAddPanel(page, pm) {
   await pm.dashboardCreate.addPanelSmart();
   await page.waitForURL((url) => url.pathname.includes("add_panel"), { timeout: 30000 });
-  await waitForEditorSettled(page, pm);
-}
-
-/** Return to the dashboard list and delete the test dashboard. */
-async function removeDashboard(page, dashboardName) {
-  page.once("dialog", (dialog) => dialog.accept().catch(() => {}));
-  const org = (process.env.ORGNAME || "").trim();
-  await page
-    .goto(`${process.env.ZO_BASE_URL}/web/dashboards?org_identifier=${org}`, {
-      timeout: 30000,
-    })
-    .catch(() => {});
-  await waitForDashboardPage(page).catch(() => {});
-  await deleteDashboard(page, dashboardName);
-}
-
-/**
- * Best-effort teardown under a hard budget. A stalled deployment must not fail
- * a test whose assertions already passed, so an overrun is logged and dropped
- * rather than left to burn the whole afterEach timeout.
- */
-async function cleanupDashboard(page, dashboardName) {
-  if (!dashboardName) return;
-  const warn = (error) =>
-    testLogger.warn("Cleanup failed for test dashboard", { dashboardName, error });
-
-  let timer;
-  const budget = new Promise((resolve) => {
-    timer = setTimeout(() => {
-      warn(`exceeded the ${CLEANUP_BUDGET_MS}ms cleanup budget`);
-      resolve();
-    }, CLEANUP_BUDGET_MS);
-  });
-
-  await Promise.race([
-    removeDashboard(page, dashboardName).catch((e) => warn(e.message)),
-    budget,
-  ]);
-  clearTimeout(timer);
+  await waitForPanelEditorSettled(page, pm);
 }
 
 test.describe("Dashboard panel editor unsaved-changes guard", () => {
@@ -189,7 +133,7 @@ test.describe("Dashboard panel editor unsaved-changes guard", () => {
   });
 
   test.afterEach(async ({ page }) => {
-    await cleanupDashboard(page, dashboardName);
+    await cleanupDashboardWithinBudget(page, dashboardName);
   });
 
   test(
@@ -267,7 +211,7 @@ test.describe("Dashboard panel editor unsaved-changes guard", () => {
 
       await pm.dashboardCreate.addPanel();
       await page.waitForURL((url) => url.pathname.includes("add_panel"), { timeout: 30000 });
-      await waitForEditorSettled(page, pm);
+      await waitForPanelEditorSettled(page, pm);
 
       await expectDiscardWithoutPrompt(page, pm);
       testLogger.info("Fresh editor closed without a confirm");
@@ -336,12 +280,12 @@ test.describe("Dashboard panel editor unsaved-changes guard", () => {
 
       await startNewPanelWithEdits(page, pm, panelName);
       await keepNewPanelAsDraft(page, pm);
-      await expect(page.locator('[data-test="dashboard-panel-add-draft-dot"]')).toBeVisible({
+      await expect(getAddPanelDraftDot(page)).toBeVisible({
         timeout: 15000,
       });
 
       await openAddPanel(page, pm);
-      await expect(page.locator(PANEL_DRAFT_RESTORE_DIALOG)).toContainText(
+      await expect(getPanelDraftRestoreDialog(page)).toContainText(
         "You have unsaved changes from",
         { timeout: 15000 }
       );
@@ -352,11 +296,11 @@ test.describe("Dashboard panel editor unsaved-changes guard", () => {
       await expect(pm.dashboardPanelActions.getEditPanelDropdown(panelName)).toBeVisible({
         timeout: 30000,
       });
-      await expect(page.locator('[data-test="dashboard-panel-add-draft-dot"]')).toHaveCount(0);
+      await expect(getAddPanelDraftDot(page)).toHaveCount(0);
 
       // Saving cleared the draft, so the next Add Panel starts clean.
       await openAddPanel(page, pm);
-      await expect(page.locator(PANEL_DRAFT_RESTORE_DIALOG)).toHaveCount(0);
+      await expect(getPanelDraftRestoreDialog(page)).toHaveCount(0);
       await expectDiscardWithoutPrompt(page, pm);
       testLogger.info("Draft kept, continued and saved", { panelName });
     }
@@ -378,7 +322,7 @@ test.describe("Dashboard panel editor unsaved-changes guard", () => {
       await expectDiscardWithoutPrompt(page, pm);
 
       await openAddPanel(page, pm);
-      await expect(page.locator(PANEL_DRAFT_RESTORE_DIALOG)).toHaveCount(0);
+      await expect(getPanelDraftRestoreDialog(page)).toHaveCount(0);
       await expectDiscardWithoutPrompt(page, pm);
       testLogger.info("Start fresh removed the draft");
     }
@@ -406,7 +350,7 @@ test.describe("Dashboard panel editor unsaved-changes guard", () => {
       expect(watcher.messages, "browser Back never raises a native confirm").toEqual([]);
 
       await openAddPanel(page, pm);
-      await expect(page.locator(PANEL_DRAFT_RESTORE_DIALOG)).toHaveCount(0);
+      await expect(getPanelDraftRestoreDialog(page)).toHaveCount(0);
       testLogger.info("Browser Back asked in-app and Discard left no draft");
     }
   );
