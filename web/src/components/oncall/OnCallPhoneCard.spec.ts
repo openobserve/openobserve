@@ -22,7 +22,13 @@ import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import type { Contact, RefusalReason, VerificationRefusalBody } from "@/ts/interfaces/oncall";
 import type { TranslateFn } from "@/types/i18n";
-import { formatCountdown, phoneCardState, phoneRefusalText, refusalOf } from "@/utils/oncall";
+import {
+  formatCountdown,
+  phoneCardState,
+  phoneRefusalText,
+  refusalOf,
+  samePhone,
+} from "@/utils/oncall";
 
 vi.mock("@/services/oncall", () => ({
   default: {
@@ -98,22 +104,22 @@ describe("phoneRefusalText", () => {
     ["too_soon", { retry_after_secs: 42 }, "You just asked for a code. Try again in 1 min."],
     [
       "user_daily_limit",
-      { retry_after_secs: 6 * 3600 },
-      "You have asked for too many codes today. Try again in 6 h.",
+      { retry_after_secs: 59 * 60 },
+      "You have asked for too many codes. Try again in 59 min.",
     ],
     [
       "number_daily_limit",
-      { retry_after_secs: 2 * 3600 + 1 },
-      "This number has had too many codes today. Try again in 3 h.",
-    ],
-    [
-      "user_daily_limit",
-      { retry_after_secs: 59 * 60 },
-      "You have asked for too many codes today. Try again in 59 min.",
+      { retry_after_secs: 30 * 60 + 1 },
+      "This number has had too many codes. Try again in 31 min.",
     ],
     ["no_provider", {}, "This organisation has no phone provider yet."],
     ["no_phone", {}, "Save a phone number first."],
     ["number_rejected", {}, "This number cannot receive texts. Check it and try again."],
+    [
+      "number_not_allowed",
+      {},
+      "This organisation's phone account cannot reach this number yet. Ask an admin to check the phone provider.",
+    ],
     ["provider_unavailable", {}, "The code could not be sent right now. Try again in a minute."],
   ];
 
@@ -149,6 +155,18 @@ describe("formatCountdown", () => {
     [6 * 3600 - 1, "5:59:59"],
   ])("%i s reads %s", (secs, expected) => {
     expect(formatCountdown(secs)).toBe(expected);
+  });
+});
+
+describe("samePhone", () => {
+  it.each([
+    ["+14155550134", "+14155550134", true],
+    ["+1 (415) 555-0134", "+14155550134", true],
+    ["  +1.415.555.0134 ", "+14155550134", true],
+    ["+14155550199", "+14155550134", false],
+    ["", "", false],
+  ])("%j vs %j is %s", (a, b, expected) => {
+    expect(samePhone(a, b)).toBe(expected);
   });
 });
 
@@ -248,6 +266,81 @@ describe("OnCallPhoneCard", () => {
     expect(find(w, "resend").text()).toBe("Resend in 0:42");
   });
 
+  it("after a send, Send code waits out the countdown for that number only", async () => {
+    const w = await render(contact());
+    service.setContact.mockResolvedValue({ data: UNVERIFIED } as any);
+    service.sendContactCode.mockResolvedValue({ data: undefined } as any);
+    service.getContact.mockResolvedValue({ data: UNVERIFIED } as any);
+    await find(w, "input").setValue(PHONE);
+    await find(w, "send").trigger("click");
+    await flushPromises();
+
+    await find(w, "change").trigger("click");
+    await find(w, "input").setValue("+1 415 555 0134");
+    expect(find(w, "send").attributes("disabled")).toBeDefined();
+    expect(find(w, "send").text()).toBe("Resend in 1:00");
+
+    await find(w, "input").setValue("+14155550199");
+    expect(find(w, "send").attributes("disabled")).toBeUndefined();
+    expect(find(w, "send").text()).toBe("Send code");
+
+    await find(w, "input").setValue(PHONE);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(find(w, "send").attributes("disabled")).toBeUndefined();
+  });
+
+  it.each([
+    ["number_rejected", "This number cannot receive texts. Check it and try again."],
+    [
+      "number_not_allowed",
+      "This organisation's phone account cannot reach this number yet. Ask an admin to check the phone provider.",
+    ],
+    ["provider_unavailable", "The code could not be sent right now. Try again in a minute."],
+  ] as const)(
+    "a resend failing with %s drops the code box, since the old code no longer matches",
+    async (reason, message) => {
+      const w = await render(contact());
+      service.setContact.mockResolvedValue({ data: UNVERIFIED } as any);
+      service.sendContactCode.mockResolvedValue({ data: undefined } as any);
+      service.getContact.mockResolvedValue({ data: UNVERIFIED } as any);
+      await find(w, "input").setValue(PHONE);
+      await find(w, "send").trigger("click");
+      await flushPromises();
+
+      await vi.advanceTimersByTimeAsync(60_000);
+      service.sendContactCode.mockRejectedValue(refusal({ reason }));
+      await find(w, "resend").trigger("click");
+      await flushPromises();
+
+      expect(find(w, "error").text()).toBe(message);
+      expect(find(w, "code").exists()).toBe(false);
+      expect(w.text()).not.toContain("Code sent to");
+      // The undelivered code still starts the server's gap, so a send now would read as too_soon.
+      expect(find(w, "send").attributes("disabled")).toBeDefined();
+      expect(find(w, "send").text()).toBe("Resend in 1:00");
+    },
+  );
+
+  it("a resend refused by a daily limit keeps the box, since nothing replaced the code", async () => {
+    const w = await render(contact());
+    service.setContact.mockResolvedValue({ data: UNVERIFIED } as any);
+    service.sendContactCode.mockResolvedValue({ data: undefined } as any);
+    service.getContact.mockResolvedValue({ data: UNVERIFIED } as any);
+    await find(w, "input").setValue(PHONE);
+    await find(w, "send").trigger("click");
+    await flushPromises();
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    service.sendContactCode.mockRejectedValue(
+      refusal({ reason: "user_daily_limit", retry_after_secs: 3600 }, 429),
+    );
+    await find(w, "resend").trigger("click");
+    await flushPromises();
+
+    expect(find(w, "error").exists()).toBe(true);
+    expect(find(w, "code").exists()).toBe(true);
+  });
+
   it("a number proved in another org needs no code", async () => {
     const w = await render(contact());
     service.setContact.mockResolvedValue({ data: VERIFIED } as any);
@@ -279,7 +372,7 @@ describe("OnCallPhoneCard", () => {
     const w = await render(UNVERIFIED);
     service.setContact.mockResolvedValue({ data: UNVERIFIED } as any);
     service.sendContactCode.mockRejectedValue(
-      refusal({ reason: "number_daily_limit", retry_after_secs: 3 * 3600 }, 429),
+      refusal({ reason: "number_daily_limit", retry_after_secs: 40 * 60 }, 429),
     );
 
     await find(w, "send").trigger("click");
@@ -287,7 +380,7 @@ describe("OnCallPhoneCard", () => {
 
     expect(find(w, "error").attributes("role")).toBe("alert");
     const error = find(w, "error").text();
-    expect(error).toBe("This number has had too many codes today. Try again in 3 h.");
+    expect(error).toBe("This number has had too many codes. Try again in 40 min.");
     expect(error).not.toContain(PHONE);
   });
 

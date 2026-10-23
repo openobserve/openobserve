@@ -662,6 +662,8 @@ export const validateSqlQuery = async (
         reject("sql_error");
       });
   });
+  // Save awaits this later; until then a rejection would be reported as unhandled.
+  validateSqlQueryPromise.value.catch(() => {});
 };
 
 export const saveAlertJson = async (

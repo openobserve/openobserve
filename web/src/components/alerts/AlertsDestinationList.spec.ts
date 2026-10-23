@@ -524,10 +524,11 @@ describe("AlertsDestinationList", () => {
       method: "post",
       emails: ["alerts@example.com", "oncall@example.com"],
     });
+    const lowerPutDest = makeDestination(5, { name: "lower-put", method: "put" });
 
     beforeEach(async () => {
       (destinationService.list as any).mockResolvedValue({
-        data: [makeDestination(1), emailDest],
+        data: [makeDestination(1), emailDest, lowerPutDest],
       });
       wrapper = mountComponent();
       await flushPromises();
@@ -551,6 +552,10 @@ describe("AlertsDestinationList", () => {
         "https://example.com/hook-1",
       );
       expect(wrapper!.find('[data-test="destination-method-destination-1"]').text()).toBe("POST");
+    });
+
+    it("shows a lowercase stored method in uppercase", () => {
+      expect(wrapper!.find('[data-test="destination-method-lower-put"]').text()).toBe("PUT");
     });
 
     it("labels the column URL / Recipients, not URL", () => {
@@ -699,6 +704,27 @@ describe("AlertsDestinationList", () => {
       expect(saved.filterQuery).toBe("abc");
       expect(saved.tab).toBe("prebuilt");
       expect(saved.pageSize).toBe(100);
+    });
+  });
+  describe("templates load denied", () => {
+    it("falls back to no templates without an unhandled rejection on a 403", async () => {
+      const { queryClient } = await import("@/composables/query/queryClient");
+      queryClient.clear();
+      (templateService.list as any).mockRejectedValue({ response: { status: 403 } });
+      (destinationService.list as any).mockResolvedValue({ data: [] });
+      const unhandled = vi.fn();
+      process.on("unhandledRejection", unhandled);
+
+      const w: any = mountComponent();
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      process.off("unhandledRejection", unhandled);
+      expect(unhandled.mock.calls.map(([reason]) => reason)).not.toContainEqual({
+        response: { status: 403 },
+      });
+      expect(w.vm.templates).toEqual([]);
+      w.unmount();
     });
   });
 });
