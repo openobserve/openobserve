@@ -2473,7 +2473,6 @@ export default defineComponent({
         analytics.track("Button Click", {
           button: action,
           user_org: store.state.selectedOrganization.identifier,
-          user_id: store.state.userInfo.email,
           page: "Alerts",
         });
         track("Button Click", {
@@ -3016,7 +3015,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: "Delete Alert",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         alert_name: selectedDelete.value.name,
         page: "Alerts",
       });
