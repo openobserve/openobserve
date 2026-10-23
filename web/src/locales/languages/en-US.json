@@ -11312,7 +11312,8 @@
         "dailySentence": "Daily · {time} for {duration} · {zone}",
         "weeklySentence": "Weekly on {days} · {time} for {duration} · {zone}",
         "fromNoEnd": "{schedule}, from {start} with no end date",
-        "fromUntil": "{schedule}, from {start} until {until}"
+        "fromUntil": "{schedule}, from {start} until {until}",
+        "onceFor": "Once, {duration}"
       },
       "validation": {
         "conditionRequired": "Add a condition, or remove the condition block.",
@@ -11653,8 +11654,8 @@
         "presets": {
           "30m": "30 min",
           "1h": "1 h",
-          "2h": "2 h",
           "4h": "4 h",
+          "24h": "24 h",
           "custom": "Custom"
         },
         "endsAt": "Ends on",
@@ -11668,7 +11669,34 @@
         "mutedTooltip": "Muted by {name} until {end}",
         "exclude": "Exclude a window…",
         "firingMuted": "Firing · muted",
-        "firingMutedTooltip": "Still firing. Notifications are muted by {name}."
+        "firingMutedTooltip": "Still firing. Notifications are muted by {name}.",
+        "untilClear": "Until it clears",
+        "untilClearHint": "Ends when the alert recovers, or after 24 h at the latest.",
+        "confirmUntilClear": "Mute until it clears",
+        "titleOne": "Mute {name}",
+        "subtitleOne": "It keeps running and keeps its history. Notifications, pages and workflows stop until the window ends.",
+        "untilTime": "Until {time}.",
+        "groups": "Groups",
+        "groupsThis": "This group",
+        "groupsAll": "All groups of this alert",
+        "addGroup": "Add a firing group",
+        "groupsHint": "Only these groups are muted; other groups keep notifying",
+        "confirm24h": {
+          "title": "Mute for 24 hours?",
+          "message": "Until it clears ends the mute as soon as the alert recovers.",
+          "useUntilClear": "Use until it clears",
+          "ok": "Mute 24 h"
+        },
+        "muteGroup": "Mute this group",
+        "endNow": "End mute now",
+        "endMute": "End mute",
+        "mutedUntilClear": "Muted until it clears · 24 h at most",
+        "mutedUntilClearGroups": "Muted until it clears · {count} group | Muted until it clears · {count} groups",
+        "mutedGroups": "Muted · {count} group · ends in {duration} | Muted · {count} groups · ends in {duration}",
+        "mutedUntilClearTooltip": "Muted by {name} until the alert recovers, {end} at the latest",
+        "mutedGroupsTooltip": "Muted by {name} until {end}. Groups: {labels}",
+        "mutedUntilClearGroupsTooltip": "Muted by {name} until the alert recovers, {end} at the latest. Groups: {labels}",
+        "untilTomorrow": "Until {time} tomorrow."
       },
       "corrected": "Corrected",
       "correctedBy": "Score corrected by {names}",
@@ -11754,7 +11782,66 @@
           "sent": "Test sent to {count} destination | Test sent to {count} destinations",
           "failed": "The test did not reach {names}."
         }
+      },
+      "untilClear": {
+        "schedule": "Until it clears",
+        "atMost": "24 h at most",
+        "endsWhenClears": "ends when it clears",
+        "byTime": "by {time}",
+        "whenCleared": "when it cleared",
+        "endedBy": "ended by {product}",
+        "createdFrom": "from {source}"
+      },
+      "groupTarget": "Group: {labels}",
+      "moreGroups": "+{count}",
+      "quickMuteTooltip": "Quick mute from an alert",
+      "endedLabel": "ended"
+    },
+    "ack": {
+      "acknowledge": "Acknowledge",
+      "acknowledgeGroups": "Acknowledge {count} firing group | Acknowledge {count} firing groups",
+      "unacknowledge": "Unacknowledge",
+      "takeOver": "Take over",
+      "chip": "Acked by {who} via {source} · {time}",
+      "chipTooltip": "Acknowledged by {who} at {time} from {source}",
+      "firingAcknowledged": "Firing · acknowledged",
+      "tile": "Acknowledged",
+      "groupsAcknowledged": "{count} acknowledged",
+      "byAt": "{who} · {time}",
+      "sources": {
+        "oncall": "on-call",
+        "incident": "incident"
+      },
+      "history": {
+        "dedupSuppressed": "suppressed by ack ({who})",
+        "acked": "Acknowledged by {who} from {source}",
+        "ackedViaPage": "Acknowledged by {who} via on-call page {page}",
+        "ackedViaIncident": "Acknowledged by {who} via incident {incident}",
+        "unacked": "Unacknowledged by {who} from {source}",
+        "unackedResume": "Unacknowledged by {who} from {source} · repeats resume at {time}",
+        "takenOver": "Taken over by {who} from {previous} ({source})"
+      },
+      "refused": {
+        "ack": "You can't acknowledge this alert. Acknowledge and Mute need the Admin or Editor role, or being the alert's on-call responder.",
+        "mute": "You can't mute this alert. Acknowledge and Mute need the Admin or Editor role, or being the alert's on-call responder.",
+        "onCall": "On call: {people}",
+        "canAct": "Can act: {people}",
+        "people": "On call: {onCall}. Can act: {canAct}"
+      },
+      "errors": {
+        "notFiring": "This alert is not firing, so there is nothing to acknowledge.",
+        "firingChanged": "The alert fired again since this page loaded. Refresh and try again."
       }
+    },
+    "groupActions": {
+      "menu": "Group actions",
+      "viewHistory": "View this group's history"
+    },
+    "firingState": {
+      "level": "Level",
+      "firingSince": "Firing since",
+      "firingFor": "firing for {duration}",
+      "incident": "Incident"
     }
   },
   "alert_dependencies": {
@@ -12281,13 +12368,14 @@
       "openSlackSettings": "Set it up in Settings › Slack"
     },
     "prebuilt": {
-      "slackDescription": "Send notifications to Slack channels",
+      "slackDescription": "Posts a new message with your webhook and template. Use it for on-call pages or custom Slack layouts.",
       "discordDescription": "Send notifications to Discord channels",
       "msteamsDescription": "Send notifications to Teams channels",
       "emailDescription": "Send HTML formatted email notifications",
       "pagerdutyDescription": "Create incidents in PagerDuty",
       "opsgenieDescription": "Create alerts in Opsgenie",
-      "servicenowDescription": "Create incidents in ServiceNow"
+      "servicenowDescription": "Create incidents in ServiceNow",
+      "slackAppDescription": "Updates scheduled alerts in place. Acknowledge, mute and investigate from Slack. Needs a connected workspace."
     },
     "import": {
       "title": "Import Destination",
@@ -12329,7 +12417,8 @@
     "severityCriticalDescription": "Highest priority incidents",
     "severityErrorDescription": "Standard error incidents",
     "severityWarningDescription": "Warning level incidents",
-    "severityInfoDescription": "Informational incidents"
+    "severityInfoDescription": "Informational incidents",
+    "urlRecipientsChannel": "URL / recipients / channel"
   },
   "pipeline_destinations": {
     "header": "Pipeline Destinations",
@@ -12852,7 +12941,7 @@
     "groupIntegrations": "Integrations",
     "groupAccount": "Account",
     "slackApp": "Slack",
-    "slackAppDesc": "Ask OpenObserve questions from Slack",
+    "slackAppDesc": "Ask OpenObserve questions and act on alerts from Slack",
     "generalDesc": "Theme, query defaults, and core preferences",
     "orgDesc": "Organization parameters and identifiers",
     "cipherKeysDesc": "Encryption keys for sensitive fields",
@@ -20373,7 +20462,9 @@
         "succeeded": "Succeeded",
         "failed": "Failed",
         "skipped": "Skipped",
-        "pending": "Pending"
+        "pending": "Pending",
+        "acknowledged": "Acknowledged",
+        "ackevent": "Ack event"
       },
       "alertLevel": {
         "ok": "Ok",
@@ -20667,7 +20758,16 @@
       "alertSavedSuccessfully": "Alert saved successfully.",
       "alertUpdatedSuccessfully": "Alert updated successfully.",
       "openingDedupConfig": "Opening dedup configuration for: {name}",
-      "editingAlert": "Editing alert: {name}"
+      "editingAlert": "Editing alert: {name}",
+      "ack": {
+        "acked": "Acknowledged {name}",
+        "ackedGroups": "Acknowledged {count} group of {name} | Acknowledged {count} groups of {name}",
+        "alreadyAcked": "Already acknowledged by {who}",
+        "unacked": "Unacknowledged {name}",
+        "takenOver": "You took over the acknowledgement of {name}",
+        "failed": "Could not acknowledge {name}",
+        "unackFailed": "Could not unacknowledge {name}"
+      }
     },
     "cipherkeys": {
       "cipherKeyUpdatedSuccessfully": "Cipher key updated successfully",
@@ -20979,7 +21079,14 @@
       "muted": "Muted {count} item until {time}. Filed in {folder}. | Muted {count} items until {time}. Filed in {folder}.",
       "muteFailed": "Could not create the mute",
       "viewDowntime": "View downtime",
-      "itemsDropped": "{count} chosen item is outside the chosen folders and was removed. | {count} chosen items are outside the chosen folders and were removed."
+      "itemsDropped": "{count} chosen item is outside the chosen folders and was removed. | {count} chosen items are outside the chosen folders and were removed.",
+      "mutedUntilClear": "Muted {name} until it clears, {time} at the latest",
+      "alreadyMuted": "{name} is already muted until {time}",
+      "muteChanged": "This mute changed since the page loaded. It now ends {time}.",
+      "muteEnded": "Mute ended. Notifications resume.",
+      "mutedOne": "Muted {name} until {time}",
+      "timeTomorrow": "{time} tomorrow",
+      "notQuickMute": "This mute was set on the Downtimes page. Change it there."
     }
   },
   "cipherKeys": {
@@ -26425,7 +26532,10 @@
       "managedBy": "managed by your instance admin",
       "managedTitle": "Managed by your instance admin.",
       "managedDetail": "Credentials, linking and which organizations use {team} are set in _meta.",
-      "managedQuestions": "Questions: {contact}"
+      "managedQuestions": "Questions: {contact}",
+      "outboundQueue": "Alert messages: {count} queued, oldest {age} | Alert messages: {count} queued, oldest {age}",
+      "outboundEmpty": "No alert messages queued",
+      "ageSeconds": "{count} s"
     },
     "channels": {
       "title": "Channel defaults",
@@ -26461,7 +26571,8 @@
       "instanceAdminOnly": "Instance admin only",
       "ownOrgOnlyHint": "On an instance workspace you map channels to your own org",
       "claimableHint": "Unclaimed channels and channels {org} owns",
-      "servedOrgsHint": "Any organization this workspace serves"
+      "servedOrgsHint": "Any organization this workspace serves",
+      "alertRoutes": "{count} destination | {count} destinations"
     },
     "people": {
       "title": "Linked people",
@@ -26615,6 +26726,83 @@
       "remove": "Remove",
       "saved": "Organizations saved",
       "saveFailed": "The organizations could not be saved."
+    },
+    "destination": {
+      "appTile": "{product} app",
+      "webhookTile": "{product} webhook",
+      "twoWay": "Two-way",
+      "recommendedForAlertResponse": "Recommended for alert response",
+      "choiceHint": "On-call pages and super clusters use the webhook. Manual and realtime sends from a Slack app destination are separate posts.",
+      "unavailableReason": "Needs the Enterprise Slack app on a single cluster",
+      "unavailableFlag": "Turned off on this server; ask your operator to set {variable}",
+      "unavailableMasterKey": "Needs an encryption key on this server; ask your operator to set {variable}",
+      "unavailableCloud": "Not turned on for your Cloud region yet",
+      "unavailableNoAccess": "Ask an org admin to turn on the Slack app",
+      "postOnly": "Post only",
+      "switchToApp": "Switch to {product} app",
+      "switchThis": "Switch this destination",
+      "switchBack": "Switch back",
+      "channelInWorkspace": "#{channel} · {workspace}",
+      "workspace": "Workspace",
+      "channel": "Channel",
+      "mention": "Mention",
+      "mentionCritical": "{'@'}here for critical, none for others",
+      "mentionNone": "None",
+      "mentionHelp": "Used on repeats and level upgrades",
+      "refireReuse": "Re-fire reuse (minutes)",
+      "refireReuseHelp": "A re-fire within this time edits the earlier message instead of posting a new one",
+      "buttons": "Acknowledge, Mute and Investigate buttons",
+      "buttonsHelp": "Resolve is added when the firing has an incident or on-call page",
+      "autoInvestigate": "Investigate automatically for critical alerts",
+      "autoInvestigateHelp": "Runs as the org's AI service account, with its access; posts findings in the alert thread",
+      "templateDefault": "Default {product} template ({name})",
+      "sendTest": "Send test",
+      "setsDefault": "Sets #{channel}'s default org to {org}",
+      "answersFor": "#{channel} answers questions for org {org}. Alerts from {thisOrg} post here and their threads answer in {thisOrg}; the channel default is unchanged.",
+      "sharedTag": "Shared · {product} Connect",
+      "sharedTitle": "#{channel} is shared with people outside {workspace}.",
+      "sharedDetail": "They will see alert names, values, charts and links. Their clicks on the buttons are refused.",
+      "sharedConfirm": "I understand, post alerts to this shared channel",
+      "sharedRequired": "Confirm that alerts may post to this shared channel",
+      "versionMismatch": "Nodes run different versions. Upgrade every node first.",
+      "oncallNotAllowed": "A {product} app destination can't be an on-call team channel",
+      "answersForAnother": "#{channel} answers questions for another org. Alerts from {thisOrg} post here and their threads answer in {thisOrg}; the channel default is unchanged.",
+      "oncallTag": "On-call room",
+      "oncallTitle": "On-call pages for team {team} also post to #{channel} through {destination}.",
+      "oncallDetail": "Alerts here post separately.",
+      "oncallConfirm": "I understand, post alerts to this on-call room",
+      "oncallRequired": "Confirm that alerts may post to this on-call room",
+      "workspaceRequired": "Pick a workspace",
+      "refireRange": "Enter whole minutes from 0 to {max}",
+      "connectTitle": "Connect {product} to post alerts with buttons",
+      "connectDetail": "Pick a channel on {product}'s screen and Allow. OpenObserve creates this destination for that channel.",
+      "connected": "{name} was created for #{channel}. Check its settings and save.",
+      "saveFailed": "The destination could not be saved.",
+      "switched": "{name} now posts through the {product} app",
+      "switchedBack": "{name} posts through its webhook again",
+      "switchFailed": "Could not switch {name}: {reason}",
+      "switchedAll": "{count} destination switched | {count} destinations switched",
+      "switchThisDetail": "Switch it to the {product} app for Acknowledge, Mute and Investigate buttons. Its name, template and alerts stay the same; Switch back restores the webhook."
+    },
+    "switchAll": {
+      "title": "{count} webhook destination posts to this workspace. | {count} webhook destinations post to this workspace.",
+      "detail": "Switch it to the {product} app for Acknowledge, Mute and Investigate buttons. Its name, template and alerts stay the same; Switch back restores the webhook. | Switch them to the {product} app for Acknowledge, Mute and Investigate buttons. Names, templates and alerts stay the same; Switch back restores the webhook.",
+      "review": "Review",
+      "action": "Switch all",
+      "summary": "{switched} switched · {count} could not be switched"
+    },
+    "oncallUnlinked": {
+      "title": "On-call members not linked to {product}",
+      "description": "Pages cannot DM them, and their clicks on alert and page buttons wait until they link",
+      "remind": "Remind them",
+      "columnPerson": "Person",
+      "columnTeam": "Team",
+      "columnNextShift": "Next shift",
+      "columnReminder": "Reminder",
+      "dmSent": "DM sent {time}",
+      "notSent": "Not sent",
+      "reminded": "Reminder sent to {count} person | Reminder sent to {count} people",
+      "remindFailed": "The reminders could not be sent."
     }
   },
   "fleet": {

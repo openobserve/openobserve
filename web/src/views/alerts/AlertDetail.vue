@@ -53,12 +53,28 @@
           data-test="alerts-alertdetail-level-badge"
         />
         <span
+          v-if="firingFor"
+          class="text-compact text-text-secondary"
+          data-test="alerts-alertdetail-firing-for"
+          >{{ firingFor }}</span
+        >
+        <span
           v-if="isMultiAlert && firingSummary"
           class="text-compact text-text-secondary"
           data-test="alerts-alertdetail-firing-summary"
         >
           {{ firingSummary }}
+          <template v-if="acknowledgedGroups">
+            {{ raw("·") }}
+            {{ t("alerts.ack.groupsAcknowledged", { count: acknowledgedGroups }) }}
+          </template>
         </span>
+        <AckChip v-if="headerAck" :ack="headerAck" data-test="alerts-alertdetail-ack-chip" />
+        <MutedChip
+          v-if="headerDowntime"
+          :downtime="headerDowntime"
+          data-test="alerts-alertdetail-muted-chip"
+        />
         <CompositeReferencesDrawer
           v-if="(alert?.referenced_by_composite_count ?? 0) > 0"
           :open="referenceDrawerOpen"
@@ -72,6 +88,19 @@
     </template>
 
     <template #actions>
+      <AlertHeaderActions
+        v-if="showHeaderActions"
+        :alert-id="alertId"
+        :name="alert?.name || alertId"
+        :folder-id="folderId"
+        :firing="isFiringNow"
+        :unacked-groups="unackedGroups"
+        :ack="headerAck"
+        :downtime="alertWideMute"
+        :mute-enabled="downtimesEnabled"
+        :groups="firingGroups"
+        @changed="onAckMuteChanged"
+      />
       <OButton
         v-if="!notFound"
         variant="outline"
@@ -141,6 +170,14 @@
 
         <OContent v-if="isMultiAlert" class="shrink-0 pt-3">
           <OStatStrip :items="groupStats" data-test="alerts-alertdetail-group-stats" />
+        </OContent>
+        <OContent v-else-if="firingTiles.length" class="shrink-0 pt-3">
+          <OStatStrip
+            :items="firingTiles"
+            selectable
+            data-test="alerts-alertdetail-tiles"
+            @select="openIncident"
+          />
         </OContent>
 
         <!-- A grouped alert that never opted in has no Groups tab, because it
@@ -232,8 +269,14 @@
             <AlertGroupsTable
               :groups="groupData?.list || []"
               :loading="loadingGroups"
+              :alert-id="alertId"
+              :alert-name="alert?.name || alertId"
+              :folder-id="folderId"
+              :downtime="headerDowntime"
+              :mute-enabled="downtimesEnabled"
               @refresh="fetchGroups"
               @show-history="openGroupHistory"
+              @changed="onAckMuteChanged"
             />
           </OTabPanel>
 
@@ -317,7 +360,8 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useQuery } from "@tanstack/vue-query";
+import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -326,6 +370,9 @@ import AlertEvaluationHistory from "@/components/alerts/AlertEvaluationHistory.v
 import AlertGroupChart from "@/components/alerts/AlertGroupChart.vue";
 import AlertGroupHistory from "@/components/alerts/AlertGroupHistory.vue";
 import AlertGroupsTable from "@/components/alerts/AlertGroupsTable.vue";
+import AlertHeaderActions from "@/components/alerts/AlertHeaderActions.vue";
+import AckChip from "@/components/alerts/AckChip.vue";
+import MutedChip from "@/components/alerts/downtimes/MutedChip.vue";
 import AnomalyDetectionChart from "@/components/alerts/AnomalyDetectionChart.vue";
 import CompositeAlertDetail from "@/components/alerts/composite/CompositeAlertDetail.vue";
 import CompositeReferencesDrawer from "@/components/alerts/composite/CompositeReferencesDrawer.vue";
@@ -345,6 +392,15 @@ import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import alertsService from "@/services/alerts";
+import { alertAcksQuery, alertsListQuery } from "@/services/alerts.queries";
+import type { ActiveDowntime } from "@/services/downtimes";
+import { useDowntimesEnabled } from "@/composables/downtimes/useDowntimesEnabled";
+import { useNowMicros } from "@/composables/downtimes/useNowMicros";
+import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
+import { formatDuration } from "@/utils/downtimes/schedule";
+import { formatInZone } from "@/utils/oncall";
+import { isFiringOutcome, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
+import { ackedCount, unackedFiringCount } from "@/utils/alerts/ackState";
 import sloService from "@/services/slos";
 import {
   isSloAlert,
@@ -354,8 +410,10 @@ import {
 } from "@/utils/alerts/sloAlertRouting";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type {
+  AckView,
   AlertGroup,
   AlertGroupsResponse,
+  AlertListAck,
   AlertGroupTransition,
   CompositeAlertReference,
 } from "@/ts/interfaces/alert";
@@ -367,6 +425,9 @@ const store = useStore();
 
 const alertId = computed(() => String(route.params.alert_id || ""));
 const orgId = computed(() => store.state.selectedOrganization?.identifier);
+// The GET carries no folder; the list navigates here with it, and "default" is every org's first folder.
+const folderId = computed(() => String(route.query.folder || "default"));
+const downtimesEnabled = useDowntimesEnabled();
 
 const alert = ref<any>(null);
 const groupData = ref<AlertGroupsResponse | null>(null);
@@ -447,7 +508,9 @@ const isGroupedButSimple = computed(
 // The GET response carries no rollup level, and M-2 defines the rollup as the
 // most severe group — which is exactly the first row of the worst-first group
 // list. Deriving it here beats showing nothing or re-fetching the list page.
-const rollupLevel = computed(() => groupData.value?.list?.[0]?.level);
+const rollupLevel = computed(
+  () => groupData.value?.list?.[0]?.level ?? (firingSince.value ? listRow.value?.level : null),
+);
 
 const backTarget = computed(() => ({
   label: t("alerts.header"),
@@ -575,6 +638,149 @@ const groupStats = computed<StatItem[]>(() => {
     },
   ];
 });
+
+// The alert GET has no run state, so the header reads this alert's row of its folder's list.
+const listQuery = useQuery(() =>
+  Object.assign(alertsListQuery(orgId.value, folderId.value), {
+    enabled: !!orgId.value && !!alertId.value,
+  }),
+);
+const acksQuery = useQuery(() =>
+  Object.assign(alertAcksQuery(orgId.value, alertId.value, folderId.value), {
+    enabled: !!orgId.value && !!alertId.value,
+  }),
+);
+
+interface AlertListRow {
+  alert_id?: string;
+  id?: string;
+  enabled?: boolean;
+  last_outcome?: string | null;
+  last_outcome_since?: number | null;
+  level?: string | null;
+  ack?: AlertListAck | null;
+  active_downtime?: (ActiveDowntime & { version?: number }) | null;
+  incident?: { id: string; title?: string | null; status: string } | null;
+}
+
+const listRow = computed<AlertListRow | null>(
+  () =>
+    (listQuery.data.value as AlertListRow[] | undefined)?.find(
+      (row) => (row.alert_id ?? row.id) === alertId.value,
+    ) ?? null,
+);
+
+const showHeaderActions = computed(() => !!alert.value && !notFound.value && !isAnomalyAlert.value);
+
+const isFiringNow = computed(() => {
+  const row = listRow.value;
+  const runFiring =
+    !!row &&
+    shouldShowRunOutcome(row.enabled, row.last_outcome) &&
+    isFiringOutcome(row.last_outcome);
+  return runFiring || (isCompositeAlert.value && alert.value?.evaluation?.result === true);
+});
+
+const headerAck = computed<Pick<AckView, "acked_by" | "acked_at" | "ack_source"> | null>(() => {
+  if (isMultiAlert.value) return null;
+  const acks = acksQuery.data.value ?? [];
+  return acks.find((ack) => ack.group_key === "") ?? listRow.value?.ack ?? null;
+});
+
+const headerDowntime = computed(() => listRow.value?.active_downtime ?? null);
+
+// A group mute is extended and ended from its group's row, so the header keeps offering Mute.
+const alertWideMute = computed(() =>
+  headerDowntime.value && !headerDowntime.value.alert_groups?.length ? headerDowntime.value : null,
+);
+
+const firingGroups = computed<AlertGroup[]>(() =>
+  isMultiAlert.value
+    ? (groupData.value?.list || []).filter((g) => isFiringOutcome(g.last_outcome))
+    : [],
+);
+
+// The tiles describe one firing: a multi-alert has its group strip, a composite its own panel.
+const isSingleRow = computed(
+  () => !isMultiAlert.value && !isCompositeAlert.value && !isAnomalyAlert.value,
+);
+
+const nowMicros = useNowMicros();
+const viewerZone = useViewerTimezone();
+
+const firingSince = computed<number | null>(() => {
+  const since = listRow.value?.last_outcome_since;
+  return isSingleRow.value && isFiringNow.value && since ? since : null;
+});
+
+const firingFor = computed(() => {
+  if (firingSince.value === null) return null;
+  const secs = Math.max(0, Math.floor((nowMicros.value - firingSince.value) / 1_000_000));
+  return t("alerts.firingState.firingFor", { duration: formatDuration(secs, t) });
+});
+
+const LEVEL_TILES: Record<string, { label: I18nKey; tone: StatItem["tone"] }> = {
+  critical: { label: "alerts.groups.critical", tone: "error" },
+  warning: { label: "alerts.groups.warning", tone: "warning" },
+  ok: { label: "alerts.groups.ok", tone: "success" },
+};
+
+const firingTiles = computed<StatItem[]>(() => {
+  if (firingSince.value === null) return [];
+  const level = LEVEL_TILES[(listRow.value?.level || "").toLowerCase()];
+  const tiles: StatItem[] = [];
+  if (level) {
+    tiles.push({
+      key: "level",
+      label: t("alerts.firingState.level"),
+      value: t(level.label),
+      tone: level.tone,
+      selectable: false,
+      dataTest: "alerts-alertdetail-tile-level",
+    });
+  }
+  tiles.push({
+    key: "firing-since",
+    label: t("alerts.firingState.firingSince"),
+    value: formatInZone(firingSince.value, viewerZone.value, { timeStyle: "short" }),
+    selectable: false,
+    dataTest: "alerts-alertdetail-tile-firing-since",
+  });
+  const incident = listRow.value?.incident;
+  if (incident) {
+    tiles.push({
+      key: "incident",
+      label: t("alerts.firingState.incident"),
+      value: incident.title || incident.id,
+      dataTest: "alerts-alertdetail-tile-incident",
+    });
+  }
+  return tiles;
+});
+
+const openIncident = (key: string) => {
+  const incident = listRow.value?.incident;
+  if (key !== "incident" || !incident) return;
+  router.push({
+    name: "incidentDetail",
+    params: { id: incident.id },
+    query: { org_identifier: orgId.value },
+  });
+};
+
+const unackedGroups = computed(() =>
+  isMultiAlert.value ? unackedFiringCount(groupData.value?.list || []) : null,
+);
+
+const acknowledgedGroups = computed(() =>
+  isMultiAlert.value ? ackedCount(groupData.value?.list || []) : 0,
+);
+
+// The mutations invalidate the cached reads; the group table is a plain fetch, so it reloads here.
+const onAckMuteChanged = async () => {
+  await Promise.all([listQuery.refetch(), acksQuery.refetch()]);
+  if (isMultiAlert.value) await fetchGroups();
+};
 
 const fetchAlert = async () => {
   if (!orgId.value || !alertId.value) return;

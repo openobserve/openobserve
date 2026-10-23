@@ -19,6 +19,20 @@ import type { I18nKey, I18nText } from "@/types/i18n";
 export type PrebuiltTypeId =
   "slack" | "discord" | "msteams" | "pagerduty" | "servicenow" | "email" | "opsgenie";
 
+/** A tile in the destination type picker: every prebuilt type, plus the Slack app. */
+export type DestinationTileId = PrebuiltTypeId | "slack_app";
+
+export interface DestinationTile {
+  disabled?: boolean;
+  id: DestinationTileId;
+  name: string;
+  descriptionKey: I18nKey;
+  icon: string;
+  image?: string;
+  /** Tells the two Slack tiles apart. */
+  tag?: { label: I18nText; variant: "success-soft" | "default-soft" };
+}
+
 /**
  * A user-facing validation message, expressed as an i18n KEY (+ optional
  * interpolation params) rather than English copy.

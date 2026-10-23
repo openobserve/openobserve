@@ -29,7 +29,12 @@ import {
 import type { InstallationView, LinkingView } from "@/types/slack";
 
 vi.mock("@/services/slack", () => ({
-  default: { getLinking: vi.fn(), updateLinking: vi.fn(), linkAll: vi.fn() },
+  default: {
+    getLinking: vi.fn(),
+    updateLinking: vi.fn(),
+    linkAll: vi.fn(),
+    listOncallUnlinked: vi.fn(() => Promise.resolve({ data: { members: [] } })),
+  },
 }));
 
 const PeopleStub = {
