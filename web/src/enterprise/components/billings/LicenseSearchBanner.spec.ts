@@ -201,6 +201,17 @@ describe("LicenseSearchBanner", () => {
     );
     expect(w.findComponent(OBanner).props("variant")).toBe("success");
   });
+  it("an unchanged refresh preserves the paused warning until config confirms recovery", async () => {
+    vi.mocked(licenseServer.refresh_license_limits).mockResolvedValue({
+      data: { outcome: "unchanged" },
+    } as never);
+    const w = await mountBanner(PAUSED);
+    await w.get('[data-test="license-banner-refresh"]').trigger("click");
+    await flushPromises();
+    expect(w.text()).toContain("Search is paused.");
+    expect(w.text()).toContain("License is up to date");
+    expect(w.findComponent(OBanner).props("variant")).toBe("error");
+  });
   it("unreachable outcome keeps the paused banner and shows the error line", async () => {
     vi.mocked(licenseServer.refresh_license_limits).mockResolvedValue({
       data: { error: "unreachable", limits_refreshed: true },

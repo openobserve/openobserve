@@ -112,3 +112,13 @@ describe("LicenseExpiryBanner", () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 });
+
+it("an unchanged refresh preserves the expiry date, warning and recheck action", async () => {
+  const { w } = await mountBanner();
+  await w.get('[data-test="license-expiry-refresh"]').trigger("click");
+  await flushPromises();
+  expect(w.text()).toContain("Your license expires on Nov 2, 2026.");
+  expect(w.text()).toContain("License is up to date");
+  expect(w.find('[data-test="license-expiry-refresh"]').exists()).toBe(true);
+  expect(w.findComponent({ name: "OBanner" }).props("variant")).toBe("warning");
+});

@@ -91,3 +91,11 @@ describe("license refresh messages", () => {
     expect(statusLabel("registered", gt)).toBe("Registered");
   });
 });
+
+it.each(["constructor", "__proto__", "toString"])(
+  "unknown inherited name %s uses the translated fallback",
+  (error) => {
+    expect(refreshMessage({ error }, gt).text).toContain("Online refresh could not be completed");
+    expect(statusLabel(error, gt)).toBe("Status unavailable");
+  },
+);

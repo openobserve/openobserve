@@ -167,3 +167,28 @@ describe("LicenseOnlineRefreshCard", () => {
     expect(card({ registration: "future_state" }).text()).toContain("Status unavailable");
   });
 });
+
+it("rotation confirms the installation key changed", async () => {
+  const w = card();
+  await w.get('[data-test="license-online-rotate"]').trigger("click");
+  await flushPromises();
+  expect(w.get('[data-test="license-online-outcome"]').text()).toBe("Installation key rotated.");
+});
+it("does not attribute an earlier success to the latest failed-attempt actor", () => {
+  const w = card({
+    last_success_at: 1792485600000000,
+    last_attempt_by: "different@example.test",
+    last_error: "timeout",
+  });
+  const rows = w.findAll('[data-test="o2-description-item"]');
+  expect(rows.find((row) => row.text().includes("Last refreshed"))?.text()).not.toContain(
+    "different@example.test",
+  );
+});
+it("shows the fetched successor and expiry beside the last refresh", () => {
+  const w = card({
+    last_outcome: { error: "refused_by_env" },
+    successor_available: { license_id: "lic_new", expires_at: 1825113600000000 },
+  });
+  expect(w.text()).toContain("renewed license fetched (lic_new, expires Nov 2, 2027)");
+});

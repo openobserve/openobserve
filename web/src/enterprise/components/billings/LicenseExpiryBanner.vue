@@ -1,18 +1,8 @@
 <template>
-  <OBanner
-    v-if="visible"
-    bar
-    :variant="outcome?.variant === 'success' ? 'success' : 'warning'"
-    :icon="outcome?.variant === 'success' ? 'check-circle' : 'schedule'"
-    data-test="license-expiry-banner"
-  >
+  <OBanner v-if="visible" bar variant="warning" icon="schedule" data-test="license-expiry-banner">
     <div>
-      <div>{{ outcome?.variant === "success" ? outcome.text : message }}</div>
-      <div
-        v-if="outcome && outcome.variant !== 'success'"
-        data-test="license-expiry-outcome"
-        aria-live="polite"
-      >
+      <div>{{ message }}</div>
+      <div v-if="outcome" data-test="license-expiry-outcome" aria-live="polite">
         {{ outcome.text }}
       </div>
       <div v-if="outcome?.hint" class="mt-1 text-xs">{{ outcome.hint }}</div>
@@ -20,12 +10,7 @@
     <template #actions>
       <div class="flex flex-wrap items-center gap-3">
         <OButton
-          v-if="
-            expiry.kind === 'expiring' &&
-            expiry.online &&
-            canUpdate &&
-            outcome?.variant !== 'success'
-          "
+          v-if="expiry.kind === 'expiring' && expiry.online && canUpdate"
           variant="banner-dismiss"
           size="sm"
           :loading="refreshing"
