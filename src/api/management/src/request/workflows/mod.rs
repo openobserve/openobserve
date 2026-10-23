@@ -621,6 +621,16 @@ pub async fn delete_workflows(
             }
         }
     } else {
+        let draft_exists = match workflows::get_draft_by_id(&org_id, &id).await {
+            Ok(v) => v.is_some(),
+            Err(e) => {
+                log::error!("error getting draft {org_id}/{id} before delete : {e}");
+                return MetaHttpResponse::internal_error(e);
+            }
+        };
+        if !draft_exists {
+            return MetaHttpResponse::bad_request("draft workflow with given id not found");
+        }
         match workflows::delete_draft(&org_id, &id).await {
             Ok(_) => MetaHttpResponse::ok("deleted successfully"),
             Err(e) => {
