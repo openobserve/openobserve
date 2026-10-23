@@ -141,6 +141,7 @@ const SchemaLoadPage = require("./generalPages/schemaLoadPage.js");
 const APICleanup = require("./apiCleanup.js");
 const WorkflowsPage = require("./workflowsPages/workflowsPage.js");
 const WorkflowFoldersPage = require("./workflowsPages/workflowFoldersPage.js");
+const WorkflowHttpPage = require("./workflowsPages/workflowHttpPage.js");
 
 // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
 import { LogsQueryPage } from "./logsPages/logsQueryPage.js";
@@ -253,6 +254,7 @@ class PageManager {
     // ===== WORKFLOWS (v1) PAGE OBJECT =====
     this.workflowsPage = new WorkflowsPage(page);
     this.workflowFoldersPage = new WorkflowFoldersPage(page);
+    this.workflowHttpPage = new WorkflowHttpPage(page);
 
     // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
     this.logsPage = new LogsPage(page);
