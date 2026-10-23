@@ -1,6 +1,7 @@
 const { test, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
 
 // Stripe returns invoice totals in the currency's minor unit (2 digits for
 // USD/EUR, 0 for JPY). The invoice table divides by 10 ** minorDigits and
@@ -50,6 +51,7 @@ test.describe('Billing Invoice Currency Formatting testcases', () => {
     let pm;
 
     test.beforeEach(async ({ page }, testInfo) => {
+        test.skip(!isCloudEnvironment(), 'Invoice history is Cloud-only (Stripe billing)');
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
