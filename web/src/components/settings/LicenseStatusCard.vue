@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OCardSection role="body">
       <div class="mb-3 text-xl font-semibold">{{ t("about.license_status_title") }}</div>
       <OBanner
-        v-if="envKeyActive"
+        v-if="envKeyActive && revHwmWarning?.source !== 'env'"
         :variant="envKeyInUse ? 'warning' : 'info'"
         :icon="envKeyInUse ? 'warning' : 'info'"
         class="mb-3"
@@ -30,6 +30,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         data-test="license-status-env-key"
       />
+      <OBanner
+        v-if="revHwmWarning"
+        variant="warning"
+        icon="warning"
+        class="mb-3"
+        inline-actions
+        :content="revWarningText"
+        data-test="license-status-rev-hwm"
+      >
+        <template #actions>
+          <OButton
+            v-if="revHwmWarning.source === 'db' && canUpdateLicense"
+            variant="outline"
+            size="sm-action"
+            data-test="license-status-rev-hwm-add-key"
+            @click="emit('add-license-key')"
+            >{{ t("about.add_new_license_key") }}</OButton
+          >
+        </template>
+      </OBanner>
       <ODescriptionList>
         <ODescriptionItem :label="t('about.license_status_search')">
           <div data-test="license-status-search">
@@ -72,14 +92,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
-import { quotaPercent, type LicenseDecision } from "@/utils/licenseWaivers";
+import {
+  issuedOn,
+  quotaPercent,
+  type LicenseDecision,
+  type RevHwmWarning,
+} from "@/utils/licenseWaivers";
 
 const props = defineProps<{
   decision: LicenseDecision;
@@ -87,9 +113,31 @@ const props = defineProps<{
   envKeyActive: boolean;
   envKeyInUse?: boolean;
   evaluatedAt?: number;
+  revHwmWarning?: RevHwmWarning | null;
+  canUpdateLicense?: boolean;
 }>();
 
-const { t } = useI18nTyped();
+const emit = defineEmits<{ "add-license-key": [] }>();
+const { t, locale } = useI18nTyped();
+
+const revWarningText = computed(() => {
+  const warning = props.revHwmWarning;
+  if (!warning) return undefined;
+  const undated = warning.loaded_rev === 0;
+  const key =
+    warning.source === "env"
+      ? undated
+        ? "about.license_status_env_below_hwm_undated"
+        : "about.license_status_env_below_hwm"
+      : undated
+        ? "about.license_status_db_below_hwm_undated"
+        : "about.license_status_db_below_hwm";
+  return t(key, {
+    loaded: issuedOn(warning.loaded_rev, locale.value),
+    hwm: issuedOn(warning.hwm_rev, locale.value),
+    variable: raw("O2_LICENSE_KEY"),
+  });
+});
 
 const envKeyInUse = computed(() => props.envKeyInUse !== false);
 

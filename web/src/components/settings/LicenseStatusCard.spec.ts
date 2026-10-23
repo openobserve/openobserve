@@ -126,3 +126,58 @@ describe("LicenseStatusCard", () => {
     );
   });
 });
+
+describe("license revision high-water warning", () => {
+  const warning = {
+    source: "env",
+    license_id: "lic_1",
+    loaded_rev: Date.UTC(2026, 9, 14) * 1000,
+    hwm_rev: Date.UTC(2026, 9, 20) * 1000,
+  };
+  it("shows the env-below-hwm warning with both dates", () => {
+    const w = mountCard({ envKeyActive: true, revHwmWarning: warning });
+    const text = w.find('[data-test="license-status-rev-hwm"]').text();
+    expect(text).toContain("O2_LICENSE_KEY holds an older key");
+    expect(text).toContain("Oct 14, 2026");
+    expect(text).toContain("Oct 20, 2026");
+    expect(w.find('[data-test="license-status-env-key"]').exists()).toBe(false);
+  });
+  it("shows the db-below-hwm warning", () => {
+    const w = mountCard({ revHwmWarning: { ...warning, source: "db" } });
+    expect(w.find('[data-test="license-status-rev-hwm"]').text()).toContain(
+      "The stored key for this license",
+    );
+  });
+  it("no rev warning when rev_hwm_warning is null", () =>
+    expect(
+      mountCard({ revHwmWarning: null }).find('[data-test="license-status-rev-hwm"]').exists(),
+    ).toBe(false));
+  it("an undated env key never renders the epoch", () => {
+    const text = mountCard({ revHwmWarning: { ...warning, loaded_rev: 0 } })
+      .find('[data-test="license-status-rev-hwm"]')
+      .text();
+    expect(text).toContain("older undated key");
+    expect(text).not.toContain("1970");
+  });
+  it("an undated stored key never renders the epoch", () => {
+    const text = mountCard({ revHwmWarning: { ...warning, source: "db", loaded_rev: 0 } })
+      .find('[data-test="license-status-rev-hwm"]')
+      .text();
+    expect(text).toContain("stored undated key");
+    expect(text).not.toContain("1970");
+  });
+  it("only an updater sees the stored-key recovery action", async () => {
+    const props = { revHwmWarning: { ...warning, source: "db" } };
+    expect(mountCard(props).find('[data-test="license-status-rev-hwm-add-key"]').exists()).toBe(
+      false,
+    );
+    const w = mountCard({ ...props, canUpdateLicense: true });
+    await w.find('[data-test="license-status-rev-hwm-add-key"]').trigger("click");
+    expect(w.emitted("add-license-key")).toHaveLength(1);
+    expect(
+      mountCard({ revHwmWarning: warning, canUpdateLicense: true })
+        .find('[data-test="license-status-rev-hwm-add-key"]')
+        .exists(),
+    ).toBe(false);
+  });
+});

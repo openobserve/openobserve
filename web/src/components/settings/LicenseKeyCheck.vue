@@ -34,13 +34,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch, onBeforeUnmount } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import {
+  boundaryDelayMs,
   issuedOn,
   knownWaivers,
   waiverKindLabel,
@@ -52,7 +53,7 @@ import {
 
 const props = defineProps<{ result: KeyCheckResult | null; refusal: RevRefusal | null }>();
 const { t, locale } = useI18nTyped();
-const nowUs = Date.now() * 1000;
+const nowUs = ref(Date.now() * 1000);
 const accepted = computed(() => !props.refusal && props.result?.outcome === "accept");
 const groups = computed(() =>
   [
@@ -68,6 +69,24 @@ const groups = computed(() =>
     },
   ].filter((g) => g.rows.length),
 );
+const rows = computed(() => (accepted.value ? groups.value.flatMap((group) => group.rows) : []));
+let boundaryTimer: ReturnType<typeof setTimeout> | undefined;
+const clearBoundaryTimer = () => {
+  if (boundaryTimer !== undefined) clearTimeout(boundaryTimer);
+  boundaryTimer = undefined;
+};
+const armBoundaryTimer = () => {
+  clearBoundaryTimer();
+  nowUs.value = Date.now() * 1000;
+  const upcoming = rows.value
+    .flatMap((waiver) => [waiver.starts_at, waiver.ends_at])
+    .filter((boundary) => boundary > nowUs.value);
+  if (!upcoming.length) return;
+  boundaryTimer = setTimeout(armBoundaryTimer, boundaryDelayMs(Math.min(...upcoming), nowUs.value));
+};
+watch(rows, armBoundaryTimer, { immediate: true });
+onBeforeUnmount(clearBoundaryTimer);
+
 const columns = computed<OTableColumnDef[]>(() => [
   { id: "waiver", header: t("about.waiver_col_waiver"), cell: " ", size: 300 },
   { id: "window", header: t("about.waiver_col_window"), cell: " ", size: 270 },

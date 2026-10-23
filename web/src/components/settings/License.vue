@@ -98,6 +98,9 @@
             :env-key-active="!!licenseData.env_key_active"
             :env-key-in-use="licenseData.env_key_in_use"
             :evaluated-at="licenseData.evaluated_at"
+            :rev-hwm-warning="licenseData.rev_hwm_warning"
+            :can-update-license="licenseData.can_update_license === true"
+            @add-license-key="showUpdateFormAndFocus"
           />
           <OCard class="border-card-glass-border border border-solid">
             <OCardSection role="body">
@@ -289,8 +292,7 @@
                     :disabled="isSubmitting"
                     @click="
                       showUpdateForm = false;
-                      licenseKey = '';
-                      clearKeyCheck();
+                      resetLicenseDrafts();
                     "
                   >
                     {{ t("common.cancel") }}
@@ -623,6 +625,12 @@ export default defineComponent({
     const noLicenseKey = noLicenseDraft.useStore((state) => state.values.licenseKey);
     const updateLicenseKey = updateLicenseDraft.useStore((state) => state.values.licenseKey);
     const licenseDefaults = computed((): LicenseForm => ({ licenseKey: licenseKey.value }));
+    const resetLicenseDrafts = () => {
+      clearKeyCheck();
+      licenseKey.value = "";
+      noLicenseDraft.reset({ licenseKey: "" });
+      updateLicenseDraft.reset({ licenseKey: "" });
+    };
     watch([noLicenseKey, updateLicenseKey], clearKeyCheck, { flush: "sync" });
     watch(
       licenseKey,
@@ -704,7 +712,7 @@ export default defineComponent({
           variant: "success",
           message: t("about.license_updated_success"),
         });
-        licenseKey.value = "";
+        resetLicenseDrafts();
         isLicenseKeyAutoFilled.value = false;
         showUpdateForm.value = false;
 
@@ -1134,6 +1142,7 @@ export default defineComponent({
       updateLicense,
       checkLicense,
       clearKeyCheck,
+      resetLicenseDrafts,
       result,
       refusal,
       checkError,

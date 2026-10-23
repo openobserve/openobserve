@@ -556,6 +556,36 @@ describe("License.vue", () => {
       expect(setConfig).not.toHaveBeenCalled();
     });
 
+    it("passes the high-water warning and permission to the status card", async () => {
+      const warning = {
+        source: "db",
+        license_id: "lic_1",
+        loaded_rev: Date.UTC(2026, 9, 14) * 1000,
+        hwm_rev: Date.UTC(2026, 9, 20) * 1000,
+      };
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({
+          ...mockLicenseData,
+          decision: {
+            search_allowed: true,
+            blocks: [],
+            exceeded_days: 0,
+            allowed_days: 3,
+            limit_today_gb: 200,
+            used_today_gb: 122,
+            waiver_ids_applied: [],
+          },
+          rev_hwm_warning: warning,
+          can_update_license: true,
+        }),
+      );
+      wrapper.unmount();
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.find('[data-test="license-status-rev-hwm"]').text()).toContain("stored key");
+      await wrapper.find('[data-test="license-status-rev-hwm-add-key"]').trigger("click");
+      expect(wrapper.vm.showUpdateForm).toBe(true);
+    });
     it("a rev_rollback 409 shows both issue dates inline", async () => {
       vi.mocked(licenseServer.update_license).mockRejectedValue({
         response: {
@@ -634,6 +664,16 @@ describe("License.vue", () => {
       );
       await flushPromises();
       expect(wrapper.find('[data-test="license-key-check-banner"]').exists()).toBe(false);
+    });
+    it("cancel clears the form-owned draft even when the incoming key was empty", async () => {
+      wrapper.vm.showUpdateForm = true;
+      await flushPromises();
+      const field = () => wrapper.find('textarea[data-test="update-license-key-input-field"]');
+      await field().setValue("typed-key");
+      await wrapper.find('[data-test="cancel-update-license-btn"]').trigger("click");
+      wrapper.vm.showUpdateForm = true;
+      await flushPromises();
+      expect(field().element.value).toBe("");
     });
     it("editing a completed preview clears it", async () => {
       vi.mocked(licenseServer.check_license).mockResolvedValue(

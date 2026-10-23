@@ -68,6 +68,7 @@ export interface LicenseDecision {
 }
 
 export interface LicenseWaiverFields {
+  rev_hwm_warning?: RevHwmWarning | null;
   waivers?: LicenseWaiver[];
   decision?: LicenseDecision;
   base?: LicenseDecision;
