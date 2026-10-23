@@ -60,6 +60,9 @@ pub async fn incr_pending_file(
     stream_name: &str,
     min_ts: i64,
 ) {
+    if schema::is_stream_key_too_long(org_id, stream_type, stream_name) {
+        return; // add_job would fail on the file_list_jobs stream column
+    }
     let cfg = get_config();
     let ingester_num = get_cached_online_ingester_nodes()
         .await
@@ -101,5 +104,18 @@ pub async fn incr_pending_file(
         log::debug!(
             "[COMPACTOR:INCREMENTAL] enqueued incremental merge for [{org_id}/{stream_type}/{stream_name}] hour {hour}"
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_incr_pending_file_skips_too_long_stream() {
+        let stream_name = "m".repeat(schema::STREAM_KEY_MAX_LEN);
+        incr_pending_file("org", StreamType::Metrics, &stream_name, hour_micros(1)).await;
+        let key = format!("org/{}/{stream_name}", StreamType::Metrics);
+        assert!(!PENDING_FILES.read().await.contains_key(&key));
     }
 }

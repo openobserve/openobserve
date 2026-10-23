@@ -121,14 +121,18 @@ pub fn check_request_columns_limit(
     ))
 }
 
+/// Whether a stream's file_list key is too long to store, without counting it as an ingest error.
+pub fn is_stream_key_too_long(org_id: &str, stream_type: StreamType, stream_name: &str) -> bool {
+    stream_key_len(org_id, stream_type, stream_name) > STREAM_KEY_MAX_LEN
+}
+
 /// Rejects a stream whose file_list key cannot be stored, so its files would never be listed.
 pub fn check_stream_key_len(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
 ) -> Result<(), anyhow::Error> {
-    // VARCHAR(n) counts characters, not bytes
-    let len = org_id.chars().count() + stream_type.as_str().len() + stream_name.chars().count() + 2;
+    let len = stream_key_len(org_id, stream_type, stream_name);
     if len <= STREAM_KEY_MAX_LEN {
         return Ok(());
     }
@@ -143,6 +147,11 @@ pub fn check_stream_key_len(
     Err(anyhow::anyhow!(
         "Stream name too long: {org_id}/{stream_type}/{stream_name} is {len} characters, only {STREAM_KEY_MAX_LEN} accepted. Data discarded."
     ))
+}
+
+fn stream_key_len(org_id: &str, stream_type: StreamType, stream_name: &str) -> usize {
+    // VARCHAR(n) counts characters, not bytes
+    org_id.chars().count() + stream_type.as_str().len() + stream_name.chars().count() + 2
 }
 
 #[derive(Debug)]
@@ -1344,7 +1353,9 @@ mod tests {
         // "org/metrics/" is 12 characters
         let fits = "m".repeat(STREAM_KEY_MAX_LEN - 12);
         assert!(check_stream_key_len("org", StreamType::Metrics, &fits).is_ok());
+        assert!(!is_stream_key_too_long("org", StreamType::Metrics, &fits));
         let over = format!("{fits}m");
+        assert!(is_stream_key_too_long("org", StreamType::Metrics, &over));
         let err = check_stream_key_len("org", StreamType::Metrics, &over).unwrap_err();
         assert!(err.to_string().contains("is 257 characters"), "{err}");
         // a multi-byte name is measured in characters, as the VARCHAR column is
