@@ -122,7 +122,7 @@ describe("LicenseStatusCard", () => {
     const banner = w.findComponent({ name: "OBanner" });
     expect(banner.props("variant")).toBe("info");
     expect(w.find("[data-test=license-status-env-key]").text()).toContain(
-      "newer than O2_LICENSE_KEY is in use",
+      "in use instead of O2_LICENSE_KEY",
     );
   });
 });
@@ -180,4 +180,11 @@ describe("license revision high-water warning", () => {
         .exists(),
     ).toBe(false);
   });
+});
+
+it("describes keys fetched online as well as pasted keys", () => {
+  const w = mountCard({ envKeyActive: true, envKeyInUse: false });
+  expect(w.get('[data-test="license-status-env-key"]').text()).toBe(
+    "A newer key for this license (pasted or fetched online) is in use instead of O2_LICENSE_KEY. Update O2_LICENSE_KEY when convenient so the two match.",
+  );
 });
