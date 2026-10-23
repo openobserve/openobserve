@@ -6287,6 +6287,8 @@
       "cooldown": "Dieses Dashboard kann derzeit nicht geladen werden. Neuer Versuch in {time}.",
       "rateLimitedRetry": "Zu viele Anfragen. Neuer Versuch in {time}.",
       "nextRefreshIn": "Nächste Aktualisierung in {time}",
+      "lastUpdatedAgo": "Zuletzt aktualisiert {time}",
+      "lastRefreshedNext": "Zuletzt aktualisiert: {time} · {next}",
       "refreshFailed": "Einige Panels konnten um {time} nicht aktualisiert werden. Sie zeigen ältere Daten. Nächster Versuch in {next}.",
       "refreshFailedNoRetry": "Einige Panels konnten um {time} nicht aktualisiert werden. Sie zeigen ältere Daten.",
       "panelFrom": "von {time}",
@@ -7853,6 +7855,7 @@
       "intro": "Jeder mit einem öffentlichen Link kann dieses Dashboard ohne Anmeldung ansehen.",
       "editNote": "Die Adresse des Links bleibt gleich. Änderungen erscheinen bei der nächsten Aktualisierung auf der öffentlichen Seite.",
       "name": "Name",
+      "namePlaceholder": "z. B. Statusansicht für Kunden",
       "nameRequired": "Name ist erforderlich",
       "nameTooLong": "Der Name darf höchstens 256 Zeichen lang sein",
       "untitled": "Unbenannter Link",
@@ -20362,13 +20365,6 @@
         "needsAttention": "Benötigt Aufmerksamkeit",
         "expired": "Abgelaufen",
         "dashboardDeleted": "Dashboard gelöscht"
-      },
-      "publicLinkRangeState": {
-        "cached": "Bereit",
-        "building": "Wird geladen",
-        "notCached": "Nicht im Cache, wird bei der nächsten Ansicht aufgebaut",
-        "neverViewed": "Nie angesehen",
-        "needsAttention": "Benötigt Aufmerksamkeit"
       },
       "downtimeStatus": {
         "scheduled": "Geplant",

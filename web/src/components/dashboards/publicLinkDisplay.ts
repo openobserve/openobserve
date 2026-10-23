@@ -119,6 +119,15 @@ export function publicLinkSearchTerm(input: string): string {
 }
 
 // Offered on every link with a dashboard; a paused or expired one gets the server's reason.
+/**
+ * The server hid the slug because the caller can't read the link's dashboard, so it
+ * refuses every change to the link too (403). A deleted dashboard also hides its
+ * slug, but revoking that orphan stays allowed, so it is not counted here.
+ */
+export function noDashboardAccess(link: PublicLink): boolean {
+  return !link.slug && link.status !== "dashboard_deleted";
+}
+
 export function canRefresh(link: PublicLink): boolean {
   return link.status !== "dashboard_deleted";
 }

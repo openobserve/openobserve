@@ -184,31 +184,6 @@ export const BADGE_GROUPS = {
     },
   },
 
-  // One range of a public link, as its owning querier reports it; never viewed is a not-cached link nobody opened.
-  publicLinkRangeState: {
-    mode: "dot",
-    shape: "pill",
-    values: {
-      cached: { variant: "success-soft", labelKey: "components.badge.publicLinkRangeState.cached" },
-      building: {
-        variant: "blue-soft",
-        labelKey: "components.badge.publicLinkRangeState.building",
-      },
-      notcached: {
-        variant: "default-soft",
-        labelKey: "components.badge.publicLinkRangeState.notCached",
-      },
-      neverviewed: {
-        variant: "default-soft",
-        labelKey: "components.badge.publicLinkRangeState.neverViewed",
-      },
-      needsattention: {
-        variant: "warning-soft",
-        labelKey: "components.badge.publicLinkRangeState.needsAttention",
-      },
-    },
-  },
-
   // One chip per downtime target, plus the shared condition. The caller always supplies the label.
   downtimeTarget: {
     mode: "icon",

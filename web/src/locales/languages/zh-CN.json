@@ -6287,6 +6287,8 @@
       "cooldown": "当前无法加载此仪表盘。将在 {time} 后重试。",
       "rateLimitedRetry": "请求过多。将在 {time} 后重试。",
       "nextRefreshIn": "下次刷新：{time}",
+      "lastUpdatedAgo": "上次更新：{time}",
+      "lastRefreshedNext": "上次刷新时间：{time} · {next}",
       "refreshFailed": "部分面板在 {time} 时未能刷新。它们显示的是较旧的数据。将在 {next} 后重试。",
       "refreshFailedNoRetry": "部分面板在 {time} 时未能刷新。它们显示的是较旧的数据。",
       "panelFrom": "自 {time}",
@@ -7853,6 +7855,7 @@
       "intro": "任何拥有公开链接的人无需登录即可查看此仪表盘。",
       "editNote": "链接地址保持不变。更改将在公开页面下次更新时显示。",
       "name": "名称",
+      "namePlaceholder": "例如：客户状态视图",
       "nameRequired": "名称为必填项",
       "nameTooLong": "名称最多为 256 个字符",
       "untitled": "未命名链接",
@@ -20362,13 +20365,6 @@
         "needsAttention": "需要关注",
         "expired": "已过期",
         "dashboardDeleted": "仪表盘已删除"
-      },
-      "publicLinkRangeState": {
-        "cached": "就绪",
-        "building": "加载中",
-        "notCached": "未缓存，下次查看时构建",
-        "neverViewed": "从未查看",
-        "needsAttention": "需要关注"
       },
       "downtimeStatus": {
         "scheduled": "已计划",

@@ -20364,13 +20364,6 @@
         "expired": "Expired",
         "dashboardDeleted": "Dashboard deleted"
       },
-      "publicLinkRangeState": {
-        "cached": "Ready",
-        "building": "Loading",
-        "notCached": "Not cached, builds on the next view",
-        "neverViewed": "Never viewed",
-        "needsAttention": "Needs attention"
-      },
       "downtimeStatus": {
         "scheduled": "Scheduled",
         "active": "Active",

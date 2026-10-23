@@ -209,7 +209,8 @@
           >
             <OTooltip side="bottom" :content="t('dashboard.publicLinks.openPublicPage')" />
           </OButton>
-          <span class="inline-flex max-md:hidden">
+          <!-- No access to the dashboard: the server refuses every change, so no action shows. -->
+          <span v-if="!noDashboardAccess(row)" class="inline-flex max-md:hidden">
             <OTooltip
               v-if="!hasDashboard(row)"
               side="bottom"
@@ -232,7 +233,7 @@
             </OButton>
           </span>
           <OButton
-            v-if="takeOverReplacesResume(row, userId)"
+            v-if="!noDashboardAccess(row) && takeOverReplacesResume(row, userId)"
             variant="ghost-success"
             size="icon-sm"
             icon-left="how-to-reg"
@@ -246,7 +247,7 @@
             <OTooltip side="bottom" :content="t('dashboard.publicLinks.takeOver')" />
           </OButton>
           <!-- A disabled button gets no pointer events, so the reason tooltip sits on the wrapper. -->
-          <span v-else class="inline-flex max-md:hidden">
+          <span v-else-if="!noDashboardAccess(row)" class="inline-flex max-md:hidden">
             <OTooltip v-if="!canPause(row)" side="bottom" :content="pauseBlockedReason(row, t)" />
             <OButton
               :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
@@ -269,7 +270,7 @@
               />
             </OButton>
           </span>
-          <ODropdown side="bottom" align="end">
+          <ODropdown v-if="!noDashboardAccess(row)" side="bottom" align="end">
             <template #trigger>
               <OButton
                 icon-left="more-vert"
@@ -431,6 +432,7 @@ import {
   canRefresh,
   canTakeOver,
   displayStatus,
+  noDashboardAccess,
   publicLinkColumns,
   publicLinkSearchTerm,
   forbiddenMessage,

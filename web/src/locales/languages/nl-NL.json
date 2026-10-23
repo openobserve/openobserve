@@ -6287,6 +6287,8 @@
       "cooldown": "Kan dit dashboard nu niet laden. Nieuwe poging over {time}.",
       "rateLimitedRetry": "Te veel verzoeken. Nieuwe poging over {time}.",
       "nextRefreshIn": "Volgende vernieuwing over {time}",
+      "lastUpdatedAgo": "Laatst bijgewerkt {time}",
+      "lastRefreshedNext": "Laatst ververst: {time} · {next}",
       "refreshFailed": "Sommige panelen konden om {time} niet worden vernieuwd. Ze tonen oudere gegevens. Volgende poging over {next}.",
       "refreshFailedNoRetry": "Sommige panelen konden om {time} niet worden vernieuwd. Ze tonen oudere gegevens.",
       "panelFrom": "vanaf {time}",
@@ -7853,6 +7855,7 @@
       "intro": "Iedereen met een openbare link kan dit dashboard bekijken zonder in te loggen.",
       "editNote": "Het adres van de link blijft hetzelfde. Wijzigingen verschijnen bij de volgende update op de openbare pagina.",
       "name": "Naam",
+      "namePlaceholder": "bijv. Statusweergave voor klanten",
       "nameRequired": "Naam is verplicht",
       "nameTooLong": "Naam mag maximaal 256 tekens bevatten",
       "untitled": "Naamloze link",
@@ -20362,13 +20365,6 @@
         "needsAttention": "Vereist aandacht",
         "expired": "Verlopen",
         "dashboardDeleted": "Dashboard verwijderd"
-      },
-      "publicLinkRangeState": {
-        "cached": "Gereed",
-        "building": "Laden",
-        "notCached": "Niet in cache, wordt bij de volgende weergave opgebouwd",
-        "neverViewed": "Nooit bekeken",
-        "needsAttention": "Vereist aandacht"
       },
       "downtimeStatus": {
         "scheduled": "Gepland",

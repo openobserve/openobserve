@@ -1002,6 +1002,49 @@ describe("PublicLinksPanel", () => {
     expect(has(w, "dashboards-public-links-panel-l1-copy-btn")).toBe(false);
   });
 
+  it("offers no action the server would refuse on a link whose dashboard the caller can't read", async () => {
+    vi.mocked(admin.list).mockResolvedValue({
+      data: {
+        list: [
+          link({ id: "l1", publisher_left: true }),
+          link({ id: "l2", name: "Hidden", slug: null, publisher_left: true }),
+          link({ id: "l3", name: "Hidden paused", slug: null, status: "paused", enabled: false }),
+        ],
+      },
+    } as never);
+    const w = build();
+    await flushPromises();
+
+    const ACTIONS = [
+      "edit-btn",
+      "pause-btn",
+      "take-over-btn",
+      "menu-btn",
+      "edit-menu",
+      "pause-menu",
+      "take-over-menu",
+      "refresh-menu",
+      "revoke-menu",
+    ];
+    for (const id of ACTIONS) {
+      expect(has(w, `dashboards-public-links-panel-l2-${id}`)).toBe(false);
+    }
+    for (const id of ["resume-btn", "resume-menu", "take-over-btn", "revoke-menu"]) {
+      expect(has(w, `dashboards-public-links-panel-l3-${id}`)).toBe(false);
+    }
+    // The row itself stays: status, publisher and the No access badge.
+    expect(has(w, "dashboards-public-links-panel-l2-status")).toBe(true);
+    expect(has(w, "dashboards-public-links-panel-l2-publisher-left")).toBe(true);
+    expect(w.find('[data-test="dashboards-public-links-panel-l2-url-hidden"]').text()).toBe(
+      "No access",
+    );
+    expect(w.text()).toContain("Hidden");
+    // A readable link keeps every action.
+    for (const id of ["edit-btn", "menu-btn", "take-over-menu", "revoke-menu"]) {
+      expect(has(w, `dashboards-public-links-panel-l1-${id}`)).toBe(true);
+    }
+  });
+
   it("shows no URL, copy or open on a saved link whose URL the server hid", async () => {
     vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
     vi.mocked(admin.create).mockResolvedValue({ data: link({ slug: null }) } as never);

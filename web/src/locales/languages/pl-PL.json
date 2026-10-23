@@ -6287,6 +6287,8 @@
       "cooldown": "Nie można teraz załadować tego pulpitu. Ponowna próba za {time}.",
       "rateLimitedRetry": "Zbyt wiele żądań. Ponowna próba za {time}.",
       "nextRefreshIn": "Następne odświeżenie za {time}",
+      "lastUpdatedAgo": "Ostatnia aktualizacja {time}",
+      "lastRefreshedNext": "Ostatnie odświeżenie: {time} · {next}",
       "refreshFailed": "Nie udało się odświeżyć niektórych paneli o {time}. Pokazują starsze dane. Następna próba za {next}.",
       "refreshFailedNoRetry": "Nie udało się odświeżyć niektórych paneli o {time}. Pokazują starsze dane.",
       "panelFrom": "od {time}",
@@ -7853,6 +7855,7 @@
       "intro": "Każdy, kto ma link publiczny, może wyświetlić ten pulpit bez logowania.",
       "editNote": "Adres linku pozostaje taki sam. Zmiany pojawią się na stronie publicznej przy jej następnej aktualizacji.",
       "name": "Nazwa",
+      "namePlaceholder": "np. Widok statusu dla klientów",
       "nameRequired": "Nazwa jest wymagana",
       "nameTooLong": "Nazwa może mieć maksymalnie 256 znaków",
       "untitled": "Link bez nazwy",
@@ -20362,13 +20365,6 @@
         "needsAttention": "Wymaga uwagi",
         "expired": "Wygasł",
         "dashboardDeleted": "Pulpit usunięty"
-      },
-      "publicLinkRangeState": {
-        "cached": "Gotowe",
-        "building": "Ładowanie",
-        "notCached": "Brak w pamięci podręcznej, zbuduje się przy następnym wyświetleniu",
-        "neverViewed": "Nigdy nie wyświetlano",
-        "needsAttention": "Wymaga uwagi"
       },
       "downtimeStatus": {
         "scheduled": "Zaplanowana",

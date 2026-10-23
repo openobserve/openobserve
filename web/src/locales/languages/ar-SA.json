@@ -6287,6 +6287,8 @@
       "cooldown": "تعذّر تحميل لوحة المعلومات هذه الآن. ستتم إعادة المحاولة خلال {time}.",
       "rateLimitedRetry": "طلبات كثيرة جدًا. ستتم إعادة المحاولة خلال {time}.",
       "nextRefreshIn": "التحديث التالي خلال {time}",
+      "lastUpdatedAgo": "آخر تحديث {time}",
+      "lastRefreshedNext": "آخر تحديث: {time} · {next}",
       "refreshFailed": "تعذّر تحديث بعض اللوحات في {time}. إنها تعرض بيانات قديمة. المحاولة التالية خلال {next}.",
       "refreshFailedNoRetry": "تعذّر تحديث بعض اللوحات في {time}. إنها تعرض بيانات قديمة.",
       "panelFrom": "من {time}",
@@ -7853,6 +7855,7 @@
       "intro": "يمكن لأي شخص لديه رابط عام عرض لوحة المعلومات هذه دون تسجيل الدخول.",
       "editNote": "يبقى عنوان الرابط كما هو. تظهر التغييرات على الصفحة العامة عند تحديثها التالي.",
       "name": "الاسم",
+      "namePlaceholder": "مثال: عرض حالة العملاء",
       "nameRequired": "الاسم مطلوب",
       "nameTooLong": "يجب ألا يتجاوز الاسم 256 حرفًا",
       "untitled": "رابط بدون عنوان",
@@ -20362,13 +20365,6 @@
         "needsAttention": "يحتاج إلى انتباه",
         "expired": "منتهي الصلاحية",
         "dashboardDeleted": "تم حذف لوحة المعلومات"
-      },
-      "publicLinkRangeState": {
-        "cached": "جاهز",
-        "building": "جارٍ التحميل",
-        "notCached": "غير مخزّن مؤقتًا، يُبنى عند العرض التالي",
-        "neverViewed": "لم تتم مشاهدته",
-        "needsAttention": "يحتاج إلى انتباه"
       },
       "downtimeStatus": {
         "scheduled": "مجدولة",

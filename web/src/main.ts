@@ -163,6 +163,16 @@ const getConfig = async () => {
         beforeSend: (event) => {
           event.view.url = scrubAuthParams(event.view.url) ?? event.view.url;
           event.view.referrer = scrubAuthParams(event.view.referrer);
+          if (event.type === "resource") {
+            event.resource.url = scrubAuthParams(event.resource.url) ?? event.resource.url;
+          }
+          if (event.type === "error") {
+            event.error.message = scrubAuthParams(event.error.message) ?? event.error.message;
+            if (event.error.resource) {
+              event.error.resource.url =
+                scrubAuthParams(event.error.resource.url) ?? event.error.resource.url;
+            }
+          }
           if (event.type === "error" && isExtensionOnlyError(event.error?.stack)) return false;
           if (event.type === "action" && event.action.target?.name) {
             event.action.target.name = event.action.target.name.replace(JWT_PATTERN, "");
@@ -206,6 +216,9 @@ const getConfig = async () => {
         apiVersion: options.apiVersion,
         beforeSend: (log) => {
           if (log.view?.url) log.view.url = scrubAuthParams(log.view.url) ?? log.view.url;
+          if (log.view?.referrer) log.view.referrer = scrubAuthParams(log.view.referrer);
+          if (log.http?.url) log.http.url = scrubAuthParams(log.http.url) ?? log.http.url;
+          log.message = scrubAuthParams(log.message) ?? log.message;
           // Filter out specific logs before sending
           const logMessage = log.message || "";
 

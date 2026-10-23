@@ -6287,6 +6287,8 @@
       "cooldown": "目前無法載入此儀表板。將在 {time} 後重試。",
       "rateLimitedRetry": "請求過多。將在 {time} 後重試。",
       "nextRefreshIn": "下次更新於 {time} 後",
+      "lastUpdatedAgo": "上次更新：{time}",
+      "lastRefreshedNext": "上次重新整理：{time} · {next}",
       "refreshFailed": "部分面板無法在 {time} 更新。它們顯示的是較舊資料。將在 {next} 後重試。",
       "refreshFailedNoRetry": "部分面板無法在 {time} 更新。它們顯示的是較舊資料。",
       "panelFrom": "自 {time}",
@@ -7848,6 +7850,7 @@
       "intro": "任何擁有公開連結的人都能在無需登入的情況下檢視此儀表板。",
       "editNote": "連結的網址保持不變。變更會於公開頁面下次更新時顯示。",
       "name": "名稱",
+      "namePlaceholder": "例如：客戶狀態檢視",
       "nameRequired": "名稱為必填",
       "nameTooLong": "名稱最多只能有 256 個字元",
       "untitled": "未命名連結",
@@ -20357,13 +20360,6 @@
         "needsAttention": "需要關注",
         "expired": "已到期",
         "dashboardDeleted": "儀表板已刪除"
-      },
-      "publicLinkRangeState": {
-        "cached": "就緒",
-        "building": "載入中",
-        "notCached": "未快取，下次檢視時建置",
-        "neverViewed": "從未檢視",
-        "needsAttention": "需要關注"
       },
       "downtimeStatus": {
         "scheduled": "已排程",

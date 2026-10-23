@@ -324,13 +324,74 @@ describe("PublicLinksTable", () => {
       expect(find(w, `dashboards-public-links-l1-${id}`).exists()).toBe(true);
     }
     expect(find(w, "dashboards-public-links-l1-url-hidden").exists()).toBe(false);
-    // The row keeps its other actions.
-    expect(find(w, "dashboards-public-links-l2-edit-btn").exists()).toBe(true);
 
     // Search still runs over a row with no slug.
     await find(w, "dashboards-public-links-search").find("input").setValue("hidden");
     await flushPromises();
     expect(rows(w)).toHaveLength(1);
+  });
+
+  it("offers no action the server would refuse on a link whose dashboard the caller can't read", async () => {
+    vi.mocked(admin.listOrg).mockResolvedValue({
+      data: {
+        list: [
+          link({ id: "l1", publisher_left: true }),
+          link({ id: "l2", name: "Hidden", slug: null, publisher_left: true }),
+          link({ id: "l3", name: "Hidden paused", slug: null, status: "paused", enabled: false }),
+        ],
+      },
+    } as never);
+    const w = build();
+    await flushPromises();
+
+    const ACTIONS = [
+      "edit-btn",
+      "pause-btn",
+      "take-over-btn",
+      "menu-btn",
+      "dashboard-menu",
+      "edit-menu",
+      "pause-menu",
+      "take-over-menu",
+      "refresh-menu",
+      "revoke-menu",
+    ];
+    for (const id of ACTIONS) {
+      expect(find(w, `dashboards-public-links-l2-${id}`).exists()).toBe(false);
+    }
+    for (const id of ["resume-btn", "resume-menu", "take-over-btn", "revoke-menu"]) {
+      expect(find(w, `dashboards-public-links-l3-${id}`).exists()).toBe(false);
+    }
+    // The row itself stays: name, status, publisher and the No access badge.
+    expect(find(w, "dashboards-public-links-l2-name").text()).toBe("Hidden");
+    expect(find(w, "dashboards-public-links-l2-status").exists()).toBe(true);
+    expect(find(w, "dashboards-public-links-l2-publisher-left").exists()).toBe(true);
+    expect(find(w, "dashboards-public-links-l2-url-hidden").text()).toBe("No access");
+    // A readable link keeps every action.
+    for (const id of ["edit-btn", "menu-btn", "dashboard-menu", "take-over-menu", "revoke-menu"]) {
+      expect(find(w, `dashboards-public-links-l1-${id}`).exists()).toBe(true);
+    }
+  });
+
+  it("still lets an orphan link, whose dashboard was deleted, be revoked", async () => {
+    vi.mocked(admin.listOrg).mockResolvedValue({
+      data: {
+        list: [
+          link({
+            id: "l3",
+            slug: null,
+            status: "dashboard_deleted",
+            dashboard_title: null,
+            folder_name: null,
+          }),
+        ],
+      },
+    } as never);
+    const w = build();
+    await flushPromises();
+    expect(find(w, "dashboards-public-links-l3-revoke-menu").exists()).toBe(true);
+    expect(find(w, "dashboards-public-links-l3-edit-btn").exists()).toBe(true);
+    expect(find(w, "dashboards-public-links-l3-dashboard-menu").exists()).toBe(false);
   });
 
   it("names every icon-only row action for screen readers", async () => {

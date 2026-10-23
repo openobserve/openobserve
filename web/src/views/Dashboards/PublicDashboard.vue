@@ -796,8 +796,9 @@ const check = async (): Promise<PollOutcome> => {
     state.value = "ready";
     const next = body.value as DataBody;
     if (configBehind(next)) {
-      configSyncedRev = next.rev;
+      // Marked only once the read lands; a failed read must retry on the next poll's 304.
       await loadConfig();
+      configSyncedRev = next.rev;
       // The author removed this range; the default's result replaces it.
       if (selectedKey.value !== key) {
         showRange(selectedKey.value);

@@ -6287,6 +6287,8 @@
       "cooldown": "Không thể tải bảng điều khiển này ngay bây giờ. Sẽ thử lại sau {time}.",
       "rateLimitedRetry": "Quá nhiều yêu cầu. Sẽ thử lại sau {time}.",
       "nextRefreshIn": "Lần làm mới tiếp theo sau {time}",
+      "lastUpdatedAgo": "Cập nhật lần cuối {time}",
+      "lastRefreshedNext": "Cập nhật lần cuối: {time} · {next}",
       "refreshFailed": "Một số panel không thể làm mới lúc {time}. Chúng đang hiển thị dữ liệu cũ hơn. Lần thử tiếp theo sau {next}.",
       "refreshFailedNoRetry": "Một số panel không thể làm mới lúc {time}. Chúng đang hiển thị dữ liệu cũ hơn.",
       "panelFrom": "từ {time}",
@@ -7853,6 +7855,7 @@
       "intro": "Bất kỳ ai có liên kết công khai đều có thể xem bảng điều khiển này mà không cần đăng nhập.",
       "editNote": "Địa chỉ của liên kết không thay đổi. Các thay đổi sẽ xuất hiện trên trang công khai ở lần cập nhật tiếp theo.",
       "name": "Tên",
+      "namePlaceholder": "ví dụ: Chế độ xem trạng thái cho khách hàng",
       "nameRequired": "Tên là bắt buộc",
       "nameTooLong": "Tên không được vượt quá 256 ký tự",
       "untitled": "Liên kết chưa đặt tên",
@@ -20362,13 +20365,6 @@
         "needsAttention": "Cần chú ý",
         "expired": "Đã hết hạn",
         "dashboardDeleted": "Bảng điều khiển đã bị xóa"
-      },
-      "publicLinkRangeState": {
-        "cached": "Sẵn sàng",
-        "building": "Đang tải",
-        "notCached": "Chưa được lưu đệm, sẽ tạo ở lần xem tiếp theo",
-        "neverViewed": "Chưa từng được xem",
-        "needsAttention": "Cần chú ý"
       },
       "downtimeStatus": {
         "scheduled": "Đã lên lịch",

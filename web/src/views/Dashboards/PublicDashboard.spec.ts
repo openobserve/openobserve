@@ -713,6 +713,30 @@ describe("PublicDashboard viewer", () => {
     expect(service.getConfig).toHaveBeenCalledTimes(2);
   });
 
+  it("retries a failed layout read on the next poll, even when the body answers 304", async () => {
+    vi.useFakeTimers();
+    vi.mocked(service.getConfig)
+      .mockResolvedValueOnce({ data: CONFIG, status: 200 } as never)
+      .mockRejectedValueOnce(new Error("Network Error"))
+      .mockResolvedValue({ data: { ...CONFIG, link_rev: 2 }, status: 200 } as never);
+    vi.mocked(service.getData)
+      .mockResolvedValueOnce({ status: 200, data: { ...okBody("c"), link_rev: 2 } } as never)
+      .mockResolvedValue({ status: 304, data: "" } as never);
+    const w = buildWrapper();
+    await flushPromises();
+    expect(service.getConfig).toHaveBeenCalledTimes(2);
+    expect(grid(w).exists()).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(service.getData).toHaveBeenLastCalledWith("abc", "r3600", "c");
+    expect(service.getConfig).toHaveBeenCalledTimes(3);
+
+    // Synced now: the next 304 for the same rev reads no layout.
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(service.getData).toHaveBeenCalledTimes(3);
+    expect(service.getConfig).toHaveBeenCalledTimes(3);
+  });
+
   it("lists ranges in the picker only when viewers can switch, and always offers the timezone", async () => {
     (service.getConfig as any).mockResolvedValue({ data: CONFIG, status: 200 });
     (service.getData as any).mockResolvedValue({

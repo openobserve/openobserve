@@ -6287,6 +6287,8 @@
       "cooldown": "Não é possível carregar este painel agora. Tentando novamente em {time}.",
       "rateLimitedRetry": "Muitas requisições. Tentando novamente em {time}.",
       "nextRefreshIn": "Próxima atualização em {time}",
+      "lastUpdatedAgo": "Última atualização {time}",
+      "lastRefreshedNext": "Última atualização: {time} · {next}",
       "refreshFailed": "Alguns painéis não puderam ser atualizados em {time}. Eles exibem dados mais antigos. Próxima tentativa em {next}.",
       "refreshFailedNoRetry": "Alguns painéis não puderam ser atualizados em {time}. Eles exibem dados mais antigos.",
       "panelFrom": "desde {time}",
@@ -7853,6 +7855,7 @@
       "intro": "Qualquer pessoa com um link público pode visualizar este painel sem fazer login.",
       "editNote": "O endereço do link permanece o mesmo. As alterações aparecem na página pública na próxima atualização.",
       "name": "Nome",
+      "namePlaceholder": "ex.: Vista de estado para clientes",
       "nameRequired": "O nome é obrigatório",
       "nameTooLong": "O nome deve ter no máximo 256 caracteres",
       "untitled": "Link sem título",
@@ -20362,13 +20365,6 @@
         "needsAttention": "Precisa de atenção",
         "expired": "Expirado",
         "dashboardDeleted": "Painel excluído"
-      },
-      "publicLinkRangeState": {
-        "cached": "Pronto",
-        "building": "Carregando",
-        "notCached": "Sem cache, será gerado na próxima visualização",
-        "neverViewed": "Nunca visualizado",
-        "needsAttention": "Precisa de atenção"
       },
       "downtimeStatus": {
         "scheduled": "Agendada",

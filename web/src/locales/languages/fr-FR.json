@@ -6287,6 +6287,8 @@
       "cooldown": "Impossible de charger ce tableau de bord pour le moment. Nouvelle tentative dans {time}.",
       "rateLimitedRetry": "Trop de requêtes. Nouvelle tentative dans {time}.",
       "nextRefreshIn": "Prochain rafraîchissement dans {time}",
+      "lastUpdatedAgo": "Dernière mise à jour {time}",
+      "lastRefreshedNext": "Dernière actualisation : {time} · {next}",
       "refreshFailed": "Certains panneaux n'ont pas pu être actualisés à {time}. Ils affichent des données plus anciennes. Nouvelle tentative dans {next}.",
       "refreshFailedNoRetry": "Certains panneaux n'ont pas pu être actualisés à {time}. Ils affichent des données plus anciennes.",
       "panelFrom": "depuis {time}",
@@ -7853,6 +7855,7 @@
       "intro": "Toute personne disposant d'un lien public peut consulter ce tableau de bord sans se connecter.",
       "editNote": "L'adresse du lien reste inchangée. Les modifications apparaissent sur la page publique lors de sa prochaine mise à jour.",
       "name": "Nom",
+      "namePlaceholder": "ex. : Vue d'état pour les clients",
       "nameRequired": "Le nom est obligatoire",
       "nameTooLong": "Le nom doit comporter au maximum 256 caractères",
       "untitled": "Lien sans titre",
@@ -20362,13 +20365,6 @@
         "needsAttention": "Nécessite votre attention",
         "expired": "Expiré",
         "dashboardDeleted": "Tableau de bord supprimé"
-      },
-      "publicLinkRangeState": {
-        "cached": "Prêt",
-        "building": "Chargement",
-        "notCached": "Non mis en cache, généré à la prochaine consultation",
-        "neverViewed": "Jamais consulté",
-        "needsAttention": "Nécessite votre attention"
       },
       "downtimeStatus": {
         "scheduled": "Planifié",

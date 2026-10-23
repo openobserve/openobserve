@@ -6287,6 +6287,8 @@
       "cooldown": "Bu gösterge panosu şu anda yüklenemiyor. {time} sonra tekrar denenecek.",
       "rateLimitedRetry": "Çok fazla istek. {time} sonra tekrar denenecek.",
       "nextRefreshIn": "{time} sonra yenilenecek",
+      "lastUpdatedAgo": "Son güncelleme: {time}",
+      "lastRefreshedNext": "Son yenileme: {time} · {next}",
       "refreshFailed": "Bazı paneller {time} itibarıyla yenilenemedi. Daha eski veriler gösteriliyor. Sonraki deneme {next} sonra.",
       "refreshFailedNoRetry": "Bazı paneller {time} itibarıyla yenilenemedi. Daha eski veriler gösteriliyor.",
       "panelFrom": "{time} itibarıyla",
@@ -7853,6 +7855,7 @@
       "intro": "Herkese açık bağlantıya sahip olan herkes oturum açmadan bu gösterge panosunu görüntüleyebilir.",
       "editNote": "Bağlantının adresi aynı kalır. Değişiklikler bir sonraki güncellemede herkese açık sayfada görünür.",
       "name": "Ad",
+      "namePlaceholder": "örn. Müşteri durum görünümü",
       "nameRequired": "Ad gereklidir",
       "nameTooLong": "Ad en fazla 256 karakter olmalıdır",
       "untitled": "Adsız bağlantı",
@@ -20362,13 +20365,6 @@
         "needsAttention": "Dikkat gerekiyor",
         "expired": "Süresi doldu",
         "dashboardDeleted": "Gösterge panosu silindi"
-      },
-      "publicLinkRangeState": {
-        "cached": "Hazır",
-        "building": "Yükleniyor",
-        "notCached": "Önbelleğe alınmadı, sonraki görüntülemede oluşturulur",
-        "neverViewed": "Hiç görüntülenmedi",
-        "needsAttention": "Dikkat gerekiyor"
       },
       "downtimeStatus": {
         "scheduled": "Planlandı",

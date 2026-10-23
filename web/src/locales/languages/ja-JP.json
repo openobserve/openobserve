@@ -6287,6 +6287,8 @@
       "cooldown": "現在このダッシュボードを読み込めません。{time} 後に再試行します。",
       "rateLimitedRetry": "リクエストが多すぎます。{time} 後に再試行します。",
       "nextRefreshIn": "次回の更新まで {time}",
+      "lastUpdatedAgo": "最終更新 {time}",
+      "lastRefreshedNext": "最終更新: {time} · {next}",
       "refreshFailed": "一部のパネルは {time} に更新できませんでした。古いデータを表示しています。{next} 後に再試行します。",
       "refreshFailedNoRetry": "一部のパネルは {time} に更新できませんでした。古いデータを表示しています。",
       "panelFrom": "{time} から",
@@ -7853,6 +7855,7 @@
       "intro": "公開リンクを持つ人は誰でもサインインせずにこのダッシュボードを閲覧できます。",
       "editNote": "リンクのアドレスは変わりません。変更は次回の更新時に公開ページに反映されます。",
       "name": "名前",
+      "namePlaceholder": "例: 顧客向けステータスビュー",
       "nameRequired": "名前は必須です",
       "nameTooLong": "名前は 256 文字以内である必要があります",
       "untitled": "無題のリンク",
@@ -20362,13 +20365,6 @@
         "needsAttention": "要対応",
         "expired": "期限切れ",
         "dashboardDeleted": "ダッシュボード削除済み"
-      },
-      "publicLinkRangeState": {
-        "cached": "準備完了",
-        "building": "読み込み中",
-        "notCached": "未キャッシュ。次回表示時に構築されます",
-        "neverViewed": "未閲覧",
-        "needsAttention": "要対応"
       },
       "downtimeStatus": {
         "scheduled": "スケジュール済み",
