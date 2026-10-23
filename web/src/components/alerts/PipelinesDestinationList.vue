@@ -308,7 +308,7 @@ export default defineComponent({
       {
         id: "method",
         header: t("alert_destinations.method"),
-        accessorKey: "method",
+        accessorFn: (row: any) => (row.method ?? "").toUpperCase(),
         sortable: true,
         resizable: true,
         hideable: true,

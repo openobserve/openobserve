@@ -426,7 +426,7 @@ export default defineComponent({
     const destinationUrl = (row: DestinationPayload): string =>
       row.type === "email" ? (row.emails ?? []).join(", ") : (row.url ?? "");
     const destinationMethod = (row: DestinationPayload): string =>
-      row.type === "email" ? "" : (row.method ?? "");
+      row.type === "email" ? "" : (row.method ?? "").toUpperCase();
 
     const columns: OTableColumnDef[] = [
       {

@@ -524,10 +524,11 @@ describe("AlertsDestinationList", () => {
       method: "post",
       emails: ["alerts@example.com", "oncall@example.com"],
     });
+    const lowerPutDest = makeDestination(5, { name: "lower-put", method: "put" });
 
     beforeEach(async () => {
       (destinationService.list as any).mockResolvedValue({
-        data: [makeDestination(1), emailDest],
+        data: [makeDestination(1), emailDest, lowerPutDest],
       });
       wrapper = mountComponent();
       await flushPromises();
@@ -551,6 +552,10 @@ describe("AlertsDestinationList", () => {
         "https://example.com/hook-1",
       );
       expect(wrapper!.find('[data-test="destination-method-destination-1"]').text()).toBe("POST");
+    });
+
+    it("shows a lowercase stored method in uppercase", () => {
+      expect(wrapper!.find('[data-test="destination-method-lower-put"]').text()).toBe("PUT");
     });
 
     it("labels the column URL / Recipients, not URL", () => {
