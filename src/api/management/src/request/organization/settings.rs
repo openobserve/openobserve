@@ -19,6 +19,8 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+#[cfg(feature = "cloud")]
+use config::utils::str::is_valid_domain;
 use db::organization::{get_org_setting, set_org_setting};
 use infra::errors::{DbError, Error};
 #[cfg(feature = "enterprise")]
@@ -83,6 +85,12 @@ pub async fn create(
     if let Err(response) = check_budget_config(&org_id, &settings).await {
         return response;
     }
+
+    #[cfg(feature = "cloud")]
+    let settings = match check_domain_management_config(settings).await {
+        Ok(settings) => settings,
+        Err(msg) => return MetaHttpResponse::bad_request(msg),
+    };
 
     match db::organization::update_org_setting(&org_id, |data| {
         apply_settings_payload(data, settings)
@@ -273,10 +281,24 @@ async fn check_domain_org_mappings(
 
     let mut allowed_orgs: HashSet<_> = child_orgs.into_iter().map(|v| v.member_org_id).collect();
     allowed_orgs.insert(org_id.to_string());
+
+    let mut seen_domains = HashSet::new();
     for mapping in &mut mappings {
         use openobserve_core::org_domain_ownership;
 
         let domain = mapping.domain.trim().to_lowercase();
+
+        if !is_valid_domain(&domain) {
+            return Err(format!("domain {domain} is not a valid domain",));
+        }
+
+        if seen_domains.contains(&(domain.clone(), mapping.org_id.clone())) {
+            return Err(format!(
+                "domain {domain} is linked to {} multiple times",
+                mapping.org_id
+            ));
+        }
+        seen_domains.insert((domain.clone(), mapping.org_id.clone()));
 
         if !allowed_orgs.contains(&mapping.org_id) {
             return Err(format!(
@@ -292,7 +314,7 @@ async fn check_domain_org_mappings(
             return Err(format!("No org with org id {} found", mapping.org_id));
         }
 
-        if mapping.domain.is_empty() || mapping.domain.contains(' ') {
+        if domain.is_empty() || domain.contains(' ') {
             return Err(format!(
                 "domain cannot have space or be empty, bad domain '{}'",
                 mapping.domain
@@ -334,6 +356,22 @@ async fn check_domain_org_mappings(
         mapping.domain = domain;
     }
     settings.domain_org_mappings = Some(mappings);
+    Ok(settings)
+}
+
+#[cfg(feature = "cloud")]
+async fn check_domain_management_config(
+    mut settings: OrganizationSettingPayload,
+) -> Result<OrganizationSettingPayload, String> {
+    if let Some(mut config) = settings.domain_management_config {
+        config.blocked_emails = config
+            .blocked_emails
+            .into_iter()
+            .map(|v| v.trim().to_lowercase())
+            .collect();
+
+        settings.domain_management_config = Some(config);
+    }
     Ok(settings)
 }
 

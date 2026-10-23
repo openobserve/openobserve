@@ -15,7 +15,7 @@
 
 use axum::{Json, extract::Path, response::Response};
 use common::meta::http::HttpResponse as MetaHttpResponse;
-use config::{META_ORG_ID, meta::status_pages::CreateDomainRequest};
+use config::{META_ORG_ID, meta::status_pages::CreateDomainRequest, utils::str::is_valid_domain};
 use infra::table::org_domain_requests::Status;
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{org_domain_ownership, org_domain_requests};
@@ -44,6 +44,12 @@ pub async fn link_domain(
 ) -> Response {
     let domain = body.domain.trim().to_lowercase();
 
+    if !is_valid_domain(&domain) {
+        return MetaHttpResponse::bad_request(format!(
+            "domain {domain} is not a valid domain to link"
+        ));
+    }
+
     match org_domain_ownership::get_verified_org_for_domain(&domain).await {
         Ok(Some(v)) => {
             log::info!(
@@ -64,6 +70,18 @@ pub async fn link_domain(
             ));
         }
         _ => {}
+    }
+
+    let existing = match org_domain_requests::get_req_by_org_domain(&org_id, &domain).await {
+        Ok(v) => v,
+        Err(e) => {
+            return MetaHttpResponse::internal_error(format!(
+                "error getting org domain requests : {e}"
+            ));
+        }
+    };
+    if existing.is_some() {
+        return MetaHttpResponse::bad_request(format!("there is already a request open for this domain by this org"));
     }
 
     match org_domain_ownership::save_org_domain_mapping(&org_id, &domain).await {
@@ -87,6 +105,10 @@ pub async fn raise_request(
     Json(body): Json<CreateDomainRequest>,
 ) -> Response {
     let domain = body.domain.trim().to_lowercase();
+
+    if !is_valid_domain(&domain) {
+        return MetaHttpResponse::bad_request(format!("domain {domain} is not a valid domain",));
+    }
 
     match org_domain_ownership::get_verified_org_for_domain(&domain).await {
         Ok(Some(v)) => {
