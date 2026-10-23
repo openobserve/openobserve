@@ -529,14 +529,14 @@ pub async fn zo_config(
         false,
         o2cfg.alert_calibration.enabled && check_features(&[Feature::AlertInsights])
     );
-    let incidents_enabled = enterprise_value!(false, o2cfg.incidents.enabled);
     // Incident analysis needs RCA on and an agent to answer.
     let incidents_rca_enabled = enterprise_value!(
         false,
-        o2cfg.incidents.enabled && o2cfg.incidents.rca_enabled && o2cfg.ai.has_agent_target()
+        incidents_enabled
+            && o2cfg.incidents.rca_enabled
+            && o2cfg.ai.has_agent_target()
+            && check_features(&[Feature::RootCauseAnalysis])
     );
-    let downtimes_enabled = enterprise_value!(false, o2cfg.downtimes.enabled);
-    let alert_calibration_enabled = enterprise_value!(false, o2cfg.alert_calibration.enabled);
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
     // Enterprise builds have it unless O2_ANOMALY_DETECTION_DISABLED turns it off.
     let anomaly_detection_enabled = enterprise_value!(false, !o2cfg.anomaly_detection.disabled);

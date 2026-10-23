@@ -589,7 +589,8 @@ fn refusal_response(
         | R::NoCode
         | R::NoProvider
         | R::NoPhone
-        | R::NumberRejected => StatusCode::BAD_REQUEST,
+        | R::NumberRejected
+        | R::NumberNotAllowed => StatusCode::BAD_REQUEST,
     };
     let mut body = serde_json::json!({ "message": refusal.to_string(), "reason": refusal.reason });
     if let Some(n) = refusal.tries_left {
