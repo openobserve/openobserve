@@ -1,6 +1,7 @@
 import { execSync, spawn } from "node:child_process";
 import { readFileSync, existsSync, writeFileSync, unlinkSync } from "node:fs";
 import { resolve, dirname } from "node:path";
+import { request as httpRequest } from "node:http";
 import { fileURLToPath } from "node:url";
 import { randomBytes, randomUUID } from "node:crypto";
 import { context, SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
@@ -739,6 +740,26 @@ function extractText(parts) {
     .trim();
 }
 
+// opencode answers /message only when the agent finishes, and the built-in fetch gives up on response headers after 300 s ("fetch failed").
+function postJsonWithoutHeadersTimeout(url, payload, signal) {
+  return new Promise((resolvePromise, reject) => {
+    const req = httpRequest(url, { method: "POST", headers: { "Content-Type": "application/json" }, signal }, res => {
+      let body = "";
+      res.setEncoding("utf8");
+      res.on("data", chunk => { body += chunk; });
+      res.on("error", reject);
+      res.on("end", () => resolvePromise({
+        ok: res.statusCode >= 200 && res.statusCode < 300,
+        status: res.statusCode,
+        text: async () => body,
+        json: async () => JSON.parse(body),
+      }));
+    });
+    req.on("error", reject);
+    req.end(JSON.stringify(payload));
+  });
+}
+
 async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGENT_TIMEOUT_MS, traceOptions = {}) {
   const llmSpan = TRACE.startSpan("gen_ai.chat", {
     "gen_ai.operation.name": "chat",
@@ -777,18 +798,13 @@ async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGE
     const session = await sessionResp.json();
 
     try {
-      const messageResp = await fetch(`${baseUrl}/session/${session.id}/message`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          agent: agentName,
-          model: { providerID: PROVIDER_ID, modelID: MODEL_ID },
-          ...(MODEL_VARIANT ? { variant: MODEL_VARIANT } : {}),
-          system: truncatedSystem,
-          parts: [{ type: "text", text: truncatedUser }],
-        }),
-        signal: controller.signal,
-      });
+      const messageResp = await postJsonWithoutHeadersTimeout(`${baseUrl}/session/${session.id}/message`, {
+        agent: agentName,
+        model: { providerID: PROVIDER_ID, modelID: MODEL_ID },
+        ...(MODEL_VARIANT ? { variant: MODEL_VARIANT } : {}),
+        system: truncatedSystem,
+        parts: [{ type: "text", text: truncatedUser }],
+      }, controller.signal);
       TRACE.setSpanAttributes(llmSpan, { "http.response.status_code": messageResp.status });
 
       if (!messageResp.ok) {
