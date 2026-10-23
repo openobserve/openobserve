@@ -62,6 +62,7 @@ vi.mock("@/components/flow/forms/FunctionPicker.vue", () => ({
 import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
 import { buildTestSample } from "@/plugins/workflows/testSample";
 import WorkflowFunction from "./WorkflowFunction.vue";
+import { httpEditorState, resetHttpEditorState } from "@/plugins/workflows/httpEndpointUi";
 
 // The "Events" sample comes from the CURRENT trigger's kind, so seed a trigger
 // node in the graph. Default = alert; individual tests override it.
@@ -333,5 +334,36 @@ describe("WorkflowFunction", () => {
       const events = picker(createWrapper()).props("sampleEvents");
       expect(events == null || (Array.isArray(events) && events.length === 0)).toBe(true);
     });
+  });
+});
+
+describe("WorkflowFunction HTTP sample", () => {
+  beforeEach(() => {
+    resetHttpEditorState();
+    seedTrigger();
+  });
+  afterEach(() => {
+    resetHttpEditorState();
+    workflowObj.currentSelectedWorkflow.nodes = [];
+  });
+
+  it("offers the HTTP sample while the endpoint is on", () => {
+    httpEditorState.endpointOn = true;
+    httpEditorState.payloadFrom = "http";
+    const events = picker(createWrapper()).props("sampleEvents") as any[];
+    expect(events).toHaveLength(1);
+    expect(events[0].meta.trigger_source).toBe("http");
+  });
+
+  it("keeps the kind sample by default and while the endpoint is off", () => {
+    httpEditorState.endpointOn = true;
+    expect(
+      (picker(createWrapper()).props("sampleEvents") as any[])[0].meta.trigger_source,
+    ).toBeUndefined();
+    httpEditorState.endpointOn = false;
+    httpEditorState.payloadFrom = "http";
+    expect(
+      (picker(createWrapper()).props("sampleEvents") as any[])[0].meta.trigger_source,
+    ).toBeUndefined();
   });
 });

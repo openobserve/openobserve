@@ -190,12 +190,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-trigger="{ row }">
-              <OTag
-                v-if="row.trigger && row.trigger !== '—'"
-                :value="row.trigger"
-                variant="amber-soft"
-                data-test="workflow-list-trigger-tag"
-              />
+              <div class="flex min-w-0 items-center gap-1">
+                <OTag
+                  v-if="row.trigger && row.trigger !== '—'"
+                  :value="row.trigger"
+                  variant="amber-soft"
+                  data-test="workflow-list-trigger-tag"
+                />
+                <span v-if="hooksOn && hasHttpEndpoint(row)" class="inline-flex shrink-0">
+                  <OTag
+                    :value="t('workflow.http.listTag')"
+                    variant="blue-soft"
+                    icon="webhook"
+                    data-test="workflow-list-http-tag"
+                  />
+                  <OTooltip side="bottom" :content="t('workflow.http.listTagTooltip')" />
+                </span>
+              </div>
             </template>
 
             <template #cell-actions="{ row }">
@@ -278,6 +289,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span>{{ t("workflow.edit") }}</span>
                   </ODropdownItem>
                   <ODropdownItem
+                    v-if="hooksOn"
+                    icon-left="webhook"
+                    :data-test="`workflow-list-${row.name}-http-endpoint`"
+                    @select="openHttpPanel(row)"
+                  >
+                    <span>{{ t("workflow.http.listMenuItem") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    v-if="hooksOn && hasHttpEndpoint(row)"
+                    icon-left="link"
+                    :data-test="`workflow-list-${row.name}-copy-endpoint`"
+                    @select="copyEndpointUrl(row)"
+                  >
+                    <span>{{ t("workflow.http.copyUrl") }}</span>
+                    <OTooltip
+                      v-if="row.is_draft"
+                      side="left"
+                      :content="t('workflow.http.copyUrlDraftHint')"
+                    />
+                  </ODropdownItem>
+                  <ODropdownItem
                     :data-test="`workflow-list-${row.name}-delete`"
                     variant="destructive"
                     @select="openDeleteDialog(row)"
@@ -325,11 +357,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:cancel="resetConfirmDialog"
     v-model="confirmDialogMeta.show"
   />
+
+  <WorkflowHttpEndpointPanel
+    v-if="hooksOn && httpPanelRow"
+    :open="httpPanelOpen"
+    :workflow-id="httpPanelRow.id"
+    :workflow-name="httpPanelRow.name || ''"
+    :kind="rowTriggerKind(httpPanelRow)"
+    :is-draft-only="!!httpPanelRow.is_draft"
+    :workflow-enabled="httpPanelRow.enabled !== false"
+    context="list"
+    @update:open="httpPanelOpen = $event"
+  />
 </template>
 
 <script setup lang="ts">
 import { workflowKeys } from "@/services/workflows.querykeys";
-import { workflowFolderQuery, workflowSearchQuery } from "@/services/workflows.queries";
+import {
+  workflowFolderQuery,
+  workflowHttpTriggerQuery,
+  workflowSearchQuery,
+} from "@/services/workflows.queries";
+import { copyToClipboard } from "@/utils/clipboard";
+import { hasHttpEndpoint, workflowHooksEnabled } from "@/plugins/workflows/httpEndpoint";
+import WorkflowHttpEndpointPanel from "@/components/workflows/WorkflowHttpEndpointPanel.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import { ref, computed, defineAsyncComponent, onMounted, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -413,6 +464,7 @@ const onFolderChange = (folderId: string) => {
 const store = useStore();
 
 const currentRouteName = computed(() => router.currentRoute.value.name);
+const hooksOn = computed(() => workflowHooksEnabled(store.state.zoConfig));
 const orgId = computed(() => store.state.selectedOrganization.identifier as string);
 
 const shapeWorkflows = (list: any[]) =>
@@ -526,6 +578,38 @@ const filteredWorkflows = computed(() => {
 const triggerKind = (wf: any): string => {
   const triggerNode = (wf.nodes || []).find((n: any) => n.data?.node_type === "workflow_trigger");
   return triggerNode?.data?.trigger_kind || triggerNode?.meta?.trigger_kind || DEFAULT_TRIGGER_KIND;
+};
+
+// No trigger node yet means no kind: the panel then titles the workflow by name alone.
+const rowTriggerKind = (wf: any): string | undefined => {
+  const triggerNode = (wf.nodes || []).find((n: any) => n.data?.node_type === "workflow_trigger");
+  if (!triggerNode) return undefined;
+  return triggerNode.data?.trigger_kind || triggerNode.meta?.trigger_kind || DEFAULT_TRIGGER_KIND;
+};
+
+const httpPanelRow = ref<any>(null);
+const httpPanelOpen = ref(false);
+const openHttpPanel = (row: any) => {
+  httpPanelRow.value = row;
+  httpPanelOpen.value = true;
+};
+
+// The row carries only the flag, so the URL comes from the endpoint itself.
+const copyEndpointUrl = async (row: any) => {
+  try {
+    const state = await queryClient.fetchQuery(workflowHttpTriggerQuery(orgId.value, row.id));
+    if (!state.configured) return;
+    if (await copyToClipboard(state.url, t, { silent: true })) {
+      toast({ message: t("toastMessages.workflows.endpointUrlCopied"), variant: "success" });
+    }
+  } catch (e: any) {
+    toast({
+      message: t("workflow.http.copyUrlFailed", {
+        reason: raw(e?.response?.data?.message || e?.message) || t("common.unknownError"),
+      }),
+      variant: "error",
+    });
+  }
 };
 
 const triggerLabel = (wf: any): string => {

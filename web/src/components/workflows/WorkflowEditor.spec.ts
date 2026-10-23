@@ -65,6 +65,7 @@ vi.mock("@/services/workflows", async (importOriginal) => {
       promoteWorkflow: vi.fn(),
       getWorkflowRun: vi.fn(),
       testWorkflow: vi.fn(),
+      getHttpTrigger: vi.fn(),
     },
   });
 });
@@ -78,7 +79,24 @@ const { stub } = vi.hoisted(() => ({
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/plugins/workflows/WorkflowCanvas.vue", () => stub("WorkflowCanvas"));
 vi.mock("./WorkflowNodeDrawer.vue", () => stub("WorkflowNodeDrawer"));
-vi.mock("./WorkflowTestDialog.vue", () => stub("WorkflowTestDialog"));
+vi.mock("./WorkflowTestDialog.vue", () =>
+  stub("WorkflowTestDialog", { props: ["seed", "payloadFrom"] }),
+);
+vi.mock("./WorkflowHttpEndpointPanel.vue", () =>
+  stub("WorkflowHttpEndpointPanel", {
+    props: [
+      "open",
+      "workflowId",
+      "workflowName",
+      "kind",
+      "isDraftOnly",
+      "workflowEnabled",
+      "context",
+      "beforeCreate",
+    ],
+    emits: ["update:open", "run-test"],
+  }),
+);
 vi.mock("./WorkflowLinkAlertsDialog.vue", () =>
   stub("WorkflowLinkAlertsDialog", {
     props: ["workflowId", "workflowName"],
@@ -87,7 +105,16 @@ vi.mock("./WorkflowLinkAlertsDialog.vue", () =>
 );
 vi.mock("@/components/flow/StepPickerDialog.vue", () =>
   stub("StepPickerDialog", {
-    props: ["items", "title", "searchPlaceholder", "noMatchText", "testPrefix"],
+    props: [
+      "items",
+      "title",
+      "searchPlaceholder",
+      "noMatchText",
+      "testPrefix",
+      "footnote",
+      "footnoteIcon",
+      "footnoteTestId",
+    ],
     emits: ["pick", "close"],
   }),
 );
@@ -104,6 +131,9 @@ import store from "@/test/unit/helpers/store";
 import WorkflowEditor from "./WorkflowEditor.vue";
 import workflowService from "@/services/workflows";
 import analytics from "@/services/product_analytics";
+import { queryClient } from "@/composables/query/queryClient";
+import { enabledTriggers } from "@/plugins/workflows/triggers";
+import { httpEditorState, resetHttpEditorState } from "@/plugins/workflows/httpEndpointUi";
 import useWorkflowCanvas, {
   workflowObj,
   hydrateWorkflow,
@@ -2018,5 +2048,153 @@ describe("WorkflowEditor", () => {
       expect(wf().nodes).toHaveLength(2);
       expect(workflowObj.deleteConfirm).toEqual({ show: false, nodeId: "" });
     });
+  });
+});
+
+describe("WorkflowEditor HTTP endpoint", () => {
+  let wrapper: any = null;
+  const getHttpTrigger = (workflowService as any).getHttpTrigger;
+  const button = (w: any) => w.find('[data-test="workflow-editor-http-endpoint"]');
+  const chip = (w: any) => w.find('[data-test="workflow-editor-http-endpoint-chip"]');
+  // OTag renders a fragment, so its data-test sits on an inner element, not the component root.
+  const chipVariant = (w: any) =>
+    w
+      .findAllComponents({ name: "OTag" })
+      .find((c: any) => c.find('[data-test="workflow-editor-http-endpoint-chip"]').exists())
+      ?.props("variant");
+  const panel = (w: any) => w.findComponent({ name: "WorkflowHttpEndpointPanel" });
+  const endpoint = (enabled = true) => ({
+    configured: true,
+    enabled,
+    url: "https://o2/h",
+    credentials: [],
+    permissions: { edit: true, test: true, reveal: true },
+  });
+
+  const openSaved = async (overrides: any = {}) => {
+    hydrateWorkflow(savedGraph(overrides));
+    mockRouter.currentRoute.value = { query: { id: "wf-1" } };
+    wrapper = mountEditor();
+    await flushPromises();
+    return wrapper;
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetWorkflowData();
+    resetHttpEditorState();
+    queryClient.clear();
+    mockRouter.currentRoute.value = { query: {} };
+    listWorkflows.mockResolvedValue({ data: [] });
+    getHttpTrigger.mockResolvedValue(endpoint());
+    store.state.zoConfig = { ...store.state.zoConfig, workflow_hooks_enabled: true };
+  });
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    resetWorkflowData();
+    store.state.zoConfig = { ...store.state.zoConfig, workflow_hooks_enabled: false };
+  });
+
+  it("shows the button on alert and incident workflows and unsaved ones", async () => {
+    wrapper = mountEditor();
+    await flushPromises();
+    expect(button(wrapper).text()).toContain(t("workflow.http.editorButton"));
+    expect(chip(wrapper).exists()).toBe(false);
+    wrapper.unmount();
+    const incident = savedGraph().nodes.map((n: any) =>
+      n.id === "t1" ? { ...n, meta: { trigger_kind: "incident_event" } } : n,
+    );
+    await openSaved({ nodes: incident });
+    expect(button(wrapper).exists()).toBe(true);
+    expect(panel(wrapper).props("kind")).toBe("incident_event");
+  });
+
+  it("sits between History and Test", async () => {
+    await openSaved();
+    const html = wrapper.html();
+    const at = (id: string) => html.indexOf(`data-test="${id}"`);
+    expect(at("workflow-editor-history")).toBeLessThan(at("workflow-editor-http-endpoint"));
+    expect(at("workflow-editor-http-endpoint")).toBeLessThan(at("workflow-editor-test"));
+  });
+
+  it("chip success when live, warning when draft or disabled", async () => {
+    await openSaved();
+    expect(chipVariant(wrapper)).toBe("success-soft");
+    expect(httpEditorState.endpointOn).toBe(true);
+    wrapper.unmount();
+    queryClient.clear();
+    await openSaved({ is_draft: true });
+    expect(chipVariant(wrapper)).toBe("warning-soft");
+    wrapper.unmount();
+    queryClient.clear();
+    await openSaved({ enabled: false });
+    expect(chipVariant(wrapper)).toBe("warning-soft");
+
+    wrapper.unmount();
+    queryClient.clear();
+    getHttpTrigger.mockResolvedValue(endpoint(false));
+    await openSaved();
+    expect(chip(wrapper).exists()).toBe(false);
+    expect(httpEditorState.endpointOn).toBe(false);
+  });
+
+  it("hides the header button and its overflow item when workflow_hooks_enabled is false", async () => {
+    store.state.zoConfig = { ...store.state.zoConfig, workflow_hooks_enabled: false };
+    await openSaved();
+    expect(button(wrapper).exists()).toBe(false);
+    expect(panel(wrapper).exists()).toBe(false);
+    expect(getHttpTrigger).not.toHaveBeenCalled();
+    expect(httpEditorState.endpointOn).toBe(false);
+  });
+
+  it("opens the panel with the workflow, and a badge click opens the same panel", async () => {
+    await openSaved();
+    expect(panel(wrapper).props("open")).toBe(false);
+    await button(wrapper).trigger("click");
+    expect(panel(wrapper).props()).toMatchObject({
+      open: true,
+      workflowId: "wf-1",
+      workflowName: "my workflow",
+      kind: "alert_fired",
+      isDraftOnly: false,
+      workflowEnabled: true,
+      context: "editor",
+    });
+    expect(typeof panel(wrapper).props("beforeCreate")).toBe("function");
+    await panel(wrapper).vm.$emit("update:open", false);
+    expect(panel(wrapper).props("open")).toBe(false);
+    httpEditorState.panelOpen = true;
+    await nextTick();
+    expect(panel(wrapper).props("open")).toBe(true);
+  });
+
+  it("Run test closes the panel and opens the Test dialog preset to HTTP request", async () => {
+    await openSaved();
+    await button(wrapper).trigger("click");
+    const seed = [{ meta: { trigger_source: "http", trigger_id: "test" }, data: [] }];
+    await panel(wrapper).vm.$emit("update:open", false);
+    await panel(wrapper).vm.$emit("run-test", seed);
+    await flushPromises();
+    expect(panel(wrapper).props("open")).toBe(false);
+    expect(workflowObj.testRun.show).toBe(true);
+    const dialog = wrapper.findComponent({ name: "WorkflowTestDialog" });
+    expect(dialog.props("seed")).toEqual(seed);
+    expect(dialog.props("payloadFrom")).toBe("http");
+  });
+
+  it("the picker shows the HTTP cue and only enabled kinds", async () => {
+    wrapper = mountEditor();
+    await flushPromises();
+    workflowObj.stepPicker = { ...workflowObj.stepPicker, show: true, mode: "trigger" };
+    await nextTick();
+    const picker = wrapper.findComponent({ name: "StepPickerDialog" });
+    expect(picker.props("footnote")).toBe(t("workflow.http.pickerCue"));
+    const keys = picker.props("items").map((i: any) => i.key);
+    expect(keys).toEqual(enabledTriggers().map((d) => d.kind));
+    expect(keys).not.toContain("http_request");
+    workflowObj.stepPicker = { ...workflowObj.stepPicker, mode: "next" };
+    await nextTick();
+    expect(wrapper.findComponent({ name: "StepPickerDialog" }).props("footnote")).toBeUndefined();
   });
 });

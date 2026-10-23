@@ -37,65 +37,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t(introKey) }}
     </p>
 
-    <!-- VARIANT VIEW (kinds with commonMetaKeys, e.g. incidents): an event_type
-         picker above the selected event's FULL payload — common and event-specific
-         fields merged in one `meta`. Preview-only — the trigger node has no config. -->
-    <template v-if="isSplit">
-      <OSelect
-        v-model="selectedVariant"
-        :label="t(variantLabelKey)"
-        :options="variantOptions"
-        class="mb-3"
-        data-test="workflow-trigger-sample-variant"
+    <div
+      v-if="showHttpLink"
+      data-test="workflow-trigger-http-link"
+      class="border-border-default rounded-default mb-3 flex items-center gap-2 border px-3 py-1.5 text-xs"
+    >
+      <OIcon name="webhook" size="xs" class="text-text-secondary shrink-0" />
+      <span class="text-text-secondary min-w-0 flex-1">
+        {{
+          httpEditorState.endpointOn
+            ? t("workflow.http.triggerLinkOn")
+            : t("workflow.http.triggerLinkOff")
+        }}
+      </span>
+      <OButton
+        variant="ghost-primary"
+        size="xs"
+        data-test="workflow-trigger-http-link-action"
+        @click="emit('open-http-endpoint')"
+      >
+        {{
+          httpEditorState.endpointOn
+            ? t("workflow.http.triggerLinkOnAction")
+            : t("workflow.http.triggerLinkOffAction")
+        }}
+      </OButton>
+    </div>
+
+    <!-- Kinds with commonMetaKeys (incidents) pick an event_type; with the endpoint on, every kind also offers the HTTP request. -->
+    <OSelect
+      v-if="showPicker"
+      v-model="selectedVariant"
+      :label="pickerLabel"
+      :options="pickerOptions"
+      class="mb-3"
+      data-test="workflow-trigger-sample-variant"
+    />
+
+    <!-- Renders the SAME text the Test dialog seeds, so reference and test input cannot drift. -->
+    <div
+      data-test="workflow-trigger-structure"
+      class="rounded-default border-border-default min-h-0 w-full flex-1 overflow-hidden border"
+    >
+      <QueryEditor
+        :key="selectedVariant"
+        editor-id="workflow-trigger-payload"
+        language="json"
+        :read-only="true"
+        :show-auto-complete="false"
+        :show-line-numbers="false"
+        :sticky-scroll="false"
+        :query="shownPayloadText"
+        class="h-full! w-full"
       />
-
-      <div
-        data-test="workflow-trigger-structure"
-        class="rounded-default border-border-default min-h-0 w-full flex-1 overflow-hidden border"
-      >
-        <QueryEditor
-          :key="selectedVariant"
-          editor-id="workflow-trigger-payload"
-          language="json"
-          :read-only="true"
-          :show-auto-complete="false"
-          :show-line-numbers="false"
-          :sticky-scroll="false"
-          :query="mergedPayloadText"
-          class="h-full! w-full"
-        />
-      </div>
-    </template>
-
-    <!-- SINGLE VIEW (alert): one read-only payload reference. Renders the SAME
-         text the Test dialog seeds, so reference and test input cannot drift. -->
-    <template v-else>
-      <div
-        data-test="workflow-trigger-structure"
-        class="rounded-default border-border-default min-h-0 w-full flex-1 overflow-hidden border"
-      >
-        <QueryEditor
-          editor-id="workflow-trigger-payload"
-          language="json"
-          :read-only="true"
-          :show-auto-complete="false"
-          :show-line-numbers="false"
-          :sticky-scroll="false"
-          :query="payloadText"
-          class="h-full! w-full"
-        />
-      </div>
-      <p v-if="noteKey" class="text-text-secondary mt-2 text-xs leading-normal">
-        {{ t(noteKey) }}
-      </p>
-    </template>
+    </div>
+    <p
+      v-if="noteKey && !isSplit && !showsHttp"
+      class="text-text-secondary mt-2 text-xs leading-normal"
+    >
+      {{ t(noteKey) }}
+    </p>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { computed, defineAsyncComponent, ref } from "vue";
+import { computed, defineAsyncComponent, ref, watch } from "vue";
+import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { workflowHooksEnabled } from "@/plugins/workflows/httpEndpoint";
+import { httpEditorState, httpPreviewSample } from "@/plugins/workflows/httpEndpointUi";
 import WorkflowConfigHeader from "./WorkflowConfigHeader.vue";
 import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
 import {
@@ -109,6 +122,8 @@ import {
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
 const { t } = useI18nTyped();
+const store = useStore();
+const emit = defineEmits<{ (e: "open-http-endpoint"): void }>();
 
 const savedData = workflowObj.currentSelectedNodeData?.data || {};
 const triggerKind = savedData.trigger_kind || DEFAULT_TRIGGER_KIND;
@@ -128,7 +143,27 @@ const variantOptions = variants.map((v) => ({
   label: v.labelKey ? t(v.labelKey) : raw(v.key),
   value: v.key,
 }));
-const selectedVariant = ref(variants[0]?.key ?? "");
+// Sentinels outside every kind's variant keys, so they never collide with an event_type.
+const KIND_VARIANT = "__kind__";
+const HTTP_VARIANT = "__http__";
+
+const hooksOn = computed(() => workflowHooksEnabled(store.state.zoConfig));
+const showHttpLink = computed(() => hooksOn.value && !workflowObj.readOnly);
+const offersHttp = computed(() => hooksOn.value && httpEditorState.endpointOn);
+
+const selectedVariant = ref(
+  offersHttp.value && httpEditorState.payloadFrom === "http"
+    ? HTTP_VARIANT
+    : (variants[0]?.key ?? KIND_VARIANT),
+);
+const showsHttp = computed(() => selectedVariant.value === HTTP_VARIANT);
+watch(selectedVariant, (v) => {
+  httpEditorState.payloadFrom = v === HTTP_VARIANT ? "http" : "trigger";
+});
+// The endpoint turning off takes the HTTP choice with it.
+watch(offersHttp, (on) => {
+  if (!on && showsHttp.value) selectedVariant.value = variants[0]?.key ?? KIND_VARIANT;
+});
 
 // Kinds with variant samples (e.g. incidents) render a picker + the selected
 // event's FULL payload (common + event-specific merged into one `meta`); the rest
@@ -144,6 +179,20 @@ const mergedPayloadText = computed(() => {
 
 // Combined single-payload text for non-split kinds (Alert Fired).
 const payloadText = computed(() => buildTriggerSampleText(triggerKind));
+
+const showPicker = computed(() => isSplit || offersHttp.value);
+const pickerLabel = computed(() =>
+  offersHttp.value ? t("workflow.http.payloadFrom") : t(variantLabelKey),
+);
+const pickerOptions = computed(() => {
+  const kindOptions = isSplit ? variantOptions : [{ label: t(def.labelKey), value: KIND_VARIANT }];
+  if (!offersHttp.value) return kindOptions;
+  return [...kindOptions, { label: t("workflow.http.payloadHttp"), value: HTTP_VARIANT }];
+});
+const shownPayloadText = computed(() => {
+  if (showsHttp.value) return JSON.stringify(httpPreviewSample(), null, 2);
+  return isSplit ? mergedPayloadText.value : payloadText.value;
+});
 
 // No editable fields — carry the trigger kind through (persisted in meta).
 const submit = () => ({ trigger_kind: triggerKind });
