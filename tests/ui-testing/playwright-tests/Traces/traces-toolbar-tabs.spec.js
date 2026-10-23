@@ -88,16 +88,19 @@ test.describe("Traces toolbar tabs (in-page)", () => {
     testLogger.info('Catalog tab restored from ?tab= after reload');
   });
 
-  test("P1: Rail flyout still navigates to the standalone Service Graph route", {
+  test("P1: Rail flyout reaches Service Graph through the in-page tab", {
     tag: ['@traces', '@tracesToolbarTabs', '@enterprise', '@P1', '@all']
   }, async ({ page }) => {
     testLogger.info('=== Opening rail flyout and clicking Service Graph ===');
 
     await pm.tracesPage.switchToServiceMaps();
 
-    // The flyout path IS the standalone route — proving the dual semantics coexist
-    expect(page.url()).toMatch(/\/traces\/service-graph/);
-    await pm.tracesPage.expectStandaloneServiceGraphPageVisible();
-    testLogger.info('Standalone Service Graph page rendered from flyout');
+    // #13852 rerouted the flyout through the Traces page's ?tab= views: the old
+    // /traces/service-graph path survives only as a legacy redirect, so the flyout
+    // lands on the in-page tab. Asserted against a live env, which answers
+    // /web/traces?org_identifier=...&tab=service-graph.
+    expect(page.url()).toMatch(/tab=service-graph/);
+    await pm.tracesPage.expectServiceGraphViewVisible();
+    testLogger.info('Service Graph in-page view rendered from the rail flyout');
   });
 });
