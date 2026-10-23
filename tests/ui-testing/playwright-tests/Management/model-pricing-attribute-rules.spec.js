@@ -11,6 +11,12 @@ const { apiListModels, apiCreateModel, apiDeleteModel } = require('../utils/mode
 test.describe("Model Pricing — Attribute Rules", () => {
     test.describe.configure({ mode: 'parallel' });
 
+    test.beforeEach(async ({ page }) => {
+        await navigateToBase(page);
+        const edition = await new PageManager(page).editionFeaturesPage.detectEdition();
+        test.skip(edition === 'opensource', `Model pricing is Enterprise/Cloud-only (detected: ${edition})`);
+    });
+
     test("Create a model with an attribute-rule tier, save persists it, and the drawer renders the rule", {
         tag: ['@model-pricing-attribute-rules', '@modelPricing', '@create', '@rules', '@P0', '@all'],
     }, async ({ page }, testInfo) => {
