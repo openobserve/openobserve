@@ -228,8 +228,10 @@ export function useWorkflowHttpEndpoint(args: UseWorkflowHttpEndpointArgs) {
     }
   };
 
-  const refresh = async () => {
-    await trigger.refetch();
+  /** Refetches the endpoint; false when the read failed (the last good data stays on screen). */
+  const refresh = async (): Promise<boolean> => {
+    const result = await trigger.refetch();
+    return !result.isError;
   };
 
   const revealCredential = async (credentialId: string) => {

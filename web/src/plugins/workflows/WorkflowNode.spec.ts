@@ -78,6 +78,7 @@ vi.mock("@/lib/overlay/Tooltip/OTooltip.vue", () => ({
 import WorkflowNode from "@/plugins/workflows/WorkflowNode.vue";
 import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { httpEditorState, resetHttpEditorState } from "@/plugins/workflows/httpEndpointUi";
 
 const TRIGGER = { id: "t1", data: { node_type: "workflow_trigger" } };
 const CONDITION = { id: "c1", data: { node_type: "condition" } };
@@ -1059,5 +1060,43 @@ describe("WorkflowNode", () => {
       await wrapper.find('[data-test="workflow-node-condition-test-rehearsal"]').trigger("click");
       expectNdvOpenedOn("c1");
     });
+  });
+});
+
+describe("WorkflowNode HTTP badge", () => {
+  beforeEach(() => {
+    setGraph([TRIGGER, CONDITION]);
+    workflowObj.readOnly = false;
+    // Earlier describes leave the step dialog open, which would mask a click that leaked to the node.
+    workflowObj.dialog.show = false;
+    resetHttpEditorState();
+  });
+  afterEach(() => {
+    resetHttpEditorState();
+    workflowObj.readOnly = false;
+  });
+
+  it("badge opens the panel", async () => {
+    httpEditorState.endpointOn = true;
+    const w = mountNode("t1", TRIGGER.data);
+    const badge = w.find('[data-test="workflow-trigger-http-badge"]');
+    expect(badge.text()).toContain(i18n.global.t("workflow.http.nodeBadge"));
+    await badge.trigger("click");
+    expect(httpEditorState.panelOpen).toBe(true);
+    expect(workflowObj.dialog.show).toBe(false);
+  });
+
+  it("hides the badge while the endpoint is off, on other steps and in the run view", async () => {
+    expect(
+      mountNode("t1", TRIGGER.data).find('[data-test="workflow-trigger-http-badge"]').exists(),
+    ).toBe(false);
+    httpEditorState.endpointOn = true;
+    expect(
+      mountNode("c1", CONDITION.data).find('[data-test="workflow-trigger-http-badge"]').exists(),
+    ).toBe(false);
+    workflowObj.readOnly = true;
+    expect(
+      mountNode("t1", TRIGGER.data).find('[data-test="workflow-trigger-http-badge"]').exists(),
+    ).toBe(false);
   });
 });
