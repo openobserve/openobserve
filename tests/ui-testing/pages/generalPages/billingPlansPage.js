@@ -9,6 +9,8 @@
 // assertions, keeping the spec a pure flow description.
 
 import { expect } from '@playwright/test';
+// Text anchors resolve from the app's own en-US strings, so a copy edit cannot break them.
+const billingStrings = require('../../../../web/src/locales/languages/en-US.json').billing;
 
 export class BillingPlansPage {
     constructor(page) {
@@ -52,10 +54,10 @@ export class BillingPlansPage {
         // ============================================================
         // Text-only anchors (no data-test per feature doc "NEEDS SELECTOR")
         // ============================================================
-        this.subscribedTag = page.getByText('Subscribed', { exact: true });
-        this.onDiscountTag = page.getByText('On discount', { exact: true });
-        this.aiCreditsLabel = page.getByText('AI credits', { exact: true });
-        this.pricingErrorText = page.getByText('Pricing details did not load.', { exact: true });
+        this.subscribedTag = page.getByText(billingStrings.subscribed, { exact: true });
+        this.onDiscountTag = page.getByText(billingStrings.discountTag, { exact: true });
+        this.aiCreditsLabel = page.getByText(billingStrings.aiCredits, { exact: true });
+        this.pricingErrorText = page.getByText(billingStrings.pricingErrorMessage, { exact: true });
     }
 
     // ----------------------------------------------------------------
