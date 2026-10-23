@@ -470,6 +470,23 @@ describe("PanelContainer", () => {
       expect(wrapper.attributes("data-kiosk-failed")).toBe("true");
     });
 
+    it("reduces a raw SQL parser error to one readable line", async () => {
+      wrapper = createWrapper({ kiosk: true });
+      await emitRendererError(
+        'Error# SQL error: ParserError("Expected: an SQL statement, found: SELEKT at Line: 1, Column: 1")\nstack line',
+      );
+
+      const summary = wrapper.find('[data-test="dashboard-panel-kiosk-error-summary"]');
+      expect(summary.text()).toBe(
+        "Query error: Expected: an SQL statement, found: SELEKT at Line: 1, Column: 1",
+      );
+      expect(summary.text()).not.toContain("ParserError");
+      expect(summary.text()).not.toContain("stack line");
+      // Wraps up to three lines in a narrow panel instead of cutting one line mid-word.
+      expect(summary.find(".line-clamp-3").exists()).toBe(true);
+      expect(summary.classes()).toContain("break-words");
+    });
+
     it("keeps today's tooltip-only error outside kiosk", async () => {
       wrapper = createWrapper();
       await emitRendererError({ message: "stream k8s_events not found", code: 404 });

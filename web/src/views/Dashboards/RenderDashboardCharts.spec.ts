@@ -1070,6 +1070,39 @@ describe("RenderDashboardCharts", () => {
       expect(wrapper.find(".render-dashboard-charts-container").classes()).toContain("pt-2");
     });
 
+    it("shows the one-row bar with its values in a playlist slide, but out of interaction", async () => {
+      wrapper = createWrapper({
+        showTabs: true,
+        kiosk: true,
+        viewOnly: true,
+        readOnlySelectors: true,
+        dashboardData: {
+          ...kioskDashboard(),
+          variables: { list: [{ name: "region", type: "constant", value: "eu" }] },
+        },
+      });
+      await flushPromises();
+      const row = wrapper.find('[data-test="dashboard-kiosk-controls"]');
+      expect(row.classes()).not.toContain("hidden");
+      expect(row.attributes("inert")).toBeDefined();
+      expect(row.attributes("data-read-only")).toBe("true");
+      expect(row.find('[data-test="global-variables-selector"]').exists()).toBe(true);
+    });
+
+    it("keeps the plain TV mode bar interactive", async () => {
+      wrapper = createWrapper({
+        kiosk: true,
+        dashboardData: {
+          ...kioskDashboard(),
+          variables: { list: [{ name: "region", type: "constant", value: "eu" }] },
+        },
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="dashboard-kiosk-controls"]').attributes("inert")).toBe(
+        undefined,
+      );
+    });
+
     it("scales the cell height so every row fits when fit is on", async () => {
       wrapper = createWrapper({ dashboardData: kioskDashboard(), kiosk: true, fitToScreen: true });
       await flushPromises();

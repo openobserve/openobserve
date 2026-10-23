@@ -53,6 +53,14 @@ describe("KioskStrip", () => {
     vi.useRealTimers();
   });
 
+  it("shows the playlist position only when the screen is a playlist slide", () => {
+    expect(
+      mountStrip({ level: "ok" }).find('[data-test="dashboard-kiosk-position"]').exists(),
+    ).toBe(false);
+    const slide = mountStrip({ level: "ok" }, { position: raw("2 of 5") });
+    expect(slide.find('[data-test="dashboard-kiosk-position"]').text()).toBe("2 of 5");
+  });
+
   it("shows the name on the left and the range, refresh and relative update time grouped right", () => {
     const wrapper = mountStrip({ level: "ok" });
     expect(wrapper.find('[data-test="dashboard-kiosk-title"]').text()).toBe("Kubernetes overview");

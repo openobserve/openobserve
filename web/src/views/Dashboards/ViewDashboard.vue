@@ -445,8 +445,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <KioskStrip
-          v-if="kioskMode"
+          v-if="kioskMode && !playlistEmbed"
           :title="currentDashboardData.data?.title"
+          :position="playlistPosition"
           :time-range-label="kioskTimeRange"
           :refresh-seconds="refreshInterval"
           :health="kioskHealth"
@@ -456,6 +457,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :countdown="kioskCountdown"
           @exit="exitKiosk"
         />
+        <div v-if="playlistHolding" class="fixed inset-0 z-50">
+          <PlaylistHoldingCard
+            :label="playlistHolding.label"
+            :title="playlistHolding.title"
+            :note="playlistHolding.note"
+          />
+        </div>
         <OBanner
           v-if="hasUnsavedConflict"
           variant="warning"
@@ -494,6 +502,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :initialVariableValues="initialVariableValues"
           :viewOnly="store.state.printMode || kioskMode"
           :kiosk="kioskMode"
+          :readOnlySelectors="playlistEmbed || playlistPageActive"
           :fitToScreen="kioskMode && kioskFit"
           :layoutMode="layoutMode"
           @layoutChange="onLayoutChange"
@@ -700,6 +709,18 @@ import {
   resolveKioskRefresh,
   stripKioskParams,
 } from "@/utils/dashboard/kiosk";
+import {
+  PLAYLIST_VIEW_PATH,
+  isPlaylistEmbed,
+  isPlaylistPage,
+  missingReasonFor,
+  parsePlaylistMisses,
+  parsePlaylistQuery,
+  pickPlaylistParams,
+  stripPlaylistParams,
+} from "@/utils/dashboard/playlist";
+import { usePlaylistFrame, usePlaylistPage } from "@/composables/dashboard/usePlaylistFrame";
+import PlaylistHoldingCard from "@/components/dashboards/kiosk/PlaylistHoldingCard.vue";
 import { pingBackend } from "@/services/health";
 import { raw } from "@/types/i18n";
 
@@ -742,6 +763,7 @@ export default defineComponent({
     ODialog,
     KioskStrip,
     KioskSetupPopover,
+    PlaylistHoldingCard,
   },
   setup() {
     const { t } = useI18nTyped();
@@ -761,6 +783,22 @@ export default defineComponent({
     const kioskMode = computed(() => store.state.kioskMode === true);
     const kioskFit = computed(() => isFitEnabled(route.query.fit));
     const { active: kioskPointerActive } = useIdleReveal(kioskMode);
+
+    // One slide of a TV playlist: inside the player's frame, or a full page when framing is blocked.
+    const playlistEmbed =
+      isKioskEnabled(route.query.kiosk) &&
+      isPlaylistEmbed(route.query) &&
+      typeof window !== "undefined" &&
+      window.parent !== window;
+    const playlistPageConfig =
+      isKioskEnabled(route.query.kiosk) && !playlistEmbed && isPlaylistPage(route.query)
+        ? parsePlaylistQuery(route.query)
+        : null;
+    // Filled in once the kiosk health exists; a playlist slide never falls back to the dashboard list.
+    const playlistReporters = {
+      missing: (_reason: "notFound" | "forbidden") => false,
+      error: () => false,
+    };
 
     const { showPositiveNotification, showErrorNotification } = useNotifications();
     const saveConflict = useDashboardSaveConflict();
@@ -1143,11 +1181,16 @@ export default defineComponent({
         );
 
         if (!dashboard || typeof dashboard !== "object" || !Object.keys(dashboard).length) {
+          if (playlistReporters.missing("notFound")) return;
           showErrorNotification(t("dashboard.viewDashboard.dashboardNotFound"));
           goBackToDashboardList();
           return;
         }
       } catch (error: any) {
+        const missingReason = missingReasonFor(error?.response?.status);
+        if (missingReason ? playlistReporters.missing(missingReason) : playlistReporters.error()) {
+          return;
+        }
         showErrorNotification(error?.message || t("dashboard.viewDashboard.failedToLoadDashboard"));
         goBackToDashboardList();
         return;
@@ -1799,6 +1842,65 @@ export default defineComponent({
     });
     provide(KIOSK_PANEL_HEALTH_KEY, kioskRefresh.registry);
 
+    const playlistFrame = usePlaylistFrame(playlistEmbed, {
+      title: computed(() => currentDashboardData.data?.title),
+      health: kioskRefresh.health,
+      failingCount: kioskRefresh.failingCount,
+      lastSuccessAt: kioskRefresh.lastSuccessAt,
+    });
+    const playlistPage = usePlaylistPage({
+      enabled: !!playlistPageConfig,
+      config: playlistPageConfig,
+      misses: parsePlaylistMisses(route.query),
+      ready: computed(
+        () =>
+          kioskRefresh.lastSuccessAt.value !== null || kioskRefresh.health.value.level === "bad",
+      ),
+      outage: computed(() => kioskRefresh.health.value.level === "bad"),
+      resolveHref: (query) =>
+        window.location.origin + router.resolve({ path: PLAYLIST_VIEW_PATH, query }).href,
+    });
+    playlistReporters.missing = (reason) => {
+      if (!playlistEmbed) return playlistPage.reportMissing(reason);
+      playlistFrame.reportMissing(reason);
+      return true;
+    };
+    playlistReporters.error = () => {
+      if (!playlistEmbed) return playlistPage.reportError();
+      playlistFrame.reportError();
+      return true;
+    };
+    const playlistPosition = computed(() =>
+      playlistPage.active
+        ? t("dashboard.playlist.position", {
+            current: playlistPage.position.value.index + 1,
+            total: playlistPage.position.value.count,
+          })
+        : null,
+    );
+    const playlistHolding = computed(() => {
+      if (!playlistPage.active) return null;
+      const { index, count } = playlistPage.position.value;
+      const waiting =
+        playlistPage.missing.value !== null ||
+        playlistPage.leaving.value ||
+        (kioskRefresh.lastSuccessAt.value === null && kioskRefresh.health.value.level !== "bad");
+      if (!waiting) return null;
+      const name = currentDashboardData.data?.title
+        ? raw(currentDashboardData.data.title)
+        : t("dashboard.playlist.slideName", { number: index + 1 });
+      const missing = playlistPage.missing.value;
+      return {
+        label: t("dashboard.playlist.loadingSlide", { current: index + 1, total: count }),
+        title: currentDashboardData.data?.title ?? null,
+        note: missing
+          ? missing === "forbidden"
+            ? t("dashboard.playlist.skippedForbidden", { name })
+            : t("dashboard.playlist.skippedNotFound", { name })
+          : null,
+      };
+    });
+
     const onDataZoom = (event: any) => {
       const selectedDateObj = {
         start: new Date(event.start),
@@ -2049,7 +2151,9 @@ export default defineComponent({
           print: store.state.printMode,
           searchtype: route.query.searchtype,
           ...cellParams, // Keep cell-explorer deep link intact
-          ...(kioskMode.value ? pickKioskParams(route.query) : {}),
+          ...(kioskMode.value
+            ? { ...pickKioskParams(route.query), ...pickPlaylistParams(route.query) }
+            : {}),
         };
 
         // CRITICAL: Only update URL if query has actually changed
@@ -2265,7 +2369,7 @@ export default defineComponent({
     const exitKiosk = async () => {
       if (!kioskMode.value) return;
       leaveKioskState();
-      const query = stripKioskParams(route.query);
+      const query = stripPlaylistParams(stripKioskParams(route.query));
       if (refreshBeforeKiosk !== null) query.refresh = generateDurationLabel(refreshBeforeKiosk);
       await router.replace({ query });
       // Only after the replace: the interval watcher rewrites the URL and would otherwise race it.
@@ -2661,6 +2765,10 @@ export default defineComponent({
       kioskMode,
       kioskFit,
       kioskPointerActive,
+      playlistEmbed,
+      playlistPosition,
+      playlistHolding,
+      playlistPageActive: playlistPage.active,
       kioskHealth: kioskRefresh.health,
       kioskLastSuccessAt: kioskRefresh.lastSuccessAt,
       kioskCountdown: kioskRefresh.countdown,

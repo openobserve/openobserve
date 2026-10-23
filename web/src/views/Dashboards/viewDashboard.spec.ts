@@ -2404,7 +2404,7 @@ describe("ViewDashboard", () => {
             },
             RenderDashboardCharts: {
               name: "RenderDashboardCharts",
-              props: ["viewOnly", "kiosk", "fitToScreen", "showTabs"],
+              props: ["viewOnly", "kiosk", "fitToScreen", "showTabs", "readOnlySelectors"],
               setup() {
                 return { applyLive: inject<Ref<boolean> | null>("dashboardAutoRun", null) };
               },
@@ -2428,6 +2428,7 @@ describe("ViewDashboard", () => {
       const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
       expect(charts.props("viewOnly")).toBe(false);
       expect(charts.props("kiosk")).toBe(false);
+      expect(charts.props("readOnlySelectors")).toBe(false);
       expect(wrapper.findComponent({ name: "OPageLayout" }).props("headerClass")).toBe("shrink-0");
     });
 
@@ -2463,6 +2464,7 @@ describe("ViewDashboard", () => {
       const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
       expect(charts.props("viewOnly")).toBe(true);
       expect(charts.props("kiosk")).toBe(true);
+      expect(charts.props("readOnlySelectors")).toBe(false);
     });
 
     it("passes the strip its countdown and loading state and exits when it asks to", async () => {
@@ -2611,6 +2613,106 @@ describe("ViewDashboard", () => {
       routeLeaveGuards.at(-1)?.();
 
       expect(global.mockStoreDispatch).toHaveBeenCalledWith("setKioskMode", false);
+    });
+
+    describe("TV playlist slide", () => {
+      const realParent = window.parent;
+      const postMessage = vi.fn();
+
+      beforeEach(() => {
+        postMessage.mockClear();
+        global.mockShowErrorNotification.mockClear();
+        global.mockRouterPush.mockClear();
+        global.mockRouterBack.mockClear();
+        global.mockStoreState.kioskMode = true;
+      });
+
+      afterEach(() => {
+        Object.defineProperty(window, "parent", { value: realParent, configurable: true });
+      });
+
+      const insideFrame = () =>
+        Object.defineProperty(window, "parent", { value: { postMessage }, configurable: true });
+
+      it("inside the player frame hides the strip and reports a deleted dashboard instead of leaving for the list", async () => {
+        insideFrame();
+        Object.assign(mockExtraRouteQuery, { kiosk: "true", embed: "true" });
+        vi.mocked(getDashboard).mockRejectedValueOnce({ response: { status: 404 }, message: "x" });
+        await mountKiosk();
+
+        expect(wrapper.findComponent({ name: "KioskStrip" }).exists()).toBe(false);
+        expect(postMessage).toHaveBeenCalledWith(
+          { source: "o2-tv-playlist", type: "missing", reason: "notFound" },
+          window.location.origin,
+        );
+        expect(global.mockShowErrorNotification).not.toHaveBeenCalled();
+        expect(global.mockRouterPush).not.toHaveBeenCalled();
+        expect(global.mockRouterBack).not.toHaveBeenCalled();
+      });
+
+      it("inside the player frame shows the tabs and pickers read-only", async () => {
+        insideFrame();
+        Object.assign(mockExtraRouteQuery, { kiosk: "true", embed: "true" });
+        await mountKiosk();
+
+        const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
+        expect(charts.props("readOnlySelectors")).toBe(true);
+        expect(charts.props("kiosk")).toBe(true);
+      });
+
+      it("reports a server error as a load failure so the player retries it", async () => {
+        insideFrame();
+        Object.assign(mockExtraRouteQuery, { kiosk: "true", embed: "true" });
+        vi.mocked(getDashboard).mockRejectedValueOnce({ response: { status: 502 }, message: "x" });
+        await mountKiosk();
+
+        expect(postMessage).toHaveBeenCalledWith(
+          { source: "o2-tv-playlist", type: "error" },
+          window.location.origin,
+        );
+        expect(global.mockShowErrorNotification).not.toHaveBeenCalled();
+      });
+
+      it("a normal kiosk link still shows the error and goes back to the list", async () => {
+        Object.assign(mockExtraRouteQuery, { kiosk: "true", embed: "true" });
+        vi.mocked(getDashboard).mockRejectedValueOnce({
+          response: { status: 404 },
+          message: "gone",
+        });
+        await mountKiosk();
+
+        expect(wrapper.findComponent({ name: "KioskStrip" }).exists()).toBe(true);
+        expect(global.mockShowErrorNotification).toHaveBeenCalled();
+      });
+
+      it("the page fallback keeps the playlist in the URL rewrite and shows the slide position", async () => {
+        Object.assign(mockExtraRouteQuery, {
+          kiosk: "true",
+          refresh: "5m",
+          playlist: "test-dashboard-1:default,d2:ops",
+          interval: "1m",
+          slide: "1",
+          tvpage: "1",
+        });
+        await mountKiosk();
+
+        const rewrites = global.mockRouterReplace.mock.calls.map((call) => call[0]?.query);
+        expect(rewrites.length).toBeGreaterThan(0);
+        rewrites.forEach((query) =>
+          expect(query).toMatchObject({
+            playlist: "test-dashboard-1:default,d2:ops",
+            interval: "1m",
+            slide: "1",
+            tvpage: "1",
+          }),
+        );
+        expect(wrapper.findComponent({ name: "KioskStrip" }).props("position")).toBe(
+          "dashboard.playlist.position",
+        );
+        expect(
+          wrapper.findComponent({ name: "RenderDashboardCharts" }).props("readOnlySelectors"),
+        ).toBe(true);
+      });
     });
   });
 });

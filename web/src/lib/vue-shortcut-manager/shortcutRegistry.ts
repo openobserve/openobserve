@@ -118,6 +118,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
       "shortcuts.pages.dashboardsList",
       "shortcuts.pages.dashboards",
       "shortcuts.pages.dashboardsPanel",
+      "shortcuts.pages.dashboardTvPlaylist",
       "shortcuts.pages.panelEditor",
     ],
   },
@@ -353,6 +354,36 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         descriptionKey: "shortcuts.actions.dashboardFullscreen",
       },
       { id: "dashboardExport", key: "x", descriptionKey: "shortcuts.actions.dashboardExport" },
+    ],
+  },
+
+  // ── Dashboard TV playlist ────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.dashboardTvPlaylist",
+    scope: "dashboard-tv",
+    shortcuts: [
+      {
+        id: "dashboardPlaylistPrev",
+        key: "left",
+        display: "←",
+        descriptionKey: "shortcuts.actions.dashboardPlaylistPrev",
+      },
+      {
+        id: "dashboardPlaylistNext",
+        key: "right",
+        display: "→",
+        descriptionKey: "shortcuts.actions.dashboardPlaylistNext",
+      },
+      {
+        id: "dashboardPlaylistPause",
+        key: "space",
+        descriptionKey: "shortcuts.actions.dashboardPlaylistPause",
+      },
+      {
+        id: "dashboardPlaylistExit",
+        key: "escape",
+        descriptionKey: "shortcuts.actions.dashboardPlaylistExit",
+      },
     ],
   },
 

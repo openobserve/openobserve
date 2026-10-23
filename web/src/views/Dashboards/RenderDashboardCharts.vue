@@ -47,6 +47,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'hidden'
             : 'contents'
         "
+        :inert="readOnlySelectors || undefined"
+        :data-read-only="readOnlySelectors || undefined"
         data-test="dashboard-kiosk-controls"
       >
         <!-- Global variables sit above the tab bar: they apply dashboard-wide, not to the active tab. -->
@@ -289,6 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         :initialVariableValues="initialVariableValues"
                         class="panel-variables-margin mb-2"
+                        :inert="readOnlySelectors || undefined"
                         data-test="panel-variables-selector"
                       />
                     </div>
@@ -481,6 +484,11 @@ export default defineComponent({
     },
     /** Wall-screen display: shows failed panels loudly and turns off drilldown and context menus. */
     kiosk: {
+      type: Boolean,
+      default: false,
+    },
+    /** Shows the tab bar and variable pickers with their values but takes them out of interaction. */
+    readOnlySelectors: {
       type: Boolean,
       default: false,
     },

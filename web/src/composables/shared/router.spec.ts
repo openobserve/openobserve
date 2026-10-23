@@ -2163,6 +2163,48 @@ describe("useRoutes (router.ts)", () => {
       expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
     });
 
+    it("sends a playlist link on the dashboard view to the TV player", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      vi.mocked(routeGuard).mockClear();
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "viewDashboard");
+      const next = vi.fn();
+
+      route.beforeEnter(
+        { query: { org_identifier: "acme", playlist: "d1:f1,d2", interval: "2m", slide: "2" } },
+        {},
+        next,
+      );
+
+      expect(next).toHaveBeenCalledWith({
+        path: "/dashboards/tv",
+        query: { org_identifier: "acme", playlist: "d1:f1,d2:default", interval: "2m", slide: "2" },
+        replace: true,
+      });
+      expect(routeGuard).not.toHaveBeenCalled();
+    });
+
+    it("keeps the TV player's own page fallback on the dashboard view", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "viewDashboard");
+      const to = { query: { dashboard: "d1", playlist: "d1,d2", tvpage: "1", kiosk: "true" } };
+      const next = vi.fn();
+      route.beforeEnter(to, {}, next);
+      expect(routeGuard).toHaveBeenCalledWith(to, {}, next);
+    });
+
+    it("registers the TV playlist route behind the route guard", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "dashboardTvPlaylist");
+      expect(route.path).toBe("/dashboards/tv");
+      expect(route.meta.titleKey).toBe("routeTitles.dashboardTvPlaylist");
+      const next = vi.fn();
+      route.beforeEnter({}, {}, next);
+      expect(routeGuard).toHaveBeenCalledWith({}, {}, next);
+    });
+
     it("should call routeGuard for functionList route beforeEnter", async () => {
       const { routeGuard } = await import("@/utils/zincutils");
       const { homeChildRoutes } = useRoutes();
