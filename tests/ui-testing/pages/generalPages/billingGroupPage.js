@@ -1,6 +1,4 @@
-// Page Object for the Billing Group payer view and its remove action.
-// The remove flow mutates real multi-org membership, so tests mock the three reads
-// and the DELETE via page.route and navigate directly to /web/billings/billing_group.
+// Remove-flow tests mock the three reads and the DELETE via page.route: removal mutates real multi-org membership.
 import { expect } from '@playwright/test';
 const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 
