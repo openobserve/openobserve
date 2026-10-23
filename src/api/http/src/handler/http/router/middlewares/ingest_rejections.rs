@@ -102,7 +102,6 @@ fn rejected_org(method: &Method, path: &str, response: &Response) -> Option<Stri
     if !is_ingestion_write(method, relative) {
         return None;
     }
-    let relative = relative.strip_prefix("v2/").unwrap_or(relative);
     relative.split('/').next().map(str::to_string)
 }
 
@@ -439,5 +438,14 @@ mod tests {
         );
         assert_eq!(sink.kv.puts.load(Ordering::SeqCst), 2);
         assert_eq!(sink.kv.gets.load(Ordering::SeqCst), 2);
+    }
+
+    #[test]
+    fn test_a_v2_path_is_recorded_only_for_an_org_named_v2() {
+        let response = StatusCode::FORBIDDEN.into_response();
+        let org = |path| rejected_org(&Method::POST, path, &response);
+        assert_eq!(org("/v2/s/_json").as_deref(), Some("v2"));
+        assert_eq!(org("/v2/acme/folders/_json"), None);
+        assert_eq!(org("/acme/s/_json").as_deref(), Some("acme"));
     }
 }

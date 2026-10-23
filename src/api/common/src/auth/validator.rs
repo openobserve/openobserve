@@ -2168,9 +2168,20 @@ CN5lTowpVXP2OIiiNTGa75Fj
     async fn exercise_path_org_is_the_routed_org() {
         let pwd = "Complexpass#123";
         let member = "kv-member@example.com";
-        for org in ["kv", "api", "v2", "aws", "gcp"] {
+        for org in ["kv", "api", "aws", "gcp"] {
             let _ = organization::check_and_create_org_without_ofga(org).await;
         }
+        // `v2` is reserved for new orgs, so it is seeded as an org that predates the reservation.
+        let _ = infra::table::organizations::add(
+            "v2",
+            "v2",
+            config::meta::organization::OrganizationType::Custom,
+        )
+        .await;
+        assert!(
+            organization::get_org("v2").await.is_some(),
+            "org v2 is not seeded"
+        );
         seed_user_without_password_ext("kv", member, UserRole::Admin, pwd, "kv-member-tok").await;
         let credentials = base64::encode(&format!("{member}:{pwd}"));
         let basic = AuthExtractor::bypass(format!("Basic {credentials}"), String::new());

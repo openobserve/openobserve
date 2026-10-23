@@ -266,9 +266,9 @@ async fn routed_org_differs(parts: &mut Parts) -> bool {
     let Some((_, routed_org)) = params.iter().find(|(name, _)| *name == "org_id") else {
         return false;
     };
-    // The nest strip drops an empty `{org_id}` segment from the URI: nothing to compare.
+    // The nest strip drops an empty `{org_id}` segment from the URI, so auth checks the next one.
     if routed_org.is_empty() {
-        return false;
+        return true;
     }
     let path_columns: Vec<&str> = routed_path(parts.uri.path()).split('/').collect();
     // The router hands over the decoded param, so compare it with the decoded segment.
@@ -487,6 +487,19 @@ fn audited_path(uri: &Uri) -> String {
     path.strip_prefix('/').unwrap_or(path).to_string()
 }
 
+#[cfg(any(feature = "enterprise", test))]
+fn audit_org_and_next<'a>(path_columns: &[&'a str]) -> (&'a str, &'a str) {
+    let org = org_from_path(path_columns);
+    // Pointer equality finds the org's own slot even when an earlier segment has the same text.
+    let next = path_columns
+        .iter()
+        .position(|column| std::ptr::eq(*column, org))
+        .and_then(|at| path_columns.get(at + 1))
+        .copied()
+        .unwrap_or("");
+    (org, next)
+}
+
 /// A delegated `/ai/chat` is audited like a Slack `chat_stream` turn: no question text.
 #[cfg(feature = "enterprise")]
 fn delegated_chat_audit_body(
@@ -607,23 +620,18 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
         &path
     };
 
+    let (audit_org, after_org) = audit_org_and_next(&path_columns);
+
     if get_o2_config().common.audit_enabled
-        && !(path_columns
-            .get(1)
-            .unwrap_or(&"")
-            .to_string()
-            .ends_with("_stream")
+        && !(after_org.ends_with("_stream")
             || path.ends_with("ai/chat_stream")
             || common::meta::ingestion_routes::is_ingestion_write(&http_method, ingestion_path))
     {
         let query_params = request.uri().query().unwrap_or("").to_string();
-        let org_id = {
-            let org = path_columns.first().unwrap_or(&"");
-            if org.eq(&"organizations") {
-                "".to_string()
-            } else {
-                org.to_string()
-            }
+        let org_id = if audit_org == "organizations" {
+            String::new()
+        } else {
+            audit_org.to_string()
         };
 
         let user_email = request
@@ -3101,12 +3109,27 @@ mod tests {
                 .layer(middleware::from_fn(guard)),
         );
         for (uri, expected) in [
-            ("/api//kv/note", StatusCode::OK),
+            ("/api//kv/note", StatusCode::FORBIDDEN),
             ("/api/acme/kv/note", StatusCode::OK),
         ] {
             let request = Request::get(uri).body(Body::empty()).unwrap();
             let status = nested.clone().oneshot(request).await.unwrap().status();
             assert_eq!(status, expected, "{uri}");
+        }
+    }
+
+    #[test]
+    fn a_v2_request_is_audited_under_the_org_it_serves() {
+        for (path, org, next) in [
+            ("v2/acme/alerts/a1", "acme", "alerts"),
+            ("v2/v2/folders/alerts", "v2", "folders"),
+            ("v2/acme/_search_stream", "v2", "acme"),
+            ("acme/_search_stream", "acme", "_search_stream"),
+            ("organizations", "organizations", ""),
+            ("", "", ""),
+        ] {
+            let columns: Vec<&str> = path.split('/').collect();
+            assert_eq!(audit_org_and_next(&columns), (org, next), "{path}");
         }
     }
 

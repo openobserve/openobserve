@@ -61,6 +61,8 @@ use crate::{
 };
 
 const MASKED_TOKEN: &str = "NOT_AVAILABLE";
+// API version prefixes: an org with one of these ids makes `/api/v2/...` paths ambiguous.
+const RESERVED_ORG_IDS: [&str; 3] = ["v1", "v2", "v3"];
 
 /// Checks if a service account token should be masked
 /// Returns true if:
@@ -753,6 +755,14 @@ fn validate_auto_created_org_id(org_id: &str) -> Result<(), anyhow::Error> {
     {
         return Err(anyhow::anyhow!(
             "Organization identifier can only contain alphanumeric characters (A-Z, a-z, 0-9), hyphens, and underscores"
+        ));
+    }
+    if RESERVED_ORG_IDS
+        .iter()
+        .any(|reserved| org_id.eq_ignore_ascii_case(reserved))
+    {
+        return Err(anyhow::anyhow!(
+            "Organization identifier {org_id} is reserved"
         ));
     }
     Ok(())
@@ -1523,7 +1533,16 @@ mod tests {
 
     #[test]
     fn test_validate_auto_created_org_id_accepts_identifiers() {
-        for org_id in ["default", "_meta", "acme-corp", "team_1", "Org2"] {
+        for org_id in [
+            "default",
+            "_meta",
+            "acme-corp",
+            "team_1",
+            "Org2",
+            "v4",
+            "v2org",
+            "api_v2",
+        ] {
             assert!(
                 validate_auto_created_org_id(org_id).is_ok(),
                 "expected {org_id} to be accepted"
@@ -1540,6 +1559,14 @@ mod tests {
                 validate_auto_created_org_id(org_id).is_err(),
                 "expected {org_id:?} to be rejected"
             );
+        }
+    }
+
+    #[test]
+    fn test_validate_auto_created_org_id_rejects_api_version_prefixes() {
+        for org_id in ["v1", "v2", "v3", "V2"] {
+            let err = validate_auto_created_org_id(org_id).unwrap_err();
+            assert!(err.to_string().contains("reserved"), "{org_id}: {err}");
         }
     }
 }
