@@ -1235,7 +1235,7 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockSearchObj.data.editorValue).toBe("(service_name = 'a') and http_method = 'GET'");
       const runs = vi
         .mocked(analytics.track)
-        .mock.calls.filter(([, props]: any[]) => props?.button === "Search Data");
+        .mock.calls.filter(([event]: any[]) => event === "traces_search_run");
       expect(runs).toHaveLength(1);
       expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
     });
@@ -1915,9 +1915,7 @@ describe("Index.vue (Main Traces Page)", () => {
       const searchDataRuns = () =>
         vi
           .mocked(analytics.track)
-          .mock.calls.filter(
-            ([event, props]: any[]) => event === "Button Click" && props?.button === "Search Data",
-          ).length;
+          .mock.calls.filter(([event]: any[]) => event === "traces_search_run").length;
 
       beforeEach(() => {
         mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
@@ -2214,6 +2212,49 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
+    });
+
+    it("tracks traces_search_run and traces_more_rows_loaded without user or page fields", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+      mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      mockSearchObj.meta.showQuery = true;
+      mockSearchObj.meta.showHistogram = false;
+      mockSearchObj.meta.sqlMode = false;
+      mockSearchObj.meta.showFields = true;
+      vi.mocked(analytics.track).mockClear();
+
+      wrapper.vm.searchData();
+      await wrapper.vm.getMoreData();
+      await flushPromises();
+
+      expect(analytics.track).toHaveBeenCalledWith("traces_search_run", {
+        stream_name: "default",
+        show_query: true,
+        show_histogram: false,
+        sql_mode: false,
+        show_fields: true,
+      });
+      expect(analytics.track).toHaveBeenCalledWith("traces_more_rows_loaded", {
+        stream_name: "default",
+      });
+      expect(analytics.track).not.toHaveBeenCalledWith("Button Click", expect.anything());
     });
   });
 
