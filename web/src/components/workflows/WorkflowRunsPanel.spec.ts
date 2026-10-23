@@ -21,7 +21,8 @@
 
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 
-const { mockList, mockToast, mockRetry, mockGetHttp } = vi.hoisted(() => ({
+const { mockList, mockToast, mockRetry, mockGetHttp, mockAlerts } = vi.hoisted(() => ({
+  mockAlerts: vi.fn().mockResolvedValue({ data: { list: [] } }),
   mockList: vi.fn().mockResolvedValue({ data: [] }),
   mockToast: vi.fn(),
   mockRetry: vi.fn().mockResolvedValue({ data: {} }),
@@ -36,6 +37,12 @@ vi.mock("@/services/workflows", async (importOriginal) => {
       retryWorkflow: (...a: any[]) => mockRetry(...a),
       getHttpTrigger: (...a: any[]) => mockGetHttp(...a),
     },
+  });
+});
+vi.mock("@/services/alerts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { listByFolderId: (...a: any[]) => mockAlerts(...a) },
   });
 });
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
@@ -110,16 +117,12 @@ const globalCfg = {
     OTag: {
       name: "OTag",
       props: ["type", "value", "size", "label", "variant", "icon"],
-      template: `<b class="o-tag">{{ value }}</b>`,
+      template: `<b class="o-tag">{{ label || value }}</b>`,
     },
     OButton: stub("OButton", ["variant", "size", "iconLeft", "loading"]),
     OTooltip: stub("OTooltip", ["side", "content"]),
     DateTime: DateTimeStub,
-    WorkflowExecutionTimeline: stub("WorkflowExecutionTimeline", [
-      "history",
-      "firingLabel",
-      "okLabel",
-    ]),
+    WorkflowRunsTimeline: stub("WorkflowRunsTimeline", ["runs", "start", "end", "timezone"]),
     NoData: stub("NoData"),
     OEmptyState: stub("OEmptyState", ["preset", "filtered"]),
   },
@@ -665,13 +668,7 @@ describe("WorkflowRunsPanel — test-run visibility defaults by draft state", ()
   });
 });
 
-// The panel is a fixed 27.5rem (440px) master-detail column, so the column widths
-// are a hard budget, not a preference: every pixel over the container pushes a
-// column off-screen where no horizontal scrollbar reaches it.
-describe("WorkflowRunsPanel — column layout fits the 27.5rem panel", () => {
-  const PANEL_WIDTH = 440;
-  const INDEX_COL = 56;
-
+describe("WorkflowRunsPanel — one fixed column set", () => {
   const colsOf = (w: any) => w.findComponent(OTableStub as any).props("columns") as any[];
   const byId = (w: any, id: string) => colsOf(w).find((c) => c.id === id);
 
@@ -692,50 +689,39 @@ describe("WorkflowRunsPanel — column layout fits the 27.5rem panel", () => {
     };
   });
 
-  // Defect 2/3: the declared widths summed to 918px in a 440px panel, so Duration,
-  // Started and Ended were pushed out of view entirely.
-  it("declares a total width that fits the panel", async () => {
+  it("declares Started, Status, Run, Trigger, Source details, Duration and Actions at their sizes", async () => {
     const w = await mountCols();
-    const total = colsOf(w).reduce((sum, c) => sum + (c.size ?? 0), INDEX_COL);
-    expect(total).toBeLessThanOrEqual(PANEL_WIDTH);
+    expect(colsOf(w).map((c) => [c.id, c.size])).toEqual([
+      ["start_time", 112],
+      ["status", 92],
+      ["run_id", 88],
+      ["trigger", 124],
+      ["details", 210],
+      ["duration", 84],
+      ["actions", 68],
+    ]);
   });
 
-  // Defect 3: a run history is scanned as "when did it run, how long, did it pass".
-  it("leads with the columns a run history is scanned by", async () => {
+  it("pins actions last and budgets two icon slots", async () => {
     const w = await mountCols();
-    const order = colsOf(w).map((c) => c.id);
-    expect(order.slice(0, 3)).toEqual(["start_time", "duration", "status"]);
-  });
-
-  // Defect 3: `actions` is pinned right, so declaring it between start_time and
-  // end_time made the source order lie about the rendered order.
-  it("declares the pinned actions column last", async () => {
-    const w = await mountCols();
-    const order = colsOf(w).map((c) => c.id);
-    expect(order[order.length - 1]).toBe("actions");
     expect(byId(w, "actions").pinned).toBe("right");
+    expect(byId(w, "actions").meta.actionCount).toBe(2);
   });
 
-  // Defect 2: the Error column flexed to absorb every leftover pixel, so on a
-  // history with no failures the widest column carried nothing but em-dashes. The
-  // reason now rides on the Failed badge instead of holding a column open.
-  it("spends no column width on the error text", async () => {
+  it("spends no column width on the error text and shows no index column", async () => {
     const w = await mountCols();
     expect(byId(w, "error")).toBeUndefined();
-    expect(colsOf(w).some((c) => c.meta?.flex)).toBe(false);
+    expect(w.findComponent(OTableStub as any).props("showIndex")).toBeFalsy();
   });
 
-  // Defect 1: the status cell rendered the Success badge AND the "Test run" badge
-  // inside a column capped at 100px, clipping the second badge to a stray "T".
-  it("gives the test-run marker its own column instead of crowding status", async () => {
+  it("lets Source details absorb what the pinned actions floor leaves", async () => {
     const w = await mountCols();
-    expect(byId(w, "event_type")).toBeTruthy();
+    expect(byId(w, "details").meta).toMatchObject({ autoWidth: true, fillRemaining: true });
+    for (const c of colsOf(w).filter((c) => !["details", "actions"].includes(c.id)))
+      expect(c.maxSize).toBe(c.size);
   });
 });
 
-// Defect 1 (root cause): two badges cannot fit a 100px cell. The status cell must
-// render the outcome alone; the test/real distinction is load-bearing and moves to
-// its own column rather than being dropped.
 describe("WorkflowRunsPanel — test-run marker is legible", () => {
   const testRun = {
     run_id: "t-1",
@@ -773,12 +759,10 @@ describe("WorkflowRunsPanel — test-run marker is legible", () => {
             template: `<div class="o-table">
               <div v-for="r in data" :key="r.run_id" class="o-row">
                 <span class="c-status"><slot name="cell-status" :row="r" /></span>
-                <span class="c-type"><slot name="cell-event_type" :row="r" /></span>
+                <span class="c-trigger"><slot name="cell-trigger" :row="r" /></span>
               </div>
             </div>`,
           },
-          OBadge: { name: "OBadge", props: ["variant", "size"], template: `<b><slot /></b>` },
-          // The shared stub drops its slot, which would hide the marker it wraps.
           OTooltip: {
             name: "OTooltip",
             props: ["side", "content", "maxWidth"],
@@ -796,9 +780,10 @@ describe("WorkflowRunsPanel — test-run marker is legible", () => {
     expect(w.find(".c-status").text()).not.toContain("Test run");
   });
 
-  it("renders the test-run marker in its own cell", async () => {
+  it("names the test run in its Trigger badge", async () => {
     const w = await mountRows();
-    expect(w.find(".c-type").text()).toContain("Test");
+    expect(w.find(".c-trigger").text()).toContain("Test run");
+    expect(w.find('[data-test="workflow-run-test-marker"]').exists()).toBe(true);
   });
 });
 
@@ -859,6 +844,15 @@ describe("WorkflowRunsPanel — a failure still explains itself", () => {
 
 // ── Stored statuses and HTTP request runs (AC-WEB-06, AC-UI-10) ────────────────
 describe("WorkflowRunsPanel — stored statuses and HTTP request runs", () => {
+  const COLUMN_IDS = [
+    "start_time",
+    "status",
+    "run_id",
+    "trigger",
+    "details",
+    "duration",
+    "actions",
+  ];
   const facts = (over: Record<string, any> = {}) => ({
     credential_prefix: "o2wh_4fK9…oI4k",
     caller_ip: "203.0.113.24",
@@ -916,7 +910,7 @@ describe("WorkflowRunsPanel — stored statuses and HTTP request runs", () => {
       <slot name="empty" v-if="!data || data.length === 0" />
       <div v-for="r in data" :key="r.run_id" class="o-row" :data-run="r.run_id">
         <span v-for="c in columns" :key="c.id" :class="'c-' + c.id">
-          <slot :name="'cell-' + c.id" :row="r" :value="r[c.accessorKey]" />
+          <slot :name="'cell-' + c.id" :row="r" :value="c.accessorFn ? c.accessorFn(r) : r[c.accessorKey]" />
         </span>
       </div>
     </div>`,
@@ -980,12 +974,15 @@ describe("WorkflowRunsPanel — stored statuses and HTTP request runs", () => {
     await flushPromises();
   };
   const filter = (w: any) => w.find('[data-test="workflow-runs-trigger-filter"]');
+  const timeline = (w: any) => w.findComponent({ name: "WorkflowRunsTimeline" });
 
   beforeEach(() => {
     mockList.mockClear();
     mockRetry.mockClear();
     mockGetHttp.mockReset();
     mockGetHttp.mockResolvedValue({ configured: false });
+    mockAlerts.mockReset();
+    mockAlerts.mockResolvedValue({ data: { list: [] } });
     (store.state as any).zoConfig.workflow_hooks_enabled = true;
     workflowObj.runsHistory = {
       list: [],
@@ -1029,27 +1026,45 @@ describe("WorkflowRunsPanel — stored statuses and HTTP request runs", () => {
       row({ run_id: "t-1", status: "failed", error: null }),
       row({ run_id: "t-2", status: "succeeded", error: "x" }),
       row({ run_id: "t-3", status: "queued", error: null }),
-      row({ run_id: "t-4", status: "running", error: null }),
       row({ run_id: "t-5", status: "expired", error: null }),
-      row({ run_id: "t-6", status: "failed", error: "worker_lost" }),
     ]);
-    const hist = w.findComponent({ name: "WorkflowExecutionTimeline" }).props("history") as {
-      status: string;
-    }[];
-    expect(hist.map((h) => h.status)).toEqual([
-      "error",
-      "success",
-      "pending",
-      "pending",
-      "skipped",
-      "error",
+    const runs = timeline(w).props("runs") as { id: string; status: string }[];
+    expect(runs.map((r) => [r.id, r.status])).toEqual([
+      ["t-1", "failed"],
+      ["t-2", "succeeded"],
+      ["t-3", "queued"],
+      ["t-5", "expired"],
     ]);
   });
 
-  it("hides the trigger filter on a workflow that never had an endpoint", async () => {
+  it("pins the timeline to the picked range and keeps it when a filter matches nothing", async () => {
+    mockGetHttp.mockResolvedValue({ configured: true, enabled: true });
+    const w = await mountHttp([
+      row({ run_id: "h-1", event_type: "Webhook", http_request: facts() }),
+    ]);
+    expect(timeline(w).props("start")).toBe(1000);
+    expect(timeline(w).props("end")).toBe(2000);
+    await setFilter(w, "alert_fired");
+    expect(rowIds(w)).toEqual([]);
+    expect(timeline(w).exists()).toBe(true);
+    expect(timeline(w).props("runs")).toEqual([
+      expect.objectContaining({ id: "h-1", matched: false }),
+    ]);
+  });
+
+  it("marks only the filtered rows as matched on the timeline", async () => {
+    const w = await mountHttp();
+    await setFilter(w, "http_request");
+    const runs = timeline(w).props("runs") as { id: string; matched: boolean }[];
+    expect(runs.filter((r) => r.matched).map((r) => r.id)).toEqual(rowIds(w));
+    expect(runs.find((r) => r.id === "alert-1")?.matched).toBe(false);
+  });
+
+  it("hides the trigger filter on a workflow that never had an endpoint, same columns", async () => {
     const w = await mountHttp([row({ run_id: "alert-1" })]);
     expect(filter(w).exists()).toBe(false);
-    expect(colIds(w)).toContain("event_type");
+    expect(w.find('[data-test="workflow-runs-search"]').exists()).toBe(false);
+    expect(colIds(w)).toEqual(COLUMN_IDS);
   });
 
   it("hides the trigger filter while hooks are off on the server", async () => {
@@ -1076,62 +1091,68 @@ describe("WorkflowRunsPanel — stored statuses and HTTP request runs", () => {
     expect(filter(w).exists()).toBe(true);
   });
 
-  it("names each run's source in words under All triggers", async () => {
+  it("names each run's trigger in words under All triggers", async () => {
     const w = await mountHttp();
-    expect(colIds(w)).toContain("source");
-    expect(colIds(w)).not.toContain("event_type");
-    expect(w.find('[data-run="0193f2c4-dddd"] .c-source').text()).toBe("HTTP request");
-    expect(w.find('[data-run="alert-1"] .c-source').text()).toBe("Alert fired");
+    expect(w.find('[data-run="0193f2c4-dddd"] .c-trigger').text()).toBe("HTTP request");
+    expect(w.find('[data-run="alert-1"] .c-trigger').text()).toBe("Alert fired");
+    expect(w.find('[data-run="retry-1"] .c-trigger').text()).toBe("Retry run");
   });
 
-  it("the HTTP filter swaps the columns and widens the panel", async () => {
+  it("keeps the identical column set under every filter", async () => {
     const w = await mountHttp();
-    await setFilter(w, "http_request");
-    expect(colIds(w)).toEqual([
-      "received",
-      "status",
-      "run_id",
-      "caller",
-      "idempotency_key",
-      "actions",
-    ]);
+    const sets: unknown[] = [];
+    for (const f of ["all", "alert_fired", "http_request"]) {
+      await setFilter(w, f);
+      sets.push(
+        (w.findComponent(CellTable as any).props("columns") as any[]).map((c) => [
+          c.id,
+          c.size,
+          c.maxSize,
+        ]),
+      );
+    }
+    expect(colIds(w)).toEqual(COLUMN_IDS);
+    expect(sets[1]).toEqual(sets[0]);
+    expect(sets[2]).toEqual(sets[0]);
     expect(w.emitted("update:triggerFilter")?.at(-1)).toEqual(["http_request"]);
     expect(rowIds(w)).not.toContain("alert-1");
     expect(rowIds(w)).not.toContain("retry-1");
   });
 
-  it("dates Started and Received like the mockups (Oct 21, 09:39)", async () => {
+  it("keeps the same table instance across filters", async () => {
     const w = await mountHttp();
-    const started = w
-      .find('[data-run="alert-1"] .c-start_time')
-      .findComponent({ name: "OTimeCell" });
-    expect(started.props("format")).toBe("MMM d, HH:mm");
+    const before = w.findComponent(CellTable as any).vm;
     await setFilter(w, "http_request");
-    const received = w
-      .find('[data-run="0193f2c4-dddd"] .c-received')
-      .findComponent({ name: "OTimeCell" });
-    expect(received.props("format")).toBe("MMM d, HH:mm");
+    expect(w.findComponent(CellTable as any).vm).toBe(before);
   });
 
-  // Measured in the built UI: a 32rem panel leaves the table 494 px, and OTable floors the actions column at 84.
-  it("names the source layout so the page can give it a 32rem panel its columns fit", async () => {
+  it("gives every filter option the same fixed width and no icon", async () => {
     const w = await mountHttp();
-    expect(w.emitted("layout")?.at(-1)).toEqual(["source"]);
-    const cols = w.findComponent(CellTable as any).props("columns") as any[];
-    const total = cols.reduce(
-      (sum, c) => sum + (c.id === "actions" ? Math.max(c.size, 84) : c.size),
-      0,
-    );
-    expect(total).toBeLessThanOrEqual(494);
-    const size = (id: string) => cols.find((c) => c.id === id).size;
-    // Content measured in the built UI: Started 90, Source 92, Running chip 68, Duration header and sort icon 72, plus 16-22 px padding.
-    expect(size("start_time")).toBeGreaterThanOrEqual(112);
-    expect(size("source")).toBeGreaterThanOrEqual(112);
-    expect(size("status")).toBeGreaterThanOrEqual(96);
-    // The Duration header with its sort icon, and a "14m 52s" value.
-    expect(size("duration")).toBeGreaterThanOrEqual(88);
-    await setFilter(w, "http_request");
-    expect(w.emitted("layout")?.at(-1)).toEqual(["http"]);
+    const items = w.findAllComponents(ToggleItemStub as any);
+    expect(items).toHaveLength(3);
+    for (const item of items) {
+      expect(item.classes()).toEqual(expect.arrayContaining(["w-28", "shrink-0"]));
+      expect(item.props("iconLeft")).toBeUndefined();
+    }
+  });
+
+  it("dates Started like the mockups and shows the received time for a queued HTTP run", async () => {
+    const w = await mountHttp([
+      row({ run_id: "alert-1", start_time: 5000 }),
+      row({
+        run_id: "q-1",
+        event_type: "Webhook",
+        status: "queued",
+        start_time: 0,
+        _timestamp: 7000,
+        http_request: facts({ status: "queued" }),
+      }),
+    ]);
+    const started = (id: string) =>
+      w.find(`[data-run="${id}"] .c-start_time`).findComponent({ name: "OTimeCell" });
+    expect(started("alert-1").props("format")).toBe("MMM d, HH:mm");
+    expect(started("alert-1").props("value")).toBe(5000);
+    expect(started("q-1").props("value")).toBe(7000);
   });
 
   it("a reason line wraps under its chip instead of cutting off", async () => {
@@ -1154,13 +1175,25 @@ describe("WorkflowRunsPanel — stored statuses and HTTP request runs", () => {
     expect(rowIds(w)).toEqual(["alert-1"]);
   });
 
-  it("shows the caller as the credential prefix over the caller IP, and — for a missing key", async () => {
-    const w = await mountHttp();
-    await setFilter(w, "http_request");
-    const caller = w.find('[data-run="0193f25e-bbbb"] .c-caller').text();
-    expect(caller).toContain("o2wh_4fK9…oI4k");
-    expect(caller).toContain("198.51.100.7");
-    expect(w.find('[data-run="0193f25e-bbbb"] .c-idempotency_key').text()).toBe("—");
+  it("source details: token prefix over IP and key, the alert name, the retried run, the user", async () => {
+    mockAlerts.mockResolvedValue({
+      data: { list: [{ alert_id: "al-1", name: "checkout_5xx_rate" }] },
+    });
+    const w = await mountHttp([
+      ...httpRows,
+      row({ run_id: "alert-2", source_id: "al-1" }),
+      row({ run_id: "alert-3", source_id: "al-gone" }),
+      row({ run_id: "retry-2", event_type: "Retry", source_id: "3L5y2KdQ-original" }),
+      row({ run_id: "manual-1", event_type: "Manual", source_id: "root@example.com" }),
+    ]);
+    const details = (id: string) => w.find(`[data-test="workflow-run-details-${id}"]`).text();
+    expect(details("0193f25e-bbbb")).toContain("o2wh_4fK9…oI4k");
+    expect(details("0193f25e-bbbb")).toContain("198.51.100.7 · no idempotency key");
+    expect(details("0193f2c4-dddd")).toContain("203.0.113.24 · key deploy-d-4821");
+    expect(details("alert-2")).toBe("checkout_5xx_rate");
+    expect(details("alert-3")).toBe("al-gone");
+    expect(details("retry-2")).toBe("Retry of 3L5y2KdQ");
+    expect(details("manual-1")).toBe("root@example.com");
     expect(w.find('[data-run="0193f2c4-dddd"] .c-run_id').text()).toContain("0193f2c4");
     expect(w.find('[data-run="0193f2c4-dddd"] .c-run_id').text()).not.toContain("dddd");
   });
@@ -1176,6 +1209,20 @@ describe("WorkflowRunsPanel — stored statuses and HTTP request runs", () => {
     expect(w.find('[data-test="workflow-run-reason-0193f2c4-dddd"]').exists()).toBe(false);
   });
 
+  it("every row has an open icon and keeps the retry slot reserved when it cannot retry", async () => {
+    const w = await mountHttp();
+    for (const id of rowIds(w)) {
+      const actions = w.find(`[data-run="${id}"] .c-actions`);
+      expect(actions.find(`[data-test="workflow-run-open-${id}"]`).exists()).toBe(true);
+      const slots =
+        actions.findAll(`[data-test="workflow-run-retry-${id}"]`).length +
+        actions.findAll('[data-test="workflow-run-retry-slot"]').length;
+      expect(slots).toBe(1);
+    }
+    await w.find('[data-test="workflow-run-open-alert-1"]').trigger("click");
+    expect(w.emitted("select-run")?.at(-1)).toEqual(["alert-1"]);
+  });
+
   it("retry is hidden for never-executed runs", async () => {
     const w = await mountHttp();
     expect(w.find('[data-test="workflow-run-retry-0193f25e-bbbb"]').exists()).toBe(false);
@@ -1184,18 +1231,42 @@ describe("WorkflowRunsPanel — stored statuses and HTTP request runs", () => {
     expect(w.find('[data-test="workflow-run-retry-0193f2c4-dddd"]').exists()).toBe(true);
   });
 
-  it("search under the HTTP filter matches a run id prefix or an idempotency key", async () => {
-    const w = await mountHttp();
-    expect(w.find('[data-test="workflow-runs-search"]').exists()).toBe(false);
-    await setFilter(w, "http_request");
+  it("search shows under every filter and matches a run id prefix, key, token prefix or alert", async () => {
+    mockAlerts.mockResolvedValue({
+      data: { list: [{ alert_id: "al-1", name: "checkout_5xx_rate" }] },
+    });
+    const w = await mountHttp([...httpRows, row({ run_id: "alert-2", source_id: "al-1" })]);
     const search = w.findComponent(SearchStub as any);
     expect(search.attributes("data-test")).toBe("workflow-runs-search");
+    expect(search.props("placeholder")).toBe("Search run ID, idempotency key or alert");
+    search.vm.$emit("update:modelValue", "5XX");
+    await flushPromises();
+    expect(rowIds(w)).toEqual(["alert-2"]);
+    search.vm.$emit("update:modelValue", "4fK9");
+    await flushPromises();
+    expect(rowIds(w)).toHaveLength(4);
+    await setFilter(w, "http_request");
+    expect(w.findComponent(SearchStub as any).exists()).toBe(true);
     search.vm.$emit("update:modelValue", "DEPLOY-D-4825");
     await flushPromises();
     expect(rowIds(w)).toEqual(["0193f2e8-aaaa"]);
     search.vm.$emit("update:modelValue", "0193f2c4");
     await flushPromises();
     expect(rowIds(w)).toEqual(["0193f2c4-dddd"]);
+  });
+
+  it("prioritizes search empty and clears search without resetting the trigger filter", async () => {
+    const w = await mountHttp(httpRows);
+    await setFilter(w, "http_request");
+    w.findComponent(SearchStub).vm.$emit("update:modelValue", "no-such-run");
+    await flushPromises();
+    const empty = w.findComponent(EmptyStub);
+    expect(empty.attributes("data-test")).toBe("workflow-runs-search-empty");
+    empty.vm.$emit("action");
+    await flushPromises();
+    expect(w.findComponent(SearchStub).props("modelValue")).toBe("");
+    expect(rowIds(w).length).toBeGreaterThan(0);
+    expect(w.emitted("update:triggerFilter")?.at(-1)).toEqual(["http_request"]);
   });
 
   it("an empty HTTP filter says so and offers all triggers back", async () => {
@@ -1212,25 +1283,13 @@ describe("WorkflowRunsPanel — stored statuses and HTTP request runs", () => {
     expect(rowIds(w)).toEqual(["alert-1"]);
   });
 
-  // OTable reads show-index once at setup, so a layout change has to remount it.
-  it("remounts the table when the column set changes", async () => {
-    const w = await mountHttp();
-    const before = w.findComponent(CellTable as any).vm;
-    await setFilter(w, "http_request");
-    expect(w.findComponent(CellTable as any).vm).not.toBe(before);
-  });
-
-  it("the Source and HTTP column sets fit their panel widths", async () => {
-    const w = await mountHttp();
-    const total = () =>
-      (w.findComponent(CellTable as any).props("columns") as any[]).reduce(
-        (sum, c) => sum + (c.size ?? 0),
-        0,
-      );
-    expect(w.findComponent(CellTable as any).props("showIndex")).toBe(false);
-    // The panel inner width is its rem width minus p-2 padding and the 1px border.
-    expect(total()).toBeLessThanOrEqual(494);
-    await setFilter(w, "http_request");
-    expect(total()).toBeLessThanOrEqual(716);
+  it("an empty alert filter names it, says the rest are dimmed and offers all triggers", async () => {
+    const w = await mountHttp(httpRows.filter((r) => r.event_type === "Webhook"));
+    await setFilter(w, "alert_fired");
+    const empty = w.findComponent(EmptyStub as any);
+    expect(empty.attributes("data-test")).toBe("workflow-runs-filter-empty");
+    expect(empty.props("title")).toBe("No alert-fired runs in this time range");
+    expect(empty.props("description")).toBe("The other runs are still on the timeline, dimmed.");
+    expect(empty.props("actionLabel")).toBe("Show all triggers");
   });
 });

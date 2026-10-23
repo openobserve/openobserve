@@ -14,6 +14,7 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 import OCodeBlock from "./OCodeBlock.vue";
+import hljs from "./highlighter";
 
 const stubs = {
   // Native button so the parent's @click falls through (no extra $emit('click')
@@ -33,6 +34,22 @@ describe("OCodeBlock", () => {
   beforeEach(() => {
     copyMock.mockReset();
     copyMock.mockResolvedValue(true);
+  });
+
+  it("bypasses cache reads and writes for sensitive code", async () => {
+    const highlight = vi.spyOn(hljs, "highlight");
+    const wrapper = mountBlock({ code: "echo cache-probe", lang: "bash" });
+    const initial = highlight.mock.calls.length;
+    await wrapper.setProps({ sensitive: true });
+    expect(highlight).toHaveBeenCalledTimes(initial + 1);
+    await wrapper.setProps({ code: "echo secret-probe" });
+    await wrapper.setProps({ code: "echo cache-probe" });
+    expect(highlight).toHaveBeenCalledTimes(initial + 3);
+    await wrapper.setProps({ sensitive: false, code: "echo secret-probe" });
+    expect(highlight).toHaveBeenCalledTimes(initial + 4);
+    await wrapper.setProps({ code: "echo cache-probe" });
+    expect(highlight).toHaveBeenCalledTimes(initial + 4);
+    highlight.mockRestore();
   });
 
   it("insets the code only when padded", () => {
