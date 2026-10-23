@@ -543,8 +543,11 @@ const props = defineProps({
   },
 });
 const emit = defineEmits(["get:destinations", "cancel:hideform"]);
-const apiMethods = ["get", "post", "put"];
-const outputFormats = ["json", "ndjson"];
+const apiMethods = ["get", "post", "put"].map((m) => ({ label: raw(m.toUpperCase()), value: m }));
+const outputFormats = ["json", "ndjson"].map((f) => ({
+  label: raw(f.toUpperCase()),
+  value: f,
+}));
 const store = useStore();
 const { t } = useI18nTyped();
 
