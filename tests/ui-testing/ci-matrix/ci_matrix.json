@@ -114,7 +114,8 @@
       "dashboard-refresh-without-cache.spec.js",
       "dashboard-print-layout.spec.js",
       "dashboard-layout-edit-mode.spec.js",
-      "dashboardPagination.spec.js"
+      "dashboardPagination.spec.js",
+      "dashboard-refresh-button.spec.js"
     ],
     "disabled": [
       {
@@ -363,7 +364,8 @@
       "searchPatternsMultiStream.spec.js",
       "logsActionReasons.spec.js",
       "logsSearchCancelled.spec.js",
-      "logsToolbarPins.spec.js"
+      "logsToolbarPins.spec.js",
+      "logs-query-editor-keyboard.spec.js"
     ],
     "disabled": [
       {
