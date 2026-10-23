@@ -4990,6 +4990,8 @@
       "idleInConfig": "{stream} đã nhận dữ liệu. Quá trình kiểm tra bắt đầu khi bạn sao chép cấu hình.",
       "idleMatches": "Các stream khớp đã nhận dữ liệu. Quá trình kiểm tra bắt đầu khi bạn sao chép lệnh.",
       "idleMatchesConfig": "Các stream khớp đã nhận dữ liệu. Quá trình kiểm tra bắt đầu khi bạn sao chép cấu hình.",
+      "idleNew": "Quá trình kiểm tra bắt đầu khi bạn sao chép lệnh.",
+      "idleNewConfig": "Quá trình kiểm tra bắt đầu khi bạn sao chép cấu hình.",
       "checkNow": "Kiểm tra ngay",
       "receivedPill": "Đã nhận sự kiện đầu tiên",
       "receivedNewPill": "Đã nhận dữ liệu mới",
