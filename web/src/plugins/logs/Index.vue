@@ -808,16 +808,12 @@ export default defineComponent({
     searchData() {
       this.autoRun.engine.requestRun("run");
 
-      analytics.track("Button Click", {
-        button: "Search Data",
-        user_org: this.store.state.selectedOrganization.identifier,
-        user_id: this.store.state.userInfo.email,
+      analytics.track("logs_search_run", {
         stream_name: this.searchObj.data.stream.selectedStream.join(","),
         show_query: this.searchObj.meta.showQuery,
         show_histogram: this.searchObj.meta.showHistogram,
-        sqlMode: this.searchObj.meta.sqlMode,
-        showFields: this.searchObj.meta.showFields,
-        page: "Search Logs",
+        sql_mode: this.searchObj.meta.sqlMode,
+        show_fields: this.searchObj.meta.showFields,
       });
     },
     async getMoreDataRecordsPerPage() {
@@ -838,14 +834,6 @@ export default defineComponent({
           this.searchObj.data.queryResults.aggs = null;
           await this.getJobData(false);
         }
-
-        analytics.track("Button Click", {
-          button: "Get More Data",
-          user_org: this.store.state.selectedOrganization.identifier,
-          user_id: this.store.state.userInfo.email,
-          stream_name: this.searchObj.data.stream.selectedStream.join(","),
-          page: "Search Logs",
-        });
       }
     },
     async getMoreData() {
@@ -871,12 +859,8 @@ export default defineComponent({
           }
         }
 
-        analytics.track("Button Click", {
-          button: "Get More Data",
-          user_org: this.store.state.selectedOrganization.identifier,
-          user_id: this.store.state.userInfo.email,
+        analytics.track("logs_more_rows_loaded", {
           stream_name: this.searchObj.data.stream.selectedStream.join(","),
-          page: "Search Logs",
         });
       }
     },
@@ -901,7 +885,6 @@ export default defineComponent({
         analytics.track("Button Click", {
           button: "Get Less Data",
           user_org: this.store.state.selectedOrganization.identifier,
-          user_id: this.store.state.userInfo.email,
           stream_name: this.searchObj.data.stream.selectedStream.join(","),
           page: "Search Logs",
         });

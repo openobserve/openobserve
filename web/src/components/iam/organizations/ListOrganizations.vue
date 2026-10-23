@@ -434,7 +434,6 @@ export default defineComponent({
         analytics.track("Button Click", {
           button: button_txt,
           user_org: store.state.selectedOrganization.identifier,
-          user_id: store.state.userInfo.email,
           page: "Organizations",
         });
       }
@@ -466,7 +465,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: "Invite Member",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         page: "Organizations",
       });
     };
