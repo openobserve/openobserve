@@ -1,0 +1,9 @@
+{
+  "action": "append",
+  "target_spec": "tests/ui-testing/playwright-tests/Logs/logsToolbarPins.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Logs/logsToolbarPins.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "logsToolbarPins.spec.js already covers the primary pin flows (default histogram pin, unpin persistence, generic pin persistence, unknown-key drop, corrupt storage, cross-scope isolation, canonical order, width-driven collapse, syntax-guide-via-menu-title). The dev's own diff added the syntax-guide title test. The one WIRED behavior still unasserted is 'function editor never collapses at narrow width' (showPinnedFunctionEditor = isPinned('functionEditor') with no width budget, SearchBar.vue:2501/915-917), so one new test() in the existing spec closes that gap. No new file, so no ci_matrix registration."
+}

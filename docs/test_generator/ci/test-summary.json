@@ -1,0 +1,7 @@
+[
+  {
+    "title": "the function editor stays pinned and visible at every viewport width",
+    "action": "append",
+    "verifies": "the pinned function editor remains visible at every viewport width because it is exempt from the left-section width budget"
+  }
+]
