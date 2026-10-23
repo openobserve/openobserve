@@ -230,6 +230,7 @@ mod m20261017_000001_add_rca_run_progress_columns;
 mod m20261018_000001_create_rca_steering;
 mod m20261018_000001_create_slack_tables;
 mod m20261020_000001_create_eval_job_states_tables;
+mod m20261021_000001_status_pages_add_favicon_img;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -598,6 +599,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261016_000001_create_rca_runs::Migration),
             Box::new(m20261017_000001_add_rca_run_progress_columns::Migration),
             Box::new(m20261018_000001_create_rca_steering::Migration),
+            Box::new(m20261021_000001_status_pages_add_favicon_img::Migration),
         ]
     }
 }
@@ -672,6 +674,7 @@ mod tests {
         (113, "m20261016_000001_create_rca_runs"),
         (114, "m20261017_000001_add_rca_run_progress_columns"),
         (115, "m20261018_000001_create_rca_steering"),
+        (116, "m20261021_000001_status_pages_add_favicon_img"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
