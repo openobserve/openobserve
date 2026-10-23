@@ -2177,17 +2177,7 @@ fn search_routes_with(llm_eval: bool) -> Router {
         .route("/v2/{org_id}/alerts/{alert_id}/trigger", patch(alerts::trigger_alert))
         .route("/v2/{org_id}/alerts/{alert_id}/retrain", patch(alerts::retrain_alert))
 
-        // Database Monitoring — its own top-level module, not under /traces.
-        // The path segment must stay `db_monitoring` to match the OFGA resource
-        // these routes authorize against (`db_monitoring:{org}`, see o2_openfga
-        // ROUTE_PERMISSIONS).
-        //
-        // Every route below is registered in both builds; the build-type gate
-        // lives in the handlers, three of which (deadlocks/blocking/
-        // table_health) are dual-implemented and answer 403 on OSS. Registering
-        // them in the enterprise-gated block instead would 404 them, losing the
-        // distinction between "not licensed" and "no such endpoint". Runtime
-        // off-switch is ZO_DB_MONITORING_ENABLED.
+        // Both builds register these so OSS answers 403, not 404; OFGA keys on this path segment.
         .route("/{org_id}/db_monitoring/databases", get(db_monitoring::handler::get_dbm_databases))
         .route("/{org_id}/db_monitoring/queries", get(db_monitoring::handler::get_dbm_queries))
         .route("/{org_id}/db_monitoring/query/history", get(db_monitoring::handler::get_dbm_query_history))
@@ -2197,10 +2187,7 @@ fn search_routes_with(llm_eval: bool) -> Router {
         .route("/{org_id}/db_monitoring/deadlocks", get(db_monitoring::handler::get_dbm_deadlocks))
         .route("/{org_id}/db_monitoring/blocking", get(db_monitoring::handler::get_dbm_blocking))
         .route("/{org_id}/db_monitoring/activity", get(db_monitoring::handler::get_dbm_activity))
-        // `query/insights` returns the query-detail page's Logs-side pair in one
-        // round trip; `query/plans` and `query/server_metrics` are superseded by
-        // it (same sections, same envelopes) and stay registered for
-        // compatibility.
+        // plans and server_metrics are superseded by query/insights; kept for compatibility
         .route("/{org_id}/db_monitoring/query/insights", get(db_monitoring::handler::get_dbm_query_insights))
         .route("/{org_id}/db_monitoring/query/plans", get(db_monitoring::handler::get_dbm_query_plans))
         .route("/{org_id}/db_monitoring/query/server_metrics", get(db_monitoring::handler::get_dbm_query_server_metrics))
