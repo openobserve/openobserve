@@ -5,6 +5,7 @@
 //   Editor: /web/settings/model_pricing/edit?org_identifier={org}&id={id}
 
 import { expect } from '@playwright/test';
+const modelPricingStrings = require('../../../../web/src/locales/languages/en-US.json').modelPricing;
 
 // en-US trigger labels for each rule operator. The rule-op select renders a
 // Reka SelectTrigger (not the listbox PopoverTrigger), so the selected value is
@@ -346,6 +347,7 @@ export class ModelPricingPage {
         await valueInput.fill(String(valuePricePerMillion));
     }
 
+    /** Saves the editor and returns the saved model body; throws when no save request completes or it fails. */
     async clickSave() {
         // /llm/models/test and /llm/models/refresh-built-in share the prefix but are not saves, so match only the collection and item paths.
         const isSaveUrl = (url) => {
@@ -554,7 +556,7 @@ export class ModelPricingPage {
     }
 
     async expectRuleValuesInputHidden(tierIndex, ruleIndex) {
-        await expect(this.ruleValuesInput(tierIndex, ruleIndex)).not.toBeVisible({ timeout: 5000 });
+        await expect(this.ruleValuesInput(tierIndex, ruleIndex)).toHaveCount(0, { timeout: 5000 });
     }
 
     async expectTieWarningVisible() {
@@ -582,7 +584,10 @@ export class ModelPricingPage {
     /** Open the "+N more" pricing drawer for a model row and assert it is visible. */
     async openPricingDrawerForModel(name) {
         const row = this.listTable.locator(`tr:has-text("${name}")`);
-        const moreLink = row.locator('button, a, span').filter({ hasText: /\+\d+\s*more/i }).first();
+        const moreLink = row
+            .locator('button, a, span')
+            .filter({ hasText: new RegExp(`\\+\\d+\\s*${modelPricingStrings.overflowMore}`, 'i') })
+            .first();
         await expect(moreLink).toBeVisible({ timeout: 5000 });
         await moreLink.click();
         await expect(this.pricingDrawer).toBeVisible({ timeout: 10000 });

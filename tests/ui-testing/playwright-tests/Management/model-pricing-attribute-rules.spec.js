@@ -216,6 +216,8 @@ test.describe("Model Pricing — Attribute Rules", () => {
         // A presence operator on a usage. key is forbidden.
         await pm.modelPricingPage.fillRuleKeys(1, 0, 'usage.input');
         await pm.modelPricingPage.expectRuleOpError(1, 0);
+        await pm.modelPricingPage.saveBtn.click();
+        await pm.modelPricingPage.expectRuleOpError(1, 0);
         await pm.modelPricingPage.editorTitle.waitFor({ state: 'visible', timeout: 5000 });
 
         testLogger.info('Test completed successfully');

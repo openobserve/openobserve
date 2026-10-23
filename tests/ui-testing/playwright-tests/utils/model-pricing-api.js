@@ -1,18 +1,10 @@
-/**
- * Shared REST client for the /llm/models endpoints, used by the model-pricing
- * suites to seed and verify what the UI persists. Keeping the raw HTTP here —
- * and out of the specs — satisfies the Page Object Model rule that a spec only
- * describes the flow.
- */
+// REST client for /llm/models so the model-pricing specs keep raw HTTP out of the spec (POM rule).
 const http = require('http');
 const https = require('https');
 const nodeFetch = require('node-fetch');
 const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
 
-// node-fetch v2 keep-alive pooling + gzip decompression is the root cause of
-// "Premature close" / ECONNRESET flakiness in CI. Pick the agent by protocol so
-// both local (http://localhost) and cloud/alpha (https://) URLs work — an
-// http.Agent rejects https:// URLs.
+// No keep-alive/gzip (node-fetch v2 "Premature close" flake); the agent follows the protocol because http.Agent rejects https.
 const noKeepAliveHttpAgent = new http.Agent({ keepAlive: false });
 const noKeepAliveHttpsAgent = new https.Agent({ keepAlive: false });
 const selectAgent = (parsedURL) =>
@@ -27,6 +19,7 @@ function apiHeaders() {
     return getAuthHeaders();
 }
 
+/** Lists models; returns [] on any failure. */
 async function apiListModels() {
     try {
         const res = await fetch(apiBase(), { headers: apiHeaders() });
@@ -38,6 +31,7 @@ async function apiListModels() {
     }
 }
 
+/** Creates a model from `{ name, match_pattern, enabled, tiers: [{ name, condition, prices, rules?: [{ keys, op, values }] }] }`; returns null when the API rejects it. */
 async function apiCreateModel(body) {
     const res = await fetch(apiBase(), {
         method: 'POST',
@@ -48,6 +42,7 @@ async function apiCreateModel(body) {
     return res.json();
 }
 
+/** Deletes a model by id; returns false on any failure. */
 async function apiDeleteModel(id) {
     try {
         const res = await fetch(`${apiBase()}/${id}`, {
