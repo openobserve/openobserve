@@ -52,7 +52,7 @@ use crate::traces::service_graph::v4::{
 /// The summary stream written by this job. Declared as
 /// `StreamType::ServiceGraph` in the internal ingestion request (the stream
 /// NAME separates the data), read back as Logs — the exact mechanics of
-/// `_o2_service_graph` (design §5.3).
+/// `_agent_signals` (design §5.3).
 pub const O2_DB_STATS_STREAM: &str = "_o2_db_stats";
 
 /// Request size for each rollup search. A query returning exactly this many
