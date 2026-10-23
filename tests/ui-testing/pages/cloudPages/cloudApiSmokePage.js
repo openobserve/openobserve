@@ -8,6 +8,7 @@ const { ingestCustomData, waitForStreamListed } = require('../../playwright-test
 
 // Alpha blocks private and loopback hosts for destinations (SSRF guard).
 const WEBHOOK_URL = 'https://example.com/o2-cloud-api-smoke';
+const PANEL_ID = 'panel_1';
 
 class CloudApiSmokePage {
     constructor(page) {
@@ -67,12 +68,12 @@ class CloudApiSmokePage {
         return this.expectOk('GET', `api/${this.org}/alerts/destinations/${name}`);
     }
 
-    alertPayload(name, stream, destination) {
+    alertPayload(name, stream, destination, { realtime = false } = {}) {
         return {
             name,
             stream_type: 'logs',
             stream_name: stream,
-            is_real_time: false,
+            is_real_time: realtime,
             query_condition: {
                 type: 'custom',
                 conditions: { version: 2, conditions: { filterType: 'group', logicalOperator: 'AND', conditions: [] } },
@@ -80,8 +81,9 @@ class CloudApiSmokePage {
                 vrl_function: null, search_event_type: null, multi_time_range: [],
             },
             trigger_condition: {
-                period: 10, operator: '>=', threshold: 3, frequency: 10, cron: '',
+                period: 10, operator: '>=', threshold: 5, frequency: 10, cron: '',
                 frequency_type: 'minutes', silence: 10, timezone: 'UTC', align_time: true,
+                warning_threshold: 2, notify_on_warning: true,
             },
             destinations: [destination],
             context_attributes: { team: 'qa' },
@@ -90,6 +92,8 @@ class CloudApiSmokePage {
             description: 'cloud api smoke',
             priority: 2,
             tags: ['cloud-api-smoke'],
+            runbook_url: 'https://example.com/runbooks/cloud-api-smoke',
+            deduplication: { enabled: true, fingerprint_fields: ['level'], time_window_minutes: 30 },
             notify_on_recovery: true,
             recovery_destinations: [destination],
             pending_period_sec: 60,
@@ -111,12 +115,25 @@ class CloudApiSmokePage {
         await this.expectOk('PUT', `api/v2/${this.org}/alerts/${id}?folder=default`, payload);
     }
 
+    clearedAlert(stored) {
+        const { runbook_url: _runbook, deduplication: _dedup, ...rest } = stored;
+        return { ...rest, recovery_destinations: [], tags: [], context_attributes: {} };
+    }
+
     // ===== DASHBOARDS =====
 
     async createDashboard(title) {
         const created = await this.expectOk('POST', `api/${this.org}/dashboards?folder=default`, {
             version: 8, title, description: 'cloud api smoke',
-            tabs: [{ tabId: 'default', name: 'Default', panels: [] }],
+            tabs: [{
+                tabId: 'default', name: 'Default',
+                panels: [{
+                    id: PANEL_ID, type: 'bar', title: 'Smoke panel', description: '',
+                    config: { show_legends: true, legends_position: null, axis_border_show: false },
+                    queryType: 'sql', queries: [], layout: { x: 0, y: 0, w: 12, h: 6, i: 1 },
+                }],
+            }],
+            variables: { list: [{ type: 'constant', name: 'env', label: 'env', value: 'prod' }], showDynamicFilters: true },
         });
         const inner = created[`v${created.version}`] || created;
         const id = inner.dashboardId || inner.dashboard_id;
@@ -126,6 +143,52 @@ class CloudApiSmokePage {
 
     async getDashboard(id) {
         return this.expectOk('GET', `api/${this.org}/dashboards/${id}?folder=default`);
+    }
+
+    async addAnnotation(dashboardId, title, tags) {
+        const end = Date.now() * 1000;
+        const annotation = { title, text: 'cloud api smoke', panels: [PANEL_ID], start_time: end - 3_600_000_000, end_time: end, tags };
+        await this.expectOk('POST', `api/${this.org}/dashboards/${dashboardId}/annotations`, { timed_annotations: [annotation] });
+        return { start: annotation.start_time, end };
+    }
+
+    async findAnnotation(dashboardId, title, { start, end }) {
+        const query = `panels=${PANEL_ID}&start_time=${start - 3_600_000_000}&end_time=${end + 3_600_000_000}`;
+        const body = await this.expectOk('GET', `api/${this.org}/dashboards/${dashboardId}/annotations?${query}`);
+        const rows = Array.isArray(body) ? body : (body?.timed_annotations || body?.list || []);
+        return rows.find((r) => r.title === title);
+    }
+
+    // ===== SLOS =====
+
+    sloPayload(name, stream) {
+        return {
+            name,
+            description: 'cloud api smoke',
+            sli_type: 'count',
+            config: { source: { mode: 'single_query', query: { stream, stream_type: 'logs', good_expr: "level != 'error'" } } },
+            group_by: ['level'],
+            groups_estimate: 3,
+            window_secs: 604800,
+            slice_interval_secs: 300,
+            target: 99,
+            tags: ['cloud-api-smoke', 'tier:1'],
+            enabled: false,
+        };
+    }
+
+    async createSlo(payload) {
+        const created = await this.expectOk('POST', `api/${this.org}/slos`, payload);
+        expect(created?.id, 'SLO create must return its id').toBeTruthy();
+        return created.id;
+    }
+
+    async getSlo(id) {
+        return this.expectOk('GET', `api/${this.org}/slos/${id}`);
+    }
+
+    async updateSlo(id, payload) {
+        await this.expectOk('PUT', `api/${this.org}/slos/${id}`, payload);
     }
 
     // ===== FUNCTIONS =====
@@ -145,10 +208,14 @@ class CloudApiSmokePage {
 
     async createSavedView(name) {
         const created = await this.expectOk('POST', `api/${this.org}/savedviews`, {
-            view_name: name, data: { query: 'SELECT * FROM "smoke"', smoke: true },
+            view_name: name, data: this.savedViewData(),
         });
         expect(created?.view_id, 'saved view create must return its id').toBeTruthy();
         return created.view_id;
+    }
+
+    savedViewData() {
+        return { query: 'SELECT * FROM "smoke"', smoke: true, filters: [{ field: 'level', values: ['error', '警告'] }], nested: { depth: { ok: true } } };
     }
 
     async getSavedView(id) {
@@ -169,6 +236,9 @@ class CloudApiSmokePage {
             `api/${this.org}/savedviews`,
             `api/${this.org}/pipelines`,
             `api/${this.org}/streams`,
+            `api/${this.org}/slos`,
+            `api/v2/${this.org}/downtimes`,
+            `api/${this.org}/anomaly_detection`,
         ];
     }
 
@@ -183,13 +253,14 @@ class CloudApiSmokePage {
         }
     }
 
-    async cleanup({ alertId, destination, template, dashboardId, functionName, viewId }) {
-        if (alertId) await this.deleteLogged(`api/v2/${this.org}/alerts/${alertId}`);
+    async cleanup({ alertId, alertIds = [], destination, template, dashboardId, functionName, viewId, sloId }) {
+        for (const id of [alertId, ...alertIds].filter(Boolean)) await this.deleteLogged(`api/v2/${this.org}/alerts/${id}`);
         if (destination) await this.deleteLogged(`api/${this.org}/alerts/destinations/${destination}`);
         if (template) await this.deleteLogged(`api/${this.org}/alerts/templates/${template}`);
         if (dashboardId) await this.deleteLogged(`api/${this.org}/dashboards/${dashboardId}?folder=default`);
         if (functionName) await this.deleteLogged(`api/${this.org}/functions/${functionName}`);
         if (viewId) await this.deleteLogged(`api/${this.org}/savedviews/${viewId}`);
+        if (sloId) await this.deleteLogged(`api/${this.org}/slos/${sloId}`);
     }
 }
 
