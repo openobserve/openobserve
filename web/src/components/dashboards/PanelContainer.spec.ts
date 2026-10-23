@@ -2663,4 +2663,66 @@ describe("PanelContainer", () => {
       expect(wrapper.find('[data-test="errors-stub"]').text()).toBe("scan failed");
     });
   });
+
+  describe("annotation source failures", () => {
+    const rendererWithFailures = (failed: string[]) => ({
+      PanelSchemaRenderer: {
+        name: "PanelSchemaRenderer",
+        template: '<div data-test="panel-schema-renderer"></div>',
+        props: ["panelSchema", "selectedTimeObj", "width", "height"],
+        data: () => ({ noData: "", failedAnnotationSources: failed }),
+      },
+    });
+
+    it("shows a quiet indicator naming the failed source while the panel still renders", async () => {
+      wrapper = createWrapper({}, rendererWithFailures(["Incidents"]));
+      await flushPromises();
+      const indicator = wrapper.find('[data-test="dashboard-panel-annotation-source-error"]');
+      expect(indicator.exists()).toBe(true);
+      expect(indicator.attributes("aria-label")).toBe(
+        "Annotation source Incidents failed to load. Panel data is unaffected.",
+      );
+      expect(indicator.attributes("role")).toBe("img");
+      expect(indicator.attributes("aria-hidden")).toBeUndefined();
+      expect(wrapper.find('[data-test="panel-schema-renderer"]').exists()).toBe(true);
+    });
+
+    it("shows nothing when every source loaded", () => {
+      wrapper = createWrapper({}, rendererWithFailures([]));
+      expect(wrapper.find('[data-test="dashboard-panel-annotation-source-error"]').exists()).toBe(
+        false,
+      );
+    });
+  });
+
+  describe("annotation source truncation", () => {
+    const rendererWithTruncation = (truncated: string[]) => ({
+      PanelSchemaRenderer: {
+        name: "PanelSchemaRenderer",
+        template: '<div data-test="panel-schema-renderer"></div>',
+        props: ["panelSchema", "selectedTimeObj", "width", "height"],
+        data: () => ({ noData: "", truncatedAnnotationSources: truncated }),
+      },
+    });
+
+    it("shows a quiet indicator naming a source showing only its latest 500 markers", async () => {
+      wrapper = createWrapper({}, rendererWithTruncation(["Incidents"]));
+      await flushPromises();
+      const indicator = wrapper.find('[data-test="dashboard-panel-annotation-source-truncated"]');
+      expect(indicator.exists()).toBe(true);
+      expect(indicator.attributes("aria-label")).toBe(
+        "Annotation source Incidents is showing only the latest 500 markers in this range.",
+      );
+      expect(indicator.attributes("role")).toBe("img");
+      expect(indicator.attributes("aria-hidden")).toBeUndefined();
+      expect(wrapper.find('[data-test="panel-schema-renderer"]').exists()).toBe(true);
+    });
+
+    it("shows nothing when no source was truncated", () => {
+      wrapper = createWrapper({}, rendererWithTruncation([]));
+      expect(
+        wrapper.find('[data-test="dashboard-panel-annotation-source-truncated"]').exists(),
+      ).toBe(false);
+    });
+  });
 });
