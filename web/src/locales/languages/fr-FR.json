@@ -7812,6 +7812,8 @@
       "editForbidden": "Vous n'avez pas la permission de modifier les liens publics. Contactez un administrateur.",
       "saveBeforePublish": "Enregistrez les modifications du tableau de bord, puis publiez.",
       "publisherLeft": "L'éditeur a quitté l'organisation",
+      "urlHidden": "Aucun accès",
+      "urlHiddenHint": "Vous ne pouvez pas consulter le tableau de bord de ce lien : son URL publique est donc masquée.",
       "takeOver": "Prendre le relais",
       "takeOverTitle": "Prendre le relais sur ce lien ?",
       "takeOverBody": "Vous devenez l'éditeur. La page publique affichera ce que vous êtes autorisé à voir, ce qui peut être plus ou moins qu'avant. Toute personne disposant de l'URL y garde accès, et le lien est actif dès maintenant.",

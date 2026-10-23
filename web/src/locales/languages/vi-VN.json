@@ -7812,6 +7812,8 @@
       "editForbidden": "Bạn không có quyền chỉnh sửa liên kết công khai. Hãy liên hệ quản trị viên.",
       "saveBeforePublish": "Hãy lưu các thay đổi của bảng điều khiển, sau đó công bố.",
       "publisherLeft": "Người xuất bản đã rời tổ chức",
+      "urlHidden": "Không có quyền truy cập",
+      "urlHiddenHint": "Bạn không thể xem bảng điều khiển của liên kết này nên URL công khai của nó bị ẩn.",
       "takeOver": "Tiếp quản",
       "takeOverTitle": "Tiếp quản liên kết này?",
       "takeOverBody": "Bạn sẽ trở thành người xuất bản. Trang công khai sẽ hiển thị những gì bạn được phép xem, có thể nhiều hơn hoặc ít hơn trước đây. Ai có URL vẫn giữ quyền truy cập, và liên kết hoạt động ngay bây giờ.",

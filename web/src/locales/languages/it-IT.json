@@ -7812,6 +7812,8 @@
       "editForbidden": "Non hai l'autorizzazione per modificare i link pubblici. Rivolgiti a un amministratore.",
       "saveBeforePublish": "Salva le modifiche alla dashboard, poi pubblica.",
       "publisherLeft": "Chi ha pubblicato ha lasciato l'organizzazione",
+      "urlHidden": "Nessun accesso",
+      "urlHiddenHint": "Non puoi visualizzare la dashboard di questo link, quindi il suo URL pubblico è nascosto.",
       "takeOver": "Prendi in carico",
       "takeOverTitle": "Prendere in carico questo link?",
       "takeOverBody": "Diventi tu l'autore della pubblicazione. La pagina pubblica mostrerà ciò che sei autorizzato a vedere, che può essere più o meno di prima. Chi ha l'URL mantiene l'accesso e il link torna attivo subito.",

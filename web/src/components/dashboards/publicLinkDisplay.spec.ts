@@ -63,6 +63,10 @@ describe("publicLinkUrl", () => {
     window.history.replaceState(null, "", "/o2/web/dashboards");
     expect(publicLinkUrl(link)).toBe(`${window.location.origin}/o2/web/public/dashboards/abc`);
   });
+
+  it("has no URL for a link whose slug the server hid", () => {
+    expect(publicLinkUrl({ slug: null } as PublicLink)).toBeNull();
+  });
 });
 
 describe("publicLinkSearchTerm", () => {

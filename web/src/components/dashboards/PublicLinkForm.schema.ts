@@ -119,10 +119,13 @@ export function rangeError(
   return null;
 }
 
-/** `storedExpires` reads the edited link's own expiry date, which stays valid so an expired link can still be edited. */
+/**
+ * `today` is read at each validation, so a form left open past midnight stops accepting the old day.
+ * `storedExpires` reads the edited link's own expiry date, which stays valid so an expired link can still be edited.
+ */
 export const makePublicLinkSchema = (
   t: TranslateFn,
-  today: string,
+  today: () => string,
   storedExpires: () => string = () => "",
 ) =>
   z
@@ -139,7 +142,7 @@ export const makePublicLinkSchema = (
       expires: z
         .string()
         .refine(
-          (v) => v === "" || v >= today || v === storedExpires(),
+          (v) => v === "" || v >= today() || v === storedExpires(),
           t("dashboard.publicLinks.expiresInPast"),
         ),
     })

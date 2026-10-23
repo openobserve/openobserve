@@ -7812,6 +7812,8 @@
       "editForbidden": "Genel bağlantıları düzenleme izniniz yok. Bir yöneticiye danışın.",
       "saveBeforePublish": "Gösterge panosundaki değişiklikleri kaydedin, ardından yayımlayın.",
       "publisherLeft": "Yayınlayan kuruluştan ayrıldı",
+      "urlHidden": "Erişim yok",
+      "urlHiddenHint": "Bu bağlantının gösterge panosunu görüntüleyemediğiniz için genel URL'si gizlendi.",
       "takeOver": "Devral",
       "takeOverTitle": "Bu bağlantı devralınsın mı?",
       "takeOverBody": "Yayınlayan siz olursunuz. Genel sayfa, görmenize izin verilen içeriği gösterir; bu, öncekinden daha fazla ya da daha az olabilir. URL'ye sahip herkes erişimini korur ve bağlantı hemen etkinleşir.",

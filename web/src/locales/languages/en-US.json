@@ -7815,6 +7815,8 @@
       "editForbidden": "You don't have permission to edit public links. Ask an admin.",
       "saveBeforePublish": "Save your dashboard changes, then publish.",
       "publisherLeft": "Publisher left the org",
+      "urlHidden": "No access",
+      "urlHiddenHint": "You can't view this link's dashboard, so its public URL is hidden.",
       "takeOver": "Take over",
       "takeOverTitle": "Take over this link?",
       "takeOverBody": "You become the publisher. The public page will show what you are allowed to see, which may be more or less than before. Anyone who has the URL keeps access to it, and the link goes live now.",

@@ -2202,7 +2202,9 @@ export default defineComponent({
     }
 
     // Called directly by the search icon so it works even with a panel drilldown config.
+    // Off with drilldowns, so the anonymous public page never opens the logs drawer.
     async function exploreCellInLogs(alias: string, value: unknown, row: any) {
+      if (!allowDrilldown.value) return;
       const queries = props.panelSchema.queries ?? [];
       const qi = Number.isInteger(row?.__q) && queries[row.__q] ? row.__q : 0;
       const query = queries[qi];

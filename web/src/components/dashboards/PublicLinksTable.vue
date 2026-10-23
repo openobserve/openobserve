@@ -78,11 +78,25 @@
       </template>
 
       <template #cell-name="{ row }">
-        <span
-          class="text-text-body truncate text-sm"
-          :data-test="`dashboards-public-links-${row.id}-name`"
-        >
-          {{ row.name ? raw(row.name) : t("dashboard.publicLinks.untitled") }}
+        <span class="inline-flex min-w-0 items-center gap-1.5">
+          <span
+            class="text-text-body truncate text-sm"
+            :data-test="`dashboards-public-links-${row.id}-name`"
+          >
+            {{ row.name ? raw(row.name) : t("dashboard.publicLinks.untitled") }}
+          </span>
+          <!-- The server hides the URL of a link whose dashboard the viewer can't read. -->
+          <span v-if="!row.slug" class="inline-flex shrink-0">
+            <OBadge
+              variant="default-soft"
+              size="sm"
+              icon="lock"
+              :data-test="`dashboards-public-links-${row.id}-url-hidden`"
+            >
+              {{ t("dashboard.publicLinks.urlHidden") }}
+            </OBadge>
+            <OTooltip side="bottom" :content="t('dashboard.publicLinks.urlHiddenHint')" />
+          </span>
         </span>
       </template>
       <template #cell-dashboard="{ row }">
@@ -172,6 +186,7 @@
       <template #cell-actions="{ row }">
         <div class="flex items-center justify-end gap-0.5" @click.stop>
           <OButton
+            v-if="row.slug"
             variant="ghost"
             size="icon-sm"
             icon-left="content-copy"
@@ -183,6 +198,7 @@
             <OTooltip side="bottom" :content="t('dashboard.publicDashboard.copyLink')" />
           </OButton>
           <OButton
+            v-if="row.slug"
             variant="ghost"
             size="icon-sm"
             icon-left="open-in-new"
@@ -266,6 +282,7 @@
               />
             </template>
             <ODropdownItem
+              v-if="row.slug"
               icon-left="content-copy"
               class="md:hidden"
               :data-test="`dashboards-public-links-${row.id}-copy-menu`"
@@ -274,6 +291,7 @@
               {{ t("dashboard.publicDashboard.copyLink") }}
             </ODropdownItem>
             <ODropdownItem
+              v-if="row.slug"
               icon-left="open-in-new"
               class="md:hidden"
               :data-test="`dashboards-public-links-${row.id}-open-menu`"
@@ -642,13 +660,16 @@ function onEmptyAction(id?: string) {
 }
 
 function copyLink(link: PublicLink) {
-  copyToClipboard(publicLinkUrl(link), t, {
+  const url = publicLinkUrl(link);
+  if (!url) return;
+  copyToClipboard(url, t, {
     successMessage: t("dashboard.publicDashboard.linkCopied"),
   });
 }
 
 function openPublicPage(link: PublicLink) {
-  window.open(publicLinkUrl(link), "_blank", "noopener");
+  const url = publicLinkUrl(link);
+  if (url) window.open(url, "_blank", "noopener");
 }
 
 function openDashboard(link: PublicLink) {

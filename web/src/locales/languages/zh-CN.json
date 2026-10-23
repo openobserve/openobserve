@@ -7812,6 +7812,8 @@
       "editForbidden": "您没有编辑公开链接的权限。请联系管理员。",
       "saveBeforePublish": "请先保存仪表盘的更改，再发布。",
       "publisherLeft": "发布者已离开组织",
+      "urlHidden": "无访问权限",
+      "urlHiddenHint": "您无法查看此链接的仪表盘，因此其公开 URL 已隐藏。",
       "takeOver": "接管",
       "takeOverTitle": "接管此链接？",
       "takeOverBody": "您将成为发布者。公开页面将显示您有权查看的内容，可能比之前多或少。拥有该 URL 的任何人仍可访问，链接将立即生效。",

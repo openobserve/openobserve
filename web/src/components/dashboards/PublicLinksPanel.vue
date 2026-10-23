@@ -86,17 +86,26 @@
           data-test="dashboards-public-links-panel-created-status"
         />
       </div>
-      <div class="text-text-secondary text-xs">
-        {{ t("dashboard.publicDashboard.linkHint") }}
+      <div
+        class="text-text-secondary text-xs"
+        data-test="dashboards-public-links-panel-created-hint"
+      >
+        {{
+          createdLink.slug
+            ? t("dashboard.publicDashboard.linkHint")
+            : t("dashboard.publicLinks.urlHiddenHint")
+        }}
       </div>
       <OInput
-        :model-value="publicUrl(createdLink)"
+        v-if="createdLink.slug"
+        :model-value="publicUrl(createdLink) ?? ''"
         readonly
         :label="t('dashboard.publicDashboard.publicLink')"
         data-test="dashboards-public-links-panel-created-url"
       />
       <div class="flex flex-wrap gap-2">
         <OButton
+          v-if="createdLink.slug"
           variant="primary"
           size="sm-action"
           icon-left="content-copy"
@@ -106,6 +115,7 @@
           {{ t("dashboard.publicDashboard.copyLink") }}
         </OButton>
         <OButton
+          v-if="createdLink.slug"
           variant="outline"
           size="sm-action"
           icon-left="open-in-new"
@@ -410,8 +420,22 @@
           />
         </template>
         <template #cell-name="{ row }">
-          <span class="text-text-body truncate text-sm">
-            {{ row.name ? raw(row.name) : t("dashboard.publicLinks.untitled") }}
+          <span class="inline-flex min-w-0 items-center gap-1.5">
+            <span class="text-text-body truncate text-sm">
+              {{ row.name ? raw(row.name) : t("dashboard.publicLinks.untitled") }}
+            </span>
+            <!-- The server hides the URL of a link whose dashboard the viewer can't read. -->
+            <span v-if="!row.slug" class="inline-flex shrink-0">
+              <OBadge
+                variant="default-soft"
+                size="sm"
+                icon="lock"
+                :data-test="`dashboards-public-links-panel-${row.id}-url-hidden`"
+              >
+                {{ t("dashboard.publicLinks.urlHidden") }}
+              </OBadge>
+              <OTooltip side="bottom" :content="t('dashboard.publicLinks.urlHiddenHint')" />
+            </span>
           </span>
         </template>
         <template #cell-status="{ row }">
@@ -457,6 +481,7 @@
         <template #cell-actions="{ row }">
           <div class="flex items-center justify-end gap-0.5" @click.stop>
             <OButton
+              v-if="row.slug"
               variant="ghost"
               size="icon-sm"
               icon-left="content-copy"
@@ -468,6 +493,7 @@
               <OTooltip side="bottom" :content="t('dashboard.publicDashboard.copyLink')" />
             </OButton>
             <OButton
+              v-if="row.slug"
               variant="ghost"
               size="icon-sm"
               icon-left="open-in-new"
@@ -542,6 +568,7 @@
                 />
               </template>
               <ODropdownItem
+                v-if="row.slug"
                 icon-left="content-copy"
                 class="md:hidden"
                 :data-test="`dashboards-public-links-panel-${row.id}-copy-menu`"
@@ -550,6 +577,7 @@
                 {{ t("dashboard.publicDashboard.copyLink") }}
               </ODropdownItem>
               <ODropdownItem
+                v-if="row.slug"
                 icon-left="open-in-new"
                 class="md:hidden"
                 :data-test="`dashboards-public-links-panel-${row.id}-open-menu`"
@@ -798,7 +826,8 @@ function guardClose(): boolean {
 const timezone = computed<string>(
   () => store.state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
 );
-const today = computed(() => todayIn(timezone.value));
+// Follows the clock, so the date picker's earliest day moves on at midnight.
+const today = computed(() => todayIn(timezone.value, new Date(now.value)));
 
 const linksQuery = useQuery(() =>
   Object.assign(publicLinksForDashboardQuery(orgId.value, props.dashboardId), {
@@ -837,7 +866,7 @@ const filteredLinks = computed(() => {
   const q = publicLinkSearchTerm(searchQuery.value);
   if (!q) return links.value;
   return links.value.filter((link) =>
-    [link.name, link.slug, link.published_by].some((v) => v.toLowerCase().includes(q)),
+    [link.name, link.slug, link.published_by].some((v) => (v ?? "").toLowerCase().includes(q)),
   );
 });
 
@@ -978,7 +1007,12 @@ const primaryLabel = computed<I18nText | undefined>(() => {
 
 const form = useOForm<PublicLinkForm>({
   defaultValues: publicLinkDefaults(),
-  schema: makePublicLinkSchema(t, today.value, () => storedExpires.value),
+  // Today is read at validation time, so a drawer left open past midnight refuses yesterday.
+  schema: makePublicLinkSchema(
+    t,
+    () => todayIn(timezone.value),
+    () => storedExpires.value,
+  ),
   onSubmit: (value) => submit(value),
 });
 const ranges = form.useStore((s) => s.values.ranges);
@@ -1326,13 +1360,16 @@ async function takeOver(link: PublicLink, source: RowActionSource) {
 }
 
 function copyLink(link: PublicLink) {
-  copyToClipboard(publicUrl(link), t, {
+  const url = publicUrl(link);
+  if (!url) return;
+  copyToClipboard(url, t, {
     successMessage: t("dashboard.publicDashboard.linkCopied"),
   });
 }
 
 function openPublicPage(link: PublicLink) {
-  window.open(publicUrl(link), "_blank", "noopener");
+  const url = publicUrl(link);
+  if (url) window.open(url, "_blank", "noopener");
 }
 
 // Each opening starts on the list; an edit request jumps to that link's form once links load.

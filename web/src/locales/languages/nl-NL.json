@@ -7812,6 +7812,8 @@
       "editForbidden": "Je hebt geen toestemming om openbare links te bewerken. Vraag een beheerder.",
       "saveBeforePublish": "Sla je dashboardwijzigingen op en publiceer daarna.",
       "publisherLeft": "Uitgever heeft de organisatie verlaten",
+      "urlHidden": "Geen toegang",
+      "urlHiddenHint": "Je kunt het dashboard van deze link niet bekijken, dus de openbare URL is verborgen.",
       "takeOver": "Overnemen",
       "takeOverTitle": "Deze link overnemen?",
       "takeOverBody": "Je wordt de uitgever. De openbare pagina toont wat jij mag zien, en dat kan meer of minder zijn dan voorheen. Iedereen met de URL houdt toegang, en de link is vanaf nu actief.",

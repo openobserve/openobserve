@@ -628,6 +628,32 @@ describe("PublicLinksPanel", () => {
     expect(w.text()).toContain("Pick today or a later date");
   });
 
+  it("refuses yesterday as the expiry in a form left open past midnight", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date("2026-09-25T23:59:00Z"));
+      vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
+      vi.mocked(admin.create).mockResolvedValue({ data: link() } as never);
+      const w = build({ variablesConfig: undefined });
+      await flushPromises();
+      const form = (w.vm as unknown as { form: { setFieldValue: (k: string, v: string) => void } })
+        .form;
+      form.setFieldValue("name", "NOC wall");
+      form.setFieldValue("expires", "2026-09-25");
+
+      vi.setSystemTime(new Date("2026-09-26T00:01:00Z"));
+      await submit(w);
+      expect(admin.create).not.toHaveBeenCalled();
+      expect(w.text()).toContain("Pick today or a later date");
+
+      form.setFieldValue("expires", "2026-09-26");
+      await submit(w);
+      expect(admin.create).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("keeps Create disabled until the variable pickers have loaded", async () => {
     vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
     vi.mocked(admin.create).mockResolvedValue({ data: link() } as never);
@@ -954,6 +980,47 @@ describe("PublicLinksPanel", () => {
     expect(shown()).toEqual(["l2"]);
     await search.setValue("ABC");
     expect(shown()).toEqual(["l1"]);
+  });
+
+  it("shows No access and no copy or open action for a link whose URL the server hid", async () => {
+    vi.mocked(admin.list).mockResolvedValue({
+      data: { list: [link(), link({ id: "l2", name: "Hidden", slug: null })] },
+    } as never);
+    const w = build();
+    await flushPromises();
+
+    expect(w.find('[data-test="dashboards-public-links-panel-l2-url-hidden"]').text()).toBe(
+      "No access",
+    );
+    for (const id of ["copy-btn", "open-btn", "copy-menu", "open-menu"]) {
+      expect(has(w, `dashboards-public-links-panel-l2-${id}`)).toBe(false);
+      expect(has(w, `dashboards-public-links-panel-l1-${id}`)).toBe(true);
+    }
+    expect(has(w, "dashboards-public-links-panel-l1-url-hidden")).toBe(false);
+
+    // Search still runs over a row with no slug.
+    await w.find('[data-test="dashboards-public-links-panel-search"] input').setValue("hidden");
+    expect(has(w, "dashboards-public-links-panel-l2-url-hidden")).toBe(true);
+    expect(has(w, "dashboards-public-links-panel-l1-copy-btn")).toBe(false);
+  });
+
+  it("shows no URL, copy or open on a saved link whose URL the server hid", async () => {
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
+    vi.mocked(admin.create).mockResolvedValue({ data: link({ slug: null }) } as never);
+    const w = build({ variablesConfig: undefined });
+    await flushPromises();
+    (
+      w.vm as unknown as { form: { setFieldValue: (k: string, v: string) => void } }
+    ).form.setFieldValue("name", "NOC wall");
+    await submit(w);
+
+    expect(has(w, "dashboards-public-links-panel-created")).toBe(true);
+    expect(w.find('[data-test="dashboards-public-links-panel-created-hint"]').text()).toBe(
+      i18n.global.t("dashboard.publicLinks.urlHiddenHint"),
+    );
+    for (const id of ["url", "copy-btn", "open-btn"]) {
+      expect(has(w, `dashboards-public-links-panel-created-${id}`)).toBe(false);
+    }
   });
 
   it("names every icon-only row action for screen readers", async () => {

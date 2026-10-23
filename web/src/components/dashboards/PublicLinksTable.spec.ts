@@ -311,6 +311,28 @@ describe("PublicLinksTable", () => {
     open.mockRestore();
   });
 
+  it("shows No access and no copy or open action for a link whose URL the server hid", async () => {
+    vi.mocked(admin.listOrg).mockResolvedValue({
+      data: { list: [link(), link({ id: "l2", name: "Hidden", slug: null })] },
+    } as never);
+    const w = build();
+    await flushPromises();
+
+    expect(find(w, "dashboards-public-links-l2-url-hidden").text()).toBe("No access");
+    for (const id of ["copy-btn", "open-btn", "copy-menu", "open-menu"]) {
+      expect(find(w, `dashboards-public-links-l2-${id}`).exists()).toBe(false);
+      expect(find(w, `dashboards-public-links-l1-${id}`).exists()).toBe(true);
+    }
+    expect(find(w, "dashboards-public-links-l1-url-hidden").exists()).toBe(false);
+    // The row keeps its other actions.
+    expect(find(w, "dashboards-public-links-l2-edit-btn").exists()).toBe(true);
+
+    // Search still runs over a row with no slug.
+    await find(w, "dashboards-public-links-search").find("input").setValue("hidden");
+    await flushPromises();
+    expect(rows(w)).toHaveLength(1);
+  });
+
   it("names every icon-only row action for screen readers", async () => {
     const w = build();
     await flushPromises();

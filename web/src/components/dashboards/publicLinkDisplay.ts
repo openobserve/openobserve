@@ -76,7 +76,9 @@ export function longRange(range: PublicLinkRange, t: TranslateFn, timezone: stri
 }
 
 // Under the router's base, so a server with ZO_BASE_URI (e.g. /o2/web/) gets a working link.
-export function publicLinkUrl(link: PublicLink): string {
+// Null when the server hid the slug because the caller can't read the link's dashboard.
+export function publicLinkUrl(link: PublicLink): string | null {
+  if (!link.slug) return null;
   return new URL(`public/dashboards/${link.slug}`, window.location.origin + (getPath() || "/"))
     .href;
 }

@@ -7807,6 +7807,8 @@
       "editForbidden": "您沒有編輯公開連結的權限。請聯絡管理員。",
       "saveBeforePublish": "請先儲存儀表板的變更，再發布。",
       "publisherLeft": "發佈者已離開組織",
+      "urlHidden": "無存取權限",
+      "urlHiddenHint": "您無法檢視此連結的儀表板，因此其公開 URL 已隱藏。",
       "takeOver": "接管",
       "takeOverTitle": "要接管此連結嗎？",
       "takeOverBody": "您將成為發佈者。公開頁面會顯示您有權檢視的內容，可能比之前多或少。擁有該 URL 的任何人仍可存取，且連結會立即生效。",

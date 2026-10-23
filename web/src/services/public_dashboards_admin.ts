@@ -41,7 +41,8 @@ export interface PublicLinkConfig {
 export interface PublicLink {
   id: string;
   name: string;
-  slug: string;
+  /** Null when the caller can't read the link's dashboard: the URL is hidden from them. */
+  slug: string | null;
   dashboard_id: string;
   dashboard_title: string | null;
   folder_id: string | null;

@@ -7812,6 +7812,8 @@
       "editForbidden": "Nie masz uprawnień do edycji publicznych linków. Skontaktuj się z administratorem.",
       "saveBeforePublish": "Zapisz zmiany w pulpicie, a następnie opublikuj.",
       "publisherLeft": "Osoba publikująca opuściła organizację",
+      "urlHidden": "Brak dostępu",
+      "urlHiddenHint": "Nie możesz wyświetlić pulpitu tego linku, więc jego publiczny URL jest ukryty.",
       "takeOver": "Przejmij",
       "takeOverTitle": "Przejąć ten link?",
       "takeOverBody": "Staniesz się osobą publikującą. Strona publiczna pokaże to, co masz prawo widzieć, a to może być więcej lub mniej niż wcześniej. Każdy, kto ma URL, zachowuje dostęp, a link jest od teraz aktywny.",

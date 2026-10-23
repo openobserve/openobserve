@@ -7812,6 +7812,8 @@
       "editForbidden": "Sie haben keine Berechtigung, öffentliche Links zu bearbeiten. Wenden Sie sich an einen Administrator.",
       "saveBeforePublish": "Speichern Sie Ihre Dashboard-Änderungen und veröffentlichen Sie dann.",
       "publisherLeft": "Herausgeber hat die Organisation verlassen",
+      "urlHidden": "Kein Zugriff",
+      "urlHiddenHint": "Sie können das Dashboard dieses Links nicht ansehen, daher ist seine öffentliche URL ausgeblendet.",
       "takeOver": "Übernehmen",
       "takeOverTitle": "Diesen Link übernehmen?",
       "takeOverBody": "Sie werden zum Herausgeber. Die öffentliche Seite zeigt, was Sie sehen dürfen. Das kann mehr oder weniger sein als bisher. Wer die URL hat, behält den Zugriff, und der Link ist ab sofort aktiv.",

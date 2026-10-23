@@ -32,7 +32,7 @@ import {
 } from "./PublicLinkForm.schema";
 import type { PublicLink, PublicLinkRange } from "@/services/public_dashboards_admin";
 
-const schema = makePublicLinkSchema(gt, "2026-09-25");
+const schema = makePublicLinkSchema(gt, () => "2026-09-25");
 
 const named = () => ({ ...publicLinkDefaults(), name: "NOC wall" });
 const rel = (secs: number): PublicLinkRange => ({ type: "relative", secs });
@@ -58,8 +58,20 @@ describe("PublicLinkForm schema", () => {
     expect(schema.safeParse({ ...named(), expires: "2026-09-25" }).success).toBe(true);
   });
 
+  it("reads today at each validation, not when the schema is built", () => {
+    let today = "2026-09-25";
+    const live = makePublicLinkSchema(gt, () => today);
+    expect(live.safeParse({ ...named(), expires: "2026-09-25" }).success).toBe(true);
+    today = "2026-09-26";
+    expect(live.safeParse({ ...named(), expires: "2026-09-25" }).success).toBe(false);
+  });
+
   it("keeps an edited link's own past expiry valid, but no other past date", () => {
-    const editing = makePublicLinkSchema(gt, "2026-09-25", () => "2026-09-01");
+    const editing = makePublicLinkSchema(
+      gt,
+      () => "2026-09-25",
+      () => "2026-09-01",
+    );
     expect(editing.safeParse({ ...named(), expires: "2026-09-01" }).success).toBe(true);
     expect(editing.safeParse({ ...named(), expires: "2026-09-02" }).success).toBe(false);
     expect(editing.safeParse({ ...named(), expires: "2026-09-25" }).success).toBe(true);
