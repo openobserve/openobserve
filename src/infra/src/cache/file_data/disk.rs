@@ -166,6 +166,11 @@ enum RemoveOutcome {
     Failed, // the path could not be vacated; the index entry was restored
 }
 
+/// A public dashboard file the result cache cannot hold, even after evicting for it.
+#[derive(Debug, thiserror::Error)]
+#[error("result larger than the result cache")]
+pub struct PublicDashboardTooLarge;
+
 impl fmt::Display for FileType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -539,6 +544,39 @@ impl FileData {
                 TrashOutcome::Failed
             }
         }
+    }
+
+    /// Renames a temp file over `key`'s, evicting only the bytes it lacks; returns the old size.
+    async fn public_dashboards_admit(
+        &mut self,
+        key: &str,
+        tmp: &str,
+        path: &str,
+        size: usize,
+    ) -> Result<usize, anyhow::Error> {
+        let old = self.data.remove_key(key).map_or(0, |(_, old)| old);
+        self.cur_size -= old;
+        if self.cur_size + size > self.max_size && size <= self.max_size {
+            self.gc(self.cur_size + size - self.max_size).await;
+        }
+        let refused = if self.cur_size + size > self.max_size {
+            Some(anyhow::Error::from(PublicDashboardTooLarge))
+        } else {
+            std::fs::rename(tmp, path)
+                .err()
+                .map(|e| anyhow::anyhow!("rename {tmp} over {path}: {e}"))
+        };
+        if let Some(e) = refused {
+            self.cur_size += old;
+            if old > 0 {
+                self.data.insert(key.to_string(), old);
+            }
+            _ = std::fs::remove_file(tmp);
+            return Err(e);
+        }
+        self.cur_size += size;
+        self.data.insert(key.to_string(), size);
+        Ok(old)
     }
 
     fn size(&self) -> (usize, usize) {
@@ -1019,7 +1057,7 @@ pub async fn indexed_file_guard(file: &str) -> Option<IndexedFileGuard> {
     Some(IndexedFileGuard { _guard: files })
 }
 
-/// Atomically replaces a public dashboard file (temp, fsync, rename) and accounts the size change.
+/// Atomically replaces a public dashboard file (temp, fsync, rename) if the bucket can hold it.
 pub async fn public_dashboards_replace(
     key: &str,
     incarnation: u64,
@@ -1032,11 +1070,18 @@ pub async fn public_dashboards_replace(
         anyhow::bail!("the disk cache is disabled");
     }
     let idx = get_bucket_idx(key);
-    let Some(path) = RESULT_FILES[idx].read().await.safe_file_path(key) else {
+    let (path, max_size) = {
+        let files = RESULT_FILES[idx].read().await;
+        (files.safe_file_path(key), files.max_size)
+    };
+    let Some(path) = path else {
         anyhow::bail!("public dashboard key escapes the cache root: {key}");
     };
-    let tmp = format!("{path}.{incarnation}.tmp");
     let size = data.len();
+    if size > max_size {
+        return Err(PublicDashboardTooLarge.into());
+    }
+    let tmp = format!("{path}.{incarnation}.tmp");
     let tmp_path = tmp.clone();
     let parent = Path::new(&path).parent().map(Path::to_path_buf);
     tokio::task::spawn_blocking(move || -> std::io::Result<()> {
@@ -1049,28 +1094,11 @@ pub async fn public_dashboards_replace(
         f.sync_all()
     })
     .await??;
-    let mut files = RESULT_FILES[idx].write().await;
-    let old = files.data.remove_key(key).map_or(0, |(_, old)| old);
-    files.cur_size -= old;
-    if files.cur_size + size >= files.max_size {
-        let need = min(
-            files.max_size,
-            max(size, files.cur_size + size - files.max_size),
-        );
-        files.gc(need).await;
-    }
-    if let Err(e) = std::fs::rename(&tmp, &path) {
-        files.cur_size += old;
-        if old > 0 {
-            files.data.insert(key.to_string(), old);
-        }
-        drop(files);
-        _ = std::fs::remove_file(&tmp);
-        anyhow::bail!("rename {tmp} over {path}: {e}");
-    }
-    files.cur_size += size;
-    files.data.insert(key.to_string(), size);
-    drop(files);
+    let old = RESULT_FILES[idx]
+        .write()
+        .await
+        .public_dashboards_admit(key, &tmp, &path, size)
+        .await?;
     update_key_metrics(key, size as i64 - old as i64);
     drop_public_dashboard_bodies(key).await;
     Ok(())
@@ -2852,5 +2880,80 @@ mod tests {
         )));
         assert!(!public_dashboards_indexed(&key).await);
         drop_public_dashboard_bodies(&other).await;
+    }
+
+    /// A private 100-byte bucket holding four indexed 20-byte search results, oldest first.
+    fn small_result_bucket(tmp: &tempfile::TempDir) -> (FileData, Vec<String>) {
+        let mut files = temp_root_file_data(tmp);
+        files.max_size = 100;
+        let org = config::ider::uuid();
+        let keys: Vec<String> = (0..4)
+            .map(|i| format!("results/{org}/logs/default/h{i}/1000_2000_0_0.json"))
+            .collect();
+        for key in &keys {
+            files.data.insert(key.clone(), 20);
+            files.cur_size += 20;
+        }
+        (files, keys)
+    }
+
+    /// A written temp file of `size` bytes and the path it would replace.
+    fn staged_public_file(files: &FileData, key: &str, size: usize) -> (String, String) {
+        let path = files.get_file_path(key);
+        std::fs::create_dir_all(Path::new(&path).parent().unwrap()).unwrap();
+        let tmp = format!("{path}.1.tmp");
+        std::fs::write(&tmp, vec![0u8; size]).unwrap();
+        (tmp, path)
+    }
+
+    #[tokio::test]
+    async fn a_public_dashboard_file_larger_than_the_bucket_is_refused_and_evicts_nothing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (mut files, keys) = small_result_bucket(&tmp);
+        let key = format!(
+            "{PUBLIC_DASHBOARDS_PREFIX}org/{}/r3600",
+            config::ider::uuid()
+        );
+        files.data.insert(key.clone(), 10);
+        files.cur_size += 10;
+        let (tmp_file, path) = staged_public_file(&files, &key, 150);
+        let err = files
+            .public_dashboards_admit(&key, &tmp_file, &path, 150)
+            .await
+            .unwrap_err();
+        assert!(err.is::<PublicDashboardTooLarge>(), "{err}");
+        assert_eq!(err.to_string(), "result larger than the result cache");
+        for k in &keys {
+            assert!(files.exist(k).await, "{k} was evicted");
+        }
+        // The previous version stays indexed under its own size.
+        assert_eq!(files.data.remove_key(&key).map(|e| e.1), Some(10));
+        assert_eq!(files.cur_size, 90);
+        assert!(!Path::new(&tmp_file).exists() && !Path::new(&path).exists());
+    }
+
+    #[tokio::test]
+    async fn a_public_dashboard_file_that_fits_after_gc_evicts_only_the_bytes_it_needs() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (mut files, keys) = small_result_bucket(&tmp);
+        let key = format!(
+            "{PUBLIC_DASHBOARDS_PREFIX}org/{}/r3600",
+            config::ider::uuid()
+        );
+        let (tmp_file, path) = staged_public_file(&files, &key, 30);
+        let old = files
+            .public_dashboards_admit(&key, &tmp_file, &path, 30)
+            .await
+            .unwrap();
+        assert_eq!(old, 0);
+        // 80 + 30 is 10 over: the oldest 20-byte entry goes and nothing else.
+        assert!(!files.exist(&keys[0]).await);
+        for k in &keys[1..] {
+            assert!(files.exist(k).await, "{k} was evicted");
+        }
+        assert!(files.exist(&key).await);
+        assert_eq!(files.cur_size, 90);
+        assert_eq!(std::fs::read(&path).unwrap().len(), 30);
+        assert!(!Path::new(&tmp_file).exists());
     }
 }
