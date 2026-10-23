@@ -735,8 +735,8 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
         log::info!("[OFGA:Local] missing org-ownership back-fill needed");
         pending.missing_ownership = true;
     }
-    let v0_0_59 = version_compare::Version::from("0.0.59").unwrap();
-    if meta_version >= v0_0_59 && existing_model_version < v0_0_59 {
+    let v0_0_60 = version_compare::Version::from("0.0.60").unwrap();
+    if meta_version >= v0_0_60 && existing_model_version < v0_0_60 {
         log::info!("[OFGA:Local] public dashboards permissions migration needed");
         pending.public_dashboards = true;
     }
@@ -820,10 +820,10 @@ mod tests {
     }
 
     #[test]
-    fn public_dashboards_back_fill_runs_once_across_0_0_59() {
-        assert!(pending_migrations("0.0.59", "0.0.58").public_dashboards);
-        assert!(!pending_migrations("0.0.59", "0.0.59").public_dashboards);
-        assert!(!pending_migrations("0.0.58", "0.0.57").public_dashboards);
+    fn public_dashboards_back_fill_runs_once_across_0_0_60() {
+        assert!(pending_migrations("0.0.60", "0.0.59").public_dashboards);
+        assert!(!pending_migrations("0.0.60", "0.0.60").public_dashboards);
+        assert!(!pending_migrations("0.0.59", "0.0.58").public_dashboards);
         let pending = PendingMigrations {
             public_dashboards: true,
             ..Default::default()
