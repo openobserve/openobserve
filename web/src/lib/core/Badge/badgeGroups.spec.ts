@@ -349,3 +349,22 @@ describe("slackInstallStatus", () => {
     }
   });
 });
+
+describe("hookRunStatus", () => {
+  it("maps every stored run status to a coloured, translated dot pill", () => {
+    const expected = {
+      queued: ["warning-soft", "workflow.history.statusQueued"],
+      running: ["blue-soft", "workflow.history.statusRunning"],
+      succeeded: ["success-soft", "workflow.history.success"],
+      failed: ["error-soft", "workflow.history.failed"],
+      expired: ["default-soft", "workflow.history.statusExpired"],
+    };
+    for (const [status, [variant, labelKey]] of Object.entries(expected)) {
+      const r = resolveBadge("hookRunStatus", status);
+      expect(r.variant).toBe(variant);
+      expect(r.labelKey).toBe(labelKey);
+      expect(r.mode).toBe("dot");
+      expect(r.shape).toBe("pill");
+    }
+  });
+});

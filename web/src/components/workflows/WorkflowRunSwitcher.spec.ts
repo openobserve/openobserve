@@ -189,3 +189,46 @@ describe("WorkflowRunSwitcher — test runs in the History dropdown", () => {
     expect(wrapper.emitted("select")?.[0]).toEqual(["old"]);
   });
 });
+
+describe("WorkflowRunSwitcher — stored run status", () => {
+  const tags = (wrapper: any) =>
+    wrapper
+      .findAllComponents({ name: "OTag" })
+      .filter((c: any) => c.props("type") === "hookRunStatus")
+      .map((c: any) => c.props("value"));
+
+  beforeEach(() => {
+    workflowObj.runsHistory = {
+      list: [],
+      fetchedAt: 0,
+      params: { start: 0, end: 0 },
+      loading: false,
+    } as any;
+    workflowObj.currentSelectedWorkflow = {
+      id: "wf-1",
+      nodes: [],
+      edges: [],
+      isDraft: true,
+    } as any;
+  });
+
+  it("renders each run's status through the hookRunStatus badge group, never from error", async () => {
+    workflowObj.runsHistory.list = [
+      { ...REAL_RUN("a"), start_time: 3, status: "succeeded", error: "warning text" },
+      { ...REAL_RUN("b"), start_time: 2, status: "failed", error: null },
+      { ...REAL_RUN("c"), start_time: 1, event_type: "Webhook", status: "expired" },
+    ] as any;
+    const wrapper = mount(WorkflowRunSwitcher, {
+      props: { currentRunId: "", orgId: "default", workflowId: "wf-1" },
+      global: {
+        ...globalCfg,
+        stubs: {
+          ...globalCfg.stubs,
+          OTag: { name: "OTag", props: ["type", "value", "size"], template: "<b />" },
+        },
+      },
+    });
+    await flushPromises();
+    expect(tags(wrapper)).toEqual(["succeeded", "failed", "expired"]);
+  });
+});
