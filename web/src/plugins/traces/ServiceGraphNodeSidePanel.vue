@@ -121,6 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ chip.label }}</span
             >
             <OButton
+              :aria-label="t('common.remove')"
               variant="ghost"
               size="icon-chip"
               class="ms-0.5"

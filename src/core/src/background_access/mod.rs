@@ -146,11 +146,16 @@ pub fn anomaly_sources(
     custom_sql: Option<&str>,
 ) -> Vec<QuerySource> {
     let stream_type = StreamType::from(stream_type);
-    let mut sources = vec![QuerySource::Stream {
-        org_id: org_id.to_string(),
-        stream_type,
-        name: stream_name.to_string(),
-    }];
+    let mut sources = Vec::new();
+    // As for alerts: a row with no stream (saved before create derived it from the SQL)
+    // is checked on the streams its SQL reads, not on a stream named "".
+    if !stream_name.trim().is_empty() {
+        sources.push(QuerySource::Stream {
+            org_id: org_id.to_string(),
+            stream_type,
+            name: stream_name.to_string(),
+        });
+    }
     if let Some(sql) = custom_sql.filter(|sql| !sql.trim().is_empty()) {
         sources.push(QuerySource::Sql {
             org_id: org_id.to_string(),
@@ -1206,6 +1211,21 @@ mod tests {
             resolved_names(&anomaly_sources("o1", "metrics", "cpu", Some("  "))),
             vec!["o1/metrics/cpu"]
         );
+    }
+
+    /// A legacy custom_sql row with a blank stream is checked on what its SQL reads.
+    #[test]
+    fn anomaly_with_no_stream_reads_only_its_custom_sql() {
+        assert_eq!(
+            resolved_names(&anomaly_sources(
+                "o1",
+                "logs",
+                "",
+                Some("SELECT * FROM prod")
+            )),
+            vec!["o1/logs/prod"]
+        );
+        assert!(anomaly_sources("o1", "logs", " ", None).is_empty());
     }
 
     #[test]

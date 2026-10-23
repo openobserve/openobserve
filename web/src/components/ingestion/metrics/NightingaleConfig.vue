@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <IngestionContent>
+  <IngestionContent snippet-kind="config" config-tool="Nightingale">
     <CredentialCodeBlock slug="nightingale" :content="content" />
     <IngestionDocLink href="https://github.com/ccfos/nightingale">
       {{ t("ingestion.nightingaleDocLinkText") }}

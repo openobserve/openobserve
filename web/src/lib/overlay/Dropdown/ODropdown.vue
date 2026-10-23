@@ -298,6 +298,7 @@ onBeforeUnmount(() => {
         :collision-padding="lgUp ? 0 : 8"
         @pointer-down-outside="handlePointerDownOutside"
         @focus-outside="handleFocusOutside"
+        @close-auto-focus="(event: Event) => emit('close-auto-focus', event)"
         :style="{ zIndex: contentZIndex }"
         :class="[
           'min-w-40 p-1 max-lg:max-w-[calc(100vw-1rem)]',

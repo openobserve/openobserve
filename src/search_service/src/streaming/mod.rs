@@ -306,6 +306,7 @@ pub async fn process_search_stream_request(
                                 error_msg: Some(e.to_string()),
                                 trace_id: Some(trace_id.to_string()),
                             },
+                            delegated: None,
                         })
                         .await;
                     }
@@ -411,6 +412,7 @@ pub async fn process_search_stream_request(
                                 error_msg: Some(e.to_string()),
                                 trace_id: Some(trace_id.to_string()),
                             },
+                            delegated: None,
                         })
                         .await;
                     }
@@ -491,6 +493,7 @@ pub async fn process_search_stream_request(
                                 error_msg: Some(e.to_string()),
                                 trace_id: Some(trace_id.to_string()),
                             },
+                            delegated: None,
                         })
                         .await;
                     }
@@ -562,6 +565,7 @@ pub async fn process_search_stream_request(
                                 error_msg: Some(e.to_string()),
                                 trace_id: Some(trace_id.to_string()),
                             },
+                            delegated: None,
                         })
                         .await;
                     }
@@ -625,6 +629,7 @@ pub async fn process_search_stream_request(
                             error_msg: Some(e.to_string()),
                             trace_id: Some(trace_id.to_string()),
                         },
+                        delegated: None,
                     })
                     .await;
                 }
@@ -699,6 +704,7 @@ pub async fn process_search_stream_request(
                     error_msg: None,
                     trace_id: Some(trace_id.to_string()),
                 },
+                delegated: None,
             })
             .await;
         }
@@ -1123,6 +1129,7 @@ pub async fn process_search_stream_request_multi(
                 error_msg: None,
                 trace_id: Some(trace_id.to_string()),
             },
+            delegated: None,
         })
         .await;
     }

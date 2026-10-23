@@ -55,10 +55,10 @@ const TIMESTAMP_RANGE_RE = /^(\d{10,16})\s*-\s*(\d{10,16})$/;
 const ABSOLUTE_SINGLE_RE = /^(\d{4}\/\d{2}\/\d{2})(?:\s+(\d{2}:\d{2}:\d{2}))?$/;
 const TIMESTAMP_SINGLE_RE = /^(\d{10,16})$/;
 const ISO_SINGLE_RE =
-  /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?(Z|[+-]\d{2}:?\d{2})?$/;
+  /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?(Z|[+-]\d{2}(?::?\d{2})?)?$/;
 // The app's own log/trace timestamp display format (src/utils/date.ts formatTimestamp).
 const HUMAN_LOG_SINGLE_RE =
-  /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),?\s+(\d{4})\s+(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(?:\s+(Z|[+-]\d{2}:?\d{2}))?$/i;
+  /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),?\s+(\d{4})\s+(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(?:\s+(Z|[+-]\d{2}(?::?\d{2})?))?$/i;
 const MONTH_INDEX: Record<string, string> = {
   jan: "01",
   feb: "02",
@@ -73,6 +73,13 @@ const MONTH_INDEX: Record<string, string> = {
   nov: "11",
   dec: "12",
 };
+
+// date-fns `X` (the app's `Z` token) renders whole-hour zones as `+HH`, with no minutes.
+function normalizeOffset(offset: string): string {
+  if (offset.toUpperCase() === "Z") return "Z";
+  const [, hours, minutes = "00"] = offset.match(/^([+-]\d{2}):?(\d{2})?$/) ?? [];
+  return `${hours}:${minutes}`;
+}
 
 function isValidDateTimeParts(
   year: string,
@@ -208,8 +215,7 @@ function parseIsoSingle(raw: string): IsoSingleParsed | null {
 
   if (offset) {
     // Explicit offset already IS the instant — ignores the picker's timezone.
-    const normalizedOffset =
-      offset === "Z" ? "Z" : offset.replace(/^([+-]\d{2}):?(\d{2})$/, "$1:$2");
+    const normalizedOffset = normalizeOffset(offset);
     const iso = `${year}-${month}-${day}T${hour ?? "00"}:${minute ?? "00"}:${second ?? "00"}${normalizedOffset}`;
     const ms = Date.parse(iso);
     if (Number.isNaN(ms)) return null;
@@ -234,8 +240,7 @@ function parseHumanLogSingle(raw: string): IsoSingleParsed | null {
   if (!isValidDateTimeParts(year, month, dd, hour, minute, secWithMs)) return null;
 
   if (offset) {
-    const normalizedOffset =
-      offset.toUpperCase() === "Z" ? "Z" : offset.replace(/^([+-]\d{2}):?(\d{2})$/, "$1:$2");
+    const normalizedOffset = normalizeOffset(offset);
     const iso = `${year}-${month}-${dd}T${hour}:${minute}:${secWithMs}${normalizedOffset}`;
     const parsedMs = Date.parse(iso);
     if (Number.isNaN(parsedMs)) return null;

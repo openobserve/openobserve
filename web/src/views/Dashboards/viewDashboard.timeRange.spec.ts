@@ -92,6 +92,7 @@ vi.mock("moment-timezone", () => ({
 }));
 
 import ViewDashboard from "@/views/Dashboards/ViewDashboard.vue";
+import config from "@/aws-exports";
 import i18n from "@/locales";
 
 const relative = (period: string) => ({
@@ -185,7 +186,11 @@ describe("ViewDashboard time range gate", () => {
   };
   const refreshButton = () => wrapper.findComponent('[data-test="dashboard-refresh-btn"]');
   const refreshOptions = () => wrapper.findComponent('[data-test="dashboard-refresh-options-btn"]');
-  const refreshTooltip = () => refreshButton().findComponent({ name: "OTooltip" }).props("content");
+  const refreshTooltip = () =>
+    wrapper
+      .findAllComponents({ name: "OTooltip" })
+      .find((tip) => tip.find('[data-test="dashboard-refresh-btn"]').exists())
+      ?.props("content");
   const spanOf = (time: any) => time.end_time.getTime() - time.start_time.getTime();
   const globalSpan = () => spanOf(wrapper.vm.currentTimeObjPerPanel.__global);
 
@@ -226,12 +231,14 @@ describe("ViewDashboard time range gate", () => {
 
     it("turns Refresh yellow with the time-range tooltip while a range waits", async () => {
       await mountDashboard();
-      expect(refreshButton().props("variant")).toBe("outline");
+      expect(refreshButton().props("variant")).toBe("primary");
+      expect(refreshOptions().props("variant")).toBe("primary");
+      expect(refreshButton().text()).toContain("Refresh");
 
       await pick(relative("1h"));
 
-      expect(refreshButton().props("variant")).toBe("warning");
-      expect(refreshOptions().props("variant")).toBe("warning");
+      expect(refreshButton().props("variant")).toBe("pending");
+      expect(refreshOptions().props("variant")).toBe("pending");
       expect(refreshTooltip()).toBe("Refresh to apply the time range");
     });
 
@@ -245,7 +252,7 @@ describe("ViewDashboard time range gate", () => {
       expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("1h");
       expect(globalSpan()).toBe(60 * MINUTE);
       expect(route.query.period).toBe("1h");
-      expect(refreshButton().props("variant")).toBe("outline");
+      expect(refreshButton().props("variant")).toBe("primary");
     });
 
     it("applies the waiting range on an auto-refresh tick", async () => {
@@ -265,7 +272,7 @@ describe("ViewDashboard time range gate", () => {
       await pick(relative("1h"));
       await pick(relative("15m"));
 
-      expect(refreshButton().props("variant")).toBe("outline");
+      expect(refreshButton().props("variant")).toBe("primary");
       expect(wrapper.vm.currentTimeObjPerPanel.__global).toBe(appliedBefore);
       expect(routerReplace).not.toHaveBeenCalled();
     });
@@ -274,10 +281,10 @@ describe("ViewDashboard time range gate", () => {
       await mountDashboard();
 
       await pick(absolute(NaN, 200));
-      expect(refreshButton().props("variant")).toBe("outline");
+      expect(refreshButton().props("variant")).toBe("primary");
 
       await pick(absolute(300 * MINUTE, 200 * MINUTE));
-      expect(refreshButton().props("variant")).toBe("outline");
+      expect(refreshButton().props("variant")).toBe("primary");
 
       refreshButton().vm.$emit("click");
       await flushPromises();
@@ -298,7 +305,7 @@ describe("ViewDashboard time range gate", () => {
         relativeTimePeriod: "15m",
       });
       expect(picker().props("modelValue").relativeTimePeriod).toBe("15m");
-      expect(refreshButton().props("variant")).toBe("outline");
+      expect(refreshButton().props("variant")).toBe("primary");
       expect(routerReplace).not.toHaveBeenCalled();
     });
   });
@@ -310,7 +317,7 @@ describe("ViewDashboard time range gate", () => {
     expect(wrapper.vm.isEditingLayout).toBe(true);
 
     await pick(relative("1h"));
-    expect(refreshButton().props("variant")).toBe("warning");
+    expect(refreshButton().props("variant")).toBe("pending");
 
     refreshButton().vm.$emit("click");
     await flushPromises();
@@ -327,7 +334,7 @@ describe("ViewDashboard time range gate", () => {
 
     await pick(relative("1h"));
 
-    expect(refreshButton().props("variant")).toBe("warning");
+    expect(refreshButton().props("variant")).toBe("pending");
     expect(refreshTooltip()).toBe("Refresh to apply the time range and variable changes");
   });
 
@@ -380,11 +387,49 @@ describe("ViewDashboard time range gate", () => {
 
     expect(wrapper.vm.selectedDate.valueType).toBe("absolute");
     expect(globalSpan()).toBe(10 * MINUTE);
-    expect(refreshButton().props("variant")).toBe("outline");
+    expect(refreshButton().props("variant")).toBe("primary");
+  });
+
+  it("swaps Refresh for a labelled Cancel while enterprise panels load, with the options arrow to match", async () => {
+    const wasEnterprise = config.isEnterprise;
+    config.isEnterprise = "true";
+    try {
+      await mountDashboard();
+      wrapper.vm.arePanelsLoading = true;
+      await flushPromises();
+
+      const cancel = wrapper.findComponent('[data-test="dashboard-cancel-btn"]');
+      expect(cancel.props("variant")).toBe("cancel-query");
+      expect(cancel.text()).toContain("Cancel");
+      expect(refreshOptions().props("variant")).toBe("cancel-query");
+      expect(wrapper.find('[data-test="dashboard-refresh-btn"]').exists()).toBe(false);
+      // No X icon on wide screens; a hidden Refresh label keeps the button width.
+      expect(cancel.props("iconLeft")).toBeUndefined();
+      expect(cancel.find('[aria-hidden="true"]').text()).toContain("Refresh");
+    } finally {
+      config.isEnterprise = wasEnterprise;
+    }
+  });
+
+  it("shows the labelled Refresh with the plain refresh icon while Auto Run is off", async () => {
+    await mountDashboard();
+
+    expect(refreshButton().props("variant")).toBe("primary");
+    expect(refreshButton().props("iconLeft")).toBe("refresh");
+    expect(refreshButton().text()).toContain("Refresh");
   });
 
   describe("Auto Run on", () => {
     beforeEach(() => setAutoRun("on"));
+
+    it("keeps the labelled Refresh primary and swaps in the Auto Run icon", async () => {
+      await mountDashboard();
+
+      expect(refreshButton().props("variant")).toBe("primary");
+      expect(refreshOptions().props("variant")).toBe("primary");
+      expect(refreshButton().props("iconLeft")).toBe("autorenew");
+      expect(refreshButton().text()).toContain("Refresh");
+    });
 
     it("applies a preset at once and updates the URL", async () => {
       await mountDashboard();
@@ -394,7 +439,7 @@ describe("ViewDashboard time range gate", () => {
       expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("1h");
       expect(globalSpan()).toBe(60 * MINUTE);
       expect(route.query.period).toBe("1h");
-      expect(refreshButton().props("variant")).toBe("outline");
+      expect(refreshButton().props("variant")).toBe("primary");
       expect(refreshTooltip()).toBe("Runs queries on open and on filter/time changes");
     });
 
@@ -405,7 +450,7 @@ describe("ViewDashboard time range gate", () => {
       picker().vm.$emit("show");
       await pick(absolute(end - 30 * MINUTE, end));
       expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("15m");
-      expect(refreshButton().props("variant")).toBe("outline");
+      expect(refreshButton().props("variant")).toBe("primary");
 
       picker().vm.$emit("hide");
       await flushPromises();
@@ -440,7 +485,7 @@ describe("ViewDashboard time range gate", () => {
       relativeTimePeriod: "6h",
     });
     expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("6h");
-    expect(refreshButton().props("variant")).toBe("outline");
+    expect(refreshButton().props("variant")).toBe("primary");
   });
 
   it("leaves the picker alone when a reload keeps the same range", async () => {
@@ -451,6 +496,6 @@ describe("ViewDashboard time range gate", () => {
     await flushPromises();
 
     expect(pickerCalls.setSavedDate).not.toHaveBeenCalled();
-    expect(refreshButton().props("variant")).toBe("warning");
+    expect(refreshButton().props("variant")).toBe("pending");
   });
 });

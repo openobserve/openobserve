@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <IngestionContent :target-stream="targetStream">
+  <IngestionContent :target-stream="targetStream" snippet-kind="config" config-tool="Fluent Bit">
     <CredentialCodeBlock slug="fluentbit" :content="content" />
     <IngestionDocLink
       href="https://openobserve.ai/blog/how-to-send-kubernetes-logs-using-fluent-bit"

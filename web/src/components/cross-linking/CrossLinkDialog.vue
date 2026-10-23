@@ -97,6 +97,7 @@
             data-test="cross-link-field-input"
           />
           <OButton
+            :aria-label="t('common.add')"
             variant="ghost"
             size="icon-sm"
             icon-left="add"
