@@ -20,10 +20,12 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub org_id: String,
-    pub restricted_components: Json,
+    #[sea_orm(column_type = "Text")]
+    pub restricted_components: String,
     pub target_version: Option<String>,
     /// `config::meta::fleet::FleetSettings`; null is the built-in defaults.
-    pub fleet_defaults: Option<Json>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub fleet_defaults: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

@@ -308,9 +308,9 @@ mod tests {
             fleet_id: "f".to_string(),
             strategy: "immediate".to_string(),
             status: status.to_string(),
-            phases: serde_json::json!([]),
+            phases: "[]".to_string(),
             failure: None,
-            events: serde_json::json!([]),
+            events: "[]".to_string(),
             started_at: at,
             started_by: "u".to_string(),
             rev: 0,
@@ -469,8 +469,9 @@ mod tests {
         assert_eq!(members_with(&db, "r1").await.unwrap()[1].state, "running");
 
         row.status = "halted".to_string();
-        row.failure = Some(serde_json::json!({"gate": "rejected", "kind": "rejection"}));
-        row.events = serde_json::json!([{"key": "rejected", "at": 5}]);
+        row.failure =
+            Some(serde_json::json!({"gate": "rejected", "kind": "rejection"}).to_string());
+        row.events = serde_json::json!([{"key": "rejected", "at": 5}]).to_string();
         save_state_with(&db, &row).await.unwrap();
         assert_eq!(get_with(&db, "o1", "r1").await.unwrap().unwrap(), row);
     }
@@ -575,7 +576,8 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(get_with(&db, "o1", "r1").await.unwrap().unwrap(), row);
-        row.gates = Some(serde_json::json!([{"id": "heartbeat", "window_start_at": 7}]));
+        row.gates =
+            Some(serde_json::json!([{"id": "heartbeat", "window_start_at": 7}]).to_string());
         save_state_with(&db, &row).await.unwrap();
         assert_eq!(get_with(&db, "o1", "r1").await.unwrap().unwrap(), row);
     }

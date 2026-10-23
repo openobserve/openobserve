@@ -42,7 +42,7 @@ pub struct FleetState {
     pub config_version: Option<i64>,
     pub stable_config_id: Option<String>,
     pub stable_config_version: Option<i64>,
-    pub settings: Option<serde_json::Value>,
+    pub settings: Option<String>,
 }
 
 /// Every fleet of the org, oldest first, as the shared folder list orders them.
@@ -147,7 +147,7 @@ pub async fn set_settings_with<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
     fleet_id: &str,
-    settings: Option<serde_json::Value>,
+    settings: Option<String>,
     actor: &str,
     now_us: i64,
 ) -> Result<(), Error> {
@@ -227,14 +227,14 @@ mod tests {
         create_fleet_collectors_for_test(&db).await.unwrap();
         let overrides = serde_json::json!({"heartbeat_interval_secs": 10});
 
-        set_settings_with(&db, "o1", "f1", Some(overrides.clone()), "u", 1)
+        set_settings_with(&db, "o1", "f1", Some(overrides.to_string()), "u", 1)
             .await
             .unwrap();
         set_desired_with(&db, "o1", "f1", ("edge", 2), "u", 2)
             .await
             .unwrap();
         let row = get_with(&db, "o1", "f1").await.unwrap().unwrap();
-        assert_eq!(row.settings, Some(overrides));
+        assert_eq!(row.settings, Some(overrides.to_string()));
         assert_eq!(
             (row.config_id.as_deref(), row.config_version),
             (Some("edge"), Some(2))

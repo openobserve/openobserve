@@ -274,7 +274,7 @@ fn collectors_table() -> TableCreateStatement {
     }
     table
         .col(ColumnDef::new(C::Healthy).boolean().null())
-        .col(ColumnDef::new(C::Health).json().null())
+        .col(ColumnDef::new(C::Health).custom(text()).null())
         .col(ColumnDef::new(C::RemoteStatus).integer().null())
         .col(big_not_null(C::EnrolledAt))
         .col(big_not_null(C::LastSeenAt))
@@ -337,8 +337,8 @@ fn configs_table() -> TableCreateStatement {
     Table::create()
         .table(F::Table)
         .if_not_exists()
-        .col(ColumnDef::new(F::OrgId).string().not_null())
         .col(ColumnDef::new(F::Id).string_len(63).not_null())
+        .col(ColumnDef::new(F::OrgId).string().not_null())
         .col(ColumnDef::new(F::Description).custom(text()).not_null())
         .col(big_not_null(F::LatestVersion).default(0).to_owned())
         .col(ColumnDef::new(F::DraftYaml).custom(text()).null())
@@ -356,9 +356,9 @@ fn versions_table() -> TableCreateStatement {
     Table::create()
         .table(V::Table)
         .if_not_exists()
-        .col(ColumnDef::new(V::OrgId).string().not_null())
         .col(ColumnDef::new(V::ConfigId).string_len(63).not_null())
         .col(big_not_null(V::Version))
+        .col(ColumnDef::new(V::OrgId).string().not_null())
         .col(ColumnDef::new(V::Yaml).custom(text()).not_null())
         .col(ColumnDef::new(V::Hash).binary().not_null())
         .col(ColumnDef::new(V::Message).custom(text()).not_null())
@@ -379,9 +379,13 @@ fn settings_table() -> TableCreateStatement {
         .table(S::Table)
         .if_not_exists()
         .col(ColumnDef::new(S::OrgId).string().not_null().primary_key())
-        .col(ColumnDef::new(S::RestrictedComponents).json().not_null())
+        .col(
+            ColumnDef::new(S::RestrictedComponents)
+                .custom(text())
+                .not_null(),
+        )
         .col(ColumnDef::new(S::TargetVersion).string_len(32).null())
-        .col(ColumnDef::new(S::FleetDefaults).json().null())
+        .col(ColumnDef::new(S::FleetDefaults).custom(text()).null())
         .to_owned()
 }
 
@@ -390,15 +394,15 @@ fn fleets_table() -> TableCreateStatement {
     Table::create()
         .table(F::Table)
         .if_not_exists()
-        .col(ColumnDef::new(F::OrgId).string().not_null())
         .col(ColumnDef::new(F::FleetId).string_len(64).not_null())
+        .col(ColumnDef::new(F::OrgId).string().not_null())
         .col(ColumnDef::new(F::ConfigId).string_len(63).null())
         .col(big(F::ConfigVersion))
         .col(ColumnDef::new(F::StableConfigId).string_len(63).null())
         .col(big(F::StableConfigVersion))
         .col(big_not_null(F::UpdatedAt))
         .col(ColumnDef::new(F::UpdatedBy).string().not_null())
-        .col(ColumnDef::new(F::Settings).json().null())
+        .col(ColumnDef::new(F::Settings).custom(text()).null())
         .primary_key(Index::create().col(F::OrgId).col(F::FleetId))
         .to_owned()
 }
@@ -416,9 +420,9 @@ fn rollouts_table() -> TableCreateStatement {
         .col(ColumnDef::new(R::FleetId).string_len(64).not_null())
         .col(ColumnDef::new(R::Strategy).string_len(16).not_null())
         .col(ColumnDef::new(R::Status).string_len(16).not_null())
-        .col(ColumnDef::new(R::Phases).json().not_null())
-        .col(ColumnDef::new(R::Failure).json().null())
-        .col(ColumnDef::new(R::Events).json().not_null())
+        .col(ColumnDef::new(R::Phases).custom(text()).not_null())
+        .col(ColumnDef::new(R::Failure).custom(text()).null())
+        .col(ColumnDef::new(R::Events).custom(text()).not_null())
         .col(big_not_null(R::StartedAt))
         .col(ColumnDef::new(R::StartedBy).string().not_null())
         .col(big_not_null(R::Rev).default(0).to_owned())
@@ -429,7 +433,7 @@ fn rollouts_table() -> TableCreateStatement {
                 .default(false),
         )
         .col(big(R::ScheduledFor))
-        .col(ColumnDef::new(R::Gates).json().null())
+        .col(ColumnDef::new(R::Gates).custom(text()).null())
         .to_owned()
 }
 

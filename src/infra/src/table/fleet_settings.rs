@@ -79,7 +79,7 @@ mod tests {
     fn settings(org_id: &str, restricted: &[&str], target: Option<&str>) -> Model {
         Model {
             org_id: org_id.to_string(),
-            restricted_components: serde_json::json!(restricted),
+            restricted_components: serde_json::json!(restricted).to_string(),
             target_version: target.map(str::to_string),
             fleet_defaults: None,
         }
@@ -93,7 +93,7 @@ mod tests {
             .await
             .unwrap();
         let defaults = Model {
-            fleet_defaults: Some(serde_json::json!({"heartbeat_interval_secs": 15})),
+            fleet_defaults: Some(serde_json::json!({"heartbeat_interval_secs": 15}).to_string()),
             ..settings("o2", &["file"], None)
         };
         upsert_with(db, defaults.clone()).await.unwrap();

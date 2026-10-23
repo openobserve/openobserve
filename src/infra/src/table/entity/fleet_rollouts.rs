@@ -27,9 +27,12 @@ pub struct Model {
     pub fleet_id: String,
     pub strategy: String,
     pub status: String,
-    pub phases: Json,
-    pub failure: Option<Json>,
-    pub events: Json,
+    #[sea_orm(column_type = "Text")]
+    pub phases: String,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub failure: Option<String>,
+    #[sea_orm(column_type = "Text")]
+    pub events: String,
     pub started_at: i64,
     pub started_by: String,
     #[sea_orm(default_value = 0)]
@@ -37,7 +40,8 @@ pub struct Model {
     #[sea_orm(default_value = false)]
     pub auto_rollback: bool,
     pub scheduled_for: Option<i64>,
-    pub gates: Option<Json>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub gates: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

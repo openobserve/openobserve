@@ -32,7 +32,8 @@ pub struct Model {
     pub capabilities: Option<i64>,
     pub capabilities_at: Option<i64>,
     pub healthy: Option<bool>,
-    pub health: Option<Json>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub health: Option<String>,
     #[sea_orm(column_type = "Text", nullable)]
     pub effective_config: Option<String>,
     pub effective_hash: Option<Vec<u8>>,

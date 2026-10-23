@@ -19,9 +19,9 @@ use sea_orm::entity::prelude::*;
 #[sea_orm(table_name = "fleets")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
-    pub org_id: String,
-    #[sea_orm(primary_key, auto_increment = false)]
     pub fleet_id: String,
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub org_id: String,
     pub config_id: Option<String>,
     pub config_version: Option<i64>,
     pub stable_config_id: Option<String>,
@@ -29,7 +29,8 @@ pub struct Model {
     pub updated_at: i64,
     pub updated_by: String,
     /// `config::meta::fleet::FleetSettings`; null inherits every org default.
-    pub settings: Option<Json>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub settings: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

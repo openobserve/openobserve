@@ -19,11 +19,11 @@ use sea_orm::entity::prelude::*;
 #[sea_orm(table_name = "fleet_config_versions")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
-    pub org_id: String,
-    #[sea_orm(primary_key, auto_increment = false)]
     pub config_id: String,
     #[sea_orm(primary_key, auto_increment = false)]
     pub version: i64,
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub org_id: String,
     #[sea_orm(column_type = "Text")]
     pub yaml: String,
     pub hash: Vec<u8>,
