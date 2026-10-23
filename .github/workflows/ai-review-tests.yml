@@ -1,0 +1,54 @@
+name: AI Review Engine Tests
+
+# Runs the PR's own engine code, so this workflow gets no secrets and no write token.
+on:
+  pull_request:
+    paths:
+      - "scripts/ai-review/**"
+      - "opencode.jsonc"
+      - ".github/workflows/ai-code-review.yml"
+      - ".github/workflows/ai-review-tests.yml"
+    types: [opened, synchronize, reopened, labeled, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-review-tests-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    # Same rule as the rest of CI: only non-draft PRs carrying 'ready-for-ci'.
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false }}
+    name: engine tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: scripts/ai-review/package-lock.json
+
+      - name: Install dependencies
+        working-directory: scripts/ai-review
+        run: npm ci --ignore-scripts
+
+      - name: Unit tests
+        working-directory: scripts/ai-review
+        run: npm test
+
+      - name: Install opencode (pinned, checksum verified)
+        run: |
+          bash scripts/ai-review/install-opencode.sh "$RUNNER_TEMP/opencode"
+          echo "OPENCODE_BIN=$RUNNER_TEMP/opencode/opencode" >> "$GITHUB_ENV"
+
+      - name: Sandbox integration tests
+        working-directory: scripts/ai-review
+        run: npm run test:integration

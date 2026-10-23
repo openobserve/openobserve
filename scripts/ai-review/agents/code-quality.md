@@ -41,7 +41,7 @@ Your remit under `web/` is **correctness**: logic, reactivity, lifecycle, typing
   subscriptions), and memory leaks from retained references in long-lived components
 - **No `any`, no `!` non-null assertions, no use-site `as` casts** (except `as const` and
   `Array/Object as PropType<T>`) — type at the declaration site instead. See
-  `.claude/skills/eslint-error-handling/SKILL.md` for the conventions
+  `.o2-review-context/skills/eslint-error-handling/SKILL.md` for the conventions
 - Unhandled promise rejections, `await` missing on a service call, races between a fetch and a
   component teardown
 
