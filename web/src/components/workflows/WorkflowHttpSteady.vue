@@ -171,6 +171,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :max-body-bytes="config.max_body_bytes"
         :loading="refreshing"
         :error="rejectionsError"
+        :can-raise="permissions.edit"
+        :can-rotate="canRotate"
         @rotate="openRotate"
         @raise-limit="raiseLimit"
         @refresh="onRefresh"
@@ -216,6 +218,7 @@ const {
   activeCredential,
   storageWarning,
   canRunTest,
+  canRotate,
   runTestHint,
   rotateBlocked,
   revealedCredentials,
@@ -297,7 +300,10 @@ const raiseLimit = () => {
 const onCopy = async (id: string) => {
   try {
     const copied = await copyCredential(id);
-    if (!copied) return;
+    if (!copied) {
+      toast({ variant: "error", message: t("common.copyError") });
+      return;
+    }
     toast({
       variant: "success",
       message: isSigned.value ? t("workflow.http.secretCopied") : t("workflow.http.tokenCopied"),

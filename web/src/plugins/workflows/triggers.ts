@@ -41,7 +41,7 @@ import { ALERT_PAYLOAD_FIELDS } from "./alertFields";
 import type { WorkflowFieldOption } from "./alertFields";
 import { INCIDENT_PAYLOAD_FIELDS } from "./incidentFields";
 import { buildAlertResolvedSample, ALERT_RESOLVED_PAYLOAD_FIELDS } from "./alertResolvedSample";
-import { HTTP_REQUEST_PAYLOAD_FIELDS } from "./httpRequestSample";
+import { httpRequestPayloadFields } from "./httpRequestSample";
 
 // A selectable variant of a trigger's sample payload. When a kind defines more
 // than one (e.g. an incident's lifecycle event_types), the trigger drawer shows
@@ -222,6 +222,7 @@ export function conditionFieldOptions(
   kind: string | undefined,
   httpOn: boolean,
   t: TranslateFn,
+  queryKeys: readonly string[] = [],
 ): WorkflowFieldOption[] {
   if (!kind) return [];
   const def = triggerDef(kind);
@@ -230,8 +231,6 @@ export function conditionFieldOptions(
     fieldHeader(t(def.labelKey), "__kind_fields__"),
     ...def.conditionFields,
     fieldHeader(t("workflow.http.fieldGroup"), "__http_fields__"),
-    ...HTTP_REQUEST_PAYLOAD_FIELDS,
-    // `data` is an array a Condition cannot reach into, so body fields need a Function first.
-    fieldHeader(t("workflow.http.fieldGroupBodyHint"), "__http_body_hint__"),
+    ...httpRequestPayloadFields(queryKeys),
   ];
 }

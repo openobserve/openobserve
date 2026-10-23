@@ -35,6 +35,8 @@ async function writeClipboard(text: string): Promise<void> {
   textarea.value = text;
   textarea.style.cssText = "position:fixed;top:0;left:0;opacity:0;pointer-events:none;";
   textarea.setAttribute("readonly", "");
+  // Callers copy tokens and secrets; session replay records any unmasked DOM insert.
+  textarea.setAttribute("data-o2-privacy", "mask");
   container.appendChild(textarea);
   textarea.focus();
   textarea.select();
@@ -47,6 +49,26 @@ async function writeClipboard(text: string): Promise<void> {
 
   if (!copied) {
     throw new Error("execCommand copy failed");
+  }
+}
+
+/** Copies text that is still loading: the ClipboardItem write starts inside the click, before any await; false when no copy path works, a rejection of `text` rethrows. */
+export async function copyPendingText(text: Promise<string>): Promise<boolean> {
+  if (typeof ClipboardItem !== "undefined" && typeof navigator.clipboard?.write === "function") {
+    try {
+      const blob = text.then((value) => new Blob([value], { type: "text/plain" }));
+      await navigator.clipboard.write([new ClipboardItem({ "text/plain": blob })]);
+      return true;
+    } catch {
+      // Refused or unsupported item: fall back to writing the resolved text.
+    }
+  }
+  const value = await text;
+  try {
+    await writeClipboard(value);
+    return true;
+  } catch {
+    return false;
   }
 }
 

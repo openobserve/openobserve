@@ -27,8 +27,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import { useStore } from "vuex";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { gt, type I18nKey } from "@/types/i18n";
-import { copyToClipboard } from "@/utils/clipboard";
-import {
+import { copyPendingText, copyToClipboard } from "@/utils/clipboard";
+import { configFullQuery } from "@/services/config.queries";
+import workflowService, {
   dryRunHook,
   type DryRunResult,
   type HttpAuthMode,
@@ -50,6 +51,7 @@ import {
 } from "@/services/workflows.queries";
 import { DEFAULT_SAMPLE_BODY } from "./httpSnippets";
 import { buildHttpRequestSample } from "./httpRequestSample";
+import { HttpEndpointError } from "./httpEndpointUi";
 
 export type EndpointPhase = "loading" | "error" | "off" | "unsaved" | "revealing" | "steady";
 
@@ -61,9 +63,9 @@ export type RevealKind = "created" | "rotated" | "switched";
 /** Where the panel is open: the editor runs tests on its canvas, the list cannot. */
 export type EndpointContext = "editor" | "list";
 
-/** What the panel does on Run test: the editor closes it and opens Test with `seed`. */
+/** What the panel does on Run test: the editor closes it and opens Test with `seed`; `runAt` (µs) marks a seed taken from the latest HTTP run. */
 export type RunTestAction =
-  { kind: "open_test"; seed: unknown[] } | { kind: "open_workflow"; hint: I18nKey };
+  { kind: "open_test"; seed: unknown[]; runAt?: number } | { kind: "open_workflow"; hint: I18nKey };
 
 export interface UseWorkflowHttpEndpointArgs {
   workflowId: Ref<string | null>;
@@ -75,13 +77,15 @@ export interface UseWorkflowHttpEndpointArgs {
   beforeCreate?: () => Promise<boolean>;
 }
 
-const NO_PERMISSIONS: HttpTriggerPermissions = { edit: false, test: false, reveal: false };
-const CREDENTIAL_ROLES = new Set(["admin", "root"]);
+interface RunDetailBody {
+  data?: { output_map?: Record<string, unknown>; input_map?: Record<string, unknown> };
+}
 
-const errorMessage = (err: unknown): string => {
-  const e = err as { response?: { data?: { message?: string } }; message?: string } | null;
-  return e?.response?.data?.message ?? e?.message ?? gt("common.unknownError");
-};
+const NO_PERMISSIONS: HttpTriggerPermissions = { edit: false, test: false, reveal: false };
+
+const errorMessage = (err: unknown): string =>
+  (err as { response?: { data?: { message?: string } } } | null)?.response?.data?.message ??
+  gt("common.unknownError");
 
 const errorStatus = (err: unknown): number | undefined =>
   (err as { response?: { status?: number } } | null)?.response?.status;
@@ -129,11 +133,14 @@ export function useWorkflowHttpEndpoint(args: UseWorkflowHttpEndpointArgs) {
     liveCredentials.value.find((c) => c.state === "retiring"),
   );
 
-  // An unsaved workflow has no id to ask the server with, so the org role decides (request/organization/mod.rs).
+  // An unsaved workflow has no id to ask the server with, so the selected org's admin flag decides (request/organization/mod.rs).
+  const orgAdmin = useQuery(() => ({
+    ...configFullQuery(orgId.value),
+    enabled: !workflowId.value && !!orgId.value,
+    select: (data: { is_org_admin?: boolean } | undefined) => data?.is_org_admin === true,
+  }));
   const mayCreateCredentials = computed(
-    () =>
-      store.state.zoConfig?.rbac_enabled === true ||
-      CREDENTIAL_ROLES.has(String(store.state.currentuser?.role ?? "").toLowerCase()),
+    () => store.state.zoConfig?.rbac_enabled === true || orgAdmin.data.value === true,
   );
 
   const status = computed<EndpointStatus | undefined>(() => {
@@ -174,12 +181,9 @@ export function useWorkflowHttpEndpoint(args: UseWorkflowHttpEndpointArgs) {
   );
 
   const rotateBlocked = computed(() => !!retiringCredential.value);
+  // No live credential is still a valid rotate: the server mints a new one.
   const canRotate = computed(
-    () =>
-      permissions.value.edit &&
-      permissions.value.reveal &&
-      !!activeCredential.value &&
-      !rotateBlocked.value,
+    () => permissions.value.edit && permissions.value.reveal && !rotateBlocked.value,
   );
 
   // reset() alone leaves the settled mutation, data included, in the MutationCache until its gcTime.
@@ -253,10 +257,11 @@ export function useWorkflowHttpEndpoint(args: UseWorkflowHttpEndpointArgs) {
     revealedCredentials.value = without(revealedCredentials.value, credentialId);
   };
 
-  /** Copies the shown value, else fetches one, copies it and keeps nothing; the caller toasts. */
-  const copyCredential = async (credentialId: string): Promise<boolean> => {
-    const value = revealedCredentials.value[credentialId] ?? (await fetchSecret(credentialId));
-    return copyToClipboard(value, gt, { silent: true });
+  /** Copies the shown value, else starts the fetch inside the click and keeps nothing; the caller toasts. */
+  const copyCredential = (credentialId: string): Promise<boolean> => {
+    const shown = revealedCredentials.value[credentialId];
+    if (shown !== undefined) return copyToClipboard(shown, gt, { silent: true });
+    return copyPendingText(fetchSecret(credentialId));
   };
 
   const putAndReveal = async (payload: PutHttpTriggerPayload, kind: RevealKind) => {
@@ -273,11 +278,18 @@ export function useWorkflowHttpEndpoint(args: UseWorkflowHttpEndpointArgs) {
       if (!workflowId.value) return;
     }
     const existing = config.value;
-    const result = await putAndReveal(
-      { enabled: true, auth_mode: existing?.auth_mode ?? mode },
-      "created",
-    );
-    endpointExists.value = !existing && result.secret === null;
+    try {
+      const result = await putAndReveal(
+        { enabled: true, auth_mode: existing?.auth_mode ?? mode },
+        "created",
+      );
+      endpointExists.value = !existing && result.secret === null;
+    } catch (err) {
+      if (!existing && errorStatus(err) === 403) {
+        throw new HttpEndpointError("workflow.http.createForbidden");
+      }
+      throw err;
+    }
   };
 
   const turnOff = async () => {
@@ -304,7 +316,15 @@ export function useWorkflowHttpEndpoint(args: UseWorkflowHttpEndpointArgs) {
 
   const rotate = async (overlapSeconds: OverlapSeconds) => {
     const current = config.value;
-    if (!current || !canRotate.value) return;
+    if (!current) throw new HttpEndpointError("workflow.http.errorNotConfigured");
+    if (rotateBlocked.value) {
+      throw new HttpEndpointError(
+        current.auth_mode === "signature"
+          ? "workflow.http.rotateBlockedSigned"
+          : "workflow.http.rotateBlocked",
+      );
+    }
+    if (!canRotate.value) throw new HttpEndpointError("workflow.http.errorNotAllowed");
     const result = await rotation.mutateAsync({ overlap_seconds: overlapSeconds });
     takeSecret(result.secret, current.auth_mode, "rotated", rotation.reset);
   };
@@ -327,12 +347,12 @@ export function useWorkflowHttpEndpoint(args: UseWorkflowHttpEndpointArgs) {
   /** Dry run from the browser with the value on screen, else the active one fetched for this call only. */
   const sendTest = async (body: string = DEFAULT_SAMPLE_BODY): Promise<DryRunResult> => {
     const current = config.value;
-    if (!current) throw new Error("no HTTP endpoint is configured");
+    if (!current) throw new HttpEndpointError("workflow.http.errorNotConfigured");
     let mode = revealedMode.value ?? current.auth_mode;
     let secret = revealedSecret.value;
     if (secret === null) {
       const active = activeCredential.value;
-      if (!active) throw new Error("no live credential");
+      if (!active) throw new HttpEndpointError("workflow.http.errorNoLiveCredential");
       mode = current.auth_mode;
       secret = revealedCredentials.value[active.id] ?? (await fetchSecret(active.id));
     }
@@ -344,11 +364,29 @@ export function useWorkflowHttpEndpoint(args: UseWorkflowHttpEndpointArgs) {
     });
   };
 
-  /** The Test dialog always runs the in-memory graph, so the seed is the latest HTTP input or the sample. */
-  const runTest = (latestInput?: unknown[] | null): RunTestAction => {
+  /** The trigger step's records of a stored run; null when the run holds none or cannot be read. */
+  const runTriggerInput = async (runId: string, nodeId: string): Promise<unknown[] | null> => {
+    try {
+      const res = await workflowService.getWorkflowRun({
+        org_identifier: orgId.value,
+        id: id.value,
+        run_id: runId,
+      });
+      const body: RunDetailBody | undefined = res.data;
+      const records = body?.data?.output_map?.[nodeId] ?? body?.data?.input_map?.[nodeId];
+      return Array.isArray(records) && records.length > 0 ? records : null;
+    } catch {
+      return null;
+    }
+  };
+
+  /** The Test dialog always runs the in-memory graph, so the seed is the latest HTTP run's input or the sample. */
+  const runTest = async (triggerNodeId?: string): Promise<RunTestAction> => {
     if (context === "list") return { kind: "open_workflow", hint: runTestHint.value };
-    const seed = latestInput?.length ? latestInput : buildHttpRequestSample({ trigger_id: "test" });
-    return { kind: "open_test", seed };
+    const call = config.value?.last_call;
+    const input = call && triggerNodeId ? await runTriggerInput(call.run_id, triggerNodeId) : null;
+    if (call && input) return { kind: "open_test", seed: input, runAt: call.received_at };
+    return { kind: "open_test", seed: buildHttpRequestSample({ trigger_id: "test" }) };
   };
 
   watch(orgId, endReveal);

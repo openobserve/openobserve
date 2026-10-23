@@ -124,6 +124,23 @@ describe("WorkflowHttpRotatePopover", () => {
     );
   });
 
+  it("with no live credential it says a new one is created and offers no overlap", async () => {
+    const w = mountPopover({ current: undefined });
+    await byTest(w, "workflow-http-rotate").trigger("click");
+    const popover = byTest(w, "workflow-http-rotate-popover");
+    expect(popover.text()).toContain(t("workflow.http.rotateLeadNone"));
+    expect(popover.text()).not.toContain("Keep");
+    expect(byTest(w, "workflow-http-rotate-overlap-0").exists()).toBe(false);
+    expect(byTest(w, "workflow-http-rotate-consequence").exists()).toBe(false);
+    await byTest(w, "workflow-http-rotate-confirm").trigger("click");
+    expect(w.emitted("confirm")?.[0]).toEqual([0]);
+    const signed = mountPopover({ current: undefined, mode: "signature" });
+    await byTest(signed, "workflow-http-rotate").trigger("click");
+    expect(byTest(signed, "workflow-http-rotate-popover").text()).toContain(
+      t("workflow.http.rotateLeadNoneSigned"),
+    );
+  });
+
   it("a failure shows inside the popover; cancel emits cancel", async () => {
     const w = mountPopover({ error: "nope" });
     await byTest(w, "workflow-http-rotate").trigger("click");

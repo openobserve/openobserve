@@ -378,8 +378,9 @@ import {
   workflowHttpTriggerQuery,
   workflowSearchQuery,
 } from "@/services/workflows.queries";
-import { copyToClipboard } from "@/utils/clipboard";
+import { copyPendingText } from "@/utils/clipboard";
 import { hasHttpEndpoint, workflowHooksEnabled } from "@/plugins/workflows/httpEndpoint";
+import { HttpEndpointError, httpErrorText } from "@/plugins/workflows/httpEndpointUi";
 import WorkflowHttpEndpointPanel from "@/components/workflows/WorkflowHttpEndpointPanel.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import { ref, computed, defineAsyncComponent, onMounted, watch } from "vue";
@@ -580,33 +581,49 @@ const triggerKind = (wf: any): string => {
   return triggerNode?.data?.trigger_kind || triggerNode?.meta?.trigger_kind || DEFAULT_TRIGGER_KIND;
 };
 
+interface WorkflowListRow {
+  id: string;
+  name?: string;
+  is_draft?: boolean;
+  enabled?: boolean;
+  nodes?: {
+    data?: { node_type?: string; trigger_kind?: string };
+    meta?: { trigger_kind?: string };
+  }[];
+}
+
 // No trigger node yet means no kind: the panel then titles the workflow by name alone.
-const rowTriggerKind = (wf: any): string | undefined => {
-  const triggerNode = (wf.nodes || []).find((n: any) => n.data?.node_type === "workflow_trigger");
+const rowTriggerKind = (wf: WorkflowListRow): string | undefined => {
+  const triggerNode = (wf.nodes || []).find((n) => n.data?.node_type === "workflow_trigger");
   if (!triggerNode) return undefined;
   return triggerNode.data?.trigger_kind || triggerNode.meta?.trigger_kind || DEFAULT_TRIGGER_KIND;
 };
 
-const httpPanelRow = ref<any>(null);
+const httpPanelRow = ref<WorkflowListRow | null>(null);
 const httpPanelOpen = ref(false);
-const openHttpPanel = (row: any) => {
+const openHttpPanel = (row: WorkflowListRow) => {
   httpPanelRow.value = row;
   httpPanelOpen.value = true;
 };
 
-// The row carries only the flag, so the URL comes from the endpoint itself.
-const copyEndpointUrl = async (row: any) => {
+// The row carries only the flag, so the URL comes from the endpoint; the clipboard write starts inside the click.
+const copyEndpointUrl = async (row: WorkflowListRow) => {
+  const url = queryClient
+    .fetchQuery(workflowHttpTriggerQuery(orgId.value, row.id))
+    .then((state) => {
+      if (!state.configured) throw new HttpEndpointError("workflow.http.errorNotConfigured");
+      return state.url;
+    });
   try {
-    const state = await queryClient.fetchQuery(workflowHttpTriggerQuery(orgId.value, row.id));
-    if (!state.configured) return;
-    if (await copyToClipboard(state.url, t, { silent: true })) {
-      toast({ message: t("toastMessages.workflows.endpointUrlCopied"), variant: "success" });
-    }
-  } catch (e: any) {
+    const copied = await copyPendingText(url);
+    toast(
+      copied
+        ? { message: t("toastMessages.workflows.endpointUrlCopied"), variant: "success" }
+        : { message: t("common.copyError"), variant: "error" },
+    );
+  } catch (e: unknown) {
     toast({
-      message: t("workflow.http.copyUrlFailed", {
-        reason: raw(e?.response?.data?.message || e?.message) || t("common.unknownError"),
-      }),
+      message: t("workflow.http.copyUrlFailed", { reason: httpErrorText(e, t) }),
       variant: "error",
     });
   }
@@ -665,7 +682,6 @@ const columns = computed<OTableColumnDef<any>[]>(() => [
     sortable: true,
     resizable: true,
     hideable: true,
-    // Incident Event 94 + HTTP 63 + gap and padding, measured in the built UI.
     size: 184,
     meta: { align: "left" },
   },

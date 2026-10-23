@@ -62,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :workflow-enabled="workflowEnabled"
         :context="context"
         :before-create="beforeCreate"
+        :trigger-node-id="triggerNodeId"
         @run-test="onRunTest"
       />
     </div>
@@ -93,11 +94,12 @@ const props = defineProps<{
   workflowEnabled: boolean;
   context: EndpointContext;
   beforeCreate?: () => Promise<boolean>;
+  triggerNodeId?: string;
 }>();
 
 const emit = defineEmits<{
   (e: "update:open", open: boolean): void;
-  (e: "run-test", seed: unknown[]): void;
+  (e: "run-test", seed: unknown[], runAt?: number): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -115,8 +117,8 @@ const subtitle = computed(() =>
 const samplePayload = computed(() => JSON.stringify(httpPreviewSample(), null, 2));
 
 // The editor opens Test on the canvas, so this panel must be gone first.
-const onRunTest = (seed: unknown[]) => {
+const onRunTest = (seed: unknown[], runAt?: number) => {
   emit("update:open", false);
-  emit("run-test", seed);
+  emit("run-test", seed, runAt);
 };
 </script>

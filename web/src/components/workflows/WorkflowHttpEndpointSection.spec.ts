@@ -20,7 +20,7 @@ import enUS from "@/locales/languages/en-US.json";
 import store from "@/test/unit/helpers/store";
 import { queryClient } from "@/composables/query/queryClient";
 import workflows, { dryRunHook } from "@/services/workflows";
-import { copyToClipboard } from "@/utils/clipboard";
+import { copyPendingText, copyToClipboard } from "@/utils/clipboard";
 import {
   HOUR_US,
   HTTP_SECRET,
@@ -47,17 +47,25 @@ vi.mock("@/services/workflows", async (importOriginal) => {
       rotateHttpCredential: vi.fn(),
       revokeHttpCredential: vi.fn(),
       revealHttpCredentialSecret: vi.fn(),
+      getWorkflowRun: vi.fn(),
     },
     dryRunHook: vi.fn(),
   });
 });
-vi.mock("@/utils/clipboard", () => ({ copyToClipboard: vi.fn() }));
+vi.mock("@/utils/clipboard", () => ({ copyToClipboard: vi.fn(), copyPendingText: vi.fn() }));
+vi.mock("@/services/config", () => ({
+  default: {
+    get_config: vi.fn(),
+    get_config_full: vi.fn(async () => ({ data: { is_org_admin: true } })),
+  },
+}));
 const mockToast = vi.fn();
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...a: unknown[]) => mockToast(...a),
 }));
 
 const api = vi.mocked(workflows);
+const RECENT_US = Date.now() * 1000;
 const t = (k: string, v?: Record<string, unknown>) => i18n.global.t(k, v ?? {});
 const mounted: VueWrapper[] = [];
 
@@ -111,6 +119,10 @@ describe("WorkflowHttpEndpointSection", () => {
     store.state.currentuser = { role: "admin" };
     api.getHttpTrigger.mockResolvedValue(httpConfig());
     vi.mocked(copyToClipboard).mockResolvedValue(true);
+    vi.mocked(copyPendingText).mockImplementation(async (text) => {
+      await text;
+      return true;
+    });
   });
   afterEach(() => {
     for (const w of mounted.splice(0)) w.unmount();
@@ -242,6 +254,29 @@ describe("WorkflowHttpEndpointSection", () => {
         t("workflow.http.turnOnFailed", { reason: "boom" }),
       );
       expect(byTest(w, "workflow-http-toggle").attributes("data-value")).toBe("false");
+    });
+
+    it("a 403 on create after the draft save says why and keeps the draft", async () => {
+      api.putHttpTrigger.mockRejectedValue({
+        response: { status: 403, data: { message: "Admin or Root role required to create" } },
+      });
+      const holder: { w?: VueWrapper } = {};
+      const beforeCreate = vi.fn(async () => {
+        await holder.w!.setProps({ workflowId: "wf9" });
+        return true;
+      });
+      holder.w = await mountSection({ workflowId: null, beforeCreate });
+      await byTest(holder.w, "workflow-http-save-and-create").trigger("click");
+      await flushPromises();
+      expect(beforeCreate).toHaveBeenCalledTimes(1);
+      expect(byTest(holder.w, "workflow-http-error").text()).toBe(
+        t("workflow.http.createForbidden"),
+      );
+      expect(t("workflow.http.createForbidden")).toBe(
+        "You can't create endpoint credentials in this organization.",
+      );
+      expect(holder.w.props("workflowId")).toBe("wf9");
+      expect(api.deleteHttpTrigger).not.toHaveBeenCalled();
     });
 
     it("a 200 PUT shows the endpoint-exists hint and no reveal", async () => {
@@ -550,6 +585,20 @@ describe("WorkflowHttpEndpointSection", () => {
       expect(byTest(w, "workflow-http-credential-reveal-denied").exists()).toBe(true);
     });
 
+    it("Run test seeds the latest HTTP run's trigger input", async () => {
+      const records = [{ meta: { trigger_source: "http" }, data: [{ id: 7 }] }];
+      api.getHttpTrigger.mockResolvedValue(
+        httpConfig({ last_call: { run_id: "r9", status: "succeeded", received_at: 42 } }),
+      );
+      api.getWorkflowRun.mockResolvedValue({
+        data: { data: { output_map: { t1: records } } },
+      } as never);
+      const w = await mountSection({ triggerNodeId: "t1" });
+      await byTest(w, "workflow-http-run-test").trigger("click");
+      await flushPromises();
+      expect(w.emitted("run-test")?.[0]).toEqual([records, 42]);
+    });
+
     it("Run test closes over the seed and has the editor tooltip", async () => {
       const w = await mountSection();
       expect(byTest(w, "workflow-http-run-test-tooltip").attributes("data-content")).toBe(
@@ -579,10 +628,52 @@ describe("WorkflowHttpEndpointSection", () => {
       const w = await mountSection();
       await byTest(w, "workflow-http-credential-c1-copy").trigger("click");
       await flushPromises();
-      expect(vi.mocked(copyToClipboard).mock.calls[0][0]).toBe(HTTP_TOKEN);
+      await expect(vi.mocked(copyPendingText).mock.calls[0][0]).resolves.toBe(HTTP_TOKEN);
       expect(mockToast).toHaveBeenCalledWith(
         expect.objectContaining({ message: t("workflow.http.tokenCopied") }),
       );
+    });
+
+    it("a refused clipboard write shows the copy error toast", async () => {
+      api.revealHttpCredentialSecret.mockResolvedValue({ ...httpCredential(), secret: HTTP_TOKEN });
+      vi.mocked(copyPendingText).mockImplementation(async (text) => {
+        await text;
+        return false;
+      });
+      const w = await mountSection();
+      await byTest(w, "workflow-http-credential-c1-copy").trigger("click");
+      await flushPromises();
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "error", message: t("common.copyError") }),
+      );
+    });
+
+    it("rejection actions show only to a user who can perform them", async () => {
+      const rejections = {
+        rate_limited: { count_24h: 4, last_at: 1, last_ip: "1.2.3.4", window_start: RECENT_US },
+        credential_in_url: {
+          count_24h: 1,
+          last_at: 1,
+          last_ip: "1.2.3.4",
+          window_start: RECENT_US,
+        },
+      };
+      api.getHttpTrigger.mockResolvedValue(
+        httpConfig({ rejections, permissions: { edit: true, test: true, reveal: false } }),
+      );
+      const noReveal = await mountSection();
+      await byTest(noReveal, "workflow-http-rejections-show").trigger("click");
+      expect(byTest(noReveal, "workflow-http-rejection-raise-limit").exists()).toBe(true);
+      expect(byTest(noReveal, "workflow-http-rejection-rotate").exists()).toBe(false);
+      queryClient.clear();
+      api.getHttpTrigger.mockResolvedValue(
+        httpConfig({ rejections, permissions: { edit: false, test: false, reveal: false } }),
+      );
+      const viewer = await mountSection({ workflowId: "wf2" });
+      await byTest(viewer, "workflow-http-rejections-show").trigger("click");
+      expect(byTest(viewer, "workflow-http-rejection-rate_limited").exists()).toBe(true);
+      expect(byTest(viewer, "workflow-http-rejection-raise-limit").exists()).toBe(false);
+      expect(byTest(viewer, "workflow-http-rejection-rotate").exists()).toBe(false);
     });
 
     it("rotate is disabled with the tooltip while a credential is retiring", async () => {
@@ -675,7 +766,7 @@ describe("WorkflowHttpEndpointSection", () => {
       api.getHttpTrigger.mockResolvedValue(
         httpConfig({
           rejections: {
-            rate_limited: { count_24h: 2, last_at: 1, last_ip: "1.2.3.4", window_start: 1 },
+            rate_limited: { count_24h: 2, last_at: 1, last_ip: "1.2.3.4", window_start: RECENT_US },
           },
         }),
       );
@@ -726,6 +817,28 @@ describe("WorkflowHttpEndpointSection", () => {
       await flushPromises();
       expect(byTest(w, "workflow-http-reveal").exists()).toBe(false);
       expect(byTest(w, "workflow-http-url").exists()).toBe(true);
+    });
+
+    it("after the active token is revoked, Rotate mints a new one", async () => {
+      api.getHttpTrigger.mockResolvedValue(
+        httpConfig({ credentials: [httpCredential({ state: "revoked" })] }),
+      );
+      api.rotateHttpCredential.mockResolvedValue({
+        ...httpCredential({ id: "c2" }),
+        secret: NEW_TOKEN,
+      });
+      const w = await mountSection();
+      await byTest(w, "workflow-http-rotate").trigger("click");
+      expect(byTest(w, "workflow-http-rotate-popover").text()).toContain(
+        t("workflow.http.rotateLeadNone"),
+      );
+      await byTest(w, "workflow-http-rotate-confirm").trigger("click");
+      await flushPromises();
+      expect(api.rotateHttpCredential).toHaveBeenCalledWith(
+        expect.objectContaining({ overlap_seconds: 0 }),
+      );
+      expect(byTest(w, "workflow-http-reveal").exists()).toBe(true);
+      expect(byTest(w, "workflow-http-rotate-popover").exists()).toBe(false);
     });
 
     it("a failed rotate keeps the popover open with the reason", async () => {
@@ -794,7 +907,7 @@ describe("WorkflowHttpEndpointSection", () => {
       api.getHttpTrigger.mockResolvedValue(
         httpConfig({
           rejections: {
-            rate_limited: { count_24h: 4, last_at: 1, last_ip: "1.2.3.4", window_start: 1 },
+            rate_limited: { count_24h: 4, last_at: 1, last_ip: "1.2.3.4", window_start: RECENT_US },
           },
         }),
       );
@@ -810,7 +923,12 @@ describe("WorkflowHttpEndpointSection", () => {
       api.getHttpTrigger.mockResolvedValue(
         httpConfig({
           rejections: {
-            invalid_token: { count_24h: 1, last_at: 1, last_ip: "1.2.3.4", window_start: 1 },
+            invalid_token: {
+              count_24h: 1,
+              last_at: 1,
+              last_ip: "1.2.3.4",
+              window_start: RECENT_US,
+            },
           },
         }),
       );

@@ -46,6 +46,7 @@ vi.mock("@/services/workflows", async (importOriginal) => {
 import WorkflowTestDialog from "./WorkflowTestDialog.vue";
 import { workflowObj, LAST_TEST_RUN } from "@/plugins/workflows/useWorkflowCanvas";
 import { buildTestSampleText } from "@/plugins/workflows/testSample";
+import { INCIDENT_EVENT_TYPES } from "@/plugins/workflows/incidentSample";
 
 // ── stubs ────────────────────────────────────────────────────────────────────
 const ODrawerStub = {
@@ -801,6 +802,42 @@ describe("WorkflowTestDialog Payload from", () => {
     const seed = [{ meta: { trigger_source: "http", trigger_id: "test" }, data: [{ k: 1 }] }];
     mount(WorkflowTestDialog, { props: { seed, payloadFrom: "http" }, global: globalConfig });
     expect(JSON.parse(workflowObj.testRun.input)).toEqual(seed);
+  });
+
+  it("a seed from the latest HTTP run is labelled as that run, not as a sample", () => {
+    const seed = [{ meta: { trigger_source: "http", trigger_id: "t9" }, data: [{ k: 1 }] }];
+    mount(WorkflowTestDialog, {
+      props: { seed, payloadFrom: "http", seedRunAt: 1_700_000_000_000_000 },
+      global: globalConfig,
+    });
+    expect(workflowObj.testRun.inputSource).toBe("run");
+    expect(workflowObj.testRun.inputRunLabel).not.toBe("");
+  });
+
+  it("an Incident Event workflow offers each event's sample and HTTP request", async () => {
+    setWorkflow(
+      [
+        { id: "t1", data: { node_type: "workflow_trigger", trigger_kind: "incident_event" } },
+        destNode,
+      ],
+      [{ source: "t1", target: "d1" }],
+    );
+    const w = mountDialog();
+    const values = payloadSelect(w)
+      .props("options")
+      .map((o: any) => o.value);
+    expect(values).toEqual([...INCIDENT_EVENT_TYPES, "http"]);
+    await payloadSelect(w).vm.$emit("update:modelValue", "resolved");
+    expect(JSON.parse(workflowObj.testRun.input)[0].meta.event_type).toBe("resolved");
+  });
+
+  it("an HTTP run used as test input selects HTTP request", () => {
+    workflowObj.testRun.input = JSON.stringify([
+      { meta: { trigger_source: "http", trigger_id: "t9" }, data: [] },
+    ]);
+    workflowObj.testRun.inputSource = "run";
+    const w = mountDialog();
+    expect(payloadSelect(w).props("modelValue")).toBe("http");
   });
 
   it("offers no HTTP payload when hooks are off", () => {
