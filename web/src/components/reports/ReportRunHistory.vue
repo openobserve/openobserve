@@ -272,6 +272,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { formatTimestampInTimezone } from "@/utils/date";
 import {
   REPORT_HISTORY_RANGES,
+  RUN_TIME_FORMAT,
   pendingManualRuns,
   runChip,
   runKey,
@@ -589,7 +590,7 @@ const noRunsDescription = computed(() => {
   if (!next) return t("reports.history.emptyNoRunsUnscheduled");
   const tz = props.report?.timezone || "UTC";
   return t("reports.history.emptyNoRunsFirst", {
-    time: raw(`${formatTimestampInTimezone(next, "ddd D MMM, HH:mm", tz)} (${tz})`),
+    time: raw(`${formatTimestampInTimezone(next, RUN_TIME_FORMAT, tz)} (${tz})`),
   });
 });
 
