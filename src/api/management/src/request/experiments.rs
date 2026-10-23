@@ -63,7 +63,10 @@ use crate::{
 
 /// Scores come from search, so while it is blocked the list renders without them.
 fn summary_wanted(requested: Option<bool>, org_id: &str) -> bool {
-    requested.unwrap_or(false) && search_service::check_search_allowed(org_id, None).is_ok()
+    // the meta org is never blocked, as on the gated routes
+    requested.unwrap_or(false)
+        && (org_id == config::META_ORG_ID
+            || search_service::check_search_allowed(org_id, None).is_ok())
 }
 
 fn experiment_error_response(error: ExperimentError) -> Response {
@@ -1918,5 +1921,6 @@ mod tests {
 
         let _gate = close_search_gate_for_tests().await;
         assert!(!summary_wanted(Some(true), "acme"));
+        assert!(summary_wanted(Some(true), config::META_ORG_ID));
     }
 }
