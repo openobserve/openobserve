@@ -626,7 +626,8 @@ mod tests {
     async fn a_paused_job_resumes_with_its_finished_partitions() {
         use o2_enterprise::enterprise::license::close_search_gate_for_tests;
 
-        infra::db::create_table().await.unwrap();
+        infra::db_init().await.unwrap();
+        infra::table::migrate().await.unwrap();
         let id = submit(
             "p1b3-paused",
             "acme",
