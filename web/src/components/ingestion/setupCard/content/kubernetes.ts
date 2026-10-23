@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Kubernetes data-source setup card. The collector ships logs, k8s events and
-// cluster/pod metrics, and (via the OpenTelemetry operator) can auto-instrument
-// workloads for traces with no code change — so the card has three steps:
-// install → optionally annotate for traces → verify.
+// Kubernetes setup card: install → optionally instrument for traces (language libraries or eBPF) → verify.
 //
 // Step 1 deliberately offers ONLY the two endpoint choices — external (reach
 // OpenObserve over the network) and internal (OpenObserve runs in this same
@@ -33,7 +30,12 @@ import { raw, type TranslateFn } from "@/types/i18n";
 
 import config from "@/aws-exports";
 import { getImageURL } from "@/utils/zincutils";
-import type { CardSubstitutions, RichCardContent, RichCardStepVariant } from "../types";
+import type {
+  CardSubstitutions,
+  RichCardContent,
+  RichCardStepVariant,
+  RichCardStepVariantGroup,
+} from "../types";
 import { applySubs, applySubsMasked } from "../subs";
 
 /** Pinned cert-manager release the manual sequence installs. Bump in one place. */
@@ -104,43 +106,84 @@ const codeFor = (template: string, subs: CardSubstitutions, lang = "bash") => ({
 /**
  * Annotating a namespace makes the operator inject the language's auto-
  * instrumentation into every pod in it — no application code or image change.
- * Go is the exception: its eBPF instrumentation also needs the path to the
- * compiled binary inside the container.
  */
-const annotate = (key: string, extra = "") =>
+const annotate = (key: string) =>
   `# Every pod in the namespace is instrumented — no code or image change.
 kubectl annotate namespace my-namespace \\
-  instrumentation.opentelemetry.io/inject-${key}="openobserve-collector/openobserve-${key}"${extra}
+  instrumentation.opentelemetry.io/inject-${key}="openobserve-collector/openobserve-${key}"
 
 # Restart so running pods pick up the injection
 kubectl rollout restart deployment -n my-namespace`;
 
-const LANGUAGES: { id: string; label: string; icon: string; extra?: string }[] = [
+const LANGUAGES: { id: string; label: string; icon: string }[] = [
   { id: "java", label: "Java", icon: "images/ingestion/java.svg" },
   { id: "dotnet", label: ".NET", icon: "images/ingestion/dotnet.svg" },
   { id: "nodejs", label: "Node.js", icon: "images/ingestion/nodejs.svg" },
   { id: "python", label: "Python", icon: "images/ingestion/python.svg" },
-  {
-    id: "go",
-    label: "Go (eBPF)",
-    icon: "images/ingestion/golang.svg",
-    // eBPF attaches to the binary, so the operator needs its in-container path.
-    extra: ` \\
-  instrumentation.opentelemetry.io/otel-go-auto-target-exe="/path/to/container/executable"`,
-  },
 ];
+
+const EBPF_DOC_URL =
+  "https://github.com/openobserve/openobserve-helm-chart/blob/main/charts/openobserve-collector/docs/traces.md#ebpf-tracing";
+
+// --reuse-values would keep the old chart's defaults and lose the ebpf ones 0.6.0 adds.
+const EBPF_UPGRADE = `helm repo update openobserve
+helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-collector \\
+  --version '>=0.6.0' --reset-then-reuse-values \\
+  --set ebpf.enabled=true{flags}`;
 
 const instrumentVariants = (t: TranslateFn): RichCardStepVariant[] =>
   LANGUAGES.map((l) => ({
     id: l.id,
     label: raw(l.label),
     icon: getImageURL(l.icon),
-    code: { lang: "bash", raw: annotate(l.id, l.extra) },
-    note:
-      l.id === "go"
-        ? t("ingestion.setupCard.k8sGoEbpfNote")
-        : t("ingestion.setupCard.k8sAnnotatePodNote"),
+    code: { lang: "bash", raw: annotate(l.id) },
+    note: t("ingestion.setupCard.k8sAnnotatePodNote"),
   }));
+
+const instrumentChoices = (t: TranslateFn): (RichCardStepVariant | RichCardStepVariantGroup)[] => [
+  {
+    id: "libraries",
+    labelKey: "ingestion.setupCard.k8sLibrariesVariant",
+    variants: instrumentVariants(t),
+  },
+  {
+    id: "ebpf",
+    labelKey: "ingestion.setupCard.k8sEbpfVariant",
+    code: { lang: "bash", raw: EBPF_UPGRADE },
+    inputs: [
+      {
+        id: "ebpfPorts",
+        helmSet: "ebpf.trace.ports",
+        labelKey: "ingestion.setupCard.tracePortsLabel",
+        // A port matches on every node, so nothing is selected until the user chooses.
+        default: "",
+        placeholder: raw("8080,9000-9100"),
+        helpKey: "ingestion.setupCard.tracePortsHelp",
+      },
+      {
+        id: "ebpfExe",
+        helmSet: "ebpf.trace.exePaths",
+        labelKey: "ingestion.setupCard.traceExeLabel",
+        default: "",
+        placeholder: raw("/app/checkout*"),
+      },
+      {
+        id: "ebpfCmd",
+        helmSet: "ebpf.trace.cmdLines",
+        labelKey: "ingestion.setupCard.traceCmdLabel",
+        default: "",
+        placeholder: raw("*reports.py*"),
+        helpKey: "ingestion.setupCard.traceCmdHelp",
+      },
+    ],
+    // The chart refuses to render with all three lists empty.
+    requireOneOf: {
+      ids: ["ebpfPorts", "ebpfExe", "ebpfCmd"],
+      messageKey: "ingestion.setupCard.traceSelectorRequired",
+    },
+    note: t("ingestion.setupCard.k8sEbpfNote"),
+  },
+];
 
 // ── card ─────────────────────────────────────────────────────────────────────
 
@@ -223,7 +266,7 @@ export default function kubernetesCard(subs: CardSubstitutions, t: TranslateFn):
         descriptionKey: "ingestion.setupCard.autoInstrumentTracesDesc",
         chip: { kind: "editor", labelKey: "ingestion.setupCard.optionalLabel" },
         completeOn: "copy",
-        variants: instrumentVariants(t),
+        variants: instrumentChoices(t),
       },
       {
         id: "verify",
@@ -304,6 +347,7 @@ kubectl get pods -n openobserve-collector`,
         label: raw("OpenTelemetry Operator"),
         url: "https://github.com/open-telemetry/opentelemetry-operator",
       },
+      { label: t("ingestion.setupCard.ebpfTracingGuideLink"), url: EBPF_DOC_URL },
     ],
   };
 }

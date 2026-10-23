@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Navigation arrows: only when pagination is enabled -->
     <template v-if="showPagination">
       <OButton
+        :aria-label="t('search.firstPage')"
         v-if="pagesNumber > 1"
         variant="ghost"
         size="icon"
@@ -50,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
       </OButton>
       <OButton
+        :aria-label="t('common.previous')"
         v-if="pagesNumber > 1"
         variant="ghost"
         size="icon"
@@ -60,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
       </OButton>
       <OButton
+        :aria-label="t('common.next')"
         v-if="pagesNumber > 1"
         variant="ghost"
         size="icon"
@@ -70,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
       </OButton>
       <OButton
+        :aria-label="t('search.lastPage')"
         v-if="pagesNumber > 1"
         variant="ghost"
         size="icon"

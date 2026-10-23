@@ -32,95 +32,14 @@ const MonacoEditorHelper = require('../utils/MonacoEditorHelper.js');
 // ============================================================================
 
 /**
- * Clear IndexedDB o2FieldValues database to ensure clean test state
- */
-async function clearIndexedDB(page) {
-    await page.evaluate(async () => {
-        return new Promise((resolve, reject) => {
-            const req = indexedDB.deleteDatabase('o2FieldValues');
-            req.onsuccess = () => resolve();
-            req.onerror = () => reject(req.error);
-            req.onblocked = () => {
-                // Database is blocked - close any open connections first
-                resolve(); // Continue anyway, test isolation is secondary
-            };
-        });
-    });
-    testLogger.info('Cleared IndexedDB o2FieldValues database');
-}
-
-/**
- * Get all records from IndexedDB o2FieldValues database
- */
-async function getIndexedDBRecords(page) {
-    return await page.evaluate(async () => {
-        return new Promise((resolve, reject) => {
-            const req = indexedDB.open('o2FieldValues', 1);
-            req.onerror = () => reject(req.error);
-            req.onsuccess = (event) => {
-                const db = event.target.result;
-                if (!db.objectStoreNames.contains('fieldValues')) {
-                    db.close();
-                    resolve([]);
-                    return;
-                }
-                const tx = db.transaction('fieldValues', 'readonly');
-                const store = tx.objectStore('fieldValues');
-                const getAllReq = store.getAll();
-                getAllReq.onsuccess = () => {
-                    db.close();
-                    resolve(getAllReq.result || []);
-                };
-                getAllReq.onerror = () => {
-                    db.close();
-                    reject(getAllReq.error);
-                };
-            };
-        });
-    });
-}
-
-/**
- * Get a specific field record from IndexedDB
- */
-async function getFieldRecord(page, org, streamType, streamName, fieldName) {
-    const key = `${org}|${streamType}|${streamName}|${fieldName}`;
-    return await page.evaluate(async (searchKey) => {
-        return new Promise((resolve, reject) => {
-            const req = indexedDB.open('o2FieldValues', 1);
-            req.onerror = () => reject(req.error);
-            req.onsuccess = (event) => {
-                const db = event.target.result;
-                if (!db.objectStoreNames.contains('fieldValues')) {
-                    db.close();
-                    resolve(null);
-                    return;
-                }
-                const tx = db.transaction('fieldValues', 'readonly');
-                const store = tx.objectStore('fieldValues');
-                const getReq = store.get(searchKey);
-                getReq.onsuccess = () => {
-                    db.close();
-                    resolve(getReq.result || null);
-                };
-                getReq.onerror = () => {
-                    db.close();
-                    reject(getReq.error);
-                };
-            };
-        });
-    }, key);
-}
-
-/**
  * Wait for IndexedDB to have at least one record for a given field.
  * Uses expect.poll keyed on the actual record contents — deterministic, no setTimeout.
  */
-async function waitForFieldInIndexedDB(page, org, streamType, streamName, fieldName, timeout = 10000) {
+async function waitForFieldInIndexedDB(pm, org, streamType, streamName, fieldName, timeout = 10000) {
     let record = null;
     try {
         await expect.poll(async () => {
-            record = await getFieldRecord(page, org, streamType, streamName, fieldName);
+            record = await pm.logsPage.readFieldValueRecord(`${org}|${streamType}|${streamName}|${fieldName}`);
             return !!(record && record.values && record.values.length > 0);
         }, { timeout, intervals: [200, 500, 1000] }).toBe(true);
     } catch (_) {
@@ -148,7 +67,7 @@ async function waitForFieldInIndexedDB(page, org, streamType, streamName, fieldN
  *
  * @returns the IndexedDB record ({ values, ... }) or null if none was captured.
  */
-async function expandFieldAndCaptureValues(page, button, orgName, streamName, fieldName) {
+async function expandFieldAndCaptureValues(page, pm, button, orgName, streamName, fieldName) {
     const waitValues = () => page.waitForResponse(
         (r) => r.url().includes('_values_stream'),
         { timeout: 20000 }
@@ -170,7 +89,7 @@ async function expandFieldAndCaptureValues(page, button, orgName, streamName, fi
 
     // The IDB write happens within a beat of the response landing, so an 8s
     // window post-response is ample (vs. the old 10s racing from click time).
-    return await waitForFieldInIndexedDB(page, orgName, 'logs', streamName, fieldName, 8000);
+    return await waitForFieldInIndexedDB(pm, orgName, 'logs', streamName, fieldName, 8000);
 }
 
 /**
@@ -276,8 +195,8 @@ async function triggerSuggestionsWithRetry(page, pm, expectedValueOrNull, timeou
     const { monacoHelper } = getMonacoHelper(page, pm);
     let lastSuggestions = [];
     await expect.poll(async () => {
-        // Press Escape to close any prior popup, then re-trigger
-        await page.keyboard.press('Escape').catch(() => {});
+        // Escape with no menu open moves focus out of the editor, so only press it to close an open popup.
+        if ((await menuState(page)).visible) await page.keyboard.press('Escape');
         await page.keyboard.press('Control+Space');
         try {
             await monacoHelper.waitForSuggestions(1500);
@@ -404,7 +323,7 @@ async function findFieldWithStringValues(page, pm, orgName, streamName, maxAttem
         for (const preferredField of preferredStringFields) {
             const preferredButton = pm.logsPage.getFieldExpandButton(preferredField);
             if (await preferredButton.count() > 0) {
-                const record = await expandFieldAndCaptureValues(page, preferredButton, orgName, streamName, preferredField);
+                const record = await expandFieldAndCaptureValues(page, pm, preferredButton, orgName, streamName, preferredField);
                 const hit = pickStringValue(preferredField, record);
                 if (hit) return hit;
             }
@@ -419,7 +338,7 @@ async function findFieldWithStringValues(page, pm, orgName, streamName, maxAttem
             // Skip if already expanded (part of preferred fields)
             if (preferredStringFields.includes(fieldName)) continue;
 
-            const record = await expandFieldAndCaptureValues(page, button, orgName, streamName, fieldName);
+            const record = await expandFieldAndCaptureValues(page, pm, button, orgName, streamName, fieldName);
             const hit = pickStringValue(fieldName, record);
             if (hit) return hit;
         }
@@ -494,7 +413,7 @@ test.describe("Autocomplete Value Suggestions", () => {
         testLogger.info('Testing value capture from field expansion');
 
         // Clear IndexedDB to ensure clean state
-        await clearIndexedDB(page);
+        await pm.logsPage.clearFieldValueDB();
 
         // Select stream and run query to get results
         await pm.logsPage.selectStream(streamName);
@@ -634,7 +553,7 @@ test.describe("Autocomplete Value Suggestions", () => {
         testLogger.info('Testing persistence across page refresh');
 
         // Clear IndexedDB first
-        await clearIndexedDB(page);
+        await pm.logsPage.clearFieldValueDB();
 
         // Capture values
         await pm.logsPage.selectStream(streamName);
@@ -654,7 +573,7 @@ test.describe("Autocomplete Value Suggestions", () => {
         // After reload the page may auto-search and add new values — the
         // persistence guarantee is that ALL values captured before the refresh
         // are still present (subset check, not exact equality).
-        const recordAfter = await getFieldRecord(page, orgName, 'logs', streamName, fieldName);
+        const recordAfter = await pm.logsPage.readFieldValueRecord(`${orgName}|logs|${streamName}|${fieldName}`);
         expect(recordAfter).not.toBeNull();
         expect(recordAfter.values.length).toBeGreaterThanOrEqual(valuesBefore.length);
         testLogger.info(`Values after refresh: ${recordAfter.values.length}`);
@@ -678,7 +597,7 @@ test.describe("Autocomplete Value Suggestions", () => {
         testLogger.info('Testing stream isolation');
 
         // Clear IndexedDB first
-        await clearIndexedDB(page);
+        await pm.logsPage.clearFieldValueDB();
 
         // Capture values from first stream
         await pm.logsPage.selectStream(streamName);
@@ -743,7 +662,7 @@ test.describe("Autocomplete Value Suggestions", () => {
         testLogger.info('Testing excluded fields are not stored');
 
         // Clear IndexedDB first
-        await clearIndexedDB(page);
+        await pm.logsPage.clearFieldValueDB();
 
         // Capture values from search
         await pm.logsPage.selectStream(streamName);
@@ -752,7 +671,7 @@ test.describe("Autocomplete Value Suggestions", () => {
         // Wait for background capture
 
         // Get all records
-        const records = await getIndexedDBRecords(page);
+        const records = await pm.logsPage.readAllFieldValueRecords();
 
         // Check that excluded fields are not present
         // These fields should NEVER be stored (they're explicitly excluded in the feature)
@@ -796,7 +715,7 @@ test.describe("Autocomplete Value Suggestions", () => {
         // Wait for background capture
 
         // Get all records
-        const records = await getIndexedDBRecords(page);
+        const records = await pm.logsPage.readAllFieldValueRecords();
 
         // Check that no field has more than 50 values
         const maxValues = 50;
@@ -1098,7 +1017,7 @@ test.describe("Autocomplete Value Suggestions - Quoting Behavior", () => {
         // Response-anchored capture (not a click-time IDB race): waits for the
         // /_values_stream fetch before confirming the IndexedDB write, so a slow
         // runner can't make this null even though the data exists.
-        const record = await expandFieldAndCaptureValues(page, codeFieldBtn, orgName, streamName, 'code');
+        const record = await expandFieldAndCaptureValues(page, pm, codeFieldBtn, orgName, streamName, 'code');
         expect(record, 'Expected IndexedDB record for code field').not.toBeNull();
         expect(record.values.length, 'Expected captured values for code field').toBeGreaterThan(0);
 
@@ -1212,7 +1131,7 @@ test.describe("Autocomplete Value Suggestions - Cold Start & TTL", () => {
         testLogger.info('Testing cold start behavior');
 
         // Clear IndexedDB completely
-        await clearIndexedDB(page);
+        await pm.logsPage.clearFieldValueDB();
 
         // Navigate and select stream WITHOUT expanding any fields or running search
         await pm.logsPage.selectStream(streamName);
@@ -1347,6 +1266,8 @@ test.describe("Autocomplete key contract — Enter never inserts from a menu it 
         await page.goto(`${logData.logsUrl}?org_identifier=${orgName}`);
         await page.waitForLoadState('domcontentloaded');
         await pm.logsPage.selectStream(streamName);
+        // The editor only knows the stream once the schema fetch lands, well after the option click.
+        await pm.logsPage.waitForStreamFieldsLoaded();
         mode = await getSuggestMode(page);
         testLogger.info(`ZO_EDITOR_SUGGEST_MODE in the browser: ${mode}`);
     });
@@ -1407,7 +1328,7 @@ test.describe("Autocomplete key contract — Enter never inserts from a menu it 
         tag: ['@all', '@autosuggestions', '@logs', '@keycontract']
     }, async ({ page }) => {
         await seedEditor(page, `SELECT *`);
-        await page.keyboard.press('Escape');
+        if ((await menuState(page)).visible) await page.keyboard.press('Escape');
         await page.keyboard.press('Tab');
         expect(await editorText(page)).toMatch(/^SELECT \*[ \t]+$/);
     });
@@ -1457,9 +1378,13 @@ test.describe("Autocomplete key contract — Enter never inserts from a menu it 
     }, async ({ page }) => {
         await seedEditor(page, `SELECT * FROM "${streamName}" WHERE kubernetes_labels_app_kubernetes_io_version = `);
         await page.keyboard.press('Control+Space');
-        const menu = await waitForMenu(page).catch(() => ({ visible: false, rows: [] }));
+        await waitForMenu(page);
         // The label shows the inserted form, so a quoted Utf8 value reads '1.2' in the menu.
-        test.skip(!menu.rows.some((r) => /^'?[0-9.]+'?$/.test(r)), 'no numeric-looking value captured for this field');
+        await expect.poll(async () => (await menuState(page)).rows.some((r) => /^'?[0-9.]+'?$/.test(r)), {
+            message: 'the version value menu should offer a numeric-looking value',
+            timeout: 10000,
+        }).toBe(true);
+        const menu = await menuState(page);
         const row = menu.rows.findIndex((r) => /^'?[0-9.]+'?$/.test(r));
         for (let i = 0; i < row; i++) await page.keyboard.press('ArrowDown');
         await page.keyboard.press('Enter');
@@ -1492,7 +1417,7 @@ test.describe("Autocomplete key contract — Enter never inserts from a menu it 
     const escapeRe = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const NOT_VALUES = ['match_all', 'count', 'cast_to_arr'];
 
-    /** The first two quoted values the level column offers, or null when fewer were captured. */
+    /** The first two quoted values the level column offers, once at least two are listed. */
     async function levelValues(page) {
         await seedEditor(page, `SELECT * FROM "${streamName}" WHERE level IN (`);
         await page.keyboard.type("'");
@@ -1501,15 +1426,14 @@ test.describe("Autocomplete key contract — Enter never inserts from a menu it 
         await expect.poll(async () => {
             quoted = (await menuState(page)).rows.filter((r) => /^'.+'$/.test(r));
             return quoted.length;
-        }, { timeout: 10000 }).toBeGreaterThanOrEqual(2).catch(() => {});
-        return quoted.length >= 2 ? quoted : null;
+        }, { message: 'the level IN ( menu should list at least two quoted values', timeout: 10000 }).toBeGreaterThanOrEqual(2);
+        return quoted;
     }
 
     test("a comma inside IN opens values for the IN field, unhighlighted, without the ones chosen", {
         tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@values', '@inlist']
     }, async ({ page }) => {
         const values = await levelValues(page);
-        test.skip(!values, 'fewer than two level values captured');
         await seedEditor(page, `SELECT * FROM "${streamName}" WHERE level IN (${values[0]}`);
         await page.keyboard.type(',');
         const menu = await waitForMenu(page, 10000);
@@ -1522,7 +1446,6 @@ test.describe("Autocomplete key contract — Enter never inserts from a menu it 
         tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@values', '@inlist']
     }, async ({ page }) => {
         const values = await levelValues(page);
-        test.skip(!values, 'fewer than two level values captured');
         const prefix = `SELECT * FROM "${streamName}" WHERE level IN (${values[0]},`;
         await seedEditor(page, prefix);
         await page.keyboard.type(values[1][1]);
@@ -1536,7 +1459,6 @@ test.describe("Autocomplete key contract — Enter never inserts from a menu it 
         tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@values', '@inlist']
     }, async ({ page }) => {
         const values = await levelValues(page);
-        test.skip(!values, 'fewer than two level values captured');
         const prefix = `SELECT * FROM "${streamName}" WHERE level NOT IN (${values[0]},`;
         await seedEditor(page, prefix);
         await page.keyboard.type(values[1][1]);
@@ -1550,9 +1472,12 @@ test.describe("Autocomplete key contract — Enter never inserts from a menu it 
     }, async ({ page }) => {
         await seedEditor(page, `SELECT * FROM "${streamName}" WHERE code IN (`);
         await page.keyboard.type(' ');
-        const first = await waitForMenu(page, 10000).catch(() => ({ rows: [] }));
-        const numbers = first.rows.filter((r) => /^\d+$/.test(r));
-        test.skip(numbers.length < 2, 'fewer than two code values captured');
+        await waitForMenu(page, 10000);
+        let numbers = [];
+        await expect.poll(async () => {
+            numbers = (await menuState(page)).rows.filter((r) => /^\d+$/.test(r));
+            return numbers.length;
+        }, { message: 'the code IN ( menu should list at least two numeric values', timeout: 10000 }).toBeGreaterThanOrEqual(2);
         const prefix = `SELECT * FROM "${streamName}" WHERE code IN (${numbers[0]}, `;
         await seedEditor(page, prefix);
         await page.keyboard.press('Control+Space');
@@ -1630,6 +1555,7 @@ test.describe("Autocomplete key contract — chained menus (Automatic)", () => {
         await page.goto(`${logData.logsUrl}?org_identifier=${orgName}`);
         await page.waitForLoadState('domcontentloaded');
         await pm.logsPage.selectStream(streamName);
+        await pm.logsPage.waitForStreamFieldsLoaded();
         mode = await getSuggestMode(page);
     });
 
@@ -1690,7 +1616,7 @@ test.describe("Autocomplete key contract — chained menus (Automatic)", () => {
         expect(await editorCaret(page)).toEqual(inQuotes);
         // Monaco picks its undo keys from the user agent, which the Desktop Chrome device sets to Windows.
         const mod = await page.evaluate(() => (/Macintosh/.test(navigator.userAgent) ? 'Meta' : 'Control'));
-        await page.keyboard.press('Escape');
+        if ((await menuState(page)).visible) await page.keyboard.press('Escape');
         await page.keyboard.press(`${mod}+z`);
         await expect.poll(() => editorText(page)).not.toBe(wrapped);
         await page.keyboard.press(`${mod}+Shift+z`);
@@ -1777,7 +1703,10 @@ test.describe("Autocomplete key contract — chained menus (Automatic)", () => {
         await expect.poll(() => editorText(page)).toBe(`${WHERE}level = `);
         const values = await waitForMenu(page, 10000);
         expect(values.focused, 'the chained value menu opens unhighlighted').toBeNull();
-        test.skip(!values.rows.some((r) => /e/i.test(r) && !/values/i.test(r)), 'no level value with an e captured');
+        await expect.poll(async () => (await menuState(page)).rows.some((r) => /e/i.test(r) && !/values/i.test(r)), {
+            message: 'the chained level value menu should list a value containing e',
+            timeout: 10000,
+        }).toBe(true);
         await page.keyboard.type('e');
         await waitForMenu(page);
         await page.keyboard.press('Tab');
@@ -1802,8 +1731,12 @@ test.describe("Autocomplete key contract — chained menus (Automatic)", () => {
         test.skip(mode === 'off', 'off is the editor before the fix');
         await seedEditor(page, `${WHERE}level = `);
         await page.keyboard.type("'");
-        const menu = await waitForMenu(page, 10000).catch(() => null);
-        test.skip(!menu, 'no level values captured');
+        await waitForMenu(page, 10000);
+        await expect.poll(async () => (await menuState(page)).rows.some((r) => /^'/.test(r)), {
+            message: 'the opening-quote menu should list a level value',
+            timeout: 10000,
+        }).toBe(true);
+        const menu = await menuState(page);
         await expect.poll(async () => (await menuState(page)).focused, { timeout: 2000 }).toBe(menu.rows[0]);
         await page.keyboard.press('Enter');
         expect(await editorText(page)).toBe(`${WHERE}level = ${menu.rows[0]}`);
@@ -1823,7 +1756,7 @@ test.describe("Autocomplete key contract — chained menus (Automatic)", () => {
     test("a value fetch slower than the budget shows one row that inserts nothing", {
         tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@values']
     }, async ({ page }) => {
-        await clearIndexedDB(page);
+        await pm.logsPage.clearFieldValueDB();
         await page.route((url) => url.toString().includes('/_values?'), async (route) => {
             await new Promise((r) => setTimeout(r, 3000));
             await route.continue();
@@ -1848,7 +1781,7 @@ test.describe("Autocomplete key contract — chained menus (Automatic)", () => {
     test("Esc during a slow value fetch: the values never pop up", {
         tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@values']
     }, async ({ page }) => {
-        await clearIndexedDB(page);
+        await pm.logsPage.clearFieldValueDB();
         await page.route((url) => url.toString().includes('/_values?'), async (route) => {
             await new Promise((r) => setTimeout(r, 600));
             await route.continue();
@@ -1865,7 +1798,7 @@ test.describe("Autocomplete key contract — chained menus (Automatic)", () => {
     test("← during a slow value fetch drops the answer", {
         tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@values']
     }, async ({ page }) => {
-        await clearIndexedDB(page);
+        await pm.logsPage.clearFieldValueDB();
         await page.route((url) => url.toString().includes('/_values?'), async (route) => {
             await new Promise((r) => setTimeout(r, 600));
             await route.continue();
@@ -1882,7 +1815,7 @@ test.describe("Autocomplete key contract — chained menus (Automatic)", () => {
     test("typing forward during a slow value fetch keeps the values", {
         tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@values']
     }, async ({ page }) => {
-        await clearIndexedDB(page);
+        await pm.logsPage.clearFieldValueDB();
         await page.route((url) => url.toString().includes('/_values?'), async (route) => {
             // Well under the 1000 ms budget, so the answer is pending, not past it.
             await new Promise((r) => setTimeout(r, 300));
@@ -1901,7 +1834,7 @@ test.describe("Autocomplete key contract — chained menus (Automatic)", () => {
         tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@values']
     }, async ({ page }) => {
         test.skip(mode === 'off', 'off is the editor before the fix');
-        await clearIndexedDB(page);
+        await pm.logsPage.clearFieldValueDB();
         await page.route((url) => url.toString().includes('/_values?'), async (route) => {
             await new Promise((r) => setTimeout(r, 4000));
             await route.continue();
@@ -1944,27 +1877,33 @@ test.describe("Autocomplete group headers — never a target", () => {
     const orgName = process.env["ORGNAME"] || 'default';
     const WHERE = `SELECT * FROM "${streamName}" WHERE `;
     let mode;
+    let pm;
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
-        const pm = new PageManager(page);
+        pm = new PageManager(page);
         await ingestTestData(page);
         await waitForStreamData(page, streamName, 1).catch(() => {});
         await page.goto(`${logData.logsUrl}?org_identifier=${orgName}`);
         await page.waitForLoadState('domcontentloaded');
         await pm.logsPage.selectStream(streamName);
+        await pm.logsPage.waitForStreamFieldsLoaded('level', 'now');
         mode = await getSuggestMode(page);
         test.skip(mode === 'off', 'off keeps the flat menus');
     });
 
-    /** The value menu for level, opened by a typed space; null when fewer than two level values were captured. */
+    /** The value menu for level, opened by a typed space, once at least two level values are listed. */
     async function valueMenu(page) {
         await seedEditor(page, `${WHERE}level =`);
         await page.keyboard.type(' ');
-        const menu = await waitForMenu(page, 10000).catch(() => null);
-        // Only the captured data decides a skip, so a menu that lost its headers fails the header assertions.
-        return menu && menu.rows.filter((r) => /^'/.test(r)).length >= 2 ? menu : null;
+        await waitForMenu(page, 10000);
+        // The menu can open on a still-loading row, so wait for the values themselves.
+        await expect.poll(async () => (await menuState(page)).rows.filter((r) => /^'/.test(r)).length, {
+            message: 'the level value menu should list at least two quoted values',
+            timeout: 10000,
+        }).toBeGreaterThanOrEqual(2);
+        return await menuState(page);
     }
     const undoKey = (page) => page.evaluate(() => (/Macintosh/.test(navigator.userAgent) ? 'Meta' : 'Control'));
 
@@ -1972,7 +1911,6 @@ test.describe("Autocomplete group headers — never a target", () => {
         tag: ['@all', '@autosuggestions', '@logs', '@headers']
     }, async ({ page }) => {
         const menu = await valueMenu(page);
-        test.skip(!menu, 'fewer than two level values captured');
         // Monaco renders only the rows in view, so the Functions header below the fields may not be in the DOM yet.
         expect(menu.headers.slice(0, 2)).toEqual(['Values · recent', 'Fields']);
         expect(menu.focused).toBeNull();
@@ -1990,8 +1928,12 @@ test.describe("Autocomplete group headers — never a target", () => {
         await waitForMenu(page);
         await page.keyboard.press('Tab');
         await expect.poll(() => editorText(page)).toBe(`${WHERE}level = `);
-        const values = await waitForMenu(page, 10000);
-        test.skip(!values.rows.some((r) => /^'/.test(r)), 'no level value captured');
+        await waitForMenu(page, 10000);
+        await expect.poll(async () => (await menuState(page)).rows.some((r) => /^'/.test(r)), {
+            message: 'the chained value menu should list a level value',
+            timeout: 10000,
+        }).toBe(true);
+        const values = await menuState(page);
         await page.keyboard.press('Tab');
         await expect.poll(() => editorText(page)).toBe(`${WHERE}level = ${values.rows[0]}`);
     });
@@ -2000,7 +1942,6 @@ test.describe("Autocomplete group headers — never a target", () => {
         tag: ['@all', '@autosuggestions', '@logs', '@headers']
     }, async ({ page }) => {
         const menu = await valueMenu(page);
-        test.skip(!menu, 'fewer than two level values captured');
         await page.keyboard.press('Tab');
         await expect.poll(() => editorText(page)).toBe(`${WHERE}level = ${menu.rows[0]}`);
     });
@@ -2009,7 +1950,6 @@ test.describe("Autocomplete group headers — never a target", () => {
         tag: ['@all', '@autosuggestions', '@logs', '@headers']
     }, async ({ page }) => {
         const menu = await valueMenu(page);
-        test.skip(!menu, 'fewer than two level values captured');
         await page.keyboard.press('ArrowDown');
         await expect.poll(async () => (await menuState(page)).focused).toBe(menu.rows[0]);
         await page.keyboard.press('ArrowDown');
@@ -2022,7 +1962,6 @@ test.describe("Autocomplete group headers — never a target", () => {
         tag: ['@all', '@autosuggestions', '@logs', '@headers']
     }, async ({ page }) => {
         const menu = await valueMenu(page);
-        test.skip(!menu, 'fewer than two level values captured');
         await page.keyboard.press('ArrowDown');
         await page.keyboard.press('ArrowUp');
         await expect.poll(async () => (await menuState(page)).focused).toBe(menu.rows[0]);
@@ -2037,7 +1976,6 @@ test.describe("Autocomplete group headers — never a target", () => {
         tag: ['@all', '@autosuggestions', '@logs', '@headers']
     }, async ({ page }) => {
         const menu = await valueMenu(page);
-        test.skip(!menu, 'fewer than two level values captured');
         await page.keyboard.press('Control+Space');
         await expect.poll(async () => (await menuState(page)).focused).toBe(menu.rows[0]);
         await page.keyboard.press('Enter');
@@ -2048,7 +1986,6 @@ test.describe("Autocomplete group headers — never a target", () => {
         tag: ['@all', '@autosuggestions', '@logs', '@headers']
     }, async ({ page }) => {
         const menu = await valueMenu(page);
-        test.skip(!menu, 'fewer than two level values captured');
         for (const header of menu.headers) {
             await page.locator('.monaco-editor .suggest-widget.visible .monaco-list-row', { has: page.locator('.codicon-symbol-folder') })
                 .filter({ hasText: header }).first().click({ force: true });
@@ -2064,7 +2001,6 @@ test.describe("Autocomplete group headers — never a target", () => {
         tag: ['@all', '@autosuggestions', '@logs', '@headers']
     }, async ({ page }) => {
         const menu = await valueMenu(page);
-        test.skip(!menu, 'fewer than two level values captured');
         await page.keyboard.type('k8s');
         await expect.poll(async () => (await menuState(page)).headers).toEqual(['Fields']);
         const after = await menuState(page);
@@ -2076,13 +2012,19 @@ test.describe("Autocomplete group headers — never a target", () => {
         tag: ['@all', '@autosuggestions', '@logs', '@headers']
     }, async ({ page }) => {
         const menu = await valueMenu(page);
-        test.skip(!menu, 'fewer than two level values captured');
-        const whole = menu.rows[0].replace(/'/g, '');
+        const fields = (await pm.logsPage.getQueryEditorFieldNames()).map((f) => f.toLowerCase());
+        expect(fields.length, 'the query editor should know the stream fields').toBeGreaterThan(0);
+        // Monaco's fuzzy filter needs the typed letters in order, so a value that is no field's subsequence can only match values.
+        const row = menu.rows.filter((r) => /^'/.test(r)).find((r) => {
+            const v = r.replace(/'/g, '').toLowerCase();
+            return !fields.some((f) => { let i = 0; for (const ch of f) if (ch === v[i]) i++; return i === v.length; });
+        });
+        expect(row, `no listed level value is free of a field match; values: ${menu.rows.join(', ')}`).toBeTruthy();
+        const whole = row.replace(/'/g, '');
         await page.keyboard.type(whole);
         const after = await waitForMenu(page, 5000);
-        test.skip(after.headers.includes('Fields'), `a field also starts with ${whole}`);
-        expect(after.headers).toEqual(['Values · recent']);
-        expect(after.focused).toBe(menu.rows[0]);
+        expect(after.headers, `only values should match "${whole}"`).toEqual(['Values · recent']);
+        expect(after.focused).toBe(row);
     });
 
     test("a function name after = completes under Functions: CAS then Tab writes CAST(", {
@@ -2147,7 +2089,7 @@ test.describe("Autocomplete group headers — never a target", () => {
     test("Tab on a menu that holds only a header and a still-loading row inserts nothing and closes it", {
         tag: ['@all', '@autosuggestions', '@logs', '@headers', '@values']
     }, async ({ page }) => {
-        await clearIndexedDB(page);
+        await pm.logsPage.clearFieldValueDB();
         await page.route((url) => url.toString().includes('/_values?'), async (route) => {
             await new Promise((r) => setTimeout(r, 3000));
             await route.continue();
@@ -2181,7 +2123,6 @@ test.describe("Autocomplete group headers — never a target", () => {
         tag: ['@all', '@autosuggestions', '@logs', '@headers']
     }, async ({ page }) => {
         const menu = await valueMenu(page);
-        test.skip(!menu, 'fewer than two level values captured');
         await page.keyboard.press('Escape');
         await expect.poll(async () => (await menuState(page)).visible).toBe(false);
         expect(await editorText(page)).toBe(`${WHERE}level = `);
@@ -2191,11 +2132,10 @@ test.describe("Autocomplete group headers — never a target", () => {
         tag: ['@all', '@autosuggestions', '@logs', '@headers']
     }, async ({ page }) => {
         const menu = await valueMenu(page);
-        test.skip(!menu, 'fewer than two level values captured');
         await page.keyboard.press('ArrowDown');
         await page.keyboard.press('Enter');
         await expect.poll(() => editorText(page)).toBe(`${WHERE}level = ${menu.rows[0]}`);
-        await page.keyboard.press('Escape');
+        if ((await menuState(page)).visible) await page.keyboard.press('Escape');
         await page.keyboard.press(`${await undoKey(page)}+z`);
         await expect.poll(() => editorText(page)).toBe(`${WHERE}level = `);
     });
@@ -2219,6 +2159,7 @@ test.describe("Autocomplete — after a complete predicate, AND and OR lead", ()
         await page.goto(`${logData.logsUrl}?org_identifier=${orgName}`);
         await page.waitForLoadState('domcontentloaded');
         await pm.logsPage.selectStream(streamName);
+        await pm.logsPage.waitForStreamFieldsLoaded();
         mode = await getSuggestMode(page);
     });
 
@@ -2387,6 +2328,7 @@ test.describe("Autocomplete zero-setup row — never pressing Tab gives today's 
         await waitForStreamData(page, streamName, 1).catch(() => {});
         await page.goto(`${logData.logsUrl}?org_identifier=${orgName}`);
         await pm.logsPage.selectStream(streamName);
+        await pm.logsPage.waitForStreamFieldsLoaded();
         const mode = await getSuggestMode(page);
         const results = {};
         for (const sequence of ZERO_SETUP_SEQUENCES) {

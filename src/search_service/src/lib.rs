@@ -51,7 +51,7 @@ use usage_reporting::report_request_usage_stats;
 #[cfg(feature = "enterprise")]
 use {
     infra::{client::grpc::make_grpc_search_client, cluster::get_cached_online_query_nodes},
-    o2_enterprise::enterprise::{common::config::get_config as get_o2_config, search::TaskStatus},
+    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
     tracing::info_span,
 };
 
@@ -87,7 +87,10 @@ use ::search::{
     datafusion::{self, distributed_plan::streaming_aggs_exec},
     index, inspector, sql, tantivy, utils,
 };
+#[cfg(feature = "enterprise")]
+pub use searcher::QueryPhase;
 use searcher::Searcher;
+pub use searcher::{LeaderInfo, QueryRegistration, QueryTracker};
 
 /// The result of search in cluster
 /// data, scan_stats, wait_in_queue, is_partial, partial_err
@@ -164,39 +167,36 @@ pub async fn search(
     request.mark_chat_history_reader();
     let meta = Sql::new_from_req(&request, &query).await?;
 
-    #[cfg(feature = "enterprise")]
-    {
-        let sql = Some(in_req.query.sql.clone());
-        let start_time = Some(in_req.query.start_time);
-        let end_time = Some(in_req.query.end_time);
-        let s_event_type = in_req
-            .search_type
-            .map(|s_event_type| s_event_type.to_string());
-        // set search task
-        SEARCH_SERVER
-            .insert(
-                org_id,
-                trace_id.clone(),
-                TaskStatus::new_leader(
-                    vec![],
-                    true,
-                    user_id.clone(),
-                    Some(org_id.to_string()),
-                    Some(stream_type.to_string()),
-                    sql,
-                    start_time,
-                    end_time,
-                    s_event_type,
-                    in_req.search_event_context.clone(),
-                ),
-            )
-            .await;
-    }
+    // callers may share one trace_id across concurrent requests, e.g. Grafana via traceparent
+    let registration = SEARCH_SERVER.register_leader(
+        org_id,
+        &trace_id,
+        LeaderInfo {
+            user_id: user_id.as_deref(),
+            stream_type: stream_type.as_str(),
+            sql: &in_req.query.sql,
+            start_time: in_req.query.start_time,
+            end_time: in_req.query.end_time,
+            search_type: in_req.search_type.map(|t| t.to_string()),
+            search_event_context: in_req.search_event_context.as_ref(),
+        },
+    );
 
     let span = tracing::span::Span::current();
+    let query_tracker = registration.tracker().clone();
     let handle = tokio::task::spawn(
-        async move { cluster::http::search(request, query, req_regions, req_clusters, true).await }
-            .instrument(span),
+        async move {
+            cluster::http::search(
+                request,
+                &query_tracker,
+                query,
+                req_regions,
+                req_clusters,
+                true,
+            )
+            .await
+        }
+        .instrument(span),
     );
     let res = match handle.await {
         Ok(Ok(res)) => Ok(res),
@@ -218,16 +218,7 @@ pub async fn search(
         )
     );
 
-    // remove task because task if finished
-    let mut _work_group = None;
-    #[cfg(feature = "enterprise")]
-    {
-        if let Some((_, stat)) = SEARCH_SERVER.remove(org_id, &trace_id).await
-            && let Some(wg) = stat.work_group.as_ref()
-        {
-            _work_group = Some(wg.to_string());
-        };
-    }
+    let _work_group = registration.finish();
 
     match res {
         Ok(mut res) => {
@@ -787,10 +778,10 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
     Ok(search::QueryStatusResponse { status })
 }
 
-/// Cancels `trace_id` on every querier; `Some(org)` limits each node to that org's queries.
+/// Cancels `trace_id` in `org_id` on every querier.
 #[cfg(feature = "enterprise")]
 pub async fn cancel_query(
-    scope: Option<&str>,
+    org_id: &str,
     trace_id: &str,
 ) -> Result<search::CancelQueryResponse, Error> {
     // get nodes from cluster
@@ -816,7 +807,7 @@ pub async fn cancel_query(
         );
 
         let trace_id = trace_id.to_string();
-        let org_id = scope.map(str::to_string);
+        let org_id = org_id.to_string();
         let task = tokio::task::spawn(
             async move {
                 let mut request = tonic::Request::new(proto::cluster_rpc::CancelQueryRequest {
@@ -1066,9 +1057,9 @@ pub fn check_search_allowed(_org_id: &str, _stream: Option<&str>) -> Result<(), 
         }
         // this is installation level limit for all orgs combined
         if !o2_enterprise::enterprise::license::search_allowed() {
-            Err(Error::Message(
-                "Search is temporarily disabled due to exceeding allotted ingestion limit. Please contact your administrator.".to_string(),
-            ))
+            Err(Error::Message(search_blocked_message(
+                o2_enterprise::enterprise::license::current_license_id().as_deref(),
+            )))
         } else {
             Ok(())
         }
@@ -1109,6 +1100,16 @@ fn merge_cancel_outcomes(outcomes: Vec<Result<bool, Error>>) -> Result<bool, Err
 #[inline]
 fn is_license_exempt_stream(org_id: &str, stream: Option<&str>) -> bool {
     org_id == META_ORG_ID && (stream == Some(USAGE_STREAM) || stream == Some(AUDIT_STREAM))
+}
+
+#[cfg(any(feature = "enterprise", test))]
+fn search_blocked_message(license_id: Option<&str>) -> String {
+    match license_id.filter(|id| !id.is_empty()) {
+        Some(id) => format!(
+            "Search is temporarily disabled due to exceeding allotted ingestion limit. License ID: {id}. Please contact your administrator."
+        ),
+        None => "Search is temporarily disabled due to exceeding allotted ingestion limit. Please contact your administrator.".to_string(),
+    }
 }
 
 fn flatten_vrl_result(value: json::Value) -> Option<json::Value> {
@@ -1238,6 +1239,21 @@ mod tests {
     fn test_check_search_allowed_non_enterprise_always_ok() {
         assert!(check_search_allowed("myorg", None).is_ok());
         assert!(check_search_allowed("myorg", Some("logs")).is_ok());
+    }
+
+    #[test]
+    fn test_search_blocked_message_names_the_license() {
+        assert_eq!(
+            search_blocked_message(Some("2HbQ7f3aZk")),
+            "Search is temporarily disabled due to exceeding allotted ingestion limit. License ID: 2HbQ7f3aZk. Please contact your administrator."
+        );
+    }
+
+    #[test]
+    fn test_search_blocked_message_without_a_license_keeps_the_old_text() {
+        let old = "Search is temporarily disabled due to exceeding allotted ingestion limit. Please contact your administrator.";
+        assert_eq!(search_blocked_message(None), old);
+        assert_eq!(search_blocked_message(Some("")), old);
     }
 
     #[test]

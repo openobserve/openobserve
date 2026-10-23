@@ -1083,6 +1083,29 @@ describe("Login", () => {
     expect(userInfo.auth_time).toBeCloseTo(expectedAuthTime, -2);
   });
 
+  it("shows a rejected sign in as an inline alert, not a toast, and clears it on retry", async () => {
+    const authService = await import("@/services/auth");
+    (authService.default.sign_in_user as any).mockRejectedValueOnce({ response: { status: 401 } });
+    mockNotify.mockClear();
+
+    wrapper = mount(Login, { global: { plugins: [i18n, store, router] } });
+    wrapper.vm.name = "testuser";
+    wrapper.vm.password = "wrongpassword";
+    await wrapper.vm.onSignIn();
+    await flushPromises();
+
+    await wrapper.find('[data-test="login-as-internal-user"]').trigger("click");
+    const alert = wrapper.find('[data-test="login-error-message"]');
+    expect(alert.attributes("role")).toBe("alert");
+    expect(alert.text()).toBe("Invalid username or password");
+    expect(mockNotify).not.toHaveBeenCalled();
+
+    (authService.default.sign_in_user as any).mockResolvedValueOnce({ data: { status: false } });
+    await wrapper.vm.onSignIn();
+    await flushPromises();
+    expect(wrapper.find('[data-test="login-error-message"]').exists()).toBe(false);
+  });
+
   it("should handle failed sign in form validation reset", async () => {
     const authService = await import("@/services/auth");
 
@@ -1319,6 +1342,29 @@ describe("Login", () => {
     expect(wrapper.vm.submitting).toBe(true);
     expect(wrapper.vm.loginAsInternalUser).toBe(true);
     expect(wrapper.vm.autoRedirectDexLogin).toBe(true);
+  });
+
+  it("exposes the internal-login toggle as a button with aria-expanded", async () => {
+    store.state.zoConfig.sso_enabled = true;
+    store.state.zoConfig.native_login_enabled = true;
+    wrapper = mount(Login, { global: { plugins: [i18n, store, router] } });
+    const toggle = wrapper.find('[data-test="login-as-internal-user"]');
+    expect(toggle.element.tagName).toBe("BUTTON");
+    expect(toggle.attributes("aria-expanded")).toBe("false");
+    await toggle.trigger("click");
+    expect(toggle.attributes("aria-expanded")).toBe("true");
+  });
+
+  it("moves focus to the email field when the internal login opens", async () => {
+    store.state.zoConfig.sso_enabled = true;
+    store.state.zoConfig.native_login_enabled = true;
+    wrapper = mount(Login, {
+      attachTo: document.body,
+      global: { plugins: [i18n, store, router] },
+    });
+    await wrapper.find('[data-test="login-as-internal-user"]').trigger("click");
+    await flushPromises();
+    expect(document.activeElement?.getAttribute("data-test")).toBe("login-user-id-field");
   });
 
   // Test 53: Test tab and innerTab refs

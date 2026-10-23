@@ -112,7 +112,7 @@ describe("CompositeAlertForm", () => {
 
     expect(
       wrapper
-        .find('[data-test="alerts-composite-warning-counts-as-firing"]')
+        .find('[data-test="alerts-composite-warning-counts-as-firing-btn"]')
         .attributes("aria-checked"),
     ).toBe("true");
     expect(

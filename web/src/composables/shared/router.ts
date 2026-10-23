@@ -26,6 +26,7 @@ import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/tr
 import store from "@/stores";
 import { hasMetricsEditorParams } from "@/utils/metrics/metricsEditorParams";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
+import { forgetLinkRequest } from "@/utils/slackLink";
 
 const Search = () => import("@/plugins/logs/Index.vue");
 const SearchJobInspector = () => import("@/plugins/logs/SearchJobInspector.vue");
@@ -246,6 +247,7 @@ const useRoutes = () => {
           invalidateLoginData();
           useLocalCurrentUser("", true);
           useLocalUserInfo("", true);
+          forgetLinkRequest();
         } finally {
           window.location.href = `${getPath()}login`;
         }
@@ -276,6 +278,31 @@ const useRoutes = () => {
       component: () => import("@/views/SlackOAuthCallback.vue"),
       meta: {
         titleKey: "routeTitles.slackOAuthCallback",
+      },
+    },
+    // The three Slack pages below need a session: signed out, the guard saves the URL and returns after login.
+    {
+      path: "/slack/link",
+      name: "slackLink",
+      component: () => import("@/views/SlackLink.vue"),
+      meta: {
+        titleKey: "routeTitles.slackLink",
+      },
+    },
+    {
+      path: "/slack/link/callback",
+      name: "slackLinkCallback",
+      component: () => import("@/views/SlackLinkCallback.vue"),
+      meta: {
+        titleKey: "routeTitles.slackLinkCallback",
+      },
+    },
+    {
+      path: "/slack/connect/callback",
+      name: "slackConnectCallback",
+      component: () => import("@/views/SlackConnectCallback.vue"),
+      meta: {
+        titleKey: "routeTitles.slackConnectCallback",
       },
     },
   ];

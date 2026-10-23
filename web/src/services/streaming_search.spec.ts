@@ -532,7 +532,7 @@ describe("streaming_search service", () => {
   });
 
   describe("cancelStream", () => {
-    it("should make PUT request with traceId in array body", async () => {
+    it("should make PUT request with the trace id and its org in the body", async () => {
       mockHttpInstance.put.mockResolvedValue({ data: {} });
 
       await stream.cancelStream({
@@ -541,7 +541,7 @@ describe("streaming_search service", () => {
       });
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith("/api/test-org/query_manager/cancel", [
-        "trace-cancel-1",
+        { trace_id: "trace-cancel-1", org_id: "test-org" },
       ]);
     });
 
@@ -552,7 +552,7 @@ describe("streaming_search service", () => {
       for (const traceId of traceIds) {
         await stream.cancelStream({ org_identifier: "test-org", traceId });
         expect(mockHttpInstance.put).toHaveBeenCalledWith("/api/test-org/query_manager/cancel", [
-          traceId,
+          { trace_id: traceId, org_id: "test-org" },
         ]);
       }
     });

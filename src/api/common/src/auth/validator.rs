@@ -34,8 +34,8 @@ pub use openobserve_core::auth::get_user_email_from_auth_str;
 pub use openobserve_core::authz::{check_permissions, list_objects_for_user};
 use openobserve_core::{
     auth::{
-        AuthExtractor, SESSION_AUTH_MARKER, get_hash, get_user_details, org_from_path, routed_path,
-        try_get_hash,
+        AuthExtractor, SESSION_AUTH_MARKER, get_hash, get_user_details,
+        is_license_path_without_org, org_from_path, routed_path, try_get_hash,
     },
     users,
 };
@@ -77,6 +77,8 @@ pub enum AuthError {
     Locked {
         retry_after_secs: i64,
     },
+    /// The credential could not be checked because a store it needs is down; the client may retry.
+    Unavailable(String),
 }
 
 impl std::fmt::Display for AuthError {
@@ -88,6 +90,7 @@ impl std::fmt::Display for AuthError {
             AuthError::Locked { retry_after_secs } => {
                 write!(f, "Locked: {}", lockout_message(*retry_after_secs))
             }
+            AuthError::Unavailable(msg) => write!(f, "Unavailable: {}", msg),
         }
     }
 }
@@ -129,6 +132,7 @@ impl IntoResponse for AuthError {
                 .header(header::RETRY_AFTER, retry_after_secs)
                 .body(Body::from(lockout_message(retry_after_secs)))
                 .unwrap(),
+            AuthError::Unavailable(msg) => (StatusCode::SERVICE_UNAVAILABLE, msg).into_response(),
         }
     }
 }
@@ -148,6 +152,7 @@ pub struct AuthValidationResult {
     pub is_internal_user: bool,
     /// Name of the org ingestion token the request authenticated with.
     pub token_name: Option<String>,
+    pub delegation: Option<super::delegation::DelegatedCaller>,
 }
 
 /// What a password comparison decided, once the lockout policy has had its say.
@@ -234,6 +239,7 @@ pub async fn validator(
                         user_role: res.user_role,
                         is_internal_user: res.is_internal_user,
                         token_name: None,
+                        delegation: None,
                     });
                 }
 
@@ -255,6 +261,7 @@ pub async fn validator(
                         user_role: res.user_role,
                         is_internal_user: res.is_internal_user,
                         token_name,
+                        delegation: None,
                     })
                 } else {
                     Err(AuthError::Forbidden("Unauthorized Access".to_string()))
@@ -291,7 +298,7 @@ pub async fn validate_token(token: &str, org_id: &str) -> Result<(), AuthError> 
 /// `is_external` short-circuit means native/internal principals (incl. root, which is internal)
 /// skip the cache lookup entirely. Kept as one helper so the validator call sites stay identical.
 #[cfg(feature = "enterprise")]
-async fn blocked_external(user: &config::meta::user::User) -> bool {
+pub(crate) async fn blocked_external(user: &config::meta::user::User) -> bool {
     use o2_enterprise::enterprise::domain_management::{self, meta::AccessDecision};
     user.is_external
         && matches!(
@@ -300,15 +307,9 @@ async fn blocked_external(user: &config::meta::user::User) -> bool {
         )
 }
 
-/// Reads whose answer is instance-wide, so membership in the org named by the path is irrelevant.
-///
-/// `license` carries no org at all. `password_complexity` carries one but ignores it: the policy is
-/// the same for every organization, and the caller who most needs it is a user blocked for a forced
-/// password reset — who has to be told what password will satisfy the policy regardless of which
-/// org the console happens to be pointed at. Neither response contains org-scoped data, so nothing
-/// cross-tenant leaks by admitting a non-member.
-fn is_org_agnostic_read(path: &str) -> bool {
-    if path == "license" {
+/// A non-member may be looked up here: license routes name no org, password_complexity ignores it.
+fn is_org_agnostic_path(path: &str) -> bool {
+    if is_license_path_without_org(&path.split('/').collect::<Vec<_>>()) {
         return true;
     }
     let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
@@ -571,7 +572,7 @@ pub async fn validate_credentials(
         // rest of api calls will get blocked anyways, but without this,
         // native users get stuck in logout loop if they go to any page calling license
         // api call
-        if is_org_agnostic_read(path)
+        if is_org_agnostic_path(path)
             && let Ok(v) = db::user::get_user_record(user_id).await
         {
             // we set the record manually with minimal permission,
@@ -1069,6 +1070,7 @@ pub async fn validator_aws(req_data: &RequestData) -> Result<AuthValidationResul
                                 user_role: res.user_role,
                                 is_internal_user: res.is_internal_user,
                                 token_name: None,
+                                delegation: None,
                             })
                         } else {
                             Err(AuthError::Unauthorized("Unauthorized Access".to_string()))
@@ -1112,6 +1114,7 @@ pub async fn validator_gcp(req_data: &RequestData) -> Result<AuthValidationResul
                             user_role: res.user_role,
                             is_internal_user: res.is_internal_user,
                             token_name: None,
+                            delegation: None,
                         })
                     } else {
                         Err(AuthError::Unauthorized("Unauthorized Access".to_string()))
@@ -1194,6 +1197,7 @@ pub async fn validator_rum(req_data: &RequestData) -> Result<AuthValidationResul
                         user_role: Some(user.role),
                         is_internal_user: !user.is_external,
                         token_name: None,
+                        delegation: None,
                     })
                 } else {
                     Ok(AuthValidationResult {
@@ -1201,6 +1205,7 @@ pub async fn validator_rum(req_data: &RequestData) -> Result<AuthValidationResul
                         user_role: None,
                         is_internal_user: false,
                         token_name: None,
+                        delegation: None,
                     })
                 }
             }
@@ -1262,6 +1267,19 @@ async fn oo_validator_internal(
             is_from_session,
         )
         .await
+    } else if let Some(token) = auth_str
+        .strip_prefix("Bearer ")
+        .map(str::trim)
+        .filter(|token| token.starts_with(config::utils::delegation::TOKEN_PREFIX))
+    {
+        let result = super::delegation::validate_delegated(
+            token,
+            req_data.uri.path(),
+            path_prefix,
+            &req_data.method,
+        )
+        .await?;
+        super::delegation::authorize(result, auth_info).await
     } else if auth_str.starts_with("Bearer") {
         log::debug!("Bearer token found");
         // token_validator unwraps a "Bearer" prefix, so it must not see the session marker.
@@ -2577,6 +2595,12 @@ CN5lTowpVXP2OIiiNTGa75Fj
     }
 
     #[test]
+    fn an_unavailable_store_answers_503() {
+        let response = AuthError::Unavailable("Service Unavailable".to_string()).into_response();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[test]
     fn test_get_user_details() {
         // Test valid credentials
         let valid_creds = "username:password".as_bytes().to_vec();
@@ -2712,24 +2736,43 @@ CN5lTowpVXP2OIiiNTGa75Fj
 
     #[test]
     fn org_agnostic_reads_cover_license_and_password_complexity() {
-        assert!(is_org_agnostic_read("license"));
-        assert!(is_org_agnostic_read("acme/password_complexity"));
-        assert!(is_org_agnostic_read("_meta/password_complexity"));
+        assert!(is_org_agnostic_path("license"));
+        assert!(is_org_agnostic_path("license/refresh"));
+        assert!(is_org_agnostic_path("acme/password_complexity"));
+        assert!(is_org_agnostic_path("_meta/password_complexity"));
         // An org literally named "api" still resolves as an org.
-        assert!(is_org_agnostic_read("api/password_complexity"));
+        assert!(is_org_agnostic_path("api/password_complexity"));
     }
 
     #[test]
     fn org_agnostic_reads_do_not_widen_anything_else() {
         // Authoring the policy keeps its org-membership requirement.
-        assert!(!is_org_agnostic_read("acme/settings/password_policy"));
-        assert!(!is_org_agnostic_read("_meta/settings/password_policy"));
+        assert!(!is_org_agnostic_path("acme/settings/password_policy"));
+        assert!(!is_org_agnostic_path("_meta/settings/password_policy"));
         // Neither do neighbouring or deeper paths.
-        assert!(!is_org_agnostic_read("acme/password_complexity/detail"));
+        assert!(!is_org_agnostic_path("acme/password_complexity/detail"));
         // The path arrives nest-stripped, so a leading `api` is an org name, not the mount.
-        assert!(!is_org_agnostic_read("api/kv/password_complexity"));
-        assert!(!is_org_agnostic_read("acme/streams"));
-        assert!(!is_org_agnostic_read("password_complexity"));
-        assert!(!is_org_agnostic_read("license/keys"));
+        assert!(!is_org_agnostic_path("api/kv/password_complexity"));
+        assert!(!is_org_agnostic_path("acme/streams"));
+        assert!(!is_org_agnostic_path("password_complexity"));
+        assert!(!is_org_agnostic_path("license/keys"));
+        assert!(!is_org_agnostic_path("license/refresh/now"));
+        assert!(!is_org_agnostic_path("license/refresh/"));
+        assert!(!is_org_agnostic_path("acme/license/refresh"));
+    }
+
+    #[tokio::test]
+    async fn an_o2dt_bearer_token_goes_to_the_delegated_validator() {
+        let req_data = RequestData {
+            uri: "/api/default/streams".parse::<Uri>().unwrap(),
+            method: Method::GET,
+            headers: HeaderMap::new(),
+        };
+        let auth_info = AuthExtractor::bypass("Bearer o2dt.e30.bWFj".to_string(), String::new());
+        match oo_validator(&req_data, &auth_info).await {
+            Err(AuthError::Unauthorized(msg)) => assert_eq!(msg, "Unauthorized Access"),
+            Err(other) => panic!("expected 401, got {other}"),
+            Ok(_) => panic!("a forged delegated token was accepted"),
+        }
     }
 }

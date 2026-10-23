@@ -3028,6 +3028,20 @@ export class TracesPage {
     await this.page.getByRole('option', { name: String(size), exact: true }).click();
   }
 
+  // J/K is ignored while the list's loading prop is true (TracesSearchResultList stepTraceRow).
+  async expectTraceListIdle(timeout = 30000) {
+    await expect(this.page.locator(`${this.searchResultList} [data-test="o2-table"]`))
+      .toHaveAttribute('data-test-loading', 'false', { timeout });
+  }
+
+  async expectTraceListPageLoaded(prevLastIndex = 24, timeout = 30000) {
+    await expect(this.page.locator(`${this.searchResultList} [data-test="o2-table-row-${prevLastIndex}"]`))
+      .toHaveCount(0, { timeout });
+    await this.expectTraceListIdle(timeout);
+    await expect(this.page.locator(`${this.searchResultList} [data-test="o2-table-row-0"]`))
+      .toBeAttached({ timeout });
+  }
+
   // ----- Search windows, saved views and the shared error state (#15130) -----
 
   // Records every traces search the page sends; `panel` is the RED chart name or 'results'.

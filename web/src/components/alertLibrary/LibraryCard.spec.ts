@@ -314,4 +314,32 @@ describe("LibraryCard", () => {
     const wrapper = mountCard({ entry: { ...entry, description: "" } });
     expect(wrapper.text()).toContain("Pod OOM Killed");
   });
+
+  describe("anomaly alerts", () => {
+    const anomaly: AlertLibraryEntry = {
+      ...entry,
+      id: "apm/traces_server_error_ratio_anomaly",
+      query_type: "sql",
+      alert_type: "anomaly_detection",
+    };
+
+    it("badges an anomaly alert", () => {
+      const badge = mountCard({ entry: anomaly }).find('[data-test="alert-library-card-anomaly"]');
+      expect(badge.exists()).toBe(true);
+      expect(badge.text()).toBe("Anomaly");
+    });
+
+    it("does not badge a scheduled alert, nor one from a manifest without alert_type", () => {
+      expect(mountCard().find('[data-test="alert-library-card-anomaly"]').exists()).toBe(false);
+      const scheduled = mountCard({ entry: { ...entry, alert_type: "scheduled" } });
+      expect(scheduled.find('[data-test="alert-library-card-anomaly"]').exists()).toBe(false);
+    });
+
+    it("shows the Enterprise badge only when locked", () => {
+      const locked = mountCard({ entry: anomaly, locked: true });
+      expect(locked.find('[data-test="alert-library-card-enterprise"]').text()).toBe("Enterprise");
+      const open = mountCard({ entry: anomaly });
+      expect(open.find('[data-test="alert-library-card-enterprise"]').exists()).toBe(false);
+    });
+  });
 });

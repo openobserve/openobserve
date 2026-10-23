@@ -33,7 +33,7 @@ use {
         },
     },
     crate::search::{
-        query_manager::cancel_query_inner,
+        query_manager::cancel_in_cluster,
         utils::{
             StreamPermissionResourceType, check_cipher_key_permissions, check_stream_permissions,
         },
@@ -181,19 +181,17 @@ pub async fn submit_job(
             }
         };
 
-        // Check permissions on stream
-        for stream_name in stream_names.iter() {
-            if let Some(res) = check_stream_permissions(
-                stream_name,
-                &org_id,
-                &user_id,
-                &stream_type,
-                StreamPermissionResourceType::Search,
-            )
-            .await
-            {
-                return res;
-            }
+        if let Some(res) = crate::search::check_sql_stream_permissions(
+            &req.query.sql,
+            &org_id,
+            &user_id,
+            stream_type,
+            StreamPermissionResourceType::Search,
+            &trace_id,
+        )
+        .await
+        {
+            return res;
         }
 
         if let Some(res) = check_cipher_key_permissions(&org_id, &user_id, &req.query.sql).await {
@@ -689,7 +687,10 @@ async fn cancel_job_inner(org_id: &str, job_id: &str, user_id: &str) -> Response
     }
 
     // 4. use cancel query function to cancel the query
-    cancel_query_inner(Some(org_id), &[&job.trace_id]).await
+    match cancel_in_cluster(org_id, &job.trace_id).await {
+        Ok(status) => Json(vec![status]).into_response(),
+        Err(e) => MetaHttpResponse::bad_request(e),
+    }
 }
 
 #[cfg(feature = "enterprise")]
@@ -728,6 +729,17 @@ fn apply_pagination(response: SearchResponse, from: i64, size: i64) -> Response 
 #[cfg(feature = "enterprise")]
 async fn check_permissions(job: &JobModel, org_id: &str, user_id: &str) -> Option<Response> {
     let stream_type = StreamType::from(job.stream_type.as_str());
+    if let Ok(req) = json::from_str::<Request>(&job.payload) {
+        return crate::search::check_sql_stream_permissions(
+            &req.query.sql,
+            org_id,
+            user_id,
+            stream_type,
+            StreamPermissionResourceType::Search,
+            &job.trace_id,
+        )
+        .await;
+    }
     let stream_names: Vec<String> = json::from_str(&job.stream_names).unwrap();
     for stream_name in stream_names.iter() {
         if let Some(res) = check_stream_permissions(

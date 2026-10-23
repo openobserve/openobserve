@@ -1,6 +1,7 @@
 <template>
   <OButtonGroup data-test="dashboard-sort-by-btn-group">
     <OButton
+      :aria-label="t('dashboard.sortByClear')"
       :active="!fieldObj.sortBy"
       variant="outline"
       size="icon-xs"
@@ -10,6 +11,7 @@
       <template #icon-left><OIcon name="block" size="sm" /></template>
     </OButton>
     <OButton
+      :aria-label="t('dashboard.sortByAsc')"
       :active="fieldObj.sortBy === 'ASC'"
       variant="outline"
       size="icon-xs"
@@ -19,6 +21,7 @@
       <template #icon-left><AscSort /></template>
     </OButton>
     <OButton
+      :aria-label="t('dashboard.sortByDesc')"
       :active="fieldObj.sortBy === 'DESC'"
       variant="outline"
       size="icon-xs"
