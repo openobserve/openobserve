@@ -505,43 +505,37 @@ describe("License.vue", () => {
       const field = () => wrapper.find('textarea[data-test="update-license-key-input-field"]');
       await field().setValue("half-typed-key");
 
-      await wrapper.vm.triggerLimitRefresh();
+      await wrapper.vm.reloadLicenseData();
       await flushPromises();
       expect(field().element.value).toBe("half-typed-key");
 
-      const before = vi.mocked(licenseServer.get_license).mock.calls.length;
-      await vi.advanceTimersByTimeAsync(LICENSE_REFRESH_SETTLE_MS);
+      await wrapper.vm.reloadLicenseData();
       await flushPromises();
-      expect(vi.mocked(licenseServer.get_license).mock.calls.length).toBe(before + 1);
       expect(wrapper.text()).not.toContain("Loading license information");
       expect(field().element.value).toBe("half-typed-key");
     });
 
-    it("refresh sends one request per click burst and spins only while it runs", async () => {
-      let resolveRefresh: (v: unknown) => void = () => {};
-      vi.mocked(licenseServer.refresh_license_limits).mockImplementation(
-        () => new Promise((r) => (resolveRefresh = r)) as never,
-      );
-      const first = wrapper.vm.triggerLimitRefresh();
-      const second = wrapper.vm.triggerLimitRefresh();
+    it("refresh button lives in the online card", async () => {
+      wrapper.vm.licenseData = {
+        ...mockLicenseData,
+        refresh: {
+          mode: "online",
+          registration: "registered",
+          server_host: "license.openobserve.ai",
+          key_id: "synthetic-id",
+          last_success_at: null,
+          key_at_rest: "encrypted",
+          last_outcome: null,
+        },
+        can_update_license: true,
+      };
       await flushPromises();
-      expect(licenseServer.refresh_license_limits).toHaveBeenCalledTimes(1);
-      expect(wrapper.vm.refreshing).toBe(true);
-
-      resolveRefresh(createAxiosResponse({}));
-      await Promise.all([first, second]);
-      await flushPromises();
-      expect(wrapper.vm.refreshing).toBe(false);
-
-      let resolveReload: (v: unknown) => void = () => {};
-      vi.mocked(licenseServer.get_license).mockImplementation(
-        () => new Promise((r) => (resolveReload = r)) as never,
-      );
-      await vi.advanceTimersByTimeAsync(LICENSE_REFRESH_SETTLE_MS);
-      expect(licenseServer.get_license).toHaveBeenCalled();
-      expect(wrapper.vm.refreshing).toBe(false);
-      resolveReload(createAxiosResponse(mockLicenseData));
-      await flushPromises();
+      expect(wrapper.find('[data-test="refresh-license-limits-btn"]').exists()).toBe(false);
+      expect(
+        wrapper
+          .find('[data-test="license-online-card"] [data-test="license-online-refresh"]')
+          .text(),
+      ).toBe("Refresh now");
     });
 
     it("unmounting before the delay cancels the reload", async () => {

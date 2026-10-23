@@ -102,6 +102,15 @@
             :can-update-license="licenseData.can_update_license === true"
             @add-license-key="showUpdateFormAndFocus"
           />
+          <LicenseOnlineRefreshCard
+            v-if="licenseData.refresh"
+            :refresh="licenseData.refresh"
+            :can-update="licenseData.can_update_license === true"
+            :env-key-active="!!licenseData.env_key_active"
+            :is-root="!!licenseData.refresh.key_id || !!licenseData.refresh.stored_key"
+            @add-license-key="showUpdateFormAndFocus"
+            @refreshed="reloadLicenseData"
+          />
           <OCard class="border-card-glass-border border border-solid">
             <OCardSection role="body">
               <div class="mb-3 text-xl font-semibold">{{ t("about.license_info") }}</div>
@@ -260,16 +269,6 @@
                   @click="showUpdateFormAndFocus"
                 >
                   {{ t("about.add_new_license_key") }}
-                </OButton>
-                <OButton
-                  data-test="refresh-license-limits-btn"
-                  variant="primary"
-                  size="sm-action"
-                  v-if="licenseData.license != null"
-                  :loading="refreshing"
-                  @click="triggerLimitRefresh"
-                >
-                  {{ t("about.refresh_license_limits") }}
                 </OButton>
               </div>
             </OCardSection>
@@ -563,6 +562,7 @@ import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import DOMPurify from "dompurify";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
+import LicenseOnlineRefreshCard from "./LicenseOnlineRefreshCard.vue";
 import LicenseStatusCard from "./LicenseStatusCard.vue";
 import LicenseWaiversCard from "./LicenseWaiversCard.vue";
 import LicenseFeatures from "./LicenseFeatures.vue";
@@ -591,6 +591,7 @@ export default defineComponent({
   components: {
     LicensePeriod,
     LicenseStatusCard,
+    LicenseOnlineRefreshCard,
     LicenseWaiversCard,
     LicenseFeatures,
     LicenseKeyCheck,
@@ -611,7 +612,6 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const { confirm } = useConfirmDialog();
     const loading = ref(false);
-    const refreshing = ref(false);
     const licenseData = ref<any>({});
     const licenseKey = ref("");
     const result = ref<KeyCheckResult | null>(null);
@@ -632,7 +632,7 @@ export default defineComponent({
     const showLicenseKeyModal = ref(false);
     const isLicenseKeyAutoFilled = ref(false);
     const store = useStore();
-    const { refreshLicenseLimits, scheduleReload } = useLicenseRefresh();
+    const { scheduleReload } = useLicenseRefresh();
     const usageDashboardData = ref<any>(null);
     const dashboardRenderKey = ref(0);
 
@@ -786,16 +786,6 @@ export default defineComponent({
           textarea.focus();
         }
       }, 100);
-    };
-
-    const triggerLimitRefresh = async () => {
-      if (refreshing.value) return;
-      refreshing.value = true;
-      try {
-        if (await refreshLicenseLimits(adoptRefetchedLicense)) await reloadLicenseData();
-      } finally {
-        refreshing.value = false;
-      }
     };
 
     const maskKey = (key: string) => {
@@ -1162,7 +1152,7 @@ export default defineComponent({
       raw,
       store,
       loading,
-      refreshing,
+      reloadLicenseData,
       licenseData,
       licenseKey,
       showUpdateForm,
@@ -1191,7 +1181,6 @@ export default defineComponent({
       showLicenseExpiryWarning,
       getLicenseExpiryMessage,
       showUpdateFormAndFocus,
-      triggerLimitRefresh,
       maskKey,
       getMaskedLicenseKey,
       copyLicenseKey,
