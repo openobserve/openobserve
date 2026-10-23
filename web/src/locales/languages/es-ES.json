@@ -1541,7 +1541,7 @@
     "shareOfCaller": "Parte del llamador",
     "partialResult": "Se muestra el {percent} de las muestras. Las pilas de llamadas menos comunes quedan fuera de esta vista.",
     "otherFrameHint": "Rutas de llamada más pequeñas, agrupadas para que el gráfico sea rápido.",
-    "truncatedFrameHint": "Llamadores más allá de 128 marcos, recortados de esta pila.",
+    "truncatedFrameHint": "Los llamadores que superan los 1000 marcos se han eliminado de esta pila.",
     "smallFrames": "{count} marco pequeño | {count} marcos pequeños",
     "smallFramesHint": "Demasiado estrechos para dibujarlos uno a uno.",
     "cpuDuration": "Duración de CPU",

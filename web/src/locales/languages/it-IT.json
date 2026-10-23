@@ -1541,7 +1541,7 @@
     "shareOfCaller": "Quota del chiamante",
     "partialResult": "Mostrato il {percent} dei campioni. Gli stack di chiamate meno comuni sono esclusi da questa vista.",
     "otherFrameHint": "Percorsi di chiamata più piccoli, raggruppati per mantenere il grafico veloce.",
-    "truncatedFrameHint": "Chiamanti oltre 128 frame, tagliati da questo stack.",
+    "truncatedFrameHint": "Chiamanti oltre 1000 frame, esclusi da questo stack.",
     "smallFrames": "{count} frame piccolo | {count} frame piccoli",
     "smallFramesHint": "Troppo sottili per essere disegnati uno per uno.",
     "cpuDuration": "Durata CPU",

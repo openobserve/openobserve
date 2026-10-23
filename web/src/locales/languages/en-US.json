@@ -1541,7 +1541,7 @@
     "shareOfCaller": "Share of Caller",
     "partialResult": "Showing {percent} of samples. Less common call stacks are left out of this view.",
     "otherFrameHint": "Smaller call paths, grouped together to keep the graph fast.",
-    "truncatedFrameHint": "Callers beyond 128 frames, cut from this stack.",
+    "truncatedFrameHint": "Callers beyond 1000 frames, cut from this stack.",
     "smallFrames": "{count} small frame | {count} small frames",
     "smallFramesHint": "Too thin to draw one by one.",
     "cpuDuration": "CPU duration",
