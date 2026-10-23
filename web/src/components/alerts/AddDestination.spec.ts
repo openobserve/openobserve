@@ -694,8 +694,7 @@ describe("AddDestination - prebuilt (single form, no nested <form>)", () => {
       template: "prebuilt_slack",
       skip_tls_verify: false,
       headers: {},
-      // prebuilt_type drives type resolution (Priority 1); credential_* metadata
-      // + the url are restored by extractPrebuiltCredentials.
+      // prebuilt_type alone decides the type; credential_* and the url refill the form.
       metadata: {
         prebuilt_type: "slack",
         credential_channel: "#ops",
@@ -739,6 +738,32 @@ describe("AddDestination - prebuilt (single form, no nested <form>)", () => {
       },
     );
     expect(hoisted.mockCreatePrebuilt).not.toHaveBeenCalled();
+  });
+
+  it("EDIT mode: a custom webhook to a ServiceNow URL stays custom and keeps its token header", async () => {
+    const headers = { Authorization: "Bearer tok" };
+    const customServiceNow: any = {
+      name: "snow-token",
+      url: "https://acme.service-now.com/api/now/table/incident",
+      type: "http",
+      method: "post",
+      template: "prebuilt_servicenow",
+      skip_tls_verify: false,
+      headers,
+      metadata: {},
+    };
+    wrapper = mountComp({ isAlerts: true, destination: customServiceNow });
+    await flushPromises();
+    const form = getForm(wrapper);
+
+    expect(form.state.values.destination_type).toBe("custom");
+    expect(form.state.values.apiHeaders).toEqual([{ key: "Authorization", value: "Bearer tok" }]);
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(hoisted.mockUpdatePrebuilt).not.toHaveBeenCalled();
+    expect((destinationService.update as any).mock.calls[0][0].data.headers).toEqual(headers);
   });
 
   it("restores PagerDuty severity from its substitution metadata on edit", async () => {

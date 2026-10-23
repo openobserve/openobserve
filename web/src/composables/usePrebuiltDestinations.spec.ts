@@ -832,24 +832,20 @@ describe("usePrebuiltDestinations", () => {
       expect(result).toBe("slack");
     });
 
-    it("returns type from system-prebuilt- template prefix", () => {
+    it.each([
+      ["no indicators", { name: "custom-destination" }],
+      ["a system-prebuilt- template", { template: "system-prebuilt-discord" }],
+      ["a prebuilt_ template", { template: "prebuilt_msteams" }],
+      [
+        "a prebuilt service URL",
+        {
+          url: "https://acme.service-now.com/api/now/table/incident",
+          metadata: {},
+        },
+      ],
+    ])("returns null for a custom destination with %s", (_, destination) => {
       const { detectPrebuiltType } = usePrebuiltDestinations();
-      const result = detectPrebuiltType({
-        template: "system-prebuilt-discord",
-      });
-      expect(result).toBe("discord");
-    });
-
-    it("returns type from prebuilt_ template prefix", () => {
-      const { detectPrebuiltType } = usePrebuiltDestinations();
-      const result = detectPrebuiltType({ template: "prebuilt_msteams" });
-      expect(result).toBe("msteams");
-    });
-
-    it("returns null when no indicators are present", () => {
-      const { detectPrebuiltType } = usePrebuiltDestinations();
-      const result = detectPrebuiltType({ name: "custom-destination" });
-      expect(result).toBeNull();
+      expect(detectPrebuiltType(destination)).toBeNull();
     });
   });
 
