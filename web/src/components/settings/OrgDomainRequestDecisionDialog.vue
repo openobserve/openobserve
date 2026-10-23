@@ -38,11 +38,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           approve
             ? t("settings.orgDomainMapping.approveBody", {
                 domain: request.domain,
-                org: request.org_id,
+                org: orgName,
               })
             : t("settings.orgDomainMapping.rejectBody", {
                 domain: request.domain,
-                org: request.org_id,
+                org: orgName,
               })
         }}
       </p>
@@ -73,6 +73,7 @@ const props = defineProps<{
   open: boolean;
   request: OrgDomainRequest | null;
   approve: boolean;
+  orgName: string;
   /** Resolves true once the decision is saved; the dialog stays open on false. */
   submit: (_reason: string) => Promise<boolean>;
 }>();

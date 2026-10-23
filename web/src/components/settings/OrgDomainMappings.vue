@@ -274,23 +274,33 @@ const domainOptions = computed<SelectOption[]>(() =>
   verifiedDomains.value.map((domain) => ({ label: raw(domain), value: domain })),
 );
 
-const orgOptions = computed<SelectOption[]>(() => {
-  const current = store.state.selectedOrganization;
-  const options: SelectOption[] = [
-    { label: raw(current?.label || props.orgId), value: props.orgId },
-  ];
-  for (const member of members.data.value ?? []) {
-    if (member.member_org_id === props.orgId) continue;
-    options.push({
-      label: raw(member.member_org_name || member.member_org_id),
-      value: member.member_org_id,
-    });
+// Billing-group names first, then the user's own orgs; the id is the last resort.
+const orgNames = computed(() => {
+  const names = new Map<string, string>();
+  for (const org of store.state.organizations ?? []) {
+    if (org?.identifier && org?.name) names.set(org.identifier, org.name);
   }
-  return options;
+  if (store.state.selectedOrganization?.label) {
+    names.set(props.orgId, store.state.selectedOrganization.label);
+  }
+  for (const member of members.data.value ?? []) {
+    if (member.member_org_name) names.set(member.member_org_id, member.member_org_name);
+  }
+  return names;
 });
 
-const orgLabel = (orgId: string) =>
-  orgOptions.value.find((o) => o.value === orgId)?.label ?? raw(orgId);
+const orgLabel = (orgId: string) => raw(orgNames.value.get(orgId) || orgId);
+
+const orgOptions = computed<SelectOption[]>(() => {
+  const ids = [props.orgId];
+  for (const member of members.data.value ?? []) {
+    if (!ids.includes(member.member_org_id)) ids.push(member.member_org_id);
+  }
+  // An edited mapping keeps its org selectable even before the member list loads.
+  const editingOrg = dialogMapping.value?.org_id;
+  if (editingOrg && !ids.includes(editingOrg)) ids.push(editingOrg);
+  return ids.map((id) => ({ label: orgLabel(id), value: id }));
+});
 
 // The badge registry keys the User role as `user`; `allowed_user` is its OpenFGA relation name.
 const badgeRole = (role: string) => (role === "allowed_user" ? "user" : role);

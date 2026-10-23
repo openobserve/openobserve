@@ -43,21 +43,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ summary }}
         </p>
         <dl
-          v-if="request"
+          v-if="request || verifiedAt"
           class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm"
           data-test="settings-org-domain-details-facts"
         >
-          <dt class="text-text-secondary">{{ t("settings.orgDomainMapping.requestedBy") }}</dt>
-          <dd class="text-text-body min-w-0 break-all">{{ raw(request.requested_by) }}</dd>
-          <dt class="text-text-secondary">{{ t("settings.orgDomainMapping.requestedAt") }}</dt>
-          <dd class="text-text-body"><OTimeCell :value="request.created_at" unit="us" /></dd>
-          <template v-if="request.status !== 0">
+          <template v-if="request">
+            <dt class="text-text-secondary">{{ t("settings.orgDomainMapping.requestedBy") }}</dt>
+            <dd class="text-text-body min-w-0 break-all">{{ raw(request.requested_by) }}</dd>
+            <dt class="text-text-secondary">{{ t("settings.orgDomainMapping.requestedAt") }}</dt>
+            <dd class="text-text-body"><OTimeCell :value="request.created_at" unit="us" /></dd>
+          </template>
+          <template v-if="request && request.status !== 0">
             <dt class="text-text-secondary">{{ t("settings.orgDomainMapping.answeredBy") }}</dt>
             <dd class="text-text-body min-w-0 break-all">
               {{ raw(request.answered_by || "—") }}
             </dd>
             <dt class="text-text-secondary">{{ t("settings.orgDomainMapping.reason") }}</dt>
             <dd class="text-text-body min-w-0 break-words">{{ raw(request.reason || "—") }}</dd>
+          </template>
+          <template v-if="verifiedAt">
+            <dt class="text-text-secondary">{{ t("settings.orgDomainMapping.verifiedAt") }}</dt>
+            <dd class="text-text-body" data-test="settings-org-domain-details-verified-at">
+              <OTimeCell :value="verifiedAt" unit="us" />
+            </dd>
           </template>
         </dl>
       </template>
@@ -107,6 +115,15 @@ const title = computed(() => {
   return canVerify.value
     ? t("settings.orgDomainMapping.verifyDialogTitle", { domain: props.domain })
     : t("settings.orgDomainMapping.recordDialogTitle", { domain: props.domain });
+});
+
+// Links approved from a request carry no `verified_at`, so the approval time stands in for it.
+const verifiedAt = computed<number | null>(() => {
+  const link = props.link;
+  if (!link || link.verification_state !== 1) return null;
+  if (link.verified_at) return link.verified_at;
+  if (props.request?.status === 1) return props.request.updated_at;
+  return link.last_checked_at ?? link.updated_at;
 });
 
 const summary = computed(() => {

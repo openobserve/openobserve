@@ -92,6 +92,15 @@ export const billingGroupMembersQuery = (org: string) =>
     staleTime: NORMAL_STALE_TIME,
   });
 
+/** Every org, readable from the meta org only. */
+export const adminOrgsQuery = (org: string) =>
+  queryOptions({
+    queryKey: organizationKeys.adminOrgs(org),
+    queryFn: async (): Promise<{ identifier: string; name: string }[]> =>
+      (await organizations.get_admin_org(org)).data?.data ?? [],
+    staleTime: MEDIUM_STALE_TIME,
+  });
+
 // ── Writes ──────────────────────────────────────────────────────────────────
 
 export const createIngestionTokenMutation = (org: string) =>

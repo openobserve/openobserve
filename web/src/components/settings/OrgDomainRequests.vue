@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :last-run-at="requests.dataUpdatedAt.value || null"
           :loading="requests.isFetching.value"
           data-test="settings-org-domain-requests-refresh-btn"
-          @click="requests.refetch()"
+          @click="refresh"
         />
       </template>
       <template #empty>
@@ -161,6 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="decisionOpen"
       :request="decisionRequest"
       :approve="decisionApprove"
+      :org-name="decisionRequest ? orgLabel(decisionRequest.org_id) : ''"
       :submit="submitDecision"
     />
   </div>
@@ -187,6 +188,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { OrgDomainRequest } from "@/services/organizations";
 import {
+  adminOrgsQuery,
   decideOrgDomainRequestMutation,
   orgDomainRequestsQuery,
 } from "@/services/organizations.queries";
@@ -207,6 +209,7 @@ const STATUS_BADGES: Record<number, { variant: BadgeVariant; labelKey: I18nKey }
 };
 
 const requests = useQuery(() => orgDomainRequestsQuery(props.orgId));
+const orgs = useQuery(() => adminOrgsQuery(props.orgId));
 const decide = useMutation(() => decideOrgDomainRequestMutation(props.orgId));
 
 const loadError = computed(() => {
@@ -214,6 +217,16 @@ const loadError = computed(() => {
   if (!err) return null;
   return err?.response?.data?.message || err?.message || t("settings.orgDomainMapping.loadFailed");
 });
+
+const orgNames = computed(
+  () => new Map((orgs.data.value ?? []).map((org) => [org.identifier, org.name])),
+);
+const orgLabel = (orgId: string) => raw(orgNames.value.get(orgId) || orgId);
+
+function refresh() {
+  requests.refetch();
+  orgs.refetch();
+}
 
 const statusFilter = ref<StatusFilter>("pending");
 const filterQuery = ref("");
@@ -223,7 +236,9 @@ const visibleRows = computed(() => {
   return (requests.data.value ?? []).filter((req) => {
     if (statusFilter.value === "pending" && req.status !== 0) return false;
     if (!query) return true;
-    return [req.domain, req.org_id, req.requested_by].some((v) => v.toLowerCase().includes(query));
+    return [req.domain, req.org_id, orgLabel(req.org_id), req.requested_by].some((v) =>
+      v.toLowerCase().includes(query),
+    );
   });
 });
 
@@ -239,7 +254,7 @@ const columns: OTableColumnDef<OrgDomainRequest>[] = [
   {
     id: "org_id",
     header: t("settings.orgDomainMapping.organization"),
-    accessorKey: "org_id",
+    accessorFn: (row) => orgLabel(row.org_id),
     sortable: true,
     size: 220,
   },

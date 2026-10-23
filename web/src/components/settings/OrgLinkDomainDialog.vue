@@ -37,7 +37,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('settings.orgDomainMapping.domain')"
         required
         :placeholder="t('settings.domainPlaceholder', { example: raw('example.com') })"
-        :help-text="t('settings.orgDomainMapping.domainHelp', { at_sign: '@' })"
+        :help-text="
+          method === 'request'
+            ? t('settings.orgDomainMapping.domainHelpRequest', { at_sign: '@' })
+            : t('settings.orgDomainMapping.domainHelp', { at_sign: '@' })
+        "
       />
 
       <div class="flex flex-col gap-2">

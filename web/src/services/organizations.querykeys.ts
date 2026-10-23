@@ -33,4 +33,5 @@ export const organizationKeys = {
   domains: (org: string) => orgKey(org, "organizations", "domains"),
   domainRequests: (org: string) => orgKey(org, "organizations", "domainRequests"),
   billingGroupMembers: (org: string) => orgKey(org, "organizations", "billingGroupMembers"),
+  adminOrgs: (org: string) => orgKey(org, "organizations", "adminOrgs"),
 };
