@@ -415,8 +415,9 @@ export class AlertCreationWizard {
      * @param {string} streamName - Name of the stream
      * @param {string} destinationName - Name of the destination
      * @param {string} randomValue - Random string for unique naming
+     * @param {string} [sqlQuery] - SQL to save the alert on; defaults to the e2e_automate query
      */
-    async createScheduledAlertWithSQL(streamName, destinationName, randomValue) {
+    async createScheduledAlertWithSQL(streamName, destinationName, randomValue, sqlQuery = null) {
         const randomAlertName = 'auto_scheduled_alert_' + randomValue;
         this.currentAlertName = randomAlertName;
 
@@ -462,7 +463,7 @@ export class AlertCreationWizard {
         await monacoEditor.waitFor({ state: 'visible', timeout: 30000 });
         await monacoEditor.click({ force: true });
         await this.page.waitForTimeout(500);
-        await this.page.keyboard.type('SELECT kubernetes_labels_name FROM "e2e_automate" where kubernetes_labels_name = \'ziox-querier\'');
+        await this.page.keyboard.type(sqlQuery || 'SELECT kubernetes_labels_name FROM "e2e_automate" where kubernetes_labels_name = \'ziox-querier\'');
         testLogger.info('Entered SQL query');
 
         await this.page.locator(this.locators.runQueryButton).click();
