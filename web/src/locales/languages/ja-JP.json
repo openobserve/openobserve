@@ -3942,7 +3942,7 @@
     "delete": "削除",
     "confirmDeleteHead": "ストリームを削除",
     "confirmBatchDeleteHead": "ストリームを削除",
-    "confirmDeleteMsg": "このストリームを削除してもよろしいですか?",
+    "confirmDeleteMsg": "{name} ストリームを削除してもよろしいですか?",
     "confirmBatchDeleteMsg": "選択したストリームを削除してよろしいですか?",
     "deleteAssociatedAlertsPipelines": "ストリームに関連付けられているすべてのパイプラインとアラートを削除する",
     "cancel": "キャンセル",

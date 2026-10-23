@@ -3942,7 +3942,7 @@
     "delete": "Sil",
     "confirmDeleteHead": "Akışı Sil",
     "confirmBatchDeleteHead": "Akışları Sil",
-    "confirmDeleteMsg": "Bu akışı silmek istediğinizden emin misiniz?",
+    "confirmDeleteMsg": "{name} akışını silmek istediğinizden emin misiniz?",
     "confirmBatchDeleteMsg": "Seçili akışları silmek istediğinizden emin misiniz?",
     "deleteAssociatedAlertsPipelines": "Akışla ilişkili tüm İşlem Hatlarını ve Uyarıları silme",
     "cancel": "İptal",
