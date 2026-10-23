@@ -836,7 +836,8 @@
         "tabs": {
           "experiments": "716b52c42e952750",
           "items": "fb8e7a1a3cb7b25d"
-        }
+        },
+        "tryInPlayground": "9d9331eec0386cc6"
       },
       "editError": "1ba88bf90eb0b2b5",
       "editSuccess": "8e418a319e01e796",
@@ -1142,6 +1143,7 @@
         "datasetRows": "734bc09f57af31b2",
         "descriptionLabel": "526e0087cc3f254d",
         "descriptionPlaceholder": "dc1e7db58b2d8e76",
+        "expectedOutputScorersOnly": "a758ba9ab3e54c96",
         "identitySection": "999f23fcd7bec707",
         "leaveMessage": "80d5a857b711267a",
         "leaveTitle": "726aa0947f6e5a3c",
@@ -1524,6 +1526,7 @@
       "toolsCount": "6a34faae3846e62d",
       "toolsEmpty": "e16ce544d8c1d6b7",
       "toolsIntro": "a85efa3cbbb2d04d",
+      "unresolvedVariablesWarning": "5501b0d5c6c59a2a",
       "unusedSampledValue": "c944d3d1a8dd9c24",
       "usageCost": "a9a57267baeb4a36",
       "usageLatency": "5307d20dc7c46cc7",

@@ -15502,6 +15502,7 @@
         "userPromptLabel": "Mensagem do utilizador",
         "userPromptPlaceholder": "Referencie campos do conjunto de dados com {'{{ input }}'}.",
         "variablesLabel": "Inserir uma variável:",
+        "expectedOutputScorersOnly": "{token} · somente avaliadores",
         "scorersPlaceholder": "Selecionar avaliadores",
         "scorersHelp": "As versões dos avaliadores estão fixadas agora — edições posteriores dos avaliadores nunca alteram as pontuações deste experimento.",
         "scorersEmpty": "Nenhum avaliador disponível. Crie um em Avaliação primeiro.",
@@ -15812,6 +15813,7 @@
         "fallbackTitle": "Dataset",
         "meta": "{count} itens · atualizado em {updated}",
         "loadError": "Falha ao carregar dataset",
+        "tryInPlayground": "Experimente no Playground",
         "tabs": {
           "items": "Itens",
           "experiments": "Experimentos"
@@ -16346,6 +16348,7 @@
       "scoreSkippedNoReference": "Ignorado — sem saída esperada",
       "removeExpected": "Remover saída esperada",
       "expectedLeakWarning": "{token} nunca está disponível nos prompts de tarefa — respostas de ouro alimentam apenas os avaliadores.",
+      "unresolvedVariablesWarning": "Nenhum valor para {tokens} — enviado vazio ao executar.",
       "chipInsert": "Clique para inserir no cursor",
       "variant": "Variante {label}",
       "variantLimit": "A bancada comporta no máximo {max} variantes.",
