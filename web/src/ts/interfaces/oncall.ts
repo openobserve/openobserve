@@ -1209,6 +1209,7 @@ export type RefusalReason =
   | "no_provider"
   | "no_phone"
   | "number_rejected"
+  | "number_not_allowed"
   | "provider_unavailable";
 
 /** The 400/429/503 body of a refused send or confirm; `message` is the English API text. */
