@@ -515,7 +515,9 @@ pub async fn refresh_license_limits(Headers(user_email): Headers<UserEmail>) -> 
 #[cfg(test)]
 mod tests {
     use config::utils::{base64, json};
-    use o2_enterprise::enterprise::license::{BelowHwm, Block, KeySource, LICENSE_REV_HWM_KEY};
+    use o2_enterprise::enterprise::license::{
+        BelowHwm, Block, KeySource, LICENSE_REV_HWM_KEY, set_rev_hwm_warning_for_tests,
+    };
 
     use super::*;
 
@@ -862,11 +864,33 @@ mod tests {
         assert_eq!(warning["hwm_rev"], 1_760_918_400_000_000_i64);
     }
 
-    #[test]
-    fn get_reports_the_db_source_warning() {
-        let json = response_with_warning(KeySource::Db);
-        assert_eq!(json["rev_hwm_warning"]["source"], "db");
-        assert_eq!(json["env_key_in_use"], false);
+    #[tokio::test]
+    async fn get_reports_the_db_source_warning() {
+        let _store = store_setup().await;
+        let get = || async {
+            body_of(
+                get_license_info(Headers(UserEmail {
+                    user_id: STORE_ROOT.to_string(),
+                }))
+                .await,
+            )
+            .await
+        };
+        set_rev_hwm_warning_for_tests(Some(BelowHwm {
+            source: KeySource::Db,
+            license_id: "lic-1".into(),
+            loaded_rev: 1_760_400_000_000_000,
+            hwm_rev: 1_760_918_400_000_000,
+        }));
+        let (status, body) = get().await;
+        set_rev_hwm_warning_for_tests(None);
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let warning = &body["rev_hwm_warning"];
+        assert_eq!(warning["source"], "db");
+        assert_eq!(warning["loaded_rev"], 1_760_400_000_000_000_i64);
+        assert_eq!(warning["hwm_rev"], 1_760_918_400_000_000_i64);
+        let (_, body) = get().await;
+        assert!(body["rev_hwm_warning"].is_null(), "{body}");
     }
 
     #[test]

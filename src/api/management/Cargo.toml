@@ -102,4 +102,5 @@ zip.workspace = true
 [dev-dependencies]
 cron.workspace = true
 infra = { workspace = true, features = ["test-utils"] }
+o2_enterprise = { workspace = true, default-features = false, features = ["test-utils"] }
 openobserve-core = { workspace = true, features = ["test-utils"] }

@@ -8,6 +8,7 @@ publish = false
 [features]
 default = []
 cloud = []
+test-utils = []
 vectorscan = []
 
 [lib]
