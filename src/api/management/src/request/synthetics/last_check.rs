@@ -159,6 +159,11 @@ fn apply(item: &mut SyntheticListItem, hit: &Value) {
 
 #[cfg(test)]
 mod tests {
+    use config::meta::synthetics::SyntheticStatus;
+    use serde_json::json;
+
+    use super::*;
+
     #[test]
     fn synthetics_results_stays_gated_while_search_is_blocked() {
         // customers can ingest into this name, so it must never join the operational allowlist
@@ -166,11 +171,6 @@ mod tests {
             openobserve_synthetics::RESULTS_STREAM
         ));
     }
-
-    use config::meta::synthetics::SyntheticStatus;
-    use serde_json::json;
-
-    use super::*;
 
     /// Stored values are non-empty so a test can tell "overwritten" from
     /// "blanked".
