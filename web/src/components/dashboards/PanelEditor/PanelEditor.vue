@@ -294,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :is_ui_histogram="props.isUiHistogram"
                         :enableColumnFormat="true"
                         @metadata-update="metaDataValue"
-                        @result-metadata-update="handleResultMetadataUpdate"
+                        @result-metadata-update="onResultMetadataUpdate"
                         @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
                         @series-limit-update="handleSeriesLimitUpdate"
                         @limit-number-of-series-warning-message-update="
@@ -351,6 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :variablesData="resolvedVariablesData"
                     :panelData="seriesData"
                     @open-field-overrides="overrideConfigRef?.openOverrideConfigPopup()"
+                    @open-series-overrides="overrideConfigRef?.openOverrideConfigPopup()"
                   />
                 </PanelSidebar>
               </div>
@@ -605,7 +606,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :searchResponse="props.searchResponse"
                           :is_ui_histogram="props.isUiHistogram"
                           @metadata-update="metaDataValue"
-                          @result-metadata-update="handleResultMetadataUpdate"
+                          @result-metadata-update="onResultMetadataUpdate"
                           @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
                           @series-limit-update="handleSeriesLimitUpdate"
                           @limit-number-of-series-warning-message-update="
@@ -690,9 +691,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <OverrideConfig
-      v-if="dashboardPanelData.data.type === 'table'"
+      v-if="overrideConfigMode"
+      :key="overrideConfigMode"
       ref="overrideConfigRef"
+      :mode="overrideConfigMode"
       :panelData="seriesData"
+      :preview-source="seriesOverridePreviewSource"
     />
   </div>
 </template>
@@ -704,6 +708,7 @@ import {
   provide,
   defineAsyncComponent,
   getCurrentInstance,
+  shallowRef,
   toRef,
   watch,
   type CSSProperties,
@@ -720,6 +725,7 @@ import { resolveConfig } from "./types/panelEditor";
 import { usePanelEditor } from "./composables/usePanelEditor";
 import useBreakpoint from "@/composables/useBreakpoint";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
+import { SERIES_OVERRIDE_CHART_TYPES } from "@/composables/dashboard/useConfigPanel";
 
 // ============================================================================
 // Component Imports
@@ -906,6 +912,32 @@ const {
   selectedDate: undefined, // Managed by parent
   validatePanel,
   holdQueries: () => props.holdQueries,
+});
+
+// Tables open Column Formatting; charts with named series open Series Formatting in the same dialog.
+const overrideConfigMode = computed<"table" | "chart" | null>(() => {
+  const type = dashboardPanelData.data.type;
+  if (type === "table") return "table";
+  return SERIES_OVERRIDE_CHART_TYPES.includes(type) ? "chart" : null;
+});
+
+// The renderer keeps no copy of its result metadata, so the Series Formatting preview reads it from the event.
+const lastResultMetaData = shallowRef<any>(null);
+const onResultMetadataUpdate = (metadata: any): void => {
+  handleResultMetadataUpdate(metadata);
+  lastResultMetaData.value = metadata;
+};
+
+const seriesOverridePreviewSource = computed(() => {
+  if (overrideConfigMode.value !== "chart" || !chartData.value) return null;
+  const renderer = panelSchemaRendererRef.value;
+  return {
+    panelSchema: chartData.value,
+    data: renderer?.data,
+    metadata: renderer?.metadata,
+    resultMetaData: lastResultMetaData.value,
+    hiddenQueries: dashboardPanelData.layout.hiddenQueries ?? [],
+  };
 });
 
 // The desktop 20% field-list splitter is unusable on a phone, so there it opens at ~half width.

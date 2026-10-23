@@ -28,6 +28,8 @@ import { calculateMetricFontSize, METRIC_SPARKLINE } from "./sql/charts/convertS
 import { calculateGridPositions, getTrellisGrid } from "./calculateGridForSubPlot";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { escapeHtml } from "@/utils/html";
+import { applyGaugeSeriesThresholds, applyLineAreaThresholds } from "./thresholds";
+import { applySeriesOverrides } from "./seriesOverrides";
 
 /**
  * Re-applies trellis layout on merged multi-query data.
@@ -309,6 +311,7 @@ export const convertMultiSQLData = async (
       panelSchema?.config?.color?.colorBySeries,
       store.state.theme,
     );
+    applySeriesOverrides(options[0]?.options, panelSchema, store.state.theme);
     return options[0];
   }
 
@@ -562,6 +565,8 @@ export const convertMultiSQLData = async (
       panelSchema?.config?.color?.colorBySeries,
       store.state.theme,
     );
+    applyGaugeSeriesThresholds(allSeries, panelSchema?.config);
+    applySeriesOverrides(options[0].options, panelSchema, store.state.theme);
     return options[0];
   }
 
@@ -838,6 +843,15 @@ export const convertMultiSQLData = async (
   // series from different queries share the same subplot.
   if (isMultiQuery && isTrellis && options[0]?.options && chartPanelRef?.value) {
     reapplyTrellisLayout(options[0].options, panelSchema, chartPanelRef, chartPanelStyle);
+  }
+
+  if (options[0]?.options) {
+    if (chartType === "gauge") {
+      applyGaugeSeriesThresholds(options[0].options.series ?? [], panelSchema?.config);
+    }
+    // Override colours first: a threshold step outranks them and recolours on top.
+    applySeriesOverrides(options[0].options, panelSchema, store.state.theme);
+    applyLineAreaThresholds(options[0].options, panelSchema);
   }
 
   return options[0];
