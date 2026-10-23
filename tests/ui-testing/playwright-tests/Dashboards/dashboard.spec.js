@@ -714,8 +714,8 @@ test.describe("dashboard UI testcases", () => {
 
     // Verify the gauge chart is visible
     await pm.dashboardPanelActions.waitForChartToRender();
-    // discardPanel answers the in-app "Leave with unsaved changes?" dialog with Discard
-    await pm.dashboardPanelActions.discardPanel();
+    const asked = await pm.dashboardPanelActions.discardPanel();
+    expect(asked, "an edited panel must open the in-app leave dialog").toBe(true);
     await pm.dashboardList.menuItem("logs-item");
   });
   test("should update the chart correctly when used camel case in custom sql query", async ({

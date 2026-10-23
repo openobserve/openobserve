@@ -1170,6 +1170,8 @@ test.describe("Dashboard AddPanel panel name form validation", () => {
 
         // An edited panel opens the in-app leave dialog; answering it leaves /add_panel
         await settlePanelLeave(page, { timeout: 15000 });
+        // settlePanelLeave returns false instead of throwing when neither the dialog nor a navigation happens.
+        await page.waitForURL(url => !url.pathname.includes('add_panel'), { timeout: 15000 });
         testLogger.info('Navigated away from panel editor after Discard');
     });
 });

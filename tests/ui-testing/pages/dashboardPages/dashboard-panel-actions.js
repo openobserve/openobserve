@@ -287,7 +287,7 @@ export default class DashboardactionPage {
     try {
       await discardBtn.waitFor({ state: "visible", timeout: 15000 });
       await discardBtn.click();
-      await settlePanelLeave(this.page);
+      return await settlePanelLeave(this.page);
     } finally {
       this.page.off("dialog", dialogHandler);
     }
