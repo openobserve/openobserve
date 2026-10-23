@@ -1140,15 +1140,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-cy="search-bar-refresh-button"
                 :data-run-pending="showRunQueryPending ? 'true' : undefined"
                 :aria-label="showRunQueryPending ? t('search.runQueryPendingLabel') : undefined"
-                :variant="showRunQueryPending ? 'warning' : 'primary'"
+                :variant="showRunQueryPending ? 'pending' : 'primary'"
                 :title="t('search.runQuery')"
                 size="sm-toolbar"
                 class="element-box-shadow rounded-s-default! relative h-[1.875rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
-                :class="
+                :class="[
                   showRunQueryPending
                     ? ''
-                    : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md'
-                "
+                    : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
+                  showRunQueryPending ? 'border-e-button-pending-hover-bg!' : '',
+                ]"
                 @click="handleRunQueryFn()"
                 :loading="searchObj.loading || searchObj.loadingHistogram"
                 :disabled="
@@ -1174,11 +1175,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 {{ t("search.runQuery") }}
               </OButton>
-              <OSeparator class="h-[1.875rem]! w-px" vertical />
+              <OSeparator
+                v-if="!showRunQueryPending || isRunQueryCancelShown"
+                class="h-[1.875rem]! w-px"
+                vertical
+              />
               <ODropdown align="end" side="bottom">
                 <template #trigger>
                   <OButton
-                    :variant="showRunQueryPending && !isRunQueryCancelShown ? 'warning' : 'ghost'"
+                    :variant="showRunQueryPending && !isRunQueryCancelShown ? 'pending' : 'ghost'"
                     size="icon-xs"
                     :aria-label="t('search.refreshCacheAndRunQuery')"
                     data-test="logs-search-bar-refresh-cache-dropdown-trigger"
@@ -1187,7 +1192,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ? 'bg-cancel-query-bg! text-button-primary-foreground!'
                         : !showRunQueryPending
                           ? 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md'
-                          : '',
+                          : showRunQueryPending
+                            ? 'border-s-0'
+                            : '',
                       'rounded-e-default! rounded-s-none!',
                     ]"
                   >

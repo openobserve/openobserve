@@ -345,19 +345,18 @@ test.describe('On-call onboarding', {
     await expect(pm.oncallTeamDetailPage.getRotationDrawer())
       .toBeVisible({ timeout: 30000 });
 
-    const zoneField = pm.oncallTeamDetailPage.getHandoverTimezone(0);
+    const zoneField = pm.oncallTeamDetailPage.getPreviewZone();
     await expect(zoneField, 'the drawer must state which zone the handover is expressed in')
       .toBeVisible({ timeout: 20000 });
     await expect(zoneField, 'and it must be the team\'s zone, not the viewer\'s')
       .toContainText(TEAM_ZONE);
 
-    const timeField = pm.oncallTeamDetailPage.getHandoverTimeInput(0);
+    const timeField = pm.oncallTeamDetailPage.getHandoverTimeTrigger(0);
     await expect(timeField).toBeVisible({ timeout: 20000 });
-    const shown = await timeField.inputValue();
-    expect(
-      shown,
+    await expect(
+      timeField,
       `the handover is 00:00Z, which is 05:30 in ${TEAM_ZONE}; showing 00:00 would mean the picker is reading in UTC/browser time (G4)`,
-    ).toMatch(/^05:30/);
+    ).toContainText('05:30');
   });
 
   /**

@@ -213,8 +213,8 @@ pub async fn get_alert_history(
     }
 
     // Validate time range
-    if start_time >= end_time {
-        return MetaHttpResponse::bad_request("start_time must be before end_time");
+    if let Err(msg) = openobserve_api_common::request::validate_time_range(start_time, end_time) {
+        return MetaHttpResponse::bad_request(msg);
     }
 
     // Validate and map sort_by field to SQL column name or expression
@@ -1003,8 +1003,8 @@ pub async fn get_all_anomaly_history(
         .start_time
         .unwrap_or_else(|| (Utc::now() - Duration::try_days(7).unwrap()).timestamp_micros());
 
-    if start_time >= end_time {
-        return MetaHttpResponse::bad_request("start_time must be before end_time");
+    if let Err(msg) = openobserve_api_common::request::validate_time_range(start_time, end_time) {
+        return MetaHttpResponse::bad_request(msg);
     }
 
     // RBAC: determine which config IDs this user may see.

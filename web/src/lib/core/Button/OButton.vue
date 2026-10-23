@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { ButtonProps, ButtonEmits, ButtonSlots } from "./OButton.types";
 import { Primitive } from "reka-ui";
-import { computed, ref, onMounted, useAttrs, useId } from "vue";
-import { warnIfUnnamedIconOnly } from "./iconOnlyName";
+import { computed, ref, onMounted, onBeforeUnmount, useAttrs, useId } from "vue";
+import { UNNAMED_ICON_ONLY_DELAY_MS, warnIfUnnamedIconOnly } from "./iconOnlyName";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 defineOptions({ inheritAttrs: false });
@@ -25,7 +25,16 @@ const id = useId();
 const unavailable = computed(() => props.disabled && props.focusableUnavailable);
 const reasonId = computed(() => props.descriptionId ?? `${id}-reason`);
 const rootRef = ref<{ $el?: Element } | null>(null);
-onMounted(() => warnIfUnnamedIconOnly(rootRef.value?.$el));
+// Labels that arrive with data are not unnamed, so the dev check waits for them.
+let nameCheckTimer: ReturnType<typeof setTimeout> | undefined;
+onMounted(() => {
+  if (!import.meta.env.DEV || import.meta.env.MODE === "test") return;
+  nameCheckTimer = setTimeout(
+    () => warnIfUnnamedIconOnly(rootRef.value?.$el),
+    UNNAMED_ICON_ONLY_DELAY_MS,
+  );
+});
+onBeforeUnmount(() => clearTimeout(nameCheckTimer));
 
 defineSlots<ButtonSlots>();
 
@@ -120,6 +129,14 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "enabled:hover:bg-button-warning-hover",
     "enabled:active:bg-button-warning-active",
     "focus-visible:ring-3 focus-visible:ring-button-warning-focus-ring",
+    "disabled:opacity-60",
+  ].join(" "),
+  // A stale result awaiting a re-run is not an alert, so it stays off the solid warning fill.
+  pending: [
+    "bg-button-pending-bg text-button-pending-text border border-button-pending-bg",
+    "enabled:hover:bg-button-pending-hover-bg enabled:hover:border-button-pending-hover-bg",
+    "enabled:active:bg-button-pending-active-bg enabled:active:border-button-pending-active-bg",
+    "focus-visible:ring-3 focus-visible:ring-button-pending-focus-ring",
     "disabled:opacity-60",
   ].join(" "),
   // Neutral ghost: inherits parent text color — used for compact inline action buttons
@@ -291,6 +308,7 @@ const disabledVariantClasses: Record<NonNullable<ButtonProps["variant"]>, string
   "filter-exclude": "opacity-60",
   "ghost-warning": "opacity-60",
   warning: "opacity-60",
+  pending: "opacity-60",
   "ghost-neutral": "opacity-50",
   "outline-destructive": "opacity-50",
   "cancel-query": "opacity-60",

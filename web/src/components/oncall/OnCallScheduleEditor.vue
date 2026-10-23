@@ -125,12 +125,42 @@
          wide panel is what lets a shift rule read as one row of decisions
          instead of a column of wrapped paragraphs. -->
     <ODrawer
-      v-model:open="editing"
+      :open="editing"
       :width="60"
       :title="isNew ? t('oncall.rotationAddTitle') : t('oncall.rotationTitle')"
       :subtitle="t('oncall.rotationDrawerHint')"
+      :persistent="wouldDiscardEdits"
+      :show-close="false"
       data-test="oncall-rotation-drawer"
+      @update:open="cancelDrawer()"
     >
+      <!-- ODrawer closes itself before it emits, so its own ✕ could not be held back for the confirm. -->
+      <template #header-right>
+        <button
+          type="button"
+          :aria-label="t('components.drawer.closeDrawer')"
+          data-test="o-drawer-close-btn"
+          @mousedown.prevent
+          @click="cancelDrawer"
+          class="rounded-default text-dialog-close-text hover:bg-dialog-close-hover-bg active:bg-dialog-close-active-bg focus-visible:ring-dialog-focus-ring flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center transition-colors duration-150 focus-visible:ring-2 focus-visible:outline-none"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </template>
       <div v-if="active" class="flex flex-col gap-6">
         <div class="flex flex-col gap-1.5">
           <OInput
@@ -154,7 +184,8 @@
              gets a tab of its own like any other, so there's one layout to
              read rather than a plain form that turns into tabs the moment a
              second rule shows up. -->
-        <section class="flex flex-col gap-4">
+        <section class="border-border-default flex flex-col gap-4 border-t pt-6">
+          <h3 class="text-base font-semibold">{{ t("oncall.rotationSectionRules") }}</h3>
           <p
             v-if="!active.shift_rules.length"
             class="text-status-warning-text text-xs"
@@ -178,23 +209,17 @@
             >
               <OTab
                 v-for="(rule, ruleIndex) in active.shift_rules"
-                :key="ruleIndex"
+                :key="ruleKey(rule)"
                 :name="String(ruleIndex)"
                 :data-test="`oncall-schedule-rule-tab-${ruleIndex}`"
               >
-                <!-- Custom slot content instead of the label/icon props: a
-                     multi-rule rotation needs a delete affordance ON the tab
-                     rather than a separate button buried in the panel below,
-                     where it read as deleting the FORM rather than the tab.
-                     Matches the dashboard panel's query-tab close icon
-                     (DashboardQueryEditor.vue) — inline, always-dimly-visible
-                     rather than hover-revealed, since a tab strip this short
-                     has no crowding to hide it from. -->
+                <!-- A status icon before the name; the rare actions sit in the trailing menu. -->
                 <OIcon
-                  v-if="ruleTabIcon(rule)"
-                  :name="ruleTabIcon(rule) as any"
+                  v-if="ruleTabIcon(rule, ruleIndex)"
+                  :name="ruleTabIcon(rule, ruleIndex) as any"
                   size="sm"
                   class="shrink-0"
+                  :data-test="`oncall-schedule-rule-tab-icon-${ruleIndex}`"
                 />
                 <span class="truncate">{{
                   raw(
@@ -203,17 +228,24 @@
                       : String(t("oncall.shiftRuleNthName", { n: ruleIndex + 1 })),
                   )
                 }}</span>
-                <OIcon
-                  v-if="multiRule"
-                  name="close"
-                  size="sm"
-                  :aria-label="t('oncall.removeShiftRule')"
-                  class="hover:bg-hover-gray text-text-secondary cursor-pointer opacity-60 transition-all duration-150 hover:rounded-full hover:opacity-100"
-                  :data-test="`oncall-schedule-rule-remove-${ruleIndex}`"
-                  @click.stop.prevent="removeRule(ruleIndex)"
-                  @mousedown.stop.prevent
-                  @pointerdown.stop.prevent
-                />
+                <template #trailing>
+                  <OnCallRuleTabMenu
+                    :rule="rule"
+                    :rule-index="ruleIndex"
+                    :rule-label="namedShiftRules[ruleIndex].name"
+                    :can-remove="multiRule"
+                    :renaming="renamingRule === rule"
+                    :choices="stopChoicesFor(rule)"
+                    :consequence-at="(at: number) => stopConsequenceFor(ruleIndex, at)"
+                    :timezone="props.timezone"
+                    :now-micros="nowMicros"
+                    :name-of="nameOf"
+                    @remove="removeRule(ruleIndex)"
+                    @stop="(at: number) => (rule.ends_at = at)"
+                    @unstop="rule.ends_at = undefined"
+                    @renamed="renamingRule = null"
+                  />
+                </template>
               </OTab>
             </OTabs>
             <OButton
@@ -233,70 +265,73 @@
             <OTabPanels v-model="activeRuleTab" keep-alive>
               <OTabPanel
                 v-for="(rule, ruleIndex) in active.shift_rules"
-                :key="ruleIndex"
+                :key="ruleKey(rule)"
                 :name="String(ruleIndex)"
                 :data-test="`oncall-schedule-rule-panel-${ruleIndex}`"
               >
                 <div class="flex flex-col gap-4 pt-3">
-                  <div v-if="multiRule || isRetired(rule)" class="flex flex-wrap items-end gap-3">
-                    <OInput
-                      v-model="rule.name"
-                      class="min-w-0 flex-1"
-                      :label="t('oncall.shiftRuleName')"
-                      :data-test="`oncall-schedule-rule-name-${ruleIndex}`"
-                    />
-                    <OTag v-if="isRetired(rule)" variant="default-soft" size="xs">
-                      {{
-                        t("oncall.rotationRetiredOnDate", {
-                          date: raw(shortDate(rule.ends_at ?? 0)),
-                        })
-                      }}
-                    </OTag>
-                  </div>
+                  <OText variant="meta" :data-test="`oncall-schedule-rule-summary-${ruleIndex}`">
+                    {{ ruleSummary(ruleIndex) }}
+                  </OText>
+                  <p
+                    v-if="ruleUsage(ruleIndex)"
+                    class="text-xs"
+                    :class="
+                      ruleUsage(ruleIndex)?.kind === 'never-used'
+                        ? 'text-status-warning-text'
+                        : 'text-text-secondary'
+                    "
+                    :data-test="`oncall-schedule-rule-${ruleUsage(ruleIndex)?.kind}-${ruleIndex}`"
+                  >
+                    {{ ruleUsage(ruleIndex)?.text }}
+                  </p>
 
                   <OnCallShiftRuleFields
                     :rule="rule"
                     :rule-index="ruleIndex"
-                    :multi-rule="multiRule"
                     :has-team-members="!!props.members.length"
-                    :member-options="memberOptions"
+                    :team-members="teamMemberEmails"
+                    :holder="ruleHolder(preview.currentSegments.value, rule.name, nowMicros)"
+                    :name-of="nameOf"
                     :shift-options="shiftOptions"
                     :day-options="dayOptions"
+                    :from-minute-options="fromMinuteOptions"
                     :minute-options="minuteOptions"
-                    :priority-options="priorityOptions"
                     :timezone="props.timezone"
-                    :handover-hint="handoverHint"
+                    :show-needs-people="showNeedsPeople(rule)"
+                    :overlap-names="overlapNames(ruleIndex)"
+                    :overlap-count="overlapCount(ruleIndex)"
+                    :overlap-choice="overlapChoice(ruleIndex)"
                     :set-members="setMembers"
                     :away-clashes-for="awayClashesFor"
                     :short-date="shortDate"
-                    :handover-input="handoverInput"
-                    :set-anchor="setAnchor"
-                    :uses-advanced="usesAdvanced"
                     :add-restriction="addRestriction"
                     :remove-restriction="removeRestriction"
-                    :is-retired="isRetired"
-                    :set-retired="setRetired"
-                    :retired-at-local="retiredAtLocal"
-                    :set-retired-at="setRetiredAt"
+                    :set-overlap-winner="(wins: boolean) => setOverlapWinner(ruleIndex, wins)"
                     :priority-clash-for="priorityClashFor"
                     @open-members="openMembers"
                   />
                 </div>
               </OTabPanel>
             </OTabPanels>
-
-            <!-- Kept out from under the tabs and shown for every rule at
-                 once, merged into one timeline: it's the one place a
-                 follow-the-sun handover gets checked by eye, and that only
-                 works if every rule's shifts are visible — and lined up
-                 against each other by time, not repeated once per rule —
-                 without switching tabs. -->
-            <div class="border-border-default flex flex-col gap-4 border-t pt-4">
-              <OText variant="section">{{ t("oncall.upcoming") }}</OText>
-              <OnCallUpcomingList :rules="namedShiftRules" :now-micros="nowMicros" />
-            </div>
           </template>
         </section>
+
+        <OnCallDraftPreview
+          v-if="active.shift_rules.length"
+          v-model:page="preview.page.value"
+          class="border-border-default border-t pt-6"
+          :rotation="active"
+          :active-rule-name="activeRule?.name ?? ''"
+          :segments="preview.segments.value"
+          :window-from="preview.windowFrom.value"
+          :window-to="preview.windowTo.value"
+          :now-micros="nowMicros"
+          :timezone="props.timezone"
+          :error="preview.error.value"
+          :show-empty="!preview.hasValidRule.value || preview.loaded.value"
+          :name-of="nameOf"
+        />
       </div>
       <template #footer>
         <div class="flex items-center gap-2">
@@ -309,7 +344,7 @@
             icon-left="delete-outline"
             :loading="saving"
             data-test="oncall-rotation-delete"
-            @click="deleteActive"
+            @click="confirmRemove = true"
           >
             {{ t("oncall.removeRotation") }}
           </OButton>
@@ -329,13 +364,34 @@
         </div>
       </template>
     </ODrawer>
+
+    <ConfirmDialog
+      v-model="confirmDiscard"
+      data-test="oncall-rotation-discard-confirm"
+      :title="t('common.unsavedChanges')"
+      :message="t('oncall.rotationDiscardMessage', { name: raw(active?.name ?? '') })"
+      :ok-label="t('common.discardChanges')"
+      :cancel-label="t('dashboard.layoutEdit.keepEditing')"
+      focus-cancel
+      @update:ok="discardAndClose"
+    />
+    <ConfirmDialog
+      v-model="confirmRemove"
+      data-test="oncall-rotation-remove-confirm"
+      :title="t('oncall.removeRotationTitle', { name: raw(active?.name ?? '') })"
+      :message="t('oncall.removeRotationMessage')"
+      :ok-label="t('oncall.removeRotation')"
+      focus-cancel
+      @update:ok="deleteActive"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -353,7 +409,10 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OnCallShiftRuleFields from "./OnCallShiftRuleFields.vue";
-import OnCallUpcomingList from "./OnCallUpcomingList.vue";
+import OnCallDraftPreview from "./OnCallDraftPreview.vue";
+import OnCallRuleTabMenu from "./OnCallRuleTabMenu.vue";
+import { useRotationPreview } from "@/composables/useRotationPreview";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import { queryClient } from "@/composables/query/queryClient";
 import { setTeamScheduleMutation, unavailabilityQuery } from "@/services/oncall.queries";
 import { useMutation } from "@tanstack/vue-query";
@@ -375,12 +434,22 @@ import type { I18nKey, I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import {
+  coverageHoursSummary,
+  effectiveRivals,
+  effectiveWeekCoverage,
   formatMinuteOfDay,
-  fromZonedInputValue,
+  formatStamp,
+  overlappingRules,
+  overlapStanding,
+  prioritiesFor,
   resolveHolder,
   resolveNextHolder,
+  ruleHolder,
+  ruleHoursSummary,
+  rulesClash,
   SHIFT_PRESETS,
-  toZonedInputValue,
+  stopChoices,
+  stopConsequence,
 } from "@/utils/oncall";
 
 const props = defineProps<{
@@ -412,6 +481,12 @@ const draft = ref<Rotation[]>([]);
 const saving = ref(false);
 const editing = ref(false);
 const active = ref<Rotation | null>(null);
+const confirmRemove = ref(false);
+const confirmDiscard = ref(false);
+/// The roster link opened the confirm, so a Discard also hands over to the roster.
+const membersAfterDiscard = ref(false);
+/// The open rotation as it was when the drawer opened, to tell an edit from a look.
+const openedAs = ref("");
 
 /// Which rule's tab is showing. Keyed by index rather than a rule id — shift
 /// rules don't carry one. Reset every time the drawer OPENS, not on `active`
@@ -502,12 +577,6 @@ const namedShiftRules = computed(() =>
   })),
 );
 
-/// Whether this rule already uses anything behind the fold — an unfolded
-/// section is how a restriction the API wrote stops being invisible.
-function usesAdvanced(rule: ShiftRule): boolean {
-  return (rule.restrictions?.length ?? 0) > 0 || (rule.priority ?? 0) !== 0 || isRetired(rule);
-}
-
 /// A rotation the user has not saved yet: the drawer says "Add", and its empty
 /// preview is expected rather than a fault.
 const isNew = ref(false);
@@ -535,6 +604,8 @@ function awayClashesFor(rule: ShiftRule): Unavailability[] {
   return editorAbsences.value.filter((a) => chosen.has(a.user_email.toLowerCase()));
 }
 
+const stamp = (micros: number) => formatStamp(micros, props.timezone);
+
 function shortDate(micros: number): string {
   return new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" }).format(
     new Date(micros / 1000),
@@ -543,8 +614,16 @@ function shortDate(micros: number): string {
 
 function editRotation(rotation: Rotation) {
   active.value = rotation;
+  openedAs.value = JSON.stringify(rotation);
   editing.value = true;
 }
+
+// Bulk mode keeps an edited existing rotation in the table's draft, so only a discarding close counts.
+const wouldDiscardEdits = computed(() => {
+  const rotation = active.value;
+  if (!rotation || !(props.drawerOnly || isNew.value)) return false;
+  return JSON.stringify(rotation) !== openedAs.value;
+});
 
 /// Two rotations with one name is a screen where "page the Secondary" names
 /// two things. The server keys on the id, so this is a legibility rule rather
@@ -559,10 +638,6 @@ const nameClash = computed<I18nText | "">(() => {
   );
   return rival ? t("oncall.rotationNameClash", { name: raw(rival.name) }) : "";
 });
-
-/// The zone the handover is measured in. It is the team's, never the browser's,
-/// and getting that wrong is the single easiest mistake in this form.
-const handoverHint = computed(() => t("oncall.firstHandoverHint", { zone: raw(props.timezone) }));
 
 function removeRotation(rotation: Rotation) {
   draft.value = draft.value.filter((r) => r !== rotation);
@@ -584,16 +659,62 @@ const activeIsSavable = computed(() => {
 });
 
 function openMembers() {
-  cancelDrawer();
+  if (wouldDiscardEdits.value) {
+    membersAfterDiscard.value = true;
+    confirmDiscard.value = true;
+    return;
+  }
+  editing.value = false;
   emit("open-members");
 }
 
-const memberOptions = computed(() =>
-  props.members.map((m) => ({ label: raw(m.user_email), value: m.user_email })),
-);
+const teamMemberEmails = computed(() => props.members.map((m) => m.user_email));
+
+// One server preview for the whole drawer: the picture, the list, the people line and the stop choices all read it.
+const { nameOf } = useOrgUserNames();
+
+const preview = useRotationPreview({
+  rotation: () => active.value,
+  teamId: () => props.teamId,
+  timezone: () => props.timezone,
+  nowMicros: () => nowMicros.value,
+});
+
+const activeRule = computed(() => active.value?.shift_rules[Number(activeRuleTab.value)] ?? null);
+
+// Rules carry no id, so a tab and its panel keep their state by the rule object, not its position.
+const ruleKeys = new WeakMap<ShiftRule, number>();
+let nextRuleKey = 0;
+function ruleKey(rule: ShiftRule): number {
+  if (!ruleKeys.has(rule)) ruleKeys.set(rule, nextRuleKey++);
+  return ruleKeys.get(rule) as number;
+}
+
+/// The rule just added by "+": its tab opens straight into renaming, or it stays "Rule N".
+const renamingRule = ref<ShiftRule | null>(null);
+
+function stopChoicesFor(rule: ShiftRule) {
+  return stopChoices(
+    preview.currentSegments.value,
+    rule.name,
+    nowMicros.value,
+    preview.currentWindowTo.value,
+  );
+}
+
+/// Who takes a rule's hours once it stops at `at`, or which of them nobody covers.
+function stopConsequenceFor(index: number, at: number): { text: I18nText; gap: boolean } {
+  const rules = namedShiftRules.value;
+  const { takers, gap } = stopConsequence(rules, index, at);
+  if (gap.length) {
+    return { text: t("oncall.stopGap", { hours: coverageHoursSummary(gap, t) }), gap: true };
+  }
+  const names = raw(takers.map((k) => rules[k].name).join(", "));
+  return { text: t("oncall.stopTakers", { names }), gap: false };
+}
 
 const shiftOptions = computed(() =>
-  SHIFT_PRESETS.map((preset) => ({ label: t(preset.labelKey), value: preset.micros })),
+  SHIFT_PRESETS.map((preset) => ({ label: t(preset.phraseKey), value: preset.micros })),
 );
 
 /// 0 = Monday .. 6 = Sunday, matching the engine's own numbering.
@@ -619,68 +740,82 @@ const minuteOptions = computed(() =>
   })),
 );
 
-/// Offered rather than typed. Two rules that both apply and share a priority
-/// are equally in force, and the server rejects the ENTIRE save rather than
-/// the one rule — so a free number field is a way to take a working rota down
-/// while editing something else.
-const priorityOptions = computed(() => {
-  const rules = active.value?.shift_rules ?? [];
-  const highest = rules.reduce((max, r) => Math.max(max, r.priority ?? 0), 0);
-  const levels = new Set<number>([0, highest, highest + 1]);
-  return [...levels]
-    .filter((level) => level >= 0)
-    .sort((a, b) => a - b)
-    .map((level) => ({
-      label: level === 0 ? t("oncall.rotationPriorityBase") : raw(String(level)),
-      value: level,
-    }));
-});
+// The server refuses a window starting at 24:00.
+const fromMinuteOptions = computed(() => minuteOptions.value.slice(0, -1));
 
-/// Only rules of the SAME rotation compete. Two rotations resolve at the same
-/// instant with their own people, so an identical priority across them is not
-/// a clash — reading it as one is the confusion this rework removed.
+// The server refuses two rules of one rotation only when priority and hours are both identical.
 function priorityClashFor(rule: ShiftRule): I18nText | "" {
   const rules = active.value?.shift_rules ?? [];
-  const rival = rules.find(
-    (other) => other !== rule && (other.priority ?? 0) === (rule.priority ?? 0),
-  );
-  return rival ? t("oncall.rotationPriorityClash", { name: raw(rival.name) }) : "";
+  const at = rules.indexOf(rule);
+  const rival = rules.findIndex((other, k) => k !== at && rulesClash(rule, other));
+  return rival < 0 ? "" : t("oncall.ruleClash", { name: raw(namedShiftRules.value[rival].name) });
 }
 
-/// ── Retiring a rule ───────────────────────────────────────────────────────
-///
-/// `ends_at` is how a rule is taken out of service without deleting it.
-/// Deleting was the only way to stop one, and it discarded exactly the record
-/// the field exists to keep: "the weekend rule ran until March" stopped being
-/// something the schedule could say, and the calendar lost the reason those
-/// hours had been covered at all.
-///
-/// The end is exclusive, like every other boundary here.
+function overlapNames(index: number): string {
+  const rules = active.value?.shift_rules ?? [];
+  return overlappingRules(rules, index)
+    .map((k) => namedShiftRules.value[k].name)
+    .join(", ");
+}
+
+function overlapCount(index: number): number {
+  return overlappingRules(active.value?.shift_rules ?? [], index).length;
+}
+
+function overlapChoice(index: number): "wins" | "loses" | undefined {
+  const { winsOver, losesTo } = overlapStanding(active.value?.shift_rules ?? [], index);
+  if (winsOver.length && !losesTo.length) return "wins";
+  if (losesTo.length && !winsOver.length) return "loses";
+  return undefined;
+}
+
+function setOverlapWinner(index: number, wins: boolean) {
+  const rules = active.value?.shift_rules ?? [];
+  prioritiesFor(rules, index, wins).forEach((priority, k) => {
+    rules[k].priority = priority;
+  });
+}
+
+/// The rule's hours, then who wins where it overlaps another rule.
+function ruleSummary(index: number): I18nText {
+  const rules = active.value?.shift_rules ?? [];
+  const nameList = (indices: number[]) =>
+    indices.map((k) => namedShiftRules.value[k].name).join(", ");
+  const { winsOver, losesTo } = overlapStanding(rules, index);
+  const parts: string[] = [ruleHoursSummary(rules[index], t)];
+  if (winsOver.length) parts.push(t("oncall.ruleWinsOver", { names: raw(nameList(winsOver)) }));
+  if (losesTo.length) {
+    parts.push(t("oncall.ruleLosesTo", { names: raw(nameList(losesTo)) }, losesTo.length));
+  }
+  const named = namedShiftRules.value;
+  const effective = effectiveWeekCoverage(named, index, nowMicros.value);
+  // A rival that counts always takes some minutes, so rivals mean the hours differ.
+  if (effective.length && effectiveRivals(named, index, nowMicros.value).length) {
+    parts.push(t("oncall.ruleOnCallOnly", { hours: coverageHoursSummary(effective, t) }));
+  }
+  const endsAt = rules[index].ends_at;
+  if (endsAt !== undefined) parts.push(t("oncall.ruleStops", { date: raw(stamp(endsAt)) }));
+  return t("oncall.ruleSummaryLine", { parts: parts.join(" · ") });
+}
+
+/// A staffed rule that wins no minute: a mistake if it has windows, a standby if it has none.
+function ruleUsage(index: number): { kind: "never-used" | "standby"; text: I18nText } | null {
+  const rules = namedShiftRules.value;
+  const rule = rules[index];
+  if (!rule?.members.length || effectiveWeekCoverage(rules, index, nowMicros.value).length) {
+    return null;
+  }
+  const rivals = effectiveRivals(rules, index, nowMicros.value);
+  const names = raw(rivals.map((k) => rules[k].name).join(", "));
+  return rule.restrictions?.length
+    ? { kind: "never-used", text: t("oncall.ruleNeverWins", { names }, rivals.length) }
+    : { kind: "standby", text: t("oncall.ruleStandby", { names }, rivals.length) };
+}
+
+/// A stopped rule keeps its record; `ends_at` is exclusive, like every other boundary here.
 const isRetired = (rule: ShiftRule) => rule.ends_at !== undefined;
 
-const retiredAt = (rule: ShiftRule) => rule.ends_at ?? nowMicros.value;
-
-/// The date/time pickers carry no timezone of their own — so the value is
-/// rendered in the TEAM's zone and labelled with it, rather than in whatever
-/// zone the reader's laptop is set to.
-function retiredAtLocal(rule: ShiftRule): string {
-  return toZonedInputValue(retiredAt(rule), props.timezone);
-}
-
-function setRetired(rule: ShiftRule, on: boolean) {
-  // Defaults to now: "retire this" almost always means "as of today", and a
-  // date somebody has to fill in before the checkbox means anything is a
-  // second step for the common case.
-  rule.ends_at = on ? retiredAt(rule) : undefined;
-}
-
-function setRetiredAt(rule: ShiftRule, value: string | number) {
-  const micros = fromZonedInputValue(String(value), props.timezone);
-  if (micros !== null) rule.ends_at = micros;
-}
-
-/// A window with no days applies on no day, which is a rule that resolves to
-/// nobody — so a new one starts as the working week.
+// A window with no days applies every day; a new one starts as the working week.
 function addRestriction(rule: ShiftRule) {
   rule.restrictions = [
     ...(rule.restrictions ?? []),
@@ -700,6 +835,7 @@ function addRule() {
   const rotation = active.value;
   if (!rotation) return;
   const highest = rotation.shift_rules.reduce((max, r) => Math.max(max, r.priority ?? 0), 0);
+  const from = rotation.shift_rules[Number(activeRuleTab.value)];
   rotation.shift_rules.push({
     // Never the rotation's name: the rotation is the position, the rule is who
     // holds it and when, and one word for both is what "Base" exists to avoid.
@@ -707,16 +843,18 @@ function addRule() {
       ? String(t("oncall.shiftRuleNthName", { n: rotation.shift_rules.length + 1 }))
       : BASE_SHIFT_RULE_NAME,
     members: [],
-    shift_micros: MICROS_PER_WEEK,
+    shift_micros: from?.shift_micros ?? MICROS_PER_WEEK,
     // Top of the hour, so a handover is readable rather than landing at
     // whatever minute somebody happened to click Add.
-    anchor_micros: Math.floor(nowMicros.value / 3_600_000_000) * 3_600_000_000,
+    anchor_micros:
+      from?.anchor_micros ?? Math.floor(nowMicros.value / 3_600_000_000) * 3_600_000_000,
     priority: rotation.shift_rules.length ? highest + 1 : 0,
     restrictions: [],
   });
   // Land on the rule just added — otherwise it's created behind whichever
   // tab was already open, and looks like the click did nothing.
   activeRuleTab.value = String(rotation.shift_rules.length - 1);
+  renamingRule.value = rotation.shift_rules[rotation.shift_rules.length - 1];
 }
 
 function removeRule(index: number) {
@@ -739,41 +877,42 @@ function ruleHasProblem(rule: ShiftRule): boolean {
   return !rule.members.length || !!priorityClashFor(rule);
 }
 
-function ruleTabIcon(rule: ShiftRule): string | undefined {
+function ruleTabIcon(rule: ShiftRule, index: number): string | undefined {
   if (ruleHasProblem(rule)) return "error-outline";
+  if (ruleUsage(index)?.kind === "never-used") return "warning-amber";
   if (isRetired(rule)) return "pause-circle-filled";
   return undefined;
 }
 
+// Missing people are said out loud once the picker was used or the server stored the rule empty.
+const peopleAsked = reactive(new WeakSet<ShiftRule>());
+
+function showNeedsPeople(rule: ShiftRule): boolean {
+  return !rule.members.length && peopleAsked.has(rule);
+}
+
 function setMembers(rule: ShiftRule, members: string[]) {
   rule.members = [...members];
+  peopleAsked.add(rule);
 }
 
-/// In the TEAM's zone, which is what the label beside it promises and what
-/// every restriction window is evaluated in. Read and written with the
-/// browser's zone, an operator in Berlin editing an Asia/Kolkata team saw the
-/// handover three and a half hours from where it was — and moved it there by
-/// saving.
-function handoverInput(rule: ShiftRule): string {
-  return toZonedInputValue(rule.anchor_micros, props.timezone);
-}
-
-function setAnchor(rule: ShiftRule, value: string) {
-  const micros = fromZonedInputValue(value, props.timezone);
-  // An incomplete value means the user is mid-edit; keeping the previous
-  // anchor beats writing NaN and blanking the preview.
-  if (micros !== null) rule.anchor_micros = micros;
+/** `rule` with every array and window the editor mutates copied, so edits never reach the original. [pure] */
+function copyRule(rule: ShiftRule): ShiftRule {
+  return {
+    ...rule,
+    members: [...rule.members],
+    restrictions: rule.restrictions?.map((window) => ({ ...window, days: [...window.days] })),
+  };
 }
 
 function reset() {
   draft.value = (props.schedule?.rotations ?? []).map((r) => ({
     ...r,
-    shift_rules: (r.shift_rules ?? []).map((rule) => ({
-      ...rule,
-      members: [...rule.members],
-      restrictions: rule.restrictions ? [...rule.restrictions] : undefined,
-    })),
+    shift_rules: (r.shift_rules ?? []).map(copyRule),
   }));
+  for (const rule of draft.value.flatMap((r) => r.shift_rules)) {
+    if (!rule.members.length) peopleAsked.add(rule);
+  }
   nowMicros.value = Date.now() * 1000;
 }
 
@@ -840,11 +979,7 @@ function duplicateRotation(id: string) {
   const copy: Rotation = {
     id: mintRotationId(),
     name: String(t("oncall.railCopyName", { name: raw(source.name) })),
-    shift_rules: source.shift_rules.map((rule) => ({
-      ...rule,
-      members: [...rule.members],
-      restrictions: rule.restrictions ? [...rule.restrictions] : undefined,
-    })),
+    shift_rules: source.shift_rules.map(copyRule),
     // A copy is somebody's choice, so it is no longer the system's default.
     source: undefined,
   };
@@ -853,10 +988,17 @@ function duplicateRotation(id: string) {
   editRotation(copy);
 }
 
-/// Cancel closes; the watcher below discards. Routing every dismissal through
-/// one place is the point.
+/// Every way out but Save and Remove comes here; the watcher below discards.
 function cancelDrawer() {
+  membersAfterDiscard.value = false;
+  if (wouldDiscardEdits.value) confirmDiscard.value = true;
+  else editing.value = false;
+}
+
+function discardAndClose() {
   editing.value = false;
+  if (membersAfterDiscard.value) emit("open-members");
+  membersAfterDiscard.value = false;
 }
 
 /// EVERY way out of the drawer has to discard an unfinished rotation, not just

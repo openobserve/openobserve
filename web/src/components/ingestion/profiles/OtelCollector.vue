@@ -1,5 +1,9 @@
 <template>
-  <IngestionContent>
+  <IngestionContent
+    snippet-kind="config"
+    config-tool="OpenTelemetry Collector"
+    copy-snippet="first"
+  >
     <!-- Same configs as the profiles docs (OTLP page), so the snippet runs on its own. -->
     <div class="flex flex-col gap-2">
       <div class="text-base font-semibold">{{ t("ingestion.otlpHttp") }}</div>
