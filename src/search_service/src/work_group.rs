@@ -45,6 +45,8 @@ pub struct DeferredLock {
 #[cfg(feature = "enterprise")]
 trait Admission {
     type Lock;
+    /// Whether the search waits holding the admission lock, so it admits in arrival order.
+    fn in_order(&self) -> bool;
     async fn lock(&self, secs: u64) -> Result<Self::Lock>;
     async fn unlock(&self, lock: Self::Lock) -> Result<()>;
     async fn need_wait(&self) -> Result<(bool, ConcurrencyStatus)>;
@@ -65,6 +67,10 @@ struct QueueAdmission<'a> {
 #[cfg(feature = "enterprise")]
 impl Admission for QueueAdmission<'_> {
     type Lock = Option<dist_lock::Locker>;
+
+    fn in_order(&self) -> bool {
+        self.search_type != Some(SearchEventType::PublicDashboard)
+    }
 
     async fn lock(&self, secs: u64) -> Result<Self::Lock> {
         let cfg = get_config();
@@ -232,7 +238,8 @@ pub async fn check_work_group(
     })
 }
 
-/// Waits for a slot and admits the search; the admission lock is held only to recheck and insert.
+/// Waits for a slot and admits the search: in arrival order under the admission lock, or for a
+/// public build by polling outside it so a full per-type cap does not block the group.
 #[cfg(feature = "enterprise")]
 #[allow(clippy::too_many_arguments)]
 #[tracing::instrument(name = "service:search:work_group:checking", skip_all, fields(user_id = user_id))]
@@ -354,7 +361,7 @@ pub async fn acquire_work_group_lock(
     .await
 }
 
-/// Polls the caps without the lock until a slot looks free, then admits through `try_admit`.
+/// Admits the search, then releases the slot again when a cancel arrived during the attempt.
 #[cfg(feature = "enterprise")]
 async fn admit<A: Admission>(
     adm: &A,
@@ -366,6 +373,115 @@ async fn admit<A: Admission>(
     caller: &str,
 ) -> Result<()> {
     let deadline_ms = timeout * 1000;
+    if adm.in_order() {
+        admit_in_order(
+            adm,
+            trace_id,
+            org_id,
+            stop_watch,
+            deadline_ms,
+            &mut abort,
+            caller,
+        )
+        .await?;
+    } else {
+        admit_polling(
+            adm,
+            trace_id,
+            org_id,
+            stop_watch,
+            deadline_ms,
+            &mut abort,
+            caller,
+        )
+        .await?;
+    }
+    // A cancel that arrived during the attempt would otherwise run the search.
+    if !matches!(abort.try_recv(), Err(oneshot::error::TryRecvError::Empty)) {
+        if let Err(e) = adm.done().await {
+            log::error!("[trace_id {trace_id}] search: failed to release a canceled slot: {e}");
+        }
+        return Err(canceled_in_queue(trace_id));
+    }
+    Ok(())
+}
+
+/// Holds the admission lock across the wait, as on main, so searches queued on it admit in order.
+#[cfg(feature = "enterprise")]
+async fn admit_in_order<A: Admission>(
+    adm: &A,
+    trace_id: &str,
+    org_id: &str,
+    stop_watch: &TookWatcher,
+    deadline_ms: u64,
+    abort: &mut oneshot::Receiver<()>,
+    caller: &str,
+) -> Result<()> {
+    let elapsed = stop_watch.total_millis();
+    if elapsed >= deadline_ms {
+        return Err(queue_timeout(trace_id, org_id, caller));
+    }
+    let lock = match adm.lock((deadline_ms - elapsed).div_ceil(1000)).await {
+        Ok(lock) => lock,
+        Err(_) if stop_watch.total_millis() >= deadline_ms => {
+            return Err(queue_timeout(trace_id, org_id, caller));
+        }
+        Err(e) => return Err(e),
+    };
+    let mut waited = false;
+    let admitted = loop {
+        if stop_watch.total_millis() >= deadline_ms {
+            break Err(queue_timeout(trace_id, org_id, caller));
+        }
+        match adm.need_wait().await {
+            Ok((false, status)) => {
+                if waited {
+                    log::info!(
+                        "[trace_id {trace_id}] {caller}: approved in work_group: {status:?}"
+                    );
+                }
+                break adm.process().await;
+            }
+            Ok((true, status)) if !waited => {
+                log::info!("[trace_id {trace_id}] {caller}: waiting in work_group: {status:?}");
+                waited = true;
+            }
+            Ok((true, _)) => {}
+            Err(e) => break Err(e),
+        }
+        tokio::select! {
+            _ = tokio::time::sleep(std::time::Duration::from_millis(100)) => {}
+            _ = &mut *abort => break Err(canceled_in_queue(trace_id)),
+        }
+    };
+    match adm.unlock(lock).await {
+        Ok(()) => admitted,
+        Err(e) if admitted.is_ok() => {
+            if let Err(done_err) = adm.done().await {
+                log::error!(
+                    "[trace_id {trace_id}] search: failed to mark work group as done after unlock error: {done_err:?}"
+                );
+            }
+            Err(e)
+        }
+        Err(e) => {
+            log::warn!("[trace_id {trace_id}] search: unlock failed after a refused attempt: {e}");
+            admitted
+        }
+    }
+}
+
+/// Polls the caps without the lock until a slot looks free, then admits through `try_admit`.
+#[cfg(feature = "enterprise")]
+async fn admit_polling<A: Admission>(
+    adm: &A,
+    trace_id: &str,
+    org_id: &str,
+    stop_watch: &TookWatcher,
+    deadline_ms: u64,
+    abort: &mut oneshot::Receiver<()>,
+    caller: &str,
+) -> Result<()> {
     let mut waited = false;
     loop {
         let elapsed = stop_watch.total_millis();
@@ -386,15 +502,6 @@ async fn admit<A: Admission>(
             )
             .await?
             {
-                // A cancel that arrived during the attempt would otherwise run the search.
-                if !matches!(abort.try_recv(), Err(oneshot::error::TryRecvError::Empty)) {
-                    if let Err(e) = adm.done().await {
-                        log::error!(
-                            "[trace_id {trace_id}] search: failed to release a canceled slot: {e}"
-                        );
-                    }
-                    return Err(canceled_in_queue(trace_id));
-                }
                 if waited {
                     log::info!(
                         "[trace_id {trace_id}] {caller}: approved in work_group: {status:?}"
@@ -408,7 +515,7 @@ async fn admit<A: Admission>(
         }
         tokio::select! {
             _ = tokio::time::sleep(std::time::Duration::from_millis(100)) => {}
-            _ = &mut abort => return Err(canceled_in_queue(trace_id)),
+            _ = &mut *abort => return Err(canceled_in_queue(trace_id)),
         }
     }
 }
@@ -509,6 +616,7 @@ mod tests {
         lock_error_after: Option<Duration>,
         on_lock: Mutex<Option<Row>>,
         on_process: Mutex<Option<oneshot::Sender<()>>>,
+        admitted: Mutex<Vec<String>>,
     }
 
     impl Queue {
@@ -558,6 +666,10 @@ mod tests {
 
     impl Admission for Fake {
         type Lock = Option<OwnedMutexGuard<()>>;
+
+        fn in_order(&self) -> bool {
+            self.me.search_type != PUBLIC
+        }
 
         async fn lock(&self, _secs: u64) -> Result<Self::Lock> {
             self.queue.lock_calls.fetch_add(1, Ordering::SeqCst);
@@ -613,6 +725,8 @@ mod tests {
 
         async fn process(&self) -> Result<()> {
             self.queue.rows.lock().unwrap().push(self.me.clone());
+            let trace = self.me.trace.clone();
+            self.queue.admitted.lock().unwrap().push(trace);
             if let Some(abort) = self.queue.on_process.lock().unwrap().take() {
                 abort.send(()).unwrap();
             }
@@ -632,21 +746,52 @@ mod tests {
         timeout: u64,
         abort: oneshot::Receiver<()>,
     ) -> Result<()> {
+        run_as(queue, org, PUBLIC, trace, timeout, abort).await
+    }
+
+    async fn run_as(
+        queue: &Arc<Queue>,
+        org: &str,
+        search_type: Option<SearchEventType>,
+        trace: &str,
+        timeout: u64,
+        abort: oneshot::Receiver<()>,
+    ) -> Result<()> {
         let fake = Fake {
             queue: queue.clone(),
-            me: row(org, PUBLIC, trace),
+            me: row(org, search_type, trace),
         };
         let watch = TookWatcher::new();
         admit(&fake, trace, org, &watch, timeout, abort, "test").await
     }
 
     fn spawn(queue: &Arc<Queue>, org: &str, trace: &str) -> tokio::task::JoinHandle<Result<()>> {
+        spawn_as(queue, org, PUBLIC, trace)
+    }
+
+    fn spawn_as(
+        queue: &Arc<Queue>,
+        org: &str,
+        search_type: Option<SearchEventType>,
+        trace: &str,
+    ) -> tokio::task::JoinHandle<Result<()>> {
         let (queue, org, trace) = (queue.clone(), org.to_string(), trace.to_string());
         let (abort, rx) = oneshot::channel();
         tokio::spawn(async move {
             let _abort = abort;
-            run(&queue, &org, &trace, 10, rx).await
+            run_as(&queue, &org, search_type, &trace, 10, rx).await
         })
+    }
+
+    /// Waits until the queue holds `len` rows, failing after two seconds.
+    async fn until_len(queue: &Queue, len: usize) {
+        tokio::time::timeout(Duration::from_secs(2), async {
+            while queue.len() != len {
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .unwrap_or_else(|_| panic!("queue never reached {len} rows"));
     }
 
     fn timeouts(org: &str) -> u64 {
@@ -824,5 +969,111 @@ mod tests {
                 "queue_enabled={queue_enabled} stale_reads={stale_reads}"
             );
         }
+    }
+    /// A long waiter and the short searches arriving after it admit in arrival order, one per
+    /// freed slot, so later arrivals cannot starve it into a queue timeout.
+    #[tokio::test]
+    async fn non_public_searches_admit_in_arrival_order() {
+        let queue = Queue::new(true);
+        // The per-user cap of the short group is 4.
+        for filler in ["f0", "f1", "f2", "f3"] {
+            queue.push("s1", None, filler);
+        }
+        let long = spawn_as(&queue, "s1", None, "long");
+        tokio::time::sleep(Duration::from_millis(150)).await;
+        let shorts: Vec<String> = (0..8).map(|i| format!("short-{i}")).collect();
+        let mut handles = vec![long];
+        for trace in &shorts {
+            handles.push(spawn_as(&queue, "s1", None, trace));
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        assert!(queue.admitted.lock().unwrap().is_empty());
+
+        for _ in 0..=shorts.len() {
+            let oldest = queue.rows.lock().unwrap()[0].trace.clone();
+            queue.remove(&oldest);
+            until_len(&queue, 4).await;
+        }
+        for handle in handles {
+            tokio::time::timeout(Duration::from_secs(1), handle)
+                .await
+                .unwrap()
+                .unwrap()
+                .unwrap();
+        }
+        let mut expected = vec!["long".to_string()];
+        expected.extend(shorts);
+        assert_eq!(*queue.admitted.lock().unwrap(), expected);
+    }
+
+    #[tokio::test]
+    async fn a_public_build_on_a_full_type_cap_does_not_block_other_searches() {
+        let queue = Queue::new(true);
+        queue.push("p1", PUBLIC, "a");
+        queue.push("p1", PUBLIC, "b");
+        let public = spawn(&queue, "p1", "public");
+        tokio::time::sleep(Duration::from_millis(150)).await;
+
+        let (_abort, rx) = oneshot::channel();
+        tokio::time::timeout(
+            Duration::from_secs(1),
+            run_as(&queue, "p1", None, "plain", 10, rx),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        assert!(!public.is_finished(), "the per-org public cap of 2 is full");
+
+        queue.remove("a");
+        tokio::time::timeout(Duration::from_secs(1), public)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert_eq!(*queue.admitted.lock().unwrap(), ["plain", "public"]);
+    }
+
+    #[tokio::test]
+    async fn an_in_order_wait_holds_the_lock_and_a_cancel_releases_it() {
+        let queue = Queue::new(true);
+        for filler in ["f0", "f1", "f2", "f3"] {
+            queue.push("s2", None, filler);
+        }
+        let (abort, rx) = oneshot::channel();
+        let q = queue.clone();
+        let waiter = tokio::spawn(async move { run_as(&q, "s2", None, "me", 10, rx).await });
+        tokio::time::sleep(Duration::from_millis(150)).await;
+        assert!(queue.lock.as_ref().unwrap().try_lock().is_err());
+
+        abort.send(()).unwrap();
+        let err = tokio::time::timeout(Duration::from_secs(1), waiter)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("waiting in queue was canceled"),
+            "{err}"
+        );
+        assert_eq!(queue.traces("me"), 0);
+        assert!(queue.lock.as_ref().unwrap().try_lock().is_ok());
+    }
+
+    #[tokio::test]
+    async fn an_in_order_wait_times_out_and_releases_the_lock() {
+        let queue = Queue::new(true);
+        for filler in ["f0", "f1", "f2", "f3"] {
+            queue.push("s3", None, filler);
+        }
+        let before = timeouts("s3");
+        let (_abort, rx) = oneshot::channel();
+        let err = run_as(&queue, "s3", None, "me", 1, rx).await.unwrap_err();
+        assert!(
+            err.to_string().contains("request timeout in queue"),
+            "{err}"
+        );
+        assert_eq!(timeouts("s3"), before + 1);
+        assert_eq!(queue.traces("me"), 0);
+        assert!(queue.lock.as_ref().unwrap().try_lock().is_ok());
     }
 }
