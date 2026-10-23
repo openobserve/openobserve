@@ -1,9 +1,0 @@
-{
-  "edition_floor": "oss",
-  "reason": "0/0 changed UI files are gated",
-  "source_files": 0,
-  "gated_files": {
-    "cloud": [],
-    "enterprise": []
-  }
-}
