@@ -33,7 +33,10 @@ use config::{
         cluster::RoleGroup,
         function::RESULT_ARRAY,
         search::{self},
-        self_reporting::usage::{RequestStats, UsageType},
+        self_reporting::{
+            ai_chat::AI_CHAT_EVENTS_STREAM,
+            usage::{RequestStats, UsageType},
+        },
         sql::{OrderBy, resolve_stream_names},
         stream::{FileKey, StreamParams, StreamPartition, StreamType},
     },
@@ -91,6 +94,9 @@ use ::search::{
 pub use searcher::QueryPhase;
 use searcher::Searcher;
 pub use searcher::{LeaderInfo, QueryRegistration, QueryTracker};
+
+/// Streams no customer can write that every org still reads while search is blocked.
+pub const OPERATIONAL_STREAMS: [&str; 2] = ["_o2_alert_calibration_digests", AI_CHAT_EVENTS_STREAM];
 
 /// The result of search in cluster
 /// data, scan_stats, wait_in_queue, is_partial, partial_err
@@ -1078,6 +1084,10 @@ pub fn check_search_allowed(_org_id: &str, _stream: Option<&str>) -> Result<(), 
     Ok(())
 }
 
+pub fn is_operational_stream(stream: &str) -> bool {
+    OPERATIONAL_STREAMS.contains(&stream)
+}
+
 /// The first row of each query; two orgs may run the same trace id, so a query is its org and id.
 #[cfg(any(feature = "enterprise", test))]
 fn unique_queries(
@@ -1104,11 +1114,12 @@ fn merge_cancel_outcomes(outcomes: Vec<Result<bool, Error>>) -> Result<bool, Err
     first_err.map_or(Ok(false), Err)
 }
 
-/// The meta org's own usage and audit streams must stay searchable to diagnose the license gate.
+/// The meta org's usage and audit, and every org's own operational streams, stay searchable.
 #[cfg(any(feature = "enterprise", test))]
 #[inline]
 fn is_license_exempt_stream(org_id: &str, stream: Option<&str>) -> bool {
-    org_id == META_ORG_ID && (stream == Some(USAGE_STREAM) || stream == Some(AUDIT_STREAM))
+    (org_id == META_ORG_ID && (stream == Some(USAGE_STREAM) || stream == Some(AUDIT_STREAM)))
+        || stream.is_some_and(is_operational_stream)
 }
 
 #[cfg(any(feature = "enterprise", test))]
@@ -1330,7 +1341,7 @@ mod tests {
     }
 
     #[test]
-    fn test_is_license_exempt_stream_is_meta_org_only() {
+    fn usage_and_audit_stay_meta_only() {
         assert!(is_license_exempt_stream(META_ORG_ID, Some(USAGE_STREAM)));
         assert!(is_license_exempt_stream(META_ORG_ID, Some(AUDIT_STREAM)));
         assert!(!is_license_exempt_stream(
@@ -1397,5 +1408,78 @@ mod tests {
                 .abort_receiver(QueryPhase::Queued)
                 .is_ok()
         );
+    }
+
+    #[test]
+    fn operational_streams_are_exempt_in_every_org() {
+        for org in ["acme", META_ORG_ID] {
+            for stream in OPERATIONAL_STREAMS {
+                assert!(is_operational_stream(stream), "{stream}");
+                assert!(
+                    is_license_exempt_stream(org, Some(stream)),
+                    "{org} {stream}"
+                );
+            }
+        }
+        assert!(!is_license_exempt_stream("acme", None));
+        for stream in [
+            "logs",
+            "synthetics_step_results",
+            "errors",
+            "_anomalies",
+            "_llm_scores",
+            "_agent_signals",
+        ] {
+            assert!(!is_operational_stream(stream), "{stream}");
+            assert!(!is_license_exempt_stream("acme", Some(stream)), "{stream}");
+        }
+    }
+
+    #[test]
+    fn user_writable_history_streams_are_not_exempt() {
+        use config::meta::self_reporting::usage::TRIGGERS_STREAM;
+
+        for stream in [TRIGGERS_STREAM, "synthetics_results"] {
+            assert!(!is_operational_stream(stream), "{stream}");
+            for org in ["acme", META_ORG_ID] {
+                assert!(
+                    !is_license_exempt_stream(org, Some(stream)),
+                    "{org} {stream}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn operational_allowlist_is_exactly_the_design_list() {
+        assert_eq!(
+            OPERATIONAL_STREAMS,
+            ["_o2_alert_calibration_digests", "_o2_ai_chat_events"]
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn check_search_allowed_passes_operational_streams_with_the_gate_closed() {
+        use config::meta::self_reporting::usage::TRIGGERS_STREAM;
+        use o2_enterprise::enterprise::license::{TEST_STATICS_LOCK, close_search_gate_for_tests};
+
+        let _gate = close_search_gate_for_tests(TEST_STATICS_LOCK.lock().await);
+        for stream in OPERATIONAL_STREAMS {
+            assert!(
+                check_search_allowed("acme", Some(stream)).is_ok(),
+                "{stream}"
+            );
+        }
+        let refused = check_search_allowed("acme", Some("logs"))
+            .unwrap_err()
+            .to_string();
+        assert!(
+            refused.starts_with("Error# Search is temporarily disabled"),
+            "{refused}"
+        );
+        assert!(check_search_allowed("acme", None).is_err());
+        assert!(check_search_allowed("acme", Some(TRIGGERS_STREAM)).is_err());
+        assert!(check_search_allowed("acme", Some("synthetics_results")).is_err());
     }
 }

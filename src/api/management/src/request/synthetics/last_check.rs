@@ -159,6 +159,14 @@ fn apply(item: &mut SyntheticListItem, hit: &Value) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn synthetics_results_stays_gated_while_search_is_blocked() {
+        // customers can ingest into this name, so it must never join the operational allowlist
+        assert!(!search_service::is_operational_stream(
+            openobserve_synthetics::RESULTS_STREAM
+        ));
+    }
+
     use config::meta::synthetics::SyntheticStatus;
     use serde_json::json;
 
