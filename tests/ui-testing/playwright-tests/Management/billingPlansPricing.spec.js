@@ -2,6 +2,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
 
 // Pricing JSON documents (mock targets for the external https://openobserve.ai/pricing.json fetch).
 // Shapes copied from web/src/enterprise/components/billings/plans.spec.ts "pricing JSON" describe.
@@ -78,14 +79,10 @@ test.describe('Enterprise Billing Plans Pricing Cards testcases', () => {
     let buildType;
 
     test.beforeEach(async ({ page }, testInfo) => {
+        test.skip(!isCloudEnvironment(), 'Billing plans are a Cloud product (Stripe / marketplace billing)');
         testLogger.testStart(testInfo.title, testInfo.file);
         pm = new PageManager(page);
-        // /billings is registered on Cloud and Enterprise builds only (web/src/router/index.ts:30), so skip the OSS build.
         buildType = await pm.billingPlansPage.detectBuildType();
-        test.skip(
-            buildType === 'opensource',
-            `Billing plans are Cloud/Enterprise only (build_type: ${buildType})`,
-        );
         await navigateToBase(page);
         testLogger.info('Test setup completed');
     });
