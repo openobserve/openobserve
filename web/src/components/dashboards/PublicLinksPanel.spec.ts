@@ -810,7 +810,7 @@ describe("PublicLinksPanel", () => {
       expect(notify.positive).not.toHaveBeenCalled();
     });
 
-    it("saves the upgraded copy once into its folder, then publishes and says so", async () => {
+    it("saves the upgraded copy once into its folder, then publishes without a toast", async () => {
       const dashboard = await load(3);
       const w = await publish(dashboard);
       expect(updateDashboard).toHaveBeenCalledTimes(1);
@@ -819,8 +819,7 @@ describe("PublicLinksPanel", () => {
         vi.mocked(admin.create).mock.invocationCallOrder[0],
       );
       expect(has(w, "dashboards-public-links-panel-created")).toBe(true);
-      expect(notify.positive).toHaveBeenCalledTimes(1);
-      expect(notify.positive).toHaveBeenCalledWith("Dashboard upgraded to the current format.");
+      expect(notify.positive).not.toHaveBeenCalled();
       expect(notify.error).not.toHaveBeenCalled();
     });
 

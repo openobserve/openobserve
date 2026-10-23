@@ -7811,7 +7811,6 @@
       "createForbidden": "公開リンクを作成する権限がありません。管理者に問い合わせてください。",
       "editForbidden": "公開リンクを編集する権限がありません。管理者に問い合わせてください。",
       "saveBeforePublish": "ダッシュボードの変更を保存してから公開してください。",
-      "upgradedToast": "ダッシュボードを現在の形式にアップグレードしました。",
       "publisherLeft": "公開者が組織を離れました",
       "takeOver": "引き継ぐ",
       "takeOverTitle": "このリンクを引き継ぎますか？",

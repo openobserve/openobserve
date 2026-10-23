@@ -7811,7 +7811,6 @@
       "createForbidden": "您没有创建公开链接的权限。请联系管理员。",
       "editForbidden": "您没有编辑公开链接的权限。请联系管理员。",
       "saveBeforePublish": "请先保存仪表盘的更改，再发布。",
-      "upgradedToast": "仪表盘已升级到当前格式。",
       "publisherLeft": "发布者已离开组织",
       "takeOver": "接管",
       "takeOverTitle": "接管此链接？",

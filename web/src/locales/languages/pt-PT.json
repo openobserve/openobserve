@@ -7811,7 +7811,6 @@
       "createForbidden": "Você não tem permissão para criar links públicos. Peça a um administrador.",
       "editForbidden": "Você não tem permissão para editar links públicos. Peça a um administrador.",
       "saveBeforePublish": "Guarde as alterações do dashboard e depois publique.",
-      "upgradedToast": "Dashboard atualizado para o formato atual.",
       "publisherLeft": "O autor da publicação saiu da organização",
       "takeOver": "Assumir",
       "takeOverTitle": "Assumir este link?",

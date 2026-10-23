@@ -7811,7 +7811,6 @@
       "createForbidden": "공개 링크를 만들 권한이 없습니다. 관리자에게 문의하세요.",
       "editForbidden": "공개 링크를 편집할 권한이 없습니다. 관리자에게 문의하세요.",
       "saveBeforePublish": "대시보드 변경 사항을 저장한 후 게시하세요.",
-      "upgradedToast": "대시보드를 현재 형식으로 업그레이드했습니다.",
       "publisherLeft": "게시자가 조직을 떠났습니다",
       "takeOver": "인계받기",
       "takeOverTitle": "이 링크를 인계받을까요?",

@@ -7814,7 +7814,6 @@
       "createForbidden": "You don't have permission to create public links. Ask an admin.",
       "editForbidden": "You don't have permission to edit public links. Ask an admin.",
       "saveBeforePublish": "Save your dashboard changes, then publish.",
-      "upgradedToast": "Dashboard upgraded to the current format.",
       "publisherLeft": "Publisher left the org",
       "takeOver": "Take over",
       "takeOverTitle": "Take over this link?",

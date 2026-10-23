@@ -7811,7 +7811,6 @@
       "createForbidden": "Bạn không có quyền tạo liên kết công khai. Hãy liên hệ quản trị viên.",
       "editForbidden": "Bạn không có quyền chỉnh sửa liên kết công khai. Hãy liên hệ quản trị viên.",
       "saveBeforePublish": "Hãy lưu các thay đổi của bảng điều khiển, sau đó công bố.",
-      "upgradedToast": "Đã nâng cấp bảng điều khiển lên định dạng hiện tại.",
       "publisherLeft": "Người xuất bản đã rời tổ chức",
       "takeOver": "Tiếp quản",
       "takeOverTitle": "Tiếp quản liên kết này?",

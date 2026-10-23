@@ -7806,7 +7806,6 @@
       "createForbidden": "您沒有建立公開連結的權限。請聯絡管理員。",
       "editForbidden": "您沒有編輯公開連結的權限。請聯絡管理員。",
       "saveBeforePublish": "請先儲存儀表板的變更，再發布。",
-      "upgradedToast": "儀表板已升級至目前格式。",
       "publisherLeft": "發佈者已離開組織",
       "takeOver": "接管",
       "takeOverTitle": "要接管此連結嗎？",

@@ -1252,7 +1252,6 @@ async function submit(value: PublicLinkForm) {
     } else {
       createdLink.value = saved;
       view.value = "created";
-      if (upgrade) showPositiveNotification(t("dashboard.publicLinks.upgradedToast"));
     }
   } catch (e: unknown) {
     const refused = forbiddenMessage(

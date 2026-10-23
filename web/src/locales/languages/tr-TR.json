@@ -7811,7 +7811,6 @@
       "createForbidden": "Genel bağlantı oluşturma izniniz yok. Bir yöneticiye danışın.",
       "editForbidden": "Genel bağlantıları düzenleme izniniz yok. Bir yöneticiye danışın.",
       "saveBeforePublish": "Gösterge panosundaki değişiklikleri kaydedin, ardından yayımlayın.",
-      "upgradedToast": "Gösterge panosu güncel biçime yükseltildi.",
       "publisherLeft": "Yayınlayan kuruluştan ayrıldı",
       "takeOver": "Devral",
       "takeOverTitle": "Bu bağlantı devralınsın mı?",
