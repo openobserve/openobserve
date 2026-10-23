@@ -117,7 +117,7 @@ async function globalSetup() {
       if (isCleanupOnly || process.env.SKIP_INGESTION === 'true') {
         testLogger.info('[alpha1] Skipping data ingestion (cleanup-only run or SKIP_INGESTION=true)');
       } else {
-        await performGlobalIngestion(page);
+        await performGlobalIngestionWithFetch();
       }
 
       testLogger.info('[alpha1] Global setup completed successfully');
@@ -516,104 +516,6 @@ async function fetchCloudConfig(page) {
 }
 
 /**
- * Ingest test data into streams so they appear in UI dropdowns.
- * Uses cloud auth (email:passcode) from cloud-config.json.
- */
-async function performGlobalIngestion(page) {
-  let headers;
-  let orgId;
-
-  try {
-    const cloudConfig = JSON.parse(fs.readFileSync(CLOUD_CONFIG_FILE, 'utf-8'));
-    // Ingest into THIS shard's org (ORGNAME) rather than the org baked into
-    // cloud-config.json by the shared-auth barrier. The passcode is user-level
-    // (identity), so it authorizes any org the user is a member of — only the
-    // target org differs per shard. Enables per-shard org isolation.
-    orgId = process.env.ORGNAME || cloudConfig.orgIdentifier;
-    const basicAuth = Buffer.from(`${cloudConfig.userEmail}:${cloudConfig.passcode}`).toString('base64');
-    headers = {
-      'Authorization': `Basic ${basicAuth}`,
-      'Content-Type': 'application/json',
-    };
-  } catch (e) {
-    testLogger.warn('[alpha1] Cannot read cloud-config.json for ingestion — skipping', { error: e.message });
-    return;
-  }
-
-  // Only e2e_automate is pre-provisioned as a shared fixture. The Alerts ui-operations
-  // tests that used to rely on a shared 'auto_playwright_stream' now self-ingest their
-  // own unique per-run streams, so we no longer pre-create (or wait on) that stream —
-  // on the shared cloud org it was routinely stuck "being deleted" by other branch runs.
-  const streams = [
-    { name: 'e2e_automate', data: logsdata },
-  ];
-
-  for (const stream of streams) {
-    try {
-      const response = await page.evaluate(async ({ base, headers, orgId, streamName, data }) => {
-        const r = await fetch(`${base}/api/${orgId}/${streamName}/_json`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(data),
-        });
-        return { status: r.status, text: await r.text() };
-      }, { base: ingestBase(''), headers, orgId, streamName: stream.name, data: stream.data });
-
-      if (response.status === 200) {
-        testLogger.info(`[alpha1] Ingested test data into '${stream.name}'`, { status: response.status });
-      } else {
-        testLogger.warn(`[alpha1] Ingestion into '${stream.name}' returned ${response.status}`, { body: response.text.substring(0, 200) });
-      }
-    } catch (e) {
-      testLogger.warn(`[alpha1] Failed to ingest into '${stream.name}'`, { error: e.message });
-    }
-  }
-
-  // Wait for streams to be indexed
-  testLogger.info('[alpha1] Waiting for streams to be indexed...');
-  const maxWaitMs = 90000;
-  const pollIntervalMs = 3000;
-  const startTime = Date.now();
-  let lastSeen = 'no response';
-
-  while (Date.now() - startTime < maxWaitMs) {
-    try {
-      const streamsResult = await page.evaluate(async ({ orgId, headers }) => {
-        const r = await fetch(`/api/${orgId}/streams?type=logs&keyword=e2e_automate`, { headers });
-        if (!r.ok) return { ok: false, status: r.status };
-        const data = await r.json();
-        const names = (data.list || []).map(s => s.name);
-        return { ok: true, status: r.status, names };
-      }, { orgId, headers });
-      lastSeen = `HTTP ${streamsResult.status}, names=[${(streamsResult.names || []).join(',')}]`;
-
-      if (streamsResult.ok) {
-        const hasE2e = streamsResult.names.includes('e2e_automate');
-        if (hasE2e) {
-          testLogger.info(`[alpha1] e2e_automate indexed after ${Date.now() - startTime}ms`);
-          break;
-        }
-        testLogger.debug(`[alpha1] e2e_automate not yet indexed, waiting...`);
-      } else if (streamsResult.status === 401 || streamsResult.status === 403) {
-        // The ingestion passcode is not authorized for the streams list; retrying cannot succeed.
-        testLogger.warn(`[alpha1] Streams API returned ${streamsResult.status} — cannot verify e2e_automate here; tests wait for their own streams`);
-        return;
-      } else {
-        testLogger.debug(`[alpha1] Streams API returned ${streamsResult.status}, retrying...`);
-      }
-    } catch (e) {
-      testLogger.debug(`[alpha1] Error checking streams: ${e.message}`);
-    }
-
-    await page.waitForTimeout(pollIntervalMs);
-  }
-
-  if (Date.now() - startTime >= maxWaitMs) {
-    testLogger.warn(`[alpha1] Streams not fully indexed after ${maxWaitMs}ms (last: ${lastSeen}) — tests may fail on stream selection`);
-  }
-}
-
-/**
  * Verify that shared auth state (from cleanup job artifact) is still valid.
  * Opens a browser with the storageState and checks if the session works.
  */
@@ -693,8 +595,7 @@ async function performGlobalIngestionWithFetch() {
     };
     baseUrl = (process.env.ZO_BASE_URL || '').replace(/\/$/, '');
   } catch (e) {
-    testLogger.warn('[alpha1] Cannot read cloud-config.json for ingestion — skipping', { error: e.message });
-    return;
+    throw new Error(`[alpha1] Cannot read cloud-config.json for seed ingestion: ${e.message}`);
   }
 
   // Only e2e_automate is pre-provisioned as a shared fixture. The Alerts ui-operations
@@ -705,21 +606,29 @@ async function performGlobalIngestionWithFetch() {
     { name: 'e2e_automate', data: logsdata },
   ];
 
+  // Specs assume e2e_automate exists, so a failed seed must fail setup rather than surface later as missing data.
   for (const stream of streams) {
-    try {
-      const r = await fetch(`${ingestBase(baseUrl)}/api/${orgId}/${stream.name}/_json`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(stream.data),
-      });
-      if (r.ok) {
-        testLogger.info(`[alpha1] Ingested test data into '${stream.name}'`, { status: r.status });
-      } else {
-        const text = await r.text();
-        testLogger.warn(`[alpha1] Ingestion into '${stream.name}' returned ${r.status}`, { body: text.substring(0, 200) });
+    let lastError = '';
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const r = await fetch(`${ingestBase(baseUrl)}/api/${orgId}/${stream.name}/_json`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(stream.data),
+        });
+        if (r.ok) {
+          testLogger.info(`[alpha1] Ingested test data into '${stream.name}'`, { status: r.status });
+          lastError = '';
+          break;
+        }
+        lastError = `HTTP ${r.status}: ${(await r.text()).substring(0, 200)}`;
+      } catch (e) {
+        lastError = e.message;
       }
-    } catch (e) {
-      testLogger.warn(`[alpha1] Failed to ingest into '${stream.name}'`, { error: e.message });
+      testLogger.warn(`[alpha1] Ingestion into '${stream.name}' failed (attempt ${attempt}/2)`, { error: lastError });
+    }
+    if (lastError) {
+      throw new Error(`[alpha1] Could not seed '${stream.name}' at ${ingestBase(baseUrl)}: ${lastError}`);
     }
   }
 
