@@ -23,8 +23,8 @@ use o2_enterprise::enterprise::license::{
     BelowHwm, LICENSE_DB_KEY, License, LicenseDecision, LicenseStatus, RefreshBusy, RefreshReport,
     RefreshStatus, Rollback, RollbackReason, Waiver, check_license, click_refresh, gate_and_raise,
     get_license, ingestion_limit_exceeded_count, ingestion_used, judge_paste, license_expired,
-    license_status, load_rev_hwm, pasted_key_supersedes_env, refresh_status, rev_hwm_warning,
-    rotate_instance_key, undo_raise,
+    license_status, load_rev_hwm, paste_superseded, pasted_key_supersedes_env, refresh_status,
+    rev_hwm_warning, rotate_instance_key, undo_raise,
 };
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::{AuthExtractor, UserEmail};
@@ -524,6 +524,20 @@ pub async fn store_license(
             ));
         }
         return (StatusCode::CONFLICT, Json(env_conflict_body(&req.key))).into_response();
+    }
+
+    if let Some(rollback) = paste_superseded(loaded.as_ref(), &req.key) {
+        if q.dry_run {
+            return MetaHttpResponse::json(key_check_response(
+                rollback.reason.as_str(),
+                rollback_body(&rollback).message,
+                Some(rollback.loaded_rev),
+                loaded.as_ref(),
+                &req.key,
+                is_root,
+            ));
+        }
+        return (StatusCode::CONFLICT, Json(rollback_body(&rollback))).into_response();
     }
 
     if let Err(e) = check_license(&req.raw_key, &req.key).await {
@@ -1467,6 +1481,57 @@ mod tests {
         assert_eq!(body["code"], 409);
         assert_eq!(body["reason"], "refresh_in_progress");
         assert_eq!(body["limits_refreshed"], true);
+    }
+
+    async fn load_successor_for_paste() {
+        load_refresh_license("online").await;
+        let mut loaded = o2_enterprise::enterprise::license::LICENSE
+            .get()
+            .unwrap()
+            .write()
+            .await;
+        let (_, license) = loaded.as_mut().unwrap();
+        license.license_id = "lic-successor".into();
+        license.rev = 100;
+        license.supersedes = vec!["lic-ancestor".into()];
+        infra::db::get_db()
+            .await
+            .put(LICENSE_DB_KEY, "loaded-successor-key".into(), false, None)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn paste_of_a_superseded_licence_is_409_superseded() {
+        let _store = store_setup().await;
+        load_successor_for_paste().await;
+        let before = stored(LICENSE_DB_KEY).await;
+        let hwm = stored(LICENSE_REV_HWM_KEY).await;
+        let (status, body) = paste(lic("lic-ancestor", 9), false).await;
+        assert_eq!(status, StatusCode::CONFLICT, "{body}");
+        assert_eq!(body["code"], 409);
+        assert_eq!(body["reason"], "superseded");
+        assert_eq!(body["license_id"], "lic-ancestor");
+        assert_eq!(body["loaded_rev"], 100);
+        assert_eq!(body["pasted_rev"], 9);
+        assert_eq!(stored(LICENSE_DB_KEY).await, before);
+        assert_eq!(stored(LICENSE_REV_HWM_KEY).await, hwm);
+    }
+
+    #[tokio::test]
+    async fn dry_run_reports_superseded_without_writing() {
+        let _store = store_setup().await;
+        load_successor_for_paste().await;
+        let before = stored(LICENSE_DB_KEY).await;
+        let hwm = stored(LICENSE_REV_HWM_KEY).await;
+        let (status, body) = paste(lic("lic-ancestor", 9), true).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(body["outcome"], "superseded");
+        assert_eq!(body["license_id"], "lic-ancestor");
+        assert_eq!(body["loaded_rev"], 100);
+        assert_eq!(body["pasted_rev"], 9);
+        assert_eq!(stored(LICENSE_DB_KEY).await, before);
+        assert_eq!(stored(LICENSE_REV_HWM_KEY).await, hwm);
     }
 
     #[tokio::test]
