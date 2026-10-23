@@ -286,17 +286,25 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
   // Track if updateGroupedFields is currently running to prevent race conditions
   let isUpdatingGroupedFields = false;
   let pendingUpdateGroupedFields = false;
+  // Settles once the run in flight has written groupedFields.
+  let inFlightGroupedFields: Promise<void> | null = null;
+  let settleInFlightGroupedFields: (() => void) | null = null;
 
   // Helper function to update grouped fields
   const updateGroupedFields = async () => {
-    // If already updating, mark that we need to run again after completion
+    // Resolving before groupedFields lands makes the caller's next makeAutoSQLQuery() a silent no-op.
     if (isUpdatingGroupedFields) {
       pendingUpdateGroupedFields = true;
+      await inFlightGroupedFields;
       return;
     }
 
     isUpdatingGroupedFields = true;
     pendingUpdateGroupedFields = false;
+    // Only ever resolved, so a coalesced caller never inherits this run's rejection.
+    inFlightGroupedFields = new Promise<void>((resolve) => {
+      settleInFlightGroupedFields = resolve;
+    });
 
     try {
       // For PromQL queries, collect streams from ALL queries
@@ -356,6 +364,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
       }
     } finally {
       isUpdatingGroupedFields = false;
+      settleInFlightGroupedFields?.();
       // If there was a pending update request, run it now
       if (pendingUpdateGroupedFields) {
         updateGroupedFields();
