@@ -52,8 +52,15 @@ const D1 = {
   type: "otlphttp",
   target: "https://o2.acme.io",
   exporter: null,
+  fleet_id: null,
 };
-const D2 = { id: "d_3333cccc4444dddd", type: "kafka", target: null, exporter: "kafka/bus" };
+const D2 = {
+  id: "d_3333cccc4444dddd",
+  type: "kafka",
+  target: null,
+  exporter: "kafka/bus",
+  fleet_id: null,
+};
 
 const exporter = (name: string, destination: string, rate: number | null, over = {}) => ({
   name,
@@ -257,6 +264,35 @@ describe("FleetFlowOverview map", () => {
     await clickNode("f:edge");
     expect(details().props("title")).toBe("edge");
     expect(nodes().find((n) => n.id === "f:edge").data.selected).toBe(true);
+  });
+
+  it("draws an exporter marked for another fleet as an edge into that fleet, named after it", async () => {
+    const toEdge = {
+      id: "d_5555eeee6666ffff",
+      type: "fleet",
+      target: null,
+      exporter: null,
+      fleet_id: "edge",
+    };
+    const payload = basePipelines();
+    payload.destinations.push(toEdge);
+    payload.pipelines[0].exporters.push(exporter("otlp/gateway", toEdge.id, 5));
+    serve(payload);
+    await mountOverview();
+    expect(nodes().some((n) => n.id === `d:${toEdge.id}`)).toBe(false);
+    const into = edge(`ef:prod|otlp/gateway|edge|metrics`);
+    expect([into.source, into.target]).toEqual(["e:prod|otlp/gateway", "f:edge"]);
+    const fleetNode = (id: string) => nodes().find((n) => n.id === id);
+    expect(fleetNode("f:edge").data.inbound).toBe(true);
+    expect(fleetNode("f:prod").data.inbound).toBeFalsy();
+    expect(fleetNode("f:edge").position.x).toBeGreaterThan(
+      fleetNode("e:prod|otlp/gateway").position.x,
+    );
+    expect(
+      lists()[1]
+        .props("items")
+        .map((i: any) => i.label),
+    ).toContain("edge");
   });
 
   it("drops the exporters of an unchecked destination from the map", async () => {

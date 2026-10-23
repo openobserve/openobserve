@@ -18,6 +18,8 @@ import { CATALOG, compKey, type EditorGraph, type EditorKind } from "./editorGra
 function seed(spec: {
   pipelines: [string, string[], string[], string[]][];
   extensions?: string[];
+  /** Settings added to a component's catalog defaults, keyed by its token. */
+  settings?: Record<string, Record<string, string>>;
 }): EditorGraph {
   const graph: EditorGraph = { components: {}, pipelines: [], extensions: [] };
   const ensure = (kind: EditorKind, token: string): string => {
@@ -29,7 +31,7 @@ function seed(spec: {
         kind,
         id,
         type: item?.type ?? token.split("/")[0],
-        settings: { ...(item?.defaults ?? {}) },
+        settings: { ...(item?.defaults ?? {}), ...(spec.settings?.[token] ?? {}) },
       };
     }
     return id;
@@ -47,17 +49,31 @@ function seed(spec: {
 }
 
 const O2 = "otlphttp/openobserve";
+// The gateway release's Service; an agent sending straight to OpenObserve uses O2 instead.
+const GATEWAY = "otlp";
 const CORE = ["memory_limiter", "k8sattributes", "batch"];
+const LEADER = { k8s_leader_elector: "k8s_leader_elector" };
 
 export const SEEDS: Record<string, () => EditorGraph> = {
   "k8s-cluster-telemetry": () =>
     seed({
       pipelines: [
-        ["metrics", ["kubeletstats", "hostmetrics"], CORE, [O2]],
-        ["logs", ["filelog"], CORE, [O2]],
-        ["logs/k8s", ["k8s_events", "k8sobjects"], ["memory_limiter", "batch"], [O2, "kafka"]],
+        ["metrics", ["kubeletstats", "hostmetrics"], CORE, [GATEWAY]],
+        ["logs", ["filelog"], CORE, [GATEWAY]],
+        ["traces", ["otlp"], CORE, [GATEWAY]],
       ],
       extensions: ["file_storage", "health_check"],
+    }),
+  // Cluster-wide receivers run on the replica holding the leader lease, so they report once.
+  "k8s-gateway": () =>
+    seed({
+      pipelines: [
+        ["metrics", ["otlp", "k8s_cluster", "prometheus"], CORE, [O2]],
+        ["logs", ["otlp", "k8s_events", "k8sobjects"], CORE, [O2]],
+        ["traces", ["otlp"], ["memory_limiter", "k8sattributes", "tail_sampling", "batch"], [O2]],
+      ],
+      extensions: ["k8s_leader_elector", "health_check"],
+      settings: { k8s_cluster: LEADER, k8s_events: LEADER, k8sobjects: LEADER },
     }),
   "linux-host-baseline": () =>
     seed({

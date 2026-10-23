@@ -97,9 +97,13 @@ export const CATALOG: CatalogItem[] = [
     "protocols.http.endpoint": "0.0.0.0:4318",
   }),
   r("prometheus", "Prometheus", "query-stats", {
-    "config.scrape_configs[0].job_name": "app",
+    "config.scrape_configs[0].job_name": "kubernetes-pods",
     "config.scrape_configs[0].scrape_interval": "30s",
-    "config.scrape_configs[0].static_configs[0].targets[0]": "localhost:9090",
+    "config.scrape_configs[0].kubernetes_sd_configs[0].role": "pod",
+    "config.scrape_configs[0].relabel_configs[0].source_labels[0]":
+      "__meta_kubernetes_pod_annotation_prometheus_io_scrape",
+    "config.scrape_configs[0].relabel_configs[0].action": "keep",
+    "config.scrape_configs[0].relabel_configs[0].regex": "true",
   }),
   r("filelog", "File log", "description", {
     "include[0]": "/var/log/pods/*/*/*.log",
@@ -206,9 +210,8 @@ export const CATALOG: CatalogItem[] = [
     "detectors[1]": "system",
   }),
   e("otlp", "OTLP", "send", {
-    endpoint: "otel-gateway:4317",
-    "tls.insecure": "false",
-    "headers.Authorization": "${env:OTLP_TOKEN}",
+    endpoint: "otel-fleet-collector-gateway:4317",
+    "tls.insecure": "true",
   }),
   e("otlphttp", "OTLP HTTP", "cloud-upload", {
     endpoint: "https://collector.example.com",
@@ -236,6 +239,11 @@ export const CATALOG: CatalogItem[] = [
     create_directory: "true",
   }),
   x("health_check", "Health check", "monitor-heart", { endpoint: "0.0.0.0:13133" }),
+  x("k8s_leader_elector", "K8s leader elector", "workspace-premium", {
+    auth_type: "serviceAccount",
+    lease_name: "otel-fleet-collector-gateway",
+    lease_namespace: "${env:K8S_NAMESPACE}",
+  }),
   x("pprof", "pprof", "speed", { endpoint: "localhost:1777" }),
   x("zpages", "zpages", "insights", { endpoint: "localhost:55679" }),
 ];
