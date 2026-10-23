@@ -13,6 +13,7 @@ node_modules
 dist
 dist-ssr
 coverage
+.vitest-reports/
 *.local
 *.tsbuildinfo
 
