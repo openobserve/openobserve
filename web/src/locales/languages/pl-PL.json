@@ -3954,7 +3954,7 @@
     "delete": "Usuń",
     "confirmDeleteHead": "Usuń strumień",
     "confirmBatchDeleteHead": "Usuń strumienie",
-    "confirmDeleteMsg": "Czy na pewno chcesz usunąć ten strumień?",
+    "confirmDeleteMsg": "Czy na pewno chcesz usunąć strumień {name}?",
     "confirmBatchDeleteMsg": "Czy na pewno chcesz usunąć wybrane strumienie?",
     "deleteAssociatedAlertsPipelines": "Usuń wszystkie potoki i alerty powiązane ze strumieniem",
     "cancel": "Anuluj",

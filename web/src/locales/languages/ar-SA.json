@@ -3954,7 +3954,7 @@
     "delete": "حذف",
     "confirmDeleteHead": "حذف التدفق",
     "confirmBatchDeleteHead": "حذف التدفقات",
-    "confirmDeleteMsg": "هل أنت متأكد أنك تريد حذف هذا التدفق؟",
+    "confirmDeleteMsg": "هل أنت متأكد أنك تريد حذف التدفق {name}؟",
     "confirmBatchDeleteMsg": "هل أنت متأكد أنك تريد حذف التدفقات المختارة؟",
     "deleteAssociatedAlertsPipelines": "حذف جميع مسارات المعالجة والتنبيهات المرتبطة بالتدفق",
     "cancel": "إلغاء",

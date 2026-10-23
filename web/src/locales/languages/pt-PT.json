@@ -3954,7 +3954,7 @@
     "delete": "Eliminar",
     "confirmDeleteHead": "Eliminar stream",
     "confirmBatchDeleteHead": "Eliminar streams",
-    "confirmDeleteMsg": "Tem a certeza de que pretende eliminar este Stream?",
+    "confirmDeleteMsg": "Tem a certeza de que pretende eliminar o Stream {name}?",
     "confirmBatchDeleteMsg": "Tem a certeza de que pretende eliminar os streams selecionados?",
     "deleteAssociatedAlertsPipelines": "Elimine todos os pipelines e alertas associados ao stream",
     "cancel": "Cancelar",

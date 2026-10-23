@@ -3954,7 +3954,7 @@
     "delete": "删除",
     "confirmDeleteHead": "删除数据流",
     "confirmBatchDeleteHead": "删除数据流",
-    "confirmDeleteMsg": "你确定要删除这个数据流吗？",
+    "confirmDeleteMsg": "你确定要删除 {name} 数据流吗？",
     "confirmBatchDeleteMsg": "您确定要删除选定的数据流吗？",
     "deleteAssociatedAlertsPipelines": "删除与该数据流关联的所有流水线和告警",
     "cancel": "取消",

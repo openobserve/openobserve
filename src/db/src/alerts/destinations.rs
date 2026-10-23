@@ -89,7 +89,7 @@ pub async fn set(destination: Destination) -> Result<Destination, DestinationErr
         "{DESTINATION_WATCHER_PREFIX}{}/{}",
         saved.org_id, saved.name
     );
-    infra::coordinator::destinations::emit_put_event(&event_key).await?;
+    infra::coordinator::emit_put(&event_key).await?;
     // super cluster
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
@@ -119,7 +119,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
     // trigger watch event to update in-memory cache
     let event_key = format!("{DESTINATION_WATCHER_PREFIX}{org_id}/{name}");
     // in-cluster
-    infra::coordinator::destinations::emit_delete_event(&event_key).await?;
+    infra::coordinator::emit_delete(&event_key).await?;
     // super cluster
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
