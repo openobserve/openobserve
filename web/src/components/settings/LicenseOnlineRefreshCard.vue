@@ -128,7 +128,10 @@
           <OIcon :name="outcomeIcon" size="sm" class="mt-0.5 shrink-0" />
           <span>{{ outcome.text }}</span>
         </div>
-        <div v-if="result && outcome?.hint" class="text-text-secondary mt-1 text-xs">
+        <div
+          v-if="result && outcome?.hint && !isNetworkError"
+          class="text-text-secondary mt-1 text-xs"
+        >
           {{ outcome.hint }}
         </div>
       </template>
