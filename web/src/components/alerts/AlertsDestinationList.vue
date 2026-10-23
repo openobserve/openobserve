@@ -426,7 +426,7 @@ export default defineComponent({
     const destinationUrl = (row: DestinationPayload): string =>
       row.type === "email" ? (row.emails ?? []).join(", ") : (row.url ?? "");
     const destinationMethod = (row: DestinationPayload): string =>
-      row.type === "email" ? "" : (row.method ?? "");
+      row.type === "email" ? "" : (row.method ?? "").toUpperCase();
 
     const columns: OTableColumnDef[] = [
       {
@@ -691,7 +691,9 @@ export default defineComponent({
     const getTemplates = () => {
       queryClient
         .fetchQuery(templatesQuery(store.state.selectedOrganization.identifier))
-        .then((list: any) => (templates.value = list));
+        .then((list: any) => (templates.value = list))
+        // Template read can be denied (403) to users who may still manage destinations.
+        .catch(() => (templates.value = []));
     };
     // Called both on mount and every time `getDestinations()` resolves (cache-hit
     // paint and the async fetch that follows it), so it can run more than once for

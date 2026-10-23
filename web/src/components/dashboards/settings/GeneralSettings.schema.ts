@@ -17,9 +17,8 @@ export type GeneralSettingsForm = z.infer<ReturnType<typeof makeGeneralSettingsS
 
 // Static pre-load blank defaults for the form. The async edit-data load
 // re-seeds via `form.reset(...)`; this only covers the initial blank state.
-// `showDynamicFilters: true` matches the historical reactive default.
 export const generalSettingsDefaults = (): GeneralSettingsForm => ({
   name: "",
   description: "",
-  showDynamicFilters: true,
+  showDynamicFilters: false,
 });

@@ -577,6 +577,7 @@ import {
   toRaw,
 } from "vue";
 import { useStore } from "vuex";
+import { isCancelledError } from "@tanstack/vue-query";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { formatDate } from "@/utils/date";
 
@@ -1051,6 +1052,8 @@ export default defineComponent({
           // A folder switched away from mid-flight must not stamp over the one now active.
           if (activeFolderId.value === folderId) stampFolders([folderId ?? "default"]);
         } catch (error) {
+          // A newer folder switch cancelled this load; the newer one reports its own outcome.
+          if (isCancelledError(error)) return;
           console.error("Error loading dashboards:", error);
           forbidden.value = asCaughtError(error).response?.status === 403;
           // The grouped access toast already reports a 403; a second red toast adds nothing.
@@ -1100,7 +1103,8 @@ export default defineComponent({
         }
         currentSearchAbortController = new AbortController();
         const searchResults = await fetchSearchResults.execute(searchQuery.value);
-        filteredResults.value = toRaw(searchResults);
+        // fetchSearchResults resolves undefined when the request fails.
+        filteredResults.value = toRaw(searchResults ?? []);
       } catch (error) {
         if (asCaughtError(error).name !== "AbortError") {
           filteredResults.value = [];
@@ -1612,7 +1616,7 @@ export default defineComponent({
       loading.value = true;
       try {
         const results = await fetchSearchResults.execute(query);
-        filteredResults.value = toRaw(results);
+        filteredResults.value = toRaw(results ?? []);
       } finally {
         loading.value = false;
       }

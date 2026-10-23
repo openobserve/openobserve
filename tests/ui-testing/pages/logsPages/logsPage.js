@@ -13554,4 +13554,145 @@ export class LogsPage {
         }
     }
 
+    // =========================================================================
+    // QUERY EDITOR KEYBOARD ACCESSIBILITY — Escape / focus helpers
+    // =========================================================================
+
+    /**
+     * Focus the Monaco query editor through its public API, without the Escape
+     * press that clickQueryEditor() uses to dismiss a lingering popper. Required
+     * for the fullscreen case, where that leading Escape would collapse the
+     * expanded wrapper before the test's own Escape runs.
+     * @returns {Promise<boolean>} whether the Monaco editor could be focused
+     */
+    async focusQueryEditorMonaco() {
+        return await this.page.evaluate((selector) => {
+            const host = document.querySelector(selector);
+            if (!host || !window.monaco?.editor?.getEditors) return false;
+            const ed = window.monaco.editor.getEditors().find((e) => host.contains(e.getDomNode()));
+            if (!ed) return false;
+            ed.focus();
+            return true;
+        }, this.queryEditor).catch(() => false);
+    }
+
+    /**
+     * Whether document.activeElement sits inside the Monaco editor host or its
+     * outer wrapper — i.e. focus has NOT yet left the editor.
+     * @returns {Promise<boolean>}
+     */
+    async hasEditorFocus() {
+        return await this.page.evaluate(() => {
+            const active = document.activeElement;
+            if (!(active instanceof HTMLElement)) return false;
+            return !!active.closest('[data-test="query-editor"], [data-test="logs-search-bar-query-editor"]');
+        });
+    }
+
+    /** Assert focus is still inside the editor (e.g. after widget-close or fullscreen collapse). */
+    async expectFocusInsideEditor() {
+        await expect
+            .poll(() => this.hasEditorFocus(), { timeout: 10000, intervals: [100, 250, 500] })
+            .toBe(true);
+    }
+
+    /**
+     * Whether document.activeElement is a visible tabbable control that follows the
+     * editor host in document order — the exact target focusControlAfter() focuses.
+     * @returns {Promise<boolean>}
+     */
+    async hasFocusOnFollowingControl() {
+        return await this.page.evaluate(() => {
+            const container = document.querySelector('[data-test="query-editor"]');
+            const active = document.activeElement;
+            if (!container || !(active instanceof HTMLElement)) return false;
+            const TABBABLE =
+                'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]';
+            return (
+                !container.contains(active) &&
+                active.matches(TABBABLE) &&
+                active.getAttribute('tabindex') !== '-1' &&
+                active.getClientRects().length > 0 &&
+                Boolean(container.compareDocumentPosition(active) & Node.DOCUMENT_POSITION_FOLLOWING)
+            );
+        }).catch(() => false);
+    }
+
+    /** Assert Escape moved focus to a visible tabbable control that follows the editor. */
+    async expectFocusOnFollowingControl() {
+        await expect
+            .poll(() => this.hasFocusOnFollowingControl(), { timeout: 10000, intervals: [100, 250, 500] })
+            .toBe(true);
+    }
+
+    /**
+     * Whether the Monaco editor currently holds a non-empty text selection.
+     * @returns {Promise<boolean>}
+     */
+    async hasEditorSelection() {
+        return await this.page.evaluate((selector) => {
+            const host = document.querySelector(selector);
+            if (!host || !window.monaco?.editor?.getEditors) return false;
+            const ed = window.monaco.editor.getEditors().find((e) => host.contains(e.getDomNode()));
+            if (!ed) return false;
+            return !(ed.getSelection()?.isEmpty?.() ?? true);
+        }, this.queryEditor).catch(() => false);
+    }
+
+    /** Assert the editor holds a non-empty text selection (guard before the first Escape). */
+    async expectEditorSelectionActive() {
+        await expect
+            .poll(() => this.hasEditorSelection(), { timeout: 10000, intervals: [100, 250, 500] })
+            .toBe(true);
+    }
+
+    /** Assert the editor selection is collapsed/empty (after the first Escape). */
+    async expectEditorSelectionCollapsed() {
+        await expect
+            .poll(() => this.hasEditorSelection(), { timeout: 10000, intervals: [100, 250, 500] })
+            .toBe(false);
+    }
+
+    /** Assert the query editor fullscreen wrapper is expanded (data-fullscreen="true"). */
+    async expectQueryEditorExpanded() {
+        await expect
+            .poll(() => this.isQueryEditorExpanded(), { timeout: 10000, intervals: [100, 250, 500] })
+            .toBe(true);
+    }
+
+    /** Assert the query editor fullscreen wrapper is collapsed (data-fullscreen="false"). */
+    async expectQueryEditorCollapsed() {
+        await expect
+            .poll(() => this.isQueryEditorExpanded(), { timeout: 10000, intervals: [100, 250, 500] })
+            .toBe(false);
+    }
+
+    /** Assert the Monaco suggest widget is visible. */
+    async expectSuggestWidgetVisible() {
+        await expect
+            .poll(() => this.isSuggestionsWidgetVisible(), { timeout: 10000, intervals: [100, 250, 500] })
+            .toBe(true);
+    }
+
+    /** Assert the Monaco suggest widget is hidden/closed. */
+    async expectSuggestWidgetHidden() {
+        await expect
+            .poll(() => this.isSuggestionsWidgetVisible(), { timeout: 10000, intervals: [100, 250, 500] })
+            .toBe(false);
+    }
+
+    /**
+     * Open the suggest widget in the focused editor: type a value-quote trigger,
+     * then fall back to the deterministic Ctrl+Space manual trigger when the
+     * trigger character alone does not surface a menu (e.g. no field context).
+     */
+    async openSuggestWidget() {
+        await this.focusQueryEditorMonaco();
+        await this.page.keyboard.type("'");
+        if (!(await this.isSuggestionsWidgetVisible())) {
+            await this.getMonacoEditorHelper().triggerSuggestions();
+        }
+        await this.expectSuggestWidgetVisible();
+    }
+
 }
