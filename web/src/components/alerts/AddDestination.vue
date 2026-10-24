@@ -510,7 +510,7 @@ import {
   usePrebuiltDestinations,
   type SlackSetupMetadata,
 } from "@/composables/usePrebuiltDestinations";
-import { isPrebuiltType, detectPrebuiltTypeFromUrl } from "@/utils/prebuilt-templates";
+import { isPrebuiltType } from "@/utils/prebuilt-templates";
 import { isValidSlackWebhookUrl } from "@/utils/prebuilt-templates/slack";
 import { DEFAULT_SLACK_APP_NAME } from "@/utils/slackManifest";
 import PrebuiltDestinationForm from "./PrebuiltDestinationForm.vue";
@@ -698,7 +698,6 @@ const {
   isTestInProgress,
   lastTestResult,
   clearTestResult,
-  detectPrebuiltType,
 } = usePrebuiltDestinations();
 
 // Prebuilt credentials sub-object (`credentials.*`), read reactively for the
@@ -912,74 +911,11 @@ const setupDestinationData = () => {
       }
     }
 
-    // Priority 1: Check metadata.prebuilt_type (most reliable for prebuilt destinations)
-    if (parsedMetadata?.prebuilt_type && isPrebuiltType(parsedMetadata.prebuilt_type)) {
-      setDestType(parsedMetadata.prebuilt_type);
-    }
-    // Priority 2: Check if template starts with 'system-prebuilt-' AND destination structure matches
-    // (Must have emails array for email, or specific prebuilt URL patterns for HTTP)
-    else if (props.destination.template?.startsWith("system-prebuilt-")) {
-      const templateType = props.destination.template.replace("system-prebuilt-", "");
-      // Only treat as prebuilt if structure matches the type
-      if (
-        templateType === "email" &&
-        props.destination.type === "email" &&
-        props.destination.emails
-      ) {
-        setDestType("email");
-      } else if (props.destination.type === "http" && props.destination.url) {
-        // Use URL-only detection here — detectPrebuiltType also checks the template
-        // name, which would always match since we're already inside the
-        // system-prebuilt-* branch. A custom destination can have any template,
-        // so the URL is the only reliable signal at this point.
-        const urlType = detectPrebuiltTypeFromUrl(props.destination.url);
-        if (urlType && isPrebuiltType(urlType)) {
-          setDestType(urlType);
-        } else {
-          // Has system template but URL doesn't match prebuilt patterns - it's custom
-          setDestType("custom");
-        }
-      } else {
-        setDestType("custom");
-      }
-    }
-    // Priority 3: Check if template starts with 'prebuilt_' (user templates)
-    // Also verify the URL matches the prebuilt type to avoid misclassifying custom
-    // destinations that happen to use a template with a prebuilt_ prefix.
-    else if (props.destination.template?.startsWith("prebuilt_")) {
-      const extractedType = props.destination.template.replace("prebuilt_", "");
-      if (isPrebuiltType(extractedType) && props.destination.url) {
-        const urlType = detectPrebuiltTypeFromUrl(props.destination.url);
-        setDestType(urlType === extractedType ? extractedType : "custom");
-      } else {
-        setDestType(isPrebuiltType(extractedType) ? extractedType : "custom");
-      }
-    }
-    // Priority 4: Check if template includes 'prebuilt' (legacy format)
-    // Also verify the URL matches the prebuilt type (same guard as Priority 3).
-    else if (props.destination.template?.includes("prebuilt")) {
-      const parts = props.destination.template.split("-");
-      const extractedType = parts[parts.length - 1];
-      if (isPrebuiltType(extractedType) && props.destination.url) {
-        const urlType = detectPrebuiltTypeFromUrl(props.destination.url);
-        setDestType(urlType === extractedType ? extractedType : "custom");
-      } else {
-        setDestType(isPrebuiltType(extractedType) ? extractedType : "custom");
-      }
-    }
-    // Priority 5: Fallback to URL-based detection (for destinations without metadata)
-    else if (props.destination.url) {
-      const detectedType = detectPrebuiltType(props.destination);
-      if (detectedType) {
-        setDestType(detectedType);
-      } else {
-        setDestType("custom");
-      }
-    }
-    // Priority 6: No indicators - this is a custom destination
-    else {
-      setDestType("custom");
-    }
+    setDestType(
+      parsedMetadata?.prebuilt_type && isPrebuiltType(parsedMetadata.prebuilt_type)
+        ? parsedMetadata.prebuilt_type
+        : "custom",
+    );
 
     // Edit-prefill: seed via a single form.reset(record), not a per-field
     // setFieldValue loop — reset() also clears field meta, whereas a setFieldValue

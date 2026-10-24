@@ -87,7 +87,6 @@ export const servicenowConfig: PrebuiltConfig = {
     Accept: "application/json",
   },
   method: "post",
-  urlValidator: (url: string) => isValidServiceNowIncidentUrl(url),
   credentialFields: [
     {
       key: "instanceUrl",

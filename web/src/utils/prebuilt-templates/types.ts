@@ -74,7 +74,6 @@ export interface PrebuiltConfig {
   templateBody: string;
   headers: Record<string, string>;
   method: "get" | "post" | "put";
-  urlValidator: (url: string) => boolean;
   credentialFields: CredentialField[];
 }
 

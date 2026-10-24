@@ -26,7 +26,6 @@ import {
   PREBUILT_DESTINATION_TYPES,
   getPrebuiltConfig,
   isPrebuiltType,
-  detectPrebuiltTypeFromUrl,
   generateDestinationUrl,
   generateDestinationHeaders,
   generatePrebuiltMetadata,
@@ -812,35 +811,11 @@ export function usePrebuiltDestinations() {
   }
 
   /**
-   * Detect if an existing destination matches a prebuilt pattern
+   * Prebuilt type a destination was saved with; a custom one is never inferred from its URL or template.
    */
   function detectPrebuiltType(destination: any): PrebuiltTypeId | null {
-    if (destination.metadata?.prebuilt_type) {
-      const type = destination.metadata.prebuilt_type;
-      return isPrebuiltType(type) ? (type as PrebuiltTypeId) : null;
-    }
-
-    // Check if template name starts with "prebuilt_" or "system-prebuilt-" - this is the definitive indicator
-    if (destination.template && typeof destination.template === "string") {
-      if (destination.template.startsWith("system-prebuilt-")) {
-        // Extract type from template name (e.g., "system-prebuilt-email" -> "email")
-        const type = destination.template.replace("system-prebuilt-", "");
-        return isPrebuiltType(type) ? (type as PrebuiltTypeId) : null;
-      }
-      if (destination.template.startsWith("prebuilt_")) {
-        // Extract type from template name (e.g., "prebuilt_slack" -> "slack")
-        const type = destination.template.replace("prebuilt_", "");
-        return isPrebuiltType(type) ? (type as PrebuiltTypeId) : null;
-      }
-    }
-
-    // Try to detect based on URL pattern (fallback for destinations without template info)
-    if (destination.url) {
-      const type = detectPrebuiltTypeFromUrl(destination.url);
-      return type && isPrebuiltType(type) ? (type as PrebuiltTypeId) : null;
-    }
-
-    return null;
+    const type = destination.metadata?.prebuilt_type;
+    return type && isPrebuiltType(type) ? (type as PrebuiltTypeId) : null;
   }
 
   /**

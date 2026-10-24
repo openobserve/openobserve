@@ -101,18 +101,6 @@ export function getPopularPrebuiltTypes(): PrebuiltType[] {
 }
 
 /**
- * Detect if a URL matches a prebuilt destination pattern
- */
-export function detectPrebuiltTypeFromUrl(url: string): string | null {
-  for (const [type, config] of Object.entries(PREBUILT_CONFIGS)) {
-    if (config.urlValidator(url)) {
-      return type;
-    }
-  }
-  return null;
-}
-
-/**
  * Generate URL for prebuilt destination based on credentials
  */
 export function generateDestinationUrl(type: string, credentials: Record<string, any>): string {
