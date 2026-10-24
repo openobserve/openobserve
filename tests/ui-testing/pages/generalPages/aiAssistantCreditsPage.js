@@ -1,6 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const billingStrings = require('../../../../web/src/locales/languages/en-US.json').billing;
 
 export class AiAssistantCreditsPage {
     /**
@@ -23,6 +24,7 @@ export class AiAssistantCreditsPage {
         this.creditsLow = '[data-test="o2-ai-credits-low"]';
         this.creditsPlans = '[data-test="o2-ai-credits-plans"]';
         this.creditsContact = '[data-test="o2-ai-credits-contact"]';
+        this.contactLabelText = billingStrings.contactLabel;
         this.creditsRecheck = '[data-test="o2-ai-credits-recheck"]';
 
         // Paid-usage consent card (O2AIPaidUsageConsent.vue)
