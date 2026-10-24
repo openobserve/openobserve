@@ -381,6 +381,18 @@ export const applyPromqlPrefill = (data: any, prefill: AlertPrefill): any => {
   return data;
 };
 
+/** The condition tree without unfinished rows or the groups they leave empty; null when nothing is left. */
+export const pruneIncompleteConditions = (node: any): any => {
+  if (!node || typeof node !== "object") return null;
+  if (node.filterType === "condition") {
+    const hasValue = node.value !== undefined && node.value !== null && node.value !== "";
+    return node.column && (isUnaryOperator(node.operator) || hasValue) ? node : null;
+  }
+  if (node.filterType !== "group" || !Array.isArray(node.conditions)) return null;
+  const conditions = node.conditions.map(pruneIncompleteConditions).filter(Boolean);
+  return conditions.length ? { ...node, conditions } : null;
+};
+
 // ─── Composable ─────────────────────────────────────────────────────────────
 
 export interface AlertFormProps {
@@ -1061,9 +1073,17 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   // ── SQL Generation ──────────────────────────────────────────────────────
 
+  // Preview-only SQL, so an unfinished row never narrows what the chart shows.
   const generateSqlQueryLocal = () => {
+    const queryCondition = formData.value.query_condition;
     return generateSqlQuery(
-      formData.value,
+      {
+        ...formData.value,
+        query_condition: {
+          ...queryCondition,
+          conditions: pruneIncompleteConditions(queryCondition?.conditions),
+        },
+      },
       streamFieldsMap.value,
       isAggregationEnabled.value,
       store.state.zoConfig.timestamp_column || "_timestamp",
@@ -1071,23 +1091,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   };
 
   const generatedSqlQuery = ref("");
-
-  const allConditionsValid = (conditions: any): boolean => {
-    if (!conditions || typeof conditions !== "object") {
-      return false;
-    }
-    if (conditions.filterType === "condition") {
-      return !!(
-        conditions.column &&
-        (isUnaryOperator(conditions.operator) ||
-          (conditions.value !== undefined && conditions.value !== ""))
-      );
-    }
-    if (conditions.filterType === "group" && Array.isArray(conditions.conditions)) {
-      return conditions.conditions.every((cond: any) => allConditionsValid(cond));
-    }
-    return false;
-  };
 
   const isAggregationValid = (): boolean => {
     if (!isAggregationEnabled.value) {
@@ -1120,16 +1123,14 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         return;
       }
 
-      const hasConditions =
-        formData.value.query_condition?.conditions &&
-        Object.keys(formData.value.query_condition.conditions).length > 0;
-      const conditionsValid =
-        hasConditions && allConditionsValid(formData.value.query_condition.conditions);
+      const previewConditions = pruneIncompleteConditions(
+        formData.value.query_condition?.conditions,
+      );
       const aggregationValid = isAggregationValid();
 
       // If conditions are incomplete/missing, fall back to local SQL so the
       // preview chart still loads with raw stream data (no WHERE clause).
-      if (!conditionsValid || !aggregationValid) {
+      if (!previewConditions || !aggregationValid) {
         const localSql = generateSqlQueryLocal();
         generatedSqlQuery.value = localSql;
         previewQuery.value = localSql;
@@ -1146,7 +1147,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           type: "custom",
           conditions: {
             version: 2,
-            conditions: formData.value.query_condition.conditions,
+            conditions: previewConditions,
           },
         },
       };

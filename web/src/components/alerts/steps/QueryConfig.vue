@@ -930,6 +930,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </OTooltip>
                       </span>
                     </div>
+                    <OButton
+                      variant="ghost-primary"
+                      size="sm"
+                      data-test="alert-add-filter-btn"
+                      @click="addFilter"
+                    >
+                      <OIcon name="add" size="sm" />
+                      {{ t("alerts.queryConfig.addFilter") }}
+                    </OButton>
                   </div>
 
                   <!-- Cron description + error -->
@@ -1022,6 +1031,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OTooltip>
                   </span>
                 </div>
+                <OButton
+                  variant="ghost-primary"
+                  size="sm"
+                  data-test="alert-add-filter-btn"
+                  @click="addFilter"
+                >
+                  <OIcon name="add" size="sm" />
+                  {{ t("alerts.queryConfig.addFilter") }}
+                </OButton>
               </div>
               <div v-show="showFilters" ref="customPreviewRef">
                 <FilterGroup
@@ -1847,6 +1865,8 @@ import {
   nextTick,
   watch,
   inject,
+  provide,
+  toRef,
   type Ref,
 } from "vue";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
@@ -1858,6 +1878,7 @@ import {
   isAboveMinRefreshInterval,
   describeCron,
   getImageURL,
+  getUUID,
   resolveBrowserTimezone,
 } from "@/utils/zincutils";
 import useSqlSuggestions from "@/composables/useSuggestions";
@@ -1871,6 +1892,8 @@ import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useT
 import { alertPromqlSamples } from "@/utils/alerts/promqlSamples";
 import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
 import FilterGroup from "@/components/alerts/FilterGroup.vue";
+import { CONDITION_VALUE_SUGGEST_KEY } from "@/components/alerts/conditionOperators";
+import { useAlertValueSuggest } from "@/composables/alerts/useAlertValueSuggest";
 import QueryEditorDialog from "@/components/alerts/QueryEditorDialog.vue";
 import CustomConfirmDialog from "@/components/alerts/CustomConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -2040,6 +2063,15 @@ export default defineComponent({
     // FORM_CONTEXT_KEY. All field reads/writes below go through it; the composed
     // AddAlert schema validates on save.
     const form: any = inject(FORM_CONTEXT_KEY, null);
+
+    provide(
+      CONDITION_VALUE_SUGGEST_KEY,
+      useAlertValueSuggest(
+        computed(() => store.state.selectedOrganization?.identifier ?? ""),
+        toRef(props, "streamType"),
+        toRef(props, "streamName"),
+      ),
+    );
 
     // Initial values for the discriminator refs below (the form itself is seeded
     // by useAlertForm's defaults; `_meta` is kept fresh by the syncMeta watcher).
@@ -2305,6 +2337,21 @@ export default defineComponent({
 
     const toggleFilters = () => {
       showFilters.value = !showFilters.value;
+    };
+
+    const addFilter = () => {
+      const root = props.inputData.conditions;
+      const row = {
+        filterType: "condition",
+        column: "",
+        operator: "=",
+        value: "",
+        values: [],
+        logicalOperator: root?.logicalOperator || "AND",
+        id: getUUID(),
+      };
+      emit("update-group", { ...root, conditions: [...(root?.conditions ?? []), row] });
+      showFilters.value = true;
     };
 
     // Stream-type-driven: logs/traces are event-based, metrics are aggregation-based
@@ -3994,6 +4041,7 @@ export default defineComponent({
       onConditionValueChange,
       showFilters,
       toggleFilters,
+      addFilter,
       filtersSectionRef,
       showVrl,
       filterCount,

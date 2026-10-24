@@ -70,14 +70,29 @@ vi.mock("@/components/common/AppTabs.vue", () => ({
   },
 }));
 
-// Mock FilterGroup component
-vi.mock("@/components/alerts/FilterGroup.vue", () => ({
-  default: {
-    name: "FilterGroup",
-    template: "<div data-test='mock-filter-group'></div>",
-    props: ["streamFields", "streamFieldsMap", "showSqlPreview", "sqlQuery", "group", "depth"],
-    emits: ["add-condition", "add-group", "remove-group", "input:update"],
-  },
+// Mock FilterGroup component; it exposes the injected value suggester the real rows read.
+vi.mock("@/components/alerts/FilterGroup.vue", async () => {
+  const { inject } = await vi.importActual<typeof import("vue")>("vue");
+  const { CONDITION_VALUE_SUGGEST_KEY } = await vi.importActual<
+    typeof import("@/components/alerts/conditionOperators")
+  >("@/components/alerts/conditionOperators");
+  return {
+    default: {
+      name: "FilterGroup",
+      template: "<div data-test='mock-filter-group'></div>",
+      props: ["streamFields", "streamFieldsMap", "showSqlPreview", "sqlQuery", "group", "depth"],
+      emits: ["add-condition", "add-group", "remove-group", "input:update"],
+      setup: () => ({ valueSuggest: inject(CONDITION_VALUE_SUGGEST_KEY, null) }),
+    },
+  };
+});
+
+const { valueSuggestSpy, alertValueSuggest } = vi.hoisted(() => {
+  const alertValueSuggest = () => ({ options: { value: [] }, hint: { value: undefined } });
+  return { alertValueSuggest, valueSuggestSpy: vi.fn(() => alertValueSuggest) };
+});
+vi.mock("@/composables/alerts/useAlertValueSuggest", () => ({
+  useAlertValueSuggest: valueSuggestSpy,
 }));
 
 // Mock QueryEditorDialog component
@@ -2445,6 +2460,99 @@ describe("QueryConfig.vue", () => {
   // effectiveKeywords returns autoCompleteKeywords verbatim whenever no context is
   // active, so such a test passes with the bug still present. The only honest probe
   // is to drive a real VALUE context and require Value-kind items to reach the editor.
+
+  describe("filter value suggestions", () => {
+    it("hands the condition rows a suggester scoped to the form's stream", () => {
+      const [org, streamType, streamName] = valueSuggestSpy.mock.calls.at(-1) as any[];
+      expect([org.value, streamType.value, streamName.value]).toEqual([
+        "test-org",
+        "logs",
+        "test-stream",
+      ]);
+      const group = wrapper.findComponent({ name: "FilterGroup" });
+      expect((group.vm as any).valueSuggest).toBe(alertValueSuggest);
+    });
+
+    it("follows a stream change", async () => {
+      await setQCProps({ streamName: "other-stream", streamType: "traces" });
+      const [, streamType, streamName] = valueSuggestSpy.mock.calls.at(-1) as any[];
+      expect([streamType.value, streamName.value]).toEqual(["traces", "other-stream"]);
+    });
+  });
+
+  describe("Add filter button", () => {
+    const addButton = () => wrapper.find('[data-test="alert-add-filter-btn"]');
+    const chip = () => wrapper.find(".filters-inline-toggle");
+
+    const withRow = () => {
+      mockInputData.conditions = {
+        filterType: "group",
+        logicalOperator: "AND",
+        groupId: "root",
+        conditions: [
+          {
+            filterType: "condition",
+            column: "field1",
+            operator: "=",
+            value: "x",
+            values: [],
+            logicalOperator: "AND",
+            id: "r1",
+          },
+        ],
+      };
+    };
+
+    it("adds an empty row after the existing ones", async () => {
+      host.unmount();
+      withRow();
+      host = mountHost().h;
+      wrapper = host.findComponent(QueryConfig) as unknown as VueWrapper<any>;
+
+      await addButton().trigger("click");
+
+      const [tree] = wrapper.emitted("update-group")!.at(-1) as any[];
+      expect(tree.groupId).toBe("root");
+      expect(tree.conditions).toHaveLength(2);
+      expect(tree.conditions[0].id).toBe("r1");
+      expect(tree.conditions[1]).toMatchObject({
+        filterType: "condition",
+        column: "",
+        operator: "=",
+        value: "",
+        logicalOperator: "AND",
+      });
+      expect(mockInputData.conditions.conditions).toHaveLength(1);
+    });
+
+    it("opens the collapsed builder", async () => {
+      await chip().trigger("click");
+      expect(wrapper.vm.showFilters).toBe(false);
+
+      await addButton().trigger("click");
+
+      expect(wrapper.vm.showFilters).toBe(true);
+      expect(wrapper.emitted("update-group")).toHaveLength(1);
+    });
+
+    it("leaves the chip as the collapse toggle", async () => {
+      await chip().trigger("click");
+      expect(wrapper.vm.showFilters).toBe(false);
+      expect(wrapper.emitted("update-group")).toBeFalsy();
+      await chip().trigger("click");
+      expect(wrapper.vm.showFilters).toBe(true);
+    });
+
+    it("is offered on a realtime alert too", async () => {
+      await setQCProps({ isRealTime: "true" });
+      await chip().trigger("click");
+
+      await addButton().trigger("click");
+
+      expect(wrapper.vm.showFilters).toBe(true);
+      expect(wrapper.emitted("update-group")).toHaveLength(1);
+    });
+  });
 
   describe("QueryConfig — N1 context keywords reach the inline editor", () => {
     let host: any;

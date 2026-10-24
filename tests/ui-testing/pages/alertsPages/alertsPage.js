@@ -91,13 +91,13 @@ export class AlertsPage {
             conditionsTabsContainer: '[data-test="scheduled-alert-tabs"]',
             conditionColumnSelect: '[data-test="alert-conditions-select-column"]',
             operatorSelect: '[data-test="alert-conditions-operator-select"]',
-            conditionValueInput: '[data-test="alert-conditions-value-input"]',
+            conditionValueInput: '[data-test="alert-conditions-value-combobox"]',
             addConditionButton: '[data-test="alert-conditions-add-condition-btn"]',
             addFirstConditionButton: '[data-test="alert-conditions-add-btn"]',
             addConditionGroupButton: '[data-test="alert-conditions-add-condition-group-btn"]',
             deleteConditionButton: '[data-test="alert-conditions-delete-condition-btn"]',
             columnInput: '[data-test="alert-conditions-select-column"]',
-            valueInput: '[data-test="alert-conditions-value-input"]',
+            valueInput: '[data-test="alert-conditions-value-combobox"]',
             stepQueryConfig: '.step-query-config',
 
             // Step 3: Compare with Past (Scheduled only)

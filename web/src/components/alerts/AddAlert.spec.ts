@@ -2075,4 +2075,125 @@ describe("AddAlert (OForm owner)", () => {
       expect(form.state.values.stream_name).toBe("default");
     });
   });
+
+  describe("alert type row sits below the stream row", () => {
+    const typeRow = () => wrapper.find('[data-test="add-alert-type-tabs"]');
+    const streamRow = () => wrapper.find('[data-test="add-alert-stream-type-select-dropdown"]');
+
+    it("renders the type row after the stream row, in the same card", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+
+      const card = wrapper.find(".stream-config-card");
+      expect(card.find('[data-test="add-alert-type-tabs"]').exists()).toBe(true);
+      expect(card.find('[data-test="add-alert-stream-type-select-dropdown"]').exists()).toBe(true);
+      const position = streamRow().element.compareDocumentPosition(typeRow().element);
+      expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it("keeps the type row in composite mode, where the stream row is hidden", async () => {
+      const previous = store.state.zoConfig.composite_alerts_available;
+      try {
+        store.state.zoConfig.composite_alerts_available = true;
+        wrapper = mountAlert();
+        await flushPromises();
+        wrapper.vm.form.setFieldValue("is_real_time", "composite");
+        await flushPromises();
+
+        expect(streamRow().exists()).toBe(false);
+        expect(typeRow().exists()).toBe(true);
+      } finally {
+        store.state.zoConfig.composite_alerts_available = previous;
+      }
+    });
+  });
+
+  describe("preview ignores unfinished condition rows", () => {
+    const waitForSqlDebounce = () => new Promise((resolve) => setTimeout(resolve, 1100));
+    const row = (id: string, column: string, value: string) => ({
+      filterType: "condition",
+      column,
+      operator: "=",
+      value,
+      values: [],
+      logicalOperator: "AND",
+      id,
+    });
+
+    it("asks for SQL with only the complete rows", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedValidScheduled(form);
+      form.setFieldValue("query_condition.conditions", {
+        filterType: "group",
+        logicalOperator: "AND",
+        groupId: "root",
+        conditions: [row("a", "field1", "x"), row("b", "", "")],
+      });
+      await waitForSqlDebounce();
+      await flushPromises();
+
+      expect(alertsService.generate_sql).toHaveBeenCalled();
+      const payload = vi.mocked(alertsService.generate_sql).mock.calls.at(-1)![1] as any;
+      expect(payload.query_condition.conditions.conditions.conditions).toEqual([
+        row("a", "field1", "x"),
+      ]);
+    });
+
+    it("previews the whole stream when every row is unfinished", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedValidScheduled(form);
+      form.setFieldValue("query_condition.conditions", {
+        filterType: "group",
+        logicalOperator: "AND",
+        groupId: "root",
+        conditions: [row("a", "field1", ""), row("b", "", "")],
+      });
+      await waitForSqlDebounce();
+      await flushPromises();
+
+      expect(alertsService.generate_sql).not.toHaveBeenCalled();
+      expect(wrapper.vm.generatedSqlQuery).toContain('FROM "_rundata"');
+      expect(wrapper.vm.generatedSqlQuery).not.toContain("WHERE");
+    });
+
+    it("saves the rows exactly as entered", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedValidScheduled(form);
+      form.setFieldValue("query_condition.conditions", {
+        filterType: "group",
+        logicalOperator: "AND",
+        groupId: "root",
+        conditions: [row("a", "field1", "x")],
+      });
+      await flushPromises();
+
+      expect(wrapper.vm.getAlertPayload().query_condition.conditions.conditions).toEqual([
+        row("a", "field1", "x"),
+      ]);
+    });
+  });
+
+  describe("typed alert name", () => {
+    it("keeps a typed name when a stream is picked afterwards", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+
+      wrapper.vm.alertAutoName.markManual();
+      form.setFieldValue("name", "checkout_errors");
+      await flushPromises();
+      form.setFieldValue("stream_type", "logs");
+      await wrapper.vm.updateStreamFields("_rundata");
+      form.setFieldValue("stream_name", "_rundata");
+      await flushPromises();
+
+      expect(form.state.values.name).toBe("checkout_errors");
+    });
+  });
 });

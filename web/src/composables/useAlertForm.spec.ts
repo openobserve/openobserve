@@ -14,7 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { applyPromqlPrefill, defaultAlertValue, formForecastOf } from "@/composables/useAlertForm";
+import {
+  applyPromqlPrefill,
+  defaultAlertValue,
+  formForecastOf,
+  pruneIncompleteConditions,
+} from "@/composables/useAlertForm";
+import { generateSqlQuery } from "@/utils/alerts/alertQueryBuilder";
 import { getAlertPayload } from "@/utils/alerts/alertPayload";
 import {
   buildForecastAlertPromql,
@@ -156,5 +162,70 @@ describe("saving in Forecast mode", () => {
   it("keeps it in Threshold mode", () => {
     const payload = getAlertPayload(withWarning(null), context);
     expect(payload.query_condition.promql_warning_value).toBe(14);
+  });
+});
+
+describe("pruneIncompleteConditions", () => {
+  const leaf = (id: string, column: string, operator: string, value: string) => ({
+    filterType: "condition",
+    column,
+    operator,
+    value,
+    values: [],
+    logicalOperator: "AND",
+    id,
+  });
+  const group = (groupId: string, conditions: any[]) => ({
+    filterType: "group",
+    logicalOperator: "AND",
+    groupId,
+    conditions,
+  });
+
+  it("keeps the complete rows and drops the unfinished ones beside them", () => {
+    const tree = group("root", [
+      leaf("a", "level", "=", "error"),
+      leaf("b", "", "=", ""),
+      leaf("c", "service", "=", ""),
+      leaf("d", "body", "is_null", ""),
+      group("g1", [leaf("e", "", "=", "")]),
+      group("g2", [leaf("f", "host", "=", "node-1"), leaf("g", "", "=", "x")]),
+    ]);
+
+    expect(pruneIncompleteConditions(tree)).toEqual(
+      group("root", [
+        leaf("a", "level", "=", "error"),
+        leaf("d", "body", "is_null", ""),
+        group("g2", [leaf("f", "host", "=", "node-1")]),
+      ]),
+    );
+  });
+
+  it("drops a row whose value is null, as the form treats it as missing", () => {
+    const tree = group("root", [
+      leaf("a", "level", "=", "error"),
+      { ...leaf("b", "service", "=", ""), value: null },
+    ]);
+
+    expect(pruneIncompleteConditions(tree)).toEqual(
+      group("root", [leaf("a", "level", "=", "error")]),
+    );
+  });
+
+  it("does not touch the tree it was given", () => {
+    const tree = group("root", [leaf("a", "level", "=", "error"), leaf("b", "", "=", "")]);
+    pruneIncompleteConditions(tree);
+    expect(tree.conditions).toHaveLength(2);
+  });
+
+  it("leaves no WHERE clause when every row is unfinished", () => {
+    const tree = group("root", [leaf("a", "", "=", ""), leaf("b", "level", "=", "")]);
+    const pruned = pruneIncompleteConditions(tree);
+    const data: any = form();
+    data.stream_name = "app";
+    data.query_condition.conditions = pruned;
+
+    expect(pruned).toBeNull();
+    expect(generateSqlQuery(data, {}, false)).not.toContain("WHERE");
   });
 });

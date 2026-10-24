@@ -305,6 +305,66 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
   });
 });
 
+describe("AlertSettings — plain-language line under each timing control", () => {
+  const line = (host: any, name: string) => host.find(`[data-test="alert-settings-${name}-line"]`);
+  const scheduled = (over: Record<string, any> = {}) =>
+    mountDescendant("false", {
+      trigger_condition: { silence: 10, period: 10, frequency: 10, frequency_type: "minutes" },
+      pending_period_sec: 20,
+      keep_firing_for: 300,
+      ...over,
+    });
+
+  it("reads the current values back in words", () => {
+    const host = scheduled();
+    expect(line(host, "silence").text()).toBe("After it fires, no new notification for 10 minutes");
+    expect(line(host, "pending").text()).toBe("Fires after 3 failed checks in a row");
+    expect(line(host, "keep-firing").text()).toBe("Stays open 300 seconds after recovery");
+  });
+
+  it("follows the values as they change", async () => {
+    const host = scheduled();
+    const form = hostForm(host);
+    form.setFieldValue("trigger_condition.silence", 1);
+    form.setFieldValue("pending_period_sec", 0);
+    form.setFieldValue("keep_firing_for", 0);
+    await flushPromises();
+
+    expect(line(host, "silence").text()).toBe("After it fires, no new notification for 1 minute");
+    expect(line(host, "pending").text()).toBe("Fires on the first failed check");
+    expect(line(host, "keep-firing").text()).toBe("Recovers on the first check that passes");
+
+    form.setFieldValue("trigger_condition.silence", 0);
+    form.setFieldValue("trigger_condition.frequency", 5);
+    form.setFieldValue("pending_period_sec", 12);
+    await flushPromises();
+
+    expect(line(host, "silence").text()).toBe("Notifies on every check that fires");
+    expect(line(host, "pending").text()).toBe("Fires after 4 failed checks in a row");
+  });
+
+  it("counts time, not checks, when the schedule is a cron", () => {
+    const host = scheduled({
+      trigger_condition: { silence: 10, period: 10, frequency_type: "cron", cron: "0 */5 * * * *" },
+    });
+    expect(line(host, "pending").text()).toBe("Fires once the condition holds for 20 minutes");
+  });
+
+  it("explains silence on a realtime alert and the pending period on a composite one", () => {
+    const realtime = mountDescendant("true", { trigger_condition: { silence: 5 } });
+    expect(line(realtime, "silence").text()).toBe(
+      "After it fires, no new notification for 5 minutes",
+    );
+    expect(line(realtime, "pending").exists()).toBe(false);
+
+    const composite = mountDescendant("composite", {
+      trigger_condition: { silence: 5 },
+      pending_period_sec: 5,
+    });
+    expect(line(composite, "pending").text()).toBe("Fires once the condition holds for 5 minutes");
+  });
+});
+
 // ── Creates Incident: enterprise/cloud + incidents_enabled only ─────────────
 // Incidents is an enterprise feature: the OSS backend always reports
 // `incidents_enabled: false`, and the enterprise one only correlates when it

@@ -10327,7 +10327,14 @@
       "keepFiringFor": "Keep firing for",
       "keepFiringForTooltip": "Wait this long after the condition clears before recovering. 0 recovers immediately.",
       "keepFiringForInvalid": "Enter 0 or more seconds",
-      "keepFiringForTooLong": "Enter at most 86400 seconds (24 hours)"
+      "keepFiringForTooLong": "Enter at most 86400 seconds (24 hours)",
+      "silenceLineOff": "Notifies on every check that fires",
+      "silenceLine": "After it fires, no new notification for {count} minute | After it fires, no new notification for {count} minutes",
+      "pendingLineFirstCheck": "Fires on the first failed check",
+      "pendingLineChecks": "Fires after {count} failed checks in a row",
+      "pendingLineDuration": "Fires once the condition holds for {count} minute | Fires once the condition holds for {count} minutes",
+      "keepFiringLineOff": "Recovers on the first check that passes",
+      "keepFiringLine": "Stays open {count} second after recovery | Stays open {count} seconds after recovery"
     },
     "advanced": {
       "addVariable": "Add Variable",
@@ -10377,6 +10384,8 @@
       "onThese": "on these",
       "filters": "filters",
       "viewAlertQuery": "view the alert query",
+      "addFilter": "Add filter",
+      "valueNotSeen": "Not seen in the last {minutes} minutes.",
       "vrlEditor": "VRL Editor",
       "showVrlEditor": "Show VRL editor",
       "hideVrlEditor": "Hide VRL editor",
