@@ -161,6 +161,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ColorSwatchPicker from "../ColorSwatchPicker.vue";
 import { TEXT_SWATCHES, BG_SWATCHES } from "@/composables/dashboard/useColumnFormatting";
 
+/** `patternErrors` is keyed by row index; a row is deleted through the `remove` emit, never `update:modelValue`. */
 const props = withDefaults(
   defineProps<{
     modelValue: any[];
