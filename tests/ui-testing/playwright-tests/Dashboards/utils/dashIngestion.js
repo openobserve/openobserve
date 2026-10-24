@@ -3,6 +3,7 @@ import logsdata from "../../../../test-data/logs_data.json";
 import geoMapdata from "../../../../test-data/geo_map.json";
 import dashboardChartJsonData from "../../../../test-data/dashboard_chart_json.json";
 import sankeyData from "../../../../test-data/sankey_data.json";
+import { ingestBase } from '../../utils/ingest-url.js';
 // Fixed testLogger path - updated to use correct relative path
 const testLogger = require('../../utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier, refreshCloudConfig } = require('../../utils/cloud-auth.js');
@@ -41,7 +42,7 @@ export const ingestion = async (page, streamName = "e2e_automate") => {
   // Resolve headers/org per attempt so a refreshed passcode is picked up on retry.
   const post = () =>
     fetch(
-      `${process.env.INGESTION_URL}/api/${getOrgIdentifier()}/${streamName}/_json`,
+      `${ingestBase(process.env.INGESTION_URL)}/api/${getOrgIdentifier()}/${streamName}/_json`,
       {
         method: "POST",
         headers: getAuthHeaders(),
@@ -120,7 +121,7 @@ const ingestionForMaps = async (page, streamName = "geojson") => {
     const headers = getAuthHeaders();
 
     const fetchResponse = await fetch(
-      `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+      `${ingestBase(process.env.INGESTION_URL)}/api/${orgId}/${streamName}/_json`,
       {
         method: "POST",
         headers,
@@ -153,7 +154,7 @@ const ingestionForDashboardChartJson = async (page, streamName = "kubernetes") =
     const headers = getAuthHeaders();
 
     const fetchResponse = await fetch(
-      `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+      `${ingestBase(process.env.INGESTION_URL)}/api/${orgId}/${streamName}/_json`,
       {
         method: "POST",
         headers,
@@ -186,7 +187,7 @@ const ingestionForSankey = async (streamName = "sankey_data") => {
     const headers = getAuthHeaders();
 
     const fetchResponse = await fetch(
-      `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+      `${ingestBase(process.env.INGESTION_URL)}/api/${orgId}/${streamName}/_json`,
       {
         method: "POST",
         headers,

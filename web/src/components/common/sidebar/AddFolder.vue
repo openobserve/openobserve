@@ -18,7 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     :open="open"
     size="sm"
-    :title="editMode ? t('dashboard.updateFolder') : t('common.addFolder')"
+    :title="
+      editMode
+        ? t(folderKey(type, 'dashboard.updateFolder'))
+        : t(folderKey(type, 'common.addFolder'))
+    "
     :secondary-button-label="t('common.cancel')"
     :primary-button-label="t('common.save')"
     form-id="add-folder-sidebar-form"
@@ -62,6 +66,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import { createFolderByType, updateFolderByType } from "@/utils/commons";
 import { useI18nTyped } from "@/types/i18n";
+import { folderKey } from "./folderTerms";
 import { useStore } from "vuex";
 import useNotifications from "@/composables/useNotifications";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -142,9 +147,12 @@ export default defineComponent({
             icon,
           };
           await updateFolderByType(store, props.folderId, payload, props.type);
-          showPositiveNotification(t("toastMessages.sidebar.folderUpdatedSuccessfully"), {
-            timeout: 2000,
-          });
+          showPositiveNotification(
+            t(folderKey(props.type, "toastMessages.sidebar.folderUpdatedSuccessfully")),
+            {
+              timeout: 2000,
+            },
+          );
           emit("update:modelValue", payload);
           emit("update:open", false);
         } else {
@@ -155,16 +163,19 @@ export default defineComponent({
           );
           emit("update:modelValue", newFolder);
           emit("update:open", false);
-          showPositiveNotification(t("toastMessages.sidebar.folderAddedSuccessfully"), {
-            timeout: 2000,
-          });
+          showPositiveNotification(
+            t(folderKey(props.type, "toastMessages.sidebar.folderAddedSuccessfully")),
+            {
+              timeout: 2000,
+            },
+          );
         }
       } catch (err: any) {
         showErrorNotification(
           err?.response?.data?.message ??
             (props.editMode
-              ? t("common.sidebar.folderUpdateFailed")
-              : t("common.sidebar.folderCreateFailed")),
+              ? t(folderKey(props.type, "common.sidebar.folderUpdateFailed"))
+              : t(folderKey(props.type, "common.sidebar.folderCreateFailed"))),
           { timeout: 2000 },
         );
       }
@@ -176,6 +187,7 @@ export default defineComponent({
 
     return {
       t,
+      folderKey,
       addFolderSchema,
       store,
       addFolderDefaults,

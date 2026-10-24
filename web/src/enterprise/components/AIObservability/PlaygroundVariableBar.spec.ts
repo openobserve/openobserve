@@ -7,7 +7,10 @@ import PlaygroundVariableBar from "./PlaygroundVariableBar.vue";
 
 vi.mock("@/types/i18n", async () => {
   const actual = await vi.importActual<typeof import("@/types/i18n")>("@/types/i18n");
-  return { ...actual, useI18nTyped: () => ({ t: (key: string) => key }) };
+  // Params rendered after the key, so a test can see what was interpolated.
+  const t = (key: string, params?: Record<string, unknown>) =>
+    params ? [key, ...Object.values(params)].join("|") : key;
+  return { ...actual, useI18nTyped: () => ({ t }) };
 });
 
 const stubs = {
@@ -34,12 +37,16 @@ const stubs = {
   },
 };
 
-function mountBar(tools: Array<{ name: string }> = []) {
+function mountBar(
+  tools: Array<{ name: string }> = [],
+  vars: Record<string, string> = {},
+  usedVarNames: string[] = [],
+) {
   return mount(PlaygroundVariableBar, {
     props: {
-      varNames: [],
-      vars: {},
-      usedVarNames: [],
+      varNames: usedVarNames,
+      vars,
+      usedVarNames,
       tools: tools as any,
       provenance: null,
       sample: null,
@@ -86,6 +93,23 @@ describe("PlaygroundVariableBar — tools dropdown", () => {
     const wrapper = mountBar([{ name: "search" }, { name: "fetch" }]);
     await wrapper.get('[data-test="ai-playground-tool-remove-0"]').trigger("click");
     expect(wrapper.emitted("set-tools")?.[0]).toEqual([[{ name: "fetch" }]]);
+  });
+});
+
+describe("PlaygroundVariableBar — unresolved variables", () => {
+  const warning = '[data-test="ai-playground-unresolved-warning"]';
+
+  // expected_output has its own leak warning, so it is not listed twice.
+  it("names each referenced variable that has no value", () => {
+    const wrapper = mountBar([], { input: "x" }, ["question", "input", "expected_output"]);
+    expect(wrapper.get(warning).text()).toBe(
+      "aiObservability.playground.unresolvedVariablesWarning|{{question}}",
+    );
+  });
+
+  it("stays quiet once every referenced variable has a value", () => {
+    const wrapper = mountBar([], { input: "x", question: "q" }, ["question", "input"]);
+    expect(wrapper.find(warning).exists()).toBe(false);
   });
 });
 

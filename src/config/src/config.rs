@@ -114,7 +114,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 114: add RCA stage, context, continuation and on-call subject columns.
 // 115: create rca_steering and add the input columns to rca_runs.
 // 116: add favicon_img to status_pages.
-pub const DB_SCHEMA_VERSION: u64 = 116;
+// 117: create the fleet tables.
+pub const DB_SCHEMA_VERSION: u64 = 117;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1497,7 +1498,11 @@ pub struct ReportServer {
     pub addr: String,
     #[env_config(name = "ZO_REPORT_SERVER_HTTP_IPV6_ENABLED", default = false)]
     pub ipv6_enabled: bool,
-    #[env_config(name = "ZO_REPORT_SERVER_SECRET", default = "")]
+    #[env_config(
+        name = "ZO_REPORT_SERVER_SECRET",
+        default = "",
+        help = "Shared secret for the report server. The report server refuses to start without it; the main app and every installation that uses the same report server must set the same value."
+    )]
     pub secret: String,
 }
 

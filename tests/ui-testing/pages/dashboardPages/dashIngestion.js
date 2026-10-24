@@ -2,6 +2,7 @@
 import logsdata from "../../test-data/logs_data.json";
 import geoMapdata from "../../test-data/geo_map.json";
 import dashboardChartJsonData from "../../test-data/dashboard_chart_json.json";
+import { ingestBase } from '../../playwright-tests/utils/ingest-url.js';
 // Using require() for testLogger as it exports via module.exports (CommonJS)
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
@@ -29,7 +30,7 @@ const ingestData = async (streamName, data, errorContext = "Ingestion") => {
     const headers = getAuthHeaders();
 
     const fetchResponse = await fetch(
-      `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+      `${ingestBase(process.env.INGESTION_URL)}/api/${orgId}/${streamName}/_json`,
       {
         method: "POST",
         headers,
