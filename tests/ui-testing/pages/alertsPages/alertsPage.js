@@ -744,8 +744,8 @@ export class AlertsPage {
         return result;
     }
 
-    async createScheduledAlertWithSQL(streamName, destinationName, randomValue) {
-        const result = await this.creationWizard.createScheduledAlertWithSQL(streamName, destinationName, randomValue);
+    async createScheduledAlertWithSQL(streamName, destinationName, randomValue, sqlQuery = null) {
+        const result = await this.creationWizard.createScheduledAlertWithSQL(streamName, destinationName, randomValue, sqlQuery);
         this.currentAlertName = result;
         return result;
     }
@@ -1465,8 +1465,10 @@ export class AlertsPage {
     async waitForEvaluationHistoryRow({ attempts = 8 } = {}) {
         const row = this.getAlertHistoryDataRowLocator().first();
         const refresh = this.page.locator(this.locators.alertDetailsRefreshButton).first();
+        // isVisible() ignores its timeout and returns at once, so waitFor is what gives each attempt its 5s.
+        const rowShows = () => row.waitFor({ state: 'visible', timeout: 5000 }).then(() => true, () => false);
         for (let i = 0; i < attempts; i++) {
-            if (await row.isVisible({ timeout: 5000 }).catch(() => false)) return true;
+            if (await rowShows()) return true;
             // The history fetch is single-shot on load, so re-issue it; a reload is the fallback when the toolbar is absent.
             if (await refresh.isVisible().catch(() => false)) {
                 await refresh.click().catch(() => {});
@@ -1474,7 +1476,7 @@ export class AlertsPage {
                 await this.page.reload({ waitUntil: 'networkidle' }).catch(() => {});
             }
         }
-        return await row.isVisible({ timeout: 5000 }).catch(() => false);
+        return await rowShows();
     }
 
     /**
@@ -3255,6 +3257,11 @@ export class AlertsPage {
         return ((await valueEl.textContent()) ?? '').trim();
     }
 
+    /** Display-mode alert name value element (OFormInlineEdit span, not an <input>). */
+    getAlertNameValueLocator() {
+        return this.page.locator('[data-test="add-alert-name-input-value"]').first();
+    }
+
     /**
      * Select stream type from dropdown
      * OSelect popover pattern: open trigger, wait for popover, click option keyed by data-test-value (§4)
@@ -4234,6 +4241,40 @@ export class AlertsPage {
         return (this._searchRequests || []).map(
             (url) => new URL(url).pathname.split('/').filter(Boolean).pop(),
         );
+    }
+
+    /**
+     * Click Run Query and return the status of the validating search it issues.
+     *
+     * Run Query sends `validate=true`, so a field-validation failure is a server
+     * 400 the dialog surfaces only as a transient toast. The response is awaited
+     * from BEFORE the click: clickRunQueryAndWait() syncs on the rendered preview,
+     * and a refused query renders nothing, so reading afterwards races the reply.
+     */
+    async runQueryAndGetValidationStatus() {
+        const response = this.page.waitForResponse(
+            (res) => res.request().method() === 'POST'
+                && res.url().includes('/_search')
+                && /[?&]validate=true/.test(res.url()),
+            { timeout: 45000 },
+        );
+        await this.page.locator(this.locators.runQueryButton).click();
+        const status = (await response).status();
+        testLogger.info('Validating search responded', { status });
+        return status;
+    }
+
+    /**
+     * The query editor's result pane rendered rows.
+     *
+     * `sql-output-editor` mounts only once `outputEvents` is non-empty, so its
+     * presence separates a query that returned data from one the server refused:
+     * a refusal leaves the pane on its empty-state icon.
+     */
+    async expectSqlOutputRendered() {
+        const output = this.page.locator('[data-test="sql-output-editor"]').first();
+        await expect(output).toBeVisible({ timeout: 30000 });
+        testLogger.info('Query editor rendered SQL results');
     }
 
     /**

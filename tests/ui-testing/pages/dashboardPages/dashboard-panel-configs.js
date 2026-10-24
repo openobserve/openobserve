@@ -635,9 +635,9 @@ export default class DashboardPanelConfigs {
    * Open the Column Formatting dialog, add the first field, force it numeric so the
    * unit applies, select a unit, then save. Strictly data-test driven.
    * @param {Object} options
-   * @param {string} [options.unitName] - Unit label to select (e.g. "Bytes", "Milliseconds")
+   * @param {string} [options.unitName] - Unit label to select (e.g. "Bytes (1024)", "Milliseconds (ms)")
    */
-  async configureOverrideWithUnit({ unitName = "Bytes" } = {}) {
+  async configureOverrideWithUnit({ unitName = "Bytes (1024)" } = {}) {
     await this.openOverrideConfig();
     await this.addFirstOverrideField();
 
@@ -1129,9 +1129,18 @@ export default class DashboardPanelConfigs {
   //BG color
   async selectBGColor(color) {
     const trigger = this.page.locator('[data-test="dashboard-config-color-mode-trigger"]');
+    const option = this.page.locator(
+      `[data-test="dashboard-config-color-mode-option"][data-test-label="${color}"]`
+    );
     await trigger.waitFor({ state: "visible" });
-    await trigger.click();
-    await this._clickVirtualOption("dashboard-config-color-mode", color);
+    // The threshold section above shifts layout while it renders, so a single click can land before the popover holds.
+    await expect(async () => {
+      if ((await trigger.getAttribute("aria-expanded")) !== "true") {
+        await trigger.click();
+      }
+      await option.waitFor({ state: "visible", timeout: 2000 });
+    }).toPass({ timeout: 15000, intervals: [500, 1000, 2000] });
+    await option.click();
   }
 
   //Guage chart configs

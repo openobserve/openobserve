@@ -416,8 +416,9 @@ export class AlertCreationWizard {
      * @param {string} streamName - Name of the stream
      * @param {string} destinationName - Name of the destination
      * @param {string} randomValue - Random string for unique naming
+     * @param {string} [sqlQuery] - SQL to save the alert on; defaults to the e2e_automate query
      */
-    async createScheduledAlertWithSQL(streamName, destinationName, randomValue) {
+    async createScheduledAlertWithSQL(streamName, destinationName, randomValue, sqlQuery = null) {
         const randomAlertName = 'auto_scheduled_alert_' + randomValue;
         this.currentAlertName = randomAlertName;
 
@@ -458,7 +459,7 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(1000);
         testLogger.info('Opened SQL Editor dialog');
 
-        await this._replaceSqlEditorQuery('SELECT kubernetes_labels_name FROM "e2e_automate" where kubernetes_labels_name = \'ziox-querier\'');
+        await this._replaceSqlEditorQuery(sqlQuery || 'SELECT kubernetes_labels_name FROM "e2e_automate" where kubernetes_labels_name = \'ziox-querier\'');
 
         await this.page.locator(this.locators.runQueryButton).click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});

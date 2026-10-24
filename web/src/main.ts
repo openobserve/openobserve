@@ -32,7 +32,7 @@ import { openobserveRum } from "@openobserve/browser-rum";
 import { openobserveLogs } from "@openobserve/browser-logs";
 import { useReo } from "./services/reodotdev_analytics";
 import { contextRegistry, createDefaultContextProvider } from "./composables/contextProviders";
-import { buildVersionChecker } from "./utils/buildVersionChecker";
+import { buildVersionChecker, isChunkLoadError } from "./utils/buildVersionChecker";
 import { queryClient, setMutationNotifier } from "./composables/query/queryClient";
 import { shouldPropagateTracing } from "./utils/rum/tracingOrigin";
 import { isIgnoredNoise } from "./utils/rum/ignoredNoisePatterns";
@@ -304,10 +304,7 @@ window.addEventListener(
 
 // Handle dynamic import errors (for code splitting)
 router.onError(async (error) => {
-  const chunkFailedPattern =
-    /Loading chunk [\d]+ failed|Failed to fetch dynamically imported module/i;
-
-  if (chunkFailedPattern.test(error.message)) {
+  if (isChunkLoadError(error)) {
     // Smart detection: Check if it's stale build or network error
     const isStale = await buildVersionChecker.isStaleChunkError(error);
 
@@ -319,7 +316,10 @@ router.onError(async (error) => {
 
 // router.onError only sees route chunks; lazy components (e.g. the alert dialog) fail through Vite's preload hook.
 window.addEventListener("vite:preloadError", async (event) => {
-  if (await buildVersionChecker.isStaleChunkError(event.payload)) {
+  if (
+    isChunkLoadError(event.payload) &&
+    (await buildVersionChecker.isStaleChunkError(event.payload))
+  ) {
     showNewVersionNotification();
   }
 });

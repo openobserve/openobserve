@@ -244,6 +244,10 @@ pub async fn update(
     )
     .await
     .map_err(|e| anyhow::anyhow!("Error updating user: {e}"))?;
+    // The watch event is async; a login right after a password change must not see the old hash.
+    if let Ok(record) = get_user_record(user_email).await {
+        cache_user_record(user_email, record);
+    }
     let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
 
     #[cfg(feature = "enterprise")]
@@ -321,17 +325,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         }
                     };
 
-                USERS.insert(item_key.to_lowercase(), item_value.clone());
-                if item_value.is_root {
-                    // Root user must be there, it is created when
-                    // openobserve is run for the first time
-                    let mut root = ROOT_USER.get_mut("root").unwrap();
-                    root.first_name = item_value.first_name.clone();
-                    root.last_name = item_value.last_name.clone();
-                    root.password = item_value.password.clone();
-                    root.salt = item_value.salt.clone();
-                    root.password_ext = item_value.password_ext.clone();
-                }
+                cache_user_record(item_key, item_value);
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
@@ -420,6 +414,19 @@ pub async fn get_user_by_email(email: &str) -> Option<DBUser> {
             None
         }
     }
+}
+
+fn cache_user_record(email: &str, record: users::UserRecord) {
+    if record.is_root {
+        // Root is created on first run, so the entry always exists.
+        let mut root = ROOT_USER.get_mut("root").unwrap();
+        root.first_name = record.first_name.clone();
+        root.last_name = record.last_name.clone();
+        root.password = record.password.clone();
+        root.salt = record.salt.clone();
+        root.password_ext = record.password_ext.clone();
+    }
+    USERS.insert(email.to_lowercase(), record);
 }
 
 #[cfg(feature = "enterprise")]

@@ -41,10 +41,15 @@ export const reportsQuery = (org: string, filters: ReportListFilters) =>
     staleTime: NORMAL_STALE_TIME,
   });
 
-export const reportByIdQuery = (org: string, reportId: string) =>
+/** Background callers pass `silentForbidden` so a 403 stays out of the grouped access toast. */
+export const reportByIdQuery = (
+  org: string,
+  reportId: string,
+  options?: { silentForbidden?: boolean },
+) =>
   queryOptions({
     queryKey: reportKeys.detail(org, reportId),
-    queryFn: async () => (await reports.getReportById(org, reportId)).data,
+    queryFn: async () => (await reports.getReportById(org, reportId, options)).data,
     staleTime: NORMAL_STALE_TIME,
   });
 

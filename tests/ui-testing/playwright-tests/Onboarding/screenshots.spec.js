@@ -7,6 +7,7 @@ const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
 const { GetStartedPage } = require('../../pages/generalPages/getStartedPage.js');
 const { FirstEventPage } = require('../../pages/generalPages/firstEventPage.js');
 const { EmptyPagesPage } = require('../../pages/generalPages/emptyPagesPage.js');
+const { ingestBase } = require('../utils/ingest-url.js');
 
 const base = () => process.env.ZO_BASE_URL.replace(/\/$/, '');
 const apiBase = () => (process.env.INGESTION_URL || process.env.ZO_BASE_URL).replace(/\/$/, '');
@@ -21,11 +22,11 @@ async function createOrg(page, prefix) {
 }
 
 async function ingest(request, orgId, stream, records, headers = getAuthHeaders()) {
-    return request.post(`${apiBase()}/api/${orgId}/${stream}/_json`, { headers, data: records });
+    return request.post(`${ingestBase(apiBase())}/api/${orgId}/${stream}/_json`, { headers, data: records });
 }
 
 async function ingestMetric(request, orgId, name) {
-    const res = await request.post(`${apiBase()}/api/${orgId}/ingest/metrics/_json`, {
+    const res = await request.post(`${ingestBase(apiBase())}/api/${orgId}/ingest/metrics/_json`, {
         headers: getAuthHeaders(),
         data: [{ __name__: name, __type__: 'gauge', _timestamp: Date.now() * 1000, value: 1, host: 'web-07' }],
     });

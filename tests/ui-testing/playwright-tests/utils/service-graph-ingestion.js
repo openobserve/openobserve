@@ -26,6 +26,7 @@
 const crypto = require('crypto');
 const testLogger = require('./test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
+const { ingestBase } = require('./ingest-url.js');
 
 // ============================================================================
 // CONSTANTS
@@ -1104,7 +1105,7 @@ async function ingestTrace(page, traceData, orgId) {
   const payload = traceData.payload || traceData;
 
   try {
-    const response = await page.request.post(`${baseUrl}/api/${org}/v1/traces`, {
+    const response = await page.request.post(`${ingestBase(baseUrl)}/api/${org}/v1/traces`, {
       headers,
       data: payload,
     });

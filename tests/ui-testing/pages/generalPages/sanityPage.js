@@ -4,6 +4,7 @@ const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
 import { openNavFlyoutChild, gotoStreamsViaNav } from '../commonActions.js';
+import { ingestBase } from '../../playwright-tests/utils/ingest-url.js';
 
 export class SanityPage {
     constructor(page) {
@@ -776,7 +777,7 @@ export class SanityPage {
         };
 
         const response = await fetch(
-            `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+            `${ingestBase(process.env.INGESTION_URL)}/api/${orgId}/${streamName}/_json`,
             {
                 method: "POST",
                 headers: headers,

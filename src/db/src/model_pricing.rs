@@ -505,7 +505,7 @@ pub async fn set(item: ModelPricingDefinition) -> Result<ModelPricingDefinition,
     let saved = table::model_pricing::put(item).await?;
     let id = saved.id.map(|id| id.to_string()).unwrap_or_default();
     let event_key = format!("{WATCHER_PREFIX}{org_id}/{id}");
-    if let Err(e) = infra::coordinator::model_pricing::emit_put_event(&event_key).await {
+    if let Err(e) = infra::coordinator::emit_put(&event_key).await {
         log::error!("[model_pricing] failed to emit put event: {e}");
     }
     Ok(saved)
@@ -519,7 +519,7 @@ pub async fn delete_by_id(org_id: &str, id: &str) -> Result<bool, anyhow::Error>
     let deleted = table::model_pricing::delete_by_id(org_id, id).await?;
     if deleted {
         let event_key = format!("{WATCHER_PREFIX}{org_id}/{id}");
-        if let Err(e) = infra::coordinator::model_pricing::emit_delete_event(&event_key).await {
+        if let Err(e) = infra::coordinator::emit_delete(&event_key).await {
             log::error!("[model_pricing] failed to emit delete event: {e}");
         }
     }

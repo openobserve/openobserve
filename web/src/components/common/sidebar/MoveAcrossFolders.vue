@@ -20,7 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     size="md"
     :title="
-      t('dashboard.moveToAnotherFolder', { type: type.charAt(0).toUpperCase() + type.slice(1) })
+      t(folderKey(type, 'dashboard.moveToAnotherFolder'), {
+        type: type.charAt(0).toUpperCase() + type.slice(1),
+      })
     "
     :secondary-button-label="t('dashboard.cancel')"
     :primary-button-label="t('common.move')"
@@ -37,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             (item: any) => item.folderId === activeFolderId,
           )?.name ?? ''
         "
-        :label="t('dashboard.currentFolderLabel')"
+        :label="t(folderKey(type, 'dashboard.currentFolderLabel'))"
         disabled
         :data-test="`${type}-folder-move-name`"
       />
@@ -63,6 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
+import { folderKey } from "./folderTerms";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import { moveModuleToAnotherFolder } from "@/utils/commons";
@@ -120,7 +123,7 @@ export default defineComponent({
         await moveModuleToAnotherFolder(store, data, props.type, props.activeFolderId);
 
         showPositiveNotification(
-          t("toastMessages.sidebar.movedSuccessfully", {
+          t(folderKey(props.type, "toastMessages.sidebar.movedSuccessfully"), {
             type: props?.type?.charAt?.(0)?.toUpperCase() + props?.type?.slice?.(1),
           }),
           {
@@ -131,8 +134,9 @@ export default defineComponent({
         emit("updated", props.activeFolderId, selectedFolder.value.value);
       } catch (err: any) {
         showErrorNotification(
-          err?.message ??
-            t("toastMessages.sidebar.moveFailed", {
+          err?.response?.data?.message ??
+            err?.message ??
+            t(folderKey(props.type, "toastMessages.sidebar.moveFailed"), {
               type: props?.type?.charAt?.(0)?.toUpperCase() + props?.type?.slice?.(1),
             }),
           {
@@ -156,6 +160,8 @@ export default defineComponent({
           return "workflow_ids";
         case "downtimes":
           return "downtime_ids";
+        case "fleets":
+          return "collector_ids";
         default:
           return "alert_ids";
       }
@@ -163,6 +169,7 @@ export default defineComponent({
 
     return {
       t,
+      folderKey,
       store,
       getImageURL,
       selectedFolder,
