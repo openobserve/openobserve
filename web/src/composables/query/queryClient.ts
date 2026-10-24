@@ -51,6 +51,8 @@ declare module "@tanstack/query-core" {
     mutationMeta: {
       /** Scopes to refetch. Prefer a domain's `all` key over a precise one. */
       invalidates?: readonly (readonly unknown[])[];
+      /** Resolve `mutateAsync` only once the `invalidates` refetches land, so the caller reads fresh data next. */
+      awaitInvalidation?: boolean;
       /**
        * Scopes whose *inactive* entries are dropped outright. Use after a
        * delete: invalidation alone leaves the deleted entity's detail query
@@ -81,18 +83,20 @@ export const queryClient = new QueryClient({
    * makes the migration to this incremental.
    */
   mutationCache: new MutationCache({
-    onSuccess: (_data, _vars, _onMutateResult, mutation) => {
+    onSuccess: (_data, _vars, _onMutateResult, mutation): Promise<void> | void => {
       const meta = mutation.meta;
       if (!meta) return;
       for (const key of meta.removes ?? []) {
         queryClient.removeQueries({ queryKey: key, type: "inactive" });
       }
-      for (const key of meta.invalidates ?? []) {
-        void queryClient.invalidateQueries({ queryKey: key });
-      }
+      const refetches: Promise<void>[] = (meta.invalidates ?? []).map((key) =>
+        queryClient.invalidateQueries({ queryKey: key }),
+      );
       if (meta.successMessage) {
         notifyMutation("success", meta.successMessage);
       }
+      // TanStack awaits this callback before mutateAsync resolves.
+      if (meta.awaitInvalidation) return Promise.all(refetches).then(() => undefined);
     },
     onError: (err: any, _vars, _onMutateResult, mutation) => {
       const meta = mutation.meta;

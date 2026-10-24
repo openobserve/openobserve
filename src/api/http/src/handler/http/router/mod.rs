@@ -26,6 +26,8 @@ use axum::{
 use config::get_config;
 use openobserve_api_common::{X_O2_ASSISTANT_SESSION_ID, X_O2_ASSISTANT_TURN_ID};
 use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
+#[cfg(feature = "cloud")]
+use openobserve_api_management::request::org_domains;
 #[cfg(feature = "profiling")]
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
@@ -2063,6 +2065,18 @@ pub fn service_routes() -> Router {
                 get(billing_group::check_membership).delete(billing_group::leave_group),
             )
             .route("/{org_id}/billing_group/members", get(billing_group::check_members))
+            .route(
+                "/{org_id}/settings/domains",
+                get(org_domains::get_linked_domain).post(org_domains::link_domain)
+            )
+            .route("/{org_id}/settings/domains/requests",post(org_domains::raise_request).get(org_domains::list_requests))
+            .route("/{org_id}/settings/domain/request/{id}/approve",post(org_domains::approve_request))
+            .route("/{org_id}/settings/domain/request/{id}/reject",post(org_domains::reject_request))
+            .route("/{org_id}/settings/domains/{domain}",delete(org_domains::delete_linked_domain))
+            .route(
+                "/{org_id}/settings/domains/verify/{domain}",
+                post(org_domains::verify_domain),
+            )
             .route(
                 "/{org_id}/billing_group/members/{member_org_id}",
                 delete(billing_group::remove_member),

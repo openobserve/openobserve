@@ -14,6 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{meta::user::UserRole, stats::MemorySize};
+#[cfg(feature = "cloud")]
+use o2_enterprise::enterprise::domain_management::meta::DomainManagementConfig;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -533,8 +535,16 @@ pub struct OrganizationSettingPayload {
     pub claim_parser_function: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cross_links: Option<Vec<config::meta::stream::CrossLink>>,
+    #[cfg(feature = "cloud")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub domain_org_mappings: Option<Vec<DomainOrgMapping>>,
+    #[cfg(feature = "cloud")]
+    #[serde(default)]
+    pub domain_management_config: Option<DomainManagementConfig>,
+    #[cfg(feature = "cloud")]
+    #[serde(default)]
+    pub enforce_allowed_orgs_only: Option<bool>,
+    #[cfg(feature = "cloud")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub budget_config: Option<Vec<BudgetNotificationConfiguration>>,
 }
@@ -586,6 +596,12 @@ pub struct OrganizationSetting {
     pub domain_org_mappings: Vec<DomainOrgMapping>,
     #[cfg(feature = "cloud")]
     #[serde(default)]
+    pub enforce_allowed_orgs_only: bool,
+    #[cfg(feature = "cloud")]
+    #[serde(default)]
+    pub domain_management_config: DomainManagementConfig,
+    #[cfg(feature = "cloud")]
+    #[serde(default)]
     pub budget_config: Vec<BudgetNotificationConfiguration>,
 }
 
@@ -624,6 +640,10 @@ impl Default for OrganizationSetting {
             org_storage_enabled: false,
             #[cfg(feature = "cloud")]
             domain_org_mappings: Vec::new(),
+            #[cfg(feature = "cloud")]
+            domain_management_config: Default::default(),
+            #[cfg(feature = "cloud")]
+            enforce_allowed_orgs_only: false,
             #[cfg(feature = "cloud")]
             budget_config: Vec::new(),
         }
@@ -1465,7 +1485,13 @@ mod tests {
             #[cfg(feature = "enterprise")]
             claim_parser_function: None,
             cross_links: None,
+            #[cfg(feature = "cloud")]
             domain_org_mappings: None,
+            #[cfg(feature = "cloud")]
+            domain_management_config: None,
+            #[cfg(feature = "cloud")]
+            enforce_allowed_orgs_only: None,
+            #[cfg(feature = "cloud")]
             budget_config: None,
         };
         let json = serde_json::to_value(&payload).unwrap();
@@ -1549,6 +1575,10 @@ mod tests {
             #[cfg(feature = "cloud")]
             domain_org_mappings: vec![],
             #[cfg(feature = "cloud")]
+            domain_management_config: Default::default(),
+            #[cfg(feature = "cloud")]
+            enforce_allowed_orgs_only: false,
+            #[cfg(feature = "cloud")]
             budget_config: vec![],
         };
         let json = serde_json::to_value(&setting).unwrap();
@@ -1582,6 +1612,10 @@ mod tests {
             org_storage_enabled: false,
             #[cfg(feature = "cloud")]
             domain_org_mappings: vec![],
+            #[cfg(feature = "cloud")]
+            domain_management_config: Default::default(),
+            #[cfg(feature = "cloud")]
+            enforce_allowed_orgs_only: false,
             #[cfg(feature = "cloud")]
             budget_config: vec![],
         };
