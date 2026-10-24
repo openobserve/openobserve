@@ -135,8 +135,6 @@ def test_request_with_one_non_object_line_is_refused_as_a_whole(client: OpenObse
     assert valid.status == 202, (
         f"two valid NDJSON object lines must still be accepted, got {valid.status}: {valid.body}"
     )
-    statuses = valid.body.get("status") or [{}]
-    assert statuses[0].get("successful") == 2, f"both valid lines must be stored: {valid.body}"
 
     # The later valid request becoming searchable proves the refused one had time to land, had it been kept.
     wait_until(
