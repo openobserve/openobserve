@@ -464,7 +464,8 @@
       "reports-bulk-operations.spec.js",
       "reports-form-validation.spec.js",
       "reportCsvMediaType.spec.js",
-      "scheduledReportsDrawer.spec.js"
+      "scheduledReportsDrawer.spec.js",
+      "reportHistory.spec.js"
     ],
     "disabled": [],
     "paths": [
