@@ -233,6 +233,7 @@ mod m20261018_000001_create_slack_tables;
 mod m20261020_000001_create_eval_job_states_tables;
 mod m20261021_000001_status_pages_add_favicon_img;
 mod m20261024_000001_add_lease_to_org_cleanup_tasks;
+mod m20261024_000002_add_alert_incident_title_template;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -622,6 +623,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261021_000001_status_pages_add_favicon_img::Migration),
             Box::new(m20261005_000001_create_fleet::Migration),
             Box::new(m20261024_000001_add_lease_to_org_cleanup_tasks::Migration),
+            Box::new(m20261024_000002_add_alert_incident_title_template::Migration),
         ]
     }
 }
@@ -699,6 +701,7 @@ mod tests {
         (116, "m20261021_000001_status_pages_add_favicon_img"),
         (117, "m20261005_000001_create_fleet"),
         (118, "m20261024_000001_add_lease_to_org_cleanup_tasks"),
+        (119, "m20261024_000002_add_alert_incident_title_template"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
