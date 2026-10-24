@@ -3,6 +3,7 @@ import { mount, enableAutoUnmount } from "@vue/test-utils";
 import LicenseWaiversCard from "./LicenseWaiversCard.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import i18n from "@/locales";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { LicenseWaiver } from "@/utils/licenseWaivers";
 
 const NOW = Date.UTC(2026, 9, 20, 12, 0, 0);
@@ -35,10 +36,10 @@ describe("LicenseWaiversCard", () => {
   it("the note column takes the width the fixed columns leave", () => {
     const columns = mountCard([waiver({})])
       .findComponent(OTable)
-      .props("columns") as any[];
+      .props("columns") as OTableColumnDef[];
     const note = columns.find((c) => c.id === "note");
-    expect(note.size).toBeUndefined();
-    expect(note.meta).toMatchObject({ autoWidth: true, fillRemaining: true });
+    expect(note?.size).toBeUndefined();
+    expect(note?.meta).toMatchObject({ autoWidth: true, fillRemaining: true });
   });
 
   it("renders nothing when only unknown kinds arrive", () => {
@@ -135,4 +136,85 @@ it("explains manual online delivery and air-gapped key delivery", () => {
   expect(w.text()).toContain(
     "These come with your license. Online installs pick up changes when an administrator clicks Refresh now; air-gapped installs apply a new key from OpenObserve here.",
   );
+});
+
+describe("O14 card", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("new_kinds_visible_unknown_kind_still_filtered", async () => {
+    const w = mountCard([waiver({})]);
+    const refreshed = JSON.parse(
+      JSON.stringify([
+        waiver({}),
+        waiver({
+          id: "ingestion",
+          type: "ingestion_limit",
+          limit: { typ: "PerDayCount", value: 500 },
+        }),
+        waiver({ id: "one", type: "breach_days", extra: 1 }),
+        waiver({ id: "five", type: "breach_days", extra: 5 }),
+        waiver({ id: "grace", type: "report_grace" }),
+        waiver({ id: "future", type: "future_kind" }),
+      ]),
+    );
+    await w.setProps({ waivers: refreshed });
+    expect(w.text()).toContain("Allow 1 extra over-limit day in Oct");
+    expect(w.text()).toContain("Allow 5 extra over-limit days in Oct");
+    expect(w.text()).toContain("Reporting grace until Oct 27, 00:00");
+    expect(w.text()).toContain("Restore search");
+    expect(w.text()).toContain("Raise limit to 500 GB/day");
+    expect(w.find("[data-test=license-waiver-row-future]").exists()).toBe(false);
+  });
+
+  it("new_kind_window_and_status_boundaries_update_without_reload", async () => {
+    const start = Date.UTC(2026, 9, 30);
+    const end = Date.UTC(2026, 9, 31);
+    const monthEnd = Date.UTC(2026, 10, 1);
+    vi.setSystemTime(start - 1);
+    const w = mountCard([
+      waiver({
+        id: "breach",
+        type: "breach_days",
+        extra: 2,
+        starts_at: start * 1000,
+        ends_at: end * 1000,
+      }),
+      waiver({ id: "grace", type: "report_grace", starts_at: start * 1000, ends_at: end * 1000 }),
+    ]);
+    const row = (id: string) => w.find(`[data-test=license-waiver-row-${id}]`).text();
+    expect(row("breach")).toContain("Scheduled");
+    expect(row("grace")).toContain("Scheduled");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(row("breach")).toContain("Active");
+    expect(row("grace")).toContain("Active");
+    await vi.advanceTimersByTimeAsync(end - start - 1);
+    expect(row("grace")).toContain("Active");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(row("grace")).toContain("Ended");
+    expect(row("breach")).toContain("Past days");
+    expect(row("breach")).toContain(
+      "Past day coverage; 2 extra allowed days retained through Oct 31.",
+    );
+    await vi.advanceTimersByTimeAsync(monthEnd - end - 1);
+    expect(row("breach")).toContain("retained through Oct 31");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(row("breach")).toContain("October allowance ended at Nov 1, 00:00 UTC.");
+    expect(row("breach")).toContain("Expired");
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+it("viewers see the same waiver details and ask an administrator to refresh", async () => {
+  const w = mountCard([waiver({ id: "grace", type: "report_grace" })]);
+  await w.setProps({ canUpdate: false });
+  expect(w.get("[data-test=license-waivers-ask-admin]").text()).toBe(
+    "Ask an administrator to refresh the license for waiver changes.",
+  );
+  expect(w.text()).toContain("Reporting grace until Oct 27, 00:00");
+  await w.setProps({ canUpdate: true });
+  expect(w.find("[data-test=license-waivers-ask-admin]").exists()).toBe(false);
 });

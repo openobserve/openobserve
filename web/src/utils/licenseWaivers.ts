@@ -18,6 +18,7 @@ import type { TranslateFn, I18nText } from "@/types/i18n";
 export interface LicenseWaiver {
   id: string;
   type: string;
+  extra?: number;
   limit?: { typ: "Unlimited" | "PerDayCount"; value: number };
   starts_at: number;
   ends_at: number;
@@ -90,7 +91,7 @@ export const LICENSE_BANNER_POLL_MS = 300_000;
 /** Longer delays overflow setTimeout and fire at once, so far boundaries are re-armed in steps. */
 export const MAX_TIMEOUT_MS = 2 ** 31 - 1;
 
-const KNOWN_WAIVER_TYPES = ["search_unblock", "ingestion_limit"];
+const KNOWN_WAIVER_TYPES = ["search_unblock", "ingestion_limit", "breach_days", "report_grace"];
 
 /** Drops kinds this release cannot render, so a newer server never breaks the list. */
 export function knownWaivers(ws: LicenseWaiver[] | undefined): LicenseWaiver[] {
@@ -99,7 +100,8 @@ export function knownWaivers(ws: LicenseWaiver[] | undefined): LicenseWaiver[] {
 
 export function waiverStatus(w: LicenseWaiver, nowUs: number): WaiverStatus {
   if (nowUs < w.starts_at) return "scheduled";
-  if (nowUs >= w.ends_at) return w.type === "search_unblock" ? "ended" : "past";
+  if (w.type === "breach_days" && nowUs >= breachRetentionEndUs(w)) return "ended";
+  if (nowUs >= w.ends_at) return isDayWaiver(w) ? "past" : "ended";
   return "active";
 }
 
@@ -219,8 +221,27 @@ export function isKeyCheckResult(data: unknown): data is KeyCheckResult {
   );
 }
 
-export function waiverKindLabel(w: LicenseWaiver, t: TranslateFn): I18nText {
+export function isDayWaiver(w: LicenseWaiver): boolean {
+  return w.type === "ingestion_limit" || w.type === "breach_days";
+}
+
+export function breachRetentionEndUs(w: LicenseWaiver): number {
+  const last = new Date(lastCoveredDayUs(w) / 1000);
+  return Date.UTC(last.getUTCFullYear(), last.getUTCMonth() + 1, 1) * 1000;
+}
+
+export function waiverKindLabel(w: LicenseWaiver, t: TranslateFn, locale = "en-US"): I18nText {
   if (w.type === "search_unblock") return t("about.waiver_kind_search_unblock");
+  if (w.type === "report_grace")
+    return t("about.waiver_kind_report_grace", { end: formatUtc(w.ends_at, locale, true) });
+  if (w.type === "breach_days") {
+    if (!hasValidBreachExtra(w)) return t("about.waiver_kind_breach_unknown");
+    return t(
+      "about.waiver_kind_breach_days",
+      { count: w.extra, month: coveredMonths(w, locale, "short") },
+      w.extra,
+    );
+  }
   if (w.limit?.typ === "Unlimited") return t("about.waiver_kind_ingestion_unlimited");
   return t("about.waiver_kind_ingestion_limit", { limit: w.limit?.value ?? 0 });
 }
@@ -228,10 +249,91 @@ export function waiverKindLabel(w: LicenseWaiver, t: TranslateFn): I18nText {
 export function waiverWindowLabel(w: LicenseWaiver, locale: string, t: TranslateFn): I18nText {
   if (w.type === "search_unblock")
     return t("about.waiver_window_until", { end: formatUtc(w.ends_at, locale, true) });
-  return t("about.waiver_window_days", {
-    start: formatUtc(w.starts_at, locale, false),
-    end: formatUtc(lastCoveredDayUs(w), locale, false),
+  if (w.type === "report_grace")
+    return t("about.waiver_window_time", {
+      start: formatUtc(w.starts_at, locale, true),
+      end: formatUtc(w.ends_at, locale, true),
+    });
+  return t(
+    w.type === "breach_days" ? "about.waiver_window_covered_days" : "about.waiver_window_days",
+    {
+      start: formatUtc(w.starts_at, locale, false),
+      end: formatUtc(lastCoveredDayUs(w), locale, false),
+    },
+  );
+}
+
+export function waiverSummary(
+  w: LicenseWaiver,
+  nowUs: number,
+  locale: string,
+  t: TranslateFn,
+): I18nText | undefined {
+  if (w.type === "report_grace") {
+    if (nowUs < w.starts_at)
+      return t("about.waiver_grace_scheduled", {
+        start: formatUtc(w.starts_at, locale, false),
+        time: formatUtcTime(w.starts_at, locale),
+      });
+    return t(nowUs < w.ends_at ? "about.waiver_grace_active" : "about.waiver_grace_ended", {
+      end: formatUtc(w.ends_at, locale, false),
+      time: formatUtcTime(w.ends_at, locale),
+    });
+  }
+  if (w.type === "breach_days") return breachSummary(w, nowUs, locale, t);
+  return undefined;
+}
+
+function formatUtcTime(us: number, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
+    timeZone: "UTC",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(new Date(us / 1000));
+}
+
+function hasValidBreachExtra(w: LicenseWaiver): w is LicenseWaiver & { extra: number } {
+  return typeof w.extra === "number" && Number.isInteger(w.extra) && w.extra >= 1 && w.extra <= 5;
+}
+
+function coveredMonths(w: LicenseWaiver, locale: string, month: "short" | "long"): string {
+  const first = new Date(w.starts_at / 1000);
+  const last = new Date(lastCoveredDayUs(w) / 1000);
+  const format = new Intl.DateTimeFormat(locale, {
+    timeZone: "UTC",
+    month,
+    ...(first.getUTCFullYear() !== last.getUTCFullYear() ? { year: "numeric" as const } : {}),
   });
+  const start = format.format(first);
+  const end = format.format(last);
+  return start === end ? start : format.formatRange(first, last);
+}
+
+function breachSummary(w: LicenseWaiver, nowUs: number, locale: string, t: TranslateFn): I18nText {
+  if (!hasValidBreachExtra(w)) return t("about.waiver_details_unknown");
+  const retainedUntil = breachRetentionEndUs(w);
+  const month = coveredMonths(w, locale, "long");
+  const end = formatUtc(retainedUntil - DAY_US, locale, false);
+  if (nowUs >= retainedUntil)
+    return t("about.waiver_breach_ended", { month, end: formatUtc(retainedUntil, locale, true) });
+  if (nowUs >= w.ends_at)
+    return t("about.waiver_breach_retained", { count: w.extra, end }, w.extra);
+  if (nowUs < w.starts_at)
+    return t(
+      "about.waiver_breach_scheduled",
+      { count: w.extra, month, start: formatUtc(w.starts_at, locale, false) },
+      w.extra,
+    );
+  const first = new Date(w.starts_at / 1000);
+  const last = new Date(lastCoveredDayUs(w) / 1000);
+  const sameMonth =
+    first.getUTCMonth() === last.getUTCMonth() && first.getUTCFullYear() === last.getUTCFullYear();
+  return t(
+    sameMonth ? "about.waiver_breach_active" : "about.waiver_breach_months",
+    { count: w.extra, end },
+    w.extra,
+  );
 }
 
 function isRevision(value: unknown): value is number {

@@ -250,7 +250,10 @@
             </OCardSection>
           </OCard>
 
-          <LicenseWaiversCard :waivers="licenseData.waivers" />
+          <LicenseWaiversCard
+            :waivers="licenseData.waivers"
+            :can-update="licenseData.can_update_license === true"
+          />
 
           <OCard v-show="showUpdateForm" class="border-card-glass-border mt-4 border border-solid">
             <OCardSection role="body">

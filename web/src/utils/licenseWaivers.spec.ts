@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
+import { gt } from "@/types/i18n";
 import {
   DAY_US,
   MAX_TIMEOUT_MS,
@@ -22,13 +23,19 @@ import {
   boundaryDelayMs,
   formatUtc,
   issuedOn,
+  isDayWaiver,
+  breachRetentionEndUs,
   isRevRefusal,
+  isKeyCheckResult,
   knownWaivers,
   lastCoveredDayUs,
   licenseBannerState,
   licenseExpiryState,
   quotaPercent,
   waiverStatus,
+  waiverKindLabel,
+  waiverWindowLabel,
+  waiverSummary,
   type LicenseDecision,
 } from "./licenseWaivers";
 
@@ -61,7 +68,7 @@ describe("licenseWaivers", () => {
     expect(
       knownWaivers([
         unblock,
-        { ...unblock, id: "x", type: "breach_days" },
+        { ...unblock, id: "x", type: "future_kind" },
         { ...unblock, id: "y", type: "unknown" },
       ]).map((w) => w.id),
     ).toEqual(["wv_1"]);
@@ -203,4 +210,121 @@ describe("licenseExpiryState", () => {
       });
     },
   );
+});
+
+describe("O14 new waiver kinds", () => {
+  const breach = { ...unblock, type: "breach_days", extra: 2 };
+  const grace = {
+    ...unblock,
+    type: "report_grace",
+    starts_at: us(2026, 9, 23, 12),
+    ends_at: us(2026, 9, 30),
+  };
+
+  it("new_kinds_visible_unknown_kind_still_filtered", () => {
+    expect(
+      knownWaivers([unblock, raise, breach, grace, { ...unblock, type: "future_kind" }]),
+    ).toEqual([unblock, raise, breach, grace]);
+  });
+
+  it("breach_extra_one_and_five_render_exact_values", () => {
+    for (const extra of [1, 5]) {
+      const w = { ...breach, extra };
+      expect(waiverKindLabel(w, gt, "en-US")).toBe(
+        `Allow ${extra} extra over-limit ${extra === 1 ? "day" : "days"} in Oct`,
+      );
+      expect(waiverSummary(w, breach.starts_at, "en-US", gt)).toBe(
+        `Adds ${extra} allowed ${extra === 1 ? "day" : "days"} this month, through Oct 31.`,
+      );
+    }
+  });
+
+  it("missing_or_invalid_extra_never_invents_a_limit", () => {
+    for (const extra of [undefined, null, "2", 0, -1, 1.5, 6, NaN, Infinity]) {
+      const w = JSON.parse(JSON.stringify({ ...breach, extra }));
+      expect(waiverKindLabel(w, gt, "en-US")).toBe("Extra over-limit days");
+      expect(waiverSummary(w, breach.starts_at, "en-US", gt)).toBe(
+        "Contact OpenObserve for details.",
+      );
+    }
+  });
+
+  it("new_kind_labels_and_summaries_are_distinct", () => {
+    expect(waiverKindLabel(grace, gt, "en-US")).toBe("Reporting grace until Oct 30, 00:00");
+    expect(waiverSummary(grace, grace.starts_at, "en-US", gt)).toBe(
+      "Ends Oct 30 at 00:00 UTC; reports continue.",
+    );
+    expect(waiverWindowLabel(breach, "en-US", gt)).toBe("Oct 20 through Oct 26");
+    expect(waiverSummary(breach, breach.ends_at, "en-US", gt)).toBe(
+      "Past day coverage; 2 extra allowed days retained through Oct 31.",
+    );
+    expect(waiverSummary(breach, us(2026, 10, 1), "en-US", gt)).toBe(
+      "October allowance ended at Nov 1, 00:00 UTC.",
+    );
+  });
+
+  it("report_grace_uses_exact_time_not_day_window", () => {
+    expect(isDayWaiver(grace)).toBe(false);
+    expect(isDayWaiver(breach)).toBe(true);
+    expect(isDayWaiver(raise)).toBe(true);
+    expect(isDayWaiver(unblock)).toBe(false);
+    expect(waiverWindowLabel(grace, "en-US", gt)).toBe("Oct 23, 12:00 → Oct 30, 00:00");
+    expect(waiverSummary(grace, grace.starts_at - 1, "en-US", gt)).toBe(
+      "Grace starts Oct 23 at 12:00 UTC.",
+    );
+    expect(waiverSummary(grace, grace.ends_at, "en-US", gt)).toBe(
+      "Grace ended Oct 30 at 00:00 UTC; reports continue.",
+    );
+    expect(waiverStatus(grace, grace.starts_at - 1)).toBe("scheduled");
+    expect(waiverStatus(grace, grace.starts_at)).toBe("active");
+    expect(waiverStatus(grace, grace.ends_at - 1)).toBe("active");
+    expect(waiverStatus(grace, grace.ends_at)).toBe("ended");
+    expect(waiverStatus(breach, breach.starts_at - 1)).toBe("scheduled");
+    expect(waiverStatus(breach, breach.starts_at)).toBe("active");
+    expect(waiverStatus(breach, breach.ends_at - 1)).toBe("active");
+    expect(waiverStatus(breach, breach.ends_at)).toBe("past");
+  });
+
+  it("key-check response parsing preserves extra and tolerates future kinds", () => {
+    const result: unknown = JSON.parse(
+      JSON.stringify({
+        dry_run: true,
+        outcome: "accept",
+        message: "",
+        license_id: "synthetic",
+        same_license: true,
+        loaded_rev: 1,
+        pasted_rev: 2,
+        waivers_added: [{ ...breach, extra: 5 }, grace, { ...unblock, type: "future_kind" }],
+        waivers_removed: [],
+      }),
+    );
+    expect(isKeyCheckResult(result)).toBe(true);
+    if (!isKeyCheckResult(result)) throw new Error("Invalid fixture");
+    expect(result.waivers_added[0].extra).toBe(5);
+    expect(knownWaivers(result.waivers_added)).toHaveLength(2);
+  });
+});
+
+it("breach retention uses every touched UTC month, leap days and year rollover", () => {
+  for (const [start, end, retained] of [
+    [Date.UTC(2028, 1, 28), Date.UTC(2028, 2, 1), Date.UTC(2028, 2, 1)],
+    [Date.UTC(2026, 9, 31), Date.UTC(2026, 10, 2), Date.UTC(2026, 11, 1)],
+    [Date.UTC(2026, 11, 31), Date.UTC(2027, 0, 2), Date.UTC(2027, 1, 1)],
+  ]) {
+    const w = {
+      ...unblock,
+      type: "breach_days",
+      extra: 2,
+      starts_at: start * 1000,
+      ends_at: end * 1000,
+    };
+    expect(breachRetentionEndUs(w)).toBe(retained * 1000);
+    expect(waiverStatus(w, retained * 1000 - 1)).toBe(retained === end ? "active" : "past");
+    expect(waiverStatus(w, retained * 1000)).toBe("ended");
+    if (retained !== end) {
+      expect(waiverSummary(w, start * 1000, "en-US", gt)).toContain("in each covered UTC month");
+      expect(waiverSummary(w, end * 1000, "en-US", gt)).toContain("Past day coverage");
+    }
+  }
 });
