@@ -17,10 +17,10 @@
 // a pick applies at once with Auto Run on, or defers to a yellow/ghost-warning Refresh off.
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
-const { namespaceTablePanel, deleteCreatedDashboards } = require('../utils/dashboard-auto-run-fixtures.js');
+const { namespaceTablePanel, deleteCreatedDashboards, trackDashboard } = require('../utils/dashboard-auto-run-fixtures.js');
 import PageManager from '../../pages/page-manager.js';
 import { ingestion } from './utils/dashIngestion.js';
-import { createDashboardWithPanelTime, cleanupDashboard } from './utils/panelTimeSetup.js';
+import { createDashboardWithPanelTime, getDashboardIdFromURL } from './utils/panelTimeSetup.js';
 import { assertPanelTimePickerVisible, assertPanelTimeInURL } from './utils/panelTimeAssertions.js';
 
 test.describe('Dashboard time range apply and Auto Run', { tag: ['@dashboards', '@dashboardTimeRangeApply', '@all'] }, () => {
@@ -125,6 +125,7 @@ test.describe('Dashboard time range apply and Auto Run', { tag: ['@dashboards', 
       panelTimeEnabled: true,
       panelTimeRange: '1-h',
     });
+    trackDashboard(getDashboardIdFromURL(page));
 
     await assertPanelTimePickerVisible(page, panelId);
     await assertPanelTimeInURL(page, panelId, '1h');
@@ -141,7 +142,6 @@ test.describe('Dashboard time range apply and Auto Run', { tag: ['@dashboards', 
     await pm.dashboardTimeRange.expectPanelRefreshVariant('ghost-warning');
     await assertPanelTimeInURL(page, panelId, '6d');
 
-    await cleanupDashboard(page, pm, dashboardName);
     testLogger.info('Test completed');
   });
 
@@ -160,6 +160,7 @@ test.describe('Dashboard time range apply and Auto Run', { tag: ['@dashboards', 
       panelTimeEnabled: true,
       panelTimeRange: '1-h',
     });
+    trackDashboard(getDashboardIdFromURL(page));
 
     await pm.dashboardPanelTime.openViewPanelModal(panelId);
     await pm.dashboardPanelTime.expectViewPanelDateTimePickerVisible();
@@ -179,7 +180,6 @@ test.describe('Dashboard time range apply and Auto Run', { tag: ['@dashboards', 
     await autoRun.expectViewRefreshNotPending();
     await pm.dashboardPanelTime.closeViewPanelModal();
 
-    await cleanupDashboard(page, pm, dashboardName);
     testLogger.info('Test completed');
   });
 
