@@ -266,6 +266,8 @@ export class DowntimesPage {
 
   async closeMenu() {
     await this.page.keyboard.press('Escape');
+    // Reka refocuses the old trigger only when its exit animation ends, which dismisses any menu opened before then.
+    await expect(this.page.locator('[role="menu"]')).toHaveCount(0);
   }
 
   async deleteRow(id) {
