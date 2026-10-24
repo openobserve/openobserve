@@ -1328,4 +1328,20 @@ describe("Ingestion", () => {
       });
     });
   });
+  describe("Global search over AWS integrations", () => {
+    it("matches an AWS service by its translated description", async () => {
+      const replace = vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
+
+      wrapper.vm.globalSearchQuery = "account activity";
+      await flushPromises();
+
+      expect(replace).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "AWSConfig",
+          query: expect.objectContaining({ search: "account activity" }),
+        }),
+      );
+      replace.mockRestore();
+    });
+  });
 });

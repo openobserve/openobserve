@@ -47,7 +47,5 @@ async fn emit_status_event(org_id: &str, status: &str) -> Result<(), Error> {
 /// Sends a coordinator event to evict an org from the status cache on all nodes.
 /// Modeled as a Delete on the org's status key (no status = not blocked).
 pub async fn emit_evict_event(org_id: &str) -> Result<(), Error> {
-    let coordinator = super::get_coordinator().await;
-    let key = format!("{ORG_STATUS_KEY_PREFIX}{org_id}");
-    coordinator.delete(&key, false, true, None).await
+    super::emit_delete(&format!("{ORG_STATUS_KEY_PREFIX}{org_id}")).await
 }

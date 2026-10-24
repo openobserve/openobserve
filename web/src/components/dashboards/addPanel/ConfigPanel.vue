@@ -522,6 +522,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('dashboard.unitLabel')"
           :valueKey="'value'"
           :labelKey="'label'"
+          searchable
           data-test="dashboard-config-unit"
         />
 
@@ -1290,6 +1291,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </OCollapsible>
 
+    <!-- Section: Series Overrides -->
+    <OCollapsible
+      variant="config"
+      v-if="shouldShowSeriesOverrides(dashboardPanelData)"
+      v-show="isSectionVisible('seriesOverrides')"
+      :model-value="isExpanded('seriesOverrides')"
+      :icon="SECTION_ICONS.seriesOverrides"
+      @update:modelValue="
+        (v) => {
+          expandedSections.seriesOverrides = v;
+        }
+      "
+      class="border-card-glass-border border-t border-solid"
+      data-test="dashboard-addpanel-config-series-overrides-section"
+    >
+      <template #trigger>
+        <span
+          class="text-compact text-collapsible-label group-data-[state=open]:text-collapsible-icon-open font-medium"
+          >{{ t("dashboard.configSectionSeriesOverrides") }}</span
+        >
+        <OIcon
+          name="info-outline"
+          size="sm"
+          data-test="dashboard-addpanel-config-series-overrides-info"
+        />
+        <OTooltip
+          :content="t('dashboard.configSectionSeriesOverridesTooltip')"
+          max-width="15.625rem"
+        />
+        <OBadge
+          v-if="seriesOverrideCount"
+          variant="default-soft"
+          size="xs"
+          :aria-label="
+            t('dashboard.seriesOverrideCount', { count: seriesOverrideCount }, seriesOverrideCount)
+          "
+          data-test="dashboard-addpanel-config-series-overrides-count"
+          >{{ seriesOverrideCount }}</OBadge
+        >
+      </template>
+      <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
+        <OButton
+          variant="outline"
+          size="sm"
+          @click="$emit('open-series-overrides')"
+          data-test="dashboard-addpanel-config-series-overrides-add-btn"
+        >
+          {{ t("dashboard.addSeriesOverride") }}
+        </OButton>
+      </div>
+    </OCollapsible>
+
     <!-- Section: Map -->
     <OCollapsible
       variant="config"
@@ -1770,6 +1823,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </OCollapsible>
 
+    <!-- Section: Thresholds -->
+    <OCollapsible
+      variant="config"
+      v-if="shouldShowThresholds(dashboardPanelData)"
+      v-show="isSectionVisible('thresholds')"
+      :model-value="isExpanded('thresholds')"
+      :icon="SECTION_ICONS.thresholds"
+      @update:modelValue="
+        (v) => {
+          expandedSections.thresholds = v;
+        }
+      "
+      class="border-card-glass-border border-t border-solid"
+      data-test="dashboard-addpanel-config-thresholds-section"
+    >
+      <template #trigger>
+        <span
+          class="text-compact text-collapsible-label group-data-[state=open]:text-collapsible-icon-open font-medium"
+          >{{ t("dashboard.thresholds") }}</span
+        >
+        <OIcon
+          name="info-outline"
+          size="sm"
+          data-test="dashboard-addpanel-config-thresholds-info"
+        />
+        <OTooltip :content="t('dashboard.thresholdsTooltip')" max-width="15.625rem" />
+        <OBadge
+          v-if="thresholdStepCount"
+          variant="default-soft"
+          size="xs"
+          :aria-label="
+            t('dashboard.thresholdStepCount', { count: thresholdStepCount }, thresholdStepCount)
+          "
+          data-test="dashboard-addpanel-config-thresholds-count"
+          >{{ thresholdStepCount }}</OBadge
+        >
+      </template>
+      <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
+        <ThresholdsConfig
+          :model-value="dashboardPanelData.data.config.thresholds"
+          :chart-type="dashboardPanelData.data.type"
+          :unit="dashboardPanelData.data.config.unit"
+          :unit-custom="dashboardPanelData.data.config.unit_custom"
+          :decimals="dashboardPanelData.data.config.decimals"
+          :has-coloured-value-mappings="hasColouredValueMappings"
+          @update:model-value="onThresholdsUpdate"
+        />
+        <div
+          v-if="overridesWithStepsCount"
+          class="text-text-secondary flex items-center gap-1.5 text-xs"
+          data-test="dashboard-config-thresholds-overrides-note"
+        >
+          <OIcon name="info-outline" size="xs" class="shrink-0" />
+          <span>{{
+            t(
+              "dashboard.thresholdOverridesOwnLimits",
+              { count: overridesWithStepsCount },
+              overridesWithStepsCount,
+            )
+          }}</span>
+        </div>
+      </div>
+    </OCollapsible>
+
     <!-- Section: Background -->
     <OCollapsible
       variant="config"
@@ -1843,6 +1960,7 @@ import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
 import ColorBySeries from "./ColorBySeries.vue";
 import MarkLineConfig from "./MarkLineConfig.vue";
+import ThresholdsConfig from "./ThresholdsConfig.vue";
 import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
 import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
@@ -1850,13 +1968,18 @@ import ColorPaletteDropDown from "./ColorPaletteDropDown.vue";
 import BackGroundColorConfig from "./BackGroundColorConfig.vue";
 import SparklineConfig from "./SparklineConfig.vue";
 import ConfigPanelSearch from "./ConfigPanelSearch.vue";
+import { getSeriesOverrideEntries } from "@/composables/dashboard/useSeriesFormatting";
 import {
   isShown,
   revealAndFocus,
   usePanelEditorFocus,
   waitForElement,
 } from "@/composables/dashboard/usePanelEditorFocus";
-import { useConfigPanel } from "../../../composables/dashboard/useConfigPanel";
+import {
+  shouldShowSeriesOverrides,
+  shouldShowThresholds,
+  useConfigPanel,
+} from "../../../composables/dashboard/useConfigPanel";
 import LinearIcon from "@/components/icons/dashboards/LinearIcon.vue";
 import NoSymbol from "@/components/icons/dashboards/NoSymbol.vue";
 import Smooth from "@/components/icons/dashboards/Smooth.vue";
@@ -1868,6 +1991,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import { useStore } from "vuex";
 
 import {
@@ -1912,6 +2036,7 @@ export default defineComponent({
     ColorBySeries,
     OCombobox,
     MarkLineConfig,
+    ThresholdsConfig,
     CustomDateTimePicker,
     DateTimePickerDashboard,
     ColorPaletteDropDown,
@@ -1922,9 +2047,10 @@ export default defineComponent({
     OTooltip,
     OIcon,
     OCollapsible,
+    OBadge,
   },
   props: ["variablesData", "panelData"],
-  emits: ["open-field-overrides"],
+  emits: ["open-field-overrides", "open-series-overrides"],
   setup() {
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
     const { t } = useI18nTyped();
@@ -2709,6 +2835,34 @@ export default defineComponent({
 
     const decimalsTouched = ref(false);
 
+    const thresholdStepCount = computed(
+      () => dashboardPanelData.data.config.thresholds?.steps?.length ?? 0,
+    );
+    const hasColouredValueMappings = computed(() =>
+      (dashboardPanelData.data.config.mappings ?? []).some(
+        (mapping: { color?: string | null; textColor?: string | null }) =>
+          !!(mapping?.color || mapping?.textColor),
+      ),
+    );
+    // Override steps still draw when the panel steps are cleared, so point the user at them.
+    const seriesOverrideEntries = computed(() =>
+      getSeriesOverrideEntries(dashboardPanelData.data.config.override_config),
+    );
+    const overridesWithStepsCount = computed(
+      () =>
+        seriesOverrideEntries.value.filter((entry) =>
+          entry.config.some(
+            (item: any) => item?.type === "thresholds" && !!item?.value?.steps?.length,
+          ),
+        ).length,
+    );
+    const seriesOverrideCount = computed(() => seriesOverrideEntries.value.length);
+    // Removing the last step deletes the key so the panel saves exactly as before thresholds existed.
+    const onThresholdsUpdate = (value: object | undefined) => {
+      if (value === undefined) delete dashboardPanelData.data.config.thresholds;
+      else dashboardPanelData.data.config.thresholds = value;
+    };
+
     return {
       raw,
       axisLabelModeModel,
@@ -2788,6 +2942,13 @@ export default defineComponent({
       isPivotMode,
       decimalsTouched,
       SECTION_ICONS,
+      shouldShowThresholds,
+      thresholdStepCount,
+      hasColouredValueMappings,
+      onThresholdsUpdate,
+      shouldShowSeriesOverrides,
+      seriesOverrideCount,
+      overridesWithStepsCount,
     };
   },
 });
