@@ -389,11 +389,21 @@ export class ServiceGraphPage {
     return await this.page.locator(this.sidePanel).locator('h2').first().textContent();
   }
 
-  /** Poll until the panel title (sr-only <h2>) contains the expected service name. */
   async expectSidePanelServiceName(name) {
     await expect
-      .poll(async () => (await this.getSidePanelServiceName()) || '', { timeout: 10000 })
-      .toContain(name);
+      .poll(async () => ((await this.getSidePanelServiceName()) || '').trim(), { timeout: 10000 })
+      .toBe(name);
+  }
+
+  /** Tags the open panel node, so a close-and-reopen (which mounts a fresh node) can be told apart from an in-place update. */
+  async markSidePanelNode() {
+    await this.page.locator(this.sidePanel).evaluate((el) => {
+      el.dataset.e2eOriginalNode = 'true';
+    });
+  }
+
+  async expectSidePanelNodeUnchanged() {
+    await expect(this.page.locator(`${this.sidePanel}[data-e2e-original-node="true"]`)).toBeVisible();
   }
 
   async getHealthStatus() {
@@ -516,6 +526,12 @@ export class ServiceGraphPage {
     await this.page.waitForTimeout(300);
     const selector = type === 'logs' ? this.sidePanelViewRelatedLogsBtn : this.sidePanelViewRelatedTracesBtn;
     await this.page.locator(selector).click();
+  }
+
+  /** The traces page keeps its filter base64-encoded in ?query=, with '.' standing in for '=' padding. */
+  async getTracesUrlQuery() {
+    const encoded = new URL(this.page.url()).searchParams.get('query') || '';
+    return Buffer.from(encoded.replace(/\./g, '='), 'base64').toString('utf8');
   }
 
   async expectCorrelationDialogVisible() {

@@ -56,13 +56,15 @@ test.describe("Service Graph Side Panel (non-modal drawer) testcases", () => {
 
     await pm.servicesCatalogPage.clickServiceRow(firstService);
     await pm.servicesCatalogPage.expectSidePanelVisible();
+    await pm.serviceGraphPage.markSidePanelNode();
     testLogger.info(`Panel opened on "${firstService}"`);
 
     await pm.servicesCatalogPage.clickServiceRow(secondService);
-    await pm.servicesCatalogPage.expectSidePanelVisible();
 
     // The title only swaps if the click behind the panel reached the catalog row.
     await pm.serviceGraphPage.expectSidePanelServiceName(secondService);
+    // A dismiss-then-reopen would also swap the title, but on a freshly mounted node.
+    await pm.serviceGraphPage.expectSidePanelNodeUnchanged();
     testLogger.info(`Panel stayed open and swapped in place to "${secondService}"`);
   });
 
@@ -128,6 +130,7 @@ test.describe("Service Graph Side Panel (non-modal drawer) testcases", () => {
     await pm.serviceGraphPage.expectOperationsSectionVisible();
     const rowCount = await pm.serviceGraphPage.getOperationsTableRowCount();
     testLogger.info(`Operations table rows: ${rowCount}`);
+    expect(rowCount).toBeGreaterThan(0);
 
     const columns = await pm.serviceGraphPage.getOperationsColumnIds();
     testLogger.info(`Operations columns: ${columns.join(', ')}`);
@@ -176,6 +179,9 @@ test.describe("Service Graph Side Panel (non-modal drawer) testcases", () => {
     await pm.serviceGraphPage.clickViewRelated('traces');
 
     await expect(page).toHaveURL(/\/traces\?.*tab=traces/);
+    const tracesQuery = await pm.serviceGraphPage.getTracesUrlQuery();
+    testLogger.info(`Traces query carried over: ${tracesQuery}`);
+    expect(tracesQuery).toContain(`service_name = '${firstService}'`);
     testLogger.info('Navigated to traces search via View Related → Traces');
   });
 });
