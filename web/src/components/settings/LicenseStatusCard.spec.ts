@@ -244,6 +244,31 @@ describe("status rows from waiver data", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it.each([true, false])(
+    "drops expired relief from an initially active response without a fetch (base present: %s)",
+    async (hasBase) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(start);
+      const w = mountCard({
+        waivers: [breach],
+        base: hasBase ? decision() : undefined,
+        decision: decision({ allowed_days: 5 }),
+      });
+      expect(w.get("[data-test=license-status-days]").find("dd").text()).toBe(
+        hasBase ? "3 allowed this month + 2 from a waiver · 0 used" : "2 from a waiver · 0 used",
+      );
+      await vi.advanceTimersByTimeAsync(Date.UTC(2026, 10, 1) - start - 1);
+      expect(w.get("[data-test=license-status-days]").text()).toContain("2 from a waiver");
+      await vi.advanceTimersByTimeAsync(1);
+      const days = w.get("[data-test=license-status-days]").find("dd").text();
+      expect(days).toBe(hasBase ? "3 allowed this month · 0 used" : "0 used");
+      expect(days).not.toContain("from a waiver");
+      expect(days).not.toContain("5 allowed");
+      w.unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    },
+  );
+
   it("omits each absent source fragment instead of using a fallback", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(start);

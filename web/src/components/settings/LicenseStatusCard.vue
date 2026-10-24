@@ -223,7 +223,9 @@ const reasons = computed<{ key: string; text: string }[]>(() => {
 const daysText = computed(() => {
   const d = props.decision;
   const extra = relief.value.breachDays;
-  const allowed = extra > 0 ? props.base?.allowed_days : d.allowed_days;
+  const allowed = props.waivers?.some((w) => w.type === "breach_days")
+    ? props.base?.allowed_days
+    : d.allowed_days;
   const parts = [];
   if (typeof allowed === "number" && Number.isFinite(allowed)) {
     parts.push(t("about.license_status_days_allowed", { allowed }));

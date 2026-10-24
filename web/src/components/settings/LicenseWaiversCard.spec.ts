@@ -185,25 +185,42 @@ describe("O14 card", () => {
       }),
       waiver({ id: "grace", type: "report_grace", starts_at: start * 1000, ends_at: end * 1000 }),
     ]);
-    const row = (id: string) => w.find(`[data-test=license-waiver-row-${id}]`).text();
+    const row = (id: string) => w.get(`[data-test=license-waiver-row-${id}]`).text();
+    const expectDetails = (graceSummary: string) => {
+      expect(w.get("[data-test=license-waiver-window-breach]").text()).toBe(
+        "Oct 30 through Oct 30",
+      );
+      expect(w.get("[data-test=license-waiver-window-grace]").text()).toBe(
+        "Oct 30, 00:00 → Oct 31, 00:00",
+      );
+      expect(w.get("[data-test=license-waiver-summary-grace]").text()).toBe(graceSummary);
+    };
+    const activeSummary = "Ends Oct 31 at 00:00 UTC; reports continue.";
+    const endedSummary = "Grace ended Oct 31 at 00:00 UTC; reports continue.";
     expect(row("breach")).toContain("Scheduled");
     expect(row("grace")).toContain("Scheduled");
+    expectDetails("Grace starts Oct 30 at 00:00 UTC.");
     await vi.advanceTimersByTimeAsync(1);
     expect(row("breach")).toContain("Active");
     expect(row("grace")).toContain("Active");
+    expectDetails(activeSummary);
     await vi.advanceTimersByTimeAsync(end - start - 1);
     expect(row("grace")).toContain("Active");
+    expectDetails(activeSummary);
     await vi.advanceTimersByTimeAsync(1);
     expect(row("grace")).toContain("Ended");
+    expectDetails(endedSummary);
     expect(row("breach")).toContain("Past days");
     expect(row("breach")).toContain(
       "Past day coverage; 2 extra allowed days retained through Oct 31.",
     );
     await vi.advanceTimersByTimeAsync(monthEnd - end - 1);
     expect(row("breach")).toContain("retained through Oct 31");
+    expectDetails(endedSummary);
     await vi.advanceTimersByTimeAsync(1);
     expect(row("breach")).toContain("October allowance ended at Nov 1, 00:00 UTC.");
     expect(row("breach")).toContain("Expired");
+    expectDetails(endedSummary);
     expect(vi.getTimerCount()).toBe(0);
   });
 });
