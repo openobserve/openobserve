@@ -170,6 +170,7 @@ pub async fn search(
         query_tracker,
         &req.org_id,
         Some(user_email),
+        SearchEventType::try_from(req.search_event_type.as_str()).ok(),
         timeout,
         WorkGroup::Short,
         &mut stop_watch,

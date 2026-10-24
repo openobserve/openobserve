@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { gt } from "@/types/i18n";
+import { gt, type I18nText } from "@/types/i18n";
 
 export const b64EncodeUnicode = (str: string) => {
   try {
@@ -193,6 +193,23 @@ export const formatTimeWithSuffix = (us: number) => {
 
   return `${us.toFixed(2)}us`;
 };
+
+const EXACT_DURATION_UNITS = [
+  { secs: 31_536_000, key: "common.durationYears" },
+  { secs: 604_800, key: "common.durationWeeks" },
+  { secs: 86_400, key: "common.durationDays" },
+  { secs: 3_600, key: "common.durationHours" },
+  { secs: 60, key: "common.durationMinutes" },
+] as const;
+
+/** Whole seconds in the largest unit that divides them exactly ("10 minutes", "1 week"), so nothing is rounded away. */
+export function formatExactDuration(secs: number): I18nText {
+  const whole = Math.max(0, Math.round(secs));
+  const unit = EXACT_DURATION_UNITS.find((u) => whole > 0 && whole % u.secs === 0);
+  if (!unit) return gt("common.durationSeconds", { n: whole }, whole);
+  const n = whole / unit.secs;
+  return gt(unit.key, { n }, n);
+}
 
 export function formatDuration(ms: number) {
   if (!ms || ms === 0) return gt("common.secShort", { count: 0 });

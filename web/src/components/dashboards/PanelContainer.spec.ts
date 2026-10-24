@@ -1793,6 +1793,24 @@ describe("PanelContainer", () => {
       expect(wrapper.vm.hoverRevealClass).toBe("");
     });
 
+    it("shows a public panel's server-side partial build as Partial, with no Refresh to offer", async () => {
+      wrapper = mountWithChips({
+        viewOnly: true,
+        injectedPanelData: { data: [], serverPartial: true },
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="panel-notice-chip-partial"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-notice-chip-interrupted"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="panel-partial-data-warning"]').exists()).toBe(false);
+      expect(wrapper.vm.canRefreshFromNotice).toBe(false);
+      expect(wrapper.findComponent(PanelErrorButtons).props("canRefresh")).toBe(false);
+
+      wrapper.unmount();
+      wrapper = mountWithChips({ viewOnly: true, injectedPanelData: { data: [] } });
+      await flushPromises();
+      expect(wrapper.find('[data-test="panel-notice-chip-partial"]').exists()).toBe(false);
+    });
+
     it("keeps Refresh but not editor actions while the layout is being edited", async () => {
       wrapper = mountWithChips({ layoutMode: "edit" });
       expect(wrapper.vm.canEditFromNotice).toBe(false);
@@ -2310,6 +2328,23 @@ describe("PanelContainer", () => {
       const body = wrapper.find('[data-test="dashboard-panel-body"]');
       expect(body.exists()).toBe(true);
       expect(body.attributes("data-curated-stale")).toBe("true");
+    });
+
+    it("shows an injected result's own note and dims it only when it asks to be", () => {
+      wrapper = createWrapper({
+        viewOnly: true,
+        injectedPanelData: { data: [], dimmed: true, notice: "from 12:04" },
+      });
+      expect(wrapper.find('[data-test="dashboard-panel-injected-notice"]').text()).toBe(
+        "from 12:04",
+      );
+      expect(wrapper.find('[data-test="dashboard-panel-body"]').classes()).toContain("opacity-60");
+
+      wrapper = createWrapper({ viewOnly: true, injectedPanelData: { data: [] } });
+      expect(wrapper.find('[data-test="dashboard-panel-injected-notice"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-panel-body"]').classes()).not.toContain(
+        "opacity-60",
+      );
     });
 
     it("renders NO badge and NO dimming when config.curated_badge is absent", () => {

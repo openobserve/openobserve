@@ -16,6 +16,7 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick, ref } from "vue";
+import { createMemoryHistory, createRouter } from "vue-router";
 
 // Mock all the heavy dependencies
 vi.mock("@/composables/dashboard/usePanelDataLoader", () => ({
@@ -213,14 +214,17 @@ describe("PanelSchemaRenderer", () => {
     }
   });
 
-  const createWrapper = (props = {}) => {
+  const createWrapper = (
+    props = {},
+    extra: { plugins?: any[]; stubs?: Record<string, unknown> } = {},
+  ) => {
     return mount(PanelSchemaRenderer, {
       props: {
         ...defaultProps,
         ...props,
       },
       global: {
-        plugins: [i18n, store],
+        plugins: [i18n, store, ...(extra.plugins ?? [])],
         provide: {
           hoveredSeriesState: { value: null },
           variablesAndPanelsDataLoadingState: {
@@ -246,6 +250,7 @@ describe("PanelSchemaRenderer", () => {
           CustomChartRenderer: { template: '<div data-test="custom-chart-renderer"></div>' },
           AddAnnotation: { template: '<div data-test="add-annotation"></div>' },
           LoadingProgress: { template: '<div data-test="loading-progress"></div>' },
+          ...extra.stubs,
         },
       },
     });
@@ -1125,6 +1130,69 @@ describe("PanelSchemaRenderer", () => {
       expect(() => {
         wrapper.vm.onChartClick(mockParams);
       }).not.toThrow();
+    });
+  });
+
+  describe("Drilldowns", () => {
+    const withDrilldown = (allowDrilldown?: boolean) =>
+      createWrapper({
+        ...(allowDrilldown === undefined ? {} : { allowDrilldown }),
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          config: { drilldown: [{ name: "to logs", type: "logs", data: {} }] },
+        },
+      });
+    const click = { data: { name: "a", value: 1 }, event: { offsetX: 1, offsetY: 1 } };
+
+    it("opens the drilldown menu on a click by default", async () => {
+      wrapper = withDrilldown();
+      await wrapper.vm.onPanelClick(click);
+      expect(wrapper.vm.drilldownArray).toHaveLength(1);
+    });
+
+    it("ignores clicks when drilldowns are turned off", async () => {
+      wrapper = withDrilldown(false);
+      await wrapper.vm.onPanelClick(click);
+      expect(wrapper.vm.drilldownArray).toHaveLength(0);
+    });
+
+    // The table's search icon opens the logs drawer; the public page turns drilldowns off.
+    const exploreFromTable = async (allowDrilldown: boolean) => {
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [{ path: "/", component: { template: "<div />" } }],
+      });
+      await router.push("/");
+      wrapper = createWrapper(
+        { allowDrilldown, panelSchema: { ...defaultProps.panelSchema, type: "table" } },
+        {
+          plugins: [router],
+          stubs: {
+            TableRenderer: {
+              name: "TableRenderer",
+              emits: ["explore-cell"],
+              template: '<div data-test="table-renderer"></div>',
+            },
+          },
+        },
+      );
+      wrapper
+        .findComponent({ name: "TableRenderer" })
+        .vm.$emit("explore-cell", { columnId: "count", value: 7, row: {} });
+      await flushPromises();
+      return { drawerOpen: wrapper.vm.cellDrawer.open, query: router.currentRoute.value.query };
+    };
+
+    it("opens the logs drawer from a table cell when drilldowns are on", async () => {
+      const { drawerOpen, query } = await exploreFromTable(true);
+      expect(drawerOpen).toBe(true);
+      expect(query.cell_value).toBe("7");
+    });
+
+    it("does not open the logs drawer from a table cell when drilldowns are off", async () => {
+      const { drawerOpen, query } = await exploreFromTable(false);
+      expect(drawerOpen).toBe(false);
+      expect(query.cell_value).toBeUndefined();
     });
   });
 

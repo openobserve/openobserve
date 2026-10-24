@@ -67,3 +67,34 @@ impl From<MetricsQueryRequest> for proto::cluster_rpc::MetricsQueryRequest {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_public_promql_request_keeps_its_usage_ids_through_the_cluster_request() {
+        let ctx = SearchEventContext {
+            public_dashboard_link_id: Some("l1".into()),
+            range_key: Some("r3600".into()),
+            panel_id: Some("p1".into()),
+            ..Default::default()
+        };
+        let req = MetricsQueryRequest {
+            query: "up".into(),
+            start: 0,
+            end: 1,
+            step: 1,
+            query_exemplars: false,
+            use_cache: None,
+            search_type: Some(SearchEventType::PublicDashboard),
+            search_event_context: Some(ctx.clone()),
+            regions: vec![],
+            clusters: vec![],
+        };
+        let rpc: proto::cluster_rpc::MetricsQueryRequest = req.into();
+        // The usage row reads the context back from the cluster request, as search() does.
+        let reported: Option<SearchEventContext> = rpc.search_event_context.map(Into::into);
+        assert_eq!(reported, Some(ctx));
+    }
+}
