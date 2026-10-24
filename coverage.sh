@@ -27,23 +27,45 @@ EOF
 _cov_test() {
     cargo llvm-cov --version >/dev/null || cargo install cargo-llvm-cov
     cargo nextest --version >/dev/null || cargo install cargo-nextest
-    cargo run -- init-db
+    # cargo run -- init-db
+    curl -L https://raw.githubusercontent.com/openobserve/openobserve/main/downloadO2.sh | sh -s opensource
+    ./openobserve init-db
+
+    cargo llvm-cov nextest \
+        --workspace \
+        --verbose \
+        --no-cfg-coverage \
+        --no-cfg-coverage-nightly \
+        --no-report \
+        --test-threads=1 \
+        --no-fail-fast \
+        --retries 1 \
+        users::tests bootstrap cache::file_data::disk sourcemaps
+
     cargo llvm-cov nextest \
         --workspace \
         --verbose \
         --no-cfg-coverage \
         --no-cfg-coverage-nightly \
         --ignore-filename-regex 'job|.*generated.*' \
-        --test-threads=1 \
         --no-fail-fast \
+        --no-clean \
         --retries 1 \
-        "$@"
+        --json \
+        --summary-only \
+        --output-path report.json \
+        -- \
+        --skip users::tests \
+        --skip bootstrap \
+        --skip cache::file_data::disk \
+        --skip sourcemaps \
+        
 }
 
-cmd_html() {
-    _cov_test --html "$@"
-    open target/llvm-cov/html/index.html # HACK: `open` is not portable
-}
+# cmd_html() {
+#     _cov_test --html "$@"
+#     open target/llvm-cov/html/index.html # HACK: `open` is not portable
+# }
 
 cmd_show_env() {
     cat <<EOF
@@ -149,7 +171,7 @@ main() {
         ;;
     run-cov)
         shift
-        _cov_test --json --summary-only --output-path report.json "$@"
+        _cov_test
         ;;
     show-env)
         cmd_show_env
