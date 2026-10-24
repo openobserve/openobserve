@@ -1,10 +1,6 @@
 import { expect } from "@playwright/test";
 
-/**
- * Page Object for the dashboard time-range apply + Auto Run gate (view mode).
- * The dashboard picker renders no Apply button: a pick applies at once when
- * Auto Run is on, or defers (yellow / ghost-warning refresh) when it is off.
- */
+/** No Apply button: a pick applies at once with Auto Run on, else defers (pending global/view refresh, ghost-warning panel refresh). */
 export default class DashboardTimeRange {
   constructor(page) {
     this.page = page;

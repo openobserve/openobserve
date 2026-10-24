@@ -713,7 +713,7 @@ export default class DashboardPanelTime {
 
   /**
    * Pick a relative time in the view panel WITHOUT applying it.
-   * With Auto Run off the pick is deferred (view refresh turns warning) until Refresh is clicked.
+   * With Auto Run off the pick is deferred (view refresh turns pending) until Refresh is clicked.
    * @param {string} timeRange - e.g., "6-d", "1-w"
    */
   async selectViewPanelTimeWithoutApply(timeRange) {

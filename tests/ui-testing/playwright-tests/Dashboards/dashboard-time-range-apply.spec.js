@@ -74,7 +74,7 @@ test.describe('Dashboard time range apply and Auto Run', { tag: ['@dashboards', 
     await pm.dashboardPanelTime.selectGlobalTimeWithoutApply('1-w');
     await pm.dashboardPanelTime.dismissDateTimePicker();
 
-    await autoRun.expectRefreshVariant('warning');
+    await autoRun.expectRefreshVariant('pending');
     await autoRun.expectRefreshTooltip('Refresh to apply the time range');
     await autoRun.expectNoNewRun('time', base);
     await pm.dashboardTimeRange.expectUrlPeriod('1h');
@@ -99,7 +99,7 @@ test.describe('Dashboard time range apply and Auto Run', { tag: ['@dashboards', 
 
     await pm.dashboardPanelTime.selectGlobalTimeWithoutApply('6-d');
     await pm.dashboardPanelTime.dismissDateTimePicker();
-    await autoRun.expectRefreshVariant('warning');
+    await autoRun.expectRefreshVariant('pending');
     await autoRun.expectNoNewRun('time', base);
 
     await autoRun.toggleAutoRun();
@@ -174,7 +174,7 @@ test.describe('Dashboard time range apply and Auto Run', { tag: ['@dashboards', 
     expect(await autoRun.getStoredAutoRun()).toBe('false');
     await pm.dashboardPanelTime.openViewPanelModal(panelId);
     await pm.dashboardPanelTime.selectViewPanelTimeWithoutApply('1-w');
-    await autoRun.expectViewRefreshVariant('warning');
+    await autoRun.expectViewRefreshVariant('pending');
     await autoRun.clickViewRefresh();
     await autoRun.expectViewRefreshNotPending();
     await pm.dashboardPanelTime.closeViewPanelModal();
@@ -217,7 +217,7 @@ test.describe('Dashboard time range apply and Auto Run', { tag: ['@dashboards', 
     const base = await autoRun.settledRunCount('time');
     await pm.dashboardPanelTime.selectGlobalTimeWithoutApply('6-d');
     await pm.dashboardPanelTime.dismissDateTimePicker();
-    await autoRun.expectRefreshVariant('warning');
+    await autoRun.expectRefreshVariant('pending');
     await autoRun.expectNoNewRun('time', base);
 
     await autoRun.clickRefresh();
