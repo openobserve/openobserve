@@ -915,6 +915,7 @@ pub fn resolve_group_update(
         episode_opened_at: prev.episode_opened_at,
         episode_incident_id: prev.episode_incident_id.clone(),
         recovering_since: prev.recovering_since,
+        firing_started_at: None,
     };
 
     // An already-Ok group that vanished changes nothing on either axis, so no
@@ -1574,6 +1575,7 @@ mod tests {
             episode_opened_at: None,
             episode_incident_id: None,
             recovering_since: None,
+            firing_started_at: None,
         }
     }
 
@@ -1601,6 +1603,7 @@ mod tests {
             episode_opened_at: None,
             episode_incident_id: None,
             recovering_since: None,
+            firing_started_at: None,
         }
     }
 
@@ -4554,6 +4557,48 @@ mod tests {
         assert_eq!(
             validate_multi_alert(&query, &tc, false),
             Err(MultiAlertError::PromqlConditionMissing)
+        );
+    }
+
+    /// AC-P2.1.5
+    #[test]
+    fn each_group_has_its_own_firing_cycle_and_resolution_closes_it() {
+        let c = tc(Operator::GreaterThan, 100, None);
+        let (a, b) = (
+            group_key(&labels(&[("host", "a")])),
+            group_key(&labels(&[("host", "b")])),
+        );
+        let mut prev: HashMap<String, AlertState> = HashMap::new();
+        let mut run = |values: [f64; 2], at: i64| {
+            let classification = classify_groups(
+                vec![
+                    GroupObservation::new(labels(&[("host", "a")]), values[0]),
+                    GroupObservation::new(labels(&[("host", "b")]), values[1]),
+                ],
+                &c,
+                500,
+            );
+            for u in plan_group_updates("alert-1", &classification, &prev, at, 0).updates {
+                let s = u.state.unwrap();
+                prev.insert(s.group_key.clone(), s);
+            }
+            (
+                prev[&a].firing_started_at,
+                prev[&b].firing_started_at,
+                prev[ROLLUP_GROUP_KEY].firing_started_at,
+            )
+        };
+
+        assert_eq!(run([150.0, 10.0], 100), (Some(100), None, Some(100)));
+        assert_eq!(run([150.0, 150.0], 200), (Some(100), Some(200), Some(100)));
+        assert_eq!(run([10.0, 150.0], 300), (None, Some(200), Some(100)));
+
+        let resolved = resolve_group_update("alert-1", &b, &prev[&b], 400)
+            .state
+            .unwrap();
+        assert_eq!(
+            resolved.firing_started_at, None,
+            "the reaper's resolve clears it"
         );
     }
 }

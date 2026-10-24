@@ -54,6 +54,7 @@ const STUBS = {
   SlackChannelDefaults: stub("SlackChannelDefaults", ["installationId"]),
   SlackUninstallDialog: stub("SlackUninstallDialog", ["open", "mode", "installation"]),
   SlackOrgAccess: stub("SlackOrgAccess", ["installation"]),
+  SlackSwitchAllCard: stub("SlackSwitchAllCard", ["installation"]),
 };
 
 const switchOrg = async (store: ReturnType<typeof makeSlackStore>, identifier: string) => {
@@ -110,6 +111,19 @@ describe("Slack settings: enabled", () => {
     expect(slack.listInstallations).toHaveBeenCalledWith("acme", undefined);
     expect(w.find('[data-test="slack-no-access"]').exists()).toBe(true);
     expect(w.find('[data-test-stub="SlackConnectEmpty"]').exists()).toBe(false);
+  });
+
+  it("puts the switch-all card for the shown workspace above its card (MK-6b)", async () => {
+    vi.mocked(slack.listInstallations).mockReturnValue(
+      ok({ installations: [installationView()] }) as any,
+    );
+    const w = mountSlack({ slack_enabled: true });
+    await flushPromises();
+    const card = w.findComponent({ name: "SlackSwitchAllCard" });
+    expect(card.exists()).toBe(true);
+    expect(card.props("installation")).toMatchObject({ id: "inst-1" });
+    const html = w.html();
+    expect(html.indexOf("SlackSwitchAllCard")).toBeLessThan(html.indexOf("SlackWorkspaceCard"));
   });
 
   it("shows a retryable load error for any other failure", async () => {

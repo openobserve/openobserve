@@ -32,6 +32,8 @@ const RECORDED_MUTE_GRACE_MICROS: i64 = 24 * 3_600 * 1_000_000;
 struct RecoveryRoute {
     oncall: bool,
     destinations: bool,
+    /// Gates only the Slack thread reply; the green edit comes from the clear hook.
+    slack: bool,
 }
 
 /// One clear run's on-call decision in the scheduler.
@@ -116,6 +118,10 @@ pub async fn dispatch_recovery(alert: &Alert, event: &RecoveryEvent) {
         );
     }
 
+    if route.slack {
+        send_slack_recovered(alert, event).await;
+    }
+
     // TODO: a workflow consumer, once a link can carry AlertResolved (see that variant).
 }
 
@@ -178,11 +184,35 @@ fn clear_run_oncall<'a>(
     }
 }
 
+/// The Recovered thread reply on every Slack app destination the alert posts to.
+async fn send_slack_recovered(alert: &Alert, event: &RecoveryEvent) {
+    let mut names: Vec<String> = alert.destinations.clone();
+    for name in &alert.recovery_destinations {
+        if !names.contains(name) {
+            names.push(name.clone());
+        }
+    }
+    let slack = crate::alerts::slack_publish::slack_app_destinations(&alert.org_id, &names).await;
+    if let Err(e) = crate::alerts::slack_publish::send_recovered(
+        &crate::alerts::slack_publish::QueueSink,
+        &slack,
+        event,
+    )
+    .await
+    {
+        log::warn!(
+            "[RECOVERY] Slack recovery reply for {} not queued: {e}",
+            event.alert_id
+        );
+    }
+}
+
 /// Correlated alerts: the incident owns the resolve because it sent the trigger.
 fn recovery_route(alert: &Alert, event: &RecoveryEvent, muted: bool) -> RecoveryRoute {
     RecoveryRoute {
         oncall: !muted,
         destinations: !muted && alert.notify_on_recovery && event.incident_id.is_none(),
+        slack: !muted,
     }
 }
 
@@ -330,7 +360,8 @@ mod tests {
             muted,
             RecoveryRoute {
                 oncall: false,
-                destinations: false
+                destinations: false,
+                slack: false,
             }
         );
         let record = suppressed_recovery_record(&alert, &event, "dt-1".to_string());
@@ -362,7 +393,8 @@ mod tests {
             recovery_route(&alert, &event, false),
             RecoveryRoute {
                 oncall: true,
-                destinations: true
+                destinations: true,
+                slack: true,
             }
         );
     }
@@ -478,6 +510,7 @@ mod tests {
             emitted_at: at(40),
             last_notified_level: None,
             group_labels: None,
+            firing_started_at: None,
         };
 
         assert!(any_target_since(
@@ -502,7 +535,8 @@ mod tests {
             recovery_route(&alert, &event, downtime_id.is_some()),
             RecoveryRoute {
                 oncall: false,
-                destinations: false
+                destinations: false,
+                slack: false,
             }
         );
         let record = suppressed_recovery_record(&alert, &event, downtime_id.unwrap());

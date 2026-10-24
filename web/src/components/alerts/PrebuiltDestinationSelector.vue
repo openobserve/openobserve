@@ -55,6 +55,15 @@ limitations under the License. -->
             {{ type.name }}
           </div>
 
+          <OTag
+            v-if="type.tag"
+            data-test="destination-type-tag"
+            :variant="type.tag.variant"
+            size="sm"
+            class="mt-1"
+            :label="type.tag.label"
+          />
+
           <!-- Description -->
           <div
             data-test="destination-type-description"
@@ -121,26 +130,30 @@ limitations under the License. -->
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
-import { PREBUILT_DESTINATION_TYPES } from "@/utils/prebuilt-templates";
-import type { PrebuiltTypeId } from "@/utils/prebuilt-templates/types";
+import { destinationTypeTiles } from "@/utils/prebuilt-templates";
+import type { DestinationTileId } from "@/utils/prebuilt-templates/types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 
 // Define component props
 // `modelValue` is the owner form's `destination_type` field, which is a plain
 // string in the schema; accept `string` so the bound form value fits while the
 // emit side stays narrowed to real selections.
 interface Props {
-  modelValue?: PrebuiltTypeId | "custom" | "" | null | string;
+  modelValue?: DestinationTileId | "custom" | "" | null | string;
+  /** Slack is on for the org, so the Slack app tile is offered. */
+  slackApp?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   modelValue: null,
+  slackApp: false,
 });
 
 // Define component emits
 interface Emits {
-  (e: "update:modelValue", value: PrebuiltTypeId | "custom"): void;
-  (e: "select", value: PrebuiltTypeId | "custom"): void;
+  (e: "update:modelValue", value: DestinationTileId | "custom"): void;
+  (e: "select", value: DestinationTileId | "custom"): void;
 }
 
 const emit = defineEmits<Emits>();
@@ -152,14 +165,14 @@ const { t } = useI18nTyped();
 const selectedType = computed({
   get: () => props.modelValue,
   // Only user selections flow through the setter, so null/'' never get emitted.
-  set: (value: PrebuiltTypeId | "custom") => emit("update:modelValue", value),
+  set: (value: DestinationTileId | "custom") => emit("update:modelValue", value),
 });
 
 // Computed properties
-const filteredDestinationTypes = computed(() => PREBUILT_DESTINATION_TYPES);
+const filteredDestinationTypes = computed(() => destinationTypeTiles(props.slackApp));
 
 // Methods
-function selectType(typeId: PrebuiltTypeId | "custom") {
+function selectType(typeId: DestinationTileId | "custom") {
   selectedType.value = typeId;
   emit("select", typeId);
 }

@@ -1367,3 +1367,85 @@ describe("AddDestination — email recipients are org users", () => {
     ]);
   });
 });
+
+describe("AddDestination - Slack app type (MK-7)", () => {
+  const SlackAppFormStub = {
+    name: "SlackAppDestinationForm",
+    props: ["destination", "templates"],
+    emits: ["saved", "cancel"],
+    template: '<div data-test="slack-app-form-stub"></div>',
+  };
+  const zo = (store.state as any).zoConfig;
+  let slackWas: unknown;
+
+  const mountWithForm = (props: Record<string, any> = {}) =>
+    mount(AddDestination, {
+      props: { templates: [], destination: null, isAlerts: true, ...props },
+      global: {
+        plugins: [i18n, store],
+        stubs: {
+          SlackAppDestinationForm: SlackAppFormStub,
+          SlackAppSwitchBanner: true,
+          PrebuiltDestinationSelector: {
+            name: "PrebuiltDestinationSelector",
+            template: '<div data-test="prebuilt-destination-selector-stub"></div>',
+            props: ["modelValue", "searchQuery", "slackApp"],
+            emits: ["update:modelValue", "select", "update:searchQuery"],
+          },
+          AddUser: true,
+          DestinationPreview: true,
+          AppTabs: true,
+        },
+      },
+    });
+
+  beforeEach(() => {
+    slackWas = zo.slack_enabled;
+    zo.slack_enabled = true;
+    config.isEnterprise = "true";
+  });
+  afterEach(() => {
+    zo.slack_enabled = slackWas;
+  });
+
+  it("offers the Slack app tile only while Slack is on", async () => {
+    wrapper = mountWithForm();
+    const picker = wrapper.findComponent({ name: "PrebuiltDestinationSelector" });
+    expect(picker.props("slackApp")).toBe(true);
+    wrapper.unmount();
+    zo.slack_enabled = false;
+    wrapper = mountWithForm();
+    expect(wrapper.findComponent({ name: "PrebuiltDestinationSelector" }).props("slackApp")).toBe(
+      false,
+    );
+  });
+
+  it("swaps the webhook fields and footer for the Slack app form", async () => {
+    wrapper = mountWithForm();
+    wrapper.vm.selectDestinationType("slack_app");
+    await flushPromises();
+    expect(wrapper.find('[data-test="slack-app-form-stub"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="add-destination-submit-btn"]').exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "PrebuiltDestinationSelector" }).exists()).toBe(true);
+  });
+
+  it("edits a Slack app destination with the same form, and closes once it saved", async () => {
+    const destination = {
+      name: "sre-prod-slack",
+      type: "slack_app",
+      template: "prebuilt_slack",
+      installation_id: "inst-1",
+      channel_id: "C9",
+      channel_name: "sre-prod",
+    };
+    wrapper = mountWithForm({ destination });
+    await flushPromises();
+    const form = wrapper.findComponent({ name: "SlackAppDestinationForm" });
+    expect(form.props("destination")).toMatchObject({ name: "sre-prod-slack" });
+    expect(wrapper.findComponent({ name: "PrebuiltDestinationSelector" }).exists()).toBe(false);
+    form.vm.$emit("saved");
+    await flushPromises();
+    expect(wrapper.emitted("get:destinations")).toHaveLength(1);
+    expect(wrapper.emitted("cancel:hideform")).toHaveLength(1);
+  });
+});

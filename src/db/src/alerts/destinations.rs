@@ -69,6 +69,41 @@ pub enum DestinationError {
     NotSupportedAlertDestinationType,
     #[error("{0}")]
     InUse(String),
+    #[error("Slack app needs Enterprise")]
+    SlackAppNeedsEnterprise,
+    #[error("{0}")]
+    SlackApp(SlackAppRefusal),
+}
+
+/// A refused Slack app save; `code` lets the form show its own copy (MK-7, MK-20).
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+pub struct SlackAppRefusal {
+    #[serde(skip)]
+    pub status: u16,
+    pub code: &'static str,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub team: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub destination: Option<String>,
+}
+
+impl SlackAppRefusal {
+    pub fn new(status: u16, code: &'static str, message: impl Into<String>) -> Self {
+        Self {
+            status,
+            code,
+            message: message.into(),
+            team: None,
+            destination: None,
+        }
+    }
+}
+
+impl std::fmt::Display for SlackAppRefusal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
+    }
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Destination, DestinationError> {
@@ -111,7 +146,8 @@ pub async fn set(destination: Destination) -> Result<Destination, DestinationErr
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
-    if table::destinations::get(org_id, name).await?.is_none() {
+    // By row, not decode, so a row only a newer release can read is still deletable here.
+    if !table::destinations::exists_row(org_id, name).await? {
         return Err(DestinationError::NotFound);
     }
     table::destinations::delete(org_id, name).await?;
@@ -308,6 +344,49 @@ mod tests {
             e.to_string(),
             "Destination with the same name already exists"
         );
+    }
+
+    #[tokio::test]
+    async fn delete_removes_undecodable_row() {
+        use config::meta::destinations::{DestinationType, Endpoint, Module};
+        use sea_orm::ConnectionTrait;
+
+        std::fs::create_dir_all(&config::get_config().common.data_db_dir).unwrap();
+        infra::db_init().await.unwrap();
+        infra::table::migrate().await.unwrap();
+        let org = format!("r128_{}", config::ider::uuid());
+        set(Destination {
+            org_id: org.clone(),
+            name: "slack-dest".to_string(),
+            module: Module::Alert {
+                template: None,
+                destination_type: DestinationType::Http(Endpoint {
+                    url: "https://example.com".to_string(),
+                    ..Default::default()
+                }),
+            },
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+        infra::db::get_orm_client_rw()
+            .await
+            .execute_unprepared(&format!(
+                r#"UPDATE destinations SET type='{{"type":"from_a_newer_release"}}' WHERE org='{org}' AND name='slack-dest'"#
+            ))
+            .await
+            .unwrap();
+
+        delete(&org, "slack-dest").await.unwrap();
+        assert!(
+            !table::destinations::exists_row(&org, "slack-dest")
+                .await
+                .unwrap()
+        );
+        assert!(matches!(
+            delete(&org, "slack-dest").await,
+            Err(DestinationError::NotFound)
+        ));
     }
 
     #[test]
