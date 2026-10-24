@@ -14,7 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { applyPromqlPrefill, defaultAlertValue, formForecastOf } from "@/composables/useAlertForm";
+import {
+  applyIntentPrefill,
+  applyPromqlPrefill,
+  defaultAlertValue,
+  formForecastOf,
+  pruneIncompleteConditions,
+} from "@/composables/useAlertForm";
+import { generateSqlQuery } from "@/utils/alerts/alertQueryBuilder";
 import { getAlertPayload } from "@/utils/alerts/alertPayload";
 import {
   buildForecastAlertPromql,
@@ -156,5 +163,166 @@ describe("saving in Forecast mode", () => {
   it("keeps it in Threshold mode", () => {
     const payload = getAlertPayload(withWarning(null), context);
     expect(payload.query_condition.promql_warning_value).toBe(14);
+  });
+});
+
+describe("pruneIncompleteConditions", () => {
+  const leaf = (id: string, column: string, operator: string, value: string) => ({
+    filterType: "condition",
+    column,
+    operator,
+    value,
+    values: [],
+    logicalOperator: "AND",
+    id,
+  });
+  const group = (groupId: string, conditions: any[]) => ({
+    filterType: "group",
+    logicalOperator: "AND",
+    groupId,
+    conditions,
+  });
+
+  it("keeps the complete rows and drops the unfinished ones beside them", () => {
+    const tree = group("root", [
+      leaf("a", "level", "=", "error"),
+      leaf("b", "", "=", ""),
+      leaf("c", "service", "=", ""),
+      leaf("d", "body", "is_null", ""),
+      group("g1", [leaf("e", "", "=", "")]),
+      group("g2", [leaf("f", "host", "=", "node-1"), leaf("g", "", "=", "x")]),
+    ]);
+
+    expect(pruneIncompleteConditions(tree)).toEqual(
+      group("root", [
+        leaf("a", "level", "=", "error"),
+        leaf("d", "body", "is_null", ""),
+        group("g2", [leaf("f", "host", "=", "node-1")]),
+      ]),
+    );
+  });
+
+  it("drops a row whose value is null, as the form treats it as missing", () => {
+    const tree = group("root", [
+      leaf("a", "level", "=", "error"),
+      { ...leaf("b", "service", "=", ""), value: null },
+    ]);
+
+    expect(pruneIncompleteConditions(tree)).toEqual(
+      group("root", [leaf("a", "level", "=", "error")]),
+    );
+  });
+
+  it("does not touch the tree it was given", () => {
+    const tree = group("root", [leaf("a", "level", "=", "error"), leaf("b", "", "=", "")]);
+    pruneIncompleteConditions(tree);
+    expect(tree.conditions).toHaveLength(2);
+  });
+
+  it("leaves no WHERE clause when every row is unfinished", () => {
+    const tree = group("root", [leaf("a", "", "=", ""), leaf("b", "level", "=", "")]);
+    const pruned = pruneIncompleteConditions(tree);
+    const data: any = form();
+    data.stream_name = "app";
+    data.query_condition.conditions = pruned;
+
+    expect(pruned).toBeNull();
+    expect(generateSqlQuery(data, {}, false)).not.toContain("WHERE");
+  });
+});
+
+describe("applyIntentPrefill", () => {
+  const intentPrefill = (overrides: Partial<AlertPrefill> = {}): AlertPrefill => ({
+    version: ALERT_PREFILL_VERSION,
+    source: "intent",
+    sourceLabel: "default",
+    streamType: "traces",
+    streamName: "default",
+    queryType: "custom",
+    silenceMinutes: 60,
+    pendingPeriodMinutes: 10,
+    contextAttributes: { intent_id: "requests_get_slow" },
+    intentDefaults: true,
+    warnings: [],
+    ...overrides,
+  });
+
+  it.each(["intent", "suggestion"])(
+    "applies the hold, the context attributes and the note for the %s source",
+    (source) => {
+      const data: any = form();
+      data.trigger_condition.silence = 60;
+      data.notify_on_recovery = true;
+      const note = applyIntentPrefill(data, intentPrefill({ source }));
+
+      expect(data.pending_period_sec).toBe(10);
+      expect(data._ui.pendingPeriod).toBe(10);
+      expect(data.notify_on_recovery).toBe(false);
+      expect(data.context_attributes).toEqual([
+        expect.objectContaining({ key: "intent_id", value: "requests_get_slow" }),
+      ]);
+      expect(note).toEqual({ silenceMinutes: 60, pendingPeriodMinutes: 10 });
+    },
+  );
+
+  it("replaces an existing attribute of the same key and keeps the others", () => {
+    const data: any = form();
+    data.context_attributes = [
+      { key: "env", value: "prod", id: "1" },
+      { key: "intent_id", value: "old", id: "2" },
+    ];
+    applyIntentPrefill(data, intentPrefill());
+
+    expect(data.context_attributes.map((a: any) => [a.key, a.value])).toEqual([
+      ["env", "prod"],
+      ["intent_id", "requests_get_slow"],
+    ]);
+  });
+
+  it("ignores the intent fields for any other source", () => {
+    const data: any = form();
+    const before = JSON.parse(JSON.stringify(data));
+    const note = applyIntentPrefill(data, intentPrefill({ source: "logs" }));
+
+    expect(note).toBeNull();
+    expect(data).toEqual(before);
+  });
+
+  it("applies the fields but shows no note when the prefill does not ask for one", () => {
+    const data: any = form();
+    const note = applyIntentPrefill(data, intentPrefill({ intentDefaults: undefined }));
+
+    expect(note).toBeNull();
+    expect(data.pending_period_sec).toBe(10);
+  });
+
+  it("leaves the hold at zero for a count rule", () => {
+    const data: any = form();
+    data.trigger_condition.silence = 60;
+    const note = applyIntentPrefill(data, intentPrefill({ pendingPeriodMinutes: undefined }));
+
+    expect(data.pending_period_sec).toBe(0);
+    expect(note).toEqual({ silenceMinutes: 60, pendingPeriodMinutes: 0 });
+  });
+
+  it("opens anomaly mode for an anomaly intent when anomaly detection is available", () => {
+    const data: any = form();
+    data.name = "payment_something_unusual";
+    const note = applyIntentPrefill(data, intentPrefill({ alertType: "anomaly" }), true);
+
+    expect(data.is_real_time).toBe("anomaly");
+    expect(note).toBeNull();
+  });
+
+  it("keeps a scheduled alert for an anomaly intent when anomaly detection is off", () => {
+    const data: any = form();
+    applyIntentPrefill(data, intentPrefill({ alertType: "anomaly" }));
+    expect(data.is_real_time).toBe("false");
+  });
+
+  it("never switches the alert type for a source off the intent path", () => {
+    const data: any = form();
+    applyIntentPrefill(data, intentPrefill({ source: "logs", alertType: "anomaly" }), true);
+    expect(data.is_real_time).toBe("false");
   });
 });

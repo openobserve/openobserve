@@ -73,6 +73,34 @@
 
     <template #actions>
       <OButton
+        v-if="!notFound && typeof alert?.enabled === 'boolean'"
+        variant="outline"
+        size="sm-action"
+        :icon-left="alert.enabled ? 'pause' : 'play-arrow'"
+        :loading="togglingEnabled"
+        data-test="alerts-alertdetail-pause-resume"
+        @click="toggleEnabled"
+      >
+        {{ alert.enabled ? t("alerts.pause") : t("alerts.resume") }}
+      </OButton>
+      <ODropdown v-if="!notFound && alert && downtimesEnabled" align="end">
+        <template #trigger>
+          <OButton
+            variant="outline"
+            size="sm-action"
+            icon-left="notifications-paused"
+            data-test="alerts-alertdetail-mute"
+          >
+            {{ t("alerts.downtimes.mute.bulk") }}
+          </OButton>
+        </template>
+        <MuteMenuItems
+          data-test-prefix="alerts-alertdetail-mute"
+          @preset="muteForPreset"
+          @until="openMuteDialog([alert])"
+        />
+      </ODropdown>
+      <OButton
         v-if="!notFound"
         variant="outline"
         size="sm-action"
@@ -312,11 +340,18 @@
         </OTabPanels>
       </template>
     </div>
+    <QuickMuteDialog
+      v-if="downtimesEnabled"
+      v-model:open="muteDialogOpen"
+      :selection="muteSelection"
+      @muted="dropListCache"
+    />
   </OPageLayout>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { useMutation } from "@tanstack/vue-query";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -329,6 +364,9 @@ import AlertGroupsTable from "@/components/alerts/AlertGroupsTable.vue";
 import AnomalyDetectionChart from "@/components/alerts/AnomalyDetectionChart.vue";
 import CompositeAlertDetail from "@/components/alerts/composite/CompositeAlertDetail.vue";
 import CompositeReferencesDrawer from "@/components/alerts/composite/CompositeReferencesDrawer.vue";
+import MuteMenuItems from "@/components/alerts/downtimes/MuteMenuItems.vue";
+import QuickMuteDialog from "@/components/alerts/downtimes/QuickMuteDialog.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -345,6 +383,14 @@ import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import alertsService from "@/services/alerts";
+import {
+  toggleAlertStateMutation,
+  toggleAnomalyAlertStateMutation,
+} from "@/services/alerts.queries";
+import { alertKeys } from "@/services/alerts.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { useOrgId } from "@/composables/query";
+import { useRowMute } from "@/composables/downtimes/useRowMute";
 import sloService from "@/services/slos";
 import {
   isSloAlert,
@@ -386,6 +432,17 @@ const historyView = ref<"evaluations" | "transitions">("evaluations");
 const referenceDrawerOpen = ref(false);
 const compositeReferences = ref<CompositeAlertReference[]>([]);
 const hiddenReferenceCount = ref(0);
+
+const writeOrgId = useOrgId();
+const toggleAlertWrite = useMutation(() => toggleAlertStateMutation(writeOrgId.value));
+const toggleAnomalyWrite = useMutation(() => toggleAnomalyAlertStateMutation(writeOrgId.value));
+const togglingEnabled = ref(false);
+// Same module/id mapping the list rows use, so a mute from here files identically.
+const { downtimesEnabled, muteDialogOpen, muteSelection, muteRows, openMuteDialog } =
+  useRowMute<any>(
+    (row) => (row?.alert_type === "anomaly_detection" ? "anomaly_detections" : "alerts"),
+    () => alertId.value,
+  );
 
 const onHistoryViewChange = (value: unknown) => {
   if (value !== "evaluations" && value !== "transitions") return;
@@ -691,6 +748,53 @@ const editAlert = () => {
       tab: route.query.tab,
     },
   });
+};
+
+// The list paints a revisited folder from these caches, so a change made here must clear them.
+const dropListCache = () => {
+  void queryClient.invalidateQueries({
+    queryKey: alertKeys.all(orgId.value),
+    refetchType: "none",
+  });
+  const folder = String(route.query.folder || "default");
+  const cached = store.state.organizationData?.allAlertsListByFolderId;
+  if (cached?.[folder]) {
+    const { [folder]: _, ...rest } = cached;
+    store.dispatch("setAllAlertsListByFolderId", rest);
+  }
+};
+
+const muteForPreset = async (seconds: number) => {
+  if (!alert.value) return;
+  const id = await muteRows([alert.value], seconds);
+  if (id) dropListCache();
+};
+
+// Same write and toasts as the list row's toggle.
+const toggleEnabled = async () => {
+  if (!alert.value || togglingEnabled.value) return;
+  togglingEnabled.value = true;
+  const toggle = isAnomalyAlert.value ? toggleAnomalyWrite : toggleAlertWrite;
+  const folder = String(route.query.folder || "default");
+  try {
+    const res: any = await toggle.mutateAsync({
+      alertId: alertId.value,
+      enabled: !alert.value.enabled,
+      folderId: folder,
+    });
+    alert.value = { ...alert.value, enabled: res.data.enabled };
+    dropListCache();
+    toast({
+      variant: "success",
+      message: res.data.enabled
+        ? t("toastMessages.alerts.alertResumedSuccessfully")
+        : t("toastMessages.alerts.alertPausedSuccessfully"),
+    });
+  } catch {
+    // The mutation's central handler already toasts the failure.
+  } finally {
+    togglingEnabled.value = false;
+  }
 };
 
 onMounted(async () => {

@@ -307,10 +307,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('user.confirmDeleteHead')"
       :secondary-button-label="t('user.cancel')"
       :primary-button-label="t('user.ok')"
+      :primary-button-loading="leaver.loading.value"
       @click:secondary="confirmDelete = false"
       @click:primary="deleteUser"
     >
       <p>{{ t("user.confirmDeleteMsg") }}</p>
+      <div
+        v-if="leaver.alerts.value.length"
+        data-test="user-delete-leaver-alerts"
+        class="mt-3 flex flex-col gap-2 text-sm"
+      >
+        <p>
+          {{
+            t(
+              "user.leaverAlertsIntro",
+              { count: leaver.alerts.value.length },
+              leaver.alerts.value.length,
+            )
+          }}
+        </p>
+        <ul class="max-h-40 list-disc overflow-auto ps-5">
+          <li v-for="alert in leaver.alerts.value" :key="alert.alert_id">{{ alert.name }}</li>
+        </ul>
+        <OCheckbox
+          v-if="leaver.defaultDestination.value"
+          v-model="leaver.moveToDefault.value"
+          size="sm"
+          :label="t('user.leaverMoveToDefault')"
+          data-test="user-delete-leaver-move-checkbox"
+        />
+      </div>
     </ODialog>
 
     <ODialog
@@ -356,6 +382,7 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -378,6 +405,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
+import { useLeaverAlerts } from "@/composables/alerts/useLeaverAlerts";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
@@ -399,6 +427,7 @@ export default defineComponent({
     OStatStrip,
     OIcon,
     ODialog,
+    OCheckbox,
     OEmptyState,
     EmptyStateActionCard,
     OSearchInput,
@@ -412,6 +441,7 @@ export default defineComponent({
     const showAddUserDialog: any = ref(false);
     const confirmDelete = ref<boolean>(false);
     const confirmRevoke = ref<boolean>(false);
+    const leaver = useLeaverAlerts();
     const selectedUser: any = ref({});
     const orgData: any = ref(store.state.selectedOrganization);
     const isUpdated: any = ref(false);
@@ -1304,12 +1334,25 @@ export default defineComponent({
     const confirmDeleteAction = (row: any) => {
       confirmDelete.value = true;
       deleteUserEmail = row.email;
+      void leaver.load(store.state.selectedOrganization.identifier, row.email);
     };
 
     const deleteUser = async () => {
+      // Confirming before the lookup settles would skip the move the user is about to be offered.
+      if (leaver.loading.value) return;
       confirmDelete.value = false;
+      const org = store.state.selectedOrganization.identifier;
+      const email = deleteUserEmail;
+      const failedMoves = await leaver.moveIfChosen(org);
+      leaver.reset();
+      if (failedMoves) {
+        toast({
+          message: t("user.leaverMoveFailed", { count: failedMoves }, failedMoves),
+          variant: "warning",
+        });
+      }
       usersService
-        .delete(store.state.selectedOrganization.identifier, deleteUserEmail)
+        .delete(org, email)
         .then(async (res: any) => {
           if (res.data.code == 200) {
             toast({
@@ -1563,6 +1606,7 @@ export default defineComponent({
       forbidden,
       orgData,
       confirmDelete,
+      leaver,
       deleteUser,
       confirmDeleteAction,
       confirmRevoke,

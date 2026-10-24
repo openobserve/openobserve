@@ -72,7 +72,8 @@ export interface AlertPrefillAggregation {
   having: {
     column: string;
     operator: string;
-    value: number;
+    /** `null` leaves the limit for the user, so Save asks for one instead of guessing. */
+    value: number | null;
   };
 }
 
@@ -175,6 +176,14 @@ export interface AlertPrefill {
   /** Repeat-notification suppression, minutes. `0` is a real value (no silence). */
   silenceMinutes?: number;
   timezone?: string;
+  /** Hold before firing, minutes; applied only for intent-path sources. */
+  pendingPeriodMinutes?: number;
+  /** Stored as the alert's context attributes; applied only for intent-path sources. */
+  contextAttributes?: Record<string, string>;
+  /** The form lists the intent path's defaults in a "Suggested defaults" note. */
+  intentDefaults?: true;
+  /** Opens the form in anomaly mode; applied only for intent-path sources with anomaly detection on. */
+  alertType?: "anomaly";
 
   /** Populated when the surface had more than one stream to choose from. */
   streamCandidates?: AlertPrefillStreamCandidate[];

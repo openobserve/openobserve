@@ -325,6 +325,7 @@ const hasInsideLabel = computed(
       v-if="effectiveError && effectiveError.trim()"
       class="text-input-error-text text-xs leading-none"
       role="alert"
+      :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
     >
       {{ effectiveError }}
     </span>

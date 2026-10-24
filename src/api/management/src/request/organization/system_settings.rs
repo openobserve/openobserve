@@ -25,12 +25,19 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::meta::{
+    destinations::Destination,
     system_settings::{SettingScope, SystemSetting, SystemSettingPayload, SystemSettingQuery},
     user::UserRole,
 };
-use db::system_settings;
+use db::{alerts::destinations::DestinationError, system_settings};
 use openobserve_api_common::extractors::Headers;
-use openobserve_core::auth::UserEmail;
+use openobserve_core::{
+    alerts::notifications::org_default_destination::{
+        DEFAULT_ALERT_DESTINATION_CATEGORY, DEFAULT_ALERT_DESTINATION_KEY, is_alert_destination,
+        pointer_from_value,
+    },
+    auth::UserEmail,
+};
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
@@ -78,6 +85,79 @@ fn foreign_user_response() -> Response {
     MetaHttpResponse::forbidden(
         "Accessing settings of another user requires user administration permissions",
     )
+}
+
+fn is_default_destination_key(key: &str) -> bool {
+    key.trim()
+        .eq_ignore_ascii_case(DEFAULT_ALERT_DESTINATION_KEY)
+}
+
+/// Rejects a write or delete of the org default destination; `value` is `None` for a delete.
+async fn default_destination_guard(
+    org_id: &str,
+    caller: &str,
+    value: Option<&serde_json::Value>,
+) -> Option<Response> {
+    if !may_manage_default_destination(org_id, caller).await {
+        return Some(MetaHttpResponse::forbidden(
+            "Only an organization admin can change the default alert destination",
+        ));
+    }
+    let value = value?;
+    let Some(name) = pointer_from_value(value) else {
+        return Some(MetaHttpResponse::bad_request(
+            "default_alert_destination must look like {\"destination\": \"<name>\"}",
+        ));
+    };
+    default_destination_target_error(
+        &name,
+        openobserve_core::alerts::destinations::get(org_id, &name).await,
+    )
+}
+
+/// OSS has no per-key permissions, so only Root and the org's Admins may set it.
+#[cfg(not(feature = "enterprise"))]
+async fn may_manage_default_destination(org_id: &str, caller: &str) -> bool {
+    db::user::is_root_user(caller)
+        || matches!(
+            openobserve_core::users::get_user(Some(org_id), caller).await,
+            Some(user) if matches!(user.role, UserRole::Root | UserRole::Admin)
+        )
+}
+
+/// Enterprise already gates `/settings/v2` writes through the OpenFGA route mapping.
+#[cfg(feature = "enterprise")]
+async fn may_manage_default_destination(_org_id: &str, _caller: &str) -> bool {
+    true
+}
+
+fn default_destination_target_error(
+    name: &str,
+    found: Result<Destination, DestinationError>,
+) -> Option<Response> {
+    match found {
+        Ok(destination) if is_alert_destination(&destination) => None,
+        Ok(_) => Some(MetaHttpResponse::bad_request(format!(
+            "Destination '{name}' is a pipeline destination; the default must be an alert destination"
+        ))),
+        Err(DestinationError::NotFound) => Some(MetaHttpResponse::bad_request(format!(
+            "Destination '{name}' does not exist"
+        ))),
+        Err(e) => Some(MetaHttpResponse::internal_error(e)),
+    }
+}
+
+fn org_setting_from_payload(org_id: &str, payload: SystemSettingPayload) -> SystemSetting {
+    let mut setting = SystemSetting::new_org(org_id, &payload.setting_key, payload.setting_value);
+    if is_default_destination_key(&payload.setting_key) {
+        setting.setting_category = Some(DEFAULT_ALERT_DESTINATION_CATEGORY.to_string());
+    } else if let Some(cat) = payload.setting_category.as_deref() {
+        setting.setting_category = Some(cat.to_string());
+    }
+    if let Some(desc) = payload.description.as_deref() {
+        setting.description = Some(desc.to_string());
+    }
+    setting
 }
 
 /// Get a specific system setting with resolution (user -> org -> system)
@@ -200,19 +280,20 @@ pub async fn list_settings(
 )]
 pub async fn set_org_setting(
     Path(org_id): Path<String>,
+    Headers(user_email): Headers<UserEmail>,
     Json(payload): Json<SystemSettingPayload>,
 ) -> Response {
     if is_reserved_key(&payload.setting_key) {
         return reserved_key_response();
     }
-    let mut setting = SystemSetting::new_org(&org_id, &payload.setting_key, payload.setting_value);
-    if let Some(cat) = payload.setting_category.as_deref() {
-        setting.setting_category = Some(cat.to_string());
+    if is_default_destination_key(&payload.setting_key)
+        && let Some(rejected) =
+            default_destination_guard(&org_id, &user_email.user_id, Some(&payload.setting_value))
+                .await
+    {
+        return rejected;
     }
-    if let Some(desc) = payload.description.as_deref() {
-        setting.description = Some(desc.to_string());
-    }
-
+    let setting = org_setting_from_payload(&org_id, payload);
     match system_settings::set(&setting).await {
         Ok(result) => (StatusCode::OK, Json(result)).into_response(),
         Err(e) => MetaHttpResponse::bad_request(e.to_string().as_str()),
@@ -303,9 +384,17 @@ pub async fn set_user_setting(
         ("x-o2-mcp" = json!({"description": "Delete org system setting", "category": "system", "requires_confirmation": true}))
     )
 )]
-pub async fn delete_org_setting(Path((org_id, key)): Path<(String, String)>) -> Response {
+pub async fn delete_org_setting(
+    Path((org_id, key)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
     if is_reserved_key(&key) {
         return reserved_key_response();
+    }
+    if is_default_destination_key(&key)
+        && let Some(rejected) = default_destination_guard(&org_id, &user_email.user_id, None).await
+    {
+        return rejected;
     }
     match system_settings::delete(&SettingScope::Org, Some(&org_id), None, &key).await {
         Ok(true) => (StatusCode::OK, Json(serde_json::json!({"deleted": true}))).into_response(),
@@ -384,14 +473,14 @@ mod tests {
         let key = "prompt_settings/default".to_string();
         let org = "default".to_string();
         for response in [
-            set_org_setting(Path(org.clone()), payload()).await,
+            set_org_setting(Path(org.clone()), caller("u@x.com"), payload()).await,
             set_user_setting(
                 Path((org.clone(), "u@x.com".to_string())),
                 caller("u@x.com"),
                 payload(),
             )
             .await,
-            delete_org_setting(Path((org.clone(), key.clone()))).await,
+            delete_org_setting(Path((org.clone(), key.clone())), caller("u@x.com")).await,
             delete_user_setting(
                 Path((org.clone(), "u@x.com".to_string(), key.clone())),
                 caller("u@x.com"),
@@ -529,5 +618,149 @@ mod tests {
         )
         .await;
         assert_eq!(read.status(), StatusCode::OK);
+    }
+
+    fn seed_destination(org_id: &str, name: &str, module: config::meta::destinations::Module) {
+        common::infra::config::DESTINATIONS.insert(
+            format!("{org_id}/{name}"),
+            Destination {
+                id: None,
+                org_id: org_id.to_string(),
+                name: name.to_string(),
+                module,
+            },
+        );
+    }
+
+    fn alert_module() -> config::meta::destinations::Module {
+        config::meta::destinations::Module::Alert {
+            template: None,
+            destination_type: config::meta::destinations::DestinationType::Http(Default::default()),
+        }
+    }
+
+    fn pipeline_module() -> config::meta::destinations::Module {
+        config::meta::destinations::Module::Pipeline {
+            endpoint: Default::default(),
+        }
+    }
+
+    fn pointer(name: &str) -> serde_json::Value {
+        serde_json::json!({ "destination": name })
+    }
+
+    #[test]
+    fn only_the_default_destination_key_is_guarded() {
+        assert!(is_default_destination_key("default_alert_destination"));
+        assert!(is_default_destination_key(" Default_Alert_Destination"));
+        assert!(!is_default_destination_key("default_alert_template"));
+        assert!(!is_default_destination_key("favorite_dashboards"));
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn default_destination_rejects_a_non_admin() {
+        let org = "default-dest-guard-viewer-org";
+        let viewer = "viewer@default-dest-guard.test";
+        join(org, viewer, UserRole::Editor);
+        seed_destination(org, "ops-slack", alert_module());
+
+        let guard = default_destination_guard(org, viewer, Some(&pointer("ops-slack"))).await;
+        assert_eq!(guard.map(|r| r.status()), Some(StatusCode::FORBIDDEN));
+        let delete = default_destination_guard(org, viewer, None).await;
+        assert_eq!(delete.map(|r| r.status()), Some(StatusCode::FORBIDDEN));
+
+        let set = set_org_setting(
+            Path(org.to_string()),
+            caller(viewer),
+            Json(SystemSettingPayload {
+                setting_key: DEFAULT_ALERT_DESTINATION_KEY.to_string(),
+                setting_value: pointer("ops-slack"),
+                setting_category: None,
+                description: None,
+            }),
+        )
+        .await;
+        assert_eq!(set.status(), StatusCode::FORBIDDEN);
+        let del = delete_org_setting(
+            Path((org.to_string(), DEFAULT_ALERT_DESTINATION_KEY.to_string())),
+            caller(viewer),
+        )
+        .await;
+        assert_eq!(del.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn default_destination_accepts_an_admin_and_an_alert_destination() {
+        let org = "default-dest-guard-admin-org";
+        let admin = "admin@default-dest-guard.test";
+        join(org, admin, UserRole::Admin);
+        seed_destination(org, "ops-slack", alert_module());
+
+        assert!(
+            default_destination_guard(org, admin, Some(&pointer("ops-slack")))
+                .await
+                .is_none()
+        );
+        assert!(default_destination_guard(org, admin, None).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn default_destination_rejects_a_pipeline_destination() {
+        let org = "default-dest-guard-pipeline-org";
+        let admin = "admin@default-dest-guard-pipeline.test";
+        join(org, admin, UserRole::Admin);
+        seed_destination(org, "to-s3", pipeline_module());
+
+        let guard = default_destination_guard(org, admin, Some(&pointer("to-s3"))).await;
+        assert_eq!(guard.map(|r| r.status()), Some(StatusCode::BAD_REQUEST));
+    }
+
+    #[tokio::test]
+    async fn default_destination_rejects_a_value_without_a_name() {
+        let org = "default-dest-guard-shape-org";
+        let admin = "admin@default-dest-guard-shape.test";
+        join(org, admin, UserRole::Admin);
+
+        for value in [serde_json::json!({}), pointer(""), serde_json::json!("ops")] {
+            let guard = default_destination_guard(org, admin, Some(&value)).await;
+            assert_eq!(guard.map(|r| r.status()), Some(StatusCode::BAD_REQUEST));
+        }
+    }
+
+    #[test]
+    fn default_destination_is_always_stored_in_the_alerts_category() {
+        for category in [None, Some("dashboards".to_string())] {
+            let setting = org_setting_from_payload(
+                "default",
+                SystemSettingPayload {
+                    setting_key: DEFAULT_ALERT_DESTINATION_KEY.to_string(),
+                    setting_value: pointer("ops-slack"),
+                    setting_category: category,
+                    description: None,
+                },
+            );
+            assert_eq!(setting.setting_category.as_deref(), Some("alerts"));
+        }
+    }
+
+    #[test]
+    fn other_keys_keep_the_callers_category() {
+        let setting = org_setting_from_payload(
+            "default",
+            SystemSettingPayload {
+                setting_key: "favorite_dashboards".to_string(),
+                setting_value: serde_json::json!([]),
+                setting_category: None,
+                description: None,
+            },
+        );
+        assert_eq!(setting.setting_category, None);
+    }
+
+    #[test]
+    fn default_destination_rejects_an_unknown_destination() {
+        let missing = default_destination_target_error("gone", Err(DestinationError::NotFound));
+        assert_eq!(missing.map(|r| r.status()), Some(StatusCode::BAD_REQUEST));
     }
 }

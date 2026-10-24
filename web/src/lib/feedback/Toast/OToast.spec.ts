@@ -108,6 +108,26 @@ describe("OToast", () => {
     expect(handler).toHaveBeenCalledOnce();
   });
 
+  it("renders a second action beside the first and calls its own handler", async () => {
+    const undo = vi.fn();
+    const edit = vi.fn();
+    mountToast({
+      id: "1",
+      open: true,
+      message: "Alert added",
+      action: { label: "Undo", handler: undo },
+      secondaryAction: { label: "Edit", handler: edit },
+    });
+    await vueNextTick();
+    const btn = document.body.querySelector<HTMLButtonElement>(
+      '[data-test="o-toast-secondary-action-btn"]',
+    );
+    expect(btn!.textContent).toContain("Edit");
+    btn!.click();
+    expect(edit).toHaveBeenCalledOnce();
+    expect(undo).not.toHaveBeenCalled();
+  });
+
   it("emits openChange(false) when close button is clicked", async () => {
     const wrapper = mountToast({ id: "1", open: true, message: "Hello" });
     await vueNextTick();

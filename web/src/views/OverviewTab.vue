@@ -489,7 +489,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('overview.notMonitoredAlert')"
           :sublabel="t('overview.notMonitoredAlertDesc')"
           data-test="overview-not-monitored-alert-card"
-          @click="goToAddAlert"
+          @click="showStartSheet = true"
         />
         <EmptyStateActionCard
           v-if="showAlertsCard && anomalyEnabled"
@@ -617,6 +617,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       alert-type="anomaly_detection"
       data-test="overview-alert-history-drawer"
     />
+
+    <AlertStartSheet
+      v-if="showAlertsCard"
+      v-model:open="showStartSheet"
+      @choose="onStartChoose"
+      @blank="onStartBlank"
+      @import="onStartImport"
+    />
   </div>
 </template>
 
@@ -630,6 +638,8 @@ import { anomalyHistoryQuery } from "@/services/anomaly_detection.queries";
 import { orgSummaryQuery } from "@/services/organizations.queries";
 import { STREAM_PROBE_PAGE, streamPageQuery, streamProbeQuery } from "@/services/stream.queries";
 import { readFirstDataRecord } from "@/composables/firstEvent/useFirstDataNotice";
+import { useAlertCreation } from "@/composables/alerts/useAlertCreation";
+import type { AlertPrefill } from "@/ts/interfaces/alertPrefill";
 import { USER_DATA_STREAM_TYPES, userDataStreams } from "@/utils/internalStreams";
 import { ref, reactive, computed, defineAsyncComponent, onMounted, watch, nextTick } from "vue";
 
@@ -656,6 +666,9 @@ import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 
+const AlertStartSheet = defineAsyncComponent(
+  () => import("@/components/alerts/AlertStartSheet.vue"),
+);
 const AlertHistoryDrawer = defineAsyncComponent(
   () => import("@/components/alerts/AlertHistoryDrawer.vue"),
 );
@@ -1362,6 +1375,24 @@ const goToAlertList = () => {
 
 const goToAddAlert = () => {
   router.push({ name: "addAlert", query: { org_identifier: orgId.value } });
+};
+
+const showStartSheet = ref(false);
+const { openAlertCreation } = useAlertCreation();
+
+const onStartChoose = (prefill: AlertPrefill) => {
+  showStartSheet.value = false;
+  openAlertCreation(prefill);
+};
+
+const onStartBlank = () => {
+  showStartSheet.value = false;
+  goToAddAlert();
+};
+
+const onStartImport = () => {
+  showStartSheet.value = false;
+  router.push({ name: "alertList", query: { org_identifier: orgId.value, action: "import" } });
 };
 
 const goToIncidentList = () => {

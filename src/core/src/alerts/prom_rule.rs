@@ -26,6 +26,15 @@ use config::{
     utils::json::{Map, Value},
 };
 
+/// Distinguishes "stream exists" from "confirmed absent" so a lookup error stays an error.
+pub(super) enum RuleStream {
+    Existing(String),
+    /// Every referenced metric was looked up and none exists yet.
+    Absent {
+        first: String,
+    },
+}
+
 pub(super) async fn evaluate(
     condition: &QueryCondition,
     org: &str,
@@ -66,18 +75,19 @@ pub(super) async fn evaluate(
     )
 }
 
-pub(super) async fn infer_stream(org: &str, query: &QueryCondition) -> anyhow::Result<String> {
+pub(super) async fn infer_stream(org: &str, query: &QueryCondition) -> anyhow::Result<RuleStream> {
     let names = referenced_streams(query.promql.as_deref().unwrap_or_default())?;
-    for name in names {
+    for name in &names {
         let schema =
-            infra::schema::get(org, &name, config::meta::stream::StreamType::Metrics).await?;
+            infra::schema::get(org, name, config::meta::stream::StreamType::Metrics).await?;
         if !schema.fields().is_empty() {
-            return Ok(name);
+            return Ok(RuleStream::Existing(name.clone()));
         }
     }
-    Err(anyhow::anyhow!(
-        "expression has no referenced existing metrics stream; supply stream_name"
-    ))
+    let Some(first) = names.into_iter().next() else {
+        anyhow::bail!("expression has no referenced existing metrics stream; supply stream_name");
+    };
+    Ok(RuleStream::Absent { first })
 }
 
 fn complete_rule_result(
@@ -387,9 +397,15 @@ mod tests {
             promql: Some("z + a".into()),
             ..Default::default()
         };
-        assert_eq!(infer_stream(org, &query).await.unwrap(), "z");
+        assert!(matches!(
+            infer_stream(org, &query).await.unwrap(),
+            RuleStream::Existing(name) if name == "z"
+        ));
         query.promql = Some("a".into());
-        assert!(infer_stream(org, &query).await.is_err());
+        assert!(matches!(
+            infer_stream(org, &query).await.unwrap(),
+            RuleStream::Absent { first } if first == "a"
+        ));
         query.promql = Some("vector(1)".into());
         assert!(infer_stream(org, &query).await.is_err());
         let mut cache = STREAM_SCHEMAS_LATEST.write().await;

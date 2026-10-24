@@ -37,7 +37,7 @@ use datafusion::{
 use hashbrown::HashSet;
 pub use metrics_index::{matcher_predicates, matcher_residual_field};
 use promql_parser::{
-    label::{MatchOp, Matchers},
+    label::{MatchOp, Matcher, Matchers},
     parser::{Offset, VectorSelector},
 };
 
@@ -62,12 +62,27 @@ pub fn metric_name(selector: &VectorSelector) -> Option<String> {
 }
 
 pub fn apply_matchers(df: DataFrame, matchers: &Matchers) -> Result<DataFrame> {
-    let predicates = matcher_predicates(df.schema().as_arrow(), matchers);
+    let schema = df.schema().as_arrow();
+    if matchers
+        .matchers
+        .iter()
+        .any(|mat| absent_label_rejects(schema, mat))
+    {
+        return df.filter(lit(false));
+    }
+    let predicates = matcher_predicates(schema, matchers);
     let mut df = df;
     for predicate in predicates {
         df = df.filter(predicate)?;
     }
     Ok(df)
+}
+
+/// Whether `matcher` rejects a series lacking its label, which PromQL reads as the empty value.
+pub fn absent_label_rejects(schema: &Schema, matcher: &Matcher) -> bool {
+    ![TIMESTAMP_COL_NAME, VALUE_LABEL, NAME_LABEL].contains(&matcher.name.as_str())
+        && schema.field_with_name(&matcher.name).is_err()
+        && !matcher.is_match("")
 }
 
 pub fn apply_label_selector(
@@ -421,17 +436,33 @@ mod tests {
         assert!(result.is_some());
     }
 
-    #[test]
-    fn test_apply_matchers_unknown_field_is_skipped() {
-        let (df, _) = make_df();
-        use promql_parser::label::{MatchOp, Matcher};
-        let matchers = Matchers::new(vec![Matcher {
-            op: MatchOp::Equal,
-            name: "unknown_col".to_string(),
-            value: "x".to_string(),
-        }]);
-        let result = apply_matchers(df, &matchers);
-        assert!(result.is_ok());
+    #[tokio::test]
+    async fn test_apply_matchers_absent_label_matches_as_empty_string() {
+        for (query, rows) in [
+            (r#"m{job="x"}"#, 0),
+            (r#"m{job=""}"#, 3),
+            (r#"m{job!="x"}"#, 3),
+            (r#"m{job!=""}"#, 0),
+            (r#"m{job=~"x.*"}"#, 0),
+            (r#"m{job=~".*"}"#, 3),
+            (r#"m{job=~"x|"}"#, 3),
+            (r#"m{job!~".*"}"#, 0),
+            (r#"m{job!~"x.*"}"#, 3),
+            (r#"m{service="api",job="x"}"#, 0),
+            (r#"m{service="api",job!="x"}"#, 1),
+        ] {
+            let (df, _) = make_string_df();
+            let batches = apply_matchers(df, &parsed_matchers(query))
+                .unwrap()
+                .collect()
+                .await
+                .unwrap();
+            assert_eq!(
+                batches.iter().map(|batch| batch.num_rows()).sum::<usize>(),
+                rows,
+                "{query}"
+            );
+        }
     }
 
     #[test]

@@ -26,8 +26,11 @@
 import {
   ALERT_PREFILL_VERSION,
   type AlertPrefill,
+  type AlertPrefillConditionGroup,
   type AlertPrefillWarning,
 } from "@/ts/interfaces/alertPrefill";
+import { getUUID } from "@/utils/uuid";
+import { isUnaryOperator } from "../conditionsFormatter";
 import {
   firstAggregateAlias,
   hasHistogramBucketing,
@@ -57,6 +60,16 @@ export interface LogsPrefillInput {
   hasResults?: boolean;
   /** The filter was held, so `resolvedSql` reads the stream without it. */
   heldFilterDropped?: boolean;
+  /** parseWhereClauseToFilterChecked(rawQuery), run by the caller because parsing is async. */
+  parsedFilter?: LogsParsedFilter | null;
+  /** zoConfig.timestamp_column, projected in place of a leading `SELECT *`. */
+  timestampColumn?: string;
+}
+
+/** The logs query builder's filter tree, as parseWhereClauseToFilterChecked returns it. */
+export interface LogsParsedFilter {
+  filter: { filterType: string; logicalOperator: string; conditions: any[] };
+  complete: boolean;
 }
 
 /**
@@ -71,6 +84,7 @@ export const logsAlertSnapshot = (
   resolvedSql: string,
   timezone?: string,
   heldFilterDropped?: boolean,
+  extra: Pick<LogsPrefillInput, "parsedFilter" | "timestampColumn"> = {},
 ): LogsPrefillInput => ({
   streamNames: searchObj?.data?.stream?.selectedStream ?? [],
   streamType: searchObj?.data?.stream?.streamType ?? "logs",
@@ -90,7 +104,70 @@ export const logsAlertSnapshot = (
   timezone,
   hasResults: (searchObj?.data?.queryResults?.hits?.length ?? 0) > 0,
   ...(heldFilterDropped ? { heldFilterDropped } : {}),
+  ...(extra.parsedFilter ? { parsedFilter: extra.parsedFilter } : {}),
+  ...(extra.timestampColumn ? { timestampColumn: extra.timestampColumn } : {}),
 });
+
+/** Logs-builder operator spellings mapped onto the alert form's; anything absent has no builder row. */
+const BUILDER_OPERATORS: Record<string, string> = {
+  "=": "=",
+  "!=": "!=",
+  "<>": "!=",
+  "<": "<",
+  ">": ">",
+  "<=": "<=",
+  ">=": ">=",
+  Contains: "Contains",
+  "Not Contains": "NotContains",
+  "Is Null": "is_null",
+  "Is Not Null": "is_not_null",
+};
+
+const logicalOf = (node: any): "AND" | "OR" => (node?.logicalOperator === "OR" ? "OR" : "AND");
+
+/** One leaf of the logs filter as an alert condition, or null when the builder cannot hold it. */
+const toAlertCondition = (node: any): Record<string, unknown> | null => {
+  const operator = BUILDER_OPERATORS[node?.operator];
+  const column = node?.column?.field;
+  if (node?.type !== "condition" || !operator || !column || node?.column?.streamAlias) return null;
+  return {
+    filterType: "condition",
+    column,
+    operator,
+    value: isUnaryOperator(operator) ? "" : String(node.value ?? ""),
+    logicalOperator: logicalOf(node),
+    ignore_case: false,
+    id: getUUID(),
+  };
+};
+
+/** The whole logs filter tree as alert conditions, or null if any leaf cannot convert. */
+const toAlertConditions = (node: any): AlertPrefillConditionGroup | null => {
+  const conditions: any[] = [];
+  for (const child of node?.conditions ?? []) {
+    const converted =
+      child?.filterType === "group" ? toAlertConditions(child) : toAlertCondition(child);
+    if (!converted) return null;
+    conditions.push(converted);
+  }
+  return {
+    filterType: "group",
+    logicalOperator: logicalOf(node),
+    groupId: getUUID(),
+    conditions,
+  };
+};
+
+/** Builder conditions for a filter-mode search, or null when it must stay SQL. */
+const builderConditions = (input: LogsPrefillInput): AlertPrefillConditionGroup | null => {
+  if (input.sqlMode || input.heldFilterDropped) return null;
+  if (!(input.rawQuery ?? "").trim()) return toAlertConditions({ conditions: [] });
+  if (!input.parsedFilter?.complete) return null;
+  return toAlertConditions(input.parsedFilter.filter);
+};
+
+// Save validation (frontend and backend) refuses `SELECT *`.
+const LEADING_SELECT_STAR = /^(\s*select\s+)\*(?=\s|,)/i;
 
 /** Count the streams a SQL statement reads, to spot joins we can't represent. */
 const readsMultipleStreams = (sql: string): boolean => {
@@ -117,17 +194,25 @@ export const buildPrefillFromLogs = (input: LogsPrefillInput): AlertPrefill => {
     warnings.push(warn("noStream", "blocking"));
   }
 
+  const conditions = builderConditions(input);
+
   // In SQL mode the editor content IS the query. Otherwise it is a WHERE
   // fragment, and only the resolved payload is a runnable statement — say so,
   // because the alert's query will not look like what the user typed.
-  let sql = input.sqlMode ? input.rawQuery : input.resolvedSql;
+  let sql = conditions ? "" : input.sqlMode ? input.rawQuery : input.resolvedSql;
   if (input.heldFilterDropped) {
     warnings.push(warn("heldFilterDropped", "warning"));
-  } else if (!input.sqlMode && (input.rawQuery ?? "").trim()) {
+  } else if (!conditions && !input.sqlMode && (input.rawQuery ?? "").trim()) {
     warnings.push(warn("convertedToSql", "info"));
   }
 
   sql = (sql ?? "").trim();
+
+  if (LEADING_SELECT_STAR.test(sql)) {
+    const column = input.timestampColumn || "_timestamp";
+    sql = sql.replace(LEADING_SELECT_STAR, `$1${column}`);
+    warnings.push(warn("selectStarReplaced", "info", { column }));
+  }
 
   // Time bucketing produces one row per bucket; an alert evaluates a single
   // window, so the row count would be the bucket count and the threshold
@@ -174,8 +259,9 @@ export const buildPrefillFromLogs = (input: LogsPrefillInput): AlertPrefill => {
     streamType: input.streamType || "logs",
     streamName,
     streamCandidates: streams.map((name) => ({ name, type: input.streamType || "logs" })),
-    queryType: "sql",
-    sql,
+    ...(conditions
+      ? { queryType: "custom" as const, conditions }
+      : { queryType: "sql" as const, sql }),
     vrlFunction: vrl,
     periodMinutes: minutes,
     timezone: input.timezone,

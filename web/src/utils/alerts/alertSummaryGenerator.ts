@@ -18,6 +18,13 @@ import { hasDeliveryTarget } from "./deliveryTarget";
  */
 type SummaryTranslate = (key: string, named?: Record<string, unknown>, plural?: number) => string;
 
+/** An aggregate rule's limit: what is measured, compared how, against what. */
+interface AggregateLimit {
+  measure: string;
+  operator: string;
+  threshold: unknown;
+}
+
 export interface SummarySegment {
   text: string;
   fieldId?: string; // Optional field ID for clickable segments
@@ -33,6 +40,7 @@ export interface SummarySegment {
  * @param wizardStep - Deprecated; unused.
  * @param previewQuery - The formatted preview query string
  * @param generatedSqlQuery - The generated SQL query for custom conditions (computed property)
+ * @param isAggregationEnabled - Whether the Builder rule aggregates; formData keeps a stale aggregation when it doesn't
  */
 export function generateAlertSummary(
   formData: any,
@@ -41,6 +49,7 @@ export function generateAlertSummary(
   _wizardStep: number = 6,
   previewQuery: string = "",
   generatedSqlQuery: string = "",
+  isAggregationEnabled: boolean = false,
 ): string {
   // Generate summary based on available data
   if (!formData) {
@@ -62,6 +71,7 @@ export function generateAlertSummary(
   const parts: string[] = [];
   const isRealTime = formData.is_real_time === "true" || formData.is_real_time === true;
   const forecast = formData._ui?.forecast ?? null;
+  const aggregate = isAggregationEnabled ? aggregateLimit(formData, translate) : null;
 
   // Escape user-controlled strings before embedding in HTML (XSS prevention)
   const esc = (s: string) =>
@@ -172,7 +182,16 @@ export function generateAlertSummary(
     }
 
     // Trigger condition (only for scheduled alerts - real-time doesn't use threshold)
-    if (
+    if (aggregate) {
+      const trigger = translate("alerts.summary.aggregateTrigger", {
+        measure: aggregate.measure,
+        threshold: aggregate.threshold,
+        operator: getOperatorSymbol(aggregate.operator, translate),
+      });
+      parts.push(
+        `✓ ${translate("alerts.summary.triggersWhen")}: ${clickable(trigger, "threshold")}`,
+      );
+    } else if (
       formData.query_condition &&
       formData.trigger_condition?.operator &&
       formData.trigger_condition?.threshold !== undefined
@@ -231,7 +250,13 @@ export function generateAlertSummary(
   const bulletPoints = parts.join("\n");
 
   // Add plain English summary first (show from step 1 onwards for better UX)
-  const plainEnglish = generatePlainEnglishSummary(formData, destinations, isRealTime, translate);
+  const plainEnglish = generatePlainEnglishSummary(
+    formData,
+    destinations,
+    isRealTime,
+    translate,
+    aggregate,
+  );
   if (plainEnglish) {
     // Return plain English first, then bullet points (with single line break for tighter spacing)
     return `<div class="plain-english-section">"${esc(plainEnglish)}"</div>\n${bulletPoints}`;
@@ -256,6 +281,65 @@ function getOperatorSymbol(operator: string, t: SummaryTranslate): string {
   };
 
   return operatorMap[operator] || operator;
+}
+
+/** The aggregate rule's measure and limit, or null until function, column and value are all set. */
+function aggregateLimit(formData: any, t: SummaryTranslate): AggregateLimit | null {
+  if (formData.query_condition?.type !== "custom") return null;
+  const aggregation = formData.query_condition?.aggregation;
+  const fn = aggregation?.function;
+  const column = aggregation?.having?.column;
+  const threshold = aggregation?.having?.value;
+  if (!fn || !column || threshold === undefined || threshold === null || threshold === "") {
+    return null;
+  }
+  return {
+    measure: measureText(fn, column, t),
+    operator: aggregation.having.operator || ">=",
+    threshold,
+  };
+}
+
+/** "the average of value", one message per function so each language words it whole. */
+function measureText(fn: string, column: string, t: SummaryTranslate): string {
+  const named: Record<string, string> = {
+    avg: "alerts.summary.measure.avg",
+    sum: "alerts.summary.measure.sum",
+    min: "alerts.summary.measure.min",
+    max: "alerts.summary.measure.max",
+    count: "alerts.summary.measure.count",
+    median: "alerts.summary.measure.median",
+  };
+  if (named[fn]) return t(named[fn], { column });
+  if (/^p\d+$/.test(fn)) return t("alerts.summary.measure.percentile", { fn, column });
+  return t("alerts.summary.measure.other", { fn, column });
+}
+
+/** "Alert me when the average of value is 250 or more over 10 minutes". */
+function aggregateSentence(limit: AggregateLimit, period: number, t: SummaryTranslate): string {
+  const conditionKeys: Record<string, string> = {
+    ">=": "alerts.summary.plainEnglish.aggregateAtLeast",
+    ">": "alerts.summary.plainEnglish.aggregateMoreThan",
+    "<=": "alerts.summary.plainEnglish.aggregateOrLess",
+    "<": "alerts.summary.plainEnglish.aggregateLessThan",
+    "=": "alerts.summary.plainEnglish.aggregateExactly",
+    "!=": "alerts.summary.plainEnglish.aggregateNot",
+  };
+  const { measure, operator, threshold } = limit;
+  const condition = t(conditionKeys[operator] ?? "alerts.summary.plainEnglish.aggregateOther", {
+    measure,
+    threshold,
+    operator,
+  });
+  const inMinutes = period < 60 || period % 60 !== 0;
+  const count = inMinutes ? period : period / 60;
+  return t(
+    inMinutes
+      ? "alerts.summary.plainEnglish.alertMeWhenAggregateMinutes"
+      : "alerts.summary.plainEnglish.alertMeWhenAggregateHours",
+    { condition, count },
+    count === 1 ? 1 : 2,
+  );
 }
 
 /**
@@ -406,6 +490,7 @@ function generatePlainEnglishSummary(
   destinations: any[],
   isRealTime: boolean,
   t: SummaryTranslate,
+  aggregate: AggregateLimit | null = null,
 ): string {
   if (!formData || !formData.stream_name) return "";
 
@@ -447,8 +532,10 @@ function generatePlainEnglishSummary(
       // The window is part of the sentence rather than a fragment glued into it:
       // "10-minute" is an English compound, so minutes and hours get a message each.
       const inMinutes = period < 60;
+      const aggregateText = aggregate ? aggregateSentence(aggregate, period, t) : "";
       parts.push(
         forecastSentence ||
+          aggregateText ||
           t(
             inMinutes
               ? "alerts.summary.plainEnglish.alertMeWhenMinutes"

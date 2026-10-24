@@ -22,6 +22,12 @@ import type {
   CompositeTimelineResponse,
 } from "@/ts/interfaces/alert";
 
+/** The funnel's "saved" and "destination attached" steps; source names the path that produced the alert. */
+const trackAlertCreated = (data: any, source: string) => {
+  analytics.track("alert_created", { source });
+  if (data?.destinations?.length) analytics.track("alert_destination_attached", { source });
+};
+
 const alerts = {
   list: (
     page_num: number,
@@ -64,11 +70,21 @@ const alerts = {
     }
     return http().get(url);
   },
-  create: (org_identifier: string, stream_name: string, stream_type: string, data: any) => {
+  /** One alert of any type from any folder, enough to tell whether the org has none. */
+  listOrgSample: (org_identifier: string) => {
+    return http().get(`/api/v2/${org_identifier}/alerts?page_size=1`);
+  },
+  create: (
+    org_identifier: string,
+    stream_name: string,
+    stream_type: string,
+    data: any,
+    source = "blank",
+  ) => {
     return http()
       .post(`/api/${org_identifier}/${stream_name}/alerts?type=${stream_type}`, data)
       .then((res) => {
-        analytics.track("alert_created");
+        trackAlertCreated(data, source);
         return res;
       });
   },
@@ -116,7 +132,7 @@ const alerts = {
     )}/preview?type=${stream_type}`;
     return http().get(url);
   },
-  create_by_alert_id: (org_identifier: string, data: any, folder_id?: any) => {
+  create_by_alert_id: (org_identifier: string, data: any, folder_id?: any, source = "blank") => {
     let url = `/api/v2/${org_identifier}/alerts`;
     if (folder_id) {
       url += `?folder=${folder_id}`;
@@ -124,7 +140,7 @@ const alerts = {
     return http()
       .post(url, data)
       .then((res) => {
-        analytics.track("alert_created");
+        trackAlertCreated(data, source);
         return res;
       });
   },
@@ -220,6 +236,13 @@ const alerts = {
   list_by_slo: (org_identifier: string, slo_id: string) => {
     return http().get(
       `/api/v2/${org_identifier}/alerts?slo_id=${encodeURIComponent(slo_id)}&alert_type=slo`,
+    );
+  },
+  /** Alerts whose every email destination lists only this user and that have no other route. */
+  list_by_sole_recipient: (org_identifier: string, email: string) => {
+    return http().get(
+      `/api/v2/${org_identifier}/alerts?sole_recipient=${encodeURIComponent(email)}`,
+      { skipAccessToast: true },
     );
   },
   get_by_alert_id: (org_identifier: string, alert_id: string, folder_id?: any) => {
@@ -336,7 +359,7 @@ const alerts = {
     return http()
       .post(url, data)
       .then((res) => {
-        analytics.track("alert_created");
+        analytics.track("alert_created", { source: "clone" });
         return res;
       });
   },

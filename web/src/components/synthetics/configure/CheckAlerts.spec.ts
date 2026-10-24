@@ -72,11 +72,26 @@ const OButtonStub = {
   template: '<button v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
 };
 
+const ODrawerStub = {
+  name: "ODrawer",
+  props: ["open"],
+  template: '<div v-if="open" data-test="drawer-stub"><slot /></div>',
+};
+
+const AddDestinationStub = {
+  name: "AddDestination",
+  props: { drawer: Boolean },
+  emits: ["created", "cancel:hideform"],
+  template: '<div data-test="add-destination-stub" />',
+};
+
 const STUBS = {
   OInput: OInputStub,
   OSelect: OSelectStub,
   OIcon: OIconStub,
   OButton: OButtonStub,
+  ODrawer: ODrawerStub,
+  AddDestination: AddDestinationStub,
 };
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
@@ -94,6 +109,10 @@ vi.mock("vue-router", () => ({
   useRouter: vi.fn(() => ({
     resolve: mockResolve,
   })),
+}));
+
+vi.mock("@/services/alert_templates", () => ({
+  default: { list: vi.fn().mockResolvedValue({ data: [] }) },
 }));
 
 vi.mock("vuex", () => ({
@@ -253,7 +272,7 @@ describe("CheckAlerts", () => {
       vi.unstubAllGlobals();
     });
 
-    it("should call window.open with the correct URL when clicked", async () => {
+    it("opens the destination form in a drawer instead of a new tab", async () => {
       wrapper = mountCheckAlerts(mockMonitorHttp, ["dest-1"]);
 
       const addBtn = wrapper.find('[data-test="create-destination-btn"]');
@@ -261,25 +280,20 @@ describe("CheckAlerts", () => {
 
       await addBtn.trigger("click");
 
-      expect(mockWindowOpen).toHaveBeenCalledWith(
-        "/alerts/destinations?action=add&org_identifier=default",
-        "_blank",
-      );
+      expect(wrapper.findComponent(AddDestinationStub).props("drawer")).toBe(true);
+      expect(mockWindowOpen).not.toHaveBeenCalled();
     });
 
-    it("should call router.resolve with the correct arguments", async () => {
-      wrapper = mountCheckAlerts(mockMonitorHttp, ["dest-1"]);
+    it("selects the destination created in the drawer", async () => {
+      wrapper = mountCheckAlerts({ notifications: { destinations: ["dest-1"] } }, ["dest-1"]);
 
-      const addBtn = wrapper.find('[data-test="create-destination-btn"]');
-      await addBtn.trigger("click");
+      await wrapper.find('[data-test="create-destination-btn"]').trigger("click");
+      wrapper.findComponent(AddDestinationStub).vm.$emit("created", "new-dest");
+      await wrapper.vm.$nextTick();
 
-      expect(mockResolve).toHaveBeenCalledWith({
-        name: "alertDestinations",
-        query: {
-          action: "add",
-          org_identifier: "default",
-        },
-      });
+      const emitted = wrapper.emitted("update:check") ?? [];
+      const last = emitted[emitted.length - 1]?.[0] as BrowserCheck;
+      expect(last.notifications.destinations).toEqual(["dest-1", "new-dest"]);
     });
   });
 

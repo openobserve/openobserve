@@ -70,15 +70,60 @@ vi.mock("@/components/common/AppTabs.vue", () => ({
   },
 }));
 
-// Mock FilterGroup component
-vi.mock("@/components/alerts/FilterGroup.vue", () => ({
-  default: {
-    name: "FilterGroup",
-    template: "<div data-test='mock-filter-group'></div>",
-    props: ["streamFields", "streamFieldsMap", "showSqlPreview", "sqlQuery", "group", "depth"],
-    emits: ["add-condition", "add-group", "remove-group", "input:update"],
-  },
+// Mock FilterGroup component; it exposes the injected value suggester the real rows read.
+vi.mock("@/components/alerts/FilterGroup.vue", async () => {
+  const { inject } = await vi.importActual<typeof import("vue")>("vue");
+  const { CONDITION_VALUE_SUGGEST_KEY } = await vi.importActual<
+    typeof import("@/components/alerts/conditionOperators")
+  >("@/components/alerts/conditionOperators");
+  return {
+    default: {
+      name: "FilterGroup",
+      template: "<div data-test='mock-filter-group'></div>",
+      props: ["streamFields", "streamFieldsMap", "showSqlPreview", "sqlQuery", "group", "depth"],
+      emits: ["add-condition", "add-group", "remove-group", "input:update"],
+      setup: () => ({ valueSuggest: inject(CONDITION_VALUE_SUGGEST_KEY, null) }),
+    },
+  };
+});
+
+const { valueSuggestSpy, alertValueSuggest, chipValues } = vi.hoisted(() => {
+  // Values the mocked provider offers per column, read when a row (or the chip row) asks.
+  const chipValues: Record<string, string[]> = {};
+  const alertValueSuggest = (column?: () => string) => ({
+    options: {
+      get value() {
+        return (chipValues[column?.() ?? ""] ?? []).map((v) => ({ label: v, value: v }));
+      },
+    },
+    hint: { value: undefined },
+  });
+  return { alertValueSuggest, chipValues, valueSuggestSpy: vi.fn(() => alertValueSuggest) };
+});
+vi.mock("@/composables/alerts/useAlertValueSuggest", () => ({
+  useAlertValueSuggest: valueSuggestSpy,
 }));
+
+// Controllable suggestion state; the composable's own behaviour is covered by its spec.
+const suggestionMock = vi.hoisted(() => ({ rule: null as any, state: null as any }));
+vi.mock("@/composables/alerts/useThresholdSuggestion", async () => {
+  const { ref: vueRef } = await vi.importActual<typeof import("vue")>("vue");
+  suggestionMock.state = {
+    suggested: vueRef(null),
+    usualHigh: vueRef(null),
+    truncatedDays: vueRef(null),
+    history: vueRef(null),
+    backtest: vueRef(null),
+    loading: vueRef(false),
+    error: vueRef(false),
+  };
+  return {
+    useThresholdSuggestion: vi.fn((rule: () => any) => {
+      suggestionMock.rule = rule;
+      return suggestionMock.state;
+    }),
+  };
+});
 
 // Mock QueryEditorDialog component
 vi.mock("@/components/alerts/QueryEditorDialog.vue", () => ({
@@ -2446,6 +2491,242 @@ describe("QueryConfig.vue", () => {
   // active, so such a test passes with the bug still present. The only honest probe
   // is to drive a real VALUE context and require Value-kind items to reach the editor.
 
+  describe("filter value suggestions", () => {
+    it("hands the condition rows a suggester scoped to the form's stream", () => {
+      const [org, streamType, streamName] = valueSuggestSpy.mock.calls.at(-1) as any[];
+      expect([org.value, streamType.value, streamName.value]).toEqual([
+        "test-org",
+        "logs",
+        "test-stream",
+      ]);
+      const group = wrapper.findComponent({ name: "FilterGroup" });
+      expect((group.vm as any).valueSuggest).toBe(alertValueSuggest);
+    });
+
+    it("follows a stream change", async () => {
+      await setQCProps({ streamName: "other-stream", streamType: "traces" });
+      const [, streamType, streamName] = valueSuggestSpy.mock.calls.at(-1) as any[];
+      expect([streamType.value, streamName.value]).toEqual(["traces", "other-stream"]);
+    });
+  });
+
+  describe("Add filter button", () => {
+    const addButton = () => wrapper.find('[data-test="alert-add-filter-btn"]');
+    const chip = () => wrapper.find(".filters-inline-toggle");
+
+    const withRow = () => {
+      mockInputData.conditions = {
+        filterType: "group",
+        logicalOperator: "AND",
+        groupId: "root",
+        conditions: [
+          {
+            filterType: "condition",
+            column: "field1",
+            operator: "=",
+            value: "x",
+            values: [],
+            logicalOperator: "AND",
+            id: "r1",
+          },
+        ],
+      };
+    };
+
+    it("adds an empty row after the existing ones", async () => {
+      host.unmount();
+      withRow();
+      host = mountHost().h;
+      wrapper = host.findComponent(QueryConfig) as unknown as VueWrapper<any>;
+
+      await addButton().trigger("click");
+
+      const [tree] = wrapper.emitted("update-group")!.at(-1) as any[];
+      expect(tree.groupId).toBe("root");
+      expect(tree.conditions).toHaveLength(2);
+      expect(tree.conditions[0].id).toBe("r1");
+      expect(tree.conditions[1]).toMatchObject({
+        filterType: "condition",
+        column: "",
+        operator: "=",
+        value: "",
+        logicalOperator: "AND",
+      });
+      expect(mockInputData.conditions.conditions).toHaveLength(1);
+    });
+
+    it("opens the collapsed builder", async () => {
+      await chip().trigger("click");
+      expect(wrapper.vm.showFilters).toBe(false);
+
+      await addButton().trigger("click");
+
+      expect(wrapper.vm.showFilters).toBe(true);
+      expect(wrapper.emitted("update-group")).toHaveLength(1);
+    });
+
+    it("leaves the chip as the collapse toggle", async () => {
+      await chip().trigger("click");
+      expect(wrapper.vm.showFilters).toBe(false);
+      expect(wrapper.emitted("update-group")).toBeFalsy();
+      await chip().trigger("click");
+      expect(wrapper.vm.showFilters).toBe(true);
+    });
+
+    it("is offered on a realtime alert too", async () => {
+      await setQCProps({ isRealTime: "true" });
+      await chip().trigger("click");
+
+      await addButton().trigger("click");
+
+      expect(wrapper.vm.showFilters).toBe(true);
+      expect(wrapper.emitted("update-group")).toHaveLength(1);
+    });
+  });
+
+  describe("Intent value chips and the U4 note", () => {
+    const serviceColumns = [
+      { label: "service", value: "service", type: "Utf8" },
+      { label: "body", value: "body", type: "Utf8" },
+    ];
+    const chipRow = () => host.find('[data-test="alert-intent-value-chips"]');
+    const chips = () => host.findAll('[data-test="alert-intent-value-chip"]');
+    const useButton = () => host.find('[data-test="alert-threshold-use-suggested"]');
+    const updatedNote = () => host.find('[data-test="alert-threshold-updated"]');
+    const offer = (suggested: number | null) => {
+      suggestionMock.state.suggested.value = suggested;
+      suggestionMock.state.history.value = "ok";
+      suggestionMock.state.loading.value = false;
+      suggestionMock.state.error.value = false;
+    };
+    const remount = (qc: Record<string, any> = {}) => {
+      host.unmount();
+      host = mountHost({ columns: serviceColumns, intentId: "errors_increase", ...qc }).h;
+      wrapper = host.findComponent(QueryConfig) as unknown as VueWrapper<any>;
+    };
+
+    beforeEach(async () => {
+      chipValues.service = ["payments", "checkout", "catalog", "frontend", "cart", "search"];
+      offer(null);
+      remount();
+      await flushPromises();
+    });
+
+    afterEach(() => {
+      delete chipValues.service;
+      offer(null);
+    });
+
+    it("offers values of the first low-cardinality field on an intent-started rule", () => {
+      expect(chipRow().text()).toContain("Add a service filter:");
+      expect(chips().map((c) => c.text())).toEqual([
+        "payments",
+        "checkout",
+        "catalog",
+        "frontend",
+        "cart",
+      ]);
+      expect(chips()[0].attributes("aria-label")).toBe("Add filter service = payments");
+    });
+
+    it.each([
+      ["the blank form", { intentId: "" }],
+      ["edit", { beingUpdated: true }],
+      ["an intent without chips", { intentId: "data_stops_arriving" }],
+      ["a stream with no such field", { columns: [{ label: "body", value: "body" }] }],
+    ])("is absent on %s", async (_label, qc) => {
+      remount(qc);
+      await flushPromises();
+      expect(chipRow().exists()).toBe(false);
+    });
+
+    it("adds an AND condition on the field when a chip is clicked", async () => {
+      await chips()[0].trigger("click");
+
+      const [tree] = wrapper.emitted("update-group")!.at(-1) as any[];
+      expect(tree.logicalOperator).toBe("AND");
+      expect(tree.conditions.at(-1)).toMatchObject({
+        filterType: "condition",
+        column: "service",
+        operator: "=",
+        value: "payments",
+        logicalOperator: "AND",
+      });
+    });
+
+    it("keeps an OR filter intact by ANDing the chip beside it", async () => {
+      mockInputData.conditions = {
+        filterType: "group",
+        logicalOperator: "OR",
+        groupId: "root",
+        conditions: [
+          { filterType: "condition", column: "body", operator: "Contains", value: "a", id: "a" },
+          { filterType: "condition", column: "body", operator: "Contains", value: "b", id: "b" },
+        ],
+      };
+      remount();
+      await flushPromises();
+      await chips()[1].trigger("click");
+
+      const [tree] = wrapper.emitted("update-group")!.at(-1) as any[];
+      expect(tree.logicalOperator).toBe("AND");
+      expect(tree.conditions).toHaveLength(2);
+      expect(tree.conditions[0]).toMatchObject({ logicalOperator: "OR", groupId: "root" });
+      expect(tree.conditions[1]).toMatchObject({ column: "service", value: "checkout" });
+    });
+
+    it("hides the row once the field is filtered", async () => {
+      mockInputData.conditions = {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [
+          { filterType: "condition", column: "service", operator: "=", value: "x", id: "s" },
+        ],
+      };
+      remount();
+      await flushPromises();
+      expect(chipRow().exists()).toBe(false);
+    });
+
+    it("moves a limit that took the old suggestion and says so", async () => {
+      offer(40);
+      await flushPromises();
+      await useButton().trigger("click");
+      await flushPromises();
+      expect(hostForm().getFieldValue("trigger_condition.threshold")).toBe(40);
+
+      await chips()[0].trigger("click");
+      offer(null);
+      suggestionMock.state.loading.value = true;
+      await flushPromises();
+      offer(15);
+      await flushPromises();
+
+      expect(hostForm().getFieldValue("trigger_condition.threshold")).toBe(15);
+      expect(updatedNote().text()).toBe("Updated for payments: was 40, now 15");
+    });
+
+    it("never moves a typed limit, and still notes the new suggestion", async () => {
+      offer(40);
+      await flushPromises();
+      await host.find('[data-test="alert-trigger-threshold-input"] input').setValue("7");
+      await chips()[0].trigger("click");
+      offer(15);
+      await flushPromises();
+
+      expect(Number(hostForm().getFieldValue("trigger_condition.threshold"))).toBe(7);
+      expect(updatedNote().text()).toBe("Updated for payments: was 40, now 15");
+    });
+
+    it("shows no note when the suggestion moves for another reason", async () => {
+      offer(40);
+      await flushPromises();
+      offer(15);
+      await flushPromises();
+      expect(updatedNote().exists()).toBe(false);
+    });
+  });
+
   describe("QueryConfig — N1 context keywords reach the inline editor", () => {
     let host: any;
     let editorStub: any;
@@ -2521,6 +2802,117 @@ describe("QueryConfig.vue", () => {
       expect(delivered).toBeDefined();
       // effectiveSuggestions is [] in value context; the base list is not.
       expect(delivered).toEqual([]);
+    });
+  });
+  describe("Threshold suggestion", () => {
+    const YESTERDAY_0910 = Date.UTC(2026, 9, 22, 9, 10);
+    const offer = (over: Record<string, any> = {}) => {
+      suggestionMock.state.suggested.value = 15;
+      suggestionMock.state.usualHigh.value = 6;
+      suggestionMock.state.truncatedDays.value = null;
+      suggestionMock.state.history.value = "ok";
+      suggestionMock.state.backtest.value = { episodes: 1, at: [YESTERDAY_0910] };
+      suggestionMock.state.loading.value = false;
+      suggestionMock.state.error.value = false;
+      for (const [key, value] of Object.entries(over)) suggestionMock.state[key].value = value;
+    };
+    const hint = () => host.find('[data-test="alert-threshold-suggestion"]');
+    const useButton = () => host.find('[data-test="alert-threshold-use-suggested"]');
+    const remount = (qc: Record<string, any> = {}, formOver: Record<string, any> = {}) => {
+      host.unmount();
+      const { h } = mountHost(qc, formOver);
+      host = h;
+      wrapper = host.findComponent(QueryConfig) as unknown as VueWrapper<any>;
+    };
+
+    beforeEach(async () => {
+      mockStore.state.timezone = "UTC";
+      offer();
+      await nextTick();
+    });
+
+    it("offers the suggestion beside a new count rule without filling it", async () => {
+      await flushPromises();
+      expect(suggestionMock.rule().enabled).toBe(true);
+      expect(suggestionMock.rule().kind).toBe("count");
+      expect(useButton().text()).toBe("Use suggested 15");
+      expect(hostForm().getFieldValue("trigger_condition.threshold")).toBe(3);
+    });
+
+    it("fills the threshold only when clicked, and a typed value stays until then", async () => {
+      const input = host.find('[data-test="alert-trigger-threshold-input"] input');
+      await input.setValue("7");
+      offer({ suggested: 20 });
+      await flushPromises();
+      expect(Number(hostForm().getFieldValue("trigger_condition.threshold"))).toBe(7);
+
+      await useButton().trigger("click");
+      await flushPromises();
+      expect(hostForm().getFieldValue("trigger_condition.threshold")).toBe(20);
+      expect(useButton().exists()).toBe(false);
+    });
+
+    it("says how high it usually goes and how often it would have fired, in the user's time zone", async () => {
+      await flushPromises();
+      expect(hint().text()).toContain("Usually up to 6 (past week).");
+      expect(hint().text()).toContain("Would have fired 1 time yesterday, at 09:10 (UTC).");
+    });
+
+    it("says when it would not have fired", async () => {
+      offer({ backtest: { episodes: 0, at: [] } });
+      await flushPromises();
+      expect(hint().text()).toContain("Wouldn't have fired yesterday.");
+    });
+
+    it.each([
+      [{ error: true, suggested: null }, "Couldn't check history."],
+      [
+        { history: "none", suggested: null, usualHigh: null },
+        "Not enough history to suggest a limit yet.",
+      ],
+      [{ history: "short", backtest: null }, "Not tested: not enough history."],
+      [{ truncatedDays: 3 }, "Based on the last 3 days (history limit)."],
+    ])("explains the edge case %o", async (state, copy) => {
+      offer(state);
+      await flushPromises();
+      expect(hint().text()).toContain(copy);
+    });
+
+    it("fills a measure rule's value, and stays off once it is grouped", async () => {
+      wrapper.vm.selectedFunction = "avg";
+      wrapper.vm.onLogFunctionChange("avg");
+      hostForm().setFieldValue("query_condition.aggregation.having.column", "field2");
+      await flushPromises();
+      expect(suggestionMock.rule()).toMatchObject({ enabled: true, kind: "value" });
+
+      await useButton().trigger("click");
+      await flushPromises();
+      expect(hostForm().getFieldValue("query_condition.aggregation.having.value")).toBe(15);
+
+      hostForm().setFieldValue("logGroupBy", ["field1"]);
+      await flushPromises();
+      expect(suggestionMock.rule().enabled).toBe(false);
+    });
+
+    it("is off in edit mode", async () => {
+      remount({ beingUpdated: true });
+      await flushPromises();
+      expect(suggestionMock.rule().enabled).toBe(false);
+      expect(hint().exists()).toBe(false);
+    });
+
+    it("is off for realtime, SQL and PromQL rules", async () => {
+      remount({ isRealTime: "true" }, { is_real_time: "true" });
+      expect(suggestionMock.rule().enabled).toBe(false);
+      remount({ tab: "sql" });
+      expect(suggestionMock.rule().enabled).toBe(false);
+      remount({ tab: "promql" });
+      expect(suggestionMock.rule().enabled).toBe(false);
+    });
+
+    it("keeps the blank form's default threshold of 3", async () => {
+      await flushPromises();
+      expect(hostForm().getFieldValue("trigger_condition.threshold")).toBe(3);
     });
   });
 });

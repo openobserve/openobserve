@@ -26,8 +26,31 @@ vi.mock("@/services/alerts", async (importOriginal) => {
       getHistory: vi.fn(),
       getCompositeReferences: vi.fn(),
       getCompositeTimeline: vi.fn(),
+      toggle_state_by_alert_id: vi.fn(),
     },
   });
+});
+
+const mockMuteFor = vi.hoisted(() => vi.fn());
+vi.mock("@/composables/downtimes/useQuickMute", async () => {
+  const { ref } = await import("vue");
+  return {
+    useQuickMute: () => ({
+      mute: vi.fn(),
+      muteFor: mockMuteFor,
+      isPending: ref(false),
+      timezone: ref("UTC"),
+      defaultFolderId: ref("default"),
+    }),
+  };
+});
+
+// Mutable so a test can turn on the enterprise gate the Mute action sits behind.
+const mockConfig = vi.hoisted(() => ({}) as Record<string, string>);
+vi.mock("@/aws-exports", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  Object.assign(mockConfig, actual.default, { isEnterprise: "false", isCloud: "false" });
+  return { default: mockConfig };
 });
 
 // The view reads its identity from the route; a hermetic route beats standing
@@ -572,5 +595,124 @@ describe("AlertDetail — anomaly alerts", () => {
   it("leaves every other alert family without a charts tab", async () => {
     wrapper = await mountView({ alert: makeSimpleAlert() });
     expect(wrapper.find('[data-test="alerts-alertdetail-tab-charts"]').exists()).toBe(false);
+  });
+});
+
+describe("AlertDetail — header actions", () => {
+  let wrapper: VueWrapper;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockConfig.isEnterprise = "false";
+    (store.state as any).zoConfig.downtimes_enabled = false;
+  });
+  afterEach(() => {
+    wrapper?.unmount();
+    mockConfig.isEnterprise = "false";
+    (store.state as any).zoConfig.downtimes_enabled = false;
+  });
+
+  it("pauses a running alert from the header", async () => {
+    vi.mocked(alertsService.toggle_state_by_alert_id).mockResolvedValue({
+      data: { enabled: false },
+    } as any);
+    wrapper = await mountView({ alert: { ...makeSimpleAlert(), enabled: true } as any });
+
+    const button = wrapper.find('[data-test="alerts-alertdetail-pause-resume"]');
+    expect(button.text()).toContain("Pause");
+    await button.trigger("click");
+    await flushPromises();
+
+    expect(alertsService.toggle_state_by_alert_id).toHaveBeenCalledWith(
+      store.state.selectedOrganization.identifier,
+      "alert-1",
+      false,
+      "default",
+    );
+    expect(wrapper.find('[data-test="alerts-alertdetail-pause-resume"]').text()).toContain(
+      "Resume",
+    );
+  });
+
+  it("resumes a paused alert", async () => {
+    vi.mocked(alertsService.toggle_state_by_alert_id).mockResolvedValue({
+      data: { enabled: true },
+    } as any);
+    wrapper = await mountView({ alert: { ...makeSimpleAlert(), enabled: false } as any });
+
+    const button = wrapper.find('[data-test="alerts-alertdetail-pause-resume"]');
+    expect(button.text()).toContain("Resume");
+    await button.trigger("click");
+    await flushPromises();
+
+    expect(alertsService.toggle_state_by_alert_id).toHaveBeenCalledWith(
+      expect.any(String),
+      "alert-1",
+      true,
+      "default",
+    );
+  });
+
+  it("hides Mute without downtimes", async () => {
+    wrapper = await mountView({ alert: { ...makeSimpleAlert(), enabled: true } as any });
+    expect(wrapper.find('[data-test="alerts-alertdetail-mute"]').exists()).toBe(false);
+  });
+
+  describe("muting refreshes the list's cached rows", () => {
+    const seedListCache = () => {
+      (store.state as any).organizationData.allAlertsListByFolderId = {
+        default: [{ alert_id: "alert-1" }],
+        other: [{ alert_id: "x" }],
+      };
+    };
+    const enableDowntimes = () => {
+      mockConfig.isEnterprise = "true";
+      (store.state as any).zoConfig.downtimes_enabled = true;
+    };
+
+    it("drops the folder's cached rows after a preset mute", async () => {
+      enableDowntimes();
+      seedListCache();
+      mockMuteFor.mockResolvedValue("dt-1");
+      wrapper = await mountView({ alert: { ...makeSimpleAlert(), enabled: true } as any });
+
+      await (wrapper.vm as any).muteForPreset(3600);
+      await flushPromises();
+
+      expect(mockMuteFor).toHaveBeenCalled();
+      const cached = (store.state as any).organizationData.allAlertsListByFolderId;
+      expect(cached.default).toBeUndefined();
+      expect(cached.other).toBeDefined();
+    });
+
+    it("keeps the cache when the preset mute did not happen", async () => {
+      enableDowntimes();
+      seedListCache();
+      mockMuteFor.mockResolvedValue(null);
+      wrapper = await mountView({ alert: { ...makeSimpleAlert(), enabled: true } as any });
+
+      await (wrapper.vm as any).muteForPreset(3600);
+      await flushPromises();
+
+      expect((store.state as any).organizationData.allAlertsListByFolderId.default).toBeDefined();
+    });
+
+    it("drops the folder's cached rows after a mute from the Until dialog", async () => {
+      enableDowntimes();
+      seedListCache();
+      wrapper = await mountView({ alert: { ...makeSimpleAlert(), enabled: true } as any });
+
+      wrapper.findComponent({ name: "QuickMuteDialog" }).vm.$emit("muted", "dt-2");
+      await flushPromises();
+
+      expect((store.state as any).organizationData.allAlertsListByFolderId.default).toBeUndefined();
+    });
+  });
+
+  it("offers Mute when downtimes are on", async () => {
+    mockConfig.isEnterprise = "true";
+    (store.state as any).zoConfig.downtimes_enabled = true;
+    wrapper = await mountView({ alert: { ...makeSimpleAlert(), enabled: true } as any });
+    expect(wrapper.find('[data-test="alerts-alertdetail-mute"]').exists()).toBe(true);
   });
 });

@@ -33,6 +33,13 @@ vi.mock("@/services/alert_templates", async (importOriginal) => {
   });
 });
 
+vi.mock("@/services/settings", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { getSetting: vi.fn(), setOrgSetting: vi.fn() },
+  });
+});
+
 vi.mock("@/utils/zincutils", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
   return {
@@ -62,6 +69,9 @@ import { mount, flushPromises } from "@vue/test-utils";
 import AlertsDestinationList from "./AlertsDestinationList.vue";
 import destinationService from "@/services/alert_destination";
 import templateService from "@/services/alert_templates";
+import settingsService from "@/services/settings";
+import { queryClient } from "@/composables/query/queryClient";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -100,6 +110,7 @@ const OTableStub = {
       <slot name="actions" />
       <slot name="selection-actions" />
       <template v-for="row in data" :key="row.name">
+        <slot name="cell-name" :row="row" />
         <div :data-test="'destination-url-' + row.name">
           <slot name="cell-url" :row="row">{{ urlOf(row) }}</slot>
         </div>
@@ -156,6 +167,11 @@ function mountComponent() {
           template:
             '<button data-test="o-button-stub" v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
           emits: ["click"],
+        },
+        ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
+        ODropdownItem: {
+          emits: ["select"],
+          template: '<button v-bind="$attrs" @click="$emit(\'select\')"><slot /></button>',
         },
         OInput: {
           props: ["modelValue"],
@@ -725,6 +741,136 @@ describe("AlertsDestinationList", () => {
       });
       expect(w.vm.templates).toEqual([]);
       w.unmount();
+    });
+  });
+  // ── org default destination and SMTP state ────────────────────────────────
+
+  describe("org default destination", () => {
+    const t = i18n.global.t as any;
+    const badge = (name: string) => `[data-test="destination-default-badge-${name}"]`;
+    const useAsDefault = (name: string) =>
+      `[data-test="alert-destination-list-${name}-use-as-default"]`;
+    const defaultIs = (destination: string | null) =>
+      (settingsService.getSetting as any).mockImplementation(() =>
+        destination === null
+          ? Promise.reject({ response: { status: 404 } })
+          : Promise.resolve({ data: { setting_value: { destination } } }),
+      );
+
+    beforeEach(() => {
+      queryClient.clear();
+      defaultIs("destination-2");
+      (settingsService.setOrgSetting as any).mockResolvedValue({ data: {} });
+    });
+
+    it("tags the org default destination", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect(wrapper.find(badge("destination-2")).text()).toBe(
+        t("alert_destinations.orgDefaultBadge"),
+      );
+      expect(wrapper.find(badge("destination-1")).exists()).toBe(false);
+    });
+
+    it("tags nothing when no default is set", async () => {
+      defaultIs(null);
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test^="destination-default-badge-"]').exists()).toBe(false);
+    });
+
+    it("offers Use as default on every row except the current default", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect(wrapper.find(useAsDefault("destination-1")).text()).toBe(
+        t("alert_destinations.useAsDefault"),
+      );
+      expect(wrapper.find(useAsDefault("destination-2")).exists()).toBe(false);
+    });
+
+    it("writes the org setting and moves the tag", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+
+      await wrapper.find(useAsDefault("destination-1")).trigger("click");
+      await flushPromises();
+
+      expect(settingsService.setOrgSetting).toHaveBeenCalledWith(
+        "default",
+        "default_alert_destination",
+        { destination: "destination-1" },
+        "alerts",
+      );
+      expect(wrapper.find(badge("destination-1")).exists()).toBe(true);
+      expect(wrapper.find(badge("destination-2")).exists()).toBe(false);
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "success",
+          message: t("alert_destinations.defaultSet", { name: "destination-1" }),
+        }),
+      );
+    });
+
+    it("keeps the old default and says so when the write fails", async () => {
+      (settingsService.setOrgSetting as any).mockRejectedValue({ response: { status: 500 } });
+      wrapper = mountComponent();
+      await flushPromises();
+
+      await wrapper.find(useAsDefault("destination-1")).trigger("click");
+      await flushPromises();
+
+      expect(wrapper.find(badge("destination-2")).exists()).toBe(true);
+      expect(wrapper.find(badge("destination-1")).exists()).toBe(false);
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "error",
+          message: t("alert_destinations.defaultSetFailed"),
+        }),
+      );
+    });
+  });
+
+  describe("SMTP state", () => {
+    const smtpBadge = (name: string) => `[data-test="destination-smtp-off-badge-${name}"]`;
+
+    beforeEach(() => {
+      queryClient.clear();
+      (settingsService.getSetting as any).mockRejectedValue({ response: { status: 404 } });
+      (destinationService.list as any).mockResolvedValue({
+        data: [
+          makeDestination(1),
+          makeDestination(2, { type: "email", url: "", emails: ["a@b.co"] }),
+        ],
+      });
+    });
+
+    afterEach(() => {
+      delete (store.state.zoConfig as any).smtp_enabled;
+    });
+
+    it("marks email rows when SMTP is off in this region", async () => {
+      (store.state.zoConfig as any).smtp_enabled = false;
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect(wrapper.find(smtpBadge("destination-2")).text()).toBe(
+        i18n.global.t("alert_destinations.smtpOffBadge"),
+      );
+      expect(wrapper.find(smtpBadge("destination-1")).exists()).toBe(false);
+    });
+
+    it.each([
+      ["on", true],
+      ["unknown", undefined],
+    ])("marks nothing while SMTP is %s", async (_case, smtpEnabled) => {
+      (store.state.zoConfig as any).smtp_enabled = smtpEnabled;
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect(wrapper.find(smtpBadge("destination-2")).exists()).toBe(false);
     });
   });
 });

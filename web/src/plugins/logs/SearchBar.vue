@@ -953,6 +953,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="search-time order-2">
           <div class="flex">
+            <CreateAlertAction
+              variant="toolbar"
+              class="me-1"
+              :source="createAlertSource"
+              :build="buildAlertPrefill"
+              :label="t('search.alertOnThis')"
+              :disabled-reason="createAlertDisabledReason"
+              :note="createAlertNote"
+              data-test="logs-search-bar-alert-on-this-btn"
+            />
             <OButtonGroup
               class="element-box-shadow border-card-glass-border me-1 border p-0"
               v-if="
@@ -1772,10 +1782,15 @@ import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
-import { isSqlQuery } from "@/utils/query/sqlUtils";
+import { isSqlQuery, parseWhereClauseToFilterChecked } from "@/utils/query/sqlUtils";
 import { isSchemaBackedField } from "@/utils/logs/interestingFields";
 import { appendConjunct, looksLikeSqlStatement } from "@/utils/query/freeTextFilter";
-import { buildFilterContext, isFilterHeld } from "@/composables/useLogs/freeTextSearch";
+import {
+  buildFilterContext,
+  isFilterHeld,
+  planStreamsFilter,
+  rewrittenFilter,
+} from "@/composables/useLogs/freeTextSearch";
 import { useFreeTextPreview } from "@/composables/useLogs/useFreeTextPreview";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { setFieldTypeOf } from "@/utils/query/sqlDiagnostics";
@@ -1829,7 +1844,11 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
-import { buildPrefillFromLogs, logsAlertSnapshot } from "@/utils/alerts/prefill/fromLogs";
+import {
+  buildPrefillFromLogs,
+  logsAlertSnapshot,
+  type LogsParsedFilter,
+} from "@/utils/alerts/prefill/fromLogs";
 import { usePatternActions } from "@/plugins/logs/patterns/usePatternActions";
 import type { AlertBuildOptions } from "@/ts/interfaces/alertPrefill";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -4772,11 +4791,45 @@ export default defineComponent({
     const buildLogsAlertPrefill = () => {
       const held = isFilterHeld(searchObj, store.state.zoConfig);
       const payload = buildSearch(true, true, held ? "" : undefined);
+      const where = alertFilterWhere();
+      const parsed = alertParsedFilter.value;
 
       return buildPrefillFromLogs(
-        logsAlertSnapshot(searchObj, payload?.query?.sql ?? "", store.state.timezone, held),
+        logsAlertSnapshot(searchObj, payload?.query?.sql ?? "", store.state.timezone, held, {
+          parsedFilter: where !== null && parsed?.where === where ? parsed.parsed : null,
+          timestampColumn: store.state.zoConfig?.timestamp_column,
+        }),
       );
     };
+
+    // The filter as SQL, or null when only free text or a held filter could express it.
+    const alertFilterWhere = (): string | null => {
+      if (searchObj.meta.sqlMode) return null;
+      const raw = (searchObj.data.query ?? "").trim();
+      const ctx = buildFilterContext(searchObj, store.state.zoConfig);
+      const plan = planStreamsFilter(raw, searchObj.data.stream.selectedStream ?? [], ctx);
+      if (plan.kind !== "sql") return null;
+      return rewrittenFilter(searchObj, ctx) ?? raw;
+    };
+
+    // Parsing is async but the alert action builds on click, so the parse runs ahead of it.
+    const alertParsedFilter = ref<{ where: string; parsed: LogsParsedFilter } | null>(null);
+    watch(
+      alertFilterWhere,
+      async (where) => {
+        if (where === null) {
+          alertParsedFilter.value = null;
+          return;
+        }
+        try {
+          const parsed = await parseWhereClauseToFilterChecked(where);
+          if (alertFilterWhere() === where) alertParsedFilter.value = { where, parsed };
+        } catch {
+          alertParsedFilter.value = null;
+        }
+      },
+      { immediate: true },
+    );
 
     // On the patterns tab the alert is about patterns, so the patterns adapter
     // takes over — which is what surfaces the include/exclude-all control in the

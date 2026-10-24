@@ -17,11 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   LibraryRail — what am I looking at (severity × category).
 
-  ONE list, no axis switcher. Packs used to be a second axis, but a pack is a
-  coarse bucket ("databases", "observability") and the category is the thing
-  people actually come looking for — Kafka, Clickhouse, Cilium. Two axes over
-  the same catalogue meant a tab to reach the useful one; the pack still names
-  itself in the gallery's group headings, which is where it earns its keep.
+  ONE list, no axis switcher: the category is the thing people come looking for
+  (Kafka, Clickhouse, Cilium), so it stays the only thing you tick. Packs are
+  headings over that list, not a second axis — flat, 100+ rows like "Node",
+  "Pod" and "Other" lost which technology they belonged to. Each heading says
+  how many of its rules have data ("ready / total"), and packs with the most
+  ready rules come first. Empty rows are hidden; "Show all" brings them back
+  and is remembered per browser.
 
   Categories are MULTI-SELECT on the metrics-explorer rail pattern: a search
   box over the list, tick boxes with counts, and a "N selected / Clear" footer.
@@ -116,41 +118,106 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="alert-library-rail-empty-categories"
       />
 
-      <div
-        v-for="item in visibleItems"
-        :key="item.id"
-        class="rounded-default hover:bg-surface-subtle flex items-center justify-between gap-2 px-2 py-1"
-        :class="selectedCategories.includes(item.id) ? 'bg-surface-subtle' : ''"
-      >
-        <OCheckbox
-          size="sm"
-          class="min-w-0 flex-1"
-          :model-value="selectedCategories.includes(item.id)"
-          :aria-label="t('alert_library.facetAria', { label: item.label, count: item.count })"
-          :data-active="String(selectedCategories.includes(item.id))"
-          :data-test="`alert-library-rail-category-${item.id}`"
-          @update:model-value="toggleCategory(item.id)"
+      <section v-for="group in packGroups" :key="group.pack" class="pt-2 first:pt-0">
+        <div
+          class="text-text-secondary flex items-center justify-between gap-2 px-2 py-1 text-xs font-semibold"
+          :data-test="`alert-library-rail-pack-heading-${group.pack}`"
         >
-          <template #label>
-            <OTruncatedText class="block text-xs">{{ item.label }}</OTruncatedText>
-          </template>
-        </OCheckbox>
+          <OTruncatedText class="block min-w-0">{{ group.label }}</OTruncatedText>
+          <OTag
+            v-if="addedPacks?.includes(group.pack)"
+            variant="success-soft"
+            :label="t('alert_library.added')"
+            :title="t('alert_library.packAddedHint')"
+            class="ms-auto shrink-0"
+            data-test="alert-library-rail-pack-added"
+          />
+          <span class="shrink-0 tabular-nums" data-test="alert-library-rail-pack-count"
+            >{{ group.ready }} / {{ group.total }}</span
+          >
+          <OTooltip
+            :content="
+              t(
+                'alert_library.packReadyHint',
+                { ready: group.ready, total: group.total },
+                group.total,
+              )
+            "
+          />
+        </div>
 
-        <OTag
-          type="countChip"
-          value="neutral"
-          size="xs"
-          shape="rounded"
-          :data-test="`alert-library-rail-count-${item.id}`"
-          >{{ item.count }}</OTag
+        <div v-if="(reviewCounts?.[group.pack] ?? 0) > 0" class="px-2 pb-1">
+          <OButton
+            variant="ghost-primary"
+            size="xs"
+            :data-test="`alert-library-rail-pack-review-${group.pack}`"
+            @click="emit('review', group.pack)"
+          >
+            {{
+              t(
+                "alert_library.review.open",
+                { count: reviewCounts?.[group.pack] ?? 0 },
+                reviewCounts?.[group.pack] ?? 0,
+              )
+            }}
+          </OButton>
+        </div>
+
+        <div
+          v-for="item in group.rows"
+          :key="item.id"
+          class="rounded-default hover:bg-surface-subtle flex items-center justify-between gap-2 px-2 py-1"
+          :class="selectedCategories.includes(item.id) ? 'bg-surface-subtle' : ''"
         >
+          <OCheckbox
+            size="sm"
+            class="min-w-0 flex-1"
+            :model-value="selectedCategories.includes(item.id)"
+            :aria-label="t('alert_library.facetAria', { label: item.label, count: item.count })"
+            :data-active="String(selectedCategories.includes(item.id))"
+            :data-test="`alert-library-rail-category-${item.id}`"
+            @update:model-value="toggleCategory(item.id)"
+          >
+            <template #label>
+              <OTruncatedText class="block text-xs">{{ item.label }}</OTruncatedText>
+            </template>
+          </OCheckbox>
+
+          <OTag
+            type="countChip"
+            value="neutral"
+            size="xs"
+            shape="rounded"
+            :data-test="`alert-library-rail-count-${item.id}`"
+            >{{ item.count }}</OTag
+          >
+        </div>
+      </section>
+
+      <div v-if="hasEmptyRows" class="px-2 pt-2">
+        <OButton
+          variant="ghost-primary"
+          size="xs"
+          data-test="alert-library-rail-show-all"
+          @click="toggleShowAll"
+        >
+          {{
+            showAll
+              ? t("alert_library.hideEmptyCategories")
+              : t(
+                  "alert_library.showAllCategories",
+                  { count: categories.length },
+                  categories.length,
+                )
+          }}
+        </OButton>
       </div>
     </div>
   </nav>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import type { AcceptableValue } from "reka-ui";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -161,12 +228,15 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped } from "@/types/i18n";
 
-import type { LibraryFacet } from "./libraryFacets";
+import type { LibraryCategoryFacet, LibraryFacet } from "./libraryFacets";
+
+const SHOW_ALL_STORAGE_KEY = "o2_alert_library_rail_show_all";
 
 const props = defineProps<{
-  categories: LibraryFacet[];
+  categories: LibraryCategoryFacet[];
   /** Empty means every category — the rail opens unfiltered. */
   selectedCategories: string[];
   /** Includes the "all" pseudo-facet, built by the caller. */
@@ -178,15 +248,22 @@ const props = defineProps<{
    * filters left the rail still narrowed by a term nobody had cleared.
    */
   search: string;
+  /** Packs the org already has alerts from, read off their `pack:` tag. */
+  addedPacks?: string[];
+  /** Per pack, how many rules a review would offer; no button for a pack without any. */
+  reviewCounts?: Record<string, number>;
 }>();
 
 const emit = defineEmits<{
   "update:selectedCategories": [ids: string[]];
   "update:severity": [id: string];
   "update:search": [term: string];
+  review: [pack: string];
 }>();
 
 const { t } = useI18nTyped();
+
+const showAll = ref(readShowAll());
 
 /**
  * Search matches the LABEL, not the id: the box filters the list you can see,
@@ -204,11 +281,43 @@ const visibleItems = computed(() => {
     // filter you could see the effect of but not the control for.
     if (props.selectedCategories.includes(item.id)) return true;
     if (needle && !String(item.label).toLowerCase().includes(needle)) return false;
-    // A zero-count row filters to nothing, so offering it wastes a click.
-    if (item.count === 0) return false;
+    // A zero-count row filters to nothing, so it is offered only on request.
+    if (item.count === 0 && !showAll.value) return false;
     return true;
   });
 });
+
+// Tallies cover every row of the pack, hidden ones too, so the heading describes the pack.
+const packGroups = computed(() => {
+  const groups = new Map<
+    string,
+    { pack: string; label: string; ready: number; total: number; rows: LibraryCategoryFacet[] }
+  >();
+  for (const item of props.categories) {
+    let group = groups.get(item.pack);
+    if (!group) {
+      group = { pack: item.pack, label: String(item.packLabel), ready: 0, total: 0, rows: [] };
+      groups.set(item.pack, group);
+    }
+    group.ready += item.ready;
+    group.total += item.total;
+  }
+  for (const item of visibleItems.value) groups.get(item.pack)?.rows.push(item);
+  return [...groups.values()]
+    .filter((group) => group.rows.length > 0)
+    .sort((a, b) => b.ready - a.ready || a.label.localeCompare(b.label));
+});
+
+const hasEmptyRows = computed(() => props.categories.some((item) => item.count === 0));
+
+const toggleShowAll = () => {
+  showAll.value = !showAll.value;
+  try {
+    window.localStorage.setItem(SHOW_ALL_STORAGE_KEY, String(showAll.value));
+  } catch {
+    // Storage can be disabled or full; the toggle still works for this visit.
+  }
+};
 
 const toggleCategory = (id: string) => {
   const selected = props.selectedCategories;
@@ -223,4 +332,12 @@ const onSeverityChange = (value: AcceptableValue | AcceptableValue[] | boolean) 
   // widen it with the explicit All chip, never by accidentally clearing one.
   if (typeof value === "string" && value !== "") emit("update:severity", value);
 };
+
+function readShowAll(): boolean {
+  try {
+    return window.localStorage.getItem(SHOW_ALL_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
 </script>

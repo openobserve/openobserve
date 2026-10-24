@@ -1121,6 +1121,18 @@ export const BADGE_GROUPS = {
     fallback: { variant: "default" },
   },
 
+  // Destination row flags (AlertsDestinationList): the org default, and email rows this region cannot send.
+  destinationFlag: {
+    mode: "plain",
+    shape: "pill",
+    size: "md",
+    values: {
+      default: { variant: "primary-soft", labelKey: "alert_destinations.orgDefaultBadge" },
+      smtpoff: { variant: "warning-soft", labelKey: "alert_destinations.smtpOffBadge" },
+    },
+    fallback: { variant: "default" },
+  },
+
   // Destination ORIGIN — prebuilt vs custom (AlertsDestinationList). Colour is the
   // prebuilt/custom distinction (NOT the specific type — that's `destinationType`);
   // the type NAME is passed as the slot label. SOLID variants + pill.
