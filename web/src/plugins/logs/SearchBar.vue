@@ -2731,7 +2731,7 @@ export default defineComponent({
       },
     };
 
-    const updateQueryValue = (value: string) => {
+    const updateQueryValue = (value: string, origin?: { fromUser?: boolean }) => {
       // During stream changes, the editor's debounced onDidChangeModelContent
       // callback can re-emit a stale value after onStreamChange has cleared the
       // query. Reject these stale re-emissions to prevent the old filter from
@@ -2763,8 +2763,8 @@ export default defineComponent({
 
       _sqlOnQueryChange();
 
-      // Turn off SQL mode when query is completely cleared
-      if (value.trim() === "" && searchObj.meta.sqlMode === true) {
+      // A write the user did not make must not change their mode: the Build tab's panel reset arrives as an empty value, and off SQL mode it syncs the generated SQL back as a WHERE clause an aggregate query does not have.
+      if (value.trim() === "" && searchObj.meta.sqlMode === true && origin?.fromUser !== false) {
         searchObj.meta.sqlMode = false;
         searchObj.data.filterErrMsg = "";
       }

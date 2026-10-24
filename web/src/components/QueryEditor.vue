@@ -165,6 +165,11 @@ import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseF
 
 type Language = "sql" | "promql" | "vrl" | "javascript";
 
+interface QueryChangeOrigin {
+  /** false when the editor was written to (setValue), rather than typed in. */
+  fromUser: boolean;
+}
+
 interface Props {
   // Language configuration
   languages?: Language[]; // Available languages (default: ['sql'])
@@ -220,7 +225,7 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  "update:query": [query: string];
+  "update:query": [query: string, origin?: QueryChangeOrigin];
   "user-edit": [];
   "language-change": [language: Language];
   "ask-ai": [naturalLanguage: string, language: Language];
@@ -328,8 +333,8 @@ const rootStyle = computed(() => {
 });
 
 // Handle query update from editor
-const handleQueryUpdate = (newQuery: string) => {
-  emit("update:query", newQuery);
+const handleQueryUpdate = (newQuery: string, _event?: unknown, origin?: QueryChangeOrigin) => {
+  emit("update:query", newQuery, origin);
 };
 
 const handleEditorFocus = () => {
