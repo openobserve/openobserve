@@ -2740,11 +2740,6 @@ export default defineComponent({
         return;
       }
 
-      // Honouring a programmatic empty turns SQL mode off (below), and the Build tab then syncs its generated SQL back as a WHERE clause an aggregate query does not have.
-      if (value.trim() === "" && origin?.fromUser === false) {
-        return;
-      }
-
       // A URL / short-link restore has just set the SQL query, but the lazy-loaded
       // Monaco editor fires this callback with an empty "" as it mounts, BEFORE the
       // restored value is applied. Treating that transient empty as a real edit
@@ -2768,8 +2763,8 @@ export default defineComponent({
 
       _sqlOnQueryChange();
 
-      // Turn off SQL mode when query is completely cleared
-      if (value.trim() === "" && searchObj.meta.sqlMode === true) {
+      // A write the user did not make must not change their mode: the Build tab's panel reset arrives as an empty value, and off SQL mode it syncs the generated SQL back as a WHERE clause an aggregate query does not have.
+      if (value.trim() === "" && searchObj.meta.sqlMode === true && origin?.fromUser !== false) {
         searchObj.meta.sqlMode = false;
         searchObj.data.filterErrMsg = "";
       }

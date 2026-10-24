@@ -50,11 +50,11 @@ describe("SearchBar — a programmatic empty is not a user clear", () => {
     expect(wrapper.vm.searchObj.meta.sqlMode).toBe(true);
   });
 
-  it("keeps the query when the editor emits an empty value it was written to", () => {
+  it("still clears the query so a stale stream-not-found error goes with it", () => {
     wrapper.vm.updateQueryValue("", { fromUser: false });
 
-    expect(wrapper.vm.searchObj.data.query).toBe(GENERATED_SQL);
-    expect(wrapper.vm.searchObj.data.editorValue).toBe(GENERATED_SQL);
+    expect(wrapper.vm.searchObj.data.query).toBe("");
+    expect(wrapper.vm.searchObj.data.editorValue).toBe("");
   });
 
   it("still turns SQL mode off when the user clears the editor", () => {
