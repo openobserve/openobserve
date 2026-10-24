@@ -6167,6 +6167,23 @@
     "gpuExporter": "GPU exporter"
   },
   "dashboard": {
+    "panelDraft": {
+      "restoreTitle": "Unsaved panel draft",
+      "restoreMessage": "You have unsaved changes from {date}.",
+      "changedOnServer": "This panel was changed after your draft was saved. Saving the draft will replace those changes.",
+      "continueDraft": "Continue draft",
+      "startFresh": "Start fresh",
+      "panelDeleted": "This panel no longer exists, so its unsaved draft was discarded.",
+      "variablesSkipped": "{count} variable from your draft was not added because its name is already in use | {count} variables from your draft were not added because their names are already in use",
+      "leaveTitle": "Leave with unsaved changes?",
+      "leaveMessage": "Save the panel, keep your changes as a draft in this browser, or discard them.",
+      "keepDraft": "Keep draft",
+      "addPanelDot": "Add panel · unsaved draft",
+      "panelDot": "Unsaved changes in this browser",
+      "panelActionsDot": "Panel actions · unsaved draft",
+      "keepFailed": "The draft could not be kept because this browser's storage is full or unavailable. Save the panel or discard your changes.",
+      "panelMissingOnSave": "This panel no longer exists on the dashboard. Reload the dashboard and add it again."
+    },
     "sortByClear": "Clear sorting",
     "sortByAsc": "Sort ascending",
     "sortByDesc": "Sort descending",
@@ -7793,6 +7810,7 @@
     "showExemplarsHelp": "Draws trace samples on this chart for everyone who opens the dashboard. Viewers can still hide them from the panel header."
   },
   "panel": {
+    "saveAndStay": "Save and keep editing",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
     "addZAxisShort": "+Z",
@@ -19710,7 +19728,7 @@
       "logsSearchHistory": "Open search history",
       "alertsImport": "Import alert",
       "panelEditorRun": "Run / apply query",
-      "panelEditorSave": "Save panel",
+      "panelEditorSave": "Save and keep editing",
       "panelEditorBack": "Discard and go back",
       "traceNextSpan": "Next span",
       "tracePrevSpan": "Previous span",
@@ -20573,6 +20591,7 @@
       "updatingSyntheticsSteps": "Updating synthetics steps..."
     },
     "dashboard": {
+      "panelSaved": "Panel saved",
       "clickOnTheChartDataOr": "Click on the chart data or select a range to add an annotation",
       "runningQueryCanceledSuccessfully": "Running query canceled successfully",
       "panelQueryHasNoStreamToAlertOn": "This panel's query has no stream to alert on."

@@ -6167,6 +6167,23 @@
     "gpuExporter": "Exportador de GPU"
   },
   "dashboard": {
+    "panelDraft": {
+      "restoreTitle": "Rascunho de painel não guardado",
+      "restoreMessage": "Tem alterações não guardadas de {date}.",
+      "changedOnServer": "Este painel foi alterado depois de o rascunho ser guardado. Guardar o rascunho substituirá essas alterações.",
+      "continueDraft": "Continuar rascunho",
+      "startFresh": "Começar de novo",
+      "panelDeleted": "Este painel já não existe, por isso o rascunho não guardado foi descartado.",
+      "variablesSkipped": "{count} variável do rascunho não foi adicionada porque o nome já está em uso | {count} variáveis do rascunho não foram adicionadas porque os nomes já estão em uso",
+      "leaveTitle": "Sair com alterações não guardadas?",
+      "leaveMessage": "Guarde o painel, mantenha as alterações como rascunho neste navegador ou descarte-as.",
+      "keepDraft": "Manter rascunho",
+      "addPanelDot": "Adicionar painel · rascunho não guardado",
+      "panelDot": "Alterações não guardadas neste navegador",
+      "panelActionsDot": "Ações do painel · rascunho não guardado",
+      "keepFailed": "Não foi possível manter o rascunho porque o armazenamento deste navegador está cheio ou indisponível. Guarde o painel ou descarte as alterações.",
+      "panelMissingOnSave": "Este painel já não existe no dashboard. Recarregue o dashboard e adicione-o novamente."
+    },
     "sortByClear": "Limpar ordenação",
     "sortByAsc": "Ordenar em ordem crescente",
     "sortByDesc": "Ordenar em ordem decrescente",
@@ -7795,6 +7812,7 @@
     "showExemplarsHelp": "Desenha amostras de traces neste gráfico para todos os que abrirem o dashboard. Quem o visualiza pode ainda ocultá-las no cabeçalho do painel."
   },
   "panel": {
+    "saveAndStay": "Guardar e continuar a editar",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
     "addZAxisShort": "+Z",
@@ -19712,7 +19730,7 @@
       "logsSearchHistory": "Abrir histórico de pesquisa",
       "alertsImport": "Importar alerta",
       "panelEditorRun": "Executar/aplicar consulta",
-      "panelEditorSave": "Guardar painel",
+      "panelEditorSave": "Guardar e continuar a editar",
       "panelEditorBack": "Descartar e voltar",
       "traceNextSpan": "Próximo span",
       "tracePrevSpan": "Span anterior",
@@ -20575,6 +20593,7 @@
       "updatingSyntheticsSteps": "A atualizar etapas de sintéticos..."
     },
     "dashboard": {
+      "panelSaved": "Painel guardado",
       "clickOnTheChartDataOr": "Clique nos dados do gráfico ou selecione um intervalo para adicionar uma anotação",
       "runningQueryCanceledSuccessfully": "Consulta em execução cancelada com sucesso",
       "panelQueryHasNoStreamToAlertOn": "A consulta deste painel não tem stream para alertar."

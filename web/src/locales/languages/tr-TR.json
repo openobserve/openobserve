@@ -6167,6 +6167,23 @@
     "gpuExporter": "GPU dışa aktarıcı"
   },
   "dashboard": {
+    "panelDraft": {
+      "restoreTitle": "Kaydedilmemiş panel taslağı",
+      "restoreMessage": "{date} tarihinden kaydedilmemiş değişiklikleriniz var.",
+      "changedOnServer": "Bu panel, taslağınız kaydedildikten sonra değiştirildi. Taslağı kaydetmek bu değişikliklerin yerine geçer.",
+      "continueDraft": "Taslağa devam et",
+      "startFresh": "Baştan başla",
+      "panelDeleted": "Bu panel artık mevcut değil, bu nedenle kaydedilmemiş taslağı silindi.",
+      "variablesSkipped": "Adı zaten kullanıldığı için taslaktaki {count} değişken eklenmedi | Adları zaten kullanıldığı için taslaktaki {count} değişken eklenmedi",
+      "leaveTitle": "Kaydedilmemiş değişikliklerle çıkılsın mı?",
+      "leaveMessage": "Paneli kaydedin, değişikliklerinizi bu tarayıcıda taslak olarak saklayın veya atın.",
+      "keepDraft": "Taslağı sakla",
+      "addPanelDot": "Panel ekle · kaydedilmemiş taslak",
+      "panelDot": "Bu tarayıcıda kaydedilmemiş değişiklikler var",
+      "panelActionsDot": "Panel işlemleri · kaydedilmemiş taslak",
+      "keepFailed": "Bu tarayıcının depolama alanı dolu veya kullanılamıyor olduğundan taslak saklanamadı. Paneli kaydedin veya değişikliklerinizi atın.",
+      "panelMissingOnSave": "Bu panel artık panoda yok. Panoyu yeniden yükleyin ve paneli tekrar ekleyin."
+    },
     "sortByClear": "Sıralamayı temizle",
     "sortByAsc": "Artan sırala",
     "sortByDesc": "Azalan sırala",
@@ -7795,6 +7812,7 @@
     "showExemplarsHelp": "Bu grafikte, gösterge panosunu açan herkes için iz örneklerini çizer. Görüntüleyenler bunları yine de panel başlığından gizleyebilir."
   },
   "panel": {
+    "saveAndStay": "Kaydet ve düzenlemeye devam et",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
     "addZAxisShort": "+Z",
@@ -19712,7 +19730,7 @@
       "logsSearchHistory": "Arama geçmişini aç",
       "alertsImport": "Uyarıyı içe aktar",
       "panelEditorRun": "Sorguyu çalıştır/uygula",
-      "panelEditorSave": "Paneli kaydet",
+      "panelEditorSave": "Kaydet ve düzenlemeye devam et",
       "panelEditorBack": "Vazgeç ve geri dön",
       "traceNextSpan": "Sonraki span",
       "tracePrevSpan": "Önceki span",
@@ -20575,6 +20593,7 @@
       "updatingSyntheticsSteps": "Sentetik adımları güncelleniyor..."
     },
     "dashboard": {
+      "panelSaved": "Panel kaydedildi",
       "clickOnTheChartDataOr": "Ek açıklama eklemek için grafik verisine tıklayın veya bir aralık seçin",
       "runningQueryCanceledSuccessfully": "Çalışan sorgu başarıyla iptal edildi",
       "panelQueryHasNoStreamToAlertOn": "Bu panelin sorgusunda uyarı verecek bir akış yok."

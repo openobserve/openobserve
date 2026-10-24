@@ -3,6 +3,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
 const { waitForDashboardPage, deleteDashboard } = require('../Dashboards/utils/dashCreation.js');
+const { settlePanelLeave } = require('../../pages/dashboardPages/panel-leave-dialog.js');
 
 
 /**
@@ -1351,12 +1352,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     const discardBtn = builder.getDashboardDiscardBtn();
     if (await discardBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await discardBtn.click();
-      // Handle confirmation dialog if appears
-      const confirmBtn = builder.getDashboardConfirmPrimaryBtn();
-      if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await confirmBtn.click();
-        await confirmBtn.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-      }
+      // An edited panel opens the in-app leave dialog; answer it with Discard
+      await settlePanelLeave(page, { timeout: 15000 }).catch(() => {});
     }
     testLogger.info('Discarded panel editor');
 

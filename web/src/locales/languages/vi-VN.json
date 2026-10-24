@@ -6167,6 +6167,23 @@
     "gpuExporter": "GPU exporter"
   },
   "dashboard": {
+    "panelDraft": {
+      "restoreTitle": "Bản nháp panel chưa lưu",
+      "restoreMessage": "Bạn có thay đổi chưa lưu từ {date}.",
+      "changedOnServer": "Panel này đã bị thay đổi sau khi bản nháp của bạn được lưu. Lưu bản nháp sẽ thay thế những thay đổi đó.",
+      "continueDraft": "Tiếp tục bản nháp",
+      "startFresh": "Bắt đầu lại",
+      "panelDeleted": "Panel này không còn tồn tại nên bản nháp chưa lưu của nó đã bị hủy.",
+      "variablesSkipped": "{count} biến từ bản nháp không được thêm vì tên đã được sử dụng | {count} biến từ bản nháp không được thêm vì tên đã được sử dụng",
+      "leaveTitle": "Rời đi khi còn thay đổi chưa lưu?",
+      "leaveMessage": "Lưu panel, giữ thay đổi dưới dạng bản nháp trong trình duyệt này hoặc hủy chúng.",
+      "keepDraft": "Giữ bản nháp",
+      "addPanelDot": "Thêm panel · bản nháp chưa lưu",
+      "panelDot": "Có thay đổi chưa lưu trong trình duyệt này",
+      "panelActionsDot": "Thao tác panel · bản nháp chưa lưu",
+      "keepFailed": "Không thể giữ bản nháp vì bộ nhớ của trình duyệt này đã đầy hoặc không khả dụng. Hãy lưu panel hoặc hủy thay đổi.",
+      "panelMissingOnSave": "Panel này không còn tồn tại trên dashboard. Hãy tải lại dashboard và thêm lại panel."
+    },
     "sortByClear": "Xóa sắp xếp",
     "sortByAsc": "Sắp xếp tăng dần",
     "sortByDesc": "Sắp xếp giảm dần",
@@ -7795,6 +7812,7 @@
     "showExemplarsHelp": "Vẽ mẫu trace trên biểu đồ này cho tất cả những ai mở bảng điều khiển. Người xem vẫn có thể ẩn chúng từ tiêu đề panel."
   },
   "panel": {
+    "saveAndStay": "Lưu và tiếp tục chỉnh sửa",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
     "addZAxisShort": "+Z",
@@ -19712,7 +19730,7 @@
       "logsSearchHistory": "Mở lịch sử tìm kiếm",
       "alertsImport": "Nhập cảnh báo",
       "panelEditorRun": "Chạy / áp dụng truy vấn",
-      "panelEditorSave": "Lưu panel",
+      "panelEditorSave": "Lưu và tiếp tục chỉnh sửa",
       "panelEditorBack": "Hủy và quay lại",
       "traceNextSpan": "Span tiếp theo",
       "tracePrevSpan": "Span trước đó",
@@ -20575,6 +20593,7 @@
       "updatingSyntheticsSteps": "Đang cập nhật các bước Synthetics..."
     },
     "dashboard": {
+      "panelSaved": "Đã lưu panel",
       "clickOnTheChartDataOr": "Nhấp vào dữ liệu biểu đồ hoặc chọn một phạm vi để thêm chú thích",
       "runningQueryCanceledSuccessfully": "Đã hủy truy vấn đang chạy thành công",
       "panelQueryHasNoStreamToAlertOn": "Truy vấn của panel này không có stream để cảnh báo."

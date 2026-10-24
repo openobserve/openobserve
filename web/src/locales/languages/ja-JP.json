@@ -6167,6 +6167,23 @@
     "gpuExporter": "GPU エクスポーター"
   },
   "dashboard": {
+    "panelDraft": {
+      "restoreTitle": "未保存のパネル下書き",
+      "restoreMessage": "{date} の未保存の変更があります。",
+      "changedOnServer": "下書きの保存後にこのパネルが変更されました。下書きを保存すると、それらの変更は置き換えられます。",
+      "continueDraft": "下書きを続ける",
+      "startFresh": "新しく始める",
+      "panelDeleted": "このパネルは存在しなくなったため、未保存の下書きは破棄されました。",
+      "variablesSkipped": "名前が既に使われているため、下書きの {count} 個の変数は追加されませんでした | 名前が既に使われているため、下書きの {count} 個の変数は追加されませんでした",
+      "leaveTitle": "未保存の変更を残して移動しますか？",
+      "leaveMessage": "パネルを保存するか、変更をこのブラウザーに下書きとして残すか、破棄してください。",
+      "keepDraft": "下書きを残す",
+      "addPanelDot": "パネルを追加 · 未保存の下書き",
+      "panelDot": "このブラウザーに未保存の変更があります",
+      "panelActionsDot": "パネルの操作 · 未保存の下書き",
+      "keepFailed": "このブラウザーのストレージがいっぱいか利用できないため、下書きを残せませんでした。パネルを保存するか、変更を破棄してください。",
+      "panelMissingOnSave": "このパネルはダッシュボードに存在しなくなりました。ダッシュボードを再読み込みして、もう一度追加してください。"
+    },
     "sortByClear": "並べ替えを解除",
     "sortByAsc": "昇順で並べ替え",
     "sortByDesc": "降順で並べ替え",
@@ -7795,6 +7812,7 @@
     "showExemplarsHelp": "このダッシュボードを開くすべてのユーザーに対して、このグラフにトレースサンプルを描画します。閲覧者はパネルヘッダーから非表示にできます。"
   },
   "panel": {
+    "saveAndStay": "保存して編集を続ける",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
     "addZAxisShort": "+Z",
@@ -19712,7 +19730,7 @@
       "logsSearchHistory": "検索履歴を開く",
       "alertsImport": "アラートをインポート",
       "panelEditorRun": "クエリの実行/適用",
-      "panelEditorSave": "パネルを保存",
+      "panelEditorSave": "保存して編集を続ける",
       "panelEditorBack": "破棄して戻る",
       "traceNextSpan": "次のスパン",
       "tracePrevSpan": "前のスパン",
@@ -20575,6 +20593,7 @@
       "updatingSyntheticsSteps": "合成モニタリングのステップを更新中..."
     },
     "dashboard": {
+      "panelSaved": "パネルを保存しました",
       "clickOnTheChartDataOr": "チャートデータをクリックするか、範囲を選択して注釈を追加します",
       "runningQueryCanceledSuccessfully": "実行中のクエリが正常にキャンセルされました",
       "panelQueryHasNoStreamToAlertOn": "このパネルのクエリにはアラート対象のストリームがありません。"

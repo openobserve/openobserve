@@ -6167,6 +6167,23 @@
     "gpuExporter": "Eksporter GPU"
   },
   "dashboard": {
+    "panelDraft": {
+      "restoreTitle": "Niezapisany szkic panelu",
+      "restoreMessage": "Masz niezapisane zmiany z {date}.",
+      "changedOnServer": "Ten panel został zmieniony po zapisaniu szkicu. Zapisanie szkicu zastąpi te zmiany.",
+      "continueDraft": "Kontynuuj szkic",
+      "startFresh": "Zacznij od nowa",
+      "panelDeleted": "Ten panel już nie istnieje, więc jego niezapisany szkic został odrzucony.",
+      "variablesSkipped": "{count} zmienna ze szkicu nie została dodana, ponieważ jej nazwa jest już używana | Zmienne ze szkicu niedodane, ponieważ ich nazwy są już używane: {count}",
+      "leaveTitle": "Wyjść z niezapisanymi zmianami?",
+      "leaveMessage": "Zapisz panel, zachowaj zmiany jako szkic w tej przeglądarce lub je odrzuć.",
+      "keepDraft": "Zachowaj szkic",
+      "addPanelDot": "Dodaj panel · niezapisany szkic",
+      "panelDot": "Niezapisane zmiany w tej przeglądarce",
+      "panelActionsDot": "Akcje panelu · niezapisany szkic",
+      "keepFailed": "Nie udało się zachować szkicu, ponieważ pamięć tej przeglądarki jest pełna lub niedostępna. Zapisz panel lub odrzuć zmiany.",
+      "panelMissingOnSave": "Ten panel już nie istnieje na pulpicie. Wczytaj pulpit ponownie i dodaj go jeszcze raz."
+    },
     "sortByClear": "Wyczyść sortowanie",
     "sortByAsc": "Sortuj rosnąco",
     "sortByDesc": "Sortuj malejąco",
@@ -7795,6 +7812,7 @@
     "showExemplarsHelp": "Rysuje próbki trace na tym wykresie dla wszystkich, którzy otworzą pulpit. Przeglądający nadal mogą je ukryć w nagłówku panelu."
   },
   "panel": {
+    "saveAndStay": "Zapisz i edytuj dalej",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
     "addZAxisShort": "+Z",
@@ -19712,7 +19730,7 @@
       "logsSearchHistory": "Otwórz historię wyszukiwania",
       "alertsImport": "Importuj alert",
       "panelEditorRun": "Wykonaj / zastosuj zapytanie",
-      "panelEditorSave": "Zapisz panel",
+      "panelEditorSave": "Zapisz i edytuj dalej",
       "panelEditorBack": "Odrzuć i wróć",
       "traceNextSpan": "Następny span",
       "tracePrevSpan": "Poprzedni span",
@@ -20575,6 +20593,7 @@
       "updatingSyntheticsSteps": "Aktualizowanie kroków syntetycznych..."
     },
     "dashboard": {
+      "panelSaved": "Panel zapisany",
       "clickOnTheChartDataOr": "Kliknij na dane wykresu lub zaznacz zakres, aby dodać adnotację",
       "runningQueryCanceledSuccessfully": "Uruchomione zapytanie zostało anulowane",
       "panelQueryHasNoStreamToAlertOn": "Zapytanie tego panelu nie ma strumienia, na którym można ustawić alert."

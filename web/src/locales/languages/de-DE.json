@@ -6167,6 +6167,23 @@
     "gpuExporter": "GPU-Exporter"
   },
   "dashboard": {
+    "panelDraft": {
+      "restoreTitle": "Nicht gespeicherter Panel-Entwurf",
+      "restoreMessage": "Sie haben nicht gespeicherte Änderungen vom {date}.",
+      "changedOnServer": "Dieses Panel wurde geändert, nachdem Ihr Entwurf gespeichert wurde. Wenn Sie den Entwurf speichern, werden diese Änderungen ersetzt.",
+      "continueDraft": "Entwurf fortsetzen",
+      "startFresh": "Neu beginnen",
+      "panelDeleted": "Dieses Panel existiert nicht mehr, daher wurde sein nicht gespeicherter Entwurf verworfen.",
+      "variablesSkipped": "{count} Variable aus Ihrem Entwurf wurde nicht hinzugefügt, weil ihr Name bereits verwendet wird | {count} Variablen aus Ihrem Entwurf wurden nicht hinzugefügt, weil ihre Namen bereits verwendet werden",
+      "leaveTitle": "Mit nicht gespeicherten Änderungen verlassen?",
+      "leaveMessage": "Speichern Sie das Panel, behalten Sie Ihre Änderungen als Entwurf in diesem Browser oder verwerfen Sie sie.",
+      "keepDraft": "Entwurf behalten",
+      "addPanelDot": "Panel hinzufügen · nicht gespeicherter Entwurf",
+      "panelDot": "Nicht gespeicherte Änderungen in diesem Browser",
+      "panelActionsDot": "Panel-Aktionen · nicht gespeicherter Entwurf",
+      "keepFailed": "Der Entwurf konnte nicht behalten werden, weil der Speicher dieses Browsers voll oder nicht verfügbar ist. Speichern Sie das Panel oder verwerfen Sie Ihre Änderungen.",
+      "panelMissingOnSave": "Dieses Panel existiert nicht mehr im Dashboard. Laden Sie das Dashboard neu und fügen Sie es erneut hinzu."
+    },
     "sortByClear": "Sortierung aufheben",
     "sortByAsc": "Aufsteigend sortieren",
     "sortByDesc": "Absteigend sortieren",
@@ -7795,6 +7812,7 @@
     "showExemplarsHelp": "Zeichnet Trace-Stichproben in diesem Diagramm für alle, die das Dashboard öffnen. Betrachter können sie weiterhin über die Panel-Kopfzeile ausblenden."
   },
   "panel": {
+    "saveAndStay": "Speichern und weiter bearbeiten",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
     "addZAxisShort": "+Z",
@@ -19712,7 +19730,7 @@
       "logsSearchHistory": "Suchverlauf öffnen",
       "alertsImport": "Alarm importieren",
       "panelEditorRun": "Abfrage ausführen/anwenden",
-      "panelEditorSave": "Panel speichern",
+      "panelEditorSave": "Speichern und weiter bearbeiten",
       "panelEditorBack": "Verwerfen und zurückgehen",
       "traceNextSpan": "Nächstes Span",
       "tracePrevSpan": "Vorheriges Span",
@@ -20575,6 +20593,7 @@
       "updatingSyntheticsSteps": "Synthetics-Schritte werden aktualisiert..."
     },
     "dashboard": {
+      "panelSaved": "Panel gespeichert",
       "clickOnTheChartDataOr": "Klicken Sie auf die Diagrammdaten oder wählen Sie einen Bereich aus, um eine Anmerkung hinzuzufügen",
       "runningQueryCanceledSuccessfully": "Laufende Abfrage erfolgreich abgebrochen",
       "panelQueryHasNoStreamToAlertOn": "Die Abfrage dieses Panels hat keinen Stream, auf den ein Alarm gesetzt werden kann."

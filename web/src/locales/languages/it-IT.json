@@ -6167,6 +6167,23 @@
     "gpuExporter": "Esportatore GPU"
   },
   "dashboard": {
+    "panelDraft": {
+      "restoreTitle": "Bozza del pannello non salvata",
+      "restoreMessage": "Hai modifiche non salvate del {date}.",
+      "changedOnServer": "Questo pannello è stato modificato dopo il salvataggio della bozza. Salvando la bozza sostituirai quelle modifiche.",
+      "continueDraft": "Continua la bozza",
+      "startFresh": "Ricomincia",
+      "panelDeleted": "Questo pannello non esiste più, quindi la sua bozza non salvata è stata eliminata.",
+      "variablesSkipped": "{count} variabile della bozza non è stata aggiunta perché il nome è già in uso | {count} variabili della bozza non sono state aggiunte perché i nomi sono già in uso",
+      "leaveTitle": "Uscire con modifiche non salvate?",
+      "leaveMessage": "Salva il pannello, conserva le modifiche come bozza in questo browser oppure eliminale.",
+      "keepDraft": "Conserva la bozza",
+      "addPanelDot": "Aggiungi pannello · bozza non salvata",
+      "panelDot": "Modifiche non salvate in questo browser",
+      "panelActionsDot": "Azioni del pannello · bozza non salvata",
+      "keepFailed": "Impossibile conservare la bozza perché lo spazio di archiviazione di questo browser è pieno o non disponibile. Salva il pannello o elimina le modifiche.",
+      "panelMissingOnSave": "Questo pannello non esiste più nella dashboard. Ricarica la dashboard e aggiungilo di nuovo."
+    },
     "sortByClear": "Cancella ordinamento",
     "sortByAsc": "Ordina in modo crescente",
     "sortByDesc": "Ordina in modo decrescente",
@@ -7795,6 +7812,7 @@
     "showExemplarsHelp": "Disegna campioni di traccia su questo grafico per tutti coloro che aprono la dashboard. I visualizzatori possono comunque nasconderli dall'intestazione del pannello."
   },
   "panel": {
+    "saveAndStay": "Salva e continua a modificare",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
     "addZAxisShort": "+Z",
@@ -19712,7 +19730,7 @@
       "logsSearchHistory": "Apri la cronologia delle ricerche",
       "alertsImport": "Importa avviso",
       "panelEditorRun": "Esegui/applica query",
-      "panelEditorSave": "Salva pannello",
+      "panelEditorSave": "Salva e continua a modificare",
       "panelEditorBack": "Scarta e torna indietro",
       "traceNextSpan": "Span successivo",
       "tracePrevSpan": "Span precedente",
@@ -20575,6 +20593,7 @@
       "updatingSyntheticsSteps": "Aggiornamento dei passaggi di Synthetics..."
     },
     "dashboard": {
+      "panelSaved": "Pannello salvato",
       "clickOnTheChartDataOr": "Fai clic sui dati del grafico o seleziona un intervallo per aggiungere un'annotazione",
       "runningQueryCanceledSuccessfully": "Query in esecuzione annullata con successo",
       "panelQueryHasNoStreamToAlertOn": "La query di questo pannello non ha uno stream su cui attivare un avviso."
