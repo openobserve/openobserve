@@ -363,14 +363,14 @@ function startBackgroundIngest(page, stream, { services, hosts = ['h1'], extra =
   return { stop: () => { stopped = true; clearInterval(timer); } };
 }
 
-/** Self-ingest destination like seedNotificationDestination, but the template also renders {rows} so the sink can be filtered per group. */
+/** Self-ingest destination like seedNotificationDestination; the template renders {rows} to filter per group and the incident fields to count incident notifications. */
 async function seedSinkDestination(page, baseName) {
   const template = `${baseName}_tmpl`;
   const destination = `${baseName}_dest`;
   const sink = `${baseName}_sink`;
   const tmplRes = await api(page, 'post', `${v1()}/alerts/templates`, {
     name: template,
-    body: '{"text":"{alert_name} {alert_level} {rows}"}',
+    body: '{"text":"{alert_name} {alert_level} {rows}","incident_id":"{incident_id}","incident_event":"{incident_event}"}',
     type: 'http',
     title: '',
   });
@@ -445,7 +445,7 @@ async function downtimeEventCount(page, sink, downtimeName, event, sinceUs) {
   return searchCount(page, sql, Math.ceil((nowUs() - sinceUs) / MICROS) + 120);
 }
 
-/** Incident notifications post {"incident": {id, event, …}}, which flattens to incident_id / incident_event; no event counts them all. */
+/** Incident notifications render through the destination template, which seedSinkDestination gives incident_id / incident_event; no event counts them all. */
 async function incidentEventCount(page, sink, incidentId, event = null) {
   const byEvent = event ? ` AND incident_event = '${sqlStr(event)}'` : '';
   const sql = `SELECT COUNT(*) AS c FROM "${sink}" WHERE incident_id = '${sqlStr(incidentId)}'${byEvent}`;
