@@ -26,7 +26,7 @@ use config::meta::system_settings::{SettingScope, SystemSetting};
 use sea_orm::{
     ActiveModelTrait,
     ActiveValue::{NotSet, Set},
-    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Schema,
+    ColumnTrait, ConnectionTrait, DbBackend, EntityTrait, QueryFilter, QueryOrder, Schema,
 };
 
 use crate::{
@@ -308,6 +308,15 @@ pub async fn delete(
     Ok(result.rows_affected > 0)
 }
 
+/// Delete the row only if its `updated_at` and value are unchanged; else `Ok(false)`.
+pub async fn delete_if_unchanged(
+    id: i64,
+    updated_at: i64,
+    value: &serde_json::Value,
+) -> Result<bool, anyhow::Error> {
+    delete_if_unchanged_with(get_orm_client_rw().await, id, updated_at, value).await
+}
+
 /// Delete all settings for an organization
 pub async fn delete_org_settings(org_id: &str) -> Result<u64, anyhow::Error> {
     let client = get_orm_client_rw().await;
@@ -335,6 +344,27 @@ pub async fn delete_user_settings(org_id: &str, user_id: &str) -> Result<u64, an
     Ok(result.rows_affected)
 }
 
+async fn delete_if_unchanged_with<C: ConnectionTrait>(
+    conn: &C,
+    id: i64,
+    updated_at: i64,
+    value: &serde_json::Value,
+) -> Result<bool, anyhow::Error> {
+    // Only Postgres stores jsonb; other backends store the serialized text the binder wrote.
+    let same_value = match conn.get_database_backend() {
+        DbBackend::Postgres => Column::SettingValue.eq(value.clone()),
+        _ => Column::SettingValue.eq(serde_json::to_string(value)?),
+    };
+    let result = Entity::delete_many()
+        .filter(Column::Id.eq(id))
+        .filter(Column::UpdatedAt.eq(updated_at))
+        .filter(same_value)
+        .exec(conn)
+        .await
+        .map_err(|e| anyhow!("DbError# {e}"))?;
+    Ok(result.rows_affected > 0)
+}
+
 /// Convert DB model to domain type
 fn model_to_setting(model: Model) -> SystemSetting {
     SystemSetting {
@@ -355,7 +385,68 @@ fn model_to_setting(model: Model) -> SystemSetting {
 
 #[cfg(test)]
 mod tests {
+    use sea_orm::{Database, DatabaseConnection};
+
     use super::*;
+
+    async fn db_with_row(updated_at: i64) -> DatabaseConnection {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(Entity).take();
+        db.execute(backend.build(&stmt)).await.unwrap();
+        ActiveModel {
+            id: Set(1),
+            scope: Set("org".to_string()),
+            org_id: Set(Some("default".to_string())),
+            user_id: Set(None),
+            setting_key: Set("default_alert_destination".to_string()),
+            setting_category: Set(Some("alerts".to_string())),
+            setting_value: Set(serde_json::json!({"destination": "ops-slack"})),
+            description: Set(None),
+            created_at: Set(1),
+            updated_at: Set(updated_at),
+            created_by: Set(None),
+            updated_by: Set(None),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+        db
+    }
+
+    fn read_value() -> serde_json::Value {
+        serde_json::json!({"destination": "ops-slack"})
+    }
+
+    #[tokio::test]
+    async fn delete_if_unchanged_removes_a_row_read_at_its_current_version() {
+        let db = db_with_row(100).await;
+        assert!(
+            delete_if_unchanged_with(&db, 1, 100, &read_value())
+                .await
+                .unwrap()
+        );
+        assert!(Entity::find_by_id(1).one(&db).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn delete_if_unchanged_keeps_a_row_updated_since_it_was_read() {
+        let db = db_with_row(200).await;
+        assert!(
+            !delete_if_unchanged_with(&db, 1, 100, &read_value())
+                .await
+                .unwrap()
+        );
+        assert!(Entity::find_by_id(1).one(&db).await.unwrap().is_some());
+    }
+
+    #[tokio::test]
+    async fn delete_if_unchanged_keeps_a_row_rewritten_in_the_same_microsecond() {
+        let db = db_with_row(100).await;
+        let stale = serde_json::json!({"destination": "ops-email"});
+        assert!(!delete_if_unchanged_with(&db, 1, 100, &stale).await.unwrap());
+        assert!(Entity::find_by_id(1).one(&db).await.unwrap().is_some());
+    }
 
     #[test]
     fn test_model_to_setting() {

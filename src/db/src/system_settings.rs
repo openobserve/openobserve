@@ -221,6 +221,32 @@ pub async fn delete(
     Ok(result)
 }
 
+/// Delete `setting` only if its stored row is unchanged since it was read; `Ok(false)` leaves it.
+pub async fn delete_if_unchanged(setting: &SystemSetting) -> Result<bool> {
+    let Some(id) = setting.id else {
+        return Ok(false);
+    };
+    let deleted = db::delete_if_unchanged(id, setting.updated_at, &setting.setting_value)
+        .await
+        .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+    if !deleted {
+        return Ok(false);
+    }
+
+    let cache_k = cache_key(
+        &setting.scope,
+        setting.org_id.as_deref(),
+        setting.user_id.as_deref(),
+        &setting.setting_key,
+    );
+    SYSTEM_SETTINGS.write().await.remove(&cache_k);
+    let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, cache_k);
+    if let Err(e) = infra::coordinator::system_settings::emit_delete_event(&event_key).await {
+        log::error!("Failed to emit system settings delete event: {}", e);
+    }
+    Ok(true)
+}
+
 /// Delete all settings for an organization
 pub async fn delete_org_settings(org_id: &str) -> Result<u64> {
     let result = db::delete_org_settings(org_id)
