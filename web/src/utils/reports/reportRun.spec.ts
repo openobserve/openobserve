@@ -16,9 +16,11 @@
 import { describe, expect, it } from "vitest";
 import type { ReportRunHit } from "@/services/reports";
 import { BADGE_GROUPS } from "@/lib/core/Badge/badgeGroups";
+import { formatTimestampInTimezone } from "@/utils/date";
 import {
   MANUAL_RUN_TTL_MS,
   OVERDUE_GRACE_MS,
+  RUN_TIME_FORMAT,
   isCachedReport,
   isOverdue,
   lastRunChip,
@@ -180,5 +182,13 @@ describe("runKey", () => {
   it("adds the retry count only when there is one", () => {
     expect(runKey({ timestamp: 5, retries: 0 })).toBe("5");
     expect(runKey({ timestamp: 5, retries: 2 })).toBe("5-2");
+  });
+});
+
+describe("RUN_TIME_FORMAT", () => {
+  it("renders the short weekday, not a padded day of month", () => {
+    expect(formatTimestampInTimezone(1_792_748_160_000_000, RUN_TIME_FORMAT, "Asia/Calcutta")).toBe(
+      "Fri 23 Oct, 15:06",
+    );
   });
 });

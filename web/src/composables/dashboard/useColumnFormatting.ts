@@ -58,7 +58,9 @@ export interface ColumnOverrideUI {
 // A type alias, not an interface: OSelect's options are an index-signature type an interface can't satisfy.
 export type UnitOption = {
   label: I18nText;
+  // Absent on group header rows, which are never a unit.
   value?: string | null;
+  header?: boolean;
   // OSelect nesting: the pinned locales are listed under the Other Locale row.
   expandable?: boolean;
   parentValue?: string;
@@ -200,26 +202,51 @@ const OTHER_LOCALE_KEY = "other-locale";
  * current unit so a pinned locale outside the offered list stays selectable.
  */
 export const getUnitOptions = (t: TranslateFn, currentUnit?: string | null): UnitOption[] => [
+  { label: t("dashboard.unitGroupNumber"), header: true },
   { label: t("dashboard.default"), value: null },
   { label: t("dashboard.numbers"), value: "numbers" },
   { label: t("dashboard.localeFormat"), value: "locale" },
   { label: t("dashboard.otherLocale"), value: OTHER_LOCALE_KEY, expandable: true },
   ...getPinnedLocaleOptions(currentUnit),
-  { label: t("dashboard.bytes"), value: "bytes" },
-  { label: t("dashboard.kilobytes"), value: "kilobytes" },
-  { label: t("dashboard.megabytes"), value: "megabytes" },
-  { label: t("dashboard.bytesPerSecond"), value: "bps" },
+  { label: t("dashboard.unitGroupData"), header: true },
+  { label: t("dashboard.bytesBinary"), value: "bytes" },
+  { label: t("dashboard.kilobytesBinary"), value: "kilobytes" },
+  { label: t("dashboard.megabytesBinary"), value: "megabytes" },
+  { label: t("dashboard.bytesSi"), value: "bytes-si" },
+  { label: t("dashboard.kilobytesSi"), value: "kilobytes-si" },
+  { label: t("dashboard.megabytesSi"), value: "megabytes-si" },
+  { label: t("dashboard.bits"), value: "bits" },
+  { label: t("dashboard.unitGroupDataRate"), header: true },
+  { label: t("dashboard.bytesPerSecondBinary"), value: "bps" },
+  { label: t("dashboard.bytesPerSecondSi"), value: "bps-si" },
+  { label: t("dashboard.bitsPerSecond"), value: "bits-per-sec" },
+  { label: t("dashboard.unitGroupThroughput"), header: true },
+  { label: t("dashboard.requestsPerSecond"), value: "req-per-sec" },
+  { label: t("dashboard.opsPerSecond"), value: "ops-per-sec" },
+  { label: t("dashboard.eventsPerSecond"), value: "events-per-sec" },
+  { label: t("dashboard.requestsPerMinute"), value: "req-per-min" },
+  { label: t("dashboard.opsPerMinute"), value: "ops-per-min" },
+  { label: t("dashboard.eventsPerMinute"), value: "events-per-min" },
+  { label: t("dashboard.perSecond"), value: "per-sec" },
+  { label: t("dashboard.perMinute"), value: "per-min" },
+  { label: t("dashboard.unitGroupTime"), header: true },
   { label: t("dashboard.seconds"), value: "seconds" },
   { label: t("dashboard.milliseconds"), value: "milliseconds" },
   { label: t("dashboard.microseconds"), value: "microseconds" },
   { label: t("dashboard.nanoseconds"), value: "nanoseconds" },
+  { label: t("dashboard.minutes"), value: "minutes" },
+  { label: t("dashboard.hours"), value: "hours" },
+  { label: t("dashboard.days"), value: "days" },
+  { label: t("dashboard.unitGroupPercent"), header: true },
   { label: t("dashboard.percent1"), value: "percent-1" },
   { label: t("dashboard.percent"), value: "percent" },
+  { label: t("dashboard.unitGroupCurrency"), header: true },
   { label: t("dashboard.currencyDollar"), value: "currency-dollar" },
   { label: t("dashboard.currencyEuro"), value: "currency-euro" },
   { label: t("dashboard.currencyPound"), value: "currency-pound" },
   { label: t("dashboard.currencyYen"), value: "currency-yen" },
   { label: t("dashboard.currencyRupees"), value: "currency-rupee" },
+  { label: t("dashboard.unitGroupCustom"), header: true },
   { label: t("dashboard.custom"), value: "custom" },
 ];
 

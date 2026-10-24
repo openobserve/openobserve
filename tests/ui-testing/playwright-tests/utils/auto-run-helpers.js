@@ -15,6 +15,7 @@
 
 // Shared helpers for the Logs Auto Run specs (item 2): request classification, fixtures, stats.
 const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
+const { ingestBase } = require('./ingest-url.js');
 
 const MINUTE_US = 60 * 1_000_000;
 
@@ -62,12 +63,44 @@ function trackSearches(page) {
 async function ingestRows(request, org, stream, rows) {
   const headers = { ...getAuthHeaders(), 'Content-Type': 'application/json' };
   for (let i = 0; i < rows.length; i += 2000) {
-    const response = await request.post(`${apiBase()}/api/${org}/${stream}/_json`, {
+    const response = await request.post(`${ingestBase(apiBase())}/api/${org}/${stream}/_json`, {
       headers,
       data: rows.slice(i, i + 2000),
     });
     if (!response.ok()) throw new Error(`ingest failed: ${response.status()} ${await response.text()}`);
   }
+}
+
+// Polls the search API (track_total_hits) until a freshly-ingested stream has at
+// least `minRows` searchable. Search-based (not stats-based), so it does not wait
+// on the periodic stats-calculation job (ZO_CALCULATE_STATS_INTERVAL) the way
+// waitForStats does; the WAL -> index lag is typically a few seconds.
+async function waitForSearchable(request, org, stream, minRows = 1, timeoutMs = 120000) {
+  const headers = { ...getAuthHeaders(), 'Content-Type': 'application/json' };
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const now = Date.now() * 1000;
+    const response = await request.post(`${apiBase()}/api/${org}/_search?type=logs`, {
+      headers,
+      data: {
+        query: {
+          sql: `SELECT * FROM "${stream}"`,
+          start_time: now - 3600e6,
+          end_time: now,
+          from: 0,
+          size: 0,
+          track_total_hits: true,
+        },
+      },
+    });
+    if (response.ok()) {
+      const body = await response.json().catch(() => null);
+      const total = Number(body?.total ?? 0);
+      if (total >= minRows) return total;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+  throw new Error(`${org}/${stream} not searchable (>=${minRows} rows) within ${timeoutMs} ms`);
 }
 
 async function waitForStats(request, org, stream, timeoutMs = 180000) {
@@ -113,6 +146,7 @@ module.exports = {
   classifySearch,
   trackSearches,
   ingestRows,
+  waitForSearchable,
   waitForStats,
   estimateMb,
   readConfig,

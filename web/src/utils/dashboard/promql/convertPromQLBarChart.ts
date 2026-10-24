@@ -23,6 +23,7 @@ import {
 } from "./shared/axisBuilder";
 import { getSeriesColor } from "../colorPalette";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
+import { createSeriesOverrideLookup } from "../seriesOverrides";
 import { calculateWidthText } from "../chartDimensionUtils";
 
 /**
@@ -36,6 +37,7 @@ export class BarConverter implements PromQLChartConverter {
     const config = panelSchema.config || {};
     const isHorizontal = chartType.startsWith("h-");
     const isStacked = chartType.includes("stacked");
+    const seriesOverrides = createSeriesOverrideLookup(config);
 
     const series: any[] = [];
     const categories: string[] = [];
@@ -169,15 +171,17 @@ export class BarConverter implements PromQLChartConverter {
       seriesDataCollection.forEach((seriesData) => {
         const numericValues = seriesData.rawValues.map(([, val]) => parseFloat(val));
 
-        const color = getSeriesColor(
-          config.color || null,
-          seriesData.name,
-          numericValues,
-          chartMin,
-          chartMax,
-          store.state.theme,
-          config.color?.colorBySeries,
-        );
+        const color =
+          seriesOverrides.get(seriesData.name)?.color ??
+          getSeriesColor(
+            config.color || null,
+            seriesData.name,
+            numericValues,
+            chartMin,
+            chartMax,
+            store.state.theme,
+            config.color?.colorBySeries,
+          );
 
         dataItems.push(
           color ? { value: seriesData.value, itemStyle: { color } } : { value: seriesData.value },
@@ -194,8 +198,9 @@ export class BarConverter implements PromQLChartConverter {
           rotate: config?.label_option?.rotate || 0,
           // Add unit formatting to labels
           formatter: (params: any) => {
+            const unit = seriesOverrides.unitArgs(params.name);
             return formatUnitValue(
-              getUnitValue(params.value, config?.unit, config?.unit_custom, config?.decimals),
+              getUnitValue(params.value, unit.unit, unit.unitCustom, unit.decimals),
             );
           },
         },
@@ -224,6 +229,13 @@ export class BarConverter implements PromQLChartConverter {
         width: config.axis_width || 150,
       };
     }
+    // Plain h-bar categories are the series names, so they take the display names.
+    if (!isStacked && categories.some((name) => seriesOverrides.get(name)?.displayName)) {
+      axisConfig.yAxis.axisLabel = {
+        ...axisConfig.yAxis.axisLabel,
+        formatter: (name: string) => String(seriesOverrides.displayName(name)),
+      };
+    }
 
     // containLabel reserves the label area; fixed px insets avoid the waste
     // of percentage margins on wide panels and starvation on short ones.
@@ -247,7 +259,13 @@ export class BarConverter implements PromQLChartConverter {
         containLabel: true,
         ...(config.axis_width && { left: config.axis_width }),
       },
-      tooltip: buildTooltip(panelSchema, "axis", store, extras?.hoveredSeriesState),
+      tooltip: buildTooltip(
+        panelSchema,
+        "axis",
+        store,
+        extras?.hoveredSeriesState,
+        isStacked ? "seriesName" : "name",
+      ),
       // Legend config will be applied by applyLegendConfiguration in convertPromQLChartData
       // This ensures consistent behavior with SQL charts (applies to stacked and non-stacked)
     };
