@@ -21,8 +21,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="license-waivers-card"
   >
     <OCardSection role="body">
-      <div class="text-xl font-semibold">{{ t("about.waivers_title") }}</div>
-      <div class="text-text-secondary mt-1 mb-3 text-sm">{{ t("about.waivers_from_key") }}</div>
+      <div class="text-xl font-semibold" data-test="license-waivers-title">
+        {{ t("about.waivers_title") }}
+      </div>
+      <div class="text-text-secondary mt-1 mb-3 text-sm" data-test="license-waivers-description">
+        {{ t("about.waivers_from_key") }}
+      </div>
       <OTable
         :data="rows"
         :columns="columns"
@@ -30,18 +34,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         pagination="none"
         sorting="none"
         :frame="false"
+        :default-columns="false"
+        :dense="false"
+        wrap
         :show-global-filter="false"
         table-id="license-waivers"
         data-test="license-waivers-table"
       >
         <template #cell-waiver="{ row }">
-          <span class="flex items-center gap-2" :data-test="`license-waiver-row-${row.id}`">
-            <span>{{ waiverKindLabel(row, t) }}</span>
-            <OTag type="licenseWaiverStatus" :value="waiverStatus(row, nowUs)" />
-          </span>
+          <div :data-test="`license-waiver-row-${row.id}`">
+            <div
+              class="flex flex-wrap items-center gap-2"
+              :data-test="`license-waiver-heading-${row.id}`"
+            >
+              <span :data-test="`license-waiver-label-${row.id}`">{{
+                waiverKindLabel(row, t, locale)
+              }}</span>
+              <OTag
+                type="licenseWaiverStatus"
+                :value="waiverStatus(row, nowUs)"
+                :label="
+                  row.type === 'breach_days' && waiverStatus(row, nowUs) === 'ended'
+                    ? t('about.waiver_expired')
+                    : undefined
+                "
+                :data-test="`license-waiver-status-${row.id}`"
+              />
+            </div>
+            <div
+              v-if="waiverSummary(row, nowUs, locale, t)"
+              class="text-text-secondary mt-1 text-xs"
+              :data-test="`license-waiver-summary-${row.id}`"
+            >
+              {{ waiverSummary(row, nowUs, locale, t) }}
+            </div>
+          </div>
         </template>
-        <template #cell-window="{ row }">{{ waiverWindowLabel(row, locale, t) }}</template>
+        <template #cell-window="{ row }">
+          <span :data-test="`license-waiver-window-${row.id}`">{{
+            waiverWindowLabel(row, locale, t)
+          }}</span>
+        </template>
+        <template #cell-note="{ row }">
+          <span :data-test="`license-waiver-note-${row.id}`">{{ row.note }}</span>
+        </template>
       </OTable>
+      <div
+        v-if="!canUpdate"
+        class="text-text-secondary mt-3 text-sm"
+        data-test="license-waivers-ask-admin"
+      >
+        {{ t("about.waivers_ask_admin") }}
+      </div>
     </OCardSection>
   </OCard>
 </template>
@@ -55,7 +99,9 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import {
-  boundaryDelayMs,
+  MAX_TIMEOUT_MS,
+  breachRetentionEndUs,
+  waiverSummary,
   waiverKindLabel,
   waiverWindowLabel,
   knownWaivers,
@@ -63,7 +109,10 @@ import {
   type LicenseWaiver,
 } from "@/utils/licenseWaivers";
 
-const props = defineProps<{ waivers: LicenseWaiver[] | undefined }>();
+const props = withDefaults(
+  defineProps<{ waivers: LicenseWaiver[] | undefined; canUpdate?: boolean }>(),
+  { canUpdate: true },
+);
 
 const { t, locale } = useI18nTyped();
 
@@ -82,10 +131,17 @@ const armBoundaryTimer = () => {
   clearBoundaryTimer();
   nowUs.value = Date.now() * 1000;
   const upcoming = rows.value
-    .flatMap((w) => [w.starts_at, w.ends_at])
+    .flatMap((w) => [
+      w.starts_at,
+      w.ends_at,
+      ...(w.type === "breach_days" ? [breachRetentionEndUs(w)] : []),
+    ])
     .filter((b) => b > nowUs.value);
   if (!upcoming.length) return;
-  boundaryTimer = setTimeout(armBoundaryTimer, boundaryDelayMs(Math.min(...upcoming), nowUs.value));
+  boundaryTimer = setTimeout(
+    armBoundaryTimer,
+    Math.min(Math.ceil((Math.min(...upcoming) - nowUs.value) / 1000), MAX_TIMEOUT_MS),
+  );
 };
 
 watch(rows, armBoundaryTimer, { immediate: true });
@@ -93,7 +149,7 @@ watch(rows, armBoundaryTimer, { immediate: true });
 onBeforeUnmount(clearBoundaryTimer);
 
 const columns = computed<OTableColumnDef[]>(() => [
-  { id: "waiver", header: t("about.waiver_col_waiver"), cell: " ", size: 240 },
+  { id: "waiver", header: t("about.waiver_col_waiver"), cell: " ", size: 360 },
   { id: "window", header: t("about.waiver_col_window"), cell: " ", size: 220 },
   {
     id: "note",
