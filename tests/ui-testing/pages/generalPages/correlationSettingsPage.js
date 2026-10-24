@@ -84,8 +84,6 @@ export class CorrelationSettingsPage {
     /**
      * Ensure semantic groups exist in the backend for testing fingerprint checkboxes
      * Adds any missing test groups to the org's semantic groups (GET, merge, PUT), keeping every existing group
-     * AND POST /api/{org}/alerts/deduplication/config to include them in the config
-     * The frontend reads semantic groups from the config endpoint first
      * @param {string} orgId - Organization identifier
      * @returns {Promise<boolean>} - True if successful
      */
