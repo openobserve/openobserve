@@ -16,6 +16,7 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
+import { createMemoryHistory, createRouter, type Router } from "vue-router";
 import { http, HttpResponse } from "msw";
 // Mock aws-exports so isEnterprise / isCloud can be controlled per-test
 vi.mock("@/aws-exports", () => ({
@@ -75,7 +76,6 @@ import AlertList from "@/components/alerts/AlertList.vue";
 import config from "@/aws-exports";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import router from "@/test/unit/helpers/router";
 import AlertService from "@/services/alerts";
 import { queryClient } from "@/composables/query/queryClient";
 import { alertKeys } from "@/services/alerts.querykeys";
@@ -103,7 +103,6 @@ if (typeof window !== "undefined") {
   });
 }
 
-// Stub for in-house ODialog/ODrawer used by the migrated component
 const O_OVERLAY_PROPS = {
   open: { type: Boolean, default: false },
   size: { type: String, default: undefined },
@@ -126,14 +125,17 @@ const O_OVERLAY_PROPS = {
   neutralButtonLoading: { type: Boolean, default: false },
 };
 
+// Closed overlays must not mount child controls, matching reka-ui's lazy content.
 const ODialogStub = {
   name: "ODialog",
   template:
     '<div class="o-dialog-stub" :data-test-id="$attrs[\'data-test\']" :data-open="open">' +
+    '<template v-if="open">' +
     '<slot name="header-left" />' +
     '<slot name="header-right" />' +
     "<slot />" +
     '<slot name="footer" />' +
+    "</template>" +
     "</div>",
   props: O_OVERLAY_PROPS,
   emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
@@ -142,7 +144,7 @@ const ODialogStub = {
 const ODrawerStub = {
   name: "ODrawer",
   template:
-    '<div class="o-drawer-stub" :data-open="open"><slot name="header" /><slot /><slot name="footer" /></div>',
+    '<div class="o-drawer-stub" :data-open="open"><template v-if="open"><slot name="header" /><slot /><slot name="footer" /></template></div>',
   props: O_OVERLAY_PROPS,
   emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
 };
@@ -196,15 +198,17 @@ const makeAlert = (idx: number, overrides: Partial<AlertV2> = {}): AlertV2 => ({
 });
 
 let alertsDB: AlertV2[] = [];
+let router: Router;
 
 let mountedWrappers: ReturnType<typeof mount>[] = [];
 
-async function mountAlertList() {
+async function mountAlertList({ renderTable = true } = {}) {
   const wrapper = mount(AlertList, {
     attachTo: node,
     global: {
       plugins: [i18n, store, router],
       stubs: {
+        OTable: !renderTable,
         FolderList: {
           template: '<div data-test="stub-folder-list"></div>',
         },
@@ -247,12 +251,7 @@ async function mountAlertList() {
       },
     },
   });
-  // emulate current route
-  wrapper.vm.router.currentRoute.value.name = "alertList";
-  wrapper.vm.router.currentRoute.value.query = {} as any;
-  // Tracked so afterEach can tear it down: every mount here attaches to the one
-  // shared `node`, so an un-unmounted tree keeps its watchers and observers
-  // alive for the rest of the file and each later test pays for all of them.
+  // Every mounted tree must release its watchers before the next test starts.
   mountedWrappers.push(wrapper);
   return wrapper;
 }
@@ -261,23 +260,20 @@ const alertsSvc = AlertService as any;
 const templatesSvc = vi.mocked(TemplateService);
 const destinationsSvc = vi.mocked(DestinationService);
 
-// Remove router.isReady await to avoid timeouts with guards
-// beforeAll(async () => {
-//   await router.isReady();
-// });
-
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks();
 
-  // Reset the shared router singleton before mounting. The component's
-  // immediate watcher on query.action (and the activeTab init read of
-  // query.tab) run during mount(), before mountAlertList can blank the query —
-  // so a leftover action/tab from an earlier test (e.g. "when action=add"
-  // pushes {action:"add"}) would asynchronously re-open the add/import dialog
-  // and hide the list (and its type filter), breaking every later assertion.
-  router.currentRoute.value.query = {};
-  router.currentRoute.value.params = {};
-  router.currentRoute.value.name = "alertList";
+  // A fresh router prevents pending navigation and lazy app imports from leaking between tests.
+  router = createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { name: "alertList", path: "/alerts", component: { template: "<div />" } },
+      { name: "alertDetail", path: "/alerts/:alert_id", component: { template: "<div />" } },
+      { name: "alertTemplates", path: "/templates", component: { template: "<div />" } },
+    ],
+  });
+  await router.push({ name: "alertList" });
+  await router.isReady();
 
   // align store shape expected by component watchers
   // ensure foldersByType has 'alerts' key and alerts map exists
@@ -1435,40 +1431,30 @@ describe("AlertList - isAnomalyDetectionEnabled", () => {
   });
 });
 
-// 12. ODialog / ODrawer migration coverage
 describe("AlertList - ODialog/ODrawer migration", () => {
-  it("clone dialog (ODialog) is not rendered when showForm=false", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    wrapper.vm.showForm = false;
-    await wrapper.vm.$nextTick();
-    const dialogs = wrapper.findAllComponents({ name: "ODialog" });
-    // ODialog is unconditionally rendered but receives open=false
-    const cloneDialog = dialogs.find((d: any) => d.props("title") !== undefined);
-    expect(cloneDialog?.props("open")).toBe(false);
+  it("clone dialog keeps its contents unmounted while closed", async () => {
+    const wrapper = await mountAlertList({ renderTable: false });
+    const cloneDialog = wrapper.findComponent(ODialogStub);
+    expect(cloneDialog.props("open")).toBe(false);
+    expect(wrapper.find('[data-test="to-be-clone-alert-name"]').exists()).toBe(false);
   });
 
   it("clone dialog (ODialog) renders with open=true when showForm=true", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
+    const wrapper = await mountAlertList({ renderTable: false });
     wrapper.vm.showForm = true;
     await wrapper.vm.$nextTick();
     const cloneDialog = wrapper.findComponent({ name: "ODialog" });
     expect(cloneDialog.exists()).toBe(true);
     expect(cloneDialog.props("open")).toBe(true);
-    // Migration metadata
     expect(cloneDialog.props("persistent")).toBe(true);
     expect(cloneDialog.props("size")).toBe("sm");
   });
 
   it("clone dialog ODialog binds title, labels, and primaryDisabled to isSubmitting and a present name", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
+    const wrapper = await mountAlertList({ renderTable: false });
     wrapper.vm.showForm = true;
     wrapper.vm.isSubmitting = false;
-    // duplicateAlert() seeds this from the source row, so the dialog is never
-    // open with a blank name in the UI. Setting showForm alone reaches a state
-    // the user cannot.
+    // duplicateAlert() seeds the name before opening the dialog.
     wrapper.vm.toBeCloneAlertName = "orders_latency_clone";
     await wrapper.vm.$nextTick();
 
@@ -1482,9 +1468,7 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     await wrapper.vm.$nextTick();
     expect(cloneDialog.props("primaryButtonDisabled")).toBe(true);
 
-    // #14627: a whitespace-only name is refused too. Neither clone endpoint
-    // rejects a blank name, and the resulting row cannot be searched, toggled
-    // or deleted by name — so Save has to be the gate.
+    // The clone endpoints accept blank names, so Save must reject them (#14627).
     wrapper.vm.isSubmitting = false;
     wrapper.vm.toBeCloneAlertName = "   ";
     await wrapper.vm.$nextTick();
@@ -1492,15 +1476,18 @@ describe("AlertList - ODialog/ODrawer migration", () => {
   });
 
   it("clone dialog emits click:secondary -> closes showForm", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
+    const wrapper = await mountAlertList({ renderTable: false });
     wrapper.vm.showForm = true;
-    await wrapper.vm.$nextTick();
+    await nextTick();
 
-    const cloneDialog = wrapper.findComponent({ name: "ODialog" });
-    await cloneDialog.vm.$emit("click:secondary");
-    await flushPromises();
+    const cloneDialog = wrapper.findComponent(ODialogStub);
+    expect(cloneDialog.props("open")).toBe(true);
+    expect(wrapper.find('[data-test="to-be-clone-alert-name"]').exists()).toBe(true);
+    cloneDialog.vm.$emit("click:secondary");
+    await nextTick();
     expect(wrapper.vm.showForm).toBe(false);
+    expect(cloneDialog.props("open")).toBe(false);
+    expect(wrapper.find('[data-test="to-be-clone-alert-name"]').exists()).toBe(false);
   });
 
   it("duplicateAlert pre-fills stream type and name from the source row", async () => {
@@ -1572,15 +1559,14 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     expect(alertsSvc.create_by_alert_id).toHaveBeenCalled();
   });
 
-  it("clone dialog secondary button (Cancel) closes the dialog", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
+  it("clone dialog update:open closes the dialog", async () => {
+    const wrapper = await mountAlertList({ renderTable: false });
     wrapper.vm.showForm = true;
     await wrapper.vm.$nextTick();
 
     const dialog = wrapper.findComponent({ name: "ODialog" });
     expect(dialog.exists()).toBe(true);
-    await dialog.vm.$emit("click:secondary");
+    dialog.vm.$emit("update:open", false);
     await wrapper.vm.$nextTick();
     expect(wrapper.vm.showForm).toBe(false);
   });
