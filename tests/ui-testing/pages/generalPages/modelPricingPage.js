@@ -5,6 +5,21 @@
 //   Editor: /web/settings/model_pricing/edit?org_identifier={org}&id={id}
 
 import { expect } from '@playwright/test';
+const modelPricingStrings = require('../../../../web/src/locales/languages/en-US.json').modelPricing;
+
+// en-US trigger labels for each rule operator. The rule-op select renders a
+// Reka SelectTrigger (not the listbox PopoverTrigger), so the selected value is
+// shown as its display label rather than a `data-test-selected-value` attribute.
+const RULE_OP_LABELS = {
+    in: 'is one of',
+    not_in: 'is not one of',
+    exists: 'is set',
+    not_exists: 'is not set',
+    gt: '>',
+    gte: '>=',
+    lt: '<',
+    lte: '<=',
+};
 
 export class ModelPricingPage {
     constructor(page) {
@@ -73,7 +88,7 @@ export class ModelPricingPage {
         // ============================================================
         // Editor page — optional feature buttons (may not exist in all builds)
         // ============================================================
-        this.addTierBtn     = page.locator('button').filter({ hasText: /add.?tier/i }).first();
+        this.addTierBtn     = page.locator('[data-test="model-pricing-add-tier-btn"]');
         this.templateBtn    = page.locator('button').filter({ hasText: /openai/i }).first();
         this.priceValueInput = page.getByPlaceholder('0.00').first();
         this.examplesBtn    = page.locator('button').filter({ hasText: /example/i }).first();
@@ -111,6 +126,18 @@ export class ModelPricingPage {
         this.testMatchWaiting   = page.locator('[data-test="test-match-waiting"]');
         this.testMatchNoResult  = page.locator('[data-test="test-match-no-result"]');
         this.testMatchResult    = page.locator('[data-test="test-match-result"]');
+
+        // ============================================================
+        // Editor page — attribute rules (per-tier)
+        // ============================================================
+        this.tieWarning     = page.locator('[data-test="model-pricing-tier-tie-warning"]');
+        this.drawerTierRule = page.locator('[data-test="model-pricing-drawer-tier-rule"]');
+
+        // ============================================================
+        // Test Match Dialog — attribute rows
+        // ============================================================
+        this.testMatchAttributeAdd = page.locator('[data-test="test-match-attribute-add"]');
+        this.testMatchTierRule     = page.locator('[data-test="test-match-tier-rule"]');
 
         // ============================================================
         // Confirm dialog (ODialog generic buttons)
@@ -320,6 +347,7 @@ export class ModelPricingPage {
         await valueInput.fill(String(valuePricePerMillion));
     }
 
+    /** Saves the editor and returns the saved model body; throws when no save request completes or it fails. */
     async clickSave() {
         // /llm/models/test and /llm/models/refresh-built-in share the prefix but are not saves, so match only the collection and item paths.
         const isSaveUrl = (url) => {
@@ -334,7 +362,12 @@ export class ModelPricingPage {
                 { timeout: 60000 }
             )
             .then(
-                resp => ({ method: resp.request().method(), status: resp.status(), ok: resp.ok() }),
+                async resp => ({
+                    method: resp.request().method(),
+                    status: resp.status(),
+                    ok: resp.ok(),
+                    body: resp.ok() ? await resp.json().catch(() => null) : null,
+                }),
                 () => null
             );
 
@@ -357,6 +390,8 @@ export class ModelPricingPage {
             this.listTitle.waitFor({ state: 'visible', timeout: 15000 }),
             this.toastMessage.first().waitFor({ state: 'visible', timeout: 15000 }),
         ]).catch(() => {});
+
+        return response.body;
     }
 
     async clickCancel() {
@@ -396,7 +431,8 @@ export class ModelPricingPage {
     /** Fill the test-match input. data-test is on the OInput wrapper — use inner <input>. */
     async fillTestMatchInput(modelName) {
         const input = this.testMatchInput.locator('input').first();
-        await input.fill(modelName, { force: true });
+        await expect(input).toBeVisible({ timeout: 5000 });
+        await input.fill(modelName);
     }
 
     async clickTestMatchRun() {
@@ -412,6 +448,187 @@ export class ModelPricingPage {
         const closeBtn = this.testMatchDialog.locator('[data-test="o-dialog-close-btn"]');
         await closeBtn.click();
         await this.testMatchDialog.waitFor({ state: 'hidden', timeout: 5000 });
+    }
+
+    // ----------------------------------------------------------------
+    // Attribute rules actions (editor, per non-default tier)
+    // ----------------------------------------------------------------
+
+    async clickAddTier() {
+        await this.addTierBtn.click();
+    }
+
+    async clickAddRule(tierIndex) {
+        const btn = this.page.locator(`[data-test="model-pricing-tier-add-rule-btn-${tierIndex}"]`);
+        await btn.click();
+    }
+
+    async clickRemoveRule(tierIndex, ruleIndex) {
+        const btn = this.page.locator(
+            `[data-test="model-pricing-tier-rule-remove-btn-${tierIndex}-${ruleIndex}"]`
+        );
+        await btn.click();
+    }
+
+    async fillRuleKeys(tierIndex, ruleIndex, value) {
+        const input = this.ruleKeysInput(tierIndex, ruleIndex);
+        await input.waitFor({ state: 'visible', timeout: 5000 });
+        await input.fill(value);
+    }
+
+    async fillRuleValues(tierIndex, ruleIndex, value) {
+        const input = this.ruleValuesInput(tierIndex, ruleIndex);
+        await input.waitFor({ state: 'visible', timeout: 5000 });
+        await input.fill(value);
+    }
+
+    async fillRuleValue(tierIndex, ruleIndex, value) {
+        const input = this.ruleValueInput(tierIndex, ruleIndex);
+        await input.waitFor({ state: 'visible', timeout: 5000 });
+        await input.fill(String(value));
+    }
+
+    async selectRuleOp(tierIndex, ruleIndex, opValue) {
+        const trigger = this.page.locator(
+            `[data-test="model-pricing-tier-rule-op-select-${tierIndex}-${ruleIndex}-trigger"]`
+        );
+        await trigger.waitFor({ state: 'visible', timeout: 5000 });
+        await trigger.click();
+        const option = this.page.locator(
+            `[data-test="model-pricing-tier-rule-op-select-${tierIndex}-${ruleIndex}-option"][data-test-value="${opValue}"]`
+        );
+        await option.waitFor({ state: 'visible', timeout: 5000 });
+        await option.click();
+    }
+
+    // ----------------------------------------------------------------
+    // Attribute rules locators + assertions
+    // ----------------------------------------------------------------
+
+    ruleKeysInput(tierIndex, ruleIndex) {
+        return this.page.locator(
+            `[data-test="model-pricing-tier-rule-keys-input-${tierIndex}-${ruleIndex}-field"]`
+        );
+    }
+
+    ruleValuesInput(tierIndex, ruleIndex) {
+        return this.page.locator(
+            `[data-test="model-pricing-tier-rule-values-input-${tierIndex}-${ruleIndex}-field"]`
+        );
+    }
+
+    ruleValueInput(tierIndex, ruleIndex) {
+        return this.page.locator(
+            `[data-test="model-pricing-tier-rule-value-input-${tierIndex}-${ruleIndex}-field"]`
+        );
+    }
+
+    async expectRuleKeysError(tierIndex, ruleIndex) {
+        await expect(
+            this.page.locator(
+                `[data-test="model-pricing-tier-rule-keys-input-${tierIndex}-${ruleIndex}-error"]`
+            )
+        ).toBeVisible({ timeout: 5000 });
+    }
+
+    async expectRuleOpError(tierIndex, ruleIndex) {
+        await expect(
+            this.page.locator(
+                `[data-test="model-pricing-tier-rule-op-select-${tierIndex}-${ruleIndex}-error"]`
+            )
+        ).toBeVisible({ timeout: 5000 });
+    }
+
+    async expectRuleOpValue(tierIndex, ruleIndex, opValue) {
+        // The rule-op select renders a Reka SelectTrigger whose selected value is
+        // displayed as its label text (e.g. "is one of" for "in") — it has no
+        // `data-test-selected-value` attribute in this build.
+        const label = RULE_OP_LABELS[opValue] ?? opValue;
+        await expect(
+            this.page.locator(
+                `[data-test="model-pricing-tier-rule-op-select-${tierIndex}-${ruleIndex}-trigger"]`
+            )
+        ).toContainText(label, { timeout: 5000 });
+    }
+
+    async expectRuleValueInputVisible(tierIndex, ruleIndex) {
+        await expect(this.ruleValueInput(tierIndex, ruleIndex)).toBeVisible({ timeout: 5000 });
+    }
+
+    async expectRuleValuesInputHidden(tierIndex, ruleIndex) {
+        await expect(this.ruleValuesInput(tierIndex, ruleIndex)).toHaveCount(0, { timeout: 5000 });
+    }
+
+    async expectTieWarningVisible() {
+        await expect(this.tieWarning).toBeVisible({ timeout: 10000 });
+    }
+
+    async expectAddRuleDisabled(tierIndex) {
+        await expect(
+            this.page.locator(`[data-test="model-pricing-tier-add-rule-btn-${tierIndex}"]`)
+        ).toBeDisabled({ timeout: 5000 });
+    }
+
+    async expectRuleCount(tierIndex, count) {
+        await expect
+            .poll(
+                () =>
+                    this.page
+                        .locator(`[data-test^="model-pricing-tier-rule-remove-btn-${tierIndex}-"]`)
+                        .count(),
+                { timeout: 5000, message: `expected tier ${tierIndex} to hold ${count} rules` }
+            )
+            .toBe(count);
+    }
+
+    /** Open the "+N more" pricing drawer for a model row and assert it is visible. */
+    async openPricingDrawerForModel(name) {
+        const row = this.listTable.locator(`tr:has-text("${name}")`);
+        const moreLink = row
+            .locator('button, a, span')
+            .filter({ hasText: new RegExp(`\\+\\d+\\s*${modelPricingStrings.overflowMore}`, 'i') })
+            .first();
+        await expect(moreLink).toBeVisible({ timeout: 5000 });
+        await moreLink.click();
+        await expect(this.pricingDrawer).toBeVisible({ timeout: 10000 });
+    }
+
+    async expectDrawerTierRuleVisible(textFragment) {
+        await expect(this.drawerTierRule.filter({ hasText: textFragment }).first())
+            .toBeVisible({ timeout: 10000 });
+    }
+
+    // ----------------------------------------------------------------
+    // Test Match Dialog — attribute rows
+    // ----------------------------------------------------------------
+
+    async clickTestMatchAttributeAdd() {
+        await this.testMatchAttributeAdd.click();
+    }
+
+    async fillTestMatchAttributeKey(attrIndex, value) {
+        const input = this.page
+            .locator(`[data-test="test-match-attribute-key-${attrIndex}"]`)
+            .locator('input')
+            .first();
+        await input.fill(value);
+    }
+
+    async fillTestMatchAttributeValue(attrIndex, value) {
+        const input = this.page
+            .locator(`[data-test="test-match-attribute-value-${attrIndex}"]`)
+            .locator('input')
+            .first();
+        await input.fill(value);
+    }
+
+    async expectTestMatchResultVisible() {
+        await expect(this.testMatchResult).toBeVisible({ timeout: 10000 });
+    }
+
+    async expectTestMatchTierRuleVisible(textFragment) {
+        await expect(this.testMatchTierRule.filter({ hasText: textFragment }).first())
+            .toBeVisible({ timeout: 10000 });
     }
 
     // ----------------------------------------------------------------
