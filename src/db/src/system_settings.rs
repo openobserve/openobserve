@@ -28,6 +28,11 @@ use infra::{errors::Result, table::system_settings as db};
 /// Watcher prefix for system settings events
 const SYSTEM_SETTINGS_WATCHER_PREFIX: &str = "/system_settings/";
 
+/// Org-scope setting keys that replicate across a super cluster.
+#[cfg(feature = "enterprise")]
+const REPLICATED_SYSTEM_SETTING_KEYS: [&str; 2] =
+    ["default_alert_destination", "default_alert_template"];
+
 /// Generate a cache key for a system setting
 fn cache_key(
     scope: &SettingScope,
@@ -38,6 +43,16 @@ fn cache_key(
     let org = org_id.unwrap_or("_");
     let user = user_id.unwrap_or("_");
     format!("{}:{}:{}:{}", scope.as_str(), org, user, key)
+}
+
+#[cfg(feature = "enterprise")]
+fn is_replicated_setting_key(key: &str) -> bool {
+    REPLICATED_SYSTEM_SETTING_KEYS.contains(&key)
+}
+
+#[cfg(feature = "enterprise")]
+fn is_replicated_org_setting(scope: &SettingScope, org_id: Option<&str>, key: &str) -> bool {
+    *scope == SettingScope::Org && org_id.is_some() && is_replicated_setting_key(key)
 }
 
 /// Get a single setting from the populated in-memory cache, without a database lookup.
@@ -175,6 +190,29 @@ pub async fn set(setting: &SystemSetting) -> Result<SystemSetting> {
         log::error!("Failed to emit system settings put event: {}", e);
     }
 
+    #[cfg(feature = "enterprise")]
+    if is_replicated_org_setting(
+        &setting.scope,
+        setting.org_id.as_deref(),
+        &setting.setting_key,
+    ) && let Some(org_id) = setting.org_id.as_deref()
+        && o2_enterprise::enterprise::common::config::get_config()
+            .super_cluster
+            .enabled
+        && !config::get_config().common.local_mode
+        && let Ok(value) = config::utils::json::to_vec(setting)
+        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::system_settings_put(
+            &format!("/system_settings/{org_id}/{}", setting.setting_key),
+            value.into(),
+        )
+        .await
+    {
+        log::error!(
+            "[SUPER_CLUSTER] Failed to publish system_settings put: org_id: {org_id}, key: {}, error: {e}",
+            setting.setting_key
+        );
+    }
+
     Ok(result)
 }
 
@@ -216,6 +254,23 @@ pub async fn delete(
     let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, cache_k);
     if let Err(e) = infra::coordinator::emit_delete(&event_key).await {
         log::error!("Failed to emit system settings delete event: {}", e);
+    }
+
+    #[cfg(feature = "enterprise")]
+    if is_replicated_org_setting(scope, org_id, key)
+        && let Some(org_id) = org_id
+        && o2_enterprise::enterprise::common::config::get_config()
+            .super_cluster
+            .enabled
+        && !config::get_config().common.local_mode
+        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::system_settings_delete(
+            &format!("/system_settings/{org_id}/{key}"),
+        )
+        .await
+    {
+        log::error!(
+            "[SUPER_CLUSTER] Failed to publish system_settings delete: org_id: {org_id}, key: {key}, error: {e}"
+        );
     }
 
     Ok(result)
@@ -814,6 +869,39 @@ mod tests {
             get_default_gen_ai_agent_mapping_config()
         );
         SYSTEM_SETTINGS.write().await.remove(&key);
+    }
+
+    #[test]
+    #[cfg(feature = "enterprise")]
+    fn publish_gate_allows_only_replicated_org_keys() {
+        assert!(is_replicated_org_setting(
+            &SettingScope::Org,
+            Some("org-1"),
+            "default_alert_destination"
+        ));
+        assert!(is_replicated_org_setting(
+            &SettingScope::Org,
+            Some("org-1"),
+            "default_alert_template"
+        ));
+        // System-scope settings are region-local.
+        assert!(!is_replicated_org_setting(
+            &SettingScope::System,
+            None,
+            "default_alert_destination"
+        ));
+        // Non-allow-listed keys never replicate.
+        assert!(!is_replicated_org_setting(
+            &SettingScope::Org,
+            Some("org-1"),
+            "semantic_field_groups"
+        ));
+        // Org scope requires an org.
+        assert!(!is_replicated_org_setting(
+            &SettingScope::Org,
+            None,
+            "default_alert_destination"
+        ));
     }
 
     #[test]
