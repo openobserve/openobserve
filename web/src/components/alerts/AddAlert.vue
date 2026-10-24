@@ -567,6 +567,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :destinations="destinations"
                 :previewQuery="previewQuery"
                 :generatedSqlQuery="generatedSqlQuery"
+                :isAggregationEnabled="isAggregationEnabled"
               />
             </div>
           </div>

@@ -95,6 +95,27 @@ vi.mock("@/composables/alerts/useAlertValueSuggest", () => ({
   useAlertValueSuggest: valueSuggestSpy,
 }));
 
+// Controllable suggestion state; the composable's own behaviour is covered by its spec.
+const suggestionMock = vi.hoisted(() => ({ rule: null as any, state: null as any }));
+vi.mock("@/composables/alerts/useThresholdSuggestion", async () => {
+  const { ref: vueRef } = await vi.importActual<typeof import("vue")>("vue");
+  suggestionMock.state = {
+    suggested: vueRef(null),
+    usualHigh: vueRef(null),
+    truncatedDays: vueRef(null),
+    history: vueRef(null),
+    backtest: vueRef(null),
+    loading: vueRef(false),
+    error: vueRef(false),
+  };
+  return {
+    useThresholdSuggestion: vi.fn((rule: () => any) => {
+      suggestionMock.rule = rule;
+      return suggestionMock.state;
+    }),
+  };
+});
+
 // Mock QueryEditorDialog component
 vi.mock("@/components/alerts/QueryEditorDialog.vue", () => ({
   default: {
@@ -2629,6 +2650,117 @@ describe("QueryConfig.vue", () => {
       expect(delivered).toBeDefined();
       // effectiveSuggestions is [] in value context; the base list is not.
       expect(delivered).toEqual([]);
+    });
+  });
+  describe("Threshold suggestion", () => {
+    const YESTERDAY_0910 = Date.UTC(2026, 9, 22, 9, 10);
+    const offer = (over: Record<string, any> = {}) => {
+      suggestionMock.state.suggested.value = 15;
+      suggestionMock.state.usualHigh.value = 6;
+      suggestionMock.state.truncatedDays.value = null;
+      suggestionMock.state.history.value = "ok";
+      suggestionMock.state.backtest.value = { episodes: 1, at: [YESTERDAY_0910] };
+      suggestionMock.state.loading.value = false;
+      suggestionMock.state.error.value = false;
+      for (const [key, value] of Object.entries(over)) suggestionMock.state[key].value = value;
+    };
+    const hint = () => host.find('[data-test="alert-threshold-suggestion"]');
+    const useButton = () => host.find('[data-test="alert-threshold-use-suggested"]');
+    const remount = (qc: Record<string, any> = {}, formOver: Record<string, any> = {}) => {
+      host.unmount();
+      const { h } = mountHost(qc, formOver);
+      host = h;
+      wrapper = host.findComponent(QueryConfig) as unknown as VueWrapper<any>;
+    };
+
+    beforeEach(async () => {
+      mockStore.state.timezone = "UTC";
+      offer();
+      await nextTick();
+    });
+
+    it("offers the suggestion beside a new count rule without filling it", async () => {
+      await flushPromises();
+      expect(suggestionMock.rule().enabled).toBe(true);
+      expect(suggestionMock.rule().kind).toBe("count");
+      expect(useButton().text()).toBe("Use suggested 15");
+      expect(hostForm().getFieldValue("trigger_condition.threshold")).toBe(3);
+    });
+
+    it("fills the threshold only when clicked, and a typed value stays until then", async () => {
+      const input = host.find('[data-test="alert-trigger-threshold-input"] input');
+      await input.setValue("7");
+      offer({ suggested: 20 });
+      await flushPromises();
+      expect(Number(hostForm().getFieldValue("trigger_condition.threshold"))).toBe(7);
+
+      await useButton().trigger("click");
+      await flushPromises();
+      expect(hostForm().getFieldValue("trigger_condition.threshold")).toBe(20);
+      expect(useButton().exists()).toBe(false);
+    });
+
+    it("says how high it usually goes and how often it would have fired, in the user's time zone", async () => {
+      await flushPromises();
+      expect(hint().text()).toContain("Usually up to 6 (past week).");
+      expect(hint().text()).toContain("Would have fired 1 time yesterday, at 09:10 (UTC).");
+    });
+
+    it("says when it would not have fired", async () => {
+      offer({ backtest: { episodes: 0, at: [] } });
+      await flushPromises();
+      expect(hint().text()).toContain("Wouldn't have fired yesterday.");
+    });
+
+    it.each([
+      [{ error: true, suggested: null }, "Couldn't check history."],
+      [
+        { history: "none", suggested: null, usualHigh: null },
+        "Not enough history to suggest a limit yet.",
+      ],
+      [{ history: "short", backtest: null }, "Not tested: not enough history."],
+      [{ truncatedDays: 3 }, "Based on the last 3 days (history limit)."],
+    ])("explains the edge case %o", async (state, copy) => {
+      offer(state);
+      await flushPromises();
+      expect(hint().text()).toContain(copy);
+    });
+
+    it("fills a measure rule's value, and stays off once it is grouped", async () => {
+      wrapper.vm.selectedFunction = "avg";
+      wrapper.vm.onLogFunctionChange("avg");
+      hostForm().setFieldValue("query_condition.aggregation.having.column", "field2");
+      await flushPromises();
+      expect(suggestionMock.rule()).toMatchObject({ enabled: true, kind: "value" });
+
+      await useButton().trigger("click");
+      await flushPromises();
+      expect(hostForm().getFieldValue("query_condition.aggregation.having.value")).toBe(15);
+
+      hostForm().setFieldValue("logGroupBy", ["field1"]);
+      await flushPromises();
+      expect(suggestionMock.rule().enabled).toBe(false);
+    });
+
+    it("is off in edit mode", async () => {
+      remount({ beingUpdated: true });
+      await flushPromises();
+      expect(suggestionMock.rule().enabled).toBe(false);
+      expect(hint().exists()).toBe(false);
+    });
+
+    it("is off for realtime, SQL and PromQL rules", async () => {
+      remount({ isRealTime: "true" }, { is_real_time: "true" });
+      expect(suggestionMock.rule().enabled).toBe(false);
+      remount({ tab: "sql" });
+      expect(suggestionMock.rule().enabled).toBe(false);
+      remount({ tab: "promql" });
+      expect(suggestionMock.rule().enabled).toBe(false);
+    });
+
+    it("keeps the blank form's default threshold of 3", async () => {
+      await flushPromises();
+      expect(hostForm().getFieldValue("trigger_condition.threshold")).toBe(3);
     });
   });
 });

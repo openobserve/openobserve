@@ -177,6 +177,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </div>
                       </div>
+                      <ThresholdSuggestionHint
+                        v-if="thresholdRule.enabled"
+                        v-bind="thresholdHint"
+                        @use="applySuggestedThreshold"
+                      />
                       <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
                            critical's operator, so the row only echoes it. -->
                       <div v-if="countWarningVisible" class="flex items-start gap-2">
@@ -270,6 +275,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </div>
                       </div>
+                      <ThresholdSuggestionHint
+                        v-if="thresholdRule.enabled"
+                        v-bind="thresholdHint"
+                        @use="applySuggestedThreshold"
+                      />
                       <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
                            critical's operator, so the row only echoes it. -->
                       <div v-if="aggWarningVisible" class="flex items-start gap-2">
@@ -555,6 +565,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </div>
                       </div>
+                      <ThresholdSuggestionHint
+                        v-if="thresholdRule.enabled"
+                        v-bind="thresholdHint"
+                        @use="applySuggestedThreshold"
+                      />
                       <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
                            critical's operator, so the row only echoes it. -->
                       <div v-if="countWarningVisible" class="flex items-start gap-2">
@@ -647,6 +662,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </div>
                       </div>
+                      <ThresholdSuggestionHint
+                        v-if="thresholdRule.enabled"
+                        v-bind="thresholdHint"
+                        @use="applySuggestedThreshold"
+                      />
                       <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
                            critical's operator, so the row only echoes it. -->
                       <div v-if="aggWarningVisible" class="flex items-start gap-2">
@@ -1907,6 +1927,11 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import AlertMultiToggle from "@/components/alerts/AlertMultiToggle.vue";
 import ForecastAlertFields from "@/components/alerts/steps/ForecastAlertFields.vue";
+import ThresholdSuggestionHint from "@/components/alerts/steps/ThresholdSuggestionHint.vue";
+import {
+  useThresholdSuggestion,
+  type ThresholdRule,
+} from "@/composables/alerts/useThresholdSuggestion";
 import {
   FORECAST_FREQUENCY_MINUTES,
   FORECAST_PERIOD_MINUTES,
@@ -1931,6 +1956,7 @@ export default defineComponent({
     OTruncatedText,
     AlertMultiToggle,
     ForecastAlertFields,
+    ThresholdSuggestionHint,
     AlertQueryPreview,
     FilterGroup,
     QueryEditorDialog,
@@ -3592,6 +3618,57 @@ export default defineComponent({
       }
     };
 
+    const numberOrNull = (value: unknown): number | null =>
+      value === "" || value === null || value === undefined || Number.isNaN(Number(value))
+        ? null
+        : Number(value);
+
+    // Count mode limits trigger_condition.threshold; measure mode limits aggregation.having.value.
+    const thresholdIsCount = computed(() => selectedFunction.value === "total_events");
+    const thresholdHasGroupBy = computed(() =>
+      isEventBased.value ? hasLogGroupByFields.value : hasMetricGroupByFields.value,
+    );
+    const thresholdRule = computed<ThresholdRule>(() => {
+      const isCount = thresholdIsCount.value;
+      const measured = isCount || !!fv("query_condition.aggregation.having.column");
+      return {
+        // Grouped rules fire per group, so one series of buckets can't back-test them.
+        enabled:
+          !props.beingUpdated &&
+          localTab.value === "custom" &&
+          props.isRealTime === "false" &&
+          measured &&
+          (isCount || !thresholdHasGroupBy.value),
+        streamName: props.streamName,
+        streamType: props.streamType,
+        query: props.generatedSqlQuery,
+        kind: isCount ? "count" : "value",
+        operator: isCount ? triggerOperator.value : conditionOperator.value,
+        threshold: numberOrNull(isCount ? triggerThreshold.value : conditionValue.value),
+        periodMinutes: Number(fv("trigger_condition.period")) || 0,
+        silenceMinutes: Number(fv("trigger_condition.silence")) || 0,
+      };
+    });
+    const thresholdSuggestion = useThresholdSuggestion(() => thresholdRule.value);
+    const thresholdHint = computed(() => ({
+      suggested: thresholdSuggestion.suggested.value,
+      usualHigh: thresholdSuggestion.usualHigh.value,
+      truncatedDays: thresholdSuggestion.truncatedDays.value,
+      history: thresholdSuggestion.history.value,
+      backtest: thresholdSuggestion.backtest.value,
+      loading: thresholdSuggestion.loading.value,
+      error: thresholdSuggestion.error.value,
+      current: thresholdRule.value.threshold,
+    }));
+    const applySuggestedThreshold = (value: number) => {
+      if (thresholdIsCount.value) {
+        onTriggerThresholdChange(value);
+      } else {
+        conditionValue.value = value;
+        emitAggregationUpdate();
+      }
+    };
+
     // Legacy toggle kept for compatibility — not used in new UI
     const toggleAggregation = () => {
       emit("update:isAggregationEnabled", localIsAggregationEnabled.value);
@@ -3975,6 +4052,9 @@ export default defineComponent({
       deleteGroupByColumn,
       emitAggregationUpdate,
       emitPromqlConditionUpdate,
+      thresholdRule,
+      thresholdHint,
+      applySuggestedThreshold,
       // V3.1 inline condition
       isEventBased,
       logFunctionOptions,
