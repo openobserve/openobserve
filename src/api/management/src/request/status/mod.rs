@@ -232,6 +232,8 @@ struct ConfigResponse<'a> {
     composite_alerts_available: bool,
     synthetics_enabled: bool,
     oncall_enabled: bool,
+    /// This region can send email; region-local, not cluster-wide.
+    smtp_enabled: bool,
     slack_enabled: bool,
     /// The same reason for every org, null when on.
     slack_disabled_reason: Option<DisabledReason>,
@@ -654,6 +656,7 @@ pub async fn zo_config(
         composite_alerts_available,
         synthetics_enabled,
         oncall_enabled,
+        smtp_enabled: cfg.smtp.smtp_enabled,
         slack_enabled: slack_disabled_reason.is_none(),
         slack_disabled_reason,
         synthetics_private_locations_enabled,
@@ -2565,6 +2568,19 @@ mod tests {
             .await
             .unwrap();
         serde_json::from_slice(&body).unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_zo_config_serves_smtp_enabled_and_no_other_smtp_detail() {
+        let json = zo_config_json().await;
+        assert_eq!(json["smtp_enabled"], get_config().smtp.smtp_enabled);
+        let smtp_keys: Vec<&String> = json
+            .as_object()
+            .unwrap()
+            .keys()
+            .filter(|k| k.contains("smtp"))
+            .collect();
+        assert_eq!(smtp_keys, vec!["smtp_enabled"]);
     }
 
     #[cfg(feature = "enterprise")]

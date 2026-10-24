@@ -701,6 +701,7 @@ fn composite_list_item(
         tags,
         destinations: Vec::new(),
         template: None,
+        library_id: None,
         groups_observed: None,
         groups_firing: None,
         groups_observed_is_lower_bound: None,
