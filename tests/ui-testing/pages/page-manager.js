@@ -30,6 +30,7 @@ import DashboardPanelTime from "./dashboardPages/dashboard-panel-time";
 import DashboardZoomDrag from "./dashboardPages/dashboard-zoom-drag";
 import LogsVisualise from "./dashboardPages/visualise";
 import { DashboardPage } from "./dashboardPages/dashboardPage.js";
+import { DashboardSaveConflictPage } from "./dashboardPages/dashboard-save-conflict.js";
 import { ScheduledReportsDrawerPage } from "./dashboardPages/scheduledReportsDrawer.js";
 import { AlertsPage } from "./alertsPages/alertsPage.js";
 import CreateAlertFromSourceDialogPage from "./alertsPages/createAlertFromSourceDialogPage.js";
@@ -205,6 +206,7 @@ class PageManager {
     this.dashboardZoomDrag = new DashboardZoomDrag(page);
     this.logsVisualise = new LogsVisualise(page);
     this.dashboardPage = new DashboardPage(page);
+    this.dashboardSaveConflict = new DashboardSaveConflictPage(page);
     this.scheduledReportsDrawer = new ScheduledReportsDrawerPage(page);
 
     // ===== EXISTING ALERTS PAGE OBJECT =====
