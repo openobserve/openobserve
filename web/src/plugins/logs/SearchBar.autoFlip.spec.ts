@@ -111,6 +111,19 @@ describe("SearchBar — SQL auto-flip (item 1, spec 6.4)", () => {
     }
   });
 
+  it("leaves SQL mode when the query is cleared on the Logs tab", () => {
+    wrapper.vm.searchObj.meta.sqlMode = true;
+    wrapper.vm.updateQueryValue("");
+    expect(wrapper.vm.searchObj.meta.sqlMode).toBe(false);
+  });
+
+  it("stays in SQL mode when the Build tab's builder empties the editor", () => {
+    wrapper.vm.searchObj.meta.logsVisualizeToggle = "build";
+    wrapper.vm.searchObj.meta.sqlMode = true;
+    wrapper.vm.updateQueryValue("");
+    expect(wrapper.vm.searchObj.meta.sqlMode).toBe(true);
+  });
+
   it("still flips SQL on an unknown stream so the missing stream is reported", () => {
     wrapper.vm.updateQueryValue('SELECT * FROM "does_not_exist"');
     expect(wrapper.vm.searchObj.meta.sqlMode).toBe(true);

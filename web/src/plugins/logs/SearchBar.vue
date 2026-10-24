@@ -2763,8 +2763,12 @@ export default defineComponent({
 
       _sqlOnQueryChange();
 
-      // Turn off SQL mode when query is completely cleared
-      if (value.trim() === "" && searchObj.meta.sqlMode === true) {
+      // Clearing the query leaves SQL mode, but not on the Build tab: there the builder's transient empty query echoes back here.
+      if (
+        value.trim() === "" &&
+        searchObj.meta.sqlMode === true &&
+        searchObj.meta.logsVisualizeToggle !== "build"
+      ) {
         searchObj.meta.sqlMode = false;
         searchObj.data.filterErrMsg = "";
       }
