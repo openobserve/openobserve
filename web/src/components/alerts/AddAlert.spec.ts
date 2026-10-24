@@ -285,6 +285,22 @@ describe("AddAlert (OForm owner)", () => {
     });
   });
 
+  describe("after save", () => {
+    it("hands the created alert's id to the host so it can open the alert", async () => {
+      (alertsService.create_by_alert_id as any).mockResolvedValueOnce({
+        data: { code: 200, message: "Alert saved", id: "new-alert-id" },
+      });
+      wrapper = mountAlert({ folderId: "team-a" });
+      await flushPromises();
+      seedValidScheduled(wrapper.vm.form);
+
+      await wrapper.vm.form.handleSubmit();
+      await flushPromises();
+
+      expect(wrapper.emitted("update:list")?.[0]).toEqual(["team-a", "new-alert-id"]);
+    });
+  });
+
   // The pre-save gates that are NOT schema rules — re-homed from the old
   // QueryConfig.validate() into useAlertForm.runImperativeQueryChecks (run at
   // the top of onSubmit, i.e. only after the composed schema passes). Same
@@ -1300,6 +1316,8 @@ describe("AddAlert (OForm owner)", () => {
         }),
         expect.anything(),
       );
+      // An edit carries no id, so the host returns to the list rather than the detail page.
+      expect(wrapper.emitted("update:list")?.[0]).toHaveLength(1);
     });
   });
 

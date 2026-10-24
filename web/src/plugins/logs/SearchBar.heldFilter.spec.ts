@@ -84,7 +84,7 @@ describe("SearchBar — a held filter never reaches an alert or a download", () 
       wrapper!.vm.searchObj.data.query = query;
       const prefill = wrapper!.vm.buildAlertPrefill();
       const keys = prefill.warnings.map((w: any) => w.key);
-      expect(prefill.sql).toBe('select * from "fts_a"');
+      expect(prefill.sql).toBe('select _timestamp from "fts_a"');
       expect(keys).toContain("heldFilterDropped");
       expect(keys).not.toContain("textFilterDropped");
       expect(keys).not.toContain("convertedToSql");
@@ -95,7 +95,9 @@ describe("SearchBar — a held filter never reaches an alert or a download", () 
   it("carries a filter it can run into the logs alert without the warning", () => {
     wrapper!.vm.searchObj.data.query = "status=500 -404";
     const prefill = wrapper!.vm.buildAlertPrefill();
-    expect(prefill.sql).toBe(`select * from "fts_a"  WHERE status = 500 AND NOT match_all('404')`);
+    expect(prefill.sql).toBe(
+      `select _timestamp from "fts_a"  WHERE status = 500 AND NOT match_all('404')`,
+    );
     expect(prefill.warnings.map((w: any) => w.key)).not.toContain("heldFilterDropped");
   });
 

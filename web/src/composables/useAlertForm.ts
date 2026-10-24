@@ -404,7 +404,8 @@ export interface AlertFormProps {
 }
 
 export interface AlertFormEmit {
-  (e: "update:list", folderId?: string): void;
+  /** `createdId` is set only after a create, so the host can open the new alert. */
+  (e: "update:list", folderId?: string, createdId?: string): void;
   (e: "cancel:hideform"): void;
   (e: "refresh:destinations"): void;
   (e: "refresh:templates"): void;
@@ -2498,7 +2499,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       const request = callAlert
         .then((res: { data: any }) => {
           resetForm(defaultAlertValue());
-          emit("update:list", activeFolderId.value);
+          emit("update:list", activeFolderId.value, res.data?.id || undefined);
           addAlertForm.value?.resetValidation();
           dismiss();
           toast({

@@ -1303,6 +1303,7 @@
     "commonGroupFields": "Common Group Fields",
     "queryRangeHours": "{count} hour | {count} hours",
     "menuGroupAlerts": "Alerts",
+    "alertOnThis": "Alert on this",
     "runQueryPendingLabel": "Run query, changes not applied yet",
     "queryActions": {
       "runEditedFirst": "Run your edited query first",
@@ -10718,6 +10719,7 @@
     "outputMessagesLabel": "Output Messages",
     "confirmDeleteTemplates": "Are you sure you want to delete {count} template? | Are you sure you want to delete {count} templates?",
     "lastOutcome": "Last Outcome",
+    "waitingForFirstRun": "Waiting for first run",
     "priority": "Priority",
     "priorityUnset": "Unset",
     "priorityTooltip": "How much this alert matters to your team. Used for filtering, sorting and notification routing — it does not affect when the alert fires.",
@@ -10925,6 +10927,7 @@
         "orderByStripped": "ORDER BY was removed — ordering has no effect on alert evaluation.",
         "histogramNotSupported": "This query buckets results over time, which an alert cannot evaluate. Create the alert from a dashboard panel instead.",
         "convertedToSql": "Your filter was converted to SQL because it uses expressions the condition builder cannot represent.",
+        "selectStarReplaced": "Alerts cannot select every column, so the query reads {column} instead of *.",
         "joinSingleStream": "This query reads more than one stream; the alert will be attached to \"{stream}\".",
         "broadMatch": "This alert matches every record in the stream. Add a filter unless that is what you want.",
         "noResults": "Your query returned no results — the alert will only fire once matching data appears.",

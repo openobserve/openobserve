@@ -1206,14 +1206,6 @@ describe("AlertList - micro validations", () => {
     expect(expr).toContain("OR");
   });
 
-  it("routeTo pushes with name", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    const spy = vi.spyOn(router, "push");
-    await wrapper.vm.routeTo("alertTemplates");
-    expect(spy).toHaveBeenCalled();
-  });
-
   it("importAlert sets dialog and pushes route, preserving the rest of the query", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
@@ -2156,3 +2148,73 @@ describe("AlertList - triggered in the last 15 minutes", () => {
     expect(fired.filter((c: any) => c.find(".bg-warning-500").exists())).toHaveLength(4);
   });
 }, 15000);
+
+describe("AlertList - first alert dead ends", () => {
+  // A stale ?action= from an earlier spec's navigation can swap the table for the editor.
+  const mountShown = async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    await wrapper.vm.handleActionQuery(undefined);
+    await flushPromises();
+    return wrapper;
+  };
+
+  it("keeps Add enabled when the org has no templates", async () => {
+    queryClient.removeQueries({ queryKey: ["alerts"] });
+    queryClient.clear();
+    templatesSvc.list.mockImplementation(() => Promise.resolve({ data: [] } as any));
+    const wrapper: any = await mountShown();
+
+    expect(wrapper.vm.templates).toEqual([]);
+    const add = wrapper.find('[data-test="alert-list-add-alert-btn"]');
+    expect(add.attributes("disabled")).toBeUndefined();
+  });
+
+  it("shows the no-alerts empty state rather than a templates gate", async () => {
+    templatesSvc.list.mockImplementation(() => Promise.resolve({ data: [] } as any));
+    const wrapper: any = await mountShown();
+    wrapper.vm.templates = [];
+    wrapper.vm.allAlerts = [];
+    wrapper.vm.filteredResults = [];
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="alert-list-create-template-text"]').exists()).toBe(false);
+  });
+
+  it("labels an enabled alert that has not run yet", async () => {
+    const wrapper: any = await mountShown();
+
+    const waiting = wrapper.find('[data-test="alert-list-Scheduled Alert A-waiting-first-run"]');
+    expect(waiting.exists()).toBe(true);
+    expect(waiting.text()).toBe("Waiting for first run");
+    // A paused alert is not waiting for anything.
+    expect(
+      wrapper.find('[data-test="alert-list-RealTime Alert B-waiting-first-run"]').exists(),
+    ).toBe(false);
+  });
+
+  it("opens the new alert's detail page after a create from the list's form", async () => {
+    const wrapper: any = await mountShown();
+    const push = vi.spyOn(router, "push");
+
+    await wrapper.vm.refreshList("team-a", "new-id");
+
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "alertDetail",
+        params: { alert_id: "new-id" },
+        query: expect.objectContaining({ folder: "team-a" }),
+      }),
+    );
+  });
+
+  it("returns to the list after an edit from the list's form", async () => {
+    const wrapper: any = await mountShown();
+    const push = vi.spyOn(router, "push");
+
+    await wrapper.vm.refreshList("default");
+
+    expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "alertList" }));
+    expect(push).not.toHaveBeenCalledWith(expect.objectContaining({ name: "alertDetail" }));
+  });
+});
