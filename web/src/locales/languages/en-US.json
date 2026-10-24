@@ -26581,6 +26581,7 @@
       "action": "Action",
       "target": "Target",
       "auditDisabled": "The audit trail needs O2_AUDIT_ENABLED=true on the server",
+      "auditDelayHint": "No entries yet. The server publishes audit records in batches, every 10 minutes by default (O2_AUDIT_PUBLISH_INTERVAL).",
       "alertAutoRolledBack": "A rollout was rolled back automatically",
       "alertOfflineRatio": "A fleet's offline share exceeded its threshold",
       "alertRolloutHalted": "A rollout halted",

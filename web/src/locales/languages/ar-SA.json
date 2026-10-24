@@ -26583,6 +26583,7 @@
       "action": "الإجراء",
       "target": "الهدف",
       "auditDisabled": "يتطلب سجل التدقيق ضبط O2_AUDIT_ENABLED=true على الخادم",
+      "auditDelayHint": "لا توجد إدخالات بعد. ينشر الخادم سجلات التدقيق على دفعات، كل 10 دقائق افتراضيًا (O2_AUDIT_PUBLISH_INTERVAL).",
       "alertAutoRolledBack": "تم التراجع عن عملية طرح تلقائيًا",
       "alertOfflineRatio": "تجاوزت نسبة غير المتصلين في أسطول حدّها",
       "alertRolloutHalted": "توقفت عملية طرح",

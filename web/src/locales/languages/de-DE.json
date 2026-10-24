@@ -26583,6 +26583,7 @@
       "action": "Aktion",
       "target": "Ziel",
       "auditDisabled": "Das Audit-Protokoll erfordert O2_AUDIT_ENABLED=true auf dem Server",
+      "auditDelayHint": "Noch keine Einträge. Der Server veröffentlicht Audit-Einträge gebündelt, standardmäßig alle 10 Minuten (O2_AUDIT_PUBLISH_INTERVAL).",
       "alertAutoRolledBack": "Ein Rollout wurde automatisch zurückgerollt",
       "alertOfflineRatio": "Der Offline-Anteil eines Fleets hat seinen Schwellenwert überschritten",
       "alertRolloutHalted": "Ein Rollout wurde angehalten",

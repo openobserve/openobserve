@@ -26583,6 +26583,7 @@
       "action": "Acción",
       "target": "Destino",
       "auditDisabled": "El registro de auditoría requiere O2_AUDIT_ENABLED=true en el servidor",
+      "auditDelayHint": "Aún no hay entradas. El servidor publica los registros de auditoría por lotes, cada 10 minutos de forma predeterminada (O2_AUDIT_PUBLISH_INTERVAL).",
       "alertAutoRolledBack": "Un despliegue se revirtió automáticamente",
       "alertOfflineRatio": "La proporción sin conexión de una flota superó su umbral",
       "alertRolloutHalted": "Un despliegue se detuvo",

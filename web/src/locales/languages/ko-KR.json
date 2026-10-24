@@ -26583,6 +26583,7 @@
       "action": "작업",
       "target": "대상",
       "auditDisabled": "감사 추적을 사용하려면 서버에 O2_AUDIT_ENABLED=true가 필요합니다",
+      "auditDelayHint": "아직 기록이 없습니다. 서버는 감사 기록을 묶어서 발행하며 기본값은 10분마다입니다(O2_AUDIT_PUBLISH_INTERVAL).",
       "alertAutoRolledBack": "롤아웃이 자동으로 롤백되었습니다",
       "alertOfflineRatio": "플릿의 오프라인 비율이 임계값을 초과했습니다",
       "alertRolloutHalted": "롤아웃이 중단되었습니다",
