@@ -370,6 +370,8 @@ export interface FleetFlowDestination {
   type: string;
   target: string | null;
   exporter: string | null;
+  /** Set when `type` is `fleet`: an exporter marked `# fleet: <name>` sends to that fleet. */
+  fleet_id: string | null;
 }
 
 /** A readable fleet; one without own-metrics telemetry still lists its stable version's pipelines. */

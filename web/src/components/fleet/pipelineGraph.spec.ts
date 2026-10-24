@@ -148,6 +148,51 @@ describe("buildPipelineMap", () => {
     expect(edges.get("re:edge|a|otlp|logs")?.rate).toBe(5);
     expect(edges.get("re:edge|a|debug|logs")?.rate).toBeNull();
   });
+
+  it("draws an exporter sending to another fleet as an edge to that fleet's node, one stage right", () => {
+    const agent = pipeline({
+      fleet: "agents",
+      name: "logs",
+      receivers: [{ name: "filelog", rate: 50, refused: 0 }],
+      exporters: [exporter("otlp/gateway", "d_gw", 50)],
+      out_rate: 50,
+    });
+    const gateway = pipeline({
+      fleet: "gateway",
+      name: "logs",
+      receivers: [{ name: "otlp", rate: 50, refused: 0 }],
+      exporters: [exporter("otlphttp", "d_o2", 50)],
+      out_rate: 50,
+    });
+    const fleetOf = (d: string) => (d === "d_gw" ? "gateway" : null);
+    const map = buildPipelineMap([agent, gateway], layout, fleetOf);
+    const nodes = byId(map.nodes);
+    expect(nodes.has("d:d_gw")).toBe(false);
+    expect(byId(map.edges).get("ef:agents|otlp/gateway|gateway|logs")).toMatchObject({
+      source: "e:agents|otlp/gateway",
+      target: "f:gateway",
+      rate: 50,
+    });
+    expect(nodes.get("f:gateway")).toMatchObject({ inbound: true, stage: 1 });
+    expect(nodes.get("f:agents")?.inbound).toBeUndefined();
+    const x = (id: string) => nodes.get(id)!.x;
+    const path = ["f:agents", "r:agents|filelog", "e:agents|otlp/gateway", "f:gateway"];
+    const rest = ["r:gateway|otlp", "e:gateway|otlphttp", "d:d_o2"];
+    const xs = [...path, ...rest].map(x);
+    expect(xs).toEqual([...xs].sort((a, b) => a - b));
+    expect(new Set(xs).size).toBe(xs.length);
+  });
+
+  it("keeps a fleet that sends to itself or a cycle of fleets within the fleet count", () => {
+    const a = pipeline({ fleet: "a", name: "logs", exporters: [exporter("otlp", "d_b", 1)] });
+    const b = pipeline({ fleet: "b", name: "logs", exporters: [exporter("otlp", "d_a", 1)] });
+    const self = pipeline({ fleet: "c", name: "logs", exporters: [exporter("otlp", "d_c", 1)] });
+    const fleetOf = (d: string) => ({ d_a: "a", d_b: "b", d_c: "c" })[d] ?? null;
+    const stages = buildPipelineMap([a, b, self], layout, fleetOf)
+      .nodes.filter((n) => n.column === "fleet")
+      .map((n) => n.stage);
+    expect(Math.max(...stages)).toBeLessThan(3);
+  });
 });
 
 describe("strokeWidth", () => {

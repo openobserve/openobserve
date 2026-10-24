@@ -756,7 +756,9 @@ describe("useFleetFlow", () => {
     generated_at: 1791122400000,
     metrics_restricted: false,
     fleets: [{ id: "edge", name: "edge", config: "base", version: 2, collectors: 3 }],
-    destinations: [{ id: "d_1", type: "otlphttp", target: "https://o2.acme.io", exporter: null }],
+    destinations: [
+      { id: "d_1", type: "otlphttp", target: "https://o2.acme.io", exporter: null, fleet_id: null },
+    ],
     pipelines: [
       {
         id: "edge/logs",

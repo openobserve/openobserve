@@ -924,7 +924,8 @@ pub struct FlowIssue {
     pub value: f64,
 }
 
-/// `exporter` is set only on a config-scoped destination, so the UI can label it.
+/// `exporter` is set only on a config-scoped destination so the UI can label it; `fleet_id` on a
+/// `fleet` one.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct FlowDestination {
     pub id: String,
@@ -932,6 +933,8 @@ pub struct FlowDestination {
     pub kind: String,
     pub target: Option<String>,
     pub exporter: Option<String>,
+    #[serde(default)]
+    pub fleet_id: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
