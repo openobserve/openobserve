@@ -23,6 +23,8 @@ const testLogger = require("../utils/test-logger.js");
 // is the only deterministic route to it.
 const SERIES_BREAKDOWN_FIELD = "breakdown";
 const SERIES_MEASURE_FIELD = "metric_value";
+const SERIES_CAP = 100;
+const SERIES_COUNT = 150;
 
 test.describe("Dashboard Panel Notices testcases", () => {
   test.describe.configure({ mode: "parallel" });
@@ -85,7 +87,7 @@ test.describe("Dashboard Panel Notices testcases", () => {
         .toString(36)
         .slice(2, 8)}`;
 
-      await ingestionHighCardinality(pm.page, streamName);
+      await ingestionHighCardinality(pm.page, streamName, { count: SERIES_COUNT });
       await pm.dashboardMaxQueryRange.waitForStreamReady(streamName);
 
       await pm.dashboardList.menuItem("dashboards-item");
@@ -100,14 +102,7 @@ test.describe("Dashboard Panel Notices testcases", () => {
       await pm.chartTypeSelector.searchAndAddField(SERIES_MEASURE_FIELD, "y");
       await pm.chartTypeSelector.searchAndAddField(SERIES_BREAKDOWN_FIELD, "b");
       await pm.dashboardPanelActions.applyDashboardBtn();
-      await pm.dashboardPanelActions
-        .waitForChartToRender()
-        .catch((error) =>
-          testLogger.warn(
-            "Chart render wait failed; notice assertions gate on the search response, not the render",
-            { error: error.message },
-          ),
-        );
+      await pm.dashboardPanelActions.waitForChartToRender();
       await pm.dashboardPanelActions.addPanelName("SeriesCapPanel");
       await pm.dashboardPanelActions.savePanel();
 
@@ -115,7 +110,7 @@ test.describe("Dashboard Panel Notices testcases", () => {
 
       const chip = pm.dashboardNotices.noticeChip("series-cap");
       await expect(chip).toBeVisible({ timeout: 20000 });
-      await expect(chip).toContainText(/\b100\/150 series$/);
+      await expect(chip).toContainText(new RegExp(`\\b${SERIES_CAP}/${SERIES_COUNT} series$`));
 
       await pm.dashboardNotices.openNoticeTooltip("series-cap");
       await expect(
@@ -150,7 +145,7 @@ test.describe("Dashboard Panel Notices testcases", () => {
         .toString(36)
         .slice(2, 8)}`;
 
-      await ingestionHighCardinality(pm.page, streamName);
+      await ingestionHighCardinality(pm.page, streamName, { count: SERIES_COUNT });
       await pm.dashboardMaxQueryRange.waitForStreamReady(streamName);
 
       await pm.dashboardList.menuItem("dashboards-item");
@@ -165,14 +160,7 @@ test.describe("Dashboard Panel Notices testcases", () => {
       await pm.chartTypeSelector.searchAndAddField(SERIES_MEASURE_FIELD, "y");
       await pm.chartTypeSelector.searchAndAddField(SERIES_BREAKDOWN_FIELD, "b");
       await pm.dashboardPanelActions.applyDashboardBtn();
-      await pm.dashboardPanelActions
-        .waitForChartToRender()
-        .catch((error) =>
-          testLogger.warn(
-            "Chart render wait failed; notice assertions gate on the search response, not the render",
-            { error: error.message },
-          ),
-        );
+      await pm.dashboardPanelActions.waitForChartToRender();
       await pm.dashboardPanelActions.addPanelName("SeriesCapPanel");
       await pm.dashboardPanelActions.savePanel();
 
@@ -227,14 +215,7 @@ test.describe("Dashboard Panel Notices testcases", () => {
       // query carries a VRL function.
       await pm.dashboardNotices.addPanelVrlFunction(".foo = 1");
       await pm.dashboardPanelActions.applyDashboardBtn();
-      await pm.dashboardPanelActions
-        .waitForChartToRender()
-        .catch((error) =>
-          testLogger.warn(
-            "Chart render wait failed; notice assertions gate on the search response, not the render",
-            { error: error.message },
-          ),
-        );
+      await pm.dashboardPanelActions.waitForChartToRender();
       await pm.dashboardPanelActions.addPanelName("FunctionErrorPanel");
       await pm.dashboardPanelActions.savePanel();
 

@@ -25,7 +25,7 @@ const getAuthToken = async () => {
   return `Basic ${basicAuthCredentials}`;
 };
 
-// Shared by every _json ingest here so the retry, passcode-refresh and backoff rules cannot drift apart.
+// Shared by ingestion() and ingestionHighCardinality() so their retry, passcode-refresh and backoff rules cannot drift apart.
 const postWithRetry = async (page, streamName, records, label) => {
   // Resolve headers/org per attempt so a refreshed passcode is picked up on retry.
   const post = () =>
