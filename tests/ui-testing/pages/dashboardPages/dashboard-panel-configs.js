@@ -1129,9 +1129,18 @@ export default class DashboardPanelConfigs {
   //BG color
   async selectBGColor(color) {
     const trigger = this.page.locator('[data-test="dashboard-config-color-mode-trigger"]');
+    const option = this.page.locator(
+      `[data-test="dashboard-config-color-mode-option"][data-test-label="${color}"]`
+    );
     await trigger.waitFor({ state: "visible" });
-    await trigger.click();
-    await this._clickVirtualOption("dashboard-config-color-mode", color);
+    // The threshold section above shifts layout while it renders, so a single click can land before the popover holds.
+    await expect(async () => {
+      if ((await trigger.getAttribute("aria-expanded")) !== "true") {
+        await trigger.click();
+      }
+      await option.waitFor({ state: "visible", timeout: 2000 });
+    }).toPass({ timeout: 15000, intervals: [500, 1000, 2000] });
+    await option.click();
   }
 
   //Guage chart configs

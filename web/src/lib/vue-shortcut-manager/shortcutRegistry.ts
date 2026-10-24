@@ -153,6 +153,10 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
   { titleKey: "shortcuts.modules.reports", pages: ["shortcuts.pages.reports"] },
   { titleKey: "shortcuts.modules.synthetics", pages: ["shortcuts.pages.syntheticsJourney"] },
   {
+    titleKey: "shortcuts.modules.fleet",
+    pages: ["shortcuts.pages.fleetOverview", "shortcuts.pages.fleetConfigEditor"],
+  },
+  {
     titleKey: "shortcuts.modules.iam",
     title: "IAM",
     pages: [
@@ -1147,6 +1151,33 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     scope: "rum-source-maps",
     shortcuts: [
       { id: "sourceMapsRefresh", key: "r", descriptionKey: "shortcuts.actions.sourceMapsRefresh" },
+    ],
+  },
+
+  // ── Fleet — Overview flow map ───────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.fleetOverview",
+    scope: "fleet-overview",
+    shortcuts: [
+      {
+        id: "fleetFlowCloseDetails",
+        key: "escape",
+        descriptionKey: "shortcuts.actions.fleetFlowCloseDetails",
+      },
+    ],
+  },
+
+  // ── Fleet — Configuration editor ────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.fleetConfigEditor",
+    scope: "fleet-config-editor",
+    shortcuts: [
+      {
+        id: "fleetEditorDeleteNode",
+        keys: ["delete", "backspace"],
+        display: "del / ⌫",
+        descriptionKey: "shortcuts.actions.fleetEditorDeleteNode",
+      },
     ],
   },
 ];

@@ -67,6 +67,7 @@ import { LoginPage } from "./generalPages/loginPage.js";
 import { IngestionPage } from "./generalPages/ingestionPage.js";
 import { CloudLoginPage } from "./cloudPages/cloudLoginPage.js";
 import { isCloudEnvironment } from "./cloudPages/cloud-env.js";
+import { BillingInvoicesPage } from "./cloudPages/billingInvoicesPage.js";
 import { IngestionConfigPage } from "./generalPages/ingestionConfigPage.js";
 import { RouteGuardPage } from "./generalPages/routeGuardPage.js";
 import { SplunkHecPage } from "./generalPages/splunkHecPage.js";
@@ -90,6 +91,7 @@ import { RumProductAnalyticsPage } from "./rumPages/rumProductAnalyticsPage.js";
 import { ReportsPage } from "./reportsPages/reportsPage.js";
 import { ReportFoldersPage } from "./reportsPages/reportFoldersPage.js";
 import { ReportsFormValidationPage } from "./reportsPages/reportsFormValidationPage.js";
+import { ReportHistoryPage } from "./reportsPages/reportHistoryPage.js";
 import { DataPage } from "./generalPages/dataPage.js";
 import { IamPage } from "./iamPages/iamPage.js";
 import { IngestionTokensPage } from "./iamPages/ingestionTokensPage.js";
@@ -114,12 +116,14 @@ import { CorrelationSettingsPage } from "./generalPages/correlationSettingsPage.
 import { CorrelationDrawerPage } from "./generalPages/correlationDrawerPage.js";
 import { CrossLinkPage } from "./generalPages/crossLinkPage.js";
 import { ModelPricingPage } from "./generalPages/modelPricingPage.js";
+import { BillingPlansPage } from "./generalPages/billingPlansPage.js";
 import { QueueWorkbenchPage } from "./generalPages/queueWorkbenchPage.js";
 import { EditionFeaturesPage } from "./generalPages/editionFeaturesPage.js";
 import { OrganizationManagementPage } from "./generalPages/organizationManagementPage.js";
 import { LogoManagementPage } from "./generalPages/logoManagementPage.js";
 import { StatusPagesPage } from "./generalPages/statusPagesPage.js";
 import { QueryManagementPage } from "./generalPages/queryManagementPage.js";
+import { BillingGroupPage } from "./generalPages/billingGroupPage.js";
 import { ConnectDataSourcePopupPage } from "./generalPages/connectDataSourcePopupPage.js";
 import { RegexPatternsFormValidationPage } from "./generalPages/regexPatternsFormValidationPage.js";
 import { CipherKeysFormValidationPage } from "./generalPages/cipherKeysFormValidationPage.js";
@@ -127,6 +131,7 @@ import { SharedComponentsFormValidationPage } from "./generalPages/sharedCompone
 import { SettingsFormValidationPage } from "./generalPages/settingsFormValidationPage.js";
 import { PasswordPolicyPage } from "./generalPages/passwordPolicyPage.js";
 import { AiToolsetsFormValidationPage } from "./generalPages/aiToolsetsFormValidationPage.js";
+import { AiAssistantCreditsPage } from "./generalPages/aiAssistantCreditsPage.js";
 import { RumFormValidationPage } from "./generalPages/rumFormValidationPage.js";
 const SchemaPage = require("./generalPages/schemaPage.js");
 const SchemaLoadPage = require("./generalPages/schemaLoadPage.js");
@@ -250,6 +255,7 @@ class PageManager {
     this.pipelinesPage = new PipelinesPage(page);
     this.pipelinesFormValidation = new PipelinesFormValidationPage(page);
     this.loginPage = isCloudEnvironment() ? new CloudLoginPage(page) : new LoginPage(page);
+    this.billingInvoicesPage = new BillingInvoicesPage(page);
     this.ingestionPage = new IngestionPage(page);
     this.routeGuardPage = new RouteGuardPage(page);
     this.ingestionConfigPage = new IngestionConfigPage(page);
@@ -269,6 +275,7 @@ class PageManager {
     this.reportsPage = new ReportsPage(page);
     this.reportFoldersPage = new ReportFoldersPage(page);
     this.reportsFormValidation = new ReportsFormValidationPage(page);
+    this.reportHistoryPage = new ReportHistoryPage(page);
     this.dataPage = new DataPage(page);
     this.iamPage = new IamPage(page);
     this.ingestionTokensPage = new IngestionTokensPage(page);
@@ -293,12 +300,14 @@ class PageManager {
     this.correlationDrawerPage = new CorrelationDrawerPage(page);
     this.crossLinkPage = new CrossLinkPage(page);
     this.modelPricingPage = new ModelPricingPage(page);
+    this.billingPlansPage = new BillingPlansPage(page);
     this.queueWorkbenchPage = new QueueWorkbenchPage(page);
     this.editionFeaturesPage = new EditionFeaturesPage(page);
     this.organizationManagementPage = new OrganizationManagementPage(page);
     this.logoManagementPage = new LogoManagementPage(page);
     this.statusPagesPage = new StatusPagesPage(page);
     this.queryManagementPage = new QueryManagementPage(page);
+    this.billingGroupPage = new BillingGroupPage(page);
     this.connectDataSourcePopupPage = new ConnectDataSourcePopupPage(page);
     this.regexPatternsFormValidation = new RegexPatternsFormValidationPage(page);
     this.sharedComponentsFormValidation = new SharedComponentsFormValidationPage(page);
@@ -331,6 +340,7 @@ class PageManager {
     // ===== ANOMALY DETECTION PAGE OBJECTS =====
     this.anomalyDetectionPage = new AnomalyDetectionPage(page, this.commonActions);
     this.aiToolsetsFormValidation = new AiToolsetsFormValidationPage(page);
+    this.aiAssistantCreditsPage = new AiAssistantCreditsPage(page);
 
     // ===== ONLINE EVALS PAGE OBJECTS =====
     this.llmProvidersPage = new LlmProvidersPage(page);
