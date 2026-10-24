@@ -9124,6 +9124,8 @@
       "expressionPlaceholder": "bijv. A && B",
       "insert": "Invoegen:",
       "addAlert": "Alarm toevoegen",
+      "addUnavailableCap": "Je kunt maximaal {max} alarmen toevoegen.",
+      "addUnavailableNone": "Er zijn geen geschikte alarmen meer om toe te voegen.",
       "removeChild": "Verwijder onderliggende alert {name}",
       "noChildren": "Nog geen sub-alarmen. Voeg er ten minste twee toe.",
       "wouldTrigger": "Zou triggeren",
@@ -15502,6 +15504,7 @@
         "userPromptLabel": "Gebruikersbericht",
         "userPromptPlaceholder": "Verwijs naar datasetvelden met {'{{ input }}'}.",
         "variablesLabel": "Voeg een variabele in:",
+        "expectedOutputScorersOnly": "{token} · alleen beoordelaars",
         "scorersPlaceholder": "Selecteer scorers",
         "scorersHelp": "Scorerversies zijn nu vastgezet — latere bewerkingen van scorers veranderen de scores van dit experiment nooit.",
         "scorersEmpty": "Geen scorers beschikbaar. Maak er eerst een aan onder Evalueren.",
@@ -15812,6 +15815,7 @@
         "fallbackTitle": "Dataset",
         "meta": "{count} items · bijgewerkt {updated}",
         "loadError": "Dataset laden mislukt",
+        "tryInPlayground": "Uitproberen in Playground",
         "tabs": {
           "items": "Items",
           "experiments": "Experimenten"
@@ -16346,6 +16350,7 @@
       "scoreSkippedNoReference": "Overgeslagen — geen verwachte uitvoer",
       "removeExpected": "Verwijder verwacht resultaat",
       "expectedLeakWarning": "{token} is nooit beschikbaar in taakprompts — gouden antwoorden voeden alleen scorers.",
+      "unresolvedVariablesWarning": "Geen waarde voor {tokens} — wordt leeg verzonden bij uitvoering.",
       "chipInsert": "Klik om bij de cursor in te voegen",
       "variant": "Variant {label}",
       "variantLimit": "De testbank bevat maximaal {max} varianten.",

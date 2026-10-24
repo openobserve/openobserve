@@ -479,17 +479,14 @@ pub async fn rotate_token(org_id: &str, name: &str) -> Result<String, errors::Er
 }
 
 /// Delete all tokens for an org (cascade on org deletion).
-pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+pub async fn delete_by_org(org_id: &str) -> Result<Vec<(String, Option<String>)>, errors::Error> {
     let client = get_orm_client_rw().await;
-
-    Entity::delete_many()
-        .filter(Column::OrgId.eq(org_id))
-        .exec(client)
+    let delete = Entity::delete_many().filter(Column::OrgId.eq(org_id));
+    let removed = super::delete_returning(client, delete, &[Column::Token, Column::SplunkToken])
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-
     invalidate_default_cache(org_id);
-    Ok(())
+    Ok(removed)
 }
 
 /// Delete a single token row by org_id and token value.
@@ -716,5 +713,47 @@ mod tests {
         assert!(!record.is_default);
         assert!(!record.enabled);
         assert_eq!(record.description, "");
+    }
+
+    #[tokio::test]
+    async fn test_org_delete_returns_each_token_and_its_splunk_guid() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("t_ingest_tok");
+        let other = format!("{org}_other");
+        let record = |org: &str, name: &str, splunk: Option<&str>| OrgIngestionTokenRecord {
+            id: config::ider::uuid(),
+            org_id: org.to_string(),
+            name: name.to_string(),
+            token: format!("{org}_{name}"),
+            description: String::new(),
+            is_default: false,
+            enabled: true,
+            created_by: "t".to_string(),
+            created_at: 1,
+            updated_at: 1,
+            splunk_token: Some(splunk.map(str::to_string)),
+        };
+        let guid = format!("{org}_guid");
+        for row in [
+            record(&org, "a", Some(&guid)),
+            record(&org, "b", None),
+            record(&other, "a", None),
+        ] {
+            add(&row).await.unwrap();
+        }
+
+        let mut removed = delete_by_org(&org).await.unwrap();
+        removed.sort();
+        let left = list_by_org(&org).await.unwrap();
+        let kept = delete_by_org(&other).await.unwrap();
+
+        assert_eq!(
+            removed,
+            [(format!("{org}_a"), Some(guid)), (format!("{org}_b"), None)]
+        );
+        assert!(left.is_empty());
+        assert_eq!(kept.len(), 1, "another org's token went with this org's");
     }
 }

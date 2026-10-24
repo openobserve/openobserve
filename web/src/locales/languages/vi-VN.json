@@ -9124,6 +9124,8 @@
       "expressionPlaceholder": "ví dụ: A && B",
       "insert": "Chèn:",
       "addAlert": "Thêm cảnh báo",
+      "addUnavailableCap": "Bạn có thể thêm tối đa {max} cảnh báo.",
+      "addUnavailableNone": "Không còn cảnh báo nào đủ điều kiện để thêm.",
       "removeChild": "Xóa cảnh báo con {name}",
       "noChildren": "Chưa có cảnh báo con nào. Thêm ít nhất hai.",
       "wouldTrigger": "Sẽ kích hoạt",
@@ -15502,6 +15504,7 @@
         "userPromptLabel": "Tin nhắn người dùng",
         "userPromptPlaceholder": "Tham chiếu các trường dữ liệu bằng {'{{ input }}'}.",
         "variablesLabel": "Chèn một biến:",
+        "expectedOutputScorersOnly": "{token} · chỉ bộ chấm điểm",
         "scorersPlaceholder": "Chọn bộ chấm điểm",
         "scorersHelp": "Phiên bản bộ chấm điểm hiện đã được ghim — các chỉnh sửa bộ chấm điểm sau này sẽ không bao giờ thay đổi điểm của thí nghiệm này.",
         "scorersEmpty": "Không có bộ chấm điểm nào. Hãy tạo một bộ trong mục Evaluate trước.",
@@ -15812,6 +15815,7 @@
         "fallbackTitle": "Tập dữ liệu",
         "meta": "{count} mục · đã cập nhật {updated}",
         "loadError": "Không thể tải tập dữ liệu",
+        "tryInPlayground": "Dùng thử trong Playground",
         "tabs": {
           "items": "Mục",
           "experiments": "Thử nghiệm"
@@ -16346,6 +16350,7 @@
       "scoreSkippedNoReference": "Bỏ qua — không có đầu ra dự kiến",
       "removeExpected": "Xóa đầu ra mong đợi",
       "expectedLeakWarning": "{token} không bao giờ khả dụng trong lời nhắc tác vụ — câu trả lời vàng chỉ cung cấp cho bộ chấm điểm.",
+      "unresolvedVariablesWarning": "Không có giá trị cho {tokens} — gửi trống khi chạy.",
       "chipInsert": "Nhấp để chèn tại con trỏ",
       "variant": "Biến thể {label}",
       "variantLimit": "Bộ thử nghiệm chứa tối đa {max} biến thể.",

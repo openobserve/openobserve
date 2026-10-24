@@ -9124,6 +9124,8 @@
       "expressionPlaceholder": "например, A && B",
       "insert": "Вставить:",
       "addAlert": "Добавить оповещение",
+      "addUnavailableCap": "Можно добавить до {max} оповещений.",
+      "addUnavailableNone": "Больше нет подходящих оповещений для добавления.",
       "removeChild": "Удалить дочернее оповещение {name}",
       "noChildren": "Пока нет под-оповещений. Добавьте как минимум два.",
       "wouldTrigger": "Сработало бы",
@@ -15502,6 +15504,7 @@
         "userPromptLabel": "Сообщение пользователя",
         "userPromptPlaceholder": "Ссылайтесь на поля набора данных с помощью {'{{ input }}'}.",
         "variablesLabel": "Вставить переменную:",
+        "expectedOutputScorersOnly": "{token} · только для оценщиков",
         "scorersPlaceholder": "Выберите оценщиков",
         "scorersHelp": "Версии оценщиков закреплены — последующие изменения оценщиков никогда не изменят результаты этого эксперимента.",
         "scorersEmpty": "Нет доступных оценщиков. Сначала создайте его в разделе Evaluate.",
@@ -15812,6 +15815,7 @@
         "fallbackTitle": "Датасет",
         "meta": "Элементов: {count} · обновлено {updated}",
         "loadError": "Не удалось загрузить датасет",
+        "tryInPlayground": "Попробовать в Playground",
         "tabs": {
           "items": "Элементы",
           "experiments": "Эксперименты"
@@ -16346,6 +16350,7 @@
       "scoreSkippedNoReference": "Пропущено — нет ожидаемого ответа",
       "removeExpected": "Удалить ожидаемый результат",
       "expectedLeakWarning": "{token} никогда не доступен в промптах задач — эталонные ответы поступают только в оценщики.",
+      "unresolvedVariablesWarning": "Нет значения для {tokens} — при запуске будет отправлено пустым.",
       "chipInsert": "Нажмите, чтобы вставить в позицию курсора",
       "variant": "Вариант {label}",
       "variantLimit": "Максимальное число вариантов на стенде — {max}.",

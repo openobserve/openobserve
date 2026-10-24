@@ -9124,6 +9124,8 @@
       "expressionPlaceholder": "p. ex. A && B",
       "insert": "Insérer :",
       "addAlert": "Ajouter une alerte",
+      "addUnavailableCap": "Vous pouvez ajouter jusqu'à {max} alertes.",
+      "addUnavailableNone": "Aucune autre alerte éligible à ajouter.",
       "removeChild": "Supprimer l'enfant {name}",
       "noChildren": "Aucune sous-alerte pour l'instant. Ajoutez-en au moins deux.",
       "wouldTrigger": "Déclencherait",
@@ -15502,6 +15504,7 @@
         "userPromptLabel": "Message utilisateur",
         "userPromptPlaceholder": "Référencez les champs du jeu de données avec {'{{ input }}'}.",
         "variablesLabel": "Insérer une variable :",
+        "expectedOutputScorersOnly": "{token} · évaluateurs uniquement",
         "scorersPlaceholder": "Sélectionner les évaluateurs",
         "scorersHelp": "Les versions des évaluateurs sont épinglées maintenant — les modifications ultérieures des évaluateurs ne changent jamais les scores de cette expérience.",
         "scorersEmpty": "Aucun évaluateur disponible. Créez-en un dans Évaluer d'abord.",
@@ -15812,6 +15815,7 @@
         "fallbackTitle": "Jeu de données",
         "meta": "{count} éléments · mis à jour {updated}",
         "loadError": "Échec du chargement du jeu de données",
+        "tryInPlayground": "Essayer dans Playground",
         "tabs": {
           "items": "Éléments",
           "experiments": "Expériences"
@@ -16346,6 +16350,7 @@
       "scoreSkippedNoReference": "Ignoré — aucun résultat attendu",
       "removeExpected": "Supprimer la sortie attendue",
       "expectedLeakWarning": "{token} n'est jamais disponible dans les invites de tâche — les réponses de référence alimentent uniquement les évaluateurs.",
+      "unresolvedVariablesWarning": "Aucune valeur pour {tokens} — envoyé vide lors de l'exécution.",
       "chipInsert": "Cliquez pour insérer au curseur",
       "variant": "Variante {label}",
       "variantLimit": "Le banc d'essai peut contenir au plus {max} variantes.",

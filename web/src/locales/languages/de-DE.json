@@ -9124,6 +9124,8 @@
       "expressionPlaceholder": "z. B. A && B",
       "insert": "Einfügen:",
       "addAlert": "Alarm hinzufügen",
+      "addUnavailableCap": "Sie können bis zu {max} Alarme hinzufügen.",
+      "addUnavailableNone": "Keine weiteren geeigneten Alarme zum Hinzufügen.",
       "removeChild": "Kind {name} entfernen",
       "noChildren": "Noch keine Unteralarme. Fügen Sie mindestens zwei hinzu.",
       "wouldTrigger": "Würde auslösen",
@@ -15502,6 +15504,7 @@
         "userPromptLabel": "Benutzernachricht",
         "userPromptPlaceholder": "Referenzieren Sie Datensatzfelder mit {'{{ input }}'}.",
         "variablesLabel": "Variable einfügen:",
+        "expectedOutputScorersOnly": "{token} · nur Scorer",
         "scorersPlaceholder": "Scorer auswählen",
         "scorersHelp": "Scorer-Versionen sind jetzt festgelegt — spätere Scorer-Änderungen ändern die Ergebnisse dieses Experiments nicht mehr.",
         "scorersEmpty": "Keine Scorer verfügbar. Erstellen Sie zuerst einen unter „Evaluate“.",
@@ -15812,6 +15815,7 @@
         "fallbackTitle": "Datensatz",
         "meta": "{count} Elemente · aktualisiert {updated}",
         "loadError": "Fehler beim Laden des Datensatzes",
+        "tryInPlayground": "Im Playground testen",
         "tabs": {
           "items": "Elemente",
           "experiments": "Experimente"
@@ -16346,6 +16350,7 @@
       "scoreSkippedNoReference": "Übersprungen — keine erwartete Ausgabe",
       "removeExpected": "Erwartete Ausgabe entfernen",
       "expectedLeakWarning": "{token} ist in Aufgaben-Prompts nie verfügbar — goldene Antworten dienen nur den Scorern.",
+      "unresolvedVariablesWarning": "Kein Wert für {tokens} — beim Ausführen leer gesendet.",
       "chipInsert": "Zum Einfügen an der Cursorposition klicken",
       "variant": "Variante {label}",
       "variantLimit": "Die Testumgebung fasst höchstens {max} Varianten.",

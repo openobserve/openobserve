@@ -80,8 +80,8 @@ use crate::{
             validator_proxy_url, validator_rum,
         },
         router::middlewares::{
-            blocked_orgs_middleware, ingest_rejections_middleware, password_policy_middleware,
-            root_only_middleware,
+            blocked_org_param, blocked_orgs_middleware, ingest_rejections_middleware,
+            password_policy_middleware, root_only_middleware,
         },
     },
 };
@@ -265,21 +265,24 @@ fn attach_mcp_www_authenticate(_org_id: &str, resp: Response) -> Response {
     resp
 }
 
-/// Whether the router bound `{org_id}` to a segment other than the one the auth layers check.
-async fn routed_org_differs(parts: &mut Parts) -> bool {
+/// Rejects missing organizations and disagreements between routing and auth.
+async fn validate_routed_org(parts: &mut Parts) -> Result<(), AuthError> {
     let Ok(params) = RawPathParams::from_request_parts(parts, &()).await else {
-        return false;
+        return Ok(());
     };
     let Some((_, routed_org)) = params.iter().find(|(name, _)| *name == "org_id") else {
-        return false;
+        return Ok(());
     };
-    // The nest strip drops an empty `{org_id}` segment from the URI: nothing to compare.
+    // The nest strip drops an empty `{org_id}` segment from the URI, so auth checks the next one.
     if routed_org.is_empty() {
-        return false;
+        return Err(AuthError::NotFound("Organization not found".to_string()));
     }
     let path_columns: Vec<&str> = routed_path(parts.uri.path()).split('/').collect();
     // The router hands over the decoded param, so compare it with the decoded segment.
-    !urlencoding::decode(org_from_path(&path_columns)).is_ok_and(|org| org == routed_org)
+    if !urlencoding::decode(org_from_path(&path_columns)).is_ok_and(|org| org == routed_org) {
+        return Err(AuthError::Forbidden("Unauthorized Access".to_string()));
+    }
+    Ok(())
 }
 
 /// Authentication middleware for API routes.
@@ -299,8 +302,8 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
     let (mut parts, body) = request.into_parts();
     let uri = req_data.uri.clone();
     // The auth layers check one org, so the handler must serve that same org.
-    if routed_org_differs(&mut parts).await {
-        return AuthError::Forbidden("Unauthorized Access".to_string()).into_response();
+    if let Err(error) = validate_routed_org(&mut parts).await {
+        return error.into_response();
     }
     let auth_info = match AuthExtractor::from_request_parts(&mut parts, &()).await {
         Ok(info) => info,
@@ -494,6 +497,19 @@ fn audited_path(uri: &Uri) -> String {
     path.strip_prefix('/').unwrap_or(path).to_string()
 }
 
+#[cfg(any(feature = "enterprise", test))]
+fn audit_org_and_next<'a>(path_columns: &[&'a str]) -> (&'a str, &'a str) {
+    let org = org_from_path(path_columns);
+    // Pointer equality finds the org's own slot even when an earlier segment has the same text.
+    let next = path_columns
+        .iter()
+        .position(|column| std::ptr::eq(*column, org))
+        .and_then(|at| path_columns.get(at + 1))
+        .copied()
+        .unwrap_or("");
+    (org, next)
+}
+
 /// A delegated `/ai/chat` is audited like a Slack `chat_stream` turn: no question text.
 #[cfg(feature = "enterprise")]
 fn delegated_chat_audit_body(
@@ -620,23 +636,18 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
         &path
     };
 
+    let (audit_org, after_org) = audit_org_and_next(&path_columns);
+
     if get_o2_config().common.audit_enabled
-        && !(path_columns
-            .get(1)
-            .unwrap_or(&"")
-            .to_string()
-            .ends_with("_stream")
+        && !(after_org.ends_with("_stream")
             || path.ends_with("ai/chat_stream")
             || common::meta::ingestion_routes::is_ingestion_write(&http_method, ingestion_path))
     {
         let query_params = request.uri().query().unwrap_or("").to_string();
-        let org_id = {
-            let org = path_columns.first().unwrap_or(&"");
-            if org.eq(&"organizations") {
-                "".to_string()
-            } else {
-                org.to_string()
-            }
+        let org_id = if audit_org == "organizations" {
+            String::new()
+        } else {
+            audit_org.to_string()
         };
 
         let user_email = request
@@ -1122,6 +1133,7 @@ pub fn service_routes() -> Router {
         .route("/organizations", get(organization::org::organizations).post(organization::org::create_org))
         .route("/{org_id}/organizations/assume_service_account", post(organization::assume_service_account::assume_service_account))
         .route("/{org_id}/org_cleanup_tasks/{target_org_id}", get(organization::org::list_org_cleanup_tasks))
+        .route("/{org_id}/org_cleanup_tasks/{target_org_id}/retry", post(organization::org::retry_org_cleanup))
         .route(
             "/{org_id}/organizations/{target_org_id}/resurrect",
             post(organization::org::resurrect_org_deletion),
@@ -2531,6 +2543,7 @@ pub fn other_service_routes() -> Router {
             "/{org_id}/{stream_name}/_kinesis_firehose",
             post(logs::ingest::handle_kinesis_request),
         )
+        .route_layer(middleware::from_fn(blocked_org_param))
         .layer(middleware::from_fn(aws_auth_middleware))
         .layer(RequestDecompressionLayer::new());
 
@@ -2539,6 +2552,7 @@ pub fn other_service_routes() -> Router {
             "/{org_id}/{stream_name}/_sub",
             post(logs::ingest::handle_gcp_request),
         )
+        .route_layer(middleware::from_fn(blocked_org_param))
         .layer(middleware::from_fn(gcp_auth_middleware))
         .layer(RequestDecompressionLayer::new());
 
@@ -2546,6 +2560,7 @@ pub fn other_service_routes() -> Router {
         .route("/v1/{org_id}/logs", post(rum::ingest::log))
         .route("/v1/{org_id}/replay", post(rum::ingest::sessionreplay))
         .route("/v1/{org_id}/rum", post(rum::ingest::data))
+        .route_layer(middleware::from_fn(blocked_org_param))
         .layer(middleware::from_fn(RumExtraData::extractor_middleware))
         .layer(middleware::from_fn(rum_auth_middleware))
         .layer(RequestDecompressionLayer::new());
@@ -3220,8 +3235,8 @@ mod tests {
     async fn the_routed_org_must_be_the_org_the_auth_layers_check() {
         async fn guard(request: axum::extract::Request, next: Next) -> Response {
             let (mut parts, body) = request.into_parts();
-            if routed_org_differs(&mut parts).await {
-                return StatusCode::FORBIDDEN.into_response();
+            if let Err(error) = validate_routed_org(&mut parts).await {
+                return error.into_response();
             }
             next.run(Request::from_parts(parts, body)).await
         }
@@ -3249,12 +3264,27 @@ mod tests {
                 .layer(middleware::from_fn(guard)),
         );
         for (uri, expected) in [
-            ("/api//kv/note", StatusCode::OK),
+            ("/api//kv/note", StatusCode::NOT_FOUND),
             ("/api/acme/kv/note", StatusCode::OK),
         ] {
             let request = Request::get(uri).body(Body::empty()).unwrap();
             let status = nested.clone().oneshot(request).await.unwrap().status();
             assert_eq!(status, expected, "{uri}");
+        }
+    }
+
+    #[test]
+    fn a_v2_request_is_audited_under_the_org_it_serves() {
+        for (path, org, next) in [
+            ("v2/acme/alerts/a1", "acme", "alerts"),
+            ("v2/v2/folders/alerts", "v2", "folders"),
+            ("v2/acme/_search_stream", "v2", "acme"),
+            ("acme/_search_stream", "acme", "_search_stream"),
+            ("organizations", "organizations", ""),
+            ("", "", ""),
+        ] {
+            let columns: Vec<&str> = path.split('/').collect();
+            assert_eq!(audit_org_and_next(&columns), (org, next), "{path}");
         }
     }
 

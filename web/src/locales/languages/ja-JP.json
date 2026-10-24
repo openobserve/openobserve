@@ -9124,6 +9124,8 @@
       "expressionPlaceholder": "例: A && B",
       "insert": "挿入:",
       "addAlert": "アラートを追加",
+      "addUnavailableCap": "追加できるアラートは最大 {max} 件です。",
+      "addUnavailableNone": "追加できる対象のアラートはこれ以上ありません。",
       "removeChild": "子 {name} を削除",
       "noChildren": "まだサブアラートがありません。少なくとも2つ追加してください。",
       "wouldTrigger": "トリガーする",
@@ -15502,6 +15504,7 @@
         "userPromptLabel": "ユーザーメッセージ",
         "userPromptPlaceholder": "データセットフィールドを {'{{ input }}'} で参照します。",
         "variablesLabel": "変数を挿入:",
+        "expectedOutputScorersOnly": "{token} · スコアラーのみ",
         "scorersPlaceholder": "スコアラーを選択",
         "scorersHelp": "スコアラーのバージョンは現在固定されています — 後からスコアラーを編集しても、この実験のスコアは変わりません。",
         "scorersEmpty": "利用可能なスコアラーがありません。最初にEvaluateで作成してください。",
@@ -15812,6 +15815,7 @@
         "fallbackTitle": "データセット",
         "meta": "{count} 項目 · 更新日時 {updated}",
         "loadError": "データセットの読み込みに失敗しました",
+        "tryInPlayground": "プレイグラウンドで試す",
         "tabs": {
           "items": "項目",
           "experiments": "実験"
@@ -16346,6 +16350,7 @@
       "scoreSkippedNoReference": "スキップ — 期待される出力がありません",
       "removeExpected": "期待される出力を削除",
       "expectedLeakWarning": "{token} はタスクプロンプトでは利用できません — ゴールデンアンサーはスコアラーにのみ供給されます。",
+      "unresolvedVariablesWarning": "{tokens} の値がありません — 実行時は空で送信されます。",
       "chipInsert": "クリックしてカーソル位置に挿入",
       "variant": "バリアント {label}",
       "variantLimit": "ベンチは最大 {max} 個のバリアントを保持できます。",

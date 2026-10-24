@@ -246,7 +246,14 @@ pub async fn process_token(
 
             // Add the user to the newly added organizations
             for org in orgs_added {
-                let _ = organization::check_and_create_org(&org.name).await;
+                // A missing org is still created here, so only blocked orgs are skipped.
+                if db::org_status::is_blocked(&org.name) {
+                    log::warn!("Skipping SSO membership in blocked org {}", org.name);
+                    continue;
+                }
+                if let Err(error) = organization::check_and_create_org(&org.name).await {
+                    log::warn!("Failed to auto-create organization '{}': {error}", org.name);
+                }
 
                 match users::add_user_to_org(
                     &org.name,
@@ -358,6 +365,8 @@ pub async fn process_token(
             Ok(None)
         } else {
             log::info!("User does not exist in the database");
+            let maps_any_org = !source_orgs.is_empty();
+            source_orgs.retain(|org| !db::org_status::is_blocked(&org.name));
 
             if openfga_cfg.enabled {
                 for (index, org) in source_orgs.iter().enumerate() {
@@ -372,7 +381,9 @@ pub async fn process_token(
 
                     // Create the org if it does not exist. `org.name` is the id of the org.
                     // Also it creates necessary ofga tuples for the newly created org
-                    let _ = organization::check_and_create_org(&org.name).await;
+                    if let Err(error) = organization::check_and_create_org(&org.name).await {
+                        log::warn!("Failed to auto-create organization '{}': {error}", org.name);
+                    }
 
                     if index == 0 {
                         // this is to allow user call organization api with org
@@ -380,6 +391,12 @@ pub async fn process_token(
                     }
 
                     tuples_to_add.insert(org.name.to_owned(), tuples);
+                }
+                // Index 0 carries it otherwise, and the existing-user path never writes it later.
+                if maps_any_org && source_orgs.is_empty() {
+                    let mut tuples = vec![];
+                    get_new_user_creation_tuple(&user_email, &mut tuples);
+                    tuples_to_add.insert(user_email.to_owned(), tuples);
                 }
             }
             let (first_name, last_name) = split_name(&name);
@@ -493,7 +510,12 @@ async fn map_group_to_custom_role(
         };
 
         // Always create default org (system org)
-        let _ = organization::check_and_create_org(&dex_cfg.default_org).await;
+        if let Err(error) = organization::check_and_create_org(&dex_cfg.default_org).await {
+            log::warn!(
+                "Failed to auto-create organization '{}': {error}",
+                dex_cfg.default_org
+            );
+        }
 
         let custom_orgs =
             validate_and_filter_custom_orgs(&custom_roles, &dex_cfg.default_org, user_email).await;
@@ -796,7 +818,10 @@ async fn validate_and_filter_custom_orgs(
     let mut valid_orgs: std::collections::HashMap<String, Vec<String>> =
         std::collections::HashMap::new();
     for (org_id, roles) in custom_orgs {
-        if org_id == default_org || organization::get_org(&org_id).await.is_some() {
+        if org_id == default_org
+            || (!db::org_status::is_blocked(&org_id)
+                && organization::get_org(&org_id).await.is_some())
+        {
             valid_orgs.insert(org_id, roles);
         } else {
             log::error!(
@@ -862,12 +887,22 @@ pub async fn process_domain_org_mapping(
             .into_iter()
             .find(|m| m.domain.to_lowercase() == domain)
         {
-            if org_status::is_blocked(&mapped.org_id) {
-                log::info!(
-                    "user {user_email} supposed to be mapped to org {} but org status is blocked, so skipping",
-                    mapped.org_id
-                );
-                return Ok(false);
+            match org_status::read_active(&mapped.org_id).await {
+                Ok(true) => {}
+                Ok(false) => {
+                    log::warn!(
+                        "domain org mapping for user {user_email} points at inactive org {}, skipping",
+                        mapped.org_id
+                    );
+                    return Ok(false);
+                }
+                Err(e) => {
+                    log::warn!(
+                        "domain org mapping for user {user_email}: cannot read the status of org {}, skipping: {e}",
+                        mapped.org_id
+                    );
+                    return Ok(false);
+                }
             }
 
             log::info!("found domain org mapping for user {user_email}, processing");

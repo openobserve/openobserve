@@ -7,6 +7,7 @@ import { openNavFlyoutChild, clickNavUntilRoute, selectLogsViewMode } from '../c
 import { openOSelectDropdown } from '../alertsPages/oselectHelpers.js';
 import * as fs from 'fs';
 import * as path from 'path';
+import { ingestBase } from '../../playwright-tests/utils/ingest-url.js';
 
 // Import testLogger for proper logging
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
@@ -2375,7 +2376,10 @@ export class LogsPage {
     }
 
     async displayTwoStreams() {
-        await this.clearAndFillQueryEditor("SELECT * FROM 'e2e_automate' UNION ALL SELECT * FROM 'e2e_automate'");
+        const unionQuery = "SELECT * FROM 'e2e_automate' UNION ALL SELECT * FROM 'e2e_automate'";
+        await this.clearAndFillQueryEditor(unionQuery);
+        // Typed while the stream picks still load, the edit never reaches searchObj, so Run sends it as a non-SQL filter.
+        await this.waitForSearchQueryCommitted(unionQuery);
 
         // Ensure query editor is ready
         await this.ensureQueryEditorReady();
@@ -2850,7 +2854,7 @@ export class LogsPage {
             : process.env.INGESTION_URL;
 
         try {
-            const response = await this.page.request.post(`${baseUrl}/api/${orgId}/${streamName}/_json`, {
+            const response = await this.page.request.post(`${ingestBase(baseUrl)}/api/${orgId}/${streamName}/_json`, {
                 headers: headers,
                 data: logData
             });
@@ -3261,7 +3265,7 @@ export class LogsPage {
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                const response = await this.page.request.post(`${baseUrl}/api/${orgId}/${streamName}/_json`, {
+                const response = await this.page.request.post(`${ingestBase(baseUrl)}/api/${orgId}/${streamName}/_json`, {
                     headers: headers,
                     data: logData
                 });
@@ -7192,7 +7196,7 @@ export class LogsPage {
         const httpsAgent = new https.Agent({ keepAlive: false });
         const agent = (parsedURL) => (parsedURL.protocol === 'https:' ? httpsAgent : httpAgent);
 
-        const ingestUrl = `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
+        const ingestUrl = `${ingestBase(process.env.INGESTION_URL)}/api/${orgId}/${streamName}/_json`;
         const maxAttempts = 3;
 
         let successCount = 0;
@@ -7382,7 +7386,7 @@ export class LogsPage {
         const orgId = getOrgIdentifier();
         const headers = getAuthHeaders();
 
-        const url = `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
+        const url = `${ingestBase(process.env.INGESTION_URL)}/api/${orgId}/${streamName}/_json`;
 
         try {
             const response = await this.page.request.post(url, {
@@ -13381,7 +13385,10 @@ export class LogsPage {
             ),
             this.page.locator(this.searchBarRefreshButton).click(),
         ]);
-        await response.finished();
+        // A streamed (text/event-stream) response never reports finished; the Run button wait covers completion.
+        if (!(await response.headerValue('content-type'))?.includes('text/event-stream')) {
+            await response.finished();
+        }
         await this.waitForRunQueryButton(timeout);
         await expect(this.resultsTable()).toBeVisible({ timeout });
     }

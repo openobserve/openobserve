@@ -9124,6 +9124,8 @@
       "expressionPlaceholder": "p. ej., A && B",
       "insert": "Insertar:",
       "addAlert": "Añadir alerta",
+      "addUnavailableCap": "Puedes añadir hasta {max} alertas.",
+      "addUnavailableNone": "No hay más alertas elegibles para añadir.",
       "removeChild": "Eliminar subalerta {name}",
       "noChildren": "Aún no hay subalertas. Añade al menos dos.",
       "wouldTrigger": "Se activaría",
@@ -15502,6 +15504,7 @@
         "userPromptLabel": "Mensaje del usuario",
         "userPromptPlaceholder": "Haz referencia a los campos del conjunto de datos con {'{{ input }}'}.",
         "variablesLabel": "Insertar una variable:",
+        "expectedOutputScorersOnly": "{token} · solo evaluadores",
         "scorersPlaceholder": "Seleccionar evaluadores",
         "scorersHelp": "Las versiones de los evaluadores están fijadas ahora — las ediciones posteriores de los evaluadores nunca cambiarán las puntuaciones de este experimento.",
         "scorersEmpty": "No hay evaluadores disponibles. Crea uno en Evaluar primero.",
@@ -15812,6 +15815,7 @@
         "fallbackTitle": "Conjunto de datos",
         "meta": "{count} elementos · actualizado {updated}",
         "loadError": "No se pudo cargar el conjunto de datos",
+        "tryInPlayground": "Probar en Playground",
         "tabs": {
           "items": "Elementos",
           "experiments": "Experimentos"
@@ -16346,6 +16350,7 @@
       "scoreSkippedNoReference": "Omitido — no hay salida esperada",
       "removeExpected": "Quitar resultado esperado",
       "expectedLeakWarning": "{token} nunca está disponible en las indicaciones de la tarea — las respuestas de referencia solo alimentan a los evaluadores.",
+      "unresolvedVariablesWarning": "Sin valor para {tokens}: se envía vacío al ejecutar.",
       "chipInsert": "Haz clic para insertar en el cursor",
       "variant": "Variante {label}",
       "variantLimit": "El banco de pruebas admite como máximo {max} variantes.",

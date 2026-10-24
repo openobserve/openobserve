@@ -2,7 +2,8 @@ name: Sister Enterprise Merge Gate
 
 # An OSS PR with an open, same-named o2-enterprise PR must wait: enterprise merges first.
 # Checks once when "Merge when ready" is clicked (and on later pushes or re-labels) and again on the
-# merge-queue commit; it never waits. If it fails, merge the enterprise PR, then re-run this job.
+# merge-queue commit; it never waits. If it fails, merging the enterprise PR re-runs this job via
+# o2-enterprise sister-gate-auto-rerun.yml (or re-run it by hand).
 # A bot push fires no pull_request_target, so re-add a label to re-check the current head.
 # Make the job `Sister Enterprise PR` a required check on main.
 #

@@ -9124,6 +9124,8 @@
       "expressionPlaceholder": "es. A && B",
       "insert": "Inserisci:",
       "addAlert": "Aggiungi avviso",
+      "addUnavailableCap": "Puoi aggiungere fino a {max} avvisi.",
+      "addUnavailableNone": "Nessun altro avviso idoneo da aggiungere.",
       "removeChild": "Rimuovi il figlio {name}",
       "noChildren": "Ancora nessun sotto-avviso. Aggiungi almeno due.",
       "wouldTrigger": "Attiverebbe",
@@ -15502,6 +15504,7 @@
         "userPromptLabel": "Messaggio utente",
         "userPromptPlaceholder": "Riferisci i campi del dataset con {'{{ input }}'}.",
         "variablesLabel": "Inserisci una variabile:",
+        "expectedOutputScorersOnly": "{token} · solo scorer",
         "scorersPlaceholder": "Seleziona valutatori",
         "scorersHelp": "Le versioni dei valutatori sono ora fissate — modifiche successive ai valutatori non cambieranno mai i punteggi di questo esperimento.",
         "scorersEmpty": "Nessun valutatore disponibile. Creane uno sotto Valuta prima.",
@@ -15812,6 +15815,7 @@
         "fallbackTitle": "Dataset",
         "meta": "{count} elementi · aggiornato {updated}",
         "loadError": "Impossibile caricare il dataset",
+        "tryInPlayground": "Prova nel Playground",
         "tabs": {
           "items": "Elementi",
           "experiments": "Esperimenti"
@@ -16346,6 +16350,7 @@
       "scoreSkippedNoReference": "Saltato — nessun output atteso",
       "removeExpected": "Rimuovi output atteso",
       "expectedLeakWarning": "{token} non è mai disponibile nei prompt delle attività — le risposte di riferimento alimentano solo i valutatori.",
+      "unresolvedVariablesWarning": "Nessun valore per {tokens} — verrà inviato vuoto all'esecuzione.",
       "chipInsert": "Fai clic per inserire al cursore",
       "variant": "Variante {label}",
       "variantLimit": "Il playground supporta al massimo {max} varianti.",

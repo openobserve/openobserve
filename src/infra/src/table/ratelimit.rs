@@ -521,6 +521,16 @@ pub async fn delete(rule_id: String) -> Result<(), anyhow::Error> {
     }
 }
 
+/// Rows only; the enterprise rule cache is evicted by `o2_ratelimit::dataresource::db::evict_org`.
+pub async fn delete_by_org(org: &str) -> Result<(), anyhow::Error> {
+    Entity::delete_many()
+        .filter(Column::Org.eq(org))
+        .exec(get_orm_client_rw().await)
+        .await
+        .map_err(|e| anyhow!("DbError# {e}"))?;
+    Ok(())
+}
+
 pub async fn list(
     org: &str,
     api: Option<&str>,

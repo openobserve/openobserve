@@ -9122,6 +9122,8 @@
       "expressionPlaceholder": "e.g. A && B",
       "insert": "Insert:",
       "addAlert": "Add alert",
+      "addUnavailableCap": "You can add up to {max} alerts.",
+      "addUnavailableNone": "No more eligible alerts to add.",
       "removeChild": "Remove child {name}",
       "noChildren": "No sub-alerts yet. Add at least two.",
       "wouldTrigger": "Would trigger",
@@ -15500,6 +15502,7 @@
         "userPromptLabel": "User message",
         "userPromptPlaceholder": "Reference dataset fields with {'{{ input }}'}.",
         "variablesLabel": "Insert a variable:",
+        "expectedOutputScorersOnly": "{token} · scorers only",
         "scorersPlaceholder": "Select scorers",
         "scorersHelp": "Scorer versions are pinned now — later scorer edits never change this experiment's scores.",
         "scorersEmpty": "No scorers available. Create one under Evaluate first.",
@@ -15810,6 +15813,7 @@
         "fallbackTitle": "Dataset",
         "meta": "{count} items · updated {updated}",
         "loadError": "Failed to load dataset",
+        "tryInPlayground": "Try in Playground",
         "tabs": {
           "items": "Items",
           "experiments": "Experiments"
@@ -16344,6 +16348,7 @@
       "scoreSkippedNoReference": "Skipped — no expected output",
       "removeExpected": "Remove expected output",
       "expectedLeakWarning": "{token} is never available in task prompts — golden answers only feed scorers.",
+      "unresolvedVariablesWarning": "No value for {tokens} — sent empty when run.",
       "chipInsert": "Click to insert at the cursor",
       "variant": "Variant {label}",
       "variantLimit": "The bench holds at most {max} variants.",

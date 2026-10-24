@@ -9124,6 +9124,8 @@
       "expressionPlaceholder": "예: A && B",
       "insert": "삽입:",
       "addAlert": "알림 추가",
+      "addUnavailableCap": "최대 {max}개의 알림을 추가할 수 있습니다.",
+      "addUnavailableNone": "추가할 수 있는 알림이 더 이상 없습니다.",
       "removeChild": "하위 항목 {name} 제거",
       "noChildren": "아직 하위 알림이 없습니다. 최소 두 개를 추가하세요.",
       "wouldTrigger": "트리거됨",
@@ -15502,6 +15504,7 @@
         "userPromptLabel": "사용자 메시지",
         "userPromptPlaceholder": "데이터셋 필드를 {'{{ input }}'}로 참조하세요.",
         "variablesLabel": "변수 삽입:",
+        "expectedOutputScorersOnly": "{token} · 스코어러만",
         "scorersPlaceholder": "스코어러 선택",
         "scorersHelp": "스코어러 버전은 지금 고정됩니다. 나중에 스코어러를 수정해도 이 실험의 점수는 변경되지 않습니다.",
         "scorersEmpty": "사용 가능한 스코어러가 없습니다. 먼저 Evaluate에서 만드세요.",
@@ -15812,6 +15815,7 @@
         "fallbackTitle": "데이터셋",
         "meta": "{count}개 항목 · 업데이트됨 {updated}",
         "loadError": "데이터셋을 불러오지 못했습니다",
+        "tryInPlayground": "플레이그라운드에서 사용해 보기",
         "tabs": {
           "items": "항목",
           "experiments": "실험"
@@ -16346,6 +16350,7 @@
       "scoreSkippedNoReference": "건너뜀 — 예상 출력 없음",
       "removeExpected": "예상 출력 제거",
       "expectedLeakWarning": "{token}은(는) 태스크 프롬프트에서 사용할 수 없습니다 — 정답은 스코어러에만 전달됩니다.",
+      "unresolvedVariablesWarning": "{tokens}에 대한 값이 없습니다 — 실행 시 빈 값으로 전송됩니다.",
       "chipInsert": "클릭하여 커서 위치에 삽입",
       "variant": "변형 {label}",
       "variantLimit": "벤치에는 최대 {max}개의 변형이 들어갑니다.",

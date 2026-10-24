@@ -59,6 +59,7 @@ pub mod gen_ai_agents;
 pub mod incident_events;
 pub mod incident_integrations;
 pub mod kv_store;
+pub mod llm_eval;
 pub mod llm_prompts;
 pub mod llm_secrets;
 mod migration;
@@ -126,6 +127,8 @@ pub mod synthetics_variables;
 pub mod system_prompts;
 pub mod system_settings;
 pub mod templates;
+#[cfg(test)]
+pub(crate) mod testing;
 pub mod timed_annotation_panels;
 pub mod timed_annotations;
 #[cfg(feature = "cloud")]
@@ -210,6 +213,49 @@ pub async fn create_user_tables() -> Result<(), anyhow::Error> {
     user_auth_state::create_table().await?;
 
     Ok(())
+}
+
+/// Deletes the rows `delete` matches and returns `cols` of each, in one statement.
+pub(crate) async fn delete_returning<E, T, C>(
+    conn: &C,
+    delete: sea_orm::DeleteMany<E>,
+    cols: &[E::Column],
+) -> Result<Vec<T>, sea_orm::DbErr>
+where
+    E: sea_orm::EntityTrait,
+    T: sea_orm::TryGetableMany,
+    C: sea_orm::ConnectionTrait,
+{
+    use sea_orm::{Iden, QueryTrait, sea_query::Query};
+    let mut stmt = delete.into_query();
+    stmt.returning(Query::returning().columns(cols.iter().copied()));
+    let names: Vec<String> = cols.iter().map(|c| c.to_string()).collect();
+    let rows = conn
+        .query_all(conn.get_database_backend().build(&stmt))
+        .await?;
+    rows.iter()
+        .map(|row| T::try_get_many(row, "", &names).map_err(sea_orm::DbErr::from))
+        .collect()
+}
+
+/// `delete_returning` of whole rows; sea-orm's `exec_with_returning` panics on SQLite here.
+pub(crate) async fn delete_returning_models<E, C>(
+    conn: &C,
+    delete: sea_orm::DeleteMany<E>,
+) -> Result<Vec<E::Model>, sea_orm::DbErr>
+where
+    E: sea_orm::EntityTrait,
+    C: sea_orm::ConnectionTrait,
+{
+    use sea_orm::{FromQueryResult, QueryTrait, sea_query::Query};
+    let mut stmt = delete.into_query();
+    stmt.returning(Query::returning().all());
+    let rows = conn
+        .query_all(conn.get_database_backend().build(&stmt))
+        .await?;
+    rows.iter()
+        .map(|row| E::Model::from_query_result(row, ""))
+        .collect()
 }
 
 #[macro_export]
