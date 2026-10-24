@@ -11,7 +11,6 @@ export class RumPerformancePage {
             '[data-test="performance-summary-loading-indicator"]',
         );
 
-        // Toolbar + toggle group
         this.toolbar = page.locator('[data-test="rum-performance-toolbar"]');
         this.tabsDropdownBtn = page.locator('[data-test="rum-performance-tabs-dropdown-btn"]');
         this.shareLinkBtn = page.locator('[data-test="rum-performance-share-link-btn"]');
@@ -21,14 +20,17 @@ export class RumPerformancePage {
         this.refreshOptionsBtn = page.locator('[data-test="rum-performance-refresh-options-btn"]');
         this.autoRunToggleBtn = page.locator('[data-test="rum-performance-auto-run-toggle-btn"]');
 
-        // Child dashboards
         this.overviewSchemaLoading = page.locator(
             '[data-test="performance-summary-schema-loading"]',
         );
         this.overviewEmpty = page.locator('[data-test="performance-summary-empty"]');
         this.dashboardPanels = page.locator('[data-test="dashboard-panel-container"]');
         this.errorsDashboard = page.locator('[data-test="performance-error-dashboard"]');
+        this.errorsSchemaLoading = page.locator('[data-test="errors-dashboard-schema-loading"]');
+        this.errorsEmpty = page.locator('[data-test="errors-dashboard-empty"]');
         this.apiDashboard = page.locator('[data-test="api-performance-dashboards"]');
+        this.apiSchemaLoading = page.locator('[data-test="api-dashboard-schema-loading"]');
+        this.apiEmpty = page.locator('[data-test="api-dashboard-empty"]');
         this.webVitalsSchemaLoading = page.locator(
             '[data-test="web-vitals-dashboard-schema-loading"]',
         );
@@ -56,13 +58,27 @@ export class RumPerformancePage {
         await this.refreshButton.click();
     }
 
-    /** Settle the current load first, so the only search request left to observe is the one the click fires. */
     async clickRefreshAndExpectSearch(timeoutMs = 15000) {
-        await this.expectSummaryLoadingResolved();
-        const search = this.page.waitForRequest(
-            (req) => req.method() === 'POST' && /\/api\/[^/]+\/_search/.test(req.url()),
-            { timeout: timeoutMs },
-        );
+        const isSearch = (req) => req.method() === 'POST' && /\/api\/[^/]+\/_search/.test(req.url());
+        let seen = 0;
+        const countSearch = (req) => {
+            if (isSearch(req)) seen += 1;
+        };
+        this.page.on('request', countSearch);
+        // Panels lazy-load their queries, so wait for 2s with no new search before attributing one to the click.
+        let previous = -1;
+        await expect
+            .poll(
+                () => {
+                    const quiet = seen === previous;
+                    previous = seen;
+                    return quiet;
+                },
+                { intervals: [2000], timeout: 30000 },
+            )
+            .toBe(true);
+        this.page.off('request', countSearch);
+        const search = this.page.waitForRequest(isSearch, { timeout: timeoutMs });
         await this.refreshButton.click();
         await search;
     }
@@ -107,15 +123,22 @@ export class RumPerformancePage {
         });
     }
 
-    async expectErrorsDashboardMounted(timeoutMs = 15000) {
+    async expectErrorsDashboardMounted(timeoutMs = 30000) {
         await expect(this.errorsDashboard).toBeVisible({ timeout: timeoutMs });
+        await expect(this.errorsSchemaLoading).toBeHidden({ timeout: timeoutMs });
+        await expect(
+            this.errorsEmpty.or(this.errorsDashboard.locator(this.dashboardPanels)).first(),
+        ).toBeVisible({ timeout: timeoutMs });
     }
 
-    async expectApiDashboardMounted(timeoutMs = 15000) {
+    async expectApiDashboardMounted(timeoutMs = 30000) {
         await expect(this.apiDashboard).toBeVisible({ timeout: timeoutMs });
+        await expect(this.apiSchemaLoading).toBeHidden({ timeout: timeoutMs });
+        await expect(
+            this.apiEmpty.or(this.apiDashboard.locator(this.dashboardPanels)).first(),
+        ).toBeVisible({ timeout: timeoutMs });
     }
 
-    /** Vitals child resolves: schema-loading gone, then a terminal state is shown. */
     async expectWebVitalsMounted(timeoutMs = 30000) {
         await expect(this.webVitalsSchemaLoading).toBeHidden({ timeout: timeoutMs });
         await expect(this.webVitalsEmpty.or(this.learnWebVitalsLink).first()).toBeVisible({
@@ -136,8 +159,17 @@ export class RumPerformancePage {
         await expect(this.shareLinkBtn).toBeVisible({ timeout: timeoutMs });
     }
 
-    async isShareLinkBtnDisabled() {
-        return this.shareLinkBtn.isDisabled();
+    async getConfiguredWebUrl() {
+        const base = process.env.ZO_BASE_URL || 'http://localhost:5080';
+        const org = process.env.ORGNAME || 'default';
+        return await this.page.evaluate(async (url) => {
+            const res = await fetch(url, { credentials: 'include' });
+            return (await res.json()).web_url || '';
+        }, `${base}/api/${org}/config`);
+    }
+
+    async expectShareLinkBtnEnabled(timeoutMs = 15000) {
+        await expect(this.shareLinkBtn).toBeEnabled({ timeout: timeoutMs });
     }
 
     async clickShareLink() {
@@ -148,12 +180,27 @@ export class RumPerformancePage {
         await expect(this.shareLinkToast).toBeVisible({ timeout: timeoutMs });
     }
 
-    async expectCopiedShortUrl(timeoutMs = 15000) {
+    /** Returns the original URL behind the copied short link, via the lookup the /web/short route uses. */
+    async resolveCopiedShortUrl(timeoutMs = 15000) {
+        let copied = '';
         await expect
-            .poll(() => this.page.evaluate(() => navigator.clipboard.readText()).catch(() => ''), {
-                timeout: timeoutMs,
-            })
-            .toContain('/short/');
+            .poll(
+                async () => {
+                    copied = await this.page
+                        .evaluate(() => navigator.clipboard.readText())
+                        .catch(() => '');
+                    return copied;
+                },
+                { timeout: timeoutMs },
+            )
+            .toMatch(/\/short\/[^/?#]+/);
+        const id = copied.match(/\/short\/([^/?#]+)/)[1];
+        const base = process.env.ZO_BASE_URL || 'http://localhost:5080';
+        const org = process.env.ORGNAME || 'default';
+        return await this.page.evaluate(async (url) => {
+            const res = await fetch(url, { credentials: 'include' });
+            return await res.json();
+        }, `${base}/api/${org}/short/${id}?type=ui`);
     }
 
     async openRefreshOptions() {

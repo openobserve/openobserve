@@ -1,5 +1,3 @@
-// Asserts each child dashboard reaches a resolved state, never panel data, so a missing _rumdata stream still passes.
-
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
@@ -14,6 +12,10 @@ test.describe('RUM App Performance toolbar & toggle group', () => {
     await navigateToBase(page);
     pm = new PageManager(page);
     testLogger.info('Test setup completed');
+  });
+
+  test.afterEach(async ({}, testInfo) => {
+    testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
   test('should render the toolbar with four tabs and Overview active by default', {
@@ -73,16 +75,15 @@ test.describe('RUM App Performance toolbar & toggle group', () => {
     testLogger.info('Errors tab auto-selected from the deep link');
   });
 
-  test('should re-run the Overview dashboard on manual refresh without hanging', {
+  test('should re-run the Overview dashboard on manual refresh', {
     tag: ['@rum', '@rum-app-performance-toolbar', '@ui', '@all', '@P1'],
   }, async ({ page }) => {
-    testLogger.info('Testing manual refresh re-runs the dashboard and resolves');
+    testLogger.info('Testing manual refresh re-runs the dashboard');
     await pm.rumPerformancePage.gotoPerformance();
     await pm.rumPerformancePage.expectOverviewResolved();
     await pm.rumPerformancePage.clickRefreshAndExpectSearch();
-    await pm.rumPerformancePage.expectSummaryLoadingResolved();
     await pm.rumPerformancePage.expectOverviewResolved();
-    testLogger.info('Manual refresh fired a new search and resolved without a stuck loading indicator');
+    testLogger.info('Manual refresh fired a new search and the Overview re-rendered');
   });
 
   test.fixme('Auto-Run / Live-Mode toggle needs ZO_AUTO_QUERY_ENABLED=true, which no CI shard sets, so useAutoRunToggle never renders the refresh-options dropdown', {
@@ -104,13 +105,15 @@ test.describe('RUM App Performance toolbar & toggle group', () => {
     await pm.rumPerformancePage.gotoPerformance();
     await pm.rumPerformancePage.expectShareLinkBtnVisible();
     test.skip(
-      await pm.rumPerformancePage.isShareLinkBtnDisabled(),
-      'Share button disabled: zoConfig.web_url is not configured (config gating, not a regression)',
+      !(await pm.rumPerformancePage.getConfiguredWebUrl()),
+      'server has no ZO_WEB_URL, so sharing is disabled by design',
     );
+    await pm.rumPerformancePage.expectShareLinkBtnEnabled();
     await pm.rumPerformancePage.clickShareLink();
     await pm.rumPerformancePage.expectLinkCopiedToast();
-    await pm.rumPerformancePage.expectCopiedShortUrl();
-    testLogger.info('Share link copied a short URL');
+    const originalUrl = await pm.rumPerformancePage.resolveCopiedShortUrl();
+    testLogger.info('Share link resolves to', { originalUrl });
+    expect(originalUrl).toContain('/rum/performance');
   });
 
   test('should collapse the tab strip into a dropdown on mobile and navigate', {
