@@ -30,6 +30,7 @@ pub enum OrgStatus {
     Active,
     PendingDeletion,
     Deleting,
+    Deleted,
 }
 
 use config::meta::{cluster::Node, self_reporting::usage};

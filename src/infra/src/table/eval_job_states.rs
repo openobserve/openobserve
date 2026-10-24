@@ -15,17 +15,21 @@
 
 //! Persistence for `config::meta::eval_job_health`; the decisions live there.
 
+use std::collections::BTreeMap;
+
 use config::meta::eval_job_health::{
     EvalJobHealth, EvalJobLastError, EvalJobState, EvalJobStateTransition, EvalJobStateUpdate,
 };
 use sea_orm::{
-    ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait, sea_query::OnConflict,
+    ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set, TransactionTrait,
+    sea_query::OnConflict,
 };
 
-use super::entity::{eval_job_state_transitions, eval_job_states};
+use super::entity::{eval_job_state_transitions, eval_job_states, organizations};
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
     errors,
+    org_lifecycle::OrgLifecycleGuard,
 };
 
 /// Stored health for a batch of jobs; never-measured jobs are absent.
@@ -50,11 +54,23 @@ pub async fn get_many_with<C: sea_orm::ConnectionTrait>(
         .collect())
 }
 
-/// Writes a pass's states and transitions in one transaction, so `since` and the log never
-/// disagree: a single upsert covers all the states and a single insert all the transitions.
+/// Persists each active org's health atomically while serializing against deletion.
 pub async fn persist(updates: &[EvalJobStateUpdate]) -> Result<(), errors::Error> {
+    if updates.is_empty() {
+        return Ok(());
+    }
+    let mut by_org: BTreeMap<&str, Vec<EvalJobStateUpdate>> = BTreeMap::new();
+    for update in updates {
+        by_org
+            .entry(&update.state.org_id)
+            .or_default()
+            .push(update.clone());
+    }
     let client = get_orm_client_rw().await;
-    persist_with(client, updates).await
+    for (org_id, updates) in by_org {
+        persist_active_org_with(client, org_id, &updates).await?;
+    }
+    Ok(())
 }
 
 pub async fn persist_with<C: sea_orm::ConnectionTrait + TransactionTrait>(
@@ -101,6 +117,31 @@ pub async fn delete_transitions_before(cutoff: i64) -> Result<u64, errors::Error
         .exec(client)
         .await?
         .rows_affected)
+}
+
+async fn persist_active_org_with<C: sea_orm::ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    updates: &[EvalJobStateUpdate],
+) -> Result<(), errors::Error> {
+    // Deletion takes this lock before changing status, so an admitted write finishes first.
+    let guard = OrgLifecycleGuard::acquire(org_id).await?;
+    let result = async {
+        let status = organizations::Entity::find()
+            .select_only()
+            .column(organizations::Column::Status)
+            .filter(organizations::Column::Identifier.eq(org_id))
+            .into_tuple::<String>()
+            .one(conn)
+            .await?;
+        if status.as_deref() == Some("active") {
+            persist_with(conn, updates).await?;
+        }
+        Ok(())
+    }
+    .await;
+    guard.release().await;
+    result
 }
 
 /// An unknown `health` id reads as never measured rather than failing the list.
@@ -361,6 +402,57 @@ mod tests {
                 .unwrap(),
             2,
             "job-1's first measurement and job-2's; the steady job-1 pass logs none"
+        );
+    }
+
+    #[tokio::test]
+    async fn late_updates_skip_inactive_and_missing_orgs() {
+        use sea_orm::ConnectionTrait;
+
+        let db = db().await;
+        db.execute_unprepared(
+            "CREATE TABLE organizations (identifier TEXT PRIMARY KEY, status TEXT NOT NULL)",
+        )
+        .await
+        .unwrap();
+        db.execute_unprepared("INSERT INTO organizations VALUES ('org', 'active')")
+            .await
+            .unwrap();
+        let update = apply_health("job-1", "org", None, observed(EvalJobHealth::Healthy), 100);
+        persist_active_org_with(&db, "org", std::slice::from_ref(&update))
+            .await
+            .unwrap();
+        assert_eq!(eval_job_states::Entity::find().count(&db).await.unwrap(), 1);
+        for status in ["pending_deletion", "deleting", "deleted"] {
+            db.execute_unprepared(&format!("UPDATE organizations SET status = '{status}'"))
+                .await
+                .unwrap();
+            delete_by_job_with(&db, "job-1").await.unwrap();
+            persist_active_org_with(&db, "org", std::slice::from_ref(&update))
+                .await
+                .unwrap();
+            assert_eq!(eval_job_states::Entity::find().count(&db).await.unwrap(), 0);
+            assert_eq!(
+                eval_job_state_transitions::Entity::find()
+                    .count(&db)
+                    .await
+                    .unwrap(),
+                0
+            );
+        }
+        db.execute_unprepared("DELETE FROM organizations")
+            .await
+            .unwrap();
+        persist_active_org_with(&db, "org", &[update])
+            .await
+            .unwrap();
+        assert_eq!(eval_job_states::Entity::find().count(&db).await.unwrap(), 0);
+        assert_eq!(
+            eval_job_state_transitions::Entity::find()
+                .count(&db)
+                .await
+                .unwrap(),
+            0
         );
     }
 

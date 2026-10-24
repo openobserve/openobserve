@@ -34,6 +34,17 @@ use crate::{
     table::entity::system_settings::{ActiveModel, Column, Entity, Model},
 };
 
+/// The columns a setting's cache key is built from, in [`SettingRowKey`] order.
+const SETTING_KEY_COLUMNS: [Column; 4] = [
+    Column::Scope,
+    Column::OrgId,
+    Column::UserId,
+    Column::SettingKey,
+];
+
+/// `(scope, org_id, user_id, setting_key)` of one setting row.
+pub type SettingRowKey = (String, Option<String>, Option<String>, String);
+
 /// Create the table from the entity, for callers that stand up a schema without running the
 /// migrations that own it in production.
 pub async fn create_table() -> Result<(), anyhow::Error> {
@@ -158,6 +169,20 @@ pub async fn list(
         .map_err(|e| anyhow!("DbError# {e}"))?;
 
     Ok(results.into_iter().map(model_to_setting).collect())
+}
+
+/// `(scope, org_id, user_id, setting_key)` of every setting row of the org, at any scope.
+pub async fn list_keys_by_org(org_id: &str) -> Result<Vec<SettingRowKey>, anyhow::Error> {
+    use sea_orm::QuerySelect;
+    let client = get_orm_client_ro().await;
+    Entity::find()
+        .select_only()
+        .columns(SETTING_KEY_COLUMNS)
+        .filter(Column::OrgId.eq(org_id))
+        .into_tuple()
+        .all(client)
+        .await
+        .map_err(|e| anyhow!("DbError# {e}"))
 }
 
 /// List all resolved settings for org/user (merging all levels)
@@ -308,17 +333,13 @@ pub async fn delete(
     Ok(result.rows_affected > 0)
 }
 
-/// Delete all settings for an organization
-pub async fn delete_org_settings(org_id: &str) -> Result<u64, anyhow::Error> {
+/// Delete all settings for an organization and return the key of each deleted row.
+pub async fn delete_org_settings(org_id: &str) -> Result<Vec<SettingRowKey>, anyhow::Error> {
     let client = get_orm_client_rw().await;
-
-    let result = Entity::delete_many()
-        .filter(Column::OrgId.eq(org_id))
-        .exec(client)
+    let delete = Entity::delete_many().filter(Column::OrgId.eq(org_id));
+    super::delete_returning(client, delete, &SETTING_KEY_COLUMNS)
         .await
-        .map_err(|e| anyhow!("DbError# {e}"))?;
-
-    Ok(result.rows_affected)
+        .map_err(|e| anyhow!("DbError# {e}"))
 }
 
 /// Delete all settings for a user in an organization
@@ -382,5 +403,33 @@ mod tests {
         assert_eq!(setting.user_id, None);
         assert_eq!(setting.setting_key, "test_key");
         assert_eq!(setting.setting_value, serde_json::json!(["a", "b", "c"]));
+    }
+
+    #[tokio::test]
+    async fn test_org_settings_delete_returns_the_key_of_each_row_it_removed() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("t_settings");
+        let other = format!("{org}_other");
+        for (org, key) in [(&org, "a"), (&org, "b"), (&other, "a")] {
+            set(&SystemSetting::new_org(
+                org.as_str(),
+                key,
+                serde_json::json!(1),
+            ))
+            .await
+            .unwrap();
+        }
+
+        let mut removed = delete_org_settings(&org).await.unwrap();
+        removed.sort_by(|x, y| x.3.cmp(&y.3));
+        let left = list_keys_by_org(&org).await.unwrap();
+        let kept = delete_org_settings(&other).await.unwrap();
+
+        let org_row = |key: &str| ("org".to_string(), Some(org.clone()), None, key.to_string());
+        assert_eq!(removed, [org_row("a"), org_row("b")]);
+        assert!(left.is_empty());
+        assert_eq!(kept.len(), 1, "another org's setting went with this org's");
     }
 }

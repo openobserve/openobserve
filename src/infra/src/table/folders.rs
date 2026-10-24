@@ -377,14 +377,11 @@ async fn list_models(
         .await
 }
 
-/// Deletes all folders belonging to the given org.
-pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+/// Deletes all folders of the org and returns each one's `(folder_id, type)`.
+pub async fn delete_by_org(org_id: &str) -> Result<Vec<(String, i16)>, errors::Error> {
     let client = get_orm_client_rw().await;
-    Entity::delete_many()
-        .filter(Column::Org.eq(org_id))
-        .exec(client)
-        .await?;
-    Ok(())
+    let delete = Entity::delete_many().filter(Column::Org.eq(org_id));
+    Ok(super::delete_returning(client, delete, &[Column::FolderId, Column::Type]).await?)
 }
 
 #[cfg(test)]

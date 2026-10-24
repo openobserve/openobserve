@@ -55,6 +55,16 @@ use crate::common::meta::{
     },
 };
 
+#[cfg(not(feature = "cloud"))]
+const NOT_SUPPORTED_HERE: &str = "Not supported on this deployment";
+
+#[derive(serde::Serialize)]
+struct CleanupTaskView {
+    #[serde(flatten)]
+    task: infra::table::org_cleanup_tasks::CleanupTask,
+    exhausted: bool,
+}
+
 /// GetOrganizations
 
 #[utoipa::path(
@@ -1210,6 +1220,18 @@ pub async fn enable_org_storage(
     }
 
     let target_org_id = req.org_id;
+    // The target comes from the body, so the blocked-org gate never saw it.
+    match db::org_status::read_active(&target_org_id).await {
+        Ok(true) => {}
+        Ok(false) => {
+            return MetaHttpResponse::bad_request(format!("org {target_org_id} is not active"));
+        }
+        Err(e) => {
+            return MetaHttpResponse::internal_error(format!(
+                "cannot read the status of org {target_org_id}: {e}"
+            ));
+        }
+    }
 
     let enabled = db::organization::update_org_setting(&target_org_id, |org_settings| {
         !std::mem::replace(&mut org_settings.org_storage_enabled, true)
@@ -1625,7 +1647,7 @@ pub async fn resurrect_org_deletion(
 pub async fn resurrect_org_deletion(
     Path((_meta_org, _target_org_id)): Path<(String, String)>,
 ) -> Response {
-    MetaHttpResponse::forbidden("Enterprise feature")
+    MetaHttpResponse::forbidden(NOT_SUPPORTED_HERE)
 }
 
 /// ListOrgCleanupTasks - admin endpoint to inspect cleanup task state for an org
@@ -1640,9 +1662,50 @@ pub async fn list_org_cleanup_tasks(
         return MetaHttpResponse::forbidden("Not allowed");
     }
     match infra::table::org_cleanup_tasks::list_by_org_status(&target_org_id, None).await {
-        Ok(tasks) => MetaHttpResponse::json(tasks),
+        Ok(tasks) => MetaHttpResponse::json(
+            tasks
+                .into_iter()
+                .map(|task| CleanupTaskView {
+                    exhausted: openobserve_core::org_cleanup::is_exhausted(&task),
+                    task,
+                })
+                .collect::<Vec<_>>(),
+        ),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
+}
+
+#[cfg(feature = "cloud")]
+pub async fn retry_org_cleanup(
+    Headers(user_email): Headers<UserEmail>,
+    Path((_org_id, target_org_id)): Path<(String, String)>,
+) -> Response {
+    if !may_retry_cleanup(&user_email.user_id, &target_org_id).await {
+        return MetaHttpResponse::forbidden("Not allowed");
+    }
+    match openobserve_core::org_cleanup::retry(&target_org_id).await {
+        Ok(()) => MetaHttpResponse::ok("Organization cleanup retry scheduled"),
+        Err(e) => MetaHttpResponse::bad_request(e),
+    }
+}
+
+#[cfg(not(feature = "cloud"))]
+pub async fn retry_org_cleanup(
+    Path((_org_id, _target_org_id)): Path<(String, String)>,
+) -> Response {
+    MetaHttpResponse::forbidden(NOT_SUPPORTED_HERE)
+}
+
+/// Root, or an Admin of the org being deleted; the path org plays no part.
+#[cfg(any(feature = "cloud", test))]
+async fn may_retry_cleanup(user_id: &str, target_org_id: &str) -> bool {
+    use config::meta::user::UserRole;
+
+    is_root_user(user_id)
+        || matches!(
+            openobserve_core::users::get_user(Some(target_org_id), user_id).await,
+            Some(user) if user.role == UserRole::Admin
+        )
 }
 
 /// Helper function to collect nodes from the local cluster
@@ -1846,6 +1909,54 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    fn join(org_id: &str, email: &str, role: config::meta::user::UserRole) {
+        common::infra::config::USERS.insert(
+            email.to_string(),
+            infra::table::users::UserRecord {
+                email: email.to_string(),
+                first_name: "F".to_string(),
+                last_name: "L".to_string(),
+                password: "hash".to_string(),
+                salt: "salt".to_string(),
+                is_root: false,
+                password_ext: None,
+                user_type: config::meta::user::UserType::Internal,
+                created_at: 0,
+                updated_at: 0,
+                must_reset_password: false,
+                password_reset_reason: None,
+                flagged_at: None,
+                password_updated_at: None,
+            },
+        );
+        common::infra::config::ORG_USERS.insert(
+            format!("{org_id}/{email}"),
+            infra::table::org_users::OrgUserRecord {
+                role,
+                token: "token".to_string(),
+                rum_token: None,
+                org_id: org_id.to_string(),
+                email: email.to_string(),
+                created_at: 0,
+                allow_static_token: true,
+            },
+        );
+    }
+
+    #[tokio::test]
+    async fn cleanup_retry_is_root_or_an_admin_of_the_target_org() {
+        use config::meta::user::UserRole;
+        let (target, other) = ("retry-target-org", "retry-other-org");
+        join(config::DEFAULT_ORG, "root@retry-rule.test", UserRole::Root);
+        join(target, "admin@retry-rule.test", UserRole::Admin);
+        join(target, "editor@retry-rule.test", UserRole::Editor);
+        join(other, "other-admin@retry-rule.test", UserRole::Admin);
+        assert!(super::may_retry_cleanup("root@retry-rule.test", target).await);
+        assert!(super::may_retry_cleanup("admin@retry-rule.test", target).await);
+        assert!(!super::may_retry_cleanup("editor@retry-rule.test", target).await);
+        assert!(!super::may_retry_cleanup("other-admin@retry-rule.test", target).await);
     }
 
     #[cfg(feature = "cloud")]
