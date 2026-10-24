@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { convertStateTimelineData } from "@/utils/dashboard/convertStateTimelineData";
 import { describe, expect, it } from "vitest";
 import {
   emptySeriesOverrideDraft,
@@ -234,21 +235,38 @@ describe("value mappings in a series override draft", () => {
     expect(serializeSeriesOverride(draft)).toEqual(stored);
   });
 
-  it("names the rows of a state timeline by their raw entity", () => {
-    const options = {
-      series: [
-        {
-          type: "custom",
-          data: [
-            { name: "host-1 (Query 1)", entity: "host-1" },
-            { name: "host-2" },
-            { name: "host-2" },
-          ],
-        },
-        { type: "line", name: undefined },
-        { type: "custom", name: "up" },
+  it("lists every rendered state timeline row by its raw entity, even one with only no data", () => {
+    const converted = convertStateTimelineData(
+      {
+        id: "p",
+        type: "state-timeline",
+        queryType: "sql",
+        config: {},
+        queries: [
+          {
+            fields: {
+              x: [{ alias: "x" }],
+              y: [{ alias: "y", label: "state" }],
+              breakdown: [{ alias: "b" }],
+            },
+          },
+        ],
+      },
+      [
+        [
+          { x: "1970-01-01T00:00:00", b: "host-1", y: "up" },
+          { x: "1970-01-01T00:00:00", b: "host-2", y: null },
+        ],
       ],
-    };
-    expect(getLegendSeriesNames(options, "state-timeline")).toEqual(["host-1", "host-2"]);
+      { state: { timezone: "UTC", theme: "light", selectedOrganization: { identifier: "o" } } },
+      null,
+      [[{ histogram_interval: 10 }]],
+      null,
+    );
+    expect(getLegendSeriesNames(converted.options, "state-timeline", converted.extras)).toEqual([
+      "host-1",
+      "host-2",
+    ]);
+    expect(getLegendSeriesNames(converted.options, "state-timeline")).toEqual([]);
   });
 });

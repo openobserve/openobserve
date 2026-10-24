@@ -788,7 +788,17 @@ export const convertStateTimelineData = (
   const showLegend = config.show_legends !== false;
   const noDataFill = chartColor("--color-surface-subtle");
   const noDataBorder = chartColor("--color-border-strong");
-  const zoned = (ms: number) => toZonedTime(ms, timezone).getTime();
+  // Segment bounds and sample times repeat across rows, so each instant is converted once.
+  const zonedDates = new Map<number, Date>();
+  const crosshairX = (ms: number) => {
+    let date = zonedDates.get(ms);
+    if (!date) {
+      date = toZonedTime(ms, timezone);
+      zonedDates.set(ms, date);
+    }
+    return date;
+  };
+  const zoned = (ms: number) => crosshairX(ms).getTime();
   const hasNoData = rows.some((row) => row.segments.some((segment) => segment.state === null));
 
   const segmentData = rows.flatMap((row, rowIndex) =>
@@ -818,7 +828,6 @@ export const convertStateTimelineData = (
   const distinctTimes = new Set<number>();
   for (const row of rows) for (const sample of row.samples) distinctTimes.add(sample.t);
   const sampleTimes = [...distinctTimes].sort((a, b) => a - b);
-  const crosshairX = (ms: number) => toZonedTime(ms, timezone);
 
   const { markLines, markAreas } = getAnnotationsData(annotations, timezone);
   const hasAnnotations = markLines.length > 0 || markAreas.length > 0;
@@ -1109,6 +1118,8 @@ export const convertStateTimelineData = (
       panelId: panelSchema.id,
       isTimeSeries: true,
       crosshairSeriesIndex: 1,
+      // Overrides match each rendered row's raw entity, including a row that is all no data.
+      rowEntities: rows.map((row) => row.entity ?? row.name),
       ...(scrolls ? { rowScroll: true } : {}),
       // The renderer reports the scrolled window so the all-rows tooltip lists what is in view.
       setRowWindow: (start: number, end: number) => {

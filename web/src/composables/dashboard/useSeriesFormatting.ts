@@ -173,7 +173,7 @@ export const serializeSeriesOverrides = (drafts: SeriesOverrideDraft[]): SeriesO
     .filter((entry): entry is SeriesOverrideEntry => entry !== null);
 
 /** Legend series names of converted chart options, read per chart type like Color by series. */
-export const getLegendSeriesNames = (options: any, chartType: string): string[] => {
+export const getLegendSeriesNames = (options: any, chartType: string, extras?: any): string[] => {
   const series: any[] = Array.isArray(options?.series) ? options.series : [];
   let names: unknown[];
   if (chartType === "pie" || chartType === "donut") {
@@ -181,8 +181,7 @@ export const getLegendSeriesNames = (options: any, chartType: string): string[] 
   } else if (chartType === "gauge") {
     names = series.map((s: any) => s?.data?.[0]?.name);
   } else if (chartType === "state-timeline") {
-    // Rows are axis categories; overrides match each row's raw entity, which the segments carry.
-    names = (series[0]?.data ?? []).map((item: any) => item?.entity ?? item?.name);
+    names = extras?.rowEntities ?? [];
   } else if (chartType === "metric") {
     // `_metricLabel` is drawn and may hold a display name; overrides match `_metricName`.
     names = series.map((s: any) => s?._metricName ?? s?._metricLabel);
@@ -329,7 +328,7 @@ const readOriginalNames = async (
   }
   const detached = { value: document.createElement("div") };
   const result = await convertWithOverrides(source, [], store, detached);
-  return getLegendSeriesNames(result?.options, chartType);
+  return getLegendSeriesNames(result?.options, chartType, result?.extras);
 };
 
 /** Converts the editor's fetched data twice: without overrides for the original legend names, and with the draft for the preview. */

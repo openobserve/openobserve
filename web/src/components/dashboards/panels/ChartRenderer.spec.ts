@@ -46,6 +46,7 @@ vi.mock("echarts/core", () => ({
     dispatchAction: vi.fn(),
     convertFromPixel: vi.fn(),
     convertToPixel: vi.fn(),
+    getZr: vi.fn().mockReturnValue({ on: vi.fn(), off: vi.fn() }),
   }),
   dispose: vi.fn(),
 }));
@@ -580,14 +581,19 @@ describe("ChartRenderer", () => {
       await flushPromises();
       const mockChart = vi.mocked(echarts.init).mock.results.at(-1)?.value;
       vi.mocked(mockChart.convertFromPixel).mockReturnValue(12345 as any);
+      const zr = mockChart.getZr();
+      // The zr listener must be in place before the first setOption so it precedes the tooltip's.
+      const registered = zr.on.mock.invocationCallOrder.at(-1);
+      expect(registered).toBeLessThan(mockChart.setOption.mock.invocationCallOrder.at(-1));
+      const [event, onMove] = zr.on.mock.calls.at(-1);
+      expect(event).toBe("mousemove");
 
-      timeline
-        .find('[data-test="chart-renderer"]')
-        .element.dispatchEvent(new MouseEvent("pointermove", { clientX: 100, bubbles: true }));
+      onMove({ offsetX: 100 });
 
       expect(mockChart.convertFromPixel).toHaveBeenCalledWith({ xAxisIndex: 0 }, 100);
       expect(setPointerTime).toHaveBeenCalledWith(12345);
       timeline.unmount();
+      expect(zr.off).toHaveBeenCalledWith("mousemove", onMove);
     });
 
     it("clears only the crosshair of a crosshair panel when the hover ends, keeping its scroll", async () => {

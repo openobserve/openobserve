@@ -36,8 +36,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }
     "
     @contextmenu="handleNativeContextMenu"
-    @pointermove.capture="reportPointerTime"
-    @mousemove.capture="reportPointerTime"
   ></div>
 </template>
 
@@ -261,6 +259,7 @@ export default defineComponent({
       chart?.off("click");
       chart?.off("mouseover");
       chart?.off("contextmenu");
+      chart?.getZr().off("mousemove", reportPointerTime);
 
       //dispose
       if (chart) {
@@ -409,13 +408,14 @@ export default defineComponent({
       return kept;
     };
 
-    // Capture phase runs before ECharts' own handler, so its tooltip reads this move's time, not the last one's.
-    const reportPointerTime = (event: MouseEvent) => {
+    const reportPointerTime = (event: { offsetX: number }) => {
       const report = props.data?.extras?.setPointerTime;
-      if (!report || !chart || !chartRef.value) return;
-      const x = event.clientX - chartRef.value.getBoundingClientRect().left;
-      report(Number(chart.convertFromPixel({ xAxisIndex: 0 }, x)));
+      if (!report || !chart) return;
+      report(Number(chart.convertFromPixel({ xAxisIndex: 0 }, event.offsetX)));
     };
+
+    // Registered before setOption, so it runs ahead of the tooltip's own zr handler and the tooltip reads this move's time.
+    const trackPointer = () => chart?.getZr().on("mousemove", reportPointerTime);
 
     const chartOptions = (options: Record<string, unknown>) =>
       withChartFont(
@@ -847,6 +847,7 @@ export default defineComponent({
           renderer: props.renderType,
           devicePixelRatio: window.devicePixelRatio || 1,
         });
+        trackPointer();
         const options = props.data.options || {};
 
         // change color and background color of tooltip
@@ -899,6 +900,7 @@ export default defineComponent({
           chart = echarts.init(chartRef.value, theme, {
             renderer: props.renderType,
           });
+          trackPointer();
           chart?.setOption(chartOptions(props?.data?.options || {}), {
             lazyUpdate: true,
             notMerge: true,
@@ -953,6 +955,7 @@ export default defineComponent({
           chart = echarts.init(chartRef.value, theme, {
             renderer: props.renderType,
           });
+          trackPointer();
           if (chartRef.value.clientWidth === 0 || chartRef.value.clientHeight === 0) {
             reinitWhenSized();
           }
@@ -988,6 +991,7 @@ export default defineComponent({
       throttledSetHoveredSeriesIndex.cancel();
 
       // Clean up chart instance
+      chart?.getZr().off("mousemove", reportPointerTime);
       chart?.dispose();
       chart = null;
 
@@ -1047,6 +1051,7 @@ export default defineComponent({
           chart = echarts.init(chartRef.value, theme, {
             renderer: props.renderType,
           });
+          trackPointer();
         }
         chart?.setOption(chartOptions(props?.data?.options || {}), {
           lazyUpdate: true,
