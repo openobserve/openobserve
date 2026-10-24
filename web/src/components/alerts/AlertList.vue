@@ -39,24 +39,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- The provider behind the Terraform export tab, which is otherwise
              only discoverable once the export dialog is already open. -->
         <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
-        <OButton
-          data-test="alert-list-add-alert-btn"
-          variant="primary"
-          size="sm"
-          @click="
-            activeTab === 'anomalyDetection'
-              ? router.push({
-                  name: 'addAnomalyDetection',
-                  query: {
-                    org_identifier: store.state.selectedOrganization.identifier,
-                    folder: activeFolderId,
-                    tab: activeTab,
-                  },
-                })
-              : showAddUpdateFn({})
-          "
-          >{{ t(`alerts.add`) }}</OButton
-        >
+        <OButtonGroup data-test="alert-list-add-alert-group">
+          <OButton
+            data-test="alert-list-add-alert-btn"
+            variant="primary"
+            size="sm"
+            @click="
+              activeTab === 'anomalyDetection'
+                ? router.push({
+                    name: 'addAnomalyDetection',
+                    query: {
+                      org_identifier: store.state.selectedOrganization.identifier,
+                      folder: activeFolderId,
+                      tab: activeTab,
+                    },
+                  })
+                : showAddUpdateFn({})
+            "
+            >{{ t(`alerts.add`) }}</OButton
+          >
+          <ODropdown v-model:open="newAlertMenuOpen" side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                data-test="alert-list-add-alert-menu-btn"
+                variant="primary"
+                size="sm"
+                class="relative px-1.5"
+                :aria-label="t('alerts.startSheet.newAlertMenu')"
+              >
+                <OIcon name="arrow-drop-down" size="sm" />
+                <span
+                  v-if="showNewAlertHint"
+                  class="bg-warning-500 absolute end-1 top-1 size-1.5 rounded-full"
+                  data-test="alert-list-new-alert-hint"
+                />
+                <OTooltip
+                  :content="
+                    showNewAlertHint
+                      ? t('alerts.startSheet.hint')
+                      : t('alerts.startSheet.newAlertMenu')
+                  "
+                  side="bottom"
+                />
+              </OButton>
+            </template>
+            <ODropdownItem
+              icon-left="lightbulb"
+              data-test="alert-list-start-from-suggestion"
+              @select="openStartSheet"
+            >
+              {{ t("alerts.startSheet.startFromSuggestion") }}
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="upload-file"
+              data-test="alert-list-new-alert-import"
+              @select="importAlert"
+            >
+              {{ t("dashboard.import") }}
+            </ODropdownItem>
+          </ODropdown>
+        </OButtonGroup>
       </template>
 
       <template #actions-overflow>
@@ -742,7 +784,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #empty>
+                <AlertListFirstRun
+                  v-if="showFirstRun"
+                  :has-data="orgHasData"
+                  @choose="onStartChoose"
+                  @situations="openStartSheet"
+                  @import="importAlert"
+                  @blank="showAddUpdateFn({})"
+                />
                 <OEmptyState
+                  v-else
                   size="hero"
                   preset="no-alerts"
                   :filtered="!!(filterQuery || searchQuery || stateFilter)"
@@ -946,6 +997,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="alert-export-dialog"
       @download="onExportDownloaded"
     />
+
+    <AlertStartSheet
+      v-model:open="showStartSheet"
+      @choose="onStartChoose"
+      @import="onStartImport"
+      @blank="onStartBlank"
+    />
   </div>
 </template>
 
@@ -1042,6 +1100,12 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import IacRegistryLinks from "@/components/common/IacRegistryLinks.vue";
 import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
+import AlertStartSheet from "@/components/alerts/AlertStartSheet.vue";
+import AlertListFirstRun from "@/components/alerts/AlertListFirstRun.vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import { useAlertCreation } from "@/composables/alerts/useAlertCreation";
+import { orgHasUserStreams } from "@/composables/firstEvent/useFirstDataNotice";
+import type { AlertPrefill } from "@/ts/interfaces/alertPrefill";
 import CompositeReferencesDrawer from "@/components/alerts/composite/CompositeReferencesDrawer.vue";
 import ExportResourceDialog from "@/components/common/ExportResourceDialog.vue";
 import { alertsToTerraform } from "@/utils/alerts/alertTerraform";
@@ -1055,6 +1119,25 @@ import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
 
 // import alertList from "./alerts";
+
+const NEW_ALERT_HINT_KEY = "o2.alerts.newAlertHintSeen";
+
+// Blocked storage reads as seen, so a locked-down browser is never nagged.
+const readNewAlertHintSeen = (): boolean => {
+  try {
+    return localStorage.getItem(NEW_ALERT_HINT_KEY) === "1";
+  } catch {
+    return true;
+  }
+};
+
+const writeNewAlertHintSeen = (): void => {
+  try {
+    localStorage.setItem(NEW_ALERT_HINT_KEY, "1");
+  } catch {
+    // storage unavailable: the hint shows again next visit
+  }
+};
 
 export default defineComponent({
   name: "AlertList",
@@ -1093,6 +1176,9 @@ export default defineComponent({
     ExportResourceDialog,
     IacRegistryLinks,
     AlertSectionTabs,
+    AlertStartSheet,
+    AlertListFirstRun,
+    OButtonGroup,
   },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup() {
@@ -3151,6 +3237,86 @@ export default defineComponent({
       });
     };
 
+    // An empty folder is not an empty org, so the first-run panel waits for the org-wide answer.
+    const orgAlertState = ref<"pending" | "none" | "some" | "unknown">("pending");
+    const orgHasData = ref<boolean | null>(null);
+    const showStartSheet = ref(false);
+    const newAlertMenuOpen = ref(false);
+    const showNewAlertHint = ref(!readNewAlertHintSeen());
+    const { openAlertCreation } = useAlertCreation();
+
+    // Type tabs and filtered views keep today's hero; only the unfiltered All tab onboards.
+    const showFirstRun = computed(
+      () =>
+        orgAlertState.value === "none" &&
+        activeTab.value === "all" &&
+        !(filterQuery.value || searchQuery.value || stateFilter.value),
+    );
+
+    const checkOrgAlerts = async () => {
+      const org = store.state.selectedOrganization.identifier;
+      // An answer for an org the user has already left must not decide this org's empty state.
+      const current = () => store.state.selectedOrganization.identifier === org;
+      try {
+        const res: any = await alertsService.listOrgSample(org);
+        if (!current()) return;
+        const list = res?.data?.list;
+        if (!Array.isArray(list)) {
+          orgAlertState.value = "unknown";
+          return;
+        }
+        if (list.length) {
+          orgAlertState.value = "some";
+          return;
+        }
+        const hasData = await orgHasUserStreams(org).catch(() => null);
+        if (!current()) return;
+        orgHasData.value = hasData;
+        orgAlertState.value = "none";
+      } catch {
+        if (current()) orgAlertState.value = "unknown";
+      }
+    };
+
+    const openStartSheet = () => {
+      showStartSheet.value = true;
+    };
+
+    const onStartChoose = (prefill: AlertPrefill) => {
+      showStartSheet.value = false;
+      openAlertCreation(prefill, { folder: activeFolderId.value });
+    };
+
+    const onStartImport = () => {
+      showStartSheet.value = false;
+      importAlert();
+    };
+
+    const onStartBlank = () => {
+      showStartSheet.value = false;
+      void showAddUpdateFn({});
+    };
+
+    watch(newAlertMenuOpen, (open) => {
+      if (!open || !showNewAlertHint.value) return;
+      showNewAlertHint.value = false;
+      writeNewAlertHintSeen();
+    });
+
+    watch(allAlerts, (rows) => {
+      if (rows.length && orgAlertState.value === "none") orgAlertState.value = "some";
+    });
+
+    onMounted(() => void checkOrgAlerts());
+    watch(
+      () => store.state.selectedOrganization?.identifier,
+      () => {
+        orgAlertState.value = "pending";
+        orgHasData.value = null;
+        void checkOrgAlerts();
+      },
+    );
+
     const goToAlertInsights = () => {
       router.push({
         name: "alertInsights",
@@ -3875,6 +4041,15 @@ export default defineComponent({
     ]);
 
     return {
+      showStartSheet,
+      newAlertMenuOpen,
+      showNewAlertHint,
+      showFirstRun,
+      orgHasData,
+      openStartSheet,
+      onStartChoose,
+      onStartImport,
+      onStartBlank,
       downtimesEnabled,
       muteDialogOpen,
       muteSelection,

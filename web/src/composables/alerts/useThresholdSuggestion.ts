@@ -44,11 +44,20 @@ export interface ThresholdRule {
   silenceMinutes: number;
 }
 
-interface RuleHistory {
+export interface RuleHistory {
   buckets: Bucket[];
   now: number;
   historyStart: number;
   truncatedDays: number | null;
+}
+
+/** One rule's bucketed history query, as both the form hint and the start-sheet suggestions run it. */
+export interface RuleHistoryRequest {
+  streamName: string;
+  streamType: string;
+  kind: RuleKind;
+  historySql: string;
+  periodMinutes: number;
 }
 
 const HOUR_MS = 3_600_000;
@@ -59,6 +68,55 @@ const positive = (value: unknown): number => {
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? n : 0;
 };
+
+/** The rule's buckets over the past week, capped by the stream's query range. */
+export async function fetchRuleHistory(
+  store: any,
+  getStream: (name: string, type: string, schema: boolean) => Promise<any>,
+  request: RuleHistoryRequest,
+): Promise<RuleHistory> {
+  const { streamName, streamType, kind, historySql, periodMinutes } = request;
+  const stepMs = periodMinutes * 60_000;
+  const stream = await getStream(streamName, streamType, false).catch(() => null);
+  const maxHours =
+    positive(stream?.settings?.max_query_range) || positive(store.state.zoConfig?.max_query_range);
+  const windowMs = maxHours ? Math.min(WEEK_MS, maxHours * HOUR_MS) : WEEK_MS;
+  const now = Date.now();
+  const start = now - windowMs;
+  const limit = Math.ceil(windowMs / stepMs) + 1;
+  const sql = `${historySql} LIMIT ${limit}`;
+  const base64 = !!store.state.zoConfig?.sql_base64_enabled;
+  const res = await searchService.search(
+    {
+      org_identifier: store.state.selectedOrganization.identifier,
+      query: {
+        query: {
+          sql: base64 ? b64EncodeUnicode(sql) : sql,
+          start_time: start * 1000,
+          end_time: now * 1000,
+          from: 0,
+          size: limit,
+        },
+        ...(base64 ? { encoding: "base64" } : {}),
+      },
+      page_type: streamType,
+    },
+    "ui",
+  );
+  const raw: Bucket[] = ((res?.data?.hits ?? []) as Record<string, unknown>[])
+    .map((hit) => ({ time: parseBucketTime(hit.zo_sql_key), value: Number(hit.zo_sql_num) }))
+    .filter((b) => Number.isFinite(b.time) && Number.isFinite(b.value));
+  const firstRecord = positive(stream?.stats?.doc_time_min) / 1000;
+  const firstBucket = raw.length ? Math.min(...raw.map((b) => b.time)) : now;
+  const historyStart = Math.max(start, firstRecord || firstBucket);
+  return {
+    // A period with no matching rows is a real zero for a count rule, and missing data for a value rule.
+    buckets: kind === "count" ? fillCountBuckets(raw, historyStart, now, stepMs) : raw,
+    now,
+    historyStart,
+    truncatedDays: windowMs < WEEK_MS ? Math.round((windowMs / DAY_MS) * 10) / 10 : null,
+  };
+}
 
 /** Suggested threshold and back-test for a Builder rule: one query per stream/filter/period, threshold edits re-scored locally. */
 export function useThresholdSuggestion(rule: () => ThresholdRule) {
@@ -72,50 +130,14 @@ export function useThresholdSuggestion(rule: () => ThresholdRule) {
   );
   const enabled = computed(() => !!historySql.value && !!rule().streamName);
 
-  const fetchHistory = async (): Promise<RuleHistory> => {
-    const { streamName, streamType, kind } = rule();
-    const stepMs = periodMinutes.value * 60_000;
-    const stream = await getStream(streamName, streamType, false).catch(() => null);
-    const maxHours =
-      positive(stream?.settings?.max_query_range) ||
-      positive(store.state.zoConfig?.max_query_range);
-    const windowMs = maxHours ? Math.min(WEEK_MS, maxHours * HOUR_MS) : WEEK_MS;
-    const now = Date.now();
-    const start = now - windowMs;
-    const limit = Math.ceil(windowMs / stepMs) + 1;
-    const sql = `${historySql.value} LIMIT ${limit}`;
-    const base64 = !!store.state.zoConfig?.sql_base64_enabled;
-    const res = await searchService.search(
-      {
-        org_identifier: store.state.selectedOrganization.identifier,
-        query: {
-          query: {
-            sql: base64 ? b64EncodeUnicode(sql) : sql,
-            start_time: start * 1000,
-            end_time: now * 1000,
-            from: 0,
-            size: limit,
-          },
-          ...(base64 ? { encoding: "base64" } : {}),
-        },
-        page_type: streamType,
-      },
-      "ui",
-    );
-    const raw: Bucket[] = ((res?.data?.hits ?? []) as Record<string, unknown>[])
-      .map((hit) => ({ time: parseBucketTime(hit.zo_sql_key), value: Number(hit.zo_sql_num) }))
-      .filter((b) => Number.isFinite(b.time) && Number.isFinite(b.value));
-    const firstRecord = positive(stream?.stats?.doc_time_min) / 1000;
-    const firstBucket = raw.length ? Math.min(...raw.map((b) => b.time)) : now;
-    const historyStart = Math.max(start, firstRecord || firstBucket);
-    return {
-      // A period with no matching rows is a real zero for a count rule, and missing data for a value rule.
-      buckets: kind === "count" ? fillCountBuckets(raw, historyStart, now, stepMs) : raw,
-      now,
-      historyStart,
-      truncatedDays: windowMs < WEEK_MS ? Math.round((windowMs / DAY_MS) * 10) / 10 : null,
-    };
-  };
+  const fetchHistory = (): Promise<RuleHistory> =>
+    fetchRuleHistory(store, getStream, {
+      streamName: rule().streamName,
+      streamType: rule().streamType,
+      kind: rule().kind,
+      historySql: historySql.value ?? "",
+      periodMinutes: periodMinutes.value,
+    });
 
   const query = useQuery(() => ({
     queryKey: orgKey(

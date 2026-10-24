@@ -10919,6 +10919,45 @@
         "title": "Something unusual"
       }
     },
+    "startSheet": {
+      "title": "Start a new alert",
+      "subtitle": "Pick what you want to know about. Every choice opens the alert form for review before anything is saved.",
+      "newAlertMenu": "More ways to start",
+      "startFromSuggestion": "Start from a suggestion",
+      "hint": "Start from a suggestion",
+      "suggestedHeading": "Suggested for your data",
+      "suggestionLabel": "{intent} in {stream}",
+      "intentsHeading": "Pick a situation",
+      "intentOn": "On {stream}",
+      "intentNoStream": "No stream fits yet",
+      "intentNoData": "Send data first",
+      "noData": "Suggestions need data. Send logs, metrics or traces first; ready-made alerts and import already work.",
+      "ingestData": "Ingest data",
+      "libraryHeading": "Ready-made alerts",
+      "librarySearchPlaceholder": "Search ready-made alerts",
+      "libraryNoMatch": "No ready-made alert matches.",
+      "libraryBrowse": "Browse the library",
+      "libraryFailed": "Couldn't load the library.",
+      "otherHeading": "Other ways to start",
+      "import": "Import",
+      "importDesc": "Bring alerts in from a file",
+      "blank": "Blank alert",
+      "blankDesc": "Start from an empty form"
+    },
+    "firstRun": {
+      "title": "Set up your first alert",
+      "description": "Start from what your data already shows. Each suggestion opens in the alert form for one look before you save it.",
+      "noDataTitle": "Send data first",
+      "noDataDescription": "Suggestions need data. Ingest logs, metrics or traces; a blank alert and import already work.",
+      "create": "New alert",
+      "createDesc": "Define a condition to monitor",
+      "situation": "Pick a situation",
+      "situationDesc": "Errors, slow requests, missing data and more",
+      "import": "Import",
+      "importDesc": "Bring alerts in from a file",
+      "ingest": "Ingest data",
+      "ingestDesc": "Connect a source to send data"
+    },
     "prefill": {
       "dialog": {
         "title": "Create alert",

@@ -71,6 +71,22 @@ vi.mock("@/services/alert_destination", async (importOriginal) => {
   });
 });
 
+const startMocks = vi.hoisted(() => ({
+  openAlertCreation: vi.fn(() => true),
+  orgHasUserStreams: vi.fn(),
+}));
+vi.mock("@/composables/alerts/useAlertCreation", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return {
+    ...actual,
+    useAlertCreation: () => ({ openAlertCreation: startMocks.openAlertCreation }),
+  };
+});
+vi.mock("@/composables/firstEvent/useFirstDataNotice", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return { ...actual, orgHasUserStreams: startMocks.orgHasUserStreams };
+});
+
 import AlertList from "@/components/alerts/AlertList.vue";
 import config from "@/aws-exports";
 import i18n from "@/locales";
@@ -199,7 +215,7 @@ let alertsDB: AlertV2[] = [];
 
 let mountedWrappers: ReturnType<typeof mount>[] = [];
 
-async function mountAlertList() {
+async function mountAlertList(extraStubs: Record<string, unknown> = {}) {
   const wrapper = mount(AlertList, {
     attachTo: node,
     global: {
@@ -244,6 +260,7 @@ async function mountAlertList() {
           template: '<button type="button"><slot /></button>',
         },
         SelectFolderDropDown: true,
+        ...extraStubs,
       },
     },
   });
@@ -359,6 +376,11 @@ beforeEach(() => {
   (alertsSvc.getCompositeReferences as any) = vi.fn().mockResolvedValue({
     data: { references: [], hidden_reference_count: 0 },
   });
+
+  (alertsSvc.listOrgSample as any) = vi
+    .fn()
+    .mockResolvedValue({ data: { list: [makeAlert(1)] } } as any);
+  startMocks.orgHasUserStreams.mockResolvedValue(true);
 
   (alertsSvc.create_by_alert_id as any) = vi
     .fn()
@@ -2216,5 +2238,210 @@ describe("AlertList - first alert dead ends", () => {
 
     expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "alertList" }));
     expect(push).not.toHaveBeenCalledWith(expect.objectContaining({ name: "alertDetail" }));
+  });
+});
+
+describe("AlertList - start surfaces", () => {
+  const startStubs = {
+    AlertStartSheet: {
+      name: "AlertStartSheet",
+      props: ["open", "initialStream"],
+      emits: ["update:open", "choose", "import", "blank"],
+      template: '<div data-test="alert-start-sheet-stub" :data-open="String(open)"></div>',
+    },
+    AlertListFirstRun: {
+      name: "AlertListFirstRun",
+      props: ["hasData"],
+      emits: ["choose", "situations", "import", "blank"],
+      template: '<div data-test="alert-list-first-run" :data-has-data="String(hasData)"></div>',
+    },
+  };
+
+  const mountStart = async () => {
+    const wrapper: any = await mountAlertList(startStubs);
+    await waitData(wrapper);
+    await wrapper.vm.handleActionQuery(undefined);
+    await flushPromises();
+    return wrapper;
+  };
+
+  const emptyList = async (wrapper: any) => {
+    wrapper.vm.allAlerts = [];
+    wrapper.vm.filteredResults = [];
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    await flushPromises();
+  };
+
+  const menuItem = (wrapper: any, dataTest: string) =>
+    wrapper
+      .findAllComponents({ name: "ODropdownItem" })
+      .find((item: any) => item.attributes("data-test") === dataTest);
+
+  beforeEach(() => {
+    localStorage.removeItem("o2.alerts.newAlertHintSeen");
+  });
+
+  it("keeps New alert's main click on today's form", async () => {
+    const wrapper = await mountStart();
+    const push = vi.spyOn(router, "push");
+    await wrapper.find('[data-test="alert-list-add-alert-btn"]').trigger("click");
+    await flushPromises();
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "alertList",
+        query: expect.objectContaining({ action: "add" }),
+      }),
+    );
+    expect(wrapper.find('[data-test="alert-start-sheet-stub"]').attributes("data-open")).toBe(
+      "false",
+    );
+  });
+
+  it("opens the start sheet from the arrow's Start from a suggestion item", async () => {
+    const wrapper = await mountStart();
+    wrapper.vm.newAlertMenuOpen = true;
+    await flushPromises();
+    menuItem(wrapper, "alert-list-start-from-suggestion").vm.$emit("select", new Event("select"));
+    await flushPromises();
+    expect(wrapper.find('[data-test="alert-start-sheet-stub"]').attributes("data-open")).toBe(
+      "true",
+    );
+  });
+
+  it("imports from the arrow's Import item", async () => {
+    const wrapper = await mountStart();
+    wrapper.vm.newAlertMenuOpen = true;
+    await flushPromises();
+    menuItem(wrapper, "alert-list-new-alert-import").vm.$emit("select", new Event("select"));
+    await flushPromises();
+    expect(wrapper.vm.showImportAlertDialog).toBe(true);
+  });
+
+  it("hands a chosen start to the prefill pipeline in the open folder", async () => {
+    const wrapper = await mountStart();
+    const prefill = { source: "suggestion", streamName: "app" };
+    wrapper.findComponent({ name: "AlertStartSheet" }).vm.$emit("choose", prefill);
+    await flushPromises();
+    expect(startMocks.openAlertCreation).toHaveBeenCalledWith(prefill, { folder: "default" });
+  });
+
+  it("shows the hint on the arrow once, until the menu is opened", async () => {
+    const first = await mountStart();
+    expect(first.find('[data-test="alert-list-new-alert-hint"]').exists()).toBe(true);
+    first.vm.newAlertMenuOpen = true;
+    await flushPromises();
+    expect(first.find('[data-test="alert-list-new-alert-hint"]').exists()).toBe(false);
+    first.unmount();
+
+    const again = await mountStart();
+    expect(again.find('[data-test="alert-list-new-alert-hint"]').exists()).toBe(false);
+  });
+
+  it("asks the org, not the folder, whether any alert exists", async () => {
+    await mountStart();
+    expect(alertsSvc.listOrgSample).toHaveBeenCalledWith(
+      store.state.selectedOrganization.identifier,
+    );
+  });
+
+  it("keeps today's hero for an empty folder in an org that has alerts", async () => {
+    const wrapper = await mountStart();
+    await emptyList(wrapper);
+    expect(wrapper.find('[data-test="alert-list-first-run"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain("Create your first alert");
+  });
+
+  it("shows suggestions in place of the hero when the org has no alerts", async () => {
+    (alertsSvc.listOrgSample as any).mockResolvedValue({ data: { list: [] } });
+    alertsDB = [];
+    const wrapper = await mountStart();
+    await emptyList(wrapper);
+    const firstRun = wrapper.find('[data-test="alert-list-first-run"]');
+    expect(firstRun.exists()).toBe(true);
+    expect(firstRun.attributes("data-has-data")).toBe("true");
+    expect(wrapper.text()).not.toContain("Create your first alert");
+  });
+
+  it("shows the no-data variant when the org has no streams yet", async () => {
+    (alertsSvc.listOrgSample as any).mockResolvedValue({ data: { list: [] } });
+    alertsDB = [];
+    startMocks.orgHasUserStreams.mockResolvedValue(false);
+    const wrapper = await mountStart();
+    await emptyList(wrapper);
+    expect(wrapper.find('[data-test="alert-list-first-run"]').attributes("data-has-data")).toBe(
+      "false",
+    );
+  });
+
+  it("keeps the filtered empty state while a search is active, even with no alerts", async () => {
+    (alertsSvc.listOrgSample as any).mockResolvedValue({ data: { list: [] } });
+    alertsDB = [];
+    const wrapper = await mountStart();
+    wrapper.vm.filterQuery = "nothing-matches";
+    await emptyList(wrapper);
+    expect(wrapper.find('[data-test="alert-list-first-run"]').exists()).toBe(false);
+  });
+
+  it("keeps today's hero on a type tab, even when the org has no alerts", async () => {
+    (alertsSvc.listOrgSample as any).mockResolvedValue({ data: { list: [] } });
+    alertsDB = [];
+    const wrapper = await mountStart();
+    wrapper.vm.activeTab = "scheduled";
+    await emptyList(wrapper);
+    expect(wrapper.find('[data-test="alert-list-first-run"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain("Create your first alert");
+  });
+
+  const switchOrg = async (wrapper: any, identifier: string) => {
+    wrapper.vm.store.state.selectedOrganization.identifier = identifier;
+    await flushPromises();
+  };
+
+  it("drops an org check that answers after the org changed", async () => {
+    const original = store.state.selectedOrganization.identifier;
+    let answerOld: (value: unknown) => void = () => {};
+    (alertsSvc.listOrgSample as any)
+      .mockImplementationOnce(() => new Promise((resolve) => (answerOld = resolve)))
+      .mockResolvedValue({ data: { list: [makeAlert(1)] } });
+    alertsDB = [];
+    try {
+      const wrapper = await mountStart();
+      await switchOrg(wrapper, "second-org");
+      answerOld({ data: { list: [] } });
+      await emptyList(wrapper);
+      expect(wrapper.find('[data-test="alert-list-first-run"]').exists()).toBe(false);
+    } finally {
+      store.state.selectedOrganization.identifier = original;
+    }
+  });
+
+  it("drops a data check that answers after the org changed", async () => {
+    const original = store.state.selectedOrganization.identifier;
+    let answerOld: (value: boolean) => void = () => {};
+    (alertsSvc.listOrgSample as any)
+      .mockResolvedValueOnce({ data: { list: [] } })
+      .mockResolvedValue({ data: { list: [makeAlert(1)] } });
+    startMocks.orgHasUserStreams.mockImplementationOnce(
+      () => new Promise((resolve) => (answerOld = resolve)),
+    );
+    alertsDB = [];
+    try {
+      const wrapper = await mountStart();
+      await switchOrg(wrapper, "second-org");
+      answerOld(true);
+      await emptyList(wrapper);
+      expect(wrapper.find('[data-test="alert-list-first-run"]').exists()).toBe(false);
+    } finally {
+      store.state.selectedOrganization.identifier = original;
+    }
+  });
+
+  it("keeps today's hero when the org check fails", async () => {
+    (alertsSvc.listOrgSample as any).mockRejectedValue(new Error("down"));
+    const wrapper = await mountStart();
+    await emptyList(wrapper);
+    expect(wrapper.find('[data-test="alert-list-first-run"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain("Create your first alert");
   });
 });

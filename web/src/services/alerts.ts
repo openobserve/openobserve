@@ -64,6 +64,10 @@ const alerts = {
     }
     return http().get(url);
   },
+  /** One alert of any type from any folder, enough to tell whether the org has none. */
+  listOrgSample: (org_identifier: string) => {
+    return http().get(`/api/v2/${org_identifier}/alerts?page_size=1`);
+  },
   create: (org_identifier: string, stream_name: string, stream_type: string, data: any) => {
     return http()
       .post(`/api/${org_identifier}/${stream_name}/alerts?type=${stream_type}`, data)
