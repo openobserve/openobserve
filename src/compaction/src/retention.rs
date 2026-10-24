@@ -80,6 +80,9 @@ pub(crate) async fn generate_jobs() -> Result<(), anyhow::Error> {
                 continue; // skip data retention for enrichment tables and filelist
             }
             for stream_name in streams {
+                if schema::is_stream_key_too_long(&org_id, stream_type, &stream_name) {
+                    continue; // its files were never listed, so there is nothing to expire
+                }
                 let Some(node_name) =
                     get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
                 else {

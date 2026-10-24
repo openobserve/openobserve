@@ -143,6 +143,14 @@ impl MetricRecords<'_> {
         }
     }
 
+    /// How many rows the metric writes, counted as data points when it is rejected.
+    fn point_count(&self) -> usize {
+        match self {
+            Self::Json { records, .. } => records.len(),
+            Self::NumberPoints(points) => points.len(),
+        }
+    }
+
     /// Whether every row the metric writes is a stale marker.
     fn only_stale(&self) -> bool {
         match self {
@@ -263,6 +271,8 @@ pub async fn handle_otlp_request(
     // check if stream is deleting from cache
     let mut stream_delete_status: HashMap<String, bool> = HashMap::new();
     let mut skipped_records: u32 = 0;
+    // a metric can repeat across resources and scopes, so each stream is checked once a batch
+    let mut stream_too_long: HashMap<String, Option<String>> = HashMap::new();
 
     for resource_metric in &request.resource_metrics {
         if resource_metric.scope_metrics.is_empty() {
@@ -358,6 +368,14 @@ pub async fn handle_otlp_request(
                 // no stream. The per-stream lookups below therefore run only once we know there
                 // is something to write.
                 if records.is_empty() {
+                    continue;
+                }
+                let rejection = stream_too_long
+                    .entry(metric_name.clone())
+                    .or_insert_with(|| ingest::reject_long_stream(org_id, &metric_name));
+                if let Some(message) = rejection {
+                    partial_success.rejected_data_points += records.point_count() as i64;
+                    partial_success.error_message = message.clone();
                     continue;
                 }
 
@@ -611,6 +629,11 @@ pub async fn handle_otlp_request(
 
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     for (local_metric_name, json_data) in json_data_by_stream {
+        if let Some(message) = ingest::reject_long_stream(org_id, &local_metric_name) {
+            partial_success.rejected_data_points += json_data.len() as i64;
+            partial_success.error_message = message;
+            continue;
+        }
         #[cfg(feature = "vectorscan")]
         let json_data = {
             let mut json_data = json_data;

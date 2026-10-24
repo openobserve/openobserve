@@ -182,7 +182,10 @@ async fn buffer_record(
 
     if !lookups.schemas.contains_key(&stream_name) {
         let mut schema = infra::schema::get(org_id, &stream_name, StreamType::Metrics).await?;
-        if schema == Schema::empty() {
+        // a too-long stream gets no schema; its records are rejected per stream after the pipelines
+        if schema == Schema::empty()
+            && !schema::is_stream_key_too_long(org_id, StreamType::Metrics, &stream_name)
+        {
             let metadata = family_metadata(&stream_name, metric_type);
             schema = schema.with_metadata(metadata);
             db::schema::merge(
@@ -482,6 +485,14 @@ pub async fn ingest(
     let mut stream_data_buf: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
     for (stream_name, records) in records_by_stream {
+        if let Some(message) = ingest::reject_long_stream(org_id, &stream_name) {
+            let stream_status = stream_status_map
+                .entry(stream_name.clone())
+                .or_insert_with(|| StreamStatus::new(&stream_name));
+            stream_status.status.failed += records.len() as u32;
+            stream_status.status.error = message;
+            continue;
+        }
         // redacted before finish_rows, so the series hash covers the stored values
         #[cfg(feature = "vectorscan")]
         let records = {

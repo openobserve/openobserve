@@ -108,6 +108,13 @@ pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow:
         }
         for (stream_type, streams) in stream_types {
             for stream_name in streams {
+                // ingestion rejects these now, but streams created before keep failing add_job
+                if schema::is_stream_key_too_long(&org_id, stream_type, &stream_name) {
+                    log::debug!(
+                        "[COMPACTOR] skip [{org_id}/{stream_type}/{stream_name}]: stream key too long for file_list"
+                    );
+                    continue;
+                }
                 let Some(node_name) =
                     get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
                 else {
@@ -202,6 +209,9 @@ pub async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
         let stream_type = StreamType::Metrics;
         let streams = stream_types.remove(&stream_type).unwrap_or_default();
         for stream_name in streams {
+            if schema::is_stream_key_too_long(&org_id, stream_type, &stream_name) {
+                continue; // add_job would fail on the file_list_jobs stream column
+            }
             let Some(node_name) =
                 get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
             else {
