@@ -683,7 +683,15 @@ describe("alerts service", () => {
       await expect(alerts.create("org123", "logs", "logs", { name: "a" })).resolves.toBe(response);
 
       expect(analytics.track).toHaveBeenCalledTimes(1);
-      expect(analytics.track).toHaveBeenCalledWith("alert_created");
+      expect(analytics.track).toHaveBeenCalledWith("alert_created", { source: "blank" });
+    });
+
+    it("tags alert_created from create with the caller's source", async () => {
+      mockHttpInstance.post.mockResolvedValue({ data: { code: 200 } });
+
+      await alerts.create("org123", "logs", "logs", { name: "a" }, "library");
+
+      expect(analytics.track).toHaveBeenCalledWith("alert_created", { source: "library" });
     });
 
     it("does not track alert_created when the request rejects", async () => {
@@ -703,7 +711,53 @@ describe("alerts service", () => {
       );
 
       expect(analytics.track).toHaveBeenCalledTimes(1);
-      expect(analytics.track).toHaveBeenCalledWith("alert_created");
+      expect(analytics.track).toHaveBeenCalledWith("alert_created", { source: "blank" });
+    });
+
+    it("tags alert_created from create_by_alert_id with the caller's source", async () => {
+      mockHttpInstance.post.mockResolvedValue({ data: { code: 200 } });
+
+      await alerts.create_by_alert_id("org123", { name: "a" }, "f1", "intent");
+
+      expect(analytics.track).toHaveBeenCalledWith("alert_created", { source: "intent" });
+    });
+
+    it("tracks alert_destination_attached after alert_created when the new alert has destinations", async () => {
+      mockHttpInstance.post.mockResolvedValue({ data: { code: 200 } });
+
+      await alerts.create_by_alert_id(
+        "org123",
+        { name: "a", destinations: ["d1"] },
+        "f1",
+        "library",
+      );
+
+      expect((analytics.track as any).mock.calls).toEqual([
+        ["alert_created", { source: "library" }],
+        ["alert_destination_attached", { source: "library" }],
+      ]);
+    });
+
+    it("tracks alert_destination_attached from create when the new alert has destinations", async () => {
+      mockHttpInstance.post.mockResolvedValue({ data: { code: 200 } });
+
+      await alerts.create("org123", "logs", "logs", { name: "a", destinations: ["d1"] });
+
+      expect(analytics.track).toHaveBeenCalledWith("alert_destination_attached", {
+        source: "blank",
+      });
+    });
+
+    it("does not track alert_destination_attached when the new alert has no destinations", async () => {
+      mockHttpInstance.post.mockResolvedValue({ data: { code: 200 } });
+
+      await alerts.create_by_alert_id("org123", { name: "a", destinations: [] }, "f1");
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).not.toHaveBeenCalledWith(
+        "alert_destination_attached",
+        expect.anything(),
+      );
     });
 
     it("does not track alert_created from create_by_alert_id when the request rejects", async () => {
@@ -725,7 +779,7 @@ describe("alerts service", () => {
       );
 
       expect(analytics.track).toHaveBeenCalledTimes(1);
-      expect(analytics.track).toHaveBeenCalledWith("alert_created");
+      expect(analytics.track).toHaveBeenCalledWith("alert_created", { source: "clone" });
     });
 
     it("does not track alert_created from clone_by_id when the request rejects", async () => {

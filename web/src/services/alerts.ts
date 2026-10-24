@@ -22,6 +22,12 @@ import type {
   CompositeTimelineResponse,
 } from "@/ts/interfaces/alert";
 
+/** The funnel's "saved" and "destination attached" steps; source names the path that produced the alert. */
+const trackAlertCreated = (data: any, source: string) => {
+  analytics.track("alert_created", { source });
+  if (data?.destinations?.length) analytics.track("alert_destination_attached", { source });
+};
+
 const alerts = {
   list: (
     page_num: number,
@@ -68,11 +74,17 @@ const alerts = {
   listOrgSample: (org_identifier: string) => {
     return http().get(`/api/v2/${org_identifier}/alerts?page_size=1`);
   },
-  create: (org_identifier: string, stream_name: string, stream_type: string, data: any) => {
+  create: (
+    org_identifier: string,
+    stream_name: string,
+    stream_type: string,
+    data: any,
+    source = "blank",
+  ) => {
     return http()
       .post(`/api/${org_identifier}/${stream_name}/alerts?type=${stream_type}`, data)
       .then((res) => {
-        analytics.track("alert_created");
+        trackAlertCreated(data, source);
         return res;
       });
   },
@@ -120,7 +132,7 @@ const alerts = {
     )}/preview?type=${stream_type}`;
     return http().get(url);
   },
-  create_by_alert_id: (org_identifier: string, data: any, folder_id?: any) => {
+  create_by_alert_id: (org_identifier: string, data: any, folder_id?: any, source = "blank") => {
     let url = `/api/v2/${org_identifier}/alerts`;
     if (folder_id) {
       url += `?folder=${folder_id}`;
@@ -128,7 +140,7 @@ const alerts = {
     return http()
       .post(url, data)
       .then((res) => {
-        analytics.track("alert_created");
+        trackAlertCreated(data, source);
         return res;
       });
   },
@@ -340,7 +352,7 @@ const alerts = {
     return http()
       .post(url, data)
       .then((res) => {
-        analytics.track("alert_created");
+        analytics.track("alert_created", { source: "clone" });
         return res;
       });
   },

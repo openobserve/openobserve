@@ -800,6 +800,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // Set only by an intent-path prefill, so the blank form and edit never show the intent affordances.
   const intentDefaultsNote = ref<IntentDefaultsNote | null>(null);
   const intentId = ref("");
+  // The prefill's source id, reported on the funnel events; a form opened without a prefill is "blank".
+  const alertSource = ref("blank");
 
   const folderQuery = router.currentRoute.value.query.folder;
   // Prefer the folder the caller (AlertList) hands us over the URL query: the
@@ -1017,6 +1019,15 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     }
 
     onInputUpdate("stream_name", stream_name);
+  };
+
+  // Only the select calls this: updateStreamFields also runs on SQL sync and prefill, which are not a pick.
+  const pickStream = async (stream_name: string) => {
+    analytics.track("alert_stream_picked", {
+      stream_type: formData.value.stream_type,
+      source: alertSource.value,
+    });
+    await updateStreamFields(stream_name);
   };
 
   // ── SQL → stream-name sync ──────────────────────────────────────────────
@@ -1802,6 +1813,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         value: Array.isArray(activeFolderId.value) ? activeFolderId.value[0] : activeFolderId.value,
       },
       handleAlertError,
+      source: alertSource.value,
     };
 
     const prepareAndSaveAlertFunction = (data: any) => prepareAndSaveAlertUtil(data, saveContext);
@@ -1850,6 +1862,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     if (!prefill) return;
 
     isLoadingPrefill.value = true;
+    alertSource.value = prefill.source;
     try {
       // Mutate a LOCAL working copy, then seed the ONE form with a single
       // resetForm (Rule ③ — `formData` is a readonly read-view).
@@ -2543,6 +2556,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         store.state.selectedOrganization.identifier,
         payload,
         activeFolderId.value,
+        alertSource.value,
       );
 
       // Same as the update branch: returned below so isSubmitting spans the request.
@@ -3354,6 +3368,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     editorUpdate,
     updateEditorContent,
     updateStreamFields,
+    pickStream,
     updateStreams,
     filterStreams,
     generateSqlQuery: generateSqlQueryLocal,

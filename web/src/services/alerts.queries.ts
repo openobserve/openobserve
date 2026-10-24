@@ -128,10 +128,10 @@ export const promRulePreviewQuery = (org: string, expression: string, at: number
 /** Create or update, chosen by the caller; the scope is `alertKeys.all` because the folder a row lands in is rarely the one on screen. */
 export const saveAlertMutation = (org: string, isUpdate: () => boolean) =>
   mutationOptions({
-    mutationFn: (vars: { payload: any; folderId?: string }) =>
+    mutationFn: (vars: { payload: any; folderId?: string; source?: string }) =>
       isUpdate()
         ? alerts.update_by_alert_id(org, vars.payload, vars.folderId)
-        : alerts.create_by_alert_id(org, vars.payload, vars.folderId),
+        : alerts.create_by_alert_id(org, vars.payload, vars.folderId, vars.source),
     // Callers compose their own per-row or per-batch outcome messages.
     meta: { invalidates: [alertKeys.all(org)], silentError: true },
   });

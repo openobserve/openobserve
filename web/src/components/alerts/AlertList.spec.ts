@@ -75,6 +75,8 @@ const startMocks = vi.hoisted(() => ({
   openAlertCreation: vi.fn(() => true),
   orgHasUserStreams: vi.fn(),
 }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+
 vi.mock("@/composables/alerts/useAlertCreation", async (importOriginal) => {
   const actual: any = await importOriginal();
   return {
@@ -93,6 +95,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import AlertService from "@/services/alerts";
+import analytics from "@/services/product_analytics";
 import { queryClient } from "@/composables/query/queryClient";
 import { alertKeys } from "@/services/alerts.querykeys";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -1681,6 +1684,7 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     // After successful submit, the dialog closes
     expect(wrapper.vm.showForm).toBe(false);
     expect(alertsSvc.create_by_alert_id).toHaveBeenCalled();
+    expect((alertsSvc.create_by_alert_id as any).mock.calls.at(-1)[3]).toBe("clone");
   });
 
   it("clone dialog secondary button (Cancel) closes the dialog", async () => {
@@ -2435,6 +2439,107 @@ describe("AlertList - start surfaces", () => {
     } finally {
       store.state.selectedOrganization.identifier = original;
     }
+  });
+
+  describe("funnel analytics", () => {
+    const newAlertClicks = () =>
+      vi.mocked(analytics.track).mock.calls.filter(([event]) => event === "new_alert_clicked");
+
+    beforeEach(() => vi.mocked(analytics.track).mockClear());
+
+    it("tracks alerts_opened once when the list mounts", async () => {
+      await mountStart();
+      const opened = vi
+        .mocked(analytics.track)
+        .mock.calls.filter(([event]) => event === "alerts_opened");
+      expect(opened).toEqual([["alerts_opened"]]);
+    });
+
+    it("tags New alert's main click as the main button", async () => {
+      const wrapper = await mountStart();
+      await wrapper.find('[data-test="alert-list-add-alert-btn"]').trigger("click");
+      await flushPromises();
+      expect(newAlertClicks()).toEqual([
+        ["new_alert_clicked", { entry: "main_button", option: "blank" }],
+      ]);
+    });
+
+    it("tags the main click on the anomaly tab as an anomaly start, and still opens anomaly creation", async () => {
+      const wrapper = await mountStart();
+      const push = vi.spyOn(router, "push");
+      wrapper.vm.activeTab = "anomalyDetection";
+      await flushPromises();
+      await wrapper.find('[data-test="alert-list-add-alert-btn"]').trigger("click");
+      await flushPromises();
+      expect(push).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "addAnomalyDetection",
+          query: expect.objectContaining({ tab: "anomalyDetection" }),
+        }),
+      );
+      expect(newAlertClicks()).toEqual([
+        ["new_alert_clicked", { entry: "main_button", option: "anomaly" }],
+      ]);
+    });
+
+    it.each([
+      ["alert-list-start-from-suggestion", "suggestion"],
+      ["alert-list-new-alert-import", "import"],
+    ])("tags the arrow's %s item as a split item", async (dataTest, option) => {
+      const wrapper = await mountStart();
+      wrapper.vm.newAlertMenuOpen = true;
+      await flushPromises();
+      menuItem(wrapper, dataTest).vm.$emit("select", new Event("select"));
+      await flushPromises();
+      expect(newAlertClicks()).toEqual([["new_alert_clicked", { entry: "split_item", option }]]);
+    });
+
+    it("tags the start sheet's cards with the card picked, using the prefill's source id", async () => {
+      const wrapper = await mountStart();
+      const sheet = wrapper.findComponent({ name: "AlertStartSheet" });
+      sheet.vm.$emit("choose", { source: "intent", streamName: "app" });
+      sheet.vm.$emit("import");
+      sheet.vm.$emit("blank");
+      await flushPromises();
+      expect(newAlertClicks()).toEqual([
+        ["new_alert_clicked", { entry: "start_sheet_card", option: "intent" }],
+        ["new_alert_clicked", { entry: "start_sheet_card", option: "import" }],
+        ["new_alert_clicked", { entry: "start_sheet_card", option: "blank" }],
+      ]);
+    });
+
+    it("tags the first-run panel's actions as the empty state", async () => {
+      (alertsSvc.listOrgSample as any).mockResolvedValue({ data: { list: [] } });
+      alertsDB = [];
+      const wrapper = await mountStart();
+      await emptyList(wrapper);
+      const firstRun = wrapper.findComponent({ name: "AlertListFirstRun" });
+      firstRun.vm.$emit("choose", { source: "suggestion", streamName: "app" });
+      firstRun.vm.$emit("situations");
+      firstRun.vm.$emit("import");
+      firstRun.vm.$emit("blank");
+      await flushPromises();
+      expect(newAlertClicks()).toEqual([
+        ["new_alert_clicked", { entry: "empty_state", option: "suggestion" }],
+        ["new_alert_clicked", { entry: "empty_state", option: "situations" }],
+        ["new_alert_clicked", { entry: "empty_state", option: "import" }],
+        ["new_alert_clicked", { entry: "empty_state", option: "blank" }],
+      ]);
+    });
+
+    it("tags the no-alerts hero's create action as the empty state, and not its clear-filters action", async () => {
+      const wrapper = await mountStart();
+      await emptyList(wrapper);
+      const hero = wrapper
+        .findAllComponents({ name: "OEmptyState" })
+        .find((c: any) => c.props("preset") === "no-alerts");
+      hero.vm.$emit("action", "clear-filters");
+      hero.vm.$emit("action", "create");
+      await flushPromises();
+      expect(newAlertClicks()).toEqual([
+        ["new_alert_clicked", { entry: "empty_state", option: "blank" }],
+      ]);
+    });
   });
 
   it("keeps today's hero when the org check fails", async () => {

@@ -1032,6 +1032,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           input,
           folderId,
+          "import",
         );
 
         // Success

@@ -24,6 +24,7 @@ import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { nextTick } from "vue";
 import AddAlert from "@/components/alerts/AddAlert.vue";
 import alertsService from "@/services/alerts";
+import analytics from "@/services/product_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import store from "@/test/unit/helpers/store";
@@ -2212,6 +2213,51 @@ describe("AddAlert (OForm owner)", () => {
       await flushPromises();
 
       expect(form.state.values.name).toBe("checkout_errors");
+    });
+  });
+
+  describe("funnel analytics", () => {
+    const streamSelect = () =>
+      wrapper
+        .findAllComponents({ name: "OFormSelect" })
+        .find((c: any) => c.props("name") === "stream_name");
+
+    it("tags a blank form's create with source blank", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      seedValidScheduled(wrapper.vm.form);
+
+      await wrapper.vm.form.handleSubmit();
+      await flushPromises();
+
+      expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+      expect((alertsService.create_by_alert_id as any).mock.calls[0][3]).toBe("blank");
+    });
+
+    it("tracks alert_stream_picked when the user picks a stream, without the stream's name", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("stream_type", "logs");
+      await flushPromises();
+
+      streamSelect().vm.$emit("update:modelValue", "_rundata");
+      await flushPromises();
+
+      expect(analytics.track).toHaveBeenCalledWith("alert_stream_picked", {
+        stream_type: "logs",
+        source: "blank",
+      });
+    });
+
+    it("does not track alert_stream_picked when the stream changes without the user picking it", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("stream_type", "logs");
+
+      await wrapper.vm.updateStreamFields("_rundata");
+      await flushPromises();
+
+      expect(analytics.track).not.toHaveBeenCalledWith("alert_stream_picked", expect.anything());
     });
   });
 });

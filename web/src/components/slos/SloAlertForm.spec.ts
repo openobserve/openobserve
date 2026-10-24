@@ -116,6 +116,7 @@ describe("SloAlertForm", () => {
 
     expect(createSpy).toHaveBeenCalled();
     const body = createSpy.mock.calls[0][1];
+    expect(createSpy.mock.calls[0][3]).toBe("slo");
     expect(body.query_condition.type).toBe("slo");
     expect(body.query_condition.slo_condition.slo_id).toBe("slo-123");
     expect(body.stream_name).toBe("");

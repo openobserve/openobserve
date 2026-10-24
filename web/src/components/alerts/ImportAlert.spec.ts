@@ -170,6 +170,14 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
       const sent = vi.mocked(mockAlertsService.default.create_by_alert_id).mock.calls.at(-1)?.[1];
       expect(sent.trigger_condition.timezone).toBe("Asia/Calcutta");
     });
+
+    it("tags an imported alert's create with source import", async () => {
+      const mockAlertsService = await import("@/services/alerts");
+      vi.mocked(mockAlertsService.default.create_by_alert_id).mockResolvedValue(true as any);
+      await wrapper.vm.createAlert({ name: "imported", trigger_condition: {} }, 1, "folder1");
+      const call = vi.mocked(mockAlertsService.default.create_by_alert_id).mock.calls.at(-1);
+      expect(call?.[3]).toBe("import");
+    });
   });
 
   describe("1. Data Update Functions", () => {

@@ -44,18 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-list-add-alert-btn"
             variant="primary"
             size="sm"
-            @click="
-              activeTab === 'anomalyDetection'
-                ? router.push({
-                    name: 'addAnomalyDetection',
-                    query: {
-                      org_identifier: store.state.selectedOrganization.identifier,
-                      folder: activeFolderId,
-                      tab: activeTab,
-                    },
-                  })
-                : showAddUpdateFn({})
-            "
+            @click="onNewAlertMain"
             >{{ t(`alerts.add`) }}</OButton
           >
           <ODropdown v-model:open="newAlertMenuOpen" side="bottom" align="end">
@@ -86,14 +75,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdownItem
               icon-left="lightbulb"
               data-test="alert-list-start-from-suggestion"
-              @select="openStartSheet"
+              @select="(trackNewAlert('split_item', 'suggestion'), openStartSheet())"
             >
               {{ t("alerts.startSheet.startFromSuggestion") }}
             </ODropdownItem>
             <ODropdownItem
               icon-left="upload-file"
               data-test="alert-list-new-alert-import"
-              @select="importAlert"
+              @select="(trackNewAlert('split_item', 'import'), importAlert())"
             >
               {{ t("dashboard.import") }}
             </ODropdownItem>
@@ -787,10 +776,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <AlertListFirstRun
                   v-if="showFirstRun"
                   :has-data="orgHasData"
-                  @choose="onStartChoose"
-                  @situations="openStartSheet"
-                  @import="importAlert"
-                  @blank="showAddUpdateFn({})"
+                  @choose="onFirstRunChoose"
+                  @situations="(trackNewAlert('empty_state', 'situations'), openStartSheet())"
+                  @import="(trackNewAlert('empty_state', 'import'), importAlert())"
+                  @blank="(trackNewAlert('empty_state', 'blank'), showAddUpdateFn({}))"
                 />
                 <OEmptyState
                   v-else
@@ -801,7 +790,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     (id) =>
                       id === 'clear-filters'
                         ? ((filterQuery = ''), (searchQuery = ''), (stateFilter = null))
-                        : showAddUpdateFn({})
+                        : (trackNewAlert('empty_state', 'blank'), showAddUpdateFn({}))
                   "
                 />
               </template>
@@ -1000,7 +989,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <AlertStartSheet
       v-model:open="showStartSheet"
-      @choose="onStartChoose"
+      @choose="onSheetChoose"
       @import="onStartImport"
       @blank="onStartBlank"
     />
@@ -2892,6 +2881,7 @@ export default defineComponent({
             store.state.selectedOrganization.identifier,
             toBeClonedAlert.value,
             folderIdToBeCloned.value,
+            "clone",
           )
           .then(async (res) => {
             dismiss();
@@ -3278,6 +3268,11 @@ export default defineComponent({
       }
     };
 
+    // The funnel's "new alert" step; option is the choice made there, never user data.
+    const trackNewAlert = (entry: string, option: string) => {
+      analytics.track("new_alert_clicked", { entry, option });
+    };
+
     const openStartSheet = () => {
       showStartSheet.value = true;
     };
@@ -3288,13 +3283,42 @@ export default defineComponent({
     };
 
     const onStartImport = () => {
+      trackNewAlert("start_sheet_card", "import");
       showStartSheet.value = false;
       importAlert();
     };
 
     const onStartBlank = () => {
+      trackNewAlert("start_sheet_card", "blank");
       showStartSheet.value = false;
       void showAddUpdateFn({});
+    };
+
+    const onSheetChoose = (prefill: AlertPrefill) => {
+      trackNewAlert("start_sheet_card", prefill.source);
+      onStartChoose(prefill);
+    };
+
+    const onFirstRunChoose = (prefill: AlertPrefill) => {
+      trackNewAlert("empty_state", prefill.source);
+      onStartChoose(prefill);
+    };
+
+    const onNewAlertMain = () => {
+      if (activeTab.value !== "anomalyDetection") {
+        trackNewAlert("main_button", "blank");
+        void showAddUpdateFn({});
+        return;
+      }
+      trackNewAlert("main_button", "anomaly");
+      void router.push({
+        name: "addAnomalyDetection",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          folder: activeFolderId.value,
+          tab: activeTab.value,
+        },
+      });
     };
 
     watch(newAlertMenuOpen, (open) => {
@@ -3307,7 +3331,10 @@ export default defineComponent({
       if (rows.length && orgAlertState.value === "none") orgAlertState.value = "some";
     });
 
-    onMounted(() => void checkOrgAlerts());
+    onMounted(() => {
+      analytics.track("alerts_opened");
+      void checkOrgAlerts();
+    });
     watch(
       () => store.state.selectedOrganization?.identifier,
       () => {
@@ -4047,6 +4074,10 @@ export default defineComponent({
       showFirstRun,
       orgHasData,
       openStartSheet,
+      trackNewAlert,
+      onSheetChoose,
+      onFirstRunChoose,
+      onNewAlertMain,
       onStartChoose,
       onStartImport,
       onStartBlank,
