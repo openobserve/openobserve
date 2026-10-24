@@ -57,6 +57,25 @@ describe("SearchBar — a programmatic empty is not a user clear", () => {
     expect(wrapper.vm.searchObj.data.editorValue).toBe("");
   });
 
+  it("clears a stream-not-found error when the editor is emptied by a write", () => {
+    // streamNotFound.spec.js empties the editor through Monaco, so the clear arrives programmatic:
+    // the error has to go with the query it was raised for, whoever emptied it.
+    wrapper.vm.searchObj.data.filterErrMsg = "Stream not found in query: missing_stream";
+
+    wrapper.vm.updateQueryValue("", { fromUser: false });
+
+    expect(wrapper.vm.searchObj.data.filterErrMsg).toBe("");
+    expect(wrapper.vm.searchObj.meta.sqlMode).toBe(true);
+  });
+
+  it("clears a stream-not-found error when the user empties the editor", () => {
+    wrapper.vm.searchObj.data.filterErrMsg = "Stream not found in query: missing_stream";
+
+    wrapper.vm.updateQueryValue("", { fromUser: true });
+
+    expect(wrapper.vm.searchObj.data.filterErrMsg).toBe("");
+  });
+
   it("still turns SQL mode off when the user clears the editor", () => {
     wrapper.vm.updateQueryValue("", { fromUser: true });
 

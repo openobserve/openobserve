@@ -2763,10 +2763,13 @@ export default defineComponent({
 
       _sqlOnQueryChange();
 
-      // A write the user did not make must not change their mode: the Build tab's panel reset arrives as an empty value, and off SQL mode it syncs the generated SQL back as a WHERE clause an aggregate query does not have.
-      if (value.trim() === "" && searchObj.meta.sqlMode === true && origin?.fromUser !== false) {
-        searchObj.meta.sqlMode = false;
+      if (value.trim() === "" && searchObj.meta.sqlMode === true) {
+        // An emptied query names no stream, so its stream-not-found error goes however it was emptied.
         searchObj.data.filterErrMsg = "";
+        // A write the user did not make must not change their mode: the Build tab's panel reset arrives as an empty value, and off SQL mode it syncs the generated SQL back as a WHERE clause an aggregate query does not have.
+        if (origin?.fromUser !== false) {
+          searchObj.meta.sqlMode = false;
+        }
       }
 
       // Turn off SQL mode when the query is no longer a SQL statement (user
