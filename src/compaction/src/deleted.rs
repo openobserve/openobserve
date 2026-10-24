@@ -136,7 +136,7 @@ async fn drop_unreachable_rows(
     }
     // An unloaded account whose provider row and DEK both remain may only lag here: stay strict.
     if infra::table::org_storage_providers::exists_for_org(org_id).await?
-        && infra::table::cipher::find_dek(org_id).await?.is_some()
+        && infra::table::cipher::has_org_key(org_id).await?
     {
         return Ok(files);
     }

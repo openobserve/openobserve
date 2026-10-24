@@ -383,7 +383,9 @@ pub async fn set(
 pub async fn remove_org_results(org_id: &str) -> Result<()> {
     let dirs = infra::cache::file_data::disk::get_dirs().await;
     let org = org_id.to_string();
-    let files = blocking(move || org_result_files(&dirs, &org)).await?;
+    let files = tokio::task::spawn_blocking(move || org_result_files(&dirs, &org))
+        .await
+        .map_err(|e| Error::Message(format!("cache file scan task: {e}")))??;
     let mut keys = Vec::with_capacity(files.len());
     let mut paths = Vec::with_capacity(files.len());
     for (path, key) in files {
@@ -394,7 +396,9 @@ pub async fn remove_org_results(org_id: &str) -> Result<()> {
         keys.push(key);
     }
     // The index removes only files it holds, so an unindexed one goes by path.
-    blocking(move || remove_result_paths(&paths)).await?;
+    tokio::task::spawn_blocking(move || remove_result_paths(&paths))
+        .await
+        .map_err(|e| Error::Message(format!("cache file removal task: {e}")))??;
     remove_evicted_files(keys).await;
     Ok(())
 }
@@ -719,14 +723,6 @@ fn remove_result_paths(paths: &[String]) -> Result<()> {
         }
     }
     Ok(())
-}
-
-async fn blocking<T: Send + 'static>(
-    work: impl FnOnce() -> Result<T> + Send + 'static,
-) -> Result<T> {
-    tokio::task::spawn_blocking(work)
-        .await
-        .map_err(|e| Error::Message(format!("cache file task: {e}")))?
 }
 
 #[cfg(test)]

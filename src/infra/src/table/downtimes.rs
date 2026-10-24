@@ -651,17 +651,23 @@ pub async fn move_to_folder_with<C: ConnectionTrait>(
     Ok(res.rows_affected)
 }
 
-/// Every id of the org, tombstones included, as [delete_by_org_with] removes them.
-pub async fn list_ids_by_org_with<C: ConnectionTrait>(
+pub async fn list_references_by_org_with<C: ConnectionTrait>(
     conn: &C,
     org: &str,
-) -> Result<Vec<String>, errors::Error> {
-    Ok(Entity::find()
+) -> Result<Vec<(String, String)>, errors::Error> {
+    let rows = Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .column(Column::FolderId)
         .filter(Column::Org.eq(org))
+        .into_tuple::<(String, String)>()
         .all(conn)
-        .await?
+        .await?;
+    let pks = rows.iter().map(|(_, folder)| folder.clone()).collect();
+    let slugs = folder_slugs_for_ids(conn, pks).await?;
+    Ok(rows
         .into_iter()
-        .map(|m| m.id)
+        .map(|(id, folder)| (id, slugs.get(&folder).cloned().unwrap_or(folder)))
         .collect())
 }
 
@@ -883,19 +889,29 @@ async fn folder_slugs<C: ConnectionTrait>(
     conn: &C,
     models: &[Model],
 ) -> Result<HashMap<String, String>, errors::Error> {
-    if models.is_empty() {
+    let pks = models.iter().map(|m| m.folder_id.clone()).collect();
+    folder_slugs_for_ids(conn, pks).await
+}
+
+async fn folder_slugs_for_ids<C: ConnectionTrait>(
+    conn: &C,
+    mut pks: Vec<String>,
+) -> Result<HashMap<String, String>, errors::Error> {
+    if pks.is_empty() {
         return Ok(HashMap::new());
     }
-    let mut pks: Vec<String> = models.iter().map(|m| m.folder_id.clone()).collect();
     pks.sort_unstable();
     pks.dedup();
     Ok(folders::Entity::find()
+        .select_only()
+        .column(folders::Column::Id)
+        .column(folders::Column::FolderId)
         .filter(folders::Column::Id.is_in(pks))
         .filter(folders::Column::Type.eq(folder_type_into_i16(FolderType::Downtimes)))
+        .into_tuple::<(String, String)>()
         .all(conn)
         .await?
         .into_iter()
-        .map(|f| (f.id, f.folder_id))
         .collect())
 }
 
@@ -1527,26 +1543,36 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn the_org_id_listing_keeps_tombstones_the_row_listing_skips() {
+    async fn raw_org_references_include_malformed_rows_and_tombstones() {
         let db = db().await;
-        for id in ["d1", "d2"] {
+        for id in ["d1", "d2", "malformed"] {
             put_with(&db, &downtime(id, Repeat::None, Some(11 * DAY)))
                 .await
                 .unwrap();
         }
+        Entity::update_many()
+            .col_expr(Column::Repeat, Expr::value(999_i16))
+            .filter(Column::Id.eq("malformed"))
+            .exec(&db)
+            .await
+            .unwrap();
         let mut foreign = downtime("d3", Repeat::None, Some(11 * DAY));
         foreign.org = "other".to_string();
         put_with(&db, &foreign).await.unwrap();
         delete_with(&db, "acme", "d2").await.unwrap().unwrap();
 
-        let mut listed = list_ids_by_org_with(&db, "acme").await.unwrap();
+        let mut listed = list_references_by_org_with(&db, "acme").await.unwrap();
         listed.sort();
-        assert_eq!(
-            listed,
-            ["d1", "d2"],
-            "a tombstone still needs its cross-region delete"
-        );
+        let expected: Vec<_> = ["d1", "d2", "malformed"]
+            .into_iter()
+            .map(|id| (id.to_string(), "default".to_string()))
+            .collect();
+        assert_eq!(listed, expected);
         assert_eq!(ids(&list_with(&db, "acme", None).await.unwrap()), ["d1"]);
+        let mut removed = delete_by_org_with(&db, "acme").await.unwrap();
+        removed.sort();
+        assert_eq!(removed, expected);
+        assert_eq!(ids(&list_all_with(&db).await.unwrap()), ["d3"]);
     }
 
     /// The test schema with `downtimes_folder_fk` enforced, as the migration creates it.

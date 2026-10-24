@@ -24,8 +24,8 @@ use config::meta::{
 };
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
-    IntoActiveModel, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
-    TryIntoModel, prelude::Expr, sea_query::Func,
+    IntoActiveModel, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set,
+    TransactionTrait, TryIntoModel, prelude::Expr, sea_query::Func,
 };
 use serde_json::Value as JsonValue;
 use svix_ksuid::KsuidLike;
@@ -161,6 +161,10 @@ pub async fn list(params: ListDashboardsParams) -> Result<Vec<(Folder, Dashboard
         })
         .collect::<Result<_, errors::Error>>()?;
     Ok(dashboards)
+}
+
+pub async fn list_ids_by_org(org_id: &str) -> Result<Vec<(String, String)>, errors::Error> {
+    Ok(list_ids_by_org_with(get_orm_client_ro().await, org_id).await?)
 }
 
 /// Lists dashboards like [`list`], but logs and skips rows that do not convert.
@@ -447,6 +451,24 @@ async fn list_models(
     Ok(folders_and_dashboards)
 }
 
+async fn list_ids_by_org_with<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+) -> Result<Vec<(String, String)>, sea_orm::DbErr> {
+    dashboards::Entity::find()
+        .select_only()
+        .column(dashboards::Column::DashboardId)
+        .column_as(
+            Expr::col((folders::Entity, folders::Column::FolderId)),
+            "folder_id",
+        )
+        .left_join(folders::Entity)
+        .filter(folders::Column::Org.eq(org_id))
+        .into_tuple::<(String, String)>()
+        .all(db)
+        .await
+}
+
 fn convert_skipping_invalid(
     rows: Vec<(folders::Model, dashboards::Model)>,
 ) -> Vec<(Folder, Dashboard)> {
@@ -647,6 +669,51 @@ mod tests {
         let kept = convert_skipping_invalid(vec![(folder.clone(), bad), (folder, good)]);
         assert_eq!(kept.len(), 1);
         assert_eq!(kept[0].1.dashboard_id(), Some("dash-1"));
+    }
+
+    #[tokio::test]
+    async fn list_ids_by_org_includes_malformed_dashboards_and_scopes_the_org() {
+        let db = sea_orm::Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = sea_orm::Schema::new(backend);
+        db.execute(backend.build(&schema.create_table_from_entity(folders::Entity)))
+            .await
+            .unwrap();
+        db.execute(backend.build(&schema.create_table_from_entity(dashboards::Entity)))
+            .await
+            .unwrap();
+        for (org, id, version, data) in [
+            ("org", "valid", 8, serde_json::json!({})),
+            ("org", "invalid", 999, serde_json::Value::Null),
+            ("other", "untouched", 8, serde_json::json!({})),
+        ] {
+            folders::ActiveModel {
+                id: Set(format!("folder-{id}")),
+                org: Set(org.to_string()),
+                folder_id: Set(format!("f-{id}")),
+                name: Set(id.to_string()),
+                description: Set(None),
+                icon: Set(None),
+                r#type: Set(0),
+            }
+            .insert(&db)
+            .await
+            .unwrap();
+            let mut model = make_model(version, data);
+            model.id = id.to_string();
+            model.dashboard_id = id.to_string();
+            model.folder_id = format!("folder-{id}");
+            model.into_active_model().insert(&db).await.unwrap();
+        }
+        let mut ids = list_ids_by_org_with(&db, "org").await.unwrap();
+        ids.sort();
+        assert_eq!(
+            ids,
+            [
+                ("invalid".to_string(), "f-invalid".to_string()),
+                ("valid".to_string(), "f-valid".to_string())
+            ]
+        );
     }
 
     #[tokio::test]

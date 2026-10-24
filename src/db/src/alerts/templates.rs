@@ -149,18 +149,8 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
     Ok(())
 }
 
-/// Org teardown, org-exact; returns each template kept because other orgs' destinations use it.
-pub async fn delete_by_org(org_id: &str) -> Result<Vec<(String, Vec<String>)>, TemplateError> {
-    let mut owned = Vec::new();
-    let mut kept = Vec::new();
-    for (id, name) in table::templates::list_ids_by_org(org_id).await? {
-        let users = table::destinations::orgs_using_template(&id, org_id).await?;
-        if users.is_empty() {
-            owned.push((id, name));
-        } else {
-            kept.push((name, users));
-        }
-    }
+pub async fn delete_by_org(org_id: &str) -> Result<(), TemplateError> {
+    let owned = table::templates::list_ids_by_org(org_id).await?;
     let names: Vec<String> = owned.iter().map(|(_, name)| name.clone()).collect();
     let owners = &tuple_owners(org_id, &names).await?;
     let local = |name: String| async move {
@@ -171,8 +161,7 @@ pub async fn delete_by_org(org_id: &str) -> Result<Vec<(String, Vec<String>)>, T
         infra::coordinator::emit_delete(&event_key).await?;
         Ok::<(), TemplateError>(())
     };
-    let used_since = &std::sync::Mutex::new(Vec::new());
-    // No super-cluster event: its receiver deletes by name with the `default` org fallback.
+    // Org deletion is refused while super-cluster replication is enabled.
     db::teardown::evict_then_delete(
         owned,
         |(_, name): (String, String)| local(name),
@@ -181,21 +170,12 @@ pub async fn delete_by_org(org_id: &str) -> Result<Vec<(String, Vec<String>)>, T
             for owner in owners.get(&name).into_iter().flatten() {
                 remove_ownership(owner, "templates", Authz::new(&name)).await;
             }
-            // The delete itself checks for other orgs' destinations; the listing may predate one.
-            if !table::templates::delete_unused_by_id(org_id, &id).await? {
-                used_since.lock().unwrap().push((id, name));
-            }
+            table::templates::delete_by_id(org_id, &id).await?;
             Ok(())
         },
     )
     .await?;
-    let used_since = std::mem::take(&mut *used_since.lock().unwrap());
-    for (id, name) in used_since {
-        let users = table::destinations::orgs_using_template(&id, org_id).await?;
-        kept.push((name, users));
-    }
-    // The org-wide delete names any unused template the listing missed.
-    let missed = table::templates::delete_unused_by_org(org_id).await?;
+    let missed = table::templates::delete_by_org_returning(org_id).await?;
     let names: Vec<String> = missed.iter().map(|(_, name)| name.clone()).collect();
     let owners = tuple_owners(org_id, &names).await?;
     for (_, name) in missed {
@@ -204,7 +184,7 @@ pub async fn delete_by_org(org_id: &str) -> Result<Vec<(String, Vec<String>)>, T
         }
         db::teardown::evict(local(name.clone()), broadcast(name)).await?;
     }
-    Ok(kept)
+    Ok(())
 }
 
 /// For each name, the owners of its `template:{name}` tuples; none when no tuples are kept.

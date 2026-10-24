@@ -417,21 +417,25 @@ pub async fn get_dek(org: &str) -> Result<Vec<u8>, errors::Error> {
     Ok(dek)
 }
 
-/// The org's DEK if it has one; unlike [`get_dek`] it never mints one.
-pub async fn find_dek(org: &str) -> Result<Option<Vec<u8>>, errors::Error> {
-    if let Some(entry) = DEK_CACHE.get(org)
-        && entry.1.elapsed() < DEK_CACHE_TTL
-    {
-        return Ok(Some(entry.0.clone()));
-    }
-    let Some(b64) = get_data(org, EntryKind::CipherKey, DEFAULT_DEK_NAME).await? else {
-        return Ok(None);
-    };
-    let dek = BASE64_STANDARD
-        .decode(b64)
-        .map_err(|e| errors::Error::Message(format!("failed to decode DEK for org {org}: {e}")))?;
-    DEK_CACHE.insert(org.to_string(), (dek.clone(), Instant::now()));
-    Ok(Some(dek))
+pub async fn encrypt_for_org(org: &str, plaintext: &str) -> Result<String, errors::Error> {
+    let key = get_dek(org).await?;
+    Algorithm::Aes256Siv
+        .encrypt(&key, plaintext)
+        .map_err(|e| errors::Error::Message(e.to_string()))
+}
+
+/// Decrypts existing org data without provisioning a missing encryption key.
+pub async fn decrypt_for_org(org: &str, ciphertext: &str) -> Result<String, errors::Error> {
+    let key = find_dek(org)
+        .await?
+        .ok_or_else(|| errors::Error::Message("the org has no encryption key".to_string()))?;
+    Algorithm::Aes256Siv
+        .decrypt(&key, ciphertext)
+        .map_err(|e| errors::Error::Message(e.to_string()))
+}
+
+pub async fn has_org_key(org: &str) -> Result<bool, errors::Error> {
+    Ok(find_dek(org).await?.is_some())
 }
 
 /// Deletes all cipher key entries belonging to the given org, the system DEK included.
@@ -481,6 +485,22 @@ pub async fn boot(key_b64: Option<&str>) -> Result<(), errors::Error> {
         Err(problem) => log::error!("cipher master key: stored secrets are off: {problem}"),
     }
     Ok(())
+}
+
+async fn find_dek(org: &str) -> Result<Option<Vec<u8>>, errors::Error> {
+    if let Some(entry) = DEK_CACHE.get(org)
+        && entry.1.elapsed() < DEK_CACHE_TTL
+    {
+        return Ok(Some(entry.0.clone()));
+    }
+    let Some(b64) = get_data(org, EntryKind::CipherKey, DEFAULT_DEK_NAME).await? else {
+        return Ok(None);
+    };
+    let dek = BASE64_STANDARD
+        .decode(b64)
+        .map_err(|e| errors::Error::Message(format!("failed to decode DEK for org {org}: {e}")))?;
+    DEK_CACHE.insert(org.to_string(), (dek.clone(), Instant::now()));
+    Ok(Some(dek))
 }
 
 /// Builds the mode from the master-key setting; absent or empty means no key. [pure]
@@ -1108,6 +1128,48 @@ mod tests {
             is_system: false,
         };
         assert!(!filter.is_system);
+    }
+
+    #[tokio::test]
+    async fn test_org_encryption_provisions_only_on_write_and_forgets_deleted_keys() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        if master_key().is_err() {
+            boot(None).await.expect("cipher");
+        }
+        let org = crate::table::testing::unique("t_cipher_crypto");
+        let other = format!("{org}_other");
+        assert!(!has_org_key(&org).await.unwrap());
+        assert!(decrypt_for_org(&org, "unreadable").await.is_err());
+        assert!(
+            get_data(&org, EntryKind::CipherKey, DEFAULT_DEK_NAME)
+                .await
+                .unwrap()
+                .is_none()
+        );
+
+        let encrypted = encrypt_for_org(&org, "sensitive").await.unwrap();
+        assert_ne!(encrypted, "sensitive");
+        assert!(has_org_key(&org).await.unwrap());
+        assert_eq!(
+            decrypt_for_org(&org, &encrypted).await.unwrap(),
+            "sensitive"
+        );
+        encrypt_for_org(&other, "other").await.unwrap();
+        assert!(decrypt_for_org(&other, &encrypted).await.is_err());
+
+        delete_by_org(&org).await.unwrap();
+        assert!(!has_org_key(&org).await.unwrap());
+        assert!(decrypt_for_org(&org, &encrypted).await.is_err());
+        assert!(
+            get_data(&org, EntryKind::CipherKey, DEFAULT_DEK_NAME)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(has_org_key(&other).await.unwrap());
+        delete_by_org(&other).await.unwrap();
     }
 
     #[tokio::test]

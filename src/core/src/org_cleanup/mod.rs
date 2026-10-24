@@ -202,7 +202,7 @@ impl TombstoneStore for DbTombstoneStore {
     }
 
     async fn remove_row(&self, tombstone: &Tombstone) -> Result<bool, anyhow::Error> {
-        // Its chats were purged before its deletion ended, a later org's a whole tombstone after.
+        // The cutoff preserves chat rows belonging to a later organization that reused this id.
         infra::table::ai_chat_sessions::delete_purged_by_org(
             &tombstone.org_id,
             tombstone.generation + LATE_ROW_SLACK_MICROS,
@@ -1303,14 +1303,9 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     crate::db::alerts::destinations::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/destinations: {e}"))?;
-    let kept = crate::db::alerts::templates::delete_by_org(org_id)
+    crate::db::alerts::templates::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/templates: {e}"))?;
-    for (template, users) in kept {
-        log::warn!(
-            "[ORG_CLEANUP] org {org_id}: kept template {template}, used by destinations of {users:?}"
-        );
-    }
     // Local only: deletion is refused while super-cluster replication is on.
     oncall_teams::delete_by_org(org_id)
         .await
@@ -1566,8 +1561,6 @@ async fn announce_removed_member(
     Ok(())
 }
 
-/// Emit an audit entry to the _meta org for an org status transition.
-/// Fire-and-forget; never blocks the transition. Enterprise-only.
 #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
 async fn emit_status_audit(org_id: &str, actor: &str, from: &str, to: &str) {
     #[cfg(feature = "enterprise")]
@@ -1578,6 +1571,7 @@ async fn emit_status_audit(org_id: &str, actor: &str, from: &str, to: &str) {
             org_id: org_id.to_string(),
             _timestamp: config::utils::time::now_micros(),
             protocol: auditor::Protocol::Http,
+            delegated: None,
             response_meta: auditor::ResponseMeta {
                 http_method: "SYSTEM".to_string(),
                 http_path: format!("/system/org_cleanup/{from}_to_{to}"),
@@ -4713,8 +4707,8 @@ mod tests {
             "a row only the delete returned must still lose its tuple"
         );
         assert!(
-            body.contains("list_ids_by_org_with("),
-            "tombstoned rows hold no tuple but still need their cross-region delete"
+            body.contains("list_references_by_org_with("),
+            "raw references must include unreadable rows and tombstones"
         );
         assert!(
             body.contains("let removed = table::delete_by_org(")

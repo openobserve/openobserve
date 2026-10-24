@@ -612,16 +612,15 @@ pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<(), Da
     Ok(())
 }
 
-/// Org teardown: deletes each listed dashboard by its primary row, then drops the unparsable rows.
 pub async fn delete_by_org(org_id: &str) -> Result<(), DashboardError> {
-    let dashboards: Vec<(String, String)> =
-        table::dashboards::list_skipping_invalid(ListDashboardsParams::new(org_id))
-            .await?
-            .into_iter()
-            .filter_map(|(folder, dashboard)| {
-                Some((dashboard.dashboard_id()?.to_string(), folder.folder_id))
-            })
-            .collect();
+    system_settings::delete(
+        &SettingScope::Org,
+        Some(org_id),
+        None,
+        HOME_DASHBOARD_SETTING_KEY,
+    )
+    .await?;
+    let dashboards = table::dashboards::list_ids_by_org(org_id).await?;
     let local = |(dashboard_id, _): (String, String)| async move {
         common::infra::config::DASHBOARD_ID_TO_ORG
             .write()
@@ -639,15 +638,13 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), DashboardError> {
         |(dashboard_id, folder_id): (String, String)| async move {
             forget_dashboard(org_id, &dashboard_id, &folder_id).await?;
             table::dashboards::delete_from_folder(org_id, &folder_id, &dashboard_id).await?;
-            reconcile_home_dashboard_on_delete(org_id, &dashboard_id).await;
             Ok(())
         },
     )
     .await?;
-    // Also unparseable rows; the delete names each row the listing missed, which goes after it.
+    // A retry must also evict rows that appeared after the initial listing.
     for (dashboard_id, folder_id) in table::dashboards::delete_by_org(org_id).await? {
         forget_dashboard(org_id, &dashboard_id, &folder_id).await?;
-        reconcile_home_dashboard_on_delete(org_id, &dashboard_id).await;
         let item = (dashboard_id, folder_id);
         db::teardown::evict(local(item.clone()), broadcast(item)).await?;
     }
@@ -1270,6 +1267,39 @@ mod tests {
     use config::meta::dashboards::v8;
 
     use super::*;
+
+    #[tokio::test]
+    async fn org_deletion_clears_an_orphan_home_pin_without_dashboard_rows() {
+        use config::meta::system_settings::SystemSetting;
+
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs ZO_META_STORE");
+            return;
+        }
+        infra::db_init().await.unwrap();
+        table::migrate().await.unwrap();
+        let org = format!("home_pin_teardown_{}", config::utils::time::now_micros());
+        system_settings::set(&SystemSetting::new_org(
+            &org,
+            HOME_DASHBOARD_SETTING_KEY,
+            serde_json::json!({"dashboardId": "missing", "folderId": "missing"}),
+        ))
+        .await
+        .unwrap();
+        delete_by_org(&org).await.unwrap();
+        assert!(
+            system_settings::get(
+                &SettingScope::Org,
+                Some(&org),
+                None,
+                HOME_DASHBOARD_SETTING_KEY
+            )
+            .await
+            .unwrap()
+            .is_none()
+        );
+        delete_by_org(&org).await.unwrap();
+    }
 
     fn make_panel(i: i64, x: i64, y: i64, w: i64, h: i64) -> v8::Panel {
         let mut p: v8::Panel = serde_json::from_str(

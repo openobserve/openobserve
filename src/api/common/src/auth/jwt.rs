@@ -252,10 +252,7 @@ pub async fn process_token(
                     continue;
                 }
                 if let Err(error) = organization::check_and_create_org(&org.name).await {
-                    log::warn!(
-                        "Failed to auto-create organization '{}': {error}",
-                        &org.name
-                    );
+                    log::warn!("Failed to auto-create organization '{}': {error}", org.name);
                 }
 
                 match users::add_user_to_org(
@@ -385,10 +382,7 @@ pub async fn process_token(
                     // Create the org if it does not exist. `org.name` is the id of the org.
                     // Also it creates necessary ofga tuples for the newly created org
                     if let Err(error) = organization::check_and_create_org(&org.name).await {
-                        log::warn!(
-                            "Failed to auto-create organization '{}': {error}",
-                            &org.name
-                        );
+                        log::warn!("Failed to auto-create organization '{}': {error}", org.name);
                     }
 
                     if index == 0 {
@@ -519,7 +513,7 @@ async fn map_group_to_custom_role(
         if let Err(error) = organization::check_and_create_org(&dex_cfg.default_org).await {
             log::warn!(
                 "Failed to auto-create organization '{}': {error}",
-                &dex_cfg.default_org
+                dex_cfg.default_org
             );
         }
 

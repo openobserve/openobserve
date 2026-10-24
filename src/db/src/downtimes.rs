@@ -130,12 +130,12 @@ pub async fn delete(org: &str, id: &str, stored: table::RowVersion) -> Result<bo
 /// Org deletion: every row, every node cache, every region and every OpenFGA tuple.
 pub async fn delete_by_org(org: &str) -> Result<(), anyhow::Error> {
     let conn = infra::db::get_orm_client_ro().await;
-    let rows = table::list_with(conn, org, None).await?;
-    let ids = table::list_ids_by_org_with(conn, org).await?;
+    let rows = table::list_references_by_org_with(conn, org).await?;
+    let ids: Vec<String> = rows.iter().map(|(id, _)| id.clone()).collect();
     // A retry lists no deleted row, so every side effect runs while the rows still exist.
     evict_org(org, &ids).await?;
-    for row in &rows {
-        crate::authz::remove_ownership(org, "downtimes", ownership(row)).await;
+    for (id, folder) in &rows {
+        crate::authz::remove_ownership(org, "downtimes", ownership_ref(id, folder)).await;
     }
     let removed = table::delete_by_org(org).await?;
     // The delete names each row the listing missed, whose tuple and copies go after it.
@@ -145,12 +145,7 @@ pub async fn delete_by_org(org: &str) -> Result<(), anyhow::Error> {
         .cloned()
         .collect();
     for (id, folder_id) in &missed {
-        let owned = Authz {
-            obj_id: id.clone(),
-            parent_type: "downtime_folders".to_string(),
-            parent: folder_id.clone(),
-        };
-        crate::authz::remove_ownership(org, "downtimes", owned).await;
+        crate::authz::remove_ownership(org, "downtimes", ownership_ref(id, folder_id)).await;
     }
     let missed: Vec<String> = missed.into_iter().map(|(id, _)| id).collect();
     evict_org(org, &missed).await?;
@@ -235,11 +230,7 @@ pub fn all_cached() -> Vec<Arc<Vec<Downtime>>> {
 
 /// The OpenFGA object of a downtime, parented by its folder so folder grants reach it.
 pub fn ownership(downtime: &Downtime) -> Authz {
-    Authz {
-        obj_id: downtime.id.clone(),
-        parent_type: "downtime_folders".to_string(),
-        parent: downtime.folder_id.clone(),
-    }
+    ownership_ref(&downtime.id, &downtime.folder_id)
 }
 
 /// Reloads one org from the table so the cache never holds half a row.
@@ -280,7 +271,14 @@ async fn on_delete(org: String, id: String) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// `(org, tuple)` for every row, each parented by the folder it is filed in.
+fn ownership_ref(id: &str, folder_id: &str) -> Authz {
+    Authz {
+        obj_id: id.to_string(),
+        parent_type: "downtime_folders".to_string(),
+        parent: folder_id.to_string(),
+    }
+}
+
 fn ownership_backfill(orgs: &[Arc<Vec<Downtime>>]) -> Vec<(String, Authz)> {
     orgs.iter()
         .flat_map(|rows| rows.iter())

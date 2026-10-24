@@ -2445,19 +2445,20 @@ mod tests {
         dashboard_id
     }
 
-    /// Deleted-org templates: a twin of a `default` one, and one another org's destination uses.
-    async fn seed_shared_templates(org: &str, kept: &str) -> [String; 3] {
-        use config::meta::destinations::Module;
+    async fn seed_shared_templates(org: &str, kept: &str) -> [String; 4] {
+        use config::meta::destinations::{Destination, Module};
         use infra::table::entity::{destinations, templates};
-        use sea_orm::{ActiveModelTrait, Set};
+        use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 
         let conn = infra::db::get_orm_client_rw().await;
         let twin = format!("{org}Twin");
+        let fallback = format!("{org}Fallback");
         let mut ids = Vec::new();
         for (owner, name) in [
             (config::DEFAULT_ORG, twin.as_str()),
             (org, twin.as_str()),
-            (org, "orgdelShared"),
+            (kept, twin.as_str()),
+            (config::DEFAULT_ORG, fallback.as_str()),
         ] {
             let id = config::ider::uuid();
             templates::ActiveModel {
@@ -2485,51 +2486,88 @@ mod tests {
         else {
             panic!("orgdelDest is an alert destination");
         };
-        destinations::ActiveModel {
-            id: Set(config::ider::uuid()),
-            org: Set(kept.to_string()),
-            name: Set("orgdelSharedDest".to_string()),
-            module: Set("alert".to_string()),
-            template_id: Set(Some(ids[2].clone())),
-            r#type: Set(serde_json::to_value(destination_type).unwrap()),
+        for (name, template, expected_id) in [
+            ("orgdelOwnedDest", twin, &ids[2]),
+            ("orgdelDefaultDest", fallback, &ids[3]),
+        ] {
+            infra::table::destinations::put(Destination {
+                org_id: kept.to_string(),
+                name: name.to_string(),
+                module: Module::Alert {
+                    template: Some(template),
+                    destination_type: destination_type.clone(),
+                },
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+            let stored = destinations::Entity::find()
+                .filter(destinations::Column::Org.eq(kept))
+                .filter(destinations::Column::Name.eq(name))
+                .one(conn)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(stored.template_id.as_ref(), Some(expected_id));
         }
-        .insert(conn)
-        .await
-        .unwrap();
         ids.try_into().unwrap()
     }
 
-    /// The `default` twin and the template another org uses survive; then both are dropped.
-    async fn assert_shared_templates(org: &str, kept: &str, ids: &[String; 3]) {
+    async fn assert_shared_templates(org: &str, kept: &str, ids: &[String; 4]) {
         let ids_of = |rows: Vec<(String, String)>| -> Vec<String> {
             rows.into_iter().map(|(id, _)| id).collect()
         };
-        let defaults = infra::table::templates::list_ids_by_org(config::DEFAULT_ORG).await;
+        let defaults = ids_of(
+            infra::table::templates::list_ids_by_org(config::DEFAULT_ORG)
+                .await
+                .unwrap(),
+        );
+        assert!(defaults.contains(&ids[0]), "the default twin was deleted");
         assert!(
-            ids_of(defaults.unwrap()).contains(&ids[0]),
-            "the default org's same-named template was deleted"
+            defaults.contains(&ids[3]),
+            "the default fallback was deleted"
         );
-        let left = infra::table::templates::list_ids_by_org(org).await;
-        assert_eq!(
-            ids_of(left.unwrap()),
-            [ids[2].clone()],
-            "only the template {kept} uses is kept"
+        assert!(
+            infra::table::templates::list_ids_by_org(org)
+                .await
+                .unwrap()
+                .is_empty(),
+            "the deleted organization's templates remain"
         );
-        let users = infra::table::destinations::orgs_using_template(&ids[2], org).await;
-        assert_eq!(users.unwrap(), [kept.to_string()]);
-        infra::table::destinations::delete(kept, "orgdelSharedDest")
+        let survivors = infra::table::templates::list_ids_by_org(kept)
             .await
             .unwrap();
         assert!(
-            infra::table::templates::delete_unused_by_id(org, &ids[2])
-                .await
-                .unwrap()
+            ids_of(survivors).contains(&ids[2]),
+            "the live twin was deleted"
         );
+        for destination in ["orgdelOwnedDest", "orgdelDefaultDest"] {
+            assert!(
+                infra::table::destinations::get(kept, destination)
+                    .await
+                    .unwrap()
+                    .is_some()
+            );
+            infra::table::destinations::delete(kept, destination)
+                .await
+                .unwrap();
+        }
         assert!(
-            infra::table::templates::delete_unused_by_id(config::DEFAULT_ORG, &ids[0])
+            !infra::table::templates::delete_by_id(org, &ids[0])
                 .await
                 .unwrap()
         );
+        for (owner, id) in [
+            (config::DEFAULT_ORG, &ids[0]),
+            (kept, &ids[2]),
+            (config::DEFAULT_ORG, &ids[3]),
+        ] {
+            assert!(
+                infra::table::templates::delete_by_id(owner, id)
+                    .await
+                    .unwrap()
+            );
+        }
     }
 
     /// Asserts the raw-routed rows and the caches their db-layer deletes evict.

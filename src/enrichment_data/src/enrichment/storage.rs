@@ -376,6 +376,9 @@ pub mod local {
         data: Values,
         updated_at: i64,
     ) -> Result<()> {
+        if db::org_status::is_blocked(org_id) {
+            return Ok(());
+        }
         let key = get_key(org_id, table_name);
         let table_dir = get_table_dir(&key);
         let file_path = get_table_path(table_dir.to_str().unwrap(), updated_at);
@@ -408,11 +411,18 @@ pub mod local {
             .await
             .map_err(|e| anyhow!("Failed to write enrichment table file: {}", e))?;
 
-        update_metadata(|metadata| {
+        let metadata_update = update_metadata(|metadata| {
+            if db::org_status::is_blocked(org_id) {
+                return false;
+            }
             metadata.insert(key.to_string(), updated_at);
             true
         })
-        .await?;
+        .await;
+        if db::org_status::is_gone(org_id) {
+            config::utils::enrichment_local_cache::delete_org(org_id).await?;
+        }
+        metadata_update?;
 
         log::debug!("Stored enrichment table {key} to local storage");
         Ok(())
@@ -422,6 +432,9 @@ pub mod local {
     /// This returns data in RecordBatch format directly from parquet files,
     /// avoiding unnecessary conversions
     pub async fn retrieve(org_id: &str, table_name: &str) -> Result<Values> {
+        if db::org_status::is_blocked(org_id) {
+            return Ok(Values::RecordBatch(vec![]));
+        }
         let key = get_key(org_id, table_name);
         let file_dir = get_table_dir(&key);
         let mut files = Vec::new();
@@ -458,6 +471,9 @@ pub mod local {
                 batches.push(batch);
             }
         }
+        if db::org_status::is_blocked(org_id) {
+            return Ok(Values::RecordBatch(vec![]));
+        }
         Ok(Values::RecordBatch(batches))
     }
 
@@ -491,6 +507,9 @@ pub mod local {
     }
 
     pub async fn get_last_updated_at(org_id: &str, table_name: &str) -> Result<i64> {
+        if db::org_status::is_blocked(org_id) {
+            return Ok(0);
+        }
         let key = get_key(org_id, table_name);
         let metadata_content = get_metadata_content().await?;
         Ok(metadata_content.get(&key).cloned().unwrap_or_default())
@@ -502,6 +521,9 @@ pub mod local {
         data: Values,
         updated_at: i64,
     ) -> Result<()> {
+        if db::org_status::is_blocked(org_id) {
+            return Ok(());
+        }
         let key = get_key(org_id, table_name);
         let metadata_content = get_metadata_content().await?;
         let last_updated_at = metadata_content.get(&key).cloned().unwrap_or_default();
@@ -594,6 +616,30 @@ mod tests {
 
     use super::*;
     use crate::enrichment::storage::Values;
+
+    #[tokio::test]
+    async fn test_local_cache_rejects_blocked_org_reads_and_writes() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+        for (suffix, status) in [
+            ("pending", OrgStatus::PendingDeletion),
+            ("deleting", OrgStatus::Deleting),
+            ("deleted", OrgStatus::Deleted),
+        ] {
+            let org = format!("enrichment_blocked_{suffix}");
+            let table = "blocked_cache";
+            ORG_STATUS_CACHE.insert(org.clone(), status);
+            local::store(&org, table, Values::RecordBatch(vec![]), 42)
+                .await
+                .unwrap();
+            local::store_data_if_needed(&org, table, Values::RecordBatch(vec![]), 42)
+                .await
+                .unwrap();
+            assert!(local::retrieve(&org, table).await.unwrap().is_empty());
+            assert_eq!(local::get_last_updated_at(&org, table).await.unwrap(), 0);
+            assert!(!get_table_dir(&get_key(&org, table)).exists());
+            ORG_STATUS_CACHE.remove(&org);
+        }
+    }
 
     // current ignore because it need database to get schema
     #[ignore]

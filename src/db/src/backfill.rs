@@ -75,15 +75,20 @@ pub async fn add(job: BackfillJob) -> Result<()> {
 /// Delete a backfill job
 pub async fn delete(org: &str, job_id: &str) -> Result<()> {
     infra::table::backfill_jobs::delete(org, job_id).await?;
+    #[cfg(feature = "enterprise")]
     publish_delete(org, job_id).await;
     Ok(())
 }
 
 /// Org teardown: one delete, then each returned job's super-cluster event, as [`delete`] sends.
 pub async fn delete_by_org(org: &str) -> Result<()> {
-    for job_id in infra::table::backfill_jobs::delete_by_org(org).await? {
+    let job_ids = infra::table::backfill_jobs::delete_by_org(org).await?;
+    #[cfg(feature = "enterprise")]
+    for job_id in job_ids {
         publish_delete(org, &job_id).await;
     }
+    #[cfg(not(feature = "enterprise"))]
+    let _ = job_ids;
     Ok(())
 }
 
@@ -267,9 +272,8 @@ pub async fn update_enabled(org: &str, job_id: &str, enabled: bool) -> Result<()
     Ok(())
 }
 
-#[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
+#[cfg(feature = "enterprise")]
 async fn publish_delete(org: &str, job_id: &str) {
-    #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled

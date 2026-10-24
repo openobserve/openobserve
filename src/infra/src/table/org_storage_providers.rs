@@ -119,32 +119,10 @@ impl From<Model> for OrgStorageProvider {
     }
 }
 
-fn encrypt_data(dek: &[u8], plaintext: &str) -> Result<String, errors::Error> {
-    config::utils::encryption::Algorithm::Aes256Siv
-        .encrypt(dek, plaintext)
-        .map_err(|e| errors::Error::Message(e.to_string()))
-}
-
-fn decrypt_data(dek: &[u8], ciphertext_b64: &str) -> Result<String, errors::Error> {
-    config::utils::encryption::Algorithm::Aes256Siv
-        .decrypt(dek, ciphertext_b64)
-        .map_err(|e| errors::Error::Message(e.to_string()))
-}
-
-/// A row with no DEK cannot be decrypted, and minting one would leave a key behind.
-async fn decrypt_stored(provider: &OrgStorageProvider) -> Result<String, errors::Error> {
-    let dek = cipher::find_dek(&provider.org_id)
-        .await?
-        .ok_or_else(|| errors::Error::Message("the org has no DEK".to_string()))?;
-    decrypt_data(&dek, &provider.data)
-}
-
 pub async fn add(entry: OrgStorageProvider) -> Result<(), errors::Error> {
     let cache_entry = entry.clone();
 
-    let dek = cipher::get_dek(&entry.org_id).await?;
-
-    let encrypted_data = encrypt_data(&dek, &entry.data)?;
+    let encrypted_data = cipher::encrypt_for_org(&entry.org_id, &entry.data).await?;
 
     let model = ActiveModel {
         org_id: Set(entry.org_id),
@@ -191,7 +169,7 @@ pub async fn get_for_org(org_id: &str) -> Result<Option<OrgStorageProvider>, err
     let ret = match res {
         Some(row) => {
             let mut provider = OrgStorageProvider::from(row);
-            provider.data = decrypt_stored(&provider).await?;
+            provider.data = cipher::decrypt_for_org(&provider.org_id, &provider.data).await?;
             Some(provider)
         }
         None => None,
@@ -247,7 +225,7 @@ pub async fn list_all() -> Result<Vec<OrgStorageProvider>, errors::Error> {
     let mut ret = Vec::with_capacity(temp.len());
 
     for mut t in temp.into_iter() {
-        match decrypt_stored(&t).await {
+        match cipher::decrypt_for_org(&t.org_id, &t.data).await {
             Ok(decrypted) => {
                 t.data = decrypted;
                 ret.push(t);
@@ -297,7 +275,9 @@ mod tests {
         ONCE.get_or_init(|| async {
             crate::db_init().await.expect("meta store");
             crate::table::migrate().await.expect("migrations");
-            cipher::boot(None).await.expect("cipher");
+            if cipher::master_key().is_err() {
+                cipher::boot(None).await.expect("cipher");
+            }
         })
         .await;
         true

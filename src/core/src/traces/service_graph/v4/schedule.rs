@@ -449,7 +449,7 @@ fn persist_snapshot(
     path: &Path,
     write: impl FnOnce(&Path) -> std::io::Result<()>,
 ) -> std::io::Result<()> {
-    if super::super::org_being_deleted(org) {
+    if super::super::org_being_deleted(org) || crate::db::file_list::BLOCKED_ORGS.contains(org) {
         return Ok(());
     }
     let written = write(path);
@@ -1041,6 +1041,16 @@ mod tests {
         ORG_STATUS_CACHE.remove(gone);
         assert!(!gone_path.exists(), "a deleting org's snapshot was written");
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_persist_snapshot_skips_configured_blocked_orgs() {
+        for org in crate::db::file_list::BLOCKED_ORGS.iter() {
+            persist_snapshot(org, Path::new("unused-blocked-snapshot"), |_| {
+                panic!("a configured blocked org must not write a snapshot")
+            })
+            .unwrap();
+        }
     }
 
     #[test]

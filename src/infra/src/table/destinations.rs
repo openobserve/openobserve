@@ -245,24 +245,6 @@ pub async fn list_names_by_org(org_id: &str) -> Result<Vec<String>, Error> {
     Ok(names)
 }
 
-/// Orgs other than `except_org` with a destination on this template.
-pub async fn orgs_using_template(
-    template_id: &str,
-    except_org: &str,
-) -> Result<Vec<String>, Error> {
-    let client = get_orm_client_ro().await;
-    let orgs = Entity::find()
-        .select_only()
-        .column(Column::Org)
-        .filter(Column::TemplateId.eq(template_id))
-        .filter(Column::Org.ne(except_org))
-        .distinct()
-        .into_tuple::<String>()
-        .all(client)
-        .await?;
-    Ok(orgs)
-}
-
 #[cfg(test)]
 mod tests {
     use svix_ksuid::KsuidLike as _;

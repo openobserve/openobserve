@@ -234,11 +234,8 @@ impl TrialQuotaPool {
     }
 }
 
-/// The key both [`ORG_USAGE`] and [`ORG_LIMITS`] use. `\u{1f}` (ASCII unit
-/// separator) rather than `/` or `:`: an org id is user-chosen, and a separator
-/// it can contain would let two different scopes collide into one pool.
 fn scope(org_id: &str, pool: TrialQuotaPool) -> String {
-    format!("{org_id}\u{1f}{}", pool.key())
+    format!("{}:{org_id}:{}", org_id.len(), pool.key())
 }
 
 /// One cumulative consent value per `(org, pool)` — the runtime source of truth.
@@ -603,10 +600,8 @@ pub async fn set_limit(org_id: &str, usage_limit: u64) -> Result<(), anyhow::Err
 
 /// Drops every pool's counter, limit and consent of a deleted org from this node.
 pub fn evict_org(org_id: &str) {
-    let owned = |key: &String| {
-        key.split_once('\u{1f}')
-            .is_some_and(|(org, _)| org == org_id)
-    };
+    let prefix = format!("{}:{org_id}:", org_id.len());
+    let owned = |key: &String| key.starts_with(&prefix);
     ORG_USAGE.write().retain(|key, _| !owned(key));
     ORG_LIMITS.write().retain(|key, _| !owned(key));
     let mut consent = ORG_PAID_OVERAGE.write();
@@ -2100,6 +2095,17 @@ mod tests {
             scope("acme", TrialQuotaPool::AiCredits),
             scope("acme_ai_credits", TrialQuotaPool::AiCredits),
         );
+    }
+
+    #[test]
+    fn scope_keys_are_readable_and_unambiguous() {
+        assert_eq!(
+            scope("acme", TrialQuotaPool::AiCredits),
+            "4:acme:ai_credits"
+        );
+        let org = "acme:ai_credits";
+        let prefix = format!("{}:acme:", "acme".len());
+        assert!(!scope(org, TrialQuotaPool::AiCredits).starts_with(&prefix));
     }
 
     #[test]
