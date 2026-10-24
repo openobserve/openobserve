@@ -1167,6 +1167,15 @@ export default defineComponent({
       if (language === "javascript") {
         await import("monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js");
       }
+      if (language === "yaml") {
+        await import("monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution.js");
+      }
+      if (language === "shell") {
+        await import("monaco-editor/esm/vs/basic-languages/shell/shell.contribution.js");
+      }
+      if (language === "powershell") {
+        await import("monaco-editor/esm/vs/basic-languages/powershell/powershell.contribution.js");
+      }
     };
 
     // Retokenize in place rather than making the consumer remount: recreating the

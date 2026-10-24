@@ -58,6 +58,8 @@ fn folder_error_response(value: FolderError) -> Response {
         FolderError::DeleteWithPrompts => MetaHttpResponse::bad_request(
             "Folder contains prompts, please move/delete prompts from folder",
         ),
+        FolderError::DeleteFleet(message) => MetaHttpResponse::bad_request(message),
+        FolderError::FleetChanged(message) => MetaHttpResponse::conflict(message),
         FolderError::NotFound => MetaHttpResponse::not_found("Folder not found"),
         FolderError::PermittedFoldersMissingUser => MetaHttpResponse::forbidden(""),
         FolderError::PermittedFoldersValidator(err) => MetaHttpResponse::forbidden(err),
@@ -641,6 +643,11 @@ mod tests {
             (FolderError::DeleteWithReports, 400),
             (FolderError::DeleteWithSynthetics, 400),
             (FolderError::DeleteWithPrompts, 400),
+            (
+                FolderError::DeleteFleet("holds collectors".to_string()),
+                400,
+            ),
+            (FolderError::FleetChanged("retry".to_string()), 409),
             (FolderError::PermittedFoldersMissingUser, 403),
             (
                 FolderError::PermittedFoldersValidator("test".to_string()),

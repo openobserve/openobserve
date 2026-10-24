@@ -34,6 +34,8 @@ export const IGNORED_NOISE_PATTERNS: RegExp[] = [
   // Monaco editor disposal cancelling a pending operation — the message is
   // the bare word, with no distinguishing stack.
   /^Canceled$/,
+  // Monaco's paste reads the clipboard; the browser denies it without a user grant.
+  /NotAllowedError[\s\S]*Clipboard read/i,
 ];
 
 /** Whether a captured error/log message+stack is known noise, not a real bug. */

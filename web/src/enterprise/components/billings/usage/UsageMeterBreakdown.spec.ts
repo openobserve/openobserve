@@ -61,6 +61,34 @@ describe("UsageMeterBreakdown group-by sections", () => {
   });
 });
 
+describe("UsageMeterBreakdown by user before dashboards are recorded", () => {
+  it("offers by user and hands the chart the same filter the table uses", async () => {
+    const wrapper = mount(UsageMeterBreakdown, {
+      props: { meterKey: "query", details: mockMeteringResponse().upcoming!, refreshToken: 0 },
+      global: { plugins: [i18n, store], stubs: { OTable: true } },
+    });
+    await flushPromises();
+    releaseSchema({
+      schema: ["stream_name", "user_email", "alert_name", "event", "size"].map((name) => ({
+        name,
+      })),
+    });
+    await flushPromises();
+
+    const [payload] = wrapper.emitted("sections")!.at(-1) as any[];
+    expect(payload.unavailable).toEqual(["dashboard", "scheduled"]);
+    const byUser = payload.sections.find((item: { id: string }) => item.id === "user");
+    expect(byUser.sql("default")).not.toContain("dashboard_name");
+
+    // Searches with no user (system ones) group under an empty name, which reads as a dash.
+    const nameColumn = (wrapper.findComponent({ name: "OTable" }).props("columns") as any[]).find(
+      (column) => column.id === "name",
+    );
+    expect(nameColumn.accessorFn({ name: "" })).toBe("—");
+    expect(nameColumn.accessorFn({ name: "a@b.c" })).toBe("a@b.c");
+  });
+});
+
 describe("UsageMeterBreakdown kept alive", () => {
   const details = mockMeteringResponse().upcoming!;
   const schema = {
