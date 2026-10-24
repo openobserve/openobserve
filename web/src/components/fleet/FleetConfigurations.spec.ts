@@ -121,7 +121,10 @@ describe("FleetConfigurations", () => {
 
   it("renders the rows the API returns", async () => {
     wrapper = await mountList();
-    expect(fleet.listConfigs).toHaveBeenCalledWith(store.state.selectedOrganization.identifier);
+    expect(fleet.listConfigs).toHaveBeenCalledWith(
+      store.state.selectedOrganization.identifier,
+      expect.objectContaining({ offset: 0 }),
+    );
     const text = bodyText(wrapper);
     expect(text).toContain("edge-minimal");
     expect(text).toContain("org-baseline");

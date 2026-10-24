@@ -26586,6 +26586,7 @@
       "action": "Actie",
       "target": "Doel",
       "auditDisabled": "Voor de audittrail is O2_AUDIT_ENABLED=true op de server nodig",
+      "auditDelayHint": "Nog geen vermeldingen. De server publiceert auditrecords in batches, standaard elke 10 minuten (O2_AUDIT_PUBLISH_INTERVAL).",
       "alertAutoRolledBack": "Een uitrol is automatisch teruggedraaid",
       "alertOfflineRatio": "Het offline-aandeel van een fleet heeft de drempel overschreden",
       "alertRolloutHalted": "Een uitrol is gestopt",

@@ -26586,6 +26586,7 @@
       "action": "Akcja",
       "target": "Cel",
       "auditDisabled": "Dziennik audytu wymaga O2_AUDIT_ENABLED=true na serwerze",
+      "auditDelayHint": "Brak wpisów. Serwer publikuje rekordy audytu partiami, domyślnie co 10 minut (O2_AUDIT_PUBLISH_INTERVAL).",
       "alertAutoRolledBack": "Wdrożenie zostało automatycznie wycofane",
       "alertOfflineRatio": "Odsetek kolektorów offline we flocie przekroczył próg",
       "alertRolloutHalted": "Wdrożenie zostało wstrzymane",

@@ -26586,6 +26586,7 @@
       "action": "Hành động",
       "target": "Đối tượng",
       "auditDisabled": "Nhật ký kiểm toán cần O2_AUDIT_ENABLED=true trên máy chủ",
+      "auditDelayHint": "Chưa có bản ghi. Máy chủ phát hành bản ghi kiểm toán theo lô, mặc định mỗi 10 phút (O2_AUDIT_PUBLISH_INTERVAL).",
       "alertAutoRolledBack": "Một đợt triển khai đã tự động quay lui",
       "alertOfflineRatio": "Tỷ lệ ngoại tuyến của một fleet vượt ngưỡng",
       "alertRolloutHalted": "Một đợt triển khai đã dừng",

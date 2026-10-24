@@ -26586,6 +26586,7 @@
       "action": "Action",
       "target": "Cible",
       "auditDisabled": "Le journal d'audit nécessite O2_AUDIT_ENABLED=true sur le serveur",
+      "auditDelayHint": "Aucune entrée pour l'instant. Le serveur publie les enregistrements d'audit par lots, toutes les 10 minutes par défaut (O2_AUDIT_PUBLISH_INTERVAL).",
       "alertAutoRolledBack": "Un déploiement a été annulé automatiquement",
       "alertOfflineRatio": "La part de collecteurs hors ligne d'une flotte a dépassé son seuil",
       "alertRolloutHalted": "Un déploiement a été interrompu",

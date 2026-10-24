@@ -26586,6 +26586,7 @@
       "action": "Действие",
       "target": "Объект",
       "auditDisabled": "Для журнала аудита на сервере требуется O2_AUDIT_ENABLED=true",
+      "auditDelayHint": "Записей пока нет. Сервер публикует записи аудита пакетами, по умолчанию каждые 10 минут (O2_AUDIT_PUBLISH_INTERVAL).",
       "alertAutoRolledBack": "Развертывание было автоматически откачено",
       "alertOfflineRatio": "Доля коллекторов парка не в сети превысила порог",
       "alertRolloutHalted": "Развертывание остановлено",

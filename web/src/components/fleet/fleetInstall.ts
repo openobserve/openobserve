@@ -142,6 +142,8 @@ function dockerCommand(t: InstallTarget): string {
     "mkdir -p otel-fleet && cat > otel-fleet/supervisor.yaml <<EOF",
     ...yaml,
     "EOF",
+    // The state volume survives, so a rerun upgrades or re-tokens the same collector identity.
+    "docker rm -f otel-fleet-collector >/dev/null 2>&1 || true",
     "docker run -d --name otel-fleet-collector --restart unless-stopped \\",
     '  --hostname "$(hostname)" \\',
     '  -v "$PWD/otel-fleet/supervisor.yaml:/etc/opampsupervisor/supervisor.yaml:ro" \\',

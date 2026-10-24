@@ -69,6 +69,7 @@ describe("installCommand", () => {
     expect(cmd).toContain("insecure: true");
     expect(cmd).toContain("O2_ENDPOINT: http://host.docker.internal:5080/api/acme");
     expect(cmd).toContain("-v otel-fleet-state:/var/lib/opampsupervisor");
+    expect(cmd).toContain("docker rm -f otel-fleet-collector >/dev/null 2>&1 || true");
     expect(cmd).toContain('--hostname "$(hostname)"');
     expect(cmd).toContain("o2cr.ai/openobserve/otel-fleet-collector:0.163.1");
     const remote = installCommand("docker", { ...target, version: null });

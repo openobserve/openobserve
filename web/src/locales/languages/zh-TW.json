@@ -26581,6 +26581,7 @@
       "action": "動作",
       "target": "目標",
       "auditDisabled": "稽核軌跡需要在伺服器上設定 O2_AUDIT_ENABLED=true",
+      "auditDelayHint": "尚無記錄。伺服器按批次發布稽核記錄,預設每 10 分鐘一次(O2_AUDIT_PUBLISH_INTERVAL)。",
       "alertAutoRolledBack": "推出已自動回復",
       "alertOfflineRatio": "機群的離線比例超過其門檻",
       "alertRolloutHalted": "推出已中止",
