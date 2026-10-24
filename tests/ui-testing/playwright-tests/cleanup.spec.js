@@ -331,6 +331,7 @@ test.describe("Pre-Test Cleanup", () => {
     await pm.apiCleanup.cleanupStreams(
       [
         /^e2e_slo_14269_/,             // slo-error-messages.spec.js (#14269) seeded stream
+        /^cloud_api_smoke$/,           // Cloud/cloudApiSmoke.spec.js seed stream (re-seeded each run)
         /^e2e_13354_/,                 // logs-field-value-rendering.spec.js (#13354)
         /^e2e_13896_/,                 // logs-result-display.spec.js (#13896)
         /^e2e_13990_other_/,           // logs-bugs.spec.js (#13990)
