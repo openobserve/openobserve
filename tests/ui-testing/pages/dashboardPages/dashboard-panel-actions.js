@@ -338,7 +338,11 @@ export default class DashboardactionPage {
       { timeout: 30000 }
     );
     await this.applyDashboardBtn();
-    await (await promqlResponse).finished();
+    const response = await promqlResponse;
+    // A streamed (text/event-stream) response never reports finished; waitForChartToRender covers completion.
+    if (!(await response.headerValue("content-type"))?.includes("text/event-stream")) {
+      await response.finished();
+    }
     await this.waitForChartToRender();
   }
 
