@@ -260,6 +260,15 @@ pub async fn remove(org: &str, id: &str) -> Result<(), errors::Error> {
     Ok(())
 }
 
+/// Credentials are ciphertext under the org DEK, so they must go before the DEK does.
+pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
+    Entity::delete_many()
+        .filter(Column::Org.eq(org))
+        .exec(get_orm_client_rw().await)
+        .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use base64::{Engine, prelude::BASE64_STANDARD};

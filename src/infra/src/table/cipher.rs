@@ -334,6 +334,19 @@ pub async fn list_filtered(
         .collect()
 }
 
+/// Deletes the org's non-system entries of `kind` and returns their names, never decrypted.
+pub async fn delete_non_system_by_org(
+    org: &str,
+    kind: EntryKind,
+) -> Result<Vec<String>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let delete = Entity::delete_many()
+        .filter(Column::Org.eq(org))
+        .filter(Column::Kind.eq(kind.to_string()))
+        .filter(Column::IsSystem.eq(false));
+    Ok(super::delete_returning(client, delete, &[Column::Name]).await?)
+}
+
 pub async fn clear() -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;
     Entity::delete_many().exec(client).await?;
@@ -404,13 +417,35 @@ pub async fn get_dek(org: &str) -> Result<Vec<u8>, errors::Error> {
     Ok(dek)
 }
 
-/// Deletes all cipher key entries belonging to the given org.
+pub async fn encrypt_for_org(org: &str, plaintext: &str) -> Result<String, errors::Error> {
+    let key = get_dek(org).await?;
+    Algorithm::Aes256Siv
+        .encrypt(&key, plaintext)
+        .map_err(|e| errors::Error::Message(e.to_string()))
+}
+
+/// Decrypts existing org data without provisioning a missing encryption key.
+pub async fn decrypt_for_org(org: &str, ciphertext: &str) -> Result<String, errors::Error> {
+    let key = find_dek(org)
+        .await?
+        .ok_or_else(|| errors::Error::Message("the org has no encryption key".to_string()))?;
+    Algorithm::Aes256Siv
+        .decrypt(&key, ciphertext)
+        .map_err(|e| errors::Error::Message(e.to_string()))
+}
+
+pub async fn has_org_key(org: &str) -> Result<bool, errors::Error> {
+    Ok(find_dek(org).await?.is_some())
+}
+
+/// Deletes all cipher key entries belonging to the given org, the system DEK included.
 pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::Org.eq(org))
         .exec(client)
         .await?;
+    DEK_CACHE.remove(org);
     Ok(())
 }
 
@@ -450,6 +485,22 @@ pub async fn boot(key_b64: Option<&str>) -> Result<(), errors::Error> {
         Err(problem) => log::error!("cipher master key: stored secrets are off: {problem}"),
     }
     Ok(())
+}
+
+async fn find_dek(org: &str) -> Result<Option<Vec<u8>>, errors::Error> {
+    if let Some(entry) = DEK_CACHE.get(org)
+        && entry.1.elapsed() < DEK_CACHE_TTL
+    {
+        return Ok(Some(entry.0.clone()));
+    }
+    let Some(b64) = get_data(org, EntryKind::CipherKey, DEFAULT_DEK_NAME).await? else {
+        return Ok(None);
+    };
+    let dek = BASE64_STANDARD
+        .decode(b64)
+        .map_err(|e| errors::Error::Message(format!("failed to decode DEK for org {org}: {e}")))?;
+    DEK_CACHE.insert(org.to_string(), (dek.clone(), Instant::now()));
+    Ok(Some(dek))
 }
 
 /// Builds the mode from the master-key setting; absent or empty means no key. [pure]
@@ -1077,5 +1128,100 @@ mod tests {
             is_system: false,
         };
         assert!(!filter.is_system);
+    }
+
+    #[tokio::test]
+    async fn test_org_encryption_provisions_only_on_write_and_forgets_deleted_keys() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        if master_key().is_err() {
+            boot(None).await.expect("cipher");
+        }
+        let org = crate::table::testing::unique("t_cipher_crypto");
+        let other = format!("{org}_other");
+        assert!(!has_org_key(&org).await.unwrap());
+        assert!(decrypt_for_org(&org, "unreadable").await.is_err());
+        assert!(
+            get_data(&org, EntryKind::CipherKey, DEFAULT_DEK_NAME)
+                .await
+                .unwrap()
+                .is_none()
+        );
+
+        let encrypted = encrypt_for_org(&org, "sensitive").await.unwrap();
+        assert_ne!(encrypted, "sensitive");
+        assert!(has_org_key(&org).await.unwrap());
+        assert_eq!(
+            decrypt_for_org(&org, &encrypted).await.unwrap(),
+            "sensitive"
+        );
+        encrypt_for_org(&other, "other").await.unwrap();
+        assert!(decrypt_for_org(&other, &encrypted).await.is_err());
+
+        delete_by_org(&org).await.unwrap();
+        assert!(!has_org_key(&org).await.unwrap());
+        assert!(decrypt_for_org(&org, &encrypted).await.is_err());
+        assert!(
+            get_data(&org, EntryKind::CipherKey, DEFAULT_DEK_NAME)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(has_org_key(&other).await.unwrap());
+        delete_by_org(&other).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_user_key_delete_returns_only_non_system_names_of_the_org() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        if master_key().is_err() {
+            boot(None).await.expect("cipher");
+        }
+        let org = crate::table::testing::unique("t_cipher");
+        let other = format!("{org}_other");
+        for (owner, name, is_system) in [
+            (&org, "user_a", false),
+            (&org, "user_b", false),
+            (&org, "system", true),
+            (&other, "user_a", false),
+        ] {
+            add(CipherEntry {
+                org: owner.clone(),
+                created_at: 1,
+                created_by: "t".to_string(),
+                name: name.to_string(),
+                data: "{}".to_string(),
+                kind: EntryKind::CipherKey,
+                is_system,
+            })
+            .await
+            .unwrap();
+        }
+
+        let mut removed = delete_non_system_by_org(&org, EntryKind::CipherKey)
+            .await
+            .unwrap();
+        removed.sort();
+        let system_kept = get_data(&org, EntryKind::CipherKey, "system")
+            .await
+            .unwrap();
+        let other_kept = get_data(&other, EntryKind::CipherKey, "user_a")
+            .await
+            .unwrap();
+        delete_by_org(&org).await.unwrap();
+        delete_by_org(&other).await.unwrap();
+
+        assert_eq!(removed, ["user_a", "user_b"]);
+        assert!(
+            system_kept.is_some(),
+            "the system key went with the user keys"
+        );
+        assert!(
+            other_kept.is_some(),
+            "another org's key went with this org's"
+        );
     }
 }
