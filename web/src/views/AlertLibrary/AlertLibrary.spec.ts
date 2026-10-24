@@ -23,6 +23,7 @@ import { makeAlertSectionRouter } from "@/test/unit/helpers/alertSectionRouter";
 import type { AlertLibraryEntry, AlertLibraryManifest } from "@/types/alertLibrary";
 import config from "@/aws-exports";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { queryClient } from "@/composables/query/queryClient";
 
 // See AlertSectionTabs.spec.ts — the app router is neither needed nor cheap.
 const router = makeAlertSectionRouter();
@@ -88,11 +89,14 @@ const manifestFixture: AlertLibraryManifest = {
   ],
 };
 
+// Microsecond epoch an hour ago, inside the 24 h window "For your data" asks for.
+const FRESH = { doc_time_max: (Date.now() - 60 * 60 * 1000) * 1000 };
+
 // The org receives two of the three k8s streams — so one k8s alert is unusable.
 const STREAM_LIST = [
-  { name: "kube_pod_metrics", stream_type: "metrics" },
-  { name: "kube_node_metrics", stream_type: "metrics" },
-  { name: "o2_logs", stream_type: "logs" },
+  { name: "kube_pod_metrics", stream_type: "metrics", stats: FRESH },
+  { name: "kube_node_metrics", stream_type: "metrics", stats: FRESH },
+  { name: "o2_logs", stream_type: "logs", stats: FRESH },
 ];
 
 const manifestRef = ref<AlertLibraryManifest | null>(null);
@@ -100,6 +104,7 @@ const isLoadingRef = ref(false);
 const errorRef = ref<{ code: string } | null>(null);
 const loadManifest = vi.fn();
 const getStreams = vi.fn();
+const loadAlertFileMock = vi.fn();
 
 vi.mock("@/composables/alerts/useAlertLibrary", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/composables/alerts/useAlertLibrary")>();
@@ -110,7 +115,7 @@ vi.mock("@/composables/alerts/useAlertLibrary", async (importOriginal) => {
       isLoading: isLoadingRef,
       error: errorRef,
       loadManifest,
-      loadAlertFile: vi.fn(),
+      loadAlertFile: loadAlertFileMock,
       clearLibrary: vi.fn(),
       isReady: (e: AlertLibraryEntry, byType: Record<string, Set<string>>) =>
         (e.required_streams ?? []).every((name) => byType[e.stream_type]?.has(name)),
@@ -121,6 +126,54 @@ vi.mock("@/composables/alerts/useAlertLibrary", async (importOriginal) => {
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({ getStreams }),
 }));
+
+const quickAdd = vi.hoisted(() => ({
+  add: vi.fn(),
+  deps: null as null | { onAdded: (id: string) => void; onRemoved: (id: string) => void },
+}));
+
+vi.mock("@/composables/alerts/useLibraryQuickAdd", () => ({
+  useLibraryQuickAdd: (deps: {
+    onAdded: (id: string) => void;
+    onRemoved: (id: string) => void;
+  }) => {
+    quickAdd.deps = deps;
+    return { add: quickAdd.add, isAdding: () => false };
+  },
+}));
+
+const labelCheck = vi.hoisted(() => ({ needsData: vi.fn((): string => "") }));
+
+vi.mock("@/composables/alerts/useLibraryLabelCheck", () => ({
+  useLibraryLabelCheck: () => ({ check: vi.fn(), needsData: labelCheck.needsData }),
+  clearLabelChecks: vi.fn(),
+}));
+
+// The drawer's own spec covers the review; here it must not claim the quick-add mock's deps.
+vi.mock("@/composables/alerts/useLibraryReview", async () => {
+  const actual = await vi.importActual<Record<string, unknown>>(
+    "@/composables/alerts/useLibraryReview",
+  );
+  const { ref: vueRef } = await import("vue");
+  return {
+    ...actual,
+    useLibraryReview: () => ({
+      rows: vueRef([]),
+      selectedIds: vueRef([]),
+      loading: vueRef(false),
+      enabling: vueRef(false),
+      load: vi.fn(),
+      enable: vi.fn(),
+    }),
+  };
+});
+
+const listAlerts = vi.hoisted(() => vi.fn());
+
+vi.mock("@/services/alerts", async () => {
+  const actual = await vi.importActual<{ default: Record<string, unknown> }>("@/services/alerts");
+  return { ...actual, default: { ...actual.default, listByFolderId: listAlerts } };
+});
 
 import AlertLibrary from "./AlertLibrary.vue";
 
@@ -137,6 +190,9 @@ const mountView = async () => {
   return wrapper;
 };
 
+/** The All view: rules without data are hidden from the default "For your data". */
+const showAll = () => router.push({ name: "alertLibrary", query: { facet: "all" } });
+
 /** Rail rows are checkboxes; the click target is the box, not the label. */
 const tickRail = async (wrapper: ReturnType<typeof mount>, test: string) => {
   await wrapper.find(`[data-test="${test}"]`).find('[role="checkbox"]').trigger("click");
@@ -150,6 +206,8 @@ describe("AlertLibrary", () => {
     errorRef.value = null;
     loadManifest.mockReset().mockResolvedValue(manifestFixture);
     getStreams.mockReset().mockResolvedValue({ name: "all", list: STREAM_LIST });
+    listAlerts.mockReset().mockResolvedValue({ data: { list: [] } });
+    queryClient.clear();
     await router.push({ name: "alertLibrary" });
     await router.isReady();
   });
@@ -209,7 +267,7 @@ describe("AlertLibrary", () => {
     expect(wrapper.find('[data-test="alert-library-card-k8s/pod-oom-killed"]').exists()).toBe(true);
   });
 
-  it("opens on the whole library, not on one pack", async () => {
+  it("opens across every pack, not on one", async () => {
     // The rail narrows; it does not gate. Landing pre-filtered to whichever
     // pack happens to sort first hides most of the catalogue behind a click
     // nobody knows to make.
@@ -226,7 +284,8 @@ describe("AlertLibrary", () => {
     // group came from.
     const wrapper = await mountView();
     expect(wrapper.find('[data-test="alert-library-rail-pack-k8s"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="alert-library-group-k8s/pod"]').text()).toContain(
+    // The pod rule is a starter on the landing view, so its group is the node one.
+    expect(wrapper.find('[data-test="alert-library-group-k8s/node"]').text()).toContain(
       "Kubernetes",
     );
   });
@@ -235,17 +294,18 @@ describe("AlertLibrary", () => {
     // Category names are pack-scoped, so a heading has to say which pack it
     // belongs to — but repeating it on every group of a single pack is noise.
     const wrapper = await mountView();
-    expect(wrapper.find('[data-test="alert-library-group-k8s/pod"]').text()).toContain(
+    expect(wrapper.find('[data-test="alert-library-group-k8s/node"]').text()).toContain(
       "Kubernetes",
     );
 
-    await tickRail(wrapper, "alert-library-rail-category-pod");
+    await tickRail(wrapper, "alert-library-rail-category-k8s/pod");
     expect(wrapper.find('[data-test="alert-library-group-k8s/pod"]').text()).not.toContain(
       "Kubernetes",
     );
   });
 
   it("marks only the alert whose stream is missing, and names that stream", async () => {
+    await showAll();
     const wrapper = await mountView();
     const unusable = wrapper.find('[data-test="alert-library-card-k8s/cert-expiring"]');
     expect(unusable.text()).toContain("Not ingested");
@@ -272,7 +332,7 @@ describe("AlertLibrary", () => {
     // The tiles describe what is on screen. Left counting the whole library
     // they would contradict the grid under them.
     const wrapper = await mountView();
-    await tickRail(wrapper, "alert-library-rail-category-self-monitoring");
+    await tickRail(wrapper, "alert-library-rail-category-openobserve/self-monitoring");
     const tiles = wrapper.findAll('[data-test^="alert-library-stat-"]');
     expect(tiles[2].text()).toContain("1");
   });
@@ -329,7 +389,7 @@ describe("AlertLibrary", () => {
 
   it("narrows to the ticked categories, and holds more than one at a time", async () => {
     const wrapper = await mountView();
-    await tickRail(wrapper, "alert-library-rail-category-node");
+    await tickRail(wrapper, "alert-library-rail-category-k8s/node");
     expect(wrapper.find('[data-test="alert-library-card-k8s/node-disk-pressure"]').exists()).toBe(
       true,
     );
@@ -337,7 +397,7 @@ describe("AlertLibrary", () => {
       false,
     );
 
-    await tickRail(wrapper, "alert-library-rail-category-pod");
+    await tickRail(wrapper, "alert-library-rail-category-k8s/pod");
     expect(wrapper.find('[data-test="alert-library-card-k8s/pod-oom-killed"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="alert-library-card-k8s/node-disk-pressure"]').exists()).toBe(
       true,
@@ -348,7 +408,7 @@ describe("AlertLibrary", () => {
     // Nothing scopes the rail to a pack any more, so a category selection is
     // answered from the whole library.
     const wrapper = await mountView();
-    await tickRail(wrapper, "alert-library-rail-category-self-monitoring");
+    await tickRail(wrapper, "alert-library-rail-category-openobserve/self-monitoring");
     expect(
       wrapper.find('[data-test="alert-library-card-openobserve/ingest-errors"]').exists(),
     ).toBe(true);
@@ -358,12 +418,12 @@ describe("AlertLibrary", () => {
     // Counts answer "how many are there". Recomputing them against the
     // selection would drop every other row to zero the moment you ticked one.
     const wrapper = await mountView();
-    await tickRail(wrapper, "alert-library-rail-category-pod");
+    await tickRail(wrapper, "alert-library-rail-category-k8s/pod");
     const facets = wrapper.findComponent({ name: "LibraryRail" }).props("categories") as Array<{
       id: string;
       count: number;
     }>;
-    expect(facets.find((f) => f.id === "node")?.count).toBe(1);
+    expect(facets.find((f) => f.id === "k8s/node")?.count).toBe(1);
   });
 
   it("searches across title, description and stream", async () => {
@@ -398,14 +458,45 @@ describe("AlertLibrary", () => {
     // The copy names the telemetry to send, so it is only advice while there is
     // a single thing to name.
     getStreams.mockResolvedValue({ name: "all", list: [] });
+    await showAll();
     const wrapper = await mountView();
     expect(wrapper.find('[data-test="alert-library-empty-state"]').exists()).toBe(false);
 
-    await tickRail(wrapper, "alert-library-rail-category-cert-manager");
+    await tickRail(wrapper, "alert-library-rail-category-k8s/cert-manager");
     expect(wrapper.find('[data-test="alert-library-empty-state"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="alert-library-empty-state"]').text()).toContain(
       "Cert manager",
     );
+  });
+
+  it("treats same-named categories from two packs as two, so the banner stays away", async () => {
+    // Category names are pack-scoped; one label would name two different technologies.
+    manifestRef.value = {
+      ...manifestFixture,
+      alerts: [
+        ...manifestFixture.alerts,
+        entry({
+          id: "observability/cert-renewal",
+          name: "cert-renewal",
+          pack: "observability",
+          category: "cert-manager",
+          title: "Certificate Renewal Failing",
+          stream: "otel_cert_metrics",
+          required_streams: ["otel_cert_metrics"],
+        }),
+      ],
+    };
+    getStreams.mockResolvedValue({ name: "all", list: [] });
+    await showAll();
+    const wrapper = await mountView();
+    await tickRail(wrapper, "alert-library-rail-category-k8s/cert-manager");
+    await tickRail(wrapper, "alert-library-rail-category-observability/cert-manager");
+
+    expect(wrapper.find('[data-test="alert-library-card-k8s/cert-expiring"]').exists()).toBe(true);
+    expect(
+      wrapper.find('[data-test="alert-library-card-observability/cert-renewal"]').exists(),
+    ).toBe(true);
+    expect(wrapper.find('[data-test="alert-library-empty-state"]').exists()).toBe(false);
   });
 
   it("does not claim your data is missing when the stream request itself failed", async () => {
@@ -430,6 +521,7 @@ describe("AlertLibrary", () => {
   });
 
   it("tells the drawer whether the alert can run, so it can say so before install", async () => {
+    await showAll();
     const wrapper = await mountView();
     await wrapper.find('[data-test="alert-library-card-k8s/cert-expiring"]').trigger("click");
     expect(wrapper.findComponent({ name: "LibraryDrawer" }).props("ready")).toBe(false);
@@ -464,6 +556,7 @@ describe("AlertLibrary", () => {
     });
 
     it("keeps a known verdict when a REFRESH fails, instead of discarding it", async () => {
+      await showAll();
       const wrapper = await mountView();
       expect(wrapper.findAll('[data-test^="alert-library-stat-"]')[1].text()).toContain("1");
 
@@ -490,21 +583,22 @@ describe("AlertLibrary", () => {
           id: string;
           count: number;
         }>;
-      expect(facets().find((f) => f.id === "node")?.count).toBe(1);
+      expect(facets().find((f) => f.id === "k8s/node")?.count).toBe(1);
 
       wrapper.findComponent({ name: "OSearchInput" }).vm.$emit("update:modelValue", "OOM killer");
       await flushPromises();
       // "node-disk-pressure" does not match, so its category offers nothing.
-      expect(facets().find((f) => f.id === "node")).toBeUndefined();
-      expect(facets().find((f) => f.id === "pod")?.count).toBe(1);
+      expect(facets().find((f) => f.id === "k8s/node")).toBeUndefined();
+      expect(facets().find((f) => f.id === "k8s/pod")?.count).toBe(1);
     });
 
     it("does not explain an empty grid twice", async () => {
       // The banner and the no-results state both used to render: two different
       // explanations for one blank area, the banner citing alerts not on screen.
       getStreams.mockResolvedValue({ name: "all", list: [] });
+      await showAll();
       const wrapper = await mountView();
-      await tickRail(wrapper, "alert-library-rail-category-cert-manager");
+      await tickRail(wrapper, "alert-library-rail-category-k8s/cert-manager");
       expect(wrapper.find('[data-test="alert-library-empty-state"]').exists()).toBe(true);
 
       await wrapper.find('[data-test="alert-library-stat-ready"]').trigger("click");
@@ -555,7 +649,7 @@ describe("AlertLibrary", () => {
       expect(rail.props("search")).toBe("");
     });
   });
-  it("shows the All tile as the active one until a facet is chosen", async () => {
+  it("lights the tile in view, and All once the active facet is toggled off", async () => {
     // The strip has a state — "no availability filter" — that used to light no
     // tile at all, while the All tile it corresponds to was a button that could
     // never look pressed.
@@ -567,20 +661,23 @@ describe("AlertLibrary", () => {
           "true",
       );
 
-    expect(pressed()).toEqual(["all"]);
-
-    await wrapper.find('[data-test="alert-library-stat-ready"]').trigger("click");
-    await flushPromises();
     expect(pressed()).toEqual(["ready"]);
 
-    // Toggling the active tile off returns to All — and now says so.
+    // Toggling the active tile off returns to All — and says so.
     await wrapper.find('[data-test="alert-library-stat-ready"]').trigger("click");
     await flushPromises();
     expect(pressed()).toEqual(["all"]);
+
+    await wrapper.find('[data-test="alert-library-stat-missing"]').trigger("click");
+    await flushPromises();
+    expect(pressed()).toEqual(["missing"]);
   });
 
   // ── selection ──────────────────────────────────────────────────────────────
   describe("bulk selection", () => {
+    // Selection spans the whole library here; the default view has its own block below.
+    beforeEach(showAll);
+
     const CARD = "alert-library-card-k8s/pod-oom-killed";
     const BOX = "alert-library-select-k8s/pod-oom-killed";
     const BAR = "alert-library-selection-bar";
@@ -704,7 +801,7 @@ describe("AlertLibrary", () => {
       // a control labelled "in view" would silently discard that work.
       const wrapper = await mountView();
       await tick(wrapper, BOX);
-      await tickRail(wrapper, "alert-library-rail-category-node");
+      await tickRail(wrapper, "alert-library-rail-category-k8s/node");
 
       await tick(wrapper, ALL);
       expect(bar(wrapper).attributes("data-selected")).toBe("2");
@@ -740,7 +837,7 @@ describe("AlertLibrary", () => {
     it("keeps a selection across a filter change, and says how much is off screen", async () => {
       const wrapper = await mountView();
       await tick(wrapper, BOX);
-      await tickRail(wrapper, "alert-library-rail-category-node");
+      await tickRail(wrapper, "alert-library-rail-category-k8s/node");
 
       expect(wrapper.find(`[data-test="${CARD}"]`).exists()).toBe(false);
       expect(bar(wrapper).attributes("data-selected")).toBe("1");
@@ -754,7 +851,7 @@ describe("AlertLibrary", () => {
       // One is not enough to catch a set difference taken the wrong way round.
       const wrapper = await mountView();
       await tick(wrapper, ALL);
-      await tickRail(wrapper, "alert-library-rail-category-node");
+      await tickRail(wrapper, "alert-library-rail-category-k8s/node");
 
       expect(bar(wrapper).attributes("data-selected")).toBe("4");
       expect(bar(wrapper).attributes("data-offscreen")).toBe("3");
@@ -799,7 +896,7 @@ describe("AlertLibrary", () => {
       // has to hold for both.
       const wrapper = await mountView();
       await tick(wrapper, BOX);
-      await tickRail(wrapper, "alert-library-rail-category-node");
+      await tickRail(wrapper, "alert-library-rail-category-k8s/node");
       await press(wrapper, "alert-library-rail-clear-categories");
 
       expect(bar(wrapper).attributes("data-selected")).toBe("1");
@@ -916,7 +1013,7 @@ describe("AlertLibrary", () => {
     it("drops the group heading control when only one group is on screen", async () => {
       // It would duplicate the toolbar's control on the same screen.
       const wrapper = await mountView();
-      await tickRail(wrapper, "alert-library-rail-category-pod");
+      await tickRail(wrapper, "alert-library-rail-category-k8s/pod");
       expect(wrapper.find('[data-test="alert-library-select-group-k8s/pod"]').exists()).toBe(false);
     });
 
@@ -980,7 +1077,7 @@ describe("AlertLibrary", () => {
       // hand-off would install a different set from the one that was counted.
       const wrapper = await mountView();
       await tick(wrapper, BOX);
-      await tickRail(wrapper, "alert-library-rail-category-node");
+      await tickRail(wrapper, "alert-library-rail-category-k8s/node");
       await press(wrapper, "alert-library-add-selected");
 
       expect((dialog(wrapper).props("preselect") as AlertLibraryEntry[]).map((e) => e.id)).toEqual([
@@ -992,7 +1089,7 @@ describe("AlertLibrary", () => {
       const wrapper = await mountView();
       await tick(wrapper, ALL);
       await press(wrapper, "alert-library-add-selected");
-      await tickRail(wrapper, "alert-library-rail-category-node");
+      await tickRail(wrapper, "alert-library-rail-category-k8s/node");
 
       expect(dialog(wrapper).props("preselect") as AlertLibraryEntry[]).toHaveLength(4);
     });
@@ -1142,9 +1239,11 @@ describe("AlertLibrary", () => {
     const card = (wrapper: ReturnType<typeof mount>) =>
       wrapper.find(`[data-test="alert-library-card-${ANOMALY}"]`);
 
-    beforeEach(() => {
+    beforeEach(async () => {
       manifestRef.value = withAnomaly;
       upgrade.close();
+      // The anomaly fixture's stream is not ingested, so it lives outside "For your data".
+      await showAll();
     });
 
     afterEach(() => {
@@ -1161,6 +1260,19 @@ describe("AlertLibrary", () => {
         false,
       );
       expect(wrapper.find('[data-test="alert-library-stat-all"]').text()).toContain("5");
+    });
+
+    it("installs an anomaly alert in one click, not through the wizard", async () => {
+      setAccess("enabled");
+      getStreams.mockResolvedValue({
+        name: "all",
+        list: [...STREAM_LIST, { name: "default", stream_type: "traces", stats: FRESH }],
+      });
+      const wrapper = await mountView();
+      await wrapper.find(`[data-test="alert-library-card-add-${ANOMALY}"]`).trigger("click");
+      await flushPromises();
+      expect(quickAdd.add).toHaveBeenCalledWith(expect.objectContaining({ id: ANOMALY }));
+      expect(wrapper.findComponent({ name: "LibraryInstallDialog" }).props("open")).toBe(false);
     });
 
     it("hides anomaly alerts entirely when entitled but turned off", async () => {
@@ -1400,6 +1512,389 @@ describe("AlertLibrary", () => {
         .props("preselect") as AlertLibraryEntry[];
       expect(batch.map((e) => e.id)).not.toContain(ANOMALY);
       expect(batch).toHaveLength(4);
+    });
+  });
+
+  // ── browse defaults ────────────────────────────────────────────────────────
+  describe("browse defaults", () => {
+    type View = ReturnType<typeof mount>;
+
+    const pressed = (wrapper: View) =>
+      ["ready", "missing", "all"].filter(
+        (key) =>
+          wrapper.find(`[data-test="alert-library-stat-${key}"]`).attributes("aria-pressed") ===
+          "true",
+      );
+
+    const card = (wrapper: View, id: string) =>
+      wrapper.find(`[data-test="alert-library-card-${id}"]`);
+
+    const press = async (wrapper: View, test: string) => {
+      await wrapper.get(`[data-test="${test}"]`).trigger("click");
+      await flushPromises();
+    };
+
+    const search = async (wrapper: View, term: string) => {
+      wrapper.findComponent({ name: "OSearchInput" }).vm.$emit("update:modelValue", term);
+      await flushPromises();
+    };
+
+    const groupOrder = (wrapper: View) =>
+      wrapper
+        .findAll('[data-test^="alert-library-group-"]')
+        .map((heading) => heading.attributes("data-test")?.replace("alert-library-group-", ""));
+
+    it("opens on For your data, leaving rules without data one click away", async () => {
+      const wrapper = await mountView();
+      expect(pressed(wrapper)).toEqual(["ready"]);
+      expect(card(wrapper, "k8s/pod-oom-killed").exists()).toBe(true);
+      expect(card(wrapper, "k8s/cert-expiring").exists()).toBe(false);
+
+      await press(wrapper, "alert-library-stat-missing");
+      expect(card(wrapper, "k8s/cert-expiring").exists()).toBe(true);
+      expect(card(wrapper, "k8s/pod-oom-killed").exists()).toBe(false);
+    });
+
+    it("names the strip For your data, Needs data and All", async () => {
+      const wrapper = await mountView();
+      expect(wrapper.get('[data-test="alert-library-stat-ready"]').text()).toContain(
+        "For your data",
+      );
+      expect(wrapper.get('[data-test="alert-library-stat-missing"]').text()).toContain(
+        "Needs data",
+      );
+      expect(wrapper.get('[data-test="alert-library-stat-all"]').text()).toContain("All");
+    });
+
+    it("counts a stream with no data in the last 24 hours as needing data", async () => {
+      const stale = { doc_time_max: (Date.now() - 2 * 24 * 60 * 60 * 1000) * 1000 };
+      getStreams.mockResolvedValue({
+        name: "all",
+        list: [
+          STREAM_LIST[0],
+          { name: "kube_node_metrics", stream_type: "metrics", stats: stale },
+          STREAM_LIST[2],
+        ],
+      });
+      const wrapper = await mountView();
+      expect(card(wrapper, "k8s/node-disk-pressure").exists()).toBe(false);
+      expect(wrapper.get('[data-test="alert-library-stat-ready"]').text()).toContain("2");
+      expect(wrapper.get('[data-test="alert-library-stat-missing"]').text()).toContain("2");
+    });
+
+    it("shows the whole library from the All tile", async () => {
+      const wrapper = await mountView();
+      await press(wrapper, "alert-library-stat-all");
+      expect(pressed(wrapper)).toEqual(["all"]);
+      expect(card(wrapper, "k8s/cert-expiring").exists()).toBe(true);
+      expect(card(wrapper, "k8s/pod-oom-killed").exists()).toBe(true);
+    });
+
+    it("ranks groups by how many of their rules fit, then by severity", async () => {
+      manifestRef.value = {
+        ...manifestFixture,
+        alerts: [
+          ...manifestFixture.alerts,
+          entry({
+            id: "k8s/node-not-ready",
+            name: "node-not-ready",
+            category: "node",
+            title: "Node Not Ready",
+            severity: "warning",
+            stream: "kube_node_metrics",
+            required_streams: ["kube_node_metrics"],
+          }),
+          entry({
+            id: "k8s/volume-filling",
+            name: "volume-filling",
+            category: "storage",
+            title: "Volume Filling",
+            severity: "info",
+          }),
+        ],
+      };
+      const wrapper = await mountView();
+      await press(wrapper, "alert-library-stat-all");
+      // Alphabetical would put cert-manager first and storage before self-monitoring.
+      expect(groupOrder(wrapper)).toEqual([
+        "k8s/node",
+        "k8s/pod",
+        "openobserve/self-monitoring",
+        "k8s/storage",
+        "k8s/cert-manager",
+      ]);
+    });
+
+    it("matches every word of the search somewhere, including the pack name", async () => {
+      const wrapper = await mountView();
+      await search(wrapper, "kubernetes oom");
+      expect(card(wrapper, "k8s/pod-oom-killed").exists()).toBe(true);
+      expect(card(wrapper, "k8s/node-disk-pressure").exists()).toBe(false);
+      expect(card(wrapper, "openobserve/ingest-errors").exists()).toBe(false);
+    });
+
+    it("matches tags", async () => {
+      manifestRef.value = {
+        ...manifestFixture,
+        alerts: manifestFixture.alerts.map((alert) =>
+          alert.id === "k8s/node-disk-pressure" ? { ...alert, tags: ["capacity"] } : alert,
+        ),
+      };
+      const wrapper = await mountView();
+      await search(wrapper, "capacity");
+      expect(card(wrapper, "k8s/node-disk-pressure").exists()).toBe(true);
+      expect(card(wrapper, "k8s/pod-oom-killed").exists()).toBe(false);
+    });
+
+    it("highlights the matched words on the card", async () => {
+      const wrapper = await mountView();
+      await search(wrapper, "disk pressure");
+      const marks = card(wrapper, "k8s/node-disk-pressure")
+        .findAll("mark")
+        .map((mark) => mark.text());
+      expect(marks).toEqual(["Disk", "Pressure", "disk", "pressure"]);
+    });
+
+    it("restores facet, search, severity and categories from the URL", async () => {
+      await router.push({
+        name: "alertLibrary",
+        query: {
+          facet: "missing",
+          q: "certificate",
+          severity: "info",
+          categories: "k8s/cert-manager",
+        },
+      });
+      const wrapper = await mountView();
+      expect(pressed(wrapper)).toEqual(["missing"]);
+      expect(wrapper.findComponent({ name: "OSearchInput" }).props("modelValue")).toBe(
+        "certificate",
+      );
+      const rail = wrapper.findComponent({ name: "LibraryRail" });
+      expect(rail.props("severity")).toBe("info");
+      expect(rail.props("selectedCategories")).toEqual(["k8s/cert-manager"]);
+      expect(card(wrapper, "k8s/cert-expiring").exists()).toBe(true);
+    });
+
+    it("ignores URL values it does not recognise", async () => {
+      await router.push({ name: "alertLibrary", query: { facet: "bogus", severity: "loud" } });
+      const wrapper = await mountView();
+      expect(pressed(wrapper)).toEqual(["ready"]);
+      expect(wrapper.findComponent({ name: "LibraryRail" }).props("severity")).toBe("all");
+    });
+
+    it("writes the filters to the URL, leaving defaults out", async () => {
+      await router.push({ name: "alertLibrary", query: { org_identifier: "default" } });
+      const wrapper = await mountView();
+      const query = () => router.currentRoute.value.query;
+      expect(query()).toEqual({ org_identifier: "default" });
+
+      await press(wrapper, "alert-library-stat-all");
+      await search(wrapper, "disk");
+      wrapper.findComponent({ name: "LibraryRail" }).vm.$emit("update:severity", "warning");
+      wrapper
+        .findComponent({ name: "LibraryRail" })
+        .vm.$emit("update:selectedCategories", ["k8s/node", "k8s/pod"]);
+      await flushPromises();
+
+      expect(query()).toEqual({
+        org_identifier: "default",
+        facet: "all",
+        q: "disk",
+        severity: "warning",
+        categories: "k8s/node,k8s/pod",
+      });
+    });
+
+    describe("select all in view", () => {
+      const ALL = "alert-library-select-all-in-view";
+      const many = (count: number) =>
+        Array.from({ length: count }, (_, index) =>
+          entry({ id: `k8s/pod-${index}`, name: `pod-${index}`, title: `Pod rule ${index}` }),
+        );
+      const tickAll = async (wrapper: View) => {
+        await wrapper.get(`[data-test="${ALL}"]`).get('[role="checkbox"]').trigger("click");
+        await flushPromises();
+      };
+      const selected = (wrapper: View) =>
+        wrapper.find('[data-test="alert-library-selection-bar"]').attributes("data-selected");
+      const confirm = (wrapper: View) => wrapper.findComponent({ name: "ConfirmDialog" });
+
+      it("asks before selecting more than 50 alerts, and selects them once confirmed", async () => {
+        manifestRef.value = { ...manifestFixture, alerts: many(51) };
+        const wrapper = await mountView();
+        await tickAll(wrapper);
+        expect(wrapper.find('[data-test="alert-library-selection-bar"]').exists()).toBe(false);
+        expect(confirm(wrapper).props("modelValue")).toBe(true);
+        expect(confirm(wrapper).findComponent({ name: "ODialog" }).vm.$attrs["data-test"]).toBe(
+          "alert-library-select-all-confirm",
+        );
+
+        confirm(wrapper).vm.$emit("update:ok");
+        await flushPromises();
+        expect(selected(wrapper)).toBe("51");
+      });
+
+      it("selects nothing when the confirm is cancelled", async () => {
+        manifestRef.value = { ...manifestFixture, alerts: many(51) };
+        const wrapper = await mountView();
+        await tickAll(wrapper);
+        confirm(wrapper).vm.$emit("update:cancel");
+        confirm(wrapper).vm.$emit("update:modelValue", false);
+        await flushPromises();
+        expect(wrapper.find('[data-test="alert-library-selection-bar"]').exists()).toBe(false);
+        expect(confirm(wrapper).props("modelValue")).toBe(false);
+      });
+
+      it("selects 50 or fewer without asking", async () => {
+        manifestRef.value = { ...manifestFixture, alerts: many(50) };
+        const wrapper = await mountView();
+        await tickAll(wrapper);
+        expect(selected(wrapper)).toBe("50");
+        expect(confirm(wrapper).props("modelValue")).toBe(false);
+      });
+    });
+  });
+
+  describe("library add", () => {
+    const START = '[data-test="alert-library-start-with"]';
+    const card = (id: string) => `[data-test="alert-library-card-${id}"]`;
+    // A starter renders once, in the row; anywhere else would be the groups.
+    const count = (wrapper: ReturnType<typeof mount>, id: string) =>
+      wrapper.findAll(card(id)).length;
+
+    it("starts with the critical rules that fit, one per category, not repeated below", async () => {
+      const wrapper = await mountView();
+      const start = wrapper.find(START);
+      expect(start.find(card("k8s/pod-oom-killed")).exists()).toBe(true);
+      expect(start.find(card("openobserve/ingest-errors")).exists()).toBe(true);
+      // Warning, so not a starter; it stays in the groups.
+      expect(start.find(card("k8s/node-disk-pressure")).exists()).toBe(false);
+      expect(count(wrapper, "k8s/pod-oom-killed")).toBe(1);
+      expect(count(wrapper, "k8s/node-disk-pressure")).toBe(1);
+    });
+
+    it("hides the starters once the user searches, so the grid shows every match", async () => {
+      await router.push({ name: "alertLibrary", query: { q: "pod" } });
+      const wrapper = await mountView();
+      expect(wrapper.find(START).exists()).toBe(false);
+      expect(count(wrapper, "k8s/pod-oom-killed")).toBe(1);
+    });
+
+    it("tags a rule Added from the org's library_id", async () => {
+      listAlerts.mockResolvedValue({ data: { list: [{ library_id: "k8s/node-disk-pressure" }] } });
+      const wrapper = await mountView();
+      const added = (id: string) =>
+        wrapper.find(card(id)).find('[data-test="alert-library-card-added"]').exists();
+      expect(added("k8s/node-disk-pressure")).toBe(true);
+      expect(added("k8s/pod-oom-killed")).toBe(false);
+    });
+
+    it("marks a pack Added from the pack: tag", async () => {
+      listAlerts.mockResolvedValue({ data: { list: [{ tags: ["pack:openobserve"] }] } });
+      const wrapper = await mountView();
+      const rail = wrapper.findComponent({ name: "LibraryRail" });
+      expect(rail.props("addedPacks")).toEqual(["openobserve"]);
+    });
+
+    it("Add installs through the one-click path, and marks the rule once added", async () => {
+      const wrapper = await mountView();
+      await wrapper
+        .find('[data-test="alert-library-card-add-k8s/node-disk-pressure"]')
+        .trigger("click");
+      expect(quickAdd.add).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "k8s/node-disk-pressure" }),
+      );
+      quickAdd.deps!.onAdded("k8s/node-disk-pressure");
+      await flushPromises();
+      expect(
+        wrapper
+          .find(card("k8s/node-disk-pressure"))
+          .find('[data-test="alert-library-card-added"]')
+          .exists(),
+      ).toBe(true);
+    });
+
+    it("blocks Add on a rule whose stream is missing, naming it", async () => {
+      await showAll();
+      const wrapper = await mountView();
+      const blocked = wrapper.find(card("k8s/cert-expiring"));
+      const add = blocked.find('[data-test="alert-library-card-add-k8s/cert-expiring"]');
+      expect(add.attributes("disabled")).toBeDefined();
+      expect(
+        blocked.find('[data-test="alert-library-card-add-blocked"]').attributes("title"),
+      ).toContain("certmanager_metrics");
+      await add.trigger("click");
+      expect(quickAdd.add).not.toHaveBeenCalled();
+    });
+
+    it("Customize opens today's wizard seeded with the rule's file", async () => {
+      const wrapper = await mountView();
+      loadAlertFileMock.mockResolvedValue({ name: "x" });
+      const cardView = wrapper
+        .findAllComponents({ name: "LibraryCard" })
+        .find((c) => (c.props("entry") as AlertLibraryEntry).id === "k8s/node-disk-pressure")!;
+      cardView.vm.$emit("customize");
+      await flushPromises();
+      const wizard = wrapper.findComponent({ name: "LibraryInstallDialog" });
+      expect(wizard.props("open")).toBe(true);
+      expect((wizard.props("seed") as any).entry.id).toBe("k8s/node-disk-pressure");
+    });
+  });
+  describe("pack review", () => {
+    const card = (id: string) => `[data-test="alert-library-card-${id}"]`;
+
+    it("fetches no library file on page load", async () => {
+      await mountView();
+      expect(loadAlertFileMock).not.toHaveBeenCalled();
+    });
+
+    it("offers each pack's runnable rules for review from the rail", async () => {
+      const wrapper = await mountView();
+      const review = wrapper.find('[data-test="alert-library-rail-pack-review-k8s"]');
+      expect(review.text()).toBe("Review 2 alerts");
+      await review.trigger("click");
+      await flushPromises();
+      const drawer = wrapper.findComponent({ name: "LibraryReviewDrawer" });
+      expect(drawer.props("open")).toBe(true);
+      expect(drawer.props("pack")).toBe("k8s");
+      expect((drawer.props("entries") as AlertLibraryEntry[]).map((item) => item.id)).toEqual([
+        "k8s/pod-oom-killed",
+        "k8s/node-disk-pressure",
+      ]);
+    });
+
+    it("marks a rule added from the review", async () => {
+      const wrapper = await mountView();
+      wrapper
+        .findComponent({ name: "LibraryReviewDrawer" })
+        .vm.$emit("added", "k8s/node-disk-pressure");
+      await flushPromises();
+      expect(
+        wrapper
+          .find(card("k8s/node-disk-pressure"))
+          .find('[data-test="alert-library-card-added"]')
+          .exists(),
+      ).toBe(true);
+    });
+
+    it("shows Needs data on a card whose file a review has checked", async () => {
+      labelCheck.needsData.mockImplementation(((item: AlertLibraryEntry) =>
+        item.id === "k8s/pod-oom-killed" ? "job hadoop-namenode" : "") as () => string);
+      const wrapper = await mountView();
+      expect(
+        wrapper
+          .find(card("k8s/pod-oom-killed"))
+          .find('[data-test="alert-library-card-needs-labels"]')
+          .text(),
+      ).toBe("Needs data: job hadoop-namenode");
+      expect(
+        wrapper
+          .find(card("k8s/node-disk-pressure"))
+          .find('[data-test="alert-library-card-needs-labels"]')
+          .exists(),
+      ).toBe(false);
+      labelCheck.needsData.mockImplementation(() => "");
     });
   });
 });

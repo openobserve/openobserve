@@ -12,8 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { describe, it, expect } from "vitest";
-import { getAlertPayload } from "./alertPayload";
+import { describe, it, expect, vi } from "vitest";
+import { getAlertPayload, prepareAndSaveAlert } from "./alertPayload";
+import alertsService from "@/services/alerts";
+
+vi.mock("@/services/alerts", () => ({
+  default: { create_by_alert_id: vi.fn(() => Promise.resolve({ data: {} })) },
+}));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn(() => vi.fn()) }));
 
 describe("alertPayload", () => {
   describe("getAlertPayload", () => {
@@ -559,6 +565,29 @@ describe("alertPayload", () => {
       expect(payload.query_condition.conditions).toEqual([]);
       expect(payload.query_condition.promql_condition).toBeNull();
       expect(payload.query_condition.aggregation).toBeNull();
+    });
+  });
+
+  describe("prepareAndSaveAlert", () => {
+    it("tags the JSON editor's create with the form's prefill source", async () => {
+      const context: any = {
+        store: { state: { selectedOrganization: { identifier: "org1" }, userInfo: { email: "" } } },
+        t: (key: string) => key,
+        props: { isUpdated: false },
+        emit: vi.fn(),
+        router: { currentRoute: { value: { query: {} } } },
+        isAggregationEnabled: { value: false },
+        activeFolderId: { value: "default" },
+        handleAlertError: vi.fn(),
+        source: "intent",
+      };
+
+      await prepareAndSaveAlert(
+        { name: "a", is_real_time: "false", query_condition: { conditions: [] } },
+        context,
+      );
+
+      expect((alertsService.create_by_alert_id as any).mock.calls[0][3]).toBe("intent");
     });
   });
 });

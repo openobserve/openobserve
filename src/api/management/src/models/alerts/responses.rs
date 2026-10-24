@@ -134,6 +134,9 @@ pub struct ListAlertsResponseBodyItem {
     /// alert defers to each destination's own template.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub template: Option<String>,
+    /// Alert library entry this alert was installed from (`context_attributes.library_id`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub library_id: Option<String>,
     /// Multi-alerts only (§5.4): how many groups the last evaluation observed,
     /// counted **before** the M-6 cap truncated them. Absent for every alert
     /// that has not opted in.
@@ -513,6 +516,10 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             tags: alert.tags,
             destinations: alert.destinations,
             template: alert.template,
+            library_id: alert
+                .context_attributes
+                .as_ref()
+                .and_then(|attrs| attrs.get("library_id").cloned()),
             // Filled from the rollup state row by `enrich_with_run_state`,
             // alongside the other run-state fields above.
             groups_observed: None,
@@ -649,6 +656,7 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
         // Anomaly configs deliver through their own path, not alert destinations.
         destinations: Vec::new(),
         template: None,
+        library_id: None,
         // Anomaly configs have no grouping, so there is nothing to count.
         groups_observed: None,
         groups_firing: None,
@@ -871,6 +879,7 @@ mod tests {
             tags: vec![],
             destinations: vec![],
             template: None,
+            library_id: None,
             groups_observed: None,
             groups_firing: None,
             groups_observed_is_lower_bound: None,
@@ -891,6 +900,7 @@ mod tests {
         // Empty destinations / no override template are omitted from the wire.
         assert!(!obj.contains_key("destinations"));
         assert!(!obj.contains_key("template"));
+        assert!(!obj.contains_key("library_id"));
         // §5.4: a non-multi alert must not advertise a group summary at all —
         // an absent field reads as "not a multi-alert", a zero would read as
         // "observed no groups".
@@ -1061,6 +1071,53 @@ mod tests {
         assert!(item.oncall_team.is_none(), "whitespace is not a team");
         let json = serde_json::to_value(&item).unwrap();
         assert!(!json.as_object().unwrap().contains_key("oncall_team"));
+    }
+
+    #[test]
+    fn test_a_library_alert_reports_its_library_id() {
+        let mut alert = meta_alerts::Alert::default();
+        alert.id = Some(svix_ksuid::Ksuid::new(None, None));
+        alert.context_attributes = Some(
+            [
+                ("library_id".to_string(), "k8s/pod-oom-killed".to_string()),
+                ("library_hash".to_string(), "abc".to_string()),
+            ]
+            .into_iter()
+            .collect(),
+        );
+
+        let item =
+            ListAlertsResponseBodyItem::try_from((meta_folders::Folder::default(), alert, None))
+                .unwrap();
+
+        assert_eq!(item.library_id.as_deref(), Some("k8s/pod-oom-killed"));
+        let json = serde_json::to_value(&item).unwrap();
+        assert_eq!(json["library_id"], "k8s/pod-oom-killed");
+        assert!(!json.as_object().unwrap().contains_key("library_hash"));
+    }
+
+    #[test]
+    fn test_an_alert_without_library_id_omits_the_field() {
+        let mut no_attrs = meta_alerts::Alert::default();
+        no_attrs.id = Some(svix_ksuid::Ksuid::new(None, None));
+        let mut other_attrs = no_attrs.clone();
+        other_attrs.context_attributes = Some(
+            [("team".to_string(), "payments".to_string())]
+                .into_iter()
+                .collect(),
+        );
+
+        for alert in [no_attrs, other_attrs] {
+            let item = ListAlertsResponseBodyItem::try_from((
+                meta_folders::Folder::default(),
+                alert,
+                None,
+            ))
+            .unwrap();
+            assert!(item.library_id.is_none());
+            let json = serde_json::to_value(&item).unwrap();
+            assert!(!json.as_object().unwrap().contains_key("library_id"));
+        }
     }
 
     /// An anomaly config takes the other construction path. It carried the same

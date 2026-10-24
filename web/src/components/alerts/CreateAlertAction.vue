@@ -128,6 +128,8 @@ const props = withDefaults(
     /** Folder the alert lands in. */
     folder?: string;
     buttonVariant?: "primary" | "secondary" | "outline" | "ghost";
+    /** Replaces the source's label where the host needs its own wording. */
+    label?: I18nText;
     dataTest?: string;
   }>(),
   {
@@ -145,7 +147,7 @@ const { openAlertCreation } = useAlertCreation();
 const { isMobile } = useBreakpoint();
 
 const source_ = computed(() => getAlertSource(props.source));
-const label = computed(() => t(source_.value.labelKey));
+const label = computed(() => props.label ?? t(source_.value.labelKey));
 
 const onActivate = () => {
   if (props.disabledReason) return;

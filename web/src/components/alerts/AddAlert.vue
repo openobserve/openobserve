@@ -179,34 +179,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="bg-card-glass-bg stream-config-card [container-type:inline-size] shrink-0 [container-name:stream-config]"
           >
-            <div class="border-border-default flex items-center gap-0 border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
-              <span class="text-compact me-3 font-semibold tracking-[0.01em]">{{
-                t("alerts.alertType")
-              }}</span>
-              <!-- Alert Type -->
-              <OToggleGroup
-                :model-value="formData.is_real_time"
-                :disabled="beingUpdated || anomalyEditMode"
-                class="min-w-0"
-                mobile-dropdown
-                data-test="add-alert-type-tabs"
-                @update:model-value="onAlertTypeChange"
-              >
-                <OToggleGroupItem
-                  v-for="option in alertTypeOptions"
-                  :key="option.value"
-                  :value="option.value"
-                  size="sm"
-                  :data-test="`add-alert-type-tab-${option.value}`"
-                >
-                  <template #icon-left>
-                    <OIcon :name="option.icon" size="sm" />
-                  </template>
-                  {{ option.label }}
-                </OToggleGroupItem>
-              </OToggleGroup>
-            </div>
             <div
               v-if="!isCompositeMode"
               class="flex items-center gap-4 px-3 py-2 max-md:flex-wrap max-md:gap-2"
@@ -248,13 +220,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :loading="isFetchingStreams"
                   class="stream-name-select w-full! max-w-75 min-w-0"
                   :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
-                  @update:model-value="updateStreamFields($event)"
+                  @update:model-value="pickStream($event)"
                 />
                 <OTooltip
                   v-if="!formData.stream_type"
                   :content="t('alerts.selectStreamTypeFirst')"
                 />
               </div>
+            </div>
+            <div
+              class="border-border-default flex items-center gap-0 px-3 py-2.5"
+              :class="{ 'border-t': !isCompositeMode }"
+            >
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
+              <span class="text-compact me-3 font-semibold tracking-[0.01em]">{{
+                t("alerts.alertType")
+              }}</span>
+              <!-- Alert Type -->
+              <OToggleGroup
+                :model-value="formData.is_real_time"
+                :disabled="beingUpdated || anomalyEditMode"
+                class="min-w-0"
+                mobile-dropdown
+                data-test="add-alert-type-tabs"
+                @update:model-value="onAlertTypeChange"
+              >
+                <OToggleGroupItem
+                  v-for="option in alertTypeOptions"
+                  :key="option.value"
+                  :value="option.value"
+                  size="sm"
+                  :data-test="`add-alert-type-tab-${option.value}`"
+                >
+                  <template #icon-left>
+                    <OIcon :name="option.icon" size="sm" />
+                  </template>
+                  {{ option.label }}
+                </OToggleGroupItem>
+              </OToggleGroup>
             </div>
           </div>
 
@@ -330,6 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :isAggregationEnabled="isAggregationEnabled"
                     :beingUpdated="beingUpdated"
                     :isSeeding="isLoadingPrefill"
+                    :intentId="beingUpdated ? '' : intentId"
                     :promqlCondition="formData.query_condition.promql_condition"
                     :triggerCondition="formData.trigger_condition"
                     @update:tab="updateTab"
@@ -359,9 +363,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :isAggregationEnabled="isAggregationEnabled"
                     :destinations="formData.destinations"
                     :recoveryDestinations="formData.recovery_destinations"
+                    :intentDefaults="beingUpdated ? null : intentDefaultsNote"
                     :formattedDestinations="getFormattedDestinations"
                     :destinationObjects="destinations"
                     :workflows="formData.workflows"
+                    :emailMeError="emailMeError"
+                    :resolveDestinations="resolveEmailMe"
                     @update:trigger="updateTriggerCondition"
                     @update:aggregation="updateAggregation"
                     @update:isAggregationEnabled="(val) => (isAggregationEnabled = val)"
@@ -564,6 +571,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :destinations="destinations"
                 :previewQuery="previewQuery"
                 :generatedSqlQuery="generatedSqlQuery"
+                :isAggregationEnabled="isAggregationEnabled"
               />
             </div>
           </div>

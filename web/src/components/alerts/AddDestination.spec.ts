@@ -33,6 +33,7 @@ const hoisted = vi.hoisted(() => ({
   mockRenderTemplateBody: vi.fn(),
   mockClearTestResult: vi.fn(),
   mockTrack: vi.fn(),
+  mockRouterPush: vi.fn(),
   mockTestInProgress: false,
   mockLastTestResult: null as null | {
     success: boolean;
@@ -42,7 +43,10 @@ const hoisted = vi.hoisted(() => ({
 }));
 
 vi.mock("vue-router", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({
+    push: hoisted.mockRouterPush,
+    resolve: (to: any) => ({ href: `/resolved/${to.name}` }),
+  }),
   useRoute: () => ({ params: {}, query: {} }),
 }));
 
@@ -1365,5 +1369,160 @@ describe("AddDestination — email recipients are org users", () => {
     expect(wrapper.findComponent({ name: "AddUser" }).props("roles")).toEqual([
       { label: "Admin", value: "admin" },
     ]);
+  });
+});
+
+// The alert form's destination drawer appends whatever `created` names, so it must fire once per create only.
+describe("AddDestination - created event", () => {
+  const VALID_SLACK = "https://hooks.slack.com/services/T000/B000/xxxxxxxx";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.mockCreatePrebuilt.mockResolvedValue(undefined);
+    hoisted.mockUpdatePrebuilt.mockResolvedValue(undefined);
+  });
+
+  async function fillCustomHttp(w: any, name: string) {
+    const form = await toCustomHttp(w);
+    form.setFieldValue("name", name);
+    form.setFieldValue("url", "https://example.com/webhook");
+    form.setFieldValue("method", "post");
+    form.setFieldValue("template", "tmpl1");
+    await nextTick();
+    return form;
+  }
+
+  it("names the destination once after a custom create", async () => {
+    wrapper = mountComp();
+    const form = await fillCustomHttp(wrapper, "dest1");
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(wrapper.emitted("created")).toEqual([["dest1"]]);
+  });
+
+  it("names the destination once after a prebuilt create", async () => {
+    config.isCloud = "true";
+    wrapper = mountComp();
+    const form = getForm(wrapper);
+    form.setFieldValue("destination_type", "slack");
+    form.setFieldValue("type", "http");
+    form.setFieldValue("name", "my-slack");
+    form.setFieldValue("slack_setup_method", "oauth");
+    form.setFieldValue("credentials", { webhookUrl: VALID_SLACK, channel: "alerts" });
+    form.setFieldValue("slack_team_id", "T000");
+    form.setFieldValue("slack_team_name", "Acme");
+    form.setFieldValue("slack_channel_id", "B000");
+    await nextTick();
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(hoisted.mockCreatePrebuilt).toHaveBeenCalledTimes(1);
+    expect(wrapper.emitted("created")).toEqual([["my-slack"]]);
+  });
+
+  it("stays silent when a custom create fails", async () => {
+    vi.mocked(destinationService.create).mockRejectedValueOnce({
+      response: { status: 400, data: { message: "bad" } },
+    });
+    wrapper = mountComp();
+    const form = await fillCustomHttp(wrapper, "dest1");
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(wrapper.emitted("created")).toBeUndefined();
+  });
+
+  it("stays silent on a custom update", async () => {
+    wrapper = mountComp({
+      templates: [{ name: "tmpl1", body: "{}", type: "http" }],
+      destination: {
+        name: "hook",
+        url: "https://hooks.example.com/in",
+        method: "post",
+        type: "http",
+        template: "tmpl1",
+        skip_tls_verify: false,
+        headers: {},
+      },
+    });
+    await flushPromises();
+
+    await getForm(wrapper).handleSubmit();
+    await flushPromises();
+
+    expect(destinationService.update).toHaveBeenCalledTimes(1);
+    expect(wrapper.emitted("created")).toBeUndefined();
+  });
+
+  it("stays silent on a prebuilt update", async () => {
+    wrapper = mountComp({
+      destination: {
+        name: "old-slack",
+        url: VALID_SLACK,
+        type: "http",
+        method: "post",
+        template: "prebuilt_slack",
+        skip_tls_verify: false,
+        headers: {},
+        metadata: { prebuilt_type: "slack", credential_channel: "#ops" },
+      },
+    });
+    await flushPromises();
+
+    await getForm(wrapper).handleSubmit();
+    await flushPromises();
+
+    expect(hoisted.mockUpdatePrebuilt).toHaveBeenCalledTimes(1);
+    expect(wrapper.emitted("created")).toBeUndefined();
+  });
+});
+
+describe("AddDestination - drawer mode", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  async function toEmailWithoutTemplates(w: any) {
+    const form = getForm(w);
+    form.setFieldValue("destination_type", "custom");
+    form.setFieldValue("type", "email");
+    await flushPromises();
+  }
+
+  const templateLink = (w: any) =>
+    w
+      .findAll("button")
+      .find((b: any) => b.text() === i18n.global.t("alert_destinations.createEmailTemplate"));
+
+  it("drops the page header and its back link", () => {
+    wrapper = mountComp({ drawer: true });
+    expect(wrapper.find('[data-test="add-destination-title"]').exists()).toBe(false);
+  });
+
+  // Navigating away would discard the alert being authored behind the drawer.
+  it("opens the create-template page in a new tab", async () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    wrapper = mountComp({ drawer: true });
+    await toEmailWithoutTemplates(wrapper);
+
+    await templateLink(wrapper).trigger("click");
+
+    expect(open).toHaveBeenCalledWith("/resolved/alertTemplates", "_blank");
+    expect(hoisted.mockRouterPush).not.toHaveBeenCalled();
+  });
+
+  it("keeps the in-page create-template navigation on the Destinations page", async () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    wrapper = mountComp();
+    await toEmailWithoutTemplates(wrapper);
+
+    await templateLink(wrapper).trigger("click");
+
+    expect(hoisted.mockRouterPush).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "alertTemplates" }),
+    );
+    expect(open).not.toHaveBeenCalled();
   });
 });

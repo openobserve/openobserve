@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { shallowMount } from "@vue/test-utils";
+import { flushPromises, shallowMount } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import { ref } from "vue";
 import ImportAlert from "./ImportAlert.vue";
+import enUS from "@/locales/languages/en-US.json";
+import { queryClient } from "@/composables/query/queryClient";
 
 // Mock all external dependencies
 vi.mock("@/services/alerts", async (importOriginal) => {
@@ -65,6 +67,17 @@ vi.mock("@/services/anomaly_detection", () => ({
   },
 }));
 
+const getSettingMock = vi.hoisted(() => vi.fn());
+vi.mock("@/services/settings", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { getSetting: (...args: any[]) => getSettingMock(...args) },
+  });
+});
+
+const toastMock = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastMock }));
+
 vi.mock("axios", () => ({
   default: {
     get: vi.fn().mockResolvedValue({
@@ -81,6 +94,8 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    queryClient.clear();
+    getSettingMock.mockRejectedValue({ response: { status: 404 } });
 
     mockStore = createStore({
       state: {
@@ -109,7 +124,11 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
       },
     });
 
-    wrapper = shallowMount(ImportAlert, {
+    wrapper = mountImport();
+  });
+
+  const mountImport = () =>
+    shallowMount(ImportAlert, {
       props: {
         destinations: [
           { name: "test-destination-1" },
@@ -126,8 +145,9 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
           AppTabs: { template: "<div></div>" },
           SelectFolderDropDown: { template: "<div></div>" },
           BaseImport: {
+            name: "BaseImport",
             template: '<div><slot name="output-content"></slot></div>',
-            props: ["title", "testPrefix", "isImporting", "editorHeights"],
+            props: ["title", "testPrefix", "isImporting", "editorHeights", "parseFile"],
             emits: ["back", "cancel", "import"],
             setup(_props: any, { expose }: any) {
               const jsonArrayOfObj = ref([]);
@@ -149,7 +169,6 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         },
       },
     });
-  });
 
   describe("legacy timezone names", () => {
     it("finds Asia/Kolkata by the old name Calcutta", () => {
@@ -169,6 +188,14 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
       await wrapper.vm.createAlert(input, 1, "folder1");
       const sent = vi.mocked(mockAlertsService.default.create_by_alert_id).mock.calls.at(-1)?.[1];
       expect(sent.trigger_condition.timezone).toBe("Asia/Calcutta");
+    });
+
+    it("tags an imported alert's create with source import", async () => {
+      const mockAlertsService = await import("@/services/alerts");
+      vi.mocked(mockAlertsService.default.create_by_alert_id).mockResolvedValue(true as any);
+      await wrapper.vm.createAlert({ name: "imported", trigger_condition: {} }, 1, "folder1");
+      const call = vi.mocked(mockAlertsService.default.create_by_alert_id).mock.calls.at(-1);
+      expect(call?.[3]).toBe("import");
     });
   });
 
@@ -1011,6 +1038,376 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
       const payload = await submitAnomaly(exportedAnomaly({ seasonality: "daily" }));
 
       expect(payload.anomaly_config.seasonality).toBeUndefined();
+    });
+  });
+
+  describe("Prometheus rule YAML", () => {
+    const RULES = `groups:
+  - name: node
+    rules:
+      - record: job:up:sum
+        expr: sum by (job) (up)
+      - alert: InstanceDown
+        expr: up == 0 unless on(instance) maintenance == 1
+        for: 5m
+        labels:
+          severity: critical
+`;
+
+    const sentPayloads = async () => {
+      const service = await import("@/services/alerts");
+      return vi.mocked(service.default.create_by_alert_id).mock.calls.map((call) => call[1]);
+    };
+
+    it("converts pasted rules and imports them as paused rule-mode alerts", async () => {
+      const service = await import("@/services/alerts");
+      vi.mocked(service.default.create_by_alert_id).mockResolvedValue(true as any);
+
+      await wrapper.vm.importJson({ jsonStr: RULES });
+
+      const sent = await sentPayloads();
+      expect(sent).toHaveLength(1);
+      expect(sent[0]).toMatchObject({
+        name: "instance_down",
+        org_id: "test-org",
+        stream_type: "metrics",
+        enabled: false,
+        pending_period_sec: 300,
+        priority: 1,
+        query_condition: {
+          type: "promql",
+          promql: "up == 0 unless on(instance) maintenance == 1",
+          promql_rule_mode: true,
+          promql_multi_alert: true,
+        },
+      });
+      expect(wrapper.vm.alertErrorsToDisplay).toEqual([]);
+    });
+
+    it("tells the user how many rules were converted and how many recording rules were skipped", async () => {
+      await wrapper.vm.importJson({ jsonStr: RULES });
+      expect(wrapper.vm.notesToDisplay).toEqual([
+        wrapper.vm.t("alerts.import.promConverted", { count: 1 }),
+        wrapper.vm.t("alerts.import.promSkippedRecords", { count: 1 }),
+      ]);
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="alert-import-notes"]').exists()).toBe(true);
+    });
+
+    it("hands BaseImport a file parser that reads rule YAML and JSON", () => {
+      const parseFile = wrapper.findComponent({ name: "BaseImport" }).props("parseFile");
+      expect(parseFile(RULES, "node.rules.yml")).toMatchObject([{ name: "instance_down" }]);
+      expect(parseFile('{"name":"a"}', "a.json")).toEqual({ name: "a" });
+    });
+
+    it("prefixes a file's conversion notes with its name", () => {
+      wrapper.vm.parseAlertFile(RULES, "node.rules.yml");
+      expect(wrapper.vm.notesToDisplay[0]).toBe(
+        wrapper.vm.t("alerts.import.noteInFile", {
+          fileName: "node.rules.yml",
+          note: wrapper.vm.t("alerts.import.promConverted", { count: 1 }),
+        }),
+      );
+    });
+
+    it("explains a file it cannot read and still lets BaseImport report it", () => {
+      expect(() => wrapper.vm.parseAlertFile("name: a\n", "a.yaml")).toThrow();
+      expect(wrapper.vm.parseError).toMatchObject({ format: "yaml", fileName: "a.yaml" });
+    });
+
+    it("rejects a rule file with no alerting rules instead of reporting success", async () => {
+      await wrapper.vm.importJson({ jsonStr: "groups: []\n" });
+      expect(await sentPayloads()).toHaveLength(0);
+      expect(toastMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "error",
+          message: wrapper.vm.t("alerts.import.nothingToImport"),
+        }),
+      );
+      expect(wrapper.vm.notesToDisplay).toContain(wrapper.vm.t("alerts.import.promNoAlerts"));
+    });
+
+    it("does not report success for a dropped file of only recording rules", async () => {
+      const recordsOnly = "groups:\n  - name: g\n    rules:\n      - record: a\n        expr: up\n";
+      const parsed = wrapper.findComponent({ name: "BaseImport" }).props("parseFile")(
+        recordsOnly,
+        "records.yml",
+      );
+      // BaseImport serialises the file's result, so Import receives JSON text, not the YAML.
+      await wrapper.vm.importJson({ jsonStr: JSON.stringify(parsed) });
+      expect(await sentPayloads()).toHaveLength(0);
+      expect(toastMock).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+      expect(toastMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "error",
+          message: wrapper.vm.t("alerts.import.nothingToImport"),
+        }),
+      );
+      expect(wrapper.vm.notesToDisplay).toContain(
+        wrapper.vm.t("alerts.import.noteInFile", {
+          fileName: "records.yml",
+          note: wrapper.vm.t("alerts.import.promNoAlerts"),
+        }),
+      );
+    });
+  });
+
+  describe("friendly parse errors", () => {
+    it.each([
+      ["broken JSON", '{"name": "a",}', "json"],
+      ["YAML that is not a rule file", "name: a\n", "yaml"],
+      ["Terraform", 'resource "openobserve_alert" "a" {\n}\n', "terraform"],
+      ["plain text", "hello", "unknown"],
+    ])("names %s instead of showing the raw parser error", async (_case, text, format) => {
+      await wrapper.vm.importJson({ jsonStr: text });
+      expect(wrapper.vm.parseError.format).toBe(format);
+      const message = toastMock.mock.calls.at(-1)?.[0].message;
+      expect(message).toBe(wrapper.vm.parseError.message);
+      expect(message).not.toMatch(/Unexpected token|is not valid JSON/);
+    });
+
+    it("offers a sample of both accepted formats", async () => {
+      await wrapper.vm.importJson({ jsonStr: "name: a\n" });
+      await wrapper.vm.$nextTick();
+      const panel = wrapper.find('[data-test="alert-import-parse-error"]');
+      expect(panel.exists()).toBe(true);
+      const samples = panel.findAllComponents({ name: "OCodeBlock" });
+      expect(samples.map((s: any) => s.props("lang"))).toEqual(["json", "yaml"]);
+    });
+
+    it("clears the explanation once the text parses", async () => {
+      await wrapper.vm.importJson({ jsonStr: "name: a\n" });
+      await wrapper.vm.importJson({ jsonStr: '{"name": "a"}' });
+      expect(wrapper.vm.parseError).toBeNull();
+    });
+  });
+
+  describe("org_id and tz_offset", () => {
+    const validAlert = (overrides: Record<string, unknown> = {}) => ({
+      name: "a1",
+      org_id: "test-org",
+      stream_type: "logs",
+      stream_name: "test-stream",
+      is_real_time: false,
+      query_condition: { type: "sql", sql: "select 1", multi_time_range: [] },
+      trigger_condition: {
+        period: 10,
+        operator: ">=",
+        threshold: 1,
+        frequency: 10,
+        silence: 10,
+        frequency_type: "minutes",
+      },
+      destinations: [],
+      enabled: true,
+      ...overrides,
+    });
+
+    it("rewrites another org's id to this org with a note instead of an error", async () => {
+      const input = validAlert({ org_id: "other-org" });
+      expect(await wrapper.vm.validateAlertInputs(input, 1)).toBe(true);
+      expect(input.org_id).toBe("test-org");
+      expect(wrapper.vm.notesToDisplay).toEqual([
+        wrapper.vm.t("alerts.import.orgIdRewritten", {
+          index: 1,
+          from: "other-org",
+          orgId: "test-org",
+        }),
+      ]);
+    });
+
+    it("still asks for an org when the export has none", async () => {
+      await wrapper.vm.validateAlertInputs(validAlert({ org_id: "" }), 1);
+      expect(wrapper.vm.alertErrorsToDisplay.flat().map((e: any) => e.field)).toContain("org_id");
+    });
+
+    it.each([-330, 330, 0])("accepts a tz_offset of %d", async (tz) => {
+      expect(await wrapper.vm.validateAlertInputs(validAlert({ tz_offset: tz }), 1)).toBe(true);
+    });
+
+    it("still rejects a tz_offset that is not a number", async () => {
+      expect(await wrapper.vm.validateAlertInputs(validAlert({ tz_offset: "-330" }), 1)).toBe(
+        false,
+      );
+    });
+
+    it("lets a rule-mode alert leave the stream for the backend to infer", async () => {
+      const input = validAlert({
+        stream_type: "metrics",
+        stream_name: "",
+        query_condition: { type: "promql", promql: "up == 0", promql_rule_mode: true },
+      });
+      expect(await wrapper.vm.validateAlertInputs(input, 1)).toBe(true);
+    });
+
+    it("still requires a stream for a PromQL alert outside rule mode", async () => {
+      const input = validAlert({
+        stream_type: "metrics",
+        stream_name: "",
+        query_condition: { type: "promql", promql: "up" },
+      });
+      expect(await wrapper.vm.validateAlertInputs(input, 1)).toBe(false);
+    });
+  });
+
+  describe("Prometheus batch", () => {
+    const BATCH = `groups:
+  - name: node
+    rules:
+      - record: job:up:sum
+        expr: sum by (job) (up)
+      - alert: InstanceDown
+        expr: up == 0
+        labels:
+          severity: critical
+  - name: disk
+    rules:
+      - alert: DiskFilling
+        expr: node_filesystem_avail_bytes < 1e9
+        labels:
+          severity: warning
+`;
+    const MISSING_METRIC =
+      "Cannot infer a referenced metrics stream for PromQL rule: expression has no referenced existing metrics stream; supply stream_name";
+
+    const createMock = async () => {
+      const service = await import("@/services/alerts");
+      return vi.mocked(service.default.create_by_alert_id);
+    };
+
+    it("routes each converted rule to the destination chosen for its severity", async () => {
+      const create = await createMock();
+      create.mockResolvedValue({ data: { id: "x" } } as any);
+      wrapper.vm.severityRoutes.critical = "test-destination-1";
+      wrapper.vm.severityRoutes.warning = "email-dest";
+
+      await wrapper.vm.importJson({ jsonStr: BATCH });
+
+      const sent = create.mock.calls.map((call) => call[1]);
+      expect(sent.map((a: any) => [a.name, a.destinations])).toEqual([
+        ["instance_down", ["test-destination-1"]],
+        ["disk_filling", ["email-dest"]],
+      ]);
+    });
+
+    it("preselects the org default destination for critical rules only", async () => {
+      getSettingMock.mockResolvedValue({
+        data: { setting_value: { destination: "test-destination-2" } },
+      });
+      // The beforeEach mount cached the unset setting.
+      queryClient.clear();
+      const fresh = mountImport();
+      await flushPromises();
+      expect((fresh.vm as any).severityRoutes).toEqual({
+        critical: "test-destination-2",
+        warning: "",
+      });
+      fresh.unmount();
+    });
+
+    it("summarises the detected rule files in a banner", async () => {
+      wrapper.vm.parseAlertFile(BATCH, "a.yml");
+      wrapper.vm.parseAlertFile(BATCH, "b.yml");
+      expect(wrapper.vm.promBatch).toEqual({ rules: 4, groups: 4, skipped: 2 });
+      await wrapper.vm.$nextTick();
+      const banner = wrapper
+        .find('[data-test="alert-import-prom-batch"]')
+        .findComponent({ name: "OBanner" });
+      expect(banner.exists()).toBe(true);
+      expect(banner.props("content")).toBe(
+        wrapper.vm.t("alerts.import.promDetected", { rules: 4, groups: 4, skipped: 2 }),
+      );
+    });
+
+    it("lists one row per rule with its status", async () => {
+      const create = await createMock();
+      create
+        .mockResolvedValueOnce({ data: { id: "id-1" } } as any)
+        .mockRejectedValueOnce({ response: { data: { message: "boom" } } });
+
+      await wrapper.vm.importJson({ jsonStr: BATCH });
+
+      expect(wrapper.vm.importRows).toEqual([
+        expect.objectContaining({
+          index: 1,
+          name: "instance_down",
+          status: "imported",
+          alertId: "id-1",
+        }),
+        expect.objectContaining({
+          index: 2,
+          name: "disk_filling",
+          status: "failed",
+          reason: "boom",
+        }),
+      ]);
+      await wrapper.vm.$nextTick();
+      const table = wrapper.findComponent('[data-test="alert-import-results-table"]');
+      expect(table.exists()).toBe(true);
+    });
+
+    it("reads a row refused for a missing metric as not arriving yet", async () => {
+      const create = await createMock();
+      create.mockRejectedValue({ response: { data: { message: MISSING_METRIC } } });
+
+      await wrapper.vm.importJson({ jsonStr: BATCH });
+
+      const row = wrapper.vm.importRows[0];
+      expect(row.status).toBe("missingMetric");
+      expect(wrapper.vm.rowStatusText(row)).toBe(wrapper.vm.t("alerts.import.rowMissingMetric"));
+      expect((enUS as any).alerts.import.rowMissingMetric).toBe("Metric not arriving yet");
+    });
+
+    it("re-sends only the retried row and updates its status", async () => {
+      const create = await createMock();
+      create
+        .mockRejectedValueOnce({ response: { data: { message: MISSING_METRIC } } })
+        .mockResolvedValueOnce({ data: { id: "id-2" } } as any);
+      await wrapper.vm.importJson({ jsonStr: BATCH });
+      expect(create).toHaveBeenCalledTimes(2);
+
+      create.mockResolvedValueOnce({ data: { id: "id-1" } } as any);
+      await wrapper.vm.retryRow(wrapper.vm.importRows[0]);
+
+      expect(create).toHaveBeenCalledTimes(3);
+      expect(create.mock.calls[2][1]).toMatchObject({ name: "instance_down" });
+      expect(wrapper.vm.importRows.map((r: any) => [r.name, r.status])).toEqual([
+        ["instance_down", "imported"],
+        ["disk_filling", "imported"],
+      ]);
+    });
+
+    it("hands the imported batch to the list when every rule imports", async () => {
+      vi.useFakeTimers();
+      try {
+        const create = await createMock();
+        create
+          .mockResolvedValueOnce({ data: { id: "id-1" } } as any)
+          .mockResolvedValueOnce({ data: { id: "id-2" } } as any);
+        await wrapper.vm.importJson({ jsonStr: BATCH });
+        vi.runAllTimers();
+        expect(wrapper.emitted("imported")?.at(-1)).toEqual([
+          { folderId: "default", ids: ["id-1", "id-2"] },
+        ]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("lets the user open the imported part of a batch that partly failed", async () => {
+      const create = await createMock();
+      create
+        .mockResolvedValueOnce({ data: { id: "id-1" } } as any)
+        .mockRejectedValueOnce({ response: { data: { message: "boom" } } });
+      await wrapper.vm.importJson({ jsonStr: BATCH });
+      expect(wrapper.emitted("imported")).toBeUndefined();
+
+      wrapper.vm.showImportedAlerts();
+
+      expect(wrapper.emitted("imported")?.at(-1)).toEqual([{ folderId: "default", ids: ["id-1"] }]);
+      expect(wrapper.vm.router.push).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "alertList" }),
+      );
     });
   });
 

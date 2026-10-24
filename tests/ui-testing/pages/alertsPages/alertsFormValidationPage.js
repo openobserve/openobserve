@@ -135,9 +135,9 @@ export class AlertsFormValidationPage {
     this.filterConditionOperatorPopover = '[data-test="alert-conditions-operator-select-popover"]';
     this.filterConditionOperatorError   = '[data-test="alert-conditions-operator-select-error"]';
     // Value input: OInput → fill via -field, error via -error
-    this.filterConditionValueTrigger = '[data-test="alert-conditions-value-input"]';
-    this.filterConditionValueField = '[data-test="alert-conditions-value-input-field"]';
-    this.filterConditionValueError = '[data-test="alert-conditions-value-input-error"]';
+    this.filterConditionValueTrigger = '[data-test="alert-conditions-value-combobox"]';
+    this.filterConditionValueField = '[data-test="alert-conditions-value-combobox-input"]';
+    this.filterConditionValueError = '[data-test="alert-conditions-value-combobox-error"]';
     // AND/OR label span (FilterCondition.vue) — readable operator text for the
     // row, used to assert the toggle button flipped the logical operator.
     this.filterConditionOperatorLabel = '[data-test="alert-conditions-operator-label"]';

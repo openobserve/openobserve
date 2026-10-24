@@ -47,6 +47,7 @@ use infra::{
     schema::SchemaCache,
 };
 use ingestion_common::IngestUser;
+use promql::utils::absent_label_rejects;
 use promql_parser::{label::MatchOp, parser};
 use proto::prometheus_rpc;
 use schema::stream_schema_exists;
@@ -952,7 +953,9 @@ pub async fn get_label_values(
         return Ok(vec![]);
     }
 
-    let sql = metadata_sql(&metric_name, &[&label_name], &schema, selector.as_ref());
+    let Some(sql) = metadata_sql(&metric_name, &[&label_name], &schema, selector.as_ref()) else {
+        return Ok(vec![]);
+    };
 
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
@@ -1048,7 +1051,11 @@ fn series_sql(
                 name != TIMESTAMP_COL_NAME && name != VALUE_LABEL && name != HASH_LABEL
             }),
     );
-    (columns.len() > 1).then(|| metadata_sql(metric_name, &columns, schema, selector))
+    if columns.len() > 1 {
+        metadata_sql(metric_name, &columns, schema, selector)
+    } else {
+        None
+    }
 }
 
 fn metadata_sql(
@@ -1056,7 +1063,16 @@ fn metadata_sql(
     columns: &[&str],
     schema: &Schema,
     selector: Option<&parser::VectorSelector>,
-) -> String {
+) -> Option<String> {
+    let matchers = selector
+        .into_iter()
+        .flat_map(|selector| &selector.matchers.matchers);
+    if matchers
+        .clone()
+        .any(|mat| absent_label_rejects(schema, mat))
+    {
+        return None;
+    }
     let columns = columns
         .iter()
         .map(|name| quote_identifier(name))
@@ -1066,9 +1082,7 @@ fn metadata_sql(
         columns.join(", "),
         quote_identifier(metric_name)
     );
-    let predicates = selector
-        .into_iter()
-        .flat_map(|selector| &selector.matchers.matchers)
+    let predicates = matchers
         .filter(|mat| {
             // The stored metric name can differ from the stream selected by __name__.
             mat.name != TIMESTAMP_COL_NAME
@@ -1091,7 +1105,7 @@ fn metadata_sql(
         sql.push_str(" WHERE ");
         sql.push_str(&predicates.join(" AND "));
     }
-    sql
+    Some(sql)
 }
 
 /// Fills in `__hash__` and `_timestamp`, so the schema below sees the fields that get written.
@@ -1460,7 +1474,7 @@ mod tests {
                 assert_eq!(selector.matchers.matchers[0].value, value);
                 for (sql, projection) in [
                     (
-                        metadata_sql("up", &["job"], &schema, Some(&selector)),
+                        metadata_sql("up", &["job"], &schema, Some(&selector)).unwrap(),
                         "\"job\"",
                     ),
                     (
@@ -1538,7 +1552,7 @@ mod tests {
             };
             let metric = try_into_metric_name(&selector).unwrap();
             for sql in [
-                metadata_sql(&metric, &["job"], &schema, Some(&selector)),
+                metadata_sql(&metric, &["job"], &schema, Some(&selector)).unwrap(),
                 series_sql(&metric, &schema, Some(&selector)).unwrap(),
             ] {
                 let batches = ctx.sql(&sql).await.unwrap().collect().await.unwrap();
@@ -1576,7 +1590,7 @@ mod tests {
         };
 
         let parser::Expr::VectorSelector(selector) = parser::parse(
-            r#"{__name__='metric"name',job="ok",missing="skip",_timestamp="skip",value="skip"}"#,
+            r#"{__name__='metric"name',job="ok",missing!="skip",_timestamp="skip",value="skip"}"#,
         )
         .unwrap() else {
             panic!("expected a vector selector");
@@ -1599,7 +1613,7 @@ mod tests {
         );
         for (sql, expected) in [
             (
-                metadata_sql(&metric, &["label\"field"], &schema, Some(&selector)),
+                metadata_sql(&metric, &["label\"field"], &schema, Some(&selector)).unwrap(),
                 r#"SELECT DISTINCT "label""field" FROM "metric""name" WHERE "job" = 'ok'"#,
             ),
             (
@@ -1613,9 +1627,48 @@ mod tests {
         }
         assert!(series_sql(&metric, &Schema::empty(), Some(&selector)).is_none());
         assert_eq!(
-            metadata_sql(&metric, &["select"], &schema, None),
+            metadata_sql(&metric, &["select"], &schema, None).unwrap(),
             r#"SELECT DISTINCT "select" FROM "metric""name""#
         );
+    }
+
+    #[test]
+    fn metadata_sql_absent_label_matches_as_empty_string() {
+        use datafusion::arrow::datatypes::{DataType, Field};
+
+        let schema = Schema::new(vec![Field::new("job", DataType::Utf8, true)]);
+        for (query, matches) in [
+            (r#"up{missing="x"}"#, false),
+            (r#"up{missing=""}"#, true),
+            (r#"up{missing!="x"}"#, true),
+            (r#"up{missing!=""}"#, false),
+            (r#"up{missing=~"x.*"}"#, false),
+            (r#"up{missing=~".*"}"#, true),
+            (r#"up{missing!~".*"}"#, false),
+            (r#"up{missing!~"x.*"}"#, true),
+            (r#"up{job="ok",missing="x"}"#, false),
+        ] {
+            let parser::Expr::VectorSelector(selector) = parser::parse(query).unwrap() else {
+                panic!("expected a vector selector");
+            };
+            let metadata = metadata_sql("up", &["job"], &schema, Some(&selector));
+            let series = series_sql("up", &schema, Some(&selector));
+            if matches {
+                assert_eq!(
+                    metadata.as_deref(),
+                    Some(r#"SELECT DISTINCT "job" FROM "up""#),
+                    "{query}"
+                );
+                assert_eq!(
+                    series.as_deref(),
+                    Some(r#"SELECT DISTINCT "__hash__", "job" FROM "up""#),
+                    "{query}"
+                );
+            } else {
+                assert_eq!(metadata, None, "{query}");
+                assert_eq!(series, None, "{query}");
+            }
+        }
     }
 
     fn schema_with_metadata(blob: &str) -> Schema {

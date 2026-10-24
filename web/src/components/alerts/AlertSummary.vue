@@ -97,6 +97,10 @@ const props = defineProps({
     type: String,
     default: "",
   },
+  isAggregationEnabled: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const summaryContainer = ref<HTMLElement | null>(null);
@@ -110,6 +114,7 @@ const summaryText = computed(() => {
     undefined,
     props.previewQuery,
     props.generatedSqlQuery,
+    props.isAggregationEnabled,
   );
 });
 

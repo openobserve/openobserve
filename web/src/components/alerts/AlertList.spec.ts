@@ -71,12 +71,31 @@ vi.mock("@/services/alert_destination", async (importOriginal) => {
   });
 });
 
+const startMocks = vi.hoisted(() => ({
+  openAlertCreation: vi.fn(() => true),
+  orgHasUserStreams: vi.fn(),
+}));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+
+vi.mock("@/composables/alerts/useAlertCreation", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return {
+    ...actual,
+    useAlertCreation: () => ({ openAlertCreation: startMocks.openAlertCreation }),
+  };
+});
+vi.mock("@/composables/firstEvent/useFirstDataNotice", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return { ...actual, orgHasUserStreams: startMocks.orgHasUserStreams };
+});
+
 import AlertList from "@/components/alerts/AlertList.vue";
 import config from "@/aws-exports";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import AlertService from "@/services/alerts";
+import analytics from "@/services/product_analytics";
 import { queryClient } from "@/composables/query/queryClient";
 import { alertKeys } from "@/services/alerts.querykeys";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -199,7 +218,7 @@ let alertsDB: AlertV2[] = [];
 
 let mountedWrappers: ReturnType<typeof mount>[] = [];
 
-async function mountAlertList() {
+async function mountAlertList(extraStubs: Record<string, unknown> = {}) {
   const wrapper = mount(AlertList, {
     attachTo: node,
     global: {
@@ -244,6 +263,7 @@ async function mountAlertList() {
           template: '<button type="button"><slot /></button>',
         },
         SelectFolderDropDown: true,
+        ...extraStubs,
       },
     },
   });
@@ -359,6 +379,11 @@ beforeEach(() => {
   (alertsSvc.getCompositeReferences as any) = vi.fn().mockResolvedValue({
     data: { references: [], hidden_reference_count: 0 },
   });
+
+  (alertsSvc.listOrgSample as any) = vi
+    .fn()
+    .mockResolvedValue({ data: { list: [makeAlert(1)] } } as any);
+  startMocks.orgHasUserStreams.mockResolvedValue(true);
 
   (alertsSvc.create_by_alert_id as any) = vi
     .fn()
@@ -1206,14 +1231,6 @@ describe("AlertList - micro validations", () => {
     expect(expr).toContain("OR");
   });
 
-  it("routeTo pushes with name", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    const spy = vi.spyOn(router, "push");
-    await wrapper.vm.routeTo("alertTemplates");
-    expect(spy).toHaveBeenCalled();
-  });
-
   it("importAlert sets dialog and pushes route, preserving the rest of the query", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
@@ -1667,6 +1684,7 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     // After successful submit, the dialog closes
     expect(wrapper.vm.showForm).toBe(false);
     expect(alertsSvc.create_by_alert_id).toHaveBeenCalled();
+    expect((alertsSvc.create_by_alert_id as any).mock.calls.at(-1)[3]).toBe("clone");
   });
 
   it("clone dialog secondary button (Cancel) closes the dialog", async () => {
@@ -2156,3 +2174,430 @@ describe("AlertList - triggered in the last 15 minutes", () => {
     expect(fired.filter((c: any) => c.find(".bg-warning-500").exists())).toHaveLength(4);
   });
 }, 15000);
+
+describe("AlertList - imported batch", () => {
+  it("narrows the list to the alerts the import just created", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    // A stale ?action= from an earlier spec's navigation can swap the table for the editor.
+    await wrapper.vm.handleActionQuery(undefined);
+
+    wrapper.vm.onImportedBatch({ folderId: "default", ids: ["alert-2", "alert-5"] });
+    await flushPromises();
+
+    expect(wrapper.vm.displayedAlerts.map((r: any) => r.alert_id)).toEqual(["alert-2", "alert-5"]);
+    expect(wrapper.find('[data-test="alert-list-imported-banner"]').exists()).toBe(true);
+  });
+
+  it("enables each paused imported alert through the per-alert toggle", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    wrapper.vm.onImportedBatch({ folderId: "default", ids: ["alert-1", "alert-2", "alert-5"] });
+
+    await wrapper.vm.enableImported();
+    await flushPromises();
+
+    const toggled = alertsSvc.toggle_state_by_alert_id.mock.calls.map((c: any[]) => [c[1], c[2]]);
+    expect(toggled).toEqual([
+      ["alert-2", true],
+      ["alert-5", true],
+    ]);
+    expect(wrapper.vm.displayedAlerts.every((r: any) => r.enabled)).toBe(true);
+  });
+
+  it("shows the paused batch even when the Active filter was on", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    wrapper.vm.stateFilter = "active";
+
+    wrapper.vm.onImportedBatch({ folderId: "default", ids: ["alert-2", "alert-5"] });
+
+    expect(wrapper.vm.displayedAlerts.map((r: any) => r.alert_id)).toEqual(["alert-2", "alert-5"]);
+  });
+
+  it("goes back to the whole folder when the batch is cleared", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    wrapper.vm.onImportedBatch({ folderId: "default", ids: ["alert-2"] });
+
+    wrapper.vm.clearImportedBatch();
+
+    expect(wrapper.vm.displayedAlerts).toHaveLength(alertsDB.length);
+  });
+});
+
+describe("AlertList - first alert dead ends", () => {
+  // A stale ?action= from an earlier spec's navigation can swap the table for the editor.
+  const mountShown = async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    await wrapper.vm.handleActionQuery(undefined);
+    await flushPromises();
+    return wrapper;
+  };
+
+  it("keeps Add enabled when the org has no templates", async () => {
+    queryClient.removeQueries({ queryKey: ["alerts"] });
+    queryClient.clear();
+    templatesSvc.list.mockImplementation(() => Promise.resolve({ data: [] } as any));
+    const wrapper: any = await mountShown();
+
+    expect(wrapper.vm.templates).toEqual([]);
+    const add = wrapper.find('[data-test="alert-list-add-alert-btn"]');
+    expect(add.attributes("disabled")).toBeUndefined();
+  });
+
+  it("shows the no-alerts empty state rather than a templates gate", async () => {
+    templatesSvc.list.mockImplementation(() => Promise.resolve({ data: [] } as any));
+    const wrapper: any = await mountShown();
+    wrapper.vm.templates = [];
+    wrapper.vm.allAlerts = [];
+    wrapper.vm.filteredResults = [];
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="alert-list-create-template-text"]').exists()).toBe(false);
+  });
+
+  it("labels an enabled alert that has not run yet", async () => {
+    const wrapper: any = await mountShown();
+
+    const waiting = wrapper.find('[data-test="alert-list-Scheduled Alert A-waiting-first-run"]');
+    expect(waiting.exists()).toBe(true);
+    expect(waiting.text()).toBe("Waiting for first run");
+    // A paused alert is not waiting for anything.
+    expect(
+      wrapper.find('[data-test="alert-list-RealTime Alert B-waiting-first-run"]').exists(),
+    ).toBe(false);
+  });
+
+  it("opens the new alert's detail page after a create from the list's form", async () => {
+    const wrapper: any = await mountShown();
+    const push = vi.spyOn(router, "push");
+
+    await wrapper.vm.refreshList("team-a", "new-id");
+
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "alertDetail",
+        params: { alert_id: "new-id" },
+        query: expect.objectContaining({ folder: "team-a" }),
+      }),
+    );
+  });
+
+  it("returns to the list after an edit from the list's form", async () => {
+    const wrapper: any = await mountShown();
+    const push = vi.spyOn(router, "push");
+
+    await wrapper.vm.refreshList("default");
+
+    expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "alertList" }));
+    expect(push).not.toHaveBeenCalledWith(expect.objectContaining({ name: "alertDetail" }));
+  });
+});
+
+describe("AlertList - start surfaces", () => {
+  const startStubs = {
+    AlertStartSheet: {
+      name: "AlertStartSheet",
+      props: ["open", "initialStream"],
+      emits: ["update:open", "choose", "import", "blank"],
+      template: '<div data-test="alert-start-sheet-stub" :data-open="String(open)"></div>',
+    },
+    AlertListFirstRun: {
+      name: "AlertListFirstRun",
+      props: ["hasData"],
+      emits: ["choose", "situations", "import", "blank"],
+      template: '<div data-test="alert-list-first-run" :data-has-data="String(hasData)"></div>',
+    },
+  };
+
+  const mountStart = async () => {
+    const wrapper: any = await mountAlertList(startStubs);
+    await waitData(wrapper);
+    await wrapper.vm.handleActionQuery(undefined);
+    await flushPromises();
+    return wrapper;
+  };
+
+  const emptyList = async (wrapper: any) => {
+    wrapper.vm.allAlerts = [];
+    wrapper.vm.filteredResults = [];
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    await flushPromises();
+  };
+
+  const menuItem = (wrapper: any, dataTest: string) =>
+    wrapper
+      .findAllComponents({ name: "ODropdownItem" })
+      .find((item: any) => item.attributes("data-test") === dataTest);
+
+  beforeEach(() => {
+    localStorage.removeItem("o2.alerts.newAlertHintSeen");
+  });
+
+  it("keeps New alert's main click on today's form", async () => {
+    const wrapper = await mountStart();
+    const push = vi.spyOn(router, "push");
+    await wrapper.find('[data-test="alert-list-add-alert-btn"]').trigger("click");
+    await flushPromises();
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "alertList",
+        query: expect.objectContaining({ action: "add" }),
+      }),
+    );
+    expect(wrapper.find('[data-test="alert-start-sheet-stub"]').attributes("data-open")).toBe(
+      "false",
+    );
+  });
+
+  it("opens the start sheet from the arrow's Start from a suggestion item", async () => {
+    const wrapper = await mountStart();
+    wrapper.vm.newAlertMenuOpen = true;
+    await flushPromises();
+    menuItem(wrapper, "alert-list-start-from-suggestion").vm.$emit("select", new Event("select"));
+    await flushPromises();
+    expect(wrapper.find('[data-test="alert-start-sheet-stub"]').attributes("data-open")).toBe(
+      "true",
+    );
+  });
+
+  it("imports from the arrow's Import item", async () => {
+    const wrapper = await mountStart();
+    wrapper.vm.newAlertMenuOpen = true;
+    await flushPromises();
+    menuItem(wrapper, "alert-list-new-alert-import").vm.$emit("select", new Event("select"));
+    await flushPromises();
+    expect(wrapper.vm.showImportAlertDialog).toBe(true);
+  });
+
+  it("hands a chosen start to the prefill pipeline in the open folder", async () => {
+    const wrapper = await mountStart();
+    const prefill = { source: "suggestion", streamName: "app" };
+    wrapper.findComponent({ name: "AlertStartSheet" }).vm.$emit("choose", prefill);
+    await flushPromises();
+    expect(startMocks.openAlertCreation).toHaveBeenCalledWith(prefill, { folder: "default" });
+  });
+
+  it("shows the hint on the arrow once, until the menu is opened", async () => {
+    const first = await mountStart();
+    expect(first.find('[data-test="alert-list-new-alert-hint"]').exists()).toBe(true);
+    first.vm.newAlertMenuOpen = true;
+    await flushPromises();
+    expect(first.find('[data-test="alert-list-new-alert-hint"]').exists()).toBe(false);
+    first.unmount();
+
+    const again = await mountStart();
+    expect(again.find('[data-test="alert-list-new-alert-hint"]').exists()).toBe(false);
+  });
+
+  it("asks the org, not the folder, whether any alert exists", async () => {
+    await mountStart();
+    expect(alertsSvc.listOrgSample).toHaveBeenCalledWith(
+      store.state.selectedOrganization.identifier,
+    );
+  });
+
+  it("keeps today's hero for an empty folder in an org that has alerts", async () => {
+    const wrapper = await mountStart();
+    await emptyList(wrapper);
+    expect(wrapper.find('[data-test="alert-list-first-run"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain("Create your first alert");
+  });
+
+  it("shows suggestions in place of the hero when the org has no alerts", async () => {
+    (alertsSvc.listOrgSample as any).mockResolvedValue({ data: { list: [] } });
+    alertsDB = [];
+    const wrapper = await mountStart();
+    await emptyList(wrapper);
+    const firstRun = wrapper.find('[data-test="alert-list-first-run"]');
+    expect(firstRun.exists()).toBe(true);
+    expect(firstRun.attributes("data-has-data")).toBe("true");
+    expect(wrapper.text()).not.toContain("Create your first alert");
+  });
+
+  it("shows the no-data variant when the org has no streams yet", async () => {
+    (alertsSvc.listOrgSample as any).mockResolvedValue({ data: { list: [] } });
+    alertsDB = [];
+    startMocks.orgHasUserStreams.mockResolvedValue(false);
+    const wrapper = await mountStart();
+    await emptyList(wrapper);
+    expect(wrapper.find('[data-test="alert-list-first-run"]').attributes("data-has-data")).toBe(
+      "false",
+    );
+  });
+
+  it("keeps the filtered empty state while a search is active, even with no alerts", async () => {
+    (alertsSvc.listOrgSample as any).mockResolvedValue({ data: { list: [] } });
+    alertsDB = [];
+    const wrapper = await mountStart();
+    wrapper.vm.filterQuery = "nothing-matches";
+    await emptyList(wrapper);
+    expect(wrapper.find('[data-test="alert-list-first-run"]').exists()).toBe(false);
+  });
+
+  it("keeps today's hero on a type tab, even when the org has no alerts", async () => {
+    (alertsSvc.listOrgSample as any).mockResolvedValue({ data: { list: [] } });
+    alertsDB = [];
+    const wrapper = await mountStart();
+    wrapper.vm.activeTab = "scheduled";
+    await emptyList(wrapper);
+    expect(wrapper.find('[data-test="alert-list-first-run"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain("Create your first alert");
+  });
+
+  const switchOrg = async (wrapper: any, identifier: string) => {
+    wrapper.vm.store.state.selectedOrganization.identifier = identifier;
+    await flushPromises();
+  };
+
+  it("drops an org check that answers after the org changed", async () => {
+    const original = store.state.selectedOrganization.identifier;
+    let answerOld: (value: unknown) => void = () => {};
+    (alertsSvc.listOrgSample as any)
+      .mockImplementationOnce(() => new Promise((resolve) => (answerOld = resolve)))
+      .mockResolvedValue({ data: { list: [makeAlert(1)] } });
+    alertsDB = [];
+    try {
+      const wrapper = await mountStart();
+      await switchOrg(wrapper, "second-org");
+      answerOld({ data: { list: [] } });
+      await emptyList(wrapper);
+      expect(wrapper.find('[data-test="alert-list-first-run"]').exists()).toBe(false);
+    } finally {
+      store.state.selectedOrganization.identifier = original;
+    }
+  });
+
+  it("drops a data check that answers after the org changed", async () => {
+    const original = store.state.selectedOrganization.identifier;
+    let answerOld: (value: boolean) => void = () => {};
+    (alertsSvc.listOrgSample as any)
+      .mockResolvedValueOnce({ data: { list: [] } })
+      .mockResolvedValue({ data: { list: [makeAlert(1)] } });
+    startMocks.orgHasUserStreams.mockImplementationOnce(
+      () => new Promise((resolve) => (answerOld = resolve)),
+    );
+    alertsDB = [];
+    try {
+      const wrapper = await mountStart();
+      await switchOrg(wrapper, "second-org");
+      answerOld(true);
+      await emptyList(wrapper);
+      expect(wrapper.find('[data-test="alert-list-first-run"]').exists()).toBe(false);
+    } finally {
+      store.state.selectedOrganization.identifier = original;
+    }
+  });
+
+  describe("funnel analytics", () => {
+    const newAlertClicks = () =>
+      vi.mocked(analytics.track).mock.calls.filter(([event]) => event === "new_alert_clicked");
+
+    beforeEach(() => vi.mocked(analytics.track).mockClear());
+
+    it("tracks alerts_opened once when the list mounts", async () => {
+      await mountStart();
+      const opened = vi
+        .mocked(analytics.track)
+        .mock.calls.filter(([event]) => event === "alerts_opened");
+      expect(opened).toEqual([["alerts_opened"]]);
+    });
+
+    it("tags New alert's main click as the main button", async () => {
+      const wrapper = await mountStart();
+      await wrapper.find('[data-test="alert-list-add-alert-btn"]').trigger("click");
+      await flushPromises();
+      expect(newAlertClicks()).toEqual([
+        ["new_alert_clicked", { entry: "main_button", option: "blank" }],
+      ]);
+    });
+
+    it("tags the main click on the anomaly tab as an anomaly start, and still opens anomaly creation", async () => {
+      const wrapper = await mountStart();
+      const push = vi.spyOn(router, "push");
+      wrapper.vm.activeTab = "anomalyDetection";
+      await flushPromises();
+      await wrapper.find('[data-test="alert-list-add-alert-btn"]').trigger("click");
+      await flushPromises();
+      expect(push).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "addAnomalyDetection",
+          query: expect.objectContaining({ tab: "anomalyDetection" }),
+        }),
+      );
+      expect(newAlertClicks()).toEqual([
+        ["new_alert_clicked", { entry: "main_button", option: "anomaly" }],
+      ]);
+    });
+
+    it.each([
+      ["alert-list-start-from-suggestion", "suggestion"],
+      ["alert-list-new-alert-import", "import"],
+    ])("tags the arrow's %s item as a split item", async (dataTest, option) => {
+      const wrapper = await mountStart();
+      wrapper.vm.newAlertMenuOpen = true;
+      await flushPromises();
+      menuItem(wrapper, dataTest).vm.$emit("select", new Event("select"));
+      await flushPromises();
+      expect(newAlertClicks()).toEqual([["new_alert_clicked", { entry: "split_item", option }]]);
+    });
+
+    it("tags the start sheet's cards with the card picked, using the prefill's source id", async () => {
+      const wrapper = await mountStart();
+      const sheet = wrapper.findComponent({ name: "AlertStartSheet" });
+      sheet.vm.$emit("choose", { source: "intent", streamName: "app" });
+      sheet.vm.$emit("import");
+      sheet.vm.$emit("blank");
+      await flushPromises();
+      expect(newAlertClicks()).toEqual([
+        ["new_alert_clicked", { entry: "start_sheet_card", option: "intent" }],
+        ["new_alert_clicked", { entry: "start_sheet_card", option: "import" }],
+        ["new_alert_clicked", { entry: "start_sheet_card", option: "blank" }],
+      ]);
+    });
+
+    it("tags the first-run panel's actions as the empty state", async () => {
+      (alertsSvc.listOrgSample as any).mockResolvedValue({ data: { list: [] } });
+      alertsDB = [];
+      const wrapper = await mountStart();
+      await emptyList(wrapper);
+      const firstRun = wrapper.findComponent({ name: "AlertListFirstRun" });
+      firstRun.vm.$emit("choose", { source: "suggestion", streamName: "app" });
+      firstRun.vm.$emit("situations");
+      firstRun.vm.$emit("import");
+      firstRun.vm.$emit("blank");
+      await flushPromises();
+      expect(newAlertClicks()).toEqual([
+        ["new_alert_clicked", { entry: "empty_state", option: "suggestion" }],
+        ["new_alert_clicked", { entry: "empty_state", option: "situations" }],
+        ["new_alert_clicked", { entry: "empty_state", option: "import" }],
+        ["new_alert_clicked", { entry: "empty_state", option: "blank" }],
+      ]);
+    });
+
+    it("tags the no-alerts hero's create action as the empty state, and not its clear-filters action", async () => {
+      const wrapper = await mountStart();
+      await emptyList(wrapper);
+      const hero = wrapper
+        .findAllComponents({ name: "OEmptyState" })
+        .find((c: any) => c.props("preset") === "no-alerts");
+      hero.vm.$emit("action", "clear-filters");
+      hero.vm.$emit("action", "create");
+      await flushPromises();
+      expect(newAlertClicks()).toEqual([
+        ["new_alert_clicked", { entry: "empty_state", option: "blank" }],
+      ]);
+    });
+  });
+
+  it("keeps today's hero when the org check fails", async () => {
+    (alertsSvc.listOrgSample as any).mockRejectedValue(new Error("down"));
+    const wrapper = await mountStart();
+    await emptyList(wrapper);
+    expect(wrapper.find('[data-test="alert-list-first-run"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain("Create your first alert");
+  });
+});

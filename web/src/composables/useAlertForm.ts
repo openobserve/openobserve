@@ -97,6 +97,7 @@ import {
 import { AlertFocusManager } from "@/utils/alerts/focusManager";
 import { readAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
 import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
+import { useEmailMeDestination } from "@/composables/alerts/useEmailMeDestination";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
 import type { AlertPrefill, AlertPrefillWarning } from "@/ts/interfaces/alertPrefill";
 import {
@@ -381,7 +382,58 @@ export const applyPromqlPrefill = (data: any, prefill: AlertPrefill): any => {
   return data;
 };
 
+/** The condition tree without unfinished rows or the groups they leave empty; null when nothing is left. */
+export const pruneIncompleteConditions = (node: any): any => {
+  if (!node || typeof node !== "object") return null;
+  if (node.filterType === "condition") {
+    const hasValue = node.value !== undefined && node.value !== null && node.value !== "";
+    return node.column && (isUnaryOperator(node.operator) || hasValue) ? node : null;
+  }
+  if (node.filterType !== "group" || !Array.isArray(node.conditions)) return null;
+  const conditions = node.conditions.map(pruneIncompleteConditions).filter(Boolean);
+  return conditions.length ? { ...node, conditions } : null;
+};
+
+/** Seeds the intent path's fields for intent-path sources only; returns what the "Suggested defaults" note lists, or null. */
+export const applyIntentPrefill = (
+  data: any,
+  prefill: AlertPrefill,
+  anomalyAvailable = false,
+): IntentDefaultsNote | null => {
+  if (!getAlertSource(prefill.source).intentPath) return null;
+  // The form's is_real_time watcher seeds the anomaly config from the stream and name set here.
+  if (prefill.alertType === "anomaly" && anomalyAvailable) {
+    data.is_real_time = "anomaly";
+    return null;
+  }
+  if (prefill.pendingPeriodMinutes !== undefined) {
+    data.pending_period_sec = prefill.pendingPeriodMinutes;
+    data._ui = { ...data._ui, pendingPeriod: prefill.pendingPeriodMinutes };
+  }
+  const attributes = Object.entries(prefill.contextAttributes ?? {});
+  if (attributes.length) {
+    const keys = new Set(attributes.map(([key]) => key));
+    data.context_attributes = [
+      ...(data.context_attributes ?? []).filter((attribute: any) => !keys.has(attribute.key)),
+      ...attributes.map(([key, value]) => ({ key, value, id: getUUID() })),
+    ];
+  }
+  // Recovery notices stay off until recovery destinations save on every database.
+  data.notify_on_recovery = false;
+  if (!prefill.intentDefaults) return null;
+  return {
+    silenceMinutes: Number(data.trigger_condition?.silence) || 0,
+    pendingPeriodMinutes: Number(data.pending_period_sec) || 0,
+  };
+};
+
 // ─── Composable ─────────────────────────────────────────────────────────────
+
+/** The intent path's defaults as applied, listed by the form's "Suggested defaults" note. */
+export interface IntentDefaultsNote {
+  silenceMinutes: number;
+  pendingPeriodMinutes: number;
+}
 
 export interface AlertFormProps {
   modelValue: any;
@@ -392,7 +444,8 @@ export interface AlertFormProps {
 }
 
 export interface AlertFormEmit {
-  (e: "update:list", folderId?: string): void;
+  /** `createdId` is set only after a create, so the host can open the new alert. */
+  (e: "update:list", folderId?: string, createdId?: string): void;
   (e: "cancel:hideform"): void;
   (e: "refresh:destinations"): void;
   (e: "refresh:templates"): void;
@@ -535,6 +588,15 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   /** Reset the whole form (edit-prefill / post-save reset) to a complete alert
    *  object, re-seeding the form-only extras (logGroupBy / _meta). */
   const resetForm = (obj: any): void => form.reset(withFormExtras(obj));
+
+  const emailMe = useEmailMeDestination({
+    destinations: () => formData.value.destinations ?? [],
+    setDestinations: (names) => setF("destinations", names),
+    recoveryDestinations: () => form.state.values.recovery_destinations ?? [],
+    setRecoveryDestinations: (names) => setF("recovery_destinations", names),
+    onCreated: () => emit("refresh:destinations"),
+  });
+
   const indexOptions = ref([]);
   const schemaList = ref([]);
   const streams: any = ref({});
@@ -745,6 +807,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const isLoadingPrefill = ref(false);
   /** Lossy transforms the source adapter performed, surfaced in the form. */
   const prefillWarnings = ref<AlertPrefillWarning[]>([]);
+  // Set only by an intent-path prefill, so the blank form and edit never show the intent affordances.
+  const intentDefaultsNote = ref<IntentDefaultsNote | null>(null);
+  const intentId = ref("");
+  // The prefill's source id, reported on the funnel events; a form opened without a prefill is "blank".
+  const alertSource = ref("blank");
 
   const folderQuery = router.currentRoute.value.query.folder;
   // Prefer the folder the caller (AlertList) hands us over the URL query: the
@@ -861,9 +928,13 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   });
 
   const getFormattedDestinations = computed(() => {
-    return props.destinations.map((destination: any) => {
-      return destination.name;
-    });
+    const names: (string | { label: string; value: string })[] = props.destinations.map(
+      (destination: any) => destination.name,
+    );
+    const emailMeOption = emailMe.option.value;
+    return emailMeOption && !names.includes(emailMeOption.value)
+      ? [...names, emailMeOption]
+      : names;
   });
 
   // Threshold mark line for chart
@@ -964,6 +1035,15 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     onInputUpdate("stream_name", stream_name);
   };
 
+  // Only the select calls this: updateStreamFields also runs on SQL sync and prefill, which are not a pick.
+  const pickStream = async (stream_name: string) => {
+    analytics.track("alert_stream_picked", {
+      stream_type: formData.value.stream_type,
+      source: alertSource.value,
+    });
+    await updateStreamFields(stream_name);
+  };
+
   // ── SQL → stream-name sync ──────────────────────────────────────────────
   // When the user edits the SQL query and changes the stream name inside the
   // FROM clause, update the stream-name dropdown to match.
@@ -1061,9 +1141,17 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   // ── SQL Generation ──────────────────────────────────────────────────────
 
+  // Preview-only SQL, so an unfinished row never narrows what the chart shows.
   const generateSqlQueryLocal = () => {
+    const queryCondition = formData.value.query_condition;
     return generateSqlQuery(
-      formData.value,
+      {
+        ...formData.value,
+        query_condition: {
+          ...queryCondition,
+          conditions: pruneIncompleteConditions(queryCondition?.conditions),
+        },
+      },
       streamFieldsMap.value,
       isAggregationEnabled.value,
       store.state.zoConfig.timestamp_column || "_timestamp",
@@ -1071,23 +1159,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   };
 
   const generatedSqlQuery = ref("");
-
-  const allConditionsValid = (conditions: any): boolean => {
-    if (!conditions || typeof conditions !== "object") {
-      return false;
-    }
-    if (conditions.filterType === "condition") {
-      return !!(
-        conditions.column &&
-        (isUnaryOperator(conditions.operator) ||
-          (conditions.value !== undefined && conditions.value !== ""))
-      );
-    }
-    if (conditions.filterType === "group" && Array.isArray(conditions.conditions)) {
-      return conditions.conditions.every((cond: any) => allConditionsValid(cond));
-    }
-    return false;
-  };
 
   const isAggregationValid = (): boolean => {
     if (!isAggregationEnabled.value) {
@@ -1120,16 +1191,14 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         return;
       }
 
-      const hasConditions =
-        formData.value.query_condition?.conditions &&
-        Object.keys(formData.value.query_condition.conditions).length > 0;
-      const conditionsValid =
-        hasConditions && allConditionsValid(formData.value.query_condition.conditions);
+      const previewConditions = pruneIncompleteConditions(
+        formData.value.query_condition?.conditions,
+      );
       const aggregationValid = isAggregationValid();
 
       // If conditions are incomplete/missing, fall back to local SQL so the
       // preview chart still loads with raw stream data (no WHERE clause).
-      if (!conditionsValid || !aggregationValid) {
+      if (!previewConditions || !aggregationValid) {
         const localSql = generateSqlQueryLocal();
         generatedSqlQuery.value = localSql;
         previewQuery.value = localSql;
@@ -1146,7 +1215,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           type: "custom",
           conditions: {
             version: 2,
-            conditions: formData.value.query_condition.conditions,
+            conditions: previewConditions,
           },
         },
       };
@@ -1758,6 +1827,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         value: Array.isArray(activeFolderId.value) ? activeFolderId.value[0] : activeFolderId.value,
       },
       handleAlertError,
+      source: alertSource.value,
     };
 
     const prepareAndSaveAlertFunction = (data: any) => prepareAndSaveAlertUtil(data, saveContext);
@@ -1806,6 +1876,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     if (!prefill) return;
 
     isLoadingPrefill.value = true;
+    alertSource.value = prefill.source;
     try {
       // Mutate a LOCAL working copy, then seed the ONE form with a single
       // resetForm (Rule ③ — `formData` is a readonly read-view).
@@ -1879,6 +1950,14 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       if (prefill.timezone) {
         data.trigger_condition.timezone = prefill.timezone;
       }
+      intentDefaultsNote.value = applyIntentPrefill(
+        data,
+        prefill,
+        store.state.zoConfig?.anomaly_detection_enabled === true,
+      );
+      intentId.value = getAlertSource(prefill.source).intentPath
+        ? (prefill.contextAttributes?.intent_id ?? "")
+        : "";
 
       // A source that carries a real trigger says so explicitly, and is believed.
       // Otherwise: with a threshold expressed inside the query (HAVING / promql
@@ -2411,10 +2490,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       return false;
     }
 
-    const payload = getAlertPayload();
-    // Read before the save: resetForm in .then clears the form the payload came from.
-    const sendsNowhere = !hasDeliveryTarget(payload);
-
     const dismiss = toast({
       variant: "loading",
       message: t("common.pleaseWait"),
@@ -2435,6 +2510,24 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         return false;
       }
     }
+
+    // Email me becomes a real destination before the save, so a failure keeps the alert unsaved.
+    if (
+      !beingUpdated.value &&
+      !(await emailMe.resolve(form.state.values.destinations ?? [], true))
+    ) {
+      dismiss();
+      activeTab.value = "condition";
+      return false;
+    }
+
+    const payload = getAlertPayload();
+    // Read before the save: resetForm in .then clears the form the payload came from.
+    const sendsNowhere = !hasDeliveryTarget(payload);
+    const emailedToast = emailMe.savedToast(
+      [...(payload.destinations ?? []), ...(payload.recovery_destinations ?? [])],
+      payload.template,
+    );
 
     if (formData.value.is_real_time !== "composite") {
       // VERSION HANDLING - wrap conditions with version field for backend
@@ -2491,21 +2584,24 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         store.state.selectedOrganization.identifier,
         payload,
         activeFolderId.value,
+        alertSource.value,
       );
 
       // Same as the update branch: returned below so isSubmitting spans the request.
       const request = callAlert
         .then((res: { data: any }) => {
           resetForm(defaultAlertValue());
-          emit("update:list", activeFolderId.value);
+          emit("update:list", activeFolderId.value, res.data?.id || undefined);
           addAlertForm.value?.resetValidation();
           dismiss();
-          toast({
-            variant: "success",
-            message: sendsNowhere
-              ? t("alerts.messages.alertSavedNoDestination")
-              : t("alerts.messages.alertSaved"),
-          });
+          toast(
+            emailedToast ?? {
+              variant: "success",
+              message: sendsNowhere
+                ? t("alerts.messages.alertSavedNoDestination")
+                : t("alerts.messages.alertSaved"),
+            },
+          );
           showSaveWarnings(res);
         })
         .catch((err: any) => {
@@ -3054,6 +3150,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       setF("is_real_time", "anomaly");
     }
 
+    // Anomaly detection keeps its own destinations, outside this form's field.
+    if (!beingUpdated.value && !isAnomalyMode.value) {
+      void emailMe.preselect(() => form.state.values as any);
+    }
+
     // Load anomaly detection config when editing
     const routeAnomalyId = router.currentRoute.value.params.anomaly_id as string | undefined;
     if (routeAnomalyId) {
@@ -3252,6 +3353,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     validationErrors,
     isLoadingPrefill,
     prefillWarnings,
+    intentDefaultsNote,
+    intentId,
     activeFolderId,
     alertType,
 
@@ -3290,6 +3393,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     getSelectedTab,
     getFormattedDestinations,
     generatedSqlQuery,
+    emailMeError: emailMe.error,
+    resolveEmailMe: emailMe.resolve,
 
     // Form (Rule ③ owner) + write helpers
     form,
@@ -3300,6 +3405,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     editorUpdate,
     updateEditorContent,
     updateStreamFields,
+    pickStream,
     updateStreams,
     filterStreams,
     generateSqlQuery: generateSqlQueryLocal,

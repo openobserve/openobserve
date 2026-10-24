@@ -33,6 +33,7 @@ import { buildPrefillFromLibrary } from "@/utils/alerts/prefill/fromLibrary";
 import { normalizePrefill } from "@/utils/alerts/alertPrefill";
 import { ALERT_PREFILL_KEY } from "@/utils/alerts/alertPrefillStorage";
 import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
+import alertsService from "@/services/alerts";
 
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
@@ -334,6 +335,18 @@ describe("AddAlert — a prefill seeds the form", () => {
       expect(config.mark_line).toEqual([expect.objectContaining({ name: "Critical", value: "2" })]);
       expect(config.y_axis_max).toBeGreaterThan(2);
       expect(config.y_axis_min).toBeLessThan(2);
+    });
+  });
+
+  describe("funnel analytics", () => {
+    it("tags the create with the prefill's source", async () => {
+      wrapper = await openWithPrefill(sqlEntry(), sqlFile());
+
+      await wrapper.vm.form.handleSubmit();
+      await flushPromises();
+
+      expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+      expect((alertsService.create_by_alert_id as any).mock.calls[0][3]).toBe("library");
     });
   });
 });

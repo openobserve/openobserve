@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildPrefillFromLogs, logsAlertSnapshot, type LogsPrefillInput } from "./fromLogs";
 import { isPrefillBlocked, normalizePrefill } from "../alertPrefill";
+import { parseWhereClauseToFilterChecked } from "@/utils/query/sqlUtils";
 
 const logs = (overrides: Partial<LogsPrefillInput> = {}): LogsPrefillInput => ({
   streamNames: ["k8s_logs"],
@@ -16,17 +17,20 @@ const keys = (p: ReturnType<typeof buildPrefillFromLogs>) => p.warnings.map((w) 
 
 describe("buildPrefillFromLogs", () => {
   describe("query selection", () => {
-    it("uses the editor content verbatim in SQL mode", () => {
+    it("uses the editor content in SQL mode, projecting the timestamp instead of *", () => {
       const p = buildPrefillFromLogs(
         logs({ sqlMode: true, rawQuery: 'SELECT * FROM "k8s_logs" WHERE a = 1' }),
       );
-      expect(p.sql).toBe('SELECT * FROM "k8s_logs" WHERE a = 1');
+      expect(p.queryType).toBe("sql");
+      expect(p.sql).toBe('SELECT _timestamp FROM "k8s_logs" WHERE a = 1');
       expect(keys(p)).not.toContain("convertedToSql");
+      expect(keys(p)).toContain("selectStarReplaced");
     });
 
     it("uses the resolved payload in filter mode and says the query changed shape", () => {
       const p = buildPrefillFromLogs(logs());
-      expect(p.sql).toBe('select * from "k8s_logs" WHERE code = 200');
+      expect(p.queryType).toBe("sql");
+      expect(p.sql).toBe('select _timestamp from "k8s_logs" WHERE code = 200');
       expect(keys(p)).toContain("convertedToSql");
     });
 
@@ -41,12 +45,177 @@ describe("buildPrefillFromLogs", () => {
     });
   });
 
+  describe("builder prefill from a filter-mode search", () => {
+    const parsed = (conditions: any[], complete = true) => ({
+      filter: { filterType: "group", logicalOperator: "AND", conditions },
+      complete,
+    });
+    const leaf = (field: string, operator: string, value: any, logicalOperator = "AND") => ({
+      type: "condition",
+      values: [],
+      column: { field, streamAlias: null },
+      operator,
+      value,
+      logicalOperator,
+      filterType: "condition",
+    });
+
+    it("opens the condition builder when the whole filter converts", () => {
+      const p = buildPrefillFromLogs(logs({ parsedFilter: parsed([leaf("code", "=", "200")]) }));
+      expect(p.queryType).toBe("custom");
+      expect(p.sql).toBeUndefined();
+      expect(p.conditions?.filterType).toBe("group");
+      expect(p.conditions?.groupId).toEqual(expect.any(String));
+      expect(p.conditions?.groupId).not.toBe("");
+      expect(p.conditions?.conditions).toEqual([
+        expect.objectContaining({
+          filterType: "condition",
+          column: "code",
+          operator: "=",
+          value: "200",
+          logicalOperator: "AND",
+          id: expect.any(String),
+        }),
+      ]);
+      expect(keys(p)).not.toContain("convertedToSql");
+      expect(isPrefillBlocked(normalizePrefill(p))).toBe(false);
+    });
+
+    it("maps the logs operator spellings onto the alert form's", () => {
+      const p = buildPrefillFromLogs(
+        logs({
+          parsedFilter: parsed([
+            leaf("a", "<>", "1"),
+            leaf("b", "Contains", "x", "OR"),
+            leaf("c", "Not Contains", "y"),
+            leaf("d", "Is Null", null),
+            leaf("e", "Is Not Null", null),
+          ]),
+        }),
+      );
+      const ops = p.conditions?.conditions.map((c: any) => [
+        c.operator,
+        c.value,
+        c.logicalOperator,
+      ]);
+      expect(ops).toEqual([
+        ["!=", "1", "AND"],
+        ["Contains", "x", "OR"],
+        ["NotContains", "y", "AND"],
+        ["is_null", "", "AND"],
+        ["is_not_null", "", "AND"],
+      ]);
+    });
+
+    it("keeps nested groups as nested groups", () => {
+      const nested = {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [leaf("b", "=", "2"), leaf("c", "=", "3", "OR")],
+      };
+      const p = buildPrefillFromLogs(logs({ parsedFilter: parsed([leaf("a", "=", "1"), nested]) }));
+      const group = p.conditions?.conditions[1];
+      expect(group.filterType).toBe("group");
+      expect(group.groupId).toEqual(expect.any(String));
+      expect(group.conditions.map((c: any) => c.column)).toEqual(["b", "c"]);
+    });
+
+    it("opens an empty builder for an empty search", () => {
+      const p = buildPrefillFromLogs(
+        logs({ rawQuery: "", resolvedSql: 'select * from "k8s_logs"' }),
+      );
+      expect(p.queryType).toBe("custom");
+      expect(p.conditions?.conditions).toEqual([]);
+      expect(p.conditions?.groupId).toEqual(expect.any(String));
+      expect(keys(p)).toContain("broadMatch");
+      expect(isPrefillBlocked(normalizePrefill(p))).toBe(false);
+    });
+
+    it("falls back to SQL when the filter only partly parsed", () => {
+      const p = buildPrefillFromLogs(
+        logs({ parsedFilter: parsed([leaf("code", "=", "200")], false) }),
+      );
+      expect(p.queryType).toBe("sql");
+      expect(p.conditions).toBeUndefined();
+      expect(p.sql).toBe('select _timestamp from "k8s_logs" WHERE code = 200');
+      expect(keys(p)).toContain("convertedToSql");
+    });
+
+    it("falls back to SQL when a parsed clause has no builder operator", () => {
+      const p = buildPrefillFromLogs(
+        logs({
+          rawQuery: "str_match(msg, 'x')",
+          resolvedSql: "select * from \"k8s_logs\" WHERE str_match(msg, 'x')",
+          parsedFilter: parsed([leaf("msg", "str_match", "x")]),
+        }),
+      );
+      expect(p.queryType).toBe("sql");
+      expect(keys(p)).toContain("convertedToSql");
+    });
+
+    it("falls back to SQL for an IN list", () => {
+      const list = { ...leaf("a", null as any, null), type: "list", values: ["1", "2"] };
+      expect(buildPrefillFromLogs(logs({ parsedFilter: parsed([list]) })).queryType).toBe("sql");
+    });
+
+    it("keeps SQL when the filter was held", () => {
+      const p = buildPrefillFromLogs(
+        logs({
+          resolvedSql: 'select * from "k8s_logs"',
+          heldFilterDropped: true,
+          parsedFilter: parsed([leaf("code", "=", "200")]),
+        }),
+      );
+      expect(p.queryType).toBe("sql");
+    });
+
+    it("never uses the builder in SQL mode", () => {
+      const p = buildPrefillFromLogs(
+        logs({
+          sqlMode: true,
+          rawQuery: 'SELECT * FROM "k8s_logs" WHERE code = 200',
+          parsedFilter: parsed([leaf("code", "=", "200")]),
+        }),
+      );
+      expect(p.queryType).toBe("sql");
+    });
+
+    it("converts a real parse of a quick-mode filter", async () => {
+      const parsedFilter = await parseWhereClauseToFilterChecked("code = 200 and level != 'debug'");
+      const p = buildPrefillFromLogs(
+        logs({ rawQuery: "code = 200 and level != 'debug'", parsedFilter }),
+      );
+      expect(p.queryType).toBe("custom");
+      expect(p.conditions?.conditions.map((c: any) => [c.column, c.operator, c.value])).toEqual([
+        ["code", "=", "200"],
+        ["level", "!=", "debug"],
+      ]);
+    });
+  });
+
+  describe("select * rewrite", () => {
+    it("projects the configured timestamp column", () => {
+      const p = buildPrefillFromLogs(
+        logs({ sqlMode: true, rawQuery: 'select * from "a"', timestampColumn: "ts" }),
+      );
+      expect(p.sql).toBe('select ts from "a"');
+    });
+
+    it("leaves an explicit projection alone", () => {
+      const p = buildPrefillFromLogs(
+        logs({ sqlMode: true, rawQuery: 'SELECT count(*) AS total FROM "a"' }),
+      );
+      expect(p.sql).toBe('SELECT count(*) AS total FROM "a"');
+      expect(keys(p)).not.toContain("selectStarReplaced");
+    });
+  });
+
   describe("display-only clauses", () => {
     it("strips LIMIT, which would otherwise cap the alert's count", () => {
       const p = buildPrefillFromLogs(
         logs({ sqlMode: true, rawQuery: 'SELECT * FROM "k8s_logs" LIMIT 100' }),
       );
-      expect(p.sql).toBe('SELECT * FROM "k8s_logs"');
+      expect(p.sql).toBe('SELECT _timestamp FROM "k8s_logs"');
       expect(keys(p)).toContain("limitStripped");
     });
 
@@ -54,14 +223,16 @@ describe("buildPrefillFromLogs", () => {
       const p = buildPrefillFromLogs(
         logs({ sqlMode: true, rawQuery: 'SELECT * FROM "k8s_logs" ORDER BY _timestamp DESC' }),
       );
-      expect(p.sql).toBe('SELECT * FROM "k8s_logs"');
+      expect(p.sql).toBe('SELECT _timestamp FROM "k8s_logs"');
       expect(keys(p)).toContain("orderByStripped");
     });
 
     it("leaves a subquery's LIMIT alone", () => {
       const sql = 'SELECT * FROM "k8s_logs" WHERE id IN (SELECT id FROM "t" LIMIT 5)';
       const p = buildPrefillFromLogs(logs({ sqlMode: true, rawQuery: sql }));
-      expect(p.sql).toBe(sql);
+      expect(p.sql).toBe(
+        'SELECT _timestamp FROM "k8s_logs" WHERE id IN (SELECT id FROM "t" LIMIT 5)',
+      );
     });
   });
 
@@ -168,7 +339,7 @@ describe("buildPrefillFromLogs", () => {
       expect(keys(p)).toContain("broadMatch");
       expect(keys(p)).not.toContain("convertedToSql");
       expect(isPrefillBlocked(p)).toBe(false);
-      expect(p.sql).toBe('select * from "k8s_logs"');
+      expect(p.sql).toBe('select _timestamp from "k8s_logs"');
     });
 
     it("notes an empty result set without blocking", () => {
@@ -253,6 +424,19 @@ describe("logsAlertSnapshot", () => {
       true,
     );
     expect(logsAlertSnapshot(searchObj(), "SELECT 1").heldFilterDropped).toBeFalsy();
+  });
+
+  it("carries the parsed filter and timestamp column through to the adapter", () => {
+    const parsedFilter = {
+      filter: { filterType: "group", logicalOperator: "AND", conditions: [] },
+      complete: true,
+    };
+    const snapshot = logsAlertSnapshot(searchObj(), "SELECT 1", undefined, false, {
+      parsedFilter,
+      timestampColumn: "ts",
+    });
+    expect(snapshot.parsedFilter).toBe(parsedFilter);
+    expect(snapshot.timestampColumn).toBe("ts");
   });
 
   it("feeds the adapter end to end", () => {

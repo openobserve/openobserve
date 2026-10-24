@@ -77,6 +77,21 @@ describe("OFormCombobox", () => {
     expect(wrapper.text()).toContain("Series is required");
   });
 
+  it("marks the error with the field's data-test, as OFormInput does", async () => {
+    wrapper = mount(OForm, {
+      props: {
+        defaultValues: { series: "" },
+        schema: z.object({ series: z.string().min(1, "Series is required") }),
+      },
+      slots: {
+        default: () => h(OFormCombobox, { name: "series", items, "data-test": "series" }),
+      },
+      global: { components: { OFormCombobox } },
+    });
+    await driveSubmit(wrapper);
+    expect(wrapper.find('[data-test="series-error"]').text()).toBe("Series is required");
+  });
+
   it("clears the error on change after submit", async () => {
     wrapper = mount(OForm, {
       props: {

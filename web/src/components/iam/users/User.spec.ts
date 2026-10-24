@@ -25,6 +25,10 @@ import organizationsService from "@/services/organizations";
 import { getRoles } from "@/services/iam";
 import analytics from "@/services/product_analytics";
 import { queryClient } from "@/composables/query/queryClient";
+import alertsService from "@/services/alerts";
+import settingsService from "@/services/settings";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import { LEAVER_LOOKUP_TIMEOUT_MS } from "@/composables/alerts/useLeaverAlerts";
 
 // Create i18n instance with comprehensive translations for CI/CD compatibility
 const i18n = createI18n({
@@ -52,6 +56,14 @@ vi.mock("@/services/organizations", async (importOriginal) => {
   return automockService(await importOriginal());
 });
 vi.mock("@/services/iam", async (importOriginal) => {
+  const { automockService } = await import("@/test/unit/helpers/mockService");
+  return automockService(await importOriginal());
+});
+vi.mock("@/services/alerts", async (importOriginal) => {
+  const { automockService } = await import("@/test/unit/helpers/mockService");
+  return automockService(await importOriginal());
+});
+vi.mock("@/services/settings", async (importOriginal) => {
   const { automockService } = await import("@/test/unit/helpers/mockService");
   return automockService(await importOriginal());
 });
@@ -199,6 +211,8 @@ const mockUsersService = vi.mocked(usersService);
 const mockOrganizationsService = vi.mocked(organizationsService);
 const mockGetRoles = vi.mocked(getRoles);
 const mockAnalytics = vi.mocked(analytics);
+const mockAlertsService = vi.mocked(alertsService);
+const mockSettingsService = vi.mocked(settingsService);
 
 beforeAll(() => {
   process.env.TZ = "UTC";
@@ -1133,6 +1147,167 @@ describe("User Component", () => {
       wrapper.vm.confirmDelete = true;
       await wrapper.vm.deleteUser();
       expect(wrapper.vm.confirmDelete).toBe(false);
+    });
+  });
+
+  describe("Leaver alerts on delete", () => {
+    const leaverAlerts = [
+      { alert_id: "a1", name: "CPU high", folder_id: "default" },
+      { alert_id: "a2", name: "Disk full", folder_id: "ops" },
+    ];
+    const deleteDialog = () =>
+      wrapper.findAllComponents(ODialogStub).find((d: any) => d.props("title") === "Delete User")!;
+
+    const moveCheckbox = () =>
+      wrapper
+        .findAllComponents(OCheckbox)
+        .find((c: any) => c.attributes("data-test") === "user-delete-leaver-move-checkbox")!;
+
+    const openDelete = async () => {
+      wrapper.vm.confirmDeleteAction({ email: "leaver@example.com" });
+      await flushPromises();
+    };
+
+    const confirm = async () => {
+      await deleteDialog().vm.$emit("click:primary");
+      await flushPromises();
+    };
+
+    beforeEach(() => {
+      queryClient.clear();
+      mockAlertsService.list_by_sole_recipient.mockResolvedValue({
+        data: { list: leaverAlerts },
+      } as any);
+      mockSettingsService.getSetting.mockResolvedValue({
+        data: { setting_value: { destination: "team-email" } },
+      } as any);
+      mockAlertsService.get_by_alert_id.mockImplementation(
+        async (_org: string, id: string) =>
+          ({
+            data: {
+              id,
+              name: id,
+              destinations: [`email-leaver@example.com`],
+              recovery_destinations: [`email-leaver@example.com`],
+              enabled: true,
+            },
+          }) as any,
+      );
+      mockAlertsService.update_by_alert_id.mockResolvedValue({ data: {} } as any);
+    });
+
+    it("lists the alerts whose only recipient is the user", async () => {
+      await openDelete();
+      expect(mockAlertsService.list_by_sole_recipient).toHaveBeenCalledWith(
+        store.state.selectedOrganization.identifier,
+        "leaver@example.com",
+      );
+      const list = wrapper.find('[data-test="user-delete-leaver-alerts"]');
+      expect(list.exists()).toBe(true);
+      expect(list.text()).toContain("CPU high");
+      expect(list.text()).toContain("Disk full");
+      expect(wrapper.find('[data-test="user-delete-leaver-move-checkbox"]').exists()).toBe(true);
+    });
+
+    it("moves each listed alert to the org default when opted in", async () => {
+      await openDelete();
+      await moveCheckbox().vm.$emit("update:modelValue", true);
+      await confirm();
+      expect(mockAlertsService.update_by_alert_id).toHaveBeenCalledTimes(2);
+      expect(mockAlertsService.update_by_alert_id).toHaveBeenCalledWith(
+        store.state.selectedOrganization.identifier,
+        expect.objectContaining({
+          id: "a1",
+          destinations: ["team-email"],
+          recovery_destinations: ["team-email"],
+          enabled: true,
+        }),
+        "default",
+      );
+      expect(mockAlertsService.update_by_alert_id).toHaveBeenCalledWith(
+        store.state.selectedOrganization.identifier,
+        expect.objectContaining({ id: "a2", destinations: ["team-email"] }),
+        "ops",
+      );
+      expect(mockUsersService.delete).toHaveBeenCalledWith(
+        store.state.selectedOrganization.identifier,
+        "leaver@example.com",
+      );
+    });
+
+    it("leaves the alerts untouched when not opted in", async () => {
+      await openDelete();
+      await confirm();
+      expect(mockAlertsService.get_by_alert_id).not.toHaveBeenCalled();
+      expect(mockAlertsService.update_by_alert_id).not.toHaveBeenCalled();
+      expect(mockUsersService.delete).toHaveBeenCalledWith(
+        store.state.selectedOrganization.identifier,
+        "leaver@example.com",
+      );
+    });
+
+    it("offers no move when the org has no default destination", async () => {
+      mockSettingsService.getSetting.mockRejectedValue({ response: { status: 404 } });
+      await openDelete();
+      expect(wrapper.find('[data-test="user-delete-leaver-alerts"]').text()).toContain("CPU high");
+      expect(wrapper.find('[data-test="user-delete-leaver-move-checkbox"]').exists()).toBe(false);
+    });
+
+    it("still deletes, with no list, when the alert query fails", async () => {
+      mockAlertsService.list_by_sole_recipient.mockRejectedValue({ response: { status: 500 } });
+      await openDelete();
+      expect(wrapper.find('[data-test="user-delete-leaver-alerts"]').exists()).toBe(false);
+      await confirm();
+      expect(mockUsersService.delete).toHaveBeenCalledWith(
+        store.state.selectedOrganization.identifier,
+        "leaver@example.com",
+      );
+    });
+
+    it("holds the confirm in a loading state until the lookup settles", async () => {
+      let answer: (value: any) => void = () => {};
+      mockAlertsService.list_by_sole_recipient.mockReturnValue(
+        new Promise((resolve) => (answer = resolve)) as any,
+      );
+      await openDelete();
+      expect(deleteDialog().props("primaryButtonLoading")).toBe(true);
+      await confirm();
+      expect(mockUsersService.delete).not.toHaveBeenCalled();
+      answer({ data: { list: leaverAlerts } });
+      await flushPromises();
+      expect(deleteDialog().props("primaryButtonLoading")).toBe(false);
+      expect(wrapper.find('[data-test="user-delete-leaver-alerts"]').text()).toContain("CPU high");
+      await moveCheckbox().vm.$emit("update:modelValue", true);
+      await confirm();
+      expect(mockAlertsService.update_by_alert_id).toHaveBeenCalledTimes(2);
+      expect(mockUsersService.delete).toHaveBeenCalledTimes(1);
+    });
+
+    it("releases the confirm, with no list, when the lookup outlasts its time limit", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      mockAlertsService.list_by_sole_recipient.mockReturnValue(new Promise(() => {}) as any);
+      await openDelete();
+      expect(deleteDialog().props("primaryButtonLoading")).toBe(true);
+      await vi.advanceTimersByTimeAsync(LEAVER_LOOKUP_TIMEOUT_MS);
+      await flushPromises();
+      expect(deleteDialog().props("primaryButtonLoading")).toBe(false);
+      expect(wrapper.find('[data-test="user-delete-leaver-alerts"]').exists()).toBe(false);
+      await confirm();
+      expect(mockUsersService.delete).toHaveBeenCalledWith(
+        store.state.selectedOrganization.identifier,
+        "leaver@example.com",
+      );
+    });
+
+    it("still deletes when moving an alert fails", async () => {
+      mockAlertsService.update_by_alert_id.mockRejectedValue({ response: { status: 500 } });
+      await openDelete();
+      await moveCheckbox().vm.$emit("update:modelValue", true);
+      await confirm();
+      expect(mockUsersService.delete).toHaveBeenCalledWith(
+        store.state.selectedOrganization.identifier,
+        "leaver@example.com",
+      );
     });
   });
 

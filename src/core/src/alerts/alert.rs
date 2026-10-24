@@ -503,6 +503,20 @@ fn validate_custom_group_by(
         })
 }
 
+/// Refuses to enable a rule-mode alert whose metric stream has not arrived yet.
+async fn check_rule_stream_exists(org_id: &str, alert: &Alert) -> Result<(), AlertError> {
+    if !alert.query_condition.promql_rule_mode {
+        return Ok(());
+    }
+    let schema = infra::schema::get(org_id, &alert.stream_name, alert.stream_type).await?;
+    if schema.fields().is_empty() {
+        return Err(AlertError::StreamNotFound {
+            stream_name: alert.stream_name.clone(),
+        });
+    }
+    Ok(())
+}
+
 /// Structural half only: `{var}` tokens are unresolved until send time, so a body shaped right but
 /// malformed still fails at send. A CONTENT template always renders an object.
 fn platform_body_is_addressable(kind: TemplateKind, body: &str) -> bool {
@@ -697,10 +711,23 @@ async fn prepare_alert(
     }
 
     let stream_type = alert.stream_type;
+    // A paused rule keeps its first referenced metric as a placeholder until it arrives.
+    let mut stream_pending = false;
     let stream_name = if stream_name.is_empty() && alert.query_condition.promql_rule_mode {
-        super::prom_rule::infer_stream(org_id, &alert.query_condition)
-            .await
-            .map_err(|e| AlertError::PromRuleStreamMissing(e.to_string()))?
+        match super::prom_rule::infer_stream(org_id, &alert.query_condition).await {
+            Ok(super::prom_rule::RuleStream::Existing(name)) => name,
+            Ok(super::prom_rule::RuleStream::Absent { first }) if !alert.enabled => {
+                stream_pending = true;
+                first
+            }
+            Ok(super::prom_rule::RuleStream::Absent { .. }) => {
+                return Err(AlertError::PromRuleStreamMissing(
+                    "expression has no referenced existing metrics stream; supply stream_name"
+                        .to_string(),
+                ));
+            }
+            Err(e) => return Err(AlertError::PromRuleStreamMissing(e.to_string())),
+        }
     } else {
         stream_name.to_string()
     };
@@ -860,7 +887,8 @@ async fn prepare_alert(
     // everything after it still applies, notably the realtime rejection: an
     // SLO alert is not `Custom`, so a realtime one is refused exactly as any
     // other non-Custom realtime alert is.
-    if !is_slo_alert {
+    // A pending stream has no schema to validate against until the metric arrives.
+    if !is_slo_alert && !stream_pending {
         // before saving alert check column type to decide numeric condition
         let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
         if stream_name.is_empty() || schema.fields().is_empty() {
@@ -2250,6 +2278,10 @@ pub async fn enable_by_name(
             }
         };
     alert.enabled = value;
+    // Enabling is the moment the alert starts measuring, so the stream must exist.
+    if value {
+        check_rule_stream_exists(org_id, &alert).await?;
+    }
     db::alerts::alert::set(org_id, alert, false).await?;
     Ok(())
 }
@@ -9363,5 +9395,99 @@ mod rule_notification_tests {
             .await
             .unwrap_err();
         assert!(matches!(error, AlertError::PromqlMissingQuery));
+    }
+}
+
+#[cfg(test)]
+mod rule_stream_save_tests {
+    use arrow_schema::{DataType, Field, Schema};
+    use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+    use super::*;
+
+    fn metrics_key(org: &str, metric: &str) -> String {
+        format!("{org}/metrics/{metric}")
+    }
+
+    async fn put_schema(org: &str, metric: &str, exists: bool) {
+        let schema = if exists {
+            Schema::new(vec![Field::new("value", DataType::Float64, false)])
+        } else {
+            Schema::empty()
+        };
+        STREAM_SCHEMAS_LATEST
+            .write()
+            .await
+            .insert(metrics_key(org, metric), SchemaCache::new(schema));
+    }
+
+    async fn clear_schemas(org: &str, metrics: &[&str]) {
+        let mut cache = STREAM_SCHEMAS_LATEST.write().await;
+        for metric in metrics {
+            cache.remove(&metrics_key(org, metric));
+        }
+    }
+
+    fn paused_rule_alert(org: &str, promql: &str) -> Alert {
+        let mut alert = Alert::default();
+        alert.name = "rule".into();
+        alert.org_id = org.into();
+        alert.stream_type = StreamType::Metrics;
+        alert.query_condition.query_type = QueryType::PromQL;
+        alert.query_condition.promql_rule_mode = true;
+        alert.query_condition.promql = Some(promql.into());
+        alert
+    }
+
+    #[tokio::test]
+    async fn a_paused_rule_mode_alert_saves_against_its_first_referenced_metric() {
+        let org = "paused-rule-missing-metric";
+        put_schema(org, "http_requests_total", false).await;
+        let mut alert = paused_rule_alert(org, "rate(http_requests_total[5m])");
+        alert.enabled = false;
+        let result = prepare_alert(org, "", "rule", &mut alert, true, false).await;
+        clear_schemas(org, &["http_requests_total"]).await;
+        let _ = result.expect("a paused rule with a missing metric must save");
+        assert_eq!(alert.stream_name, "http_requests_total");
+    }
+
+    #[tokio::test]
+    async fn an_enabled_rule_mode_alert_still_fails_when_its_metric_is_missing() {
+        let org = "enabled-rule-missing-metric";
+        put_schema(org, "http_requests_total", false).await;
+        let mut alert = paused_rule_alert(org, "rate(http_requests_total[5m])");
+        alert.enabled = true;
+        let result = prepare_alert(org, "", "rule", &mut alert, true, false).await;
+        clear_schemas(org, &["http_requests_total"]).await;
+        assert!(matches!(result, Err(AlertError::PromRuleStreamMissing(_))));
+    }
+
+    #[tokio::test]
+    async fn a_paused_rule_mode_alert_still_rejects_invalid_promql() {
+        let org = "paused-rule-invalid-promql";
+        let mut alert = paused_rule_alert(org, "rate(");
+        alert.enabled = false;
+        let result = prepare_alert(org, "", "rule", &mut alert, true, false).await;
+        assert!(matches!(result, Err(AlertError::PromRuleStreamMissing(_))));
+    }
+
+    #[tokio::test]
+    async fn enabling_a_rule_mode_alert_requires_its_stream_to_exist() {
+        let org = "rule-stream-exists";
+        let mut alert = paused_rule_alert(org, "rate(http_requests_total[5m])");
+        alert.stream_name = "http_requests_total".into();
+
+        put_schema(org, "http_requests_total", false).await;
+        assert!(matches!(
+            check_rule_stream_exists(org, &alert).await,
+            Err(AlertError::StreamNotFound { .. })
+        ));
+
+        put_schema(org, "http_requests_total", true).await;
+        assert!(check_rule_stream_exists(org, &alert).await.is_ok());
+
+        let ordinary = Alert::default();
+        assert!(check_rule_stream_exists(org, &ordinary).await.is_ok());
+        clear_schemas(org, &["http_requests_total"]).await;
     }
 }

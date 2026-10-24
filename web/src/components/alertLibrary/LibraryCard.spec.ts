@@ -342,4 +342,79 @@ describe("LibraryCard", () => {
       expect(open.find('[data-test="alert-library-card-enterprise"]').exists()).toBe(false);
     });
   });
+
+  describe("one-click add", () => {
+    it("emits add from the Add button without opening the drawer", async () => {
+      const wrapper = mountCard();
+      await wrapper
+        .find('[data-test="alert-library-card-add-k8s/pod-oom-killed"]')
+        .trigger("click");
+      expect(wrapper.emitted("add")).toHaveLength(1);
+      expect(wrapper.emitted("open")).toBeUndefined();
+    });
+
+    it("emits customize from the menu's Customize item", async () => {
+      // The real menu renders its items only while open, through a portal.
+      const wrapper = mount(LibraryCard, {
+        props: { entry, ready: true },
+        global: {
+          plugins: [i18n],
+          stubs: {
+            ODropdown: { template: "<div><slot name='trigger' /><slot /></div>" },
+            ODropdownItem: {
+              emits: ["select"],
+              template:
+                "<button v-bind='$attrs' @click=\"$emit('select', $event)\"><slot /></button>",
+            },
+          },
+        },
+      });
+      await wrapper
+        .find('[data-test="alert-library-card-customize-k8s/pod-oom-killed"]')
+        .trigger("click");
+      expect(wrapper.emitted("customize")).toHaveLength(1);
+    });
+
+    it("blocks Add and names the missing stream", () => {
+      const wrapper = mountCard({ ready: false, missingStreams: ["kube_node_info"] });
+      const add = wrapper.find('[data-test="alert-library-card-add-k8s/pod-oom-killed"]');
+      expect(add.attributes("disabled")).toBeDefined();
+      const reason = wrapper.find('[data-test="alert-library-card-add-blocked"]');
+      expect(reason.attributes("title")).toContain("kube_node_info");
+    });
+
+    it("does not emit add while blocked", async () => {
+      const wrapper = mountCard({ ready: false, missingStreams: ["kube_node_info"] });
+      await wrapper
+        .find('[data-test="alert-library-card-add-k8s/pod-oom-killed"]')
+        .trigger("click");
+      expect(wrapper.emitted("add")).toBeUndefined();
+    });
+
+    it("shows the Added tag only for a rule the org has", () => {
+      expect(mountCard().find('[data-test="alert-library-card-added"]').exists()).toBe(false);
+      const added = mountCard({ added: true }).find('[data-test="alert-library-card-added"]');
+      expect(added.text()).toBe("Added");
+    });
+  });
+  describe("label readiness", () => {
+    it("says which label value is missing once the rule's file was checked", () => {
+      const note = mountCard({ needsLabels: "job hadoop-namenode" }).find(
+        '[data-test="alert-library-card-needs-labels"]',
+      );
+      expect(note.text()).toBe("Needs data: job hadoop-namenode");
+    });
+
+    it("says nothing about labels before a check", () => {
+      expect(mountCard().find('[data-test="alert-library-card-needs-labels"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("leaves the missing-stream chip in charge when the stream itself is absent", () => {
+      const wrapper = mountCard({ ready: false, needsLabels: "job hadoop-namenode" });
+      expect(wrapper.find('[data-test="alert-library-card-needs-labels"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="alert-library-card-needs-data"]').exists()).toBe(true);
+    });
+  });
 });

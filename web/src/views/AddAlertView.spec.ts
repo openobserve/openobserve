@@ -1,16 +1,27 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 import AddAlertView from "./AddAlertView.vue";
 import destinationService from "@/services/alert_destination";
 import alertsService from "@/services/alerts";
+import templateService from "@/services/alert_templates";
+import { queryClient } from "@/composables/query/queryClient";
 
 vi.mock("@/services/alert_destination", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
     default: {
       list: vi.fn(),
+    },
+  });
+});
+
+vi.mock("@/services/alert_templates", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(() => Promise.resolve({ data: [] })),
     },
   });
 });
@@ -55,7 +66,80 @@ describe("AddAlertView.vue", () => {
           name: "editAlert",
           component: { template: "<div>Edit</div>" },
         },
+        {
+          path: "/alerts/detail/:alert_id",
+          name: "alertDetail",
+          component: { template: "<div>Detail</div>" },
+        },
       ],
+    });
+  });
+
+  describe("after save and templates", () => {
+    const AddAlertStub = {
+      name: "AddAlert",
+      props: ["modelValue", "isUpdated", "destinations", "templates"],
+      template: '<div class="add-alert-stub"></div>',
+    };
+    const mountView = async () => {
+      vi.mocked(destinationService.list).mockResolvedValue({ data: [] } as any);
+      const wrapper = mount(AddAlertView, {
+        global: { plugins: [store, router], stubs: { AddAlert: AddAlertStub } },
+      });
+      await flushPromises();
+      return wrapper;
+    };
+
+    beforeEach(() => queryClient.clear());
+    // The router uses the real jsdom history, so a navigation here would leak its URL into later tests.
+    afterEach(() => window.history.replaceState({}, "", "/"));
+
+    it("passes the org's templates to the form", async () => {
+      const templates = [{ name: "default_template" }];
+      vi.mocked(templateService.list).mockResolvedValue({ data: templates } as any);
+      const wrapper = await mountView();
+      expect(templateService.list).toHaveBeenCalledWith(
+        expect.objectContaining({ org_identifier: "test-org" }),
+      );
+      expect(wrapper.findComponent({ name: "AddAlert" }).props("templates")).toEqual(templates);
+    });
+
+    it("refetches templates when the form asks for a refresh", async () => {
+      vi.mocked(templateService.list).mockResolvedValue({ data: [{ name: "a" }] } as any);
+      const wrapper = await mountView();
+      vi.mocked(templateService.list).mockResolvedValue({ data: [{ name: "b" }] } as any);
+
+      wrapper.findComponent({ name: "AddAlert" }).vm.$emit("refresh:templates");
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "AddAlert" }).props("templates")).toEqual([
+        { name: "b" },
+      ]);
+    });
+
+    it("opens the new alert's detail page after a create", async () => {
+      const wrapper = await mountView();
+      const pushSpy = vi.spyOn(router, "push");
+
+      wrapper.findComponent({ name: "AddAlert" }).vm.$emit("update:list", "team-a", "new-id");
+      await flushPromises();
+
+      expect(pushSpy).toHaveBeenCalledWith({
+        name: "alertDetail",
+        params: { alert_id: "new-id" },
+        query: { org_identifier: "test-org", folder: "team-a" },
+      });
+    });
+
+    it("returns to the list after an edit", async () => {
+      const wrapper = await mountView();
+      const pushSpy = vi.spyOn(router, "push");
+
+      wrapper.findComponent({ name: "AddAlert" }).vm.$emit("update:list", "team-a");
+      await flushPromises();
+
+      expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ name: "alertList" }));
+      expect(pushSpy).not.toHaveBeenCalledWith(expect.objectContaining({ name: "alertDetail" }));
     });
   });
 

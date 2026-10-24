@@ -452,3 +452,23 @@ describe("getMetricUsage", () => {
     expect(get).toHaveBeenCalledWith("/api/test-org/metrics/a%3Ab%2Fc/usage", { signal });
   });
 });
+
+describe("labels", () => {
+  it("scopes the label names to one metric when match is given", async () => {
+    const get = vi.fn().mockResolvedValue({ data: {} });
+    (http as any).mockReturnValue({ get });
+
+    await metrics.labels({ org_identifier: "o", match: "up", start_time: 1, end_time: 2 });
+
+    expect(get).toHaveBeenCalledWith("/api/o/prometheus/api/v1/labels?match[]=up&start=1&end=2");
+  });
+
+  it("keeps the org-wide URL without match", async () => {
+    const get = vi.fn().mockResolvedValue({ data: {} });
+    (http as any).mockReturnValue({ get });
+
+    await metrics.labels({ org_identifier: "o", start_time: 1, end_time: 2 });
+
+    expect(get).toHaveBeenCalledWith("/api/o/prometheus/api/v1/labels?start=1&end=2");
+  });
+});

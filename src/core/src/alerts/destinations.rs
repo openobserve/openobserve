@@ -437,6 +437,12 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
 
     db::alerts::destinations::delete(org_id, name).await?;
     remove_ownership(org_id, "destinations", Authz::new(name)).await;
+    // The destination is already gone, and the reader treats a dangling pointer as unset.
+    if let Err(e) =
+        super::notifications::org_default_destination::clear_if_points_to(org_id, name).await
+    {
+        log::error!("[DESTINATIONS] clear default_alert_destination for {org_id}/{name}: {e}");
+    }
     Ok(())
 }
 
