@@ -667,7 +667,8 @@ pub async fn move_dashboard(
             )
             .await;
         }
-        if get_openfga_config().enabled {
+        // A same-folder move would delete the only parent tuple, cutting off folder grants.
+        if get_openfga_config().enabled && curr_folder.folder_id != to_folder {
             set_parent_relation(
                 dashboard_id,
                 &get_ofga_type("dashboards"),
