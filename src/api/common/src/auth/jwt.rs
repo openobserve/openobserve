@@ -246,7 +246,12 @@ pub async fn process_token(
 
             // Add the user to the newly added organizations
             for org in orgs_added {
-                let _ = organization::check_and_create_org(&org.name).await;
+                if let Err(error) = organization::check_and_create_org(&org.name).await {
+                    log::warn!(
+                        "Failed to auto-create organization '{}': {error}",
+                        &org.name
+                    );
+                }
 
                 match users::add_user_to_org(
                     &org.name,
@@ -372,7 +377,12 @@ pub async fn process_token(
 
                     // Create the org if it does not exist. `org.name` is the id of the org.
                     // Also it creates necessary ofga tuples for the newly created org
-                    let _ = organization::check_and_create_org(&org.name).await;
+                    if let Err(error) = organization::check_and_create_org(&org.name).await {
+                        log::warn!(
+                            "Failed to auto-create organization '{}': {error}",
+                            &org.name
+                        );
+                    }
 
                     if index == 0 {
                         // this is to allow user call organization api with org
@@ -493,7 +503,12 @@ async fn map_group_to_custom_role(
         };
 
         // Always create default org (system org)
-        let _ = organization::check_and_create_org(&dex_cfg.default_org).await;
+        if let Err(error) = organization::check_and_create_org(&dex_cfg.default_org).await {
+            log::warn!(
+                "Failed to auto-create organization '{}': {error}",
+                &dex_cfg.default_org
+            );
+        }
 
         let custom_orgs =
             validate_and_filter_custom_orgs(&custom_roles, &dex_cfg.default_org, user_email).await;

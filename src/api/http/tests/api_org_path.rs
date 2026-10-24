@@ -193,8 +193,27 @@ async fn a_member_reaches_a_v2_route_of_their_org() -> Option<String> {
 async fn a_blank_org_is_refused() -> Option<String> {
     let status = send(app(), kv_set("/api//kv/blank")).await;
     let stored = written("", "blank").await || written("kv", "blank").await;
-    (status != StatusCode::FORBIDDEN || stored)
-        .then(|| format!("/api//kv/blank: answered {status} (stored: {stored}) instead of 403"))
+    (status != StatusCode::NOT_FOUND || stored)
+        .then(|| format!("/api//kv/blank: answered {status} (stored: {stored}) instead of 404"))
+}
+
+async fn empty_org_folder_routes_are_not_found() -> Vec<Option<String>> {
+    let mut failures = Vec::new();
+    for folder_type in ["dashboards", "alerts"] {
+        let uri = format!("/api/v2//folders/{folder_type}");
+        let request = as_user(
+            Method::POST,
+            &uri,
+            MEMBER,
+            r#"{"description":"newfoldernvp","name":"test"}"#,
+        );
+        let status = send(app(), request).await;
+        failures.push(
+            (status != StatusCode::NOT_FOUND)
+                .then(|| format!("{uri}: answered {status} instead of 404")),
+        );
+    }
+    failures
 }
 
 fn refused(status: StatusCode) -> bool {
@@ -377,6 +396,7 @@ async fn the_org_auth_checks_is_the_org_the_route_serves() {
         ingest_is_refused("gcp", pubsub_request_for_gcp()).await,
     ];
     failures.extend(a_v2_member_is_refused_a_v2_module_route_of_another_org().await);
+    failures.extend(empty_org_folder_routes_are_not_found().await);
     failures.extend(behind_base_uri_cases().await);
     let failures: Vec<String> = failures.into_iter().flatten().collect();
     assert!(failures.is_empty(), "{failures:#?}");

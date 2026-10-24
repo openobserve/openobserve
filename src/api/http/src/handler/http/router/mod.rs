@@ -265,21 +265,24 @@ fn attach_mcp_www_authenticate(_org_id: &str, resp: Response) -> Response {
     resp
 }
 
-/// Whether the router bound `{org_id}` to a segment other than the one the auth layers check.
-async fn routed_org_differs(parts: &mut Parts) -> bool {
+/// Rejects missing organizations and disagreements between routing and auth.
+async fn validate_routed_org(parts: &mut Parts) -> Result<(), AuthError> {
     let Ok(params) = RawPathParams::from_request_parts(parts, &()).await else {
-        return false;
+        return Ok(());
     };
     let Some((_, routed_org)) = params.iter().find(|(name, _)| *name == "org_id") else {
-        return false;
+        return Ok(());
     };
     // The nest strip drops an empty `{org_id}` segment from the URI, so auth checks the next one.
     if routed_org.is_empty() {
-        return true;
+        return Err(AuthError::NotFound("Organization not found".to_string()));
     }
     let path_columns: Vec<&str> = routed_path(parts.uri.path()).split('/').collect();
     // The router hands over the decoded param, so compare it with the decoded segment.
-    !urlencoding::decode(org_from_path(&path_columns)).is_ok_and(|org| org == routed_org)
+    if !urlencoding::decode(org_from_path(&path_columns)).is_ok_and(|org| org == routed_org) {
+        return Err(AuthError::Forbidden("Unauthorized Access".to_string()));
+    }
+    Ok(())
 }
 
 /// Authentication middleware for API routes.
@@ -299,8 +302,8 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
     let (mut parts, body) = request.into_parts();
     let uri = req_data.uri.clone();
     // The auth layers check one org, so the handler must serve that same org.
-    if routed_org_differs(&mut parts).await {
-        return AuthError::Forbidden("Unauthorized Access".to_string()).into_response();
+    if let Err(error) = validate_routed_org(&mut parts).await {
+        return error.into_response();
     }
     let auth_info = match AuthExtractor::from_request_parts(&mut parts, &()).await {
         Ok(info) => info,
@@ -3228,8 +3231,8 @@ mod tests {
     async fn the_routed_org_must_be_the_org_the_auth_layers_check() {
         async fn guard(request: axum::extract::Request, next: Next) -> Response {
             let (mut parts, body) = request.into_parts();
-            if routed_org_differs(&mut parts).await {
-                return StatusCode::FORBIDDEN.into_response();
+            if let Err(error) = validate_routed_org(&mut parts).await {
+                return error.into_response();
             }
             next.run(Request::from_parts(parts, body)).await
         }
@@ -3257,7 +3260,7 @@ mod tests {
                 .layer(middleware::from_fn(guard)),
         );
         for (uri, expected) in [
-            ("/api//kv/note", StatusCode::FORBIDDEN),
+            ("/api//kv/note", StatusCode::NOT_FOUND),
             ("/api/acme/kv/note", StatusCode::OK),
         ] {
             let request = Request::get(uri).body(Body::empty()).unwrap();

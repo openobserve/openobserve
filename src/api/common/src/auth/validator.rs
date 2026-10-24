@@ -975,6 +975,9 @@ async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Res
             && ingestion_routes::is_ingestion_write(method, path)
             && openobserve_core::organization::check_and_create_org(org_id)
                 .await
+                .inspect_err(|error| {
+                    log::warn!("Failed to auto-create organization '{org_id}': {error}");
+                })
                 .is_ok()
         {
             Ok(())
