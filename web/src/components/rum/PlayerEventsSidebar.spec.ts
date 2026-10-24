@@ -454,8 +454,14 @@ describe("PlayerEventsSidebar", () => {
   // ==========================================================================
 
   describe("Event Filtering", () => {
-    it("should have all 4 event types selected by default", () => {
-      expect(wrapper.vm.selectedEventTypes).toEqual(["error", "action", "view", "frustration"]);
+    it("should have all 5 event types selected by default", () => {
+      expect(wrapper.vm.selectedEventTypes).toEqual([
+        "error",
+        "action",
+        "view",
+        "frustration",
+        "failed_request",
+      ]);
     });
 
     it("should have correct event type options list", () => {
@@ -464,7 +470,29 @@ describe("PlayerEventsSidebar", () => {
         { label: "Action", value: "action" },
         { label: "View", value: "view" },
         { label: "Frustration", value: "frustration" },
+        { label: "Failed requests", value: "failed_request" },
       ]);
+    });
+
+    it("should list failed requests by default and drop them when the type is deselected", async () => {
+      await wrapper.setProps({
+        events: [
+          ...mockEvents,
+          {
+            id: "event4",
+            type: "failed_request",
+            name: "403 GET /api/items",
+            displayTime: "10:36",
+            relativeTime: 6000,
+          },
+        ],
+      });
+      expect(wrapper.find('[data-test="player-event-row-failed_request"]').exists()).toBe(true);
+
+      wrapper.vm.selectedEventTypes = ["error"];
+      wrapper.vm.searchEvents("");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="player-event-row-failed_request"]').exists()).toBe(false);
     });
 
     it("should show only matching event when search term filters by name", async () => {

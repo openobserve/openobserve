@@ -397,7 +397,7 @@ const EVENTS_TAIL_US = 60_000_000;
 const DEFAULT_LOOKUP_US = 30 * DAY_US;
 const WATCHDOG_MS = 2000;
 const EVENTS_PAGE_SIZE = 150;
-const RUM_EVENT_TYPES = ["action", "view", "error"];
+const RUM_EVENT_TYPES = ["action", "view", "error", "resource"];
 const MAX_EVENT_PAGES = 50;
 const SEARCH_STREAM_NOT_FOUND = 20002;
 const EMPTY_TIMELINE: MobileTimeline = Object.freeze({
@@ -1434,9 +1434,11 @@ const pollManifest = async () => {
 const pollEvents = async () => {
   const hits = await fetchEventPages(rumEventsSql(), liveWindowUs(lastEventsTs, EVENTS_TAIL_US));
   if (cancelled) return;
+  const failed = await fetchFailedRequests(liveWindowUs(lastEventsTs, EVENTS_TAIL_US));
+  if (cancelled) return;
   const logs = await fetchEventPages(errorLogsSql(), liveWindowUs(lastLogsTs, EVENTS_TAIL_US));
   if (cancelled) return;
-  const changed = addRumEvents(hits);
+  const changed = addRumEvents([...hits, ...failed]);
   if (addErrorLogs(logs) || changed) publishEvents();
 };
 
@@ -1466,6 +1468,10 @@ const eventsRequest = (sql: string, window: QueryWindow, from: number) => {
 const rumEventsSql = () =>
   `select * from "_rumdata" where ${sqlEquals("session_id", sessionId.value)} and (type='error' or type='action' or type='view') order by date asc`;
 
+// Status 0 is a request that got no response: blocked by CORS, aborted or offline.
+const failedRequestsSql = () =>
+  `select * from "_rumdata" where ${sqlEquals("session_id", sessionId.value)} and type='resource' and resource_type in ('fetch','xhr') and (resource_status_code >= 400 or resource_status_code = 0) order by date asc`;
+
 const errorLogsSql = () =>
   `select * from "_rumlog" where ${sqlEquals("session_id", sessionId.value)} and status='error' order by date asc`;
 
@@ -1479,6 +1485,18 @@ const fetchEventPages = async (sql: string, window: QueryWindow) => {
     if (rows.length < EVENTS_PAGE_SIZE || cancelled) break;
   }
   return hits;
+};
+
+// Mobile streams, and streams with no resources yet, lack these columns; that must not cost the other events.
+const fetchFailedRequests = async (window: QueryWindow) => {
+  try {
+    const columns = await rumColumns();
+    if (!columns.resource_status_code || !columns.resource_type) return [];
+    return await fetchEventPages(failedRequestsSql(), window);
+  } catch (error) {
+    console.error("Failed to fetch failed requests:", error);
+    return [];
+  }
 };
 
 // Re-sends of a view share its date, so the document version marks the newer one, and a later arrival when there is none.
@@ -1543,15 +1561,18 @@ const publishEvents = () => {
 // Paged in full, because the live cursor is the largest arrival time seen and a cut-off first page would skip the rest.
 const getSessionEvents = () => {
   isLoading.value.push(true);
-  fetchEventPages(rumEventsSql(), serverWindowUs(EVENTS_TAIL_US, EVENTS_TAIL_US))
-    .then((hits: any[]) => {
+  Promise.all([
+    fetchEventPages(rumEventsSql(), serverWindowUs(EVENTS_TAIL_US, EVENTS_TAIL_US)),
+    fetchFailedRequests(serverWindowUs(EVENTS_TAIL_US, EVENTS_TAIL_US)),
+  ])
+    .then(([hits, failed]: [any[], any[]]) => {
       // Test the SOURCE field, not the rendered value: user_email is filled with
       // t("common.unknownUser") when absent, so comparing it to the English
       // literal stopped this backfill firing in every non-English locale.
       if (!sessionState.data.selectedSession?.user_email)
         sessionDetails.value.user_email = hits[0]?.usr_email;
 
-      addRumEvents(hits);
+      addRumEvents([...hits, ...failed]);
       publishEvents();
       getSessionErrorLogs();
     })
@@ -1626,6 +1647,16 @@ const handleActionEvent = (event: any) => {
   return _event;
 };
 
+const handleResourceEvent = (event: any) => {
+  const _event = getDefaultEvent(event);
+  _event.type = "failed_request";
+  const status = Number(event?.resource_status_code);
+  _event.name = `${status === 0 ? t("rum.playerEvents.noResponse") : status} ${(
+    event?.resource_method || "GET"
+  ).toUpperCase()} ${event?.resource_url}`;
+  return _event;
+};
+
 const handleViewEvent = (event: any) => {
   const _event = getDefaultEvent(event);
   // if (event.event.custom.error) {
@@ -1650,6 +1681,7 @@ const formatEvent = (event: any) => {
       error: handleErrorEvent,
       action: handleActionEvent,
       view: handleViewEvent,
+      resource: handleResourceEvent,
     };
 
     return eventTypes[event.type](event);

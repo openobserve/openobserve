@@ -1836,8 +1836,11 @@
       "error": "Error",
       "action": "Action",
       "view": "View",
-      "frustration": "Frustration"
+      "frustration": "Frustration",
+      "failedRequest": "Failed requests",
+      "noResponse": "No response"
     },
+    "replayCanvasNotRecorded": "Canvas content not recorded",
     "actionOnTarget": "{action} on \"{target}\"",
     "errorWhileFetchingErrorEvents": "Error while fetching error events",
     "errorWhileFetchingSessionReplay": "Error while fetching session replay data",
@@ -19991,7 +19994,8 @@
         "longtask": "Long Task",
         "view": "View",
         "action": "Action",
-        "resource": "Resource"
+        "resource": "Resource",
+        "failedrequest": "Failed request"
       },
       "subscriptionPlan": {
         "payasyougo": "Pay as you go",
