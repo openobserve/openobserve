@@ -222,6 +222,13 @@ const alerts = {
       `/api/v2/${org_identifier}/alerts?slo_id=${encodeURIComponent(slo_id)}&alert_type=slo`,
     );
   },
+  /** Alerts whose every email destination lists only this user and that have no other route. */
+  list_by_sole_recipient: (org_identifier: string, email: string) => {
+    return http().get(
+      `/api/v2/${org_identifier}/alerts?sole_recipient=${encodeURIComponent(email)}`,
+      { skipAccessToast: true },
+    );
+  },
   get_by_alert_id: (org_identifier: string, alert_id: string, folder_id?: any) => {
     // A teardown-time watcher can reach here with no id; that must not become
     // a GET /alerts/undefined on the wire.

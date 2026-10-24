@@ -3123,7 +3123,10 @@
     "revokeInvitationTitle": "Revoke Invitation",
     "revokeInvitationMsg": "Are you sure you want to revoke the invitation for {email}?",
     "deleteUsersTitle": "Delete Users",
-    "deleteUsersMsg": "Are you sure you want to delete {count} user? | Are you sure you want to delete {count} users?"
+    "deleteUsersMsg": "Are you sure you want to delete {count} user? | Are you sure you want to delete {count} users?",
+    "leaverAlertsIntro": "This alert notifies only this user, so it will stop sending once they are removed: | These {count} alerts notify only this user, so they will stop sending once they are removed:",
+    "leaverMoveToDefault": "Move these alerts to the org default destination",
+    "leaverMoveFailed": "{count} alert could not be moved to the org default destination. | {count} alerts could not be moved to the org default destination."
   },
   "invitation": {
     "pendingInvitations": "Pending Invitations",

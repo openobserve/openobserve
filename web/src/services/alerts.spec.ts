@@ -604,6 +604,19 @@ describe("alerts service", () => {
     });
   });
 
+  describe("list_by_sole_recipient", () => {
+    it("should ask for the alerts that only notify one user, encoded, without the access toast", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: { list: [] } });
+
+      await alerts.list_by_sole_recipient("org123", "a+b@example.com");
+
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(
+        "/api/v2/org123/alerts?sole_recipient=a%2Bb%40example.com",
+        { skipAccessToast: true },
+      );
+    });
+  });
+
   describe("move_to_another_folder", () => {
     it("should make PATCH request with folder_id when provided", async () => {
       const params = {
