@@ -989,6 +989,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Filters section — scheduled -->
             <div v-if="isRealTime === 'false'" ref="filtersSectionRef" class="mt-1 px-3">
+              <div
+                v-if="intentChipField && intentChips.length"
+                class="mb-2 flex flex-wrap items-center gap-2"
+                data-test="alert-intent-value-chips"
+              >
+                <span class="text-text-secondary text-xs font-semibold">
+                  {{ t("alerts.queryConfig.valueChips.label", { field: intentChipField }) }}
+                </span>
+                <OButton
+                  v-for="value in intentChips"
+                  :key="value"
+                  variant="outline"
+                  size="chip"
+                  :aria-label="
+                    t('alerts.queryConfig.valueChips.add', { field: intentChipField, value })
+                  "
+                  data-test="alert-intent-value-chip"
+                  @click="addValueChip(value)"
+                >
+                  <OIcon name="add" size="xs" />
+                  {{ value }}
+                </OButton>
+              </div>
               <div v-show="showFilters" ref="customPreviewRef">
                 <FilterGroup
                   :stream-fields="columns"
@@ -1914,6 +1937,7 @@ import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
 import FilterGroup from "@/components/alerts/FilterGroup.vue";
 import { CONDITION_VALUE_SUGGEST_KEY } from "@/components/alerts/conditionOperators";
 import { useAlertValueSuggest } from "@/composables/alerts/useAlertValueSuggest";
+import { getIntent, valueChipField } from "@/utils/alerts/intents";
 import QueryEditorDialog from "@/components/alerts/QueryEditorDialog.vue";
 import CustomConfirmDialog from "@/components/alerts/CustomConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -1947,7 +1971,14 @@ import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import { type QueryConfigMeta } from "./QueryConfig.schema";
 
+const MAX_VALUE_CHIPS = 5;
+
 const UnifiedQueryEditor = defineAsyncComponent(() => import("@/components/QueryEditor.vue"));
+
+const conditionUsesColumn = (node: any, column: string): boolean =>
+  node?.filterType === "condition"
+    ? node.column === column
+    : (node?.conditions ?? []).some((child: any) => conditionUsesColumn(child, column));
 
 export default defineComponent({
   name: "Step2QueryConfig",
@@ -2063,6 +2094,11 @@ export default defineComponent({
       type: Object as PropType<any>,
       default: null,
     },
+    // Set only on a create started from an intent; drives the value-chip row.
+    intentId: {
+      type: String,
+      default: "",
+    },
   },
   emits: [
     "update:tab",
@@ -2090,14 +2126,12 @@ export default defineComponent({
     // AddAlert schema validates on save.
     const form: any = inject(FORM_CONTEXT_KEY, null);
 
-    provide(
-      CONDITION_VALUE_SUGGEST_KEY,
-      useAlertValueSuggest(
-        computed(() => store.state.selectedOrganization?.identifier ?? ""),
-        toRef(props, "streamType"),
-        toRef(props, "streamName"),
-      ),
+    const valueSuggest = useAlertValueSuggest(
+      computed(() => store.state.selectedOrganization?.identifier ?? ""),
+      toRef(props, "streamType"),
+      toRef(props, "streamName"),
     );
+    provide(CONDITION_VALUE_SUGGEST_KEY, valueSuggest);
 
     // Initial values for the discriminator refs below (the form itself is seeded
     // by useAlertForm's defaults; `_meta` is kept fresh by the syncMeta watcher).
@@ -3659,6 +3693,7 @@ export default defineComponent({
       loading: thresholdSuggestion.loading.value,
       error: thresholdSuggestion.error.value,
       current: thresholdRule.value.threshold,
+      updated: thresholdUpdate.value,
     }));
     const applySuggestedThreshold = (value: number) => {
       if (thresholdIsCount.value) {
@@ -3668,6 +3703,73 @@ export default defineComponent({
         emitAggregationUpdate();
       }
     };
+
+    const intentChipField = computed<string | null>(() => {
+      const intent = getIntent(props.intentId);
+      if (props.beingUpdated || !intent?.valueChips) return null;
+      if (props.isRealTime !== "false" || localTab.value !== "custom") return null;
+      const field = valueChipField(props.columns);
+      return field && !conditionUsesColumn(props.inputData.conditions, field) ? field : null;
+    });
+    const chipSuggestions = valueSuggest(
+      () => intentChipField.value ?? "",
+      () => "",
+      () => [],
+    );
+    const intentChips = computed<string[]>(() =>
+      intentChipField.value
+        ? chipSuggestions.options.value
+            .map((option) => String(option.value))
+            .slice(0, MAX_VALUE_CHIPS)
+        : [],
+    );
+    const pendingChip = ref<{ value: string; before: number | null } | null>(null);
+    const thresholdUpdate = ref<{ value: string; before: number; after: number } | null>(null);
+
+    const addValueChip = (value: string) => {
+      const field = intentChipField.value;
+      if (!field) return;
+      const root = props.inputData.conditions;
+      const row = {
+        filterType: "condition",
+        column: field,
+        operator: "=",
+        value,
+        values: [],
+        logicalOperator: "AND",
+        id: getUUID(),
+      };
+      // An OR filter would turn the chip into an alternative, so it is wrapped to keep the chip a narrowing AND.
+      const next =
+        root?.logicalOperator === "OR" && root.conditions?.length
+          ? {
+              filterType: "group",
+              logicalOperator: "AND",
+              groupId: getUUID(),
+              conditions: [root, row],
+            }
+          : {
+              ...root,
+              logicalOperator: root?.logicalOperator ?? "AND",
+              conditions: [...(root?.conditions ?? []), row],
+            };
+      pendingChip.value = { value, before: thresholdSuggestion.suggested.value };
+      thresholdUpdate.value = null;
+      emit("update-group", next);
+    };
+
+    // A limit equal to the old suggestion was accepted, not typed, so it follows the re-suggestion.
+    watch(
+      () => [thresholdSuggestion.suggested.value, thresholdSuggestion.loading.value] as const,
+      ([after, loading]) => {
+        const pending = pendingChip.value;
+        if (!pending || loading || after === null) return;
+        pendingChip.value = null;
+        if (pending.before === null || after === pending.before) return;
+        if (thresholdRule.value.threshold === pending.before) applySuggestedThreshold(after);
+        thresholdUpdate.value = { value: pending.value, before: pending.before, after };
+      },
+    );
 
     // Legacy toggle kept for compatibility — not used in new UI
     const toggleAggregation = () => {
@@ -4055,6 +4157,9 @@ export default defineComponent({
       thresholdRule,
       thresholdHint,
       applySuggestedThreshold,
+      intentChipField,
+      intentChips,
+      addValueChip,
       // V3.1 inline condition
       isEventBased,
       logFunctionOptions,

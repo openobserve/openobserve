@@ -393,7 +393,46 @@ export const pruneIncompleteConditions = (node: any): any => {
   return conditions.length ? { ...node, conditions } : null;
 };
 
+/** Seeds the intent path's fields for intent-path sources only; returns what the "Suggested defaults" note lists, or null. */
+export const applyIntentPrefill = (
+  data: any,
+  prefill: AlertPrefill,
+  anomalyAvailable = false,
+): IntentDefaultsNote | null => {
+  if (!getAlertSource(prefill.source).intentPath) return null;
+  // The form's is_real_time watcher seeds the anomaly config from the stream and name set here.
+  if (prefill.alertType === "anomaly" && anomalyAvailable) {
+    data.is_real_time = "anomaly";
+    return null;
+  }
+  if (prefill.pendingPeriodMinutes !== undefined) {
+    data.pending_period_sec = prefill.pendingPeriodMinutes;
+    data._ui = { ...data._ui, pendingPeriod: prefill.pendingPeriodMinutes };
+  }
+  const attributes = Object.entries(prefill.contextAttributes ?? {});
+  if (attributes.length) {
+    const keys = new Set(attributes.map(([key]) => key));
+    data.context_attributes = [
+      ...(data.context_attributes ?? []).filter((attribute: any) => !keys.has(attribute.key)),
+      ...attributes.map(([key, value]) => ({ key, value, id: getUUID() })),
+    ];
+  }
+  // Recovery notices stay off until recovery destinations save on every database.
+  data.notify_on_recovery = false;
+  if (!prefill.intentDefaults) return null;
+  return {
+    silenceMinutes: Number(data.trigger_condition?.silence) || 0,
+    pendingPeriodMinutes: Number(data.pending_period_sec) || 0,
+  };
+};
+
 // ─── Composable ─────────────────────────────────────────────────────────────
+
+/** The intent path's defaults as applied, listed by the form's "Suggested defaults" note. */
+export interface IntentDefaultsNote {
+  silenceMinutes: number;
+  pendingPeriodMinutes: number;
+}
 
 export interface AlertFormProps {
   modelValue: any;
@@ -758,6 +797,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const isLoadingPrefill = ref(false);
   /** Lossy transforms the source adapter performed, surfaced in the form. */
   const prefillWarnings = ref<AlertPrefillWarning[]>([]);
+  // Set only by an intent-path prefill, so the blank form and edit never show the intent affordances.
+  const intentDefaultsNote = ref<IntentDefaultsNote | null>(null);
+  const intentId = ref("");
 
   const folderQuery = router.currentRoute.value.query.folder;
   // Prefer the folder the caller (AlertList) hands us over the URL query: the
@@ -1881,6 +1923,14 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       if (prefill.timezone) {
         data.trigger_condition.timezone = prefill.timezone;
       }
+      intentDefaultsNote.value = applyIntentPrefill(
+        data,
+        prefill,
+        store.state.zoConfig?.anomaly_detection_enabled === true,
+      );
+      intentId.value = getAlertSource(prefill.source).intentPath
+        ? (prefill.contextAttributes?.intent_id ?? "")
+        : "";
 
       // A source that carries a real trigger says so explicitly, and is believed.
       // Otherwise: with a threshold expressed inside the query (HAVING / promql
@@ -3254,6 +3304,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     validationErrors,
     isLoadingPrefill,
     prefillWarnings,
+    intentDefaultsNote,
+    intentId,
     activeFolderId,
     alertType,
 

@@ -87,9 +87,18 @@ vi.mock("@/components/alerts/FilterGroup.vue", async () => {
   };
 });
 
-const { valueSuggestSpy, alertValueSuggest } = vi.hoisted(() => {
-  const alertValueSuggest = () => ({ options: { value: [] }, hint: { value: undefined } });
-  return { alertValueSuggest, valueSuggestSpy: vi.fn(() => alertValueSuggest) };
+const { valueSuggestSpy, alertValueSuggest, chipValues } = vi.hoisted(() => {
+  // Values the mocked provider offers per column, read when a row (or the chip row) asks.
+  const chipValues: Record<string, string[]> = {};
+  const alertValueSuggest = (column?: () => string) => ({
+    options: {
+      get value() {
+        return (chipValues[column?.() ?? ""] ?? []).map((v) => ({ label: v, value: v }));
+      },
+    },
+    hint: { value: undefined },
+  });
+  return { alertValueSuggest, chipValues, valueSuggestSpy: vi.fn(() => alertValueSuggest) };
 });
 vi.mock("@/composables/alerts/useAlertValueSuggest", () => ({
   useAlertValueSuggest: valueSuggestSpy,
@@ -2572,6 +2581,149 @@ describe("QueryConfig.vue", () => {
 
       expect(wrapper.vm.showFilters).toBe(true);
       expect(wrapper.emitted("update-group")).toHaveLength(1);
+    });
+  });
+
+  describe("Intent value chips and the U4 note", () => {
+    const serviceColumns = [
+      { label: "service", value: "service", type: "Utf8" },
+      { label: "body", value: "body", type: "Utf8" },
+    ];
+    const chipRow = () => host.find('[data-test="alert-intent-value-chips"]');
+    const chips = () => host.findAll('[data-test="alert-intent-value-chip"]');
+    const useButton = () => host.find('[data-test="alert-threshold-use-suggested"]');
+    const updatedNote = () => host.find('[data-test="alert-threshold-updated"]');
+    const offer = (suggested: number | null) => {
+      suggestionMock.state.suggested.value = suggested;
+      suggestionMock.state.history.value = "ok";
+      suggestionMock.state.loading.value = false;
+      suggestionMock.state.error.value = false;
+    };
+    const remount = (qc: Record<string, any> = {}) => {
+      host.unmount();
+      host = mountHost({ columns: serviceColumns, intentId: "errors_increase", ...qc }).h;
+      wrapper = host.findComponent(QueryConfig) as unknown as VueWrapper<any>;
+    };
+
+    beforeEach(async () => {
+      chipValues.service = ["payments", "checkout", "catalog", "frontend", "cart", "search"];
+      offer(null);
+      remount();
+      await flushPromises();
+    });
+
+    afterEach(() => {
+      delete chipValues.service;
+      offer(null);
+    });
+
+    it("offers values of the first low-cardinality field on an intent-started rule", () => {
+      expect(chipRow().text()).toContain("Add a service filter:");
+      expect(chips().map((c) => c.text())).toEqual([
+        "payments",
+        "checkout",
+        "catalog",
+        "frontend",
+        "cart",
+      ]);
+      expect(chips()[0].attributes("aria-label")).toBe("Add filter service = payments");
+    });
+
+    it.each([
+      ["the blank form", { intentId: "" }],
+      ["edit", { beingUpdated: true }],
+      ["an intent without chips", { intentId: "data_stops_arriving" }],
+      ["a stream with no such field", { columns: [{ label: "body", value: "body" }] }],
+    ])("is absent on %s", async (_label, qc) => {
+      remount(qc);
+      await flushPromises();
+      expect(chipRow().exists()).toBe(false);
+    });
+
+    it("adds an AND condition on the field when a chip is clicked", async () => {
+      await chips()[0].trigger("click");
+
+      const [tree] = wrapper.emitted("update-group")!.at(-1) as any[];
+      expect(tree.logicalOperator).toBe("AND");
+      expect(tree.conditions.at(-1)).toMatchObject({
+        filterType: "condition",
+        column: "service",
+        operator: "=",
+        value: "payments",
+        logicalOperator: "AND",
+      });
+    });
+
+    it("keeps an OR filter intact by ANDing the chip beside it", async () => {
+      mockInputData.conditions = {
+        filterType: "group",
+        logicalOperator: "OR",
+        groupId: "root",
+        conditions: [
+          { filterType: "condition", column: "body", operator: "Contains", value: "a", id: "a" },
+          { filterType: "condition", column: "body", operator: "Contains", value: "b", id: "b" },
+        ],
+      };
+      remount();
+      await flushPromises();
+      await chips()[1].trigger("click");
+
+      const [tree] = wrapper.emitted("update-group")!.at(-1) as any[];
+      expect(tree.logicalOperator).toBe("AND");
+      expect(tree.conditions).toHaveLength(2);
+      expect(tree.conditions[0]).toMatchObject({ logicalOperator: "OR", groupId: "root" });
+      expect(tree.conditions[1]).toMatchObject({ column: "service", value: "checkout" });
+    });
+
+    it("hides the row once the field is filtered", async () => {
+      mockInputData.conditions = {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [
+          { filterType: "condition", column: "service", operator: "=", value: "x", id: "s" },
+        ],
+      };
+      remount();
+      await flushPromises();
+      expect(chipRow().exists()).toBe(false);
+    });
+
+    it("moves a limit that took the old suggestion and says so", async () => {
+      offer(40);
+      await flushPromises();
+      await useButton().trigger("click");
+      await flushPromises();
+      expect(hostForm().getFieldValue("trigger_condition.threshold")).toBe(40);
+
+      await chips()[0].trigger("click");
+      offer(null);
+      suggestionMock.state.loading.value = true;
+      await flushPromises();
+      offer(15);
+      await flushPromises();
+
+      expect(hostForm().getFieldValue("trigger_condition.threshold")).toBe(15);
+      expect(updatedNote().text()).toBe("Updated for payments: was 40, now 15");
+    });
+
+    it("never moves a typed limit, and still notes the new suggestion", async () => {
+      offer(40);
+      await flushPromises();
+      await host.find('[data-test="alert-trigger-threshold-input"] input').setValue("7");
+      await chips()[0].trigger("click");
+      offer(15);
+      await flushPromises();
+
+      expect(Number(hostForm().getFieldValue("trigger_condition.threshold"))).toBe(7);
+      expect(updatedNote().text()).toBe("Updated for payments: was 40, now 15");
+    });
+
+    it("shows no note when the suggestion moves for another reason", async () => {
+      offer(40);
+      await flushPromises();
+      offer(15);
+      await flushPromises();
+      expect(updatedNote().exists()).toBe(false);
     });
   });
 

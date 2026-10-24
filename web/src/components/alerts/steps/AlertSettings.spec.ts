@@ -365,6 +365,46 @@ describe("AlertSettings — plain-language line under each timing control", () =
   });
 });
 
+describe("AlertSettings — Suggested defaults note on the intent path", () => {
+  const mountNote = (intentDefaults: Record<string, number> | null) =>
+    mount(
+      defineComponent({
+        components: { OForm, AlertSettings },
+        setup: () => ({
+          schema: parentSchema,
+          defaultValues: { trigger_condition: { silence: 60, period: 10 }, destinations: [] },
+          formData: makeFormData(),
+          intentDefaults,
+        }),
+        template: `
+          <OForm :schema="schema" :default-values="defaultValues" @submit="() => {}">
+            <AlertSettings :form-data="formData" is-real-time="false" :intent-defaults="intentDefaults" />
+          </OForm>
+        `,
+      }),
+      { global: { plugins: [makeStore(), i18n] } },
+    );
+  const note = (host: any) => host.find('[data-test="alert-settings-suggested-defaults"]');
+
+  it("lists the silence, the hold and the recovery notice for a value rule", () => {
+    const host = mountNote({ silenceMinutes: 60, pendingPeriodMinutes: 10 });
+    expect(note(host).text()).toBe(
+      "Suggested defaults: checks pause for 60 minutes after it fires, it holds for 10 minutes before firing, and recovery notices are off. Change any of them below.",
+    );
+  });
+
+  it("leaves the hold out for a count rule", () => {
+    const host = mountNote({ silenceMinutes: 60, pendingPeriodMinutes: 0 });
+    expect(note(host).text()).toBe(
+      "Suggested defaults: checks pause for 60 minutes after it fires, and recovery notices are off. Change any of them below.",
+    );
+  });
+
+  it("is absent outside the intent path", () => {
+    expect(note(mountNote(null)).exists()).toBe(false);
+  });
+});
+
 // ── Creates Incident: enterprise/cloud + incidents_enabled only ─────────────
 // Incidents is an enterprise feature: the OSS backend always reports
 // `incidents_enabled: false`, and the enterprise one only correlates when it

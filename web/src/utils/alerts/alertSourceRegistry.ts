@@ -43,6 +43,8 @@ export interface AlertSourceDefinition {
   pickQueryOnly?: boolean;
   /** Its aggregation is a Builder-tab seed, not a threshold, so it must not set the trigger on its own. */
   aggregationIsSeed?: boolean;
+  /** The form applies the intent path's defaults (hold, context attributes, the note) only for these. */
+  intentPath?: boolean;
 }
 
 export const DEFAULT_ALERT_SOURCE: AlertSourceDefinition = {
@@ -140,6 +142,24 @@ export const ALERT_SOURCES: Record<string, AlertSourceDefinition> = {
     // The conversion row filter is the whole condition, so any returned row fires.
     defaultThreshold: "count",
     showQueryPreview: true,
+  },
+  intent: {
+    id: "intent",
+    labelKey: "alerts.prefill.sources.intent.label",
+    toastKey: "alerts.prefill.sources.intent.toast",
+    icon: "shield-alert-outline",
+    defaultThreshold: "count",
+    showQueryPreview: true,
+    intentPath: true,
+  },
+  suggestion: {
+    id: "suggestion",
+    labelKey: "alerts.prefill.sources.suggestion.label",
+    toastKey: "alerts.prefill.sources.suggestion.toast",
+    icon: "shield-alert-outline",
+    defaultThreshold: "count",
+    showQueryPreview: true,
+    intentPath: true,
   },
 };
 

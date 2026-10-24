@@ -10350,6 +10350,8 @@
       "keepFiringForInvalid": "Enter 0 or more seconds",
       "keepFiringForTooLong": "Enter at most 86400 seconds (24 hours)",
       "silenceLineOff": "Notifies on every check that fires",
+      "suggestedDefaults": "Suggested defaults: checks pause for {silence} minutes after it fires, and recovery notices are off. Change any of them below.",
+      "suggestedDefaultsWithHold": "Suggested defaults: checks pause for {silence} minutes after it fires, it holds for {pending} minutes before firing, and recovery notices are off. Change any of them below.",
       "silenceLine": "After it fires, no new notification for {count} minute | After it fires, no new notification for {count} minutes",
       "pendingLineFirstCheck": "Fires on the first failed check",
       "pendingLineChecks": "Fires after {count} failed checks in a row",
@@ -10417,7 +10419,12 @@
         "notTested": "Not tested: not enough history.",
         "noHistory": "Not enough history to suggest a limit yet.",
         "failed": "Couldn't check history.",
-        "checking": "Checking history…"
+        "checking": "Checking history…",
+        "updatedFor": "Updated for {value}: was {before}, now {after}"
+      },
+      "valueChips": {
+        "label": "Add a {field} filter:",
+        "add": "Add filter {field} = {value}"
       },
       "vrlEditor": "VRL Editor",
       "showVrlEditor": "Show VRL editor",
@@ -10892,6 +10899,26 @@
       "previewReason": "{count} series forecast to reach {threshold} within {horizon}",
       "rowTemplateHint": "Each series’ row reads like “reaches 90 in 3 days”. Rows show only in a destination template that includes {'{'}rows{'}'}."
     },
+    "intents": {
+      "errors_increase": {
+        "title": "Errors increase"
+      },
+      "requests_get_slow": {
+        "title": "Requests get slow"
+      },
+      "data_stops_arriving": {
+        "title": "Data stops arriving"
+      },
+      "message_appears": {
+        "title": "A message appears"
+      },
+      "metric_crosses_limit": {
+        "title": "A metric crosses a limit"
+      },
+      "something_unusual": {
+        "title": "Something unusual"
+      }
+    },
     "prefill": {
       "dialog": {
         "title": "Create alert",
@@ -10950,6 +10977,14 @@
         "rumfunnel": {
           "label": "Alert me",
           "toast": "Imported from Product Analytics: \"{sourceLabel}\""
+        },
+        "intent": {
+          "label": "Start from a suggestion",
+          "toast": "Alert started for {sourceLabel}. Check it, then save."
+        },
+        "suggestion": {
+          "label": "Set up",
+          "toast": "Suggested alert for {sourceLabel}. Check it, then save."
         }
       },
       "warnings": {

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    v-if="lines.length || showUse"
+    v-if="lines.length || showUse || updated"
     class="text-text-secondary flex flex-wrap items-center gap-x-2 gap-y-1 text-xs"
     data-test="alert-threshold-suggestion"
   >
@@ -29,6 +29,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       {{ t("alerts.queryConfig.thresholdSuggestion.useSuggested", { value: suggested }) }}
     </OButton>
+    <span v-if="updated" class="text-text-body font-medium" data-test="alert-threshold-updated">{{
+      t("alerts.queryConfig.thresholdSuggestion.updatedFor", updated)
+    }}</span>
     <span v-for="line in lines" :key="line">{{ line }}</span>
   </div>
 </template>
@@ -50,6 +53,8 @@ const props = defineProps<{
   loading: boolean;
   error: boolean;
   current: number | null;
+  /** Set after a value chip re-suggested the limit. */
+  updated?: { value: string; before: number; after: number } | null;
 }>();
 
 const emit = defineEmits<{ use: [value: number] }>();

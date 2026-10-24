@@ -31,6 +31,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          nested `name=` (trigger_condition.*, destinations, creates_incident); the
          composed schema in AddAlert.schema.ts validates them on save. -->
     <div class="px-3 py-2">
+      <div
+        v-if="suggestedDefaultsText"
+        class="text-text-secondary mb-3 text-xs"
+        data-test="alert-settings-suggested-defaults"
+      >
+        {{ suggestedDefaultsText }}
+      </div>
       <div>
         <!-- For Real-Time Alerts -->
         <template v-if="isRealTime === 'true' || isRealTime === 'composite'">
@@ -465,6 +472,7 @@ import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import { convertMinutesToCron, getCronIntervalDifferenceInSeconds } from "@/utils/zincutils";
+import type { IntentDefaultsNote } from "@/composables/useAlertForm";
 
 export default defineComponent({
   name: "Step3AlertConditions",
@@ -520,6 +528,11 @@ export default defineComponent({
     recoveryDestinations: {
       type: Array as PropType<any[]>,
       default: () => [],
+    },
+    // Set only on the intent path; the blank form and edit pass null.
+    intentDefaults: {
+      type: Object as PropType<IntentDefaultsNote | null>,
+      default: null,
     },
   },
   emits: [
@@ -716,6 +729,17 @@ export default defineComponent({
       return t("alerts.alertSettings.pendingLineDuration", { count: minutes }, minutes);
     });
 
+    const suggestedDefaultsText = computed(() => {
+      const note = props.intentDefaults;
+      if (!note) return "";
+      return note.pendingPeriodMinutes > 0
+        ? t("alerts.alertSettings.suggestedDefaultsWithHold", {
+            silence: note.silenceMinutes,
+            pending: note.pendingPeriodMinutes,
+          })
+        : t("alerts.alertSettings.suggestedDefaults", { silence: note.silenceMinutes });
+    });
+
     const keepFiringLine = computed(() => {
       const seconds = countOf("keep_firing_for");
       if (seconds === null) return "";
@@ -832,6 +856,7 @@ export default defineComponent({
       pendingPeriodError,
       pendingPeriodWarning,
       silenceLine,
+      suggestedDefaultsText,
       pendingLine,
       keepFiringLine,
       pendingPeriodUnit,
