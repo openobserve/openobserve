@@ -406,4 +406,46 @@ describe("BaseImport.vue", () => {
       expect((wrapper.vm as any).splitterModel).toBe(60);
     });
   });
+
+  describe("parseFile", () => {
+    const dropFiles = async (files: File[]) => {
+      (wrapper.vm as any).jsonFiles = files;
+      await nextTick();
+    };
+
+    it("parses a dropped file as JSON when no parseFile is given", async () => {
+      wrapper = createWrapper();
+      await dropFiles([new File(['{"name":"a"}'], "a.json")]);
+      await vi.waitFor(() => expect((wrapper.vm as any).jsonArrayOfObj).toEqual([{ name: "a" }]));
+    });
+
+    it("hands each file's text and name to parseFile and combines the results", async () => {
+      const parseFile = vi.fn((text: string, name: string) => [{ name, text }]);
+      wrapper = createWrapper({ parseFile });
+      await dropFiles([new File(["groups: []"], "a.yaml"), new File(["x"], "b.yml")]);
+      await vi.waitFor(() =>
+        expect((wrapper.vm as any).jsonArrayOfObj).toEqual([
+          { name: "a.yaml", text: "groups: []" },
+          { name: "b.yml", text: "x" },
+        ]),
+      );
+      expect(parseFile).toHaveBeenCalledTimes(2);
+    });
+
+    it("wraps a single object returned by parseFile in a list", async () => {
+      wrapper = createWrapper({ parseFile: () => ({ name: "one" }) });
+      await dropFiles([new File(["x"], "a.yaml")]);
+      await vi.waitFor(() => expect((wrapper.vm as any).jsonArrayOfObj).toEqual([{ name: "one" }]));
+    });
+
+    it("skips a file parseFile throws on and keeps the others", async () => {
+      const parseFile = (text: string) => {
+        if (text === "bad") throw new Error("bad");
+        return [{ ok: true }];
+      };
+      wrapper = createWrapper({ parseFile });
+      await dropFiles([new File(["bad"], "a.yaml"), new File(["good"], "b.yaml")]);
+      await vi.waitFor(() => expect((wrapper.vm as any).jsonArrayOfObj).toEqual([{ ok: true }]));
+    });
+  });
 });

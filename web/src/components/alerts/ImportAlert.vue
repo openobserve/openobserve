@@ -21,6 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     test-prefix="alert"
     class="min-h-0 flex-1"
     :is-importing="isAlertImporting"
+    :parse-file="parseAlertFile"
+    @update:active-tab="clearReadNotes"
     @back="router.back()"
     @cancel="router.back()"
     @import="importJson"
@@ -55,12 +57,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OFile
             data-test="alert-import-json-file-input"
             :model-value="jsonFiles"
-            @update:model-value="updateFiles"
+            @update:model-value="
+              (files) => {
+                clearReadNotes();
+                updateFiles(files);
+              }
+            "
             :label="t('dashboard.dropFileMsg')"
-            accept=".json"
+            accept=".json,.yaml,.yml"
             multiple
             drop-zone
-            :help-text="t('alerts.jsonFilesOnlyHint')"
+            :help-text="t('alerts.importFilesHint')"
             size="md"
           />
         </div>
@@ -90,6 +97,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <OSeparator class="mt-1 shrink-0" />
         <div class="error-report-container min-h-0 flex-1 resize-none overflow-auto">
+          <div
+            v-if="parseError"
+            class="flex flex-col gap-2 p-2.5"
+            data-test="alert-import-parse-error"
+          >
+            <OBanner variant="error" :content="parseErrorText" preserve-whitespace />
+            <p class="text-text-secondary text-sm">{{ t("alerts.import.acceptedFormats") }}</p>
+            <OCodeBlock
+              :code="ALERT_JSON_SAMPLE"
+              lang="json"
+              chrome="editor"
+              filename="alert.json"
+              data-test="alert-import-sample-json"
+            />
+            <OCodeBlock
+              :code="PROM_RULES_SAMPLE"
+              lang="yaml"
+              chrome="editor"
+              filename="rules.yml"
+              data-test="alert-import-sample-prom"
+            />
+          </div>
+
+          <div v-if="notesToDisplay.length > 0" class="p-2.5" data-test="alert-import-notes">
+            <div
+              v-for="(note, index) in notesToDisplay"
+              :key="index"
+              class="text-text-secondary px-0 py-1.25 text-sm"
+              :data-test="`alert-import-note-${index}`"
+            >
+              {{ note }}
+            </div>
+          </div>
+
           <!-- Alert Errors Section -->
           <div class="mb-2.5 p-2.5" v-if="alertErrorsToDisplay.length > 0">
             <div class="error-list">
@@ -316,6 +357,19 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+import {
+  ALERT_JSON_SAMPLE,
+  convertPromRules,
+  detectImportFormat,
+  isPromRulesYaml,
+  PROM_RULES_SAMPLE,
+  PromRulesImportError,
+  type ImportFormat,
+  type PromRulesImportResult,
+  type PromRulesImportWarning,
+} from "@/utils/alerts/promRulesImport";
 import {
   detectConditionsVersion,
   convertV0ToV2,
@@ -329,6 +383,8 @@ export default defineComponent({
   name: "ImportAlert",
   components: {
     OSeparator,
+    OBanner,
+    OCodeBlock,
     BaseImport,
     SelectFolderDropDown,
     OInput,
@@ -365,6 +421,7 @@ export default defineComponent({
     }[];
 
     type AlertErrors = (ErrorMessage | string)[][];
+    type ParseError = { format: ImportFormat | "prometheus"; message: I18nText; fileName?: string };
     const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
@@ -379,6 +436,19 @@ export default defineComponent({
     const userSelectedAlertName = ref<string[]>([]);
 
     const alertCreators = ref<alertCreator>([]);
+    const parseError = ref<ParseError | null>(null);
+    // Conversion notes outlive one Import click, since a dropped file is read only once.
+    const conversionNotes = ref<I18nText[]>([]);
+    const importNotes = ref<I18nText[]>([]);
+    const notesToDisplay = computed(() => [...conversionNotes.value, ...importNotes.value]);
+    const parseErrorText = computed(() =>
+      parseError.value?.fileName
+        ? t("alerts.import.parseErrorInFile", {
+            fileName: parseError.value.fileName,
+            message: parseError.value.message,
+          })
+        : (parseError.value?.message ?? raw("")),
+    );
     const destinationCreators = ref<any>([]);
     const streamList = ref<any>([]);
     const streams = ref<any>({});
@@ -482,6 +552,101 @@ export default defineComponent({
       }
     };
 
+    const warningNote = (warning: PromRulesImportWarning): I18nText => {
+      switch (warning.code) {
+        case "renamed":
+          return t("alerts.import.promRenamed", { from: warning.from, alert: warning.alert });
+        case "unknown_severity":
+          return t("alerts.import.promUnknownSeverity", {
+            alert: warning.alert,
+            severity: warning.severity,
+          });
+        case "invalid_duration":
+          return t("alerts.import.promInvalidDuration", {
+            alert: warning.alert,
+            field: warning.field,
+            value: warning.value,
+          });
+        case "unmapped_template":
+          return t("alerts.import.promUnmappedTemplate", {
+            alert: warning.alert,
+            text: warning.text,
+          });
+        case "invalid_rule":
+          return t("alerts.import.promInvalidRule", {
+            group: warning.group,
+            index: warning.index,
+          });
+      }
+    };
+
+    const conversionSummary = (result: PromRulesImportResult): I18nText[] => [
+      ...(result.alerts.length > 0
+        ? [t("alerts.import.promConverted", { count: result.alerts.length })]
+        : []),
+      ...(result.skipped > 0
+        ? [t("alerts.import.promSkippedRecords", { count: result.skipped })]
+        : []),
+      ...result.warnings.map(warningNote),
+    ];
+
+    const jsonSyntaxMessage = (error: unknown): I18nText => {
+      // Only the position is kept: the engine's own wording is what the user could not act on.
+      const at = /line (\d+) column (\d+)/.exec(String((error as Error)?.message ?? ""));
+      return at
+        ? t("alerts.import.parseErrorJsonAt", { line: at[1], column: at[2] })
+        : t("alerts.import.parseErrorJson");
+    };
+
+    const parseErrorFor = (text: string, error: unknown): ParseError => {
+      if (error instanceof PromRulesImportError) {
+        return {
+          format: "prometheus",
+          message:
+            error.code === "invalid_yaml"
+              ? t("alerts.import.parseErrorPromYaml")
+              : t("alerts.import.parseErrorPromNoGroups"),
+        };
+      }
+      const format = detectImportFormat(text);
+      const messages: Record<ImportFormat, () => I18nText> = {
+        json: () => jsonSyntaxMessage(error),
+        yaml: () => t("alerts.import.parseErrorYaml"),
+        terraform: () => t("alerts.import.parseErrorTerraform"),
+        unknown: () => t("alerts.import.parseErrorUnknown"),
+      };
+      return { format, message: messages[format]() };
+    };
+
+    const readImportText = (text: string, fileName?: string): unknown => {
+      try {
+        if (!isPromRulesYaml(text)) return JSON.parse(text);
+        const result = convertPromRules(text, {
+          orgId: store.state.selectedOrganization.identifier,
+        });
+        const notes = [
+          ...conversionSummary(result),
+          ...(result.alerts.length === 0 ? [t("alerts.import.promNoAlerts")] : []),
+        ];
+        conversionNotes.value.push(
+          ...(fileName
+            ? notes.map((note) => t("alerts.import.noteInFile", { fileName, note }))
+            : notes),
+        );
+        return result.alerts;
+      } catch (error) {
+        parseError.value = { ...parseErrorFor(text, error), fileName };
+        throw error;
+      }
+    };
+
+    const parseAlertFile = (text: string, fileName: string) => readImportText(text, fileName);
+
+    const clearReadNotes = () => {
+      conversionNotes.value = [];
+      parseError.value = null;
+    };
+
     onMounted(() => {
       activeFolderId.value =
         props.folderId ||
@@ -496,6 +661,8 @@ export default defineComponent({
       destinationErrorsToDisplay.value = [];
       alertCreators.value = [];
       destinationCreators.value = [];
+      importNotes.value = [];
+      parseError.value = null;
 
       try {
         // Check if jsonStr is empty or null
@@ -503,13 +670,20 @@ export default defineComponent({
           throw new Error(t("alerts.import.jsonStringEmpty"));
         }
 
-        const parsedJson = JSON.parse(jsonString);
+        if (isPromRulesYaml(jsonString)) conversionNotes.value = [];
+        const parsedJson: any = readImportText(jsonString);
+        // A dropped rule file reaches here as "[]" JSON, so an empty list is refused whatever the source.
+        if (Array.isArray(parsedJson) && parsedJson.length === 0) {
+          throw new Error(t("alerts.import.nothingToImport"));
+        }
         // Convert single object to array if needed
         jsonArrayOfObj.value = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
       } catch (e: any) {
         toast({
           variant: "error",
-          message: e.message || t("alerts.import.invalidJsonFormat"),
+          message: parseError.value
+            ? parseErrorText.value
+            : e.message || t("alerts.import.invalidJsonFormat"),
         });
         // Reset BaseImport's importing flag on validation error
         if (baseImportRef.value) {
@@ -646,6 +820,18 @@ export default defineComponent({
       }
 
       // 2. Validate 'org_id' field
+      const currentOrgId = store.state.selectedOrganization.identifier;
+      if (
+        typeof input.org_id === "string" &&
+        input.org_id.trim() !== "" &&
+        input.org_id !== currentOrgId
+      ) {
+        importNotes.value.push(
+          t("alerts.import.orgIdRewritten", { index, from: input.org_id, orgId: currentOrgId }),
+        );
+        input.org_id = currentOrgId;
+        updateOrgId(currentOrgId, index - 1);
+      }
       if (
         !input.org_id ||
         typeof input.org_id !== "string" ||
@@ -681,11 +867,15 @@ export default defineComponent({
         alertErrors.push(err);
       }
 
-      // 4. Validate 'stream_name' field
+      // 4. Validate 'stream_name' field; rule mode may leave it empty for the backend to infer.
+      const isPromRuleMode =
+        input.query_condition?.type === "promql" &&
+        input.query_condition?.promql_rule_mode === true;
       if (
-        !input.stream_name ||
-        typeof input.stream_name !== "string" ||
-        !streamList.value.includes(input.stream_name)
+        !(isPromRuleMode && input.stream_name === "") &&
+        (!input.stream_name ||
+          typeof input.stream_name !== "string" ||
+          !streamList.value.includes(input.stream_name))
       ) {
         alertErrors.push({
           message: t("alerts.import.streamNameInvalid", { index }),
@@ -923,7 +1113,8 @@ export default defineComponent({
         alertErrors.push(t("alerts.import.enabledBoolean", { index }));
       }
 
-      if (input.tz_offset && (typeof input.tz_offset !== "number" || input.tz_offset < 0)) {
+      // Negative is valid: the backend's tz_offset is signed minutes, west of UTC below zero.
+      if (input.tz_offset && typeof input.tz_offset !== "number") {
         alertErrors.push(t("alerts.import.tzOffsetNumber", { index }));
       }
 
@@ -1177,6 +1368,13 @@ export default defineComponent({
       destinationErrorsToDisplay,
       alertCreators,
       destinationCreators,
+      parseError,
+      parseErrorText,
+      notesToDisplay,
+      parseAlertFile,
+      clearReadNotes,
+      ALERT_JSON_SAMPLE,
+      PROM_RULES_SAMPLE,
       userSelectedDestinations,
       getFormattedDestinations,
       jsonArrayOfObj,

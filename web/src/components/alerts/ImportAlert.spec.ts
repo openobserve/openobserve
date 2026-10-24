@@ -65,6 +65,9 @@ vi.mock("@/services/anomaly_detection", () => ({
   },
 }));
 
+const toastMock = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastMock }));
+
 vi.mock("axios", () => ({
   default: {
     get: vi.fn().mockResolvedValue({
@@ -126,8 +129,9 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
           AppTabs: { template: "<div></div>" },
           SelectFolderDropDown: { template: "<div></div>" },
           BaseImport: {
+            name: "BaseImport",
             template: '<div><slot name="output-content"></slot></div>',
-            props: ["title", "testPrefix", "isImporting", "editorHeights"],
+            props: ["title", "testPrefix", "isImporting", "editorHeights", "parseFile"],
             emits: ["back", "cancel", "import"],
             setup(_props: any, { expose }: any) {
               const jsonArrayOfObj = ref([]);
@@ -1011,6 +1015,215 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
       const payload = await submitAnomaly(exportedAnomaly({ seasonality: "daily" }));
 
       expect(payload.anomaly_config.seasonality).toBeUndefined();
+    });
+  });
+
+  describe("Prometheus rule YAML", () => {
+    const RULES = `groups:
+  - name: node
+    rules:
+      - record: job:up:sum
+        expr: sum by (job) (up)
+      - alert: InstanceDown
+        expr: up == 0 unless on(instance) maintenance == 1
+        for: 5m
+        labels:
+          severity: critical
+`;
+
+    const sentPayloads = async () => {
+      const service = await import("@/services/alerts");
+      return vi.mocked(service.default.create_by_alert_id).mock.calls.map((call) => call[1]);
+    };
+
+    it("converts pasted rules and imports them as paused rule-mode alerts", async () => {
+      const service = await import("@/services/alerts");
+      vi.mocked(service.default.create_by_alert_id).mockResolvedValue(true as any);
+
+      await wrapper.vm.importJson({ jsonStr: RULES });
+
+      const sent = await sentPayloads();
+      expect(sent).toHaveLength(1);
+      expect(sent[0]).toMatchObject({
+        name: "instance_down",
+        org_id: "test-org",
+        stream_type: "metrics",
+        enabled: false,
+        pending_period_sec: 300,
+        priority: 1,
+        query_condition: {
+          type: "promql",
+          promql: "up == 0 unless on(instance) maintenance == 1",
+          promql_rule_mode: true,
+          promql_multi_alert: true,
+        },
+      });
+      expect(wrapper.vm.alertErrorsToDisplay).toEqual([]);
+    });
+
+    it("tells the user how many rules were converted and how many recording rules were skipped", async () => {
+      await wrapper.vm.importJson({ jsonStr: RULES });
+      expect(wrapper.vm.notesToDisplay).toEqual([
+        wrapper.vm.t("alerts.import.promConverted", { count: 1 }),
+        wrapper.vm.t("alerts.import.promSkippedRecords", { count: 1 }),
+      ]);
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="alert-import-notes"]').exists()).toBe(true);
+    });
+
+    it("hands BaseImport a file parser that reads rule YAML and JSON", () => {
+      const parseFile = wrapper.findComponent({ name: "BaseImport" }).props("parseFile");
+      expect(parseFile(RULES, "node.rules.yml")).toMatchObject([{ name: "instance_down" }]);
+      expect(parseFile('{"name":"a"}', "a.json")).toEqual({ name: "a" });
+    });
+
+    it("prefixes a file's conversion notes with its name", () => {
+      wrapper.vm.parseAlertFile(RULES, "node.rules.yml");
+      expect(wrapper.vm.notesToDisplay[0]).toBe(
+        wrapper.vm.t("alerts.import.noteInFile", {
+          fileName: "node.rules.yml",
+          note: wrapper.vm.t("alerts.import.promConverted", { count: 1 }),
+        }),
+      );
+    });
+
+    it("explains a file it cannot read and still lets BaseImport report it", () => {
+      expect(() => wrapper.vm.parseAlertFile("name: a\n", "a.yaml")).toThrow();
+      expect(wrapper.vm.parseError).toMatchObject({ format: "yaml", fileName: "a.yaml" });
+    });
+
+    it("rejects a rule file with no alerting rules instead of reporting success", async () => {
+      await wrapper.vm.importJson({ jsonStr: "groups: []\n" });
+      expect(await sentPayloads()).toHaveLength(0);
+      expect(toastMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "error",
+          message: wrapper.vm.t("alerts.import.nothingToImport"),
+        }),
+      );
+      expect(wrapper.vm.notesToDisplay).toContain(wrapper.vm.t("alerts.import.promNoAlerts"));
+    });
+
+    it("does not report success for a dropped file of only recording rules", async () => {
+      const recordsOnly = "groups:\n  - name: g\n    rules:\n      - record: a\n        expr: up\n";
+      const parsed = wrapper.findComponent({ name: "BaseImport" }).props("parseFile")(
+        recordsOnly,
+        "records.yml",
+      );
+      // BaseImport serialises the file's result, so Import receives JSON text, not the YAML.
+      await wrapper.vm.importJson({ jsonStr: JSON.stringify(parsed) });
+      expect(await sentPayloads()).toHaveLength(0);
+      expect(toastMock).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+      expect(toastMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "error",
+          message: wrapper.vm.t("alerts.import.nothingToImport"),
+        }),
+      );
+      expect(wrapper.vm.notesToDisplay).toContain(
+        wrapper.vm.t("alerts.import.noteInFile", {
+          fileName: "records.yml",
+          note: wrapper.vm.t("alerts.import.promNoAlerts"),
+        }),
+      );
+    });
+  });
+
+  describe("friendly parse errors", () => {
+    it.each([
+      ["broken JSON", '{"name": "a",}', "json"],
+      ["YAML that is not a rule file", "name: a\n", "yaml"],
+      ["Terraform", 'resource "openobserve_alert" "a" {\n}\n', "terraform"],
+      ["plain text", "hello", "unknown"],
+    ])("names %s instead of showing the raw parser error", async (_case, text, format) => {
+      await wrapper.vm.importJson({ jsonStr: text });
+      expect(wrapper.vm.parseError.format).toBe(format);
+      const message = toastMock.mock.calls.at(-1)?.[0].message;
+      expect(message).toBe(wrapper.vm.parseError.message);
+      expect(message).not.toMatch(/Unexpected token|is not valid JSON/);
+    });
+
+    it("offers a sample of both accepted formats", async () => {
+      await wrapper.vm.importJson({ jsonStr: "name: a\n" });
+      await wrapper.vm.$nextTick();
+      const panel = wrapper.find('[data-test="alert-import-parse-error"]');
+      expect(panel.exists()).toBe(true);
+      const samples = panel.findAllComponents({ name: "OCodeBlock" });
+      expect(samples.map((s: any) => s.props("lang"))).toEqual(["json", "yaml"]);
+    });
+
+    it("clears the explanation once the text parses", async () => {
+      await wrapper.vm.importJson({ jsonStr: "name: a\n" });
+      await wrapper.vm.importJson({ jsonStr: '{"name": "a"}' });
+      expect(wrapper.vm.parseError).toBeNull();
+    });
+  });
+
+  describe("org_id and tz_offset", () => {
+    const validAlert = (overrides: Record<string, unknown> = {}) => ({
+      name: "a1",
+      org_id: "test-org",
+      stream_type: "logs",
+      stream_name: "test-stream",
+      is_real_time: false,
+      query_condition: { type: "sql", sql: "select 1", multi_time_range: [] },
+      trigger_condition: {
+        period: 10,
+        operator: ">=",
+        threshold: 1,
+        frequency: 10,
+        silence: 10,
+        frequency_type: "minutes",
+      },
+      destinations: [],
+      enabled: true,
+      ...overrides,
+    });
+
+    it("rewrites another org's id to this org with a note instead of an error", async () => {
+      const input = validAlert({ org_id: "other-org" });
+      expect(await wrapper.vm.validateAlertInputs(input, 1)).toBe(true);
+      expect(input.org_id).toBe("test-org");
+      expect(wrapper.vm.notesToDisplay).toEqual([
+        wrapper.vm.t("alerts.import.orgIdRewritten", {
+          index: 1,
+          from: "other-org",
+          orgId: "test-org",
+        }),
+      ]);
+    });
+
+    it("still asks for an org when the export has none", async () => {
+      await wrapper.vm.validateAlertInputs(validAlert({ org_id: "" }), 1);
+      expect(wrapper.vm.alertErrorsToDisplay.flat().map((e: any) => e.field)).toContain("org_id");
+    });
+
+    it.each([-330, 330, 0])("accepts a tz_offset of %d", async (tz) => {
+      expect(await wrapper.vm.validateAlertInputs(validAlert({ tz_offset: tz }), 1)).toBe(true);
+    });
+
+    it("still rejects a tz_offset that is not a number", async () => {
+      expect(await wrapper.vm.validateAlertInputs(validAlert({ tz_offset: "-330" }), 1)).toBe(
+        false,
+      );
+    });
+
+    it("lets a rule-mode alert leave the stream for the backend to infer", async () => {
+      const input = validAlert({
+        stream_type: "metrics",
+        stream_name: "",
+        query_condition: { type: "promql", promql: "up == 0", promql_rule_mode: true },
+      });
+      expect(await wrapper.vm.validateAlertInputs(input, 1)).toBe(true);
+    });
+
+    it("still requires a stream for a PromQL alert outside rule mode", async () => {
+      const input = validAlert({
+        stream_type: "metrics",
+        stream_name: "",
+        query_condition: { type: "promql", promql: "up" },
+      });
+      expect(await wrapper.vm.validateAlertInputs(input, 1)).toBe(false);
     });
   });
 
