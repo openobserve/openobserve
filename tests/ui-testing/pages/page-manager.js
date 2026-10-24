@@ -16,6 +16,7 @@ import DashboardSqlAutocomplete from "./dashboardPages/dashboard-sql-autocomplet
 import DashboardPromQLEditor from "./dashboardPages/dashboard-promql-editor";
 import DashboardMultiSQL from "./dashboardPages/dashboard-multi-sql";
 import DashboardMaxQueryRange from "./dashboardPages/dashboard-max-query-range";
+import DashboardNotices from "./dashboardPages/dashboard-notices.js";
 import DashboardDrilldownPage from "./dashboardPages/dashboard-drilldown";
 import DashboardCellExplorerPage from "./dashboardPages/dashboard-cell-explorer";
 import DashboardLegendsCopy from "./dashboardPages/dashboard-legends-copy";
@@ -26,9 +27,11 @@ import DashboardPrintPage from "./dashboardPages/dashboard-print";
 import DashboardTimeRefresh from "./dashboardPages/dashboard-refresh";
 import DateTimeHelper from "./dashboardPages/dashboard-time";
 import DashboardPanelTime from "./dashboardPages/dashboard-panel-time";
+import DashboardTimeRange from "./dashboardPages/dashboard-time-range.js";
 import DashboardZoomDrag from "./dashboardPages/dashboard-zoom-drag";
 import LogsVisualise from "./dashboardPages/visualise";
 import { DashboardPage } from "./dashboardPages/dashboardPage.js";
+import { DashboardSaveConflictPage } from "./dashboardPages/dashboard-save-conflict.js";
 import { ScheduledReportsDrawerPage } from "./dashboardPages/scheduledReportsDrawer.js";
 import { AlertsPage } from "./alertsPages/alertsPage.js";
 import CreateAlertFromSourceDialogPage from "./alertsPages/createAlertFromSourceDialogPage.js";
@@ -162,6 +165,9 @@ const PipelineImportExportPage = require("./pipelinesPages/pipelineImportExportP
 // ===== ANOMALY DETECTION PAGE OBJECTS =====
 const { AnomalyDetectionPage } = require("./anomalyPages/anomalyDetectionPage.js");
 
+// ===== DOWNTIMES PAGE OBJECTS =====
+import { DowntimesPage } from "./alertsPages/downtimesPage.js";
+
 // ===== ONLINE EVALS PAGE OBJECTS =====
 import { LlmProvidersPage } from "./onlineEvalsPages/llmProvidersPage.js";
 
@@ -190,6 +196,7 @@ class PageManager {
     this.dashboardPromQLEditor = new DashboardPromQLEditor(page);
     this.dashboardMultiSQL = new DashboardMultiSQL(page);
     this.dashboardMaxQueryRange = new DashboardMaxQueryRange(page);
+    this.dashboardNotices = new DashboardNotices(page);
     this.dashboardDrilldown = new DashboardDrilldownPage(page);
     this.dashboardCellExplorer = new DashboardCellExplorerPage(page);
     this.dashboardLegendsCopy = new DashboardLegendsCopy(page);
@@ -200,9 +207,11 @@ class PageManager {
     this.dashboardTimeRefresh = new DashboardTimeRefresh(page);
     this.dateTimeHelper = new DateTimeHelper(page);
     this.dashboardPanelTime = new DashboardPanelTime(page);
+    this.dashboardTimeRange = new DashboardTimeRange(page);
     this.dashboardZoomDrag = new DashboardZoomDrag(page);
     this.logsVisualise = new LogsVisualise(page);
     this.dashboardPage = new DashboardPage(page);
+    this.dashboardSaveConflict = new DashboardSaveConflictPage(page);
     this.scheduledReportsDrawer = new ScheduledReportsDrawerPage(page);
 
     // ===== EXISTING ALERTS PAGE OBJECT =====
@@ -339,6 +348,9 @@ class PageManager {
 
     // ===== ANOMALY DETECTION PAGE OBJECTS =====
     this.anomalyDetectionPage = new AnomalyDetectionPage(page, this.commonActions);
+
+    // ===== DOWNTIMES PAGE OBJECTS =====
+    this.downtimesPage = new DowntimesPage(page);
     this.aiToolsetsFormValidation = new AiToolsetsFormValidationPage(page);
     this.aiAssistantCreditsPage = new AiAssistantCreditsPage(page);
 

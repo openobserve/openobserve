@@ -441,8 +441,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
         {
             panic!("ZO_ROOT_USER_PASSWORD is too weak: {msg}");
         }
-        let _ =
-            openobserve_core::organization::check_and_create_org_without_ofga(DEFAULT_ORG).await;
+        if let Err(error) =
+            openobserve_core::organization::check_and_create_org_without_ofga(DEFAULT_ORG).await
+        {
+            log::warn!("Failed to auto-create organization '{DEFAULT_ORG}': {error}");
+        }
         if let Err(e) = users::create_root_user(
             DEFAULT_ORG,
             UserRequest {

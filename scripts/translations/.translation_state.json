@@ -3500,6 +3500,8 @@
       "addAnd": "2391efd77dad752c",
       "addNot": "9bb0eac73d78f585",
       "addOr": "9d7cc1970cb445ae",
+      "addUnavailableCap": "8d9a9d7f3749196d",
+      "addUnavailableNone": "2f60b0b0f3332666",
       "advancedExpression": "22be2b722c80a9f7",
       "advancedExpressionHelp": "d61befbf40f4e791",
       "and": "bd972cc4f15d8c17",

@@ -9124,6 +9124,8 @@
       "expressionPlaceholder": "예: A && B",
       "insert": "삽입:",
       "addAlert": "알림 추가",
+      "addUnavailableCap": "최대 {max}개의 알림을 추가할 수 있습니다.",
+      "addUnavailableNone": "추가할 수 있는 알림이 더 이상 없습니다.",
       "removeChild": "하위 항목 {name} 제거",
       "noChildren": "아직 하위 알림이 없습니다. 최소 두 개를 추가하세요.",
       "wouldTrigger": "트리거됨",

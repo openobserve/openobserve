@@ -714,7 +714,9 @@ pub async fn add_user_to_org(
         let initiating_user = if is_root_user(initiator_id) {
             let local_org = org_id.replace(' ', "_");
             // If the org does not exist, create it
-            let _ = organization::check_and_create_org(&local_org).await;
+            if let Err(error) = organization::check_and_create_org(&local_org).await {
+                log::warn!("Failed to auto-create organization '{local_org}': {error}");
+            }
             root_user.get("root").unwrap().clone()
         } else {
             match db::user::get(Some(org_id), initiator_id).await {
