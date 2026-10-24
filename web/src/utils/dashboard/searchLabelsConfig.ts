@@ -25,6 +25,7 @@ const SECTION_DEFS = [
   { id: "pivotTable", icon: "table-view" },
   { id: "valueTransformations", icon: "transform" },
   { id: "fieldOverrides", icon: "tune" },
+  { id: "seriesOverrides", icon: "tune" },
   { id: "map", icon: "location-on" },
   { id: "gauge", icon: "speed" },
   { id: "layout", icon: "dashboard" },
@@ -32,6 +33,7 @@ const SECTION_DEFS = [
   { id: "drilldown", icon: "ads-click" },
   { id: "comparison", icon: "compare-arrows" },
   { id: "markLines", icon: "timeline" },
+  { id: "thresholds", icon: "rule" },
   { id: "background", icon: "color-lens" },
   { id: "sparkline", icon: "show-chart" },
 ] as const satisfies ReadonlyArray<SectionDef>;

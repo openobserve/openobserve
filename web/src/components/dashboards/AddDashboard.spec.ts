@@ -236,6 +236,21 @@ describe("AddDashboard", () => {
       );
     });
 
+    it("should create the dashboard with dynamic filters hidden", async () => {
+      wrapper = createWrapper();
+
+      await wrapper.vm.onSubmit({ name: "New Dashboard", description: "" });
+      await flushPromises();
+
+      expect(dashboardService.create).toHaveBeenCalledWith(
+        "test-org",
+        expect.objectContaining({
+          variables: { list: [], showDynamicFilters: false },
+        }),
+        "default",
+      );
+    });
+
     it("should emit 'updated' after a successful submission", async () => {
       wrapper = createWrapper();
 

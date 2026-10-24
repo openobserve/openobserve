@@ -26,6 +26,8 @@ import { toZonedTime } from "date-fns-tz";
 import { formatDate, isTimeSeries, isTimeStamp } from "./dateTimeUtils";
 import { getDataValue } from "./aliasUtils";
 import { RE2JS } from "re2js";
+import { metricThresholdColor, type Thresholds } from "./thresholds";
+import { isSeriesOverrideEntry } from "./seriesOverrides";
 
 /** Persisted `override_config` item type discriminants (mirrored in the Rust schema). */
 export const OVERRIDE_CONFIG_TYPES = {
@@ -338,6 +340,8 @@ export const parseOverrideConfigs = (overrideConfigs: any[] | undefined): Overri
     return { colorConfigMap, unitConfigMap, styleConfigMap, conditionalRulesMap, fieldTypeMap };
 
   for (const o of overrideConfigs) {
+    // Chart series overrides share the array; they never style a table column.
+    if (isSeriesOverrideEntry(o)) continue;
     const alias = o?.field?.value;
     if (!alias) continue;
     const aliasLower = alias.toLowerCase();
@@ -455,6 +459,8 @@ export interface MetricStyleOptions {
   customUnit: string | null | undefined;
   decimals: number | null | undefined;
   panelBackground: string;
+  /** Panel threshold steps; a step colour sits between a mapping colour and the panel background. */
+  thresholds?: Thresholds | null;
 }
 
 /**
@@ -462,13 +468,13 @@ export interface MetricStyleOptions {
  * `config.mappings` (value / range / regex / thresholds → text + colors). Precedence:
  *   text: mapping text → unit-formatted value
  *   fill: mapping textColor → (caller contrast fallback)
- *   bg:   mapping color → panel background
+ *   bg:   mapping color → threshold step color → panel background
  */
 export const resolveMetricValueStyle = (
   rawValue: unknown,
   opts: MetricStyleOptions,
 ): ResolvedMetricStyle => {
-  const { mappings, unit, customUnit, decimals, panelBackground } = opts;
+  const { mappings, unit, customUnit, decimals, panelBackground, thresholds } = opts;
   const cache = buildValueMappingCache(mappings);
   let mapping = lookupValueMappingFull(rawValue, cache);
 
@@ -491,12 +497,14 @@ export const resolveMetricValueStyle = (
   const mappedText = mapping?.text;
   const text = mappedText != null && mappedText !== "" ? mappedText : formatted;
   const textColor = mapping?.textColor || undefined;
-  const bgColor = mapping?.color || panelBackground || "";
+  const bgColor =
+    mapping?.color || metricThresholdColor(rawValue, thresholds ?? null) || panelBackground || "";
 
   return { text, textColor, bgColor };
 };
 
-const tryCompileLinearRegex = (input: string): RE2JS | null => {
+/** Compile a `/pattern/flags` or plain pattern with the linear-time engine; null when it does not compile. */
+export const tryCompileLinearRegex = (input: string): RE2JS | null => {
   const { pattern, flags } = parseRegexPattern(input);
   let re2Flags = 0;
   for (const flag of flags) re2Flags |= RE2_FLAG_BY_JS_FLAG[flag] ?? 0;

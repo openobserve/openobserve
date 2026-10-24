@@ -409,6 +409,15 @@ describe("Common Service", () => {
       }
     });
 
+    it("moves fleet collectors at /v2/{org}/fleets/move with the source fleet as ?folder=", async () => {
+      const moveData = { collector_ids: ["c1"], dst_folder_id: "edge" };
+      await common.move_across_folders("test-org", "fleets", moveData, "default");
+      expect(mockHttp.patch).toHaveBeenCalledWith(
+        "/api/v2/test-org/fleets/move?folder=default",
+        moveData,
+      );
+    });
+
     it("should handle complex move data", async () => {
       const complexMoveData = {
         items: Array.from({ length: 50 }, (_, i) => `item-${i}`),

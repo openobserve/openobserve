@@ -40,6 +40,39 @@ export interface ConfigOptions {
   };
 }
 
+export const THRESHOLD_CHART_TYPES: readonly string[] = [
+  "line",
+  "area",
+  "area-stacked",
+  "bar",
+  "h-bar",
+  "scatter",
+  "gauge",
+  "metric",
+];
+
+export const shouldShowThresholds = (dashboardPanelData: any): boolean =>
+  THRESHOLD_CHART_TYPES.includes(dashboardPanelData?.data?.type);
+
+// Charts whose series have names an override can match; tables keep Column Formatting.
+export const SERIES_OVERRIDE_CHART_TYPES: readonly string[] = [
+  "line",
+  "area",
+  "area-stacked",
+  "bar",
+  "h-bar",
+  "stacked",
+  "h-stacked",
+  "scatter",
+  "pie",
+  "donut",
+  "gauge",
+  "metric",
+];
+
+export const shouldShowSeriesOverrides = (dashboardPanelData: any): boolean =>
+  SERIES_OVERRIDE_CHART_TYPES.includes(dashboardPanelData?.data?.type);
+
 // ---------------------------------------------------------------------------
 // Pure filter helpers (exported so they can be unit-tested independently)
 // ---------------------------------------------------------------------------
@@ -48,7 +81,20 @@ export function filterOption(option: ConfigOption | undefined, normalizedQuery: 
   if (!option || option.visible === false) return false;
   if (!normalizedQuery) return true;
   const labels = Array.isArray(option.label) ? option.label : [option.label];
-  return labels.some((l) => l.toLowerCase().includes(normalizedQuery));
+  return labels.some((l) => matchesLabel(l.toLowerCase(), normalizedQuery));
+}
+
+// A plural query ("limits") also finds the singular, but only as a whole word end, so "axis" never widens to "axi".
+function matchesLabel(label: string, query: string): boolean {
+  if (label.includes(query)) return true;
+  if (query.length < 4 || !query.endsWith("s")) return false;
+  const singular = query.slice(0, -1);
+  let at = label.indexOf(singular);
+  while (at !== -1) {
+    if (!/\p{L}/u.test(label.charAt(at + singular.length))) return true;
+    at = label.indexOf(singular, at + 1);
+  }
+  return false;
 }
 
 export function filterSection(
@@ -359,6 +405,20 @@ export function useConfigPanel(
         ],
       },
     },
+    seriesOverrides: {
+      "series-overrides": {
+        label: [
+          t("dashboard.configSectionSeriesOverrides"),
+          t("dashboard.addSeriesOverride"),
+          t("dashboard.seriesFormattingTitle"),
+          ...(typeof tm === "function" &&
+          Array.isArray(tm("dashboard.configSectionSeriesOverridesAliases"))
+            ? (tm("dashboard.configSectionSeriesOverridesAliases") as string[])
+            : []),
+        ],
+        visible: shouldShowSeriesOverrides(dashboardPanelData),
+      },
+    },
     map: {
       "map-config": {
         label: t("dashboard.configSectionMap"),
@@ -417,6 +477,16 @@ export function useConfigPanel(
       "mark-lines": {
         label: t("dashboard.markLines"),
         visible: shouldShowCartesianAxisConfig(dashboardPanelData),
+      },
+    },
+    thresholds: {
+      thresholds: {
+        label: [
+          t("dashboard.thresholds"),
+          t("dashboard.thresholdShowAsLine"),
+          t("dashboard.thresholdAddStep"),
+        ],
+        visible: shouldShowThresholds(dashboardPanelData),
       },
     },
     background: {

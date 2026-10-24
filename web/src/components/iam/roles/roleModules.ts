@@ -23,6 +23,7 @@ export type ModuleGroupId =
   | "pipelines"
   | "monitoring"
   | "ai"
+  | "fleet"
   | "access"
   | "platform"
   | "other";
@@ -64,6 +65,7 @@ export const GROUP_ORDER: ModuleGroupId[] = [
   "pipelines",
   "monitoring",
   "ai",
+  "fleet",
   "access",
   "platform",
   "other",
@@ -76,6 +78,7 @@ export const GROUP_LABEL_KEYS: Record<ModuleGroupId, I18nKey> = {
   pipelines: "iam.editRole.moduleGroupPipelines",
   monitoring: "iam.editRole.moduleGroupMonitoring",
   ai: "iam.editRole.moduleGroupAi",
+  fleet: "iam.editRole.moduleGroupFleet",
   access: "iam.editRole.moduleGroupAccess",
   platform: "iam.editRole.moduleGroupPlatform",
   other: "iam.editRole.moduleGroupOther",
@@ -139,6 +142,9 @@ const GROUP_OF: Record<string, ModuleGroupId> = {
   ai_chat_share: "ai",
   mcp: "ai",
   model_pricing: "ai",
+  fleets: "fleet",
+  fleet_configs: "fleet",
+  fleet_management: "fleet",
   role: "access",
   group: "access",
   service_accounts: "access",
@@ -198,6 +204,9 @@ const ICON_OF: Record<string, IconName> = {
   experiment: "science",
   playground: "psychology",
   pfolder: "folder",
+  fleets: "workspaces",
+  fleet_configs: "tune",
+  fleet_management: "admin-panel-settings",
   prompt: "edit-note",
   prompt_label: "label",
   ai: "smart-toy",

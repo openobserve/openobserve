@@ -246,6 +246,7 @@
     "actual_folder": "GeneralTests",
     "browser": "chrome",
     "run_files": [
+      "navRailKeyboard.spec.js",
       "navRailGeometry.spec.js",
       "sanity.spec.js",
       "landingPage.spec.js",
@@ -365,7 +366,8 @@
       "searchPatternsMultiStream.spec.js",
       "logsActionReasons.spec.js",
       "logsSearchCancelled.spec.js",
-      "logsToolbarPins.spec.js"
+      "logsToolbarPins.spec.js",
+      "logs-query-editor-keyboard.spec.js"
     ],
     "disabled": [
       {
@@ -463,7 +465,8 @@
       "reports-bulk-operations.spec.js",
       "reports-form-validation.spec.js",
       "reportCsvMediaType.spec.js",
-      "scheduledReportsDrawer.spec.js"
+      "scheduledReportsDrawer.spec.js",
+      "reportHistory.spec.js"
     ],
     "disabled": [],
     "paths": [
