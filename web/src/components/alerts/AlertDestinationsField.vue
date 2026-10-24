@@ -86,15 +86,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <!-- Always rendered when asked for, so picking or clearing a target only
            swaps the text and nothing below moves. Styled as a field hint. -->
-      <p
-        v-else-if="showStatus"
-        class="text-input-help-text pt-1 text-xs"
-        :data-test="
-          notifiesNobody ? 'alert-settings-destinations-note' : 'alert-settings-destinations-status'
-        "
-      >
-        {{ statusText }}
-      </p>
+      <div v-else-if="showStatus" class="flex flex-wrap items-center gap-x-2 pt-1">
+        <p
+          class="text-input-help-text text-xs"
+          :data-test="
+            notifiesNobody
+              ? 'alert-settings-destinations-note'
+              : 'alert-settings-destinations-status'
+          "
+        >
+          {{ statusText }}
+        </p>
+        <OButton
+          v-if="notifiesNobody"
+          data-test="alert-destinations-note-add-btn"
+          variant="ghost-primary"
+          size="xs"
+          @click="openDestinationDrawer"
+        >
+          {{ t("alerts.alertSettings.noDestinationAction") }}
+        </OButton>
+      </div>
     </div>
     <ODrawer
       v-model:open="showDestinationDrawer"
@@ -164,6 +176,12 @@ const props = withDefaults(
     showSendTest?: boolean;
     /** The alert's own template; a test uses it before the destination's. */
     alertTemplate?: string;
+    /** On-call team set elsewhere on the form; the status line names it first. */
+    oncallTeam?: string;
+    /** The alert opens an incident; the status line names it after the on-call team. */
+    createsIncident?: boolean;
+    /** Turns planned names (Email me) into real destinations before a test; null stops the test. */
+    resolveDestinations?: (names: string[]) => Promise<string[] | null>;
   }>(),
   { supportsWorkflows: true, notifiesNobody: false, showStatus: false, showSendTest: false },
 );
@@ -229,6 +247,8 @@ const fetchWorkflows = async (force = false) => {
 const statusText = computed<I18nText>(() => {
   if (props.notifiesNobody) return t("alerts.alertSettings.noDestinationNote");
   const parts: string[] = [];
+  if (props.oncallTeam?.trim()) parts.push(t("alerts.alertSettings.oncallTeamTarget"));
+  if (props.createsIncident) parts.push(t("alerts.alertSettings.incidentTarget"));
   const { destinations } = props;
   if (destinations.length === 1) parts.push(destinations[0]);
   else if (destinations.length > 1) {
@@ -326,12 +346,18 @@ const reportTestResults = (names: string[], results: PromiseSettledResult<unknow
   }
 };
 
-const sendTest = async () => {
+const resolveTestTargets = async (): Promise<string[] | null> => {
   const names = [...props.destinations];
-  if (names.length === 0) return;
+  return props.resolveDestinations ? props.resolveDestinations(names) : names;
+};
+
+const sendTest = async () => {
+  if (props.destinations.length === 0) return;
   const org = store.state.selectedOrganization.identifier;
   isSendingTest.value = true;
   try {
+    const names = await resolveTestTargets();
+    if (!names) return;
     let known: { name: string; template?: string }[] = [];
     if (!props.alertTemplate) {
       try {

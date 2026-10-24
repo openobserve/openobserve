@@ -60,6 +60,24 @@ describe("alert_destination service", () => {
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/alerts/destinations`,
         params.data,
+        undefined,
+      );
+    });
+
+    // Email me shows its own 403 copy on the field, so it opts out of the grouped access toast.
+    it("forwards request options to the POST", async () => {
+      mockHttpInstance.post.mockResolvedValue({ data: {} });
+
+      await destination.create({
+        org_identifier: "org1",
+        data: { name: "email-a@b.co", type: "email" },
+        options: { skipAccessToast: true },
+      });
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(
+        "/api/org1/alerts/destinations",
+        { name: "email-a@b.co", type: "email" },
+        { skipAccessToast: true },
       );
     });
 
@@ -78,6 +96,7 @@ describe("alert_destination service", () => {
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/alerts/destinations?module=${params.module}`,
         params.data,
+        undefined,
       );
     });
 
@@ -96,6 +115,7 @@ describe("alert_destination service", () => {
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/alerts/destinations`,
         params.data,
+        undefined,
       );
     });
   });

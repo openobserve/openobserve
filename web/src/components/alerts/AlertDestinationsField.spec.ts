@@ -208,6 +208,38 @@ describe("AlertDestinationsField status line", () => {
     );
   });
 
+  // Who to tell names the routes an org set up on purpose before the destinations picked here.
+  it("lists the on-call team and the incident before the destinations", () => {
+    const wrapper = mountField({
+      destinations: ["ops-slack"],
+      oncallTeam: "sre",
+      createsIncident: true,
+      showStatus: true,
+    });
+    const targets = new Intl.ListFormat("en", { type: "conjunction" }).format([
+      t("alerts.alertSettings.oncallTeamTarget"),
+      t("alerts.alertSettings.incidentTarget"),
+      "ops-slack",
+    ]);
+    expect(wrapper.find(STATUS).text()).toBe(t("alerts.alertSettings.sendsToStatus", { targets }));
+  });
+
+  it("offers to add a destination from the nobody-notified note", async () => {
+    const wrapper = mountField({ notifiesNobody: true, showStatus: true });
+    const add = wrapper.find('[data-test="alert-destinations-note-add-btn"]');
+    expect(add.text()).toBe(t("alerts.alertSettings.noDestinationAction"));
+
+    await add.trigger("click");
+    await flushPromises();
+
+    expect(wrapper.findComponent(DrawerStub).props("open")).toBe(true);
+  });
+
+  it("offers no add action once the alert notifies someone", () => {
+    const wrapper = mountField({ destinations: ["ops-slack"], showStatus: true });
+    expect(wrapper.find('[data-test="alert-destinations-note-add-btn"]').exists()).toBe(false);
+  });
+
   it("stays quiet unless asked, as on the recovery field", () => {
     const wrapper = mountField({ notifiesNobody: true });
     expect(wrapper.find(NOTE).exists()).toBe(false);
@@ -428,6 +460,21 @@ describe("AlertDestinationsField send test", () => {
       variant: "error",
       message: t("alerts.alertSettings.sendTestLookupFailed"),
     });
+  });
+
+  // Email me exists only as a planned name until its first test or the save creates it.
+  it("lets the parent turn planned destinations into real ones before sending", async () => {
+    const resolveDestinations = vi.fn(async () => ["email-me@example.com", "ops"]);
+    await clickSend({ destinations: ["planned", "ops"], resolveDestinations });
+
+    expect(resolveDestinations).toHaveBeenCalledWith(["planned", "ops"]);
+    expect(sentTemplates().map(([name]) => name)).toEqual(["email-me@example.com", "ops"]);
+  });
+
+  it("sends nothing when the parent could not resolve the destinations", async () => {
+    await clickSend({ destinations: ["planned"], resolveDestinations: async () => null });
+
+    expect(destinationMocks.testSend).not.toHaveBeenCalled();
   });
 
   it("still sends the alert's template when the destination templates cannot be read", async () => {

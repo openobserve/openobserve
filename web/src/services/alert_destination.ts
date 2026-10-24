@@ -29,13 +29,13 @@ export interface SlackOAuthStartResponse {
 }
 
 const destination = {
-  create: ({ org_identifier, data, module }: any) => {
+  create: ({ org_identifier, data, module, options }: any) => {
     let url = `/api/${org_identifier}/alerts/destinations`;
     if (module) {
       url += `?module=${module}`;
     }
     return http()
-      .post(url, data)
+      .post(url, data, options)
       .then((res) => {
         analytics.track("alert_destination_created", { module: module || "alert" });
         return res;

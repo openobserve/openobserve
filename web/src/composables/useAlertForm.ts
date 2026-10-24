@@ -97,6 +97,7 @@ import {
 import { AlertFocusManager } from "@/utils/alerts/focusManager";
 import { readAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
 import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
+import { useEmailMeDestination } from "@/composables/alerts/useEmailMeDestination";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
 import type { AlertPrefill, AlertPrefillWarning } from "@/ts/interfaces/alertPrefill";
 import {
@@ -535,6 +536,15 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   /** Reset the whole form (edit-prefill / post-save reset) to a complete alert
    *  object, re-seeding the form-only extras (logGroupBy / _meta). */
   const resetForm = (obj: any): void => form.reset(withFormExtras(obj));
+
+  const emailMe = useEmailMeDestination({
+    destinations: () => formData.value.destinations ?? [],
+    setDestinations: (names) => setF("destinations", names),
+    recoveryDestinations: () => form.state.values.recovery_destinations ?? [],
+    setRecoveryDestinations: (names) => setF("recovery_destinations", names),
+    onCreated: () => emit("refresh:destinations"),
+  });
+
   const indexOptions = ref([]);
   const schemaList = ref([]);
   const streams: any = ref({});
@@ -861,9 +871,13 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   });
 
   const getFormattedDestinations = computed(() => {
-    return props.destinations.map((destination: any) => {
-      return destination.name;
-    });
+    const names: (string | { label: string; value: string })[] = props.destinations.map(
+      (destination: any) => destination.name,
+    );
+    const emailMeOption = emailMe.option.value;
+    return emailMeOption && !names.includes(emailMeOption.value)
+      ? [...names, emailMeOption]
+      : names;
   });
 
   // Threshold mark line for chart
@@ -2411,10 +2425,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       return false;
     }
 
-    const payload = getAlertPayload();
-    // Read before the save: resetForm in .then clears the form the payload came from.
-    const sendsNowhere = !hasDeliveryTarget(payload);
-
     const dismiss = toast({
       variant: "loading",
       message: t("common.pleaseWait"),
@@ -2435,6 +2445,24 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         return false;
       }
     }
+
+    // Email me becomes a real destination before the save, so a failure keeps the alert unsaved.
+    if (
+      !beingUpdated.value &&
+      !(await emailMe.resolve(form.state.values.destinations ?? [], true))
+    ) {
+      dismiss();
+      activeTab.value = "condition";
+      return false;
+    }
+
+    const payload = getAlertPayload();
+    // Read before the save: resetForm in .then clears the form the payload came from.
+    const sendsNowhere = !hasDeliveryTarget(payload);
+    const emailedToast = emailMe.savedToast(
+      [...(payload.destinations ?? []), ...(payload.recovery_destinations ?? [])],
+      payload.template,
+    );
 
     if (formData.value.is_real_time !== "composite") {
       // VERSION HANDLING - wrap conditions with version field for backend
@@ -2500,12 +2528,14 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           emit("update:list", activeFolderId.value);
           addAlertForm.value?.resetValidation();
           dismiss();
-          toast({
-            variant: "success",
-            message: sendsNowhere
-              ? t("alerts.messages.alertSavedNoDestination")
-              : t("alerts.messages.alertSaved"),
-          });
+          toast(
+            emailedToast ?? {
+              variant: "success",
+              message: sendsNowhere
+                ? t("alerts.messages.alertSavedNoDestination")
+                : t("alerts.messages.alertSaved"),
+            },
+          );
           showSaveWarnings(res);
         })
         .catch((err: any) => {
@@ -3054,6 +3084,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       setF("is_real_time", "anomaly");
     }
 
+    // Anomaly detection keeps its own destinations, outside this form's field.
+    if (!beingUpdated.value && !isAnomalyMode.value) {
+      void emailMe.preselect(() => form.state.values as any);
+    }
+
     // Load anomaly detection config when editing
     const routeAnomalyId = router.currentRoute.value.params.anomaly_id as string | undefined;
     if (routeAnomalyId) {
@@ -3290,6 +3325,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     getSelectedTab,
     getFormattedDestinations,
     generatedSqlQuery,
+    emailMeError: emailMe.error,
+    resolveEmailMe: emailMe.resolve,
 
     // Form (Rule ③ owner) + write helpers
     form,

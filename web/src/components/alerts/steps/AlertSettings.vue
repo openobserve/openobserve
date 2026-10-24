@@ -132,11 +132,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :destinations="destinations"
             :workflows="workflows"
             :destination-options="formattedDestinations"
-            :error="destinationsError"
+            :error="destinationsError || emailMeError"
             :notifies-nobody="notifiesNobody"
             show-status
             show-send-test
             :alert-template="formData?.template"
+            :oncall-team="oncallTeamRoute"
+            :creates-incident="incidentRoute"
+            :resolve-destinations="resolveDestinations"
             :placeholder="t('alerts.summary.noDestination')"
             @update:destinations="$emit('update:destinations', $event)"
             @update:workflows="$emit('update:workflows', $event)"
@@ -301,11 +304,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :destinations="destinations"
             :workflows="workflows"
             :destination-options="formattedDestinations"
-            :error="destinationsError"
+            :error="destinationsError || emailMeError"
             :notifies-nobody="notifiesNobody"
             show-status
             show-send-test
             :alert-template="formData?.template"
+            :oncall-team="oncallTeamRoute"
+            :creates-incident="incidentRoute"
+            :resolve-destinations="resolveDestinations"
             :placeholder="t('alerts.summary.noDestination')"
             @update:destinations="$emit('update:destinations', $event)"
             @update:workflows="$emit('update:workflows', $event)"
@@ -488,6 +494,15 @@ export default defineComponent({
       type: Array as PropType<any[]>,
       default: () => [],
     },
+    // Why Email me could not become a real destination; shown on the main field.
+    emailMeError: {
+      type: String,
+      default: "",
+    },
+    resolveDestinations: {
+      type: Function as PropType<(names: string[]) => Promise<string[] | null>>,
+      default: undefined,
+    },
   },
   emits: [
     "update:trigger",
@@ -541,6 +556,15 @@ export default defineComponent({
           workflows: props.workflows,
           oncall_team: props.formData?.oncall_team,
         }),
+    );
+    // On-call teams page only in enterprise and cloud builds, as in hasDeliveryTarget.
+    const oncallTeamRoute = computed(() =>
+      config.isEnterprise === "true" || config.isCloud === "true"
+        ? (props.formData?.oncall_team ?? "")
+        : "",
+    );
+    const incidentRoute = computed(
+      () => incidentsEnabled.value && !!props.formData?.creates_incident,
     );
     const pendingPeriodError = fieldError("_ui.pendingPeriod");
     // Forecast mode fixes the period and reads its own history window, so a period field would only compete with it.
@@ -756,6 +780,8 @@ export default defineComponent({
       isForecastMode,
       silenceError,
       destinationsError,
+      oncallTeamRoute,
+      incidentRoute,
       notifiesNobody,
       pendingPeriodError,
       pendingPeriodWarning,

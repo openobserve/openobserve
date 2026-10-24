@@ -170,6 +170,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
 
+          <template #cell-name="{ row }">
+            <div class="flex min-w-0 items-center gap-2">
+              <OTruncatedText>{{ row.name }}</OTruncatedText>
+              <OTag
+                v-if="row.name === orgDefault"
+                :data-test="`destination-default-badge-${row.name}`"
+                type="destinationFlag"
+                value="default"
+                class="flex-shrink-0"
+              />
+              <OTag
+                v-if="smtpOff && row.type === 'email'"
+                :data-test="`destination-smtp-off-badge-${row.name}`"
+                type="destinationFlag"
+                value="smtp-off"
+                class="flex-shrink-0"
+              />
+            </div>
+          </template>
+
           <template #cell-template="{ row }">
             <div
               v-if="row.template"
@@ -258,11 +278,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     icon-left="more-vert"
                     variant="ghost"
                     size="icon-xs-sq"
-                    class="md:hidden"
+                    :class="{ 'md:hidden': row.name === orgDefault }"
                     data-test="alert-destination-list-row-more-actions"
                     @click.stop
                   />
                 </template>
+                <ODropdownItem
+                  v-if="row.name !== orgDefault"
+                  icon-left="check-circle"
+                  :data-test="`alert-destination-list-${row.name}-use-as-default`"
+                  @select="setOrgDefault(row)"
+                >
+                  <span>{{ t("alert_destinations.useAsDefault") }}</span>
+                </ODropdownItem>
                 <ODropdownItem
                   icon-left="download"
                   class="md:hidden"
@@ -386,6 +414,15 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
+import { raw } from "@/types/i18n";
+import settingsService from "@/services/settings";
+import { settingQuery } from "@/services/settings.queries";
+import { settingKeys } from "@/services/settings.querykeys";
+import {
+  ORG_DEFAULT_DESTINATION_CATEGORY,
+  ORG_DEFAULT_DESTINATION_KEY,
+  orgDefaultDestinationOf,
+} from "@/composables/alerts/useEmailMeDestination";
 
 interface ConformDelete {
   visible: boolean;
@@ -495,8 +532,8 @@ export default defineComponent({
         header: t("alert_destinations.actions"),
         isAction: true,
         pinned: "right",
-        size: 130,
-        meta: { align: "center", actionCount: 3 },
+        size: 160,
+        meta: { align: "center", actionCount: 4 },
       },
     ];
     const destinations: Ref<DestinationPayload[]> = ref([]);
@@ -543,6 +580,44 @@ export default defineComponent({
       selectedDestinations.value = ids.map((id: any) => map.get(id)).filter(Boolean);
     };
 
+    // New alerts start with this destination; a missing or malformed setting reads as none.
+    const orgDefault = ref<string | null>(null);
+    const loadOrgDefault = () => {
+      queryClient
+        .fetchQuery(
+          settingQuery(store.state.selectedOrganization.identifier, ORG_DEFAULT_DESTINATION_KEY),
+        )
+        .then((value) => (orgDefault.value = orgDefaultDestinationOf(value)))
+        .catch(() => (orgDefault.value = null));
+    };
+    const setOrgDefault = async (row: DestinationPayload) => {
+      const org = store.state.selectedOrganization.identifier;
+      const value = { destination: row.name };
+      try {
+        await settingsService.setOrgSetting(
+          org,
+          ORG_DEFAULT_DESTINATION_KEY,
+          value,
+          ORG_DEFAULT_DESTINATION_CATEGORY,
+        );
+        orgDefault.value = row.name;
+        queryClient.setQueryData(settingKeys.one(org, ORG_DEFAULT_DESTINATION_KEY), value);
+        toast({
+          variant: "success",
+          message: t("alert_destinations.defaultSet", { name: row.name }),
+        });
+      } catch (err: any) {
+        // The access interceptor already explains a 403.
+        if (err?.response?.status === 403) return;
+        toast({
+          variant: "error",
+          message: raw(err?.response?.data?.message) || t("alert_destinations.defaultSetFailed"),
+        });
+      }
+    };
+    // The server refuses new email destinations without SMTP; existing ones fail to send.
+    const smtpOff = computed(() => store.state.zoConfig?.smtp_enabled === false);
+
     onActivated(() => {
       getTemplates();
       if (!destinations.value.length) getDestinations();
@@ -550,6 +625,7 @@ export default defineComponent({
     onBeforeMount(() => {
       getDestinations();
       getTemplates();
+      loadOrgDefault();
     });
 
     watch(
@@ -1071,6 +1147,9 @@ export default defineComponent({
       oTableRef,
       currentPage,
       onPageChange,
+      orgDefault,
+      setOrgDefault,
+      smtpOff,
     };
   },
 });

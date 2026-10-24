@@ -362,6 +362,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :formattedDestinations="getFormattedDestinations"
                     :destinationObjects="destinations"
                     :workflows="formData.workflows"
+                    :emailMeError="emailMeError"
+                    :resolveDestinations="resolveEmailMe"
                     @update:trigger="updateTriggerCondition"
                     @update:aggregation="updateAggregation"
                     @update:isAggregationEnabled="(val) => (isAggregationEnabled = val)"

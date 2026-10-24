@@ -99,6 +99,7 @@ function makeDescendantHost(
   defaultOverrides: Record<string, any> = {},
   formDataOverrides: Record<string, any> = {},
   destinations: string[] = [],
+  settingsProps: Record<string, any> = {},
 ) {
   return defineComponent({
     components: { OForm, AlertSettings },
@@ -111,7 +112,7 @@ function makeDescendantHost(
         ...defaultOverrides,
       };
       const formData = makeFormData(formDataOverrides);
-      return { schema, defaultValues, formData, isRealTime, destinations };
+      return { schema, defaultValues, formData, isRealTime, destinations, settingsProps };
     },
     template: `
       <OForm :schema="schema" :default-values="defaultValues" @submit="() => {}">
@@ -120,6 +121,7 @@ function makeDescendantHost(
           :is-real-time="isRealTime"
           :destinations="destinations"
           :formatted-destinations="['dest-a','dest-b']"
+          v-bind="settingsProps"
         />
       </OForm>
     `,
@@ -376,6 +378,62 @@ describe("AlertSettings — Send test", () => {
       (field: any) => field.props("label") === t("alerts.alertSettings.recoveryDestinations"),
     );
     expect(recovery.props("showSendTest")).toBe(false);
+  });
+});
+
+describe("AlertSettings — Who to tell", () => {
+  const original = { isEnterprise: config.isEnterprise, isCloud: config.isCloud };
+  const fields = (host: any) => host.findAllComponents({ name: "AlertDestinationsField" });
+  afterEach(() => {
+    config.isEnterprise = original.isEnterprise;
+    config.isCloud = original.isCloud;
+  });
+
+  it("names the on-call team and the incident to the main field", () => {
+    config.isEnterprise = "true";
+    const host = mount(
+      makeDescendantHost("false", {}, { oncall_team: "sre", creates_incident: true }),
+      { global: { plugins: [makeStore({ incidents_enabled: true }), i18n] } },
+    );
+    expect(fields(host)[0].props("oncallTeam")).toBe("sre");
+    expect(fields(host)[0].props("createsIncident")).toBe(true);
+  });
+
+  it("names neither in OSS, where they deliver nothing", () => {
+    config.isEnterprise = "false";
+    config.isCloud = "false";
+    const host = mount(
+      makeDescendantHost("false", {}, { oncall_team: "sre", creates_incident: true }),
+      { global: { plugins: [makeStore({ incidents_enabled: true }), i18n] } },
+    );
+    expect(fields(host)[0].props("oncallTeam")).toBe("");
+    expect(fields(host)[0].props("createsIncident")).toBe(false);
+  });
+
+  it("shows why Email me could not be set up on the destination field", () => {
+    const host = mount(makeDescendantHost("true", {}, {}, [], { emailMeError: "Ask an admin" }), {
+      global: { plugins: [makeStore(), i18n] },
+    });
+    expect(host.find('[data-test="alert-settings-destinations-error"]').text()).toBe(
+      "Ask an admin",
+    );
+  });
+
+  it("hands the Email me resolver to the main field only", () => {
+    const resolveDestinations = vi.fn();
+    const host = mount(
+      makeDescendantHost(
+        "false",
+        { notify_on_recovery: true },
+        { notify_on_recovery: true },
+        ["dest-a"],
+        { resolveDestinations },
+      ),
+      { global: { plugins: [makeStore(), i18n] } },
+    );
+    const [main, recovery] = fields(host);
+    expect(main.props("resolveDestinations")).toBe(resolveDestinations);
+    expect(recovery.props("resolveDestinations")).toBeUndefined();
   });
 });
 
