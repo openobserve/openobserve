@@ -139,6 +139,19 @@ describe("RcaVerdictCard", () => {
       );
     });
 
+    it("M (resumed): names the step the run resumed from", () => {
+      const wrapper = mountCard({
+        cardState: "investigating",
+        liveMode: "fresh",
+        liveResumeStep: "Await flag change actor",
+        hasEarlierReport: true,
+      });
+
+      expect(byTest(wrapper, "rca-reanalyzing-message").text()).toBe(
+        "Resuming from “Await flag change actor”…",
+      );
+    });
+
     it("L: the reason, collapsed details, and Retry with the failed mode first", async () => {
       const wrapper = mountCard({
         cardState: "failed",
@@ -644,8 +657,7 @@ describe("RcaVerdictCard", () => {
         summary: rcaRunSummaryCancelled(),
       });
 
-      // A stored record reads "Failed"; the headline says it was cancelled.
-      expect(text(wrapper, "rca-verdict-state")).toBe("Failed");
+      expect(text(wrapper, "rca-verdict-state")).toBe("Cancelled");
       expect(text(wrapper, "rca-verdict-headline")).toBe(
         "Run cancelled before a verdict. Partial results below",
       );

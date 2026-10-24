@@ -101,6 +101,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
 
+      <p
+        v-else-if="!thread && runLive"
+        data-test="rca-thread-working"
+        role="status"
+        class="text-text-secondary text-compact m-0 flex items-center gap-2"
+      >
+        <OSpinner size="xs" />
+        {{ t("alerts.incidents.rcaThread.working") }}
+      </p>
+
       <ol v-else-if="thread" class="m-0 flex list-none flex-col gap-3.5 p-0">
         <li
           v-if="thread.truncated"
@@ -484,6 +494,8 @@ watch(
 
 const emptyMessage = computed<I18nText | null>(() => {
   if (props.noTranscript) return t("alerts.incidents.rcaThread.noTranscript");
+  // A live run's session is created after the run starts, so "expired" is only a race there.
+  if (props.runLive && !props.thread && props.status === "expired") return null;
   switch (props.status) {
     case "expired":
       return t("alerts.incidents.rcaThread.transcriptExpired");

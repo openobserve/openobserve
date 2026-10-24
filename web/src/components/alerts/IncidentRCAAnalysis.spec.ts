@@ -333,15 +333,25 @@ describe("IncidentRCAAnalysis", () => {
       expect(byTest(wrapper, "rca-thread-final-note").exists()).toBe(true);
     });
 
-    it("TH32: an expired thread shows the expired transcript", async () => {
+    it("TH32: an expired thread of a finished run shows the expired transcript", async () => {
       answers.thread = null;
       answers.threadStatus = "expired";
-      wrapper = mountPanel(liveProps());
+      wrapper = mountPanel(completedProps());
       await flushPromises();
 
       expect(byTest(wrapper, "rca-thread-empty").text()).toBe(
         "The transcript of this run is no longer stored.",
       );
+    });
+
+    it("a live run whose transcript is not stored yet shows the working line", async () => {
+      answers.thread = null;
+      answers.threadStatus = "expired";
+      wrapper = mountPanel(liveProps());
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-thread-working").exists()).toBe(true);
+      expect(byTest(wrapper, "rca-thread-empty").exists()).toBe(false);
     });
   });
 
@@ -374,6 +384,32 @@ describe("IncidentRCAAnalysis", () => {
       );
       await byTest(wrapper, "rca-banner-cancel-btn").trigger("click");
       expect(wrapper.emitted("cancel-rca")).toHaveLength(1);
+    });
+
+    it("M: a resumed run names the step it resumed from", async () => {
+      wrapper = mountPanel(
+        liveProps({
+          rca: rcaSummary({
+            current_run: rcaRun({
+              trigger: "resume",
+              context_used: {
+                resumed_from: {
+                  run_id: "run-1",
+                  steps: 2,
+                  from_step: { index: 3, stage: "changes", title: "Await flag change actor" },
+                },
+              },
+            }),
+          }),
+          reportRun: rcaRunItem(),
+          reportText: REPORT,
+        }),
+      );
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-reanalyzing-message").text()).toBe(
+        "Resuming from “Await flag change actor”…",
+      );
     });
 
     it("M: Follow in thread scrolls the thread column", async () => {
@@ -1017,7 +1053,7 @@ describe("IncidentRCAAnalysis", () => {
       });
       await flushPromises();
 
-      expect(byTest(wrapper, "rca-verdict-state").text()).toBe("Failed");
+      expect(byTest(wrapper, "rca-verdict-state").text()).toBe("Cancelled");
       expect(byTest(wrapper, "rca-verdict-headline").text()).toBe(
         "Run cancelled before a verdict. Partial results below",
       );
