@@ -69,7 +69,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`alert-library-card-title-${entry.id}`"
           @click.stop="emit('open')"
         >
-          {{ entry.title }}
+          <template v-for="(part, index) in titleParts" :key="index"
+            ><mark v-if="part.match" class="bg-highlight-bg rounded-default text-inherit">{{
+              part.text
+            }}</mark
+            ><template v-else>{{ part.text }}</template></template
+          >
         </button>
       </h3>
       <OTag
@@ -82,7 +87,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <OTruncatedText v-if="entry.description" as="p" :lines="3" class="text-text-secondary text-xs">
-      {{ entry.description }}
+      <template v-for="(part, index) in descriptionParts" :key="index"
+        ><mark v-if="part.match" class="bg-highlight-bg rounded-default text-inherit">{{
+          part.text
+        }}</mark
+        ><template v-else>{{ part.text }}</template></template
+      >
     </OTruncatedText>
 
     <div class="mt-auto flex flex-col gap-1 pt-1">
@@ -160,6 +170,7 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import type { AlertLibraryEntry } from "@/types/alertLibrary";
 import { useI18nTyped } from "@/types/i18n";
+import { highlightSegments } from "@/utils/alerts/librarySearch";
 
 import { alertTypeOf, queryTypeLabel, severityBadgeValue, severityLabel } from "./libraryFacets";
 
@@ -171,6 +182,8 @@ const props = defineProps<{
   selected?: boolean;
   /** An anomaly alert this build is not entitled to; the gallery turns its clicks into the upsell. */
   locked?: boolean;
+  /** Lowercased search words to mark in the title and description. */
+  highlight?: string[];
 }>();
 
 const emit = defineEmits<{
@@ -185,4 +198,8 @@ const severityText = computed(() => severityLabel(t, props.entry.severity));
 // A query language, not prose — one correct form worldwide.
 const queryTypeLabelText = computed(() => queryTypeLabel(props.entry.query_type));
 const isAnomaly = computed(() => alertTypeOf(props.entry) === "anomaly");
+const titleParts = computed(() => highlightSegments(props.entry.title, props.highlight ?? []));
+const descriptionParts = computed(() =>
+  highlightSegments(props.entry.description, props.highlight ?? []),
+);
 </script>
