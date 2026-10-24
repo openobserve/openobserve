@@ -12,18 +12,26 @@
       :panel-unit-custom="dashboardPanelData.data.config.unit_custom ?? ''"
       :panel-decimals="dashboardPanelData.data.config.decimals ?? 2"
       :initial-field="pendingInitialField"
+      :mode="mode"
+      :series-names="legendSeriesNames"
+      :chart-type="dashboardPanelData.data.type"
+      :preview-source="previewSource"
       @close="showOverrideConfigPopup = false"
-      @save="saveOverrideConfigConfig"
+      @save="onPopupSave"
     />
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, inject, onBeforeMount } from "vue";
+import { defineComponent, ref, computed, inject, onBeforeMount, PropType } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OverrideConfigPopup from "../OverrideConfigPopup.vue";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { getFieldLabel } from "@/utils/dashboard/fieldLabel";
+import {
+  getLegendSeriesNames,
+  type SeriesOverridePreviewSource,
+} from "@/composables/dashboard/useSeriesFormatting";
 
 interface Column {
   alias: string;
@@ -38,6 +46,16 @@ export default defineComponent({
     panelData: {
       type: Object,
       default: () => ({}),
+    },
+    /** "table" edits `override_config` (Column Formatting); "chart" edits its series entries. */
+    mode: {
+      type: String as PropType<"table" | "chart">,
+      default: "table",
+    },
+    /** Chart mode: what the Series Formatting preview converts again with the draft. */
+    previewSource: {
+      type: Object as PropType<SeriesOverridePreviewSource | null>,
+      default: null,
     },
   },
   setup(props) {
@@ -152,7 +170,19 @@ export default defineComponent({
       }
     };
 
+    const isChartMode = computed(() => props.mode === "chart");
+
+    const legendSeriesNames = computed(() =>
+      isChartMode.value
+        ? getLegendSeriesNames(props.panelData?.options, dashboardPanelData.data.type)
+        : [],
+    );
+
     const openOverrideConfigPopup = async (field?: string) => {
+      if (isChartMode.value) {
+        showOverrideConfigPopup.value = true;
+        return;
+      }
       // For PromQL mode, fetch labels first to ensure we have the latest label data
       if (promqlMode.value) {
         const query = dashboardPanelData.data.queries[0];
@@ -172,9 +202,22 @@ export default defineComponent({
       showOverrideConfigPopup.value = false;
     };
 
-    fetchColumns();
+    // A chart panel that never had the key keeps it absent, so it stores what it stored before.
+    const saveSeriesOverrides = (overrideConfig: any[]) => {
+      const config = dashboardPanelData.data.config;
+      if (overrideConfig.length || "override_config" in config) {
+        config.override_config = overrideConfig;
+      }
+      showOverrideConfigPopup.value = false;
+    };
+
+    const onPopupSave = (saved: any) =>
+      isChartMode.value ? saveSeriesOverrides(saved) : saveOverrideConfigConfig(saved);
+
+    if (!isChartMode.value) fetchColumns();
 
     onBeforeMount(() => {
+      if (isChartMode.value) return;
       // Ensure that the override_config object is initialized in config
       if (!dashboardPanelData.data.config.override_config) {
         dashboardPanelData.data.config.override_config = [];
@@ -187,6 +230,9 @@ export default defineComponent({
       pendingInitialField,
       openOverrideConfigPopup,
       saveOverrideConfigConfig,
+      saveSeriesOverrides,
+      onPopupSave,
+      legendSeriesNames,
       columns,
       previewData,
     };

@@ -606,6 +606,60 @@ describe("useHttpStreaming", () => {
       });
     });
   });
+  describe("mid-stream network failure", () => {
+    const handlers = { data: vi.fn(), error: vi.fn(), complete: vi.fn(), reset: vi.fn() };
+    const request: any = {
+      queryReq: { query: { sql: 'SELECT * FROM "default"', start_time: 1, end_time: 2 } },
+      type: "search",
+      isPagination: false,
+      traceId: "trace-net",
+      org_id: "test-org",
+      searchType: "ui",
+      pageType: "logs",
+    };
+
+    const failRead = async (error: unknown) => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const err = vi.spyOn(console, "error").mockImplementation(() => {});
+      // The shared vi.fn Worker mock cannot be called with `new`; a plain function can.
+      vi.stubGlobal("Worker", function () {
+        return mockWorker;
+      });
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        body: {
+          getReader: () => ({
+            read: vi.fn().mockRejectedValue(error),
+            releaseLock: vi.fn(),
+          }),
+        },
+      });
+      await httpStreaming.fetchQueryDataWithHttpStream(request, handlers);
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return { warn, err };
+    };
+
+    afterEach(() => vi.restoreAllMocks());
+
+    it.each([
+      "network error",
+      "Load failed",
+      "Failed to fetch",
+      "NetworkError when attempting to fetch resource.",
+    ])("warns instead of erroring on a %s TypeError and still reports it", async (message) => {
+      const { warn, err } = await failRead(new TypeError(message));
+      expect(err).not.toHaveBeenCalledWith("Error reading stream:", expect.anything());
+      expect(warn).toHaveBeenCalledWith("Error reading stream:", expect.any(TypeError));
+      expect(handlers.error).toHaveBeenCalled();
+    });
+
+    it("keeps logging other read failures as errors", async () => {
+      const { err } = await failRead(new Error("worker exploded"));
+      expect(err).toHaveBeenCalledWith("Error reading stream:", expect.any(Error));
+    });
+  });
+
   describe("WebSocket response converters", () => {
     const traceId = "0534c2294079426a86bd88b13775253120";
 

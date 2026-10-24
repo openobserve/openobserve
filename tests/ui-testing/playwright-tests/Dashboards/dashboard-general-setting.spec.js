@@ -53,7 +53,7 @@ test.describe("dashboard general setting", () => {
     await deleteDashboard(page, newDashboardName);
   });
 
-  test("should verify that dynamic toggle is disabled", async ({ page }) => {
+  test("should verify that dynamic toggle is disabled by default", async ({ page }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
     const randomDashboardName = generateDashboardName();
@@ -71,8 +71,9 @@ test.describe("dashboard general setting", () => {
     await pm.dashboardSetting.openSetting(); // Ensure settings are opened
     await pm.dashboardSetting.dashboardNameChange(newDashboardName);
 
-    //verify that dynamic toggle is disabled
+    await expect(pm.dashboardSetting.dynamicFilterSwitch).toHaveAttribute("aria-checked", "false");
     await pm.dashboardSetting.showDynamicFilter();
+    await expect(pm.dashboardSetting.dynamicFilterSwitch).toHaveAttribute("aria-checked", "true");
     await pm.dashboardSetting.saveSetting();
     await expect(pm.dashboardSetting.getToastMessageByText("Dashboard updated successfully")).toBeVisible({
       timeout: 30000,

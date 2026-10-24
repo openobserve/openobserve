@@ -177,6 +177,15 @@
     >
       {{ t("aiObservability.playground.expectedLeakWarning", { token: expectedToken }) }}
     </p>
+    <p
+      v-if="unresolvedVarNames.length"
+      class="text-status-warning-text text-2xs basis-full"
+      data-test="ai-playground-unresolved-warning"
+    >
+      {{
+        t("aiObservability.playground.unresolvedVariablesWarning", { tokens: unresolvedTokensText })
+      }}
+    </p>
   </div>
 </template>
 
@@ -240,6 +249,14 @@ const { t } = useI18nTyped();
 const expectedToken = `{{${EXPECTED_OUTPUT_TOKEN}}}`;
 
 const usesExpectedToken = computed(() => props.varNames.includes(EXPECTED_OUTPUT_TOKEN));
+
+/** Referenced but unbound (sent as ""); `expected_output` has its own warning. */
+const unresolvedVarNames = computed(() =>
+  props.usedVarNames.filter((name) => name !== EXPECTED_OUTPUT_TOKEN && !props.vars[name]),
+);
+const unresolvedTokensText = computed(() =>
+  unresolvedVarNames.value.map((name) => `{{${name}}}`).join(", "),
+);
 
 /** Forwarded to the Variables menu inside — PlaygroundPage only holds a ref on
  *  the bar, not on everything nested inside it. */

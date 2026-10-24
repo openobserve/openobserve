@@ -46,6 +46,8 @@ mod file_list_dump;
 pub(crate) mod files;
 mod flatten_compactor;
 #[cfg(feature = "enterprise")]
+mod fleet_inventory;
+#[cfg(feature = "enterprise")]
 mod incidents;
 mod leader;
 #[cfg(feature = "enterprise")]
@@ -439,8 +441,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
         {
             panic!("ZO_ROOT_USER_PASSWORD is too weak: {msg}");
         }
-        let _ =
-            openobserve_core::organization::check_and_create_org_without_ofga(DEFAULT_ORG).await;
+        if let Err(error) =
+            openobserve_core::organization::check_and_create_org_without_ofga(DEFAULT_ORG).await
+        {
+            log::warn!("Failed to auto-create organization '{DEFAULT_ORG}': {error}");
+        }
         if let Err(e) = users::create_root_user(
             DEFAULT_ORG,
             UserRequest {
@@ -504,6 +509,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::org_ingestion_tokens::run_splunk_token_reload());
     tokio::task::spawn(db::organization::watch());
     tokio::task::spawn(db::org_status::watch());
+    // KV reads are served from a per-node cache, so every node, routers included, must hear writes.
+    tokio::task::spawn(db::kv::watch());
     if let Err(e) = db::org_status::load_from_db().await {
         log::error!("Failed to load org status cache: {e}");
     }
@@ -654,6 +661,56 @@ pub async fn init() -> Result<(), anyhow::Error> {
             // An ack token is single-use, and single-use on one node only is not single-use.
             o2_enterprise::enterprise::oncall::token::mark_spent(tag, expires_at);
         }));
+    }
+    // Every node: the validator, which reads the token cache, runs wherever HTTP is served.
+    #[cfg(feature = "enterprise")]
+    if openobserve_core::fleet::enabled() {
+        use o2_enterprise::enterprise::fleet::{
+            apply_event,
+            enrollment::{ENROLLMENT, RECONCILE_INTERVAL_SECS},
+            inventory::FLEET_CALLBACKS,
+        };
+        // Subscribed before the reads below, so an event committed during them still arrives.
+        let events = infra::coordinator::fleet::subscribe()
+            .await
+            .expect("fleet watch failed");
+        // A dropped subscription would silently stop revokes, deletes and assignments arriving.
+        tokio::task::spawn(async move {
+            let mut events = Some(events);
+            loop {
+                let subscribed = match events.take() {
+                    Some(events) => Ok(events),
+                    None => infra::coordinator::fleet::subscribe().await,
+                };
+                let watched = match subscribed {
+                    Ok(events) => {
+                        infra::coordinator::fleet::run(events, |event| {
+                            tokio::spawn(apply_event(event));
+                        })
+                        .await
+                    }
+                    Err(e) => Err(e.into()),
+                };
+                log::error!("[FLEET] fleet watch ended ({watched:?}), re-subscribing");
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            }
+        });
+        let rw = infra::db::get_orm_client_rw().await;
+        ENROLLMENT
+            .hydrate_with(rw)
+            .await
+            .expect("fleet token cache load failed");
+        FLEET_CALLBACKS
+            .desired()
+            .hydrate_with(rw)
+            .await
+            .expect("fleet desired configurations load failed");
+        spawn_pausable_job!("fleet_token_reconcile", RECONCILE_INTERVAL_SECS, {
+            ENROLLMENT.reconcile().await;
+        });
+        spawn_pausable_job!("fleet_desired_reconcile", RECONCILE_INTERVAL_SECS, {
+            FLEET_CALLBACKS.reconcile_desired().await;
+        });
     }
     // org_settings_watch already started above for all nodes including routers
     // Watch needed on queriers (UI APIs) and on whichever node role is the configured
@@ -1408,6 +1465,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
     llm_secret_cleanup::run();
     #[cfg(feature = "enterprise")]
     prompt_webhook_delivery::run();
+    #[cfg(feature = "enterprise")]
+    if openobserve_core::fleet::enabled() {
+        o2_enterprise::enterprise::fleet::opamp::run_sweep();
+    }
+    #[cfg(feature = "enterprise")]
+    fleet_inventory::run();
 
     if LOCAL_NODE.is_compactor() {
         tokio::task::spawn(file_list_dump::run());
@@ -1652,6 +1715,26 @@ mod tests {
         assert!(
             router_return < boot,
             "Slack tasks start only on the roles that ran them before"
+        );
+    }
+
+    #[test]
+    fn kv_watch_is_spawned_before_the_router_return() {
+        let source = include_str!("mod.rs");
+        let init = source
+            .split("pub async fn init()")
+            .nth(1)
+            .and_then(|rest| rest.split("mod tests {").next())
+            .expect("init() body");
+        let kv_watch = init
+            .find("tokio::task::spawn(db::kv::watch());")
+            .expect("init() must spawn db::kv::watch() or other nodes keep stale KV values");
+        let router_return = init
+            .find("if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role()")
+            .expect("router return in init()");
+        assert!(
+            kv_watch < router_return,
+            "routers serve the PKCE login callback, which reads the KV cache"
         );
     }
 
