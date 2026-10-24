@@ -368,4 +368,14 @@ describe("LibraryRail", () => {
       expect(wrapper.find(SHOW_ALL).exists()).toBe(false);
     });
   });
+
+  describe("added packs", () => {
+    it("marks a pack heading the org already has alerts from", () => {
+      const wrapper = mountRail({ addedPacks: ["k8s"] });
+      const k8s = wrapper.find('[data-test="alert-library-rail-pack-heading-k8s"]');
+      expect(k8s.find('[data-test="alert-library-rail-pack-added"]').text()).toBe("Added");
+      const mq = wrapper.find('[data-test="alert-library-rail-pack-heading-mq"]');
+      expect(mq.find('[data-test="alert-library-rail-pack-added"]').exists()).toBe(false);
+    });
+  });
 });

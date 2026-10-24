@@ -23,6 +23,7 @@ import { makeAlertSectionRouter } from "@/test/unit/helpers/alertSectionRouter";
 import type { AlertLibraryEntry, AlertLibraryManifest } from "@/types/alertLibrary";
 import config from "@/aws-exports";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { queryClient } from "@/composables/query/queryClient";
 
 // See AlertSectionTabs.spec.ts — the app router is neither needed nor cheap.
 const router = makeAlertSectionRouter();
@@ -103,6 +104,7 @@ const isLoadingRef = ref(false);
 const errorRef = ref<{ code: string } | null>(null);
 const loadManifest = vi.fn();
 const getStreams = vi.fn();
+const loadAlertFileMock = vi.fn();
 
 vi.mock("@/composables/alerts/useAlertLibrary", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/composables/alerts/useAlertLibrary")>();
@@ -113,7 +115,7 @@ vi.mock("@/composables/alerts/useAlertLibrary", async (importOriginal) => {
       isLoading: isLoadingRef,
       error: errorRef,
       loadManifest,
-      loadAlertFile: vi.fn(),
+      loadAlertFile: loadAlertFileMock,
       clearLibrary: vi.fn(),
       isReady: (e: AlertLibraryEntry, byType: Record<string, Set<string>>) =>
         (e.required_streams ?? []).every((name) => byType[e.stream_type]?.has(name)),
@@ -124,6 +126,28 @@ vi.mock("@/composables/alerts/useAlertLibrary", async (importOriginal) => {
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({ getStreams }),
 }));
+
+const quickAdd = vi.hoisted(() => ({
+  add: vi.fn(),
+  deps: null as null | { onAdded: (id: string) => void; onRemoved: (id: string) => void },
+}));
+
+vi.mock("@/composables/alerts/useLibraryQuickAdd", () => ({
+  useLibraryQuickAdd: (deps: {
+    onAdded: (id: string) => void;
+    onRemoved: (id: string) => void;
+  }) => {
+    quickAdd.deps = deps;
+    return { add: quickAdd.add, isAdding: () => false };
+  },
+}));
+
+const listAlerts = vi.hoisted(() => vi.fn());
+
+vi.mock("@/services/alerts", async () => {
+  const actual = await vi.importActual<{ default: Record<string, unknown> }>("@/services/alerts");
+  return { ...actual, default: { ...actual.default, listByFolderId: listAlerts } };
+});
 
 import AlertLibrary from "./AlertLibrary.vue";
 
@@ -156,6 +180,8 @@ describe("AlertLibrary", () => {
     errorRef.value = null;
     loadManifest.mockReset().mockResolvedValue(manifestFixture);
     getStreams.mockReset().mockResolvedValue({ name: "all", list: STREAM_LIST });
+    listAlerts.mockReset().mockResolvedValue({ data: { list: [] } });
+    queryClient.clear();
     await router.push({ name: "alertLibrary" });
     await router.isReady();
   });
@@ -232,7 +258,8 @@ describe("AlertLibrary", () => {
     // group came from.
     const wrapper = await mountView();
     expect(wrapper.find('[data-test="alert-library-rail-pack-k8s"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="alert-library-group-k8s/pod"]').text()).toContain(
+    // The pod rule is a starter on the landing view, so its group is the node one.
+    expect(wrapper.find('[data-test="alert-library-group-k8s/node"]').text()).toContain(
       "Kubernetes",
     );
   });
@@ -241,7 +268,7 @@ describe("AlertLibrary", () => {
     // Category names are pack-scoped, so a heading has to say which pack it
     // belongs to — but repeating it on every group of a single pack is noise.
     const wrapper = await mountView();
-    expect(wrapper.find('[data-test="alert-library-group-k8s/pod"]').text()).toContain(
+    expect(wrapper.find('[data-test="alert-library-group-k8s/node"]').text()).toContain(
       "Kubernetes",
     );
 
@@ -1209,6 +1236,19 @@ describe("AlertLibrary", () => {
       expect(wrapper.find('[data-test="alert-library-stat-all"]').text()).toContain("5");
     });
 
+    it("installs an anomaly alert in one click, not through the wizard", async () => {
+      setAccess("enabled");
+      getStreams.mockResolvedValue({
+        name: "all",
+        list: [...STREAM_LIST, { name: "default", stream_type: "traces", stats: FRESH }],
+      });
+      const wrapper = await mountView();
+      await wrapper.find(`[data-test="alert-library-card-add-${ANOMALY}"]`).trigger("click");
+      await flushPromises();
+      expect(quickAdd.add).toHaveBeenCalledWith(expect.objectContaining({ id: ANOMALY }));
+      expect(wrapper.findComponent({ name: "LibraryInstallDialog" }).props("open")).toBe(false);
+    });
+
     it("hides anomaly alerts entirely when entitled but turned off", async () => {
       setAccess("hidden");
       const wrapper = await mountView();
@@ -1687,6 +1727,92 @@ describe("AlertLibrary", () => {
         expect(selected(wrapper)).toBe("50");
         expect(confirm(wrapper).props("modelValue")).toBe(false);
       });
+    });
+  });
+
+  describe("library add", () => {
+    const START = '[data-test="alert-library-start-with"]';
+    const card = (id: string) => `[data-test="alert-library-card-${id}"]`;
+    // A starter renders once, in the row; anywhere else would be the groups.
+    const count = (wrapper: ReturnType<typeof mount>, id: string) =>
+      wrapper.findAll(card(id)).length;
+
+    it("starts with the critical rules that fit, one per category, not repeated below", async () => {
+      const wrapper = await mountView();
+      const start = wrapper.find(START);
+      expect(start.find(card("k8s/pod-oom-killed")).exists()).toBe(true);
+      expect(start.find(card("openobserve/ingest-errors")).exists()).toBe(true);
+      // Warning, so not a starter; it stays in the groups.
+      expect(start.find(card("k8s/node-disk-pressure")).exists()).toBe(false);
+      expect(count(wrapper, "k8s/pod-oom-killed")).toBe(1);
+      expect(count(wrapper, "k8s/node-disk-pressure")).toBe(1);
+    });
+
+    it("hides the starters once the user searches, so the grid shows every match", async () => {
+      await router.push({ name: "alertLibrary", query: { q: "pod" } });
+      const wrapper = await mountView();
+      expect(wrapper.find(START).exists()).toBe(false);
+      expect(count(wrapper, "k8s/pod-oom-killed")).toBe(1);
+    });
+
+    it("tags a rule Added from the org's library_id", async () => {
+      listAlerts.mockResolvedValue({ data: { list: [{ library_id: "k8s/node-disk-pressure" }] } });
+      const wrapper = await mountView();
+      const added = (id: string) =>
+        wrapper.find(card(id)).find('[data-test="alert-library-card-added"]').exists();
+      expect(added("k8s/node-disk-pressure")).toBe(true);
+      expect(added("k8s/pod-oom-killed")).toBe(false);
+    });
+
+    it("marks a pack Added from the pack: tag", async () => {
+      listAlerts.mockResolvedValue({ data: { list: [{ tags: ["pack:openobserve"] }] } });
+      const wrapper = await mountView();
+      const rail = wrapper.findComponent({ name: "LibraryRail" });
+      expect(rail.props("addedPacks")).toEqual(["openobserve"]);
+    });
+
+    it("Add installs through the one-click path, and marks the rule once added", async () => {
+      const wrapper = await mountView();
+      await wrapper
+        .find('[data-test="alert-library-card-add-k8s/node-disk-pressure"]')
+        .trigger("click");
+      expect(quickAdd.add).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "k8s/node-disk-pressure" }),
+      );
+      quickAdd.deps!.onAdded("k8s/node-disk-pressure");
+      await flushPromises();
+      expect(
+        wrapper
+          .find(card("k8s/node-disk-pressure"))
+          .find('[data-test="alert-library-card-added"]')
+          .exists(),
+      ).toBe(true);
+    });
+
+    it("blocks Add on a rule whose stream is missing, naming it", async () => {
+      await showAll();
+      const wrapper = await mountView();
+      const blocked = wrapper.find(card("k8s/cert-expiring"));
+      const add = blocked.find('[data-test="alert-library-card-add-k8s/cert-expiring"]');
+      expect(add.attributes("disabled")).toBeDefined();
+      expect(
+        blocked.find('[data-test="alert-library-card-add-blocked"]').attributes("title"),
+      ).toContain("certmanager_metrics");
+      await add.trigger("click");
+      expect(quickAdd.add).not.toHaveBeenCalled();
+    });
+
+    it("Customize opens today's wizard seeded with the rule's file", async () => {
+      const wrapper = await mountView();
+      loadAlertFileMock.mockResolvedValue({ name: "x" });
+      const cardView = wrapper
+        .findAllComponents({ name: "LibraryCard" })
+        .find((c) => (c.props("entry") as AlertLibraryEntry).id === "k8s/node-disk-pressure")!;
+      cardView.vm.$emit("customize");
+      await flushPromises();
+      const wizard = wrapper.findComponent({ name: "LibraryInstallDialog" });
+      expect(wizard.props("open")).toBe(true);
+      expect((wizard.props("seed") as any).entry.id).toBe("k8s/node-disk-pressure");
     });
   });
 });

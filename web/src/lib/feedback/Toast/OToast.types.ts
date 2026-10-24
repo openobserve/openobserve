@@ -41,6 +41,8 @@ export interface ToastOptions {
   position?: ToastPosition;
   /** Optional action button rendered inside the toast */
   action?: ToastAction;
+  /** A second, quieter action after `action` */
+  secondaryAction?: ToastAction;
   /** Collapsible list of affected resources shown below the message */
   details?: ToastDetail[];
   /** Called once when this toast is dismissed (either by user or auto-timeout) */

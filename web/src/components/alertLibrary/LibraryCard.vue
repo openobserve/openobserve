@@ -157,6 +157,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <span class="truncate">{{ t("alert_library.notIngested", { stream: entry.stream }) }}</span>
       </OTag>
+
+      <!-- Its own stop: an Add or menu click must never also open the drawer. -->
+      <div class="flex items-center gap-1.5 pt-1" @click.stop>
+        <OTag
+          v-if="added"
+          variant="success-soft"
+          icon="check-circle"
+          :label="t('alert_library.added')"
+          :title="t('alert_library.addedHint')"
+          data-test="alert-library-card-added"
+        />
+        <span
+          class="ms-auto inline-flex"
+          :title="blockedText"
+          :data-test="blockedText ? 'alert-library-card-add-blocked' : undefined"
+        >
+          <OButtonGroup radius="sm">
+            <OButton
+              variant="outline"
+              size="xs"
+              icon-left="add"
+              :loading="adding"
+              :disabled="blocked"
+              :aria-label="t('alert_library.quickAdd.addAria', { title: entry.title })"
+              :data-test="`alert-library-card-add-${entry.id}`"
+              @click.stop="onAdd"
+            >
+              {{ t("alert_library.quickAdd.add") }}
+              <OTooltip v-if="!blocked" :content="addHint" />
+            </OButton>
+            <ODropdown align="end">
+              <template #trigger>
+                <OButton
+                  variant="outline"
+                  size="icon-xs"
+                  :aria-label="t('alert_library.quickAdd.moreOptions', { title: entry.title })"
+                  :data-test="`alert-library-card-add-menu-${entry.id}`"
+                >
+                  <OIcon name="expand-more" size="xs" />
+                </OButton>
+              </template>
+              <ODropdownItem
+                :data-test="`alert-library-card-customize-${entry.id}`"
+                @select="emit('customize')"
+              >
+                {{ t("alert_library.quickAdd.customize") }}
+              </ODropdownItem>
+            </ODropdown>
+          </OButtonGroup>
+        </span>
+      </div>
     </div>
   </article>
 </template>
@@ -165,14 +216,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { AlertLibraryEntry } from "@/types/alertLibrary";
 import { useI18nTyped } from "@/types/i18n";
 import { highlightSegments } from "@/utils/alerts/librarySearch";
 
-import { alertTypeOf, queryTypeLabel, severityBadgeValue, severityLabel } from "./libraryFacets";
+import {
+  alertTypeOf,
+  packLabel,
+  queryTypeLabel,
+  severityBadgeValue,
+  severityLabel,
+} from "./libraryFacets";
+import { NOISY_FIRE_LIMIT } from "./libraryQuickAdd";
 
 const props = defineProps<{
   entry: AlertLibraryEntry;
@@ -184,11 +247,19 @@ const props = defineProps<{
   locked?: boolean;
   /** Lowercased search words to mark in the title and description. */
   highlight?: string[];
+  /** The org already has this rule. */
+  added?: boolean;
+  /** A one-click add of this rule is in flight. */
+  adding?: boolean;
+  /** Required streams the org lacks; non-empty blocks Add. */
+  missingStreams?: string[];
 }>();
 
 const emit = defineEmits<{
   (e: "open"): void;
   (e: "update:selected", value: boolean): void;
+  (e: "add"): void;
+  (e: "customize"): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -202,4 +273,20 @@ const titleParts = computed(() => highlightSegments(props.entry.title, props.hig
 const descriptionParts = computed(() =>
   highlightSegments(props.entry.description, props.highlight ?? []),
 );
+const blocked = computed(() => (props.missingStreams?.length ?? 0) > 0);
+const blockedText = computed(() =>
+  blocked.value
+    ? t("alert_library.quickAdd.blocked", { streams: (props.missingStreams ?? []).join(", ") })
+    : undefined,
+);
+const addHint = computed(() =>
+  t("alert_library.quickAdd.addHint", {
+    folder: packLabel(props.entry.pack),
+    limit: NOISY_FIRE_LIMIT,
+  }),
+);
+
+const onAdd = () => {
+  if (!blocked.value && !props.adding) emit("add");
+};
 </script>

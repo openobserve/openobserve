@@ -242,6 +242,15 @@ onUnmounted(() => {
             />
             {{ actionSucceeded && action.successLabel ? action.successLabel : action.label }}
           </button>
+          <button
+            v-if="secondaryAction"
+            type="button"
+            data-test="o-toast-secondary-action-btn"
+            class="rounded-default text-toast-action-text hover:bg-toast-action-text/10 focus-visible:ring-toast-action-text inline-flex items-center justify-center px-2.5 py-0.5 text-xs font-semibold transition-all focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none"
+            @click.stop="secondaryAction.handler()"
+          >
+            {{ secondaryAction.label }}
+          </button>
         </div>
 
         <!-- Expandable affected-sections list -->

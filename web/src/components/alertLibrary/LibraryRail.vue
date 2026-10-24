@@ -124,6 +124,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`alert-library-rail-pack-heading-${group.pack}`"
         >
           <OTruncatedText class="block min-w-0">{{ group.label }}</OTruncatedText>
+          <OTag
+            v-if="addedPacks?.includes(group.pack)"
+            variant="success-soft"
+            :label="t('alert_library.added')"
+            :title="t('alert_library.packAddedHint')"
+            class="ms-auto shrink-0"
+            data-test="alert-library-rail-pack-added"
+          />
           <span class="shrink-0 tabular-nums" data-test="alert-library-rail-pack-count"
             >{{ group.ready }} / {{ group.total }}</span
           >
@@ -223,6 +231,8 @@ const props = defineProps<{
    * filters left the rail still narrowed by a term nobody had cleared.
    */
   search: string;
+  /** Packs the org already has alerts from, read off their `pack:` tag. */
+  addedPacks?: string[];
 }>();
 
 const emit = defineEmits<{

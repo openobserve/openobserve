@@ -69,6 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :severities="severityFacets"
             :severity="severity"
             :search="railSearch"
+            :added-packs="addedPackList"
             @update:search="railSearch = $event"
             @update:selected-categories="selectedCategories = $event"
             @update:severity="severity = $event"
@@ -90,6 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :severities="severityFacets"
             :severity="severity"
             :search="railSearch"
+            :added-packs="addedPackList"
             @update:search="railSearch = $event"
             @update:selected-categories="selectedCategories = $event"
             @update:severity="severity = $event"
@@ -276,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
 
               <OEmptyState
-                v-else-if="groupedEntries.length === 0"
+                v-else-if="visibleEntries.length === 0"
                 size="block"
                 class="py-8"
                 illustration="no-results"
@@ -290,6 +292,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
 
               <template v-else>
+                <section
+                  v-if="starters.length > 0"
+                  class="pt-3"
+                  data-test="alert-library-start-with"
+                >
+                  <div class="flex items-baseline gap-2 pb-2">
+                    <h2 class="text-text-heading text-sm font-semibold">
+                      {{ t("alert_library.startWithThese") }}
+                    </h2>
+                    <span class="text-text-secondary text-xs">
+                      {{ t("alert_library.startWithTheseHint") }}
+                    </span>
+                  </div>
+                  <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    <LibraryCard
+                      v-for="entry in starters"
+                      :key="entry.id"
+                      :entry="entry"
+                      :ready="entryReady(entry)"
+                      :selected="selectedIds.has(entry.id)"
+                      :locked="isLocked(entry)"
+                      :highlight="searchTerms"
+                      :added="isAdded(entry)"
+                      :adding="isAdding(entry.id)"
+                      :missing-streams="cardMissingStreams(entry)"
+                      @open="openEntry(entry)"
+                      @update:selected="onCardSelected(entry, $event)"
+                      @add="onCardAdd(entry)"
+                      @customize="onCustomize(entry)"
+                    />
+                  </div>
+                </section>
                 <section v-for="group in groupedEntries" :key="group.id" class="pt-3">
                   <!-- A sibling of the heading: inside it, it would rename the heading. -->
                   <div class="flex items-center gap-2 pb-2">
@@ -327,8 +361,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :selected="selectedIds.has(entry.id)"
                       :locked="isLocked(entry)"
                       :highlight="searchTerms"
+                      :added="isAdded(entry)"
+                      :adding="isAdding(entry.id)"
+                      :missing-streams="cardMissingStreams(entry)"
                       @open="openEntry(entry)"
                       @update:selected="onCardSelected(entry, $event)"
+                      @add="onCardAdd(entry)"
+                      @customize="onCustomize(entry)"
                     />
                   </div>
                 </section>
@@ -383,6 +422,12 @@ import LibraryEmptyState from "@/components/alertLibrary/LibraryEmptyState.vue";
 import LibraryInstallDialog from "@/components/alertLibrary/LibraryInstallDialog.vue";
 import LibraryRail from "@/components/alertLibrary/LibraryRail.vue";
 import {
+  libraryMarks,
+  missingStreams,
+  pickStartWithThese,
+  type LibraryMarks,
+} from "@/components/alertLibrary/libraryQuickAdd";
+import {
   ALERT_TYPE_ORDER,
   alertTypeLabel,
   alertTypeOf,
@@ -401,6 +446,8 @@ import {
   streamDataState,
 } from "@/composables/alerts/useAlertLibrary";
 import type { AlertLibraryErrorCode } from "@/composables/alerts/useAlertLibrary";
+import { useLibraryQuickAdd } from "@/composables/alerts/useLibraryQuickAdd";
+import { queryClient } from "@/composables/query/queryClient";
 import useStreams from "@/composables/useStreams";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -417,6 +464,8 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { alertsListQuery } from "@/services/alerts.queries";
 import type { AlertLibraryEntry, AlertLibraryFile, StreamsByType } from "@/types/alertLibrary";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { matchesSearchWords, searchWords } from "@/utils/alerts/librarySearch";
@@ -437,7 +486,7 @@ const store = useStore();
 const route = useRoute();
 const router = useRouter();
 
-const { manifest, isLoading, error, loadManifest, isReady } = useAlertLibrary();
+const { manifest, isLoading, error, loadManifest, loadAlertFile, isReady } = useAlertLibrary();
 const anomalyAccess = useAnomalyLibraryAccess();
 const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 const { getStreams } = useStreams(t);
@@ -465,6 +514,13 @@ const pendingBatch = ref<AlertLibraryEntry[]>([]);
 
 /** A Set, not an array: every card asks this on every render. */
 const selectedIds = ref<Set<string>>(new Set());
+
+/** What the org's alert list says it already has from the library. */
+const serverMarks = ref<LibraryMarks>({ entryIds: new Set(), packs: new Set() });
+// Adds and Undos made on this page, applied over the list until it is read again.
+const addedHere = ref<Set<string>>(new Set());
+const removedHere = ref<Set<string>>(new Set());
+const packsAddedHere = ref<Set<string>>(new Set());
 
 const streamsByType = ref<StreamsByType>({});
 const streamsPending = ref(true);
@@ -535,6 +591,47 @@ const entryFits = (entry: AlertLibraryEntry): boolean =>
 
 const isLocked = (entry: AlertLibraryEntry): boolean =>
   anomalyAccess.value !== "enabled" && alertTypeOf(entry) === "anomaly";
+
+// Only a known stream list can say a stream is missing; an unknown one blocks nothing.
+const cardMissingStreams = (entry: AlertLibraryEntry): string[] =>
+  readinessKnown.value ? missingStreams(entry, streamsByType.value) : [];
+
+// ── added marks ────────────────────────────────────────────────────────────
+const isAdded = (entry: AlertLibraryEntry): boolean =>
+  !removedHere.value.has(entry.id) &&
+  (addedHere.value.has(entry.id) || serverMarks.value.entryIds.has(entry.id));
+
+const addedPackList = computed(() => [
+  ...new Set([...serverMarks.value.packs, ...packsAddedHere.value]),
+]);
+
+const withId = (set: Set<string>, id: string, present: boolean): Set<string> => {
+  const next = new Set(set);
+  if (present) next.add(id);
+  else next.delete(id);
+  return next;
+};
+
+// Anomaly installs carry no library_id, so like the list they earn a pack mark only.
+const markAdded = (entryId: string) => {
+  const entry = entries.value.find((candidate) => candidate.id === entryId);
+  if (entry) packsAddedHere.value = withId(packsAddedHere.value, entry.pack, true);
+  if (entry && alertTypeOf(entry) === "anomaly") return;
+  addedHere.value = withId(addedHere.value, entryId, true);
+  removedHere.value = withId(removedHere.value, entryId, false);
+};
+
+const markRemoved = (entryId: string) => {
+  addedHere.value = withId(addedHere.value, entryId, false);
+  removedHere.value = withId(removedHere.value, entryId, true);
+  const entry = entries.value.find((candidate) => candidate.id === entryId);
+  if (entry) packsAddedHere.value = withId(packsAddedHere.value, entry.pack, false);
+};
+
+const { add: quickAdd, isAdding } = useLibraryQuickAdd({
+  onAdded: markAdded,
+  onRemoved: markRemoved,
+});
 
 // ── scope ──────────────────────────────────────────────────────────────────
 /**
@@ -757,6 +854,23 @@ const byGridOrder = (a: AlertLibraryEntry, b: AlertLibraryEntry) =>
 /** Every filter has already been applied by `availableEntries`; this orders it. */
 const visibleEntries = computed(() => [...availableEntries.value].sort(byGridOrder));
 
+// Only on the landing view: under a search or filter, pulling rules out of the groups would hide matches.
+const showStarters = computed(
+  () =>
+    readinessKnown.value &&
+    facet.value === "ready" &&
+    search.value.trim() === "" &&
+    selectedCategories.value.length === 0 &&
+    severity.value === "all" &&
+    alertType.value === "all",
+);
+
+const starters = computed(() =>
+  showStarters.value
+    ? pickStartWithThese(visibleEntries.value, (entry) => entryFits(entry) && !isLocked(entry))
+    : [],
+);
+
 /**
  * Grouped by pack AND category, never category alone: category names are
  * pack-scoped in the manifest, so two packs can both ship a "connections"
@@ -766,7 +880,9 @@ const visibleEntries = computed(() => [...availableEntries.value].sort(byGridOrd
  */
 const groupedEntries = computed(() => {
   const groups = new Map<string, AlertLibraryEntry[]>();
+  const started = new Set(starters.value.map((entry) => entry.id));
   for (const entry of visibleEntries.value) {
+    if (started.has(entry.id)) continue;
     const key = `${entry.pack}/${entry.category}`;
     const bucket = groups.get(key);
     if (bucket) bucket.push(entry);
@@ -883,6 +999,7 @@ const addSelected = () => {
 };
 
 const onInstalled = ({ entryIds }: { entryIds: string[] }) => {
+  for (const id of entryIds) markAdded(id);
   const added = new Set(entryIds);
   selectedIds.value = new Set([...selectedIds.value].filter((id) => !added.has(id)));
 };
@@ -971,6 +1088,26 @@ const onInstall = (payload: { entry: AlertLibraryEntry; file: AlertLibraryFile }
   installOpen.value = true;
 };
 
+const onCardAdd = (entry: AlertLibraryEntry) => {
+  if (isLocked(entry)) {
+    openUpgradeDialog();
+    return;
+  }
+  void quickAdd(entry);
+};
+
+const onCustomize = async (entry: AlertLibraryEntry) => {
+  if (isLocked(entry)) {
+    openUpgradeDialog();
+    return;
+  }
+  try {
+    onInstall({ entry, file: await loadAlertFile(entry) });
+  } catch {
+    toast({ variant: "error", message: t("alert_library.drawer.loadFailed") });
+  }
+};
+
 const onInstallOpenChange = (open: boolean) => {
   installOpen.value = open;
   // Batch and file are per-open; the selection survives, because rebuilding it is manual work.
@@ -1013,11 +1150,25 @@ const loadStreams = async () => {
   }
 };
 
+// Every folder: library installs land in a folder per pack.
+const loadAddedMarks = async () => {
+  try {
+    const org = store.state.selectedOrganization?.identifier ?? "";
+    serverMarks.value = libraryMarks(await queryClient.fetchQuery(alertsListQuery(org, "")));
+    addedHere.value = new Set();
+    removedHere.value = new Set();
+    packsAddedHere.value = new Set();
+  } catch {
+    // Without the list there are no marks; the gallery itself still works.
+  }
+};
+
 const refresh = () => {
   void loadManifest({ force: true }).catch(() => {
     // Surfaced through `error`; the empty state offers Retry.
   });
   void loadStreams();
+  void loadAddedMarks();
 };
 
 onMounted(() => {
@@ -1025,6 +1176,7 @@ onMounted(() => {
     /* see refresh */
   });
   void loadStreams();
+  void loadAddedMarks();
 });
 
 function isFacet(value: string): value is Facet {
