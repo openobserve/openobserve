@@ -20,21 +20,24 @@ const get_promql_series = ({
 };
 
 /**
- * Org-wide label names, for the metrics explorer's label-filter picker.
- * Routed in the backend at src/handler/http/router/mod.rs:676.
+ * Label names, org-wide or, with `match`, for one metric.
+ * Routed in the backend at src/api/http/src/handler/http/router/mod.rs:1243.
  */
 const labels = ({
   org_identifier,
+  match,
   start_time,
   end_time,
   signal,
 }: {
   org_identifier: string;
+  match?: string;
   start_time: number;
   end_time: number;
   signal?: AbortSignal;
 }) => {
-  const url = `/api/${org_identifier}/prometheus/api/v1/labels?start=${start_time}&end=${end_time}`;
+  const scope = match ? `match[]=${encodeURIComponent(match)}&` : "";
+  const url = `/api/${org_identifier}/prometheus/api/v1/labels?${scope}start=${start_time}&end=${end_time}`;
   return signal ? http().get(url, { signal }) : http().get(url);
 };
 

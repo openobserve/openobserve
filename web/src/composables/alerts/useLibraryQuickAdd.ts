@@ -53,6 +53,14 @@ export interface QuickAddDeps {
   onRemoved: (entryId: string) => void;
 }
 
+/** A caller that already knows the route or the estimate, as a pack review does. */
+export interface InstallOptions {
+  /** A destination name, or "" for none; the org default when absent. */
+  destination?: string;
+  /** Yesterday's fires; estimated here when absent. */
+  fires?: number | null;
+}
+
 interface CreatedAlert {
   entry: AlertLibraryEntry;
   alertId: string;
@@ -69,6 +77,10 @@ interface Installed {
 
 const serverMessage = (error: any): string | undefined =>
   error?.response?.data?.message ?? error?.response?.data?.error;
+
+/** Anomaly rules learn their own band, so they install without an estimate. */
+export const isAnomalyRule = (entry: AlertLibraryEntry, file: AlertLibraryFile): boolean =>
+  alertTypeOf(entry) === "anomaly" || file.alert_type === "anomaly_detection";
 
 /** One-click library add: 24 h estimate, org defaults, pack folder, and a toast with Undo and Edit. */
 export function useLibraryQuickAdd(deps: QuickAddDeps) {
@@ -212,8 +224,12 @@ export function useLibraryQuickAdd(deps: QuickAddDeps) {
   const installAnomaly = async (
     entry: AlertLibraryEntry,
     file: AlertLibraryFile,
+    options: InstallOptions,
   ): Promise<Installed> => {
-    const [destination, folder] = await Promise.all([defaultDestination(), packFolder(entry)]);
+    const [destination, folder] = await Promise.all([
+      options.destination ?? defaultDestination(),
+      packFolder(entry),
+    ]);
     const payload = buildAnomalyInstallPayload({ entry, file, folderId: folder.id, destination });
     const response: any = await anomalyService.create(org(), payload, folder.id);
     await invalidate(true);
@@ -227,15 +243,17 @@ export function useLibraryQuickAdd(deps: QuickAddDeps) {
     return { created, fires: null, folderName: folder.name };
   };
 
-  const install = async (entry: AlertLibraryEntry): Promise<Installed> => {
+  /** Creates the rule in its pack folder, paused when noisy; throws the server's error. */
+  const install = async (
+    entry: AlertLibraryEntry,
+    options: InstallOptions = {},
+  ): Promise<Installed> => {
     const file = await loadAlertFile(entry);
     // The file is checked too: the wizard does the same, since the manifest list is what stamps the type.
-    if (alertTypeOf(entry) === "anomaly" || file.alert_type === "anomaly_detection") {
-      return installAnomaly(entry, file);
-    }
+    if (isAnomalyRule(entry, file)) return installAnomaly(entry, file, options);
     const [fires, destination, folder] = await Promise.all([
-      estimateFires(file),
-      defaultDestination(),
+      options.fires !== undefined ? options.fires : estimateFires(file),
+      options.destination ?? defaultDestination(),
       packFolder(entry),
     ]);
     const payload = buildQuickAddPayload(
@@ -287,5 +305,5 @@ export function useLibraryQuickAdd(deps: QuickAddDeps) {
     }
   };
 
-  return { add, isAdding };
+  return { add, isAdding, install, estimateFires };
 }

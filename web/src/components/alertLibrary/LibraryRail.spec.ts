@@ -378,4 +378,20 @@ describe("LibraryRail", () => {
       expect(mq.find('[data-test="alert-library-rail-pack-added"]').exists()).toBe(false);
     });
   });
+  describe("pack review", () => {
+    it("offers a review of each pack with rules to review", () => {
+      const wrapper = mountRail({ reviewCounts: { k8s: 6 } });
+      const review = wrapper.find('[data-test="alert-library-rail-pack-review-k8s"]');
+      expect(review.text()).toBe("Review 6 alerts");
+      expect(wrapper.find('[data-test="alert-library-rail-pack-review-mq"]').exists()).toBe(false);
+    });
+
+    it("emits the pack to review", async () => {
+      const wrapper = mountRail({ reviewCounts: { k8s: 1 } });
+      const review = wrapper.find('[data-test="alert-library-rail-pack-review-k8s"]');
+      expect(review.text()).toBe("Review 1 alert");
+      await review.trigger("click");
+      expect(wrapper.emitted("review")).toEqual([["k8s"]]);
+    });
+  });
 });

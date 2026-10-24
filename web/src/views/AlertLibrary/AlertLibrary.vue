@@ -70,9 +70,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :severity="severity"
             :search="railSearch"
             :added-packs="addedPackList"
+            :review-counts="reviewCounts"
             @update:search="railSearch = $event"
             @update:selected-categories="selectedCategories = $event"
             @update:severity="severity = $event"
+            @review="openReview"
           />
         </div>
         <ODrawer
@@ -92,9 +94,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :severity="severity"
             :search="railSearch"
             :added-packs="addedPackList"
+            :review-counts="reviewCounts"
             @update:search="railSearch = $event"
             @update:selected-categories="selectedCategories = $event"
             @update:severity="severity = $event"
+            @review="openReview"
           />
         </ODrawer>
 
@@ -317,6 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :added="isAdded(entry)"
                       :adding="isAdding(entry.id)"
                       :missing-streams="cardMissingStreams(entry)"
+                      :needs-labels="labelsNeeded(entry)"
                       @open="openEntry(entry)"
                       @update:selected="onCardSelected(entry, $event)"
                       @add="onCardAdd(entry)"
@@ -364,6 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :added="isAdded(entry)"
                       :adding="isAdding(entry.id)"
                       :missing-streams="cardMissingStreams(entry)"
+                      :needs-labels="labelsNeeded(entry)"
                       @open="openEntry(entry)"
                       @update:selected="onCardSelected(entry, $event)"
                       @add="onCardAdd(entry)"
@@ -385,6 +391,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-state="selectedDataState.state"
       :last-ingested-micros="selectedDataState.lastIngestedMicros"
       @install="onInstall"
+    />
+
+    <LibraryReviewDrawer
+      v-model:open="reviewOpen"
+      :pack="reviewPack"
+      :entries="reviewEntries"
+      @added="markAdded"
     />
 
     <ConfirmDialog
@@ -421,6 +434,7 @@ import LibraryDrawer from "@/components/alertLibrary/LibraryDrawer.vue";
 import LibraryEmptyState from "@/components/alertLibrary/LibraryEmptyState.vue";
 import LibraryInstallDialog from "@/components/alertLibrary/LibraryInstallDialog.vue";
 import LibraryRail from "@/components/alertLibrary/LibraryRail.vue";
+import LibraryReviewDrawer from "@/components/alertLibrary/LibraryReviewDrawer.vue";
 import {
   libraryMarks,
   missingStreams,
@@ -446,6 +460,7 @@ import {
   streamDataState,
 } from "@/composables/alerts/useAlertLibrary";
 import type { AlertLibraryErrorCode } from "@/composables/alerts/useAlertLibrary";
+import { useLibraryLabelCheck } from "@/composables/alerts/useLibraryLabelCheck";
 import { useLibraryQuickAdd } from "@/composables/alerts/useLibraryQuickAdd";
 import { queryClient } from "@/composables/query/queryClient";
 import useStreams from "@/composables/useStreams";
@@ -506,6 +521,9 @@ const selectAllConfirmOpen = ref(false);
 /** Kept after close so the drawer can animate out with its content intact. */
 const selectedEntry = ref<AlertLibraryEntry | null>(null);
 const drawerOpen = ref(false);
+
+const reviewOpen = ref(false);
+const reviewPack = ref<string | null>(null);
 
 const installOpen = ref(false);
 const installSeed = ref<{ entry: AlertLibraryEntry; file: AlertLibraryFile } | null>(null);
@@ -632,6 +650,33 @@ const { add: quickAdd, isAdding } = useLibraryQuickAdd({
   onAdded: markAdded,
   onRemoved: markRemoved,
 });
+
+const { needsData: labelsNeeded } = useLibraryLabelCheck();
+
+// ── pack review ────────────────────────────────────────────────────────────
+// Every runnable rule of the pack, whatever the filters: the review is about the pack.
+const reviewable = (entry: AlertLibraryEntry): boolean =>
+  entryFits(entry) && !isLocked(entry) && !isAdded(entry);
+
+const reviewCounts = computed<Record<string, number>>(() => {
+  const counts: Record<string, number> = {};
+  for (const entry of entries.value) {
+    if (reviewable(entry)) counts[entry.pack] = (counts[entry.pack] ?? 0) + 1;
+  }
+  return counts;
+});
+
+// Frozen when the review opens, so an add inside it does not reshuffle its rows.
+const reviewEntries = ref<AlertLibraryEntry[]>([]);
+
+const openReview = (pack: string) => {
+  reviewEntries.value = entries.value
+    .filter((entry) => entry.pack === pack && reviewable(entry))
+    .sort(byGridOrder);
+  reviewPack.value = pack;
+  mobileFiltersOpen.value = false;
+  reviewOpen.value = true;
+};
 
 // ── scope ──────────────────────────────────────────────────────────────────
 /**

@@ -146,6 +146,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
+        <div v-if="(reviewCounts?.[group.pack] ?? 0) > 0" class="px-2 pb-1">
+          <OButton
+            variant="ghost-primary"
+            size="xs"
+            :data-test="`alert-library-rail-pack-review-${group.pack}`"
+            @click="emit('review', group.pack)"
+          >
+            {{
+              t(
+                "alert_library.review.open",
+                { count: reviewCounts?.[group.pack] ?? 0 },
+                reviewCounts?.[group.pack] ?? 0,
+              )
+            }}
+          </OButton>
+        </div>
+
         <div
           v-for="item in group.rows"
           :key="item.id"
@@ -233,12 +250,15 @@ const props = defineProps<{
   search: string;
   /** Packs the org already has alerts from, read off their `pack:` tag. */
   addedPacks?: string[];
+  /** Per pack, how many rules a review would offer; no button for a pack without any. */
+  reviewCounts?: Record<string, number>;
 }>();
 
 const emit = defineEmits<{
   "update:selectedCategories": [ids: string[]];
   "update:severity": [id: string];
   "update:search": [term: string];
+  review: [pack: string];
 }>();
 
 const { t } = useI18nTyped();

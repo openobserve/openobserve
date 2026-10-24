@@ -397,4 +397,24 @@ describe("LibraryCard", () => {
       expect(added.text()).toBe("Added");
     });
   });
+  describe("label readiness", () => {
+    it("says which label value is missing once the rule's file was checked", () => {
+      const note = mountCard({ needsLabels: "job hadoop-namenode" }).find(
+        '[data-test="alert-library-card-needs-labels"]',
+      );
+      expect(note.text()).toBe("Needs data: job hadoop-namenode");
+    });
+
+    it("says nothing about labels before a check", () => {
+      expect(mountCard().find('[data-test="alert-library-card-needs-labels"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("leaves the missing-stream chip in charge when the stream itself is absent", () => {
+      const wrapper = mountCard({ ready: false, needsLabels: "job hadoop-namenode" });
+      expect(wrapper.find('[data-test="alert-library-card-needs-labels"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="alert-library-card-needs-data"]').exists()).toBe(true);
+    });
+  });
 });

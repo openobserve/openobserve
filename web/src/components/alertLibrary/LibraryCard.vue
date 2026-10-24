@@ -158,6 +158,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="truncate">{{ t("alert_library.notIngested", { stream: entry.stream }) }}</span>
       </OTag>
 
+      <OTag
+        v-if="ready && needsLabels"
+        variant="warning-quiet"
+        class="max-w-full min-w-0 self-start"
+        :title="t('alert_library.review.needsDataHint', { labels: needsLabels })"
+        data-test="alert-library-card-needs-labels"
+      >
+        <template #icon>
+          <OIcon name="sensors-off" size="xs" class="text-badge-warning-soft-text shrink-0" />
+        </template>
+        <span class="truncate">{{
+          t("alert_library.review.needsData", { labels: needsLabels })
+        }}</span>
+      </OTag>
+
       <!-- Its own stop: an Add or menu click must never also open the drawer. -->
       <div class="flex items-center gap-1.5 pt-1" @click.stop>
         <OTag
@@ -253,6 +268,8 @@ const props = defineProps<{
   adding?: boolean;
   /** Required streams the org lacks; non-empty blocks Add. */
   missingStreams?: string[];
+  /** "job hadoop-namenode" once a review found the rule's label values missing. */
+  needsLabels?: string;
 }>();
 
 const emit = defineEmits<{

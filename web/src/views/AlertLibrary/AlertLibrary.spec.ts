@@ -142,6 +142,32 @@ vi.mock("@/composables/alerts/useLibraryQuickAdd", () => ({
   },
 }));
 
+const labelCheck = vi.hoisted(() => ({ needsData: vi.fn((): string => "") }));
+
+vi.mock("@/composables/alerts/useLibraryLabelCheck", () => ({
+  useLibraryLabelCheck: () => ({ check: vi.fn(), needsData: labelCheck.needsData }),
+  clearLabelChecks: vi.fn(),
+}));
+
+// The drawer's own spec covers the review; here it must not claim the quick-add mock's deps.
+vi.mock("@/composables/alerts/useLibraryReview", async () => {
+  const actual = await vi.importActual<Record<string, unknown>>(
+    "@/composables/alerts/useLibraryReview",
+  );
+  const { ref: vueRef } = await import("vue");
+  return {
+    ...actual,
+    useLibraryReview: () => ({
+      rows: vueRef([]),
+      selectedIds: vueRef([]),
+      loading: vueRef(false),
+      enabling: vueRef(false),
+      load: vi.fn(),
+      enable: vi.fn(),
+    }),
+  };
+});
+
 const listAlerts = vi.hoisted(() => vi.fn());
 
 vi.mock("@/services/alerts", async () => {
@@ -1813,6 +1839,62 @@ describe("AlertLibrary", () => {
       const wizard = wrapper.findComponent({ name: "LibraryInstallDialog" });
       expect(wizard.props("open")).toBe(true);
       expect((wizard.props("seed") as any).entry.id).toBe("k8s/node-disk-pressure");
+    });
+  });
+  describe("pack review", () => {
+    const card = (id: string) => `[data-test="alert-library-card-${id}"]`;
+
+    it("fetches no library file on page load", async () => {
+      await mountView();
+      expect(loadAlertFileMock).not.toHaveBeenCalled();
+    });
+
+    it("offers each pack's runnable rules for review from the rail", async () => {
+      const wrapper = await mountView();
+      const review = wrapper.find('[data-test="alert-library-rail-pack-review-k8s"]');
+      expect(review.text()).toBe("Review 2 alerts");
+      await review.trigger("click");
+      await flushPromises();
+      const drawer = wrapper.findComponent({ name: "LibraryReviewDrawer" });
+      expect(drawer.props("open")).toBe(true);
+      expect(drawer.props("pack")).toBe("k8s");
+      expect((drawer.props("entries") as AlertLibraryEntry[]).map((item) => item.id)).toEqual([
+        "k8s/pod-oom-killed",
+        "k8s/node-disk-pressure",
+      ]);
+    });
+
+    it("marks a rule added from the review", async () => {
+      const wrapper = await mountView();
+      wrapper
+        .findComponent({ name: "LibraryReviewDrawer" })
+        .vm.$emit("added", "k8s/node-disk-pressure");
+      await flushPromises();
+      expect(
+        wrapper
+          .find(card("k8s/node-disk-pressure"))
+          .find('[data-test="alert-library-card-added"]')
+          .exists(),
+      ).toBe(true);
+    });
+
+    it("shows Needs data on a card whose file a review has checked", async () => {
+      labelCheck.needsData.mockImplementation(((item: AlertLibraryEntry) =>
+        item.id === "k8s/pod-oom-killed" ? "job hadoop-namenode" : "") as () => string);
+      const wrapper = await mountView();
+      expect(
+        wrapper
+          .find(card("k8s/pod-oom-killed"))
+          .find('[data-test="alert-library-card-needs-labels"]')
+          .text(),
+      ).toBe("Needs data: job hadoop-namenode");
+      expect(
+        wrapper
+          .find(card("k8s/node-disk-pressure"))
+          .find('[data-test="alert-library-card-needs-labels"]')
+          .exists(),
+      ).toBe(false);
+      labelCheck.needsData.mockImplementation(() => "");
     });
   });
 });
