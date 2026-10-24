@@ -92,7 +92,7 @@ const errorHandler = vi.fn();
 const metaStore = () =>
   createStore({
     state: {
-      selectedOrganization: { identifier: "_meta", name: "_meta" },
+      selectedOrganization: { identifier: "_meta", label: "_meta" },
       userInfo: { email: "root@acme.example" },
       zoConfig: { slack_enabled: true, meta_org: "_meta" },
     },
@@ -212,12 +212,30 @@ describe("SlackSelfHostedWizard Step 0", () => {
     expect(w.find('[data-test="slack-wizard-next"]').attributes("disabled")).toBeUndefined();
   });
 
-  it("R-37 the no-Helm hint names only the master key, never a super-cluster key", async () => {
+  it("R-37 / S7 the no-Helm hint shows only under a failing master-key check, and never names a super-cluster key", async () => {
+    vi.mocked(slack.getPrerequisites).mockReturnValue(
+      ok({
+        checks: [
+          {
+            id: "master_key",
+            status: "fail",
+            detail: "Not set",
+            variable: "O2_MASTER_ENCRYPTION_KEY",
+            fix: "openssl rand -base64 64",
+          },
+        ],
+      }) as any,
+    );
     const w = await mountWizard();
-    expect(w.text()).toContain(
-      "Installed without Helm? Set O2_MASTER_ENCRYPTION_KEY, restart, then Re-check.",
+    expect(w.find('[data-test="slack-prereq-helm-hint"]').text()).toBe(
+      "Installed without Helm? Set it in the server environment, restart, then Re-check.",
     );
     expect(w.text()).not.toMatch(/super.cluster|replicat|O2_SUPER_CLUSTER_SECRET_KEY/i);
+
+    vi.mocked(slack.getPrerequisites).mockReturnValue(ok({ checks: passing }) as any);
+    await w.find('[data-test="slack-prereq-recheck"]').trigger("click");
+    await flushPromises();
+    expect(w.text()).not.toContain("Installed without Helm");
   });
 
   it("AC-7.1 blocks Next while a check fails", async () => {
@@ -294,6 +312,30 @@ describe("SlackSelfHostedWizard Step 2", () => {
       expect(w.find(`[data-test="slack-wizard-${field}"]`).exists()).toBe(false);
     }
     expect(w.text()).not.toMatch(/xoxb/);
+  });
+
+  it("S9 switches the path from a link under the token field, never from the footer", async () => {
+    const w = await toStep2();
+    expect(w.find('[data-test="slack-wizard-token-help"]').text()).toContain(
+      "paste the refresh token",
+    );
+    const footer = w.find('[data-test="slack-wizard-create"]').element.parentElement!;
+    const labels = () =>
+      Array.from(footer.querySelectorAll("button")).map((b) => b.textContent?.trim());
+    expect(labels()).toEqual(["Back", "Create the app"]);
+    const link = w.find('[data-test="slack-wizard-manual"]');
+    expect(link.text()).toBe("No configuration token? Set up manually");
+    expect(
+      w
+        .find('[data-test="slack-wizard-config-token"]')
+        .element.compareDocumentPosition(link.element) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    await link.trigger("click");
+    await flushPromises();
+    expect(w.find('[data-test="slack-wizard-manual"]').text()).toBe(
+      "Use a configuration token instead",
+    );
+    expect(labels()).toEqual(["Back", "Save credentials"]);
   });
 
   it("AC-7.3 creates the app from the configuration token and moves to Install", async () => {
@@ -881,6 +923,29 @@ describe("SlackSelfHostedWizard on an instance workspace's team (M3, R-81, R-82)
     });
     expect(slack.uninstallInstallation).toHaveBeenCalledWith("_meta", "inst-1");
     expect(w.emitted("done")).toHaveLength(1);
+  });
+
+  it("S10 says OpenObserve was unreachable when the create request gets no response", async () => {
+    vi.mocked(slack.createInstallation).mockReturnValue(
+      Promise.reject(
+        Object.assign(new Error("Network Error"), { code: "ERR_NETWORK", request: {} }),
+      ) as any,
+    );
+    const w = await mountWizard();
+    await toCreate(w);
+    await submitToken(w);
+    expect(step(w)).toBe("2");
+    const banner = w.find('[data-test="slack-wizard-unreachable"]');
+    expect(banner.attributes("role")).toBe("alert");
+    expect(banner.text()).toContain("Couldn't reach OpenObserve. Nothing was created.");
+    expect(banner.text()).toContain("http vs https");
+    expect(banner.text()).toContain("POST /api/acme/slack/installations · no response");
+    expect(w.find('[data-test="slack-wizard-create-error"]').exists()).toBe(false);
+    expect(w.text()).not.toContain("Unknown error");
+    const token = w.find('[data-test="slack-wizard-config-token"] input')
+      .element as HTMLInputElement;
+    expect(token.value).toBe("xoxe-1-sample");
+    expect(toast).not.toHaveBeenCalled();
   });
 
   it("a refused config token shows the server message verbatim", async () => {
