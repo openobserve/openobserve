@@ -26,7 +26,8 @@ function crosses(start, end, box) {
 }
 
 test.describe('nav rail hover intent', () => {
-  test.describe.configure({ mode: 'serial' });
+  // Parallel: no beforeAll/afterAll and no shared state, so nothing needs sequencing.
+  test.describe.configure({ mode: 'parallel' });
 
   for (const [w, h] of SIZES) {
     for (const dir of DIRS) {
@@ -74,7 +75,17 @@ test.describe('nav rail hover intent', () => {
           const href = await item.getAttribute('href');
           const expectedTab = new URL(href, 'http://localhost').searchParams.get('tab');
           await page.mouse.click(end.x, end.y);
-          await page.waitForTimeout(700);
+          // Poll the URL: waitForURL also waits for 'load', which a section index like /product-analytics/overview?period=7d outlasts.
+          const want = pathname(href);
+          await expect
+            .poll(
+              () => {
+                const p = new URL(page.url()).pathname;
+                return p === want || p.startsWith(`${want}/`);
+              },
+              { timeout: 30000 },
+            )
+            .toBe(true);
           const url = new URL(page.url());
           // A section index may redirect to its first sub-route (/product-analytics -> /overview).
           const landed = url.pathname === pathname(href) || url.pathname.startsWith(`${pathname(href)}/`);
