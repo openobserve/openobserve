@@ -245,6 +245,7 @@
     "actual_folder": "GeneralTests",
     "browser": "chrome",
     "run_files": [
+      "navRailKeyboard.spec.js",
       "navRailGeometry.spec.js",
       "sanity.spec.js",
       "landingPage.spec.js",
