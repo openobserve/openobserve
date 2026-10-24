@@ -21,6 +21,7 @@ import { withQueryClient } from "@/test/unit/helpers/queryClient";
 import reports from "@/services/reports";
 import { rememberManualRun } from "@/utils/reports/reportRun";
 import type { ReportRunHit } from "@/services/reports";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import ReportRunHistory from "./ReportRunHistory.vue";
 
 const replace = vi.fn();
@@ -33,7 +34,9 @@ vi.mock("vue-router", async (importOriginal) => ({
 
 vi.mock("@/services/reports", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
-  return overlayServiceMock(await importOriginal(), { default: { getHistory: vi.fn() } });
+  return overlayServiceMock(await importOriginal(), {
+    default: { getHistory: vi.fn(), getReportById: vi.fn() },
+  });
 });
 
 const RESPONSE = {
@@ -62,7 +65,10 @@ const mountHistory = (props: Record<string, unknown> = {}) => {
     props: { reportId: "r1", ...props },
     global: {
       plugins: [i18n, store, withQueryClient()],
-      stubs: { OTable: { template: "<div><slot name='subheader' /><slot name='empty' /></div>" } },
+      stubs: {
+        OTable: { template: "<div><slot name='subheader' /><slot name='empty' /></div>" },
+        ODrawer: { template: "<div data-test='drawer'><slot /></div>" },
+      },
     },
   });
   mounted.push(wrapper);
@@ -77,6 +83,8 @@ describe("ReportRunHistory", () => {
     for (const k of Object.keys(routeQuery)) delete routeQuery[k];
     vi.mocked(reports.getHistory).mockReset();
     vi.mocked(reports.getHistory).mockResolvedValue({ data: RESPONSE } as any);
+    vi.mocked(reports.getReportById).mockReset();
+    vi.mocked(reports.getReportById).mockRejectedValue({ response: { status: 404 } });
   });
 
   it("reads one report's runs over the last 7 days by default", async () => {
@@ -338,6 +346,57 @@ describe("ReportRunHistory", () => {
         .mocked(reports.getHistory)
         .mock.calls.some(([, q]) => q.run_report_id === target.report_id && q.retries === 4),
     ).toBe(true);
+  });
+
+  it("loads the run's report for the org-wide drawer", async () => {
+    const target = { ...RESPONSE.hits[0], report_id: "r9", scheduled_for: 10, error: null };
+    routeQuery.run = "10";
+    routeQuery.run_report_id = target.report_id;
+    vi.mocked(reports.getHistory).mockResolvedValue({
+      data: { ...RESPONSE, hits: [target] },
+    } as any);
+    vi.mocked(reports.getReportById).mockResolvedValue({
+      data: {
+        timezone: "Asia/Kolkata",
+        dashboards: [{ dashboard: "d1", folder: "default", tabs: ["Overview"] }],
+      },
+    } as any);
+    const w = mountHistory({ reportId: undefined });
+    await flushPromises();
+    expect(reports.getReportById).toHaveBeenCalledWith(expect.any(String), "r9", {
+      silentForbidden: true,
+    });
+    expect(w.find('[data-test="reports-reportrundrawer-scheduled-for"]').text()).toMatch(
+      / \(Asia\/Kolkata\)$/,
+    );
+    expect(w.find('[data-test="reports-reportrundrawer-dashboard-0"]').exists()).toBe(true);
+  });
+
+  it("opens the org-wide drawer quietly when the report GET is denied", async () => {
+    const target = { ...RESPONSE.hits[0], report_id: "r9", scheduled_for: 10, error: null };
+    routeQuery.run = "10";
+    routeQuery.run_report_id = target.report_id;
+    vi.mocked(reports.getHistory).mockResolvedValue({
+      data: { ...RESPONSE, hits: [target] },
+    } as any);
+    vi.mocked(reports.getReportById).mockRejectedValue({ response: { status: 403 } });
+    const w = mountHistory({ reportId: undefined });
+    await flushPromises();
+    expect(reports.getReportById).toHaveBeenCalled();
+    expect((w.vm as any).selectedRun).toEqual(target);
+    expect(w.find('[data-test="reports-reportrundrawer"]').exists()).toBe(true);
+    expect(w.find('[data-test="reports-reportrundrawer-scheduled-for"]').text()).toMatch(
+      / \(UTC\)$/,
+    );
+    expect(w.findAllComponents(OBanner)).toHaveLength(0);
+  });
+
+  it("does not fetch the report when the page passes it", async () => {
+    routeQuery.run = "10";
+    routeQuery.run_report_id = "r1";
+    mountHistory({ report: { timezone: "Asia/Kolkata", dashboards: [] } });
+    await flushPromises();
+    expect(reports.getReportById).not.toHaveBeenCalled();
   });
 
   it("reconciles an ingested manual row while staying on page two", async () => {

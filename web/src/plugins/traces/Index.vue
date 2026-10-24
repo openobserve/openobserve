@@ -771,8 +771,9 @@ function fetchTracesCount() {
           searchObj.meta.resultGrid.showPagination = count > 0;
         }
       },
-      error: (_payload: any, _err: any) => {
-        console.error("Failed to fetch traces count");
+      error: (_payload: any, err: any) => {
+        // The count is a best-effort badge; the main search reports its own failures.
+        console.warn("Failed to fetch traces count", err);
         currentCountTraceId = null;
       },
       complete: (_payload: any) => {
@@ -1525,7 +1526,13 @@ const restoreFilters = (query: string) => {
 
   const defaultQuery = `SELECT * FROM "${selectedStreamName.value}" WHERE `;
 
-  const parsedQuery = tracesParser.value.astify(defaultQuery + query);
+  let parsedQuery;
+  try {
+    parsedQuery = tracesParser.value.astify(defaultQuery + query);
+  } catch {
+    // A filter the parser rejects just leaves the field-value selections as they are.
+    return;
+  }
 
   restoreFiltersFromQuery(parsedQuery.where);
 };

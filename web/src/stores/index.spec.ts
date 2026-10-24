@@ -262,6 +262,21 @@ describe("root store", () => {
   });
 });
 
+describe("setOrganizations", () => {
+  afterEach(() => store.commit("setOrganizations", []));
+
+  it.each([undefined, null, { data: [] }, "oops"])("stores an empty list for %s", (payload) => {
+    store.commit("setOrganizations", payload);
+    expect(store.state.organizations).toEqual([]);
+  });
+
+  it("keeps a real organization list", () => {
+    const orgs = [{ identifier: "default" }];
+    store.commit("setOrganizations", orgs);
+    expect(store.state.organizations).toEqual(orgs);
+  });
+});
+
 // #14696/#12952 regression lock: reverting the store's theme default to "" fails these.
 describe("initial theme default from localStorage (#14696)", () => {
   const evaluateFreshStore = async () => {

@@ -110,3 +110,33 @@ describe("MainLayout — organization settings load", () => {
     expect(store.state.organizationData.organizationSettings.red_insights_enabled).toBe(false);
   });
 });
+
+describe("MainLayout — organization selection without an org list", () => {
+  let wrapper: VueWrapper | undefined;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = undefined;
+    queryClient.clear();
+    vi.restoreAllMocks();
+  });
+
+  it("does not throw when the organizations list is missing", async () => {
+    getOrgSettings.mockResolvedValue({ data: { data: {} } });
+    wrapper = await mountLayout();
+    await flushPromises();
+    const saved = store.state.organizations;
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    store.state.organizations = undefined;
+
+    await (
+      wrapper.vm as unknown as { setSelectedOrganization: () => Promise<void> }
+    ).setSelectedOrganization();
+
+    store.state.organizations = saved;
+    expect(consoleError).not.toHaveBeenCalledWith(
+      "Error in setSelectedOrganization:",
+      expect.anything(),
+    );
+  });
+});

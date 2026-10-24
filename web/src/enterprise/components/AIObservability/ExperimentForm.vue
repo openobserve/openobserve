@@ -281,8 +281,7 @@
                     required
                     data-test="ai-experiment-form-user-prompt"
                   />
-                  <!-- The variables a dataset row exposes. Clicking one
-                       appends it, so the reference is also the input method. -->
+                  <!-- Chips: `input` plus the fields every row shares; `expected_output` feeds scorers only. -->
                   <div class="flex flex-wrap items-center gap-1.5">
                     <span class="text-text-secondary text-xs">
                       {{ t("aiObservability.experiments.form.variablesLabel") }}
@@ -298,7 +297,28 @@
                     >
                       {{ variable.token }}
                     </OButton>
+                    <span
+                      class="text-text-secondary text-xs opacity-60"
+                      data-test="ai-experiment-form-variable-expected_output"
+                    >
+                      {{
+                        t("aiObservability.experiments.form.expectedOutputScorersOnly", {
+                          token: expectedOutputToken,
+                        })
+                      }}
+                    </span>
                   </div>
+                  <p
+                    v-if="usesExpectedOutput"
+                    class="text-status-warning-text text-2xs"
+                    data-test="ai-experiment-form-expected-leak-warning"
+                  >
+                    {{
+                      t("aiObservability.playground.expectedLeakWarning", {
+                        token: expectedOutputToken,
+                      })
+                    }}
+                  </p>
                 </div>
               </template>
 
@@ -600,7 +620,12 @@ import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import llmDatasetsService, { type LlmDataset } from "@/services/llm-datasets.service";
+import llmDatasetsService, {
+  commonInputFields,
+  DATASET_ITEMS_MAX_PAGE_SIZE,
+  type LlmDataset,
+  type LlmDatasetItem,
+} from "@/services/llm-datasets.service";
 import { type RemoteTask } from "@/services/remote-tasks.service";
 import { chatProviders } from "@/services/llm-playground.service";
 import { remoteTasksListQuery } from "@/services/llm-experiments.queries";
@@ -936,10 +961,45 @@ const scorerOptions = computed(() =>
 
 const scorerApplicability = computed(() => preview.value?.applicability?.scorerApplicability ?? []);
 
-const promptVariables = ["input", "expected_output"].map((name) => ({
-  name,
-  token: raw(`{{ ${name} }}`),
-}));
+/** First page of the selected dataset; source toggles filter it without refetching. */
+const datasetRows = ref<LlmDatasetItem[]>([]);
+/** Fields every selected-source row shares — suggestions; preview validation stays the authority. */
+const datasetInputFields = computed(() =>
+  commonInputFields(
+    sources.value.length
+      ? datasetRows.value.filter((item) => sources.value.includes(item.source))
+      : datasetRows.value,
+  ),
+);
+const promptVariables = computed(() =>
+  ["input", ...datasetInputFields.value].map((name) => ({ name, token: raw(`{{ ${name} }}`) })),
+);
+const expectedOutputToken = raw("{{ expected_output }}");
+const usesExpectedOutput = computed(() =>
+  [systemPrompt.value, userPrompt.value].some((prompt) =>
+    /\{\{\s*expected_output\s*\}\}/.test(String(prompt ?? "")),
+  ),
+);
+
+/** Bumped per load, so a slow response for a since-deselected dataset is dropped. */
+let datasetRowsRequest = 0;
+
+async function loadDatasetRows() {
+  const id = datasetId.value;
+  const request = ++datasetRowsRequest;
+  if (!id || !orgId.value) {
+    datasetRows.value = [];
+    return;
+  }
+  try {
+    const page = await llmDatasetsService.listItems(orgId.value, id, {
+      size: DATASET_ITEMS_MAX_PAGE_SIZE,
+    });
+    if (request === datasetRowsRequest) datasetRows.value = page.items;
+  } catch {
+    if (request === datasetRowsRequest) datasetRows.value = [];
+  }
+}
 
 function goBack() {
   router.push(aiExperimentsRoute(orgId.value));
@@ -1190,6 +1250,7 @@ watch(
 const runPreviewAfterTyping = debounce(runPreview, 500);
 watch([systemPrompt, userPrompt], runPreviewAfterTyping);
 onBeforeUnmount(() => runPreviewAfterTyping.cancel());
+watch(datasetId, loadDatasetRows, { immediate: true });
 watch([promptId, promptSelectionMode, promptLabel, promptVersion], resolvePromptSelection);
 
 onBeforeRouteLeave((to, _from, next) => {

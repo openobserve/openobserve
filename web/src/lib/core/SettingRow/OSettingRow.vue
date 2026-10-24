@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- The last row drops its own rule, so a card needs no per-row conditionals. -->
 <template>
   <div
-    class="flex items-center gap-6"
+    class="flex items-center gap-6 max-md:flex-col max-md:items-stretch max-md:gap-2"
     :class="[
       !inPair && 'border-border-default border-b px-3 py-3 last:border-b-0',
       disabled && 'opacity-60',
@@ -25,13 +25,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data-test="dataTest"
   >
     <!-- Half of a 45% pair cell, so single and paired controls share one column. -->
-    <div class="min-w-0 shrink-0" :class="inPair ? 'w-1/2' : 'w-[22.5%]'">
+    <div class="min-w-0 shrink-0 max-md:w-full" :class="inPair ? 'w-1/2' : 'w-[22.5%]'">
       <div class="text-text-heading text-sm font-medium">{{ label }}</div>
       <div v-if="description" class="text-text-secondary mt-0.5 text-xs">
         {{ description }}
       </div>
     </div>
-    <div class="flex shrink-0 items-center justify-end">
+    <div class="flex shrink-0 items-center justify-end max-md:min-w-0 max-md:justify-start">
       <slot />
     </div>
   </div>

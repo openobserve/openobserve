@@ -27,6 +27,17 @@ describe("badgeGroups", () => {
     expect(r.icon).toBeUndefined();
   });
 
+  it("resolves licenseWaiverStatus", () => {
+    expect(resolveBadge("licenseWaiverStatus", "active").variant).toBe("success-soft");
+    expect(resolveBadge("licenseWaiverStatus", "scheduled").variant).toBe("blue-soft");
+    const past = resolveBadge("licenseWaiverStatus", "past");
+    expect(past.variant).toBe("default-soft");
+    expect(past.labelKey).toBe("components.badge.licenseWaiverStatus.past");
+    const ended = resolveBadge("licenseWaiverStatus", "ended");
+    expect(ended.variant).toBe("default-soft");
+    expect(ended.labelKey).toBe("components.badge.licenseWaiverStatus.ended");
+  });
+
   it("resolves downtimeStatus to dot mode with an amber active state", () => {
     expect(resolveBadge("downtimeStatus", "active").variant).toBe("warning-soft");
     expect(resolveBadge("downtimeStatus", "scheduled").variant).toBe("blue-soft");

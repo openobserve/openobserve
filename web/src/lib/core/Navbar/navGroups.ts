@@ -59,6 +59,8 @@ export const GATE_PREDICATES: Record<string, (c: NavGateContext) => boolean> = {
   downtimes: (c) => (c.isEnterprise || c.isCloud) && c.downtimesEnabled,
   // Enterprise/cloud plus `/config` `alert_calibration_enabled`, the same rule as the route guard.
   alertCalibration: (c) => (c.isEnterprise || c.isCloud) && c.alertCalibrationEnabled,
+  // Enterprise plus `/config` `fleet_enabled`; the route stays so management reads keep working.
+  fleet: (c) => c.isEnterprise && c.fleetEnabled,
 };
 
 /**
@@ -376,6 +378,14 @@ export const NAV_GROUPS: NavGroupDef[] = [
         icon: "data-plus-line",
         name: "ingestion",
         requires: "ingestion",
+      },
+      // Lit on the config editor too, which is its own route rather than a tab of /fleet.
+      {
+        titleKey: "menu.fleet",
+        icon: "workspaces",
+        name: "fleet",
+        gate: "fleet",
+        activeOnRoutes: ["fleetConfigEditor"],
       },
     ],
   },

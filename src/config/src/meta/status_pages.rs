@@ -196,6 +196,8 @@ pub struct UpdatePageRequest {
     /// `apply_logo_field`); an already-set logo keeps rendering under a
     /// lapsed license or an OSS build.
     pub logo_img: Option<String>,
+    /// Base64-encoded browser-tab icon; gated like `logo_img`.
+    pub favicon_img: Option<String>,
 }
 
 /// Admin view of a page. Deliberately omits `password_hash`; carries only
@@ -218,6 +220,7 @@ pub struct PageAdminView {
     pub brand_name: Option<String>,
     pub accent_color: Option<String>,
     pub logo_img: Option<String>,
+    pub favicon_img: Option<String>,
     pub tracking_since: Option<i64>,
     pub owner: Option<String>,
     pub created_at: i64,
@@ -1084,6 +1087,7 @@ mod tests {
             brand_name: None,
             accent_color: None,
             logo_img: None,
+            favicon_img: None,
             tracking_since: None,
             owner: Some("a@b.c".into()),
             created_at: 1,
