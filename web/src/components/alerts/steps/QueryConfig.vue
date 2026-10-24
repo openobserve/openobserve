@@ -177,6 +177,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </div>
                       </div>
+                      <ThresholdSuggestionHint
+                        v-if="thresholdRule.enabled"
+                        v-bind="thresholdHint"
+                        @use="applySuggestedThreshold"
+                      />
                       <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
                            critical's operator, so the row only echoes it. -->
                       <div v-if="countWarningVisible" class="flex items-start gap-2">
@@ -270,6 +275,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </div>
                       </div>
+                      <ThresholdSuggestionHint
+                        v-if="thresholdRule.enabled"
+                        v-bind="thresholdHint"
+                        @use="applySuggestedThreshold"
+                      />
                       <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
                            critical's operator, so the row only echoes it. -->
                       <div v-if="aggWarningVisible" class="flex items-start gap-2">
@@ -555,6 +565,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </div>
                       </div>
+                      <ThresholdSuggestionHint
+                        v-if="thresholdRule.enabled"
+                        v-bind="thresholdHint"
+                        @use="applySuggestedThreshold"
+                      />
                       <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
                            critical's operator, so the row only echoes it. -->
                       <div v-if="countWarningVisible" class="flex items-start gap-2">
@@ -647,6 +662,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </div>
                       </div>
+                      <ThresholdSuggestionHint
+                        v-if="thresholdRule.enabled"
+                        v-bind="thresholdHint"
+                        @use="applySuggestedThreshold"
+                      />
                       <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
                            critical's operator, so the row only echoes it. -->
                       <div v-if="aggWarningVisible" class="flex items-start gap-2">
@@ -930,6 +950,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </OTooltip>
                       </span>
                     </div>
+                    <OButton
+                      variant="ghost-primary"
+                      size="sm"
+                      data-test="alert-add-filter-btn"
+                      @click="addFilter"
+                    >
+                      <OIcon name="add" size="sm" />
+                      {{ t("alerts.queryConfig.addFilter") }}
+                    </OButton>
                   </div>
 
                   <!-- Cron description + error -->
@@ -1022,6 +1051,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OTooltip>
                   </span>
                 </div>
+                <OButton
+                  variant="ghost-primary"
+                  size="sm"
+                  data-test="alert-add-filter-btn"
+                  @click="addFilter"
+                >
+                  <OIcon name="add" size="sm" />
+                  {{ t("alerts.queryConfig.addFilter") }}
+                </OButton>
               </div>
               <div v-show="showFilters" ref="customPreviewRef">
                 <FilterGroup
@@ -1847,6 +1885,8 @@ import {
   nextTick,
   watch,
   inject,
+  provide,
+  toRef,
   type Ref,
 } from "vue";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
@@ -1858,6 +1898,7 @@ import {
   isAboveMinRefreshInterval,
   describeCron,
   getImageURL,
+  getUUID,
   resolveBrowserTimezone,
 } from "@/utils/zincutils";
 import useSqlSuggestions from "@/composables/useSuggestions";
@@ -1871,6 +1912,8 @@ import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useT
 import { alertPromqlSamples } from "@/utils/alerts/promqlSamples";
 import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
 import FilterGroup from "@/components/alerts/FilterGroup.vue";
+import { CONDITION_VALUE_SUGGEST_KEY } from "@/components/alerts/conditionOperators";
+import { useAlertValueSuggest } from "@/composables/alerts/useAlertValueSuggest";
 import QueryEditorDialog from "@/components/alerts/QueryEditorDialog.vue";
 import CustomConfirmDialog from "@/components/alerts/CustomConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -1884,6 +1927,11 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import AlertMultiToggle from "@/components/alerts/AlertMultiToggle.vue";
 import ForecastAlertFields from "@/components/alerts/steps/ForecastAlertFields.vue";
+import ThresholdSuggestionHint from "@/components/alerts/steps/ThresholdSuggestionHint.vue";
+import {
+  useThresholdSuggestion,
+  type ThresholdRule,
+} from "@/composables/alerts/useThresholdSuggestion";
 import {
   FORECAST_FREQUENCY_MINUTES,
   FORECAST_PERIOD_MINUTES,
@@ -1908,6 +1956,7 @@ export default defineComponent({
     OTruncatedText,
     AlertMultiToggle,
     ForecastAlertFields,
+    ThresholdSuggestionHint,
     AlertQueryPreview,
     FilterGroup,
     QueryEditorDialog,
@@ -2040,6 +2089,15 @@ export default defineComponent({
     // FORM_CONTEXT_KEY. All field reads/writes below go through it; the composed
     // AddAlert schema validates on save.
     const form: any = inject(FORM_CONTEXT_KEY, null);
+
+    provide(
+      CONDITION_VALUE_SUGGEST_KEY,
+      useAlertValueSuggest(
+        computed(() => store.state.selectedOrganization?.identifier ?? ""),
+        toRef(props, "streamType"),
+        toRef(props, "streamName"),
+      ),
+    );
 
     // Initial values for the discriminator refs below (the form itself is seeded
     // by useAlertForm's defaults; `_meta` is kept fresh by the syncMeta watcher).
@@ -2305,6 +2363,21 @@ export default defineComponent({
 
     const toggleFilters = () => {
       showFilters.value = !showFilters.value;
+    };
+
+    const addFilter = () => {
+      const root = props.inputData.conditions;
+      const row = {
+        filterType: "condition",
+        column: "",
+        operator: "=",
+        value: "",
+        values: [],
+        logicalOperator: root?.logicalOperator || "AND",
+        id: getUUID(),
+      };
+      emit("update-group", { ...root, conditions: [...(root?.conditions ?? []), row] });
+      showFilters.value = true;
     };
 
     // Stream-type-driven: logs/traces are event-based, metrics are aggregation-based
@@ -3545,6 +3618,57 @@ export default defineComponent({
       }
     };
 
+    const numberOrNull = (value: unknown): number | null =>
+      value === "" || value === null || value === undefined || Number.isNaN(Number(value))
+        ? null
+        : Number(value);
+
+    // Count mode limits trigger_condition.threshold; measure mode limits aggregation.having.value.
+    const thresholdIsCount = computed(() => selectedFunction.value === "total_events");
+    const thresholdHasGroupBy = computed(() =>
+      isEventBased.value ? hasLogGroupByFields.value : hasMetricGroupByFields.value,
+    );
+    const thresholdRule = computed<ThresholdRule>(() => {
+      const isCount = thresholdIsCount.value;
+      const measured = isCount || !!fv("query_condition.aggregation.having.column");
+      return {
+        // Grouped rules fire per group, so one series of buckets can't back-test them.
+        enabled:
+          !props.beingUpdated &&
+          localTab.value === "custom" &&
+          props.isRealTime === "false" &&
+          measured &&
+          (isCount || !thresholdHasGroupBy.value),
+        streamName: props.streamName,
+        streamType: props.streamType,
+        query: props.generatedSqlQuery,
+        kind: isCount ? "count" : "value",
+        operator: isCount ? triggerOperator.value : conditionOperator.value,
+        threshold: numberOrNull(isCount ? triggerThreshold.value : conditionValue.value),
+        periodMinutes: Number(fv("trigger_condition.period")) || 0,
+        silenceMinutes: Number(fv("trigger_condition.silence")) || 0,
+      };
+    });
+    const thresholdSuggestion = useThresholdSuggestion(() => thresholdRule.value);
+    const thresholdHint = computed(() => ({
+      suggested: thresholdSuggestion.suggested.value,
+      usualHigh: thresholdSuggestion.usualHigh.value,
+      truncatedDays: thresholdSuggestion.truncatedDays.value,
+      history: thresholdSuggestion.history.value,
+      backtest: thresholdSuggestion.backtest.value,
+      loading: thresholdSuggestion.loading.value,
+      error: thresholdSuggestion.error.value,
+      current: thresholdRule.value.threshold,
+    }));
+    const applySuggestedThreshold = (value: number) => {
+      if (thresholdIsCount.value) {
+        onTriggerThresholdChange(value);
+      } else {
+        conditionValue.value = value;
+        emitAggregationUpdate();
+      }
+    };
+
     // Legacy toggle kept for compatibility — not used in new UI
     const toggleAggregation = () => {
       emit("update:isAggregationEnabled", localIsAggregationEnabled.value);
@@ -3928,6 +4052,9 @@ export default defineComponent({
       deleteGroupByColumn,
       emitAggregationUpdate,
       emitPromqlConditionUpdate,
+      thresholdRule,
+      thresholdHint,
+      applySuggestedThreshold,
       // V3.1 inline condition
       isEventBased,
       logFunctionOptions,
@@ -3994,6 +4121,7 @@ export default defineComponent({
       onConditionValueChange,
       showFilters,
       toggleFilters,
+      addFilter,
       filtersSectionRef,
       showVrl,
       filterCount,

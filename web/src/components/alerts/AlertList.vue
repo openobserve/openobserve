@@ -43,7 +43,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="alert-list-add-alert-btn"
           variant="primary"
           size="sm"
-          :disabled="!templates.length"
           @click="
             activeTab === 'anomalyDetection'
               ? router.push({
@@ -542,6 +541,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`alert-list-${row.name}-last-outcome`"
                   />
                 </OTooltip>
+                <span
+                  v-else-if="row.enabled && !row.last_outcome"
+                  class="text-text-secondary"
+                  :data-test="`alert-list-${row.name}-waiting-first-run`"
+                >
+                  {{ t("alerts.waitingForFirstRun") }}
+                </span>
                 <span v-else class="text-text-body">—</span>
               </template>
 
@@ -764,15 +770,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <template #empty>
                 <OEmptyState
-                  v-if="!templates.length"
-                  size="hero"
-                  preset="no-alert-templates"
-                  :description="t('alerts.noTemplatesMsg')"
-                  data-test="alert-list-create-template-text"
-                  @action="routeTo('alertTemplates')"
-                />
-                <OEmptyState
-                  v-else
                   size="hero"
                   preset="no-alerts"
                   :filtered="!!(filterQuery || searchQuery || stateFilter || importedBatchActive)"
@@ -2897,7 +2894,7 @@ export default defineComponent({
         });
       }
     };
-    const refreshList = async (folderId?: string) => {
+    const refreshList = async (folderId?: string, createdId?: string) => {
       //here we are fetching the alerts from the server because after creating the alert we should get the latest alerts
       //and then we are setting the activeFolderId to the folderId
       //this is done to avoid multiple api calls , when we assign the folderId before fetching it will trigger the watch and it will fetch the alerts again
@@ -2916,6 +2913,19 @@ export default defineComponent({
       // Re-apply active search/filter on the freshly fetched data
       if (filterQuery.value) {
         filterAlertsByQuery(filterQuery.value);
+      }
+      if (createdId) {
+        showAddAlertDialog.value = false;
+        await router.push({
+          name: "alertDetail",
+          params: { alert_id: createdId },
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+            folder: resolvedFolderId,
+            tab: activeTab.value,
+          },
+        });
+        return;
       }
       await hideForm();
       activeFolderId.value = resolvedFolderId;
@@ -4052,7 +4062,6 @@ export default defineComponent({
       runOutcomeTooltip,
       toggleAlertState,
       templates,
-      routeTo,
       refreshDestination,
       showImportAlertDialog,
       importAlert,

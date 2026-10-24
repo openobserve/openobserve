@@ -69,6 +69,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ silenceError }}
               </div>
+              <div
+                v-if="silenceLine && !silenceError"
+                class="text-text-secondary text-xs"
+                data-test="alert-settings-silence-line"
+              >
+                {{ silenceLine }}
+              </div>
             </div>
           </div>
 
@@ -120,6 +127,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 role="alert"
               >
                 {{ pendingPeriodError }}
+              </div>
+              <div
+                v-if="pendingLine && !pendingPeriodError"
+                class="text-text-secondary text-xs"
+                data-test="alert-settings-pending-line"
+              >
+                {{ pendingLine }}
               </div>
             </div>
           </div>
@@ -232,6 +246,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ silenceError }}
               </div>
+              <div
+                v-if="silenceLine && !silenceError"
+                class="text-text-secondary text-xs"
+                data-test="alert-settings-silence-line"
+              >
+                {{ silenceLine }}
+              </div>
             </div>
           </div>
 
@@ -290,6 +311,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 role="alert"
               >
                 {{ pendingPeriodWarning }}
+              </div>
+              <div
+                v-if="pendingLine && !pendingPeriodError"
+                class="text-text-secondary text-xs"
+                data-test="alert-settings-pending-line"
+              >
+                {{ pendingLine }}
               </div>
             </div>
           </div>
@@ -397,21 +425,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
               <OTooltip :content="t('alerts.alertSettings.keepFiringForTooltip')" side="right" />
             </div>
-            <div class="flex items-center">
-              <div class="w-21.75">
-                <OFormInput
-                  :aria-label="t('alerts.alertSettings.keepFiringFor')"
-                  name="keep_firing_for"
-                  type="number"
-                  min="0"
-                  :debounce="300"
-                  data-test="alert-settings-keep-firing-for-input"
-                />
+            <div class="flex flex-col gap-1">
+              <div class="flex items-center">
+                <div class="w-21.75">
+                  <OFormInput
+                    :aria-label="t('alerts.alertSettings.keepFiringFor')"
+                    name="keep_firing_for"
+                    type="number"
+                    min="0"
+                    :debounce="300"
+                    data-test="alert-settings-keep-firing-for-input"
+                  />
+                </div>
+                <div
+                  class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 min-w-22.5 items-center justify-center"
+                >
+                  {{ t("alerts.seconds") }}
+                </div>
               </div>
               <div
-                class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 min-w-22.5 items-center justify-center"
+                v-if="keepFiringLine"
+                class="text-text-secondary text-xs"
+                data-test="alert-settings-keep-firing-line"
               >
-                {{ t("alerts.seconds") }}
+                {{ keepFiringLine }}
               </div>
             </div>
           </div>
@@ -675,6 +712,45 @@ export default defineComponent({
       });
     });
 
+    // A blank or negative field is an error, so it gets no reading.
+    const countOf = (name: string): number | null => {
+      const raw = fv(name);
+      if (raw === "" || raw === null || raw === undefined) return null;
+      const value = Number(raw);
+      return Number.isFinite(value) && value >= 0 ? value : null;
+    };
+
+    const silenceLine = computed(() => {
+      const minutes = countOf("trigger_condition.silence");
+      if (minutes === null) return "";
+      if (minutes === 0) return t("alerts.alertSettings.silenceLineOff");
+      return t("alerts.alertSettings.silenceLine", { count: minutes }, minutes);
+    });
+
+    // The first matching check opens the pending window and a later one fires once it has elapsed.
+    const pendingLine = computed(() => {
+      const minutes = countOf("pending_period_sec") ?? 0;
+      if (minutes === 0) return t("alerts.alertSettings.pendingLineFirstCheck");
+      const frequency = Number(fv("trigger_condition.frequency"));
+      const countsChecks =
+        props.isRealTime === "false" &&
+        fv("trigger_condition.frequency_type") !== "cron" &&
+        Number.isFinite(frequency) &&
+        frequency > 0;
+      if (countsChecks) {
+        const count = Math.ceil(minutes / frequency - 1e-9) + 1;
+        return t("alerts.alertSettings.pendingLineChecks", { count });
+      }
+      return t("alerts.alertSettings.pendingLineDuration", { count: minutes }, minutes);
+    });
+
+    const keepFiringLine = computed(() => {
+      const seconds = countOf("keep_firing_for");
+      if (seconds === null) return "";
+      if (seconds === 0) return t("alerts.alertSettings.keepFiringLineOff");
+      return t("alerts.alertSettings.keepFiringLine", { count: seconds }, seconds);
+    });
+
     // ── Workflows (enterprise/cloud only) ────────────────────────────────────
     const getBrowserTimezone = (): string => {
       try {
@@ -785,6 +861,9 @@ export default defineComponent({
       notifiesNobody,
       pendingPeriodError,
       pendingPeriodWarning,
+      silenceLine,
+      pendingLine,
+      keepFiringLine,
       pendingPeriodUnit,
       pendingPeriodUnitOptions,
       onPendingPeriodChange,
