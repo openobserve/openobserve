@@ -41,10 +41,7 @@ export class ServiceGraphPage {
     this.sidePanelViewRelatedLogsBtn = '[data-test="service-graph-node-panel-view-related-logs-btn"]';
     this.sidePanelViewRelatedTracesBtn = '[data-test="service-graph-node-panel-view-related-traces-btn"]';
     this.sidePanelCloseBtn = '[data-test="service-graph-side-panel"] [data-test="o-drawer-close-btn"]';
-    // ODrawer renders a full-size overlay scrim behind the panel. With `seamless`
-    // (which ServiceGraphNodeSidePanel always sets) it carries
-    // `pointer-events-none bg-transparent`, so the page behind stays interactive
-    // and undimmed — the headline non-modal signal this feature asserts.
+    // reka-ui renders this scrim only for a modal drawer, so a non-modal panel has none.
     this.overlay = '[data-test="o-drawer-overlay"]';
 
     // RED charts section (Rate/Errors/Duration dashboards)
@@ -60,10 +57,6 @@ export class ServiceGraphPage {
     // data-test on OTabPanel is swallowed by <Transition> — target slot content instead
     this.recentOperations = '[data-test="service-graph-side-panel-operations-table"]';
     this.operationsTable = '[data-test="service-graph-side-panel-operations-table"]';
-    // Operations empty state: a bare translated div (no data-test) rendered when
-    // recentOperations.length === 0 && !loadingOperations. Scoped to the panel so
-    // `text=` does not collide with any other "No operations found" copy on the page.
-    this.operationsEmptyState = '[data-test="service-graph-side-panel"] text=No operations found';
     this.nodesPanel = '[data-test="service-graph-side-panel-nodes"]';
     this.nodesTable = '[data-test="service-graph-side-panel-nodes-table"]';
     this.podsPanel = '[data-test="service-graph-side-panel-pods"]';
@@ -372,23 +365,10 @@ export class ServiceGraphPage {
     await expect(this.page.locator(this.sidePanel)).not.toBeVisible({ timeout: 5000 });
   }
 
-  /**
-   * Assert the drawer has no blocking scrim. A non-modal drawer (`modal=false`)
-   * renders no overlay at all (reka-ui's DialogOverlay is a no-op comment node),
-   * while a `seamless` modal drawer renders a `pointer-events-none bg-transparent`
-   * scrim. Both satisfy the non-modal signal — the page behind is never dimmed or
-   * blocked. Fails only if an overlay is present AND blocks pointer events.
-   */
-  async expectOverlayNonBlocking() {
-    const overlay = this.page.locator(this.overlay);
-    // Non-modal → reka-ui renders no overlay; its absence is the correct signal.
-    if ((await overlay.count()) === 0) return;
-    await expect(overlay).toBeVisible({ timeout: 10000 });
-    const cls = (await overlay.getAttribute('class').catch(() => '')) || '';
-    const pointerEvents = await overlay
-      .evaluate((el) => getComputedStyle(el).pointerEvents)
-      .catch(() => '');
-    expect(cls.includes('pointer-events-none') || pointerEvents === 'none').toBeTruthy();
+  /** Modal mode renders a scrim and sets `pointer-events: none` on <body>; a non-modal drawer does neither. */
+  async expectSidePanelNonModal() {
+    await expect(this.page.locator(this.overlay)).toHaveCount(0);
+    await expect(this.page.locator('body')).not.toHaveCSS('pointer-events', 'none');
   }
 
   async expectRedChartsSectionVisible() {
@@ -460,20 +440,6 @@ export class ServiceGraphPage {
     return await table.locator('tbody tr').count();
   }
 
-  /**
-   * Whether the operations empty state ("No operations found") is visible. Used
-   * only when getOperationsTableRowCount() reports zero rows — the empty branch
-   * is reached without a hung spinner.
-   */
-  async isOperationsEmptyStateVisible() {
-    return await this.page
-      .locator(this.operationsEmptyState)
-      .first()
-      .waitFor({ state: 'visible', timeout: 10000 })
-      .then(() => true)
-      .catch(() => false);
-  }
-
   async closeSidePanel() {
     await this.page.locator(this.sidePanelCloseBtn).click();
     await this.page.locator(this.sidePanel)
@@ -523,13 +489,7 @@ export class ServiceGraphPage {
       .isVisible({ timeout: 3000 }).catch(() => false);
   }
 
-  /**
-   * Which terminal state the Metrics tab reached: 'correlation' (the correlation
-   * event header — renders for a resolved correlation object with or without metric
-   * streams), 'error', 'empty', or 'unknown' (none visible = a hung/broken tab).
-   * Re-reads the DOM independently of clickMetricsTabAndWait()'s Promise.race so a
-   * test asserts a SPECIFIC state rather than a re-derived boolean.
-   */
+  /** Terminal state of the Metrics tab: 'correlation', 'error', 'empty', or 'unknown' when none rendered. */
   async getMetricsTerminalState() {
     if (await this.page.locator(this.metricsCorrelationHeader).first().isVisible().catch(() => false)) {
       return 'correlation';
