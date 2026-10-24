@@ -174,6 +174,7 @@ test.describe('Alert Library', () => {
 
     // Select every card in view (1 ready + 1 missing + 51 bulk + 1 malformed = 54 > 50).
     await lib.selectAllInViewToggle();
+    await lib.confirmSelectAllInView();
     expect(await lib.selectedCountInBar()).toBeGreaterThan(50);
 
     await lib.addSelected();
@@ -322,12 +323,12 @@ test.describe('Alert Library', () => {
 
     // Category search narrows the rail list (nothing selected yet).
     await lib.searchCategories('bulk');
-    await lib.expectRailCategoryVisible('bulk-signals');
-    await lib.expectRailCategoryAbsent('absent-signals');
+    await lib.expectRailCategoryVisible('infrastructure/bulk-signals');
+    await lib.expectRailCategoryAbsent('observability/absent-signals');
     await lib.searchCategories('');
 
     // Category multi-select filters the gallery; clear resets it.
-    await lib.toggleCategory('bulk-signals');
+    await lib.toggleCategory('infrastructure/bulk-signals');
     await lib.expectCardVisible(bulk.id);
     await lib.expectCardAbsent(ready.id);
     await lib.clearCategories();
