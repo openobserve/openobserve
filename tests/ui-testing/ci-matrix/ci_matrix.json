@@ -115,8 +115,10 @@
       "dashboard-print-layout.spec.js",
       "dashboard-layout-edit-mode.spec.js",
       "dashboardPagination.spec.js",
+      "dashboard-save-conflict.spec.js",
       "refreshCancelButtons.spec.js",
-      "dashboard-refresh-button.spec.js"
+      "dashboard-refresh-button.spec.js",
+      "panelNotices.spec.js"
     ],
     "disabled": [
       {
@@ -143,7 +145,8 @@
       "dashboard-panel-time-url-priority.spec.js",
       "dashboard-panel-time-advanced-edge-cases.spec.js",
       "dashboard-panel-time-apply-behavior.spec.js",
-      "dashboard-panel-time-variables-behavior.spec.js"
+      "dashboard-panel-time-variables-behavior.spec.js",
+      "dashboard-time-range-apply.spec.js"
     ],
     "disabled": []
   },
@@ -533,7 +536,8 @@
       "connectDataSourcePopup.spec.js",
       "splunk-hec-ingestion-window.spec.js",
       "enrichment.spec.js",
-      "schema.spec.js"
+      "schema.spec.js",
+      "first-event-status.spec.js"
     ],
     "disabled": []
   },
@@ -555,7 +559,8 @@
       "traceGenAiParts.spec.js",
       "tracesCharts.spec.js",
       "traceSessionReplay.spec.js",
-      "traces-jk-navigation.spec.js"
+      "traces-jk-navigation.spec.js",
+      "service-graph-side-panel.spec.js"
     ],
     "disabled": []
   },

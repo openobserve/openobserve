@@ -90,6 +90,14 @@ export default class DashboardAutoRun {
     return { initial, first, second };
   }
 
+  // Dashboard + panels from the API with no variables — for the time-range apply spec.
+  async setupTimeRangeDashboard({ name, panels, period = '1h' }) {
+    const id = await createDashboard(`${name}_${Date.now()}_${Math.floor(Math.random() * 1e4)}`, { panels });
+    this.panelRuns = trackPanelRuns(this.page);
+    await this.openDashboard(ORG(), id, panels.map((p) => p.id), period);
+    return id;
+  }
+
   async addVariablesFromSettings(variables) {
     await this.dashboardSetting.openSetting();
     for (const { name, field = NAMESPACE_FIELD, options = {} } of variables) {

@@ -9124,6 +9124,8 @@
       "expressionPlaceholder": "مثلا: A و B",
       "insert": "إدراج:",
       "addAlert": "أضف تنبيه",
+      "addUnavailableCap": "يمكنك إضافة حتى {max} من التنبيهات.",
+      "addUnavailableNone": "لا توجد تنبيهات مؤهلة أخرى لإضافتها.",
       "removeChild": "إزالة التنبيه الفرعي {name}",
       "noChildren": "لا توجد تنبيهات فرعية حتى الآن. أضف على الأقل اثنين.",
       "wouldTrigger": "سيُطلَق",
