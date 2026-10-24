@@ -34,8 +34,8 @@ import { resolveSeriesOverride } from "./seriesOverrides";
 
 export const STATE_TIMELINE_MAX_ROWS = 500;
 export const STATE_TIMELINE_MAX_STATES = 20;
-/** Raw PromQL series a state timeline loads; restarts split one entity into several series. */
-export const STATE_TIMELINE_MAX_SERIES = STATE_TIMELINE_MAX_ROWS * 4;
+/** Fallback for the server's max_dashboard_state_timeline_series; restarts split one entity into several series. */
+export const STATE_TIMELINE_MAX_SERIES = 2000;
 export const STATE_TIMELINE_TOOLTIP_MAX_ROWS = 20;
 /** Ids of the row-scroll dataZooms; their events scroll rows and never zoom time. */
 export const STATE_TIMELINE_ROW_ZOOM_IDS = [
@@ -667,9 +667,11 @@ const rowWheelZoom = (visibleRows: number) => ({
   filterMode: "filter",
 });
 
-/** The series cap the PromQL loader applies to a panel; a state timeline merges series into rows, so it loads more. */
-export const promqlSeriesCap = (panelType: string | undefined, configured: number): number =>
-  panelType === "state-timeline" ? Math.max(configured, STATE_TIMELINE_MAX_SERIES) : configured;
+/** The series cap the PromQL loader applies to a panel; a state timeline merges series into rows, so it has its own. */
+export const promqlSeriesCap = (panelType: string | undefined, zoConfig: any): number =>
+  panelType === "state-timeline"
+    ? (zoConfig?.max_dashboard_state_timeline_series ?? STATE_TIMELINE_MAX_SERIES)
+    : (zoConfig?.max_dashboard_series ?? 100);
 
 /** The raw row behind a clicked segment: in SQL the entity's row at or just before the segment start, in PromQL its labels. */
 export const stateTimelineSourceRecord = (
@@ -813,9 +815,9 @@ export const convertStateTimelineData = (
   );
 
   // The crosshair line snaps to sample times, the same instants line panels hover on.
-  const sampleTimes = [
-    ...new Set(rows.flatMap((row) => row.samples.map((sample) => sample.t))),
-  ].sort((a, b) => a - b);
+  const distinctTimes = new Set<number>();
+  for (const row of rows) for (const sample of row.samples) distinctTimes.add(sample.t);
+  const sampleTimes = [...distinctTimes].sort((a, b) => a - b);
   const crosshairX = (ms: number) => toZonedTime(ms, timezone);
 
   const { markLines, markAreas } = getAnnotationsData(annotations, timezone);

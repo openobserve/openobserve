@@ -206,6 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ValueMappingList
           :model-value="override.valueMappings ?? []"
           :pattern-errors="mappingPatternErrors"
+          data-test-prefix="dashboard-series-override-value-mapping"
           @update:model-value="patch({ valueMappings: $event })"
           @remove="
             (index: number) =>

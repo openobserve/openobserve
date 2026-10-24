@@ -20,7 +20,7 @@
     icon="swap-horiz"
     :title="t('dashboard.valueMappingEmptyTitle')"
     :description="t('dashboard.valueMappingEmptyDescription')"
-    data-test="dashboard-addpanel-config-value-mapping-empty"
+    :data-test="`${dataTestPrefix}-empty`"
   />
   <draggable
     v-else
@@ -28,14 +28,14 @@
     :options="dragOptions"
     @update:model-value="emit('update:modelValue', $event)"
     @mousedown.stop="() => {}"
-    data-test="dashboard-addpanel-config-value-mapping-drag"
+    :data-test="`${dataTestPrefix}-drag`"
   >
     <div v-for="(mapping, index) in modelValue" :key="index" class="mb-2 flex items-start gap-2">
       <div class="cursor-move p-2">
         <OIcon
           name="drag-indicator"
           size="sm"
-          :data-test="`dashboard-addpanel-config-value-mapping-drag-handle-${index}`"
+          :data-test="`${dataTestPrefix}-drag-handle-${index}`"
         />
       </div>
       <div
@@ -51,7 +51,7 @@
               :model-value="mapping.type"
               :options="mappingTypes"
               class="w-full"
-              :data-test="`dashboard-addpanel-config-value-mapping-type-select-${index}`"
+              :data-test="`${dataTestPrefix}-type-select-${index}`"
               @update:model-value="update(index, { type: $event })"
             />
           </div>
@@ -61,7 +61,7 @@
                 :model-value="mapping.from"
                 :placeholder="t('dashboard.valueMappingFrom')"
                 class="w-full"
-                :data-test="`dashboard-addpanel-config-value-mapping-from-input-${index}`"
+                :data-test="`${dataTestPrefix}-from-input-${index}`"
                 @update:model-value="update(index, { from: $event })"
               />
             </div>
@@ -70,7 +70,7 @@
                 :model-value="mapping.to"
                 :placeholder="t('dashboard.valueMappingTo')"
                 class="w-full"
-                :data-test="`dashboard-addpanel-config-value-mapping-to-input-${index}`"
+                :data-test="`${dataTestPrefix}-to-input-${index}`"
                 @update:model-value="update(index, { to: $event })"
               />
             </div>
@@ -82,7 +82,7 @@
               :error="!!patternErrors[index]"
               :error-message="patternErrors[index]"
               class="w-full"
-              :data-test="`dashboard-addpanel-config-value-mapping-pattern-input-${index}`"
+              :data-test="`${dataTestPrefix}-pattern-input-${index}`"
               @update:model-value="update(index, { pattern: $event })"
             />
           </div>
@@ -91,7 +91,7 @@
               :model-value="mapping.value"
               :placeholder="t('dashboard.valueMappingValue')"
               class="w-full"
-              :data-test="`dashboard-addpanel-config-value-mapping-value-input-${index}`"
+              :data-test="`${dataTestPrefix}-value-input-${index}`"
               @update:model-value="update(index, { value: $event })"
             />
           </div>
@@ -106,7 +106,7 @@
               :model-value="mapping.text"
               :placeholder="t('dashboard.valueMappingDisplayPlaceholder')"
               class="w-full"
-              :data-test="`dashboard-addpanel-config-value-mapping-text-input-${index}`"
+              :data-test="`${dataTestPrefix}-text-input-${index}`"
               @update:model-value="update(index, { text: $event })"
             />
           </div>
@@ -119,7 +119,7 @@
           <ColorSwatchPicker
             :model-value="mapping.textColor"
             :swatches="TEXT_SWATCHES"
-            :data-test="`dashboard-addpanel-config-value-mapping-text-color-${index}`"
+            :data-test="`${dataTestPrefix}-text-color-${index}`"
             @update:model-value="update(index, { textColor: $event })"
           />
         </div>
@@ -131,7 +131,7 @@
           <ColorSwatchPicker
             :model-value="mapping.color"
             :swatches="BG_SWATCHES"
-            :data-test="`dashboard-addpanel-config-value-mapping-bg-color-${index}`"
+            :data-test="`${dataTestPrefix}-bg-color-${index}`"
             @update:model-value="update(index, { color: $event })"
           />
         </div>
@@ -142,7 +142,7 @@
         icon-left="close"
         :title="t('common.remove')"
         class="shrink-0"
-        :data-test="`dashboard-addpanel-config-value-mapping-delete-btn-${index}`"
+        :data-test="`${dataTestPrefix}-delete-btn-${index}`"
         @click="emit('remove', index)"
       />
     </div>
@@ -165,8 +165,9 @@ const props = withDefaults(
   defineProps<{
     modelValue: any[];
     patternErrors?: Record<number, I18nText>;
+    dataTestPrefix?: string;
   }>(),
-  { patternErrors: () => ({}) },
+  { patternErrors: () => ({}), dataTestPrefix: "dashboard-addpanel-config-value-mapping" },
 );
 
 const emit = defineEmits<{ "update:modelValue": [value: any[]]; remove: [index: number] }>();

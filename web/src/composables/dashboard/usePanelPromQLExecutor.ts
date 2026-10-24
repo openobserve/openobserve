@@ -318,10 +318,7 @@ export const usePanelPromQLExecutor = (ctx: {
               };
 
               // Get series limit from config
-              const maxSeries = promqlSeriesCap(
-                panelSchema.value?.type,
-                store.state?.zoConfig?.max_dashboard_series ?? 100,
-              );
+              const maxSeries = promqlSeriesCap(panelSchema.value?.type, store.state?.zoConfig);
 
               const isShifted = queryIndex !== panelQueryIndex;
               // Create chunk processor for efficient metric merging

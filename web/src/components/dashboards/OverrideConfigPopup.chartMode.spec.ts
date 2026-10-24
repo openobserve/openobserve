@@ -354,7 +354,7 @@ describe("OverrideConfigPopup in chart mode", () => {
     expect($('[data-test="dashboard-series-format-decimals"]')).toBeNull();
     expect($('[data-test="dashboard-series-format-color"]')).toBeNull();
 
-    await setInput("dashboard-addpanel-config-value-mapping-text-input-0", "Throttled");
+    await setInput("dashboard-series-override-value-mapping-text-input-0", "Throttled");
     $('[data-test="dashboard-series-format-value-mapping-add"]')!.click();
     await flushPromises();
     await save();
@@ -374,12 +374,12 @@ describe("OverrideConfigPopup in chart mode", () => {
       ],
     });
     expect(
-      $('[data-test="dashboard-addpanel-config-value-mapping-pattern-input-0"]')!.textContent,
+      $('[data-test="dashboard-series-override-value-mapping-pattern-input-0"]')!.textContent,
     ).toContain("This pattern is invalid");
     await save();
     expect(wrapper.emitted("save")).toBeUndefined();
 
-    await setInput("dashboard-addpanel-config-value-mapping-pattern-input-0", "^power");
+    await setInput("dashboard-series-override-value-mapping-pattern-input-0", "^power");
     await save();
     expect(wrapper.emitted("save")).toHaveLength(1);
   });

@@ -533,7 +533,7 @@ describe("convertStateTimelineData", () => {
         return byRow;
       };
 
-      const rows = rowsOf(load(promqlSeriesCap("state-timeline", 100)));
+      const rows = rowsOf(load(promqlSeriesCap("state-timeline", { max_dashboard_series: 100 })));
       expect(rows.size).toBe(80);
       for (const segments of rows.values()) {
         expect(segments.map((d: any) => [d.state, d.start / S - base, d.end / S - base])).toEqual([
@@ -873,11 +873,45 @@ describe("convertStateTimelineData", () => {
   });
 });
 
+describe("crosshair series", () => {
+  it("holds one point per distinct sample time across a day of rows", () => {
+    const steps = 24 * 240;
+    const base = 1_700_000_000;
+    // Half the rows report 5s later, so the distinct times are twice one row's.
+    const result = Array.from({ length: 200 }, (_, i) => ({
+      metric: { gpu: String(i) },
+      values: Array.from({ length: steps }, (_, k) => [base + (i % 2) * 5 + k * 15, "0"]),
+    }));
+    const panel = {
+      id: "big",
+      type: "state-timeline",
+      queryType: "promql",
+      config: {},
+      queries: [{ config: {} }],
+    };
+    const converted = convertStateTimelineData(
+      panel,
+      [{ resultType: "matrix", result }],
+      store,
+      null,
+      [[{ step: 15_000_000 }]],
+      null,
+    );
+    const crosshair = converted.options.series[1].data;
+    expect(crosshair).toHaveLength(2 * steps);
+    expect(crosshair[1][0].getTime() - crosshair[0][0].getTime()).toBe(5 * S);
+  });
+});
+
 describe("promqlSeriesCap", () => {
-  it("loads enough series for every row of a state timeline and leaves other panels alone", () => {
-    expect(promqlSeriesCap("state-timeline", 100)).toBe(STATE_TIMELINE_MAX_SERIES);
-    expect(promqlSeriesCap("state-timeline", 5000)).toBe(5000);
-    expect(promqlSeriesCap("line", 100)).toBe(100);
+  it("reads a state timeline's own server cap and leaves other panels on theirs", () => {
+    const config = { max_dashboard_series: 100, max_dashboard_state_timeline_series: 300 };
+    expect(promqlSeriesCap("state-timeline", config)).toBe(300);
+    expect(promqlSeriesCap("state-timeline", { max_dashboard_series: 100 })).toBe(
+      STATE_TIMELINE_MAX_SERIES,
+    );
+    expect(promqlSeriesCap("line", config)).toBe(100);
+    expect(promqlSeriesCap("line", undefined)).toBe(100);
   });
 
   it("reports series the loader still dropped", () => {
