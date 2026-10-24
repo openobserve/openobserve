@@ -23,8 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Ownership split: the PARENT owns the destinations list (options + reload on
   `refresh`) because every parent already fetches it for its own reasons; this
   field owns everything parent-agnostic — the workflows list and its
-  enterprise/config gate, and the "create" routings, which are plain
-  navigation identical from anywhere.
+  enterprise/config gate, the "create" routings (a destination drawer and a
+  new-tab workflow editor), and the opt-in Send test.
 -->
 <template>
   <div class="flex items-start max-md:flex-col max-md:gap-1">
@@ -36,22 +36,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </div>
     <div class="flex min-w-0 flex-col max-md:w-full">
-      <AlertTargetsSelect
-        :destinations="destinations"
-        :workflows="workflows"
-        :destination-options="destinationOptions"
-        :workflow-options="workflowOptions"
-        :workflows-enabled="workflowsEnabled"
-        :workflows-locked="workflowsLocked"
-        :workflows-lock-message="workflowsAccess.message"
-        :placeholder="placeholder"
-        :error="!!error"
-        @update:destinations="emit('update:destinations', $event)"
-        @update:workflows="emit('update:workflows', $event)"
-        @refresh="refreshTargets"
-        @create-destination="routeToCreateDestination"
-        @create-workflow="routeToCreateWorkflow"
-      />
+      <div class="flex items-center max-md:flex-wrap max-md:gap-y-2">
+        <AlertTargetsSelect
+          :destinations="destinations"
+          :workflows="workflows"
+          :destination-options="destinationOptions"
+          :workflow-options="workflowOptions"
+          :workflows-enabled="workflowsEnabled"
+          :workflows-locked="workflowsLocked"
+          :workflows-lock-message="workflowsAccess.message"
+          :placeholder="placeholder"
+          :error="!!error"
+          @update:destinations="emit('update:destinations', $event)"
+          @update:workflows="emit('update:workflows', $event)"
+          @refresh="refreshTargets"
+          @create-destination="openDestinationDrawer"
+          @create-workflow="routeToCreateWorkflow"
+        />
+        <!-- The span carries the reason: a disabled button gets no pointer events for its own tooltip. -->
+        <span v-if="showSendTest" class="ms-2 inline-flex max-md:ms-0">
+          <OButton
+            data-test="alert-destinations-send-test-btn"
+            variant="outline"
+            size="sm"
+            icon-left="send"
+            :disabled="destinations.length === 0"
+            :loading="isSendingTest"
+            @click="sendTest"
+          >
+            {{ t("alert_templates.testSend") }}
+          </OButton>
+          <OTooltip
+            v-if="destinations.length === 0"
+            :content="t('alert_templates.testSendNoDestination')"
+            data-test="alert-destinations-send-test-reason"
+          />
+        </span>
+      </div>
       <!-- role="alert": focusOnFirstError finds stranded errors by this marker.
            The data-test predates the extraction and is asserted by
            AlertSettings.spec, so it keeps its historical name everywhere. -->
@@ -75,6 +96,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ statusText }}
       </p>
     </div>
+    <ODrawer
+      v-model:open="showDestinationDrawer"
+      size="xl"
+      bleed
+      :title="t('alert_destinations.addTitle')"
+      data-test="alert-destinations-create-drawer"
+    >
+      <AddDestination
+        v-if="showDestinationDrawer"
+        drawer
+        :templates="templates"
+        @created="onDestinationCreated"
+        @cancel:hideform="showDestinationDrawer = false"
+      />
+    </ODrawer>
   </div>
 </template>
 
@@ -84,14 +120,24 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import AddDestination from "@/components/alerts/AddDestination.vue";
 import AlertTargetsSelect from "@/components/alerts/AlertTargetsSelect.vue";
+import destinationService from "@/services/alert_destination";
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { templatesQuery } from "@/services/alert_templates.queries";
 import { workflowsQuery } from "@/services/workflows.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 
 type RawOption = string | { label: I18nText; value: string };
+
+// Seeded in every org; the server falls back to the same content when nothing else is set.
+const DEFAULT_TEST_TEMPLATE = "o2_default_content";
 
 const props = withDefaults(
   defineProps<{
@@ -114,8 +160,12 @@ const props = withDefaults(
      *  checks): the Workflows group and its fetch are skipped even on
      *  enterprise, so the picker cannot offer options that would not save. */
     supportsWorkflows?: boolean;
+    /** Offer "Send test" beside the picker. */
+    showSendTest?: boolean;
+    /** The alert's own template; a test uses it before the destination's. */
+    alertTemplate?: string;
   }>(),
-  { supportsWorkflows: true, notifiesNobody: false, showStatus: false },
+  { supportsWorkflows: true, notifiesNobody: false, showStatus: false, showSendTest: false },
 );
 
 const emit = defineEmits<{
@@ -215,14 +265,25 @@ const refreshTargets = () => {
   fetchWorkflows(true);
 };
 
-// New tab, not navigation: leaving the form here would discard the alert
-// being authored.
-const routeToCreateDestination = () => {
-  const url = router.resolve({
-    name: "alertDestinations",
-    query: { action: "add", org_identifier: store.state.selectedOrganization.identifier },
-  }).href;
-  window.open(url, "_blank");
+// A drawer, not navigation: leaving the form here would discard the alert being authored.
+const showDestinationDrawer = ref(false);
+const templates = ref<any[]>([]);
+const openDestinationDrawer = async () => {
+  showDestinationDrawer.value = true;
+  try {
+    templates.value = await queryClient.fetchQuery(
+      templatesQuery(store.state.selectedOrganization.identifier),
+    );
+  } catch {
+    templates.value = [];
+  }
+};
+
+const onDestinationCreated = (name: string) => {
+  emit("refresh");
+  if (!props.destinations.includes(name)) {
+    emit("update:destinations", [...props.destinations, name]);
+  }
 };
 
 const routeToCreateWorkflow = () => {
@@ -231,5 +292,69 @@ const routeToCreateWorkflow = () => {
     query: { trigger: "alert_fired", org_identifier: store.state.selectedOrganization.identifier },
   }).href;
   window.open(url, "_blank");
+};
+
+const isSendingTest = ref(false);
+
+const testTemplateFor = (name: string, known: { name: string; template?: string }[]) =>
+  props.alertTemplate ||
+  known.find((destination) => destination.name === name)?.template ||
+  DEFAULT_TEST_TEMPLATE;
+
+const reportTestResults = (names: string[], results: PromiseSettledResult<unknown>[]) => {
+  let rateLimited = false;
+  results.forEach((result, index) => {
+    if (result.status === "fulfilled") return;
+    const response = (result.reason as any)?.response;
+    if (response?.status === 429) {
+      rateLimited = true;
+    } else if (response?.status === 403) {
+      toast({
+        variant: "error",
+        message: t("alerts.alertSettings.sendTestForbidden", { name: names[index] }),
+      });
+    } else {
+      toast({
+        variant: "error",
+        message: response?.data?.message ?? response?.data?.error ?? String(result.reason),
+      });
+    }
+  });
+  if (rateLimited) toast({ variant: "error", message: t("alert_templates.testSendRateLimited") });
+  if (results.some((result) => result.status === "fulfilled")) {
+    toast({ variant: "success", message: t("alert_templates.testSendSuccess") });
+  }
+};
+
+const sendTest = async () => {
+  const names = [...props.destinations];
+  if (names.length === 0) return;
+  const org = store.state.selectedOrganization.identifier;
+  isSendingTest.value = true;
+  try {
+    let known: { name: string; template?: string }[] = [];
+    if (!props.alertTemplate) {
+      try {
+        known = await queryClient.fetchQuery(destinationsQuery(org, "alert"));
+      } catch {
+        toast({ variant: "error", message: t("alerts.alertSettings.sendTestLookupFailed") });
+        return;
+      }
+    }
+    const results = await Promise.allSettled(
+      names.map((name) =>
+        destinationService.testSend({
+          org_identifier: org,
+          destination_name: name,
+          data: { template_name: testTemplateFor(name, known) },
+          // 403 gets its own message naming the destination.
+          options: { skipAccessToast: true },
+        }),
+      ),
+    );
+    reportTestResults(names, results);
+  } finally {
+    isSendingTest.value = false;
+  }
 };
 </script>

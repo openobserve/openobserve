@@ -349,6 +349,36 @@ describe("AlertSettings — Notify on recovery with nowhere to send", () => {
   });
 });
 
+describe("AlertSettings — Send test", () => {
+  const fields = (host: any) => host.findAllComponents({ name: "AlertDestinationsField" });
+
+  it.each(["true", "false"])(
+    "offers it on the main destination field with the alert's template (real-time %s)",
+    (isRealTime) => {
+      const host = mount(
+        makeDescendantHost(isRealTime, {}, { template: "alert-tpl" }, ["dest-a"]),
+        { global: { plugins: [makeStore(), i18n] } },
+      );
+      const main = fields(host)[0];
+      expect(main.props("showSendTest")).toBe(true);
+      expect(main.props("alertTemplate")).toBe("alert-tpl");
+    },
+  );
+
+  it("is not offered on the recovery field", () => {
+    const host = mount(
+      makeDescendantHost("false", { notify_on_recovery: true }, { notify_on_recovery: true }, [
+        "dest-a",
+      ]),
+      { global: { plugins: [makeStore(), i18n] } },
+    );
+    const recovery = fields(host).find(
+      (field: any) => field.props("label") === t("alerts.alertSettings.recoveryDestinations"),
+    );
+    expect(recovery.props("showSendTest")).toBe(false);
+  });
+});
+
 describe("AlertSettings — Creates Incident toggle visibility", () => {
   const original = { isEnterprise: config.isEnterprise, isCloud: config.isCloud };
   afterEach(() => {

@@ -135,6 +135,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :error="destinationsError"
             :notifies-nobody="notifiesNobody"
             show-status
+            show-send-test
+            :alert-template="formData?.template"
             :placeholder="t('alerts.summary.noDestination')"
             @update:destinations="$emit('update:destinations', $event)"
             @update:workflows="$emit('update:workflows', $event)"
@@ -302,6 +304,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :error="destinationsError"
             :notifies-nobody="notifiesNobody"
             show-status
+            show-send-test
+            :alert-template="formData?.template"
             :placeholder="t('alerts.summary.noDestination')"
             @update:destinations="$emit('update:destinations', $event)"
             @update:workflows="$emit('update:workflows', $event)"

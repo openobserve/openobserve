@@ -402,6 +402,26 @@ describe("alert_destination service", () => {
     });
   });
 
+  describe("testSend", () => {
+    // The alert form shows its own 403 message, so it opts out of the grouped access toast.
+    it("forwards request options to the POST", async () => {
+      mockHttpInstance.post.mockResolvedValue({ data: { success: true } });
+
+      await destination.testSend({
+        org_identifier: "org1",
+        destination_name: "ops hook",
+        data: { template_name: "t" },
+        options: { skipAccessToast: true },
+      });
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(
+        "/api/org1/alerts/destinations/ops%20hook/test_send",
+        { template_name: "t" },
+        { skipAccessToast: true },
+      );
+    });
+  });
+
   describe("Slack OAuth", () => {
     it("starts OAuth for the selected organization", async () => {
       mockHttpInstance.post.mockResolvedValue({ data: { authorizationUrl: "https://slack.com" } });

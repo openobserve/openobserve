@@ -10240,6 +10240,8 @@
       "noDestinationNote": "Optional. The alert still runs and records its history, but no destination is notified.",
       "sendsToStatus": "Sends to {targets} each time the alert fires.",
       "oncallTeamTarget": "an on-call team",
+      "sendTestForbidden": "You need edit access to {name} to send it a test",
+      "sendTestLookupFailed": "Couldn't load the destinations' templates, so no test was sent. Try again.",
       "createsIncident": "Creates Incident",
       "createsIncidentTooltip": "If an alert can create an incident, it does not send a dedicated notification. Instead, a notification for the incident is sent when a new incident is created or a new alert type joins an existing incident.",
       "helpTemplateTitle": "Template Override",

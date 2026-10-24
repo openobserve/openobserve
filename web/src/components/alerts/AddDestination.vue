@@ -17,12 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     class="overflow-hidden"
-    :title="destination ? t('alert_destinations.updateTitle') : t('alert_destinations.addTitle')"
+    :title="pageTitle"
     title-data-test="add-destination-title"
-    :back="{
-      label: t('alert_destinations.header'),
-      onClick: () => emit('cancel:hideform'),
-    }"
+    :back="pageBack"
     bleed
   >
     <div class="bg-card-glass-bg flex-1 overflow-x-hidden overflow-y-auto py-2">
@@ -541,8 +538,17 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  // Hosted in a drawer over another form: the host draws the header, and links must not navigate away.
+  drawer: {
+    type: Boolean,
+    default: false,
+  },
 });
-const emit = defineEmits(["get:destinations", "cancel:hideform"]);
+const emit = defineEmits<{
+  (e: "get:destinations"): void;
+  (e: "cancel:hideform"): void;
+  (e: "created", name: string): void;
+}>();
 const apiMethods = ["get", "post", "put"].map((m) => ({ label: raw(m.toUpperCase()), value: m }));
 const outputFormats = ["json", "ndjson"].map((f) => ({
   label: raw(f.toUpperCase()),
@@ -685,6 +691,16 @@ const saveDestinationWrite = useMutation(() =>
   saveDestinationMutation(orgId.value, () => isUpdatingDestination.value),
 );
 const router = useRouter();
+
+const pageTitle = computed(() => {
+  if (props.drawer) return undefined;
+  return props.destination ? t("alert_destinations.updateTitle") : t("alert_destinations.addTitle");
+});
+const pageBack = computed(() =>
+  props.drawer
+    ? undefined
+    : { label: t("alert_destinations.header"), onClick: () => emit("cancel:hideform") },
+);
 
 // Prebuilt destinations composable
 const {
@@ -1349,6 +1365,7 @@ async function handlePrebuiltSave(value: AddDestinationForm) {
         templateOverride,
         slackSetupMetadataFor(value),
       );
+      emit("created", value.name);
     }
 
     // `createDestination`/`updateDestination` above come from usePrebuiltDestinations,
@@ -1436,6 +1453,7 @@ function saveCustomDestination(value: AddDestinationForm) {
       .mutateAsync({ destination_name: value.name, data: payload })
       .then(() => {
         dismiss();
+        emit("created", value.name);
         emit("get:destinations");
         emit("cancel:hideform");
         toast({
@@ -1472,13 +1490,18 @@ const deleteApiHeader = (index: number) => {
 };
 
 const createEmailTemplate = () => {
-  router.push({
+  const target = {
     name: "alertTemplates",
     query: {
       action: "add",
       type: "email",
       org_identifier: store.state.selectedOrganization.identifier,
     },
-  });
+  };
+  if (props.drawer) {
+    window.open(router.resolve(target).href, "_blank");
+    return;
+  }
+  router.push(target);
 };
 </script>
