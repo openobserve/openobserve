@@ -9124,6 +9124,8 @@
       "expressionPlaceholder": "z. B. A && B",
       "insert": "Einfügen:",
       "addAlert": "Alarm hinzufügen",
+      "addUnavailableCap": "Sie können bis zu {max} Alarme hinzufügen.",
+      "addUnavailableNone": "Keine weiteren geeigneten Alarme zum Hinzufügen.",
       "removeChild": "Kind {name} entfernen",
       "noChildren": "Noch keine Unteralarme. Fügen Sie mindestens zwei hinzu.",
       "wouldTrigger": "Würde auslösen",

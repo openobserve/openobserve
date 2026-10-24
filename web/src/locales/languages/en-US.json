@@ -9122,6 +9122,8 @@
       "expressionPlaceholder": "e.g. A && B",
       "insert": "Insert:",
       "addAlert": "Add alert",
+      "addUnavailableCap": "You can add up to {max} alerts.",
+      "addUnavailableNone": "No more eligible alerts to add.",
       "removeChild": "Remove child {name}",
       "noChildren": "No sub-alerts yet. Add at least two.",
       "wouldTrigger": "Would trigger",

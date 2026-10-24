@@ -9124,6 +9124,8 @@
       "expressionPlaceholder": "例: A && B",
       "insert": "挿入:",
       "addAlert": "アラートを追加",
+      "addUnavailableCap": "追加できるアラートは最大 {max} 件です。",
+      "addUnavailableNone": "追加できる対象のアラートはこれ以上ありません。",
       "removeChild": "子 {name} を削除",
       "noChildren": "まだサブアラートがありません。少なくとも2つ追加してください。",
       "wouldTrigger": "トリガーする",

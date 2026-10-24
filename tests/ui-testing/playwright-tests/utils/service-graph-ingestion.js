@@ -2270,6 +2270,16 @@ async function getTopology(page) {
   }
 }
 
+/**
+ * Number of nodes in the current service graph topology (0 when empty or unreachable).
+ */
+async function countTopologyNodes(page) {
+  const topoResult = await getTopology(page);
+  const topoData = topoResult.data?.nodes ? topoResult.data : topoResult.data?.data;
+  testLogger.info(`Topology available: ${topoData?.nodes?.length || 0} nodes, ${topoData?.edges?.length || 0} edges`);
+  return topoData?.nodes?.length || 0;
+}
+
 // ============================================================================
 // EXPORTS
 // ============================================================================
@@ -2338,4 +2348,5 @@ module.exports = {
   waitForServiceGraphData,
   waitForServiceRegistry,
   getTopology,
+  countTopologyNodes,
 };

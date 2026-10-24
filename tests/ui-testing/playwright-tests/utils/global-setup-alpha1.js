@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const testLogger = require('./test-logger.js');
 const logsdata = require('../../../test-data/logs_data.json');
+const { generateTrace } = require('./trace-ingestion.js');
 const { ingestBase } = require('./ingest-url.js');
 
 // Auth storage paths. Filenames stay canonical (user.json / cloud-config.json)
@@ -516,6 +517,27 @@ async function fetchCloudConfig(page) {
 }
 
 /**
+ * Seed the default traces stream the way the OSS global setup does, for the Traces specs that query it.
+ */
+async function seedTraces(baseUrl, orgId, headers, count = 20) {
+  let ingested = 0;
+  for (let i = 1; i <= count; i++) {
+    try {
+      const r = await fetch(`${ingestBase(baseUrl)}/api/${orgId}/v1/traces`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(generateTrace(i)),
+      });
+      if (r.ok) ingested++;
+      else testLogger.warn(`[alpha1] Trace ${i} ingestion returned ${r.status}`);
+    } catch (e) {
+      testLogger.warn(`[alpha1] Trace ${i} ingestion failed`, { error: e.message });
+    }
+  }
+  testLogger.info(`[alpha1] Ingested ${ingested}/${count} traces into the default traces stream`);
+}
+
+/**
  * Verify that shared auth state (from cleanup job artifact) is still valid.
  * Opens a browser with the storageState and checks if the session works.
  */
@@ -631,6 +653,9 @@ async function performGlobalIngestionWithFetch() {
       throw new Error(`[alpha1] Could not seed '${stream.name}' at ${ingestBase(baseUrl)}: ${lastError}`);
     }
   }
+
+  // Only service-graph.spec.js used to ingest traces on alpha, so the other Traces specs had data only while it ran.
+  await seedTraces(baseUrl, orgId, headers);
 
   // Wait for streams to be indexed
   testLogger.info('[alpha1] Waiting for streams to be indexed...');

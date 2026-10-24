@@ -9124,6 +9124,8 @@
       "expressionPlaceholder": "ex.: A && B",
       "insert": "Inserir:",
       "addAlert": "Adicionar alerta",
+      "addUnavailableCap": "Pode adicionar até {max} alertas.",
+      "addUnavailableNone": "Não existem mais alertas elegíveis para adicionar.",
       "removeChild": "Remover sub-alerta {name}",
       "noChildren": "Ainda não há sub-alertas. Adicione pelo menos dois.",
       "wouldTrigger": "Dispararia",

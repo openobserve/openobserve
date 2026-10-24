@@ -1,6 +1,6 @@
 // homePage.js - Landing Page Object for OpenObserve
 import { expect } from '@playwright/test';
-import { openNavFlyoutChild, gotoMetricsEditor } from '../commonActions.js';
+import { openNavFlyoutChild, gotoMetricsEditor, clickNavUntilRoute } from '../commonActions.js';
 
 export class HomePage {
     constructor(page) {
@@ -111,19 +111,19 @@ export class HomePage {
 
     async navigateToDashboards() {
         await this.dashboardsMenu.waitFor({ state: 'visible', timeout: 10000 });
-        await this.dashboardsMenu.click();
+        await clickNavUntilRoute(this.page, '[data-test="menu-link-\\/dashboards-item"]', '/dashboards');
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     }
 
     async navigateToStreams() {
         await this.streamsMenu.waitFor({ state: 'visible', timeout: 10000 });
-        await this.streamsMenu.click();
+        await clickNavUntilRoute(this.page, '[data-test="menu-link-\\/streams-item"]', '/streams');
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     }
 
     async navigateToAlerts() {
         await this.alertsMenu.waitFor({ state: 'visible', timeout: 10000 });
-        await this.alertsMenu.click();
+        await clickNavUntilRoute(this.page, '[data-test="menu-link-\\/alerts-item"]', '/alerts');
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     }
 
