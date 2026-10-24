@@ -116,6 +116,7 @@
       "dashboard-layout-edit-mode.spec.js",
       "dashboardPagination.spec.js",
       "dashboard-save-conflict.spec.js",
+      "refreshCancelButtons.spec.js",
       "dashboard-refresh-button.spec.js"
     ],
     "disabled": [
