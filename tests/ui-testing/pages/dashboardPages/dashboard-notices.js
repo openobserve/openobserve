@@ -4,6 +4,7 @@
 // web/src/components/dashboards/PanelErrorButtons.vue, PanelNoticeContent.vue and
 // QueryInspector.vue. The spec never touches these selectors directly — it calls
 // the locator getters / action methods below through `pm.dashboardNotices`.
+import { expect } from "@playwright/test";
 const testLogger = require("../../playwright-tests/utils/test-logger.js");
 
 export default class DashboardNotices {
@@ -150,7 +151,9 @@ export default class DashboardNotices {
     const editor = this.page.locator('[data-test="dashboard-vrl-function-editor"]');
     await editor.waitFor({ state: "visible", timeout: 10000 });
     await editor.locator(".monaco-editor").click();
-    await editor.locator(".inputarea").fill(body);
+    // Monaco ignores .inputarea fills, so type it and confirm the editor shows it.
+    await this.page.keyboard.type(body, { delay: 50 });
+    await expect(editor.locator(".view-lines")).toContainText(body, { timeout: 5000 });
     testLogger.info("Panel VRL function entered", { body });
   }
 

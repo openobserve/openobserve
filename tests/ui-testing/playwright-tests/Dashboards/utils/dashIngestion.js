@@ -107,12 +107,7 @@ export const ingestion = async (page, streamName = "e2e_automate") => {
   }
 };
 
-// Ingests a dedicated stream whose breakdown field has more distinct values than
-// the dashboard's series cap (max_dashboard_series, default 100). No existing
-// fixture has a field with >100 distinct values, so this generates `count` records
-// each with a distinct breakdown value plus a numeric measure — the only
-// deterministic route to the series-cap notice. Mirrors the `ingestion()` POST
-// (INGESTION_URL + getAuthHeaders + getOrgIdentifier) above.
+// No fixture has >100 distinct values, so this writes `count` distinct breakdown values to trip the 100-series cap.
 export const ingestionHighCardinality = async (
   page,
   streamName,
@@ -135,7 +130,7 @@ export const ingestionHighCardinality = async (
   // Resolve headers/org per attempt so a refreshed passcode is picked up on retry.
   const post = () =>
     fetch(
-      `${process.env.INGESTION_URL}/api/${getOrgIdentifier()}/${streamName}/_json`,
+      `${ingestBase(process.env.INGESTION_URL)}/api/${getOrgIdentifier()}/${streamName}/_json`,
       {
         method: "POST",
         headers: getAuthHeaders(),

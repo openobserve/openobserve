@@ -115,7 +115,7 @@ test.describe("Dashboard Panel Notices testcases", () => {
 
       const chip = pm.dashboardNotices.noticeChip("series-cap");
       await expect(chip).toBeVisible({ timeout: 20000 });
-      await expect(chip).toContainText(/\b100\/\d+\+? series$/);
+      await expect(chip).toContainText(/\b100\/150 series$/);
 
       await pm.dashboardNotices.openNoticeTooltip("series-cap");
       await expect(
