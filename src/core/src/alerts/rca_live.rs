@@ -50,7 +50,7 @@ use super::{
     rca_turn::RcaTurnError,
 };
 use crate::ai_chat::{
-    CommittedPrefix, ReadError,
+    CommittedPrefix, ReadError, fork,
     rca_ledger::{RunTranscript, decode_run},
     rca_thread::{self, RcaThread, Transcript},
     read_committed_prefix,
@@ -370,6 +370,11 @@ impl<'a, R: TranscriptReader> RunParts<'a, R> {
             rca_thread::project_rca_thread(&prefix.events, &turns, active, show_tool_io);
         thread.run_id = run_id.clone();
         thread.state_version = session_version(session, self.run, show_tool_io);
+        if !active {
+            thread.reusable_steps = fork::plan_resume(&prefix.events)
+                .ok()
+                .map(|plan| plan.reused_steps);
+        }
         if let Some(lost_from) = prefix.lost_from {
             thread.truncated = true;
             thread.saved_through_seq = Some(lost_from - 1);

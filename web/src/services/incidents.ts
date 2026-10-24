@@ -301,6 +301,8 @@ export interface RcaThread {
   truncated: boolean;
   /** With `truncated`: the last saved seq (-1: none). */
   saved_through_seq?: number;
+  /** Ended run: the finished steps a Resume keeps; absent when live or nothing to keep. */
+  reusable_steps?: number;
 }
 
 export type RcaSteerKind = "message" | "answer" | "hypothesis_action" | "guidance";
