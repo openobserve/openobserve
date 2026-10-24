@@ -95,6 +95,7 @@
             v-if="licenseData.license && licenseData.decision"
             :decision="licenseData.decision"
             :base="licenseData.base"
+            :waivers="licenseData.waivers"
             :env-key-active="!!licenseData.env_key_active"
             :env-key-in-use="licenseData.env_key_in_use"
             :evaluated-at="licenseData.evaluated_at"
