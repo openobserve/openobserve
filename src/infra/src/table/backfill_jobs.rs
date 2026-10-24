@@ -242,7 +242,8 @@ mod tests {
         if !crate::table::testing::meta_store().await {
             return;
         }
-        let org = crate::table::testing::unique("t_backfill");
+        // Job ids embed the org and the id column is varchar(27).
+        let org = crate::table::testing::unique("tbf");
         let other = format!("{org}_other");
         let job = |id: &str, org: &str| BackfillJob {
             id: id.to_string(),
