@@ -505,7 +505,7 @@ const props = withDefaults(
     pausedStep?: string | null;
     /** The agent's open question. */
     pausedQuestion?: string | null;
-    /** Answer deadline of the paused run in local "HH:mm". */
+    /** Answer deadline of the paused run in local "HH:mm <zone>". */
     deadlineText?: string | null;
     /** A completed run unblocked by an answer. */
     unblocked?: RcaUnblockedLine | null;

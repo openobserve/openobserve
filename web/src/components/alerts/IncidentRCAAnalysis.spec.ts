@@ -1340,7 +1340,7 @@ describe("IncidentRCAAnalysis", () => {
       );
       // RCA_T0 + 30 min in the store's UTC zone.
       expect(byTest(wrapper, "rca-paused-deadline").text()).toBe(
-        "The agent waits until 09:23 for an answer, then closes the run as Blocked.",
+        "The agent waits until 09:23 UTC for an answer, then closes the run as Blocked.",
       );
       expect(byTest(wrapper, "rca-thread-question-status").text()).toBe("Waiting for an answer");
       expect(byTest(wrapper, "rca-steer-question").text()).toContain("Agent asks:");
@@ -1359,9 +1359,33 @@ describe("IncidentRCAAnalysis", () => {
       await flushPromises();
 
       expect(byTest(wrapper, "rca-verdict-unblocked").text()).toBe(
-        "Unblocked by a.rao at 08:58 · change history from a human lead",
+        "Unblocked by a.rao at 08:58 UTC · change history from a human lead",
       );
       expect(byTest(wrapper, "rca-thread-question-status").text()).toBe("Answered by a.rao");
+    });
+
+    it("R-I9: the deadline and the 'Unblocked by' time are local and name the viewer's zone", async () => {
+      const zone = store.state.timezone;
+      store.state.timezone = "Asia/Kolkata";
+      try {
+        answers.thread = rcaThread({
+          run_id: "run-1",
+          active: false,
+          steps: [rcaStep()],
+          questions: [rcaThreadQuestion()],
+        });
+        answers.steering = rcaSteeringUnblocked();
+        answers.runSummary = rcaRunSummary();
+        wrapper = mountSteerable(completedProps());
+        await flushPromises();
+
+        // read_at = RCA_T0 + 310 s = 08:58:30 UTC = 14:28 in Asia/Kolkata.
+        expect(byTest(wrapper, "rca-verdict-unblocked").text()).toBe(
+          "Unblocked by a.rao at 14:28 GMT+5:30 · change history from a human lead",
+        );
+      } finally {
+        store.state.timezone = zone;
+      }
     });
 
     it("H16: a hypothesis action POSTs its body; the row shows 'Pending · <author>' until read", async () => {

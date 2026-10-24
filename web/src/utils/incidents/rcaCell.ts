@@ -18,6 +18,7 @@
 import { gt, raw, type I18nKey, type I18nText } from "@/types/i18n";
 import type { Incident, RcaBand, RcaOutcome, RcaSummary } from "@/services/incidents";
 import { formatTimestampInTimezone } from "@/utils/date";
+import { timezoneAbbr } from "@/utils/formatters";
 
 export type RcaCellTone = "muted" | "warn" | "warn-strong" | "ok" | "err";
 
@@ -40,7 +41,7 @@ export interface RcaCellOptions {
   rcaEnabled: boolean;
   /** Epoch milliseconds. */
   now: number;
-  /** Zone of the "until HH:mm" answer deadline; UTC when not given. */
+  /** Zone of the "until HH:mm <zone>" answer deadline; UTC when not given. */
   timezone?: string;
 }
 
@@ -56,6 +57,13 @@ export function humanizeElapsed(ms: number): string {
   if (hours < 24) return `${hours}h ${minutes % 60}m`;
   return `${Math.floor(hours / 24)}d`;
 }
+
+/**
+ * "18:49 GMT+5:30": a time in the viewer's zone, named so it does not read as the UTC times
+ * around it. The answer deadline and the "Unblocked by" time use it; other RCA times are UTC.
+ */
+export const formatRcaLocalClock = (us: number, timezone: string): string =>
+  `${formatTimestampInTimezone(us, "HH:mm", timezone)} ${timezoneAbbr(timezone, new Date(us / 1000))}`;
 
 /** "a.rao@acme.io" → "a.rao"; a value without "@" is returned unchanged. */
 export function userLocalPart(user: string): string {
@@ -179,7 +187,7 @@ export function rcaCellModel(
       );
     }
     case "waiting_input": {
-      // "Blocked · Needs change history · until 14:40".
+      // "Blocked · Needs change history · until 14:40 GMT+5:30".
       const deadline = rca.summary.deadline_at;
       return state(
         gt("alerts.incidents.aiAnalysis.blocked"),
@@ -188,7 +196,7 @@ export function rcaCellModel(
           raw(rca.summary.detail),
           deadline
             ? gt("alerts.incidents.aiAnalysis.until", {
-                time: formatTimestampInTimezone(deadline, "HH:mm", timezone),
+                time: formatRcaLocalClock(deadline, timezone),
               })
             : EMPTY,
         ),

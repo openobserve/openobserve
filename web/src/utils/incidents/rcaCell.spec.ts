@@ -338,7 +338,7 @@ const cases: [string, Row, boolean, Expected][] = [
       kind: "state",
       label: "Blocked",
       tone: "warn-strong",
-      detail: "Needs change history · until 12:30",
+      detail: "Needs change history · until 12:30 UTC",
       rerunNote: "",
     },
   ],
@@ -431,7 +431,7 @@ describe("rcaCellModel (01 §12.1, RR-42, 03 VE14/VE44)", () => {
     },
   );
 
-  it("SG26: the until time is in the viewer's zone", () => {
+  it("SG26: the until time is in the viewer's zone and names it", () => {
     const row = {
       rca: rca({
         state: "waiting_input",
@@ -441,7 +441,7 @@ describe("rcaCellModel (01 §12.1, RR-42, 03 VE14/VE44)", () => {
       severity: "P2",
     } as Row;
     const model = rcaCellModel(row, { rcaEnabled: true, now: NOW, timezone: "Asia/Kolkata" });
-    expect(model.detail).toBe("Needs change history · until 18:00");
+    expect(model.detail).toBe("Needs change history · until 18:00 GMT+5:30");
   });
 });
 
