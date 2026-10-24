@@ -14,8 +14,7 @@ const DEEP_LINKS = [
 ];
 
 test.describe('nav rail on short screens', () => {
-  // Parallel: no beforeAll/afterAll and no shared state, so nothing needs sequencing.
-  test.describe.configure({ mode: 'parallel' });
+  test.describe.configure({ mode: 'serial' });
 
   for (const [w, h] of SHORT) {
     for (const [path, link] of DEEP_LINKS) {

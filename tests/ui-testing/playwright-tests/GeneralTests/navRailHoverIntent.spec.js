@@ -26,8 +26,7 @@ function crosses(start, end, box) {
 }
 
 test.describe('nav rail hover intent', () => {
-  // Parallel: no beforeAll/afterAll and no shared state, so nothing needs sequencing.
-  test.describe.configure({ mode: 'parallel' });
+  test.describe.configure({ mode: 'serial' });
 
   for (const [w, h] of SIZES) {
     for (const dir of DIRS) {
