@@ -1356,6 +1356,43 @@ describe("License.vue", () => {
   });
 
   describe("Backend search decision", () => {
+    it("passes GET waiver data to the status card", async () => {
+      const date = new Date();
+      const now = date.getTime() * 1000;
+      const monthStart = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1) * 1000;
+      const monthEnd = Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1) * 1000;
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({
+          ...withDecision({ allowed_days: 5, exceeded_days: 4 }),
+          base: { ...decision, allowed_days: 3, exceeded_days: 4 },
+          waivers: [
+            {
+              id: "breach",
+              type: "breach_days",
+              extra: 2,
+              starts_at: monthStart,
+              ends_at: monthEnd,
+              note: "",
+            },
+            {
+              id: "grace",
+              type: "report_grace",
+              starts_at: now - 1000000,
+              ends_at: now + 1000000,
+              note: "",
+            },
+          ],
+        }),
+      );
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.find("[data-test=license-status-days]").text()).toContain(
+        "3 allowed this month + 2 from a waiver · 4 used",
+      );
+      expect(wrapper.find("[data-test=license-status-reporting]").text()).toContain(
+        "features stay on while reports catch up",
+      );
+    });
     const decision = {
       search_allowed: true,
       blocks: [],

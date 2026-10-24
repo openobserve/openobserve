@@ -19,6 +19,7 @@ import {
   DAY_US,
   MAX_TIMEOUT_MS,
   activeSearchUnblock,
+  statusWaiverRelief,
   bannerSignature,
   boundaryDelayMs,
   formatUtc,
@@ -327,4 +328,47 @@ it("breach retention uses every touched UTC month, leap days and year rollover",
       expect(waiverSummary(w, end * 1000, "en-US", gt)).toContain("Past day coverage");
     }
   }
+});
+
+describe("status waiver relief", () => {
+  const breach = { ...unblock, type: "breach_days", extra: 2 };
+  const grace = { ...unblock, type: "report_grace" };
+
+  it("adds breach days only after activation in a covered UTC month", () => {
+    expect(statusWaiverRelief([breach], breach.starts_at - 1).breachDays).toBe(0);
+    expect(statusWaiverRelief([breach], breach.starts_at).breachDays).toBe(2);
+    expect(statusWaiverRelief([breach], breach.ends_at - 1).breachDays).toBe(2);
+    expect(statusWaiverRelief([breach], breach.ends_at).breachDays).toBe(2);
+    expect(statusWaiverRelief([breach], us(2026, 10, 1) - 1).breachDays).toBe(2);
+    expect(statusWaiverRelief([breach], us(2026, 10, 1)).breachDays).toBe(0);
+    const nextMonth = { ...breach, starts_at: us(2026, 10, 1), ends_at: us(2026, 11, 1) };
+    expect(statusWaiverRelief([breach, nextMonth], us(2026, 9, 31, 23, 59)).breachDays).toBe(2);
+    expect(statusWaiverRelief([breach, nextMonth], us(2026, 10, 1)).breachDays).toBe(2);
+    const spanning = { ...breach, ends_at: us(2026, 10, 3) };
+    expect(statusWaiverRelief([spanning], us(2026, 10, 30)).breachDays).toBe(2);
+    expect(statusWaiverRelief([spanning], us(2026, 11, 1)).breachDays).toBe(0);
+    expect(statusWaiverRelief([breach, { ...breach, extra: 5 }], breach.starts_at).breachDays).toBe(
+      7,
+    );
+  });
+
+  it("uses the half-open report grace window with microsecond precision", () => {
+    expect(statusWaiverRelief([grace], grace.starts_at - 1).reportGraceUntil).toBeUndefined();
+    expect(statusWaiverRelief([grace], grace.starts_at).reportGraceUntil).toBe(grace.ends_at);
+    expect(statusWaiverRelief([grace], grace.ends_at - 1).reportGraceUntil).toBe(grace.ends_at);
+    expect(statusWaiverRelief([grace], grace.ends_at).reportGraceUntil).toBeUndefined();
+  });
+
+  it("never invents relief for absent or invalid source fields", () => {
+    expect(statusWaiverRelief(undefined, breach.starts_at)).toEqual({ breachDays: 0 });
+    for (const extra of [undefined, 0, 6, -1, 1.5, NaN]) {
+      expect(statusWaiverRelief([{ ...breach, extra }], breach.starts_at).breachDays).toBe(0);
+    }
+    expect(
+      statusWaiverRelief([{ ...breach, ends_at: breach.starts_at }], breach.starts_at).breachDays,
+    ).toBe(0);
+    expect(
+      statusWaiverRelief([{ ...grace, ends_at: NaN }], grace.starts_at).reportGraceUntil,
+    ).toBeUndefined();
+  });
 });

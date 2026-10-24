@@ -98,6 +98,30 @@ export function knownWaivers(ws: LicenseWaiver[] | undefined): LicenseWaiver[] {
   return (ws ?? []).filter((w) => KNOWN_WAIVER_TYPES.includes(w.type));
 }
 
+export function statusWaiverRelief(
+  waivers: LicenseWaiver[] | undefined,
+  nowUs: number,
+): { breachDays: number; reportGraceUntil?: number } {
+  let breachDays = 0;
+  let reportGraceUntil: number | undefined;
+  for (const w of waivers ?? []) {
+    if (
+      !Number.isFinite(w.starts_at) ||
+      !Number.isFinite(w.ends_at) ||
+      w.starts_at >= w.ends_at ||
+      nowUs < w.starts_at
+    )
+      continue;
+    if (w.type === "breach_days" && hasValidBreachExtra(w) && nowUs < breachRetentionEndUs(w)) {
+      breachDays += w.extra;
+    }
+    if (w.type === "report_grace" && nowUs < w.ends_at) {
+      reportGraceUntil = Math.max(reportGraceUntil ?? w.ends_at, w.ends_at);
+    }
+  }
+  return { breachDays, ...(reportGraceUntil === undefined ? {} : { reportGraceUntil }) };
+}
+
 export function waiverStatus(w: LicenseWaiver, nowUs: number): WaiverStatus {
   if (nowUs < w.starts_at) return "scheduled";
   if (w.type === "breach_days" && nowUs >= breachRetentionEndUs(w)) return "ended";

@@ -1,8 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import LicenseStatusCard from "./LicenseStatusCard.vue";
 import i18n from "@/locales";
-import type { LicenseDecision } from "@/utils/licenseWaivers";
+import type { LicenseDecision, LicenseWaiver } from "@/utils/licenseWaivers";
 
 const decision = (over: Partial<LicenseDecision> = {}): LicenseDecision => ({
   search_allowed: true,
@@ -15,9 +15,9 @@ const decision = (over: Partial<LicenseDecision> = {}): LicenseDecision => ({
   ...over,
 });
 
-const mountCard = (props: Record<string, unknown>) =>
+const mountCard = (props: Partial<InstanceType<typeof LicenseStatusCard>["$props"]>) =>
   mount(LicenseStatusCard, {
-    props: { decision: decision(), envKeyActive: false, ...props } as any,
+    props: { decision: decision(), envKeyActive: false, ...props },
     global: { plugins: [i18n] },
   });
 
@@ -187,4 +187,78 @@ it("describes keys fetched online as well as pasted keys", () => {
   expect(w.get('[data-test="license-status-env-key"]').text()).toBe(
     "A newer key for this license (pasted or fetched online) is in use instead of O2_LICENSE_KEY. Update O2_LICENSE_KEY when convenient so the two match.",
   );
+});
+
+describe("status rows from waiver data", () => {
+  const start = Date.UTC(2026, 9, 24);
+  const end = Date.UTC(2026, 9, 30);
+  const breach: LicenseWaiver = {
+    id: "breach",
+    type: "breach_days",
+    extra: 2,
+    starts_at: start * 1000,
+    ends_at: end * 1000,
+    note: "",
+  };
+  const grace: LicenseWaiver = { ...breach, id: "grace", type: "report_grace" };
+  afterEach(() => vi.useRealTimers());
+
+  it("renders the approved base plus waiver and used fragments", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(start);
+    const w = mountCard({
+      waivers: [breach, grace],
+      base: decision({ exceeded_days: 4 }),
+      decision: decision({ allowed_days: 5, exceeded_days: 4 }),
+    });
+    expect(w.find("[data-test=license-status-days]").find("dd").text()).toBe(
+      "3 allowed this month + 2 from a waiver · 4 used",
+    );
+    expect(w.find("[data-test=license-status-reporting]").find("dd").text()).toBe(
+      "grace until Oct 30 — features stay on while reports catch up",
+    );
+    w.unmount();
+  });
+
+  it("updates grace at start and exclusive end and breach at UTC month rollover without a fetch", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(start - 1);
+    const w = mountCard({ waivers: [breach, grace], base: decision() });
+    expect(w.find("[data-test=license-status-reporting]").exists()).toBe(false);
+    expect(w.find("[data-test=license-status-days]").text()).not.toContain("from a waiver");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.find("[data-test=license-status-reporting]").exists()).toBe(true);
+    expect(w.find("[data-test=license-status-days]").text()).toContain("+ 2 from a waiver");
+    await vi.advanceTimersByTimeAsync(end - start - 1);
+    expect(w.find("[data-test=license-status-reporting]").exists()).toBe(true);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.find("[data-test=license-status-reporting]").exists()).toBe(false);
+    expect(w.find("[data-test=license-status-days]").text()).toContain("+ 2 from a waiver");
+    await vi.advanceTimersByTimeAsync(Date.UTC(2026, 10, 1) - end - 1);
+    expect(w.find("[data-test=license-status-days]").text()).toContain("+ 2 from a waiver");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.find("[data-test=license-status-days]").find("dd").text()).toBe(
+      "3 allowed this month · 0 used",
+    );
+    w.unmount();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("omits each absent source fragment instead of using a fallback", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(start);
+    const w = mountCard({
+      waivers: [breach],
+      decision: decision({ allowed_days: 5, exceeded_days: undefined }),
+    });
+    expect(w.find("[data-test=license-status-days]").find("dd").text()).toBe("2 from a waiver");
+    await w.setProps({
+      waivers: [{ ...breach, extra: undefined }],
+      decision: decision({ allowed_days: undefined, exceeded_days: undefined }),
+    });
+    expect(w.find("[data-test=license-status-days]").exists()).toBe(false);
+    expect(w.find("[data-test=license-status-reporting]").exists()).toBe(false);
+    expect(w.html()).not.toMatch(/undefined|NaN/);
+    w.unmount();
+  });
 });
