@@ -2156,3 +2156,54 @@ describe("AlertList - triggered in the last 15 minutes", () => {
     expect(fired.filter((c: any) => c.find(".bg-warning-500").exists())).toHaveLength(4);
   });
 }, 15000);
+
+describe("AlertList - imported batch", () => {
+  it("narrows the list to the alerts the import just created", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    // A stale ?action= from an earlier spec's navigation can swap the table for the editor.
+    await wrapper.vm.handleActionQuery(undefined);
+
+    wrapper.vm.onImportedBatch({ folderId: "default", ids: ["alert-2", "alert-5"] });
+    await flushPromises();
+
+    expect(wrapper.vm.displayedAlerts.map((r: any) => r.alert_id)).toEqual(["alert-2", "alert-5"]);
+    expect(wrapper.find('[data-test="alert-list-imported-banner"]').exists()).toBe(true);
+  });
+
+  it("enables each paused imported alert through the per-alert toggle", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    wrapper.vm.onImportedBatch({ folderId: "default", ids: ["alert-1", "alert-2", "alert-5"] });
+
+    await wrapper.vm.enableImported();
+    await flushPromises();
+
+    const toggled = alertsSvc.toggle_state_by_alert_id.mock.calls.map((c: any[]) => [c[1], c[2]]);
+    expect(toggled).toEqual([
+      ["alert-2", true],
+      ["alert-5", true],
+    ]);
+    expect(wrapper.vm.displayedAlerts.every((r: any) => r.enabled)).toBe(true);
+  });
+
+  it("shows the paused batch even when the Active filter was on", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    wrapper.vm.stateFilter = "active";
+
+    wrapper.vm.onImportedBatch({ folderId: "default", ids: ["alert-2", "alert-5"] });
+
+    expect(wrapper.vm.displayedAlerts.map((r: any) => r.alert_id)).toEqual(["alert-2", "alert-5"]);
+  });
+
+  it("goes back to the whole folder when the batch is cleared", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    wrapper.vm.onImportedBatch({ folderId: "default", ids: ["alert-2"] });
+
+    wrapper.vm.clearImportedBatch();
+
+    expect(wrapper.vm.displayedAlerts).toHaveLength(alertsDB.length);
+  });
+});

@@ -15,7 +15,7 @@
 
 import yaml from "js-yaml";
 
-import { priorityForSeverity } from "@/constants/alertLibrary";
+import { priorityForSeverity, SEVERITY_TO_PRIORITY } from "@/constants/alertLibrary";
 
 const GROUPS_LINE = /^groups\s*:/;
 const DURATION = /^(?:(\d+)y)?(?:(\d+)w)?(?:(\d+)d)?(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?(?:(\d+)ms)?$/;
@@ -23,6 +23,8 @@ const DURATION_UNIT_SECS = [31536000, 604800, 86400, 3600, 60, 1, 0.001];
 const ANY_TEMPLATE = /\{\{[\s\S]*?\}\}/g;
 const DEFAULT_SILENCE_MINUTES = 10;
 const FALLBACK_NAME = "prometheus_alert";
+// Both refusals the backend gives a rule-mode alert whose metric has no stream yet.
+const MISSING_METRIC = /no referenced existing metrics stream|^Stream \S+ not found$/;
 
 /** A minimal OpenObserve alert the import accepts as is. */
 export const ALERT_JSON_SAMPLE = JSON.stringify(
@@ -87,6 +89,7 @@ export type PromRulesImportWarning =
 
 export interface PromRulesImportResult {
   alerts: Record<string, unknown>[];
+  groups: number;
   /** Recording rules, which have no alert equivalent. */
   skipped: number;
   warnings: PromRulesImportWarning[];
@@ -97,6 +100,12 @@ export interface PromRulesImportOptions {
 }
 
 export type ImportFormat = "json" | "yaml" | "terraform" | "unknown";
+
+/** Destination names chosen once per batch; empty means that severity notifies nobody. */
+export interface SeverityRoutes {
+  critical: string;
+  warning: string;
+}
 
 interface PendingAlert {
   base: string;
@@ -149,6 +158,21 @@ const toAlertName = (raw: string): string =>
     .replace(/[^a-z0-9_]+/g, "_")
     .replace(/_+/g, "_")
     .replace(/^_|_$/g, "");
+
+/** True when the server refused a rule-mode alert because its metric is not arriving yet. */
+export const isMissingMetricError = (message: string): boolean =>
+  typeof message === "string" && MISSING_METRIC.test(message.trim());
+
+/** Fills each rule-mode alert with no destinations from its severity's route; P1 is critical. */
+export const routeBySeverity = (alerts: Record<string, any>[], routes: SeverityRoutes): void => {
+  for (const alert of alerts) {
+    if (alert?.query_condition?.promql_rule_mode !== true) continue;
+    if (Array.isArray(alert.destinations) && alert.destinations.length > 0) continue;
+    const route =
+      alert.priority === SEVERITY_TO_PRIORITY.critical ? routes.critical : routes.warning;
+    if (route) alert.destinations = [route];
+  }
+};
 
 /** Names the format a pasted text looks like, for a parse error the user can act on. */
 export const detectImportFormat = (text: string): ImportFormat => {
@@ -277,8 +301,9 @@ export const convertPromRules = (
   const warnings: PromRulesImportWarning[] = [];
   const pending: PendingAlert[] = [];
   let skipped = 0;
+  const groups = loadGroups(text);
 
-  for (const rawGroup of loadGroups(text)) {
+  for (const rawGroup of groups) {
     const group = asRecord(rawGroup);
     const groupName = typeof group.name === "string" ? group.name : "";
     const intervalSecs = parsePromDuration(group.interval) || 60;
@@ -311,5 +336,5 @@ export const convertPromRules = (
     if (names[i] !== p.base) warnings.push({ code: "renamed", alert: names[i], from: p.source });
     return buildAlert(p, names[i], options.orgId ?? "", warnings);
   });
-  return { alerts, skipped, warnings };
+  return { alerts, groups: groups.length, skipped, warnings };
 };

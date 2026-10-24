@@ -18,9 +18,11 @@ import { describe, expect, it } from "vitest";
 import {
   convertPromRules,
   detectImportFormat,
+  isMissingMetricError,
   isPromRulesYaml,
   parsePromDuration,
   PromRulesImportError,
+  routeBySeverity,
 } from "./promRulesImport";
 
 const NODE_RULES = `# node exporter rules
@@ -289,5 +291,78 @@ describe("detectImportFormat", () => {
     ["plain words", "hello there", "unknown"],
   ])("names %s", (_case, text, format) => {
     expect(detectImportFormat(text)).toBe(format);
+  });
+});
+
+describe("convertPromRules group count", () => {
+  it("counts every group in the file, including ones with only recording rules", () => {
+    const text = `groups:
+  - name: a
+    rules:
+      - alert: A
+        expr: up == 0
+  - name: b
+    rules:
+      - record: r
+        expr: up
+`;
+    expect(convertPromRules(text).groups).toBe(2);
+  });
+});
+
+describe("routeBySeverity", () => {
+  const ruleAlert = (priority?: number, destinations: string[] = []) => ({
+    name: `p${priority ?? "none"}`,
+    destinations,
+    query_condition: { type: "promql", promql_rule_mode: true },
+    ...(priority === undefined ? {} : { priority }),
+  });
+
+  it("sends critical rules to the critical route and every other severity to the warning route", () => {
+    const alerts: Record<string, any>[] = [ruleAlert(1), ruleAlert(3), ruleAlert(4), ruleAlert()];
+    routeBySeverity(alerts, { critical: "pager", warning: "team-email" });
+    expect(alerts.map((a) => a.destinations)).toEqual([
+      ["pager"],
+      ["team-email"],
+      ["team-email"],
+      ["team-email"],
+    ]);
+  });
+
+  it("leaves a rule without destinations when its route is not chosen", () => {
+    const alerts: Record<string, any>[] = [ruleAlert(1), ruleAlert(3)];
+    routeBySeverity(alerts, { critical: "pager", warning: "" });
+    expect(alerts.map((a) => a.destinations)).toEqual([["pager"], []]);
+  });
+
+  it("keeps destinations a rule already names, and never routes a non-rule alert", () => {
+    const named = ruleAlert(1, ["kept"]);
+    const sqlAlert = {
+      name: "sql",
+      destinations: [],
+      priority: 1,
+      query_condition: { type: "sql" },
+    };
+    routeBySeverity([named, sqlAlert], { critical: "pager", warning: "team-email" });
+    expect(named.destinations).toEqual(["kept"]);
+    expect(sqlAlert.destinations).toEqual([]);
+  });
+});
+
+describe("isMissingMetricError", () => {
+  it.each([
+    [
+      "Cannot infer a referenced metrics stream for PromQL rule: expression has no referenced existing metrics stream; supply stream_name",
+      true,
+    ],
+    ["Stream node_up not found", true],
+    [
+      "Cannot infer a referenced metrics stream for PromQL rule: rule mode requires stream_type=metrics",
+      false,
+    ],
+    ["Alert destination pager not found", false],
+    ["", false],
+  ])("reads %j as missing metric: %s", (message, expected) => {
+    expect(isMissingMetricError(message)).toBe(expected);
   });
 });

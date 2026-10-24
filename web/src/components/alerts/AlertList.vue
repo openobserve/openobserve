@@ -144,6 +144,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     default-key="total"
                     @select="onStatSelect"
                   />
+                  <OBanner
+                    v-if="importedBatchActive"
+                    variant="info"
+                    dense
+                    class="mt-1.5"
+                    :content="t('alerts.importedBatchShowing', { count: importedBatchIds.size })"
+                    data-test="alert-list-imported-banner"
+                  >
+                    <template #actions>
+                      <OButton
+                        variant="primary"
+                        size="sm"
+                        :loading="enablingImported"
+                        :disabled="enablingImported"
+                        data-test="alert-list-enable-imported-btn"
+                        @click="enableImported"
+                        >{{ t("alerts.enableImported") }}</OButton
+                      >
+                      <OButton
+                        variant="ghost"
+                        size="sm"
+                        data-test="alert-list-imported-show-all-btn"
+                        @click="clearImportedBatch"
+                        >{{ t("alerts.importedShowAll") }}</OButton
+                      >
+                    </template>
+                  </OBanner>
                 </div>
               </template>
 
@@ -748,11 +775,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-else
                   size="hero"
                   preset="no-alerts"
-                  :filtered="!!(filterQuery || searchQuery || stateFilter)"
+                  :filtered="!!(filterQuery || searchQuery || stateFilter || importedBatchActive)"
                   @action="
                     (id) =>
                       id === 'clear-filters'
-                        ? ((filterQuery = ''), (searchQuery = ''), (stateFilter = null))
+                        ? ((filterQuery = ''),
+                          (searchQuery = ''),
+                          (stateFilter = null),
+                          clearImportedBatch())
                         : showAddUpdateFn({})
                   "
                 />
@@ -843,6 +873,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :alerts="store?.state?.organizationData?.allAlertsListByFolderId[activeFolderId]"
         :folderId="activeFolderId"
         @update:alerts="refreshImportedAlerts"
+        @imported="onImportedBatch"
         @update:destinations="refreshDestination"
         @update:templates="getTemplates"
       />
@@ -1043,6 +1074,7 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import IacRegistryLinks from "@/components/common/IacRegistryLinks.vue";
 import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
 import CompositeReferencesDrawer from "@/components/alerts/composite/CompositeReferencesDrawer.vue";
@@ -1092,6 +1124,7 @@ export default defineComponent({
     OTag,
     OTruncatedText,
     OStatStrip,
+    OBanner,
     CompositeReferencesDrawer,
     ExportResourceDialog,
     IacRegistryLinks,
@@ -1593,8 +1626,18 @@ export default defineComponent({
     const stateFilter = ref<"active" | "paused" | "failed" | "firing" | "recent" | null>(
       savedAlertListFilters.stateFilter,
     );
+    // Set by Import so the list opens on just that batch; a switch to another folder drops it.
+    const importedBatch = ref<{ folderId: string; ids: string[] } | null>(null);
+    const enablingImported = ref(false);
+    const importedBatchActive = computed(
+      () => !!importedBatch.value && importedBatch.value.folderId === activeFolderId.value,
+    );
+    const importedBatchIds = computed(() => new Set(importedBatch.value?.ids ?? []));
     const displayedAlerts = computed(() => {
-      const rows = filteredResults.value || [];
+      const all = filteredResults.value || [];
+      const rows = importedBatchActive.value
+        ? all.filter((r: any) => importedBatchIds.value.has(r.alert_id))
+        : all;
       const f = stateFilter.value;
       if (!f) return rows;
       if (f === "firing") return rows.filter(isFiringRow);
@@ -2390,6 +2433,9 @@ export default defineComponent({
     watch(
       () => activeFolderId.value,
       async (newVal) => {
+        if (importedBatch.value && importedBatch.value.folderId !== newVal) {
+          importedBatch.value = null;
+        }
         folderIdToBeCloned.value = newVal;
         selectedAlerts.value = [];
         allSelectedAlerts.value = false;
@@ -3122,6 +3168,47 @@ export default defineComponent({
         .finally(() => {
           alertStateLoadingMap.value[row.uuid] = false;
         });
+    };
+
+    const onImportedBatch = (batch: { folderId: string; ids: string[] }) => {
+      importedBatch.value = batch.ids.length > 0 ? batch : null;
+      // Imported rules arrive paused, so a prior Active filter would hide the whole batch.
+      if (importedBatch.value) stateFilter.value = null;
+    };
+
+    const clearImportedBatch = () => {
+      importedBatch.value = null;
+    };
+
+    // One toggle per alert, in sequence, so a 200-rule batch never floods the server.
+    const enableImported = async () => {
+      if (!importedBatchActive.value || enablingImported.value) return;
+      const paused = (filteredResults.value || []).filter(
+        (row: any) => importedBatchIds.value.has(row.alert_id) && !row.enabled,
+      );
+      enablingImported.value = true;
+      let enabled = 0;
+      try {
+        for (const row of paused) {
+          try {
+            const res: any = await toggleAlertStateWrite.mutateAsync({
+              alertId: row.alert_id,
+              enabled: true,
+              folderId: activeFolderId.value,
+            });
+            row.enabled = res.data.enabled;
+            patchCachedAlert(row.alert_id, { enabled: res.data.enabled });
+            if (res.data.enabled) enabled++;
+          } catch {
+            /* the mutation handler already toasts the failure; the rest of the batch still runs */
+          }
+        }
+      } finally {
+        enablingImported.value = false;
+      }
+      if (enabled > 0) {
+        toast({ variant: "success", message: t("alerts.importedEnabled", { count: enabled }) });
+      }
     };
 
     const routeTo = (name: string) => {
@@ -3902,6 +3989,12 @@ export default defineComponent({
       summaryStats,
       stateFilter,
       displayedAlerts,
+      importedBatchActive,
+      importedBatchIds,
+      enablingImported,
+      onImportedBatch,
+      clearImportedBatch,
+      enableImported,
       onStatSelect,
       formData,
       hideForm,

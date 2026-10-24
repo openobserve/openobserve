@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { shallowMount } from "@vue/test-utils";
+import { flushPromises, shallowMount } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import { ref } from "vue";
 import ImportAlert from "./ImportAlert.vue";
+import enUS from "@/locales/languages/en-US.json";
+import { queryClient } from "@/composables/query/queryClient";
 
 // Mock all external dependencies
 vi.mock("@/services/alerts", async (importOriginal) => {
@@ -65,6 +67,14 @@ vi.mock("@/services/anomaly_detection", () => ({
   },
 }));
 
+const getSettingMock = vi.hoisted(() => vi.fn());
+vi.mock("@/services/settings", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { getSetting: (...args: any[]) => getSettingMock(...args) },
+  });
+});
+
 const toastMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastMock }));
 
@@ -84,6 +94,8 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    queryClient.clear();
+    getSettingMock.mockRejectedValue({ response: { status: 404 } });
 
     mockStore = createStore({
       state: {
@@ -112,7 +124,11 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
       },
     });
 
-    wrapper = shallowMount(ImportAlert, {
+    wrapper = mountImport();
+  });
+
+  const mountImport = () =>
+    shallowMount(ImportAlert, {
       props: {
         destinations: [
           { name: "test-destination-1" },
@@ -153,7 +169,6 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         },
       },
     });
-  });
 
   describe("legacy timezone names", () => {
     it("finds Asia/Kolkata by the old name Calcutta", () => {
@@ -1224,6 +1239,167 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         query_condition: { type: "promql", promql: "up" },
       });
       expect(await wrapper.vm.validateAlertInputs(input, 1)).toBe(false);
+    });
+  });
+
+  describe("Prometheus batch", () => {
+    const BATCH = `groups:
+  - name: node
+    rules:
+      - record: job:up:sum
+        expr: sum by (job) (up)
+      - alert: InstanceDown
+        expr: up == 0
+        labels:
+          severity: critical
+  - name: disk
+    rules:
+      - alert: DiskFilling
+        expr: node_filesystem_avail_bytes < 1e9
+        labels:
+          severity: warning
+`;
+    const MISSING_METRIC =
+      "Cannot infer a referenced metrics stream for PromQL rule: expression has no referenced existing metrics stream; supply stream_name";
+
+    const createMock = async () => {
+      const service = await import("@/services/alerts");
+      return vi.mocked(service.default.create_by_alert_id);
+    };
+
+    it("routes each converted rule to the destination chosen for its severity", async () => {
+      const create = await createMock();
+      create.mockResolvedValue({ data: { id: "x" } } as any);
+      wrapper.vm.severityRoutes.critical = "test-destination-1";
+      wrapper.vm.severityRoutes.warning = "email-dest";
+
+      await wrapper.vm.importJson({ jsonStr: BATCH });
+
+      const sent = create.mock.calls.map((call) => call[1]);
+      expect(sent.map((a: any) => [a.name, a.destinations])).toEqual([
+        ["instance_down", ["test-destination-1"]],
+        ["disk_filling", ["email-dest"]],
+      ]);
+    });
+
+    it("preselects the org default destination for critical rules only", async () => {
+      getSettingMock.mockResolvedValue({
+        data: { setting_value: { destination: "test-destination-2" } },
+      });
+      // The beforeEach mount cached the unset setting.
+      queryClient.clear();
+      const fresh = mountImport();
+      await flushPromises();
+      expect((fresh.vm as any).severityRoutes).toEqual({
+        critical: "test-destination-2",
+        warning: "",
+      });
+      fresh.unmount();
+    });
+
+    it("summarises the detected rule files in a banner", async () => {
+      wrapper.vm.parseAlertFile(BATCH, "a.yml");
+      wrapper.vm.parseAlertFile(BATCH, "b.yml");
+      expect(wrapper.vm.promBatch).toEqual({ rules: 4, groups: 4, skipped: 2 });
+      await wrapper.vm.$nextTick();
+      const banner = wrapper
+        .find('[data-test="alert-import-prom-batch"]')
+        .findComponent({ name: "OBanner" });
+      expect(banner.exists()).toBe(true);
+      expect(banner.props("content")).toBe(
+        wrapper.vm.t("alerts.import.promDetected", { rules: 4, groups: 4, skipped: 2 }),
+      );
+    });
+
+    it("lists one row per rule with its status", async () => {
+      const create = await createMock();
+      create
+        .mockResolvedValueOnce({ data: { id: "id-1" } } as any)
+        .mockRejectedValueOnce({ response: { data: { message: "boom" } } });
+
+      await wrapper.vm.importJson({ jsonStr: BATCH });
+
+      expect(wrapper.vm.importRows).toEqual([
+        expect.objectContaining({
+          index: 1,
+          name: "instance_down",
+          status: "imported",
+          alertId: "id-1",
+        }),
+        expect.objectContaining({
+          index: 2,
+          name: "disk_filling",
+          status: "failed",
+          reason: "boom",
+        }),
+      ]);
+      await wrapper.vm.$nextTick();
+      const table = wrapper.findComponent('[data-test="alert-import-results-table"]');
+      expect(table.exists()).toBe(true);
+    });
+
+    it("reads a row refused for a missing metric as not arriving yet", async () => {
+      const create = await createMock();
+      create.mockRejectedValue({ response: { data: { message: MISSING_METRIC } } });
+
+      await wrapper.vm.importJson({ jsonStr: BATCH });
+
+      const row = wrapper.vm.importRows[0];
+      expect(row.status).toBe("missingMetric");
+      expect(wrapper.vm.rowStatusText(row)).toBe(wrapper.vm.t("alerts.import.rowMissingMetric"));
+      expect((enUS as any).alerts.import.rowMissingMetric).toBe("Metric not arriving yet");
+    });
+
+    it("re-sends only the retried row and updates its status", async () => {
+      const create = await createMock();
+      create
+        .mockRejectedValueOnce({ response: { data: { message: MISSING_METRIC } } })
+        .mockResolvedValueOnce({ data: { id: "id-2" } } as any);
+      await wrapper.vm.importJson({ jsonStr: BATCH });
+      expect(create).toHaveBeenCalledTimes(2);
+
+      create.mockResolvedValueOnce({ data: { id: "id-1" } } as any);
+      await wrapper.vm.retryRow(wrapper.vm.importRows[0]);
+
+      expect(create).toHaveBeenCalledTimes(3);
+      expect(create.mock.calls[2][1]).toMatchObject({ name: "instance_down" });
+      expect(wrapper.vm.importRows.map((r: any) => [r.name, r.status])).toEqual([
+        ["instance_down", "imported"],
+        ["disk_filling", "imported"],
+      ]);
+    });
+
+    it("hands the imported batch to the list when every rule imports", async () => {
+      vi.useFakeTimers();
+      try {
+        const create = await createMock();
+        create
+          .mockResolvedValueOnce({ data: { id: "id-1" } } as any)
+          .mockResolvedValueOnce({ data: { id: "id-2" } } as any);
+        await wrapper.vm.importJson({ jsonStr: BATCH });
+        vi.runAllTimers();
+        expect(wrapper.emitted("imported")?.at(-1)).toEqual([
+          { folderId: "default", ids: ["id-1", "id-2"] },
+        ]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("lets the user open the imported part of a batch that partly failed", async () => {
+      const create = await createMock();
+      create
+        .mockResolvedValueOnce({ data: { id: "id-1" } } as any)
+        .mockRejectedValueOnce({ response: { data: { message: "boom" } } });
+      await wrapper.vm.importJson({ jsonStr: BATCH });
+      expect(wrapper.emitted("imported")).toBeUndefined();
+
+      wrapper.vm.showImportedAlerts();
+
+      expect(wrapper.emitted("imported")?.at(-1)).toEqual([{ folderId: "default", ids: ["id-1"] }]);
+      expect(wrapper.vm.router.push).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "alertList" }),
+      );
     });
   });
 
