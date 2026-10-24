@@ -70,7 +70,6 @@ export class RumProductAnalyticsPage {
         this.funnelAddStepBtn = page.locator('[data-test="rum-analytics-funnel-add-step-btn"]');
         this.funnelAddStep = page.locator('[data-test="rum-analytics-funnel-add-step"]');
         this.funnelAddDashboardBtn = page.locator('[data-test="rum-analytics-funnel-add-dashboard-btn"]');
-        this.breakdownSelect = page.locator('[data-test="rum-analytics-funnel-breakdown-select"]');
         this.breakdown = page.locator('[data-test="rum-analytics-funnel-breakdown"]');
 
         this.dropoffDrawer = page.locator('[data-test="rum-analytics-dropoff-drawer"]');
@@ -115,7 +114,6 @@ export class RumProductAnalyticsPage {
 
         this.funnelAlertBtn = page.locator('[data-test="rum-analytics-funnel-alert-btn"]');
         this.funnelLeftOut = page.locator('[data-test="rum-analytics-funnel-left-out"]');
-        this.funnelWindowFixed = page.locator('[data-test="rum-analytics-funnel-window-fixed"]');
         this.funnelWindowTrigger = page.locator('[data-test="rum-analytics-funnel-window-select-trigger"]');
         this.funnelSuggestionsError = page.locator('[data-test="rum-analytics-funnel-suggestions-error"]');
         this.funnelSuggestionsRetryBtn = page.locator('[data-test="rum-analytics-funnel-suggestions-retry-btn"]');
@@ -565,7 +563,12 @@ export class RumProductAnalyticsPage {
 
     async pickConversionWindow(value) {
         await this.pickOption('rum-analytics-funnel-window-select', { value });
-        await expect(this.funnelWindowTrigger).toHaveAttribute('data-test-selected-value', value);
+        await expect.poll(() => this.funnelFromUrl()?.w).toBe(value);
+    }
+
+    async pickBreakdown(dim) {
+        await this.page.locator('[data-test="rum-analytics-funnel-add-breakdown-btn"]').click();
+        await this.page.locator(`[data-test="rum-analytics-funnel-field-picker-dim-${dim}"]`).click();
     }
 
     dropoffSessionReplayTag(i) {
