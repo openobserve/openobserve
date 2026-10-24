@@ -72,8 +72,8 @@ echarts.use([
   SVGRenderer,
 ] as unknown as Parameters<typeof echarts.use>[0]);
 
-// Custom-chart option object. It is user-authored ECharts config that may embed
-// function-strings and an `o2_events` map, so its shape is intentionally open.
+// Custom-chart option object. It is user-authored ECharts config that may carry
+// callbacks and an `o2_events` map, so its shape is intentionally open.
 type CustomChartData = Record<string, unknown> & {
   extras?: { panelId?: string | number };
   o2_events?: Record<string, (params: echarts.ECElementEvent, chart: echarts.EChartsType) => void>;
@@ -113,37 +113,6 @@ export default defineComponent({
     let chart: echarts.EChartsType | null = null;
 
     const hoveredSeriesState = inject<HoveredSeriesState | null>("hoveredSeriesState", null);
-    const convertStringToFunction = (obj: unknown): unknown => {
-      if (typeof obj === "string" && obj.startsWith("function")) {
-        try {
-          return new Function(`return ${obj}`)(); // Convert string to function
-        } catch (error) {
-          // Preserve original runtime read of error.message; catch binds unknown
-          // under strict TS, so narrow the shape without changing the value read.
-          const message = (error as { message?: string }).message;
-          emit({
-            message: t("dashboard.customChartRenderer.errorExecutingCodeWithMessage", { message }),
-            code: "",
-          } as unknown as EmitEvent);
-        }
-      }
-
-      if (Array.isArray(obj)) {
-        return obj.map((item) => convertStringToFunction(item)); // Recursively handle arrays
-      }
-
-      if (typeof obj === "object" && obj !== null) {
-        const result: Record<string, unknown> = {};
-        for (const key in obj) {
-          if (Object.prototype.hasOwnProperty.call(obj, key)) {
-            result[key] = convertStringToFunction((obj as Record<string, unknown>)[key]); // Recursively handle object properties
-          }
-        }
-        return result;
-      }
-
-      return obj; // If it's not a function string or an object, return it as is
-    };
     function deepSanitize(obj: unknown): unknown {
       if (typeof obj === "string") {
         return DOMPurify.sanitize(obj);
@@ -175,15 +144,15 @@ export default defineComponent({
       }
 
       try {
-        const convertedData = convertStringToFunction(props.data) as CustomChartData;
-        const safeChartOptions = deepSanitize(convertedData) as CustomChartData;
+        const safeChartOptions = deepSanitize(props.data) as CustomChartData;
         chart.setOption(withChartFont(safeChartOptions));
 
-        const o2Events = convertedData.o2_events;
+        const o2Events = props.data.o2_events;
         if (o2Events) {
           const boundChart = chart;
           // Add event listeners for custom interactions
           for (const event in o2Events) {
+            if (typeof o2Events[event] !== "function") continue;
             chart.off(event);
             chart.on(event, (params) =>
               o2Events[event](params as echarts.ECElementEvent, boundChart),

@@ -220,67 +220,33 @@ describe("CustomChartRenderer", () => {
     });
   });
 
-  describe("Function Conversion", () => {
-    it("should convert string functions to executable functions", () => {
-      const stringFunction = "function() { return 'test'; }";
+  describe("Function-looking strings", () => {
+    afterEach(() => {
+      document.documentElement.removeAttribute("data-audit-chart");
+    });
 
+    it("never executes a function string in the app page", async () => {
       wrapper = createWrapper({
         data: {
           ...mockChartData,
-          customFunction: stringFunction,
+          audit_probe:
+            "function(){document.documentElement.setAttribute('data-audit-chart','executed')}()",
+          tooltip: { formatter: "function(p){ return p.name; }" },
         },
       });
+      await waitForChartInit(wrapper);
 
-      // Component should handle function conversion without errors
-      expect(wrapper.exists()).toBe(true);
+      expect(document.documentElement.getAttribute("data-audit-chart")).toBeNull();
+      const option = mockChart.setOption.mock.calls.at(-1)[0];
+      expect(typeof option.tooltip.formatter).toBe("string");
     });
 
-    it("should handle invalid function strings gracefully", () => {
-      const invalidFunction = "function() { invalid syntax }";
+    it("passes real callbacks through untouched", async () => {
+      const formatter = (p: { name: string }) => p.name;
+      wrapper = createWrapper({ data: { ...mockChartData, tooltip: { formatter } } });
+      await waitForChartInit(wrapper);
 
-      expect(() => {
-        wrapper = createWrapper({
-          data: {
-            ...mockChartData,
-            customFunction: invalidFunction,
-          },
-        });
-      }).not.toThrow();
-    });
-
-    it("should process arrays with function strings", () => {
-      const dataWithFunctionArray = {
-        ...mockChartData,
-        formatters: ["function(val) { return val + '%'; }", "function(val) { return '$' + val; }"],
-      };
-
-      expect(() => {
-        wrapper = createWrapper({ data: dataWithFunctionArray });
-      }).not.toThrow();
-    });
-
-    it("should handle nested objects with functions", () => {
-      const nestedData = {
-        ...mockChartData,
-        tooltip: {
-          formatter: "function(params) { return params.name + ': ' + params.value; }",
-        },
-      };
-
-      expect(() => {
-        wrapper = createWrapper({ data: nestedData });
-      }).not.toThrow();
-    });
-
-    it("should return non-function strings as-is", () => {
-      const regularData = {
-        ...mockChartData,
-        title: { text: "Regular title text" },
-      };
-
-      wrapper = createWrapper({ data: regularData });
-
-      expect(wrapper.exists()).toBe(true);
+      expect(mockChart.setOption.mock.calls.at(-1)[0].tooltip.formatter).toBe(formatter);
     });
   });
 
@@ -326,7 +292,7 @@ describe("CustomChartRenderer", () => {
       const eventData = {
         ...mockChartData,
         o2_events: {
-          click: "function(params) { console.log('clicked', params); }",
+          click: (params: unknown) => params,
         },
       };
 
@@ -342,8 +308,8 @@ describe("CustomChartRenderer", () => {
       const multiEventData = {
         ...mockChartData,
         o2_events: {
-          click: "function(params) { return params; }",
-          mouseover: "function(params) { return params; }",
+          click: (params: unknown) => params,
+          mouseover: (params: unknown) => params,
         },
       };
 
@@ -354,6 +320,15 @@ describe("CustomChartRenderer", () => {
       expect(mockChart.off).toHaveBeenCalledWith("mouseover");
       expect(mockChart.on).toHaveBeenCalledWith("click", expect.any(Function));
       expect(mockChart.on).toHaveBeenCalledWith("mouseover", expect.any(Function));
+    });
+
+    it("does not bind o2_events entries that are strings", async () => {
+      wrapper = createWrapper({
+        data: { ...mockChartData, o2_events: { click: "function(params) { return params; }" } },
+      });
+      await waitForChartInit(wrapper);
+
+      expect(mockChart.on).not.toHaveBeenCalled();
     });
 
     it("should not set up events when o2_events is empty", async () => {
