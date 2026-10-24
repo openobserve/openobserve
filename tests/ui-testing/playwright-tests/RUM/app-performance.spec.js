@@ -1,18 +1,4 @@
-// RUM App Performance toolbar & toggle group
-//
-// AppPerformance.vue is the RUM Performance page shell: a toolbar holding a
-// four-tab OToggleGroup (Overview / Vitals / Errors / API), a date-time range
-// picker, an auto-refresh control, a refresh button (+ an optional refresh-
-// options dropdown carrying the config-gated Auto-Run "Live Mode" toggle) and a
-// share-link button. This spec verifies the toolbar & toggle-group behaviour —
-// tab rendering, tab→route navigation, route→tab back-sync (deep-link), manual
-// refresh, the Auto-Run toggle gating, and the share-link button — without
-// asserting dashboard *content* (panels/chart data), which is data-dependent.
-//
-// Data independence: the `_rumdata` stream need not exist for these tests to
-// pass. A missing/failed schema fetch flips each child's `schemaResolved=true`
-// and renders the full dashboard (no-op filter) or an empty state, so the
-// assertions target the *resolved* (not-stuck) terminal state, not panel data.
+// Asserts each child dashboard reaches a resolved state, never panel data, so a missing _rumdata stream still passes.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
@@ -77,7 +63,7 @@ test.describe('RUM App Performance toolbar & toggle group', () => {
     testLogger.info('All four tabs navigated and mounted their child');
   });
 
-  test.fixme('deep-link back-sync is broken in this build: RealUserMonitoring.vue onMounted/onUpdated routeNameMapping omits rumPerformanceErrors/rumPerformanceWebVitals/rumPerformanceApis, so /performance/errors redirects to /performance/overview (web/src/views/RUM/RealUserMonitoring.vue:173-181, :200-208)', {
+  test.fixme('deep-link back-sync is broken: RealUserMonitoring.vue routeNameMapping omits rumPerformanceErrors/rumPerformanceWebVitals/rumPerformanceApis, so /performance/errors redirects to /performance/overview', {
     tag: ['@rum', '@rum-app-performance-toolbar', '@ui', '@all', '@P0'],
   }, async ({ page }) => {
     testLogger.info('Testing route→tab back-sync');
@@ -90,15 +76,16 @@ test.describe('RUM App Performance toolbar & toggle group', () => {
   test('should re-run the Overview dashboard on manual refresh without hanging', {
     tag: ['@rum', '@rum-app-performance-toolbar', '@ui', '@all', '@P1'],
   }, async ({ page }) => {
-    testLogger.info('Testing manual refresh resolves');
+    testLogger.info('Testing manual refresh re-runs the dashboard and resolves');
     await pm.rumPerformancePage.gotoPerformance();
     await pm.rumPerformancePage.expectOverviewResolved();
-    await pm.rumPerformancePage.clickRefresh();
+    await pm.rumPerformancePage.clickRefreshAndExpectSearch();
     await pm.rumPerformancePage.expectSummaryLoadingResolved();
-    testLogger.info('Manual refresh resolved without a stuck loading indicator');
+    await pm.rumPerformancePage.expectOverviewResolved();
+    testLogger.info('Manual refresh fired a new search and resolved without a stuck loading indicator');
   });
 
-  test.fixme('Auto-Run / Live-Mode toggle — not wired in the default E2E env: auto_query_enabled defaults to false (src/config/src/config.rs:2487), so the refresh-options dropdown and toggle never render (web/src/composables/dashboard/useAutoRunToggle.ts:38, web/src/views/RUM/AppPerformance.vue:81)', {
+  test.fixme('Auto-Run / Live-Mode toggle needs ZO_AUTO_QUERY_ENABLED=true, which no CI shard sets, so useAutoRunToggle never renders the refresh-options dropdown', {
     tag: ['@rum', '@rum-app-performance-toolbar', '@ui', '@all', '@P1'],
   }, async ({ page }) => {
     testLogger.info('Testing Auto-Run toggle (requires ZO_AUTO_QUERY_ENABLED=true)');
@@ -122,9 +109,8 @@ test.describe('RUM App Performance toolbar & toggle group', () => {
     );
     await pm.rumPerformancePage.clickShareLink();
     await pm.rumPerformancePage.expectLinkCopiedToast();
-    const copiedUrl = await pm.rumPerformancePage.getCopiedUrl();
-    expect(copiedUrl).toContain('/short/');
-    testLogger.info('Share link copied', { copiedUrl });
+    await pm.rumPerformancePage.expectCopiedShortUrl();
+    testLogger.info('Share link copied a short URL');
   });
 
   test('should collapse the tab strip into a dropdown on mobile and navigate', {

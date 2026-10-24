@@ -25,6 +25,8 @@ export class RumPerformancePage {
         this.overviewSchemaLoading = page.locator(
             '[data-test="performance-summary-schema-loading"]',
         );
+        this.overviewEmpty = page.locator('[data-test="performance-summary-empty"]');
+        this.dashboardPanels = page.locator('[data-test="dashboard-panel-container"]');
         this.errorsDashboard = page.locator('[data-test="performance-error-dashboard"]');
         this.apiDashboard = page.locator('[data-test="api-performance-dashboards"]');
         this.webVitalsSchemaLoading = page.locator(
@@ -52,6 +54,17 @@ export class RumPerformancePage {
 
     async clickRefresh() {
         await this.refreshButton.click();
+    }
+
+    /** Settle the current load first, so the only search request left to observe is the one the click fires. */
+    async clickRefreshAndExpectSearch(timeoutMs = 15000) {
+        await this.expectSummaryLoadingResolved();
+        const search = this.page.waitForRequest(
+            (req) => req.method() === 'POST' && /\/api\/[^/]+\/_search/.test(req.url()),
+            { timeout: timeoutMs },
+        );
+        await this.refreshButton.click();
+        await search;
     }
 
     /** The loading indicator must resolve (not hang) after refresh. */
@@ -87,9 +100,11 @@ export class RumPerformancePage {
         await expect(this.tabLocator(value)).toBeVisible({ timeout: timeoutMs });
     }
 
-    /** Overview child resolves: schema-loading disappears (terminal, not stuck). */
     async expectOverviewResolved(timeoutMs = 30000) {
         await expect(this.overviewSchemaLoading).toBeHidden({ timeout: timeoutMs });
+        await expect(this.overviewEmpty.or(this.dashboardPanels).first()).toBeVisible({
+            timeout: timeoutMs,
+        });
     }
 
     async expectErrorsDashboardMounted(timeoutMs = 15000) {
@@ -133,18 +148,12 @@ export class RumPerformancePage {
         await expect(this.shareLinkToast).toBeVisible({ timeout: timeoutMs });
     }
 
-    /** Read the short URL copied to clipboard, polling until it lands. */
-    async getCopiedUrl(timeoutMs = 15000) {
-        const start = Date.now();
-        let lastValue = '';
-        while (Date.now() - start < timeoutMs) {
-            lastValue = await this.page.evaluate(() => navigator.clipboard.readText());
-            if (lastValue && lastValue.includes('/short/')) {
-                return lastValue;
-            }
-            await this.page.waitForTimeout(250);
-        }
-        return lastValue;
+    async expectCopiedShortUrl(timeoutMs = 15000) {
+        await expect
+            .poll(() => this.page.evaluate(() => navigator.clipboard.readText()).catch(() => ''), {
+                timeout: timeoutMs,
+            })
+            .toContain('/short/');
     }
 
     async openRefreshOptions() {
