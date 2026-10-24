@@ -102,14 +102,14 @@ describe("installCommand", () => {
     expect(cmd).not.toContain("gateway");
   });
 
-  it("installs a gateway as its own release with agents off and one replica", () => {
+  it("installs a gateway as its own release with agents off and the chart's single replica", () => {
     const cmd = installCommand("kubernetes", { ...target, role: "gateway" });
     expect(cmd).toContain(
       `helm upgrade --install ${GATEWAY_RELEASE} openobserve/otel-fleet-collector`,
     );
     expect(cmd).toContain("--set agent.enabled=false");
     expect(cmd).toContain("--set gateway.enabled=true");
-    expect(cmd).toContain("--set gateway.replicas=1");
+    expect(cmd).not.toContain("replicas");
     expect(cmd).toContain("--set opamp.token='o2ft_abc123'");
   });
 

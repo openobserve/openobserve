@@ -104,9 +104,7 @@ function windowsCommand(t: InstallTarget): string {
 function helmCommand(t: InstallTarget): string {
   const gateway = t.role === "gateway";
   const sets = [
-    ...(gateway
-      ? ["--set agent.enabled=false", "--set gateway.enabled=true", "--set gateway.replicas=1"]
-      : []),
+    ...(gateway ? ["--set agent.enabled=false", "--set gateway.enabled=true"] : []),
     `--set image.repository=${IMAGE}`,
     ...(t.version ? [`--set image.tag=${q(t.version)}`] : []),
     `--set opamp.endpoint=${q(opampEndpoint(t))}`,
