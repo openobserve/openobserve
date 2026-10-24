@@ -96,7 +96,7 @@
     "vue-i18n": "^11.4.14",
     "vue-router": "^4.6.4",
     "vuex": "^4.1.0",
-    "zod": "4.4.3"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@cypress/vue": "^6.0.3",
