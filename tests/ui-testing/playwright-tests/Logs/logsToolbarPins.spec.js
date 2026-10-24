@@ -235,4 +235,27 @@ test.describe('Logs toolbar pins', () => {
 
     testLogger.info('Syntax guide pin state was tracked through the menu pin button title');
   });
+
+  test('the function editor stays pinned and visible at every viewport width', {
+    tag: ['@toolbarPins', '@logs', '@P1', '@all'],
+  }, async () => {
+    const pins = pm.logsToolbarPinsPage;
+    // A fresh profile with the histogram default suppressed leaves nothing pinned,
+    // so the sweep below proves the function editor stays put on its own.
+    await pins.seedPinStorage({ pins: [], decided: true });
+    await pins.navigateToLogs(getOrgIdentifier());
+    await pins.expectPinnedHidden('functionEditor');
+
+    await pins.togglePin('functionEditor');
+    await pins.expectPinnedVisible('functionEditor');
+
+    // showPinnedFunctionEditor has no width budget (SearchBar.vue:2501), so unlike
+    // left-section controls it must stay visible at every width while they collapse.
+    for (const width of [1700, 1300, 1100, 900, 700]) {
+      await pins.setViewportWidthAndSettle(width);
+      await pins.expectPinnedVisible('functionEditor');
+    }
+
+    testLogger.info('Function editor stayed pinned and visible at every viewport width');
+  });
 });
