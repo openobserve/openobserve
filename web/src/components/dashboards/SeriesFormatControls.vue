@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="flex items-start gap-2 px-3 py-2">
+    <div v-if="!isStateTimeline" class="flex items-start gap-2 px-3 py-2">
       <span :class="[LABEL_CLASS, 'min-h-8']">{{ t("dashboard.sectionValueFormatting") }}</span>
       <div class="flex min-w-0 flex-1 flex-col gap-1.5">
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="flex items-start gap-2 px-3 py-2">
+    <div v-if="!isStateTimeline" class="flex items-start gap-2 px-3 py-2">
       <span :class="[LABEL_CLASS, 'min-h-5']">{{ t("dashboard.seriesOverrideColor") }}</span>
       <div class="flex min-w-0 flex-1 flex-col gap-1">
         <ColorSwatchPicker
@@ -196,6 +196,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
+    <div
+      v-if="isStateTimeline"
+      class="flex items-start gap-2 px-3 py-2"
+      data-test="dashboard-series-format-value-mappings"
+    >
+      <span :class="[LABEL_CLASS, 'min-h-8']">{{ t("dashboard.valueMappingsTitle") }}</span>
+      <div class="flex min-w-0 flex-1 flex-col gap-2">
+        <ValueMappingList
+          :model-value="override.valueMappings ?? []"
+          :pattern-errors="mappingPatternErrors"
+          @update:model-value="patch({ valueMappings: $event })"
+          @remove="
+            (index: number) =>
+              patch({ valueMappings: (override.valueMappings ?? []).filter((_, i) => i !== index) })
+          "
+        />
+        <OButton
+          variant="outline"
+          size="sm"
+          class="self-start"
+          data-test="dashboard-series-format-value-mapping-add"
+          @click="addValueMapping"
+          >{{ t("dashboard.valueMappingAddNew") }}</OButton
+        >
+      </div>
+    </div>
+
     <div class="text-text-secondary px-3 py-2 text-xs" data-test="dashboard-series-format-rule">
       {{ t("dashboard.seriesOverrideRule") }}
     </div>
@@ -214,6 +241,9 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ColorSwatchPicker from "./ColorSwatchPicker.vue";
 import ThresholdsConfig from "./addPanel/ThresholdsConfig.vue";
+import ValueMappingList from "./addPanel/ValueMappingList.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { valueMappingPatternErrors } from "./addPanel/valueMappingErrors";
 import { getColorPalette } from "@/utils/dashboard/colorPalette";
 import { matchesSeriesOverride } from "@/utils/dashboard/seriesOverrides";
 import { getUnitOptions, type UnitOption } from "@/composables/dashboard/useColumnFormatting";
@@ -350,6 +380,20 @@ const colorSwatches = computed(() => {
 });
 
 const showThresholds = computed(() => THRESHOLD_CHART_TYPES.includes(props.chartType));
+// A state timeline shows raw states coloured per state, so unit, decimals and a row colour do not apply.
+const isStateTimeline = computed(() => props.chartType === "state-timeline");
+
+const addValueMapping = () =>
+  patch({
+    valueMappings: [
+      ...(props.override.valueMappings ?? []),
+      { type: "value", value: "", pattern: "", from: "", to: "", text: "", color: null },
+    ],
+  });
+
+const mappingPatternErrors = computed(() =>
+  valueMappingPatternErrors(props.override.valueMappings, t),
+);
 const hasSteps = computed(() => !!props.override.thresholds?.steps?.length);
 const effectiveUnit = computed(() => props.override.unit ?? props.panelUnit ?? null);
 const effectiveUnitCustom = computed(() =>

@@ -219,3 +219,36 @@ describe("withoutHiddenQueries", () => {
     expect(visible.panelSchema.queries).toHaveLength(2);
   });
 });
+
+describe("value mappings in a series override draft", () => {
+  it("round-trips the stored value_mappings through a draft", () => {
+    const stored = {
+      field: { matchBy: "series_regex", value: "^gpu" },
+      config: [
+        { type: "display_name", value: "GPU" },
+        { type: "value_mappings", value: [{ type: "regex", pattern: "^power", color: "#ffaa00" }] },
+      ],
+    };
+    const draft = toSeriesOverrideDraft(stored);
+    expect(draft.valueMappings).toEqual(stored.config[1].value);
+    expect(serializeSeriesOverride(draft)).toEqual(stored);
+  });
+
+  it("names the rows of a state timeline by their raw entity", () => {
+    const options = {
+      series: [
+        {
+          type: "custom",
+          data: [
+            { name: "host-1 (Query 1)", entity: "host-1" },
+            { name: "host-2" },
+            { name: "host-2" },
+          ],
+        },
+        { type: "line", name: undefined },
+        { type: "custom", name: "up" },
+      ],
+    };
+    expect(getLegendSeriesNames(options, "state-timeline")).toEqual(["host-1", "host-2"]);
+  });
+});

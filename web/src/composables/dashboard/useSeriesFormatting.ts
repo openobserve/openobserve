@@ -48,6 +48,8 @@ export interface SeriesOverrideDraft {
   decimals: string;
   color: string | null;
   thresholds: SeriesOverrideThresholds | undefined;
+  /** Per-series value mappings; only the state timeline reads them. */
+  valueMappings?: any[];
 }
 
 /** The applied panel schema plus the data the editor already fetched for it. */
@@ -125,6 +127,8 @@ export const toSeriesOverrideDraft = (stored: any): SeriesOverrideDraft => {
       draft.color = typeof value === "string" && value !== "" ? value : null;
     } else if (item?.type === "thresholds") {
       draft.thresholds = cloneThresholds(value);
+    } else if (item?.type === "value_mappings" && Array.isArray(value)) {
+      draft.valueMappings = JSON.parse(JSON.stringify(value));
     }
   }
   return draft;
@@ -156,6 +160,9 @@ export const serializeSeriesOverride = (draft: SeriesOverrideDraft): SeriesOverr
   if (draft.color) config.push({ type: "series_color", value: draft.color });
   const thresholds = cloneThresholds(draft.thresholds);
   if (thresholds) config.push({ type: "thresholds", value: thresholds });
+  if (draft.valueMappings?.length) {
+    config.push({ type: "value_mappings", value: JSON.parse(JSON.stringify(draft.valueMappings)) });
+  }
   if (!config.length) return null;
   return { field: { matchBy: STORED_MATCH[draft.matchBy], value: draft.value }, config };
 };
@@ -173,6 +180,9 @@ export const getLegendSeriesNames = (options: any, chartType: string): string[] 
     names = (series[0]?.data ?? []).map((item: any) => item?.name);
   } else if (chartType === "gauge") {
     names = series.map((s: any) => s?.data?.[0]?.name);
+  } else if (chartType === "state-timeline") {
+    // Rows are axis categories; overrides match each row's raw entity, which the segments carry.
+    names = (series[0]?.data ?? []).map((item: any) => item?.entity ?? item?.name);
   } else if (chartType === "metric") {
     // `_metricLabel` is drawn and may hold a display name; overrides match `_metricName`.
     names = series.map((s: any) => s?._metricName ?? s?._metricLabel);

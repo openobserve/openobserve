@@ -36,6 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }
     "
     @contextmenu="handleNativeContextMenu"
+    @pointermove.capture="reportPointerTime"
+    @mousemove.capture="reportPointerTime"
   ></div>
 </template>
 
@@ -121,6 +123,13 @@ import {
 import { LabelLayout, UniversalTransition } from "echarts/features";
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
 import { withChartFont } from "@/utils/fonts";
+import {
+  STATE_TIMELINE_ROW_ZOOM_IDS,
+  readRowWindow,
+  rowWindowFromEvent,
+  withRowWindow,
+  type RowWindow,
+} from "@/utils/dashboard/convertStateTimelineData";
 import {
   indexesNearX,
   isLineStrokeEvent,
@@ -382,10 +391,36 @@ export default defineComponent({
       });
     };
 
+    // Rows a panel scrolled to, kept across re-renders; only panels whose extras flag rowScroll set it.
+    let lastRowWindow: RowWindow | null = null;
+    const isRowScrollZoom = (ids: unknown[]) =>
+      !!props.data?.extras?.rowScroll &&
+      ids.length > 0 &&
+      ids.every((id) => STATE_TIMELINE_ROW_ZOOM_IDS.includes(id as string));
+    const noteRowWindow = (window: RowWindow | null) => {
+      if (!window) return;
+      lastRowWindow = window;
+      props.data?.extras?.setRowWindow?.(window.start, window.end);
+    };
+    const keepRowWindow = (options: Record<string, unknown>) => {
+      if (!props.data?.extras?.rowScroll) return options;
+      const kept = withRowWindow(options, lastRowWindow);
+      noteRowWindow(readRowWindow(kept));
+      return kept;
+    };
+
+    // Capture phase runs before ECharts' own handler, so its tooltip reads this move's time, not the last one's.
+    const reportPointerTime = (event: MouseEvent) => {
+      const report = props.data?.extras?.setPointerTime;
+      if (!report || !chart || !chartRef.value) return;
+      const x = event.clientX - chartRef.value.getBoundingClientRect().left;
+      report(Number(chart.convertFromPixel({ xAxisIndex: 0 }, x)));
+    };
+
     const chartOptions = (options: Record<string, unknown>) =>
       withChartFont(
         withLineStrokeEvents(
-          { aria: { enabled: !props.label }, ...options },
+          { aria: { enabled: !props.label }, ...keepRowWindow(options) },
           props.findLineOnContextMenu,
         ),
       );
@@ -658,6 +693,14 @@ export default defineComponent({
 
       //on dataZoom emit an event of start x and end x
       chart?.on("dataZoom", function (params: any) {
+        const zoomIds = params?.batch
+          ? params.batch.map((item: any) => item?.dataZoomId)
+          : [params?.dataZoomId];
+        // Scrolling rows moves the y axis only; it must never become a dashboard time range.
+        if (isRowScrollZoom(zoomIds)) {
+          noteRowWindow(rowWindowFromEvent(props.data?.options, params?.batch?.[0] ?? params));
+          return;
+        }
         //if batch then emit dataZoom event
         if (params?.batch) {
           emit("updated:dataZoom", {
@@ -666,7 +709,21 @@ export default defineComponent({
             start1: params?.batch[1]?.startValue || 0,
             end1: params?.batch[1]?.endValue || 0,
           });
+          const rows = lastRowWindow;
           restoreChart();
+          // Restore also rewinds the rows, so the scrolled window is put back.
+          if (rows && props.data?.extras?.rowScroll) {
+            chart?.dispatchAction({
+              type: "dataZoom",
+              batch: STATE_TIMELINE_ROW_ZOOM_IDS.filter((id) =>
+                props.data.options?.dataZoom?.some((zoom: any) => zoom?.id === id),
+              ).map((dataZoomId: string) => ({
+                dataZoomId,
+                startValue: rows.start,
+                endValue: rows.end,
+              })),
+            });
+          }
         }
         //else if daatazoom then emit dataZoom event
         else if (chart?.getOption()?.dataZoom) {
@@ -723,21 +780,27 @@ export default defineComponent({
         ) {
           // need to check index should not be greater than series length
           const hoveredSeriesIndex =
-            chart?.getOption()?.series.length > hoveredSeriesState?.value?.seriesIndex
+            props.data.extras?.crosshairSeriesIndex ??
+            (chart?.getOption()?.series.length > hoveredSeriesState?.value?.seriesIndex
               ? hoveredSeriesState?.value?.seriesIndex
-              : 0;
+              : 0);
           let hoveredSeriesDataIndex = hoveredSeriesState?.value?.dataIndex;
+          // Panels publish a Date or, in UTC, a zone-less string; a crosshair series compares them as one instant.
+          const hoveredTime =
+            props.data.extras?.crosshairSeriesIndex != null
+              ? new Date(hoveredSeriesState.value?.hoveredTime)
+              : hoveredSeriesState.value?.hoveredTime;
 
           // if hovered series dataindex is not there
           // or check hovered time is not at the same index in the current chart (ie if at same index then not need to find nearest index)
           if (
             !chart?.getOption()?.series[hoveredSeriesIndex]?.data[hoveredSeriesDataIndex] ||
             chart?.getOption()?.series[hoveredSeriesIndex]?.data[hoveredSeriesDataIndex][0] !=
-              hoveredSeriesState.value?.hoveredTime
+              hoveredTime
           ) {
             hoveredSeriesDataIndex = findNearestIndex(
               chart?.getOption()?.series[hoveredSeriesIndex]?.data ?? [],
-              hoveredSeriesState?.value?.hoveredTime,
+              hoveredTime,
             );
           }
 
@@ -755,7 +818,12 @@ export default defineComponent({
           hoveredSeriesState.value?.panelId == -1 &&
           hoveredSeriesState.value?.hoveredTime == null
         ) {
-          restoreChart();
+          // A restore would also reset the scrolled rows, so only the crosshair is cleared.
+          if (props.data.extras?.crosshairSeriesIndex != null) {
+            chart?.dispatchAction({ type: "updateAxisPointer", currTrigger: "leave" });
+          } else {
+            restoreChart();
+          }
         }
       },
     );
@@ -1072,6 +1140,7 @@ export default defineComponent({
       chartId,
       hoveredSeriesState,
       handleNativeContextMenu,
+      reportPointerTime,
       get chart() {
         return chart;
       },
