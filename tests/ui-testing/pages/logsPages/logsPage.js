@@ -13382,7 +13382,10 @@ export class LogsPage {
             ),
             this.page.locator(this.searchBarRefreshButton).click(),
         ]);
-        await response.finished();
+        // A streamed (text/event-stream) response never reports finished; the Run button wait covers completion.
+        if (!(await response.headerValue('content-type'))?.includes('text/event-stream')) {
+            await response.finished();
+        }
         await this.waitForRunQueryButton(timeout);
         await expect(this.resultsTable()).toBeVisible({ timeout });
     }
