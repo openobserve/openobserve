@@ -316,6 +316,40 @@ describe("useStreams Composable", () => {
   });
 
   // Test 11-15: Individual Stream Functions
+  describe("Stream error messages", () => {
+    beforeEach(() => {
+      queryClient.clear();
+      mockStore.state.streams.logs = null;
+    });
+
+    it("uses the server message when the failure carries no message of its own", async () => {
+      vi.mocked(StreamService.nameList).mockRejectedValueOnce({
+        response: { status: 404, data: { message: "Stream _sessionreplay not found" } },
+      });
+
+      await expect(streamsInstance.getStreams("logs", false, false)).rejects.toThrow(
+        "Stream _sessionreplay not found",
+      );
+    });
+
+    it.each([undefined, null, {}])(
+      "falls back to a readable message instead of stringifying %s",
+      async (failure) => {
+        vi.mocked(StreamService.nameList).mockRejectedValueOnce(failure);
+
+        await expect(streamsInstance.getStreams("logs", false, false)).rejects.toThrow(
+          /^Stream request failed$/,
+        );
+      },
+    );
+
+    it("never rejects with an empty message for a bare string failure", async () => {
+      vi.mocked(StreamService.nameList).mockRejectedValueOnce("boom");
+
+      await expect(streamsInstance.getStreams("logs", false, false)).rejects.toThrow("boom");
+    });
+  });
+
   describe("Individual Stream Functions", () => {
     it("should return null for getStream with empty parameters", async () => {
       const result = await streamsInstance.getStream("", "logs", false);

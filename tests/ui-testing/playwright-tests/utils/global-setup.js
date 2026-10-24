@@ -6,6 +6,7 @@ const testLogger = require('./test-logger.js');
 const metricsIngestion = require('./metrics-ingestion.js');
 const { ingestTraces } = require('./trace-ingestion.js');
 const { ingestRumErrors } = require('./rum-error-ingestion.js');
+const { ingestBase } = require('./ingest-url.js');
 
 /**
  * Global setup for all tests - handles authentication and test data ingestion
@@ -186,7 +187,7 @@ async function performGlobalIngestion(page) {
   const baseUrl = (process.env.INGESTION_URL || process.env.ZO_BASE_URL || 'http://localhost:5080').replace(/\/+$/, '');
   let response;
   try {
-    response = await page.request.post(`${baseUrl}/api/${orgId}/${streamName}/_json`, {
+    response = await page.request.post(`${ingestBase(baseUrl)}/api/${orgId}/${streamName}/_json`, {
       headers: headers,
       data: logsdata
     });
@@ -220,7 +221,7 @@ async function performGlobalIngestion(page) {
     testLogger.error('Data ingestion failed', {
       status: responseStatus,
       response: responseData,
-      url: `${baseUrl}/api/${orgId}/${streamName}/_json`,
+      url: `${ingestBase(baseUrl)}/api/${orgId}/${streamName}/_json`,
       orgId,
       streamName
     });

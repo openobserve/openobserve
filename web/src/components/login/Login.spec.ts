@@ -385,11 +385,26 @@ describe("Login", () => {
     const authService = await import("@/services/auth");
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     wrapper = mount(Login, { global: { plugins: [i18n, store, router] } });
-    const networkError = Object.assign(new Error("Network Error"), { code: "ERR_NETWORK" });
-    (authService.default.get_dex_login as any).mockRejectedValueOnce(networkError);
+    const serverError = Object.assign(new Error("Request failed with status code 500"), {
+      code: "ERR_BAD_RESPONSE",
+    });
+    (authService.default.get_dex_login as any).mockRejectedValueOnce(serverError);
 
     await expect(wrapper.vm.loginWithSSo()).resolves.toBeUndefined();
-    expect(consoleError).toHaveBeenCalledWith("Error during redirection:", networkError);
+    expect(consoleError).toHaveBeenCalledWith("Error during redirection:", serverError);
+    consoleError.mockRestore();
+  });
+
+  it("should not log a dex login request that never reached the network", async () => {
+    const authService = await import("@/services/auth");
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    wrapper = mount(Login, { global: { plugins: [i18n, store, router] } });
+    (authService.default.get_dex_login as any).mockRejectedValueOnce(
+      Object.assign(new Error("Network Error"), { code: "ERR_NETWORK" }),
+    );
+
+    await expect(wrapper.vm.loginWithSSo()).resolves.toBeUndefined();
+    expect(consoleError).not.toHaveBeenCalled();
     consoleError.mockRestore();
   });
 

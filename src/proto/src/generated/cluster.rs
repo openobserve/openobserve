@@ -1246,6 +1246,8 @@ pub struct GetLicenseUsageResponse {
     pub last_usage_response: ::prost::alloc::string::String,
     #[prost(message, repeated, tag = "8")]
     pub ingestion_history: ::prost::alloc::vec::Vec<UsageResult>,
+    #[prost(string, tag = "9")]
+    pub license_status_json: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct GetWorkflowInputsRequest {

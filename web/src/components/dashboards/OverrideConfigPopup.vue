@@ -23,192 +23,346 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         if (!v) closePopup();
       }
     "
-    :title="t('dashboard.columnFormattingTitle')"
-    :sub-title="t('dashboard.columnFormattingSubtitle')"
+    :title="
+      isChartMode ? t('dashboard.seriesFormattingTitle') : t('dashboard.columnFormattingTitle')
+    "
+    :sub-title="
+      isChartMode
+        ? t('dashboard.seriesFormattingSubtitle')
+        : t('dashboard.columnFormattingSubtitle')
+    "
     :width="80"
   >
     <div
       data-test="override-config-accordion"
       class="-mx-dialog-content-px -my-dialog-content-py grid h-[calc(86vh-9.375rem)] grid-cols-[16.5rem_minmax(0,1fr)_22.5rem] overflow-hidden max-[56.25rem]:grid-cols-[13.75rem_minmax(0,1fr)]"
     >
-      <!-- Left: add-field dropdown + list of added fields -->
-      <div class="border-border-strong/18 flex min-w-0 flex-col gap-2.5 border-e p-3">
-        <ODropdown
-          v-model:open="addOpenLeft"
-          align="start"
-          content-class="min-w-(--reka-popper-anchor-width)!"
-        >
-          <template #trigger>
-            <button
-              type="button"
-              data-test="dashboard-addpanel-config-add-column"
-              class="rounded-default text-accent hover:border-accent border-accent/50 hover:bg-accent/5 flex w-full shrink-0 cursor-pointer items-center justify-center gap-1.5 border border-dashed bg-transparent p-2.25 text-sm font-medium transition-colors"
+      <template v-if="isChartMode">
+        <div class="border-border-strong/18 flex min-w-0 flex-col gap-2.5 border-e p-3">
+          <SeriesAddMenu
+            :names="seriesNameOptions"
+            :used-names="usedSeriesNames"
+            @add-name="addSeries('name', $event)"
+            @add-regex="addSeries('regex')"
+          />
+          <div
+            v-if="seriesDrafts.length"
+            class="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto"
+          >
+            <div
+              v-for="(draft, idx) in seriesDrafts"
+              :key="draft.id"
+              role="button"
+              tabindex="0"
+              :data-test="`series-override-row-${idx}`"
+              class="group rounded-default hover:bg-border-strong/5 relative flex w-full cursor-pointer items-center gap-2 border-s-[0.1875rem] border-transparent py-2 ps-2.25 pe-1.5 transition-colors outline-none"
+              :class="idx === selectedSeriesIdx ? 'border-s-primary-600! bg-accent/6' : ''"
+              @click="selectedSeriesIdx = idx"
+              @keydown.enter.prevent="selectedSeriesIdx = idx"
+              @keydown.space.prevent="selectedSeriesIdx = idx"
             >
-              <OIcon name="add" size="sm" />
-              {{ t("dashboard.columnFormattingAddField") }}
-            </button>
-          </template>
-          <div class="max-h-[17.5rem] overflow-y-auto">
-            <ODropdownItem
-              v-for="opt in availableToAdd"
-              :key="opt.value"
-              :data-test="`dashboard-addpanel-config-add-field-${opt.value}`"
-              @select="addField(opt.value)"
-            >
-              <span class="flex items-center gap-2">
-                <span
-                  class="text-3xs rounded-default shrink-0 px-1.25 py-0.5 font-bold tracking-[0.05em] uppercase"
-                  :class="badgeClass(opt.isNumeric)"
-                >
-                  {{ opt.isNumeric ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
-                </span>
-                <span>{{ opt.label }}</span>
+              <span
+                class="text-3xs rounded-default shrink-0 px-1.25 py-0.5 font-bold tracking-[0.05em] uppercase"
+                :class="badgeClass(draft.matchBy === 'name')"
+                :data-test="`series-override-row-${idx}-badge`"
+              >
+                {{
+                  draft.matchBy === "regex"
+                    ? t("dashboard.seriesFormattingBadgeRegex")
+                    : t("dashboard.seriesFormattingBadgeName")
+                }}
               </span>
-            </ODropdownItem>
-            <div v-if="!availableToAdd.length" class="text-text-secondary px-2.5 py-2 text-xs">
-              {{ t("dashboard.columnFormattingAllAdded") }}
+              <OTruncatedText
+                class="flex-1 text-sm font-semibold group-hover:pe-7"
+                :class="draft.value ? '' : 'text-text-secondary'"
+              >
+                {{ seriesRowLabel(draft) }}
+              </OTruncatedText>
+              <OButton
+                variant="ghost"
+                size="icon-xs"
+                icon-left="close"
+                :title="t('common.remove')"
+                :data-test="`series-override-remove-${idx}`"
+                class="absolute! top-1/2 right-1 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-100"
+                @click.stop="removeSeries(idx)"
+              />
             </div>
           </div>
-        </ODropdown>
-
-        <div
-          v-if="columnOverrides.length"
-          class="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto"
-        >
           <div
-            v-for="(col, idx) in columnOverrides"
-            :key="idx"
-            role="button"
-            tabindex="0"
-            :data-test="`override-config-row-${idx}`"
-            class="group rounded-default hover:bg-border-strong/5 relative flex w-full cursor-pointer items-center gap-2 border-s-[0.1875rem] border-transparent py-2 ps-2.25 pe-1.5 transition-colors outline-none"
-            :class="idx === selectedIdx ? 'border-s-primary-600! bg-accent/6' : ''"
-            @click="selectedIdx = idx"
-            @keydown.enter.prevent="selectedIdx = idx"
-            @keydown.space.prevent="selectedIdx = idx"
+            v-else
+            class="flex flex-1 flex-col items-center justify-center gap-1.5 p-4 text-center"
           >
-            <span
-              class="text-3xs rounded-default shrink-0 px-1.25 py-0.5 font-bold tracking-[0.05em] uppercase"
-              :class="badgeClass(isNumericColumn(col))"
-            >
-              {{ isNumericColumn(col) ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
-            </span>
-            <OTruncatedText class="flex-1 text-sm font-semibold group-hover:pe-7">
-              {{ getFieldLabel(col.field) || t("dashboard.columnFormattingPick") }}
-            </OTruncatedText>
-            <OButton
-              variant="ghost"
-              size="icon-xs"
-              icon-left="close"
-              :title="t('common.remove')"
-              :data-test="`dashboard-addpanel-config-delete-column-${idx}`"
-              class="absolute! top-1/2 right-1 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-100"
-              @click.stop="removeColumn(idx)"
-            />
+            <OIcon name="format-color-text" size="lg" class="text-text-secondary" />
+            <div class="text-sm font-semibold">
+              {{ t("dashboard.seriesFormattingNoneAdded") }}
+            </div>
+            <div class="text-text-secondary text-xs leading-[1.4]">
+              {{ t("dashboard.seriesFormattingNoneAddedHint") }}
+            </div>
           </div>
         </div>
+
+        <template v-if="selectedSeries">
+          <div class="min-w-0 overflow-y-auto">
+            <SeriesFormatControls
+              :override="selectedSeries"
+              :series-names="seriesNameOptions"
+              :chart-type="chartType"
+              :panel-unit="panelUnit"
+              :panel-unit-custom="panelUnitCustom"
+              :panel-decimals="panelDecimals"
+              :has-coloured-value-mappings="hasColouredValueMappings"
+              @update="updateSelectedSeries"
+            />
+          </div>
+          <div
+            class="border-border-strong/18 flex min-w-0 flex-col gap-2 overflow-y-auto border-s p-3"
+          >
+            <div
+              class="text-3xs text-text-secondary flex items-center gap-1.25 font-bold tracking-[0.06em] uppercase"
+            >
+              <OIcon name="visibility" size="xs" />
+              <span>{{ t("dashboard.inlinePreview") }}</span>
+            </div>
+            <div
+              ref="chartPreviewRef"
+              class="rounded-default border-border-strong/18 relative h-60 shrink-0 overflow-hidden border"
+              data-test="series-format-preview"
+            >
+              <!-- Renders the editor's already-fetched data with the draft; PanelSchemaRenderer would query again. -->
+              <ChartRenderer
+                v-if="seriesPreviewData"
+                :data="seriesPreviewData"
+                :render-type="chartType === 'metric' ? 'svg' : 'canvas'"
+              />
+              <div
+                v-else
+                class="text-text-secondary flex h-full items-center justify-center p-4 text-center text-xs"
+                data-test="series-format-preview-empty"
+              >
+                {{ t("dashboard.seriesFormattingPreviewEmpty") }}
+              </div>
+            </div>
+            <div class="text-2xs text-text-secondary">
+              {{ t("dashboard.seriesFormattingPreviewNote") }}
+            </div>
+          </div>
+        </template>
+
         <div
           v-else
-          class="flex flex-1 flex-col items-center justify-center gap-1.5 p-4 text-center"
+          class="col-start-2 col-end-4 flex items-center justify-center p-6 max-[56.25rem]:col-end-3"
         >
-          <OIcon name="format-color-text" size="lg" class="text-text-secondary" />
-          <div class="text-sm font-semibold">
-            {{ t("dashboard.columnFormattingNoFields") }}
-          </div>
-          <div class="text-text-secondary text-xs leading-[1.4]">
-            {{ t("dashboard.columnFormattingNoFieldsHint") }}
-          </div>
-        </div>
-      </div>
-
-      <!-- Detail: controls + live preview for the selected field -->
-      <template v-if="selectedCol">
-        <div class="min-w-0 overflow-y-auto">
-          <ColumnFormatControls :col="selectedCol" :is-numeric="isNumericColumn(selectedCol)" />
-        </div>
-        <div
-          class="border-border-strong/18 flex min-w-0 flex-col gap-2 overflow-y-auto border-s p-3"
-        >
-          <div
-            class="text-3xs text-text-secondary flex items-center gap-1.25 font-bold tracking-[0.06em] uppercase"
+          <OEmptyState
+            size="block"
+            :title="t('dashboard.seriesFormattingEmptyTitle')"
+            :description="t('dashboard.seriesFormattingEmptyHint')"
           >
-            <OIcon name="visibility" size="xs" />
-            <span>{{ t("dashboard.inlinePreview") }}</span>
-          </div>
-          <div
-            class="rounded-default border-border-strong/18 overflow-hidden border [&_[data-test^=o2-table-cell-copy-]]:hidden!"
-          >
-            <TableRenderer
-              v-if="selectedPreview"
-              :data="selectedPreview"
-              :value-mapping="valueMapping"
-              :wrap-cells="true"
-              :show-pagination="false"
-            />
-          </div>
-          <div class="text-2xs text-text-secondary">
-            {{ t("dashboard.columnFormattingSampleNote") }}
-          </div>
+            <template #illustration>
+              <div
+                class="rounded-default text-text-secondary bg-border-strong/8 flex h-18 w-18 items-center justify-center"
+              >
+                <OIcon name="tune" size="xl" />
+              </div>
+            </template>
+            <template #actions>
+              <SeriesAddMenu
+                variant="primary"
+                data-test="dashboard-series-format-add-empty"
+                :names="seriesNameOptions"
+                :used-names="usedSeriesNames"
+                @add-name="addSeries('name', $event)"
+                @add-regex="addSeries('regex')"
+              />
+            </template>
+          </OEmptyState>
         </div>
       </template>
 
-      <!-- Empty state: nothing added yet -->
-      <div
-        v-else
-        class="col-start-2 col-end-4 flex items-center justify-center p-6 max-[56.25rem]:col-end-3"
-      >
-        <OEmptyState
-          size="block"
-          :title="t('dashboard.columnFormattingEmptyTitle')"
-          :description="t('dashboard.columnFormattingEmptyHint')"
-        >
-          <template #illustration>
-            <div
-              class="rounded-default text-text-secondary bg-border-strong/8 flex h-18 w-18 items-center justify-center"
-            >
-              <OIcon name="tune" size="xl" />
-            </div>
-          </template>
-          <template #actions>
-            <ODropdown
-              v-model:open="addOpenCenter"
-              align="start"
-              content-class="min-w-(--reka-popper-anchor-width)!"
-            >
-              <template #trigger>
-                <OButton
-                  variant="primary"
-                  icon-left="add"
-                  data-test="dashboard-addpanel-config-add-column-empty"
-                >
-                  {{ t("dashboard.columnFormattingAddField") }}
-                </OButton>
-              </template>
-              <div class="max-h-[17.5rem] overflow-y-auto">
-                <ODropdownItem
-                  v-for="opt in availableToAdd"
-                  :key="opt.value"
-                  :data-test="`dashboard-addpanel-config-add-field-empty-${opt.value}`"
-                  @select="addField(opt.value)"
-                >
-                  <span class="flex items-center gap-2">
-                    <span
-                      class="text-3xs rounded-default shrink-0 px-1.25 py-0.5 font-bold tracking-[0.05em] uppercase"
-                      :class="badgeClass(opt.isNumeric)"
-                    >
-                      {{ opt.isNumeric ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
-                    </span>
-                    <span>{{ opt.label }}</span>
+      <template v-else>
+        <!-- Left: add-field dropdown + list of added fields -->
+        <div class="border-border-strong/18 flex min-w-0 flex-col gap-2.5 border-e p-3">
+          <ODropdown
+            v-model:open="addOpenLeft"
+            align="start"
+            content-class="min-w-(--reka-popper-anchor-width)!"
+          >
+            <template #trigger>
+              <button
+                type="button"
+                data-test="dashboard-addpanel-config-add-column"
+                class="rounded-default text-accent hover:border-accent border-accent/50 hover:bg-accent/5 flex w-full shrink-0 cursor-pointer items-center justify-center gap-1.5 border border-dashed bg-transparent p-2.25 text-sm font-medium transition-colors"
+              >
+                <OIcon name="add" size="sm" />
+                {{ t("dashboard.columnFormattingAddField") }}
+              </button>
+            </template>
+            <div class="max-h-[17.5rem] overflow-y-auto">
+              <ODropdownItem
+                v-for="opt in availableToAdd"
+                :key="opt.value"
+                :data-test="`dashboard-addpanel-config-add-field-${opt.value}`"
+                @select="addField(opt.value)"
+              >
+                <span class="flex items-center gap-2">
+                  <span
+                    class="text-3xs rounded-default shrink-0 px-1.25 py-0.5 font-bold tracking-[0.05em] uppercase"
+                    :class="badgeClass(opt.isNumeric)"
+                  >
+                    {{ opt.isNumeric ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
                   </span>
-                </ODropdownItem>
-                <div v-if="!availableToAdd.length" class="text-text-secondary px-2.5 py-2 text-xs">
-                  {{ t("dashboard.columnFormattingAllAdded") }}
-                </div>
+                  <span>{{ opt.label }}</span>
+                </span>
+              </ODropdownItem>
+              <div v-if="!availableToAdd.length" class="text-text-secondary px-2.5 py-2 text-xs">
+                {{ t("dashboard.columnFormattingAllAdded") }}
               </div>
-            </ODropdown>
-          </template>
-        </OEmptyState>
-      </div>
+            </div>
+          </ODropdown>
+
+          <div
+            v-if="columnOverrides.length"
+            class="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto"
+          >
+            <div
+              v-for="(col, idx) in columnOverrides"
+              :key="idx"
+              role="button"
+              tabindex="0"
+              :data-test="`override-config-row-${idx}`"
+              class="group rounded-default hover:bg-border-strong/5 relative flex w-full cursor-pointer items-center gap-2 border-s-[0.1875rem] border-transparent py-2 ps-2.25 pe-1.5 transition-colors outline-none"
+              :class="idx === selectedIdx ? 'border-s-primary-600! bg-accent/6' : ''"
+              @click="selectedIdx = idx"
+              @keydown.enter.prevent="selectedIdx = idx"
+              @keydown.space.prevent="selectedIdx = idx"
+            >
+              <span
+                class="text-3xs rounded-default shrink-0 px-1.25 py-0.5 font-bold tracking-[0.05em] uppercase"
+                :class="badgeClass(isNumericColumn(col))"
+              >
+                {{ isNumericColumn(col) ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
+              </span>
+              <OTruncatedText class="flex-1 text-sm font-semibold group-hover:pe-7">
+                {{ getFieldLabel(col.field) || t("dashboard.columnFormattingPick") }}
+              </OTruncatedText>
+              <OButton
+                variant="ghost"
+                size="icon-xs"
+                icon-left="close"
+                :title="t('common.remove')"
+                :data-test="`dashboard-addpanel-config-delete-column-${idx}`"
+                class="absolute! top-1/2 right-1 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-100"
+                @click.stop="removeColumn(idx)"
+              />
+            </div>
+          </div>
+          <div
+            v-else
+            class="flex flex-1 flex-col items-center justify-center gap-1.5 p-4 text-center"
+          >
+            <OIcon name="format-color-text" size="lg" class="text-text-secondary" />
+            <div class="text-sm font-semibold">
+              {{ t("dashboard.columnFormattingNoFields") }}
+            </div>
+            <div class="text-text-secondary text-xs leading-[1.4]">
+              {{ t("dashboard.columnFormattingNoFieldsHint") }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Detail: controls + live preview for the selected field -->
+        <template v-if="selectedCol">
+          <div class="min-w-0 overflow-y-auto">
+            <ColumnFormatControls :col="selectedCol" :is-numeric="isNumericColumn(selectedCol)" />
+          </div>
+          <div
+            class="border-border-strong/18 flex min-w-0 flex-col gap-2 overflow-y-auto border-s p-3"
+          >
+            <div
+              class="text-3xs text-text-secondary flex items-center gap-1.25 font-bold tracking-[0.06em] uppercase"
+            >
+              <OIcon name="visibility" size="xs" />
+              <span>{{ t("dashboard.inlinePreview") }}</span>
+            </div>
+            <div
+              class="rounded-default border-border-strong/18 overflow-hidden border [&_[data-test^=o2-table-cell-copy-]]:hidden!"
+            >
+              <TableRenderer
+                v-if="selectedPreview"
+                :data="selectedPreview"
+                :value-mapping="valueMapping"
+                :wrap-cells="true"
+                :show-pagination="false"
+              />
+            </div>
+            <div class="text-2xs text-text-secondary">
+              {{ t("dashboard.columnFormattingSampleNote") }}
+            </div>
+          </div>
+        </template>
+
+        <!-- Empty state: nothing added yet -->
+        <div
+          v-else
+          class="col-start-2 col-end-4 flex items-center justify-center p-6 max-[56.25rem]:col-end-3"
+        >
+          <OEmptyState
+            size="block"
+            :title="t('dashboard.columnFormattingEmptyTitle')"
+            :description="t('dashboard.columnFormattingEmptyHint')"
+          >
+            <template #illustration>
+              <div
+                class="rounded-default text-text-secondary bg-border-strong/8 flex h-18 w-18 items-center justify-center"
+              >
+                <OIcon name="tune" size="xl" />
+              </div>
+            </template>
+            <template #actions>
+              <ODropdown
+                v-model:open="addOpenCenter"
+                align="start"
+                content-class="min-w-(--reka-popper-anchor-width)!"
+              >
+                <template #trigger>
+                  <OButton
+                    variant="primary"
+                    icon-left="add"
+                    data-test="dashboard-addpanel-config-add-column-empty"
+                  >
+                    {{ t("dashboard.columnFormattingAddField") }}
+                  </OButton>
+                </template>
+                <div class="max-h-[17.5rem] overflow-y-auto">
+                  <ODropdownItem
+                    v-for="opt in availableToAdd"
+                    :key="opt.value"
+                    :data-test="`dashboard-addpanel-config-add-field-empty-${opt.value}`"
+                    @select="addField(opt.value)"
+                  >
+                    <span class="flex items-center gap-2">
+                      <span
+                        class="text-3xs rounded-default shrink-0 px-1.25 py-0.5 font-bold tracking-[0.05em] uppercase"
+                        :class="badgeClass(opt.isNumeric)"
+                      >
+                        {{ opt.isNumeric ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
+                      </span>
+                      <span>{{ opt.label }}</span>
+                    </span>
+                  </ODropdownItem>
+                  <div
+                    v-if="!availableToAdd.length"
+                    class="text-text-secondary px-2.5 py-2 text-xs"
+                  >
+                    {{ t("dashboard.columnFormattingAllAdded") }}
+                  </div>
+                </div>
+              </ODropdown>
+            </template>
+          </OEmptyState>
+        </div>
+      </template>
     </div>
 
     <template #footer>
@@ -252,9 +406,28 @@ import {
   formatNumericValue,
 } from "@/utils/dashboard/tableConfigUtils";
 
+import SeriesAddMenu from "./SeriesAddMenu.vue";
+import SeriesFormatControls from "./SeriesFormatControls.vue";
+import {
+  type SeriesOverrideDraft,
+  type SeriesOverridePreviewSource,
+  type SeriesDraftMatch,
+  emptySeriesOverrideDraft,
+  getSeriesOverrideEntries,
+  isSeriesOverrideEntry,
+  serializeSeriesOverrides,
+  seriesPatternError,
+  toSeriesOverrideDraft,
+  useSeriesOverridePreview,
+  withSeriesOverrideEntries,
+} from "@/composables/dashboard/useSeriesFormatting";
+
 // Async import breaks the circular dependency (TableRenderer renders this dialog).
 const TableRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/TableRenderer.vue"),
+);
+const ChartRenderer = defineAsyncComponent(
+  () => import("@/components/dashboards/panels/ChartRenderer.vue"),
 );
 
 export default defineComponent({
@@ -269,6 +442,9 @@ export default defineComponent({
     OEmptyState,
     ColumnFormatControls,
     TableRenderer,
+    ChartRenderer,
+    SeriesAddMenu,
+    SeriesFormatControls,
   },
   props: {
     open: {
@@ -310,6 +486,25 @@ export default defineComponent({
       type: String,
       default: undefined,
     },
+    /** Which entries of `override_config` the dialog edits: "table" columns or "chart" series (Series Formatting). */
+    mode: {
+      type: String as PropType<"table" | "chart">,
+      default: "table",
+    },
+    /** Chart mode: legend names of the rendered panel, used until the preview reads the originals. */
+    seriesNames: {
+      type: Array as PropType<string[]>,
+      default: () => [],
+    },
+    chartType: {
+      type: String,
+      default: "line",
+    },
+    /** Chart mode: the applied schema and fetched data the preview converts again. */
+    previewSource: {
+      type: Object as PropType<SeriesOverridePreviewSource | null>,
+      default: null,
+    },
   },
   emits: ["close", "save"],
   setup(props: any, { emit }: any) {
@@ -323,8 +518,23 @@ export default defineComponent({
     const addOpenLeft = ref(false);
     const addOpenCenter = ref(false);
 
+    const isChartMode = computed(() => props.mode === "chart");
+    const seriesDrafts = ref<SeriesOverrideDraft[]>([]);
+    const selectedSeriesIdx = ref<number>(-1);
+    const chartPreviewRef = ref<HTMLElement | null>(null);
+
     const initFromProps = () => {
-      columnOverrides.value = loadAllFromRaw(props.overrideConfig.overrideConfigs ?? []);
+      if (isChartMode.value) {
+        seriesDrafts.value = getSeriesOverrideEntries(props.overrideConfig.overrideConfigs).map(
+          toSeriesOverrideDraft,
+        );
+        selectedSeriesIdx.value = seriesDrafts.value.length ? 0 : -1;
+        return;
+      }
+      // Series entries share the array but belong to charts, so the column list never shows them.
+      columnOverrides.value = loadAllFromRaw(
+        (props.overrideConfig.overrideConfigs ?? []).filter((e: any) => !isSeriesOverrideEntry(e)),
+      );
       selectedIdx.value = columnOverrides.value.length ? 0 : -1;
     };
 
@@ -362,6 +572,12 @@ export default defineComponent({
     const selectedCol = computed(() => columnOverrides.value[selectedIdx.value] ?? null);
 
     const footerSummary = computed(() => {
+      if (isChartMode.value) {
+        const count = seriesDrafts.value.length;
+        return count === 0
+          ? t("dashboard.seriesFormattingNoneFormatted")
+          : t("dashboard.seriesFormattingCount", { count }, count);
+      }
       const n = columnOverrides.value.length;
       if (n === 0) return t("dashboard.columnFormattingNoFieldsToFormat");
       if (n === 1) return t("dashboard.columnFormattingOneFieldToFormat");
@@ -498,10 +714,78 @@ export default defineComponent({
       }
     };
 
+    const selectedSeries = computed(() => seriesDrafts.value[selectedSeriesIdx.value] ?? null);
+    const serializedSeries = computed(() => serializeSeriesOverrides(seriesDrafts.value));
+
+    const { baseNames, previewData: seriesPreviewData } = useSeriesOverridePreview({
+      active: computed(() => props.open && isChartMode.value),
+      source: computed(() => props.previewSource),
+      chartType: computed(() => props.chartType),
+      overrides: serializedSeries,
+      chartPanelRef: chartPreviewRef,
+    });
+
+    // The preview's own conversion yields the original names, which the rendered legend loses to display names.
+    const seriesNameOptions = computed<string[]>(() => baseNames.value ?? props.seriesNames ?? []);
+
+    const usedSeriesNames = computed(() =>
+      seriesDrafts.value.filter((d) => d.matchBy === "name").map((d) => d.value),
+    );
+
+    const hasColouredValueMappings = computed(() =>
+      (props.valueMapping ?? []).some((m: any) => !!(m?.color || m?.textColor)),
+    );
+
+    const seriesRowLabel = (draft: SeriesOverrideDraft) => {
+      if (draft.value) return draft.value;
+      return draft.matchBy === "regex"
+        ? t("dashboard.seriesFormattingTypePattern")
+        : t("dashboard.seriesFormattingPickSeries");
+    };
+
+    const addSeries = (matchBy: SeriesDraftMatch, name = "") => {
+      seriesDrafts.value.push(emptySeriesOverrideDraft(matchBy, name));
+      selectedSeriesIdx.value = seriesDrafts.value.length - 1;
+    };
+
+    const updateSelectedSeries = (changes: Partial<SeriesOverrideDraft>) => {
+      if (selectedSeries.value) Object.assign(selectedSeries.value, changes);
+    };
+
+    const removeSeries = (idx: number) => {
+      seriesDrafts.value.splice(idx, 1);
+      if (selectedSeriesIdx.value >= seriesDrafts.value.length) {
+        selectedSeriesIdx.value = seriesDrafts.value.length - 1;
+      } else if (selectedSeriesIdx.value > idx) {
+        selectedSeriesIdx.value -= 1;
+      }
+    };
+
+    // An invalid pattern can never match, so Save stays on the dialog and shows its error.
+    const saveSeriesOverrides = () => {
+      const invalidIdx = seriesDrafts.value.findIndex((d) => seriesPatternError(d) !== null);
+      if (invalidIdx !== -1) {
+        selectedSeriesIdx.value = invalidIdx;
+        return;
+      }
+      emit(
+        "save",
+        withSeriesOverrideEntries(props.overrideConfig.overrideConfigs, serializedSeries.value),
+      );
+      emit("close");
+    };
+
     const closePopup = () => emit("close");
 
     const saveOverrides = () => {
-      const raw = serializeOverrides(columnOverrides.value);
+      if (isChartMode.value) {
+        saveSeriesOverrides();
+        return;
+      }
+      const raw = [
+        ...serializeOverrides(columnOverrides.value),
+        ...getSeriesOverrideEntries(props.overrideConfig.overrideConfigs),
+      ];
       overrideConfigModel.value.overrideConfigs = raw;
       emit("save", raw);
       emit("close");
@@ -524,6 +808,19 @@ export default defineComponent({
       removeColumn,
       closePopup,
       saveOverrides,
+      isChartMode,
+      seriesDrafts,
+      selectedSeriesIdx,
+      selectedSeries,
+      chartPreviewRef,
+      seriesPreviewData,
+      seriesNameOptions,
+      usedSeriesNames,
+      hasColouredValueMappings,
+      seriesRowLabel,
+      addSeries,
+      updateSelectedSeries,
+      removeSeries,
     };
   },
 });
