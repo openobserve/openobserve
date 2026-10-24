@@ -166,6 +166,7 @@ import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseF
 type Language = "sql" | "promql" | "vrl" | "javascript";
 
 interface QueryChangeOrigin {
+  /** false when the editor was written to (setValue), rather than typed in. */
   fromUser: boolean;
 }
 

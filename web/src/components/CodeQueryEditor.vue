@@ -1021,6 +1021,9 @@ export default defineComponent({
         if (!e?.isFlush && !programmatic) {
           pendingUserEdit = true;
           emit("user-edit");
+        } else {
+          // The debounce emits the latest value, so a write landing on a typed one owns the origin.
+          pendingUserEdit = false;
         }
         const quote = props.language === "promql" ? '"' : "'";
         if (e?.changes?.some((c: any) => c.text === quote || c.text === quote + quote)) {

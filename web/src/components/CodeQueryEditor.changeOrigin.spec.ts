@@ -203,6 +203,21 @@ describe("CodeQueryEditor — update:query reports where the change came from", 
     expect(lastOrigin(wrapper)).toEqual({ fromUser: true });
   });
 
+  it("reports a programmatic write that lands in the same debounce window as typing", async () => {
+    // The debounce emits the latest value, so the origin has to describe that value — not whatever happened first in the window.
+    currentValue = "code = 200";
+    contentHandler?.({
+      isFlush: false,
+      changes: [{ range: { startLineNumber: 1, startColumn: 1 }, text: "0" }],
+    });
+    wrapper.vm.setValue("");
+    await settle();
+
+    const emissions = wrapper.emitted("update:query") ?? [];
+    expect(emissions[emissions.length - 1]?.[0]).toBe("");
+    expect(lastOrigin(wrapper)).toEqual({ fromUser: false });
+  });
+
   it("does not carry a user edit over into the next programmatic write", async () => {
     currentValue = "code = 200";
     contentHandler?.({
