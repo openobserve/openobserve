@@ -986,10 +986,15 @@ export default defineComponent({
       // as a named handle so it can be flushed on the paths that consume the
       // query (blur, run) — otherwise they act on the previous query and the
       // parent re-renders the editor from that stale state, dropping the edit.
+
+      // Programmatic writes emit here too; a consumer reading one as a user edit wipes state the user never touched.
+      let pendingUserEdit = false;
       const commitModelChange = debounce((e: any) => {
         const newValue = editorObj?.getValue()?.trim();
-        emit("update-query", newValue, e);
-        emit("update:query", newValue, e);
+        const origin = { fromUser: pendingUserEdit };
+        pendingUserEdit = false;
+        emit("update-query", newValue, e, origin);
+        emit("update:query", newValue, e, origin);
 
         // Check for natural language after user stops typing (debounced)
         if (newValue) checkForNaturalLanguage(newValue);
@@ -1013,7 +1018,10 @@ export default defineComponent({
         chainState.spaceEnd = chainSpace
           ? { lineNumber: change.range.startLineNumber, column: change.range.startColumn + 1 }
           : null;
-        if (!e?.isFlush && !programmatic) emit("user-edit");
+        if (!e?.isFlush && !programmatic) {
+          pendingUserEdit = true;
+          emit("user-edit");
+        }
         const quote = props.language === "promql" ? '"' : "'";
         if (e?.changes?.some((c: any) => c.text === quote || c.text === quote + quote)) {
           const version = editorObj.getModel()?.getVersionId?.();

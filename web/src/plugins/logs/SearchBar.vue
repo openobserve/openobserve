@@ -2731,12 +2731,17 @@ export default defineComponent({
       },
     };
 
-    const updateQueryValue = (value: string) => {
+    const updateQueryValue = (value: string, origin?: { fromUser?: boolean }) => {
       // During stream changes, the editor's debounced onDidChangeModelContent
       // callback can re-emit a stale value after onStreamChange has cleared the
       // query. Reject these stale re-emissions to prevent the old filter from
       // reappearing in the search bar.
       if (searchObj.loadingStream) {
+        return;
+      }
+
+      // Honouring a programmatic empty turns SQL mode off (below), and the Build tab then syncs its generated SQL back as a WHERE clause an aggregate query does not have.
+      if (value.trim() === "" && origin?.fromUser === false) {
         return;
       }
 
