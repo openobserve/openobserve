@@ -453,6 +453,32 @@ pub async fn delete_workflow(id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+pub async fn delete_by_org(org_id: &str) -> Result<(), anyhow::Error> {
+    let client = get_orm_client_rw().await;
+    workflows::Entity::delete_many()
+        .filter(workflows::Column::OrgId.eq(org_id))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
+pub async fn delete_children_by_org(org_id: &str) -> Result<(), anyhow::Error> {
+    let client = get_orm_client_rw().await;
+    workflow_associations::Entity::delete_many()
+        .filter(workflow_associations::Column::OrgId.eq(org_id))
+        .exec(client)
+        .await?;
+    workflow_errors::Entity::delete_many()
+        .filter(workflow_errors::Column::OrgId.eq(org_id))
+        .exec(client)
+        .await?;
+    workflow_run_data::Entity::delete_many()
+        .filter(workflow_run_data::Column::OrgId.eq(org_id))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
 pub async fn delete_all_errors_older_than(
     ts: i64,
 ) -> Result<Vec<WorkflowRunErrors>, anyhow::Error> {
@@ -793,6 +819,15 @@ pub async fn delete_draft(id: &str) -> Result<(), anyhow::Error> {
 
     workflow_drafts::Entity::delete_many()
         .filter(workflow_drafts::Column::Id.eq(id))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
+pub async fn delete_drafts_by_org(org_id: &str) -> Result<(), anyhow::Error> {
+    let client = get_orm_client_rw().await;
+    workflow_drafts::Entity::delete_many()
+        .filter(workflow_drafts::Column::OrgId.eq(org_id))
         .exec(client)
         .await?;
     Ok(())

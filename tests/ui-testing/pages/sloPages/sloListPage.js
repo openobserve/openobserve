@@ -211,6 +211,20 @@ export class SloListPage {
       await expect(dialog).toHaveCount(0, { timeout: 10000 });
     }
   }
+
+  async expectCorrectedChip(name, visible = true) {
+    const chip = this.page.locator(`[data-test="slos-slolist-corrected-${name}"]`);
+    if (visible) await expect(chip).toBeVisible({ timeout: 20000 });
+    else {
+      // Absence only means something once the row itself has rendered.
+      await this.expectRowVisible(name);
+      await expect(chip).toHaveCount(0, { timeout: 20000 });
+    }
+  }
+
+  async clickExcludeWindow(name) {
+    await this.page.locator(`[data-test="slos-slolist-exclude-${name}"]`).click();
+  }
 }
 
 export default SloListPage;

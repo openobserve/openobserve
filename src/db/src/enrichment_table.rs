@@ -411,24 +411,18 @@ pub async fn get_url_job(
 /// Delete enrichment table URL job state
 pub async fn delete_url_job(org_id: &str, table_name: &str) -> Result<(), infra::errors::Error> {
     enrichment_table_urls::delete(org_id, table_name).await?;
+    publish_url_job_delete(org_id, table_name).await;
+    Ok(())
+}
 
-    #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled
-    {
-        let key = format!("{ENRICHMENT_TABLE_URL_JOB_KEY}/{}/{}", org_id, table_name);
-        if let Err(e) =
-            o2_enterprise::enterprise::super_cluster::queue::enrichment_url_delete(&key).await
-        {
-            log::error!(
-                "[Enrichment::Url] error sending enrichment table {}/{} for super_cluster delete event: {e}",
-                org_id,
-                table_name
-            );
-        }
+/// Org teardown: one delete, then each returned table's super-cluster event, as `delete_url_job`.
+pub async fn delete_url_jobs_by_org(org_id: &str) -> Result<(), infra::errors::Error> {
+    let mut names = enrichment_table_urls::delete_by_org(org_id).await?;
+    names.sort();
+    names.dedup();
+    for table_name in names {
+        publish_url_job_delete(org_id, &table_name).await;
     }
-
     Ok(())
 }
 
@@ -592,6 +586,27 @@ pub async fn claim_stale_url_jobs(
 }
 
 // write test for convert_to_vrl
+
+#[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
+async fn publish_url_job_delete(org_id: &str, table_name: &str) {
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        let key = format!("{ENRICHMENT_TABLE_URL_JOB_KEY}/{}/{}", org_id, table_name);
+        if let Err(e) =
+            o2_enterprise::enterprise::super_cluster::queue::enrichment_url_delete(&key).await
+        {
+            log::error!(
+                "[Enrichment::Url] error sending enrichment table {}/{} for super_cluster delete event: {e}",
+                org_id,
+                table_name
+            );
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 

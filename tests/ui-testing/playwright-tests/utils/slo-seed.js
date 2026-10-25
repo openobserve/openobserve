@@ -23,6 +23,7 @@
 const { expect } = require('@playwright/test');
 const testLogger = require('./test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
+const { ingestBase } = require('./ingest-url.js');
 
 /** Seed span. 8 days against a 7-day window clears the 0.9 coverage floor. */
 const SEED_DAYS = 8;
@@ -143,7 +144,7 @@ function expectedGoodFraction() {
 async function ingestBatch(page, streamName, records) {
   const org = getOrgIdentifier();
   const res = await postWithRetry(
-    page, `${baseUrl()}/api/${org}/${streamName}/_json`, records,
+    page, `${ingestBase(baseUrl())}/api/${org}/${streamName}/_json`, records,
   );
   const status = res.status();
   if (status < 200 || status >= 300) {
@@ -655,7 +656,7 @@ async function seedSloMetric(page, metricName, { minutes = 120 } = {}) {
   }
 
   const res = await postWithRetry(
-    page, `${baseUrl()}/api/${org}/ingest/metrics/_json`, rows,
+    page, `${ingestBase(baseUrl())}/api/${org}/ingest/metrics/_json`, rows,
   );
   if (!res.ok()) {
     throw new Error(

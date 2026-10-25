@@ -167,9 +167,21 @@ pub async fn invite(
         return HttpResponse::bad_request("billing group is not enabled for this org".to_string());
     }
 
-    let org_info = openobserve_core::organization::get_org(&req.org_id).await;
-    if org_info.is_none() {
-        return HttpResponse::bad_request(format!("org with org_id {} does not exist", req.org_id));
+    // A deleted org keeps its row as a tombstone, so the row alone does not make it a target.
+    match db::org_status::read_active(&req.org_id).await {
+        Ok(true) => {}
+        Ok(false) => {
+            return HttpResponse::bad_request(format!(
+                "org with org_id {} does not exist",
+                req.org_id
+            ));
+        }
+        Err(e) => {
+            return HttpResponse::internal_error(format!(
+                "cannot read the status of org {}: {e}",
+                req.org_id
+            ));
+        }
     }
 
     if let Err(e) = billing_invites::invite_org(&user, &org_id, &req.org_id).await {

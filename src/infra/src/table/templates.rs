@@ -21,7 +21,7 @@ use config::{
 };
 use sea_orm::{
     ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, ConnectionTrait, EntityTrait, ModelTrait,
-    QueryFilter, QueryOrder, Set, TryIntoModel,
+    QueryFilter, QueryOrder, QuerySelect, Set, TryIntoModel,
 };
 
 use crate::{
@@ -31,6 +31,8 @@ use crate::{
 };
 
 const DEFAULT_ORG: &str = "default";
+/// Names per `IN` list, well under every backend's bind-parameter limit.
+const NAMES_PER_QUERY: usize = 500;
 
 impl TryFrom<Model> for Template {
     type Error = TemplateError;
@@ -200,6 +202,82 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), Error> {
     Ok(())
 }
 
+/// `(id, name)` of each template of exactly this org.
+pub async fn list_ids_by_org(org_id: &str) -> Result<Vec<(String, String)>, Error> {
+    let client = get_orm_client_ro().await;
+    let ids = Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .column(Column::Name)
+        .filter(Column::Org.eq(org_id))
+        .into_tuple::<(String, String)>()
+        .all(client)
+        .await?;
+    Ok(ids)
+}
+
+/// The `names` another org holds while not deleting or deleted (no row = live), once per name.
+pub async fn names_held_by_live_orgs(org_id: &str, names: &[String]) -> Result<Vec<String>, Error> {
+    use sea_orm::sea_query::Query;
+
+    use crate::{
+        coordinator::org_status::{STATUS_DELETED, STATUS_DELETING},
+        table::entity::organizations,
+    };
+
+    let client = get_orm_client_ro().await;
+    let mut held = Vec::new();
+    for chunk in names.chunks(NAMES_PER_QUERY) {
+        // The inverse set is small: only orgs being deleted, never every live org.
+        let gone = Query::select()
+            .column(organizations::Column::Identifier)
+            .from(organizations::Entity)
+            .and_where(organizations::Column::Status.is_in([STATUS_DELETING, STATUS_DELETED]))
+            .to_owned();
+        let found = Entity::find()
+            .select_only()
+            .column(Column::Name)
+            .filter(Column::Name.is_in(chunk.iter().cloned()))
+            .filter(Column::Org.ne(org_id))
+            .filter(Column::Org.not_in_subquery(gone))
+            .distinct()
+            .into_tuple::<String>()
+            .all(client)
+            .await?;
+        held.extend(found);
+    }
+    Ok(held)
+}
+
+pub async fn delete_by_id(org_id: &str, id: &str) -> Result<bool, Error> {
+    delete_by_id_with(get_orm_client_rw().await, org_id, id).await
+}
+
+pub async fn delete_by_org_returning(org_id: &str) -> Result<Vec<(String, String)>, Error> {
+    delete_by_org_returning_with(get_orm_client_rw().await, org_id).await
+}
+
+async fn delete_by_id_with<C: ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+    id: &str,
+) -> Result<bool, Error> {
+    let deleted = Entity::delete_many()
+        .filter(Column::Id.eq(id))
+        .filter(Column::Org.eq(org_id))
+        .exec(client)
+        .await?;
+    Ok(deleted.rows_affected > 0)
+}
+
+async fn delete_by_org_returning_with<C: ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+) -> Result<Vec<(String, String)>, Error> {
+    let delete = Entity::delete_many().filter(Column::Org.eq(org_id));
+    Ok(super::delete_returning(client, delete, &[Column::Id, Column::Name]).await?)
+}
+
 #[cfg(test)]
 mod tests {
     use sea_orm::{Database, DatabaseConnection, Schema};
@@ -367,5 +445,69 @@ mod tests {
         model.kind = "content".to_string();
         let tmpl = Template::try_from(model).unwrap();
         assert_eq!(tmpl.kind, TemplateKind::Content);
+    }
+
+    #[tokio::test]
+    async fn destination_template_lookup_never_resolves_another_nondefault_org() {
+        let db = db().await;
+        put_with(&db, template("owner", "private", "mine"))
+            .await
+            .unwrap();
+        assert!(get_with(&db, "other", "private").await.unwrap().is_none());
+        assert_eq!(
+            get_with(&db, "owner", "private")
+                .await
+                .unwrap()
+                .unwrap()
+                .org_id,
+            "owner"
+        );
+        put_with(&db, template(DEFAULT_ORG, "private", "shared"))
+            .await
+            .unwrap();
+        assert_eq!(
+            get_with(&db, "other", "private")
+                .await
+                .unwrap()
+                .unwrap()
+                .org_id,
+            DEFAULT_ORG
+        );
+    }
+
+    #[tokio::test]
+    async fn org_teardown_deletes_every_owned_template_without_touching_other_orgs() {
+        let db = db().await;
+        for org in ["deleted", "live", DEFAULT_ORG] {
+            put_with(&db, template(org, "shared-name", org))
+                .await
+                .unwrap();
+        }
+        let owned = get_with(&db, "deleted", "shared-name")
+            .await
+            .unwrap()
+            .unwrap();
+        let owned_id = owned.id.unwrap().to_string();
+        assert!(!delete_by_id_with(&db, "live", &owned_id).await.unwrap());
+        assert!(delete_by_id_with(&db, "deleted", &owned_id).await.unwrap());
+        put_with(&db, template("deleted", "late", "late"))
+            .await
+            .unwrap();
+        let removed = delete_by_org_returning_with(&db, "deleted").await.unwrap();
+        assert_eq!(removed.len(), 1);
+        assert_eq!(removed[0].1, "late");
+        assert!(
+            delete_by_org_returning_with(&db, "deleted")
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            bodies(&db, "shared-name").await,
+            [
+                (DEFAULT_ORG.to_string(), DEFAULT_ORG.to_string()),
+                ("live".to_string(), "live".to_string())
+            ]
+        );
     }
 }

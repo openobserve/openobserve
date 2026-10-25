@@ -43,9 +43,12 @@ use infra::table::{
     ai_chat_sessions::{self, NO_SEQ, STATUS_ACTIVE},
     ai_chat_shares, ai_chat_turns,
 };
-use o2_enterprise::enterprise::ai::chat::{
-    AiChatEventRecord, Binding, CancelReason, ChatStore, batcher::DurableEvent,
-    record::assemble_event, registry,
+use o2_enterprise::enterprise::ai::{
+    chat::{
+        AiChatEventRecord, Binding, CancelReason, ChatStore, batcher::DurableEvent,
+        record::assemble_event, registry,
+    },
+    client::{AiAgentClient, get_agent_client},
 };
 use tokio::sync::OnceCell;
 
@@ -441,6 +444,93 @@ pub async fn delete_all_for_user(org_id: &str, user_id: &str) -> Result<Vec<Stri
     Ok(session_ids)
 }
 
+/// Tombstone the org's chats and drop each from every o2-ai replica; `Err` while a copy may stay.
+pub async fn purge_org_replicas(org_id: &str) -> Result<()> {
+    // The update names the chats it tombstones, so none waits on a lagging listing.
+    let mut session_ids = ai_chat_sessions::mark_org_deleted(org_id, now_micros())
+        .await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    for session_id in ai_chat_sessions::list_unpurged_ids_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("{e}"))?
+    {
+        if !session_ids.contains(&session_id) {
+            session_ids.push(session_id);
+        }
+    }
+    if session_ids.is_empty() {
+        return Ok(());
+    }
+    for session_id in &session_ids {
+        registry::cancel(org_id, session_id, CancelReason::Deleted);
+    }
+    // No client reaches no replica, as the retention sweep also assumes.
+    let Some(client) = get_agent_client() else {
+        return Ok(());
+    };
+    let auth = replica_purge_auth(org_id).await;
+    let failed = purge_each(
+        &session_ids,
+        |session_id| {
+            let (client, auth) = (client.clone(), auth.clone());
+            async move { purge_replica_copy(&client, org_id, &auth, &session_id).await }
+        },
+        |session_id| async move {
+            ai_chat_sessions::mark_replica_purged(org_id, &session_id, now_micros())
+                .await
+                .map_err(|e| anyhow::anyhow!("{e}"))
+        },
+    )
+    .await?;
+    if failed > 0 {
+        anyhow::bail!(
+            "{failed} of {} chats of {org_id} may still be held by an o2-ai replica",
+            session_ids.len()
+        );
+    }
+    Ok(())
+}
+
+/// Forget that the org's chat-events stream was set up, so a reused org id sets it up again.
+pub fn forget_org(org_id: &str) {
+    INITIALIZED_ORGS.remove(org_id);
+}
+
+/// Header a replica purge sends: the SRE agent's, else only the internal secret.
+pub async fn replica_purge_auth(org_id: &str) -> String {
+    match crate::organization::get_sre_agent_credentials(org_id).await {
+        Ok((email, token)) => crate::auth::build_basic_auth_header(&email, &token),
+        // o2-ai still accepts the internal secret the client attaches.
+        Err(_) => String::new(),
+    }
+}
+
+/// `replica_purge_auth` for the retention sweep, which keeps re-purging a deleted org's chats.
+pub async fn sweep_purge_auth(org_id: &str) -> String {
+    // Minting the SRE account would re-create users and tuples the org's teardown removed.
+    if crate::db::org_status::is_gone(org_id) {
+        return String::new();
+    }
+    replica_purge_auth(org_id).await
+}
+
+/// Ask every live o2-ai replica to drop one deleted chat, counted in the replica purge metric.
+pub async fn purge_replica_copy(
+    client: &AiAgentClient,
+    org_id: &str,
+    auth: &str,
+    session_id: &str,
+) -> Result<()> {
+    let result = client
+        .delete_session_everywhere(session_id, org_id, auth)
+        .await;
+    let label = if result.is_ok() { "ok" } else { "failed" };
+    metrics::AI_CHAT_REPLICA_PURGES_TOTAL
+        .with_label_values(&[label])
+        .inc();
+    result
+}
+
 /// Split a chat's events into chunks of whole turns of at most `max_events` (a longer turn alone).
 pub fn turn_chunks(events: &[DurableEvent], max_events: usize) -> Vec<&[DurableEvent]> {
     let mut starts = vec![0usize];
@@ -817,6 +907,27 @@ fn divergence<'a>(seq: i64, mut versions: impl Iterator<Item = &'a Version>) -> 
     ReadError::Divergence { seq, a, b }
 }
 
+/// Runs `purge` per chat and `confirm` per purged one; returns how many purges failed.
+async fn purge_each<P, PF, C, CF>(session_ids: &[String], purge: P, confirm: C) -> Result<usize>
+where
+    P: Fn(String) -> PF,
+    PF: Future<Output = Result<()>>,
+    C: Fn(String) -> CF,
+    CF: Future<Output = Result<()>>,
+{
+    let mut failed = 0;
+    for session_id in session_ids {
+        match purge(session_id.clone()).await {
+            Ok(()) => confirm(session_id.clone()).await?,
+            Err(e) => {
+                failed += 1;
+                log::warn!("[AI-CHAT] replica purge of deleted chat {session_id} failed: {e:#}");
+            }
+        }
+    }
+    Ok(failed)
+}
+
 /// Realtime alerts on the protected stream would hand every chat to the alert's destination.
 async fn purge_stream_alerts(org_id: &str) {
     let key = format!("{org_id}/{}/{AI_CHAT_EVENTS_STREAM}", StreamType::Logs);
@@ -914,6 +1025,61 @@ mod tests {
     use o2_enterprise::enterprise::ai::chat::{RecordContext, record};
 
     use super::*;
+
+    #[tokio::test]
+    async fn a_failed_replica_purge_is_counted_and_never_confirmed() {
+        let ids: Vec<String> = ["a", "b", "c"].iter().map(|s| s.to_string()).collect();
+        let confirmed = std::sync::Mutex::new(Vec::new());
+        let failed = purge_each(
+            &ids,
+            |id| async move {
+                if id == "b" {
+                    anyhow::bail!("replica down")
+                }
+                Ok(())
+            },
+            |id| {
+                confirmed.lock().unwrap().push(id);
+                async { Ok(()) }
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(failed, 1);
+        assert_eq!(confirmed.into_inner().unwrap(), vec!["a", "c"]);
+    }
+
+    #[tokio::test]
+    async fn a_failed_confirmation_fails_the_purge() {
+        let ids = vec!["a".to_string()];
+        let result = purge_each(
+            &ids,
+            |_| async { Ok(()) },
+            |_| async { anyhow::bail!("db down") },
+        )
+        .await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn a_gone_orgs_sweep_never_mints_the_sre_account() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+        for (org, status) in [
+            ("sweep-auth-deleting", OrgStatus::Deleting),
+            ("sweep-auth-deleted", OrgStatus::Deleted),
+        ] {
+            ORG_STATUS_CACHE.insert(org.to_string(), status);
+            assert_eq!(sweep_purge_auth(org).await, "");
+            ORG_STATUS_CACHE.remove(org);
+        }
+    }
+
+    #[test]
+    fn forgetting_an_org_drops_its_stream_setup_mark() {
+        INITIALIZED_ORGS.insert("forget-org".to_string(), Arc::new(OnceCell::new()));
+        forget_org("forget-org");
+        assert!(!INITIALIZED_ORGS.contains_key("forget-org"));
+    }
 
     #[test]
     fn expected_schema_has_a_text_payload_and_every_column() {

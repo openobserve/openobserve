@@ -275,7 +275,8 @@ pub async fn list_reports(
                         Ok(mut item) => {
                             item.last_triggered_at =
                                 scheduled_job.as_ref().and_then(|t| t.start_time);
-                            item.last_run.next_run_at = scheduled_job.map(|t| t.next_run_at);
+                            item.last_run.next_run_at =
+                                scheduled_job.and_then(|t| t.pending_next_run_at());
                             Some(item)
                         }
                         Err(e) => {
@@ -695,7 +696,8 @@ pub async fn list_reports_v2(
                         Ok(mut item) => {
                             item.last_triggered_at =
                                 scheduled_job.as_ref().and_then(|t| t.start_time);
-                            item.last_run.next_run_at = scheduled_job.map(|t| t.next_run_at);
+                            item.last_run.next_run_at =
+                                scheduled_job.and_then(|t| t.pending_next_run_at());
                             Some(item)
                         }
                         Err(e) => {
@@ -748,7 +750,7 @@ pub async fn get_report_v2(Path((org_id, report_id)): Path<(String, String)>) ->
     let next_run_at = scheduler::get(&org_id, TriggerModule::Report, &report_id)
         .await
         .ok()
-        .map(|t| t.next_run_at);
+        .and_then(|t| t.pending_next_run_at());
     MetaHttpResponse::json(GetReportResponseBody {
         report,
         last_run: LastRunFields::new(last_run, next_run_at),

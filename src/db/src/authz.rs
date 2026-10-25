@@ -85,6 +85,17 @@ pub async fn remove_ownership(org_id: &str, obj_type: &str, obj: Authz) {
 #[cfg(not(feature = "enterprise"))]
 pub async fn remove_ownership(_org_id: &str, _obj_type: &str, _obj: Authz) {}
 
+/// Whether ownership tuples are written and removed at all.
+#[cfg(feature = "enterprise")]
+pub fn tracks_ownership() -> bool {
+    o2_openfga::config::get_config().enabled
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub fn tracks_ownership() -> bool {
+    false
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn list_objects_for_user(
     org_id: &str,

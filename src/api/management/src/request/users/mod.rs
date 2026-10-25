@@ -472,6 +472,9 @@ pub async fn add_user_to_org(
 
     match users::add_user_to_org(&org_id, &email_id, role, &initiator_id).await {
         Ok(resp) => resp,
+        Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
+            MetaHttpResponse::forbidden(e)
+        }
         Err(e) => MetaHttpResponse::internal_error(e),
     }
 }

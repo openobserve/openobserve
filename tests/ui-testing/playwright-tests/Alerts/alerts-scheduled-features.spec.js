@@ -25,6 +25,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { ingestBase } = require('../utils/ingest-url.js');
 
 // ============================================================================
 // TEST DATA CONFIGURATION
@@ -42,8 +43,8 @@ const FOLDER_NAME = `E2E Scheduled ${RUN_ID}`;
 // SETUP HELPER FUNCTIONS (API-based, same pattern as incident-correlation tests)
 // ============================================================================
 
-async function apiCall(page, method, path, body = null) {
-    const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
+async function apiCall(page, method, path, body = null, base = null) {
+    const baseUrl = base || process.env.ZO_BASE_URL || 'http://localhost:5080';
     const headers = getAuthHeaders();
 
     return page.evaluate(async ({ url, method, headers, body }) => {
@@ -145,7 +146,7 @@ async function ingestTestData(page) {
             country: 'test_country'
         });
     }
-    const resp = await apiCall(page, 'POST', `/api/${org}/${STREAM_NAME}/_json`, records);
+    const resp = await apiCall(page, 'POST', `/api/${org}/${STREAM_NAME}/_json`, records, ingestBase(process.env.ZO_BASE_URL));
     testLogger.info('Ingested test data', { status: resp.status, records: records.length });
 }
 

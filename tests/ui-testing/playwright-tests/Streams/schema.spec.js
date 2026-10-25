@@ -3,6 +3,7 @@ const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const logsdata = require("../../../test-data/logs_data.json");
 const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { ingestBase } = require('../utils/ingest-url.js');
 
 test.describe.configure({ mode: 'parallel' });
 
@@ -44,7 +45,7 @@ test.describe("Schema testcases", () => {
                     return { status: 0, body: { error: String((e && e.message) || e) } };
                 }
             }, {
-                url: process.env.INGESTION_URL,
+                url: ingestBase(process.env.INGESTION_URL),
                 headers: headers,
                 orgId: orgId,
                 streamName: testStreamName,
@@ -293,7 +294,7 @@ test.describe("Schema Load testcases", () => {
                 ok: fetchResponse.ok
             };
         }, {
-            url: process.env.INGESTION_URL,
+            url: ingestBase(process.env.INGESTION_URL),
             headers: headers,
             orgId: orgId,
             streamName: streamName,

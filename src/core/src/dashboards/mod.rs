@@ -518,6 +518,22 @@ async fn reconcile_home_dashboard_on_move(org_id: &str, dashboard_id: &str, to_f
     }
 }
 
+/// Drops the dashboard's distinct-value rows and its ownership tuples.
+async fn forget_dashboard(
+    org_id: &str,
+    dashboard_id: &str,
+    folder_id: &str,
+) -> Result<(), DashboardError> {
+    distinct_values::batch_remove(OriginType::Dashboard, dashboard_id).await?;
+    let dashboard = Authz {
+        obj_id: dashboard_id.to_owned(),
+        parent_type: "folders".to_owned(),
+        parent: folder_id.to_owned(),
+    };
+    remove_ownership(org_id, "dashboards", dashboard).await;
+    Ok(())
+}
+
 /// Clear the org's pinned `home_dashboard` setting when the pinned dashboard is
 /// deleted. Best-effort — never fails the caller.
 async fn reconcile_home_dashboard_on_delete(org_id: &str, dashboard_id: &str) {
@@ -593,6 +609,45 @@ pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<(), Da
         .await;
     }
 
+    Ok(())
+}
+
+pub async fn delete_by_org(org_id: &str) -> Result<(), DashboardError> {
+    system_settings::delete(
+        &SettingScope::Org,
+        Some(org_id),
+        None,
+        HOME_DASHBOARD_SETTING_KEY,
+    )
+    .await?;
+    let dashboards = table::dashboards::list_ids_by_org(org_id).await?;
+    let local = |(dashboard_id, _): (String, String)| async move {
+        common::infra::config::DASHBOARD_ID_TO_ORG
+            .write()
+            .await
+            .remove(&dashboard_id);
+    };
+    let broadcast = |(dashboard_id, _): (String, String)| async move {
+        infra::coordinator::dashboards::emit_delete_event(org_id, &dashboard_id).await?;
+        Ok::<(), DashboardError>(())
+    };
+    db::teardown::evict_then_delete(
+        dashboards,
+        &local,
+        &broadcast,
+        |(dashboard_id, folder_id): (String, String)| async move {
+            forget_dashboard(org_id, &dashboard_id, &folder_id).await?;
+            table::dashboards::delete_from_folder(org_id, &folder_id, &dashboard_id).await?;
+            Ok(())
+        },
+    )
+    .await?;
+    // A retry must also evict rows that appeared after the initial listing.
+    for (dashboard_id, folder_id) in table::dashboards::delete_by_org(org_id).await? {
+        forget_dashboard(org_id, &dashboard_id, &folder_id).await?;
+        let item = (dashboard_id, folder_id);
+        db::teardown::evict(local(item.clone()), broadcast(item)).await?;
+    }
     Ok(())
 }
 
@@ -1212,6 +1267,39 @@ mod tests {
     use config::meta::dashboards::v8;
 
     use super::*;
+
+    #[tokio::test]
+    async fn org_deletion_clears_an_orphan_home_pin_without_dashboard_rows() {
+        use config::meta::system_settings::SystemSetting;
+
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs ZO_META_STORE");
+            return;
+        }
+        infra::db_init().await.unwrap();
+        table::migrate().await.unwrap();
+        let org = format!("home_pin_teardown_{}", config::utils::time::now_micros());
+        system_settings::set(&SystemSetting::new_org(
+            &org,
+            HOME_DASHBOARD_SETTING_KEY,
+            serde_json::json!({"dashboardId": "missing", "folderId": "missing"}),
+        ))
+        .await
+        .unwrap();
+        delete_by_org(&org).await.unwrap();
+        assert!(
+            system_settings::get(
+                &SettingScope::Org,
+                Some(&org),
+                None,
+                HOME_DASHBOARD_SETTING_KEY
+            )
+            .await
+            .unwrap()
+            .is_none()
+        );
+        delete_by_org(&org).await.unwrap();
+    }
 
     fn make_panel(i: i64, x: i64, y: i64, w: i64, h: i64) -> v8::Panel {
         let mut p: v8::Panel = serde_json::from_str(

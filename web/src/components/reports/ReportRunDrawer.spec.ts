@@ -58,7 +58,9 @@ const mountDrawer = (props: Record<string, unknown>) =>
       plugins: [i18n, store],
       stubs: {
         ODrawer: {
-          template: '<div data-test="drawer"><slot /><slot name="footer" /></div>',
+          props: ["title"],
+          template:
+            '<div data-test="drawer"><h2 data-test="drawer-title">{{ title }}</h2><slot /><slot name="footer" /></div>',
         },
       },
     },
@@ -130,6 +132,21 @@ describe("ReportRunDrawer", () => {
       run: run({ is_cached: true, status: status as ReportRunHit["status"] }),
     });
     expect(w.find('[data-test="reports-reportrundrawer-outcome"]').text()).toBe(expected);
+  });
+
+  it("starts run times with the weekday name", () => {
+    const w = mountDrawer({ run: run(), report: { timezone: "Asia/Kolkata" } });
+    expect(w.find('[data-test="drawer-title"]').text()).toMatch(/^Run · [A-Z][a-z]{2} \d/);
+    expect(w.find('[data-test="reports-reportrundrawer-scheduled-for"]').text()).toMatch(
+      /^[A-Z][a-z]{2} \d/,
+    );
+  });
+
+  it("labels the scheduled time as UTC when no report timezone is known", () => {
+    const w = mountDrawer({ run: run() });
+    expect(w.find('[data-test="reports-reportrundrawer-scheduled-for"]').text()).toBe(
+      "Sat 11 Oct, 06:30 (UTC)",
+    );
   });
 
   it("shows unknown recipients for retained legacy rows", () => {
