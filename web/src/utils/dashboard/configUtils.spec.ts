@@ -31,6 +31,7 @@ import {
   shouldShowCartesianAxisConfig,
   shouldShowAxisLabelConfig,
   shouldShowLineThickness,
+  shouldShowBarStyleConfig,
   shouldShowDrilldown,
   shouldShowTimeShift,
   shouldShowPromQLQueryType,
@@ -1388,6 +1389,15 @@ describe("configUtils", () => {
 
     it("should return false for scatter chart", () => {
       expect(shouldShowLineThickness(makeData("scatter"), false)).toBe(false);
+    });
+  });
+
+  describe("shouldShowBarStyleConfig", () => {
+    it("is true only for h-bar", () => {
+      expect(shouldShowBarStyleConfig({ data: { type: "h-bar" } })).toBe(true);
+      ["bar", "h-stacked", "stacked", "line"].forEach((type) =>
+        expect(shouldShowBarStyleConfig({ data: { type } })).toBe(false),
+      );
     });
   });
 

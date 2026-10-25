@@ -44,6 +44,7 @@ vi.mock("@/utils/dashboard/configUtils", () => ({
   shouldShowGridlines: vi.fn(() => false),
   shouldShowAxisLabelConfig: vi.fn(() => false),
   shouldShowLineThickness: vi.fn(() => false),
+  shouldShowBarStyleConfig: vi.fn(() => false),
   shouldShowDrilldown: vi.fn(() => false),
   shouldShowTimeShift: vi.fn(() => false),
 }));
@@ -689,6 +690,16 @@ describe("useConfigPanel – axis section", () => {
       makeComposable(makePanelData(), ref(true)).isConfigOptionVisible("axis", "axis-label-mode"),
     ).toBe(false);
     vi.mocked(shouldShowCartesianAxisConfig).mockReturnValue(false);
+  });
+
+  it("bar-width and bar-track visibility delegate to shouldShowBarStyleConfig", async () => {
+    const { shouldShowBarStyleConfig } = await import("@/utils/dashboard/configUtils");
+    vi.mocked(shouldShowBarStyleConfig).mockReturnValue(true);
+    const c = makeComposable();
+    expect(c.isConfigOptionVisible("axis", "bar-width")).toBe(true);
+    expect(c.isConfigOptionVisible("axis", "bar-track")).toBe(true);
+    vi.mocked(shouldShowBarStyleConfig).mockReturnValue(false);
+    expect(makeComposable().isConfigOptionVisible("axis", "bar-track")).toBe(false);
   });
 
   it("axis-label-mode is hidden for a non-cartesian panel", () => {

@@ -15,6 +15,7 @@ import {
   shouldShowGridlines,
   shouldShowAxisLabelConfig,
   shouldShowLineThickness,
+  shouldShowBarStyleConfig,
   shouldShowDrilldown,
   shouldShowTimeShift,
 } from "@/utils/dashboard/configUtils";
@@ -341,6 +342,14 @@ export function useConfigPanel(
       gridlines: {
         label: t("dashboard.showGridlines"),
         visible: shouldShowGridlines(dashboardPanelData),
+      },
+      "bar-width": {
+        label: t("dashboard.barWidth"),
+        visible: shouldShowBarStyleConfig(dashboardPanelData),
+      },
+      "bar-track": {
+        label: t("dashboard.showBarTrack"),
+        visible: shouldShowBarStyleConfig(dashboardPanelData),
       },
     },
     labels: {

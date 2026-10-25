@@ -25,6 +25,7 @@ import { getSeriesColor } from "../colorPalette";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
 import { createSeriesOverrideLookup } from "../seriesOverrides";
 import { calculateWidthText } from "../chartDimensionUtils";
+import { barTrackMax } from "../barTrack";
 
 /**
  * Converter for bar chart variants (h-bar, stacked, h-stacked)
@@ -145,11 +146,7 @@ export class BarConverter implements PromQLChartConverter {
       const dataItems: Array<{ value: number; itemStyle?: { color: string } }> = [];
 
       // First pass: calculate min/max and collect data
-      const seriesDataCollection: Array<{
-        name: string;
-        value: number;
-        rawValues: Array<[number, string]>;
-      }> = [];
+      const seriesDataCollection: Array<{ name: string; value: number }> = [];
 
       processedData.forEach((queryData) => {
         queryData.series.forEach((seriesData) => {
@@ -158,11 +155,7 @@ export class BarConverter implements PromQLChartConverter {
           if (value < chartMin) chartMin = value;
           if (value > chartMax) chartMax = value;
 
-          seriesDataCollection.push({
-            name: seriesData.name,
-            value,
-            rawValues: seriesData.values,
-          });
+          seriesDataCollection.push({ name: seriesData.name, value });
 
           categories.push(seriesData.name);
         });
@@ -170,14 +163,13 @@ export class BarConverter implements PromQLChartConverter {
 
       // Second pass: apply colors
       seriesDataCollection.forEach((seriesData) => {
-        const numericValues = seriesData.rawValues.map(([, val]) => parseFloat(val));
-
+        // The palette must see the reduced value, the one the bar shows.
         const color =
           seriesOverrides.get(seriesData.name)?.color ??
           getSeriesColor(
             config.color || null,
             seriesData.name,
-            numericValues,
+            [seriesData.value],
             chartMin,
             chartMax,
             store.state.theme,
@@ -209,6 +201,7 @@ export class BarConverter implements PromQLChartConverter {
           focus: "series",
         },
         ...(config.bar_width && { barWidth: config.bar_width }),
+        ...(config.show_bar_track && { showBackground: true }),
       });
     }
 
@@ -222,6 +215,11 @@ export class BarConverter implements PromQLChartConverter {
           xAxis: buildCategoryXAxis(categories, panelSchema, store),
           yAxis: buildValueAxis(panelSchema, store),
         };
+
+    if (!isStacked && config.show_bar_track) {
+      const max = barTrackMax(config.y_axis_max, chartMax);
+      if (max !== undefined) axisConfig.xAxis.max = max;
+    }
 
     if (isHorizontal) {
       axisConfig.yAxis.axisLabel = {

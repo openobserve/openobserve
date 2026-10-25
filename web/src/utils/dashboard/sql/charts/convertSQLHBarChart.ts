@@ -17,6 +17,7 @@ import { calculateWidthText } from "../../chartDimensionUtils";
 import { getAxisLabel } from "../../fieldLabel";
 import { largestLabel } from "../shared/contextBuilder";
 import { type SQLContext } from "../shared/types";
+import { barTrackMax } from "../../barTrack";
 
 /**
  * Applies chart-specific options for: h-bar
@@ -28,6 +29,7 @@ export function applyHBarChart(ctx: SQLContext): void {
     options,
     panelSchema,
     xAxisKeys,
+    yAxisKeys,
     breakDownKeys,
     dynamicXAxisNameGap,
     getSeries,
@@ -35,8 +37,13 @@ export function applyHBarChart(ctx: SQLContext): void {
     updateTrellisConfig,
   } = ctx;
 
+  const config = panelSchema.config ?? {};
   //generate trace based on the y axis keys
-  options.series = getSeries({ barMinHeight: 1 });
+  options.series = getSeries({
+    barMinHeight: 1,
+    ...(config.bar_width && { barWidth: config.bar_width }),
+    ...(config.show_bar_track && { showBackground: true }),
+  });
 
   if (panelSchema.config.trellis?.layout && breakDownKeys.length) {
     updateTrellisConfig();
@@ -46,6 +53,18 @@ export function applyHBarChart(ctx: SQLContext): void {
   const temp = options.xAxis;
   options.xAxis = options.yAxis;
   options.yAxis = temp;
+
+  if (config.show_bar_track) {
+    let dataMax = -Infinity;
+    for (const key of yAxisKeys) {
+      for (const v of getAxisDataFromKey(key)) {
+        if (typeof v === "number" && v > dataMax) dataMax = v;
+      }
+    }
+    const max = barTrackMax(config.y_axis_max, dataMax);
+    // Replaces the max that grows past y_axis_max, so the track always spans the same range.
+    if (max !== undefined) [options.xAxis].flat().forEach((axis: any) => (axis.max = max));
+  }
 
   // xAxisKeys will be 1
   if (!panelSchema.config.trellis?.layout) {

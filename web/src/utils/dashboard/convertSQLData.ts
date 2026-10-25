@@ -31,6 +31,7 @@ import { escapeHtml } from "@/utils/html";
 import { applyGaugeSeriesThresholds, applyLineAreaThresholds } from "./thresholds";
 import { applySeriesOverrides } from "./seriesOverrides";
 import { isTimeSeries, isTimeStamp } from "./dateTimeUtils";
+import { mergeBarTrackMax } from "./barTrack";
 
 /**
  * Re-applies trellis layout on merged multi-query data.
@@ -840,6 +841,10 @@ export const convertMultiSQLData = async (
         ];
       }
     }
+  }
+
+  if (isMultiQuery && chartType === "h-bar" && panelSchema?.config?.show_bar_track) {
+    mergeBarTrackMax(options[0]?.options, options);
   }
 
   // Re-apply color mappings on the fully merged+renamed series

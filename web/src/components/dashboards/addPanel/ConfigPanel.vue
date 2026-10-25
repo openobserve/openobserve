@@ -1026,6 +1026,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-show-gridlines"
           size="lg"
         />
+
+        <OInput
+          v-if="shouldShowBarStyleConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('axis', 'bar-width')"
+          v-model.number="dashboardPanelDataModel.data.config.bar_width"
+          type="number"
+          :min="1"
+          :label="t('dashboard.barWidth')"
+          :placeholder="t('dashboard.auto')"
+          @update:model-value="
+            (value: any) =>
+              (dashboardPanelDataModel.data.config.bar_width =
+                typeof value === 'number' && value > 0 ? Math.round(value) : null)
+          "
+          data-test="dashboard-config-bar-width"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.barWidthTooltip')" max-width="15.625rem" />
+          </template>
+        </OInput>
+
+        <OSwitch
+          v-if="shouldShowBarStyleConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('axis', 'bar-track')"
+          v-model="dashboardPanelDataModel.data.config.show_bar_track"
+          :label="t('dashboard.showBarTrack')"
+          data-test="dashboard-config-show-bar-track"
+          size="lg"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.showBarTrackTooltip')" max-width="15.625rem" />
+          </template>
+        </OSwitch>
       </div>
     </OCollapsible>
 
@@ -2159,6 +2192,7 @@ import {
   shouldShowCartesianAxisConfig,
   shouldShowAxisLabelConfig,
   shouldShowLineThickness,
+  shouldShowBarStyleConfig,
   shouldShowDrilldown,
   shouldShowTimeShift,
 } from "@/utils/dashboard/configUtils";
@@ -3098,6 +3132,7 @@ export default defineComponent({
       shouldShowCartesianAxisConfig,
       shouldShowAxisLabelConfig,
       shouldShowLineThickness,
+      shouldShowBarStyleConfig,
       shouldShowDrilldown,
       shouldShowTimeShift,
       // Panel default time configuration (v4.0)

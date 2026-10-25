@@ -268,6 +268,10 @@ export const shouldShowLineThickness = (dashboardPanelData: any, promqlMode: boo
   );
 };
 
+/** Bar width and bar track inputs: h-bar only. */
+export const shouldShowBarStyleConfig = (dashboardPanelData: any): boolean =>
+  dashboardPanelData.data.type === "h-bar";
+
 /**
  * Check if Drilldown component should be displayed
  * Used by: Drilldown component
