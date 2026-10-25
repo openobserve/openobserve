@@ -1481,6 +1481,7 @@ export default defineComponent({
           };
         } catch (error: any) {
           if (superseded()) return;
+          regionJoin.value = null;
           errorDetail.value = {
             message: error?.message,
             code: error?.code || "",

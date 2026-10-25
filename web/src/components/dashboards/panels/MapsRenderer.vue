@@ -81,16 +81,14 @@ export default defineComponent({
 
     const initChart = () => {
       if (!chartRef.value) return;
+      chart?.dispose();
       chart = echarts.init(chartRef.value, isDark.value ? "dark" : "light");
       echarts.registerMap("world", worldMap as any);
       chart.setOption(withChartFont(currentOptions()), true);
     };
 
     watch(isDark, () => {
-      if (!chart) return;
-      chart.dispose();
-      chart = echarts.init(chartRef.value, isDark.value ? "dark" : "light");
-      chart.setOption(withChartFont(currentOptions()), true);
+      if (chart) initChart();
     });
 
     onMounted(async () => {

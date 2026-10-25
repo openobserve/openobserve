@@ -3405,6 +3405,21 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.emitted("region-join-update")?.at(-1)).toEqual([null]);
     });
 
+    it("clears the maps region join when a conversion fails", async () => {
+      const { data } = await mountRacing();
+      vi.mocked(convertPanelData).mockResolvedValueOnce({
+        ...optionsWith("a"),
+        extras: { regionJoin: { unmatched: ["x"], unmatchedTotal: 1 } },
+      });
+      data.value = [primary];
+      await flushPromises();
+
+      vi.mocked(convertPanelData).mockRejectedValueOnce(new Error("bad"));
+      data.value = [shifted];
+      await flushPromises();
+      expect(wrapper.emitted("region-join-update")?.at(-1)).toEqual([null]);
+    });
+
     it("drops a previous run's conversion that resolves after the next run reset", async () => {
       const { data, loading } = await mountRacing();
       const chunk = await startRunTwoOverPendingChunk(data, loading);

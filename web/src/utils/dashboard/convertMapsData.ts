@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { gt } from "@/types/i18n";
-import { chartColor } from "@/utils/chartTheme";
 import { escapeHtml } from "@/utils/html";
 
 import { getDataValue } from "./aliasUtils";
@@ -88,9 +87,6 @@ export const buildMapsTooltip = (config: any) => ({
   trigger: "item",
   showDelay: 0,
   transitionDuration: 0.2,
-  backgroundColor: chartColor("--color-tooltip-bg"),
-  borderColor: chartColor("--color-tooltip-border"),
-  textStyle: { color: chartColor("--color-tooltip-text") },
   formatter: (params: any) =>
     `${escapeHtml(params.name)}: ${escapeHtml(formatMapValue(params.value, config))}`,
 });

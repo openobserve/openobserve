@@ -16,7 +16,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { MapsConverter } from "./convertPromQLMapsChart";
 import { ProcessedPromQLData } from "./shared/types";
-import { chartColor } from "@/utils/chartTheme";
 
 vi.mock("./shared/dataProcessor", () => ({
   applyAggregation: vi.fn((values: any[], aggregation: string) => {
@@ -560,8 +559,7 @@ describe("MapsConverter", () => {
       expect(result.tooltip.trigger).toBe("item");
       expect(result.tooltip.showDelay).toBe(0);
       expect(result.tooltip.transitionDuration).toBe(0.2);
-      expect(result.tooltip.backgroundColor).toBe(chartColor("--color-tooltip-bg"));
-      expect(result.tooltip.textStyle.color).toBe(chartColor("--color-tooltip-text"));
+      expect(result.tooltip.backgroundColor).toBeUndefined();
     });
 
     it("should format tooltip with valid value", () => {

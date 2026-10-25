@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { chartColor } from "@/utils/chartTheme";
 import { convertMapsData } from "./convertMapsData";
 
 const query = {
@@ -47,12 +46,10 @@ describe("convertMapsData", () => {
     ).toBe(true);
   });
 
-  it("uses the theme's tooltip colours and a transparent background", () => {
+  it("leaves the background to the theme and drops the fixed white tooltip", () => {
     const result: any = convertMapsData(schema(), [[{ country: "US", value: 3 }]]);
     expect(result.options.backgroundColor).toBe("transparent");
-    expect(result.options.tooltip.backgroundColor).toBe(chartColor("--color-tooltip-bg"));
-    expect(result.options.tooltip.borderColor).toBe(chartColor("--color-tooltip-border"));
-    expect(result.options.tooltip.textStyle.color).toBe(chartColor("--color-tooltip-text"));
+    expect(result.options.tooltip.backgroundColor).toBeUndefined();
   });
 
   it("joins case-insensitively and through aliases, summing rows that land on one region", () => {
