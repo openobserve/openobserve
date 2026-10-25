@@ -57,7 +57,10 @@ export const promqlGaugeValue = (metric: any, aggregation: unknown): number | nu
   // An instant query returns one `value` pair per series where a range query returns `values`.
   const points = metric?.values ?? (metric?.value ? [metric.value] : []);
   if (!points.length) return null;
-  const sorted = [...points].sort((a: any, b: any) => a[0] - b[0]);
+  const sorted = points
+    .filter((point: any) => Number.isFinite(parseFloat(point?.[1])))
+    .sort((a: any, b: any) => a[0] - b[0]);
+  if (!sorted.length) return null;
   const value = applyAggregation(sorted, (aggregation as string) || "last");
   return Number.isFinite(value) ? value : null;
 };
@@ -115,5 +118,7 @@ export const sizeGaugeDial = (gauge: any, minDim: number, cellWidth: number): vo
     overflow: "truncate",
   };
   gauge.detail = { ...gauge.detail, fontSize: sizes.detail };
-  if (gauge.axisLabel?.show) gauge.axisLabel = { ...gauge.axisLabel, fontSize: sizes.title };
+  // ECharts places labels at radius - 35 by default; this keeps them just inside the ring.
+  if (gauge.axisLabel?.show)
+    gauge.axisLabel = { ...gauge.axisLabel, fontSize: sizes.title, distance: minDim / 6 - 16 };
 };

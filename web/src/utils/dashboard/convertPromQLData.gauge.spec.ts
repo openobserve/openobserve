@@ -128,6 +128,13 @@ describe("convertPromQLData gauge display", () => {
     expect(gauge.data[0].itemStyle.color).toBe("#0000ff");
   });
 
+  it("colours a reading of 0 like any other value", async () => {
+    const [gauge] = await gaugesOf([matrix(["0"])], {
+      color: { mode: "fixed", fixedColor: ["#123456"] },
+    });
+    expect(gauge.data[0].itemStyle.color).toBe("#123456");
+  });
+
   it("labels min and max at the arc ends only when enabled", async () => {
     const [off] = await gaugesOf([matrix(["5"])]);
     expect(off.axisLabel.show).toBe(false);

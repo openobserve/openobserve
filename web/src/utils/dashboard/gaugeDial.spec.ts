@@ -91,6 +91,18 @@ describe("promqlGaugeValue", () => {
     expect(promqlGaugeValue(metric, "first")).toBe(10);
   });
 
+  it("skips non-numeric samples before reducing", () => {
+    const metric = {
+      values: [
+        [1, "10"],
+        [2, "NaN"],
+        [3, "30"],
+      ],
+    };
+    expect(promqlGaugeValue(metric, "max")).toBe(30);
+    expect(promqlGaugeValue(metric, "avg")).toBe(20);
+  });
+
   it("reads the single value pair of an instant query", () => {
     expect(promqlGaugeValue({ value: [1700000000, "42.5"] }, "last")).toBe(42.5);
   });
@@ -175,7 +187,7 @@ describe("sizeGaugeDial", () => {
     expect(gauge.axisLine.lineStyle).toEqual({ color: [[1, "#000"]], width: "50" });
     expect(gauge.title).toMatchObject({ color: "red", fontSize: 24, width: "400" });
     expect(gauge.detail).toEqual({ valueAnimation: true, fontSize: 60 });
-    expect(gauge.axisLabel.fontSize).toBe(24);
+    expect(gauge.axisLabel).toEqual({ show: true, fontSize: 24, distance: 34 });
   });
 
   it("leaves hidden end labels alone", () => {

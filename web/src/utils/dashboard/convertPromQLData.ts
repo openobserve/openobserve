@@ -1124,7 +1124,7 @@ export const convertPromQLData = async (
                     if (mapping?.color) return mapping.color;
                     const overrideColor = seriesOverrides.get(seriesName)?.color;
                     if (overrideColor) return overrideColor;
-                    if (!gaugeValue) return defaultColor;
+                    if (gaugeValue === null) return defaultColor;
                     return (
                       getSeriesColor(
                         panelSchema?.config?.color,

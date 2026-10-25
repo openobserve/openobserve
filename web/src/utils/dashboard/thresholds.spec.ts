@@ -283,6 +283,18 @@ describe("gauge", () => {
     expect(gauge.axisLine.lineStyle.color[0][1]).toBe("rgba(80, 112, 221, 0.28)");
   });
 
+  it("keeps a value-mapping colour on the dial without using it for the lowest band", () => {
+    const gauge: any = {
+      min: 0,
+      max: 100,
+      _mappedColor: "#abcdef",
+      data: [{ value: 80, itemStyle: { color: "#abcdef" } }],
+    };
+    applyGaugeThresholds(gauge, t({ steps: [{ value: 50, color: RED }] }), "#5070dd");
+    expect(gauge.data[0].itemStyle.color).toBe("#abcdef");
+    expect(gauge.axisLine.lineStyle.color[0][1]).toBe("rgba(80, 112, 221, 0.28)");
+  });
+
   it("resolves percentage steps against the gauge min..max", () => {
     const gauge: any = { min: 0, max: 200, data: [{ value: 150, itemStyle: { color: "#000" } }] };
     applyGaugeThresholds(
@@ -682,6 +694,15 @@ describe("gaugeDialRange", () => {
     expect(gaugeDialRange(0, 50, "percent-1")).toEqual({ min: 0, max: 50 });
     expect(gaugeDialRange(10, 100, "percent-1")).toEqual({ min: 10, max: 100 });
     expect(gaugeDialRange(5, 2000, "milliseconds")).toEqual({ min: 5, max: 2000 });
+  });
+
+  it("keeps an explicit max of 0 above a negative min", () => {
+    expect(gaugeDialRange(-50, 0, "default")).toEqual({ min: -50, max: 0 });
+  });
+
+  it("draws an empty or inverted span as 100 wide", () => {
+    expect(gaugeDialRange(0, 0, "default")).toEqual({ min: 0, max: 100 });
+    expect(gaugeDialRange(20, 10, "default")).toEqual({ min: 20, max: 120 });
   });
 });
 
