@@ -408,6 +408,39 @@ describe("ConfigPanel", () => {
     });
   });
 
+  describe("PromQL series limit", () => {
+    const panelOf = (type: string) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type,
+        queryType: "promql",
+        queries: [{ query: "up", config: {} }],
+        config: { ...mockDashboardPanelData.data.config },
+      },
+    });
+    const limitInput = () =>
+      wrapper.findComponent('[data-test="dashboard-config-promql-series-limit"]');
+
+    it("stores a whole number within the server cap and clears a non-positive one", async () => {
+      store.state.zoConfig = { ...store.state.zoConfig, max_dashboard_series: 100 };
+      const panel = panelOf("stacked");
+      wrapper = createWrapper({ dashboardPanelData: panel }, { promqlMode: true });
+
+      await limitInput().vm.$emit("update:modelValue", 20.7);
+      expect(panel.data.config.promql_series_limit).toBe(20);
+      await limitInput().vm.$emit("update:modelValue", 500);
+      expect(panel.data.config.promql_series_limit).toBe(100);
+      await limitInput().vm.$emit("update:modelValue", -5);
+      expect(panel.data.config.promql_series_limit).toBeNull();
+    });
+
+    it("is absent for chart types on the line/area path", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("line") }, { promqlMode: true });
+      expect(limitInput().exists()).toBe(false);
+    });
+  });
+
   describe("Axis labels mode", () => {
     const panelOf = (type: string, config: Record<string, unknown> = {}) => ({
       ...mockDashboardPanelData,
