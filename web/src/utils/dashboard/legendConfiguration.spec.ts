@@ -1262,6 +1262,21 @@ describe("pie and donut legend values", () => {
     expect([...percents].sort((a, b) => a - b)).toEqual([33, 33, 34]);
   });
 
+  it("finishes on slices whose negative values cancel the total", () => {
+    const options: any = pieOptions([
+      { name: "big", value: 1e16 },
+      { name: "small", value: 3 },
+      { name: "neg", value: -1e16 },
+    ]);
+    applyLegendConfiguration(
+      pieSchema({ legend_values: ["percent"], decimals: 8 }),
+      chartPanelRef,
+      hovered(),
+      options,
+    );
+    expect(options.legend.formatter("neg")).toBe("{b|neg}  0.00000000%");
+  });
+
   it("takes a series override's decimals for that slice's percent", () => {
     const options: any = pieOptions(slices);
     applyLegendConfiguration(

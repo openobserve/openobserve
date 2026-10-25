@@ -534,6 +534,8 @@ const buildPieLegendEntries = (
   }
   const names = [...sums.keys()];
   const values = [...sums.values()];
+  // Negatives can cancel the sum and spin ECharts' rounding loop; without them it ends within n steps.
+  const seatValues = values.map((value) => Math.max(value, 0));
   const entries = new Map<string, PieLegendEntry>();
   names.forEach((name, index) => {
     const overrideDecimals = lookup.get(name)?.decimals;
@@ -545,7 +547,7 @@ const buildPieLegendEntries = (
       if (panelDecimals > MAX_SEATS_PRECISION) {
         return overridePercentText(values[index], positiveTotal, panelDecimals);
       }
-      const percent = echartsNumber.getPercentWithPrecision(values, index, panelDecimals);
+      const percent = echartsNumber.getPercentWithPrecision(seatValues, index, panelDecimals);
       return `${percent.toFixed(panelDecimals)}%`;
     };
     const valueText = keys
