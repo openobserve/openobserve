@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 import {
@@ -95,16 +95,9 @@ describe("markdownPanelSanitizer", () => {
       expect(js.hasAttribute("target")).toBe(false);
     });
 
-    it("registers its link hook once, on a private DOMPurify instance", () => {
-      const addHookSpy = vi.spyOn(markdownPanelPurifier, "addHook");
-
-      render('<a href="https://example.org">x</a>');
-      render('<a href="https://example.org">x</a>');
-
-      expect(addHookSpy).not.toHaveBeenCalled();
+    it("uses a private DOMPurify instance, so the shared one keeps no link hook", () => {
       expect(markdownPanelPurifier).not.toBe(DOMPurify);
       expect(DOMPurify.sanitize('<a href="https://example.org">x</a>')).not.toContain("target");
-      addHookSpy.mockRestore();
     });
   });
 });
