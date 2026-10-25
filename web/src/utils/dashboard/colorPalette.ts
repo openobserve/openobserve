@@ -412,7 +412,6 @@ const verticalGradient = (topColor: string, bottomColor: string) => ({
   global: false,
 });
 
-/** Theme fade gradient for an area fill in the resolved series `color`; `stacked` reads the area-stacked opacity tokens. */
 export const getAreaGradientColor = (color: string, stacked = false) => {
   // Dark keeps a stack's layers opaque since they tile; unstacked areas overlap, so they stay translucent.
   const topAlpha = stacked
