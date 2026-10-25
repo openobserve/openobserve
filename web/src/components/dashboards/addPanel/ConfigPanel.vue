@@ -131,7 +131,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :max="maxDashboardSeries"
           @update:model-value="
             (value: any) =>
-              (dashboardPanelDataModel.data.config.promql_series_limit = value ? value : null)
+              (dashboardPanelDataModel.data.config.promql_series_limit =
+                value > 0 ? Math.floor(value) : null)
           "
           :placeholder="raw('100')"
           :label="t('dashboard.promqlSeriesLimit')"

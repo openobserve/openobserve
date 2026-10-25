@@ -38,7 +38,7 @@ export async function processPromQLData(
   const queryIndexOf = (index: number) => shift.parentQueryIndex?.[index] ?? index;
 
   // Apply series limit
-  const seriesLimit = panelSchema.config?.promql_series_limit || 100;
+  const seriesLimit = getPromqlSeriesLimit(panelSchema.config);
   const limitedData = applySeriesLimit(
     searchQueryData,
     seriesLimit,
@@ -108,6 +108,12 @@ export async function processPromQLData(
   });
 
   return result;
+}
+
+/** The per-query series cap; anything but a positive number falls back to 100. */
+export function getPromqlSeriesLimit(config: any): number {
+  const limit = Math.floor(Number(config?.promql_series_limit));
+  return limit > 0 ? limit : 100;
 }
 
 /**

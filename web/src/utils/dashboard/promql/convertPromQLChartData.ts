@@ -26,7 +26,7 @@ import {
 } from "./shared/types";
 import type { SeriesLimitInfo } from "@/utils/dashboard/panelDiagnostics";
 import { addCommasToNumber } from "@/utils/formatters";
-import { processPromQLData } from "./shared/dataProcessor";
+import { getPromqlSeriesLimit, processPromQLData } from "./shared/dataProcessor";
 import { TimeSeriesConverter } from "./convertPromQLTimeSeriesChart";
 import { PieConverter } from "./convertPromQLPieChart";
 import { TableConverter } from "./convertPromQLTableChart";
@@ -146,7 +146,7 @@ export async function convertPromQLChartData(
   }
 
   // Step 7: Apply annotations (if applicable)
-  // Only stacked has a time axis here; its categories are the step timestamps.
+  // Stacked is the only modular chart whose x categories are the step timestamps.
   if (chartType === "stacked" && options.series?.length) {
     applyAnnotations(options, annotations, processedData[0]?.timestamps ?? [], store);
   }
@@ -179,12 +179,13 @@ function getSeriesLimit(
   processedData: ProcessedPromQLData[],
   context: ConversionContext,
 ): SeriesLimitInfo | null {
-  const cap = context.panelSchema.config?.promql_series_limit || 100;
-  const received = searchQueryData.reduce(
-    (count, queryData, index) =>
-      context.nameSuffixes?.[index]
-        ? count
-        : count + ((queryData?.data?.result || queryData?.result)?.length ?? 0),
+  const isPrimary = (index: number) => !context.nameSuffixes?.[index];
+  const resultOf = (queryData: PromQLResponse) => queryData?.data?.result || queryData?.result;
+  const primaryResults = searchQueryData.filter(
+    (queryData, index) => isPrimary(index) && resultOf(queryData)?.length,
+  );
+  const received = primaryResults.reduce(
+    (count, queryData) => count + (resultOf(queryData)?.length ?? 0),
     0,
   );
   const shown = processedData.reduce(
@@ -193,13 +194,18 @@ function getSeriesLimit(
     0,
   );
   const streamed = context.metadata?.seriesLimiting;
-  const streamedTotal = streamed ? (streamed.uniqueSeriesSeen ?? streamed.metricsStored) : 0;
-  // A streamed drop happened before this cap, so the received count misses it.
-  const total =
-    streamed && streamedTotal > streamed.metricsStored
-      ? Math.max(received, streamedTotal)
-      : received;
-  return total > shown ? { shown, total, cap } : null;
+  // Streaming stats are summed over every stream, so with a shifted period they no longer describe the current one.
+  const streamedDrop =
+    !!streamed &&
+    searchQueryData.every((_, index) => isPrimary(index)) &&
+    (streamed.uniqueSeriesSeen ?? streamed.metricsStored) > streamed.metricsStored;
+  const total = streamedDrop ? Math.max(received, streamed.uniqueSeriesSeen) : received;
+  if (total <= shown) return null;
+  const perQuery = Math.min(
+    getPromqlSeriesLimit(context.panelSchema.config),
+    streamed?.maxSeries ?? Infinity,
+  );
+  return { shown, total, cap: perQuery * Math.max(primaryResults.length, 1) };
 }
 
 /**

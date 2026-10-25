@@ -19,7 +19,9 @@ import { convertPromQLChartData } from "./convertPromQLChartData";
 import { processPromQLData } from "./shared/dataProcessor";
 import { PromQLResponse, ConversionContext } from "./shared/types";
 
-vi.mock("./shared/dataProcessor", () => ({
+vi.mock("./shared/dataProcessor", async (importOriginal) => ({
+  getPromqlSeriesLimit: (await importOriginal<typeof import("./shared/dataProcessor")>())
+    .getPromqlSeriesLimit,
   processPromQLData: vi.fn(async () => [
     {
       series: [
@@ -325,35 +327,84 @@ describe("convertPromQLChartData", () => {
       },
     });
 
-    it("reports current-period series dropped by the panel cap", async () => {
+    beforeEach(async () => {
+      const actual =
+        await vi.importActual<typeof import("./shared/dataProcessor")>("./shared/dataProcessor");
+      vi.mocked(processPromQLData).mockImplementationOnce(actual.processPromQLData);
+    });
+
+    it("reports the series the panel cap dropped, with the cap summed over queries", async () => {
       mockContext.panelSchema = {
         type: "pie",
-        config: { promql_series_limit: 1 },
+        config: { promql_series_limit: 2 },
+        queries: [{ config: {} }, { config: {} }],
+      };
+
+      const result = await convertPromQLChartData([resultWith(3), resultWith(5)], mockContext);
+
+      expect(result.extras.seriesLimit).toEqual({ shown: 4, total: 8, cap: 4 });
+      expect(result.extras.limitNumberOfSeriesWarningMessage).toBeTruthy();
+    });
+
+    it("says nothing when every series fits", async () => {
+      mockContext.panelSchema = { type: "pie", config: {}, queries: [{ config: {} }] };
+
+      const result = await convertPromQLChartData([resultWith(3)], mockContext);
+
+      expect(result.extras.seriesLimit).toBeUndefined();
+    });
+
+    it("treats a non-positive limit as the default of 100", async () => {
+      mockContext.panelSchema = {
+        type: "pie",
+        config: { promql_series_limit: -5 },
         queries: [{ config: {} }],
       };
 
       const result = await convertPromQLChartData([resultWith(3)], mockContext);
 
-      expect(result.extras.seriesLimit).toEqual({ shown: 1, total: 3, cap: 1 });
-      expect(result.extras.limitNumberOfSeriesWarningMessage).toBeTruthy();
+      expect(result.extras.seriesLimit).toBeUndefined();
+      expect(result.options.series[0].data).toHaveLength(3);
     });
 
     it("does not count a shifted period as dropped series", async () => {
-      mockContext.panelSchema = { type: "pie", config: {}, queries: [{ config: {} }] };
+      mockContext.panelSchema = {
+        type: "pie",
+        config: { promql_series_limit: 2 },
+        queries: [{ config: {} }],
+      };
       mockContext.nameSuffixes = ["", "1 day ago"];
 
-      const result = await convertPromQLChartData([resultWith(1), resultWith(1)], mockContext);
+      const result = await convertPromQLChartData([resultWith(2), resultWith(9)], mockContext);
 
       expect(result.extras.seriesLimit).toBeUndefined();
     });
 
-    it("reports a drop made by the streaming loader", async () => {
+    it("reports a streaming drop with the server cap when it is the lower one", async () => {
+      mockContext.panelSchema = {
+        type: "pie",
+        config: { promql_series_limit: 500 },
+        queries: [{ config: {} }],
+      };
+      mockContext.metadata = {
+        seriesLimiting: { metricsStored: 3, uniqueSeriesSeen: 250, maxSeries: 3 },
+      };
+
+      const result = await convertPromQLChartData([resultWith(3)], mockContext);
+
+      expect(result.extras.seriesLimit).toEqual({ shown: 3, total: 250, cap: 3 });
+    });
+
+    it("ignores streaming totals once a shifted period is in them", async () => {
       mockContext.panelSchema = { type: "pie", config: {}, queries: [{ config: {} }] };
-      mockContext.metadata = { seriesLimiting: { metricsStored: 1, uniqueSeriesSeen: 250 } };
+      mockContext.nameSuffixes = ["", "1 day ago"];
+      mockContext.metadata = {
+        seriesLimiting: { metricsStored: 180, uniqueSeriesSeen: 230, maxSeries: 100 },
+      };
 
-      const result = await convertPromQLChartData([resultWith(1)], mockContext);
+      const result = await convertPromQLChartData([resultWith(80), resultWith(100)], mockContext);
 
-      expect(result.extras.seriesLimit).toEqual({ shown: 1, total: 250, cap: 100 });
+      expect(result.extras.seriesLimit).toBeUndefined();
     });
   });
 
