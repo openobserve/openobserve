@@ -353,9 +353,9 @@ export const getVariablesReferencedInQueries = (
   return candidates.filter((it: any) => referenced.has(it.name));
 };
 
-/** Escape a value for HTML text or a quoted attribute; covers `'`, which `escapeHtml` in utils/html leaves alone. */
+/** Escape a value for HTML text or any attribute; whitespace is encoded too, so an unquoted attribute cannot gain new ones. */
 export const escapeHtmlValue = (value: string): string =>
-  value.replace(/[&<>"']/g, (ch) => HTML_ENTITIES[ch]);
+  value.replace(/[&<>"'`=\s]/g, (ch) => HTML_ENTITIES[ch] ?? `&#${ch.charCodeAt(0)};`);
 
 export const processVariableContent = (
   content: string,

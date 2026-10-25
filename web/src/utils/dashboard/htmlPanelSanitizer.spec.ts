@@ -146,6 +146,21 @@ describe("htmlPanelSanitizer", () => {
       expect(out.querySelector("div")?.getAttribute("title")).toBe(payload);
     });
 
+    it("keeps an escaped value in an unquoted attribute from adding attributes", () => {
+      const value = "x style=position:fixed;inset:0";
+      const out = render(
+        processVariableContent(
+          "<a class=${x}>t</a>",
+          { values: [{ name: "x", type: "textbox", value }] },
+          undefined,
+          escapeHtmlValue,
+        ),
+      );
+
+      expect(out.querySelector("a")?.hasAttribute("style")).toBe(false);
+      expect(out.querySelector("a")?.getAttribute("class")).toBe(value);
+    });
+
     it("registers its iframe hook once, on a private DOMPurify instance", () => {
       const addHookSpy = vi.spyOn(htmlPanelPurifier, "addHook");
 

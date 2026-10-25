@@ -352,7 +352,9 @@ describe("Variables Utils", () => {
 
       expect(
         processVariableContent("$x ${list:doublequote} $none", data, undefined, escapeHtmlValue),
-      ).toBe("&lt;b a=&quot;1&quot;&gt;&#39;&amp; &quot;&lt;a&gt;&quot;,&quot;b&quot; _o2_all_");
+      ).toBe(
+        "&lt;b&#32;a&#61;&quot;1&quot;&gt;&#39;&amp; &quot;&lt;a&gt;&quot;,&quot;b&quot; _o2_all_",
+      );
     });
   });
 

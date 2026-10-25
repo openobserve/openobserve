@@ -56,6 +56,14 @@ describe("renderMarkdownPanel", () => {
     expect(out.querySelector("div")?.getAttribute("title")).toBe('"><img src=x>');
   });
 
+  it("keeps a value inside an unquoted raw HTML attribute from adding attributes", () => {
+    const out = render("<a href=${x}>t</a>", "https://evil.example style=position:fixed;inset:0");
+    const link = out.querySelector("a");
+
+    expect(link?.hasAttribute("style")).toBe(false);
+    expect(link?.getAttribute("href")).toBe("https://evil.example style=position:fixed;inset:0");
+  });
+
   it("shows values unchanged in text and code spans", () => {
     const out = render("Service `${x}` is ${x}", "api_gw-1.prod & co");
 

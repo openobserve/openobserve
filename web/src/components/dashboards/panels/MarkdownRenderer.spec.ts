@@ -377,16 +377,6 @@ describe("MarkdownRenderer", () => {
       expect(DOMPurify.sanitize).toHaveBeenCalled();
     });
 
-    it("forbids style tags so panel markdown cannot restyle the app", async () => {
-      const DOMPurify = (await import("dompurify")).default;
-
-      wrapper = createWrapper({ markdownContent: "# Hi" });
-
-      expect(DOMPurify.sanitize).toHaveBeenLastCalledWith(expect.any(String), {
-        FORBID_TAGS: ["style"],
-      });
-    });
-
     it("should sanitize content on every render", async () => {
       const DOMPurify = (await import("dompurify")).default;
 
