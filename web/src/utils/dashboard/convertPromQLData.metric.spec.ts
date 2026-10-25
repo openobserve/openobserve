@@ -76,6 +76,9 @@ describe("convertPromQLData metric cells", () => {
       expect(cell.silent).toBeUndefined();
     }
     expect(cells[0]._metricLayout.left).not.toBe(cells[1]._metricLayout.left);
+    const label = cells[0].renderItem().children.find((c: any) => c.style.text === "api");
+    expect(label.style).toMatchObject({ overflow: "truncate" });
+    expect(label.style.width).toBeLessThan(cells[0]._metricLayout.width);
   });
 
   it("keeps every query, not only the last one", async () => {

@@ -202,6 +202,9 @@ export const layoutMetricGrid = (
             y: labelY,
             fill,
             opacity: 0.65,
+            // Series labels can be far wider than a cell; cut them so neighbours never overlap.
+            width: cellWidth * 0.95,
+            overflow: "truncate",
           },
         });
         return { type: "group", children };
