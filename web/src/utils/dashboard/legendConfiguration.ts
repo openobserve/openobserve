@@ -40,6 +40,8 @@ const LEGEND_VALUES_TEXT_WIDTH = 180;
 // eslint-disable-next-line local/no-hardcoded-px -- the fixed size ECharts paints legend text at; canvas measurement has no rem
 const LEGEND_TEXT_FONT = "12px";
 const LEGEND_VALUES_MIN_NAME_WIDTH = 40;
+// Legend padding (30) plus the default icon (25) and its gap (5) beside each entry's text.
+const LEGEND_ITEM_CHROME_WIDTH = 60;
 // ECharts' largest-remainder percent loops forever once 100 * 10^precision passes 2^53.
 const MAX_SEATS_PRECISION = 13;
 
@@ -993,7 +995,13 @@ export const applyPieDonutLegendPositioning = (
       const legendLeftPx = Math.max(containerWidth - legendWidth, 0);
       options.legend.left = legendLeftPx;
       options.legend.right = 0;
-      // Note: textStyle.width is already set responsively in createBaseLegendConfig
+      // Values widen the text past the reserved width on small panels; fit it to the reservation.
+      if (pieLegendValueKeys(panelSchema).length) {
+        options.legend.textStyle.width = Math.min(
+          LEGEND_VALUES_TEXT_WIDTH,
+          Math.max(legendWidth - LEGEND_ITEM_CHROME_WIDTH, 0),
+        );
+      }
     } else if (
       panelSchema?.config?.legends_position === "bottom" ||
       panelSchema?.config?.legends_position === null

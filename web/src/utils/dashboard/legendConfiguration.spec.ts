@@ -1357,6 +1357,24 @@ describe("pie and donut legend values", () => {
     expect(options.legend.formatter("a")).toBe("{b|a}  33.3%");
   });
 
+  it("fits a right plain legend's text to the width it reserves on a small panel", () => {
+    const options: any = pieOptions([
+      { name: "a-long-service-name", value: 30 },
+      { name: "db", value: 10 },
+    ]);
+    applyLegendConfiguration(
+      pieSchema({ legends_position: "right", legend_values: ["value", "percent"], decimals: 0 }),
+      { value: { offsetWidth: 300, offsetHeight: 300 } },
+      hovered(),
+      options,
+    );
+    const reserved = 300 - options.legend.left;
+    expect(options.legend.textStyle.width).toBe(reserved - 60);
+    const text = options.legend.formatter("a-long-service-name");
+    expect(text.endsWith("75%")).toBe(true);
+    expect(text.replace(/\{[ab]\|([^}]*)\}/, "$1").length * 8).toBeLessThanOrEqual(reserved - 60);
+  });
+
   it("reserves a wider right legend for the values", () => {
     const many = Array.from({ length: 6 }, (_, i) => ({ name: `slice-${i}`, value: i + 1 }));
     const legendLeft = (config: any) => {
