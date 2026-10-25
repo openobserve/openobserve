@@ -2300,6 +2300,19 @@ mod tests {
     }
 
     #[test]
+    fn test_panel_config_promql_series_limit_accepts_an_integer() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": true,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null,
+            "promql_series_limit": 20
+        }))
+        .unwrap();
+        assert_eq!(cfg.promql_series_limit, Some(OrdF64::from(20.0)));
+    }
+
+    #[test]
     fn test_panel_config_chart_style_keys_absent_when_none() {
         let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
             "show_legends": false,

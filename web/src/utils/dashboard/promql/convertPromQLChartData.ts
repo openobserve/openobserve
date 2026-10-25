@@ -202,7 +202,7 @@ function getSeriesLimit(
   const total = streamedDrop ? Math.max(received, streamed.uniqueSeriesSeen) : received;
   if (total <= shown) return null;
   const perQuery = Math.min(
-    getPromqlSeriesLimit(context.panelSchema.config),
+    getPromqlSeriesLimit(context.panelSchema.config, context.store),
     streamed?.maxSeries ?? Infinity,
   );
   return { shown, total, cap: perQuery * Math.max(primaryResults.length, 1) };

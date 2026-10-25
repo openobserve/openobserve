@@ -288,6 +288,25 @@ describe("axisBuilder", () => {
         expect(result).not.toContain("series0");
       });
 
+      it("hoists and bolds the hovered bar of a plain h-bar by its category name", () => {
+        const tooltip = buildTooltip(
+          { config: {} },
+          "axis",
+          undefined,
+          { value: { hoveredSeriesName: "db" } },
+          "name",
+        );
+
+        const result = tooltip.formatter([
+          { seriesName: "series0", name: "api", value: 9 },
+          { seriesName: "series0", name: "db", value: 1 },
+        ]);
+
+        expect(result.indexOf("db")).toBeLessThan(result.indexOf("api"));
+        expect(result).toContain("<strong>");
+        expect(result).toMatch(/<strong>[^<]*db/);
+      });
+
       it("should format with custom unit", () => {
         const panelSchema = {
           config: {

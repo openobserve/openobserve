@@ -374,10 +374,29 @@ describe("convertPromQLChartData", () => {
         queries: [{ config: {} }],
       };
       mockContext.nameSuffixes = ["", "1 day ago"];
+      const current = resultWith(2);
+      // A shifted series survives only alongside its primary, which it shares a metric object with.
+      const shifted = { ...current, data: { ...current.data!, result: [...current.data!.result] } };
 
-      const result = await convertPromQLChartData([resultWith(2), resultWith(9)], mockContext);
+      const result = await convertPromQLChartData([current, shifted], mockContext);
 
+      expect(result.options.series[0].data).toHaveLength(4);
       expect(result.extras.seriesLimit).toBeUndefined();
+    });
+
+    it("never caps above the server limit", async () => {
+      mockContext.panelSchema = {
+        type: "pie",
+        config: { promql_series_limit: 5000 },
+        queries: [{ config: {} }],
+      };
+      mockContext.store = {
+        state: { theme: "light", timezone: "UTC", zoConfig: { max_dashboard_series: 2 } },
+      };
+
+      const result = await convertPromQLChartData([resultWith(3)], mockContext);
+
+      expect(result.extras.seriesLimit).toEqual({ shown: 2, total: 3, cap: 2 });
     });
 
     it("reports a streaming drop with the server cap when it is the lower one", async () => {
