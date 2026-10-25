@@ -268,12 +268,6 @@ export const shouldShowLineThickness = (dashboardPanelData: any, promqlMode: boo
   );
 };
 
-/**
- * Check if the scatter point size and opacity inputs should be displayed
- * Used by: symbol_size input, symbol_opacity input
- * @param dashboardPanelData - The dashboard panel data
- * @returns boolean indicating if the point inputs should be displayed
- */
 export const shouldShowScatterPointConfig = (dashboardPanelData: any): boolean => {
   return dashboardPanelData.data.type === "scatter";
 };
