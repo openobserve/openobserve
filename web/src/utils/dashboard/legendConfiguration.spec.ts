@@ -1281,10 +1281,11 @@ describe("pie and donut legend values", () => {
   });
 
   it.each([
-    [25, "75.00000000000000000000%"],
-    [-1, "75.00%"],
-    ["abc", "75.00%"],
-    [1.7, "75.0%"],
+    [13, "75.0000000000000%"],
+    [25, "75.0000000000000000000000000%"],
+    [-1, "{b|api}  75.00%"],
+    ["abc", "{b|api}  75.00%"],
+    [1.7, "{b|api}  75.0%"],
   ])("reads decimals %s as a valid percent precision", (decimals, expected) => {
     const options: any = pieOptions(slices);
     applyLegendConfiguration(
@@ -1293,7 +1294,8 @@ describe("pie and donut legend values", () => {
       hovered(),
       options,
     );
-    expect(options.legend.formatter("api")).toBe(`{b|api}  ${expected}`);
+    // A long percent leaves no room for the name, so only the value is shown.
+    expect(options.legend.formatter("api")).toBe(expected);
   });
 
   it("fits the entries to a narrow right scroll legend without cutting the values", () => {
@@ -1312,8 +1314,12 @@ describe("pie and donut legend values", () => {
       hovered(),
       options,
     );
-    expect(options.legend.textStyle.width).toBeLessThan(180);
-    expect(options.legend.formatter("a-long-service-name")).toBe("{b|a-...}  75%");
+    const width = options.legend.textStyle.width;
+    expect(width).toBeLessThan(180);
+    const text = options.legend.formatter("a-long-service-name");
+    expect(text.endsWith("75%")).toBe(true);
+    // The spec's width mock is 8px per character; rich markup is not painted.
+    expect(text.replace(/\{[ab]\|([^}]*)\}/, "$1").length * 8).toBeLessThanOrEqual(width);
   });
 
   it("gives an override-decimals slice the same percent as its slice label", () => {

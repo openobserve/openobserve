@@ -40,6 +40,8 @@ const LEGEND_VALUES_TEXT_WIDTH = 180;
 // eslint-disable-next-line local/no-hardcoded-px -- the fixed size ECharts paints legend text at; canvas measurement has no rem
 const LEGEND_TEXT_FONT = "12px";
 const LEGEND_VALUES_MIN_NAME_WIDTH = 40;
+// ECharts' largest-remainder percent loops forever once 100 * 10^precision passes 2^53.
+const MAX_SEATS_PRECISION = 13;
 
 interface PieLegendEntry {
   name: string;
@@ -489,11 +491,11 @@ const pieLegendValueKeys = (panelSchema: any): string[] => {
   return PIE_LEGEND_VALUE_KEYS.filter((key) => selected.includes(key));
 };
 
-// The SQL slice label's percentPrecision: 2 only when unset; float math gives no digits past 20.
+// The panel decimals as the SQL slice label's percentPrecision reads them; toFixed throws above 100.
 const pieLegendPercentDecimals = (decimals: unknown): number => {
   if (decimals === null || decimals === undefined || decimals === "") return 2;
   const parsed = Math.floor(Number(decimals));
-  return Number.isFinite(parsed) && parsed >= 0 ? Math.min(parsed, 20) : 2;
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.min(parsed, 100) : 2;
 };
 
 const truncateLegendName = (text: string, maxWidth: number): string => {
@@ -540,19 +542,22 @@ const buildPieLegendEntries = (
         const decimals = pieLegendPercentDecimals(overrideDecimals);
         return overridePercentText(values[index], positiveTotal, decimals);
       }
+      if (panelDecimals > MAX_SEATS_PRECISION) {
+        return overridePercentText(values[index], positiveTotal, panelDecimals);
+      }
       const percent = echartsNumber.getPercentWithPrecision(values, index, panelDecimals);
       return `${percent.toFixed(panelDecimals)}%`;
     };
     const valueText = keys
       .map((key) => (key === "value" ? lookup.formatValue(values[index], name) : percentText()))
       .join("  ");
-    // The name gives way to the values, so truncation never cuts the numbers.
-    const nameWidth = Math.max(
-      LEGEND_VALUES_MIN_NAME_WIDTH,
-      textWidth - calculateWidthText(`  ${valueText}`, LEGEND_TEXT_FONT),
-    );
+    // The name gives way to the values, and drops out when too little room is left for it.
+    const nameWidth = textWidth - calculateWidthText(`  ${valueText}`, LEGEND_TEXT_FONT);
     entries.set(name, {
-      name: truncateLegendName(String(lookup.displayName(name)), nameWidth),
+      name:
+        nameWidth < LEGEND_VALUES_MIN_NAME_WIDTH
+          ? ""
+          : truncateLegendName(String(lookup.displayName(name)), nameWidth),
       valueText,
     });
   });
@@ -585,7 +590,7 @@ const pieLegendSizingData = (panelSchema: any, data?: any[] | null): any[] => {
   const keys = pieLegendValueKeys(panelSchema);
   if (!keys.length || !Array.isArray(data)) return data ?? [];
   return [...getPieLegendEntries(panelSchema, data, keys).values()].map((entry) => ({
-    name: `${entry.name}  ${entry.valueText}`,
+    name: entry.name ? `${entry.name}  ${entry.valueText}` : entry.valueText,
   }));
 };
 
@@ -605,7 +610,8 @@ const applyPieLegendValues = (panelSchema: any, options: any, hoveredSeriesState
       : null;
     const style = name === hoveredSeriesState?.value?.hoveredSeriesName ? "a" : "b";
     const entry = entries?.get(String(name));
-    return entry ? `{${style}|${entry.name}}  ${entry.valueText}` : `{${style}|${name}}`;
+    if (!entry) return `{${style}|${name}}`;
+    return entry.name ? `{${style}|${entry.name}}  ${entry.valueText}` : entry.valueText;
   };
   options.legend.textStyle = { ...options.legend.textStyle, width: LEGEND_VALUES_TEXT_WIDTH };
 };
