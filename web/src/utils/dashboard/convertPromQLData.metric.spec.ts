@@ -90,6 +90,29 @@ describe("convertPromQLData metric cells", () => {
     expect(cells[0]._metricText).toBe("3");
   });
 
+  it("draws no cell at all when every query is empty", async () => {
+    const result = await convert([matrix(), matrix()]);
+    expect(result.options.series).toEqual([]);
+  });
+
+  it("labels and colours a cell from its series override", async () => {
+    const result = await convert([matrix(series("api", ["3"]), series("web", ["4"]))], {
+      override_config: [
+        {
+          field: { matchBy: "series", value: "web" },
+          config: [
+            { type: "display_name", value: "Web tier" },
+            { type: "series_color", value: "#123456" },
+          ],
+        },
+      ],
+    });
+    const web = cellsOf(result)[1];
+    expect(web._metricLabel).toBe("Web tier");
+    expect(web._metricName).toBe("web");
+    expect(web._metricBgColor).toBe("#123456");
+  });
+
   it("draws one cell per series of an instant query", async () => {
     const result = await convert([
       vector({ metric: { job: "api" }, value: [1_700_000_000, "4"] }),
