@@ -186,8 +186,6 @@ export function createSeriesBuilders(deps: SeriesDeps) {
         panelSchema?.config?.color?.colorBySeries,
       ) ?? null;
 
-    // For area charts, fade the fill into a bottom-to-top transparent
-    // gradient instead of a flat solid color (shared with the PromQL builder).
     const areaStyle = getAreaStyleOverride(
       panelSchema.type,
       defaultSeriesProps?.areaStyle,
