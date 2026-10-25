@@ -314,6 +314,7 @@ import { chartColor } from "@/utils/chartTheme";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
+import type { CustomChartContext } from "@/utils/dashboard/convertCustomChartData";
 import { getDataValue } from "@/utils/dashboard/aliasUtils";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { useRoute, useRouter } from "vue-router";
@@ -1360,6 +1361,7 @@ export default defineComponent({
             annotations,
             loading.value,
             filteredSparklineData.value,
+            panelSchema.value?.type === "custom_chart" ? buildCustomChartContext() : undefined,
           );
           // Superseded while awaiting: its data is older than what is coming.
           if (superseded()) return;
@@ -2138,6 +2140,23 @@ export default defineComponent({
       if (v instanceof Date) return v.getTime();
       const n = Number(v);
       return Number.isFinite(n) && n > 0 ? n : 0;
+    }
+
+    // Uses the committed variables the query ran with, so context matches the data.
+    function buildCustomChartContext(): CustomChartContext {
+      const variables: Record<string, unknown> = {};
+      for (const v of props.variablesData?.values ?? []) {
+        if (v?.name) variables[v.name] = v.value;
+      }
+      return {
+        variables,
+        timeRange: {
+          start: toMicros((props.selectedTimeObj as any)?.start_time),
+          end: toMicros((props.selectedTimeObj as any)?.end_time),
+        },
+        timezone: store.state.timezone,
+        theme: isDark.value ? "dark" : "light",
+      };
     }
 
     function openCellDrawer(params: {

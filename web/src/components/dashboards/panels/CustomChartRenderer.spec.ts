@@ -15,6 +15,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { flushPromises, mount, VueWrapper, config } from "@vue/test-utils";
+import { createStore } from "vuex";
 import i18n from "@/locales";
 import CustomChartRenderer from "./CustomChartRenderer.vue";
 
@@ -75,6 +76,21 @@ Object.defineProperty(window, "removeEventListener", {
   value: vi.fn(),
 });
 
+class MockResizeObserver {
+  static instances: MockResizeObserver[] = [];
+  disconnected = false;
+  constructor(public callback: () => void) {
+    MockResizeObserver.instances.push(this);
+  }
+  observe() {}
+  disconnect() {
+    this.disconnected = true;
+  }
+}
+vi.stubGlobal("ResizeObserver", MockResizeObserver);
+
+const store = createStore({ state: { theme: "light" } });
+
 describe("CustomChartRenderer", () => {
   let wrapper: VueWrapper<any>;
 
@@ -110,7 +126,7 @@ describe("CustomChartRenderer", () => {
         ...props,
       },
       global: {
-        plugins: [],
+        plugins: [store],
         provide: {
           hoveredSeriesState: null,
         },
@@ -131,6 +147,8 @@ describe("CustomChartRenderer", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    store.state.theme = "light";
+    MockResizeObserver.instances = [];
     // Reset all mocks to their original implementation
     const echarts = await import("echarts");
     echarts.init.mockReturnValue(mockChart);
@@ -350,7 +368,7 @@ describe("CustomChartRenderer", () => {
           data: mockChartData,
         },
         global: {
-          plugins: [],
+          plugins: [store],
           provide: {
             hoveredSeriesState: hoveredState,
           },
@@ -379,7 +397,7 @@ describe("CustomChartRenderer", () => {
           data: mockChartData,
         },
         global: {
-          plugins: [],
+          plugins: [store],
           provide: {
             hoveredSeriesState: null,
           },
@@ -392,6 +410,101 @@ describe("CustomChartRenderer", () => {
         chartElement.trigger("mouseover");
         chartElement.trigger("mouseleave");
       }).not.toThrow();
+    });
+  });
+
+  describe("Theme", () => {
+    const lastOption = () => mockChart.setOption.mock.calls.at(-1)?.[0];
+
+    it("keeps the default theme and no background in light mode", async () => {
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+
+      expect(lastOption()).not.toHaveProperty("backgroundColor");
+    });
+
+    it("inits with the dark theme and a transparent background in dark mode", async () => {
+      const echarts = await import("echarts");
+      store.state.theme = "dark";
+
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+
+      expect(echarts.init).toHaveBeenCalledWith(expect.any(Object), "dark", {
+        renderer: "canvas",
+      });
+      expect(lastOption().backgroundColor).toBe("transparent");
+    });
+
+    it("keeps a background the chart code sets in dark mode", async () => {
+      store.state.theme = "dark";
+
+      wrapper = createWrapper({ data: { ...mockChartData, backgroundColor: "#123456" } });
+      await waitForChartInit(wrapper);
+
+      expect(lastOption().backgroundColor).toBe("#123456");
+    });
+
+    it("re-creates the instance in the new theme when the theme changes", async () => {
+      const echarts = await import("echarts");
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+
+      store.state.theme = "dark";
+      await waitForChartInit(wrapper);
+
+      expect(mockChart.dispose).toHaveBeenCalledTimes(1);
+      expect(echarts.init).toHaveBeenLastCalledWith(expect.any(Object), "dark", {
+        renderer: "canvas",
+      });
+    });
+  });
+
+  describe("Zero-size mount", () => {
+    const setSize = (el: Element, width: number, height: number) => {
+      Object.defineProperty(el, "clientWidth", { configurable: true, value: width });
+      Object.defineProperty(el, "clientHeight", { configurable: true, value: height });
+    };
+
+    it("re-inits the chart once a zero-size container gets a real size", async () => {
+      const echarts = await import("echarts");
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+      expect(MockResizeObserver.instances).toHaveLength(1);
+      const observer = MockResizeObserver.instances[0];
+
+      observer.callback();
+      expect(mockChart.dispose).not.toHaveBeenCalled();
+
+      setSize(wrapper.find('[data-test="chart-renderer"]').element, 400, 300);
+      observer.callback();
+      await waitForChartInit(wrapper);
+
+      expect(observer.disconnected).toBe(true);
+      expect(mockChart.dispose).toHaveBeenCalledTimes(1);
+      expect(echarts.init).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not watch the size when the container already has one", async () => {
+      setSize(HTMLElement.prototype, 400, 300);
+      try {
+        wrapper = createWrapper();
+        await waitForChartInit(wrapper);
+
+        expect(MockResizeObserver.instances).toHaveLength(0);
+      } finally {
+        delete (HTMLElement.prototype as any).clientWidth;
+        delete (HTMLElement.prototype as any).clientHeight;
+      }
+    });
+
+    it("stops watching the size on unmount", async () => {
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+
+      wrapper.unmount();
+
+      expect(MockResizeObserver.instances[0].disconnected).toBe(true);
     });
   });
 

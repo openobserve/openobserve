@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, vi, afterEach, onTestFinished } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick, ref } from "vue";
 
@@ -1388,6 +1388,72 @@ describe("PanelSchemaRenderer", () => {
         expect(convertPanelData).toHaveBeenCalled();
         expect(wrapper.find('[data-test="chart-renderer"]').exists()).toBe(true);
         expect(wrapper.find('[data-test="no-data"]').exists()).toBe(false);
+      });
+
+      it("hands custom chart code the committed variables, time range, timezone and theme", async () => {
+        const isFirstLoadSettled = ref(false);
+        const data = ref<any[]>([]);
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ isFirstLoadSettled, data }) as any,
+        );
+        store.state.theme = "dark";
+        const previousTimezone = store.state.timezone;
+        onTestFinished(() => {
+          store.state.timezone = previousTimezone;
+        });
+        store.state.timezone = "Asia/Kolkata";
+        wrapper = createWrapper({
+          selectedTimeObj: {
+            start_time: new Date(1_700_000_000_000_000),
+            end_time: new Date(1_700_000_600_000_000),
+          },
+          variablesData: {
+            values: [
+              { name: "service", value: "api" },
+              { name: "regions", value: ["eu", "us"] },
+            ],
+          },
+          currentVariablesData: { values: [{ name: "service", value: "uncommitted" }] },
+          panelSchema: {
+            ...defaultProps.panelSchema,
+            type: "custom_chart",
+            customChartContent: "option = {}",
+            queries: [{ query: "SELECT 1", customQuery: true, fields: {}, config: {} }],
+          },
+        });
+        await flushPromises();
+        data.value = [[{ count: 1 }]];
+        isFirstLoadSettled.value = true;
+        await flushPromises();
+
+        expect(vi.mocked(convertPanelData).mock.calls.at(-1)?.[11]).toEqual({
+          variables: { service: "api", regions: ["eu", "us"] },
+          timeRange: { start: 1_700_000_000_000_000, end: 1_700_000_600_000_000 },
+          timezone: "Asia/Kolkata",
+          theme: "dark",
+        });
+      });
+
+      it("passes no custom chart context for other chart types", async () => {
+        const isFirstLoadSettled = ref(false);
+        const data = ref<any[]>([]);
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ isFirstLoadSettled, data }) as any,
+        );
+        wrapper = createWrapper({
+          panelSchema: {
+            ...defaultProps.panelSchema,
+            queryType: "promql",
+            queries: [{ query: "up", fields: {}, config: {} }],
+          },
+        });
+        await flushPromises();
+        data.value = [{ resultType: "matrix", result: [{ metric: {}, values: [[1, "4"]] }] }];
+        isFirstLoadSettled.value = true;
+        await flushPromises();
+
+        expect(convertPanelData).toHaveBeenCalled();
+        expect(vi.mocked(convertPanelData).mock.calls.at(-1)?.[11]).toBeUndefined();
       });
 
       it("shows the error when the first load fails", async () => {

@@ -30,16 +30,20 @@ const sandboxDompurifyUrl = new URL(dompurifyUrl, import.meta.url).href;
 // Exact first-party chart code allowed to run its callbacks in the app origin; stored dashboard code never is.
 const trustedCustomChartCode = new Set<string>();
 
-/**
- * Converts SQL data into a format suitable for rendering a chart.
- *
- * @param {any} panelSchema - the panel schema object
- * @param {any} searchQueryData - the search query data
- * @param {any} store - the store object
- * @return {Object} - the options object for rendering the chart
- */
+/** Read-only dashboard state handed to custom chart code as `context`. */
+export interface CustomChartContext {
+  variables: Record<string, unknown>;
+  timeRange: { start: number; end: number };
+  timezone: string;
+  theme: "light" | "dark";
+}
 
-export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
+/** Runs the panel's chart code in a sandboxed iframe and resolves with its ECharts option. */
+export const runJavaScriptCode = (
+  panelSchema: any,
+  searchQueryData: any,
+  context?: CustomChartContext,
+) => {
   return new Promise((resolve, reject) => {
     // Skip if this panel is not the one to be refreshed
     if (panelIdToBeRefreshed.value && panelIdToBeRefreshed.value !== panelSchema.id) {
@@ -114,6 +118,14 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
         executed = true;
         try {
           const data = JSON.parse(event.data.data);
+          const deepFreeze = (obj) => {
+            if (typeof obj === 'object' && obj !== null) {
+              Object.values(obj).forEach(deepFreeze);
+              Object.freeze(obj);
+            }
+            return obj;
+          };
+          const context = deepFreeze(JSON.parse(event.data.context || '{}'));
           const userCode = event.data.code.trim();
           const fnTag = event.data.fnTag;
 
@@ -140,7 +152,7 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
             parent.postMessage({ type: 'error', message: i18nMessages.executionTimeout }, '*');
           }, 2000);
 
-          (function(data, echarts) {
+          (function(data, echarts, context) {
             try {
               ${userCode};
             } catch (err) {
@@ -160,7 +172,7 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
               }
             }, 0); // Delay to ensure CSP events have time to process
 
-          })(data, window.echarts);
+          })(data, window.echarts, context);
 
         } catch (error) {
           parent.postMessage({ type: 'error', message: error.message }, '*');
@@ -210,6 +222,7 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
           code: userCode,
           fnTag,
           data: JSON.stringify(searchQueryData),
+          context: JSON.stringify(context ?? {}),
         },
         "*",
       );

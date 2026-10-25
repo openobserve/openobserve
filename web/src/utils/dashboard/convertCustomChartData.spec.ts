@@ -200,6 +200,7 @@ describe("convertCustomChartData", () => {
           type: "execute",
           code: panelSchema.customChartContent,
           data: JSON.stringify(searchQueryData),
+          context: "{}",
           fnTag: expect.stringMatching(/^__o2_fn_[0-9a-f]{32}$/),
         },
         "*",
@@ -564,6 +565,87 @@ describe("convertCustomChartData", () => {
       void runJavaScriptCode({ id: "p", customChartContent: "option = {}" }, []);
 
       expect(mockIframe.srcdoc).toContain("if (event.source !== parent || executed) return;");
+    });
+  });
+
+  describe("Read-only context", () => {
+    const context = {
+      variables: { service: "api", regions: ["eu", "us"] },
+      timeRange: { start: 1_000_000, end: 2_000_000 },
+      timezone: "Asia/Kolkata",
+      theme: "dark" as const,
+    };
+
+    // Runs the srcdoc's inline sandbox script against fake window/parent objects.
+    const runSandbox = async (code: string, ctx?: typeof context) => {
+      const acorn = await import("acorn");
+      vi.mocked(acorn.parse).mockReturnValue({ type: "Program", body: [] } as any);
+      const mockIframe = {
+        style: { display: "" },
+        setAttribute: vi.fn(),
+        onload: null as null | (() => void),
+        srcdoc: "",
+        contentWindow: { postMessage: vi.fn() },
+      };
+      vi.mocked(document.createElement).mockReturnValue(mockIframe as any);
+      void runJavaScriptCode({ id: "p", customChartContent: code }, [], ctx);
+      mockIframe.onload?.();
+      const payload = mockIframe.contentWindow.postMessage.mock.calls[0][0];
+
+      const script = mockIframe.srcdoc.match(/<script nonce="[^"]+">([\s\S]*?)<\/script>/)![1];
+      const listeners: Record<string, (e: any) => void> = {};
+      const fakeWindow = {
+        addEventListener: (t: string, h: any) => (listeners[t] = h),
+        echarts: {},
+      };
+      const fakeParent = { postMessage: vi.fn() };
+      const fakeDocument = { addEventListener: vi.fn() };
+      new Function("window", "parent", "document", "DOMPurify", script)(
+        fakeWindow,
+        fakeParent,
+        fakeDocument,
+        { sanitize: (v: string) => v },
+      );
+      listeners.message({ source: fakeParent, data: payload });
+      await new Promise((r) => setTimeout(r, 0));
+      return { payload, posted: fakeParent.postMessage.mock.calls.map((c) => c[0]) };
+    };
+
+    afterEach(() => {
+      delete (globalThis as any).option;
+    });
+
+    it("posts the context to the sandbox as JSON", async () => {
+      const { payload } = await runSandbox("option = {}", context);
+
+      expect(JSON.parse(payload.context)).toEqual(context);
+    });
+
+    it("exposes a deeply frozen context to the chart code", async () => {
+      const code = `
+        try { context.theme = "light"; context.timeRange.start = 0; context.variables.regions.push("x"); } catch (e) {}
+        option = {
+          theme: context.theme,
+          start: context.timeRange.start,
+          regions: context.variables.regions,
+          frozen: Object.isFrozen(context) && Object.isFrozen(context.variables.regions),
+        };`;
+      const { posted } = await runSandbox(code, context);
+
+      expect(posted).toHaveLength(1);
+      expect(posted[0].type).toBe("success");
+      expect(JSON.parse(posted[0].result)).toEqual({
+        theme: "dark",
+        start: 1_000_000,
+        regions: ["eu", "us"],
+        frozen: true,
+      });
+    });
+
+    it("gives chart code an empty context when none is passed", async () => {
+      const { posted } = await runSandbox("option = { keys: Object.keys(context) };");
+
+      expect(JSON.parse(posted[0].result)).toEqual({ keys: [] });
     });
   });
 

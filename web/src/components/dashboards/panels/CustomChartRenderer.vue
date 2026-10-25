@@ -55,6 +55,7 @@ import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
 
 import DOMPurify from "dompurify";
 import { withChartFont } from "@/utils/fonts";
+import { useTheme } from "@/composables/useTheme";
 
 // Register necessary components.
 // echarts' subpath type decls (echarts/components, echarts/renderers) resolve to
@@ -111,6 +112,8 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const chartRef: Ref<HTMLElement | null> = ref(null);
     let chart: echarts.EChartsType | null = null;
+    let chartTheme: "light" | "dark" | null = null;
+    const { isDark } = useTheme();
 
     const hoveredSeriesState = inject<HoveredSeriesState | null>("hoveredSeriesState", null);
     function deepSanitize(obj: unknown): unknown {
@@ -133,11 +136,20 @@ export default defineComponent({
       // The component can unmount while echarts-gl loads, nulling the ref.
       if (!chartRef.value) return;
 
-      // Initialize chart if it doesn't exist, otherwise reuse existing instance
+      const theme = isDark.value ? "dark" : "light";
+      // ECharts fixes the theme at init, so a theme change needs a fresh instance.
+      if (chart && chartTheme !== theme) {
+        chart.dispose();
+        chart = null;
+      }
       if (!chart) {
-        chart = echarts.init(chartRef.value, undefined, {
+        chart = echarts.init(chartRef.value, theme === "dark" ? "dark" : undefined, {
           renderer: "canvas",
         });
+        chartTheme = theme;
+        if (chartRef.value.clientWidth === 0 || chartRef.value.clientHeight === 0) {
+          reinitWhenSized();
+        }
       } else {
         // Clear previous chart data to prevent overlay of old and new charts
         chart.clear();
@@ -145,7 +157,12 @@ export default defineComponent({
 
       try {
         const safeChartOptions = deepSanitize(props.data) as CustomChartData;
-        chart.setOption(withChartFont(safeChartOptions));
+        // The dark theme paints an opaque background; keep the panel surface unless the code sets one.
+        const themedOptions =
+          theme === "dark"
+            ? { backgroundColor: "transparent", ...safeChartOptions }
+            : safeChartOptions;
+        chart.setOption(withChartFont(themedOptions));
 
         const o2Events = props.data.o2_events;
         if (o2Events) {
@@ -166,6 +183,23 @@ export default defineComponent({
         } as unknown as EmitEvent);
       }
     };
+
+    // An instance created at zero size keeps zero-width canvases that resize() cannot repair.
+    let zeroSizeReinitObserver: ResizeObserver | null = null;
+    function reinitWhenSized() {
+      if (!chartRef.value || zeroSizeReinitObserver) return;
+      zeroSizeReinitObserver = new ResizeObserver(() => {
+        const el = chartRef.value;
+        if (el && (el.clientWidth === 0 || el.clientHeight === 0)) return;
+        zeroSizeReinitObserver?.disconnect();
+        zeroSizeReinitObserver = null;
+        if (!el) return;
+        chart?.dispose();
+        chart = null;
+        initChart();
+      });
+      zeroSizeReinitObserver.observe(chartRef.value);
+    }
 
     const handleResize = async () => {
       await nextTick();
@@ -193,9 +227,13 @@ export default defineComponent({
       },
       { deep: true },
     );
+    watch(isDark, () => initChart());
 
     onUnmounted(() => {
+      zeroSizeReinitObserver?.disconnect();
+      zeroSizeReinitObserver = null;
       chart?.dispose();
+      chart = null;
       window.removeEventListener("resize", handleResize);
     });
 
