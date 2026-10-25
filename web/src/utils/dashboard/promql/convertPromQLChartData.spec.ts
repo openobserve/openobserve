@@ -19,30 +19,33 @@ import { convertPromQLChartData } from "./convertPromQLChartData";
 import { processPromQLData } from "./shared/dataProcessor";
 import { PromQLResponse, ConversionContext } from "./shared/types";
 
-vi.mock("./shared/dataProcessor", async (importOriginal) => ({
-  getPromqlSeriesLimit: (await importOriginal<typeof import("./shared/dataProcessor")>())
-    .getPromqlSeriesLimit,
-  processPromQLData: vi.fn(async () => [
-    {
-      series: [
-        {
-          metric: { job: "api" },
-          name: "test_metric",
-          data: { 1234567890000: 100 },
-          values: [[1234567890, "100"]],
-        },
-      ],
-      timestamps: [[1234567890000, "2009-02-13 23:31:30"]],
-    },
-  ]),
-  applyAggregation: vi.fn((values, aggregation) => {
-    if (aggregation === "last" && values.length > 0) {
-      return parseFloat(values[values.length - 1][1]);
-    }
-    return 0;
-  }),
-  fillMissingTimestamps: vi.fn((data) => data),
-}));
+vi.mock("./shared/dataProcessor", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./shared/dataProcessor")>();
+  return {
+    getPromqlSeriesLimit: actual.getPromqlSeriesLimit,
+    everyQueryInstant: actual.everyQueryInstant,
+    processPromQLData: vi.fn(async () => [
+      {
+        series: [
+          {
+            metric: { job: "api" },
+            name: "test_metric",
+            data: { 1234567890000: 100 },
+            values: [[1234567890, "100"]],
+          },
+        ],
+        timestamps: [[1234567890000, "2009-02-13 23:31:30"]],
+      },
+    ]),
+    applyAggregation: vi.fn((values, aggregation) => {
+      if (aggregation === "last" && values.length > 0) {
+        return parseFloat(values[values.length - 1][1]);
+      }
+      return 0;
+    }),
+    fillMissingTimestamps: vi.fn((data) => data),
+  };
+});
 
 vi.mock("../legendConfiguration", () => ({
   applyLegendConfiguration: vi.fn((panelSchema, chartPanelRef, hoveredSeriesState, options) => {
