@@ -731,6 +731,33 @@ describe("stacked and h-stacked bars", () => {
     },
   );
 
+  it("SQL stacked: no per-segment over-limit cue in the tooltip", async () => {
+    const rows = stackRows({ api: [600, 100], web: [700, 50] });
+    const options = await runSQL(stackPanel("stacked", STEPS), [rows]);
+    const point = (name: string, value: number) => ({
+      seriesName: name,
+      seriesIndex: options.series.findIndex((s: any) => s.name === name),
+      name: "/a",
+      marker: "<i></i>",
+      value,
+      data: value,
+    });
+    expect(options.tooltip.formatter([point("api", 600), point("web", 700)])).not.toContain("over");
+  });
+
+  it("SQL stacked with two Y fields and no breakdown: each bar is its own range", async () => {
+    const twoY = sqlPanel("stacked", { thresholds: pct80 }, [
+      sqlQuery({ x: [endpointX], y: [yField(), { ...yField("P99"), alias: "y_axis_2" }] }),
+    ]);
+    const rows = [
+      { x_axis_1: "/a", y_axis_1: 100, y_axis_2: 80 },
+      { x_axis_1: "/b", y_axis_1: 20, y_axis_2: 10 },
+    ];
+    const options = await runSQL(twoY, [rows]);
+    // side-by-side bars reach 100, not a 180 stack, so 80% is 80
+    expect(markers(options)[0].markLine.data[0].yAxis).toBe(80);
+  });
+
   it.each([
     ["stacked", "yAxis"],
     ["h-stacked", "xAxis"],

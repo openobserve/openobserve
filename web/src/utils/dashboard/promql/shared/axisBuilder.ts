@@ -42,7 +42,8 @@ export function buildTooltip(
   const decimals = config.decimals ?? 2;
   const unit = config.unit;
   const unitCustom = config.unit_custom;
-  const seriesOverrides = createSeriesOverrideLookup(config);
+  // The stack total formats with the same decimal fallback as the rows.
+  const seriesOverrides = createSeriesOverrideLookup({ ...config, decimals });
 
   return {
     trigger: triggerType,

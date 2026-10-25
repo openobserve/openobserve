@@ -215,6 +215,20 @@ describe("tooltip totals in rendered options", () => {
     expect(html).toBe("/a <br/> <strong>Total : 500ms</strong><br/> web : 300ms<br/> api : 200ms");
   });
 
+  it("SQL area-stacked on categories", async () => {
+    const options = await runSQL(sqlPanel("area-stacked", endpointX), stackRows(["/a", "/b"]));
+    const point = (name: string, value: number) => ({
+      seriesName: name,
+      seriesIndex: indexOf(options, name),
+      name: "/a",
+      marker: "",
+      value,
+      data: value,
+    });
+    const html = options.tooltip.formatter([point("api", 200), point("web", 300)]);
+    expect(html).toContain("<strong>Total : 500ms</strong>");
+  });
+
   it.each(["stacked", "area-stacked"])("SQL %s on time", async (type) => {
     const options = await runSQL(sqlPanel(type, timeX), stackRows(TIMES));
     const point = (name: string, value: number) => ({
@@ -283,6 +297,27 @@ describe("tooltip totals in rendered options", () => {
       { seriesName: "web", seriesIndex: indexOf(options, "web"), axisValue: "t", value: 300 },
     ]);
     expect(html.split("<br/>").slice(0, 2)).toEqual(["t", "<strong>Total : 500ms</strong>"]);
+  });
+
+  it("PromQL stacked: an unset decimals formats the total like the rows", async () => {
+    const result: any = await convertPromQLData(
+      { ...promPanel("stacked"), config: { show_legends: true, decimals: null } },
+      promData(),
+      store,
+      panelRef(),
+      { value: null },
+      { value: [] },
+      null,
+      [],
+      false,
+    );
+    const options = result.options;
+    const html = options.tooltip.formatter([
+      { seriesName: "api", seriesIndex: indexOf(options, "api"), axisValue: "t", value: 200 },
+      { seriesName: "web", seriesIndex: indexOf(options, "web"), axisValue: "t", value: 300 },
+    ]);
+    expect(html).toContain("<strong>Total : 500.00</strong>");
+    expect(html).toContain("api: 200.00");
   });
 
   it("PromQL area-stacked", async () => {

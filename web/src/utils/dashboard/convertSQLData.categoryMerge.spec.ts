@@ -25,7 +25,9 @@ const store = {
   },
 };
 
-const query = (alias: string) => ({
+const byService = { label: "Service", alias: "svc", column: "svc", args: [] };
+
+const query = (alias: string, breakdown: any[] = []) => ({
   query: "SELECT 1",
   customQuery: false,
   fields: {
@@ -34,18 +36,23 @@ const query = (alias: string) => ({
     x: [{ label: "Category", alias: "cat", column: "cat", args: [] }],
     y: [{ label: alias, alias, column: alias, aggregationFunction: "count", args: [] }],
     z: [],
-    breakdown: [],
+    breakdown,
     filter: { conditions: [] },
   },
   config: {},
 });
 
-const run = async (type: string, data: any[][], periods: string[] = ["", ""]) => {
+const run = async (
+  type: string,
+  data: any[][],
+  periods: string[] = ["", ""],
+  breakdown: any[] = [],
+) => {
   const panel = {
     id: "p",
     type,
     queryType: "sql",
-    queries: [query("v1"), query("v2")],
+    queries: [query("v1", breakdown), query("v2", breakdown)],
     config: {},
   };
   const result: any = await convertMultiSQLData(
@@ -74,6 +81,7 @@ const run = async (type: string, data: any[][], periods: string[] = ["", ""]) =>
   return {
     categories: (Array.isArray(axes) ? axes[0] : axes).data,
     data: series.map((s: any) => s.data),
+    axes,
   };
 };
 
@@ -92,7 +100,7 @@ describe("multi-query category merge", () => {
   it.each(["h-bar", "h-stacked"])(
     "%s: aligns every query to one row per category, in query 1's order",
     async (type) => {
-      expect(await run(type, twoQueries())).toEqual({
+      expect(await run(type, twoQueries())).toMatchObject({
         categories: ["b", "a", "c"],
         data: [
           [2, 1, null],
@@ -108,8 +116,22 @@ describe("multi-query category merge", () => {
     expect(shifted.data[1]).toEqual([null, 10, 30]);
   });
 
+  it("h-bar with a breakdown: leaves query 1's two category axes aligned", async () => {
+    const withService = [
+      [
+        { cat: "b", svc: "x", v1: 2 },
+        { cat: "a", svc: "x", v1: 1 },
+        { cat: "a", svc: "y", v1: 3 },
+      ],
+      [{ cat: "c", svc: "x", v2: 30 }],
+    ];
+    const { axes, categories } = await run("h-bar", withService, ["", ""], [byService]);
+    expect(axes).toHaveLength(2);
+    expect(categories).toHaveLength(axes[1].data.length);
+  });
+
   it("bar: keeps the alphabetical category order", async () => {
-    expect(await run("bar", twoQueries())).toEqual({
+    expect(await run("bar", twoQueries())).toMatchObject({
       categories: ["a", "b", "c"],
       data: [
         [1, 2, null],

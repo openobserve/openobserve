@@ -721,13 +721,24 @@ describe("getStackedPercentRange", () => {
     expect(getStackedPercentRange({}, series)).toEqual({ min: 0, max: 400 });
   });
 
-  it("treats series without a stack name as one group and keys plain values by index", () => {
-    const series = [{ data: [10, 20] }, { data: [5, 30] }];
-    expect(getStackedPercentRange({}, series)).toEqual({ min: 0, max: 50 });
+  it("keys plain values by index, and a series without a stack name stands alone", () => {
+    const stacked = [
+      { stack: "s", data: [10, 20] },
+      { stack: "s", data: [5, 30] },
+    ];
+    expect(getStackedPercentRange({}, stacked)).toEqual({ min: 0, max: 50 });
+    expect(getStackedPercentRange({}, [{ data: [100] }, { data: [80] }])).toEqual({
+      min: 0,
+      max: 100,
+    });
   });
 
   it("keeps a negative total as the minimum and honours a full configured range", () => {
-    expect(getStackedPercentRange({}, [{ data: [-30, 10] }, { data: [-20, 5] }])).toEqual({
+    const pair = [
+      { stack: "s", data: [-30, 10] },
+      { stack: "s", data: [-20, 5] },
+    ];
+    expect(getStackedPercentRange({}, pair)).toEqual({
       min: -50,
       max: 15,
     });
@@ -739,7 +750,11 @@ describe("getStackedPercentRange", () => {
   });
 
   it("stacks positive and negative values apart, as the chart draws them", () => {
-    const series = [{ data: [100, 20] }, { data: [-50, -10] }, { data: [30, 5] }];
+    const series = [
+      { stack: "s", data: [100, 20] },
+      { stack: "s", data: [-50, -10] },
+      { stack: "s", data: [30, 5] },
+    ];
     expect(getStackedPercentRange({}, series)).toEqual({ min: -50, max: 130 });
   });
 });

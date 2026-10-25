@@ -353,15 +353,17 @@ export const getStackedPercentRange = (
   if (yMin !== null && yMax !== null) return { min: yMin, max: yMax };
   // ECharts stacks positive and negative values apart, so each sign has its own extent.
   const totals = new Map<string, number>();
-  for (const s of series) {
+  series.forEach((s, seriesIndex) => {
+    // A series without a stack key is drawn on its own, beside the others.
+    const group = s.stack ?? `\u0000${seriesIndex}`;
     s.data.forEach((point: unknown, index: number) => {
       const value = pointValue(point, dimension);
       if (value === null) return;
       const x = Array.isArray(point) ? String(point[dimension === 1 ? 0 : 1]) : String(index);
-      const key = `${s.stack ?? ""}\u0000${x}\u0000${value < 0 ? "-" : "+"}`;
+      const key = `${group}\u0000${x}\u0000${value < 0 ? "-" : "+"}`;
       totals.set(key, (totals.get(key) ?? 0) + value);
     });
-  }
+  });
   if (totals.size === 0) return null;
   const sums = [...totals.values()];
   return { min: Math.min(0, ...sums), max: Math.max(0, ...sums) };
@@ -598,7 +600,10 @@ export const applyLineAreaThresholds = (options: any, panelSchema: any): void =>
   limitsByAxis.forEach((limits, axisIndex) =>
     extendAxisToLimits(options, valueAxis, axisIndex, limits, config),
   );
-  addTooltipCues(options.tooltip, stepsBySeries, overrides.formatValue, dimension);
+  // A stacked limit is read against the stack height, not one segment's value.
+  if (panelSchema.type !== "stacked" && panelSchema.type !== "h-stacked") {
+    addTooltipCues(options.tooltip, stepsBySeries, overrides.formatValue, dimension);
+  }
 
   if (visualMaps.length) {
     const existing = options.visualMap;

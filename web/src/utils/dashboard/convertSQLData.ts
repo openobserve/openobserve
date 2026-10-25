@@ -710,9 +710,11 @@ export const convertMultiSQLData = async (
   // C3: X-axis merge + reindex for time-series charts
   const isHorizontal = chartType === "h-bar" || chartType === "h-stacked";
   const categoryAxis = isHorizontal ? "yAxis" : "xAxis";
+  // An h-bar breakdown adds a second category axis with one entry per row, which a merge cannot realign.
   const needsXAxisMerge =
     options.length > 1 &&
     options[0]?.options?.[categoryAxis]?.[0]?.data &&
+    (!isHorizontal || options[0].options[categoryAxis].length === 1) &&
     !["pie", "donut", "metric", "gauge", "heatmap"].includes(chartType);
 
   if (needsXAxisMerge) {
