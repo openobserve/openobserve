@@ -426,6 +426,36 @@ describe("PanelErrorButtons", () => {
       wrapper.unmount();
     });
 
+    it("lists map names that joined no region, with the overflow count and missing labels", async () => {
+      const wrapper = mountAttached({
+        regionJoin: {
+          unmatched: ["us-east-1", "eu-west-1"],
+          unmatchedTotal: 25,
+          missingLabel: { label: "country", count: 2 },
+        },
+      });
+      const chip = wrapper.find('[data-test="panel-notice-chip-unmatched-regions"]');
+      expect(chip.text()).toBe("27 unmatched names");
+      await openTooltip(chip.element);
+      const details = [
+        ...(bubble()?.querySelectorAll('[data-test="panel-notice-detail-unmatched-regions"]') ??
+          []),
+      ].map((el) => el.textContent?.trim());
+      expect(details).toEqual([
+        "us-east-1, eu-west-1 and 23 more",
+        "2 series have no country label",
+      ]);
+      wrapper.unmount();
+    });
+
+    it("names a single unmatched value in the singular", () => {
+      const wrapper = mountAttached({ regionJoin: { unmatched: ["Atlantis"], unmatchedTotal: 1 } });
+      expect(wrapper.find('[data-test="panel-notice-chip-unmatched-regions"]').text()).toBe(
+        "1 unmatched name",
+      );
+      wrapper.unmount();
+    });
+
     it("shows server partial and client interruption as separate chips", () => {
       const wrapper = mountAttached({
         serverPartial: true,

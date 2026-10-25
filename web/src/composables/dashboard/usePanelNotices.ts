@@ -20,6 +20,7 @@ import {
   type PanelDiagnostics,
   type SeriesLimitInfo,
 } from "@/utils/dashboard/panelDiagnostics";
+import type { RegionJoinInfo } from "@/utils/dashboard/convertMapsData";
 
 /**
  * The notice state a PanelSchemaRenderer host keeps for PanelErrorButtons: server diagnostics,
@@ -29,6 +30,7 @@ export const usePanelNotices = (timezone: () => string) => {
   const resultMetadata = shallowRef<unknown>(null);
   const panelDiagnostics = shallowRef<PanelDiagnostics | null>(null);
   const seriesLimit = shallowRef<SeriesLimitInfo | null>(null);
+  const regionJoin = shallowRef<RegionJoinInfo | null>(null);
   // Writable, so a host can still clear it with its other warnings.
   const maxQueryRangeWarning = ref("");
 
@@ -56,16 +58,22 @@ export const usePanelNotices = (timezone: () => string) => {
     seriesLimit.value = limit;
   };
 
+  const handleRegionJoinUpdate = (join: RegionJoinInfo | null) => {
+    regionJoin.value = join;
+  };
+
   const resetNotices = () => {
     resultMetadata.value = null;
     panelDiagnostics.value = null;
     seriesLimit.value = null;
+    regionJoin.value = null;
     maxQueryRangeWarning.value = "";
   };
 
   /** The PanelErrorButtons props these notices drive, bound with `v-bind`. */
   const noticeProps = computed(() => ({
     seriesLimit: seriesLimit.value,
+    regionJoin: regionJoin.value,
     serverPartial: panelDiagnostics.value?.serverPartial ?? false,
     rowsCapped: panelDiagnostics.value?.rowsCapped ?? false,
     serverPartialReasons: panelDiagnostics.value?.partialReasons ?? [],
@@ -80,6 +88,7 @@ export const usePanelNotices = (timezone: () => string) => {
     handleResultMetadataUpdate,
     handlePanelDiagnosticsUpdate,
     handleSeriesLimitUpdate,
+    handleRegionJoinUpdate,
     resetNotices,
   };
 };

@@ -478,16 +478,6 @@ export default defineComponent({
       },
     });
 
-    const mapsEnableRoam = computed({
-      get: () => dashboardPanelData.data.config?.enable_roam !== false,
-      set: (value: boolean) => {
-        if (!dashboardPanelData.data.config) {
-          dashboardPanelData.data.config = {};
-        }
-        dashboardPanelData.data.config.enable_roam = value;
-      },
-    });
-
     // Table aggregations configuration
     const tableAggregations = computed({
       get: () => dashboardPanelData.data.config?.table_aggregations || ["last"],
@@ -684,7 +674,6 @@ export default defineComponent({
       geoNameLabel,
       mapsNameLabel,
       mapsMapType,
-      mapsEnableRoam,
       tableAggregations,
       promqlTableMode,
       promqlTableModeOptions,

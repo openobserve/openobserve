@@ -459,6 +459,10 @@ export function useConfigPanel(
         visible:
           dashboardPanelData.data.type === "geomap" || dashboardPanelData.data.type === "maps",
       },
+      "map-roam": {
+        label: t("dashboard.mapsEnableRoam"),
+        visible: dashboardPanelData.data.type === "maps",
+      },
     },
     gauge: {
       "gauge-min": {

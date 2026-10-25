@@ -891,6 +891,15 @@ describe("useConfigPanel – map section", () => {
     expect(c.isConfigOptionVisible("map", "map-config")).toBe(true);
   });
 
+  it("map-roam is searchable for maps only", () => {
+    expect(makeComposable(makePanelData("maps")).isConfigOptionVisible("map", "map-roam")).toBe(
+      true,
+    );
+    expect(makeComposable(makePanelData("geomap")).isConfigOptionVisible("map", "map-roam")).toBe(
+      false,
+    );
+  });
+
   it("map-config is hidden for non-map types", () => {
     const c = makeComposable(makePanelData("bar"));
     expect(c.isConfigOptionVisible("map", "map-config")).toBe(false);

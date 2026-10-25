@@ -16,6 +16,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { MapsConverter } from "./convertPromQLMapsChart";
 import { ProcessedPromQLData } from "./shared/types";
+import { chartColor } from "@/utils/chartTheme";
 
 vi.mock("./shared/dataProcessor", () => ({
   applyAggregation: vi.fn((values: any[], aggregation: string) => {
@@ -39,21 +40,6 @@ vi.mock("./shared/dataProcessor", () => ({
       return values.reduce((acc, v) => acc + parseFloat(v[1]), 0);
     }
     return 0;
-  }),
-}));
-
-vi.mock("../countryMappings", () => ({
-  getCountryName: vi.fn((code: string) => {
-    const countryMap: Record<string, string> = {
-      US: "United States",
-      UK: "United Kingdom",
-      CA: "Canada",
-      JP: "Japan",
-      CN: "China",
-      DE: "Germany",
-      FR: "France",
-    };
-    return countryMap[code] || code;
   }),
 }));
 
@@ -318,8 +304,6 @@ describe("MapsConverter", () => {
         config: {},
       };
 
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-
       const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].data).toHaveLength(1);
@@ -327,12 +311,11 @@ describe("MapsConverter", () => {
         name: "United States",
         value: 50,
       });
-      expect(consoleSpy).toHaveBeenCalledWith(
-        "Maps conversion warnings:",
-        expect.arrayContaining([expect.stringContaining("missing location name")]),
-      );
-
-      consoleSpy.mockRestore();
+      expect(mockExtras.regionJoin).toEqual({
+        unmatched: [],
+        unmatchedTotal: 0,
+        missingLabel: { label: "name", count: 1 },
+      });
     });
 
     it("should map country codes to full names", () => {
@@ -577,7 +560,8 @@ describe("MapsConverter", () => {
       expect(result.tooltip.trigger).toBe("item");
       expect(result.tooltip.showDelay).toBe(0);
       expect(result.tooltip.transitionDuration).toBe(0.2);
-      expect(result.tooltip.backgroundColor).toBe("rgba(255,255,255,0.8)");
+      expect(result.tooltip.backgroundColor).toBe(chartColor("--color-tooltip-bg"));
+      expect(result.tooltip.textStyle.color).toBe(chartColor("--color-tooltip-text"));
     });
 
     it("should format tooltip with valid value", () => {
@@ -609,7 +593,7 @@ describe("MapsConverter", () => {
         value: 100,
       });
 
-      expect(formatted).toBe("United States: 100");
+      expect(formatted).toBe("United States: 100.00");
     });
 
     it("should escape HTML in the region name", () => {
@@ -631,7 +615,7 @@ describe("MapsConverter", () => {
         value: 1,
       });
 
-      expect(formatted).toBe("&lt;img src=x onerror=alert(1)&gt;: 1");
+      expect(formatted).toBe("&lt;img src=x onerror=alert(1)&gt;: 1.00");
     });
 
     it("should format tooltip with dash for invalid value", () => {
@@ -965,6 +949,126 @@ describe("MapsConverter", () => {
       expect(result.series[0].data[0].value).toBe(100);
       expect(result.visualMap.min).toBe(0);
       expect(result.visualMap.max).toBe(100);
+    });
+
+    describe("region join", () => {
+      const series = (metric: Record<string, string>, value: string, name = "") => ({
+        metric,
+        name,
+        data: [],
+        values: [[1234567890, value]] as [number, string][],
+      });
+      const convert = (list: any[], config: any = {}) =>
+        converter.convert(
+          [{ series: list, timestamps: [] }] as ProcessedPromQLData[],
+          { type: "maps", config },
+          mockStore,
+          mockExtras,
+        );
+
+      it("joins names case-insensitively and through common aliases, summing per region", () => {
+        const result = convert([
+          series({ name: "us" }, "10"),
+          series({ name: "United States of America" }, "5"),
+          series({ name: "south korea" }, "7"),
+        ]);
+
+        expect(result.series[0].data).toEqual([
+          { name: "United States", value: 15 },
+          { name: "Korea", value: 7 },
+        ]);
+        expect(mockExtras.regionJoin).toBeNull();
+      });
+
+      it("keeps unmatched names out of the data and the colour scale, and reports them", () => {
+        const result = convert([
+          series({ name: "US" }, "10"),
+          series({ name: "CA" }, "20"),
+          series({ name: "us-east-1" }, "5000"),
+        ]);
+
+        expect(result.series[0].data.map((d: any) => d.name)).toEqual(["United States", "Canada"]);
+        expect(result.visualMap.min).toBe(10);
+        expect(result.visualMap.max).toBe(20);
+        expect(mockExtras.regionJoin).toEqual({ unmatched: ["us-east-1"], unmatchedTotal: 1 });
+        expect(mockExtras.legends).toEqual(["United States", "Canada"]);
+      });
+
+      it("does not fall back to a legend name that names no country", () => {
+        const result = convert([
+          series({ job: "api" }, "10", '{job="api"}'),
+          series({ name: "FR" }, "3"),
+        ]);
+
+        expect(result.series[0].data).toEqual([{ name: "France", value: 3 }]);
+        expect(mockExtras.regionJoin.missingLabel).toEqual({ label: "name", count: 1 });
+      });
+
+      it("reports series without the label even when nothing joins", () => {
+        const result = convert([series({ job: "api" }, "10", '{job="api"}')], {
+          name_label: "country",
+        });
+
+        expect(result.series).toEqual([]);
+        expect(mockExtras.regionJoin).toEqual({
+          unmatched: [],
+          unmatchedTotal: 0,
+          missingLabel: { label: "country", count: 1 },
+        });
+      });
+
+      it("lists at most 20 unmatched names but counts them all", () => {
+        convert([
+          series({ name: "US" }, "1"),
+          ...Array.from({ length: 25 }, (_, i) => series({ name: `zone-${i}` }, "1")),
+        ]);
+
+        expect(mockExtras.regionJoin.unmatched).toHaveLength(20);
+        expect(mockExtras.regionJoin.unmatchedTotal).toBe(25);
+      });
+    });
+
+    describe("units", () => {
+      const result = () =>
+        converter.convert(
+          [
+            {
+              series: [
+                { metric: { name: "US" }, name: "", data: [], values: [[1, "2048"]] },
+                { metric: { name: "DE" }, name: "", data: [], values: [[1, "1024"]] },
+              ],
+              timestamps: [],
+            },
+          ] as ProcessedPromQLData[],
+          { type: "maps", config: { unit: "bytes", decimals: 1 } },
+          mockStore,
+          mockExtras,
+        );
+
+      it("formats the tooltip value with the panel unit", () => {
+        expect(result().tooltip.formatter({ name: "United States", value: 2048 })).toBe(
+          "United States: 2.0KB",
+        );
+      });
+
+      it("formats the colour legend labels with the panel unit", () => {
+        expect(result().visualMap.formatter(1024)).toBe("1.0KB");
+      });
+
+      it("leaves the colour legend format alone when no unit or decimals are set", () => {
+        const plain = converter.convert(
+          [
+            {
+              series: [{ metric: { name: "US" }, name: "", data: [], values: [[1, "5"]] }],
+              timestamps: [],
+            },
+          ] as ProcessedPromQLData[],
+          { type: "maps", config: {} },
+          mockStore,
+          mockExtras,
+        );
+        expect(plain.visualMap.formatter).toBeUndefined();
+      });
     });
   });
 });

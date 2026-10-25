@@ -15,7 +15,9 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
+import * as echarts from "echarts/core";
 import MapsRenderer from "./MapsRenderer.vue";
+import { chartColor } from "@/utils/chartTheme";
 
 // Create mock chart instance
 const mockChart = {
@@ -56,6 +58,13 @@ vi.mock("vuex", () => ({
     },
   }),
 }));
+
+const theme = vi.hoisted(() => ({ isDark: null as any }));
+vi.mock("@/composables/useTheme", async () => {
+  const { ref } = await import("vue");
+  theme.isDark = ref(false);
+  return { default: () => ({ isDark: theme.isDark }) };
+});
 
 // Mock window event listeners with callback tracking
 let windowResizeCallback: Function | null = null;
@@ -489,6 +498,38 @@ describe("MapsRenderer", () => {
       }
 
       expect(wrapper.exists()).toBe(true);
+    });
+  });
+
+  describe("Theme", () => {
+    afterEach(() => {
+      theme.isDark.value = false;
+    });
+
+    it("initialises with the current theme and draws the options it was given", async () => {
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+
+      expect(echarts.init).toHaveBeenCalledWith(expect.any(HTMLElement), "light");
+      const [options] = mockChart.setOption.mock.calls.at(-1)!;
+      expect(options.series).toEqual(mockMapData.options.series);
+    });
+
+    it("re-initialises in the new theme and recolours the tooltip when the theme changes", async () => {
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+      vi.clearAllMocks();
+
+      theme.isDark.value = true;
+      await wrapper.vm.$nextTick();
+
+      expect(mockChart.dispose).toHaveBeenCalledTimes(1);
+      expect(echarts.init).toHaveBeenCalledWith(expect.any(HTMLElement), "dark");
+      const [options] = mockChart.setOption.mock.calls.at(-1)!;
+      expect(options.series).toEqual(mockMapData.options.series);
+      expect(options.tooltip.backgroundColor).toBe(chartColor("--color-tooltip-bg"));
+      expect(options.tooltip.textStyle.color).toBe(chartColor("--color-tooltip-text"));
+      expect(options.tooltip.formatter).toBe("{b}: {c}");
     });
   });
 });

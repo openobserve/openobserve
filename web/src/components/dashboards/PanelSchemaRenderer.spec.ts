@@ -3387,6 +3387,24 @@ describe("PanelSchemaRenderer", () => {
       return chunk;
     };
 
+    it("emits the maps region join from each conversion and clears it on the next", async () => {
+      const { data } = await mountRacing();
+      const join = { unmatched: ["us-east-1"], unmatchedTotal: 1 };
+
+      vi.mocked(convertPanelData).mockResolvedValueOnce({
+        ...optionsWith("a"),
+        extras: { regionJoin: join },
+      });
+      data.value = [primary];
+      await flushPromises();
+      expect(wrapper.emitted("region-join-update")?.at(-1)).toEqual([join]);
+
+      vi.mocked(convertPanelData).mockResolvedValueOnce(optionsWith("b"));
+      data.value = [shifted];
+      await flushPromises();
+      expect(wrapper.emitted("region-join-update")?.at(-1)).toEqual([null]);
+    });
+
     it("drops a previous run's conversion that resolves after the next run reset", async () => {
       const { data, loading } = await mountRacing();
       const chunk = await startRunTwoOverPendingChunk(data, loading);

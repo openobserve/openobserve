@@ -352,6 +352,7 @@ import ExemplarMarkerList from "@/components/dashboards/exemplars/ExemplarMarker
 import type { ExemplarMarker, InjectedExemplars, TraceVerdict } from "@/ts/interfaces/exemplars";
 import { detectChunkingDirection } from "@/utils/dashboard/chunkingDirection";
 import type { SeriesLimitInfo } from "@/utils/dashboard/panelDiagnostics";
+import type { RegionJoinInfo } from "@/utils/dashboard/convertMapsData";
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -582,6 +583,7 @@ export default defineComponent({
     "loading-state-change",
     "limit-number-of-series-warning-message-update",
     "series-limit-update",
+    "region-join-update",
     "panel-diagnostics-update",
     "sparkline-warning-update",
     "is-partial-data-update",
@@ -648,6 +650,7 @@ export default defineComponent({
 
     const limitNumberOfSeriesWarningMessage: any = ref("");
     const seriesLimit = ref<SeriesLimitInfo | null>(null);
+    const regionJoin = shallowRef<RegionJoinInfo | null>(null);
 
     const chartPanelStyle = ref({
       height: "100%",
@@ -1470,6 +1473,7 @@ export default defineComponent({
           limitNumberOfSeriesWarningMessage.value =
             panelData.value?.extras?.limitNumberOfSeriesWarningMessage ?? "";
           seriesLimit.value = panelData.value?.extras?.seriesLimit ?? null;
+          regionJoin.value = panelData.value?.extras?.regionJoin ?? null;
 
           errorDetail.value = {
             message: "",
@@ -1817,6 +1821,10 @@ export default defineComponent({
 
     watch(seriesLimit, (value) => {
       emit("series-limit-update", value);
+    });
+
+    watch(regionJoin, (value) => {
+      emit("region-join-update", value);
     });
 
     watch(

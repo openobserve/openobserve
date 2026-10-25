@@ -19,7 +19,7 @@ import { raw } from "@/types/i18n";
  * Country code to name mapping for map charts
  * Supports ISO 3166-1 alpha-2 and alpha-3 codes
  *
- * The `name` values are ECharts GeoJSON join keys — `getCountryName()` feeds them
+ * The `name` values are ECharts GeoJSON join keys — `resolveCountryName()` feeds them
  * into the `type: "map"` series, where ECharts matches them against the world map's
  * region names (hence the Natural-Earth spellings "W. Sahara", "Bosnia and Herz.").
  * They are `raw()` because translating one would break the match and drop that
@@ -249,12 +249,89 @@ export const countries: Country[] = [
   { name: raw("Zimbabwe"), alpha2: "ZW", alpha3: "ZWE" },
 ];
 
-/**
- * Get full country name by ISO code or return the input if already a full name
- * @param code - ISO alpha-2, alpha-3 code, or full country name
- * @returns Full country name
- */
-export const getCountryName = (code: string): string => {
-  const country = countries.find((c) => c.alpha2 === code || c.alpha3 === code || c.name === code);
-  return country ? country.name : code;
+// Common spellings, lower-cased, of countries whose world-map name is abbreviated or differs.
+export const COUNTRY_ALIASES: Record<string, string> = {
+  "aland islands": "Aland",
+  "åland islands": "Aland",
+  "antigua and barbuda": "Antigua and Barb.",
+  "bolivia, plurinational state of": "Bolivia",
+  "bosnia and herzegovina": "Bosnia and Herz.",
+  "british indian ocean territory": "Br. Indian Ocean Ter.",
+  "brunei darussalam": "Brunei",
+  burma: "Myanmar",
+  "cabo verde": "Cape Verde",
+  "cayman islands": "Cayman Is.",
+  "central african republic": "Central African Rep.",
+  "congo, the democratic republic of the": "Dem. Rep. Congo",
+  "cote d'ivoire": "Côte d'Ivoire",
+  curacao: "Curaçao",
+  czechia: "Czech Rep.",
+  "czech republic": "Czech Rep.",
+  "democratic people's republic of korea": "Dem. Rep. Korea",
+  "democratic republic of the congo": "Dem. Rep. Congo",
+  "dominican republic": "Dominican Rep.",
+  "dr congo": "Dem. Rep. Congo",
+  "east timor": "Timor-Leste",
+  "equatorial guinea": "Eq. Guinea",
+  eswatini: "Swaziland",
+  "falkland islands": "Falkland Is.",
+  "faroe islands": "Faeroe Is.",
+  "federated states of micronesia": "Micronesia",
+  "french polynesia": "Fr. Polynesia",
+  "french southern territories": "Fr. S. Antarctic Lands",
+  "great britain": "United Kingdom",
+  "heard island and mcdonald islands": "Heard I. and McDonald Is.",
+  "iran, islamic republic of": "Iran",
+  "ivory coast": "Côte d'Ivoire",
+  "korea, democratic people's republic of": "Dem. Rep. Korea",
+  "korea, republic of": "Korea",
+  "lao people's democratic republic": "Lao PDR",
+  laos: "Lao PDR",
+  "micronesia, federated states of": "Micronesia",
+  "moldova, republic of": "Moldova",
+  "north korea": "Dem. Rep. Korea",
+  "north macedonia": "Macedonia",
+  "northern cyprus": "N. Cyprus",
+  "northern mariana islands": "N. Mariana Is.",
+  "palestine, state of": "Palestine",
+  "republic of korea": "Korea",
+  "republic of the congo": "Congo",
+  "russian federation": "Russia",
+  "saint pierre and miquelon": "St. Pierre and Miquelon",
+  "saint vincent and the grenadines": "St. Vin. and Gren.",
+  "sao tome and principe": "São Tomé and Principe",
+  "solomon islands": "Solomon Is.",
+  "south georgia and the south sandwich islands": "S. Geo. and S. Sandw. Is.",
+  "south korea": "Korea",
+  "south sudan": "S. Sudan",
+  "syrian arab republic": "Syria",
+  "tanzania, united republic of": "Tanzania",
+  "the bahamas": "Bahamas",
+  "the gambia": "Gambia",
+  "the netherlands": "Netherlands",
+  turkiye: "Turkey",
+  türkiye: "Turkey",
+  "turks and caicos islands": "Turks and Caicos Is.",
+  uae: "United Arab Emirates",
+  uk: "United Kingdom",
+  "united states of america": "United States",
+  "united states virgin islands": "U.S. Virgin Is.",
+  "us virgin islands": "U.S. Virgin Is.",
+  "venezuela, bolivarian republic of": "Venezuela",
+  "viet nam": "Vietnam",
+  "western sahara": "W. Sahara",
+};
+
+const countryLookup = new Map<string, string>();
+for (const country of countries) {
+  countryLookup.set(country.alpha2.toLowerCase(), country.name);
+  countryLookup.set(country.alpha3.toLowerCase(), country.name);
+  countryLookup.set(country.name.toLowerCase(), country.name);
+}
+for (const [alias, name] of Object.entries(COUNTRY_ALIASES)) countryLookup.set(alias, name);
+
+/** The world-map region name for an ISO alpha-2/alpha-3 code or a country name, ignoring case; null when nothing matches. */
+export const resolveCountryName = (value: unknown): string | null => {
+  if (value === null || value === undefined) return null;
+  return countryLookup.get(String(value).trim().toLowerCase()) ?? null;
 };

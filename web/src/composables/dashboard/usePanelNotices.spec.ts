@@ -67,6 +67,7 @@ describe("usePanelNotices", () => {
 
     expect(notices.noticeProps.value).toEqual({
       seriesLimit: { shown: 100, total: 1000, cap: 100 },
+      regionJoin: null,
       serverPartial: true,
       rowsCapped: true,
       serverPartialReasons: ["Warn: results are capped to meet default limit"],
@@ -76,5 +77,15 @@ describe("usePanelNotices", () => {
     notices.resetNotices();
     expect(notices.noticeProps.value.functionErrors).toEqual([]);
     expect(notices.maxQueryRangeWarning.value).toBe("");
+  });
+
+  it("passes the maps region join to PanelErrorButtons and clears it on reset", () => {
+    const notices = usePanelNotices(() => "UTC");
+    const join = { unmatched: ["us-east-1"], unmatchedTotal: 1 };
+    notices.handleRegionJoinUpdate(join);
+    expect(notices.noticeProps.value.regionJoin).toEqual(join);
+
+    notices.resetNotices();
+    expect(notices.noticeProps.value.regionJoin).toBeNull();
   });
 });

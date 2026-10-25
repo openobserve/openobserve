@@ -22,6 +22,8 @@ import * as echarts from "echarts/core";
 import { MapChart } from "echarts/charts";
 import worldMap from "@/assets/dashboard/maps/map.json";
 import { withChartFont } from "@/utils/fonts";
+import { chartColor } from "@/utils/chartTheme";
+import useTheme from "@/composables/useTheme";
 
 echarts.use([MapChart]);
 
@@ -46,19 +48,48 @@ export default defineComponent({
     };
 
     const DEFAULT_MAP_OPTIONS = {
+      backgroundColor: "transparent",
       tooltip: {},
       series: [{ type: "map", map: "world", data: [] }],
     };
-    const initChart = async () => {
-      if (chartRef.value) {
-        chart = echarts.init(chartRef.value);
-        echarts.registerMap("world", worldMap as any);
 
-        // Default empty chart configuration to ensure map is visible
-
-        chart.setOption(withChartFont(DEFAULT_MAP_OPTIONS), true);
-      }
+    const currentOptions = () => {
+      const options = props.data.options;
+      return options && options.series && options.series.length > 0 ? options : DEFAULT_MAP_OPTIONS;
     };
+
+    const { isDark } = useTheme();
+
+    const initChart = () => {
+      if (!chartRef.value) return;
+      chart = echarts.init(chartRef.value, isDark.value ? "dark" : "light");
+      echarts.registerMap("world", worldMap as any);
+      chart.setOption(withChartFont(currentOptions()), true);
+    };
+
+    // Tooltip colours were resolved by the converter under the previous theme.
+    const withThemedTooltip = (options: any) =>
+      options.tooltip
+        ? {
+            ...options,
+            tooltip: {
+              ...options.tooltip,
+              backgroundColor: chartColor("--color-tooltip-bg"),
+              borderColor: chartColor("--color-tooltip-border"),
+              textStyle: {
+                ...options.tooltip.textStyle,
+                color: chartColor("--color-tooltip-text"),
+              },
+            },
+          }
+        : options;
+
+    watch(isDark, () => {
+      if (!chart) return;
+      chart.dispose();
+      chart = echarts.init(chartRef.value, isDark.value ? "dark" : "light");
+      chart.setOption(withChartFont(withThemedTooltip(currentOptions())), true);
+    });
 
     onMounted(async () => {
       await nextTick();
@@ -67,7 +98,7 @@ export default defineComponent({
       await nextTick();
       await nextTick();
       await nextTick();
-      await initChart();
+      initChart();
       window.addEventListener("resize", windowResizeEventCallback);
     });
 
@@ -78,16 +109,10 @@ export default defineComponent({
 
     watch(
       () => props.data.options,
-      async (newOptions) => {
+      async () => {
         if (chart) {
           await nextTick();
-          if (newOptions && newOptions.series && newOptions.series.length > 0) {
-            chart?.setOption(withChartFont(newOptions), true);
-          } else {
-            // If no data provided, set a default empty map
-
-            chart?.setOption(withChartFont(DEFAULT_MAP_OPTIONS), true);
-          }
+          chart?.setOption(withChartFont(currentOptions()), true);
         }
       },
       { deep: true },

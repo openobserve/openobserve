@@ -408,6 +408,60 @@ describe("ConfigPanel", () => {
     });
   });
 
+  describe("Map pan and zoom switch", () => {
+    const mapsPanel = (queryType: string, enableRoam?: boolean) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type: "maps",
+        queryType,
+        config: { ...mockDashboardPanelData.data.config, enable_roam: enableRoam },
+      },
+    });
+    const roamSwitch = () => wrapper.findComponent('[data-test="dashboard-config-map-roam"]');
+
+    it("shows each query type's default when unset: on for PromQL, off for SQL", () => {
+      wrapper = createWrapper({ dashboardPanelData: mapsPanel("promql") }, { promqlMode: true });
+      expect(roamSwitch().props("modelValue")).toBe(true);
+      wrapper.unmount();
+
+      wrapper = createWrapper({ dashboardPanelData: mapsPanel("sql") });
+      expect(roamSwitch().props("modelValue")).toBe(false);
+    });
+
+    it("writes config.enable_roam", async () => {
+      const panel = mapsPanel("sql");
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      await roamSwitch().vm.$emit("update:modelValue", true);
+      expect(panel.data.config.enable_roam).toBe(true);
+    });
+
+    it("reflects a saved value over the default", () => {
+      wrapper = createWrapper(
+        { dashboardPanelData: mapsPanel("promql", false) },
+        { promqlMode: true },
+      );
+      expect(roamSwitch().props("modelValue")).toBe(false);
+    });
+
+    it("is absent for geomap", () => {
+      wrapper = createWrapper({
+        dashboardPanelData: {
+          ...mockDashboardPanelData,
+          data: {
+            ...mockDashboardPanelData.data,
+            type: "geomap",
+            config: {
+              ...mockDashboardPanelData.data.config,
+              map_view: { lat: 0, lng: 0, zoom: 1 },
+            },
+          },
+        },
+      });
+      expect(wrapper.find('[data-test="dashboard-config-map-roam"]').exists()).toBe(false);
+    });
+  });
+
   describe("PromQL series limit", () => {
     const panelOf = (type: string) => ({
       ...mockDashboardPanelData,
