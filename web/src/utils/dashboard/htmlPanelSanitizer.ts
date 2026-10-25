@@ -20,6 +20,8 @@ const DOCUMENT_SELECTOR = /^(html|body|:root)(?![\w-])/i;
 
 const IFRAME_SANDBOX = "allow-scripts allow-same-origin";
 
+const TARGETABLE_TAGS = new Set(["A", "AREA", "FORM"]);
+
 const refusedIframes = new WeakSet<Element>();
 
 type ScopableRule = CSSRule & { selectorText?: string; cssRules?: CSSRuleList };
@@ -91,13 +93,16 @@ const prefixSelectors = (rules: CSSRuleList, prefix: string): void => {
 
 // a named target could steer a link or form into a panel iframe, past the embed origin check
 const keepOnlyBlankTarget = (node: Element): void => {
-  if (!node.hasAttribute("target")) return;
-  if (node.getAttribute("target")?.trim().toLowerCase() !== "_blank") {
-    node.removeAttribute("target");
+  if (!TARGETABLE_TAGS.has(node.nodeName.toUpperCase())) return;
+  // prototype calls: a form control named e.g. "hasAttribute" shadows the form's own method
+  const target = Element.prototype.getAttribute.call(node, "target");
+  if (target === null) return;
+  if (target.trim().toLowerCase() !== "_blank") {
+    Element.prototype.removeAttribute.call(node, "target");
     return;
   }
-  node.setAttribute("target", "_blank");
-  node.setAttribute("rel", "noopener noreferrer");
+  Element.prototype.setAttribute.call(node, "target", "_blank");
+  Element.prototype.setAttribute.call(node, "rel", "noopener noreferrer");
 };
 
 const scopeCss = (cssText: string, prefix: string): string => {

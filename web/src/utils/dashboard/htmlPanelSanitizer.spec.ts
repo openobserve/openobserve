@@ -147,6 +147,23 @@ describe("htmlPanelSanitizer", () => {
       expect(plain.getAttribute("rel")).toBe("nofollow");
     });
 
+    it("handles a form whose own attribute methods are shadowed by named controls", () => {
+      const proto = HTMLFormElement.prototype as any;
+      const shadow = () => {
+        throw new Error("shadowed");
+      };
+      Object.defineProperty(proto, "hasAttribute", { value: shadow, configurable: true });
+      Object.defineProperty(proto, "getAttribute", { value: shadow, configurable: true });
+      try {
+        const form = render('<form action="https://example.com/f" target="_blank"></form>')
+          .firstElementChild as Element;
+        expect(Element.prototype.getAttribute.call(form, "rel")).toBe("noopener noreferrer");
+      } finally {
+        delete proto.hasAttribute;
+        delete proto.getAttribute;
+      }
+    });
+
     it("registers its iframe hook once, on a private DOMPurify instance", () => {
       const addHookSpy = vi.spyOn(htmlPanelPurifier, "addHook");
 
