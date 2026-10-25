@@ -94,7 +94,7 @@ const prefixSelectors = (rules: CSSRuleList, prefix: string): void => {
 // a named target could steer a link or form into a panel iframe, past the embed origin check
 const keepOnlyBlankTarget = (node: Element): void => {
   if (!TARGETABLE_TAGS.has(node.nodeName.toUpperCase())) return;
-  // prototype calls: a form control named e.g. "hasAttribute" shadows the form's own method
+  // prototype calls: a form control named e.g. "getAttribute" shadows the form's own method
   const target = Element.prototype.getAttribute.call(node, "target");
   if (target === null) return;
   if (target.trim().toLowerCase() !== "_blank") {

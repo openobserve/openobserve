@@ -138,6 +138,7 @@ describe("htmlPanelSanitizer", () => {
       const [area, namedArea] = Array.from(out.querySelectorAll("area"));
       const [svgLink, namedSvgLink] = Array.from(out.querySelectorAll("svg a"));
 
+      expect(area.getAttribute("target")).toBe("_blank");
       expect(area.getAttribute("rel")).toBe("noopener noreferrer");
       expect(namedArea.hasAttribute("target")).toBe(false);
       expect(svgLink.getAttribute("target")).toBe("_blank");
@@ -167,14 +168,13 @@ describe("htmlPanelSanitizer", () => {
       const shadow = () => {
         throw new Error("shadowed");
       };
-      Object.defineProperty(proto, "hasAttribute", { value: shadow, configurable: true });
+      // jsdom has no form named-property getters, so shadow the prototype instead
       Object.defineProperty(proto, "getAttribute", { value: shadow, configurable: true });
       try {
         const form = render('<form action="https://example.com/f" target="_blank"></form>')
           .firstElementChild as Element;
         expect(Element.prototype.getAttribute.call(form, "rel")).toBe("noopener noreferrer");
       } finally {
-        delete proto.hasAttribute;
         delete proto.getAttribute;
       }
     });
