@@ -5507,11 +5507,12 @@ async fn handle_derived_stream_triggers(
                     new_trigger.module_key
                 );
 
-                let local_val = trigger_results.data // checked is some
-                        .unwrap()
-                        .into_iter()
-                        .map(json::Value::Object)
-                        .collect::<Vec<_>>();
+                let local_val = trigger_results
+                    .data // checked is some
+                    .unwrap()
+                    .into_iter()
+                    .map(json::Value::Object)
+                    .collect::<Vec<_>>();
 
                 // pass search results to pipeline to get modified results before ingesting
                 let mut json_data_by_stream: HashMap<StreamParams, Vec<json::Value>> =

@@ -67,10 +67,7 @@ mod tests {
     use std::sync::Arc;
 
     use arrow::datatypes::{DataType, Field, TimeUnit};
-    use datafusion::{
-        common::config::ConfigOptions, logical_expr::ScalarUDFImpl as _,
-        physical_plan::ColumnarValue,
-    };
+    use datafusion::{common::config::ConfigOptions, physical_plan::ColumnarValue};
 
     use super::*;
 

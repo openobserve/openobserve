@@ -219,6 +219,7 @@ async fn discover() -> Vec<(String, Vec<String>)> {
 }
 
 /// Skips orgs being deleted, then mirrors the two sources `check_ingestion_allowed` reads.
+#[cfg_attr(not(feature = "cloud"), allow(clippy::needless_bool))]
 async fn org_allowed(org: &str) -> bool {
     if super::super::org_being_deleted(org) || crate::db::file_list::BLOCKED_ORGS.contains(org) {
         return false;

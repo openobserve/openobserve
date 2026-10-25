@@ -100,7 +100,11 @@ fn create_slo_status_stmt() -> TableCreateStatement {
         // The watermark (rollup row only) — a forward clamp, not a barrier.
         .col(ColumnDef::new(SloStatus::WatermarkEnd).big_integer().null())
         // Group bookkeeping (S-10).
-        .col(ColumnDef::new(SloStatus::GroupsObserved).big_integer().null())
+        .col(
+            ColumnDef::new(SloStatus::GroupsObserved)
+                .big_integer()
+                .null(),
+        )
         .col(
             ColumnDef::new(SloStatus::GroupsObservedIsLowerBound)
                 .boolean()
@@ -146,7 +150,12 @@ fn create_slos_stmt() -> TableCreateStatement {
     Table::create()
         .table(Slos::Table)
         .if_not_exists()
-        .col(ColumnDef::new(Slos::Id).string_len(27).not_null().primary_key())
+        .col(
+            ColumnDef::new(Slos::Id)
+                .string_len(27)
+                .not_null()
+                .primary_key(),
+        )
         .col(ColumnDef::new(Slos::Org).string_len(100).not_null())
         .col(ColumnDef::new(Slos::FolderId).string_len(27).not_null())
         .col(ColumnDef::new(Slos::Name).string_len(256).not_null())
@@ -168,7 +177,11 @@ fn create_slos_stmt() -> TableCreateStatement {
                 .not_null()
                 .default(1),
         )
-        .col(ColumnDef::new(Slos::GenerationResetTime).big_integer().null())
+        .col(
+            ColumnDef::new(Slos::GenerationResetTime)
+                .big_integer()
+                .null(),
+        )
         .col(ColumnDef::new(Slos::GroupsEstimate).big_integer().null())
         .col(
             ColumnDef::new(Slos::GroupsReserved)
