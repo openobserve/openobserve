@@ -22,13 +22,7 @@ import {
   TOOLTIP_SCROLL_STYLE,
 } from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
-
-/**
- * Normalize value for symbol size calculation
- */
-function normalizeValue(value: any, minValue: any, maxValue: any) {
-  return (value - minValue) / (maxValue - minValue);
-}
+import { geoMapTooltipFormatter, normalizeGeoWeight } from "../convertGeoMapData";
 
 /**
  * Converter for geographic map charts (geomap)
@@ -47,9 +41,16 @@ export class GeoConverter implements PromQLChartConverter {
     const lonLabel = config.lon_label || "longitude";
     const weightLabel = config.weight_label || "weight";
 
-    const geoData: any[] = [];
+    const geoLabels = new Set([latLabel, lonLabel, weightLabel]);
+    const layers = new Map<number, { queryConfig: any; data: any[] }>();
     const errors: string[] = [];
     processedData.forEach((queryData) => {
+      const queryIndex = queryData.queryIndex ?? 0;
+      const queryConfig = queryData.queryConfig ?? {};
+      if (!layers.has(queryIndex)) {
+        layers.set(queryIndex, { queryConfig, data: [] });
+      }
+      const layer = layers.get(queryIndex)!;
       queryData.series.forEach((seriesData) => {
         const lat = seriesData.metric[latLabel];
         const lon = seriesData.metric[lonLabel];
@@ -69,12 +70,17 @@ export class GeoConverter implements PromQLChartConverter {
         } else if (seriesData.values && seriesData.values.length > 0) {
           weight = applyAggregation(seriesData.values, aggregation);
         } else {
-          weight = config.weight_fixed || 1; // Default weight if not provided
+          weight = queryConfig.weight_fixed ?? 1;
         }
 
-        geoData.push([parseFloat(lon), parseFloat(lat), weight]);
+        const fields = Object.fromEntries(
+          Object.entries(seriesData.metric).filter(([key]) => !geoLabels.has(key)),
+        );
+        const value = [parseFloat(lon), parseFloat(lat), weight];
+        layer.data.push(Object.keys(fields).length ? { value, fields } : value);
       });
     });
+    const geoData = [...layers.values()].flatMap((layer) => layer.data);
 
     if (errors.length > 0) {
       console.warn("GeoMap conversion warnings:", errors);
@@ -89,7 +95,7 @@ export class GeoConverter implements PromQLChartConverter {
     }
 
     // Calculate min/max values for visualMap and symbolSize
-    const values = geoData.map((item: any) => item[2]);
+    const values = geoData.map((item: any) => (Array.isArray(item) ? item : item.value)[2]);
     const minValue = Math.min(...values);
     const maxValue = Math.max(...values);
 
@@ -114,9 +120,7 @@ export class GeoConverter implements PromQLChartConverter {
         padding: 6,
         backgroundColor: "rgba(255,255,255,0.8)",
         extraCssText: TOOLTIP_SCROLL_STYLE,
-        formatter: function (params: any) {
-          return gt("dashboard.utils.mapLayerTooltip", { value: params.value[2] });
-        },
+        formatter: geoMapTooltipFormatter(panelSchema),
       },
       visualMap: {
         left: "right",
@@ -165,37 +169,35 @@ export class GeoConverter implements PromQLChartConverter {
           overflow: "truncate",
         },
       },
-      series: [
-        {
-          name: gt("dashboard.utils.mapLayerName"),
-          type: config.layer_type || "scatter",
-          coordinateSystem: "lmap",
-          data: geoData,
-          symbolSize: function (val: any) {
-            const normalizedSize = normalizeValue(val[2], minValue, maxValue);
-            const minSymbolSize = config.map_symbol_style?.size_by_value?.min ?? 1;
-            const maxSymbolSize = config.map_symbol_style?.size_by_value?.max ?? 100;
-            const mapSymbolStyleSelected = config.map_symbol_style?.size ?? "by Value";
+      series: [...layers.entries()].map(([queryIndex, layer]) => ({
+        name: gt("dashboard.utils.mapLayerNameIndexed", { index: queryIndex + 1 }),
+        type: layer.queryConfig.layer_type || "scatter",
+        coordinateSystem: "lmap",
+        data: layer.data,
+        symbolSize: function (val: any) {
+          const normalizedSize = normalizeGeoWeight(val[2], minValue, maxValue);
+          const minSymbolSize = config.map_symbol_style?.size_by_value?.min ?? 1;
+          const maxSymbolSize = config.map_symbol_style?.size_by_value?.max ?? 100;
+          const mapSymbolStyleSelected = config.map_symbol_style?.size ?? "by Value";
 
-            if (mapSymbolStyleSelected === "by Value") {
-              return minSymbolSize + normalizedSize * (maxSymbolSize - minSymbolSize);
-            } else if (mapSymbolStyleSelected === "fixed") {
-              return config.map_symbol_style?.size_fixed ?? 2;
-            }
-          },
-          itemStyle: {
-            color: "#b02a02",
-          },
-          encode: {
-            value: 2,
-          },
-          emphasis: {
-            label: {
-              show: true,
-            },
+          if (mapSymbolStyleSelected === "by Value") {
+            return minSymbolSize + normalizedSize * (maxSymbolSize - minSymbolSize);
+          } else if (mapSymbolStyleSelected === "fixed") {
+            return config.map_symbol_style?.size_fixed ?? 2;
+          }
+        },
+        itemStyle: {
+          color: "#b02a02",
+        },
+        encode: {
+          value: 2,
+        },
+        emphasis: {
+          label: {
+            show: true,
           },
         },
-      ],
+      })),
     };
   }
 }

@@ -210,11 +210,10 @@ describe("GeoConverter", () => {
         },
       ];
 
+      processedData[0].queryConfig = { weight_fixed: 50 };
       const panelSchema = {
         type: "geomap",
-        config: {
-          weight_fixed: 50,
-        },
+        config: {},
       };
 
       const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
@@ -590,10 +589,13 @@ describe("GeoConverter", () => {
       const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       const formattedTooltip = result.tooltip.formatter({
+        seriesName: "Layer 1",
         value: [0, 0, 42],
       });
 
-      expect(formattedTooltip).toBe("Layer 1: 42");
+      expect(formattedTooltip).toBe(
+        "<b>Layer 1</b><br/>Latitude: 0<br/>Longitude: 0<br/>Weight: 42.00",
+      );
     });
 
     it("should configure toolbox", () => {
@@ -705,11 +707,10 @@ describe("GeoConverter", () => {
         },
       ];
 
+      processedData[0].queryConfig = { layer_type: "heatmap" };
       const panelSchema = {
         type: "geomap",
-        config: {
-          layer_type: "heatmap",
-        },
+        config: {},
       };
 
       const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
@@ -1042,6 +1043,86 @@ describe("GeoConverter", () => {
       const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].data[0][2]).toBe(30);
+    });
+  });
+  describe("per-query layers and detail tooltip", () => {
+    const point = (lat: string, lon: string, extra: Record<string, string> = {}) => ({
+      metric: { latitude: lat, longitude: lon, ...extra },
+      name: `${lat},${lon}`,
+      data: {},
+      values: [] as [number, string][],
+    });
+
+    it("builds one layer per query with that query's layer type and fixed weight", () => {
+      const processedData: any[] = [
+        {
+          series: [point("1", "2")],
+          timestamps: [],
+          queryIndex: 0,
+          queryConfig: { layer_type: "scatter", weight_fixed: 3 },
+        },
+        {
+          series: [point("5", "6")],
+          timestamps: [],
+          queryIndex: 1,
+          queryConfig: { layer_type: "heatmap", weight_fixed: 7 },
+        },
+      ];
+
+      const result: any = converter.convert(
+        processedData,
+        { type: "geomap", config: {} },
+        mockStore,
+        mockExtras,
+      );
+
+      expect(result.series.map((s: any) => s.name)).toEqual(["Layer 1", "Layer 2"]);
+      expect(result.series.map((s: any) => s.type)).toEqual(["scatter", "heatmap"]);
+      expect(result.series[0].data).toEqual([[2, 1, 3]]);
+      expect(result.series[1].data).toEqual([[6, 5, 7]]);
+    });
+
+    it("gives a single point a finite symbol size", () => {
+      const processedData: any[] = [
+        { series: [point("1", "2")], timestamps: [], queryIndex: 0, queryConfig: {} },
+      ];
+
+      const result: any = converter.convert(
+        processedData,
+        { type: "geomap", config: {} },
+        mockStore,
+        mockExtras,
+      );
+
+      expect(result.series[0].symbolSize([2, 1, 1])).toBe(50.5);
+    });
+
+    it("shows the other series labels and the unit-formatted weight in the tooltip", () => {
+      const processedData: any[] = [
+        {
+          series: [point("1", "2", { city: "<i>Oslo</i>" })],
+          timestamps: [],
+          queryIndex: 0,
+          queryConfig: {},
+        },
+      ];
+
+      const result: any = converter.convert(
+        processedData,
+        { type: "geomap", config: { unit: "bytes", decimals: 0 } },
+        mockStore,
+        mockExtras,
+      );
+      const item = result.series[0].data[0];
+
+      expect(item).toEqual({ value: [2, 1, 1], fields: { city: "<i>Oslo</i>" } });
+      const html = result.tooltip.formatter({
+        seriesName: "Layer 1",
+        value: item.value,
+        data: item,
+      });
+      expect(html).toContain("Weight: 1B");
+      expect(html).toContain("city: &lt;i&gt;Oslo&lt;/i&gt;");
     });
   });
 });

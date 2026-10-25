@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <GeoMapRenderer
           v-else-if="panelSchema.type == 'geomap'"
           :data="
-            panelData.chartType == 'geomap'
+            panelData.chartType == 'geomap' && noData !== 'No Data'
               ? panelData
               : { options: { backgroundColor: 'transparent' } }
           "
@@ -166,7 +166,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           noData &&
           !isAwaitingFirstLoad &&
           !errorDetail?.message &&
-          panelSchema.type != 'geomap' &&
           panelSchema.type != 'maps' &&
           panelSchema.type != 'table' &&
           !loading &&
@@ -1865,10 +1864,17 @@ export default defineComponent({
         return "";
       }
 
+      const hasGeoPoints = () =>
+        panelData.value?.options?.series?.some((series: any) => series?.data?.length > 0);
+
       if (panelSchema.value?.queryType === "promql") {
         const hasResults =
           filteredData.value?.length &&
           filteredData.value.some((item: any) => item?.result?.length);
+        // Series without the lat/lon labels convert to no points.
+        if (hasResults && type === "geomap" && panelData.value?.chartType === "geomap") {
+          return hasGeoPoints() ? "" : "No Data";
+        }
         if (hasResults) return "";
         // During a reload the executor clears state.data before the new results
         // stream in. Keep showing the previously rendered chart while loading
@@ -1901,8 +1907,13 @@ export default defineComponent({
         return panelData.value?.rows?.length > 0 ? "" : "No Data";
       }
 
-      // Maps/geomap handle their own empty state.
-      if (type === "geomap" || type === "maps") {
+      // Rows with null lat/lon are dropped, so raw rows can still mean no points.
+      if (type === "geomap") {
+        return hasGeoPoints() ? "" : "No Data";
+      }
+
+      // Maps handles its own empty state.
+      if (type === "maps") {
         return "";
       }
 
