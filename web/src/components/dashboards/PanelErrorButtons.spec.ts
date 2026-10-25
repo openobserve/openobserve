@@ -435,7 +435,7 @@ describe("PanelErrorButtons", () => {
         },
       });
       const chip = wrapper.find('[data-test="panel-notice-chip-unmatched-regions"]');
-      expect(chip.text()).toBe("27 unmatched names");
+      expect(chip.text()).toBe("27 not on the map");
       await openTooltip(chip.element);
       const details = [
         ...(bubble()?.querySelectorAll('[data-test="panel-notice-detail-unmatched-regions"]') ??
@@ -448,10 +448,10 @@ describe("PanelErrorButtons", () => {
       wrapper.unmount();
     });
 
-    it("names a single unmatched value in the singular", () => {
+    it("counts a single unmatched value", () => {
       const wrapper = mountAttached({ regionJoin: { unmatched: ["Atlantis"], unmatchedTotal: 1 } });
       expect(wrapper.find('[data-test="panel-notice-chip-unmatched-regions"]').text()).toBe(
-        "1 unmatched name",
+        "1 not on the map",
       );
       wrapper.unmount();
     });

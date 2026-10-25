@@ -515,6 +515,15 @@ describe("MapsRenderer", () => {
       expect(options.series).toEqual(mockMapData.options.series);
     });
 
+    it("colours the tooltip of the empty default map from the theme", async () => {
+      wrapper = createWrapper({ data: { options: {} } });
+      await waitForChartInit(wrapper);
+
+      const [options] = mockChart.setOption.mock.calls.at(-1)!;
+      expect(options.series[0].data).toEqual([]);
+      expect(options.tooltip.backgroundColor).toBe(chartColor("--color-tooltip-bg"));
+    });
+
     it("re-initialises in the new theme and recolours the tooltip when the theme changes", async () => {
       wrapper = createWrapper();
       await waitForChartInit(wrapper);

@@ -120,8 +120,10 @@ describe("convertMapsData", () => {
     expect(result.options.visualMap.formatter(1024)).toBe("1KB");
   });
 
-  it("leaves the colour legend format alone without a unit or decimals", () => {
-    const result: any = convertMapsData(schema(), [[{ country: "US", value: 2048 }]]);
+  it("leaves the colour legend format alone without a unit, whatever the decimals", () => {
+    const result: any = convertMapsData(schema({ decimals: 2, unit: "default" }), [
+      [{ country: "US", value: 2048 }],
+    ]);
     expect(result.options.visualMap.formatter).toBeUndefined();
     expect(result.options.tooltip.formatter({ name: "Chad", value: NaN })).toBe("Chad: -");
   });

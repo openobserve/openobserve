@@ -1004,6 +1004,16 @@ describe("MapsConverter", () => {
         expect(mockExtras.regionJoin.missingLabel).toEqual({ label: "name", count: 1 });
       });
 
+      it("treats an empty label like a missing one, trying the legend name first", () => {
+        const result = convert([
+          series({ name: "" }, "4", "CA"),
+          series({ name: "" }, "9", '{name=""}'),
+        ]);
+
+        expect(result.series[0].data).toEqual([{ name: "Canada", value: 4 }]);
+        expect(mockExtras.regionJoin.missingLabel).toEqual({ label: "name", count: 1 });
+      });
+
       it("reports series without the label even when nothing joins", () => {
         const result = convert([series({ job: "api" }, "10", '{job="api"}')], {
           name_label: "country",

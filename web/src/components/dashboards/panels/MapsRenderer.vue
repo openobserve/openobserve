@@ -53,21 +53,7 @@ export default defineComponent({
       series: [{ type: "map", map: "world", data: [] }],
     };
 
-    const currentOptions = () => {
-      const options = props.data.options;
-      return options && options.series && options.series.length > 0 ? options : DEFAULT_MAP_OPTIONS;
-    };
-
-    const { isDark } = useTheme();
-
-    const initChart = () => {
-      if (!chartRef.value) return;
-      chart = echarts.init(chartRef.value, isDark.value ? "dark" : "light");
-      echarts.registerMap("world", worldMap as any);
-      chart.setOption(withChartFont(currentOptions()), true);
-    };
-
-    // Tooltip colours were resolved by the converter under the previous theme.
+    // Options can outlive a theme switch, so tooltip colours resolve at render time.
     const withThemedTooltip = (options: any) =>
       options.tooltip
         ? {
@@ -84,11 +70,27 @@ export default defineComponent({
           }
         : options;
 
+    const currentOptions = () => {
+      const options = props.data.options;
+      return withThemedTooltip(
+        options && options.series && options.series.length > 0 ? options : DEFAULT_MAP_OPTIONS,
+      );
+    };
+
+    const { isDark } = useTheme();
+
+    const initChart = () => {
+      if (!chartRef.value) return;
+      chart = echarts.init(chartRef.value, isDark.value ? "dark" : "light");
+      echarts.registerMap("world", worldMap as any);
+      chart.setOption(withChartFont(currentOptions()), true);
+    };
+
     watch(isDark, () => {
       if (!chart) return;
       chart.dispose();
       chart = echarts.init(chartRef.value, isDark.value ? "dark" : "light");
-      chart.setOption(withChartFont(withThemedTooltip(currentOptions())), true);
+      chart.setOption(withChartFont(currentOptions()), true);
     });
 
     onMounted(async () => {

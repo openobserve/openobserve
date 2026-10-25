@@ -79,7 +79,7 @@ const joinQueryRows = (
   return [...perRegion].map(([name, value]) => ({ name, value }));
 };
 
-export const formatMapValue = (value: unknown, config: any): string => {
+const formatMapValue = (value: unknown, config: any): string => {
   if (value === "-" || value === null || value === undefined || Number.isNaN(value)) return "-";
   return formatUnitValue(getUnitValue(value, config?.unit, config?.unit_custom, config?.decimals));
 };
@@ -103,7 +103,7 @@ export const buildMapsVisualMap = (regionTotals: number[], config: any) => {
     if (value < min) min = value;
     if (value > max) max = value;
   }
-  const hasUnits = !!config?.unit || config?.decimals !== undefined;
+  const hasUnit = !!config?.unit && config.unit !== "default";
   return {
     left: "right",
     min: regionTotals.length === 1 ? 0 : min,
@@ -111,8 +111,8 @@ export const buildMapsVisualMap = (regionTotals: number[], config: any) => {
     inRange: { color: MAP_COLOR_RAMP },
     text: [gt("dashboard.utils.visualMapHigh"), gt("dashboard.utils.visualMapLow")],
     calculable: true,
-    // Without a unit or decimals the legend keeps ECharts' own number format.
-    ...(hasUnits && { formatter: (value: number) => formatMapValue(value, config) }),
+    // Without a unit the legend keeps ECharts' own number format.
+    ...(hasUnit && { formatter: (value: number) => formatMapValue(value, config) }),
   };
 };
 

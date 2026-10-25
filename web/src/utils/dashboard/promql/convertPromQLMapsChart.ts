@@ -45,7 +45,7 @@ export class MapsConverter implements PromQLChartConverter {
       queryData.series.forEach((seriesData) => {
         const labelValue = seriesData.metric[nameLabel];
         // The legend name only stands in when it names a country itself, e.g. a legend template of the label.
-        const region = resolveCountryName(labelValue ?? seriesData.name);
+        const region = resolveCountryName(labelValue || seriesData.name);
         if (!region) {
           if (labelValue === undefined || labelValue === "") missingLabelCount++;
           else unmatched.add(String(labelValue));
