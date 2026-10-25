@@ -52,8 +52,7 @@ const pointOf = (point: unknown, index: number): [unknown, number | null] => {
     const time = point[0] instanceof Date ? point[0].getTime() : point[0];
     return [time, toFinite(point[1])];
   }
-  const value = point !== null && typeof point === "object" ? (point as any).value : point;
-  return [index, toFinite(value)];
+  return [index, toFinite(point)];
 };
 
 const sharedSuffix = (names: string[]): string => {
@@ -142,7 +141,7 @@ export const stackTotalRows = (
 /** Widens a user-set value-axis min/max so it never cuts into a stack; positives and negatives stack apart. */
 export const fitAxisBoundsToStacks = (options: any): void => {
   const axis = options?.yAxis;
-  if (!axis || Array.isArray(axis) || !Array.isArray(options.series)) return;
+  if (!axis || !Array.isArray(options.series)) return;
   const hasMax = typeof axis.max === "number";
   const hasMin = typeof axis.min === "number";
   if (!hasMax && !hasMin) return;

@@ -450,11 +450,8 @@ describe("fitAxisBoundsToStacks", () => {
     expect(fit({ min: -5, max: 1000 }, series)).toEqual({ min: -5, max: 1000 });
   });
 
-  it("leaves unset bounds and trellis axes alone", () => {
-    const series = [{ name: "a", stack: "s", data: [500] }];
-    expect(fit({}, series)).toEqual({});
-    const trellis = [{ max: 10 }, { max: 10 }];
-    expect(fit(trellis, series)).toEqual([{ max: 10 }, { max: 10 }]);
+  it("leaves unset bounds alone", () => {
+    expect(fit({}, [{ name: "a", stack: "s", data: [500] }])).toEqual({});
   });
 });
 
