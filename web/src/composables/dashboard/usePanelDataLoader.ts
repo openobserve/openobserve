@@ -802,6 +802,8 @@ export const usePanelDataLoader = (
 
   // remove intersection observer
   onUnmounted(() => {
+    // An aborted stream never reports loading=false, so an unmounted target would block other panels' re-runs.
+    if (panelIdToBeRefreshed.value === panelSchema.value?.id) panelIdToBeRefreshed.value = null;
     // abort on unmount
     if (abortController) {
       // Only set isPartialData if we're still loading or haven't received complete response

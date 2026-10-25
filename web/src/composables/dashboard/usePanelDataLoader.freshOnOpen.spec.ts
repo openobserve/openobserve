@@ -823,6 +823,17 @@ describe("usePanelDataLoader: fresh on open", () => {
       expect(panelIdToBeRefreshed.value).toBeNull();
     });
 
+    it("is cleared when it unmounts mid-load", async () => {
+      const { wrapper, selectedTimeObj } = mountPanel({ visit: createVisit() });
+      await settle();
+      endStream(0);
+      await refreshPanel(selectedTimeObj);
+
+      wrapper.unmount();
+
+      expect(panelIdToBeRefreshed.value).toBeNull();
+    });
+
     it("is kept when another panel's load finishes", async () => {
       mountPanel({ visit: createVisit() });
       panelIdToBeRefreshed.value = "panel-2";
