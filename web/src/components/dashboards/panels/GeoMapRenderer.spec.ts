@@ -955,6 +955,29 @@ describe("GeoMapRenderer", () => {
       expect(mockLeafletMap.setView).toHaveBeenCalledWith([39.92, 116.46], 10);
     });
 
+    it("rebuilds the map after a no-data placeholder", async () => {
+      let map: any = mockLeafletMap;
+      useLeaflet(() => map);
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+      mockChart.setOption.mockImplementation((_options: any, notMerge: any) => {
+        if (notMerge === true)
+          map = _options.lmap ? { ...mockLeafletMap, setView: vi.fn() } : undefined;
+      });
+      mockTileLayer.addTo.mockClear();
+
+      await wrapper.setProps({ data: { options: { backgroundColor: "transparent" } } });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(mockChart.setOption.mock.calls.at(-1)![1]).toBe(true);
+      expect(map).toBeUndefined();
+
+      await refreshWith({ center: [116.46, 39.92], zoom: 10 });
+
+      expect(mockChart.setOption.mock.calls.at(-1)![1]).toBe(true);
+      expect(mockTileLayer.addTo).toHaveBeenCalledWith(map);
+      expect(map.setView).toHaveBeenCalledWith([39.92, 116.46], 10);
+    });
+
     it("adds a tile layer to a replaced map", async () => {
       let map: any = mockLeafletMap;
       useLeaflet(() => map);

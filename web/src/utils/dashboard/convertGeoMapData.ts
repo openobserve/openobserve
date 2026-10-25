@@ -18,6 +18,7 @@ import { gt } from "@/types/i18n";
 import { getDataValue } from "./aliasUtils";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { escapeHtml } from "@/utils/html";
+import { TOOLTIP_SCROLL_STYLE } from "./promql/shared/types";
 
 // Equal weights (one point, or no weight field) would divide by zero and hide every marker.
 export function normalizeGeoWeight(value: any, minValue: any, maxValue: any) {
@@ -127,6 +128,7 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
       },
       padding: 6,
       backgroundColor: "rgba(255,255,255,0.8)",
+      extraCssText: TOOLTIP_SCROLL_STYLE,
       formatter: geoMapTooltipFormatter(panelSchema),
     },
     visualMap: {
