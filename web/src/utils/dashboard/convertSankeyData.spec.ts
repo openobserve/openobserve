@@ -867,6 +867,24 @@ describe("convertSankeyData", () => {
       expect(formatter({ data: series.data[2], value: 2 })).toBe("A \u21a9: formatted_unit_2");
     });
 
+    it("places sink and return node labels inside the chart", () => {
+      const result: any = convertSankeyData(schema(), [
+        [
+          { s: "A", t: "B", v: 4 },
+          { s: "B", t: "C", v: 2 },
+          { s: "B", t: "A", v: 1 },
+        ],
+      ]);
+      const labels = Object.fromEntries(
+        result.options.series[0].data.map((node: any) => [
+          node.isReturn ? `${node.rawName}-return` : node.name,
+          node.label?.position,
+        ]),
+      );
+
+      expect(labels).toEqual({ A: undefined, B: undefined, C: "left", "A-return": "left" });
+    });
+
     it("names return links by their real endpoints in the tooltip", () => {
       const result: any = convertSankeyData(schema(), [
         [

@@ -30,6 +30,7 @@ interface SankeyNode {
   rawName: string;
   isReturn?: boolean;
   itemStyle: { color: string };
+  label?: { position: "left" };
 }
 
 // The NUL prefix keeps a return node's id from colliding with any real node name.
@@ -179,6 +180,12 @@ export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
       isReturn,
       lineStyle: { curveness: 0.5 },
     };
+  });
+
+  // Sinks sit in the last column, so their labels go inside the chart instead of past its edge.
+  const sources = new Set(summed.map((link) => link.source));
+  nodes.forEach((node) => {
+    if (node.isReturn || !sources.has(node.name)) node.label = { position: "left" };
   });
 
   const config = panelSchema.config;
