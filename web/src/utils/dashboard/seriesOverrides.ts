@@ -40,6 +40,8 @@ export interface SeriesOverride {
   decimals?: number;
   color?: string;
   thresholds?: SeriesOverrideThresholds;
+  /** Value mappings for this series only, in `config.mappings` form; the state timeline reads them per row. */
+  valueMappings?: any[];
 }
 
 /** The settings of every override matching one series, merged in list order. */
@@ -50,6 +52,7 @@ export interface ResolvedSeriesOverride {
   decimals?: number;
   color?: string;
   thresholds?: SeriesOverrideThresholds;
+  valueMappings?: any[];
 }
 
 /** Arguments for `getUnitValue`, the override's unit settings merged over the panel's. */
@@ -121,6 +124,9 @@ const hasThresholdSteps = (thresholds: unknown): thresholds is SeriesOverrideThr
     Array.isArray(steps) && steps.some((step) => isSetText(step?.color) && isStepValue(step?.value))
   );
 };
+
+const hasValueMappings = (mappings: unknown): mappings is any[] =>
+  Array.isArray(mappings) && mappings.length > 0;
 
 const hasUnitSetting = (resolved: ResolvedSeriesOverride): boolean =>
   resolved.unit !== undefined ||
@@ -289,6 +295,7 @@ export const parseSeriesOverrideEntry = (entry: any): SeriesOverride | null => {
     else if (item?.type === "display_name") override.displayName = value;
     else if (item?.type === "series_color") override.color = value;
     else if (item?.type === "thresholds") override.thresholds = value;
+    else if (item?.type === "value_mappings") override.valueMappings = value;
   }
   return override;
 };
@@ -310,6 +317,9 @@ export const toSeriesOverrideEntry = (override: SeriesOverride): Record<string, 
   if (isSetText(override.color)) config.push({ type: "series_color", value: override.color });
   if (hasThresholdSteps(override.thresholds)) {
     config.push({ type: "thresholds", value: override.thresholds });
+  }
+  if (hasValueMappings(override.valueMappings)) {
+    config.push({ type: "value_mappings", value: override.valueMappings });
   }
   if (config.length === 0) return null;
   const matchBy =
@@ -358,6 +368,7 @@ export const resolveSeriesOverride = (
     if (decimals !== null) resolved.decimals = decimals;
     if (isSetText(override.color)) resolved.color = override.color.trim();
     if (hasThresholdSteps(override.thresholds)) resolved.thresholds = override.thresholds;
+    if (hasValueMappings(override.valueMappings)) resolved.valueMappings = override.valueMappings;
   }
   return Object.keys(resolved).length > 0 ? resolved : null;
 };

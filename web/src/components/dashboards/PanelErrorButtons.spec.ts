@@ -323,6 +323,24 @@ describe("PanelErrorButtons", () => {
       wrapper.unmount();
     });
 
+    it("shows a chart's own display cap as written, without the Top N action", async () => {
+      const wrapper = mountAttached({
+        seriesLimit: {
+          shown: 500,
+          total: 812,
+          cap: 500,
+          displayCapMessage: "Showing 500 of 812 rows.",
+        },
+        canEdit: true,
+      });
+      const chip = wrapper.find('[data-test="panel-notice-chip-series-cap"]');
+      expect(chip.text()).toBe("Display limited");
+      await openTooltip(chip.element);
+      expect(bubble()?.textContent).toContain("Showing 500 of 812 rows.");
+      expect(inBubble("panel-notice-action-use-top-n")).toBeNull();
+      wrapper.unmount();
+    });
+
     it("shows a capped total as a lower bound with thousands separators", async () => {
       const wrapper = mountAttached({
         seriesLimit: { shown: 100, total: 1000, cap: 100 },
