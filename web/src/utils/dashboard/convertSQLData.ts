@@ -31,6 +31,7 @@ import { escapeHtml } from "@/utils/html";
 import { applyGaugeSeriesThresholds, applyLineAreaThresholds } from "./thresholds";
 import { applySeriesOverrides } from "./seriesOverrides";
 import { isTimeSeries, isTimeStamp } from "./dateTimeUtils";
+import { fitAxisBoundsToStacks } from "./stackTotals";
 
 /**
  * Re-applies trellis layout on merged multi-query data.
@@ -865,6 +866,7 @@ export const convertMultiSQLData = async (
     }
     // Override colours first: a threshold step outranks them and recolours on top.
     applySeriesOverrides(options[0].options, panelSchema, store.state.theme);
+    if (chartType === "stacked") fitAxisBoundsToStacks(options[0].options);
     applyLineAreaThresholds(options[0].options, panelSchema);
   }
 
