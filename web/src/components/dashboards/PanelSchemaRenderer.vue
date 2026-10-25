@@ -315,6 +315,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import type { CustomChartContext } from "@/utils/dashboard/convertCustomChartData";
+import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { getDataValue } from "@/utils/dashboard/aliasUtils";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { useRoute, useRouter } from "vue-router";
@@ -2146,7 +2147,12 @@ export default defineComponent({
     function buildCustomChartContext(): CustomChartContext {
       const variables: Record<string, unknown> = {};
       for (const v of props.variablesData?.values ?? []) {
-        if (v?.name) variables[v.name] = v.value;
+        if (!v?.name) continue;
+        const isAll =
+          v.value === SELECT_ALL_VALUE ||
+          (Array.isArray(v.value) && v.value.includes(SELECT_ALL_VALUE));
+        // Only queries resolve the All sentinel, so chart code gets null instead.
+        variables[v.name] = isAll ? null : v.value;
       }
       return {
         variables,

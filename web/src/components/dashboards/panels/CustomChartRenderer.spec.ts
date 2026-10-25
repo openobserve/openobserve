@@ -417,9 +417,13 @@ describe("CustomChartRenderer", () => {
     const lastOption = () => mockChart.setOption.mock.calls.at(-1)?.[0];
 
     it("keeps the default theme and no background in light mode", async () => {
+      const echarts = await import("echarts");
       wrapper = createWrapper();
       await waitForChartInit(wrapper);
 
+      expect(echarts.init).toHaveBeenCalledWith(expect.any(Object), undefined, {
+        renderer: "canvas",
+      });
       expect(lastOption()).not.toHaveProperty("backgroundColor");
     });
 

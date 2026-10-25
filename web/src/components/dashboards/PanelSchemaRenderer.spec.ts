@@ -1411,6 +1411,8 @@ describe("PanelSchemaRenderer", () => {
             values: [
               { name: "service", value: "api" },
               { name: "regions", value: ["eu", "us"] },
+              { name: "env", value: "_o2_all_" },
+              { name: "zones", value: ["_o2_all_"] },
             ],
           },
           currentVariablesData: { values: [{ name: "service", value: "uncommitted" }] },
@@ -1427,7 +1429,7 @@ describe("PanelSchemaRenderer", () => {
         await flushPromises();
 
         expect(vi.mocked(convertPanelData).mock.calls.at(-1)?.[11]).toEqual({
-          variables: { service: "api", regions: ["eu", "us"] },
+          variables: { service: "api", regions: ["eu", "us"], env: null, zones: null },
           timeRange: { start: 1_700_000_000_000_000, end: 1_700_000_600_000_000 },
           timezone: "Asia/Kolkata",
           theme: "dark",
@@ -1454,6 +1456,28 @@ describe("PanelSchemaRenderer", () => {
 
         expect(convertPanelData).toHaveBeenCalled();
         expect(vi.mocked(convertPanelData).mock.calls.at(-1)?.[11]).toBeUndefined();
+      });
+
+      it("reports the light theme to custom chart code in light mode", async () => {
+        const isFirstLoadSettled = ref(false);
+        const data = ref<any[]>([]);
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ isFirstLoadSettled, data }) as any,
+        );
+        wrapper = createWrapper({
+          panelSchema: {
+            ...defaultProps.panelSchema,
+            type: "custom_chart",
+            customChartContent: "option = {}",
+            queries: [{ query: "SELECT 1", customQuery: true, fields: {}, config: {} }],
+          },
+        });
+        await flushPromises();
+        data.value = [[{ count: 1 }]];
+        isFirstLoadSettled.value = true;
+        await flushPromises();
+
+        expect(vi.mocked(convertPanelData).mock.calls.at(-1)?.[11]?.theme).toBe("light");
       });
 
       it("shows the error when the first load fails", async () => {
