@@ -1548,14 +1548,15 @@ export default defineComponent({
     );
 
     // The loader reloads only for query-referenced variables, but chart code may read any of them.
+    // Keyed on values only: option lists and loading flags change often and chart code cannot see them.
     watch(
-      () => props.variablesData?.values,
+      () =>
+        panelSchema.value?.type === "custom_chart" ? JSON.stringify(customChartVariables()) : "",
       () => {
-        if (panelSchema.value?.type === "custom_chart" && data.value?.length) {
+        if (panelSchema.value?.type === "custom_chart" && data.value?.length && !loading.value) {
           convertPanelDataCommon();
         }
       },
-      { deep: true },
     );
 
     // Watch for hiddenQueries changes to re-render the chart
@@ -2155,7 +2156,7 @@ export default defineComponent({
     }
 
     // Uses the committed variables the query ran with, so context matches the data.
-    function buildCustomChartContext(): CustomChartContext {
+    function customChartVariables(): Record<string, unknown> {
       const variables: Record<string, unknown> = {};
       for (const v of props.variablesData?.values ?? []) {
         if (!v?.name) continue;
@@ -2166,8 +2167,12 @@ export default defineComponent({
         // Queries run an empty value or the All sentinel as All, so chart code gets null for both.
         variables[v.name] = isAll ? null : v.value;
       }
+      return variables;
+    }
+
+    function buildCustomChartContext(): CustomChartContext {
       return {
-        variables,
+        variables: customChartVariables(),
         timeRange: {
           start: toMicros((props.selectedTimeObj as any)?.start_time),
           end: toMicros((props.selectedTimeObj as any)?.end_time),

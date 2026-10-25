@@ -1497,6 +1497,38 @@ describe("PanelSchemaRenderer", () => {
         });
       });
 
+      it("does not re-run custom chart code when only variable options or loading flags change", async () => {
+        const isFirstLoadSettled = ref(false);
+        const data = ref<any[]>([]);
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ isFirstLoadSettled, data }) as any,
+        );
+        const variable = { name: "threshold", value: "5", options: [], isLoading: false };
+        wrapper = createWrapper({
+          variablesData: { values: [variable] },
+          panelSchema: {
+            ...defaultProps.panelSchema,
+            type: "custom_chart",
+            customChartContent: "option = {}",
+            queries: [{ query: "SELECT 1", customQuery: true, fields: {}, config: {} }],
+          },
+        });
+        await flushPromises();
+        data.value = [[{ count: 1 }]];
+        isFirstLoadSettled.value = true;
+        await flushPromises();
+        const callsBefore = vi.mocked(convertPanelData).mock.calls.length;
+
+        await wrapper.setProps({
+          variablesData: {
+            values: [{ ...variable, options: [{ label: "9", value: "9" }], isLoading: true }],
+          },
+        });
+        await flushPromises();
+
+        expect(vi.mocked(convertPanelData).mock.calls.length).toBe(callsBefore);
+      });
+
       it("re-runs custom chart code with the new theme when the theme changes", async () => {
         const isFirstLoadSettled = ref(false);
         const data = ref<any[]>([]);
