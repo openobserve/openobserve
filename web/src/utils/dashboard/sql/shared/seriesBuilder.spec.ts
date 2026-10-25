@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi } from "vitest";
-import { buildDataLookupMap } from "@/utils/dashboard/sql/shared/seriesBuilder";
+import {
+  buildDataLookupMap,
+  createSeriesBuilders,
+} from "@/utils/dashboard/sql/shared/seriesBuilder";
 
 // Mock heavy dependencies
 vi.mock("@/utils/dashboard/aliasUtils", () => ({
@@ -23,6 +26,7 @@ vi.mock("@/utils/dashboard/aliasUtils", () => ({
 
 vi.mock("@/utils/dashboard/colorPalette", () => ({
   getSeriesColor: vi.fn(() => "#FF5733"),
+  getAreaStyleOverride: vi.fn(() => ({})),
 }));
 
 vi.mock("@/utils/dashboard/getAnnotationsData", () => ({
@@ -109,6 +113,35 @@ describe("seriesBuilder", () => {
       // Only first x-axis key "time" is used
       expect(result.has("A||2024-01")).toBe(true);
       expect(result.has("A||Jan")).toBe(false);
+    });
+  });
+
+  describe("getSeriesObj large mode", () => {
+    const build = (config: Record<string, any>) =>
+      createSeriesBuilders({
+        options: { xAxis: [{ data: [] }] },
+        panelSchema: { type: "bar", config, queries: [{ fields: { y: [] } }] },
+        store: { state: { theme: "light", timezone: "UTC" } },
+        missingValueData: [],
+        yAxisKeys: [],
+        breakDownKeys: [],
+        defaultSeriesProps: { type: "bar" },
+        chartMin: 0,
+        chartMax: 1,
+        dataLookupMap: new Map(),
+        annotations: [],
+        getMarkLineData: () => [],
+        getAxisDataFromKey: () => [],
+      } as any).getSeriesObj("count", [1, 2], {});
+
+    it("keeps large mode when value labels are hidden", () => {
+      expect(build({}).large).toBe(true);
+    });
+
+    it("turns large mode off when value labels are shown", () => {
+      const series: any = build({ label_option: { position: "top" } });
+      expect(series.label.show).toBe(true);
+      expect(series.large).toBe(false);
     });
   });
 });

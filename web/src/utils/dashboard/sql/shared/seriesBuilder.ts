@@ -196,19 +196,22 @@ export function createSeriesBuilders(deps: SeriesDeps) {
       store.state.theme,
     );
 
+    const label = getSeriesLabel();
+
     return {
       //only append if yaxiskeys length is more than 1
       name: yAxisName?.toString(),
       ...defaultSeriesProps,
       ...areaStyle,
-      label: getSeriesLabel(),
+      label,
       originalSeriesName: seriesName,
       // markLine if exist
       markLine: getSeriesMarkLine(),
       // markArea: getSeriesMarkArea(),
       // config to connect null values
       connectNulls: panelSchema.config?.connect_nulls ?? false,
-      large: true,
+      // Large mode draws bars as one path, which drops value labels past 400 points.
+      large: !label.show,
       color: seriesColor,
       data: seriesData,
       ...seriesConfig,
