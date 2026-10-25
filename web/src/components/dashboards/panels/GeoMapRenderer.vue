@@ -103,7 +103,6 @@ export default defineComponent({
       chart?.resize();
     };
 
-    // @ts-ignore getModel/getComponent are not in the ECharts typings
     const getLeaflet = () => chart?.getModel()?.getComponent("lmap")?.getLeaflet();
 
     const applyOptions = () => {

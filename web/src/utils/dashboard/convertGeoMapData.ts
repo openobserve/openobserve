@@ -199,7 +199,7 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
           const value = [
             getDataValue(item, query.fields.longitude.alias),
             getDataValue(item, query.fields.latitude.alias),
-            weight == null ? query.config.weight_fixed : weight,
+            weight == null ? (query.config.weight_fixed ?? 1) : weight,
           ];
           const fields = Object.fromEntries(
             Object.entries(item).filter(
@@ -212,7 +212,7 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
         return [
           item.longitude,
           item.latitude,
-          item.weight == null ? query.config.weight_fixed : item.weight,
+          item.weight == null ? (query.config.weight_fixed ?? 1) : item.weight,
         ];
       }),
       symbolSize: function (val: any) {

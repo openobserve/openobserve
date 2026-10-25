@@ -1091,6 +1091,19 @@ describe("convertGeoMapData", () => {
       expect(size).toBe(50.5);
     });
 
+    it("falls back to weight 1 when neither a weight field nor weight_fixed is set", () => {
+      const panelSchema: any = customSchema({
+        latitude: { alias: "lat" },
+        longitude: { alias: "lng" },
+        weight: null,
+      });
+      panelSchema.queries[0].config = { layer_type: "scatter" };
+
+      const result: any = convertGeoMapData(panelSchema, [[{ lat: 1, lng: 2 }]]);
+
+      expect(result.options.series[0].data).toEqual([[2, 1, 1]]);
+    });
+
     it("keeps the other custom SQL columns for the tooltip", () => {
       const panelSchema = customSchema({
         latitude: { alias: "lat" },
