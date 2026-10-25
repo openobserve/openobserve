@@ -47,7 +47,17 @@ export type GaugeColorStop = [number, string];
 export type ValueAxisKey = "xAxis" | "yAxis";
 
 const SHOW_AS: readonly ThresholdShowAs[] = ["color_line", "color", "line", "color_band"];
-const THRESHOLD_CHART_TYPES = new Set(["line", "area", "area-stacked", "bar", "h-bar", "scatter"]);
+const THRESHOLD_CHART_TYPES = new Set([
+  "line",
+  "area",
+  "area-stacked",
+  "bar",
+  "h-bar",
+  "stacked",
+  "h-stacked",
+  "scatter",
+]);
+const STACKED_CHART_TYPES = new Set(["area-stacked", "stacked", "h-stacked"]);
 const GAUGE_BAND_ALPHA = 0.28;
 const AREA_BAND_ALPHA = 0.12;
 const LIMIT_LINE_WIDTH = 1.5;
@@ -332,7 +342,7 @@ export const getLineAreaPercentRange = (
   return Number.isFinite(min) && Number.isFinite(max) ? { min, max } : null;
 };
 
-/** Percentage range of a stacked chart: the axis shows per-x totals of each stack group, starting at 0. */
+/** Percentage range of a stacked chart: per-x positive and negative stack extents of each stack group, spanning 0. */
 export const getStackedPercentRange = (
   config: any,
   series: any[],
@@ -341,19 +351,20 @@ export const getStackedPercentRange = (
   const yMin = toNumber(config?.y_axis_min);
   const yMax = toNumber(config?.y_axis_max);
   if (yMin !== null && yMax !== null) return { min: yMin, max: yMax };
+  // ECharts stacks positive and negative values apart, so each sign has its own extent.
   const totals = new Map<string, number>();
   for (const s of series) {
     s.data.forEach((point: unknown, index: number) => {
       const value = pointValue(point, dimension);
       if (value === null) return;
       const x = Array.isArray(point) ? String(point[dimension === 1 ? 0 : 1]) : String(index);
-      const key = `${s.stack ?? ""}\u0000${x}`;
+      const key = `${s.stack ?? ""}\u0000${x}\u0000${value < 0 ? "-" : "+"}`;
       totals.set(key, (totals.get(key) ?? 0) + value);
     });
   }
   if (totals.size === 0) return null;
   const sums = [...totals.values()];
-  return { min: Math.min(0, ...sums), max: Math.max(...sums) };
+  return { min: Math.min(0, ...sums), max: Math.max(0, ...sums) };
 };
 
 /** Empty series that carries the limit lines and bands of one grid, so they show once and survive legend toggles. */
@@ -460,11 +471,11 @@ const categoryNames = (options: any, horizontal: boolean): unknown[] => {
   return Array.isArray(axis?.data) ? axis.data : [];
 };
 
-/** Adds threshold colouring, limit lines and bands to line, area, bar, h-bar and scatter; call it on the final series list, as visualMaps address series by index. */
+/** Adds threshold colouring, limit lines and bands to line, area, bar, h-bar, stacked bars and scatter; call it on the final series list, as visualMaps address series by index. */
 export const applyLineAreaThresholds = (options: any, panelSchema: any): void => {
   if (!THRESHOLD_CHART_TYPES.has(panelSchema?.type) || !Array.isArray(options?.series)) return;
   const config = panelSchema.config;
-  const horizontal = panelSchema.type === "h-bar";
+  const horizontal = panelSchema.type === "h-bar" || panelSchema.type === "h-stacked";
   const dimension = horizontal ? 0 : 1;
   const valueAxis: ValueAxisKey = horizontal ? "xAxis" : "yAxis";
   const targets: Array<{ series: any; name: string; index: number; item?: any }> = [];
@@ -485,7 +496,7 @@ export const applyLineAreaThresholds = (options: any, panelSchema: any): void =>
     .filter((target): target is typeof target & { thresholds: Thresholds } => !!target.thresholds);
   if (withSteps.length === 0) return;
 
-  const stacked = panelSchema.type === "area-stacked";
+  const stacked = STACKED_CHART_TYPES.has(panelSchema.type);
   let percentRange: ValueRange | null | undefined;
   const rangeFor = (thresholds: Thresholds) => {
     if (thresholds.mode !== "percentage") return null;

@@ -161,13 +161,21 @@ const applyAxisSeriesOverride = (
   const resolved = lookup.get(series.name);
   if (!resolved) return;
   if (resolved.color) recolourSeries(series, resolved.color, panelType, theme);
-  if (hasUnitSetting(resolved)) {
-    const name = series.name;
-    series.label = {
-      ...series.label,
-      formatter: (params: any) => lookup.formatValue(pointValue(params?.value), name),
-    };
-  }
+};
+
+// Value labels take the panel unit and decimals, or the series override's.
+const formatValueLabels = (series: any, lookup: SeriesOverrideLookup) => {
+  if (!series.label) return;
+  const name = series.name;
+  series.label = {
+    ...series.label,
+    formatter: (params: any) => {
+      const value = pointValue(params?.value);
+      return value === null || value === undefined || value === "-"
+        ? ""
+        : lookup.formatValue(value, name);
+    },
+  };
 };
 
 const percentText = (value: unknown, total: number, decimals: number): string => {
@@ -429,12 +437,17 @@ export const gaugeOverrideTooltip = (
   };
 };
 
-/** Applies override colour, data-label unit, legend and title display names to the final options; matching uses the original names, which stay on the series. */
+/** Applies data-label units, then override colour, legend and title display names to the final options; matching uses the original names, which stay on the series. */
 export const applySeriesOverrides = (options: any, panelSchema: any, theme: string): void => {
   const panelType = panelSchema?.type;
   if (!SERIES_OVERRIDE_CHART_TYPES.has(panelType) || panelType === "metric") return;
   if (!Array.isArray(options?.series)) return;
   const lookup = createSeriesOverrideLookup(panelSchema?.config);
+  if (panelType !== "gauge" && panelType !== "pie" && panelType !== "donut") {
+    for (const series of options.series) {
+      if (isNamedSeries(series)) formatValueLabels(series, lookup);
+    }
+  }
   if (!lookup.active) return;
 
   if (panelType === "gauge") {

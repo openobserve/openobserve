@@ -341,8 +341,8 @@ describe("applyLineAreaThresholds", () => {
     const options = lineOptions();
     const before = JSON.stringify(options);
     applyLineAreaThresholds(options, panel("line", undefined));
-    applyLineAreaThresholds(options, panel("stacked", steps));
-    applyLineAreaThresholds(options, panel("h-stacked", steps));
+    applyLineAreaThresholds(options, panel("heatmap", steps));
+    applyLineAreaThresholds(options, panel("pie", steps));
     expect(JSON.stringify(options)).toBe(before);
     expect(options).not.toHaveProperty("visualMap");
   });
@@ -736,6 +736,11 @@ describe("getStackedPercentRange", () => {
       max: 9,
     });
     expect(getStackedPercentRange({}, [{ data: [null] }])).toBeNull();
+  });
+
+  it("stacks positive and negative values apart, as the chart draws them", () => {
+    const series = [{ data: [100, 20] }, { data: [-50, -10] }, { data: [30, 5] }];
+    expect(getStackedPercentRange({}, series)).toEqual({ min: -50, max: 130 });
   });
 });
 

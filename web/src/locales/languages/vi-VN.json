@@ -6670,6 +6670,7 @@
     "thresholdErrorEnterNumber": "Nhập một số",
     "thresholdPlaceholder": "ví dụ: {example}",
     "thresholdTooltipOver": "vượt {limit}",
+    "stackTotal": "Tổng",
     "custom": "Tùy chỉnh",
     "count": "Đếm",
     "countDistinct": "Đếm (Phân biệt)",

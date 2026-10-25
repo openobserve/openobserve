@@ -1053,21 +1053,26 @@ describe("useConfigPanel – markLines section", () => {
 // ---------------------------------------------------------------------------
 
 describe("useConfigPanel – thresholds section", () => {
-  it.each(["line", "area", "area-stacked", "bar", "h-bar", "scatter", "gauge", "metric"])(
-    "is visible for %s",
-    (type) => {
-      const c = makeComposable(makePanelData(type));
-      expect(c.isSectionVisible("thresholds")).toBe(true);
-    },
-  );
+  it.each([
+    "line",
+    "area",
+    "area-stacked",
+    "bar",
+    "h-bar",
+    "stacked",
+    "h-stacked",
+    "scatter",
+    "gauge",
+    "metric",
+  ])("is visible for %s", (type) => {
+    const c = makeComposable(makePanelData(type));
+    expect(c.isSectionVisible("thresholds")).toBe(true);
+  });
 
-  it.each(["stacked", "h-stacked", "pie", "donut", "heatmap", "table", "geomap"])(
-    "is hidden for %s",
-    (type) => {
-      const c = makeComposable(makePanelData(type));
-      expect(c.isSectionVisible("thresholds")).toBe(false);
-    },
-  );
+  it.each(["pie", "donut", "heatmap", "table", "geomap"])("is hidden for %s", (type) => {
+    const c = makeComposable(makePanelData(type));
+    expect(c.isSectionVisible("thresholds")).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------

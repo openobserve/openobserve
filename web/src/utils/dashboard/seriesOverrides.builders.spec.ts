@@ -205,11 +205,11 @@ describe("SQL line/area", () => {
     expect(options.legend.tooltip.formatter({ name: "api" })).toBe(DISPLAY);
   });
 
-  it("data labels use the override unit; the y-axis keeps the panel unit", async () => {
+  it("data labels use the override unit, other labels the panel unit; the y-axis keeps the panel unit", async () => {
     const plain = await runSQL(lineSQL("line"), [timeRows()]);
     const options = await runSQL(lineSQL("line", overrides), [timeRows()]);
     expect(named(options, "api").label.formatter({ value: [TIMES[2], 1200] })).toBe(apiValue(1200));
-    expect(named(options, "web").label.formatter).toBeUndefined();
+    expect(named(options, "web").label.formatter({ value: [TIMES[2], 900] })).toBe(panelValue(900));
     expect(options.yAxis.axisLabel.formatter(1000)).toBe(plain.yAxis.axisLabel.formatter(1000));
   });
 
@@ -334,7 +334,7 @@ describe.each(["bar", "h-bar", "stacked", "h-stacked", "scatter", "area-stacked"
       const api = named(options, "api");
       expect(api.color).toBe(OVERRIDE_COLOR);
       expect(api.label.formatter({ value: 1200 })).toBe(apiValue(1200));
-      expect(named(options, "web").label.formatter).toBeUndefined();
+      expect(named(options, "web").label.formatter({ value: 900 })).toBe(panelValue(900));
       const html = options.tooltip.formatter([
         categoryPoint("api", 1200),
         categoryPoint("web", 900),
@@ -582,6 +582,42 @@ const runPromQL = async (panel: any, data: any[]) => {
 };
 const two = () => [promMatrix({ api: [100, 600, 1200], web: [50, 300, 900] })];
 const promOverrides = { override_config: seriesEntries([API_OVERRIDE]) };
+
+describe("value labels without series overrides", () => {
+  const labels = { label_option: { position: "top" } };
+
+  it.each(["bar", "h-bar", "stacked", "h-stacked"])(
+    "SQL %s: labels take the panel unit and decimals",
+    async (type) => {
+      const options = await runSQL(categorySQL(type, labels), [categoryRows()]);
+      const web = named(options, "web");
+      expect(web.label.show).toBe(true);
+      expect(web.label.formatter({ value: 1200 })).toBe(panelValue(1200));
+      expect(web.label.formatter({ value: null })).toBe("");
+    },
+  );
+
+  it.each(["line", "area", "area-stacked", "scatter", "bar", "stacked"])(
+    "SQL %s on time: labels read the value of the point",
+    async (type) => {
+      const options = await runSQL(lineSQL(type, labels), [timeRows()]);
+      const label = named(options, "api").label;
+      expect(label.formatter({ value: [TIMES[2], 1200] })).toBe(panelValue(1200));
+      expect(label.formatter({ value: [TIMES[2], null] })).toBe("");
+    },
+  );
+
+  it.each(["line", "area-stacked", "stacked", "h-stacked"])(
+    "PromQL %s: labels take the panel unit; missing samples stay blank",
+    async (type) => {
+      const options = await runPromQL(promPanel(type, labels), two());
+      const label = named(options, "web").label;
+      expect(label.formatter({ value: ["t", 900] })).toBe(panelValue(900));
+      expect(label.formatter({ value: 900 })).toBe(panelValue(900));
+      expect(label.formatter({ value: "-" })).toBe("");
+    },
+  );
+});
 
 describe("PromQL line/area", () => {
   it("colours, renames and formats the matched series; names stay original", async () => {

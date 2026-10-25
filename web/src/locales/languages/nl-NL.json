@@ -6670,6 +6670,7 @@
     "thresholdErrorEnterNumber": "Voer een getal in",
     "thresholdPlaceholder": "bijv. {example}",
     "thresholdTooltipOver": "boven {limit}",
+    "stackTotal": "Totaal",
     "custom": "Op maat",
     "count": "Tellen",
     "countDistinct": "Aantal (verschillend)",

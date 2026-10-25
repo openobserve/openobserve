@@ -6670,6 +6670,7 @@
     "thresholdErrorEnterNumber": "数値を入力してください",
     "thresholdPlaceholder": "例: {example}",
     "thresholdTooltipOver": "{limit} 超過",
+    "stackTotal": "合計",
     "custom": "カスタム",
     "count": "カウント",
     "countDistinct": "カウント (個別)",

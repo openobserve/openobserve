@@ -47,6 +47,8 @@ export const THRESHOLD_CHART_TYPES: readonly string[] = [
   "area-stacked",
   "bar",
   "h-bar",
+  "stacked",
+  "h-stacked",
   "scatter",
   "gauge",
   "metric",

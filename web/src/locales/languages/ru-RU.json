@@ -6670,6 +6670,7 @@
     "thresholdErrorEnterNumber": "Введите число",
     "thresholdPlaceholder": "например, {example}",
     "thresholdTooltipOver": "выше {limit}",
+    "stackTotal": "Итого",
     "custom": "Пользовательский",
     "count": "Количество",
     "countDistinct": "Количество (уникальных)",

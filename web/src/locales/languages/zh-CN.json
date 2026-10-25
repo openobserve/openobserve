@@ -6670,6 +6670,7 @@
     "thresholdErrorEnterNumber": "请输入数字",
     "thresholdPlaceholder": "例如 {example}",
     "thresholdTooltipOver": "超过 {limit}",
+    "stackTotal": "总计",
     "custom": "自定义",
     "count": "计数",
     "countDistinct": "计数（去重）",

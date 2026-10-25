@@ -18,6 +18,7 @@ import { getGridLineStyle } from "../../colorPalette";
 import { chartColor } from "@/utils/chartTheme";
 import { escapeHtml } from "@/utils/html";
 import { createSeriesOverrideLookup } from "../../seriesOverrides";
+import { stackTotalRows } from "../../stackTotals";
 import { TOOLTIP_SCROLL_STYLE } from "./types";
 
 /**
@@ -34,6 +35,8 @@ export function buildTooltip(
   hoveredSeriesState?: any,
   // Pie slices and plain h-bar categories carry the series identity in the item name.
   seriesKey: "seriesName" | "name" = "seriesName",
+  // The chart's series, which carry the stack keys the tooltip totals by.
+  stackSeries?: any[],
 ): any {
   const config = panelSchema.config || {};
   const decimals = config.decimals ?? 2;
@@ -76,6 +79,16 @@ export function buildTooltip(
       if (params[0]?.axisValue) {
         tooltipItems.push(escapeHtml(params[0].axisValue));
       }
+
+      tooltipItems.push(
+        ...stackTotalRows(
+          panelSchema.type,
+          params,
+          stackSeries,
+          seriesOverrides,
+          (it: any) => it.value?.[1] ?? it.value,
+        ),
+      );
 
       // Sort by value and hoist the hovered series, matching SQL tooltips
       const hoveredName = hoveredSeriesState?.value?.hoveredSeriesName;

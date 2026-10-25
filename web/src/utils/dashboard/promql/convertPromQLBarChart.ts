@@ -266,6 +266,7 @@ export class BarConverter implements PromQLChartConverter {
         store,
         extras?.hoveredSeriesState,
         isStacked ? "seriesName" : "name",
+        series,
       ),
       // Legend config will be applied by applyLegendConfiguration in convertPromQLChartData
       // This ensures consistent behavior with SQL charts (applies to stacked and non-stacked)

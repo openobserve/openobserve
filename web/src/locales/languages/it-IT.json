@@ -6670,6 +6670,7 @@
     "thresholdErrorEnterNumber": "Inserisci un numero",
     "thresholdPlaceholder": "es. {example}",
     "thresholdTooltipOver": "sopra {limit}",
+    "stackTotal": "Totale",
     "custom": "Personalizzato",
     "count": "Conteggio",
     "countDistinct": "Conta (distinto)",

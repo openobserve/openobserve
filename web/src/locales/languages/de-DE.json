@@ -6670,6 +6670,7 @@
     "thresholdErrorEnterNumber": "Geben Sie eine Zahl ein",
     "thresholdPlaceholder": "z. B. {example}",
     "thresholdTooltipOver": "über {limit}",
+    "stackTotal": "Summe",
     "custom": "Benutzerdefiniert",
     "count": "Anzahl",
     "countDistinct": "Anzahl verschiedener Werte",

@@ -520,19 +520,25 @@ describe("ThresholdsConfig", () => {
       },
     );
 
-    it("offers only Limit line and Shaded band on stacked area, with the hint", async () => {
-      mountConfig({ chartType: "area-stacked", modelValue: twoSteps });
-      expect(find("dashboard-config-thresholds").text()).toContain(
-        "Stacked areas are not recolored; limits are drawn as lines or bands.",
-      );
-      expect(await selectOptions()).toEqual(["line", "color_band"]);
-    });
+    it.each(["area-stacked", "stacked", "h-stacked"])(
+      "offers only Limit line and Shaded band on %s, with the hint",
+      async (chartType) => {
+        mountConfig({ chartType, modelValue: twoSteps });
+        expect(find("dashboard-config-thresholds").text()).toContain(
+          "Stacked charts are not recolored; limits are drawn as lines or bands.",
+        );
+        expect(await selectOptions()).toEqual(["line", "color_band"]);
+      },
+    );
 
-    it("writes Limit line only as the stacked-area default", async () => {
-      const { model } = mountBound({ chartType: "area-stacked" });
-      await addStep();
-      expect(model.value.showAs).toBe("line");
-    });
+    it.each(["area-stacked", "stacked", "h-stacked"])(
+      "writes Limit line only as the %s default",
+      async (chartType) => {
+        const { model } = mountBound({ chartType });
+        await addStep();
+        expect(model.value.showAs).toBe("line");
+      },
+    );
 
     it("writes the picked choice", async () => {
       const { model } = mountBound({}, twoSteps);

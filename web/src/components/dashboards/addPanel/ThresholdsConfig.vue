@@ -224,8 +224,19 @@ const uid = useId();
 const rootRef = ref<HTMLElement | null>(null);
 
 const isMetric = computed(() => props.chartType === "metric");
-const isStacked = computed(() => props.chartType === "area-stacked");
-const SHOW_AS_CHART_TYPES = ["line", "area", "area-stacked", "bar", "h-bar", "scatter"];
+const isStacked = computed(() =>
+  ["area-stacked", "stacked", "h-stacked"].includes(props.chartType),
+);
+const SHOW_AS_CHART_TYPES = [
+  "line",
+  "area",
+  "area-stacked",
+  "bar",
+  "h-bar",
+  "stacked",
+  "h-stacked",
+  "scatter",
+];
 const supportsShowAs = computed(() => SHOW_AS_CHART_TYPES.includes(props.chartType));
 
 // Mode, Show as and Base picked before the first step wait here, since the key is only written once a step exists.

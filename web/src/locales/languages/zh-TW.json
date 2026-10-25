@@ -6665,6 +6665,7 @@
     "thresholdErrorEnterNumber": "請輸入數字",
     "thresholdPlaceholder": "例如 {example}",
     "thresholdTooltipOver": "超過 {limit}",
+    "stackTotal": "總計",
     "custom": "自訂",
     "count": "計數",
     "countDistinct": "計數 (不重複)",

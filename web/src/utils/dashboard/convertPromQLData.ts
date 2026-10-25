@@ -59,6 +59,7 @@ import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
 import { getPropsByChartTypeForSeries } from "./promqlChartSeriesProps";
 import { applyMeasuredYAxisLeftInset } from "./chartDimensionUtils";
 import { legendFallbackOf } from "@/utils/dashboard/promql/formula";
+import { stackTotalRows } from "./stackTotals";
 
 /** Rows a tooltip will list before it collapses the rest into a "+N more". */
 const TOOLTIP_MAX_SERIES = 10;
@@ -629,7 +630,14 @@ export const convertPromQLData = async (
           shown.push(`+${hoverText.length - shown.length} more`);
         }
 
-        return `${formatDate(date)} <br/> ${shown.join("<br/>")}`;
+        const totals = stackTotalRows(
+          panelSchema.type,
+          name,
+          options.series,
+          seriesOverrides,
+          (it: any) => it.data?.[1],
+        );
+        return `${formatDate(date)} <br/> ${[...totals, ...shown].join("<br/>")}`;
       },
       axisPointer: {
         show: true,

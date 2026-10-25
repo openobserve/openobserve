@@ -155,7 +155,7 @@ describe("charts apply series entries and skip table entries", () => {
     ]);
     expect(named(options, "api").color).toBe("#EF4444");
     expect(named(options, "web").color).toBe(named(plain, "web").color);
-    expect(named(options, "web").label.formatter).toBeUndefined();
+    expect(named(options, "web").label.formatter({ value: 900 })).toBe("900ms");
     expect(options.legend.formatter("api")).toBe("{b|Renamed}");
     expect(options.legend.formatter("web")).toBe("{b|web}");
   });

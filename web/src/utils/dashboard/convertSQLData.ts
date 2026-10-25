@@ -708,14 +708,18 @@ export const convertMultiSQLData = async (
   }
 
   // C3: X-axis merge + reindex for time-series charts
+  const isHorizontal = chartType === "h-bar" || chartType === "h-stacked";
+  const categoryAxis = isHorizontal ? "yAxis" : "xAxis";
   const needsXAxisMerge =
     options.length > 1 &&
-    options[0]?.options?.xAxis?.[0]?.data &&
+    options[0]?.options?.[categoryAxis]?.[0]?.data &&
     !["pie", "donut", "metric", "gauge", "heatmap"].includes(chartType);
 
   if (needsXAxisMerge) {
     // Save each query's original xAxis BEFORE merging
-    const originalXAxes = options.map((opt: any) => [...(opt?.options?.xAxis?.[0]?.data || [])]);
+    const originalXAxes = options.map((opt: any) => [
+      ...(opt?.options?.[categoryAxis]?.[0]?.data || []),
+    ]);
 
     // Build merged xAxis (union of all queries' values)
     const mergedXAxisSet = new Set<any>();
@@ -723,10 +727,12 @@ export const convertMultiSQLData = async (
       xData.forEach((v: any) => mergedXAxisSet.add(v));
     });
 
-    // Sort: timestamps numerically, categorical strings alphabetically
-    const mergedXAxis = Array.from(mergedXAxisSet).sort((a: any, b: any) =>
-      typeof a === "number" ? a - b : String(a).localeCompare(String(b)),
-    );
+    // Horizontal charts keep query 1's row order, which can be its ORDER BY stack-total order.
+    const mergedXAxis = isHorizontal
+      ? Array.from(mergedXAxisSet)
+      : Array.from(mergedXAxisSet).sort((a: any, b: any) =>
+          typeof a === "number" ? a - b : String(a).localeCompare(String(b)),
+        );
 
     // Optimization: skip reindexing if merged === original Q1 xAxis
     const q1Unchanged =
@@ -734,7 +740,7 @@ export const convertMultiSQLData = async (
       mergedXAxis.every((v: any, idx: number) => v === originalXAxes[0][idx]);
 
     // Apply merged xAxis to result
-    options[0].options.xAxis[0].data = mergedXAxis;
+    options[0].options[categoryAxis][0].data = mergedXAxis;
 
     // Reindex every query's series data to align with merged xAxis
     options.forEach((opt: any, queryIdx: number) => {

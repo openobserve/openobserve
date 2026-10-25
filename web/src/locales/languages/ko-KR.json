@@ -6670,6 +6670,7 @@
     "thresholdErrorEnterNumber": "숫자를 입력하세요",
     "thresholdPlaceholder": "예: {example}",
     "thresholdTooltipOver": "{limit} 초과",
+    "stackTotal": "합계",
     "custom": "커스텀",
     "count": "개수",
     "countDistinct": "개수 (고유)",
