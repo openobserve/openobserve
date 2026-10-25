@@ -146,6 +146,19 @@ describe("htmlPanelSanitizer", () => {
       expect(out.querySelector("div")?.getAttribute("title")).toBe(payload);
     });
 
+    it("leaves escaped entities in panel CSS, where they are never decoded", () => {
+      const css = render(
+        processVariableContent(
+          "<style>.a { color: ${x}; }</style>",
+          { values: [{ name: "x", type: "textbox", value: "red</style><b>" }] },
+          undefined,
+          escapeHtmlValue,
+        ),
+      ).querySelector("style")?.textContent;
+
+      expect(css).not.toContain("</style>");
+    });
+
     it("keeps an escaped value in an unquoted attribute from adding attributes", () => {
       const value = "x style=position:fixed;inset:0";
       const out = render(

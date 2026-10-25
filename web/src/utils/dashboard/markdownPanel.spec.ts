@@ -84,6 +84,20 @@ describe("renderMarkdownPanel", () => {
     expect(out.textContent).toBe('"a","b"\n');
   });
 
+  it("inserts values verbatim in fenced code, before digits and with replacement patterns", () => {
+    const out = render("```\n${x}\n```\n\n${x}5", "$&$1 <i>");
+
+    expect(out.querySelector("pre code")?.textContent).toBe("$&$1 <i>\n");
+    expect(out.querySelector("p")?.textContent).toBe("$&$1 <i>5");
+    expect(out.querySelector("i")).toBeNull();
+  });
+
+  it("strips a javascript: URL supplied as a link target", () => {
+    const out = render("[open](${x})", "javascript:alert(1)");
+
+    expect(out.querySelector("a")?.getAttribute("href") ?? null).toBeNull();
+  });
+
   it("drops style elements wherever they appear", () => {
     for (const md of [
       "<style>body{display:none}</style>\n\n# Hi",
