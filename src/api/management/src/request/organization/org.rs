@@ -108,12 +108,12 @@ pub async fn organizations(
         .ok();
     let is_root_user = is_root_user(user_id);
     let all_orgs = if is_root_user {
-        let Ok(records) = organization::list_all_orgs(limit).await else {
+        let Ok(records) = organization::list_all_orgs_with_created_at(limit).await else {
             return MetaHttpResponse::internal_error("Something went wrong");
         };
         records
     } else {
-        let Ok(records) = organization::list_orgs_by_user(user_id).await else {
+        let Ok(records) = organization::list_orgs_by_user_with_created_at(user_id).await else {
             return MetaHttpResponse::not_found("Something went wrong");
         };
         records
@@ -135,7 +135,7 @@ pub async fn organizations(
     // two orgs both named "default" — one the user's own, one they were
     // invited into. Best-effort: an org without a resolvable admin just gets
     // empty owner fields rather than failing the whole response.
-    let org_ids: Vec<String> = all_orgs.iter().map(|o| o.identifier.clone()).collect();
+    let org_ids: Vec<String> = all_orgs.iter().map(|(o, _)| o.identifier.clone()).collect();
     // `or_insert` keeps the first (lowest-email, per the query's order_by) admin per org.
     let admin_by_org: HashMap<String, (String, String)> =
         match infra::table::org_users::get_admins_for_orgs(&org_ids).await {
@@ -145,16 +145,8 @@ pub async fn organizations(
             }),
             Err(_) => HashMap::new(),
         };
-    let created_at_by_org: HashMap<String, i64> =
-        match infra::table::organizations::get_created_at_for_orgs(&org_ids).await {
-            Ok(rows) => rows.into_iter().collect(),
-            Err(e) => {
-                log::warn!("[ORG] failed to load org creation times: {e}");
-                HashMap::new()
-            }
-        };
 
-    for org in all_orgs {
+    for (org, created_at) in all_orgs {
         // Hide blocked orgs (pending_deletion or deleting) from the regular org
         // list (switcher) so a soft-deleted org feels gone. _meta admins inspect
         // them via the dedicated all_organizations endpoint instead. This matches
@@ -199,10 +191,6 @@ pub async fn organizations(
                 (String::new(), String::new())
             }
         };
-        let created_at = created_at_by_org
-            .get(&org.identifier)
-            .copied()
-            .unwrap_or_default();
         let org = OrgDetails {
             id,
             identifier: org.identifier.clone(),
