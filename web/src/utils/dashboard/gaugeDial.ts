@@ -24,6 +24,8 @@ const MIN_TITLE_FONT = 10;
 const MAX_TITLE_FONT = 24;
 // Average glyph width as a share of the font size, for fitting the value inside the ring.
 const GLYPH_WIDTH_RATIO = 0.7;
+// Typical digit width for the end labels; the bold value above needs the wider estimate.
+const LABEL_GLYPH_RATIO = 0.55;
 
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 
@@ -34,9 +36,10 @@ const END_COS = Math.cos((25 * Math.PI) / 180);
 /** True when the min and max labels at `radius` clear each other and the value text above them. */
 const endLabelsFit = (gauge: any, radius: number, labelFont: number, detailFont: number) => {
   const width = (value: unknown) =>
-    String(gauge.axisLabel.formatter?.(value) ?? value).length * GLYPH_WIDTH_RATIO * labelFont;
+    String(gauge.axisLabel.formatter?.(value) ?? value).length * LABEL_GLYPH_RATIO * labelFont;
+  // Each label runs inward from its end of the arc, so their full widths share the chord.
   const clearsEachOther =
-    (width(gauge.min) + width(gauge.max)) / 2 + labelFont / 2 <= 2 * radius * END_COS;
+    width(gauge.min) + width(gauge.max) + labelFont / 2 <= 2 * radius * END_COS;
   // Digits fill about 0.7 of the font size, so the value's lower half reaches 0.35em below centre.
   const clearsValue = radius * END_SIN - labelFont / 2 >= detailFont * 0.35;
   return clearsEachOther && clearsValue;

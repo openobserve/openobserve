@@ -213,6 +213,25 @@ describe("sizeGaugeDial", () => {
     expect(gauge.axisLabel.show).toBe(true);
   });
 
+  it("hides end labels whose combined width overruns the chord between the arc ends", () => {
+    const gauge: any = labelled(100);
+    sizeGaugeDial(gauge, 200, 200);
+    expect(gauge.axisLabel.show).toBe(false);
+  });
+
+  it("hides short end labels that would run into the value text", () => {
+    const gauge: any = {
+      min: 0,
+      max: 1,
+      axisLabel: { show: true, formatter: String },
+      data: [{ value: 1 }],
+    };
+    sizeGaugeDial(gauge, 120, 120);
+    expect(gauge.axisLabel.show).toBe(false);
+    sizeGaugeDial(gauge, 160, 160);
+    expect(gauge.axisLabel.show).toBe(true);
+  });
+
   it("leaves hidden end labels alone", () => {
     const gauge: any = { axisLabel: { show: false }, data: [{ value: 1 }] };
     sizeGaugeDial(gauge, 300, 300);
