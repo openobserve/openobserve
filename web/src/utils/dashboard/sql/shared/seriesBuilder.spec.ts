@@ -136,6 +136,7 @@ describe("seriesBuilder", () => {
 
     it("keeps large mode when value labels are hidden", () => {
       expect(build({}).large).toBe(true);
+      expect(build({ label_option: { position: null, rotate: 0 } }).large).toBe(true);
     });
 
     it("turns large mode off when value labels are shown", () => {

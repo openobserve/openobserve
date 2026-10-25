@@ -373,13 +373,19 @@ describe("applyLineAreaThresholds", () => {
     expect(markers(options)).toHaveLength(0);
   });
 
-  it("turns off large mode on bars it recolours, and only on those", () => {
-    const options: any = lineOptions();
-    options.series[0].large = true;
-    applyLineAreaThresholds(options, panel("bar", { ...steps, showAs: "line" }));
-    expect(options.series[0].large).toBe(true);
-    applyLineAreaThresholds(options, panel("bar", { ...steps, showAs: "color" }));
-    expect(options.series[0].large).toBe(false);
+  it("turns off large mode only on bars it recolours with a visualMap", () => {
+    const limitsOnly: any = lineOptions();
+    limitsOnly.series[0].large = true;
+    applyLineAreaThresholds(limitsOnly, panel("bar", { ...steps, showAs: "line" }));
+    expect(limitsOnly.series[0].large).toBe(true);
+    const stacked: any = lineOptions();
+    stacked.series[0].large = true;
+    applyLineAreaThresholds(stacked, panel("stacked", { ...steps, showAs: "color" }));
+    expect(stacked.series[0].large).toBe(true);
+    const coloured: any = lineOptions();
+    coloured.series[0].large = true;
+    applyLineAreaThresholds(coloured, panel("bar", { ...steps, showAs: "color" }));
+    expect(coloured.series[0].large).toBe(false);
   });
 
   it("line: limit lines only", () => {
