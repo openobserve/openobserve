@@ -33,6 +33,7 @@ import {
   shouldShowLineThickness,
   shouldShowDrilldown,
   shouldShowTimeShift,
+  shouldShowPromQLQueryType,
 } from "./configUtils";
 
 describe("configUtils", () => {
@@ -1435,7 +1436,7 @@ describe("configUtils", () => {
       "area-stacked",
       "stacked",
     ];
-    const nonTimeShiftTypes = ["pie", "donut", "table", "metric", "gauge"];
+    const nonTimeShiftTypes = ["pie", "donut", "table", "metric", "gauge", "state-timeline"];
 
     timeShiftTypes.forEach((type) => {
       it(`should return true for ${type} in non-promql mode with non-logs pageKey`, () => {
@@ -1476,6 +1477,36 @@ describe("configUtils", () => {
 
     it("should return false when pageKey is logs", () => {
       expect(shouldShowTimeShift({ data: { type: "area" } }, false, "logs")).toBe(false);
+    });
+  });
+
+  describe("state-timeline", () => {
+    const panel = {
+      data: {
+        type: "state-timeline",
+        queries: [{ config: { query_type: "instant" } }],
+        config: {
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "plain",
+          trellis: { layout: null },
+        },
+      },
+    };
+
+    it("hides the range/instant query type selector", () => {
+      expect(shouldShowPromQLQueryType(panel)).toBe(false);
+      expect(shouldShowPromQLQueryType({ data: { type: "line" } })).toBe(true);
+    });
+
+    it("hides legend placement and axis options that do not apply", () => {
+      expect(shouldShowLegendsToggle(panel)).toBe(true);
+      expect(shouldShowLegendPosition(panel)).toBe(false);
+      expect(shouldShowLegendType(panel)).toBe(false);
+      expect(shouldShowLegendWidth(panel)).toBe(false);
+      expect(shouldShowLegendHeight(panel)).toBe(false);
+      expect(shouldShowAxisConfig(panel)).toBe(false);
+      expect(shouldShowCartesianAxisConfig(panel)).toBe(false);
     });
   });
 });

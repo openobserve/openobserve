@@ -49,6 +49,7 @@ export const THRESHOLD_CHART_TYPES: readonly string[] = [
   "scatter",
   "gauge",
   "metric",
+  "state-timeline",
 ];
 
 export const shouldShowThresholds = (dashboardPanelData: any): boolean =>
@@ -68,6 +69,7 @@ export const SERIES_OVERRIDE_CHART_TYPES: readonly string[] = [
   "donut",
   "gauge",
   "metric",
+  "state-timeline",
 ];
 
 export const shouldShowSeriesOverrides = (dashboardPanelData: any): boolean =>
@@ -126,6 +128,8 @@ export function useConfigPanel(
   isPivotMode: ComputedRef<boolean>,
 ) {
   const { t, tm } = useI18nTyped();
+
+  const isStateTimeline = computed(() => dashboardPanelData.data.type === "state-timeline");
 
   // ── Config options ────────────────────────────────────────────────────────
 
@@ -249,12 +253,12 @@ export function useConfigPanel(
       },
     },
     data: {
-      unit: { label: t("dashboard.unitLabel") },
+      unit: { label: t("dashboard.unitLabel"), visible: !isStateTimeline.value },
       "custom-unit": {
         label: t("dashboard.customunitLabel"),
-        visible: dashboardPanelData.data.config.unit === "custom",
+        visible: !isStateTimeline.value && dashboardPanelData.data.config.unit === "custom",
       },
-      decimals: { label: t("dashboard.decimals") },
+      decimals: { label: t("dashboard.decimals"), visible: !isStateTimeline.value },
       limit: {
         label: t("dashboard.queryLimit"),
         visible:
@@ -285,6 +289,28 @@ export function useConfigPanel(
           dashboardPanelData.data.queries.length > 1 &&
           dashboardPanelData.data.type !== "geomap" &&
           dashboardPanelData.data.type !== "maps",
+      },
+    },
+    stateTimeline: {
+      "merge-gaps": {
+        label: t("dashboard.stateTimelineMergeGaps"),
+        visible: isStateTimeline.value,
+      },
+      "row-size": {
+        label: [t("dashboard.stateTimelineRowHeight"), t("dashboard.stateTimelineRowGap")],
+        visible: isStateTimeline.value,
+      },
+      "show-state-text": {
+        label: t("dashboard.stateTimelineShowStateText"),
+        visible: isStateTimeline.value,
+      },
+      "row-sort": {
+        label: t("dashboard.stateTimelineRowSort"),
+        visible: isStateTimeline.value,
+      },
+      "tooltip-mode": {
+        label: t("dashboard.stateTimelineTooltipMode"),
+        visible: isStateTimeline.value,
       },
     },
     axis: {

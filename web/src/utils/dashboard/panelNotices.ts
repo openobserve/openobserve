@@ -77,7 +77,20 @@ export const describeSeriesLimit = (
   };
 };
 
+const displayCapNotice = (message: string, t: TranslateFn): PanelNotice => ({
+  id: "series-cap",
+  tone: "warning",
+  icon: "stacked-line-chart",
+  chipLabel: t("dashboard.panelErrorButtons.displayCapChip"),
+  title: t("dashboard.panelErrorButtons.displayCapTitle"),
+  body: raw(message),
+  details: [],
+});
+
 const seriesCapNotice = (input: PanelNoticeInput, t: TranslateFn): PanelNotice => {
+  if (input.seriesLimit?.displayCapMessage) {
+    return displayCapNotice(input.seriesLimit.displayCapMessage, t);
+  }
   const described = input.seriesLimit
     ? describeSeriesLimit(input.seriesLimit, input.seriesTotalBound, t)
     : {

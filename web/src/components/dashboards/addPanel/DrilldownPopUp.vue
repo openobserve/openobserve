@@ -646,6 +646,14 @@ export default defineComponent({
           { label: t("dashboard.seriesValue"), value: "${series.__value}" },
           ...variableListName,
         ];
+      } else if (dashboardPanelData.data.type === "state-timeline") {
+        selectedValues = [
+          { label: t("dashboard.seriesName"), value: "${series.__name}" },
+          { label: t("dashboard.seriesValue"), value: "${series.__value}" },
+          { label: t("dashboard.segmentStart"), value: "${series.__start}" },
+          { label: t("dashboard.segmentEnd"), value: "${series.__end}" },
+          ...variableListName,
+        ];
       } else if (dashboardPanelData.data.type === "metric") {
         selectedValues = [
           { label: t("dashboard.seriesValue"), value: "${series.__value}" },
