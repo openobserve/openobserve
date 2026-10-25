@@ -508,38 +508,48 @@ const truncateLegendName = (text: string, maxWidth: number): string => {
   return `${text.slice(0, low)}...`;
 };
 
+// Mirrors applyPieOverrides: a slice with its own decimals gets a plain share of the positive total.
+const overridePercentText = (value: number, positiveTotal: number, decimals: number): string =>
+  `${(positiveTotal > 0 ? (value / positiveTotal) * 100 : 0).toFixed(decimals)}%`;
+
 // Keyed by name like the legend itself, so slices that share a name (merged queries) show their sum.
 const buildPieLegendEntries = (
   panelSchema: any,
   data: any[],
   keys: string[],
+  textWidth: number,
 ): Map<string, PieLegendEntry> => {
   const lookup = createSeriesOverrideLookup(panelSchema?.config);
   const panelDecimals = pieLegendPercentDecimals(panelSchema?.config?.decimals);
   const sums = new Map<string, number>();
+  let positiveTotal = 0;
   for (const item of data) {
     const numeric = Number(item?.value);
+    const value = Number.isFinite(numeric) ? numeric : 0;
     const name = String(item?.name ?? "");
-    sums.set(name, (sums.get(name) ?? 0) + (Number.isFinite(numeric) ? numeric : 0));
+    sums.set(name, (sums.get(name) ?? 0) + value);
+    if (value > 0) positiveTotal += value;
   }
   const names = [...sums.keys()];
   const values = [...sums.values()];
   const entries = new Map<string, PieLegendEntry>();
   names.forEach((name, index) => {
     const overrideDecimals = lookup.get(name)?.decimals;
-    const decimals =
-      overrideDecimals === undefined ? panelDecimals : pieLegendPercentDecimals(overrideDecimals);
+    const percentText = () => {
+      if (overrideDecimals !== undefined) {
+        const decimals = pieLegendPercentDecimals(overrideDecimals);
+        return overridePercentText(values[index], positiveTotal, decimals);
+      }
+      const percent = echartsNumber.getPercentWithPrecision(values, index, panelDecimals);
+      return `${percent.toFixed(panelDecimals)}%`;
+    };
     const valueText = keys
-      .map((key) =>
-        key === "value"
-          ? lookup.formatValue(values[index], name)
-          : `${echartsNumber.getPercentWithPrecision(values, index, decimals).toFixed(decimals)}%`,
-      )
+      .map((key) => (key === "value" ? lookup.formatValue(values[index], name) : percentText()))
       .join("  ");
     // The name gives way to the values, so truncation never cuts the numbers.
     const nameWidth = Math.max(
       LEGEND_VALUES_MIN_NAME_WIDTH,
-      LEGEND_VALUES_TEXT_WIDTH - calculateWidthText(`  ${valueText}`, LEGEND_TEXT_FONT),
+      textWidth - calculateWidthText(`  ${valueText}`, LEGEND_TEXT_FONT),
     );
     entries.set(name, {
       name: truncateLegendName(String(lookup.displayName(name)), nameWidth),
@@ -549,11 +559,32 @@ const buildPieLegendEntries = (
   return entries;
 };
 
-/** Pie/donut legend entries as rendered with their values, for sizing the legend; the data as-is when values are off. */
+// One render sizes the legend several times over the same data array; build its entries once.
+const pieLegendEntriesCache = new WeakMap<
+  any[],
+  { panelSchema: any; textWidth: number; entries: Map<string, PieLegendEntry> }
+>();
+
+const getPieLegendEntries = (
+  panelSchema: any,
+  data: any[],
+  keys: string[],
+  textWidth: number = LEGEND_VALUES_TEXT_WIDTH,
+): Map<string, PieLegendEntry> => {
+  const cached = pieLegendEntriesCache.get(data);
+  if (cached && cached.panelSchema === panelSchema && cached.textWidth === textWidth) {
+    return cached.entries;
+  }
+  const entries = buildPieLegendEntries(panelSchema, data, keys, textWidth);
+  pieLegendEntriesCache.set(data, { panelSchema, textWidth, entries });
+  return entries;
+};
+
+/** Pie/donut legend entries with their values, for sizing the legend; the data as-is when values are off. */
 const pieLegendSizingData = (panelSchema: any, data?: any[] | null): any[] => {
   const keys = pieLegendValueKeys(panelSchema);
   if (!keys.length || !Array.isArray(data)) return data ?? [];
-  return [...buildPieLegendEntries(panelSchema, data, keys).values()].map((entry) => ({
+  return [...getPieLegendEntries(panelSchema, data, keys).values()].map((entry) => ({
     name: `${entry.name}  ${entry.valueText}`,
   }));
 };
@@ -565,16 +596,15 @@ const pieLegendTextWidth = (panelSchema: any): number =>
 const applyPieLegendValues = (panelSchema: any, options: any, hoveredSeriesState: any) => {
   const keys = pieLegendValueKeys(panelSchema);
   if (!keys.length || !options.legend?.show) return;
-  let entriesData: any[] | null = null;
-  let entries = new Map<string, PieLegendEntry>();
   options.legend.formatter = (name: any) => {
     const data = options.series?.[0]?.data;
-    if (Array.isArray(data) && data !== entriesData) {
-      entriesData = data;
-      entries = buildPieLegendEntries(panelSchema, data, keys);
-    }
+    // A narrow right scroll legend shrinks textStyle.width after this point; fit the entries to it.
+    const width = Math.min(LEGEND_VALUES_TEXT_WIDTH, options.legend.textStyle?.width ?? Infinity);
+    const entries = Array.isArray(data)
+      ? getPieLegendEntries(panelSchema, data, keys, width)
+      : null;
     const style = name === hoveredSeriesState?.value?.hoveredSeriesName ? "a" : "b";
-    const entry = entries.get(String(name));
+    const entry = entries?.get(String(name));
     return entry ? `{${style}|${entry.name}}  ${entry.valueText}` : `{${style}|${name}}`;
   };
   options.legend.textStyle = { ...options.legend.textStyle, width: LEGEND_VALUES_TEXT_WIDTH };

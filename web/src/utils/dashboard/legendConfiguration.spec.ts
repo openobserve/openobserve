@@ -1259,7 +1259,7 @@ describe("pie and donut legend values", () => {
       Number(options.legend.formatter(name).split("  ")[1].replace("%", "")),
     );
     expect(percents.reduce((sum, value) => sum + value, 0)).toBe(100);
-    expect([...percents].sort()).toEqual([33, 33, 34]);
+    expect([...percents].sort((a, b) => a - b)).toEqual([33, 33, 34]);
   });
 
   it("takes a series override's decimals for that slice's percent", () => {
@@ -1294,6 +1294,46 @@ describe("pie and donut legend values", () => {
       options,
     );
     expect(options.legend.formatter("api")).toBe(`{b|api}  ${expected}`);
+  });
+
+  it("fits the entries to a narrow right scroll legend without cutting the values", () => {
+    const options: any = pieOptions([
+      { name: "a-long-service-name", value: 30 },
+      { name: "db", value: 10 },
+    ]);
+    applyLegendConfiguration(
+      pieSchema({
+        legends_position: "right",
+        legends_type: null,
+        legend_values: ["percent"],
+        decimals: 0,
+      }),
+      { value: { offsetWidth: 300, offsetHeight: 300 } },
+      hovered(),
+      options,
+    );
+    expect(options.legend.textStyle.width).toBeLessThan(180);
+    expect(options.legend.formatter("a-long-service-name")).toBe("{b|a-...}  75%");
+  });
+
+  it("gives an override-decimals slice the same percent as its slice label", () => {
+    const options: any = pieOptions([
+      { name: "a", value: 1 },
+      { name: "b", value: 2 },
+      { name: "neg", value: -1 },
+    ]);
+    applyLegendConfiguration(
+      pieSchema({
+        legend_values: ["percent"],
+        override_config: [
+          { field: { matchBy: "series", value: "a" }, config: [{ type: "decimals", value: 1 }] },
+        ],
+      }),
+      chartPanelRef,
+      hovered(),
+      options,
+    );
+    expect(options.legend.formatter("a")).toBe("{b|a}  33.3%");
   });
 
   it("reserves a wider right legend for the values", () => {
