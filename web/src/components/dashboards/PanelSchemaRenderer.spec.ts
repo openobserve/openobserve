@@ -1531,6 +1531,39 @@ describe("PanelSchemaRenderer", () => {
         expect(wrapper.emitted("error")?.length ?? 0).toBe(errorEmits);
       });
 
+      it("still renders the next load's result after a skipped chart run", async () => {
+        const isFirstLoadSettled = ref(false);
+        const data = ref<any[]>([]);
+        const loading = ref(false);
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ isFirstLoadSettled, data, loading }) as any,
+        );
+        vi.mocked(convertPanelData).mockRejectedValueOnce(new CustomChartSkippedError());
+        wrapper = createWrapper({
+          panelSchema: {
+            ...defaultProps.panelSchema,
+            type: "custom_chart",
+            customChartContent: "option = {}",
+            queries: [{ query: "SELECT 1", customQuery: true, fields: {}, config: {} }],
+          },
+        });
+        await flushPromises();
+        data.value = [[{ count: 1 }]];
+        isFirstLoadSettled.value = true;
+        await flushPromises();
+        const callsBefore = vi.mocked(convertPanelData).mock.calls.length;
+        const rendered = { chartType: "custom_chart", series: [{ type: "line" }] };
+        vi.mocked(convertPanelData).mockResolvedValueOnce(rendered as any);
+
+        loading.value = true;
+        await flushPromises();
+        loading.value = false;
+        await flushPromises();
+
+        expect(vi.mocked(convertPanelData).mock.calls.length).toBeGreaterThan(callsBefore);
+        expect(wrapper.vm.panelData).toEqual(rendered);
+      });
+
       it("does not re-run custom chart code when only variable options or loading flags change", async () => {
         const isFirstLoadSettled = ref(false);
         const data = ref<any[]>([]);
