@@ -29,7 +29,7 @@ export const isCrossOriginLink = (href: string, pageHref: string): boolean => {
   }
 };
 
-/** Sanitize rendered Markdown HTML; cross-origin links open in a new tab, and an authored `target` is still stripped. */
+/** DOMPurify's defaults still strip an authored `target`, so only the hook decides where a link opens. */
 export const sanitizeMarkdownPanel = (html: string): string => markdownPanelPurifier.sanitize(html);
 
 markdownPanelPurifier.addHook("afterSanitizeAttributes", (node) => {
