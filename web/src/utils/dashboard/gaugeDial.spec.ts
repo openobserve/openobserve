@@ -178,7 +178,9 @@ describe("sizeGaugeDial", () => {
       axisLine: { lineStyle: { color: [[1, "#000"]] } },
       title: { color: "red" },
       detail: { valueAnimation: true },
-      axisLabel: { show: true },
+      min: 0,
+      max: 100,
+      axisLabel: { show: true, formatter: String },
       data: [{ value: 75, detail: { formatter: (v: number) => `${v}%` } }],
     };
     sizeGaugeDial(gauge, 300, 400);
@@ -187,13 +189,28 @@ describe("sizeGaugeDial", () => {
     expect(gauge.axisLine.lineStyle).toEqual({ color: [[1, "#000"]], width: "50" });
     expect(gauge.title).toMatchObject({ color: "red", fontSize: 24, width: "400" });
     expect(gauge.detail).toEqual({ valueAnimation: true, fontSize: 60 });
-    expect(gauge.axisLabel).toEqual({ show: true, fontSize: 24, distance: 34 });
+    expect(gauge.axisLabel).toEqual({ show: true, formatter: String, fontSize: 24, distance: 34 });
+  });
+
+  const labelled = (max: number) => ({
+    min: 0,
+    max,
+    axisLabel: { show: true, formatter: (v: number) => `${v.toFixed(2)}%` },
+    data: [{ value: 1 }],
   });
 
   it("never pushes end labels outward onto the ring of a small dial", () => {
-    const gauge: any = { axisLabel: { show: true }, data: [{ value: 1 }] };
+    const gauge: any = labelled(100);
     sizeGaugeDial(gauge, 60, 60);
     expect(gauge.axisLabel.distance).toBe(0);
+  });
+
+  it("hides end labels that would collide, and shows them again once the dial is big enough", () => {
+    const gauge: any = labelled(100);
+    sizeGaugeDial(gauge, 100, 100);
+    expect(gauge.axisLabel.show).toBe(false);
+    sizeGaugeDial(gauge, 400, 400);
+    expect(gauge.axisLabel.show).toBe(true);
   });
 
   it("leaves hidden end labels alone", () => {

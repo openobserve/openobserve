@@ -27,6 +27,21 @@ const GLYPH_WIDTH_RATIO = 0.6;
 
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 
+// Both ends sit 25 degrees below the centre line (startAngle 205, endAngle -25).
+const END_SIN = Math.sin((25 * Math.PI) / 180);
+const END_COS = Math.cos((25 * Math.PI) / 180);
+
+/** True when the min and max labels at `radius` clear each other and the value text above them. */
+const endLabelsFit = (gauge: any, radius: number, labelFont: number, detailFont: number) => {
+  const width = (value: unknown) =>
+    String(gauge.axisLabel.formatter?.(value) ?? value).length * GLYPH_WIDTH_RATIO * labelFont;
+  const clearsEachOther =
+    (width(gauge.min) + width(gauge.max)) / 2 + labelFont / 2 <= 2 * radius * END_COS;
+  // Digits fill about 0.7 of the font size, so the value's lower half reaches 0.35em below centre.
+  const clearsValue = radius * END_SIN - labelFont / 2 >= detailFont * 0.35;
+  return clearsEachOther && clearsValue;
+};
+
 /** True when the query asks for a dial range derived from the data. */
 export const isGaugeAutoRange = (queryConfig: any): boolean => queryConfig?.range_mode === "auto";
 
@@ -113,11 +128,15 @@ export const sizeGaugeDial = (gauge: any, minDim: number, cellWidth: number): vo
     overflow: "truncate",
   };
   gauge.detail = { ...gauge.detail, fontSize: sizes.detail };
-  // ECharts places labels at radius - 35 by default; this keeps them just inside the ring.
-  if (gauge.axisLabel?.show)
-    gauge.axisLabel = {
-      ...gauge.axisLabel,
-      fontSize: sizes.title,
-      distance: Math.max(0, minDim / 6 - 16),
-    };
+  // Only gaugeEndLabels sets a formatter; `show` itself is recomputed on every resize.
+  if (typeof gauge.axisLabel?.formatter !== "function") return;
+  // ECharts puts labels at radius - 20 - distance; this keeps them just inside the ring.
+  const distance = Math.max(0, minDim / 6 - 16);
+  const labelRadius = minDim / 2 - 5 - 20 - distance;
+  gauge.axisLabel = {
+    ...gauge.axisLabel,
+    show: endLabelsFit(gauge, labelRadius, sizes.title, sizes.detail),
+    fontSize: sizes.title,
+    distance,
+  };
 };
