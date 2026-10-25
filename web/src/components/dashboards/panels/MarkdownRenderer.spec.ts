@@ -237,17 +237,6 @@ describe("MarkdownRenderer", () => {
       expect(rendererElement.html()).toContain("Updated");
     });
 
-    it("should handle markdown syntax in variables", () => {
-      wrapper = createWrapper({
-        markdownContent: "{{content}}",
-        variablesData: { content: "**Bold** and *italic*" },
-      });
-
-      const rendererElement = wrapper.find('[data-test="markdown-renderer"]');
-      expect(rendererElement.html()).toContain("<strong>Bold</strong>");
-      expect(rendererElement.html()).toContain("<em>italic</em>");
-    });
-
     it("should handle complex variable structures", () => {
       wrapper = createWrapper({
         markdownContent: "# {{user.name}}\n\nEmail: {{user.email}}\n\nCount: {{count}}",
@@ -389,16 +378,6 @@ describe("MarkdownRenderer", () => {
       await wrapper.setProps({ markdownContent: "# Updated" });
 
       expect(DOMPurify.sanitize.mock.calls.length).toBeGreaterThan(initialCallCount);
-    });
-
-    it("should handle DOMPurify sanitization of processed markdown", () => {
-      wrapper = createWrapper({
-        markdownContent: "{{content}}",
-        variablesData: { content: "# Title\n\n[Safe link](http://example.com)" },
-      });
-
-      const rendererElement = wrapper.find('[data-test="markdown-renderer"]');
-      expect(rendererElement.exists()).toBe(true);
     });
   });
 

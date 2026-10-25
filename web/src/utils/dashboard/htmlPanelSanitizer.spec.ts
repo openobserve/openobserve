@@ -146,17 +146,25 @@ describe("htmlPanelSanitizer", () => {
       expect(out.querySelector("div")?.getAttribute("title")).toBe(payload);
     });
 
-    it("leaves escaped entities in panel CSS, where they are never decoded", () => {
-      const css = render(
-        processVariableContent(
-          "<style>.a { color: ${x}; }</style>",
-          { values: [{ name: "x", type: "textbox", value: "red</style><b>" }] },
-          undefined,
-          escapeHtmlValue,
-        ),
-      ).querySelector("style")?.textContent;
+    it("decodes escaped values in panel CSS without letting them close the style element", () => {
+      const styleFor = (value: string) =>
+        render(
+          processVariableContent(
+            "<style>.a { font-family: ${x}; }</style><p>ok</p>",
+            { values: [{ name: "x", type: "textbox", value }] },
+            undefined,
+            escapeHtmlValue,
+          ),
+        );
 
-      expect(css).not.toContain("</style>");
+      expect(styleFor("'Fira Code', serif").querySelector("style")?.textContent).toContain(
+        'font-family: "Fira Code", serif',
+      );
+      const out = styleFor("x</style><img src=x>");
+      const reparsed = document.createElement("div");
+      reparsed.innerHTML = out.innerHTML;
+      expect(out.querySelector("style")?.textContent).not.toContain("</");
+      expect(reparsed.querySelector("img")).toBeNull();
     });
 
     it("keeps an escaped value in an unquoted attribute from adding attributes", () => {
