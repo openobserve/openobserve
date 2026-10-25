@@ -162,8 +162,8 @@ describe("gaugeTextSizes", () => {
     const short = gaugeTextSizes(300, "75");
     const long = gaugeTextSizes(300, "1234567.89 ms");
     expect(long.detail).toBeLessThan(short.detail);
-    // 13 glyphs at 0.6em must fit the ring's inner diameter of 190px.
-    expect(long.detail * 0.6 * 13).toBeLessThanOrEqual(190);
+    // 13 glyphs at 0.7em must fit the ring inner diameter of 190px.
+    expect(long.detail * 0.7 * 13).toBeLessThanOrEqual(190);
   });
 
   it("caps very large dials", () => {

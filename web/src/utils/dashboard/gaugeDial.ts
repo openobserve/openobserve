@@ -23,7 +23,7 @@ const MAX_DETAIL_FONT = 72;
 const MIN_TITLE_FONT = 10;
 const MAX_TITLE_FONT = 24;
 // Average glyph width as a share of the font size, for fitting the value inside the ring.
-const GLYPH_WIDTH_RATIO = 0.6;
+const GLYPH_WIDTH_RATIO = 0.7;
 
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 
@@ -103,7 +103,7 @@ export const gaugeTextSizes = (minDim: number, text: string): { detail: number; 
   const inner = Math.max((minDim * 2) / 3 - 10, 0);
   const fitsWidth = inner / (Math.max(text.length, 1) * GLYPH_WIDTH_RATIO);
   return {
-    detail: Math.round(clamp(Math.min(minDim / 5, fitsWidth), MIN_DETAIL_FONT, MAX_DETAIL_FONT)),
+    detail: Math.floor(clamp(Math.min(minDim / 5, fitsWidth), MIN_DETAIL_FONT, MAX_DETAIL_FONT)),
     title: Math.round(clamp(minDim / 12, MIN_TITLE_FONT, MAX_TITLE_FONT)),
   };
 };
