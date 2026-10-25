@@ -1458,7 +1458,7 @@ describe("PanelSchemaRenderer", () => {
         expect(vi.mocked(convertPanelData).mock.calls.at(-1)?.[11]).toBeUndefined();
       });
 
-      it("reports the light theme to custom chart code in light mode", async () => {
+      it("re-runs custom chart code with the new theme when the theme changes", async () => {
         const isFirstLoadSettled = ref(false);
         const data = ref<any[]>([]);
         vi.mocked(usePanelDataLoader).mockReturnValueOnce(
@@ -1478,6 +1478,11 @@ describe("PanelSchemaRenderer", () => {
         await flushPromises();
 
         expect(vi.mocked(convertPanelData).mock.calls.at(-1)?.[11]?.theme).toBe("light");
+
+        store.state.theme = "dark";
+        await flushPromises();
+
+        expect(vi.mocked(convertPanelData).mock.calls.at(-1)?.[11]?.theme).toBe("dark");
       });
 
       it("shows the error when the first load fails", async () => {

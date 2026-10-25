@@ -159,8 +159,8 @@ export default defineComponent({
         const safeChartOptions = deepSanitize(props.data) as CustomChartData;
         // The dark theme paints an opaque background; keep the panel surface unless the code sets one.
         const themedOptions =
-          theme === "dark"
-            ? { backgroundColor: "transparent", ...safeChartOptions }
+          theme === "dark" && safeChartOptions.backgroundColor == null
+            ? { ...safeChartOptions, backgroundColor: "transparent" }
             : safeChartOptions;
         chart.setOption(withChartFont(themedOptions));
 

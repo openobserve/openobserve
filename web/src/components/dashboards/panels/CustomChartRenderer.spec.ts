@@ -449,6 +449,15 @@ describe("CustomChartRenderer", () => {
       expect(lastOption().backgroundColor).toBe("#123456");
     });
 
+    it("uses a transparent background when the code leaves it undefined in dark mode", async () => {
+      store.state.theme = "dark";
+
+      wrapper = createWrapper({ data: { ...mockChartData, backgroundColor: undefined } });
+      await waitForChartInit(wrapper);
+
+      expect(lastOption().backgroundColor).toBe("transparent");
+    });
+
     it("re-creates the instance in the new theme when the theme changes", async () => {
       const echarts = await import("echarts");
       wrapper = createWrapper();
