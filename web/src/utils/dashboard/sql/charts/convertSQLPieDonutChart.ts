@@ -21,6 +21,7 @@ import {
   applyPieDonutChartAlignment,
   applyPieDonutCenterAdjustment,
   calculatePieChartContainer,
+  MAX_SEATS_PRECISION,
 } from "../../legendConfiguration";
 import { type SQLContext } from "../shared/types";
 import { escapeHtml } from "@/utils/html";
@@ -109,7 +110,7 @@ export function applyPieDonutChart(ctx: SQLContext): void {
           position: "inside", // You can adjust the position of the labels
           fontSize: 10,
         },
-        percentPrecision: panelSchema.config?.decimals ?? 2,
+        percentPrecision: Math.min(panelSchema.config?.decimals ?? 2, MAX_SEATS_PRECISION),
       };
       return seriesObj;
     });
@@ -246,7 +247,7 @@ export function applyPieDonutChart(ctx: SQLContext): void {
           position: "inside", // You can adjust the position of the labels
           fontSize: 10,
         },
-        percentPrecision: panelSchema.config?.decimals ?? 2,
+        percentPrecision: Math.min(panelSchema.config?.decimals ?? 2, MAX_SEATS_PRECISION),
       };
       return seriesObj;
     });

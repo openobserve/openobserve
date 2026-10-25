@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi } from "vitest";
+import { number as echartsNumber } from "echarts";
 import { applyPieDonutChart } from "@/utils/dashboard/sql/charts/convertSQLPieDonutChart";
 
 vi.mock("@/utils/dashboard/convertDataIntoUnitValue", () => ({
@@ -25,7 +26,8 @@ vi.mock("@/utils/dashboard/colorPalette", () => ({
   getSeriesColor: vi.fn(() => "#FF5733"),
 }));
 
-vi.mock("@/utils/dashboard/legendConfiguration", () => ({
+vi.mock("@/utils/dashboard/legendConfiguration", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/dashboard/legendConfiguration")>()),
   getChartDimensions: vi.fn(() => ({ chartWidth: 800, chartHeight: 400 })),
   applyPieDonutChartAlignment: vi.fn(),
   applyPieDonutCenterAdjustment: vi.fn(),
@@ -173,5 +175,37 @@ describe("applyPieDonutChart - donut type", () => {
     // Both entries should be strings ending in "%"
     expect(typeof radius[0]).toBe("string");
     expect(typeof radius[1]).toBe("string");
+  });
+});
+
+describe.each(["pie", "donut"])("applyPieDonutChart - %s slice percent precision", (type) => {
+  const contextWithDecimals = (decimals: unknown) =>
+    makeMockContext({
+      panelSchema: {
+        type,
+        config: { unit: "default", unit_custom: "", decimals, color: { mode: "fixed" } },
+        queries: [{ fields: { y: [{ label: "Value" }] } }],
+      },
+    });
+
+  it("uses the panel decimals as the label precision", () => {
+    const ctx = contextWithDecimals(4);
+    applyPieDonutChart(ctx);
+    expect(ctx.options.series[0].percentPrecision).toBe(4);
+  });
+
+  it("defaults the label precision to 2 when decimals is unset", () => {
+    const ctx = contextWithDecimals(undefined);
+    applyPieDonutChart(ctx);
+    expect(ctx.options.series[0].percentPrecision).toBe(2);
+  });
+
+  it.each([14, 20, 100])("caps decimals %i at 13 so the percent rounding ends", (decimals) => {
+    const ctx = contextWithDecimals(decimals);
+    applyPieDonutChart(ctx);
+    const precision = ctx.options.series[0].percentPrecision;
+    expect(precision).toBe(13);
+    const values = ctx.options.series[0].data.map((item: any) => item.value);
+    expect(echartsNumber.getPercentWithPrecision(values, 0, precision)).toBeCloseTo(100 / 6, 10);
   });
 });

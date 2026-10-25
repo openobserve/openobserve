@@ -42,7 +42,7 @@ const LEGEND_VALUES_MIN_NAME_WIDTH = 30;
 // Legend padding (30) plus the default icon (25) and its gap (5) beside each entry's text.
 const LEGEND_ITEM_CHROME_WIDTH = 60;
 // ECharts' largest-remainder percent loops forever once 100 * 10^precision passes 2^53.
-const MAX_SEATS_PRECISION = 13;
+export const MAX_SEATS_PRECISION = 13;
 
 interface PieLegendEntry {
   name: string;
