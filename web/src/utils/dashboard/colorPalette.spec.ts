@@ -13,7 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import { getAreaFillOpacity, getAreaGradientColor, getAreaStyleOverride } from "./colorPalette";
 
 const COLOR = "#5b8ef0";
@@ -83,5 +85,51 @@ describe("getAreaStyleOverride", () => {
     expect(getAreaStyleOverride("area", null, COLOR, "s", "light", { fill_opacity: 25 })).toEqual(
       {},
     );
+  });
+});
+
+describe("area fill tokens", () => {
+  const tokens = ["top", "bottom"].flatMap((edge) => [
+    `--chart-area-fill-${edge}-opacity`,
+    `--chart-area-stacked-fill-${edge}-opacity`,
+  ]);
+  // Vitest stubs CSS imports (even ?raw) to empty strings, so the token files are read from disk.
+  const read = (file: string) =>
+    readFileSync(resolve(process.cwd(), "src/lib/styles/tokens", file), "utf8");
+  const value = (css: string, token: string) =>
+    css.match(new RegExp(`${token}:\\s*([^;]+);`))?.[1].trim();
+
+  afterEach(() => tokens.forEach((t) => document.documentElement.style.removeProperty(t)));
+
+  it("area reads the area tokens and area-stacked its own", () => {
+    const root = document.documentElement.style;
+    root.setProperty("--chart-area-fill-top-opacity", "0.9");
+    root.setProperty("--chart-area-fill-bottom-opacity", "0.4");
+    root.setProperty("--chart-area-stacked-fill-top-opacity", "1");
+    root.setProperty("--chart-area-stacked-fill-bottom-opacity", "1");
+    expect(stops(getAreaStyleOverride("area", {}, COLOR, "s", "dark"))).toEqual([
+      "rgba(91, 142, 240, 0.9)",
+      "rgba(91, 142, 240, 0.4)",
+    ]);
+    expect(stops(getAreaStyleOverride("area-stacked", {}, COLOR, "s", "dark"))).toEqual([
+      "rgba(91, 142, 240, 1)",
+      "rgba(91, 142, 240, 1)",
+    ]);
+  });
+
+  it("dark keeps unstacked areas at the light alphas and stacked areas opaque", () => {
+    const baseCss = read("base.css");
+    const darkCss = read("dark.css");
+    tokens.forEach((t) => expect(value(baseCss, t)).toBeDefined());
+    expect(value(baseCss, "--chart-area-stacked-fill-top-opacity")).toBe(
+      value(baseCss, "--chart-area-fill-top-opacity"),
+    );
+    expect(value(baseCss, "--chart-area-stacked-fill-bottom-opacity")).toBe(
+      value(baseCss, "--chart-area-fill-bottom-opacity"),
+    );
+    expect(value(darkCss, "--chart-area-fill-top-opacity")).toBeUndefined();
+    expect(value(darkCss, "--chart-area-fill-bottom-opacity")).toBeUndefined();
+    expect(value(darkCss, "--chart-area-stacked-fill-top-opacity")).toBe("1");
+    expect(value(darkCss, "--chart-area-stacked-fill-bottom-opacity")).toBe("1");
   });
 });

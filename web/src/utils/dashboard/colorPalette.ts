@@ -417,11 +417,14 @@ const verticalGradient = (topColor: string, bottomColor: string) => ({
  * from a translucent series color at the top to fully transparent at the
  * bottom. `color` should be the resolved concrete series color.
  */
-export const getAreaGradientColor = (color: string, _theme?: string) => {
-  // The fade opacities' light/dark swap lives in the --chart-area-fill-*-opacity
-  // tokens (base/dark css); `_theme` kept for call-site compatibility, ignored.
-  const topAlpha = chartNumber("--chart-area-fill-top-opacity", 0.9);
-  const bottomAlpha = chartNumber("--chart-area-fill-bottom-opacity", 0.4);
+export const getAreaGradientColor = (color: string, stacked = false) => {
+  // Dark keeps stacked layers opaque (they never overlap); unstacked areas overlap, so they stay translucent.
+  const topAlpha = stacked
+    ? chartNumber("--chart-area-stacked-fill-top-opacity", 0.9)
+    : chartNumber("--chart-area-fill-top-opacity", 0.9);
+  const bottomAlpha = stacked
+    ? chartNumber("--chart-area-stacked-fill-bottom-opacity", 0.4)
+    : chartNumber("--chart-area-fill-bottom-opacity", 0.4);
   return verticalGradient(colorToRgba(color, topAlpha), colorToRgba(color, bottomAlpha));
 };
 
@@ -454,7 +457,7 @@ export const getAreaStyleOverride = (
       areaStyle: {
         ...baseAreaStyle,
         color: gradient
-          ? getAreaGradientColor(color, theme)
+          ? getAreaGradientColor(color, panelType === "area-stacked")
           : colorToRgba(color, chartNumber("--chart-area-fill-top-opacity", 0.9)),
       },
     };
