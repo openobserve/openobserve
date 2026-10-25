@@ -1180,7 +1180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <OInput
-          v-if="shouldShowLineThickness(dashboardPanelData)"
+          v-if="shouldShowAreaLineStyleConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('lineStyle', 'line-thickness')"
           v-model.number="dashboardPanelDataModel.data.config.line_thickness"
           type="number"
@@ -2158,7 +2158,6 @@ import {
   shouldShowAxisConfig,
   shouldShowCartesianAxisConfig,
   shouldShowAxisLabelConfig,
-  shouldShowLineThickness,
   shouldShowDrilldown,
   shouldShowTimeShift,
 } from "@/utils/dashboard/configUtils";
@@ -3097,7 +3096,6 @@ export default defineComponent({
       shouldShowAxisConfig,
       shouldShowCartesianAxisConfig,
       shouldShowAxisLabelConfig,
-      shouldShowLineThickness,
       shouldShowDrilldown,
       shouldShowTimeShift,
       // Panel default time configuration (v4.0)

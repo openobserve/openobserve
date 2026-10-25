@@ -254,16 +254,6 @@ export const shouldShowAxisLabelConfig = (dashboardPanelData: any): boolean => {
 };
 
 /**
- * Check if line thickness input should be displayed
- * Used by: line_thickness input
- * @param dashboardPanelData - The dashboard panel data
- * @returns boolean indicating if line thickness input should be displayed
- */
-export const shouldShowLineThickness = (dashboardPanelData: any): boolean => {
-  return ["area", "area-stacked", "line"].includes(dashboardPanelData.data.type);
-};
-
-/**
  * Check if Drilldown component should be displayed
  * Used by: Drilldown component
  * @param dashboardPanelData - The dashboard panel data

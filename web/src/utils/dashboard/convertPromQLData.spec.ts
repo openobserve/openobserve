@@ -1869,9 +1869,14 @@ describe("Convert PromQL Data Utils", () => {
       expect(scatterSeries.symbolSize).toBe(5);
     });
 
-    it.each(["line", "area", "area-stacked"])(
-      "applies the panel line_thickness to %s series",
-      async (type) => {
+    it.each([
+      ["line", { resultType: "matrix", values: [[1640435200, "10"]] }],
+      ["area", { resultType: "matrix", values: [[1640435200, "10"]] }],
+      ["area-stacked", { resultType: "matrix", values: [[1640435200, "10"]] }],
+      ["line", { resultType: "vector", value: [1640435200, "10"] }],
+    ])(
+      "applies the panel line_thickness to %s series (%o)",
+      async (type, { resultType, ...sample }) => {
         const result = await convertPromQLData(
           {
             id: "panel1",
@@ -1879,12 +1884,7 @@ describe("Convert PromQL Data Utils", () => {
             config: { line_thickness: 4 },
             queries: [{ config: { promql_legend: "" } }],
           },
-          [
-            {
-              resultType: "matrix",
-              result: [{ metric: { __name__: "test" }, values: [[1640435200, "10"]] }],
-            },
-          ],
+          [{ resultType, result: [{ metric: { __name__: "test" }, ...sample }] }],
           mockStore,
           mockChartPanelRef,
           mockHoveredSeriesState,

@@ -30,7 +30,6 @@ import {
   shouldShowAxisConfig,
   shouldShowCartesianAxisConfig,
   shouldShowAxisLabelConfig,
-  shouldShowLineThickness,
   shouldShowDrilldown,
   shouldShowTimeShift,
   shouldShowPromQLQueryType,
@@ -1351,21 +1350,6 @@ describe("configUtils", () => {
         expect(shouldShowAxisLabelConfig({ data: { type } })).toBe(false);
       });
     });
-  });
-
-  describe("shouldShowLineThickness", () => {
-    const makeData = (type: string) => ({ data: { type } });
-
-    it.each(["line", "area", "area-stacked"])("should return true for %s chart", (type) => {
-      expect(shouldShowLineThickness(makeData(type))).toBe(true);
-    });
-
-    it.each(["bar", "scatter", "stacked", "pie", "table"])(
-      "should return false for %s chart",
-      (type) => {
-        expect(shouldShowLineThickness(makeData(type))).toBe(false);
-      },
-    );
   });
 
   describe("shouldShowDrilldown", () => {

@@ -14,7 +14,6 @@ import {
   shouldShowCartesianAxisConfig,
   shouldShowGridlines,
   shouldShowAxisLabelConfig,
-  shouldShowLineThickness,
   shouldShowDrilldown,
   shouldShowTimeShift,
 } from "@/utils/dashboard/configUtils";
@@ -368,7 +367,7 @@ export function useConfigPanel(
       },
       "line-thickness": {
         label: t("dashboard.lineThickness"),
-        visible: shouldShowLineThickness(dashboardPanelData),
+        visible: shouldShowAreaLineStyleConfig(dashboardPanelData),
       },
     },
     table: {
