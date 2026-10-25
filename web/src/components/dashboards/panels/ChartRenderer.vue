@@ -83,6 +83,7 @@ import {
   onActivated,
   onDeactivated,
   inject,
+  toRaw,
   type PropType,
 } from "vue";
 import type { I18nText } from "@/types/i18n";
@@ -363,6 +364,12 @@ export default defineComponent({
         if (series?._legendFollows !== undefined) {
           params.selected[series.name] = params.selected[series._legendFollows] !== false;
         }
+      }
+
+      // The pie legend formatter reads the selection from the source option to show visible-slice percents.
+      const sourceOptions = toRaw(props.data?.options);
+      if (sourceOptions?.legend && sourceOptions.series?.[0]?.type === "pie") {
+        sourceOptions.legend.selected = { ...params.selected };
       }
 
       // get legend

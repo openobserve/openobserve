@@ -547,22 +547,25 @@ const buildPieLegendEntries = (
   data: any[],
   keys: string[],
   textWidth: number,
+  selected?: Record<string, boolean>,
 ): Map<string, PieLegendEntry> => {
   const lookup = createSeriesOverrideLookup(panelSchema?.config);
   const panelDecimals = pieLegendPercentDecimals(panelSchema?.config?.decimals);
   const sums = new Map<string, number>();
-  let positiveTotal = 0;
+  // ECharts drops negative and legend-hidden slices before it computes the slice percents.
+  const shares = new Map<string, number>();
   for (const item of data) {
     const numeric = Number(item?.value);
     const value = Number.isFinite(numeric) ? numeric : 0;
     const name = String(item?.name ?? "");
     sums.set(name, (sums.get(name) ?? 0) + value);
-    if (value > 0) positiveTotal += value;
+    const share = value > 0 && selected?.[name] !== false ? value : 0;
+    shares.set(name, (shares.get(name) ?? 0) + share);
   }
   const names = [...sums.keys()];
   const values = [...sums.values()];
-  // Negatives can cancel the sum and spin ECharts' rounding loop; without them it ends within n steps.
-  const seatValues = values.map((value) => Math.max(value, 0));
+  const seatValues = [...shares.values()];
+  const positiveTotal = seatValues.reduce((acc, value) => acc + value, 0);
   let seats: number[] | undefined;
   const entries = new Map<string, PieLegendEntry>();
   names.forEach((name, index) => {
@@ -570,10 +573,10 @@ const buildPieLegendEntries = (
     const percentText = () => {
       if (overrideDecimals !== undefined) {
         const decimals = pieLegendPercentDecimals(overrideDecimals);
-        return overridePercentText(values[index], positiveTotal, decimals);
+        return overridePercentText(seatValues[index], positiveTotal, decimals);
       }
       if (panelDecimals > MAX_SEATS_PRECISION) {
-        return overridePercentText(values[index], positiveTotal, panelDecimals);
+        return overridePercentText(seatValues[index], positiveTotal, panelDecimals);
       }
       seats ??= percentSeats(seatValues, panelDecimals);
       const percent = seatValues[index] ? (seats[index] ?? 0) : 0;
@@ -598,7 +601,12 @@ const buildPieLegendEntries = (
 // One render sizes the legend several times over the same data array; build its entries once.
 const pieLegendEntriesCache = new WeakMap<
   any[],
-  { panelSchema: any; textWidth: number; entries: Map<string, PieLegendEntry> }
+  {
+    panelSchema: any;
+    textWidth: number;
+    selected?: Record<string, boolean>;
+    entries: Map<string, PieLegendEntry>;
+  }
 >();
 
 const getPieLegendEntries = (
@@ -606,13 +614,19 @@ const getPieLegendEntries = (
   data: any[],
   keys: string[],
   textWidth: number = LEGEND_VALUES_TEXT_WIDTH,
+  selected?: Record<string, boolean>,
 ): Map<string, PieLegendEntry> => {
   const cached = pieLegendEntriesCache.get(data);
-  if (cached && cached.panelSchema === panelSchema && cached.textWidth === textWidth) {
+  if (
+    cached &&
+    cached.panelSchema === panelSchema &&
+    cached.textWidth === textWidth &&
+    cached.selected === selected
+  ) {
     return cached.entries;
   }
-  const entries = buildPieLegendEntries(panelSchema, data, keys, textWidth);
-  pieLegendEntriesCache.set(data, { panelSchema, textWidth, entries });
+  const entries = buildPieLegendEntries(panelSchema, data, keys, textWidth, selected);
+  pieLegendEntriesCache.set(data, { panelSchema, textWidth, selected, entries });
   return entries;
 };
 
@@ -636,8 +650,9 @@ const applyPieLegendValues = (panelSchema: any, options: any, hoveredSeriesState
     const data = options.series?.[0]?.data;
     // A narrow right scroll legend shrinks textStyle.width after this point; fit the entries to it.
     const width = Math.min(LEGEND_VALUES_TEXT_WIDTH, options.legend.textStyle?.width ?? Infinity);
+    // ChartRenderer replaces legend.selected on every toggle, so the percents follow the visible slices.
     const entries = Array.isArray(data)
-      ? getPieLegendEntries(panelSchema, data, keys, width)
+      ? getPieLegendEntries(panelSchema, data, keys, width, options.legend.selected)
       : null;
     const style = name === hoveredSeriesState?.value?.hoveredSeriesName ? "a" : "b";
     const entry = entries?.get(String(name));

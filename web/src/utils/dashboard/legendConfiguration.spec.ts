@@ -1229,6 +1229,67 @@ describe("pie and donut legend values", () => {
     expect(options.legend.formatter("api")).toBe("{b|api}  50  50%");
   });
 
+  it.each(["pie", "donut"])(
+    "leaves a negative same-name %s slice out of the percent, as the slices do",
+    (type) => {
+      const options: any = pieOptions([
+        { name: "A", value: 10 },
+        { name: "A", value: -9 },
+        { name: "B", value: 10 },
+        { name: "C", value: Infinity },
+      ]);
+      applyLegendConfiguration(
+        pieSchema({ legend_values: ["value", "percent"], decimals: 0 }, type),
+        chartPanelRef,
+        hovered(),
+        options,
+      );
+      expect(options.legend.formatter("A")).toBe("{b|A}  1  50%");
+      expect(options.legend.formatter("B")).toBe("{b|B}  10  50%");
+      expect(options.legend.formatter("C")).toBe("{b|C}  0  0%");
+    },
+  );
+
+  it("takes the percent over the slices the legend leaves visible", () => {
+    const options: any = pieOptions([
+      { name: "api", value: 10 },
+      { name: "db", value: 10 },
+      { name: "cache", value: 20 },
+    ]);
+    applyLegendConfiguration(
+      pieSchema({ legend_values: ["percent"], decimals: 0 }),
+      chartPanelRef,
+      hovered(),
+      options,
+    );
+    expect(options.legend.formatter("api")).toBe("{b|api}  25%");
+
+    options.legend.selected = { api: true, db: false, cache: false };
+    expect(options.legend.formatter("api")).toBe("{b|api}  100%");
+    expect(options.legend.formatter("db")).toBe("{b|db}  0%");
+
+    options.legend.selected = { api: true, db: true, cache: false };
+    expect(options.legend.formatter("api")).toBe("{b|api}  50%");
+  });
+
+  it("takes an override-decimals and a high-decimals percent over the visible slices too", () => {
+    const override = {
+      field: { matchBy: "series", value: "api" },
+      config: [{ type: "decimals", value: 1 }],
+    };
+    for (const config of [{ decimals: 0, override_config: [override] }, { decimals: 20 }]) {
+      const options: any = pieOptions(slices);
+      applyLegendConfiguration(
+        pieSchema({ legend_values: ["percent"], ...config }),
+        chartPanelRef,
+        hovered(),
+        options,
+      );
+      options.legend.selected = { api: true, db: false };
+      expect(options.legend.formatter("api")).toMatch(/100\.0+%$/);
+    }
+  });
+
   it("shows the override display name with the values", () => {
     const options: any = pieOptions(slices);
     applyLegendConfiguration(

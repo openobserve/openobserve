@@ -1416,5 +1416,38 @@ describe("ChartRenderer", () => {
         "api-1 (1 day ago)": false,
       });
     });
+
+    it.each([
+      ["pie", { a: true, b: false }],
+      ["line", undefined],
+    ])("hands a %s chart's legend selection to its source option", async (type, expected) => {
+      const echarts = await import("echarts/core");
+      wrapper.unmount();
+      vi.clearAllMocks();
+      const options: any = {
+        ...mockChartData.options,
+        legend: { show: true },
+        series: [{ name: "s", type, data: [] }],
+      };
+      wrapper = mount(ChartRenderer, {
+        props: { data: { ...mockChartData, options }, renderType: "canvas", height: "100%" },
+        global: {
+          plugins: [i18n],
+          provide: { store, hoveredSeriesState: mockHoveredSeriesState },
+        },
+      });
+      await flushPromises();
+      const chart = (echarts.init as any).mock.results.at(-1).value;
+      const onLegend = chart.on.mock.calls.find(
+        ([event]: any[]) => event === "legendselectchanged",
+      )[1];
+      chart.getOption.mockReturnValue({ legend: [{}] });
+      const selected = { a: true, b: false };
+
+      onLegend({ name: "a", selected });
+
+      expect(options.legend.selected).toEqual(expected);
+      expect(options.legend.selected).not.toBe(selected);
+    });
   });
 });
