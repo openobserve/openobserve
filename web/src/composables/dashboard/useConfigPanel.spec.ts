@@ -181,6 +181,7 @@ describe("ORDERED_SECTION_IDS", () => {
     "geographic",
     "legend",
     "data",
+    "stateTimeline",
     "axis",
     "labels",
     "lineStyle",
@@ -201,8 +202,8 @@ describe("ORDERED_SECTION_IDS", () => {
     "sparkline",
   ];
 
-  it("contains all 23 sections", () => {
-    expect(ORDERED_SECTION_IDS).toHaveLength(23);
+  it("contains all 24 sections", () => {
+    expect(ORDERED_SECTION_IDS).toHaveLength(24);
   });
 
   it("contains every expected section id", () => {
@@ -613,6 +614,25 @@ describe("useConfigPanel – data section", () => {
     vi.mocked(shouldShowNoValueReplacement).mockReturnValueOnce(true);
     const c = makeComposable();
     expect(c.isConfigOptionVisible("data", "no-value-replacement")).toBe(true);
+  });
+});
+
+describe("useConfigPanel – state timeline section", () => {
+  const options = ["merge-gaps", "row-size", "show-state-text", "row-sort", "tooltip-mode"];
+
+  it("shows the state timeline options and hides unit and decimals for that type", () => {
+    const c = makeComposable(makePanelData("state-timeline"));
+    for (const option of options) {
+      expect(c.isConfigOptionVisible("stateTimeline", option)).toBe(true);
+    }
+    expect(c.isConfigOptionVisible("data", "unit")).toBe(false);
+    expect(c.isConfigOptionVisible("data", "decimals")).toBe(false);
+    expect(c.isSectionVisible("thresholds")).toBe(true);
+  });
+
+  it("hides the state timeline options for other types", () => {
+    const c = makeComposable(makePanelData("line"));
+    expect(c.isSectionVisible("stateTimeline")).toBe(false);
   });
 });
 
