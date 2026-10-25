@@ -927,6 +927,127 @@ describe("BarConverter", () => {
 
       expect(result.grid.left).toBe(16);
     });
+
+    const DAY = 86400;
+    const spanning = (stamps: Array<[number, Date | string]>): ProcessedPromQLData[] => [
+      {
+        series: [
+          {
+            name: "series1",
+            values: [],
+            data: Object.fromEntries(stamps.map(([ts]) => [ts, "10"])),
+          },
+        ],
+        timestamps: stamps,
+        queryIndex: 0,
+      },
+    ];
+
+    it("keeps the date in the labels when the steps span a day or more", () => {
+      const processedData = spanning([
+        [0, "2026-10-24T17:05:00.000"],
+        [DAY, "2026-10-25T17:05:00.000"],
+      ]);
+
+      const result = converter.convert(
+        processedData,
+        { type: "h-stacked", config: {} },
+        mockStore,
+        mockExtras,
+      );
+
+      expect(result.yAxis.data).toEqual(["2026-10-24 17:05:00", "2026-10-25 17:05:00"]);
+    });
+
+    it("dates Date labels from their own fields when the steps span a day or more", () => {
+      const processedData = spanning([
+        [0, new Date(2026, 9, 24, 9, 5, 0)],
+        [2 * DAY, new Date(2026, 9, 26, 9, 5, 0)],
+      ]);
+
+      const result = converter.convert(
+        processedData,
+        { type: "h-stacked", config: {} },
+        mockStore,
+        mockExtras,
+      );
+
+      expect(result.yAxis.data).toEqual(["2026-10-24 09:05:00", "2026-10-26 09:05:00"]);
+    });
+
+    it("keeps time-only labels when the steps span less than a day", () => {
+      const processedData = spanning([
+        [0, "2026-10-24T23:30:00.000"],
+        [DAY - 1, "2026-10-25T23:29:59.000"],
+      ]);
+
+      const result = converter.convert(
+        processedData,
+        { type: "h-stacked", config: {} },
+        mockStore,
+        mockExtras,
+      );
+
+      expect(result.yAxis.data).toEqual(["23:30:00", "23:29:59"]);
+    });
+
+    it("leaves vertical stacked labels time-only over a multi-day span", () => {
+      const processedData = spanning([
+        [0, "2026-10-24T17:05:00.000"],
+        [DAY, "2026-10-25T17:05:00.000"],
+      ]);
+
+      const result = converter.convert(
+        processedData,
+        { type: "stacked", config: {} },
+        mockStore,
+        mockExtras,
+      );
+
+      expect(result.xAxis.data).toEqual(["17:05:00", "17:05:00"]);
+    });
+
+    it("attaches the panel's mark lines to every h-stacked series", () => {
+      const processedData: ProcessedPromQLData[] = [
+        {
+          series: [
+            { name: "a", values: [], data: { "1": "10" } },
+            { name: "b", values: [], data: { "1": "5" } },
+          ],
+          timestamps: [[1, "2026-10-25T17:05:00.000"]],
+          queryIndex: 0,
+        },
+      ];
+      const panelSchema = {
+        type: "h-stacked",
+        config: { mark_line: [{ name: "limit", type: "xAxis", value: 12 }] },
+      };
+
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+
+      expect(result.series).toHaveLength(2);
+      result.series.forEach((s: any) => {
+        expect(s.markLine.data).toEqual([
+          expect.objectContaining({ name: "limit", xAxis: 12, yAxis: null }),
+        ]);
+      });
+    });
+
+    it("adds no mark lines to vertical stacked series", () => {
+      const panelSchema = {
+        type: "stacked",
+        config: { mark_line: [{ name: "limit", type: "yAxis", value: 12 }] },
+      };
+
+      const result = converter.convert(
+        spanning([[1, "2026-10-25T17:05:00.000"]]),
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
+
+      expect(result.series[0].markLine).toBeUndefined();
+    });
   });
 
   describe("edge cases", () => {

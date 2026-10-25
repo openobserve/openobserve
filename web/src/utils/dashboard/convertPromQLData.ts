@@ -58,6 +58,7 @@ import { buildPromqlSeriesNames, getLegendPosition } from "./promql/shared/legen
 import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
 import { getPropsByChartTypeForSeries } from "./promqlChartSeriesProps";
 import { applyMeasuredYAxisLeftInset } from "./chartDimensionUtils";
+import { getMarkLineData } from "./promql/shared/markLines";
 import { legendFallbackOf } from "@/utils/dashboard/promql/formula";
 import { stackTotalRows } from "./stackTotals";
 
@@ -75,27 +76,6 @@ const importMoment = async () => {
   }
 
   return moment;
-};
-
-const getMarkLineData = (panelSchema: any) => {
-  return (
-    panelSchema?.config?.mark_line?.map((markLine: any) => {
-      return {
-        name: markLine.name,
-        type: markLine.type,
-        xAxis: markLine.type == "xAxis" ? markLine.value : null,
-        yAxis: markLine.type == "yAxis" ? markLine.value : null,
-        label: {
-          // The alert preview passes show_label:false — its lines are
-          // colour-coded, and a text label clips at the chart top.
-          show: markLine.show_label !== false,
-          formatter: markLine.name ? "{b}:{c}" : "{c}",
-          position: "insideEndTop",
-        },
-        ...(markLine.color ? { lineStyle: { color: markLine.color } } : {}),
-      };
-    }) ?? []
-  );
 };
 
 export type SeriesRole = "primary" | "shifted" | "forecast";
