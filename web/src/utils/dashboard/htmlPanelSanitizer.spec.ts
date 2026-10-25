@@ -130,6 +130,21 @@ describe("htmlPanelSanitizer", () => {
       expect(form?.getAttribute("rel")).toBe("noopener noreferrer");
     });
 
+    it("applies the same target rule to area and SVG links", () => {
+      const out = render(
+        '<map name="m"><area href="https://example.com/a" target="_blank"><area href="/x" target="f1"></map>' +
+          '<svg><a href="https://example.com/s" target="_blank"><text>s</text></a><a href="/y" target="f1"><text>t</text></a></svg>',
+      );
+      const [area, namedArea] = Array.from(out.querySelectorAll("area"));
+      const [svgLink, namedSvgLink] = Array.from(out.querySelectorAll("svg a"));
+
+      expect(area.getAttribute("rel")).toBe("noopener noreferrer");
+      expect(namedArea.hasAttribute("target")).toBe(false);
+      expect(svgLink.getAttribute("target")).toBe("_blank");
+      expect(svgLink.getAttribute("rel")).toBe("noopener noreferrer");
+      expect(namedSvgLink.hasAttribute("target")).toBe(false);
+    });
+
     it("drops any target other than _blank and leaves untargeted links alone", () => {
       const out = render(
         '<iframe name="f1" src="https://example.com"></iframe>' +
