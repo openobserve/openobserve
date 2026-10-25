@@ -23,7 +23,9 @@ import {
   replaceVariablePlaceholders,
   getReferencedVariableNames,
   getVariablesReferencedInQueries,
+  withTimeRangeVariables,
 } from "./variablesUtils";
+import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 
 describe("Variables Utils", () => {
   describe("formatInterval", () => {
@@ -786,6 +788,171 @@ describe("Variables Utils", () => {
       };
       expect(processVariableContent("$traceid | $traceid_sql", variablesData)).toBe(
         "abc123 | xyz789",
+      );
+    });
+  });
+
+  describe("processVariableContent URL formats", () => {
+    const data = {
+      values: [
+        { name: "q", value: "a b&c#d" },
+        { name: "hosts", value: ["web 1", "db/2"] },
+        { name: "all", value: [SELECT_ALL_VALUE] },
+        { name: "single_all", value: SELECT_ALL_VALUE },
+        { name: "cleared", value: [] },
+      ],
+    };
+
+    it("percent-encodes scalar and multi values", () => {
+      expect(processVariableContent("?q=${q:percentencode}", data)).toBe("?q=a%20b%26c%23d");
+      expect(processVariableContent("?h={{hosts:percentencode}}", data)).toBe(
+        "?h=web%201%2Cdb%2F2",
+      );
+    });
+
+    it("renders queryparam as one var- pair per value", () => {
+      expect(processVariableContent("?${q:queryparam}", data)).toBe("?var-q=a%20b%26c%23d");
+      expect(processVariableContent("?${hosts:queryparam}", data)).toBe(
+        "?var-hosts=web%201&var-hosts=db%2F2",
+      );
+    });
+
+    it("keeps the All sentinel in URL formats so dashboard links round-trip", () => {
+      const options = { allLabel: "All" };
+      expect(processVariableContent("${all:queryparam}", data, undefined, options)).toBe(
+        `var-all=${SELECT_ALL_VALUE}`,
+      );
+      expect(processVariableContent("${single_all:percentencode}", data, undefined, options)).toBe(
+        SELECT_ALL_VALUE,
+      );
+      expect(processVariableContent("${cleared:queryparam}", data, undefined, options)).toBe(
+        `var-cleared=${SELECT_ALL_VALUE}`,
+      );
+    });
+
+    it("does not parse the content-only formats in query substitution", () => {
+      const resolve = () => "X";
+      expect(replaceVariablePlaceholders("${q:percentencode}", ["q"], resolve)).toBe(
+        "${q:percentencode}",
+      );
+    });
+  });
+
+  describe("processVariableContent All and cleared values", () => {
+    const data = {
+      values: [
+        { name: "multi_all", value: [SELECT_ALL_VALUE] },
+        { name: "single_all", value: SELECT_ALL_VALUE },
+        { name: "cleared", value: [] },
+        { name: "unset", value: null },
+      ],
+    };
+
+    it("prints the All label and an empty string with allLabel", () => {
+      const options = { allLabel: "All" };
+      expect(
+        processVariableContent(
+          "$multi_all|${single_all}|${multi_all:doublequote}|$cleared|$unset",
+          data,
+          undefined,
+          options,
+        ),
+      ).toBe('All|All|"All"||');
+    });
+
+    it("keeps the sentinel in a link query value so saved links round-trip", () => {
+      expect(
+        processVariableContent(
+          "[d](/web/dashboards?var-a=$multi_all&var-b={{single_all}}&var-c=${cleared}) $multi_all",
+          data,
+          undefined,
+          { allLabel: "All" },
+        ),
+      ).toBe(
+        `[d](/web/dashboards?var-a=${SELECT_ALL_VALUE}&var-b=${SELECT_ALL_VALUE}&var-c=${SELECT_ALL_VALUE}) All`,
+      );
+    });
+
+    it("keeps the sentinel after an HTML-escaped query separator", () => {
+      expect(
+        processVariableContent("[d](/d?var-a=x&amp;var-b=$multi_all)", data, undefined, {
+          allLabel: "All",
+        }),
+      ).toBe(`[d](/d?var-a=x&amp;var-b=${SELECT_ALL_VALUE})`);
+    });
+
+    it("prints a scalar All unformatted and a multi-select All formatted", () => {
+      expect(
+        processVariableContent(
+          "${single_all:doublequote} ${multi_all:doublequote}",
+          data,
+          undefined,
+          {
+            allLabel: "All",
+          },
+        ),
+      ).toBe('All "All"');
+    });
+
+    it("prints the All label after an = that is not a URL query value", () => {
+      expect(processVariableContent("env=$multi_all", data, undefined, { allLabel: "All" })).toBe(
+        "env=All",
+      );
+    });
+
+    it("prints the All label for the sentinel inside a mixed selection", () => {
+      const mixed = { values: [{ name: "m", value: ["web", SELECT_ALL_VALUE] }] };
+      expect(processVariableContent("$m", mixed, undefined, { allLabel: "All" })).toBe("web,All");
+    });
+
+    it("keeps the sentinel without allLabel", () => {
+      expect(processVariableContent("$multi_all|$single_all|$cleared|$unset", data)).toBe(
+        [SELECT_ALL_VALUE, SELECT_ALL_VALUE, SELECT_ALL_VALUE, SELECT_ALL_VALUE].join("|"),
+      );
+    });
+  });
+
+  describe("withTimeRangeVariables", () => {
+    const time = {
+      start_time: new Date(1_700_000_000_000_000),
+      end_time: new Date(1_700_000_360_000_000),
+    };
+
+    it("appends start_time and end_time in the selected time's unit", () => {
+      const result = withTimeRangeVariables({ values: [{ name: "env", value: "prod" }] }, time);
+      expect(processVariableContent("${start_time}-{{end_time}}", result)).toBe(
+        "1700000000000000-1700000360000000",
+      );
+      expect(result.values[0]).toEqual({ name: "env", value: "prod" });
+    });
+
+    it("keeps an unset scoped variable of the same name unset", () => {
+      const result = withTimeRangeVariables(
+        { values: [{ name: "start_time", scope: "panels", panelId: "p1", value: null }] },
+        time,
+      );
+      expect(result.values).toHaveLength(2);
+      expect(processVariableContent("${start_time}", result, { panelId: "p1" })).toBe(
+        SELECT_ALL_VALUE,
+      );
+    });
+
+    it("lets a dashboard variable of the same name win", () => {
+      const result = withTimeRangeVariables(
+        { values: [{ name: "start_time", value: "mine" }] },
+        time,
+      );
+      expect(processVariableContent("${start_time}", result, { panelId: "p1" })).toBe("mine");
+    });
+
+    it("leaves the placeholder untouched while the range is unset", () => {
+      const data = { values: [] };
+      expect(withTimeRangeVariables(data, undefined)).toBe(data);
+      expect(
+        withTimeRangeVariables(data, { start_time: new Date(NaN), end_time: new Date() }),
+      ).toBe(data);
+      expect(processVariableContent("${start_time}", withTimeRangeVariables(data, undefined))).toBe(
+        "${start_time}",
       );
     });
   });

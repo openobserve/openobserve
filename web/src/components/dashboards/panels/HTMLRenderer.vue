@@ -85,6 +85,7 @@ export default defineComponent({
         tabId: props.tabId,
         panelId: props.panelId,
       };
+      // No allLabel: html panels keep the raw sentinel so hand-built var-x=_o2_all_ links round-trip.
       return processVariableContent(props.htmlContent, props.variablesData, context);
     });
 

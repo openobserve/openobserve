@@ -241,8 +241,16 @@ describe("PanelSchemaRenderer", () => {
           TableRenderer: { template: '<div data-test="table-renderer"></div>' },
           GeoMapRenderer: { template: '<div data-test="geomap-renderer"></div>' },
           MapsRenderer: { template: '<div data-test="maps-renderer"></div>' },
-          HTMLRenderer: { template: '<div data-test="html-renderer"></div>' },
-          MarkdownRenderer: { template: '<div data-test="markdown-renderer"></div>' },
+          HTMLRenderer: {
+            name: "HTMLRenderer",
+            props: ["variablesData"],
+            template: '<div data-test="html-renderer"></div>',
+          },
+          MarkdownRenderer: {
+            name: "MarkdownRenderer",
+            props: ["variablesData"],
+            template: '<div data-test="markdown-renderer"></div>',
+          },
           CustomChartRenderer: { template: '<div data-test="custom-chart-renderer"></div>' },
           AddAnnotation: { template: '<div data-test="add-annotation"></div>' },
           LoadingProgress: { template: '<div data-test="loading-progress"></div>' },
@@ -365,6 +373,30 @@ describe("PanelSchemaRenderer", () => {
 
       expect(wrapper.find('[data-test="markdown-renderer"]').exists()).toBe(true);
     });
+
+    it.each([
+      ["markdown", "MarkdownRenderer"],
+      ["html", "HTMLRenderer"],
+    ])(
+      "passes start_time and end_time to %s panels after the dashboard variables",
+      (type, renderer) => {
+        const selectedTimeObj = {
+          start_time: new Date(1_700_000_000_000_000),
+          end_time: new Date(1_700_000_360_000_000),
+        };
+        wrapper = createWrapper({
+          panelSchema: { ...defaultProps.panelSchema, type },
+          selectedTimeObj,
+          variablesData: { values: [{ name: "env", value: "prod" }] },
+        });
+
+        expect(wrapper.findComponent({ name: renderer }).props("variablesData").values).toEqual([
+          { name: "env", value: "prod" },
+          { name: "start_time", value: 1_700_000_000_000_000 },
+          { name: "end_time", value: 1_700_000_360_000_000 },
+        ]);
+      },
+    );
 
     it("should render CustomChartRenderer for custom_chart type", () => {
       wrapper = createWrapper({

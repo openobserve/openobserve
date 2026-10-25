@@ -375,6 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :showDynamicFilters="dashboardData?.variables?.showDynamicFilters"
             :selectedTimeDate="dashboardPanelData.meta.dateTime"
             @variablesData="handleVariablesDataUpdated"
+            @openAddVariable="emit('openAddVariable')"
             :initialVariableValues="initialVariableValues"
             class="mb-2 shrink-0"
             :showAddVariableButton="true"
@@ -407,6 +408,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :showDynamicFilters="dashboardData?.variables?.showDynamicFilters"
             :selectedTimeDate="dashboardPanelData.meta.dateTime"
             @variablesData="handleVariablesDataUpdated"
+            @openAddVariable="emit('openAddVariable')"
             :initialVariableValues="initialVariableValues"
             class="mb-2 shrink-0"
             :showAddVariableButton="true"
@@ -723,6 +725,7 @@ import type {
   PanelEditorVariablesData,
 } from "./types/panelEditor";
 import { resolveConfig } from "./types/panelEditor";
+import { withTimeRangeVariables } from "@/utils/dashboard/variables/variablesUtils";
 import { usePanelEditor } from "./composables/usePanelEditor";
 import useBreakpoint from "@/composables/useBreakpoint";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
@@ -1245,9 +1248,12 @@ const resolvedVariablesData = computed(() => {
 });
 
 // Live variables data (for HTML/Markdown editors)
-const liveVariablesData = computed(() => {
-  return props.variablesData || { isVariablesLoading: false, values: [] };
-});
+const liveVariablesData = computed(() =>
+  withTimeRangeVariables(
+    props.variablesData || { isVariablesLoading: false, values: [] },
+    dashboardPanelData.meta.dateTime,
+  ),
+);
 
 // ============================================================================
 // Props forwarding

@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <HTMLRenderer
             :htmlContent="panelSchema.htmlContent"
             class="flex h-full w-full flex-col"
-            :variablesData="currentVariablesData || variablesData"
+            :variablesData="textPanelVariablesData"
             :tabId="tabId"
             :panelId="panelSchema.id"
           />
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <MarkdownRenderer
             :markdownContent="panelSchema.markdownContent"
             class="flex h-full w-full flex-col"
-            :variablesData="currentVariablesData || variablesData"
+            :variablesData="textPanelVariablesData"
             :tabId="tabId"
             :panelId="panelSchema.id"
           />
@@ -320,6 +320,7 @@ import { useRoute, useRouter } from "vue-router";
 import useNotifications from "@/composables/useNotifications";
 import { validateSQLPanelFields } from "@/utils/dashboard/panelValidation";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
+import { withTimeRangeVariables } from "@/utils/dashboard/variables/variablesUtils";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import {
   forecastPointOf,
@@ -776,6 +777,13 @@ export default defineComponent({
       exemplarsOverride,
       injectedExemplars,
     } = toRefs(props);
+
+    const textPanelVariablesData = computed(() =>
+      withTimeRangeVariables(
+        props.currentVariablesData || props.variablesData,
+        props.selectedTimeObj,
+      ),
+    );
     // calls the apis to get the data based on the panel config
     let {
       data,
@@ -2227,6 +2235,7 @@ export default defineComponent({
       t,
       raw,
       store,
+      textPanelVariablesData,
       chartPanelRef,
       chartRendererRef,
       data,

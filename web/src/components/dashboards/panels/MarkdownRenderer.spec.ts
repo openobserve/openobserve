@@ -16,6 +16,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import MarkdownRenderer from "./MarkdownRenderer.vue";
+import i18n from "@/locales";
 
 // Mock external dependencies.
 // Mutable hoisted state so individual tests can drive the theme that
@@ -70,7 +71,7 @@ describe("MarkdownRenderer", () => {
     return mount(MarkdownRenderer, {
       props,
       global: {
-        plugins: [],
+        plugins: [i18n],
       },
     });
   };
@@ -208,6 +209,7 @@ describe("MarkdownRenderer", () => {
         "# {{title}}\n\nWelcome {{userName}}!",
         { title: "Dashboard", userName: "John" },
         { panelId: undefined, tabId: undefined },
+        { allLabel: "All" },
       );
     });
 

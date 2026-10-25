@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { computed, defineComponent } from "vue";
 import { useTheme } from "@/composables/useTheme";
+import { useI18nTyped } from "@/types/i18n";
 import { processVariableContent } from "@/utils/dashboard/variables/variablesUtils";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
@@ -53,13 +54,16 @@ export default defineComponent({
   },
   setup(props): any {
     const { isDark } = useTheme();
+    const { t } = useI18nTyped();
 
     const processedContent = computed(() => {
       const context = {
         tabId: props.tabId,
         panelId: props.panelId,
       };
-      return processVariableContent(props.markdownContent, props.variablesData, context);
+      return processVariableContent(props.markdownContent, props.variablesData, context, {
+        allLabel: t("dashboard.variableQueryValueSelector.all"),
+      });
     });
 
     return {
