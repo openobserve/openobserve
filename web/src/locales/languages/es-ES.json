@@ -6489,6 +6489,8 @@
     "totalLegends": "Total: {count}",
     "noLegendsAvailable": "No hay leyendas disponibles",
     "tableFiltering": "Filtrado de columnas",
+    "tableExpandableRows": "Filas expandibles",
+    "tableExpandableRowsTooltip": "Cada fila tiene un botón para expandirla y ver todos sus campos.",
     "columnFormattingTitle": "Formato de columna",
     "columnFormattingSubtitle": "Añade los campos que quieres formatear y, después, aplica estilo a cada uno con una vista previa en tiempo real.",
     "columnFormattingPick": "Elegir una columna",

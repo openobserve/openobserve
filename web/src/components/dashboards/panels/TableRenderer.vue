@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="table-wrapper relative h-full w-full" data-test="dashboard-table-renderer-wrapper">
     <OTable
       ref="tableRef"
-      :key="paginationMode"
+      :key="tableKey"
       :data="sortedRows"
       :columns="otableColumns"
       sorting="server"
@@ -45,6 +45,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @format-column="onFormatColumn"
       :enable-column-reorder="false"
       :enable-cell-copy="false"
+      :expansion="rowsExpandable ? 'multiple' : 'none'"
+      :row-key="rowsExpandable ? expansionRowKey : undefined"
       :class="{ 'wrap-enabled': wrapCells }"
       data-test="dashboard-panel-table"
       @row-click="
@@ -80,6 +82,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ formatCellValue(value, column, row) }}
         </a>
         <span v-else>{{ formatCellValue(value, column, row) }}</span>
+      </template>
+
+      <template v-if="rowsExpandable" #expansion="{ row }">
+        <dl
+          class="text-compact grid grid-cols-[minmax(0,max-content)_minmax(0,1fr)] gap-x-4 gap-y-1 px-3 py-2"
+          data-test="dashboard-table-row-detail"
+        >
+          <template v-for="col in otableColumns" :key="`detail-${col.id}`">
+            <dt class="text-text-secondary">{{ col.header }}</dt>
+            <dd class="text-text-body min-w-0 wrap-anywhere whitespace-pre-wrap">
+              <JsonFieldRenderer v-if="col.showFieldAsJson" :value="row[col.accessorKey]" />
+              <template v-else>{{ formatCellValue(row[col.accessorKey], col, row) }}</template>
+            </dd>
+          </template>
+        </dl>
       </template>
 
       <!-- Forward parent-provided cell slots (e.g. a caller's trailing action column). -->
@@ -236,6 +253,11 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    expandableRows: {
+      required: false,
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ["row-click", "format-column", "explore-cell"],
   setup(props, { emit, slots }) {
@@ -274,7 +296,30 @@ export default defineComponent({
     // with pagination off never starts slicing when it is toggled on.
     const paginationMode = computed(() => (props.showPagination ? "client" : "none"));
 
+    // Pivot rows are merged cells, so a per-row detail view has no single row to show.
+    const rowsExpandable = computed(() => props.expandableRows && !isPivot.value);
+
+    // OTable reads rowKey once at creation, so the expansion toggle re-keys the table too.
+    const tableKey = computed(() => `${paginationMode.value}-${rowsExpandable.value}`);
+
+    // Dashboard rows carry no id; a content key keeps a row open across sorts and data refreshes.
+    const expansionRowIds = new WeakMap<object, string>();
+    const expansionRowKey = (row: any): string => {
+      let id = expansionRowIds.get(row);
+      if (id === undefined) {
+        id = JSON.stringify(row);
+        expansionRowIds.set(row, id);
+      }
+      return id;
+    };
+
     const tableColumns = computed(() => (props.data?.columns as any[]) || []);
+
+    // Sticky offsets add up the earlier pinned columns' sizes, so only the last pinned one can fit its content.
+    const sizedPinnedColumns = computed(() => {
+      const pinned = (tableColumns.value as any[]).filter((c: any) => c.pinned === "left");
+      return new Set(pinned.slice(0, -1));
+    });
 
     // Map the column config → OTableColumnDef. The original fields stay at the
     // top level (CSV export reads them there) and are mirrored into `meta` for
@@ -292,7 +337,11 @@ export default defineComponent({
           ...(col.meta ?? {}),
           // Without a width OTable falls back to TanStack's flat 150px; autoWidth
           // sizes each column to its content. Pivot fixes its own widths.
-          ...(isPivot.value ? {} : { autoWidth: true }),
+          ...(isPivot.value
+            ? {}
+            : sizedPinnedColumns.value.has(col)
+              ? { fixedWidth: true }
+              : { autoWidth: true }),
           _col: col,
           format: col.format,
           align: col.align,
@@ -617,7 +666,9 @@ export default defineComponent({
       effectivePageSize,
       isPivot,
       virtualizeRows,
-      paginationMode,
+      tableKey,
+      rowsExpandable,
+      expansionRowKey,
       sortedRows,
       localSortBy,
       localSortOrder,

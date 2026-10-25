@@ -617,6 +617,31 @@ export function usePanelDrilldown({
     }
   };
 
+  // The `row` drilldown variable of the clicked table row (args are [row, index]).
+  const getTableRowVariable = () => {
+    const [row, index] = drilldownParams[1] ?? [];
+    if (panelSchema.value.queryType === "promql") {
+      // PromQL columns come from the series labels, not from query fields.
+      const { __legend__: _legend, ...rowFields } = row ?? {};
+      return { field: rowFields, index };
+    }
+    const fields: any = {};
+    panelSchema.value.queries.forEach((query: any) => {
+      const panelFields: any = [
+        ...(query.fields.x || []),
+        ...(query.fields.y || []),
+        ...(query.fields.z || []),
+      ];
+      // Both the label and the alias resolve, so either works in a drilldown template.
+      panelFields.forEach((field: any) => {
+        fields[getFieldLabel(field, panelSchema.value.config, query.customQuery)] =
+          row?.[field.alias];
+        fields[field.alias] = row?.[field.alias];
+      });
+    });
+    return { field: fields, index };
+  };
+
   const openDrilldown = async (index: any) => {
     // hide the drilldown pop up
     hidePopupsAndOverlays();
@@ -843,23 +868,7 @@ export function usePanelDrilldown({
 
           // Handle different chart types
           if (panelSchema.value.type == "table") {
-            const fields: any = {};
-            panelSchema.value.queries.forEach((query: any) => {
-              const panelFields: any = [
-                ...(query.fields.x || []),
-                ...(query.fields.y || []),
-                ...(query.fields.z || []),
-              ];
-              panelFields.forEach((field: any) => {
-                fields[getFieldLabel(field, panelSchema.value.config, query.customQuery)] =
-                  drilldownParams[1][0][field.alias];
-                fields[field.alias] = drilldownParams[1][0][field.alias];
-              });
-            });
-            drilldownVariables.row = {
-              field: fields,
-              index: drilldownParams[1][1],
-            };
+            drilldownVariables.row = getTableRowVariable();
           } else if (panelSchema.value.type == "sankey") {
             if (drilldownParams[0].dataType == "node") {
               drilldownVariables.node = {
@@ -972,21 +981,7 @@ export function usePanelDrilldown({
 
       // if chart type is 'table' then we need to pass the table name
       if (panelSchema.value.type == "table") {
-        const fields: any = {};
-        panelSchema.value.queries.forEach((query: any) => {
-          // take all field from x, y and z
-          const panelFields: any = [...query.fields.x, ...query.fields.y, ...query.fields.z];
-          panelFields.forEach((field: any) => {
-            // we have label and alias, use both in dynamic values
-            fields[getFieldLabel(field, panelSchema.value.config, query.customQuery)] =
-              drilldownParams[1][0][field.alias];
-            fields[field.alias] = drilldownParams[1][0][field.alias];
-          });
-        });
-        drilldownVariables.row = {
-          field: fields,
-          index: drilldownParams[1][1],
-        };
+        drilldownVariables.row = getTableRowVariable();
       } else if (panelSchema.value.type == "sankey") {
         // if dataType is node then set node data
         // else set edge data

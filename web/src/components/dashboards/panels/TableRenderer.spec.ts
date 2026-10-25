@@ -529,6 +529,109 @@ describe("TableRenderer", () => {
   });
 
   // ── row-click emit ────────────────────────────────────────────────────────
+  describe("pinned columns", () => {
+    const withPinned = (...fields: string[]) => ({
+      ...mockTableData,
+      columns: mockTableData.columns.map((c) =>
+        fields.includes(c.field) ? { ...c, pinned: "left" } : c,
+      ),
+    });
+
+    it("hands a pinned column to OTable as pinned left, content-sized when it is the only one", () => {
+      wrapper = createWrapper({ data: withPinned("level") });
+      const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
+      const level = columns.find((c) => c.id === "level");
+      expect(level.pinned).toBe("left");
+      expect(level.meta.autoWidth).toBe(true);
+    });
+
+    it("gives every pinned column but the last a fixed size, so sticky offsets line up", () => {
+      wrapper = createWrapper({ data: withPinned("timestamp", "level") });
+      const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
+      expect(columns.find((c) => c.id === "timestamp").meta.autoWidth).toBeUndefined();
+      expect(columns.find((c) => c.id === "timestamp").meta.fixedWidth).toBe(true);
+      expect(columns.find((c) => c.id === "level").meta.fixedWidth).toBeUndefined();
+      expect(columns.find((c) => c.id === "level").meta.autoWidth).toBe(true);
+      expect(columns.find((c) => c.id === "count").meta.autoWidth).toBe(true);
+    });
+  });
+
+  describe("expandable rows", () => {
+    it("keeps expansion off and the default row key when expandableRows is unset", () => {
+      wrapper = createWrapper();
+      const table = wrapper.findComponent({ name: "OTable" });
+      expect(table.props("expansion")).toBe("none");
+      expect(table.props("rowKey")).toBe("id");
+      expect(wrapper.find('[data-test="o2-table-expand-cell"]').exists()).toBe(false);
+    });
+
+    it("keys rows by content, so each row expands on its own and a refreshed copy keeps its key", () => {
+      wrapper = createWrapper({ expandableRows: true });
+      const table = wrapper.findComponent({ name: "OTable" });
+      expect(table.props("expansion")).toBe("multiple");
+      const rowKey = table.props("rowKey") as (row: any) => string;
+      const [a, b] = mockTableData.rows;
+      expect(rowKey(a)).not.toBe(rowKey(b));
+      expect(rowKey({ ...a })).toBe(rowKey(a));
+    });
+
+    it("keeps an expanded row open when the data refreshes with the same row", async () => {
+      wrapper = createWrapper({ expandableRows: true });
+
+      await wrapper.findAll('[data-test="o2-table-expand-cell"] button')[1].trigger("click");
+      await wrapper.setProps({
+        data: { ...mockTableData, rows: mockTableData.rows.map((r) => ({ ...r })) },
+      });
+      await flushPromises();
+
+      const details = wrapper.findAll('[data-test="dashboard-table-row-detail"]');
+      expect(details).toHaveLength(1);
+      expect(details[0].text()).toContain("ERROR");
+    });
+
+    it("shows every column of the expanded row, formatted, in the detail view", async () => {
+      const data = {
+        ...mockTableData,
+        columns: mockTableData.columns.map((c) =>
+          c.field === "count" ? { ...c, format: (v: any) => `${v} hits` } : c,
+        ),
+      };
+      wrapper = createWrapper({ data, expandableRows: true });
+
+      await wrapper.findAll('[data-test="o2-table-expand-cell"] button')[1].trigger("click");
+
+      const details = wrapper.findAll('[data-test="dashboard-table-row-detail"]');
+      expect(details).toHaveLength(1);
+      const text = details[0].text();
+      expect(text).toContain("Level");
+      expect(text).toContain("ERROR");
+      expect(text).toContain("5 hits");
+      expect(text).toContain("2023-01-01T00:01:00Z");
+    });
+
+    it("keeps the expanded row open on the same data after a re-sort", async () => {
+      wrapper = createWrapper({ expandableRows: true });
+
+      await wrapper.findAll('[data-test="o2-table-expand-cell"] button')[1].trigger("click");
+      await wrapper
+        .findComponent({ name: "OTable" })
+        .vm.$emit("sort-change", { column: "count", order: "desc" });
+      await flushPromises();
+
+      const details = wrapper.findAll('[data-test="dashboard-table-row-detail"]');
+      expect(details).toHaveLength(1);
+      expect(details[0].text()).toContain("ERROR");
+    });
+
+    it("ignores expandableRows on a pivot table", () => {
+      wrapper = createWrapper({
+        expandableRows: true,
+        data: { ...mockTableData, pivotHeaderLevels: [{ cells: [{ label: "a", colspan: 1 }] }] },
+      });
+      expect(wrapper.findComponent({ name: "OTable" }).props("expansion")).toBe("none");
+    });
+  });
+
   describe("row-click emit", () => {
     it("should emit row-click when TenstackTable emits click:dataRow", async () => {
       wrapper = createWrapper();

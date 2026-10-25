@@ -6489,6 +6489,8 @@
     "totalLegends": "Razem: {count}",
     "noLegendsAvailable": "Brak dostępnych legend",
     "tableFiltering": "Filtrowanie kolumn",
+    "tableExpandableRows": "Rozwijane wiersze",
+    "tableExpandableRowsTooltip": "Każdy wiersz ma przycisk rozwijania, który pokazuje wszystkie jego pola.",
     "columnFormattingTitle": "Formatowanie kolumn",
     "columnFormattingSubtitle": "Dodaj pola, które chcesz sformatować, a następnie stylizuj każde z podglądem na żywo.",
     "columnFormattingPick": "Wybierz kolumnę",

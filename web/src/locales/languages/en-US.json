@@ -6489,6 +6489,8 @@
     "totalLegends": "Total: {count}",
     "noLegendsAvailable": "No legends available",
     "tableFiltering": "Column Filtering",
+    "tableExpandableRows": "Expandable rows",
+    "tableExpandableRowsTooltip": "Each row gets an expand button that shows all of its fields.",
     "columnFormattingTitle": "Column Formatting",
     "columnFormattingSubtitle": "Add the fields you want to format, then style each one with a live preview.",
     "columnFormattingPick": "Choose a column",

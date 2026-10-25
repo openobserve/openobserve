@@ -440,6 +440,32 @@ describe("PromQLTableChart", () => {
       expect(wrapper.emitted("row-click")).toBeTruthy();
       expect(wrapper.emitted("row-click")[0]).toEqual([mockTableData.rows[0]]);
     });
+
+    it("forwards the clicked row and its index with the click event", async () => {
+      wrapper = createWrapper();
+      const evt = new MouseEvent("click");
+
+      const tableRenderer = wrapper.findComponent({ name: "TableRenderer" });
+      await tableRenderer.vm.$emit("row-click", evt, mockTableData.rows[1], 1);
+
+      expect(wrapper.emitted("row-click")[0]).toEqual([evt, mockTableData.rows[1], 1]);
+    });
+  });
+
+  describe("Expandable rows", () => {
+    it("leaves rows unexpandable when table_expandable_rows is unset", () => {
+      wrapper = createWrapper();
+
+      const tableRenderer = wrapper.findComponent({ name: "TableRenderer" });
+      expect(tableRenderer.props("expandableRows")).toBe(false);
+    });
+
+    it("passes table_expandable_rows to TableRenderer", () => {
+      wrapper = createWrapper({ config: { ...mockConfig, table_expandable_rows: true } });
+
+      const tableRenderer = wrapper.findComponent({ name: "TableRenderer" });
+      expect(tableRenderer.props("expandableRows")).toBe(true);
+    });
   });
 
   describe("Config Reactivity", () => {

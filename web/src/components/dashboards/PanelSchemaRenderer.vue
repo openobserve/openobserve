@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-pagination="panelSchema.config?.table_pagination && !store.state.printMode"
           :rows-per-page="panelSchema.config?.table_pagination_rows_per_page"
           :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
+          :expandable-rows="!!panelSchema.config?.table_expandable_rows"
           :enable-column-format="enableColumnFormat"
           :drilldown-columns="store.state.printMode ? [] : drilldownColumnAliases"
           :drilldown-all-columns="!store.state.printMode && drilldownAllColumns"

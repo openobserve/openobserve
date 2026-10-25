@@ -25,7 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :show-pagination="panelConfig.table_pagination && !store.state.printMode"
         :rows-per-page="panelConfig.table_pagination_rows_per_page"
         :enable-filtering="enableFiltering"
-        @row-click="$emit('row-click', $event)"
+        :expandable-rows="!!panelConfig.table_expandable_rows"
+        @row-click="(...args: any[]) => $emit('row-click', ...args)"
       >
         <!-- kube-state omits the metric family entirely when nothing is in that
              state, so an empty triage table means nothing is wrong rather than

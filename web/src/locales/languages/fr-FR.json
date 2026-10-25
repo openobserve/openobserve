@@ -6489,6 +6489,8 @@
     "totalLegends": "Total : {count}",
     "noLegendsAvailable": "Aucune légende disponible",
     "tableFiltering": "Filtrage des colonnes",
+    "tableExpandableRows": "Lignes extensibles",
+    "tableExpandableRowsTooltip": "Chaque ligne dispose d'un bouton de dépliage qui affiche tous ses champs.",
     "columnFormattingTitle": "Formatage des colonnes",
     "columnFormattingSubtitle": "Les contrôles à gauche, un aperçu en direct de la colonne à droite pour la voir en contexte.",
     "columnFormattingPick": "Choisir une colonne",
