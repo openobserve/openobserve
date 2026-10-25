@@ -38,6 +38,9 @@ export interface CustomChartContext {
   theme: "light" | "dark";
 }
 
+/** Rejects a run skipped because another panel is being refreshed; the caller keeps its current chart. */
+export class CustomChartSkippedError extends Error {}
+
 /** Runs the panel's chart code in a sandboxed iframe and resolves with its ECharts option. */
 export const runJavaScriptCode = (
   panelSchema: any,
@@ -47,6 +50,7 @@ export const runJavaScriptCode = (
   return new Promise((resolve, reject) => {
     // Skip if this panel is not the one to be refreshed
     if (panelIdToBeRefreshed.value && panelIdToBeRefreshed.value !== panelSchema.id) {
+      reject(new CustomChartSkippedError());
       return;
     }
 
@@ -191,6 +195,7 @@ export const runJavaScriptCode = (
       if (panelIdToBeRefreshed.value && panelIdToBeRefreshed.value !== panelSchema.id) {
         window.removeEventListener("message", handler);
         document.body.removeChild(iframe);
+        reject(new CustomChartSkippedError());
         return;
       }
 

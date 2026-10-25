@@ -15,6 +15,7 @@
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import {
+  CustomChartSkippedError,
   runJavaScriptCode,
   panelIdToBeRefreshed,
   trustCustomChartCode,
@@ -83,22 +84,18 @@ describe("convertCustomChartData", () => {
   });
 
   describe("Basic functionality", () => {
-    it("should skip execution when panel is not the one to be refreshed", () => {
+    it("rejects with CustomChartSkippedError when another panel is being refreshed", async () => {
       panelIdToBeRefreshed.value = "panel1";
 
       const panelSchema = {
         id: "panel2",
         customChartContent: "var option = {};",
       };
-      const searchQueryData = [];
 
-      const promise = runJavaScriptCode(panelSchema, searchQueryData);
-
-      // Should return a promise that never resolves/rejects (hanging promise)
-      expect(promise).toBeInstanceOf(Promise);
-
-      // Since the function returns without resolving, we can't await it
-      // This covers the early return path in the code
+      await expect(runJavaScriptCode(panelSchema, [])).rejects.toBeInstanceOf(
+        CustomChartSkippedError,
+      );
+      expect(document.body.appendChild).not.toHaveBeenCalled();
     });
 
     it("should reject with validation error for unsafe code", async () => {
@@ -366,7 +363,7 @@ describe("convertCustomChartData", () => {
       expect(result).toEqual({ real: "data" });
     });
 
-    it("should handle panel ID change during message handling", async () => {
+    it("rejects with CustomChartSkippedError when the refresh target changes mid-run", async () => {
       const acorn = await import("acorn");
       const walk = await import("acorn-walk");
 
@@ -388,7 +385,7 @@ describe("convertCustomChartData", () => {
         customChartContent: "var option = {};",
       };
 
-      runJavaScriptCode(panelSchema, []);
+      const promise = runJavaScriptCode(panelSchema, []);
 
       // Change the panel ID to be refreshed before message handling
       panelIdToBeRefreshed.value = "panel2";
@@ -414,13 +411,7 @@ describe("convertCustomChartData", () => {
       expect(window.removeEventListener).toHaveBeenCalledWith("message", messageHandler);
       expect(document.body.removeChild).toHaveBeenCalledWith(mockIframe);
 
-      // The promise should remain pending as the message was ignored
-      // Reset panel ID and send valid message to complete
-      panelIdToBeRefreshed.value = null;
-
-      // Need to simulate a new message handler since the old one was removed
-      // This simulates the behavior but the original promise will remain hanging
-      // which is expected behavior in this edge case
+      await expect(promise).rejects.toBeInstanceOf(CustomChartSkippedError);
     });
 
     it("should clear panelIdToBeRefreshed on successful completion", async () => {

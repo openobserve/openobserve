@@ -314,7 +314,10 @@ import { chartColor } from "@/utils/chartTheme";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
-import type { CustomChartContext } from "@/utils/dashboard/convertCustomChartData";
+import {
+  CustomChartSkippedError,
+  type CustomChartContext,
+} from "@/utils/dashboard/convertCustomChartData";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { getDataValue } from "@/utils/dashboard/aliasUtils";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
@@ -1479,7 +1482,7 @@ export default defineComponent({
             code: "",
           };
         } catch (error: any) {
-          if (superseded()) return;
+          if (superseded() || error instanceof CustomChartSkippedError) return;
           errorDetail.value = {
             message: error?.message,
             code: error?.code || "",

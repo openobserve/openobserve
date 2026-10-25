@@ -164,6 +164,7 @@ import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { copyToClipboard } from "@/utils/clipboard";
 import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
+import { CustomChartSkippedError } from "@/utils/dashboard/convertCustomChartData";
 import { FORECAST_MIN_DAYS, forecastAlertFromChart } from "@/utils/alerts/forecastAlert";
 import { getPanelDataForPageKey } from "@/composables/dashboard/useDashboardPanel";
 import {
@@ -1495,6 +1496,39 @@ describe("PanelSchemaRenderer", () => {
         expect(vi.mocked(convertPanelData).mock.calls.at(-1)?.[11]?.variables).toEqual({
           threshold: "9",
         });
+      });
+
+      it("keeps the rendered chart and shows no error when the chart run is skipped", async () => {
+        const isFirstLoadSettled = ref(false);
+        const data = ref<any[]>([]);
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ isFirstLoadSettled, data }) as any,
+        );
+        const rendered = { chartType: "custom_chart", series: [{ type: "bar" }] };
+        vi.mocked(convertPanelData).mockResolvedValueOnce(rendered as any);
+        wrapper = createWrapper({
+          variablesData: { values: [{ name: "threshold", value: "5" }] },
+          panelSchema: {
+            ...defaultProps.panelSchema,
+            type: "custom_chart",
+            customChartContent: "option = {}",
+            queries: [{ query: "SELECT 1", customQuery: true, fields: {}, config: {} }],
+          },
+        });
+        await flushPromises();
+        data.value = [[{ count: 1 }]];
+        isFirstLoadSettled.value = true;
+        await flushPromises();
+        expect(wrapper.vm.panelData).toEqual(rendered);
+        const errorEmits = wrapper.emitted("error")?.length ?? 0;
+
+        vi.mocked(convertPanelData).mockRejectedValueOnce(new CustomChartSkippedError());
+        await wrapper.setProps({ variablesData: { values: [{ name: "threshold", value: "9" }] } });
+        await flushPromises();
+
+        expect(wrapper.vm.panelData).toEqual(rendered);
+        expect(wrapper.vm.errorDetail.message).toBe("");
+        expect(wrapper.emitted("error")?.length ?? 0).toBe(errorEmits);
       });
 
       it("does not re-run custom chart code when only variable options or loading flags change", async () => {
