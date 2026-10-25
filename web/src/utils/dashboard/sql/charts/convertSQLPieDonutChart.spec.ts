@@ -179,8 +179,16 @@ describe("applyPieDonutChart - donut type", () => {
 });
 
 describe.each(["pie", "donut"])("applyPieDonutChart - %s slice percent precision", (type) => {
-  const contextWithDecimals = (decimals: unknown) =>
+  const contextWithDecimals = (decimals: unknown, values = [100, 200, 300]) =>
     makeMockContext({
+      options: {
+        xAxis: [{ data: values.map((_, i) => `slice-${i}`) }],
+        yAxis: [{ data: [] }],
+        series: [],
+        tooltip: {},
+        grid: {},
+      },
+      getAxisDataFromKey: vi.fn(() => values),
       panelSchema: {
         type,
         config: { unit: "default", unit_custom: "", decimals, color: { mode: "fixed" } },
@@ -203,12 +211,15 @@ describe.each(["pie", "donut"])("applyPieDonutChart - %s slice percent precision
     },
   );
 
+  // ECharts' percent rounding never ends on these values at precision 14.
+  const loopingValues = [3, 5, 7, 11, 13, 17, 19];
+
   it.each([14, 20, 100])("caps decimals %i at 13 so the percent rounding ends", (decimals) => {
-    const ctx = contextWithDecimals(decimals);
+    const ctx = contextWithDecimals(decimals, loopingValues);
     applyPieDonutChart(ctx);
     const precision = ctx.options.series[0].percentPrecision;
     expect(precision).toBe(13);
     const values = ctx.options.series[0].data.map((item: any) => item.value);
-    expect(echartsNumber.getPercentWithPrecision(values, 0, precision)).toBeCloseTo(100 / 6, 10);
+    expect(echartsNumber.getPercentWithPrecision(values, 0, precision)).toBeCloseTo(4, 10);
   });
 });
