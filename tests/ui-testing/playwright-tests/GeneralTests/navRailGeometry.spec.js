@@ -152,7 +152,7 @@ test.describe('nav rail geometry and screenshots', () => {
             expectBoxEqual(m.rail, expected.rail, `${key} scrolled rail`);
             expectBoxEqual(m.header, expected.header, `${key} scrolled header`);
             expectBoxEqual(m.content, expected.content, `${key} scrolled content`);
-            // Tiles moved by exactly the rail scroll, nothing else.
+            // Tiles moved by the rail scroll plus the label growth above them, nothing else.
             let shift = 0;
             for (const [k, b] of Object.entries(expected.tiles)) {
               const grown = growth[k] || 0;
