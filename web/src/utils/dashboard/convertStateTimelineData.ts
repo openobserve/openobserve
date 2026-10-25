@@ -208,7 +208,10 @@ const queryLabel = (query: any, queryIndex: number): string =>
 /** Suffixes names that collide across queries with the query's label, and keeps every final name unique. */
 const disambiguateRowNames = (rows: ExtractedRow[]): ExtractedRow[] => {
   const groups = new Map<string, ExtractedRow[]>();
-  rows.forEach((row) => groups.set(row.name, [...(groups.get(row.name) ?? []), row]));
+  rows.forEach((row) => {
+    if (!groups.has(row.name)) groups.set(row.name, []);
+    groups.get(row.name)!.push(row);
+  });
   groups.forEach((group, name) => {
     if (group.length < 2) return;
     group.forEach((row) => {
@@ -263,7 +266,8 @@ const promqlRows = (
         -Infinity,
       );
       const name = names.get(metric?.metric) ?? "";
-      byName.set(name, [...(byName.get(name) ?? []), { metric: metric?.metric, samples, last }]);
+      if (!byName.has(name)) byName.set(name, []);
+      byName.get(name)!.push({ metric: metric?.metric, samples, last });
     });
     byName.forEach((series, name) => {
       // The most recent series wins a shared timestamp and lends the row its labels.
