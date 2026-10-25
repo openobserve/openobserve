@@ -1180,7 +1180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <OInput
-          v-if="shouldShowLineThickness(dashboardPanelData, promqlMode)"
+          v-if="shouldShowLineThickness(dashboardPanelData)"
           v-show="isConfigOptionVisible('lineStyle', 'line-thickness')"
           v-model.number="dashboardPanelDataModel.data.config.line_thickness"
           type="number"

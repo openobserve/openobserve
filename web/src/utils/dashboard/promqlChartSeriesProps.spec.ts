@@ -168,6 +168,26 @@ describe("promqlChartSeriesProps", () => {
       expect((hStacked as any).orientation).toBe("h");
     });
 
+    it.each(["line", "area", "area-stacked"])("%s uses the given line thickness", (type) => {
+      expect((getPropsByChartTypeForSeries(type, 3) as any).lineStyle.width).toBe(3);
+      expect((getPropsByChartTypeForSeries(type, 0) as any).lineStyle.width).toBe(0);
+    });
+
+    it.each(["line", "area", "area-stacked"])(
+      "%s falls back to 1.5 when the thickness is unset",
+      (type) => {
+        expect((getPropsByChartTypeForSeries(type) as any).lineStyle.width).toBe(1.5);
+        expect((getPropsByChartTypeForSeries(type, null) as any).lineStyle.width).toBe(1.5);
+      },
+    );
+
+    it.each(["bar", "stacked", "h-bar", "h-stacked", "pie", "donut"])(
+      "%s ignores the line thickness",
+      (type) => {
+        expect((getPropsByChartTypeForSeries(type, 4) as any).lineStyle.width).toBe(1.5);
+      },
+    );
+
     it("all common chart types return valid objects", () => {
       const types = [
         "bar",

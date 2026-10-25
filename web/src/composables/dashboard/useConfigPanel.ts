@@ -368,7 +368,7 @@ export function useConfigPanel(
       },
       "line-thickness": {
         label: t("dashboard.lineThickness"),
-        visible: shouldShowLineThickness(dashboardPanelData, promqlMode.value),
+        visible: shouldShowLineThickness(dashboardPanelData),
       },
     },
     table: {

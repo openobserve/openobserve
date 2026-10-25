@@ -1869,6 +1869,33 @@ describe("Convert PromQL Data Utils", () => {
       expect(scatterSeries.symbolSize).toBe(5);
     });
 
+    it.each(["line", "area", "area-stacked"])(
+      "applies the panel line_thickness to %s series",
+      async (type) => {
+        const result = await convertPromQLData(
+          {
+            id: "panel1",
+            type,
+            config: { line_thickness: 4 },
+            queries: [{ config: { promql_legend: "" } }],
+          },
+          [
+            {
+              resultType: "matrix",
+              result: [{ metric: { __name__: "test" }, values: [[1640435200, "10"]] }],
+            },
+          ],
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        const series = result.options.series.find((s: any) => s.name === '{"__name__":"test"}');
+        expect(series.lineStyle.width).toBe(4);
+      },
+    );
+
     it("should use getLegendPosition function with bottom position", async () => {
       const panelSchema = {
         id: "panel1",

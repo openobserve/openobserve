@@ -816,7 +816,10 @@ export const convertPromQLData = async (
     options.grid = gridDataForGauge.gridArray;
   }
 
-  const seriesPropsBasedOnChartType = getPropsByChartTypeForSeries(panelSchema.type);
+  const seriesPropsBasedOnChartType = getPropsByChartTypeForSeries(
+    panelSchema.type,
+    panelSchema.config?.line_thickness,
+  );
 
   // if color type is shades, continuous then required to calculate min and max for chart.
   let chartMin: any = Infinity;

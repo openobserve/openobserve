@@ -1354,41 +1354,18 @@ describe("configUtils", () => {
   });
 
   describe("shouldShowLineThickness", () => {
-    const makeData = (type: string, customQuery = false) => ({
-      data: {
-        type,
-        queries: [{ customQuery }],
+    const makeData = (type: string) => ({ data: { type } });
+
+    it.each(["line", "area", "area-stacked"])("should return true for %s chart", (type) => {
+      expect(shouldShowLineThickness(makeData(type))).toBe(true);
+    });
+
+    it.each(["bar", "scatter", "stacked", "pie", "table"])(
+      "should return false for %s chart",
+      (type) => {
+        expect(shouldShowLineThickness(makeData(type))).toBe(false);
       },
-      layout: { currentQueryIndex: 0 },
-    });
-
-    it("should return true for area chart in non-promql mode without customQuery", () => {
-      expect(shouldShowLineThickness(makeData("area"), false)).toBe(true);
-    });
-
-    it("should return true for area-stacked chart in non-promql mode without customQuery", () => {
-      expect(shouldShowLineThickness(makeData("area-stacked"), false)).toBe(true);
-    });
-
-    it("should return true for line chart in non-promql mode without customQuery", () => {
-      expect(shouldShowLineThickness(makeData("line"), false)).toBe(true);
-    });
-
-    it("should return false when promqlMode is true", () => {
-      expect(shouldShowLineThickness(makeData("area"), true)).toBe(false);
-    });
-
-    it("should return false when customQuery is true", () => {
-      expect(shouldShowLineThickness(makeData("area", true), false)).toBe(false);
-    });
-
-    it("should return false for bar chart", () => {
-      expect(shouldShowLineThickness(makeData("bar"), false)).toBe(false);
-    });
-
-    it("should return false for scatter chart", () => {
-      expect(shouldShowLineThickness(makeData("scatter"), false)).toBe(false);
-    });
+    );
   });
 
   describe("shouldShowDrilldown", () => {

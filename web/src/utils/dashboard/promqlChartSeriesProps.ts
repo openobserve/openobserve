@@ -17,9 +17,10 @@
  * Returns the ECharts series props object based on the given PromQL chart type.
  *
  * @param {string} type - The chart type (e.g. "bar", "line", "area", "gauge", etc.)
+ * @param {number | null} [lineThickness] - Panel `line_thickness`, applied to line, area and area-stacked.
  * @return {object} The series props object for the given chart type.
  */
-export const getPropsByChartTypeForSeries = (type: string) => {
+export const getPropsByChartTypeForSeries = (type: string, lineThickness?: number | null) => {
   switch (type) {
     case "bar":
       return {
@@ -31,7 +32,7 @@ export const getPropsByChartTypeForSeries = (type: string) => {
       return {
         type: "line",
         emphasis: { focus: "series" },
-        lineStyle: { width: 1.5 },
+        lineStyle: { width: lineThickness ?? 1.5 },
       };
     case "scatter":
       return {
@@ -63,7 +64,7 @@ export const getPropsByChartTypeForSeries = (type: string) => {
         type: "line",
         emphasis: { focus: "series" },
         areaStyle: {},
-        lineStyle: { width: 1.5 },
+        lineStyle: { width: lineThickness ?? 1.5 },
       };
     case "stacked":
       return {
@@ -79,7 +80,7 @@ export const getPropsByChartTypeForSeries = (type: string) => {
         emphasis: {
           focus: "series",
         },
-        lineStyle: { width: 1.5 },
+        lineStyle: { width: lineThickness ?? 1.5 },
       };
     case "gauge":
       return {
