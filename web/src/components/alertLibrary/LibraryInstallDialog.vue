@@ -874,7 +874,7 @@ const installOne = async (
     timezone: store.state.timezone,
     overrides,
   });
-  await installAlert.mutateAsync({ payload, folderId: folderId.value });
+  await installAlert.mutateAsync({ payload, folderId: folderId.value, source: "library" });
   return false;
 };
 

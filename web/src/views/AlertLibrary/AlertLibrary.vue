@@ -69,9 +69,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :severities="severityFacets"
             :severity="severity"
             :search="railSearch"
+            :added-packs="addedPackList"
+            :review-counts="reviewCounts"
             @update:search="railSearch = $event"
             @update:selected-categories="selectedCategories = $event"
             @update:severity="severity = $event"
+            @review="openReview"
           />
         </div>
         <ODrawer
@@ -90,9 +93,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :severities="severityFacets"
             :severity="severity"
             :search="railSearch"
+            :added-packs="addedPackList"
+            :review-counts="reviewCounts"
             @update:search="railSearch = $event"
             @update:selected-categories="selectedCategories = $event"
             @update:severity="severity = $event"
+            @review="openReview"
           />
         </ODrawer>
 
@@ -276,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
 
               <OEmptyState
-                v-else-if="groupedEntries.length === 0"
+                v-else-if="visibleEntries.length === 0"
                 size="block"
                 class="py-8"
                 illustration="no-results"
@@ -290,6 +296,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
 
               <template v-else>
+                <section
+                  v-if="starters.length > 0"
+                  class="pt-3"
+                  data-test="alert-library-start-with"
+                >
+                  <div class="flex items-baseline gap-2 pb-2">
+                    <h2 class="text-text-heading text-sm font-semibold">
+                      {{ t("alert_library.startWithThese") }}
+                    </h2>
+                    <span class="text-text-secondary text-xs">
+                      {{ t("alert_library.startWithTheseHint") }}
+                    </span>
+                  </div>
+                  <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    <LibraryCard
+                      v-for="entry in starters"
+                      :key="entry.id"
+                      :entry="entry"
+                      :ready="entryReady(entry)"
+                      :selected="selectedIds.has(entry.id)"
+                      :locked="isLocked(entry)"
+                      :highlight="searchTerms"
+                      :added="isAdded(entry)"
+                      :adding="isAdding(entry.id)"
+                      :missing-streams="cardMissingStreams(entry)"
+                      :needs-labels="labelsNeeded(entry)"
+                      @open="openEntry(entry)"
+                      @update:selected="onCardSelected(entry, $event)"
+                      @add="onCardAdd(entry)"
+                      @customize="onCustomize(entry)"
+                    />
+                  </div>
+                </section>
                 <section v-for="group in groupedEntries" :key="group.id" class="pt-3">
                   <!-- A sibling of the heading: inside it, it would rename the heading. -->
                   <div class="flex items-center gap-2 pb-2">
@@ -326,8 +365,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :ready="entryReady(entry)"
                       :selected="selectedIds.has(entry.id)"
                       :locked="isLocked(entry)"
+                      :highlight="searchTerms"
+                      :added="isAdded(entry)"
+                      :adding="isAdding(entry.id)"
+                      :missing-streams="cardMissingStreams(entry)"
+                      :needs-labels="labelsNeeded(entry)"
                       @open="openEntry(entry)"
                       @update:selected="onCardSelected(entry, $event)"
+                      @add="onCardAdd(entry)"
+                      @customize="onCustomize(entry)"
                     />
                   </div>
                 </section>
@@ -347,6 +393,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @install="onInstall"
     />
 
+    <LibraryReviewDrawer
+      v-model:open="reviewOpen"
+      :pack="reviewPack"
+      :entries="reviewEntries"
+      @added="markAdded"
+    />
+
+    <ConfirmDialog
+      v-model="selectAllConfirmOpen"
+      :title="t('alert_library.selectAllConfirmTitle', { count: selectableVisible.length })"
+      :message="t('alert_library.selectAllConfirmMessage', { count: selectableVisible.length })"
+      :ok-label="t('alert_library.selectAllConfirmOk', { count: selectableVisible.length })"
+      data-test="alert-library-select-all-confirm"
+      @update:ok="applyViewSelection(true)"
+    />
+
     <!-- `installed` fires mid-run, so its handler must not touch `pendingBatch`. -->
     <LibraryInstallDialog
       :open="installOpen"
@@ -363,14 +425,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import type { AcceptableValue } from "reka-ui";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter, type LocationQuery } from "vue-router";
 
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
 import LibraryCard from "@/components/alertLibrary/LibraryCard.vue";
 import LibraryDrawer from "@/components/alertLibrary/LibraryDrawer.vue";
 import LibraryEmptyState from "@/components/alertLibrary/LibraryEmptyState.vue";
 import LibraryInstallDialog from "@/components/alertLibrary/LibraryInstallDialog.vue";
 import LibraryRail from "@/components/alertLibrary/LibraryRail.vue";
+import LibraryReviewDrawer from "@/components/alertLibrary/LibraryReviewDrawer.vue";
+import {
+  libraryMarks,
+  missingStreams,
+  pickStartWithThese,
+  type LibraryMarks,
+} from "@/components/alertLibrary/libraryQuickAdd";
 import {
   ALERT_TYPE_ORDER,
   alertTypeLabel,
@@ -380,6 +450,7 @@ import {
   severityLabel,
   severityRank,
   SEVERITY_ORDER,
+  type LibraryCategoryFacet,
   type LibraryFacet,
 } from "@/components/alertLibrary/libraryFacets";
 import {
@@ -389,6 +460,9 @@ import {
   streamDataState,
 } from "@/composables/alerts/useAlertLibrary";
 import type { AlertLibraryErrorCode } from "@/composables/alerts/useAlertLibrary";
+import { useLibraryLabelCheck } from "@/composables/alerts/useLibraryLabelCheck";
+import { useLibraryQuickAdd } from "@/composables/alerts/useLibraryQuickAdd";
+import { queryClient } from "@/composables/query/queryClient";
 import useStreams from "@/composables/useStreams";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -405,36 +479,51 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { alertsListQuery } from "@/services/alerts.queries";
 import type { AlertLibraryEntry, AlertLibraryFile, StreamsByType } from "@/types/alertLibrary";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
+import { matchesSearchWords, searchWords } from "@/utils/alerts/librarySearch";
 
 /** Where the alerts are authored. Not the serving URL — that is a constant. */
 const CONTRIBUTE_URL = "https://github.com/openobserve/o2-alerts-library";
 
+/** Strip facets; "ready" is "For your data", the default view. */
+const FACETS = ["ready", "missing", "all"] as const;
+const DEFAULT_FACET: Facet = "ready";
+/** Above this many alerts, "Select all in view" asks first. */
+const SELECT_ALL_CONFIRM_ABOVE = 50;
+
+type Facet = (typeof FACETS)[number];
+
 const { t } = useI18nTyped();
 const store = useStore();
+const route = useRoute();
 const router = useRouter();
 
-const { manifest, isLoading, error, loadManifest, isReady } = useAlertLibrary();
+const { manifest, isLoading, error, loadManifest, loadAlertFile, isReady } = useAlertLibrary();
 const anomalyAccess = useAnomalyLibraryAccess();
 const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 const { getStreams } = useStreams(t);
 
-/** Empty = every category. The rail narrows, it does not gate. */
-const selectedCategories = ref<string[]>([]);
+/** `<pack>/<category>` keys; empty = every category. The rail narrows, it does not gate. */
+const selectedCategories = ref<string[]>(queryList(route.query.categories));
 /** The rail's own list filter, held here so clearFilters can reset it too. */
 const railSearch = ref("");
 const { isMobile } = useBreakpoint();
 const mobileFiltersOpen = ref(false);
-const severity = ref("all");
+const severity = ref(querySeverity(route.query.severity));
 const alertType = ref("all");
-/** Stat-strip facet. `null` = no availability filter; "all" never sticks. */
-const facet = ref<"ready" | "missing" | null>(null);
-const search = ref("");
+const facet = ref<Facet>(queryFacet(route.query.facet));
+const search = ref(queryText(route.query.q));
+const selectAllConfirmOpen = ref(false);
 
 /** Kept after close so the drawer can animate out with its content intact. */
 const selectedEntry = ref<AlertLibraryEntry | null>(null);
 const drawerOpen = ref(false);
+
+const reviewOpen = ref(false);
+const reviewPack = ref<string | null>(null);
 
 const installOpen = ref(false);
 const installSeed = ref<{ entry: AlertLibraryEntry; file: AlertLibraryFile } | null>(null);
@@ -443,6 +532,13 @@ const pendingBatch = ref<AlertLibraryEntry[]>([]);
 
 /** A Set, not an array: every card asks this on every render. */
 const selectedIds = ref<Set<string>>(new Set());
+
+/** What the org's alert list says it already has from the library. */
+const serverMarks = ref<LibraryMarks>({ entryIds: new Set(), packs: new Set() });
+// Adds and Undos made on this page, applied over the list until it is read again.
+const addedHere = ref<Set<string>>(new Set());
+const removedHere = ref<Set<string>>(new Set());
+const packsAddedHere = ref<Set<string>>(new Set());
 
 const streamsByType = ref<StreamsByType>({});
 const streamsPending = ref(true);
@@ -504,15 +600,90 @@ const errorDescription = computed(() => {
 const entryReady = (entry: AlertLibraryEntry): boolean =>
   readinessKnown.value ? isReady(entry, streamsByType.value) : true;
 
+// "For your data": the streams exist AND received data in the last 24 h.
+const entryFits = (entry: AlertLibraryEntry): boolean =>
+  readinessKnown.value
+    ? isReady(entry, streamsByType.value) &&
+      streamDataState(entry, streamsByType.value).state === "fresh"
+    : true;
+
 const isLocked = (entry: AlertLibraryEntry): boolean =>
   anomalyAccess.value !== "enabled" && alertTypeOf(entry) === "anomaly";
+
+// Only a known stream list can say a stream is missing; an unknown one blocks nothing.
+const cardMissingStreams = (entry: AlertLibraryEntry): string[] =>
+  readinessKnown.value ? missingStreams(entry, streamsByType.value) : [];
+
+// ── added marks ────────────────────────────────────────────────────────────
+const isAdded = (entry: AlertLibraryEntry): boolean =>
+  !removedHere.value.has(entry.id) &&
+  (addedHere.value.has(entry.id) || serverMarks.value.entryIds.has(entry.id));
+
+const addedPackList = computed(() => [
+  ...new Set([...serverMarks.value.packs, ...packsAddedHere.value]),
+]);
+
+const withId = (set: Set<string>, id: string, present: boolean): Set<string> => {
+  const next = new Set(set);
+  if (present) next.add(id);
+  else next.delete(id);
+  return next;
+};
+
+// Anomaly installs carry no library_id, so like the list they earn a pack mark only.
+const markAdded = (entryId: string) => {
+  const entry = entries.value.find((candidate) => candidate.id === entryId);
+  if (entry) packsAddedHere.value = withId(packsAddedHere.value, entry.pack, true);
+  if (entry && alertTypeOf(entry) === "anomaly") return;
+  addedHere.value = withId(addedHere.value, entryId, true);
+  removedHere.value = withId(removedHere.value, entryId, false);
+};
+
+const markRemoved = (entryId: string) => {
+  addedHere.value = withId(addedHere.value, entryId, false);
+  removedHere.value = withId(removedHere.value, entryId, true);
+  const entry = entries.value.find((candidate) => candidate.id === entryId);
+  if (entry) packsAddedHere.value = withId(packsAddedHere.value, entry.pack, false);
+};
+
+const { add: quickAdd, isAdding } = useLibraryQuickAdd({
+  onAdded: markAdded,
+  onRemoved: markRemoved,
+});
+
+const { needsData: labelsNeeded } = useLibraryLabelCheck();
+
+// ── pack review ────────────────────────────────────────────────────────────
+// Every runnable rule of the pack, whatever the filters: the review is about the pack.
+const reviewable = (entry: AlertLibraryEntry): boolean =>
+  entryFits(entry) && !isLocked(entry) && !isAdded(entry);
+
+const reviewCounts = computed<Record<string, number>>(() => {
+  const counts: Record<string, number> = {};
+  for (const entry of entries.value) {
+    if (reviewable(entry)) counts[entry.pack] = (counts[entry.pack] ?? 0) + 1;
+  }
+  return counts;
+});
+
+// Frozen when the review opens, so an add inside it does not reshuffle its rows.
+const reviewEntries = ref<AlertLibraryEntry[]>([]);
+
+const openReview = (pack: string) => {
+  reviewEntries.value = entries.value
+    .filter((entry) => entry.pack === pack && reviewable(entry))
+    .sort(byGridOrder);
+  reviewPack.value = pack;
+  mobileFiltersOpen.value = false;
+  reviewOpen.value = true;
+};
 
 // ── scope ──────────────────────────────────────────────────────────────────
 /**
  * Everything the rail and the search have narrowed to, BEFORE the stat strip's
  * availability filter. That order matters both ways round: the strip counts
  * this set, so its numbers describe the grid underneath it, and the strip's own
- * filter is excluded so that clicking "Not ingested" cannot change the totals
+ * filter is excluded so that clicking "Needs data" cannot change the totals
  * it is being read against.
  */
 /**
@@ -524,18 +695,17 @@ const isLocked = (entry: AlertLibraryEntry): boolean =>
  */
 const text = (value: unknown): string => (typeof value === "string" ? value : "");
 
-const matchesSearch = (entry: AlertLibraryEntry, needle: string): boolean => {
-  if (!needle) return true;
-  // Joined from the fields that exist, so a missing description cannot put the
-  // literal string "undefined" into the haystack and make it searchable.
-  const haystack = [entry.title, entry.id, entry.description, entry.stream]
-    .filter((part): part is string => typeof part === "string")
-    .join(" ");
-  return haystack.toLowerCase().includes(needle);
-};
+// Rail rows are pack-scoped: two packs can ship a category of the same name.
+const categoryKey = (entry: AlertLibraryEntry): string =>
+  `${text(entry.pack)}/${text(entry.category)}`;
+
+const searchTerms = computed(() => searchWords(search.value));
+
+const matchesSearch = (entry: AlertLibraryEntry): boolean =>
+  matchesSearchWords(entry, searchTerms.value);
 
 const matchesCategory = (entry: AlertLibraryEntry): boolean =>
-  selectedCategories.value.length === 0 || selectedCategories.value.includes(entry.category);
+  selectedCategories.value.length === 0 || selectedCategories.value.includes(categoryKey(entry));
 
 const matchesSeverity = (entry: AlertLibraryEntry): boolean =>
   severity.value === "all" || entry.severity === severity.value;
@@ -544,37 +714,34 @@ const matchesAlertType = (entry: AlertLibraryEntry): boolean =>
   alertType.value === "all" || alertTypeOf(entry) === alertType.value;
 
 const matchesFacet = (entry: AlertLibraryEntry): boolean => {
-  if (facet.value === "ready") return entryReady(entry);
-  if (facet.value === "missing") return !entryReady(entry);
+  if (facet.value === "ready") return entryFits(entry);
+  if (facet.value === "missing") return !entryFits(entry);
   return true;
 };
 
-const searchScoped = computed(() => {
-  const needle = search.value.trim().toLowerCase();
-  return entries.value.filter(
-    (entry) => matchesCategory(entry) && matchesSearch(entry, needle) && matchesAlertType(entry),
-  );
-});
+const searchScoped = computed(() =>
+  entries.value.filter(
+    (entry) => matchesCategory(entry) && matchesSearch(entry) && matchesAlertType(entry),
+  ),
+);
 
 const scopedEntries = computed(() => searchScoped.value.filter(matchesSeverity));
 
-// Readiness is "the streams exist"; this is what they would actually give the
-// alert. Only the drawer reads it — the gallery's ready/needs-data facets stay
-// on stream existence, which is the question the stat strip asks.
+// The drawer's freshness line for the open alert; the strip asks the same question through entryFits.
 const selectedDataState = computed(() =>
   selectedEntry.value && readinessKnown.value
     ? streamDataState(selectedEntry.value, streamsByType.value)
     : { state: "fresh" as const, lastIngestedMicros: null },
 );
 
-const readyCount = computed(() => scopedEntries.value.filter(entryReady).length);
+const readyCount = computed(() => scopedEntries.value.filter(entryFits).length);
 const missingCount = computed(() => scopedEntries.value.length - readyCount.value);
 
 /** Non-null only when one category is in view — see showCollectorBanner. */
 const soleCategoryLabel = computed(() => {
-  const ids = new Set(scopedEntries.value.map((entry) => entry.category));
-  const [only] = [...ids];
-  return ids.size === 1 ? categoryLabel(only) : null;
+  // Pack-scoped keys: two packs sharing a category name are two things to send.
+  const keys = new Set(scopedEntries.value.map(categoryKey));
+  return keys.size === 1 ? categoryLabel(scopedEntries.value[0].category) : null;
 });
 
 /**
@@ -591,7 +758,7 @@ const showCollectorBanner = computed(
     soleCategoryLabel.value !== null &&
     scopedEntries.value.length > 0 &&
     readyCount.value === 0 &&
-    // Not over an empty grid. With the "Ready to use" tile active and
+    // Not over an empty grid. With the "For your data" tile active and
     // nothing ready, this banner and the no-results state both rendered — two
     // different explanations for one blank area, and this one citing a count of
     // alerts that were not on screen.
@@ -615,24 +782,34 @@ const availableEntries = computed(() => scopedEntries.value.filter(matchesFacet)
  * filters leave it with nothing — otherwise the rail would hide the row you
  * need in order to untick it. That is what the rail's dead-end rule is for.
  */
-const categoryFacets = computed<LibraryFacet[]>(() => {
-  const needle = search.value.trim().toLowerCase();
-  const counts = new Map<string, number>();
-  for (const id of selectedCategories.value) counts.set(id, 0);
+const categoryFacets = computed<LibraryCategoryFacet[]>(() => {
+  const rows = new Map<string, LibraryCategoryFacet>();
+  const row = (key: string): LibraryCategoryFacet => {
+    const existing = rows.get(key);
+    if (existing) return existing;
+    const slash = key.indexOf("/");
+    const pack = slash === -1 ? "" : key.slice(0, slash);
+    const created: LibraryCategoryFacet = {
+      id: key,
+      label: categoryLabel(key.slice(slash + 1)),
+      count: 0,
+      pack,
+      packLabel: packLabel(pack),
+      ready: 0,
+      total: 0,
+    };
+    rows.set(key, created);
+    return created;
+  };
+  for (const id of selectedCategories.value) row(id);
   for (const entry of entries.value) {
-    if (
-      !matchesSearch(entry, needle) ||
-      !matchesSeverity(entry) ||
-      !matchesFacet(entry) ||
-      !matchesAlertType(entry)
-    ) {
-      continue;
-    }
-    counts.set(entry.category, (counts.get(entry.category) ?? 0) + 1);
+    if (!matchesSearch(entry) || !matchesSeverity(entry) || !matchesAlertType(entry)) continue;
+    const target = row(categoryKey(entry));
+    target.total += 1;
+    if (entryFits(entry)) target.ready += 1;
+    if (matchesFacet(entry)) target.count += 1;
   }
-  return [...counts.keys()]
-    .sort((a, b) => text(a).localeCompare(text(b)))
-    .map((id) => ({ id, label: categoryLabel(id), count: counts.get(id) ?? 0 }));
+  return [...rows.values()].sort((a, b) => String(a.label).localeCompare(String(b.label)));
 });
 
 /**
@@ -722,6 +899,23 @@ const byGridOrder = (a: AlertLibraryEntry, b: AlertLibraryEntry) =>
 /** Every filter has already been applied by `availableEntries`; this orders it. */
 const visibleEntries = computed(() => [...availableEntries.value].sort(byGridOrder));
 
+// Only on the landing view: under a search or filter, pulling rules out of the groups would hide matches.
+const showStarters = computed(
+  () =>
+    readinessKnown.value &&
+    facet.value === "ready" &&
+    search.value.trim() === "" &&
+    selectedCategories.value.length === 0 &&
+    severity.value === "all" &&
+    alertType.value === "all",
+);
+
+const starters = computed(() =>
+  showStarters.value
+    ? pickStartWithThese(visibleEntries.value, (entry) => entryFits(entry) && !isLocked(entry))
+    : [],
+);
+
 /**
  * Grouped by pack AND category, never category alone: category names are
  * pack-scoped in the manifest, so two packs can both ship a "connections"
@@ -731,17 +925,17 @@ const visibleEntries = computed(() => [...availableEntries.value].sort(byGridOrd
  */
 const groupedEntries = computed(() => {
   const groups = new Map<string, AlertLibraryEntry[]>();
+  const started = new Set(starters.value.map((entry) => entry.id));
   for (const entry of visibleEntries.value) {
+    if (started.has(entry.id)) continue;
     const key = `${entry.pack}/${entry.category}`;
     const bucket = groups.get(key);
     if (bucket) bucket.push(entry);
     else groups.set(key, [entry]);
   }
   const packsOnScreen = new Set(visibleEntries.value.map((entry) => entry.pack));
-  return [...groups.keys()]
-    .sort((a, b) => text(a).localeCompare(text(b)))
-    .map((key) => {
-      const entriesInGroup = groups.get(key) ?? [];
+  return [...groups.entries()]
+    .map(([key, entriesInGroup]) => {
       const { pack, category } = entriesInGroup[0];
       return {
         id: key,
@@ -749,8 +943,14 @@ const groupedEntries = computed(() => {
         packLabel: packsOnScreen.size > 1 ? packLabel(pack) : null,
         entries: entriesInGroup,
         selectable: entriesInGroup.filter((entry) => !isLocked(entry)),
+        fit: entriesInGroup.filter(entryFits).length,
+        topSeverity: Math.min(...entriesInGroup.map((entry) => severityRank(entry.severity))),
       };
-    });
+    })
+    .sort(
+      (a, b) =>
+        b.fit - a.fit || a.topSeverity - b.topSeverity || text(a.id).localeCompare(text(b.id)),
+    );
 });
 
 // ── selection ──────────────────────────────────────────────────────────────
@@ -805,14 +1005,22 @@ const clearSelection = async () => {
 };
 
 // Writes only the visible set: dropping a cross-filter batch is what the action row's Clear is for.
-const toggleViewSelection = () => {
+const applyViewSelection = (selectAll: boolean) => {
   const next = new Set(selectedIds.value);
-  const selectAll = viewSelectionState.value !== true;
   for (const entry of selectableVisible.value) {
     if (selectAll) next.add(entry.id);
     else next.delete(entry.id);
   }
   selectedIds.value = next;
+};
+
+const toggleViewSelection = () => {
+  const selectAll = viewSelectionState.value !== true;
+  if (selectAll && selectableVisible.value.length > SELECT_ALL_CONFIRM_ABOVE) {
+    selectAllConfirmOpen.value = true;
+    return;
+  }
+  applyViewSelection(selectAll);
 };
 
 /** Additive: a partly-selected group gains the rest rather than starting over. */
@@ -836,6 +1044,7 @@ const addSelected = () => {
 };
 
 const onInstalled = ({ entryIds }: { entryIds: string[] }) => {
+  for (const id of entryIds) markAdded(id);
   const added = new Set(entryIds);
   selectedIds.value = new Set([...selectedIds.value].filter((id) => !added.has(id)));
 };
@@ -859,7 +1068,7 @@ const hasActiveFilters = computed(
     selectedCategories.value.length > 0 ||
     severity.value !== "all" ||
     alertType.value !== "all" ||
-    facet.value !== null ||
+    facet.value !== "all" ||
     search.value.trim() !== "",
 );
 
@@ -869,22 +1078,39 @@ const onAlertTypeChange = (value: AcceptableValue | AcceptableValue[] | boolean)
 };
 
 const onStatSelect = (key: string) => {
-  if (key === "all") {
-    facet.value = null;
-    return;
-  }
-  const next = key as "ready" | "missing";
-  facet.value = facet.value === next ? null : next;
+  const next = isFacet(key) ? key : "all";
+  facet.value = next === "all" || facet.value === next ? "all" : next;
 };
 
+// Lands on All, not the default facet: on an org with no data yet, "For your data" is the empty view.
 const clearFilters = () => {
   selectedCategories.value = [];
   railSearch.value = "";
   severity.value = "all";
   alertType.value = "all";
-  facet.value = null;
+  facet.value = "all";
   search.value = "";
 };
+
+/** The filters as URL query values; defaults are left out so a plain link stays plain. */
+const filterQuery = computed<Record<string, string | undefined>>(() => ({
+  facet: facet.value === DEFAULT_FACET ? undefined : facet.value,
+  q: search.value.trim() || undefined,
+  severity: severity.value === "all" ? undefined : severity.value,
+  categories: selectedCategories.value.length > 0 ? selectedCategories.value.join(",") : undefined,
+}));
+
+watch(filterQuery, (next) => {
+  const query: LocationQuery = { ...route.query };
+  let changed = false;
+  for (const [key, value] of Object.entries(next)) {
+    if ((queryText(query[key]) || undefined) === value) continue;
+    changed = true;
+    if (value === undefined) delete query[key];
+    else query[key] = value;
+  }
+  if (changed) void router.replace({ query });
+});
 
 const openEntry = (entry: AlertLibraryEntry) => {
   if (isLocked(entry)) {
@@ -905,6 +1131,26 @@ const onInstall = (payload: { entry: AlertLibraryEntry; file: AlertLibraryFile }
   installSeed.value = payload;
   drawerOpen.value = false;
   installOpen.value = true;
+};
+
+const onCardAdd = (entry: AlertLibraryEntry) => {
+  if (isLocked(entry)) {
+    openUpgradeDialog();
+    return;
+  }
+  void quickAdd(entry);
+};
+
+const onCustomize = async (entry: AlertLibraryEntry) => {
+  if (isLocked(entry)) {
+    openUpgradeDialog();
+    return;
+  }
+  try {
+    onInstall({ entry, file: await loadAlertFile(entry) });
+  } catch {
+    toast({ variant: "error", message: t("alert_library.drawer.loadFailed") });
+  }
 };
 
 const onInstallOpenChange = (open: boolean) => {
@@ -949,11 +1195,25 @@ const loadStreams = async () => {
   }
 };
 
+// Every folder: library installs land in a folder per pack.
+const loadAddedMarks = async () => {
+  try {
+    const org = store.state.selectedOrganization?.identifier ?? "";
+    serverMarks.value = libraryMarks(await queryClient.fetchQuery(alertsListQuery(org, "")));
+    addedHere.value = new Set();
+    removedHere.value = new Set();
+    packsAddedHere.value = new Set();
+  } catch {
+    // Without the list there are no marks; the gallery itself still works.
+  }
+};
+
 const refresh = () => {
   void loadManifest({ force: true }).catch(() => {
     // Surfaced through `error`; the empty state offers Retry.
   });
   void loadStreams();
+  void loadAddedMarks();
 };
 
 onMounted(() => {
@@ -961,5 +1221,29 @@ onMounted(() => {
     /* see refresh */
   });
   void loadStreams();
+  void loadAddedMarks();
 });
+
+function isFacet(value: string): value is Facet {
+  return (FACETS as readonly string[]).includes(value);
+}
+
+function queryText(value: LocationQuery[string] | undefined): string {
+  const first = Array.isArray(value) ? value[0] : value;
+  return typeof first === "string" ? first : "";
+}
+
+function queryFacet(value: LocationQuery[string] | undefined): Facet {
+  const candidate = queryText(value);
+  return isFacet(candidate) ? candidate : DEFAULT_FACET;
+}
+
+function querySeverity(value: LocationQuery[string] | undefined): string {
+  const candidate = queryText(value);
+  return (SEVERITY_ORDER as readonly string[]).includes(candidate) ? candidate : "all";
+}
+
+function queryList(value: LocationQuery[string] | undefined): string[] {
+  return queryText(value).split(",").filter(Boolean);
+}
 </script>

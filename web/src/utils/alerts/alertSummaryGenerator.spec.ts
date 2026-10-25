@@ -139,3 +139,56 @@ describe("generateAlertSummary: where it sends", () => {
     expect(summary({ ...forecastForm(), ...targets })).not.toContain(noDestination);
   });
 });
+
+describe("generateAlertSummary: aggregate rules state their own limit", () => {
+  const aggregateForm = (having: Record<string, unknown> = {}, period = 10, fn = "avg") => ({
+    stream_type: "metrics",
+    stream_name: "node_load1",
+    is_real_time: "false",
+    query_condition: {
+      type: "custom",
+      aggregation: {
+        function: fn,
+        group_by: [],
+        having: { column: "value", operator: ">=", value: 250, ...having },
+      },
+    },
+    trigger_condition: { period, operator: ">=", threshold: 1, silence: 0 },
+    destinations: [],
+  });
+  const aggSummary = (form: any, aggregate = true) =>
+    generateAlertSummary(form, [], t, undefined, "", "", aggregate);
+
+  it("builds the sentence from the function, column and limit", () => {
+    const text = aggSummary(aggregateForm());
+    expect(text).toContain("Alert me when the average of value is 250 or more over 10 minutes");
+    expect(text).not.toContain("1+ events");
+  });
+
+  it("states the limit in Triggers when, not an event count", () => {
+    const text = aggSummary(aggregateForm());
+    expect(text).toContain("the average of value is 250 (≥) or more");
+    expect(text).not.toContain("events detected");
+  });
+
+  it("follows the limit's operator and an hour period", () => {
+    const text = aggSummary(aggregateForm({ operator: ">" }, 60, "max"));
+    expect(text).toContain("Alert me when the maximum of value is more than 250 over 1 hour");
+  });
+
+  it("keeps a period that is not a whole number of hours in minutes", () => {
+    const text = aggSummary(aggregateForm({}, 90));
+    expect(text).toContain("Alert me when the average of value is 250 or more over 90 minutes");
+  });
+
+  it("names a percentile function", () => {
+    const text = aggSummary(aggregateForm({ column: "took", operator: "<", value: 5 }, 1, "p95"));
+    expect(text).toContain("Alert me when the p95 of took is less than 5 over 1 minute");
+  });
+
+  it("keeps the event wording when aggregation is off, even with a stale aggregation", () => {
+    const text = aggSummary(aggregateForm(), false);
+    expect(text).toContain("1+ events");
+    expect(text).not.toContain("the average of value");
+  });
+});

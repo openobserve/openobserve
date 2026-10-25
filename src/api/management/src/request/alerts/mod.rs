@@ -24,6 +24,7 @@ use axum::{
 use axum_extra::extract::Query as ExtraQuery;
 use config::meta::{
     alerts::alert::{Alert as MetaAlert, AlertTypeFilter},
+    destinations::{Destination, DestinationType, Module},
     triggers::{ScheduledTriggerData, Trigger, TriggerModule},
 };
 use db::scheduler;
@@ -701,6 +702,7 @@ fn composite_list_item(
         tags,
         destinations: Vec::new(),
         template: None,
+        library_id: None,
         groups_observed: None,
         groups_firing: None,
         groups_observed_is_lower_bound: None,
@@ -2785,6 +2787,22 @@ pub async fn list_alerts(
     // when asked for. Captured before `query` is moved into `params` below.
     let include_dependencies = query.include_dependencies.unwrap_or(false);
 
+    // The leaver filter needs destination definitions, so it runs after the SQL query.
+    let sole_recipient = query.sole_recipient.clone();
+    let sole_destinations: HashMap<String, Destination> = if sole_recipient.is_some() {
+        db::alerts::destinations::list(&org_id, Some("alert"))
+            .await
+            .map(|dests| {
+                dests
+                    .into_iter()
+                    .map(|dest| (dest.name.clone(), dest))
+                    .collect()
+            })
+            .unwrap_or_default()
+    } else {
+        HashMap::new()
+    };
+
     #[cfg(not(feature = "enterprise"))]
     let mut params = query.into(&org_id);
     #[cfg(feature = "enterprise")]
@@ -2850,7 +2868,10 @@ pub async fn list_alerts(
         }
         _ => false,
     };
-    if merges_extra {
+    if sole_recipient.is_some() {
+        // A recipient filter can drop arbitrary rows, so fetch all and slice after.
+        params.page_size_and_idx = None;
+    } else if merges_extra {
         // Bound the regular-alert fetch to the prefix that could fall inside the
         // requested page rather than fetching every row. Composites/anomalies
         // only push regular alerts down the merged order, so the regular rows in
@@ -2891,6 +2912,11 @@ pub async fn list_alerts(
                     }
                     AlertTypeFilter::Slo => a.query_condition.slo_condition.is_some(),
                     _ => true,
+                })
+                // BE-6: keep only alerts that notify the leaver and nobody else.
+                .filter(|(_, a)| match &sole_recipient {
+                    Some(email) => alert_notifies_only(a, email, &sole_destinations),
+                    None => true,
                 })
                 .map(|(folder, alert)| {
                     let key = alert.get_unique_key();
@@ -2946,6 +2972,24 @@ pub async fn list_alerts(
             ) {
                 continue;
             }
+            // BE-6: composites carry the same "other route" fields as regular alerts.
+            if let Some(email) = &sole_recipient {
+                let composite_destinations: Vec<String> =
+                    serde_json::from_value(definition.destinations.clone()).unwrap_or_default();
+                let workflows: Vec<String> =
+                    serde_json::from_value(definition.workflows.clone()).unwrap_or_default();
+                if definition.creates_incident
+                    || !workflows.is_empty()
+                    || composite_destinations.is_empty()
+                    || !composite_destinations.iter().all(|name| {
+                        sole_destinations
+                            .get(name)
+                            .is_some_and(|dest| destination_lists_only(dest, email))
+                    })
+                {
+                    continue;
+                }
+            }
             let folder_name = folder_names
                 .get(&definition.folder_id)
                 .cloned()
@@ -2999,7 +3043,9 @@ pub async fn list_alerts(
                 })
                 .filter(|item| {
                     config::meta::alerts::tags::matches_all_tags(&item.tags, &tag_filter)
-                }),
+                })
+                // Anomaly configs notify through their own path, never a destination.
+                .filter(|_item| sole_recipient.is_none()),
         );
         // Without this the appended rows pin to the tail whatever order was
         // requested, and the pagination below cuts the combined list in the
@@ -3012,10 +3058,8 @@ pub async fn list_alerts(
 
     sort_merged_alert_list(&mut list, requested_sort.0, requested_sort.1);
 
-    // Apply pagination to the combined list. Single-kind lists were already
-    // paginated by the SQL query, so only re-paginate when extra kinds were
-    // merged in after it.
-    let list = if merges_extra {
+    // Re-paginate when extra kinds were merged or the recipient filter fetched all rows.
+    let list = if merges_extra || sole_recipient.is_some() {
         if let Some((page_size, page_idx)) = page_size_and_idx {
             // Use saturating_mul to prevent u64 overflow before casting to usize.
             let start = page_idx.saturating_mul(page_size) as usize;
@@ -3047,6 +3091,63 @@ pub async fn list_alerts(
     }
 
     MetaHttpResponse::json(ListAlertsResponseBody { list })
+}
+
+/// `true` when `alert` notifies exactly `email` and nobody/nothing else.
+fn alert_notifies_only(
+    alert: &MetaAlert,
+    email: &str,
+    destinations: &HashMap<String, Destination>,
+) -> bool {
+    let email = email.trim();
+    if email.is_empty() || alert.destinations.is_empty() {
+        return false;
+    }
+    // These routes notify outside the destination list.
+    if alert.creates_incident || !alert.workflows.is_empty() {
+        return false;
+    }
+    if alert
+        .oncall_team
+        .as_deref()
+        .is_some_and(|team| !team.trim().is_empty())
+    {
+        return false;
+    }
+    // Recovery only adds a route when it will actually send.
+    if alert.notify_on_recovery
+        && !alert.recovery_destinations.is_empty()
+        && !alert.recovery_destinations.iter().all(|name| {
+            destinations
+                .get(name)
+                .is_some_and(|dest| destination_lists_only(dest, email))
+        })
+    {
+        return false;
+    }
+    alert.destinations.iter().all(|name| {
+        destinations
+            .get(name)
+            .is_some_and(|dest| destination_lists_only(dest, email))
+    })
+}
+
+/// `true` when `destination` is an email destination listing only `email`.
+fn destination_lists_only(destination: &Destination, email: &str) -> bool {
+    let Module::Alert {
+        destination_type, ..
+    } = &destination.module
+    else {
+        return false;
+    };
+    let DestinationType::Email(email_dest) = destination_type else {
+        return false;
+    };
+    !email_dest.recipients.is_empty()
+        && email_dest
+            .recipients
+            .iter()
+            .all(|recipient| recipient.trim().eq_ignore_ascii_case(email))
 }
 
 /// Resolve the caller's visible alert/composite object set in one bulk query,
@@ -4909,6 +5010,134 @@ mod tests {
                 .await
                 .unwrap_err();
             assert_ne!(resp.status(), StatusCode::FORBIDDEN);
+        }
+    }
+
+    mod sole_recipient {
+        use config::meta::{
+            alerts::alert::Alert as MetaAlert,
+            destinations::{Destination, DestinationType, Email, Endpoint, Module},
+        };
+        use hashbrown::HashMap;
+
+        use super::super::alert_notifies_only;
+
+        fn dest(name: &str, destination_type: DestinationType) -> (String, Destination) {
+            let destination = Destination {
+                id: None,
+                org_id: "org".to_string(),
+                name: name.to_string(),
+                module: Module::Alert {
+                    template: None,
+                    destination_type,
+                },
+            };
+            (name.to_string(), destination)
+        }
+
+        fn email(recipients: &[&str]) -> DestinationType {
+            DestinationType::Email(Email {
+                recipients: recipients.iter().map(|r| r.to_string()).collect(),
+            })
+        }
+
+        fn destinations() -> HashMap<String, Destination> {
+            HashMap::from([
+                dest("ana_mail", email(&["ana@example.com"])),
+                dest("ana_mail_2", email(&["Ana@Example.com"])),
+                dest("ana_and_bo", email(&["ana@example.com", "bo@example.com"])),
+                dest("empty_mail", email(&[])),
+                dest("slack", DestinationType::Http(Endpoint::default())),
+            ])
+        }
+
+        fn alert(destinations: &[&str]) -> MetaAlert {
+            let mut alert = MetaAlert::default();
+            alert.destinations = destinations.iter().map(|d| d.to_string()).collect();
+            alert
+        }
+
+        fn only_ana(alert: &MetaAlert) -> bool {
+            alert_notifies_only(alert, "ana@example.com", &destinations())
+        }
+
+        #[test]
+        fn test_sole_email_user_is_included() {
+            assert!(only_ana(&alert(&["ana_mail"])));
+            assert!(only_ana(&alert(&["ana_mail", "ana_mail_2"])));
+        }
+
+        #[test]
+        fn test_extra_recipient_is_excluded() {
+            assert!(!only_ana(&alert(&["ana_and_bo"])));
+            assert!(!only_ana(&alert(&["ana_mail", "empty_mail"])));
+        }
+
+        #[test]
+        fn test_extra_non_email_destination_is_excluded() {
+            assert!(!only_ana(&alert(&["ana_mail", "slack"])));
+        }
+
+        #[test]
+        fn test_unknown_destination_is_excluded() {
+            assert!(!only_ana(&alert(&["ana_mail", "deleted"])));
+        }
+
+        #[test]
+        fn test_no_destinations_is_excluded() {
+            assert!(!only_ana(&alert(&[])));
+        }
+
+        #[test]
+        fn test_match_is_case_insensitive() {
+            assert!(alert_notifies_only(
+                &alert(&["ana_mail"]),
+                " ANA@example.COM ",
+                &destinations()
+            ));
+            assert!(only_ana(&alert(&["ana_mail_2"])));
+        }
+
+        #[test]
+        fn test_blank_email_matches_nothing() {
+            assert!(!alert_notifies_only(
+                &alert(&["empty_mail"]),
+                "  ",
+                &destinations()
+            ));
+        }
+
+        #[test]
+        fn test_other_routes_are_excluded() {
+            let mut incident = alert(&["ana_mail"]);
+            incident.creates_incident = true;
+            assert!(!only_ana(&incident));
+
+            let mut workflow = alert(&["ana_mail"]);
+            workflow.workflows = vec!["wf".to_string()];
+            assert!(!only_ana(&workflow));
+
+            let mut oncall = alert(&["ana_mail"]);
+            oncall.oncall_team = Some("payments".to_string());
+            assert!(!only_ana(&oncall));
+
+            let mut blank_oncall = alert(&["ana_mail"]);
+            blank_oncall.oncall_team = Some("  ".to_string());
+            assert!(only_ana(&blank_oncall));
+        }
+
+        #[test]
+        fn test_recovery_destinations_count_as_routes() {
+            let mut recovery_slack = alert(&["ana_mail"]);
+            recovery_slack.recovery_destinations = vec!["slack".to_string()];
+            assert!(only_ana(&recovery_slack), "recovery off never sends");
+            recovery_slack.notify_on_recovery = true;
+            assert!(!only_ana(&recovery_slack));
+
+            let mut recovery_ana = alert(&["ana_mail"]);
+            recovery_ana.notify_on_recovery = true;
+            recovery_ana.recovery_destinations = vec!["ana_mail_2".to_string()];
+            assert!(only_ana(&recovery_ana));
         }
     }
 }

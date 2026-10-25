@@ -260,7 +260,7 @@ const submit = async () => {
   saving.value = true;
   try {
     const body = buildSloAlertPayload(form, { slo: props.slo, existing: existing.value });
-    await saveAlert.mutateAsync({ payload: body });
+    await saveAlert.mutateAsync({ payload: body, source: "slo" });
     emit("saved");
   } catch (e: any) {
     toast({

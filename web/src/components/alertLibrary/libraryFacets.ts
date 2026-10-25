@@ -28,6 +28,16 @@ export interface LibraryFacet {
   count: number;
 }
 
+/** A rail category row, keyed `<pack>/<category>`, with its pack's fit tallies. */
+export interface LibraryCategoryFacet extends LibraryFacet {
+  pack: string;
+  packLabel: I18nText;
+  /** Rules in this category with data in the last 24 h, under every filter but the facet. */
+  ready: number;
+  /** Rules in this category under every filter but the facet. */
+  total: number;
+}
+
 /** The rail's alert-type facet; the manifest's `scheduled` reads as Threshold. */
 export type LibraryAlertType = "scheduled" | "anomaly";
 

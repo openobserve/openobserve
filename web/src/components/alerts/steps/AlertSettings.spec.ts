@@ -99,6 +99,7 @@ function makeDescendantHost(
   defaultOverrides: Record<string, any> = {},
   formDataOverrides: Record<string, any> = {},
   destinations: string[] = [],
+  settingsProps: Record<string, any> = {},
 ) {
   return defineComponent({
     components: { OForm, AlertSettings },
@@ -111,7 +112,7 @@ function makeDescendantHost(
         ...defaultOverrides,
       };
       const formData = makeFormData(formDataOverrides);
-      return { schema, defaultValues, formData, isRealTime, destinations };
+      return { schema, defaultValues, formData, isRealTime, destinations, settingsProps };
     },
     template: `
       <OForm :schema="schema" :default-values="defaultValues" @submit="() => {}">
@@ -120,6 +121,7 @@ function makeDescendantHost(
           :is-real-time="isRealTime"
           :destinations="destinations"
           :formatted-destinations="['dest-a','dest-b']"
+          v-bind="settingsProps"
         />
       </OForm>
     `,
@@ -305,6 +307,106 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
   });
 });
 
+describe("AlertSettings — plain-language line under each timing control", () => {
+  const line = (host: any, name: string) => host.find(`[data-test="alert-settings-${name}-line"]`);
+  const scheduled = (over: Record<string, any> = {}) =>
+    mountDescendant("false", {
+      trigger_condition: { silence: 10, period: 10, frequency: 10, frequency_type: "minutes" },
+      pending_period_sec: 20,
+      keep_firing_for: 300,
+      ...over,
+    });
+
+  it("reads the current values back in words", () => {
+    const host = scheduled();
+    expect(line(host, "silence").text()).toBe("After it fires, no new notification for 10 minutes");
+    expect(line(host, "pending").text()).toBe("Fires after 3 failed checks in a row");
+    expect(line(host, "keep-firing").text()).toBe("Stays open 300 seconds after recovery");
+  });
+
+  it("follows the values as they change", async () => {
+    const host = scheduled();
+    const form = hostForm(host);
+    form.setFieldValue("trigger_condition.silence", 1);
+    form.setFieldValue("pending_period_sec", 0);
+    form.setFieldValue("keep_firing_for", 0);
+    await flushPromises();
+
+    expect(line(host, "silence").text()).toBe("After it fires, no new notification for 1 minute");
+    expect(line(host, "pending").text()).toBe("Fires on the first failed check");
+    expect(line(host, "keep-firing").text()).toBe("Recovers on the first check that passes");
+
+    form.setFieldValue("trigger_condition.silence", 0);
+    form.setFieldValue("trigger_condition.frequency", 5);
+    form.setFieldValue("pending_period_sec", 12);
+    await flushPromises();
+
+    expect(line(host, "silence").text()).toBe("Notifies on every check that fires");
+    expect(line(host, "pending").text()).toBe("Fires after 4 failed checks in a row");
+  });
+
+  it("counts time, not checks, when the schedule is a cron", () => {
+    const host = scheduled({
+      trigger_condition: { silence: 10, period: 10, frequency_type: "cron", cron: "0 */5 * * * *" },
+    });
+    expect(line(host, "pending").text()).toBe("Fires once the condition holds for 20 minutes");
+  });
+
+  it("explains silence on a realtime alert and the pending period on a composite one", () => {
+    const realtime = mountDescendant("true", { trigger_condition: { silence: 5 } });
+    expect(line(realtime, "silence").text()).toBe(
+      "After it fires, no new notification for 5 minutes",
+    );
+    expect(line(realtime, "pending").exists()).toBe(false);
+
+    const composite = mountDescendant("composite", {
+      trigger_condition: { silence: 5 },
+      pending_period_sec: 5,
+    });
+    expect(line(composite, "pending").text()).toBe("Fires once the condition holds for 5 minutes");
+  });
+});
+
+describe("AlertSettings — Suggested defaults note on the intent path", () => {
+  const mountNote = (intentDefaults: Record<string, number> | null) =>
+    mount(
+      defineComponent({
+        components: { OForm, AlertSettings },
+        setup: () => ({
+          schema: parentSchema,
+          defaultValues: { trigger_condition: { silence: 60, period: 10 }, destinations: [] },
+          formData: makeFormData(),
+          intentDefaults,
+        }),
+        template: `
+          <OForm :schema="schema" :default-values="defaultValues" @submit="() => {}">
+            <AlertSettings :form-data="formData" is-real-time="false" :intent-defaults="intentDefaults" />
+          </OForm>
+        `,
+      }),
+      { global: { plugins: [makeStore(), i18n] } },
+    );
+  const note = (host: any) => host.find('[data-test="alert-settings-suggested-defaults"]');
+
+  it("lists the silence, the hold and the recovery notice for a value rule", () => {
+    const host = mountNote({ silenceMinutes: 60, pendingPeriodMinutes: 10 });
+    expect(note(host).text()).toBe(
+      "Suggested defaults: checks pause for 60 minutes after it fires, it holds for 10 minutes before firing, and recovery notices are off. Change any of them below.",
+    );
+  });
+
+  it("leaves the hold out for a count rule", () => {
+    const host = mountNote({ silenceMinutes: 60, pendingPeriodMinutes: 0 });
+    expect(note(host).text()).toBe(
+      "Suggested defaults: checks pause for 60 minutes after it fires, and recovery notices are off. Change any of them below.",
+    );
+  });
+
+  it("is absent outside the intent path", () => {
+    expect(note(mountNote(null)).exists()).toBe(false);
+  });
+});
+
 // ── Creates Incident: enterprise/cloud + incidents_enabled only ─────────────
 // Incidents is an enterprise feature: the OSS backend always reports
 // `incidents_enabled: false`, and the enterprise one only correlates when it
@@ -346,6 +448,92 @@ describe("AlertSettings — Notify on recovery with nowhere to send", () => {
     expect(host.find(SWITCH).attributes("disabled")).toBeUndefined();
     expect(host.find('[data-test="alert-notify-on-recovery-plan-dest-a"]').exists()).toBe(true);
     expect(recoveryFieldShown(host)).toBe(true);
+  });
+});
+
+describe("AlertSettings — Send test", () => {
+  const fields = (host: any) => host.findAllComponents({ name: "AlertDestinationsField" });
+
+  it.each(["true", "false"])(
+    "offers it on the main destination field with the alert's template (real-time %s)",
+    (isRealTime) => {
+      const host = mount(
+        makeDescendantHost(isRealTime, {}, { template: "alert-tpl" }, ["dest-a"]),
+        { global: { plugins: [makeStore(), i18n] } },
+      );
+      const main = fields(host)[0];
+      expect(main.props("showSendTest")).toBe(true);
+      expect(main.props("alertTemplate")).toBe("alert-tpl");
+    },
+  );
+
+  it("is not offered on the recovery field", () => {
+    const host = mount(
+      makeDescendantHost("false", { notify_on_recovery: true }, { notify_on_recovery: true }, [
+        "dest-a",
+      ]),
+      { global: { plugins: [makeStore(), i18n] } },
+    );
+    const recovery = fields(host).find(
+      (field: any) => field.props("label") === t("alerts.alertSettings.recoveryDestinations"),
+    );
+    expect(recovery.props("showSendTest")).toBe(false);
+  });
+});
+
+describe("AlertSettings — Who to tell", () => {
+  const original = { isEnterprise: config.isEnterprise, isCloud: config.isCloud };
+  const fields = (host: any) => host.findAllComponents({ name: "AlertDestinationsField" });
+  afterEach(() => {
+    config.isEnterprise = original.isEnterprise;
+    config.isCloud = original.isCloud;
+  });
+
+  it("names the on-call team and the incident to the main field", () => {
+    config.isEnterprise = "true";
+    const host = mount(
+      makeDescendantHost("false", {}, { oncall_team: "sre", creates_incident: true }),
+      { global: { plugins: [makeStore({ incidents_enabled: true }), i18n] } },
+    );
+    expect(fields(host)[0].props("oncallTeam")).toBe("sre");
+    expect(fields(host)[0].props("createsIncident")).toBe(true);
+  });
+
+  it("names neither in OSS, where they deliver nothing", () => {
+    config.isEnterprise = "false";
+    config.isCloud = "false";
+    const host = mount(
+      makeDescendantHost("false", {}, { oncall_team: "sre", creates_incident: true }),
+      { global: { plugins: [makeStore({ incidents_enabled: true }), i18n] } },
+    );
+    expect(fields(host)[0].props("oncallTeam")).toBe("");
+    expect(fields(host)[0].props("createsIncident")).toBe(false);
+  });
+
+  it("shows why Email me could not be set up on the destination field", () => {
+    const host = mount(makeDescendantHost("true", {}, {}, [], { emailMeError: "Ask an admin" }), {
+      global: { plugins: [makeStore(), i18n] },
+    });
+    expect(host.find('[data-test="alert-settings-destinations-error"]').text()).toBe(
+      "Ask an admin",
+    );
+  });
+
+  it("hands the Email me resolver to the main field only", () => {
+    const resolveDestinations = vi.fn();
+    const host = mount(
+      makeDescendantHost(
+        "false",
+        { notify_on_recovery: true },
+        { notify_on_recovery: true },
+        ["dest-a"],
+        { resolveDestinations },
+      ),
+      { global: { plugins: [makeStore(), i18n] } },
+    );
+    const [main, recovery] = fields(host);
+    expect(main.props("resolveDestinations")).toBe(resolveDestinations);
+    expect(recovery.props("resolveDestinations")).toBeUndefined();
   });
 });
 

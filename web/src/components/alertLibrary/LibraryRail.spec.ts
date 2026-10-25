@@ -13,21 +13,44 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 
 import LibraryRail from "./LibraryRail.vue";
-import type { LibraryFacet } from "./libraryFacets";
+import type { LibraryCategoryFacet, LibraryFacet } from "./libraryFacets";
 import i18n from "@/locales";
 import { raw } from "@/types/i18n";
 
-const categories: LibraryFacet[] = [
-  { id: "kafka", label: raw("Kafka"), count: 12 },
-  { id: "clickhouse", label: raw("Clickhouse"), count: 23 },
+const pack = (id: string, label: string) => ({ pack: id, packLabel: raw(label) });
+
+const categories: LibraryCategoryFacet[] = [
+  { id: "kafka", label: raw("Kafka"), count: 12, ready: 12, total: 15, ...pack("mq", "Queues") },
+  {
+    id: "clickhouse",
+    label: raw("Clickhouse"),
+    count: 23,
+    ready: 23,
+    total: 30,
+    ...pack("databases", "Databases"),
+  },
   // id-vs-label discriminator: "cert-m" is in the id, not in "Cert Manager".
-  { id: "cert-manager", label: raw("Cert Manager"), count: 8 },
+  {
+    id: "cert-manager",
+    label: raw("Cert Manager"),
+    count: 8,
+    ready: 8,
+    total: 8,
+    ...pack("k8s", "Kubernetes"),
+  },
   // The dead end.
-  { id: "retired", label: raw("Retired"), count: 0 },
+  {
+    id: "retired",
+    label: raw("Retired"),
+    count: 0,
+    ready: 0,
+    total: 4,
+    ...pack("databases", "Databases"),
+  },
 ];
 
 const severities: LibraryFacet[] = [
@@ -74,6 +97,21 @@ const type = async (wrapper: Rail, term: string) => {
 };
 
 describe("LibraryRail", () => {
+  const stored = new Map<string, string>();
+
+  beforeEach(() => {
+    stored.clear();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => stored.get(key) ?? null,
+      setItem: (key: string, value: string) => void stored.set(key, value),
+      removeItem: (key: string) => void stored.delete(key),
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("lists one axis only — categories — with no pack switcher", () => {
     // A pack is a coarse bucket; the category is what people come looking for.
     // Two axes over one catalogue put the useful one behind a tab.
@@ -242,5 +280,118 @@ describe("LibraryRail", () => {
     expect(label.text()).toBe("Kafka");
     expect(label.attributes("title")).toBeUndefined();
     expect(label.attributes("data-o-tooltip-trigger")).toBe("overflow");
+  });
+
+  // ── pack grouping ────────────────────────────────────────────────────────
+  describe("pack grouping", () => {
+    const SHOW_ALL = '[data-test="alert-library-rail-show-all"]';
+    const heading = (wrapper: Rail, id: string) =>
+      wrapper.find(`[data-test="alert-library-rail-pack-heading-${id}"]`);
+
+    it("lists categories under pack headings, the pack with most ready first", () => {
+      const wrapper = mountRail();
+      const headings = wrapper
+        .findAll('[data-test^="alert-library-rail-pack-heading-"]')
+        .map((h) => h.attributes("data-test")?.replace("alert-library-rail-pack-heading-", ""));
+      expect(headings).toEqual(["databases", "mq", "k8s"]);
+
+      const kafka = wrapper.find('[data-test="alert-library-rail-category-kafka"]').element;
+      const mq = heading(wrapper, "mq").element;
+      const k8s = heading(wrapper, "k8s").element;
+      expect(mq.compareDocumentPosition(kafka)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+      expect(k8s.compareDocumentPosition(kafka)).toBe(Node.DOCUMENT_POSITION_PRECEDING);
+    });
+
+    it("shows ready / total on each pack heading, counting its hidden rows too", () => {
+      const wrapper = mountRail();
+      expect(heading(wrapper, "databases").text()).toContain("Databases");
+      expect(
+        heading(wrapper, "databases").find('[data-test="alert-library-rail-pack-count"]').text(),
+      ).toBe("23 / 34");
+    });
+
+    it("drops a pack heading whose rows are all hidden", async () => {
+      const wrapper = mountRail();
+      await type(wrapper, "kafka");
+      expect(heading(wrapper, "mq").exists()).toBe(true);
+      expect(heading(wrapper, "databases").exists()).toBe(false);
+    });
+
+    it("shows the empty rows on Show all, and hides them again", async () => {
+      const wrapper = mountRail();
+      expect(wrapper.find(SHOW_ALL).text()).toBe(
+        i18n.global.t("alert_library.showAllCategories", { count: 4 }, 4),
+      );
+
+      await wrapper.find(SHOW_ALL).trigger("click");
+      expect(wrapper.find('[data-test="alert-library-rail-category-retired"]').exists()).toBe(true);
+      expect(wrapper.find(SHOW_ALL).text()).toBe(
+        i18n.global.t("alert_library.hideEmptyCategories"),
+      );
+
+      await wrapper.find(SHOW_ALL).trigger("click");
+      expect(wrapper.find('[data-test="alert-library-rail-category-retired"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("remembers Show all for the next visit", async () => {
+      await mountRail().find(SHOW_ALL).trigger("click");
+      const again = mountRail();
+      expect(again.find('[data-test="alert-library-rail-category-retired"]').exists()).toBe(true);
+
+      await again.find(SHOW_ALL).trigger("click");
+      expect(mountRail().find('[data-test="alert-library-rail-category-retired"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("still works when storage is unavailable", async () => {
+      vi.stubGlobal("localStorage", {
+        getItem: () => {
+          throw new Error("denied");
+        },
+        setItem: () => {
+          throw new Error("denied");
+        },
+      });
+      const wrapper = mountRail();
+      expect(wrapper.find('[data-test="alert-library-rail-category-retired"]').exists()).toBe(
+        false,
+      );
+      await wrapper.find(SHOW_ALL).trigger("click");
+      expect(wrapper.find('[data-test="alert-library-rail-category-retired"]').exists()).toBe(true);
+    });
+
+    it("offers no Show all when no row is empty", () => {
+      const wrapper = mountRail({ categories: categories.filter((c) => c.count > 0) });
+      expect(wrapper.find(SHOW_ALL).exists()).toBe(false);
+    });
+  });
+
+  describe("added packs", () => {
+    it("marks a pack heading the org already has alerts from", () => {
+      const wrapper = mountRail({ addedPacks: ["k8s"] });
+      const k8s = wrapper.find('[data-test="alert-library-rail-pack-heading-k8s"]');
+      expect(k8s.find('[data-test="alert-library-rail-pack-added"]').text()).toBe("Added");
+      const mq = wrapper.find('[data-test="alert-library-rail-pack-heading-mq"]');
+      expect(mq.find('[data-test="alert-library-rail-pack-added"]').exists()).toBe(false);
+    });
+  });
+  describe("pack review", () => {
+    it("offers a review of each pack with rules to review", () => {
+      const wrapper = mountRail({ reviewCounts: { k8s: 6 } });
+      const review = wrapper.find('[data-test="alert-library-rail-pack-review-k8s"]');
+      expect(review.text()).toBe("Review 6 alerts");
+      expect(wrapper.find('[data-test="alert-library-rail-pack-review-mq"]').exists()).toBe(false);
+    });
+
+    it("emits the pack to review", async () => {
+      const wrapper = mountRail({ reviewCounts: { k8s: 1 } });
+      const review = wrapper.find('[data-test="alert-library-rail-pack-review-k8s"]');
+      expect(review.text()).toBe("Review 1 alert");
+      await review.trigger("click");
+      expect(wrapper.emitted("review")).toEqual([["k8s"]]);
+    });
   });
 });

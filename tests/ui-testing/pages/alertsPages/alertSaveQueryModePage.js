@@ -31,7 +31,7 @@ export class AlertSaveQueryModePage {
       destinationTrigger: '[data-test="alert-destinations-select-trigger"]',
       addCondition: '[data-test="alert-conditions-add-condition-btn"]',
       conditionColumn: '[data-test="alert-conditions-select-column-trigger"]',
-      conditionValue: '[data-test="alert-conditions-value-input-field"]',
+      conditionValue: '[data-test="alert-conditions-value-combobox-input"]',
       threshold: '[data-test="alert-trigger-threshold-input-field"]',
       realtimeTab: '[data-test="add-alert-type-tab-true"]',
       scheduledTab: '[data-test="add-alert-type-tab-false"]',

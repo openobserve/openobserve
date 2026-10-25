@@ -98,6 +98,29 @@ vi.mock("@/components/alerts/AlertHistoryDrawer.vue", () => ({
   },
 }));
 
+const startSheetMocks = vi.hoisted(() => ({ openAlertCreation: vi.fn(() => true) }));
+vi.mock("@/components/alerts/AlertStartSheet.vue", () => ({
+  __esModule: true,
+  default: {
+    name: "AlertStartSheet",
+    props: ["open", "initialStream"],
+    emits: ["update:open", "choose", "import", "blank"],
+    template:
+      '<div data-test="overview-start-sheet-stub" :data-open="String(open)" :data-stream="String(initialStream)">' +
+      "<button data-test=\"stub-choose\" @click=\"$emit('choose', { source: 'intent', streamName: 'app' })\" />" +
+      '<button data-test="stub-blank" @click="$emit(\'blank\')" />' +
+      '<button data-test="stub-import" @click="$emit(\'import\')" />' +
+      "</div>",
+  },
+}));
+vi.mock("@/composables/alerts/useAlertCreation", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return {
+    ...actual,
+    useAlertCreation: () => ({ openAlertCreation: startSheetMocks.openAlertCreation }),
+  };
+});
+
 import alertsService from "@/services/alerts";
 import anomalyService from "@/services/anomaly_detection";
 import incidentsService from "@/services/incidents";
@@ -881,6 +904,51 @@ describe("OverviewTab", () => {
       expect(wrapper.find('[data-test="overview-not-monitored-alert-card"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="overview-not-monitored-anomaly-card"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="overview-not-monitored-logs-card"]').exists()).toBe(true);
+    });
+
+    it("opens the start sheet, with no stream picked, from the alert card", async () => {
+      vi.mocked(organizationsService.get_organization_summary).mockResolvedValue(
+        summaryWithAlerts(0) as never,
+      );
+      const push = vi.spyOn(router, "push");
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      await wrapper.find('[data-test="overview-not-monitored-alert-card"]').trigger("click");
+      await flushPromises();
+
+      const sheet = wrapper.find('[data-test="overview-start-sheet-stub"]');
+      expect(sheet.attributes("data-open")).toBe("true");
+      expect(sheet.attributes("data-stream")).toBe("undefined");
+      expect(push).not.toHaveBeenCalledWith(expect.objectContaining({ name: "addAlert" }));
+    });
+
+    it("routes the start sheet's choices to the form, the blank form and import", async () => {
+      vi.mocked(organizationsService.get_organization_summary).mockResolvedValue(
+        summaryWithAlerts(0) as never,
+      );
+      const push = vi.spyOn(router, "push");
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      await wrapper.find('[data-test="overview-not-monitored-alert-card"]').trigger("click");
+      await flushPromises();
+      await wrapper.find('[data-test="stub-choose"]').trigger("click");
+      await wrapper.find('[data-test="stub-blank"]').trigger("click");
+      await wrapper.find('[data-test="stub-import"]').trigger("click");
+      await flushPromises();
+
+      expect(startSheetMocks.openAlertCreation).toHaveBeenCalledWith({
+        source: "intent",
+        streamName: "app",
+      });
+      expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "addAlert" }));
+      expect(push).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "alertList",
+          query: expect.objectContaining({ action: "import" }),
+        }),
+      );
     });
 
     it("should show all clear with the scoped sentence once one alert exists", async () => {

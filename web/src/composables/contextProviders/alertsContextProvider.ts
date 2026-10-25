@@ -45,7 +45,7 @@ export const createAlertsContextProvider = (
         currentPage: "Alerts",
         alertId: formData?.value?.id || "",
         alertName: formData?.value?.name || "",
-        isRealTime: formData?.value?.type === "realtime",
+        isRealTime: formData?.value?.is_real_time === "true",
         organization_identifier: store?.state?.selectedOrganization?.identifier || "",
         user_intent: isUpdated ? "edit existing alert" : "create new alert",
         // Current timestamp when request is fired (microseconds) for AI agent time calculations

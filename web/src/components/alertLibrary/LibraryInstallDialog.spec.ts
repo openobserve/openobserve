@@ -371,6 +371,7 @@ describe("LibraryInstallDialog", () => {
         "default",
         expect.objectContaining({ destinations: [] }),
         "default",
+        "library",
       );
     });
 
@@ -581,7 +582,12 @@ describe("LibraryInstallDialog", () => {
       await click(wrapper, "alert-library-install-next");
       await click(wrapper, "alert-library-install-run");
 
-      expect(mocks.createAlert).toHaveBeenCalledWith("default", expect.anything(), "folder-42");
+      expect(mocks.createAlert).toHaveBeenCalledWith(
+        "default",
+        expect.anything(),
+        "folder-42",
+        "library",
+      );
     });
 
     it("still lets the batch install when the folder list cannot be read", async () => {
@@ -599,7 +605,12 @@ describe("LibraryInstallDialog", () => {
       await click(wrapper, "alert-library-install-next");
       await click(wrapper, "alert-library-install-run");
 
-      expect(mocks.createAlert).toHaveBeenCalledWith("default", expect.anything(), "default");
+      expect(mocks.createAlert).toHaveBeenCalledWith(
+        "default",
+        expect.anything(),
+        "default",
+        "library",
+      );
     });
   });
 

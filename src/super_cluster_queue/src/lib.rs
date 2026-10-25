@@ -58,6 +58,7 @@ mod synthetics;
 mod synthetics_locations;
 mod synthetics_probe_tokens;
 mod synthetics_variables;
+mod system_settings;
 mod templates;
 mod user;
 
@@ -123,6 +124,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_kv_msg: kv::process,
         on_service_streams_msg: service_streams::process,
         on_rum_analytics_msg: rum_analytics::process,
+        on_system_settings_msg: system_settings::process,
     };
     let schema_queue = SchemasQueue {
         on_schema_msg: schemas::process,

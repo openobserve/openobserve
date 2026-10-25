@@ -21,7 +21,7 @@ describe("createAlertsContextProvider", () => {
       value: {
         id: "alert-123",
         name: "Test Alert",
-        type: "scheduled",
+        is_real_time: "false",
       },
     };
 
@@ -49,7 +49,7 @@ describe("createAlertsContextProvider", () => {
       value: {
         id: "alert-789",
         name: "Updated Alert",
-        type: "realtime",
+        is_real_time: "true",
       },
     };
 
@@ -70,6 +70,17 @@ describe("createAlertsContextProvider", () => {
     expect(context.isRealTime).toBe(true);
     expect(context.organization_identifier).toBe("org-123");
     expect(context.user_intent).toBe("edit existing alert");
+  });
+
+  it("reads real-time from is_real_time, the field the form sets, not a legacy type field", () => {
+    const store = { state: { selectedOrganization: { identifier: "org-1" } } };
+    const realTime = (value: Record<string, unknown>) =>
+      createAlertsContextProvider({ value }, store, false).getContext().isRealTime;
+
+    expect(realTime({ type: "realtime", is_real_time: "false" })).toBe(false);
+    expect(realTime({ is_real_time: "true" })).toBe(true);
+    expect(realTime({ is_real_time: "anomaly" })).toBe(false);
+    expect(realTime({ is_real_time: "composite" })).toBe(false);
   });
 
   it("should handle missing form data gracefully", () => {

@@ -21,6 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     test-prefix="alert"
     class="min-h-0 flex-1"
     :is-importing="isAlertImporting"
+    :parse-file="parseAlertFile"
+    @update:active-tab="clearReadNotes"
     @back="router.back()"
     @cancel="router.back()"
     @import="importJson"
@@ -55,12 +57,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OFile
             data-test="alert-import-json-file-input"
             :model-value="jsonFiles"
-            @update:model-value="updateFiles"
+            @update:model-value="
+              (files) => {
+                clearReadNotes();
+                updateFiles(files);
+              }
+            "
             :label="t('dashboard.dropFileMsg')"
-            accept=".json"
+            accept=".json,.yaml,.yml"
             multiple
             drop-zone
-            :help-text="t('alerts.jsonFilesOnlyHint')"
+            :help-text="t('alerts.importFilesHint')"
             size="md"
           />
         </div>
@@ -90,6 +97,74 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <OSeparator class="mt-1 shrink-0" />
         <div class="error-report-container min-h-0 flex-1 resize-none overflow-auto">
+          <div
+            v-if="promBatch"
+            class="flex flex-col gap-2 p-2.5"
+            data-test="alert-import-prom-batch"
+          >
+            <OBanner
+              variant="info"
+              :content="t('alerts.import.promDetected', promBatch)"
+              data-test="alert-import-prom-banner"
+            />
+            <div class="flex gap-2 max-md:flex-wrap">
+              <OSelect
+                v-model="severityRoutes.critical"
+                data-test="alert-import-route-critical"
+                class="w-75!"
+                :options="getFormattedDestinations"
+                :label="t('alerts.import.routeCritical')"
+                :placeholder="t('alerts.summary.noDestination')"
+                searchable
+                clearable
+              />
+              <OSelect
+                v-model="severityRoutes.warning"
+                data-test="alert-import-route-warning"
+                class="w-75!"
+                :options="getFormattedDestinations"
+                :label="t('alerts.import.routeWarning')"
+                :placeholder="t('alerts.summary.noDestination')"
+                searchable
+                clearable
+              />
+            </div>
+          </div>
+
+          <div
+            v-if="parseError"
+            class="flex flex-col gap-2 p-2.5"
+            data-test="alert-import-parse-error"
+          >
+            <OBanner variant="error" :content="parseErrorText" preserve-whitespace />
+            <p class="text-text-secondary text-sm">{{ t("alerts.import.acceptedFormats") }}</p>
+            <OCodeBlock
+              :code="ALERT_JSON_SAMPLE"
+              lang="json"
+              chrome="editor"
+              filename="alert.json"
+              data-test="alert-import-sample-json"
+            />
+            <OCodeBlock
+              :code="PROM_RULES_SAMPLE"
+              lang="yaml"
+              chrome="editor"
+              filename="rules.yml"
+              data-test="alert-import-sample-prom"
+            />
+          </div>
+
+          <div v-if="notesToDisplay.length > 0" class="p-2.5" data-test="alert-import-notes">
+            <div
+              v-for="(note, index) in notesToDisplay"
+              :key="index"
+              class="text-text-secondary px-0 py-1.25 text-sm"
+              :data-test="`alert-import-note-${index}`"
+            >
+              {{ note }}
+            </div>
+          </div>
+
           <!-- Alert Errors Section -->
           <div class="mb-2.5 p-2.5" v-if="alertErrorsToDisplay.length > 0">
             <div class="error-list">
@@ -269,7 +344,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="mb-2.5 p-2.5" v-if="alertCreators.length > 0">
+          <div
+            v-if="showResultsTable"
+            class="flex flex-col gap-2 p-2.5"
+            data-test="alert-import-results"
+          >
+            <div class="flex items-center justify-between gap-2">
+              <div class="text-text-heading text-sm font-semibold">
+                {{ t("alerts.alertCreationTitle") }}
+              </div>
+              <OButton
+                v-if="importedIds.length > 0"
+                variant="outline"
+                size="sm"
+                data-test="alert-import-view-imported"
+                @click="showImportedAlerts"
+                >{{ t("alerts.import.viewImported", { count: importedIds.length }) }}</OButton
+              >
+            </div>
+            <OTable
+              data-test="alert-import-results-table"
+              :data="importRows"
+              :columns="resultColumns"
+              row-key="index"
+              :show-global-filter="false"
+              :fill-height="false"
+            >
+              <template #cell-status="{ row }">
+                <OBadge
+                  :variant="ROW_STATUS_BADGE[row.status]"
+                  size="sm"
+                  :data-test="`alert-import-row-status-${row.index}`"
+                  >{{ rowStatusText(row) }}</OBadge
+                >
+              </template>
+              <template #cell-actions="{ row }">
+                <OButton
+                  v-if="isRetryable(row)"
+                  variant="ghost"
+                  size="sm"
+                  :loading="retryingRows.includes(row.index)"
+                  :data-test="`alert-import-row-retry-${row.index}`"
+                  @click="retryRow(row)"
+                  >{{ t("common.retry") }}</OButton
+                >
+              </template>
+            </OTable>
+          </div>
+
+          <div class="mb-2.5 p-2.5" v-if="alertCreators.length > 0 && !showResultsTable">
             <div class="text-primary mb-2.5 text-base" data-test="alert-import-creation-title">
               {{ t("alerts.alertCreationTitle") }}
             </div>
@@ -300,7 +423,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
 import { timezoneSearchText } from "@/utils/timezoneAliases";
-import { defineComponent, ref, onMounted, computed, watch } from "vue";
+import { defineComponent, ref, reactive, onMounted, computed, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -316,6 +439,33 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { queryClient } from "@/composables/query/queryClient";
+import { settingQuery } from "@/services/settings.queries";
+import {
+  ORG_DEFAULT_DESTINATION_KEY,
+  orgDefaultDestinationOf,
+} from "@/composables/alerts/useEmailMeDestination";
+import {
+  ALERT_JSON_SAMPLE,
+  convertPromRules,
+  detectImportFormat,
+  isMissingMetricError,
+  isPromRulesYaml,
+  PROM_RULES_SAMPLE,
+  PromRulesImportError,
+  routeBySeverity,
+  type ImportFormat,
+  type PromRulesImportResult,
+  type PromRulesImportWarning,
+  type SeverityRoutes,
+} from "@/utils/alerts/promRulesImport";
 import {
   detectConditionsVersion,
   convertV0ToV2,
@@ -325,10 +475,24 @@ import {
 } from "@/utils/alerts/alertDataTransforms";
 import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
 
+type ImportRowStatus = "imported" | "missingMetric" | "failed" | "notSent";
+
+const ROW_STATUS_BADGE: Record<ImportRowStatus, BadgeVariant> = {
+  imported: "success-soft",
+  missingMetric: "warning-soft",
+  failed: "error-soft",
+  notSent: "default-soft",
+};
+
 export default defineComponent({
   name: "ImportAlert",
   components: {
     OSeparator,
+    OBanner,
+    OCodeBlock,
+    OTable,
+    OBadge,
+    OButton,
     BaseImport,
     SelectFolderDropDown,
     OInput,
@@ -353,7 +517,7 @@ export default defineComponent({
       default: "",
     },
   },
-  emits: ["update:destinations", "update:templates", "update:alerts"],
+  emits: ["update:destinations", "update:templates", "update:alerts", "imported"],
   setup(props, { emit }) {
     type ErrorMessage = {
       field: string;
@@ -365,6 +529,15 @@ export default defineComponent({
     }[];
 
     type AlertErrors = (ErrorMessage | string)[][];
+    type ParseError = { format: ImportFormat | "prometheus"; message: I18nText; fileName?: string };
+    type PromBatch = { rules: number; groups: number; skipped: number };
+    type ImportRow = {
+      index: number;
+      name: string;
+      status: ImportRowStatus;
+      reason: string;
+      alertId?: string;
+    };
     const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
@@ -379,6 +552,27 @@ export default defineComponent({
     const userSelectedAlertName = ref<string[]>([]);
 
     const alertCreators = ref<alertCreator>([]);
+    const parseError = ref<ParseError | null>(null);
+    // Conversion notes outlive one Import click, since a dropped file is read only once.
+    const conversionNotes = ref<I18nText[]>([]);
+    const importNotes = ref<I18nText[]>([]);
+    const notesToDisplay = computed(() => [...conversionNotes.value, ...importNotes.value]);
+    const parseErrorText = computed(() =>
+      parseError.value?.fileName
+        ? t("alerts.import.parseErrorInFile", {
+            fileName: parseError.value.fileName,
+            message: parseError.value.message,
+          })
+        : (parseError.value?.message ?? raw("")),
+    );
+    // Summed over the dropped files; a dropped file reaches Import as JSON, so this is what marks the batch.
+    const readBatch = ref<PromBatch | null>(null);
+    const severityRoutes = reactive<SeverityRoutes>({ critical: "", warning: "" });
+    const orgDefaultDestination = ref<string | null>(null);
+    let routesPreselected = false;
+    const importRows = ref<ImportRow[]>([]);
+    const retryingRows = ref<number[]>([]);
+    const batchFolderId = ref<string>("default");
     const destinationCreators = ref<any>([]);
     const streamList = ref<any>([]);
     const streams = ref<any>({});
@@ -441,6 +635,17 @@ export default defineComponent({
       { immediate: true, deep: true },
     );
 
+    // Preselected once: a route the user cleared must stay cleared.
+    watch(
+      [orgDefaultDestination, getFormattedDestinations],
+      ([name, names]) => {
+        if (routesPreselected || !name || !(names as string[]).includes(name)) return;
+        routesPreselected = true;
+        if (!severityRoutes.critical) severityRoutes.critical = name;
+      },
+      { immediate: true },
+    );
+
     const userSelectedTimezone = ref<string[]>([]);
 
     const {
@@ -482,12 +687,211 @@ export default defineComponent({
       }
     };
 
+    const warningNote = (warning: PromRulesImportWarning): I18nText => {
+      switch (warning.code) {
+        case "renamed":
+          return t("alerts.import.promRenamed", { from: warning.from, alert: warning.alert });
+        case "unknown_severity":
+          return t("alerts.import.promUnknownSeverity", {
+            alert: warning.alert,
+            severity: warning.severity,
+          });
+        case "invalid_duration":
+          return t("alerts.import.promInvalidDuration", {
+            alert: warning.alert,
+            field: warning.field,
+            value: warning.value,
+          });
+        case "unmapped_template":
+          return t("alerts.import.promUnmappedTemplate", {
+            alert: warning.alert,
+            text: warning.text,
+          });
+        case "invalid_rule":
+          return t("alerts.import.promInvalidRule", {
+            group: warning.group,
+            index: warning.index,
+          });
+      }
+    };
+
+    const conversionSummary = (result: PromRulesImportResult): I18nText[] => [
+      ...(result.alerts.length > 0
+        ? [t("alerts.import.promConverted", { count: result.alerts.length })]
+        : []),
+      ...(result.skipped > 0
+        ? [t("alerts.import.promSkippedRecords", { count: result.skipped })]
+        : []),
+      ...result.warnings.map(warningNote),
+    ];
+
+    const batchOf = (result: PromRulesImportResult): PromBatch => ({
+      rules: result.alerts.length,
+      groups: result.groups,
+      skipped: result.skipped,
+    });
+
+    const pastedPromBatch = (text: unknown): PromBatch | null => {
+      if (typeof text !== "string" || !isPromRulesYaml(text)) return null;
+      try {
+        return batchOf(convertPromRules(text));
+      } catch {
+        return null;
+      }
+    };
+
+    const promBatch = computed<PromBatch | null>(
+      () => readBatch.value ?? pastedPromBatch(baseImportRef.value?.jsonStr),
+    );
+
+    const jsonSyntaxMessage = (error: unknown): I18nText => {
+      // Only the position is kept: the engine's own wording is what the user could not act on.
+      const at = /line (\d+) column (\d+)/.exec(String((error as Error)?.message ?? ""));
+      return at
+        ? t("alerts.import.parseErrorJsonAt", { line: at[1], column: at[2] })
+        : t("alerts.import.parseErrorJson");
+    };
+
+    const parseErrorFor = (text: string, error: unknown): ParseError => {
+      if (error instanceof PromRulesImportError) {
+        return {
+          format: "prometheus",
+          message:
+            error.code === "invalid_yaml"
+              ? t("alerts.import.parseErrorPromYaml")
+              : t("alerts.import.parseErrorPromNoGroups"),
+        };
+      }
+      const format = detectImportFormat(text);
+      const messages: Record<ImportFormat, () => I18nText> = {
+        json: () => jsonSyntaxMessage(error),
+        yaml: () => t("alerts.import.parseErrorYaml"),
+        terraform: () => t("alerts.import.parseErrorTerraform"),
+        unknown: () => t("alerts.import.parseErrorUnknown"),
+      };
+      return { format, message: messages[format]() };
+    };
+
+    const readImportText = (text: string, fileName?: string): unknown => {
+      try {
+        if (!isPromRulesYaml(text)) return JSON.parse(text);
+        const result = convertPromRules(text, {
+          orgId: store.state.selectedOrganization.identifier,
+        });
+        const batch = batchOf(result);
+        const prior = readBatch.value;
+        readBatch.value = prior
+          ? {
+              rules: prior.rules + batch.rules,
+              groups: prior.groups + batch.groups,
+              skipped: prior.skipped + batch.skipped,
+            }
+          : batch;
+        const notes = [
+          ...conversionSummary(result),
+          ...(result.alerts.length === 0 ? [t("alerts.import.promNoAlerts")] : []),
+        ];
+        conversionNotes.value.push(
+          ...(fileName
+            ? notes.map((note) => t("alerts.import.noteInFile", { fileName, note }))
+            : notes),
+        );
+        return result.alerts;
+      } catch (error) {
+        parseError.value = { ...parseErrorFor(text, error), fileName };
+        throw error;
+      }
+    };
+
+    const parseAlertFile = (text: string, fileName: string) => readImportText(text, fileName);
+
+    const clearReadNotes = () => {
+      conversionNotes.value = [];
+      readBatch.value = null;
+      parseError.value = null;
+    };
+
+    const loadOrgDefaultDestination = async () => {
+      const org = store.state.selectedOrganization.identifier;
+      try {
+        const setting = await queryClient.fetchQuery(
+          settingQuery(org, ORG_DEFAULT_DESTINATION_KEY),
+        );
+        orgDefaultDestination.value = orgDefaultDestinationOf(setting);
+      } catch {
+        orgDefaultDestination.value = null;
+      }
+    };
+
+    const recordRow = (row: ImportRow) => {
+      const at = importRows.value.findIndex((r) => r.index === row.index);
+      if (at === -1) importRows.value.push(row);
+      else importRows.value[at] = row;
+    };
+
+    const importedIds = computed(() =>
+      importRows.value
+        .filter((row) => row.status === "imported" && row.alertId)
+        .map((row) => row.alertId as string),
+    );
+
+    const showResultsTable = computed(
+      () => promBatch.value !== null && importRows.value.length > 0,
+    );
+
+    const isRetryable = (row: ImportRow) =>
+      row.status === "failed" || row.status === "missingMetric";
+
+    const rowStatusText = (row: ImportRow): I18nText => {
+      const labels: Record<ImportRowStatus, () => I18nText> = {
+        imported: () => t("alerts.import.rowImported"),
+        missingMetric: () => t("alerts.import.rowMissingMetric"),
+        failed: () => t("alerts.import.rowFailed"),
+        notSent: () => t("alerts.import.rowNotSent"),
+      };
+      return labels[row.status]();
+    };
+
+    const rowDetailText = (row: ImportRow): I18nText => {
+      if (row.status === "missingMetric") return t("alerts.import.rowMissingMetricHint");
+      if (row.status === "notSent") return t("alerts.import.rowNotSentHint");
+      return raw(row.reason);
+    };
+
+    const resultColumns = computed<OTableColumnDef<ImportRow>[]>(() => [
+      {
+        id: "name",
+        header: t("alerts.import.resultsRule"),
+        accessorKey: "name",
+        meta: { isName: true },
+      },
+      { id: "status", header: t("alerts.import.resultsStatus"), size: 180 },
+      { id: "details", header: t("alerts.import.resultsDetails"), accessorFn: rowDetailText },
+      { id: "actions", header: raw(""), isAction: true, size: 100 },
+    ]);
+
+    const emitImportedBatch = () => {
+      emit("imported", { folderId: batchFolderId.value, ids: importedIds.value });
+    };
+
+    const showImportedAlerts = () => {
+      emitImportedBatch();
+      router.push({
+        name: "alertList",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          folder: batchFolderId.value,
+        },
+      });
+    };
+
     onMounted(() => {
       activeFolderId.value =
         props.folderId ||
         router.currentRoute.value.query?.folder ||
         router.currentRoute.value.query?.folderId;
       getActiveFolderAlerts(activeFolderId.value as string);
+      loadOrgDefaultDestination();
     });
 
     const importJson = async ({ jsonStr: jsonString }: any) => {
@@ -496,6 +900,9 @@ export default defineComponent({
       destinationErrorsToDisplay.value = [];
       alertCreators.value = [];
       destinationCreators.value = [];
+      importNotes.value = [];
+      importRows.value = [];
+      parseError.value = null;
 
       try {
         // Check if jsonStr is empty or null
@@ -503,13 +910,24 @@ export default defineComponent({
           throw new Error(t("alerts.import.jsonStringEmpty"));
         }
 
-        const parsedJson = JSON.parse(jsonString);
+        if (isPromRulesYaml(jsonString)) {
+          conversionNotes.value = [];
+          readBatch.value = null;
+        }
+        const parsedJson: any = readImportText(jsonString);
+        // A dropped rule file reaches here as "[]" JSON, so an empty list is refused whatever the source.
+        if (Array.isArray(parsedJson) && parsedJson.length === 0) {
+          throw new Error(t("alerts.import.nothingToImport"));
+        }
         // Convert single object to array if needed
         jsonArrayOfObj.value = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
+        if (promBatch.value) routeBySeverity(jsonArrayOfObj.value, severityRoutes);
       } catch (e: any) {
         toast({
           variant: "error",
-          message: e.message || t("alerts.import.invalidJsonFormat"),
+          message: parseError.value
+            ? parseErrorText.value
+            : e.message || t("alerts.import.invalidJsonFormat"),
         });
         // Reset BaseImport's importing flag on validation error
         if (baseImportRef.value) {
@@ -520,6 +938,7 @@ export default defineComponent({
 
       let allAlertsCreated = true;
       isAlertImporting.value = true;
+      batchFolderId.value = selectedFolderId.value || "default";
 
       // Process each object in the array
       for (const [index, jsonObj] of jsonArrayOfObj.value.entries()) {
@@ -536,6 +955,7 @@ export default defineComponent({
             count: jsonArrayOfObj.value.length,
           }),
         });
+        if (promBatch.value) emitImportedBatch();
 
         // Delay navigation to allow Monaco editor to complete all debounced operations
         // Monaco has a 300ms debounce, so we wait 400ms to be safe
@@ -617,13 +1037,12 @@ export default defineComponent({
         }
 
         const isValidAlert = await validateAlertInputs(jsonObj, index);
-        if (!isValidAlert) {
+        // One invalid alert holds back the rest, so they are listed as not sent.
+        if (!isValidAlert || alertErrorsToDisplay.value.length > 0) {
+          recordRow({ index, name: String(jsonObj?.name ?? ""), status: "notSent", reason: "" });
           return false;
         }
-
-        if (alertErrorsToDisplay.value.length === 0 && isValidAlert) {
-          return await createAlert(jsonObj, index, selectedFolderId.value);
-        }
+        return await createAlert(jsonObj, index, selectedFolderId.value);
       } catch (e: any) {
         toast({
           variant: "error",
@@ -631,7 +1050,6 @@ export default defineComponent({
         });
         return false;
       }
-      return false;
     };
 
     const validateAlertInputs = async (input: any, index: number) => {
@@ -646,6 +1064,18 @@ export default defineComponent({
       }
 
       // 2. Validate 'org_id' field
+      const currentOrgId = store.state.selectedOrganization.identifier;
+      if (
+        typeof input.org_id === "string" &&
+        input.org_id.trim() !== "" &&
+        input.org_id !== currentOrgId
+      ) {
+        importNotes.value.push(
+          t("alerts.import.orgIdRewritten", { index, from: input.org_id, orgId: currentOrgId }),
+        );
+        input.org_id = currentOrgId;
+        updateOrgId(currentOrgId, index - 1);
+      }
       if (
         !input.org_id ||
         typeof input.org_id !== "string" ||
@@ -681,11 +1111,15 @@ export default defineComponent({
         alertErrors.push(err);
       }
 
-      // 4. Validate 'stream_name' field
+      // 4. Validate 'stream_name' field; rule mode may leave it empty for the backend to infer.
+      const isPromRuleMode =
+        input.query_condition?.type === "promql" &&
+        input.query_condition?.promql_rule_mode === true;
       if (
-        !input.stream_name ||
-        typeof input.stream_name !== "string" ||
-        !streamList.value.includes(input.stream_name)
+        !(isPromRuleMode && input.stream_name === "") &&
+        (!input.stream_name ||
+          typeof input.stream_name !== "string" ||
+          !streamList.value.includes(input.stream_name))
       ) {
         alertErrors.push({
           message: t("alerts.import.streamNameInvalid", { index }),
@@ -923,7 +1357,8 @@ export default defineComponent({
         alertErrors.push(t("alerts.import.enabledBoolean", { index }));
       }
 
-      if (input.tz_offset && (typeof input.tz_offset !== "number" || input.tz_offset < 0)) {
+      // Negative is valid: the backend's tz_offset is signed minutes, west of UTC below zero.
+      if (input.tz_offset && typeof input.tz_offset !== "number") {
         alertErrors.push(t("alerts.import.tzOffsetNumber", { index }));
       }
 
@@ -1028,11 +1463,19 @@ export default defineComponent({
       }
 
       try {
-        await alertsService.create_by_alert_id(
+        const response: any = await alertsService.create_by_alert_id(
           store.state.selectedOrganization.identifier,
           input,
           folderId,
+          "import",
         );
+        recordRow({
+          index,
+          name: input.name,
+          status: "imported",
+          reason: "",
+          alertId: response?.data?.id,
+        });
 
         // Success
         alertCreators.value.push({
@@ -1044,6 +1487,15 @@ export default defineComponent({
         getActiveFolderAlerts(selectedFolderId.value);
         return true;
       } catch (error: any) {
+        const reason = String(error?.response?.data?.message ?? "");
+        const missingMetric =
+          input.query_condition?.promql_rule_mode === true && isMissingMetricError(reason);
+        recordRow({
+          index,
+          name: input.name,
+          status: missingMetric ? "missingMetric" : "failed",
+          reason: reason || t("alerts.import.unknownError"),
+        });
         // Failure
         alertCreators.value.push({
           message: t("alerts.import.createFailed", {
@@ -1054,6 +1506,17 @@ export default defineComponent({
           success: false,
         });
         return false;
+      }
+    };
+
+    const retryRow = async (row: ImportRow) => {
+      const input = jsonArrayOfObj.value[row.index - 1];
+      if (!input || retryingRows.value.includes(row.index)) return;
+      retryingRows.value = [...retryingRows.value, row.index];
+      try {
+        await createAlert(input, row.index, batchFolderId.value);
+      } finally {
+        retryingRows.value = retryingRows.value.filter((index) => index !== row.index);
       }
     };
 
@@ -1177,6 +1640,25 @@ export default defineComponent({
       destinationErrorsToDisplay,
       alertCreators,
       destinationCreators,
+      parseError,
+      parseErrorText,
+      notesToDisplay,
+      parseAlertFile,
+      clearReadNotes,
+      ALERT_JSON_SAMPLE,
+      PROM_RULES_SAMPLE,
+      ROW_STATUS_BADGE,
+      promBatch,
+      severityRoutes,
+      importRows,
+      importedIds,
+      retryingRows,
+      showResultsTable,
+      resultColumns,
+      isRetryable,
+      rowStatusText,
+      retryRow,
+      showImportedAlerts,
       userSelectedDestinations,
       getFormattedDestinations,
       jsonArrayOfObj,

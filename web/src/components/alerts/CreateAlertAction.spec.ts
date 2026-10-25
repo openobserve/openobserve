@@ -114,6 +114,13 @@ describe("CreateAlertAction", () => {
     expect(button.find("span.max-md\\:hidden").text()).toBe("Create alert");
   });
 
+  it("takes the host's label over the source's", () => {
+    wrapper = mountAction({ variant: "toolbar", source: "explorer", label: "Alert on this" });
+    const button = wrapper.findComponent({ name: "OButton" });
+    expect(button.attributes("aria-label")).toBe("Alert on this");
+    expect(button.find("span.max-md\\:hidden").text()).toBe("Alert on this");
+  });
+
   it("adds no tooltip on a toolbar button whose label is visible", () => {
     wrapper = mountAction({ variant: "toolbar", source: "explorer" });
     expect(wrapper.findComponent({ name: "OTooltip" }).exists()).toBe(false);

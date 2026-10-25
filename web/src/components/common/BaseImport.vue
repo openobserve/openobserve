@@ -322,6 +322,11 @@ export default defineComponent({
       type: String,
       default: "",
     },
+    // Reads one dropped file into objects; omitted means the file is JSON.
+    parseFile: {
+      type: Function as PropType<(text: string, name: string) => unknown>,
+      required: false,
+    },
   },
   emits: ["back", "cancel", "import", "update:jsonStr", "update:jsonArray", "update:activeTab"],
   setup(props, { emit }) {
@@ -417,7 +422,9 @@ export default defineComponent({
               const reader = new FileReader();
               reader.onload = (e: any) => {
                 try {
-                  const parsedJson = JSON.parse(e.target.result);
+                  const parsedJson = props.parseFile
+                    ? props.parseFile(e.target.result, file.name)
+                    : JSON.parse(e.target.result);
                   // Convert to array if it's a single object
                   const jsonArray = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
                   resolve(jsonArray);

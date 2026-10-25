@@ -39,6 +39,14 @@ describe("toast()", () => {
     expect(toastRecords[0].message).toBe("Done!");
   });
 
+  it("keeps both actions on the record", () => {
+    const action = { label: "Undo", handler: vi.fn() };
+    const secondaryAction = { label: "Edit", handler: vi.fn() };
+    toast({ variant: "success", message: "Added", action, secondaryAction });
+    expect(toastRecords[0].action?.label).toBe("Undo");
+    expect(toastRecords[0].secondaryAction?.label).toBe("Edit");
+  });
+
   it("applies default timeout for success variant", () => {
     toast({ variant: "success", message: "OK" });
     expect(toastRecords[0].timeout).toBe(5000);

@@ -79,9 +79,11 @@ export class AlertLibraryPage {
   }
 
   // ── navigation ────────────────────────────────────────────────────────────
-  async openViaUrl() {
+  // Defaults to the All view: "For your data" depends on stream stats that lag fresh ingestion.
+  async openViaUrl({ facet = 'all' } = {}) {
     const base = process.env.ZO_BASE_URL || 'http://localhost:5080';
-    await this.page.goto(`${base}/web/alert-library?org_identifier=${getOrgIdentifier()}`);
+    const facetParam = facet ? `&facet=${facet}` : '';
+    await this.page.goto(`${base}/web/alert-library?org_identifier=${getOrgIdentifier()}${facetParam}`);
     await this.waitForGallery();
   }
 
@@ -160,6 +162,13 @@ export class AlertLibraryPage {
 
   async selectAllInViewToggle() {
     await this.page.locator(this.l.selectAllInView).click();
+  }
+
+  // Selecting more than 50 in view asks first.
+  async confirmSelectAllInView() {
+    await this.page
+      .locator('[data-test="alert-library-select-all-confirm"] [data-test="o-dialog-primary-btn"]')
+      .click();
   }
 
   async selectGroup(id) {

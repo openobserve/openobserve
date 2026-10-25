@@ -92,6 +92,8 @@ export interface SaveAlertContext {
   isAggregationEnabled: { value: boolean };
   activeFolderId: { value: string };
   handleAlertError: (err: any) => void;
+  /** Prefill source id reported on alert_created; "blank" when the form had no prefill. */
+  source?: string;
 }
 
 /**
@@ -453,6 +455,7 @@ export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext):
         store.state.selectedOrganization.identifier,
         payload,
         activeFolderId.value,
+        context.source,
       );
       emit("update:list", activeFolderId.value);
       toast({

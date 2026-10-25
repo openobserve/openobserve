@@ -59,4 +59,23 @@ describe("alertSourceRegistry", () => {
       "Query imported from the Metrics Explorer",
     );
   });
+
+  it("registers the intent and suggestion sources as the only intent-path sources", () => {
+    expect(getAlertSource("intent").id).toBe("intent");
+    expect(getAlertSource("suggestion").id).toBe("suggestion");
+    const intentPath = Object.values(ALERT_SOURCES)
+      .filter((definition) => definition.intentPath)
+      .map((definition) => definition.id);
+    expect(intentPath).toEqual(["intent", "suggestion"]);
+    expect(DEFAULT_ALERT_SOURCE.intentPath).toBeFalsy();
+  });
+
+  it("names the stream in the intent and suggestion toasts", () => {
+    expect(i18n.global.t(getAlertSource("intent").toastKey, { sourceLabel: "payment" })).toBe(
+      "Alert started for payment. Check it, then save.",
+    );
+    expect(i18n.global.t(getAlertSource("suggestion").toastKey, { sourceLabel: "payment" })).toBe(
+      "Suggested alert for payment. Check it, then save.",
+    );
+  });
 });

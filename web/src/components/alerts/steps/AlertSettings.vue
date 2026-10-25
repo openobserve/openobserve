@@ -31,6 +31,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          nested `name=` (trigger_condition.*, destinations, creates_incident); the
          composed schema in AddAlert.schema.ts validates them on save. -->
     <div class="px-3 py-2">
+      <div
+        v-if="suggestedDefaultsText"
+        class="text-text-secondary mb-3 text-xs"
+        data-test="alert-settings-suggested-defaults"
+      >
+        {{ suggestedDefaultsText }}
+      </div>
       <div>
         <!-- For Real-Time Alerts -->
         <template v-if="isRealTime === 'true' || isRealTime === 'composite'">
@@ -68,6 +75,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 role="alert"
               >
                 {{ silenceError }}
+              </div>
+              <div
+                v-if="silenceLine && !silenceError"
+                class="text-text-secondary text-xs"
+                data-test="alert-settings-silence-line"
+              >
+                {{ silenceLine }}
               </div>
             </div>
           </div>
@@ -121,6 +135,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ pendingPeriodError }}
               </div>
+              <div
+                v-if="pendingLine && !pendingPeriodError"
+                class="text-text-secondary text-xs"
+                data-test="alert-settings-pending-line"
+              >
+                {{ pendingLine }}
+              </div>
             </div>
           </div>
 
@@ -132,9 +153,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :destinations="destinations"
             :workflows="workflows"
             :destination-options="formattedDestinations"
-            :error="destinationsError"
+            :error="destinationsError || emailMeError"
             :notifies-nobody="notifiesNobody"
             show-status
+            show-send-test
+            :alert-template="formData?.template"
+            :oncall-team="oncallTeamRoute"
+            :creates-incident="incidentRoute"
+            :resolve-destinations="resolveDestinations"
             :placeholder="t('alerts.summary.noDestination')"
             @update:destinations="$emit('update:destinations', $event)"
             @update:workflows="$emit('update:workflows', $event)"
@@ -227,6 +253,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ silenceError }}
               </div>
+              <div
+                v-if="silenceLine && !silenceError"
+                class="text-text-secondary text-xs"
+                data-test="alert-settings-silence-line"
+              >
+                {{ silenceLine }}
+              </div>
             </div>
           </div>
 
@@ -286,6 +319,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ pendingPeriodWarning }}
               </div>
+              <div
+                v-if="pendingLine && !pendingPeriodError"
+                class="text-text-secondary text-xs"
+                data-test="alert-settings-pending-line"
+              >
+                {{ pendingLine }}
+              </div>
             </div>
           </div>
 
@@ -299,9 +339,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :destinations="destinations"
             :workflows="workflows"
             :destination-options="formattedDestinations"
-            :error="destinationsError"
+            :error="destinationsError || emailMeError"
             :notifies-nobody="notifiesNobody"
             show-status
+            show-send-test
+            :alert-template="formData?.template"
+            :oncall-team="oncallTeamRoute"
+            :creates-incident="incidentRoute"
+            :resolve-destinations="resolveDestinations"
             :placeholder="t('alerts.summary.noDestination')"
             @update:destinations="$emit('update:destinations', $event)"
             @update:workflows="$emit('update:workflows', $event)"
@@ -387,21 +432,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
               <OTooltip :content="t('alerts.alertSettings.keepFiringForTooltip')" side="right" />
             </div>
-            <div class="flex items-center">
-              <div class="w-21.75">
-                <OFormInput
-                  :aria-label="t('alerts.alertSettings.keepFiringFor')"
-                  name="keep_firing_for"
-                  type="number"
-                  min="0"
-                  :debounce="300"
-                  data-test="alert-settings-keep-firing-for-input"
-                />
+            <div class="flex flex-col gap-1">
+              <div class="flex items-center">
+                <div class="w-21.75">
+                  <OFormInput
+                    :aria-label="t('alerts.alertSettings.keepFiringFor')"
+                    name="keep_firing_for"
+                    type="number"
+                    min="0"
+                    :debounce="300"
+                    data-test="alert-settings-keep-firing-for-input"
+                  />
+                </div>
+                <div
+                  class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 min-w-22.5 items-center justify-center"
+                >
+                  {{ t("alerts.seconds") }}
+                </div>
               </div>
               <div
-                class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 min-w-22.5 items-center justify-center"
+                v-if="keepFiringLine"
+                class="text-text-secondary text-xs"
+                data-test="alert-settings-keep-firing-line"
               >
-                {{ t("alerts.seconds") }}
+                {{ keepFiringLine }}
               </div>
             </div>
           </div>
@@ -428,6 +482,7 @@ import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import { convertMinutesToCron, getCronIntervalDifferenceInSeconds } from "@/utils/zincutils";
+import type { IntentDefaultsNote } from "@/composables/useAlertForm";
 
 export default defineComponent({
   name: "Step3AlertConditions",
@@ -484,6 +539,20 @@ export default defineComponent({
       type: Array as PropType<any[]>,
       default: () => [],
     },
+    // Set only on the intent path; the blank form and edit pass null.
+    intentDefaults: {
+      type: Object as PropType<IntentDefaultsNote | null>,
+      default: null,
+    },
+    // Why Email me could not become a real destination; shown on the main field.
+    emailMeError: {
+      type: String,
+      default: "",
+    },
+    resolveDestinations: {
+      type: Function as PropType<(names: string[]) => Promise<string[] | null>>,
+      default: undefined,
+    },
   },
   emits: [
     "update:trigger",
@@ -537,6 +606,15 @@ export default defineComponent({
           workflows: props.workflows,
           oncall_team: props.formData?.oncall_team,
         }),
+    );
+    // On-call teams page only in enterprise and cloud builds, as in hasDeliveryTarget.
+    const oncallTeamRoute = computed(() =>
+      config.isEnterprise === "true" || config.isCloud === "true"
+        ? (props.formData?.oncall_team ?? "")
+        : "",
+    );
+    const incidentRoute = computed(
+      () => incidentsEnabled.value && !!props.formData?.creates_incident,
     );
     const pendingPeriodError = fieldError("_ui.pendingPeriod");
     // Forecast mode fixes the period and reads its own history window, so a period field would only compete with it.
@@ -647,6 +725,56 @@ export default defineComponent({
       });
     });
 
+    // A blank or negative field is an error, so it gets no reading.
+    const countOf = (name: string): number | null => {
+      const raw = fv(name);
+      if (raw === "" || raw === null || raw === undefined) return null;
+      const value = Number(raw);
+      return Number.isFinite(value) && value >= 0 ? value : null;
+    };
+
+    const silenceLine = computed(() => {
+      const minutes = countOf("trigger_condition.silence");
+      if (minutes === null) return "";
+      if (minutes === 0) return t("alerts.alertSettings.silenceLineOff");
+      return t("alerts.alertSettings.silenceLine", { count: minutes }, minutes);
+    });
+
+    // The first matching check opens the pending window and a later one fires once it has elapsed.
+    const pendingLine = computed(() => {
+      const minutes = countOf("pending_period_sec") ?? 0;
+      if (minutes === 0) return t("alerts.alertSettings.pendingLineFirstCheck");
+      const frequency = Number(fv("trigger_condition.frequency"));
+      const countsChecks =
+        props.isRealTime === "false" &&
+        fv("trigger_condition.frequency_type") !== "cron" &&
+        Number.isFinite(frequency) &&
+        frequency > 0;
+      if (countsChecks) {
+        const count = Math.ceil(minutes / frequency - 1e-9) + 1;
+        return t("alerts.alertSettings.pendingLineChecks", { count });
+      }
+      return t("alerts.alertSettings.pendingLineDuration", { count: minutes }, minutes);
+    });
+
+    const suggestedDefaultsText = computed(() => {
+      const note = props.intentDefaults;
+      if (!note) return "";
+      return note.pendingPeriodMinutes > 0
+        ? t("alerts.alertSettings.suggestedDefaultsWithHold", {
+            silence: note.silenceMinutes,
+            pending: note.pendingPeriodMinutes,
+          })
+        : t("alerts.alertSettings.suggestedDefaults", { silence: note.silenceMinutes });
+    });
+
+    const keepFiringLine = computed(() => {
+      const seconds = countOf("keep_firing_for");
+      if (seconds === null) return "";
+      if (seconds === 0) return t("alerts.alertSettings.keepFiringLineOff");
+      return t("alerts.alertSettings.keepFiringLine", { count: seconds }, seconds);
+    });
+
     // ── Workflows (enterprise/cloud only) ────────────────────────────────────
     const getBrowserTimezone = (): string => {
       try {
@@ -752,9 +880,15 @@ export default defineComponent({
       isForecastMode,
       silenceError,
       destinationsError,
+      oncallTeamRoute,
+      incidentRoute,
       notifiesNobody,
       pendingPeriodError,
       pendingPeriodWarning,
+      silenceLine,
+      suggestedDefaultsText,
+      pendingLine,
+      keepFiringLine,
       pendingPeriodUnit,
       pendingPeriodUnitOptions,
       onPendingPeriodChange,
