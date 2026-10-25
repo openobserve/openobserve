@@ -80,10 +80,8 @@ const prefixSelectors = (rules: CSSRuleList, prefix: string): void => {
             : `${prefix} ${trimmed}`;
         })
         .join(", ");
-    } else if (
-      (rule?.type === CSSRule.MEDIA_RULE || rule?.type === CSSRule.SUPPORTS_RULE) &&
-      rule.cssRules
-    ) {
+    } else if (rule?.cssRules) {
+      // any grouping rule (@media, @supports, @layer, @container, ...) would otherwise apply page-wide
       prefixSelectors(rule.cssRules, prefix);
     }
   }

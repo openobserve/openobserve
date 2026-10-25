@@ -28,6 +28,7 @@ vi.mock("vuex", () => ({
 }));
 
 vi.mock("@/utils/dashboard/variables/variablesUtils", () => ({
+  escapeHtmlValue: vi.fn((value) => value),
   processVariableContent: vi.fn((content, variables) => {
     // Simple mock implementation that replaces {{variable}} patterns
     if (!content || typeof content !== "string") return content;
@@ -208,6 +209,7 @@ describe("MarkdownRenderer", () => {
         "# {{title}}\n\nWelcome {{userName}}!",
         { title: "Dashboard", userName: "John" },
         { panelId: undefined, tabId: undefined },
+        expect.any(Function),
       );
     });
 
@@ -375,6 +377,16 @@ describe("MarkdownRenderer", () => {
       expect(DOMPurify.sanitize).toHaveBeenCalled();
     });
 
+    it("forbids style tags so panel markdown cannot restyle the app", async () => {
+      const DOMPurify = (await import("dompurify")).default;
+
+      wrapper = createWrapper({ markdownContent: "# Hi" });
+
+      expect(DOMPurify.sanitize).toHaveBeenLastCalledWith(expect.any(String), {
+        FORBID_TAGS: ["style"],
+      });
+    });
+
     it("should sanitize content on every render", async () => {
       const DOMPurify = (await import("dompurify")).default;
 
@@ -505,9 +517,7 @@ describe("MarkdownRenderer", () => {
         variablesData: { test: "value" },
       });
 
-      expect(wrapper.vm.processedContent).toBeDefined();
-      expect(wrapper.vm.DOMPurify).toBeDefined();
-      expect(wrapper.vm.marked).toBeDefined();
+      expect(wrapper.vm.renderedHtml).toBeDefined();
       // Component now exposes useTheme()'s isDark instead of a raw store.
       expect(wrapper.vm.isDark).toBe(false);
     });
@@ -524,13 +534,13 @@ describe("MarkdownRenderer", () => {
         variablesData: { title: "Initial" },
       });
 
-      const initialProcessed = wrapper.vm.processedContent;
+      const initialRendered = wrapper.vm.renderedHtml;
 
       await wrapper.setProps({
         variablesData: { title: "Updated" },
       });
 
-      expect(wrapper.vm.processedContent).not.toBe(initialProcessed);
+      expect(wrapper.vm.renderedHtml).not.toBe(initialRendered);
     });
   });
 
