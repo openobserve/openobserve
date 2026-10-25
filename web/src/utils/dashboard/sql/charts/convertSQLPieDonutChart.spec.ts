@@ -188,10 +188,10 @@ describe.each(["pie", "donut"])("applyPieDonutChart - %s slice percent precision
       },
     });
 
-  it("uses the panel decimals as the label precision", () => {
-    const ctx = contextWithDecimals(4);
+  it.each([4, 13])("uses panel decimals %i as the label precision", (decimals) => {
+    const ctx = contextWithDecimals(decimals);
     applyPieDonutChart(ctx);
-    expect(ctx.options.series[0].percentPrecision).toBe(4);
+    expect(ctx.options.series[0].percentPrecision).toBe(decimals);
   });
 
   it("defaults the label precision to 2 when decimals is unset", () => {

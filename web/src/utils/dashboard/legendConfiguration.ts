@@ -492,7 +492,7 @@ const pieLegendValueKeys = (panelSchema: any): string[] => {
   return PIE_LEGEND_VALUE_KEYS.filter((key) => selected.includes(key));
 };
 
-// The panel decimals as the SQL slice label's percentPrecision reads them; toFixed throws above 100.
+// The panel decimals for a legend percent, defaulting like the slice label; toFixed throws above 100.
 const pieLegendPercentDecimals = (decimals: unknown): number => {
   if (decimals === null || decimals === undefined || decimals === "") return 2;
   const parsed = Math.floor(Number(decimals));
