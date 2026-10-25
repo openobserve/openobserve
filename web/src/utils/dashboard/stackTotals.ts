@@ -149,6 +149,7 @@ export const fitAxisBoundsToStacks = (options: any): void => {
   let hi = -Infinity;
   let lo = Infinity;
   options.series.forEach((series: any, seriesIndex: number) => {
+    // Unnamed series carry annotations and limit lines, not stacked data.
     if (!series?.name || !Array.isArray(series.data)) return;
     const stack =
       series.stack === null || series.stack === undefined || series.stack === ""
