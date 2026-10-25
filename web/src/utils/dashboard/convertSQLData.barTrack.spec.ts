@@ -25,7 +25,9 @@ const store = {
   },
 };
 
-const query = (alias: string) => ({
+const byService = { label: "Service", alias: "svc", column: "svc", args: [] };
+
+const query = (alias: string, breakdown: any[] = []) => ({
   query: "SELECT 1",
   customQuery: false,
   fields: {
@@ -34,19 +36,19 @@ const query = (alias: string) => ({
     x: [{ label: "Category", alias: "cat", column: "cat", args: [] }],
     y: [{ label: alias, alias, column: alias, aggregationFunction: "count", args: [] }],
     z: [],
-    breakdown: [],
+    breakdown,
     filter: { conditions: [] },
   },
   config: {},
 });
 
-const run = async (config: Record<string, any>, data: any[][]) => {
+const run = async (config: Record<string, any>, data: any[][], breakdown: any[] = []) => {
   const aliases = data.map((_, i) => `v${i + 1}`);
   const panel = {
     id: "p",
     type: "h-bar",
     queryType: "sql",
-    queries: aliases.map(query),
+    queries: aliases.map((alias) => query(alias, breakdown)),
     config,
   };
   const result: any = await convertMultiSQLData(
@@ -72,6 +74,7 @@ const run = async (config: Record<string, any>, data: any[][]) => {
   const { xAxis, series } = result.options;
   return {
     valueAxis: Array.isArray(xAxis) ? xAxis[0] : xAxis,
+    valueAxes: [xAxis].flat(),
     bars: series.filter((s: any) => s.name),
   };
 };
@@ -119,6 +122,20 @@ describe("SQL h-bar bar track and bar width", () => {
     expect((await run({ show_bar_track: true, thresholds: below }, oneQuery)).valueAxis.max).toBe(
       70,
     );
+  });
+
+  it("pins every trellis value axis to the largest bar", async () => {
+    const rows = [
+      [
+        { cat: "a", svc: "x", v1: 40 },
+        { cat: "b", svc: "y", v1: 70 },
+      ],
+    ];
+    const { valueAxes } = await run({ show_bar_track: true, trellis: { layout: "auto" } }, rows, [
+      byService,
+    ]);
+    expect(valueAxes.length).toBeGreaterThan(1);
+    expect(valueAxes.map((axis: any) => axis.max)).toEqual(valueAxes.map(() => 70));
   });
 
   it("pins a multi-query track to the largest bar of any query", async () => {

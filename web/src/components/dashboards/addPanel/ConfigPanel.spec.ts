@@ -441,6 +441,38 @@ describe("ConfigPanel", () => {
     });
   });
 
+  describe("Bar width and bar track", () => {
+    const panelOf = (type: string) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type,
+        config: { ...mockDashboardPanelData.data.config },
+      },
+    });
+    const widthInput = () => wrapper.findComponent('[data-test="dashboard-config-bar-width"]');
+
+    it("stores a rounded positive width and clears an empty or non-positive one", async () => {
+      const panel = panelOf("h-bar");
+      wrapper = createWrapper({ dashboardPanelData: panel });
+
+      await widthInput().vm.$emit("update:modelValue", 2.6);
+      expect(panel.data.config.bar_width).toBe(3);
+      await widthInput().vm.$emit("update:modelValue", 0);
+      expect(panel.data.config.bar_width).toBeNull();
+      await widthInput().vm.$emit("update:modelValue", "");
+      expect(panel.data.config.bar_width).toBeNull();
+    });
+
+    it("shows both inputs for h-bar only", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("h-bar") });
+      expect(wrapper.find('[data-test="dashboard-config-show-bar-track"]').exists()).toBe(true);
+      wrapper = createWrapper({ dashboardPanelData: panelOf("bar") });
+      expect(widthInput().exists()).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-config-show-bar-track"]').exists()).toBe(false);
+    });
+  });
+
   describe("Axis labels mode", () => {
     const panelOf = (type: string, config: Record<string, unknown> = {}) => ({
       ...mockDashboardPanelData,

@@ -529,7 +529,11 @@ describe("axis reach for limit lines", () => {
     const userMax: any = hBar(50);
     applyLineAreaThresholds(
       userMax,
-      panel("h-bar", { steps: [{ value: 1000, color: RED }] }, { show_bar_track: true, y_axis_max: 50 }),
+      panel(
+        "h-bar",
+        { steps: [{ value: 1000, color: RED }] },
+        { show_bar_track: true, y_axis_max: 50 },
+      ),
     );
     expect(userMax.xAxis.max).toBe(50);
   });
