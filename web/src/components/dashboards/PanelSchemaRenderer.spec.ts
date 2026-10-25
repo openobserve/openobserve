@@ -1548,9 +1548,11 @@ describe("PanelSchemaRenderer", () => {
           },
         });
         await flushPromises();
+        const errorEmits = wrapper.emitted("error")?.length ?? 0;
         data.value = [[{ count: 1 }]];
         isFirstLoadSettled.value = true;
         await flushPromises();
+        expect(wrapper.emitted("error")?.length ?? 0).toBe(errorEmits);
         const callsBefore = vi.mocked(convertPanelData).mock.calls.length;
         const rendered = { chartType: "custom_chart", series: [{ type: "line" }] };
         vi.mocked(convertPanelData).mockResolvedValueOnce(rendered as any);
