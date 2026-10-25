@@ -109,6 +109,25 @@ describe("PromQLChartConfig", () => {
       wrapper = createWrapper({ chartType: "table" });
       expect(wrapper.find('[data-test="dashboard-config-aggregation"]').exists()).toBe(false);
     });
+
+    it("hides the metric aggregation only when every query is instant", async () => {
+      const aggregation = () => wrapper.find('[data-test="dashboard-config-aggregation"]').exists();
+      mockDashboardPanelData.data.queries = [
+        { config: { query_type: "instant" } },
+        { config: { query_type: "range" } },
+      ];
+      wrapper = createWrapper({ chartType: "metric" });
+      expect(aggregation()).toBe(true);
+
+      mockDashboardPanelData.data.queries[1].config.query_type = "instant";
+      wrapper.unmount();
+      wrapper = createWrapper({ chartType: "metric" });
+      expect(aggregation()).toBe(false);
+
+      wrapper.unmount();
+      wrapper = createWrapper({ chartType: "gauge" });
+      expect(aggregation()).toBe(true);
+    });
   });
 
   describe("Aggregation Function", () => {

@@ -400,7 +400,17 @@ export default defineComponent({
     // Chart types that support aggregation
     const chartsWithAggregation = ["pie", "donut", "geomap", "maps", "metric", "gauge", "h-bar"];
 
-    const showAggregationConfig = computed(() => chartsWithAggregation.includes(props.chartType));
+    // An instant query has one sample per series, so a metric has nothing to reduce.
+    const allQueriesInstant = computed(
+      () =>
+        dashboardPanelData.data.queries?.length > 0 &&
+        dashboardPanelData.data.queries.every((q: any) => q?.config?.query_type === "instant"),
+    );
+    const showAggregationConfig = computed(
+      () =>
+        chartsWithAggregation.includes(props.chartType) &&
+        !(props.chartType === "metric" && allQueriesInstant.value),
+    );
 
     // Aggregation value
     const aggregationValue = computed({

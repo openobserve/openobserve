@@ -408,6 +408,42 @@ describe("ConfigPanel", () => {
     });
   });
 
+  describe("Sparkline section", () => {
+    const metricPanel = (queryType: string, queryTypes: string[]) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type: "metric",
+        queryType,
+        queries: queryTypes.map((query_type) => ({ query: "x", config: { query_type } })),
+        config: { ...mockDashboardPanelData.data.config },
+      },
+    });
+
+    it("is shown for a range or mixed PromQL metric", () => {
+      wrapper = createWrapper(
+        { dashboardPanelData: metricPanel("promql", ["instant", "range"]) },
+        { promqlMode: true },
+      );
+      expect(wrapper.vm.promqlAllInstant).toBe(false);
+      expect(wrapper.text()).toContain("Sparkline");
+    });
+
+    it("is dropped when every PromQL query is instant", () => {
+      wrapper = createWrapper(
+        { dashboardPanelData: metricPanel("promql", ["instant", "instant"]) },
+        { promqlMode: true },
+      );
+      expect(wrapper.vm.promqlAllInstant).toBe(true);
+      expect(wrapper.text()).not.toContain("Sparkline");
+    });
+
+    it("stays for an SQL metric whatever its queries carry", () => {
+      wrapper = createWrapper({ dashboardPanelData: metricPanel("sql", ["instant"]) });
+      expect(wrapper.vm.promqlAllInstant).toBe(false);
+    });
+  });
+
   describe("PromQL series limit", () => {
     const panelOf = (type: string) => ({
       ...mockDashboardPanelData,

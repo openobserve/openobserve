@@ -2980,6 +2980,37 @@ describe("PanelSchemaRenderer", () => {
       expect(style.transform).toBe("translateY(-50%)");
     });
 
+    const clickZone = async (target: HTMLElement) => {
+      const w = createWrapper({
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          type: "metric",
+          config: {
+            ...defaultProps.panelSchema.config,
+            drilldown: [{ name: "Link", type: "byUrl", data: { url: "https://example.com" } }],
+          },
+        },
+      });
+      await flushPromises();
+      w.vm.panelData = { chartType: "metric", options: { series: metricSeries() } };
+      await nextTick();
+      w.vm.onMetricZoneClick(w.vm.metricItems[1], { target, offsetX: 5, offsetY: 6 });
+      await flushPromises();
+      return w;
+    };
+
+    it("opens the drilldown menu from a click on a value's hover zone", async () => {
+      wrapper = await clickZone(document.createElement("div"));
+      expect(wrapper.vm.drilldownArray).toHaveLength(1);
+    });
+
+    it("leaves the drilldown menu closed when the copy button is clicked", async () => {
+      const button = document.createElement("button");
+      button.appendChild(document.createElement("span"));
+      wrapper = await clickZone(button.firstChild as HTMLElement);
+      expect(wrapper.vm.drilldownArray).toHaveLength(0);
+    });
+
     it("copies the displayed value and flags the copied state", async () => {
       wrapper = await mountMetric();
       wrapper.vm.copyMetricItem(wrapper.vm.metricItems[1]);

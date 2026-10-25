@@ -257,6 +257,40 @@ describe("usePanelDrilldown", () => {
     );
   });
 
+  it("hands a metric cell's own name and raw value to a URL drilldown", async () => {
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    const deps = makeDeps();
+    deps.panelSchema.value.type = "metric";
+    deps.panelSchema.value.config.drilldown = [
+      {
+        name: "Link",
+        type: "byUrl",
+        targetBlank: true,
+        data: { url: "https://example.com/?n=${series.__name}&v=${series.__value}" },
+      } as any,
+    ];
+    deps.panelData.value.options.series = [
+      { _metricName: "api", _metricRaw: "12.5" },
+      { _metricName: "web", _metricRaw: 7 },
+    ] as any;
+    const api = usePanelDrilldown(deps as any);
+
+    await api.onChartClick({
+      componentType: "series",
+      seriesIndex: 1,
+      event: { offsetX: 1, offsetY: 1 },
+      value: [],
+    });
+    await api.openDrilldown(0);
+
+    expect(openSpy).toHaveBeenCalledWith(
+      "https://example.com/?n=web&v=7",
+      "_blank",
+      "noopener,noreferrer",
+    );
+    openSpy.mockRestore();
+  });
+
   describe("state timeline segment", () => {
     const segmentClick = {
       componentType: "series",

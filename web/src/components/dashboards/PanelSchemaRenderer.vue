@@ -145,6 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :style="metricZoneStyle(m)"
           @mouseenter="hoveredMetricIdx = m.idx"
           @mouseleave="hoveredMetricIdx = null"
+          @click="onMetricZoneClick(m, $event)"
         >
           <OButton
             :aria-label="t('common.copyToClipboard')"
@@ -2010,6 +2011,20 @@ export default defineComponent({
       onExemplarClick: exemplarInteraction.onExemplarClick,
     });
 
+    // The copy hover zone covers its value, so a click there stands in for a click on that cell's series.
+    const onMetricZoneClick = (m: any, event: MouseEvent) => {
+      if ((event.target as HTMLElement | null)?.closest("button")) return;
+      onChartClick({
+        componentType: "series",
+        seriesType: "custom",
+        seriesIndex: m.idx,
+        event: {
+          offsetX: (m.layout?.left ?? 0) + event.offsetX,
+          offsetY: (m.layout?.top ?? 0) + event.offsetY,
+        },
+      });
+    };
+
     const { downloadDataAsCSV, downloadDataAsJSON, getPanelCsvString } = usePanelDownload({
       panelSchema,
       data,
@@ -2279,6 +2294,7 @@ export default defineComponent({
       hoveredMetricIdx,
       metricCopiedIdx,
       copyMetricItem,
+      onMetricZoneClick,
       downloadDataAsCSV,
       downloadDataAsJSON,
       getPanelCsvData: (title: string) => {

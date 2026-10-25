@@ -40,7 +40,13 @@ import {
 import { calculateBottomLegendHeight, calculateRightLegendWidth } from "./legendConfiguration";
 import { convertPromQLChartData } from "./promql/convertPromQLChartData";
 import { PROMQL_MODULAR_CHART_TYPES } from "./promql/shared/types";
-import { calculateMetricFontSize, buildMetricSparkline } from "./sql/charts/convertSQLMetricChart";
+import {
+  calculateMetricFontSize,
+  buildMetricSparkline,
+  type MetricSparkline,
+} from "./sql/charts/convertSQLMetricChart";
+import { layoutMetricGrid } from "./metricGrid";
+import { applyAggregation } from "./promql/shared/dataProcessor";
 import { resolveMetricValueStyle } from "./tableConfigUtils";
 import {
   applyGaugeThresholds,
@@ -63,6 +69,9 @@ import { stackTotalRows } from "./stackTotals";
 
 /** Rows a tooltip will list before it collapses the rest into a "+N more". */
 const TOOLTIP_MAX_SERIES = 10;
+
+/** Metric cells drawn before the rest are dropped with a series-cap notice. */
+export const METRIC_MAX_CELLS = 50;
 
 let moment: any;
 let momentInitialized = false;
@@ -114,6 +123,128 @@ const closeForecastSeam = (twin: any, from: number) => {
   for (let i = from; i < first; i++) {
     twin.data[i] = [twin.data[i][0], start + slope * (times[i] - times[first])];
   }
+};
+
+/** One metric cell per PromQL series: its reduced value, styled, plus what the grid, copy button and drilldown read. */
+const buildPromQLMetricCell = (
+  metric: any,
+  name: string,
+  panelSchema: any,
+  seriesOverrides: ReturnType<typeof createSeriesOverrideLookup>,
+): { cell: any; sparkline: MetricSparkline | null } => {
+  const values = [...(metric?.values ?? (metric?.value ? [metric.value] : []))].sort(
+    (a: any, b: any) => a[0] - b[0],
+  );
+  const aggregation = panelSchema.config?.aggregation || "last";
+  // "last" keeps the sample string, so a value mapping on "NaN" or "+Inf" still matches it.
+  const value =
+    aggregation === "last"
+      ? (values[values.length - 1]?.[1] ?? 0)
+      : applyAggregation(values, aggregation);
+  const unitArgs = seriesOverrides.unitArgs(name);
+  const style = resolveMetricValueStyle(value, {
+    mappings: panelSchema.config?.mappings,
+    unit: unitArgs.unit,
+    customUnit: unitArgs.unitCustom,
+    decimals: unitArgs.decimals,
+    // An override colour stands in for the panel Background of this value; mappings and steps still win.
+    panelBackground:
+      seriesOverrides.get(name)?.color ?? panelSchema.config?.background?.value?.color ?? "",
+    thresholds: getSeriesThresholds(panelSchema?.config, name),
+  });
+  const sparkline = buildMetricSparkline(
+    values.map((v: any) => Number(v?.[1])),
+    panelSchema.config?.sparkline,
+    chartColor("--color-accent"),
+  );
+  return {
+    sparkline,
+    cell: {
+      type: "custom",
+      coordinateSystem: "polar",
+      z: 2,
+      _metricText: style.text,
+      // An explicit mapping text colour wins; otherwise the text contrasts with its background.
+      _metricFillColor:
+        style.textColor ??
+        getContrastColor(
+          style.bgColor,
+          chartColor("--color-chart-metric-text"),
+          chartNumber("--chart-metric-contrast-threshold", 0.5),
+        ),
+      _metricBgColor: style.bgColor,
+      _metricLabel: seriesOverrides.get(name)?.displayName ?? name,
+      _metricName: name,
+      _metricRaw: value,
+      _metricSparkData: sparkline?.data ?? null,
+      _metricSparkConfig: sparkline?.resolved ?? null,
+    },
+  };
+};
+
+/** Sets the metric options and returns its series: one cell fills the panel, several share a grid. */
+const layoutPromQLMetric = (
+  options: any,
+  built: { cell: any; sparkline: MetricSparkline | null }[],
+  panelSchema: any,
+  panelEl: HTMLElement | null | undefined,
+): any[] => {
+  options.dataset = { source: [[]] };
+  options.tooltip = { show: false };
+  options.angleAxis = { show: false };
+  options.radiusAxis = { show: false };
+  options.polar = {};
+  options.xAxis = [];
+  options.yAxis = [];
+  if (built.length !== 1) {
+    const cells = built.map(({ cell }) => cell);
+    if (cells.length) {
+      layoutMetricGrid(
+        cells,
+        panelSchema.config?.sparkline,
+        panelEl?.offsetWidth ?? 0,
+        panelEl?.offsetHeight ?? 0,
+      );
+    }
+    options.backgroundColor = panelSchema.config?.background?.value?.color ?? "";
+    return cells;
+  }
+  const [{ cell, sparkline }] = built;
+  const text = cell._metricText;
+  options.backgroundColor = cell._metricBgColor;
+  cell.renderItem = (params: any) => ({
+    type: "text",
+    style: {
+      text,
+      fontSize: calculateMetricFontSize(text, params?.coordSys?.cx * 2, params?.coordSys?.cy * 2),
+      fontWeight: 500,
+      align: "center",
+      verticalAlign: "middle",
+      x: params?.coordSys?.cx,
+      y: params?.coordSys?.cy,
+      fill: cell._metricFillColor,
+    },
+  });
+  if (panelEl) {
+    const w = panelEl.offsetWidth;
+    const h = panelEl.offsetHeight;
+    const valueH = sparkline ? h * sparkline.valueBandFactor : h;
+    cell._metricLayout = {
+      left: 0,
+      top: 0,
+      width: w,
+      height: valueH,
+      cx: w / 2,
+      cy: sparkline ? h * sparkline.valueCenterFactor : h / 2,
+      fontSize: calculateMetricFontSize(text, w, valueH),
+    };
+  }
+  if (!sparkline) return [cell];
+  options.polar = { center: ["50%", sparkline.polarCenterY], radius: 0 };
+  options.grid = sparkline.grid;
+  options.xAxis = sparkline.xAxis;
+  options.yAxis = sparkline.yAxis;
+  return [cell, sparkline.series];
 };
 
 /** Snaps shifted results onto the step grid and their primaries' series; read config via `parentQueryIndex`. */
@@ -1191,126 +1322,16 @@ export const convertPromQLData = async (
       }
       case "metric": {
         isTimeSeriesFlag = false;
-
-        switch (it?.resultType) {
-          // An INSTANT query returns "vector" (one `value` tuple per series) where a
-          // range query returns "matrix" (a `values` array). Normalising the former
-          // into the latter lets ONE branch build the painted series: the vector case
-          // below used to return a bare {name, value} with no renderItem, so a
-          // curated instant tile with a perfectly good scalar painted an empty box.
-          case "vector":
-          case "matrix": {
-            const metric = it?.result?.[0];
-
-            const values = (metric?.values ?? (metric?.value ? [metric.value] : [])).sort(
-              (a: any, b: any) => a[0] - b[0],
-            );
-            const latestValue = values[values.length - 1]?.[1] ?? 0;
-            const metricName = metric ? nameOf(seriesNames, metric.metric, index) : "";
-            const metricUnit = seriesOverrides.unitArgs(metricName);
-
-            const metricStyle = resolveMetricValueStyle(latestValue, {
-              mappings: panelSchema.config?.mappings,
-              unit: metricUnit.unit,
-              customUnit: metricUnit.unitCustom,
-              decimals: metricUnit.decimals,
-              // An override colour stands in for the panel Background of this value; mappings and steps still win.
-              panelBackground:
-                seriesOverrides.get(metricName)?.color ??
-                panelSchema.config?.background?.value?.color ??
-                "",
-              thresholds: getSeriesThresholds(panelSchema?.config, metricName),
-            });
-            options.backgroundColor = metricStyle.bgColor;
-            const metricText = metricStyle.text;
-            // metric value color: explicit mapping text color wins; otherwise auto-contrast.
-            const metricFillColor =
-              metricStyle.textColor ??
-              getContrastColor(
-                metricStyle.bgColor,
-                chartColor("--color-chart-metric-text"),
-                chartNumber("--chart-metric-contrast-threshold", 0.5),
-              );
-            // Optional sparkline: the trend of the full matrix series.
-            const sparkValues = values.map((v: any) => Number(v?.[1]));
-            const sparkline = buildMetricSparkline(
-              sparkValues,
-              panelSchema.config?.sparkline,
-              chartColor("--color-accent"),
-            );
-
-            const textSeries: any = {
-              type: "custom",
-              silent: true,
-              coordinateSystem: "polar",
-              _metricText: metricText,
-              z: 2,
-              renderItem: function (params: any) {
-                return {
-                  type: "text",
-                  style: {
-                    text: metricText,
-                    fontSize: calculateMetricFontSize(
-                      metricText,
-                      params?.coordSys?.cx * 2,
-                      params?.coordSys?.cy * 2,
-                    ), //coordSys is relative. so that we can use it to calculate the dynamic size
-                    fontWeight: 500,
-                    align: "center",
-                    verticalAlign: "middle",
-                    x: params?.coordSys?.cx,
-                    y: params?.coordSys?.cy,
-                    fill: metricFillColor,
-                  },
-                };
-              },
-            };
-            // Text series first; sparkline layered behind via z.
-            const series: any[] = sparkline ? [textSeries, sparkline.series] : [textSeries];
-
-            // Rect for the per-value copy icon overlay (single metric fills the area).
-            const panelEl = chartPanelRef?.value;
-            if (panelEl) {
-              const w = panelEl?.offsetWidth;
-              const h = panelEl?.offsetHeight;
-              const valueH = sparkline ? h * sparkline.valueBandFactor : h;
-              const cy = sparkline ? h * sparkline.valueCenterFactor : h / 2;
-              textSeries._metricLayout = {
-                left: 0,
-                top: 0,
-                width: w,
-                height: valueH,
-                cx: w / 2,
-                cy,
-                fontSize: calculateMetricFontSize(metricText, w, valueH),
-              };
-            }
-
-            options.dataset = { source: [[]] };
-            options.tooltip = {
-              show: false,
-            };
-            options.angleAxis = {
-              show: false,
-            };
-            options.radiusAxis = {
-              show: false,
-            };
-            if (sparkline) {
-              options.polar = { center: ["50%", sparkline.polarCenterY], radius: 0 };
-              options.grid = sparkline.grid;
-              options.xAxis = sparkline.xAxis;
-              options.yAxis = sparkline.yAxis;
-            } else {
-              options.polar = {};
-              options.xAxis = [];
-              options.yAxis = [];
-            }
-
-            return series;
-          }
-        }
-        break;
+        // An instant query returns a "vector" (one `value` per series), a range query a "matrix".
+        if (it?.resultType !== "vector" && it?.resultType !== "matrix") return [];
+        return (it?.result ?? []).map((metric: any) =>
+          buildPromQLMetricCell(
+            metric,
+            nameOf(seriesNames, metric.metric, index),
+            panelSchema,
+            seriesOverrides,
+          ),
+        );
       }
       default: {
         return [];
@@ -1347,13 +1368,13 @@ export const convertPromQLData = async (
     });
   }
 
-  // For metric chart type, only show one metric value (from the last query with
-  // data). Slice BEFORE flattening: each metric query contributes an array
-  // [textSeries] (+ sparklineSeries when enabled), so keeping the last query's
-  // array preserves both the value and its sparkline. Slicing after flatten would
-  // keep only the trailing element — the sparkline — and drop the value text.
-  if (panelSchema.type === "metric" && options.series.length > 1) {
-    options.series = options.series.slice(-1);
+  if (panelSchema.type === "metric") {
+    const built = options.series.flat();
+    if (built.length > METRIC_MAX_CELLS) {
+      setSeriesLimit(METRIC_MAX_CELLS, extras.seriesLimit?.total ?? built.length, METRIC_MAX_CELLS);
+      built.length = METRIC_MAX_CELLS;
+    }
+    options.series = layoutPromQLMetric(options, built, panelSchema, chartPanelRef?.value);
   }
 
   options.series = options.series.flat();
