@@ -144,6 +144,17 @@ describe("ColorPaletteDropDown", () => {
       expect(wrapper.findAll('[data-test="select-group"]')).toHaveLength(1);
     });
 
+    it("shows a carried-over non-categorical mode as the by-series palette it renders with", () => {
+      (mockDashboardPanelData.data as any).type = "sankey";
+      mockDashboardPanelData.data.config.color.mode = "continuous-temperature";
+      wrapper = createWrapper();
+      expect((wrapper.vm as any).selectedOptionLabel).toBe(
+        (wrapper.vm as any).colorOptions.find((o: any) => o.value === "palette-classic-by-series")
+          .label,
+      );
+      expect((wrapper.vm as any).selectedOptionPalette).toEqual(mockColorPalette);
+    });
+
     it("keeps every palette mode for other chart types", () => {
       (mockDashboardPanelData.data as any).type = "bar";
       wrapper = mountWithItems();

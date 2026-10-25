@@ -268,12 +268,16 @@ export default defineComponent({
       },
     ];
 
+    // A mode carried over from another chart type renders as the by-series palette on a sankey.
+    const shownMode = computed(() => {
+      const mode = dashboardPanelData?.data?.config?.color?.mode ?? "palette-classic-by-series";
+      return categoricalOnly.value && mode !== "palette-classic"
+        ? "palette-classic-by-series"
+        : mode;
+    });
+
     const selectedOptionLabel = computed(() => {
-      const selectedOption = colorOptions.find(
-        (option) =>
-          option.value ===
-          (dashboardPanelData?.data?.config?.color?.mode ?? "palette-classic-by-series"),
-      );
+      const selectedOption = colorOptions.find((option) => option.value === shownMode.value);
       return selectedOption ? selectedOption.label : t("dashboard.colorPaletteClassicBySeries");
     });
 
@@ -292,7 +296,7 @@ export default defineComponent({
     }));
 
     const selectedOptionPalette = computed<string[]>(() => {
-      const mode = dashboardPanelData?.data?.config?.color?.mode ?? "palette-classic-by-series";
+      const mode = shownMode.value;
       if (["fixed", "shades"].includes(mode)) {
         const fixed = dashboardPanelData?.data?.config?.color?.fixedColor?.[0];
         return fixed ? [fixed] : [];
