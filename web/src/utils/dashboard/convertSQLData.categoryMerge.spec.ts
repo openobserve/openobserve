@@ -126,10 +126,35 @@ describe("multi-query category merge", () => {
       ],
       [{ cat: "c", svc: "x", v2: 30 }],
     ];
-    const { axes, categories } = await run("h-bar", withService, ["", ""], [byService]);
+    const { axes, categories, data } = await run("h-bar", withService, ["", ""], [byService]);
     expect(axes).toHaveLength(2);
-    expect(categories).toHaveLength(axes[1].data.length);
+    expect(categories).toEqual(["b", "a", "a"]);
+    expect(axes[1].data).toHaveLength(3);
+    expect(data.slice(-1)).toEqual([[30]]);
   });
+
+  it.each(["h-bar", "h-stacked"])(
+    "%s on time rows: a shifted twin keeps pairing with the primary by position",
+    async (type) => {
+      const timeRows = [
+        [
+          { cat: "2024-01-02T00:00:00", v1: 1 },
+          { cat: "2024-01-02T01:00:00", v1: 2 },
+        ],
+        [
+          { cat: "2024-01-01T00:00:00", v2: 10 },
+          { cat: "2024-01-01T01:00:00", v2: 20 },
+        ],
+      ];
+      expect(await run(type, timeRows, ["", "1d ago"])).toMatchObject({
+        categories: ["2024-01-02T00:00:00", "2024-01-02T01:00:00"],
+        data: [
+          [1, 2],
+          [10, 20],
+        ],
+      });
+    },
+  );
 
   it("h-stacked: a time-shifted twin lands on the rows of its own categories", async () => {
     const shifted = await run("h-stacked", twoQueries(), ["", "1d ago"]);

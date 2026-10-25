@@ -30,6 +30,7 @@ import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { escapeHtml } from "@/utils/html";
 import { applyGaugeSeriesThresholds, applyLineAreaThresholds } from "./thresholds";
 import { applySeriesOverrides } from "./seriesOverrides";
+import { isTimeSeries, isTimeStamp } from "./dateTimeUtils";
 
 /**
  * Re-applies trellis layout on merged multi-query data.
@@ -710,11 +711,16 @@ export const convertMultiSQLData = async (
   // C3: X-axis merge + reindex for time-series charts
   const isHorizontal = chartType === "h-bar" || chartType === "h-stacked";
   const categoryAxis = isHorizontal ? "yAxis" : "xAxis";
-  // An h-bar breakdown adds a second category axis with one entry per row, which a merge cannot realign.
+  const horizontalCategories = isHorizontal ? options[0]?.options?.yAxis : null;
+  const timeSample = horizontalCategories?.[0]?.data?.slice(0, 20) ?? [];
+  // An h-bar breakdown adds a per-row second axis, and time rows of a shifted twin pair up by position.
+  const mergeableHorizontal =
+    horizontalCategories?.length === 1 &&
+    !(timeSample.length && (isTimeSeries(timeSample) || isTimeStamp(timeSample, null)));
   const needsXAxisMerge =
     options.length > 1 &&
     options[0]?.options?.[categoryAxis]?.[0]?.data &&
-    (!isHorizontal || options[0].options[categoryAxis].length === 1) &&
+    (!isHorizontal || mergeableHorizontal) &&
     !["pie", "donut", "metric", "gauge", "heatmap"].includes(chartType);
 
   if (needsXAxisMerge) {

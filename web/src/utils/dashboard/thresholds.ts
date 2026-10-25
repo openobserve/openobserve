@@ -601,7 +601,7 @@ export const applyLineAreaThresholds = (options: any, panelSchema: any): void =>
     extendAxisToLimits(options, valueAxis, axisIndex, limits, config),
   );
   // A stacked limit is read against the stack height, not one segment's value.
-  if (panelSchema.type !== "stacked" && panelSchema.type !== "h-stacked") {
+  if (!stacked) {
     addTooltipCues(options.tooltip, stepsBySeries, overrides.formatValue, dimension);
   }
 

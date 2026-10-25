@@ -731,19 +731,24 @@ describe("stacked and h-stacked bars", () => {
     },
   );
 
-  it("SQL stacked: no per-segment over-limit cue in the tooltip", async () => {
-    const rows = stackRows({ api: [600, 100], web: [700, 50] });
-    const options = await runSQL(stackPanel("stacked", STEPS), [rows]);
-    const point = (name: string, value: number) => ({
-      seriesName: name,
-      seriesIndex: options.series.findIndex((s: any) => s.name === name),
-      name: "/a",
-      marker: "<i></i>",
-      value,
-      data: value,
-    });
-    expect(options.tooltip.formatter([point("api", 600), point("web", 700)])).not.toContain("over");
-  });
+  it.each(["stacked", "area-stacked"])(
+    "SQL %s: no per-segment over-limit cue in the tooltip",
+    async (type) => {
+      const rows = stackRows({ api: [600, 100], web: [700, 50] });
+      const options = await runSQL(stackPanel(type, STEPS), [rows]);
+      const point = (name: string, value: number) => ({
+        seriesName: name,
+        seriesIndex: options.series.findIndex((s: any) => s.name === name),
+        name: "/a",
+        marker: "<i></i>",
+        value,
+        data: value,
+      });
+      expect(options.tooltip.formatter([point("api", 600), point("web", 700)])).not.toContain(
+        "over",
+      );
+    },
+  );
 
   it("SQL stacked with two Y fields and no breakdown: each bar is its own range", async () => {
     const twoY = sqlPanel("stacked", { thresholds: pct80 }, [
