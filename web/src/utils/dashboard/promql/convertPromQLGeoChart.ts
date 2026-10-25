@@ -22,7 +22,7 @@ import {
   TOOLTIP_SCROLL_STYLE,
 } from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
-import { geoMapTooltipFormatter, normalizeGeoWeight } from "../convertGeoMapData";
+import { formatGeoWeight, geoMapTooltipFormatter, normalizeGeoWeight } from "../convertGeoMapData";
 
 /**
  * Converter for geographic map charts (geomap)
@@ -143,6 +143,7 @@ export class GeoConverter implements PromQLChartConverter {
         },
         text: [gt("dashboard.utils.visualMapHigh"), gt("dashboard.utils.visualMapLow")],
         calculable: true,
+        formatter: (value: any) => formatGeoWeight(value, panelSchema),
       },
       toolbox: {
         show: true,

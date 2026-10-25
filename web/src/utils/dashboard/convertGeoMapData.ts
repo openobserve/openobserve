@@ -25,7 +25,7 @@ export function normalizeGeoWeight(value: any, minValue: any, maxValue: any) {
   return (value - minValue) / (maxValue - minValue);
 }
 
-const formatGeoWeight = (value: any, panelSchema: any) =>
+export const formatGeoWeight = (value: any, panelSchema: any) =>
   formatUnitValue(
     getUnitValue(
       value,
@@ -179,6 +179,9 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
   };
 
   options.series = panelSchema.queries.map((query: any, index: any) => {
+    const aliases = [query.fields.longitude, query.fields.latitude, query.fields.weight]
+      .map((field: any) => field?.alias)
+      .filter((alias: any) => alias != null);
     return {
       name: gt("dashboard.utils.mapLayerNameIndexed", { index: index + 1 }),
       type: query.config.layer_type,
@@ -190,9 +193,6 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
       },
       data: filteredMapData[index]?.map((item: any) => {
         if (query.customQuery) {
-          const aliases = [query.fields.longitude, query.fields.latitude, query.fields.weight]
-            .map((field: any) => field?.alias)
-            .filter((alias: any) => alias != null);
           const weight = getDataValue(item, query.fields.weight?.alias);
           const value = [
             getDataValue(item, query.fields.longitude.alias),

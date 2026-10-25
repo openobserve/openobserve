@@ -1123,6 +1123,7 @@ describe("GeoConverter", () => {
       });
       expect(html).toContain("Weight: 1B");
       expect(html).toContain("city: &lt;i&gt;Oslo&lt;/i&gt;");
+      expect(result.visualMap.formatter(2048)).toBe("2KB");
     });
   });
 });
