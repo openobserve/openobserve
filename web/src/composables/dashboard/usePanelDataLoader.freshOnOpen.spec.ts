@@ -23,6 +23,7 @@ import {
   type DashboardFreshOnOpen,
 } from "./dashboardFreshOnOpen";
 import { isEffectivePanelTimeRelative } from "@/utils/dashboard/panelTimeUtils";
+import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 
 // Real loader, executors and search handlers; only the cache, the stream transport and the network are fakes.
 const fakes = vi.hoisted(() => ({
@@ -772,6 +773,64 @@ describe("usePanelDataLoader: fresh on open", () => {
       await settle();
 
       expect(loader.isFirstLoadSettled.value).toBe(false);
+    });
+  });
+  describe("a single-panel refresh target", () => {
+    const refreshPanel = async (selectedTimeObj: any, id = "panel-1") => {
+      panelIdToBeRefreshed.value = id;
+      selectedTimeObj.value = windowEndingAt(NOW + 60_000);
+      await settle();
+    };
+
+    afterEach(() => {
+      panelIdToBeRefreshed.value = null;
+    });
+
+    it("is cleared once its load finishes", async () => {
+      const { selectedTimeObj } = mountPanel({ visit: createVisit() });
+      await settle();
+      endStream(0);
+
+      await refreshPanel(selectedTimeObj);
+      expect(fakes.streams).toHaveLength(2);
+      expect(panelIdToBeRefreshed.value).toBe("panel-1");
+
+      endStream(1);
+
+      expect(panelIdToBeRefreshed.value).toBeNull();
+    });
+
+    it("is cleared when its load fails", async () => {
+      const { selectedTimeObj } = mountPanel({ visit: createVisit() });
+      await settle();
+      endStream(0);
+
+      await refreshPanel(selectedTimeObj);
+      const { payload, handlers } = fakes.streams[1];
+      handlers.error(payload, { content: { message: "querier timed out", code: 504 } });
+
+      expect(panelIdToBeRefreshed.value).toBeNull();
+    });
+
+    it("is cleared when it has nothing to query", async () => {
+      const panel = { ...sqlPanel(), queries: [{ query: "", fields: {}, config: {} }] };
+      const { selectedTimeObj } = mountPanel({ visit: createVisit(), panel });
+      await settle();
+
+      await refreshPanel(selectedTimeObj);
+
+      expect(fakes.streams).toHaveLength(0);
+      expect(panelIdToBeRefreshed.value).toBeNull();
+    });
+
+    it("is kept when another panel's load finishes", async () => {
+      mountPanel({ visit: createVisit() });
+      panelIdToBeRefreshed.value = "panel-2";
+      await settle();
+
+      endStream(0);
+
+      expect(panelIdToBeRefreshed.value).toBe("panel-2");
     });
   });
 });

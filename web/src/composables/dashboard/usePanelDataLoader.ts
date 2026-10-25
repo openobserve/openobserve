@@ -205,10 +205,15 @@ export const usePanelDataLoader = (
   // Until the first load settles the panel has no answer yet, so "No Data" would flash over a cached result.
   const isFirstLoadSettled = ref(false);
   let latestLoadCall = 0;
+  // A single-panel refresh ends when its target settles; while it is set, every other custom chart skips its re-runs.
+  const settleLoad = () => {
+    isFirstLoadSettled.value = true;
+    if (panelIdToBeRefreshed.value === panelSchema.value?.id) panelIdToBeRefreshed.value = null;
+  };
   watch(
     () => state.loading,
     (loading) => {
-      if (!loading) isFirstLoadSettled.value = true;
+      if (!loading) settleLoad();
     },
     { flush: "sync" },
   );
@@ -549,7 +554,7 @@ export const usePanelDataLoader = (
       }
     } finally {
       // Covers every early return: a call that was not superseded and left nothing running has its answer.
-      if (loadCall === latestLoadCall && !state.loading) isFirstLoadSettled.value = true;
+      if (loadCall === latestLoadCall && !state.loading) settleLoad();
     }
   };
 
