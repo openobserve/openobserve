@@ -65,7 +65,7 @@ export const promqlGaugeValue = (metric: any, aggregation: unknown): number | nu
 /** Text shown in the dial: mapped text first, then the unit-formatted value, "-" when there is none. */
 export const gaugeValueText = (value: unknown, mapping: any, unit: GaugeUnitArgs): string => {
   if (mapping?.text != null && mapping.text !== "") return String(mapping.text);
-  if (value === null || value === undefined) return NO_VALUE_TEXT;
+  if (value === null || value === undefined || Number.isNaN(value)) return NO_VALUE_TEXT;
   try {
     const unitValue = getUnitValue(value, unit.unit, unit.unitCustom, unit.decimals);
     return unitValue.value + unitValue.unit;

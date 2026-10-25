@@ -112,6 +112,7 @@ describe("gaugeValueText", () => {
   it("shows a dash when there is no value", () => {
     expect(gaugeValueText(null, null, plainUnit)).toBe("-");
     expect(gaugeValueText(undefined, null, plainUnit)).toBe("-");
+    expect(gaugeValueText(NaN, null, plainUnit)).toBe("-");
   });
 
   it("prefers the mapped text", () => {
