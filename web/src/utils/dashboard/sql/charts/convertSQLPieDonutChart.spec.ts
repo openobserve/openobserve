@@ -194,11 +194,14 @@ describe.each(["pie", "donut"])("applyPieDonutChart - %s slice percent precision
     expect(ctx.options.series[0].percentPrecision).toBe(decimals);
   });
 
-  it("defaults the label precision to 2 when decimals is unset", () => {
-    const ctx = contextWithDecimals(undefined);
-    applyPieDonutChart(ctx);
-    expect(ctx.options.series[0].percentPrecision).toBe(2);
-  });
+  it.each([undefined, null])(
+    "defaults the label precision to 2 when decimals is %s",
+    (decimals) => {
+      const ctx = contextWithDecimals(decimals);
+      applyPieDonutChart(ctx);
+      expect(ctx.options.series[0].percentPrecision).toBe(2);
+    },
+  );
 
   it.each([14, 20, 100])("caps decimals %i at 13 so the percent rounding ends", (decimals) => {
     const ctx = contextWithDecimals(decimals);
