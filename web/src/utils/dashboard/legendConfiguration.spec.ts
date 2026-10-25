@@ -1375,6 +1375,24 @@ describe("pie and donut legend values", () => {
     expect(text.replace(/\{[ab]\|([^}]*)\}/, "$1").length * 8).toBeLessThanOrEqual(reserved - 60);
   });
 
+  it("lets a right scroll legend with values take up to half the chart", () => {
+    const many = [{ name: "a-very-long-service-name-indeed", value: 1 }];
+    const legendLeft = (config: any) => {
+      const options: any = pieOptions(many);
+      applyLegendConfiguration(
+        pieSchema({ legends_position: "right", legends_type: "scroll", ...config }),
+        { value: { offsetWidth: 600, offsetHeight: 300 } },
+        hovered(),
+        options,
+      );
+      return options.legend.left;
+    };
+    expect(legendLeft({})).toBe(400);
+    const withValues = legendLeft({ legend_values: ["percent"] });
+    expect(withValues).toBeLessThan(400);
+    expect(withValues).toBeGreaterThanOrEqual(300);
+  });
+
   it("reserves a wider right legend for the values", () => {
     const many = Array.from({ length: 6 }, (_, i) => ({ name: `slice-${i}`, value: i + 1 }));
     const legendLeft = (config: any) => {

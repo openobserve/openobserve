@@ -39,7 +39,7 @@ const LEGEND_VALUES_TEXT_WIDTH = 180;
 
 // eslint-disable-next-line local/no-hardcoded-px -- the fixed size ECharts paints legend text at; canvas measurement has no rem
 const LEGEND_TEXT_FONT = "12px";
-const LEGEND_VALUES_MIN_NAME_WIDTH = 40;
+const LEGEND_VALUES_MIN_NAME_WIDTH = 30;
 // Legend padding (30) plus the default icon (25) and its gap (5) beside each entry's text.
 const LEGEND_ITEM_CHROME_WIDTH = 60;
 // ECharts' largest-remainder percent loops forever once 100 * 10^precision passes 2^53.
@@ -1232,8 +1232,10 @@ const calculatePieDonutScrollLegendWidth = (
   }, "");
 
   // Calculate legend width based on content, with constraints for different container sizes
+  // Values need room beside the name, so the legend may take half the chart, as a plain right legend does.
+  const maxShare = pieLegendValueKeys(panelSchema).length ? 2 : 3;
   let legendWidth = Math.min(
-    chartWidth / 3, // Never take more than 1/3 of the chart width
+    chartWidth / maxShare,
     calculateWidthText(maxValue) + 60, // Calculate based on text width + padding for icons and scroll
   );
 
