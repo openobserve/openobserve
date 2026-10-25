@@ -484,11 +484,11 @@ const pieLegendValueKeys = (panelSchema: any): string[] => {
   return PIE_LEGEND_VALUE_KEYS.filter((key) => selected.includes(key));
 };
 
-// Matches the slice-label percentPrecision, which falls back to 2 only when decimals is unset.
+// Matches the slice-label percentPrecision (2 only when unset); toFixed throws above 100.
 const pieLegendPercentDecimals = (decimals: unknown): number => {
   if (decimals === null || decimals === undefined || decimals === "") return 2;
   const parsed = Math.floor(Number(decimals));
-  return Number.isFinite(parsed) && parsed >= 0 ? Math.min(parsed, 20) : 2;
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.min(parsed, 100) : 2;
 };
 
 // The legend is keyed by name, so slices that share one (merged queries) show their sum.
