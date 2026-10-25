@@ -19,6 +19,19 @@ export const shouldApplyChartAlign = (dashboardPanelData: any): boolean => {
   );
 };
 
+/** True when every visible query of the panel is a PromQL instant query, which has one sample per series. */
+export const allVisibleQueriesInstant = (dashboardPanelData: any): boolean => {
+  const queries = dashboardPanelData.data.queries ?? [];
+  const hidden = dashboardPanelData.layout?.hiddenQueries ?? [];
+  return (
+    queries.length > 0 &&
+    queries.every(
+      (query: any, index: number) =>
+        query?.config?.query_type === "instant" || hidden.includes(index),
+    )
+  );
+};
+
 /**
  * Check that show Gridlines option should be applied
  * @param dashboardPanelData - The dashboard panel data

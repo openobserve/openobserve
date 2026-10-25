@@ -352,6 +352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, computed, ref, inject } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
+import { allVisibleQueriesInstant } from "@/utils/dashboard/configUtils";
 import ColumnOrderPopUp from "./ColumnOrderPopUp.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -400,20 +401,11 @@ export default defineComponent({
     // Chart types that support aggregation
     const chartsWithAggregation = ["pie", "donut", "geomap", "maps", "metric", "gauge", "h-bar"];
 
-    // An instant query has one sample per series, so a metric has nothing to reduce.
-    const allQueriesInstant = computed(
-      () =>
-        dashboardPanelData.data.queries?.length > 0 &&
-        dashboardPanelData.data.queries.every(
-          (q: any, index: number) =>
-            q?.config?.query_type === "instant" ||
-            dashboardPanelData.layout?.hiddenQueries?.includes(index),
-        ),
-    );
     const showAggregationConfig = computed(
       () =>
         chartsWithAggregation.includes(props.chartType) &&
-        !(props.chartType === "metric" && allQueriesInstant.value),
+        // An instant query has one sample per series, so a metric has nothing to reduce.
+        !(props.chartType === "metric" && allVisibleQueriesInstant(dashboardPanelData)),
     );
 
     // Aggregation value

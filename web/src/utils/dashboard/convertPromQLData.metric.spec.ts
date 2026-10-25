@@ -153,6 +153,16 @@ describe("convertPromQLData metric cells", () => {
     expect(cellsOf(await convert(data, { aggregation: "first" }))[0]._metricRaw).toBe(4);
   });
 
+  it("shows an instant sample as is, whatever aggregation a range query left behind", async () => {
+    const result = await convert(
+      [vector({ metric: { job: "api" }, value: [1_700_000_000, "8"] })],
+      {
+        aggregation: "diff",
+      },
+    );
+    expect(cellsOf(result)[0]._metricRaw).toBe("8");
+  });
+
   it("keeps the last sample as received, so a value mapping on it still matches", async () => {
     const result = await convert([matrix(series("api", ["1", "+Inf"]))], {
       mappings: [{ type: "value", value: "+Inf", text: "unbounded" }],

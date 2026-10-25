@@ -2161,6 +2161,7 @@ import {
   shouldShowLineThickness,
   shouldShowDrilldown,
   shouldShowTimeShift,
+  allVisibleQueriesInstant,
 } from "@/utils/dashboard/configUtils";
 import { SECTION_ICONS } from "@/utils/dashboard/searchLabelsConfig";
 
@@ -2935,12 +2936,7 @@ export default defineComponent({
     const promqlAllInstant = computed(
       () =>
         dashboardPanelData.data.queryType === "promql" &&
-        dashboardPanelData.data.queries?.length > 0 &&
-        dashboardPanelData.data.queries.every(
-          (q: any, index: number) =>
-            q?.config?.query_type === "instant" ||
-            dashboardPanelData.layout?.hiddenQueries?.includes(index),
-        ),
+        allVisibleQueriesInstant(dashboardPanelData),
     );
 
     const {

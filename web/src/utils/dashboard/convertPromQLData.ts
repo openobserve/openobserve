@@ -135,7 +135,8 @@ const buildPromQLMetricCell = (
   const values = [...(metric?.values ?? (metric?.value ? [metric.value] : []))].sort(
     (a: any, b: any) => a[0] - b[0],
   );
-  const aggregation = panelSchema.config?.aggregation || "last";
+  // An instant sample has nothing to reduce, and the editor hides the reducer for it.
+  const aggregation = metric?.values ? panelSchema.config?.aggregation || "last" : "last";
   // "last" keeps the sample string, so a value mapping on "NaN" or "+Inf" still matches it.
   const value =
     aggregation === "last"
