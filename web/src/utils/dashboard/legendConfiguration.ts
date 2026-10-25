@@ -515,7 +515,7 @@ const truncateLegendName = (text: string, maxWidth: number): string => {
 const overridePercentText = (value: number, positiveTotal: number, decimals: number): string =>
   `${(positiveTotal > 0 ? (value / positiveTotal) * 100 : 0).toFixed(decimals)}%`;
 
-// ECharts' largest-remainder percent rounding (number.getPercentSeats, not exported), run once for every slice.
+// ECharts' largest-remainder percent rounding (number.getPercentSeats, not exported), in units of 10^-precision %.
 const percentSeats = (values: number[], precision: number): number[] => {
   const sum = values.reduce((acc, value) => acc + (isNaN(value) ? 0 : value), 0);
   if (sum === 0) return [];
@@ -538,7 +538,7 @@ const percentSeats = (values: number[], precision: number): number[] => {
     remainder[maxId] = 0;
     currentSum++;
   }
-  return seats.map((seat) => seat / digits);
+  return seats;
 };
 
 // Keyed by name like the legend itself, so slices that share a name (merged queries) show their sum.
@@ -552,21 +552,31 @@ const buildPieLegendEntries = (
   const lookup = createSeriesOverrideLookup(panelSchema?.config);
   const panelDecimals = pieLegendPercentDecimals(panelSchema?.config?.decimals);
   const sums = new Map<string, number>();
-  // ECharts drops negative and legend-hidden slices before it computes the slice percents.
   const shares = new Map<string, number>();
-  for (const item of data) {
+  // ECharts drops negative and legend-hidden slices, then rounds each drawn slice's percent on its own.
+  const itemShares = data.map((item) => {
     const numeric = Number(item?.value);
     const value = Number.isFinite(numeric) ? numeric : 0;
     const name = String(item?.name ?? "");
     sums.set(name, (sums.get(name) ?? 0) + value);
     const share = value > 0 && selected?.[name] !== false ? value : 0;
     shares.set(name, (shares.get(name) ?? 0) + share);
-  }
+    return share;
+  });
   const names = [...sums.keys()];
   const values = [...sums.values()];
   const seatValues = [...shares.values()];
   const positiveTotal = seatValues.reduce((acc, value) => acc + value, 0);
-  let seats: number[] | undefined;
+  let seatSums: Map<string, number> | undefined;
+  const sumSeatsByName = () => {
+    const seats = percentSeats(itemShares, panelDecimals);
+    const byName = new Map<string, number>();
+    data.forEach((item, index) => {
+      const name = String(item?.name ?? "");
+      if (itemShares[index] > 0) byName.set(name, (byName.get(name) ?? 0) + (seats[index] ?? 0));
+    });
+    return byName;
+  };
   const entries = new Map<string, PieLegendEntry>();
   names.forEach((name, index) => {
     const overrideDecimals = lookup.get(name)?.decimals;
@@ -578,8 +588,8 @@ const buildPieLegendEntries = (
       if (panelDecimals > MAX_SEATS_PRECISION) {
         return overridePercentText(seatValues[index], positiveTotal, panelDecimals);
       }
-      seats ??= percentSeats(seatValues, panelDecimals);
-      const percent = seatValues[index] ? (seats[index] ?? 0) : 0;
+      seatSums ??= sumSeatsByName();
+      const percent = (seatSums.get(name) ?? 0) / Math.pow(10, panelDecimals);
       return `${percent.toFixed(panelDecimals)}%`;
     };
     const valueText = keys
@@ -660,6 +670,8 @@ const applyPieLegendValues = (panelSchema: any, options: any, hoveredSeriesState
     return entry.name ? `{${style}|${entry.name}}  ${entry.valueText}` : entry.valueText;
   };
   options.legend.textStyle = { ...options.legend.textStyle, width: LEGEND_VALUES_TEXT_WIDTH };
+  // An empty map selects every slice; its presence tells ChartRenderer to keep it in step with clicks.
+  options.legend.selected = {};
 };
 
 /**

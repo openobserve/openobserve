@@ -1250,6 +1250,27 @@ describe("pie and donut legend values", () => {
     },
   );
 
+  it("gives a name the sum of its drawn slices' rounded percents", () => {
+    const options: any = pieOptions([
+      { name: "A", value: 1 },
+      { name: "B", value: 1 },
+      { name: "A", value: 3 },
+      { name: "C", value: 1 },
+      { name: "A", value: -9 },
+    ]);
+    applyLegendConfiguration(
+      pieSchema({ legend_values: ["percent"], decimals: 0 }),
+      chartPanelRef,
+      hovered(),
+      options,
+    );
+    const drawn = [1, 1, 3, 1];
+    const seat = (index: number) => echartsNumber.getPercentWithPrecision(drawn, index, 0);
+    expect(options.legend.formatter("A")).toBe(`{b|A}  ${seat(0) + seat(2)}%`);
+    expect(options.legend.formatter("B")).toBe(`{b|B}  ${seat(1)}%`);
+    expect(options.legend.formatter("C")).toBe(`{b|C}  ${seat(3)}%`);
+  });
+
   it("leaves a negative same-name slice out of an override-decimals percent", () => {
     const options: any = pieOptions([
       { name: "A", value: 10 },

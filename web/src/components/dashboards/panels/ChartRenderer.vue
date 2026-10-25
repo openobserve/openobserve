@@ -343,6 +343,14 @@ export default defineComponent({
       throttledSetHoveredSeriesName("");
     };
 
+    // A pie legend that shows percents reads its selection from the source option, so keep it in step.
+    const syncPieLegendSelection = (selected: Record<string, boolean>) => {
+      const sourceOptions = toRaw(props.data?.options);
+      if (sourceOptions?.legend?.selected && sourceOptions.series?.[0]?.type === "pie") {
+        sourceOptions.legend.selected = selected;
+      }
+    };
+
     const legendSelectChangedFn = (params: any) => {
       // check if all series are selected (all will be false)
       if (Object.values(params.selected).every((value: any) => value === false)) {
@@ -366,11 +374,7 @@ export default defineComponent({
         }
       }
 
-      // The pie legend formatter reads the selection from the source option to show visible-slice percents.
-      const sourceOptions = toRaw(props.data?.options);
-      if (sourceOptions?.legend && sourceOptions.series?.[0]?.type === "pie") {
-        sourceOptions.legend.selected = { ...params.selected };
-      }
+      syncPieLegendSelection({ ...params.selected });
 
       // get legend
       const legendOption = chart?.getOption()?.legend[0];
@@ -389,6 +393,7 @@ export default defineComponent({
       chart?.dispatchAction({
         type: "restore",
       });
+      syncPieLegendSelection({});
       // we need that toolbox datazoom button initially selected
       chart?.dispatchAction({
         type: "takeGlobalCursor",

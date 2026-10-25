@@ -1437,10 +1437,10 @@ describe("ChartRenderer", () => {
       chart.getOption.mockReturnValue({ legend: [{}] });
       const selected = { a: true, b: false };
       onLegend({ name: "a", selected });
-      return selected;
+      return { chart, selected };
     };
 
-    it("recomputes a pie legend's percents over the slice left visible", async () => {
+    it("recomputes a pie legend's percents over the visible slices, and again on restore", async () => {
       const options: any = {
         ...mockChartData.options,
         series: [
@@ -1464,21 +1464,30 @@ describe("ChartRenderer", () => {
       );
       expect(options.legend.formatter("a")).toBe("{b|a}  50%");
 
-      const selected = await isolateFirstSlice(options);
+      const { chart, selected } = await isolateFirstSlice(options);
 
       expect(options.legend.selected).toEqual({ a: true, b: false });
       expect(options.legend.selected).not.toBe(selected);
       expect(options.legend.formatter("a")).toBe("{b|a}  100%");
+
+      const onDataZoom = chart.on.mock.calls.find(([event]: any[]) => event === "dataZoom")[1];
+      onDataZoom({ batch: [{}, {}] });
+
+      expect(chart.dispatchAction).toHaveBeenCalledWith({ type: "restore" });
+      expect(options.legend.formatter("a")).toBe("{b|a}  50%");
     });
 
-    it("leaves a non-pie chart's source legend untouched", async () => {
-      const options: any = {
-        ...mockChartData.options,
-        legend: { show: true },
-        series: [{ name: "a", type: "line", data: [] }],
-      };
-      await isolateFirstSlice(options);
-      expect(options.legend.selected).toBeUndefined();
-    });
+    it.each(["pie", "line"])(
+      "leaves the source legend of a %s chart without legend values untouched",
+      async (type) => {
+        const options: any = {
+          ...mockChartData.options,
+          legend: { show: true },
+          series: [{ name: "a", type, data: [] }],
+        };
+        await isolateFirstSlice(options);
+        expect(options.legend.selected).toBeUndefined();
+      },
+    );
   });
 });
