@@ -633,6 +633,53 @@ describe("convertPromQLData with time-shifted results", () => {
     },
   );
 
+  it.each(["area-stacked", "stacked"])(
+    "totals each period apart in the %s tooltip, so the past period never adds to the current Total",
+    async (type) => {
+      const pods = (shiftS: number, a: string, b: string) =>
+        matrix(
+          series(
+            { pod: "api-1" },
+            ts.map((t) => t - shiftS),
+            a,
+          ),
+          series(
+            { pod: "api-2" },
+            ts.map((t) => t - shiftS),
+            b,
+          ),
+        );
+      const result = await convert(
+        { ...panel(type), config: { decimals: 0 } },
+        [pods(0, "2", "3"), pods(DAY_S, "10", "20")],
+        meta([{ panelQueryIndex: 0 }, { panelQueryIndex: 0, gapMs: DAY_MS, period: "1 day ago" }]),
+        stepMeta(2, 60),
+      );
+
+      const params = result.options.series
+        .map((s: any, seriesIndex: number) => ({ s, seriesIndex }))
+        .filter(({ s }: any) => s.name)
+        .map(({ s, seriesIndex }: any) => {
+          const point = s.data[0];
+          return {
+            seriesIndex,
+            seriesName: s.name,
+            marker: "",
+            dataIndex: 0,
+            axisValue: "t0",
+            data: point,
+            value: point,
+          };
+        });
+      expect(params).toHaveLength(4);
+      const html = result.options.tooltip.formatter(params);
+
+      expect(html).toContain("<strong>Total : 5</strong>");
+      expect(html).toContain("<strong>Total (1 day ago) : 30</strong>");
+      expect(html).not.toContain(": 35");
+    },
+  );
+
   it("names and configures shifted series through the map on the modular (stacked) path", async () => {
     const result = await convert(
       panel("stacked", [
