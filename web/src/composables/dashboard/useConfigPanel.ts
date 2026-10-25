@@ -15,6 +15,7 @@ import {
   shouldShowGridlines,
   shouldShowAxisLabelConfig,
   shouldShowLineThickness,
+  shouldShowScatterPointConfig,
   shouldShowDrilldown,
   shouldShowTimeShift,
 } from "@/utils/dashboard/configUtils";
@@ -369,6 +370,14 @@ export function useConfigPanel(
       "line-thickness": {
         label: t("dashboard.lineThickness"),
         visible: shouldShowLineThickness(dashboardPanelData, promqlMode.value),
+      },
+      "point-size": {
+        label: t("dashboard.pointSize"),
+        visible: shouldShowScatterPointConfig(dashboardPanelData),
+      },
+      "point-opacity": {
+        label: t("dashboard.pointOpacity"),
+        visible: shouldShowScatterPointConfig(dashboardPanelData),
       },
     },
     table: {

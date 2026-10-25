@@ -495,6 +495,22 @@ describe("convertPromQLData with time-shifted results", () => {
       },
     );
 
+    it("scales a scatter's point opacity, and halves it on the twin", async () => {
+      const result = await convert(
+        { ...panel("scatter"), config: { symbol_opacity: 60, symbol_size: 8 } },
+        [twoPods(), twoPods(DAY_S)],
+        oneDay,
+        stepMeta(2, 60),
+      );
+
+      const [primary, shifted] = pair(result, "api-1");
+      expect(primary.itemStyle.opacity).toBeCloseTo(0.6);
+      expect(shifted.itemStyle.opacity).toBeCloseTo(0.3);
+      expect(primary.itemStyle.color).toBeDefined();
+      expect(primary.symbolSize).toBe(8);
+      expect(shifted.symbolSize).toBe(8);
+    });
+
     it("keeps line and area series unfaded, the dash marks them", async () => {
       for (const type of ["line", "area"]) {
         const result = await convert(

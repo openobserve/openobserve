@@ -13,13 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { getScatterSymbolOpacity, getScatterSymbolSize } from "./scatterPointStyle";
+
 /**
  * Returns the ECharts series props object based on the given PromQL chart type.
  *
  * @param {string} type - The chart type (e.g. "bar", "line", "area", "gauge", etc.)
+ * @param {any} config - The panel config, read for the scatter point size.
  * @return {object} The series props object for the given chart type.
  */
-export const getPropsByChartTypeForSeries = (type: string) => {
+export const getPropsByChartTypeForSeries = (type: string, config?: any) => {
   switch (type) {
     case "bar":
       return {
@@ -37,7 +40,7 @@ export const getPropsByChartTypeForSeries = (type: string) => {
       return {
         type: "scatter",
         emphasis: { focus: "series" },
-        symbolSize: 5,
+        symbolSize: getScatterSymbolSize(config),
       };
     case "pie":
       return {
@@ -116,4 +119,15 @@ export const getPropsByChartTypeForSeries = (type: string) => {
         type: "bar",
       };
   }
+};
+
+/** Item opacity for a PromQL series; a time-shifted bar or scatter twin is drawn at half its base opacity. */
+export const getSeriesItemOpacity = (
+  type: string,
+  config: any,
+  isShifted: boolean,
+): { opacity?: number } => {
+  const base = type === "scatter" ? getScatterSymbolOpacity(config) : undefined;
+  if (isShifted && ["bar", "scatter"].includes(type)) return { opacity: (base ?? 1) * 0.5 };
+  return base === undefined ? {} : { opacity: base };
 };

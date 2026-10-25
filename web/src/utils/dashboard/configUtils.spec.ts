@@ -31,6 +31,7 @@ import {
   shouldShowCartesianAxisConfig,
   shouldShowAxisLabelConfig,
   shouldShowLineThickness,
+  shouldShowScatterPointConfig,
   shouldShowDrilldown,
   shouldShowTimeShift,
   shouldShowPromQLQueryType,
@@ -1388,6 +1389,14 @@ describe("configUtils", () => {
 
     it("should return false for scatter chart", () => {
       expect(shouldShowLineThickness(makeData("scatter"), false)).toBe(false);
+    });
+  });
+
+  describe("shouldShowScatterPointConfig", () => {
+    it("is true for scatter only", () => {
+      expect(shouldShowScatterPointConfig({ data: { type: "scatter" } })).toBe(true);
+      expect(shouldShowScatterPointConfig({ data: { type: "line" } })).toBe(false);
+      expect(shouldShowScatterPointConfig({ data: { type: "bar" } })).toBe(false);
     });
   });
 

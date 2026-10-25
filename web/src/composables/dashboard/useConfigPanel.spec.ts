@@ -44,6 +44,7 @@ vi.mock("@/utils/dashboard/configUtils", () => ({
   shouldShowGridlines: vi.fn(() => false),
   shouldShowAxisLabelConfig: vi.fn(() => false),
   shouldShowLineThickness: vi.fn(() => false),
+  shouldShowScatterPointConfig: vi.fn(() => false),
   shouldShowDrilldown: vi.fn(() => false),
   shouldShowTimeShift: vi.fn(() => false),
 }));
@@ -754,6 +755,15 @@ describe("useConfigPanel – lineStyle section", () => {
     vi.mocked(shouldShowLineThickness).mockReturnValueOnce(true);
     const c = makeComposable();
     expect(c.isConfigOptionVisible("lineStyle", "line-thickness")).toBe(true);
+  });
+
+  it("point size and opacity visibility delegate to shouldShowScatterPointConfig", async () => {
+    const { shouldShowScatterPointConfig } = await import("@/utils/dashboard/configUtils");
+    vi.mocked(shouldShowScatterPointConfig).mockReturnValue(true);
+    const c = makeComposable();
+    expect(c.isConfigOptionVisible("lineStyle", "point-size")).toBe(true);
+    expect(c.isConfigOptionVisible("lineStyle", "point-opacity")).toBe(true);
+    vi.mocked(shouldShowScatterPointConfig).mockReturnValue(false);
   });
 });
 

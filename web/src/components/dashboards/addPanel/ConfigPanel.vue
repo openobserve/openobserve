@@ -1200,6 +1200,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :placeholder="t('dashboard.lineThicknessDefault')"
           data-test="dashboard-config-line_thickness"
         />
+
+        <OInput
+          v-if="shouldShowScatterPointConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('lineStyle', 'point-size')"
+          v-model.number="dashboardPanelDataModel.data.config.symbol_size"
+          type="number"
+          :min="1"
+          @update:model-value="
+            (value: any) =>
+              (dashboardPanelDataModel.data.config.symbol_size =
+                typeof value == 'number' && value > 0 ? value : null)
+          "
+          :label="t('dashboard.pointSize')"
+          :placeholder="t('dashboard.pointSizeDefault')"
+          data-test="dashboard-config-symbol_size"
+        />
+
+        <OInput
+          v-if="shouldShowScatterPointConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('lineStyle', 'point-opacity')"
+          v-model.number="dashboardPanelDataModel.data.config.symbol_opacity"
+          type="number"
+          :min="0"
+          :max="100"
+          @update:model-value="
+            (value: any) =>
+              (dashboardPanelDataModel.data.config.symbol_opacity =
+                typeof value == 'number' ? Math.min(100, Math.max(0, value)) : null)
+          "
+          :label="t('dashboard.pointOpacity')"
+          :placeholder="t('dashboard.pointOpacityDefault')"
+          data-test="dashboard-config-symbol_opacity"
+        />
       </div>
     </OCollapsible>
 
@@ -2159,6 +2192,7 @@ import {
   shouldShowCartesianAxisConfig,
   shouldShowAxisLabelConfig,
   shouldShowLineThickness,
+  shouldShowScatterPointConfig,
   shouldShowDrilldown,
   shouldShowTimeShift,
 } from "@/utils/dashboard/configUtils";
@@ -3098,6 +3132,7 @@ export default defineComponent({
       shouldShowCartesianAxisConfig,
       shouldShowAxisLabelConfig,
       shouldShowLineThickness,
+      shouldShowScatterPointConfig,
       shouldShowDrilldown,
       shouldShowTimeShift,
       // Panel default time configuration (v4.0)
