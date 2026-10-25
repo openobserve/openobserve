@@ -89,6 +89,20 @@ describe("stackTotalRows", () => {
     ]);
   });
 
+  it("names the stacks by their panel query when their names share no suffix", () => {
+    const series = [
+      { stack: "stack-0", _panelQueryIndex: 0 },
+      { stack: "stack-0", _panelQueryIndex: 0 },
+      { stack: "q1-stack-0", _panelQueryIndex: 1 },
+      { stack: "q1-stack-0", _panelQueryIndex: 1 },
+    ];
+    const params = [param(0, "a", 1), param(1, "b", 2), param(2, "a", 3), param(3, "b", 4)];
+    expect(rows("h-stacked", params, series)).toEqual([
+      "<strong>Total #1 : 3ms</strong>",
+      "<strong>Total #2 : 7ms</strong>",
+    ]);
+  });
+
   it("formats with a unit the stack's series share through an override, and skips mixed units", () => {
     const override = (value: string) =>
       toSeriesOverrideEntry({ matchBy: "name", value, unit: "bytes", decimals: 0 });
@@ -318,6 +332,42 @@ describe("tooltip totals in rendered options", () => {
     ]);
     expect(html).toContain("<strong>Total : 500.00</strong>");
     expect(html).toContain("api: 200.00");
+  });
+
+  it("PromQL area-stacked: the total counts the rows past the tooltip row cap", async () => {
+    const values: Record<string, number[]> = {};
+    for (let i = 1; i <= 12; i++) values[`s${i}`] = [i, i];
+    const data = [
+      {
+        resultType: "matrix",
+        result: Object.entries(values).map(([service, v]) => ({
+          metric: { service },
+          values: v.map((x, i) => [promTimes[i], String(x)]),
+        })),
+      },
+    ];
+    const result: any = await convertPromQLData(
+      promPanel("area-stacked"),
+      data,
+      store,
+      panelRef(),
+      { value: null },
+      { value: [] },
+      null,
+      [],
+      false,
+    );
+    const options = result.options;
+    const params = Object.keys(values).map((name, i) => ({
+      seriesName: name,
+      seriesIndex: indexOf(options, name),
+      marker: "",
+      data: [promTimes[0] * 1000, i + 1],
+      value: [promTimes[0] * 1000, i + 1],
+    }));
+    const html = options.tooltip.formatter(params);
+    expect(html).toContain("<strong>Total : 78ms</strong>");
+    expect(html).toContain("+2 more");
   });
 
   it("PromQL area-stacked", async () => {

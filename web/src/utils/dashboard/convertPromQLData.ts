@@ -594,11 +594,13 @@ export const convertPromQLData = async (
         }
 
         const hoverText: string[] = [];
+        const rowPoints: any[] = [];
         name.forEach((it: any) => {
           if (explorerOverlays && it.data[1] == null) {
             const near = nearestSample(options.series?.[it.seriesIndex]?.data, it.dataIndex);
             if (near != null) it = { ...it, data: [it.data[0], near] };
           }
+          rowPoints.push(it);
           // if data is not null than show in tooltip
           if (it.data[1] != null) {
             // check if the series is the current series being hovered
@@ -632,7 +634,7 @@ export const convertPromQLData = async (
 
         const totals = stackTotalRows(
           panelSchema.type,
-          name,
+          rowPoints,
           options.series,
           seriesOverrides,
           (it: any) => it.data?.[1],

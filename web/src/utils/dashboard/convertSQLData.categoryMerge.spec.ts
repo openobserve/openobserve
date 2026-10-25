@@ -82,6 +82,7 @@ const run = async (
     categories: (Array.isArray(axes) ? axes[0] : axes).data,
     data: series.map((s: any) => s.data),
     axes,
+    options,
   };
 };
 
@@ -128,6 +129,42 @@ describe("multi-query category merge", () => {
     const { axes, categories } = await run("h-bar", withService, ["", ""], [byService]);
     expect(axes).toHaveLength(2);
     expect(categories).toHaveLength(axes[1].data.length);
+  });
+
+  it("h-stacked: a time-shifted twin lands on the rows of its own categories", async () => {
+    const shifted = await run("h-stacked", twoQueries(), ["", "1d ago"]);
+    expect(shifted.categories).toEqual(["b", "a", "c"]);
+    expect(shifted.data[1]).toEqual([null, 10, 30]);
+  });
+
+  it("h-stacked with a breakdown: one stack total per query on the merged rows", async () => {
+    const withService = [
+      [
+        { cat: "a", svc: "x", v1: 1 },
+        { cat: "a", svc: "y", v1: 2 },
+      ],
+      [
+        { cat: "a", svc: "x", v2: 10 },
+        { cat: "a", svc: "y", v2: 20 },
+        { cat: "c", svc: "x", v2: 30 },
+      ],
+    ];
+    const { options, categories } = await run("h-stacked", withService, ["", ""], [byService]);
+    expect(categories).toEqual(["a", "c"]);
+    const params = options.series
+      .map((s: any, seriesIndex: number) => ({ s, seriesIndex }))
+      .filter(({ s }: any) => s.name)
+      .map(({ s, seriesIndex }: any) => ({
+        seriesName: s.name,
+        seriesIndex,
+        name: "a",
+        marker: "",
+        value: s.data[0],
+        data: s.data[0],
+      }));
+    const html = options.tooltip.formatter(params);
+    expect(html).toContain("<strong>Total #1 : 3.00</strong>");
+    expect(html).toContain("<strong>Total #2 : 30.00</strong>");
   });
 
   it("bar: keeps the alphabetical category order", async () => {

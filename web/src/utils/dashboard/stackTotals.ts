@@ -105,14 +105,23 @@ export const stackTotalRows = (
   const groups = [...groupParams(params, series, lookup, valueOf).values()].sort(
     (a, b) => a.first - b.first,
   );
-  const labels = groups.map((group) => (groups.length > 1 ? sharedSuffix(group.names) : ""));
-  const distinct = new Set(labels).size === labels.length;
+  const distinct = (labels: string[]) => new Set(labels).size === labels.length;
+  const bySuffix = groups.map((group) => (groups.length > 1 ? sharedSuffix(group.names) : ""));
+  // Stacks of different panel queries read as that query's number.
+  const byQuery = groups.map(
+    (group, index) => `#${((series as any[])[group.first]?._panelQueryIndex ?? index) + 1}`,
+  );
+  const labels = distinct(bySuffix)
+    ? bySuffix
+    : distinct(byQuery)
+      ? byQuery
+      : groups.map((_, index) => `#${index + 1}`);
   const title = gt("dashboard.stackTotal");
   const rows: string[] = [];
   groups.forEach((group, index) => {
     // A single-series stack repeats its own row, and mixed units cannot be summed.
     if (group.members < 2 || group.counted === 0 || group.mixedUnits) return;
-    const label = distinct ? labels[index] : `#${index + 1}`;
+    const label = labels[index];
     const name = label ? `${title} ${label}` : title;
     const value = lookup.formatValue(group.total, group.seriesName);
     rows.push(`<strong>${escapeHtml(name)} : ${escapeHtml(value)}</strong>`);
