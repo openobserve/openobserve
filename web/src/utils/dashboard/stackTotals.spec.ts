@@ -96,6 +96,11 @@ describe("stackTotalRows", () => {
     expect(
       rows("stacked", [param(0, "a", 1024), param(1, "b", 1024)], twoInOneStack, both),
     ).toEqual(["<strong>Total : 2KB</strong>"]);
+    const withNull = [param(2, "c", null), param(0, "a", 1024), param(1, "b", 1024)];
+    const threeInOneStack = [{ stack: "s" }, { stack: "s" }, { stack: "s" }];
+    expect(rows("stacked", withNull, threeInOneStack, both)).toEqual([
+      "<strong>Total : 2KB</strong>",
+    ]);
     const one = { ...config, override_config: [override("a")] };
     expect(rows("stacked", [param(0, "a", 1), param(1, "b", 2)], twoInOneStack, one)).toEqual([]);
   });

@@ -71,7 +71,7 @@ const groupParams = (
         counted: 0,
         names: [],
         seriesName: param.seriesName,
-        unit: JSON.stringify(lookup.unitArgs(param.seriesName)),
+        unit: "",
         mixedUnits: false,
       };
       groups.set(key, group);
@@ -81,7 +81,11 @@ const groupParams = (
     group.names.push(String(param.seriesName ?? ""));
     const value = toFinite(valueOf(param));
     if (value === null) continue;
-    if (JSON.stringify(lookup.unitArgs(param.seriesName)) !== group.unit) group.mixedUnits = true;
+    const unit = JSON.stringify(lookup.unitArgs(param.seriesName));
+    if (group.counted === 0) {
+      group.unit = unit;
+      group.seriesName = param.seriesName;
+    } else if (unit !== group.unit) group.mixedUnits = true;
     group.total += value;
     group.counted++;
   }
