@@ -450,11 +450,12 @@ export const getAreaStyleOverride = (
   const gradient = panelType !== "area" || config?.fill_gradient !== false;
   const opacity = getAreaFillOpacity(panelType, config);
   if (opacity === null) {
-    const topAlpha = chartNumber("--chart-area-fill-top-opacity", 0.9);
     return {
       areaStyle: {
         ...baseAreaStyle,
-        color: gradient ? getAreaGradientColor(color, theme) : colorToRgba(color, topAlpha),
+        color: gradient
+          ? getAreaGradientColor(color, theme)
+          : colorToRgba(color, chartNumber("--chart-area-fill-top-opacity", 0.9)),
       },
     };
   }
