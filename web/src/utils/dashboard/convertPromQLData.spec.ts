@@ -2321,7 +2321,7 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      expect(result.options.series[0].data[0].value).toBe("80");
+      expect(result.options.series[0].data[0].value).toBe(80);
     });
 
     it("should test gauge tooltip valueFormatter function (lines 650-658)", async () => {

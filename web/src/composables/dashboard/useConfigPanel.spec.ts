@@ -912,6 +912,21 @@ describe("useConfigPanel – gauge section", () => {
     const c = makeComposable(makePanelData("bar"));
     expect(c.isConfigOptionVisible("gauge", "gauge-min")).toBe(false);
     expect(c.isConfigOptionVisible("gauge", "gauge-max")).toBe(false);
+    expect(c.isConfigOptionVisible("gauge", "gauge-range-mode")).toBe(false);
+    expect(c.isConfigOptionVisible("gauge", "gauge-end-labels")).toBe(false);
+  });
+
+  it("range mode and end labels are visible for gauge type", () => {
+    const c = makeComposable(makePanelData("gauge"));
+    expect(c.isConfigOptionVisible("gauge", "gauge-range-mode")).toBe(true);
+    expect(c.isConfigOptionVisible("gauge", "gauge-end-labels")).toBe(true);
+  });
+
+  it("auto range mode hides the fixed min and max", () => {
+    const c = makeComposable(makePanelData("gauge", {}, { config: { range_mode: "auto" } }));
+    expect(c.isConfigOptionVisible("gauge", "gauge-min")).toBe(false);
+    expect(c.isConfigOptionVisible("gauge", "gauge-max")).toBe(false);
+    expect(c.isConfigOptionVisible("gauge", "gauge-range-mode")).toBe(true);
   });
 });
 

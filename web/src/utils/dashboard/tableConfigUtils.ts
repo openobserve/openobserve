@@ -475,9 +475,25 @@ export const resolveMetricValueStyle = (
   opts: MetricStyleOptions,
 ): ResolvedMetricStyle => {
   const { mappings, unit, customUnit, decimals, panelBackground, thresholds } = opts;
-  const cache = buildValueMappingCache(mappings);
-  let mapping = lookupValueMappingFull(rawValue, cache);
+  const mapping = lookupDisplayedValueMapping(rawValue, buildValueMappingCache(mappings), decimals);
 
+  const formatted = formatNumericValue(rawValue, null, unit, customUnit, decimals ?? 2);
+  const mappedText = mapping?.text;
+  const text = mappedText != null && mappedText !== "" ? mappedText : formatted;
+  const textColor = mapping?.textColor || undefined;
+  const bgColor =
+    mapping?.color || metricThresholdColor(rawValue, thresholds ?? null) || panelBackground || "";
+
+  return { text, textColor, bgColor };
+};
+
+/** First mapping for a single displayed value, also trying the value as rounded to `decimals`. */
+export const lookupDisplayedValueMapping = (
+  rawValue: unknown,
+  cache: Map<any, any> | null,
+  decimals: number | null | undefined,
+): any | null => {
+  let mapping = lookupValueMappingFull(rawValue, cache);
   const numValue =
     rawValue === null || rawValue === undefined || rawValue === "" ? NaN : Number(rawValue);
   if (!mapping && cache && !Number.isNaN(numValue)) {
@@ -492,15 +508,7 @@ export const resolveMetricValueStyle = (
       }
     }
   }
-
-  const formatted = formatNumericValue(rawValue, null, unit, customUnit, decimals ?? 2);
-  const mappedText = mapping?.text;
-  const text = mappedText != null && mappedText !== "" ? mappedText : formatted;
-  const textColor = mapping?.textColor || undefined;
-  const bgColor =
-    mapping?.color || metricThresholdColor(rawValue, thresholds ?? null) || panelBackground || "";
-
-  return { text, textColor, bgColor };
+  return mapping;
 };
 
 /** Compile a `/pattern/flags` or plain pattern with the linear-time engine; null when it does not compile. */

@@ -41,7 +41,19 @@ import { calculateBottomLegendHeight, calculateRightLegendWidth } from "./legend
 import { convertPromQLChartData } from "./promql/convertPromQLChartData";
 import { PROMQL_MODULAR_CHART_TYPES } from "./promql/shared/types";
 import { calculateMetricFontSize, buildMetricSparkline } from "./sql/charts/convertSQLMetricChart";
-import { resolveMetricValueStyle } from "./tableConfigUtils";
+import {
+  buildValueMappingCache,
+  lookupDisplayedValueMapping,
+  resolveMetricValueStyle,
+} from "./tableConfigUtils";
+import {
+  gaugeAutoRange,
+  gaugeEndLabels,
+  gaugeValueText,
+  isGaugeAutoRange,
+  promqlGaugeValue,
+  sizeGaugeDial,
+} from "./gaugeDial";
 import {
   applyGaugeThresholds,
   applyLineAreaThresholds,
@@ -776,6 +788,10 @@ export const convertPromQLData = async (
   let totalLength = 0;
   // for gauge chart, it contains grid array, single chart height and width, no. of charts per row and no. of columns
   let gridDataForGauge: any = {};
+  // Dial range shared by every query in auto range mode; null when none uses it.
+  let gaugeRange: { min: number; max: number } | null = null;
+  const gaugeMappingCache =
+    panelSchema.type === "gauge" ? buildValueMappingCache(panelSchema.config?.mappings) : null;
 
   // Ensure gridlines visibility is set for all xAxis and yAxis (handles both array and object cases)
   if (options.xAxis) {
@@ -814,6 +830,16 @@ export const convertPromQLData = async (
 
     //assign grid array to gauge chart options
     options.grid = gridDataForGauge.gridArray;
+
+    if (panelSchema.queries?.some((query: any) => isGaugeAutoRange(query?.config))) {
+      gaugeRange = gaugeAutoRange(
+        limitedSearchQueryData.flatMap((it: any) =>
+          (it?.result ?? []).map((metric: any) =>
+            promqlGaugeValue(metric, panelSchema.config?.aggregation),
+          ),
+        ),
+      );
+    }
   }
 
   const seriesPropsBasedOnChartType = getPropsByChartTypeForSeries(panelSchema.type);
@@ -1062,39 +1088,23 @@ export const convertPromQLData = async (
       case "gauge": {
         // we doesnt required to hover timeseries for gauge chart
         isTimeSeriesFlag = false;
+        const queryConfig = panelSchema?.queries[parentQueryIndex[index]]?.config;
         const series = it?.result?.map((metric: any) => {
-          const values = (metric?.values ?? []).sort((a: any, b: any) => a[0] - b[0]);
-          const latestValue = values[values.length - 1]?.[1];
+          const gaugeValue = promqlGaugeValue(metric, panelSchema.config?.aggregation);
           gaugeIndex++;
 
           const seriesName = nameOf(seriesNames, metric.metric, index);
+          const unit = seriesOverrides.unitArgs(seriesName);
+          const mapping = lookupDisplayedValueMapping(gaugeValue, gaugeMappingCache, unit.decimals);
 
           const gauge: any = {
             ...getPropsByChartTypeForSeries(panelSchema.type),
-            ...gaugeDialRange(
-              panelSchema?.queries[parentQueryIndex[index]]?.config?.min,
-              panelSchema?.queries[parentQueryIndex[index]]?.config?.max,
-              seriesOverrides.unitArgs(seriesName).unit,
-            ),
+            ...((isGaugeAutoRange(queryConfig) && gaugeRange) ||
+              gaugeDialRange(queryConfig?.min, queryConfig?.max, unit.unit)),
+            ...gaugeEndLabels(panelSchema.config?.show_gauge_end_labels, unit),
+            _mappedColor: mapping?.color || undefined,
             //which grid will be used
             gridIndex: gaugeIndex - 1,
-            // radius, progress and axisline width will be calculated based on grid width and height
-            radius: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 2 - 5}px`,
-            progress: {
-              show: true,
-              width: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 6}`,
-            },
-            axisLine: {
-              lineStyle: {
-                width: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 6}`,
-              },
-            },
-            title: {
-              fontSize: 10,
-              offsetCenter: [0, "70%"],
-              width: `${gridDataForGauge.gridWidth}`,
-              overflow: "truncate",
-            },
             center: [
               `${parseFloat(options.grid[gaugeIndex - 1].left) + parseFloat(options.grid[gaugeIndex - 1].width) / 2}%`,
               `${parseFloat(options.grid[gaugeIndex - 1].top) + parseFloat(options.grid[gaugeIndex - 1].height) / 2}%`,
@@ -1102,30 +1112,24 @@ export const convertPromQLData = async (
             data: [
               {
                 name: seriesName,
-                value: latestValue ?? 0,
+                // A series without points has no value, which ECharts draws as an empty dial.
+                value: gaugeValue,
                 detail: {
-                  formatter: function (value: any) {
-                    const unit = seriesOverrides.unitArgs(seriesName);
-                    const unitValue = getUnitValue(
-                      value,
-                      unit.unit,
-                      unit.unitCustom,
-                      unit.decimals,
-                    );
-                    return unitValue.value + unitValue.unit;
-                  },
+                  formatter: (value: any) => gaugeValueText(value, mapping, unit),
+                  ...(mapping?.textColor ? { color: mapping.textColor } : {}),
                 },
                 itemStyle: {
                   color: (() => {
                     const defaultColor = null;
+                    if (mapping?.color) return mapping.color;
                     const overrideColor = seriesOverrides.get(seriesName)?.color;
                     if (overrideColor) return overrideColor;
-                    if (!latestValue) return defaultColor;
+                    if (!gaugeValue) return defaultColor;
                     return (
                       getSeriesColor(
                         panelSchema?.config?.color,
                         seriesName,
-                        latestValue,
+                        gaugeValue,
                         chartMin,
                         chartMax,
                         store.state.theme,
@@ -1139,10 +1143,14 @@ export const convertPromQLData = async (
             detail: {
               valueAnimation: true,
               offsetCenter: [0, 0],
-              fontSize: 12,
             },
             ...gaugeOverrideTooltip(seriesOverrides, seriesName),
           };
+          sizeGaugeDial(
+            gauge,
+            Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight),
+            gridDataForGauge.gridWidth,
+          );
           const thresholds = getSeriesThresholds(panelSchema?.config, seriesName);
           if (thresholds)
             applyGaugeThresholds(gauge, thresholds, echartsPaletteColor(gaugeIndex - 1));
