@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- color picker for fixed and shades typed color mode -->
       <div
-        v-if="['fixed', 'shades'].includes(dashboardPanelData.data.config.color.mode)"
+        v-if="['fixed', 'shades'].includes(shownMode)"
         class="relative ms-1.5 mt-7.5 inline-flex flex-shrink-0 items-center"
         data-test="dashboard-color-palette-color-input-wrapper"
       >
@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- color by button group -->
-    <div class="pt-3" v-if="dashboardPanelData.data.config.color.mode.startsWith('continuous')">
+    <div class="pt-3" v-if="shownMode.startsWith('continuous')">
       {{ t("dashboard.colorSeriesBy") }}
       <div>
         <OToggleGroup v-model="dashboardPanelData.data.config.color.seriesBy">
@@ -329,6 +329,7 @@ export default defineComponent({
       colorOptions,
       colorOptionsByGroup,
       categoricalOnly,
+      shownMode,
       onColorModeChange,
       selectedOptionLabel,
       selectedOptionPalette,

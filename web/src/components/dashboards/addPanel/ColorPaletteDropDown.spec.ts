@@ -153,6 +153,17 @@ describe("ColorPaletteDropDown", () => {
           .label,
       );
       expect((wrapper.vm as any).selectedOptionPalette).toEqual(mockColorPalette);
+      expect(wrapper.find('[data-test="series-by-toggle"]').exists()).toBe(false);
+    });
+
+    it("hides the single-colour picker carried over from another chart type", () => {
+      (mockDashboardPanelData.data as any).type = "sankey";
+      mockDashboardPanelData.data.config.color.mode = "fixed";
+      (mockDashboardPanelData.data.config.color as any).fixedColor = ["#53ca53"];
+      wrapper = createWrapper();
+      expect(
+        wrapper.find('[data-test="dashboard-color-palette-color-input-wrapper"]').exists(),
+      ).toBe(false);
     });
 
     it("keeps every palette mode for other chart types", () => {

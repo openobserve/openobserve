@@ -39,7 +39,7 @@ const LINK_OPACITY = 0.4;
 
 const returnNodeId = (name: string) => `${RETURN_NODE_PREFIX}${name}`;
 
-/** Sums rows per source→target pair, keeping only links with a finite positive weight. */
+/** Sums rows per source→target pair, keeping only named endpoints and finite positive weights. */
 const collectLinks = (panelSchema: any, searchQueryData: any[]): Map<string, SankeyLink> => {
   const links = new Map<string, SankeyLink>();
   panelSchema.queries.forEach((query: any, index: number) => {
@@ -53,6 +53,7 @@ const collectLinks = (panelSchema: any, searchQueryData: any[]): Map<string, San
       if (source == null || target == null || !Number.isFinite(value) || value <= 0) return;
       const sourceName = String(source);
       const targetName = String(target);
+      if (sourceName === "" || targetName === "") return;
       const key = JSON.stringify([sourceName, targetName]);
       const existing = links.get(key);
       if (existing) existing.value += value;

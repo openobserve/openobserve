@@ -314,7 +314,7 @@ describe("convertSankeyData", () => {
       expect(result.options.series[0].links[0].value).toBe(200);
     });
 
-    it("should keep an empty-string source as a node name", () => {
+    it("should skip items with an empty-string source", () => {
       const panelSchema = {
         queries: [
           {
@@ -343,11 +343,11 @@ describe("convertSankeyData", () => {
 
       const result = convertSankeyData(panelSchema, searchQueryData);
 
-      expect(result.options.series[0].links).toHaveLength(2);
-      expect(result.options.series[0].links[0].source).toBe("");
+      expect(result.options.series[0].links).toHaveLength(1);
+      expect(result.options.series[0].links[0].source).toBe("A");
     });
 
-    it("should keep an empty-string target as a node name", () => {
+    it("should skip items with an empty-string target", () => {
       const panelSchema = {
         queries: [
           {
@@ -376,8 +376,8 @@ describe("convertSankeyData", () => {
 
       const result = convertSankeyData(panelSchema, searchQueryData);
 
-      expect(result.options.series[0].links).toHaveLength(2);
-      expect(result.options.series[0].links[0].target).toBe("");
+      expect(result.options.series[0].links).toHaveLength(1);
+      expect(result.options.series[0].links[0].target).toBe("B");
     });
 
     it("should skip items with a zero value", () => {

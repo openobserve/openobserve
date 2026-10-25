@@ -1480,12 +1480,14 @@ export default defineComponent({
           };
         } catch (error: any) {
           if (superseded()) return;
+          returnLinks.value = 0;
           errorDetail.value = {
             message: error?.message,
             code: error?.code || "",
           };
         }
       } else {
+        returnLinks.value = 0;
         // if no data is available, then show the default data
         // if there is an error config in the panel schema, then show the default data on error
         // if no default data on error is set, then show the custom error message
