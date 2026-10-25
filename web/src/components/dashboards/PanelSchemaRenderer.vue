@@ -29,14 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="panelSchema.type == 'maps'"
           :data="panelData.chartType == 'maps' ? panelData : { options: {} }"
         ></MapsRenderer>
-        <GeoMapRenderer
-          v-else-if="panelSchema.type == 'geomap'"
-          :data="
-            panelData.chartType == 'geomap' && noData !== 'No Data'
-              ? panelData
-              : { options: { backgroundColor: 'transparent' } }
-          "
-        />
+        <GeoMapRenderer v-else-if="panelSchema.type == 'geomap'" :data="geoMapRendererData" />
         <PromQLTableChart
           v-else-if="panelSchema.type == 'table' && panelSchema.queryType === 'promql'"
           ref="tableRendererRef"
@@ -1851,6 +1844,9 @@ export default defineComponent({
       }
     };
 
+    const hasGeoPoints = () =>
+      panelData.value?.options?.series?.some((series: any) => series?.data?.length > 0);
+
     // Compute the value of the 'noData' variable.
     // Instead of re-scanning raw rows, this checks the conversion output
     // (panelData) which the pipeline already computed — O(1) property access.
@@ -1863,9 +1859,6 @@ export default defineComponent({
       if (type === "html" || type === "markdown") {
         return "";
       }
-
-      const hasGeoPoints = () =>
-        panelData.value?.options?.series?.some((series: any) => series?.data?.length > 0);
 
       if (panelSchema.value?.queryType === "promql") {
         const hasResults =
@@ -1955,6 +1948,13 @@ export default defineComponent({
         }),
       };
     };
+
+    // An empty layer list would still build a bare map, so it gets the placeholder too.
+    const geoMapRendererData = computed(() =>
+      panelData.value?.chartType === "geomap" && noData.value !== "No Data" && hasGeoPoints()
+        ? panelData.value
+        : { options: { backgroundColor: "transparent" } },
+    );
 
     const chartRendererData = computed(() => {
       if (noData.value === "No Data") {
@@ -2255,6 +2255,7 @@ export default defineComponent({
       errorDetail,
       panelData,
       noData,
+      geoMapRendererData,
       isAwaitingFirstLoad,
       chartRendererData,
       metadata,

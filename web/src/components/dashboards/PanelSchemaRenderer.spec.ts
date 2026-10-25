@@ -769,6 +769,22 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.find('[data-test="no-data"]').exists()).toBe(true);
     });
 
+    it("hands the map a placeholder instead of an empty layer list", async () => {
+      loaderWith([[{ lat: 1, lon: 2 }]]);
+      wrapper = createWrapper({ panelSchema: geomapPanel() });
+      await flushPromises();
+      const withPoints = { chartType: "geomap", options: { series: [{ data: [[2, 1, 1]] }] } };
+      wrapper.vm.panelData = withPoints;
+      await flushPromises();
+      expect(wrapper.vm.geoMapRendererData).toEqual(withPoints);
+
+      wrapper.vm.panelData = { chartType: "geomap", options: { lmap: {}, series: [] } };
+      await flushPromises();
+      expect(wrapper.vm.geoMapRendererData).toEqual({
+        options: { backgroundColor: "transparent" },
+      });
+    });
+
     it("shows No Data for PromQL series without geo labels", async () => {
       loaderWith([{ result: [{ metric: { job: "a" }, values: [[1, "1"]] }] }]);
       wrapper = createWrapper({ panelSchema: geomapPanel("promql") });
