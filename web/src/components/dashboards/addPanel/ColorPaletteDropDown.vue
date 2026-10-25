@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- dropdown to select color palette type/mode -->
       <OSelect
         data-test="dashboard-color-palette-select"
-        v-model="dashboardPanelData.data.config.color.mode"
+        :model-value="shownMode"
         :label="t('dashboard.colorPalette')"
         class="showLabelOnTop flex-1"
         @update:model-value="onColorModeChange"
