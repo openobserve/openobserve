@@ -74,7 +74,7 @@ export class BarConverter implements PromQLChartConverter {
         // Build categories from timestamps (only once)
         if (categories.length === 0) {
           const stamps = queryData.timestamps;
-          // Steps a day or more apart would repeat an HH:MM:SS label.
+          // A span of a day or more repeats HH:MM:SS labels.
           const withDate =
             isHStacked &&
             stamps.length > 1 &&

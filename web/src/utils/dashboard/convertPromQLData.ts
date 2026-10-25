@@ -58,7 +58,7 @@ import { buildPromqlSeriesNames, getLegendPosition } from "./promql/shared/legen
 import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
 import { getPropsByChartTypeForSeries } from "./promqlChartSeriesProps";
 import { applyMeasuredYAxisLeftInset } from "./chartDimensionUtils";
-import { getMarkLineData } from "./promql/shared/markLines";
+import { buildSeriesMarkLine } from "./promql/shared/markLines";
 import { legendFallbackOf } from "@/utils/dashboard/promql/formula";
 import { stackTotalRows } from "./stackTotals";
 
@@ -940,18 +940,7 @@ export const convertPromQLData = async (
                   store.state.theme,
                 ),
                 // markLine if exist
-                markLine: {
-                  silent: true,
-                  animation: false,
-                  data: getMarkLineData(panelSchema),
-                  lineStyle: {
-                    color: "#8B5A2B",
-                    type: [8, 4],
-                    width: 2,
-                    shadowColor: chartColor("--color-chart-markline-shadow"),
-                    shadowBlur: 2,
-                  },
-                },
+                markLine: buildSeriesMarkLine(panelSchema),
                 connectNulls: panelSchema.config?.connect_nulls ?? false,
               };
               if (nameSuffixes[index]) shiftedTwins.push([seriesObject, metric.metric]);
@@ -1019,18 +1008,7 @@ export const convertPromQLData = async (
                   seriesName,
                   store.state.theme,
                 ),
-                markLine: {
-                  silent: true,
-                  animation: false,
-                  data: getMarkLineData(panelSchema),
-                  lineStyle: {
-                    color: "#8B5A2B",
-                    type: [8, 4],
-                    width: 2,
-                    shadowColor: chartColor("--color-chart-markline-shadow"),
-                    shadowBlur: 2,
-                  },
-                },
+                markLine: buildSeriesMarkLine(panelSchema),
                 connectNulls: panelSchema.config?.connect_nulls ?? false,
               };
             });

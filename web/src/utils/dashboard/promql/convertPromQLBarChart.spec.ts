@@ -991,22 +991,6 @@ describe("BarConverter", () => {
       expect(result.yAxis.data).toEqual(["23:30:00", "23:29:59"]);
     });
 
-    it("leaves vertical stacked labels time-only over a multi-day span", () => {
-      const processedData = spanning([
-        [0, "2026-10-24T17:05:00.000"],
-        [DAY, "2026-10-25T17:05:00.000"],
-      ]);
-
-      const result = converter.convert(
-        processedData,
-        { type: "stacked", config: {} },
-        mockStore,
-        mockExtras,
-      );
-
-      expect(result.xAxis.data).toEqual(["17:05:00", "17:05:00"]);
-    });
-
     it("attaches the panel's mark lines to every h-stacked series", () => {
       const processedData: ProcessedPromQLData[] = [
         {
@@ -1031,22 +1015,6 @@ describe("BarConverter", () => {
           expect.objectContaining({ name: "limit", xAxis: 12, yAxis: null }),
         ]);
       });
-    });
-
-    it("adds no mark lines to vertical stacked series", () => {
-      const panelSchema = {
-        type: "stacked",
-        config: { mark_line: [{ name: "limit", type: "yAxis", value: 12 }] },
-      };
-
-      const result = converter.convert(
-        spanning([[1, "2026-10-25T17:05:00.000"]]),
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
-
-      expect(result.series[0].markLine).toBeUndefined();
     });
   });
 

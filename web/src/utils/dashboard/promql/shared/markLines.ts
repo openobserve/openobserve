@@ -16,7 +16,7 @@
 import { chartColor } from "@/utils/chartTheme";
 
 /** The panel's configured mark lines as ECharts markLine data items. */
-export const getMarkLineData = (panelSchema: any) => {
+const getMarkLineData = (panelSchema: any) => {
   return (
     panelSchema?.config?.mark_line?.map((markLine: any) => {
       return {
