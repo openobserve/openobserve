@@ -107,6 +107,14 @@ describe("SQL h-bar bar track and bar width", () => {
     expect((await run({ show_bar_track: true, y_axis_max: 50 }, oneQuery)).valueAxis.max).toBe(50);
   });
 
+  it("still reaches a limit line above the largest bar", async () => {
+    const thresholds = { mode: "absolute", showAs: "color_line", steps: [{ value: 1000, color: "#EF4444" }] };
+    const { valueAxis } = await run({ show_bar_track: true, thresholds }, oneQuery);
+    expect(valueAxis.max).toBe(1500);
+    const below = { ...thresholds, steps: [{ value: 20, color: "#EF4444" }] };
+    expect((await run({ show_bar_track: true, thresholds: below }, oneQuery)).valueAxis.max).toBe(70);
+  });
+
   it("pins a multi-query track to the largest bar of any query", async () => {
     const twoQueries = [...oneQuery, [{ cat: "a", v2: 90 }]];
     const { valueAxis } = await run({ show_bar_track: true }, twoQueries);

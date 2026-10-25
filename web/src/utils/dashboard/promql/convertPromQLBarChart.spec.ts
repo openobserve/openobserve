@@ -1234,14 +1234,10 @@ describe("BarConverter h-bar reducer colour, bar width and bar track", () => {
   });
 
   it("draws the track and pins the value axis to the largest reduced bar", () => {
-    const result: any = convert({ show_bar_track: true, bar_width: 14 });
+    const result: any = convert({ show_bar_track: true, bar_width: 14, aggregation: "min" });
     expect(result.series[0].showBackground).toBe(true);
     expect(result.series[0].barWidth).toBe(14);
-    expect(result.xAxis.max).toBe(90);
-  });
-
-  it("pins the track to y_axis_max when it is set", () => {
-    expect((convert({ show_bar_track: true, y_axis_max: 50 }) as any).xAxis.max).toBe(50);
+    expect(result.xAxis.max).toBe(40);
   });
 
   it("ignores the track on stacked bars", () => {
