@@ -190,6 +190,12 @@ describe("sizeGaugeDial", () => {
     expect(gauge.axisLabel).toEqual({ show: true, fontSize: 24, distance: 34 });
   });
 
+  it("never pushes end labels outward onto the ring of a small dial", () => {
+    const gauge: any = { axisLabel: { show: true }, data: [{ value: 1 }] };
+    sizeGaugeDial(gauge, 60, 60);
+    expect(gauge.axisLabel.distance).toBe(0);
+  });
+
   it("leaves hidden end labels alone", () => {
     const gauge: any = { axisLabel: { show: false }, data: [{ value: 1 }] };
     sizeGaugeDial(gauge, 300, 300);

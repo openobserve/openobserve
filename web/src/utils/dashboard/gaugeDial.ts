@@ -15,12 +15,7 @@
 
 import { getUnitValue } from "./convertDataIntoUnitValue";
 import { applyAggregation } from "./promql/shared/dataProcessor";
-
-export interface GaugeUnitArgs {
-  unit: any;
-  unitCustom: any;
-  decimals: any;
-}
+import type { SeriesUnitArgs } from "./seriesOverrides";
 
 const NO_VALUE_TEXT = "-";
 const MIN_DETAIL_FONT = 12;
@@ -66,7 +61,7 @@ export const promqlGaugeValue = (metric: any, aggregation: unknown): number | nu
 };
 
 /** Text shown in the dial: mapped text first, then the unit-formatted value, "-" when there is none. */
-export const gaugeValueText = (value: unknown, mapping: any, unit: GaugeUnitArgs): string => {
+export const gaugeValueText = (value: unknown, mapping: any, unit: SeriesUnitArgs): string => {
   if (mapping?.text != null && mapping.text !== "") return String(mapping.text);
   if (value === null || value === undefined || Number.isNaN(value)) return NO_VALUE_TEXT;
   try {
@@ -78,7 +73,7 @@ export const gaugeValueText = (value: unknown, mapping: any, unit: GaugeUnitArgs
 };
 
 /** Min and max labels at the two ends of the arc; empty when the option is off. */
-export const gaugeEndLabels = (show: unknown, unit: GaugeUnitArgs): Record<string, any> =>
+export const gaugeEndLabels = (show: unknown, unit: SeriesUnitArgs): Record<string, any> =>
   show === true
     ? {
         // One split puts ticks, and so labels, only at min and max.
@@ -120,5 +115,9 @@ export const sizeGaugeDial = (gauge: any, minDim: number, cellWidth: number): vo
   gauge.detail = { ...gauge.detail, fontSize: sizes.detail };
   // ECharts places labels at radius - 35 by default; this keeps them just inside the ring.
   if (gauge.axisLabel?.show)
-    gauge.axisLabel = { ...gauge.axisLabel, fontSize: sizes.title, distance: minDim / 6 - 16 };
+    gauge.axisLabel = {
+      ...gauge.axisLabel,
+      fontSize: sizes.title,
+      distance: Math.max(0, minDim / 6 - 16),
+    };
 };
