@@ -1229,6 +1229,88 @@ describe("pie and donut legend values", () => {
     expect(options.legend.formatter("api")).toBe("{b|Gateway}  75%");
   });
 
+  it("truncates a long name and never the values", () => {
+    const options: any = pieOptions([
+      { name: "x".repeat(40), value: 30 },
+      { name: "db", value: 10 },
+    ]);
+    applyLegendConfiguration(
+      pieSchema({ legend_values: ["percent"], decimals: 0 }),
+      chartPanelRef,
+      hovered(),
+      options,
+    );
+    expect(options.legend.formatter("x".repeat(40))).toBe(`{b|${"x".repeat(14)}...}  75%`);
+  });
+
+  it("rounds percents the way the slice labels do, so they add up to 100", () => {
+    const options: any = pieOptions([
+      { name: "a", value: 1 },
+      { name: "b", value: 1 },
+      { name: "c", value: 1 },
+    ]);
+    applyLegendConfiguration(
+      pieSchema({ legend_values: ["percent"], decimals: 0 }),
+      chartPanelRef,
+      hovered(),
+      options,
+    );
+    const percents = ["a", "b", "c"].map((name) =>
+      Number(options.legend.formatter(name).split("  ")[1].replace("%", "")),
+    );
+    expect(percents.reduce((sum, value) => sum + value, 0)).toBe(100);
+    expect([...percents].sort()).toEqual([33, 33, 34]);
+  });
+
+  it("takes a series override's decimals for that slice's percent", () => {
+    const options: any = pieOptions(slices);
+    applyLegendConfiguration(
+      pieSchema({
+        legend_values: ["percent"],
+        decimals: 0,
+        override_config: [
+          { field: { matchBy: "series", value: "db" }, config: [{ type: "decimals", value: 2 }] },
+        ],
+      }),
+      chartPanelRef,
+      hovered(),
+      options,
+    );
+    expect(options.legend.formatter("api")).toBe("{b|api}  75%");
+    expect(options.legend.formatter("db")).toBe("{b|db}  25.00%");
+  });
+
+  it.each([
+    [25, "75.00000000000000000000%"],
+    [-1, "75.00%"],
+    ["abc", "75.00%"],
+    [1.7, "75.0%"],
+  ])("reads decimals %s as a valid percent precision", (decimals, expected) => {
+    const options: any = pieOptions(slices);
+    applyLegendConfiguration(
+      pieSchema({ legend_values: ["percent"], decimals }),
+      chartPanelRef,
+      hovered(),
+      options,
+    );
+    expect(options.legend.formatter("api")).toBe(`{b|api}  ${expected}`);
+  });
+
+  it("reserves a wider right legend for the values", () => {
+    const many = Array.from({ length: 6 }, (_, i) => ({ name: `slice-${i}`, value: i + 1 }));
+    const legendLeft = (config: any) => {
+      const options: any = pieOptions(many);
+      applyLegendConfiguration(
+        pieSchema({ legends_position: "right", ...config }),
+        chartPanelRef,
+        hovered(),
+        options,
+      );
+      return options.legend.left;
+    };
+    expect(legendLeft({ legend_values: ["value", "percent"] })).toBeLessThan(legendLeft({}));
+  });
+
   it("ignores legend_values on other chart types", () => {
     const options: any = { series: [{ name: "api", data: [1] }], grid: {} };
     applyLegendConfiguration(

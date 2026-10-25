@@ -14,7 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { calculateWidthText } from "./chartDimensionUtils";
-import { createSeriesOverrideLookup, type SeriesOverrideLookup } from "./seriesOverrides";
+import { createSeriesOverrideLookup } from "./seriesOverrides";
+import { number as echartsNumber } from "echarts/core";
 import { escapeHtml } from "@/utils/html";
 
 // Constants for better maintainability
@@ -36,9 +37,13 @@ const PIE_LEGEND_VALUE_KEYS = ["value", "percent"] as const;
 // Equals calculateRightLegendWidth's text cap, so a right legend reserves room for the values.
 const LEGEND_VALUES_TEXT_WIDTH = 180;
 
-interface PieLegendSummary {
-  values: Map<string, number>;
-  total: number;
+// eslint-disable-next-line local/no-hardcoded-px -- the fixed size ECharts paints legend text at; canvas measurement has no rem
+const LEGEND_TEXT_FONT = "12px";
+const LEGEND_VALUES_MIN_NAME_WIDTH = 40;
+
+interface PieLegendEntry {
+  name: string;
+  valueText: string;
 }
 
 /**
@@ -484,54 +489,72 @@ const pieLegendValueKeys = (panelSchema: any): string[] => {
   return PIE_LEGEND_VALUE_KEYS.filter((key) => selected.includes(key));
 };
 
-// Matches the slice-label percentPrecision (2 only when unset); toFixed throws above 100.
+// The SQL slice label's percentPrecision: 2 only when unset; float math gives no digits past 20.
 const pieLegendPercentDecimals = (decimals: unknown): number => {
   if (decimals === null || decimals === undefined || decimals === "") return 2;
   const parsed = Math.floor(Number(decimals));
-  return Number.isFinite(parsed) && parsed >= 0 ? Math.min(parsed, 100) : 2;
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.min(parsed, 20) : 2;
 };
 
-// The legend is keyed by name, so slices that share one (merged queries) show their sum.
-const summarisePieData = (data: any[]): PieLegendSummary => {
-  const values = new Map<string, number>();
-  let total = 0;
-  for (const item of data) {
-    const name = String(item?.name ?? "");
-    const numeric = Number(item?.value);
-    const value = Number.isFinite(numeric) ? numeric : 0;
-    values.set(name, (values.get(name) ?? 0) + value);
-    if (value > 0) total += value;
+const truncateLegendName = (text: string, maxWidth: number): string => {
+  if (calculateWidthText(text, LEGEND_TEXT_FONT) <= maxWidth) return text;
+  let low = 0;
+  let high = text.length;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (calculateWidthText(`${text.slice(0, mid)}...`, LEGEND_TEXT_FONT) <= maxWidth) low = mid;
+    else high = mid - 1;
   }
-  return { values, total };
+  return `${text.slice(0, low)}...`;
 };
 
-const pieLegendValueText = (
-  name: string,
-  summary: PieLegendSummary,
+// Keyed by name like the legend itself, so slices that share a name (merged queries) show their sum.
+const buildPieLegendEntries = (
+  panelSchema: any,
+  data: any[],
   keys: string[],
-  lookup: SeriesOverrideLookup,
-  percentDecimals: number,
-): string => {
-  const value = summary.values.get(name);
-  if (value === undefined) return "";
-  return keys
-    .map((key) => {
-      if (key === "value") return lookup.formatValue(value, name);
-      const percent = summary.total > 0 ? (value / summary.total) * 100 : 0;
-      return `${percent.toFixed(percentDecimals)}%`;
-    })
-    .join("  ");
+): Map<string, PieLegendEntry> => {
+  const lookup = createSeriesOverrideLookup(panelSchema?.config);
+  const panelDecimals = pieLegendPercentDecimals(panelSchema?.config?.decimals);
+  const sums = new Map<string, number>();
+  for (const item of data) {
+    const numeric = Number(item?.value);
+    const name = String(item?.name ?? "");
+    sums.set(name, (sums.get(name) ?? 0) + (Number.isFinite(numeric) ? numeric : 0));
+  }
+  const names = [...sums.keys()];
+  const values = [...sums.values()];
+  const entries = new Map<string, PieLegendEntry>();
+  names.forEach((name, index) => {
+    const overrideDecimals = lookup.get(name)?.decimals;
+    const decimals =
+      overrideDecimals === undefined ? panelDecimals : pieLegendPercentDecimals(overrideDecimals);
+    const valueText = keys
+      .map((key) =>
+        key === "value"
+          ? lookup.formatValue(values[index], name)
+          : `${echartsNumber.getPercentWithPrecision(values, index, decimals).toFixed(decimals)}%`,
+      )
+      .join("  ");
+    // The name gives way to the values, so truncation never cuts the numbers.
+    const nameWidth = Math.max(
+      LEGEND_VALUES_MIN_NAME_WIDTH,
+      LEGEND_VALUES_TEXT_WIDTH - calculateWidthText(`  ${valueText}`, LEGEND_TEXT_FONT),
+    );
+    entries.set(name, {
+      name: truncateLegendName(String(lookup.displayName(name)), nameWidth),
+      valueText,
+    });
+  });
+  return entries;
 };
 
 /** Pie/donut legend entries as rendered with their values, for sizing the legend; the data as-is when values are off. */
 const pieLegendSizingData = (panelSchema: any, data?: any[] | null): any[] => {
   const keys = pieLegendValueKeys(panelSchema);
   if (!keys.length || !Array.isArray(data)) return data ?? [];
-  const lookup = createSeriesOverrideLookup(panelSchema?.config);
-  const decimals = pieLegendPercentDecimals(panelSchema?.config?.decimals);
-  const summary = summarisePieData(data);
-  return [...summary.values.keys()].map((name) => ({
-    name: `${lookup.displayName(name)}  ${pieLegendValueText(name, summary, keys, lookup, decimals)}`,
+  return [...buildPieLegendEntries(panelSchema, data, keys).values()].map((entry) => ({
+    name: `${entry.name}  ${entry.valueText}`,
   }));
 };
 
@@ -542,21 +565,17 @@ const pieLegendTextWidth = (panelSchema: any): number =>
 const applyPieLegendValues = (panelSchema: any, options: any, hoveredSeriesState: any) => {
   const keys = pieLegendValueKeys(panelSchema);
   if (!keys.length || !options.legend?.show) return;
-  const lookup = createSeriesOverrideLookup(panelSchema?.config);
-  const decimals = pieLegendPercentDecimals(panelSchema?.config?.decimals);
-  let summarisedData: any[] | null = null;
-  let summary: PieLegendSummary = { values: new Map(), total: 0 };
+  let entriesData: any[] | null = null;
+  let entries = new Map<string, PieLegendEntry>();
   options.legend.formatter = (name: any) => {
     const data = options.series?.[0]?.data;
-    if (!Array.isArray(data)) return `{b|${name}}`;
-    if (data !== summarisedData) {
-      summarisedData = data;
-      summary = summarisePieData(data);
+    if (Array.isArray(data) && data !== entriesData) {
+      entriesData = data;
+      entries = buildPieLegendEntries(panelSchema, data, keys);
     }
     const style = name === hoveredSeriesState?.value?.hoveredSeriesName ? "a" : "b";
-    const valueText = pieLegendValueText(String(name), summary, keys, lookup, decimals);
-    const label = `{${style}|${lookup.displayName(name)}}`;
-    return valueText ? `${label}  ${valueText}` : label;
+    const entry = entries.get(String(name));
+    return entry ? `{${style}|${entry.name}}  ${entry.valueText}` : `{${style}|${name}}`;
   };
   options.legend.textStyle = { ...options.legend.textStyle, width: LEGEND_VALUES_TEXT_WIDTH };
 };
