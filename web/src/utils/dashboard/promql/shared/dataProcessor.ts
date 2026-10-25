@@ -276,3 +276,12 @@ export function applyAggregation(
       return numericValues[numericValues.length - 1];
   }
 }
+
+/** True when the panel has queries and every one of them is an instant query. */
+export function everyQueryInstant(queries: any[] | undefined): boolean {
+  return (
+    Array.isArray(queries) &&
+    queries.length > 0 &&
+    queries.every((query) => query?.config?.query_type === "instant")
+  );
+}

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
-import { applyAggregation } from "./shared/dataProcessor";
+import { applyAggregation, everyQueryInstant } from "./shared/dataProcessor";
 import { buildTooltip } from "./shared/axisBuilder";
 import { buildPieChartConfig } from "./shared/gridBuilder";
 import { getSeriesColor } from "../colorPalette";
@@ -40,8 +40,10 @@ export class PieConverter implements PromQLChartConverter {
     const seriesOverrides = createSeriesOverrideLookup(config);
     const data: any[] = [];
 
-    // Get aggregation function (default: last)
-    const aggregation = config.aggregation || "last";
+    // An instant query returns one point per series, where count, range and diff would read 1 or 0.
+    const aggregation = everyQueryInstant(panelSchema.queries)
+      ? "last"
+      : config.aggregation || "last";
 
     // Calculate min/max for color scaling
     let chartMin = Infinity;

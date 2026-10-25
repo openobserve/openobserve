@@ -109,6 +109,26 @@ describe("PromQLChartConfig", () => {
       wrapper = createWrapper({ chartType: "table" });
       expect(wrapper.find('[data-test="dashboard-config-aggregation"]').exists()).toBe(false);
     });
+
+    it("hides the pie and donut aggregation only when every query is instant", () => {
+      const instant = { config: { query_type: "instant" } };
+      const range = { config: { query_type: "range" } };
+      const cases: Array<[string, any[], boolean]> = [
+        ["pie", [instant, instant], false],
+        ["donut", [instant], false],
+        ["pie", [instant, range], true],
+        ["donut", [instant, {}], true],
+        ["pie", [], true],
+        ["metric", [instant], true],
+      ];
+      for (const [chartType, queries, shown] of cases) {
+        mockDashboardPanelData.data.queries = queries;
+        wrapper = createWrapper({ chartType });
+        expect(wrapper.find('[data-test="dashboard-config-aggregation"]').exists()).toBe(shown);
+        wrapper.unmount();
+      }
+      wrapper = null;
+    });
   });
 
   describe("Aggregation Function", () => {

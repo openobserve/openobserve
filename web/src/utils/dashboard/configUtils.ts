@@ -19,6 +19,11 @@ export const shouldApplyChartAlign = (dashboardPanelData: any): boolean => {
   );
 };
 
+/** Pie and donut legends can append each slice's value and percent. */
+export const shouldShowLegendValues = (dashboardPanelData: any): boolean =>
+  (dashboardPanelData.data.type === "pie" || dashboardPanelData.data.type === "donut") &&
+  !!dashboardPanelData.data.config.show_legends;
+
 /**
  * Check that show Gridlines option should be applied
  * @param dashboardPanelData - The dashboard panel data

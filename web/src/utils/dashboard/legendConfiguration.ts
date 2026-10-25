@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { calculateWidthText } from "./chartDimensionUtils";
+import { createSeriesOverrideLookup, type SeriesOverrideLookup } from "./seriesOverrides";
 import { escapeHtml } from "@/utils/html";
 
 // Constants for better maintainability
@@ -30,6 +31,15 @@ const LEGEND_CONSTANTS = {
   MAX_SCROLL_WIDTH: 150,
   MIN_SCROLL_RESERVED: 120,
 } as const;
+
+const PIE_LEGEND_VALUE_KEYS = ["value", "percent"] as const;
+// Equals calculateRightLegendWidth's text cap, so a right legend reserves room for the values.
+const LEGEND_VALUES_TEXT_WIDTH = 180;
+
+interface PieLegendSummary {
+  values: Map<string, number>;
+  total: number;
+}
 
 /**
  * Utility function to get chart dimensions safely
@@ -84,6 +94,7 @@ const remToPx = (rem: number, rootFontSize: number = 16): number => {
  * @param {any} legendConfig - Legend configuration object to modify (optional)
  * @param {any} gridConfig - Grid configuration object to modify (optional)
  * @param {number} chartHeight - Height of the chart container (required if configuring position)
+ * @param {number} maxTextWidth - Width at which the legend truncates its text
  * @returns {number} Height in pixels to reserve at the bottom
  */
 export const calculateBottomLegendHeight = (
@@ -94,6 +105,7 @@ export const calculateBottomLegendHeight = (
   legendConfig?: any,
   gridConfig?: any,
   chartHeight?: number,
+  maxTextWidth: number = remToPx(7.5),
 ): number => {
   if (legendCount === 0) return 0;
 
@@ -115,7 +127,6 @@ export const calculateBottomLegendHeight = (
   const LEGEND_ICON_WIDTH = remToPx(0.875); // 0.875rem = 14px (Width of legend icon/symbol)
   const LEGEND_ICON_MARGIN = remToPx(0.5); // 0.5rem = 8px (Margin between icon and text)
   const LEGEND_ITEM_GAP = remToPx(0.625); // 0.625rem = 10px (ECharts itemGap default)
-  const MAX_TEXT_WIDTH = remToPx(7.5); // 7.5rem = 120px (matches legend textStyle truncation)
 
   // Pack the measured item widths greedily — an averaged estimate rounds
   // short labels up and reserves phantom rows below the real legend
@@ -125,7 +136,7 @@ export const calculateBottomLegendHeight = (
   for (const series of seriesData.length ? seriesData : Array(legendCount).fill({ name: "" })) {
     const name = (series.name || series.seriesName || "").toString();
     // eslint-disable-next-line local/no-hardcoded-px -- must match the fixed numeric fontSize ECharts paints legend text at; ECharts numeric sizes are literal CSS px and never scale with the root, so rem here would over-reserve rows
-    const textWidth = Math.min(calculateWidthText(name, "12px"), MAX_TEXT_WIDTH);
+    const textWidth = Math.min(calculateWidthText(name, "12px"), maxTextWidth);
     const itemWidth = LEGEND_ICON_WIDTH + LEGEND_ICON_MARGIN + textWidth + LEGEND_ITEM_GAP;
     if (rowX > 0 && rowX + itemWidth > availableWidth) {
       numRows++;
@@ -232,6 +243,7 @@ export const calculateChartDimensions = (
   const config = panelSchema.config || {};
   const legendPosition = config.legends_position;
   const showLegends = config.show_legends;
+  seriesData = pieLegendSizingData(panelSchema, seriesData);
   const legendCount = seriesData?.length || 0;
 
   let availableWidth = chartWidth;
@@ -349,7 +361,16 @@ const calculateLegendHeight = (
 
   // Handle different legend types
   if (legendsType === "plain") {
-    return calculateBottomLegendHeight(legendCount, chartWidth, seriesData, chartHeight);
+    return calculateBottomLegendHeight(
+      legendCount,
+      chartWidth,
+      seriesData,
+      chartHeight,
+      undefined,
+      undefined,
+      undefined,
+      pieLegendTextWidth(panelSchema),
+    );
   }
 
   // Scroll legends - single row (pages horizontally)
@@ -454,6 +475,90 @@ export const shouldApplyChartAlignment = (panelSchema: any, seriesData: any[] = 
     legendPosition === "right" &&
     (legendsType === "plain" || legendsType === "scroll" || legendsType == null)
   );
+};
+
+/** The legend values a pie or donut shows, in display order; empty for every other chart. */
+const pieLegendValueKeys = (panelSchema: any): string[] => {
+  const selected = panelSchema?.config?.legend_values;
+  if (!["pie", "donut"].includes(panelSchema?.type) || !Array.isArray(selected)) return [];
+  return PIE_LEGEND_VALUE_KEYS.filter((key) => selected.includes(key));
+};
+
+// Matches the slice-label percentPrecision, which falls back to 2 only when decimals is unset.
+const pieLegendPercentDecimals = (decimals: unknown): number => {
+  if (decimals === null || decimals === undefined || decimals === "") return 2;
+  const parsed = Math.floor(Number(decimals));
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.min(parsed, 20) : 2;
+};
+
+// The legend is keyed by name, so slices that share one (merged queries) show their sum.
+const summarisePieData = (data: any[]): PieLegendSummary => {
+  const values = new Map<string, number>();
+  let total = 0;
+  for (const item of data) {
+    const name = String(item?.name ?? "");
+    const numeric = Number(item?.value);
+    const value = Number.isFinite(numeric) ? numeric : 0;
+    values.set(name, (values.get(name) ?? 0) + value);
+    if (value > 0) total += value;
+  }
+  return { values, total };
+};
+
+const pieLegendValueText = (
+  name: string,
+  summary: PieLegendSummary,
+  keys: string[],
+  lookup: SeriesOverrideLookup,
+  percentDecimals: number,
+): string => {
+  const value = summary.values.get(name);
+  if (value === undefined) return "";
+  return keys
+    .map((key) => {
+      if (key === "value") return lookup.formatValue(value, name);
+      const percent = summary.total > 0 ? (value / summary.total) * 100 : 0;
+      return `${percent.toFixed(percentDecimals)}%`;
+    })
+    .join("  ");
+};
+
+/** Pie/donut legend entries as rendered with their values, for sizing the legend; the data as-is when values are off. */
+const pieLegendSizingData = (panelSchema: any, data?: any[] | null): any[] => {
+  const keys = pieLegendValueKeys(panelSchema);
+  if (!keys.length || !Array.isArray(data)) return data ?? [];
+  const lookup = createSeriesOverrideLookup(panelSchema?.config);
+  const decimals = pieLegendPercentDecimals(panelSchema?.config?.decimals);
+  const summary = summarisePieData(data);
+  return [...summary.values.keys()].map((name) => ({
+    name: `${lookup.displayName(name)}  ${pieLegendValueText(name, summary, keys, lookup, decimals)}`,
+  }));
+};
+
+const pieLegendTextWidth = (panelSchema: any): number =>
+  pieLegendValueKeys(panelSchema).length ? LEGEND_VALUES_TEXT_WIDTH : remToPx(7.5);
+
+// Reads the series lazily: multi-query SQL merges the slices after the legend is configured.
+const applyPieLegendValues = (panelSchema: any, options: any, hoveredSeriesState: any) => {
+  const keys = pieLegendValueKeys(panelSchema);
+  if (!keys.length || !options.legend?.show) return;
+  const lookup = createSeriesOverrideLookup(panelSchema?.config);
+  const decimals = pieLegendPercentDecimals(panelSchema?.config?.decimals);
+  let summarisedData: any[] | null = null;
+  let summary: PieLegendSummary = { values: new Map(), total: 0 };
+  options.legend.formatter = (name: any) => {
+    const data = options.series?.[0]?.data;
+    if (!Array.isArray(data)) return `{b|${name}}`;
+    if (data !== summarisedData) {
+      summarisedData = data;
+      summary = summarisePieData(data);
+    }
+    const style = name === hoveredSeriesState?.value?.hoveredSeriesName ? "a" : "b";
+    const valueText = pieLegendValueText(String(name), summary, keys, lookup, decimals);
+    const label = `{${style}|${lookup.displayName(name)}}`;
+    return valueText ? `${label}  ${valueText}` : label;
+  };
+  options.legend.textStyle = { ...options.legend.textStyle, width: LEGEND_VALUES_TEXT_WIDTH };
 };
 
 /**
@@ -800,8 +905,8 @@ export const applyPieDonutLegendPositioning = (
     // Get chart dimensions from chartPanelRef
     const chartWidth = chartPanelRef.value?.offsetWidth || 800;
     const chartHeight = chartPanelRef.value?.offsetHeight || 400;
-    // Count legend items from series data
-    const legendCount = options.series?.[0]?.data?.length || 0;
+    const legendData = pieLegendSizingData(panelSchema, options.series?.[0]?.data);
+    const legendCount = legendData.length;
 
     if (panelSchema?.config?.legends_position === "right") {
       // Calculate and apply legend width for right position
@@ -821,7 +926,7 @@ export const applyPieDonutLegendPositioning = (
           legendCount,
           chartWidth,
           chartHeight,
-          options.series?.[0]?.data || [],
+          legendData,
           false, // plain legends are not scrollable
         );
       }
@@ -863,11 +968,12 @@ export const applyPieDonutLegendPositioning = (
         calculateBottomLegendHeight(
           legendCount,
           chartWidth,
-          options.series?.[0]?.data || [],
+          legendData,
           chartHeight, // Apply 50% constraint
           options.legend,
           {}, // No grid config needed for pie/donut
           chartHeight,
+          pieLegendTextWidth(panelSchema),
         );
       }
     }
@@ -890,7 +996,7 @@ export const applyPieDonutLegendPositioning = (
       ) // Don't apply if explicit width is set
     ) {
       // Calculate legend width using the helper function to ensure consistency
-      const legendWidth = calculatePieDonutScrollLegendWidth(options, chartWidth);
+      const legendWidth = calculatePieDonutScrollLegendWidth(panelSchema, options, chartWidth);
 
       // Position legend on the right side with calculated space
       const containerWidth = chartPanelRef.value?.offsetWidth || 0;
@@ -1049,9 +1155,14 @@ export const applyPieDonutChartAlignment = (
  * Helper function to calculate scroll legend width for pie/donut charts
  * This ensures consistency between legend positioning and center adjustment
  */
-const calculatePieDonutScrollLegendWidth = (options: any, chartWidth: number): number => {
+const calculatePieDonutScrollLegendWidth = (
+  panelSchema: any,
+  options: any,
+  chartWidth: number,
+): number => {
   // Get the longest pie/donut label name to calculate appropriate width
-  const maxValue = (options.series?.[0]?.data || []).reduce((max: any, it: any) => {
+  const legendData = pieLegendSizingData(panelSchema, options.series?.[0]?.data);
+  const maxValue = legendData.reduce((max: any, it: any) => {
     return max.length < (it?.name?.length || 0) ? it?.name : max;
   }, "");
 
@@ -1091,7 +1202,8 @@ export const applyPieDonutCenterAdjustment = (
   ) {
     if (panelSchema.config?.legends_position === "right") {
       // Calculate legend width and move chart center to the left
-      const legendCount = options.series[0].data?.length || 0;
+      const legendData = pieLegendSizingData(panelSchema, options.series[0].data);
+      const legendCount = legendData.length;
 
       // Prefer explicit legend width if provided in config
       let legendWidth;
@@ -1109,7 +1221,7 @@ export const applyPieDonutCenterAdjustment = (
           legendCount,
           chartWidth,
           chartHeight,
-          options.series[0].data || [],
+          legendData,
           false, // plain legends are not scrollable
         );
       }
@@ -1122,7 +1234,8 @@ export const applyPieDonutCenterAdjustment = (
       panelSchema.config?.legends_position === null
     ) {
       // Calculate legend height and move chart center up
-      const legendCount = options.series[0].data?.length || 0;
+      const legendData = pieLegendSizingData(panelSchema, options.series[0].data);
+      const legendCount = legendData.length;
       // Prefer explicit legend height if provided in config, but not for scroll legends when position is auto/bottom
       let legendHeight;
       if (
@@ -1145,8 +1258,12 @@ export const applyPieDonutCenterAdjustment = (
         legendHeight = calculateBottomLegendHeight(
           legendCount,
           chartWidth,
-          options.series[0].data || [],
+          legendData,
           chartHeight,
+          undefined,
+          undefined,
+          undefined,
+          pieLegendTextWidth(panelSchema),
         );
       }
       const availableHeight = chartHeight - legendHeight;
@@ -1163,7 +1280,7 @@ export const applyPieDonutCenterAdjustment = (
   ) {
     if (panelSchema.config?.legends_position === "right") {
       // Calculate legend width using the same helper function to ensure consistency
-      const legendWidth = calculatePieDonutScrollLegendWidth(options, chartWidth);
+      const legendWidth = calculatePieDonutScrollLegendWidth(panelSchema, options, chartWidth);
 
       // Adjust center position based on the calculated legend width
       const availableWidth = chartWidth - legendWidth;
@@ -1200,6 +1317,7 @@ export const applyLegendConfiguration = (
   // Create base legend configuration
   const legendConfig = createBaseLegendConfig(panelSchema, hoveredSeriesState);
   options.legend = legendConfig;
+  applyPieLegendValues(panelSchema, options, hoveredSeriesState);
 
   // Apply positioning based on chart type and legend position
   const legendPosition = getLegendPosition(panelSchema.config?.legends_position);
