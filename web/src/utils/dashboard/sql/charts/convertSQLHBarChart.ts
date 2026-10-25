@@ -64,6 +64,9 @@ export function applyHBarChart(ctx: SQLContext): void {
     const max = barTrackMax(config.y_axis_max, dataMax);
     // Replaces the max that grows past y_axis_max, so the track always spans the same range.
     if (max !== undefined) [options.xAxis].flat().forEach((axis: any) => (axis.max = max));
+    const dataZoom = options.toolbox?.feature?.dataZoom;
+    // The brush zoom filters out bars past the axis max by default; a track clips them instead.
+    if (dataZoom) dataZoom.filterMode = "none";
   }
 
   // xAxisKeys will be 1

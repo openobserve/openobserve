@@ -75,6 +75,7 @@ const run = async (config: Record<string, any>, data: any[][], breakdown: any[] 
   return {
     valueAxis: Array.isArray(xAxis) ? xAxis[0] : xAxis,
     valueAxes: [xAxis].flat(),
+    options: result.options,
     bars: series.filter((s: any) => s.name),
   };
 };
@@ -88,7 +89,8 @@ const oneQuery = [
 
 describe("SQL h-bar bar track and bar width", () => {
   it("leaves series and axis max as before when both keys are unset", async () => {
-    const { valueAxis, bars } = await run({}, oneQuery);
+    const { valueAxis, bars, options } = await run({}, oneQuery);
+    expect(options.toolbox.feature.dataZoom.filterMode).toBeUndefined();
     expect(bars[0].showBackground).toBeUndefined();
     expect(bars[0].barWidth).toBeUndefined();
     expect(valueAxis.max).toBeUndefined();
@@ -107,7 +109,9 @@ describe("SQL h-bar bar track and bar width", () => {
 
   it("pins the max to y_axis_max even below the data, instead of growing to the data", async () => {
     expect((await run({ y_axis_max: 50 }, oneQuery)).valueAxis.max).toBe(70);
-    expect((await run({ show_bar_track: true, y_axis_max: 50 }, oneQuery)).valueAxis.max).toBe(50);
+    const pinned = await run({ show_bar_track: true, y_axis_max: 50 }, oneQuery);
+    expect(pinned.valueAxis.max).toBe(50);
+    expect(pinned.options.toolbox.feature.dataZoom.filterMode).toBe("none");
   });
 
   it("still reaches a limit line above the largest bar", async () => {
