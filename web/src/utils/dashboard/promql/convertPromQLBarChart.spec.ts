@@ -975,6 +975,22 @@ describe("BarConverter", () => {
       expect(result.yAxis.data).toEqual(["2026-10-24 09:05:00", "2026-10-26 09:05:00"]);
     });
 
+    it("keeps a date-less time label as is over a multi-day span", () => {
+      const processedData = spanning([
+        [0, "17:05:00"],
+        [DAY, "17:05:00"],
+      ]);
+
+      const result = converter.convert(
+        processedData,
+        { type: "h-stacked", config: {} },
+        mockStore,
+        mockExtras,
+      );
+
+      expect(result.yAxis.data).toEqual(["17:05:00", "17:05:00"]);
+    });
+
     it("keeps time-only labels when the steps span less than a day", () => {
       const processedData = spanning([
         [0, "2026-10-24T23:30:00.000"],
