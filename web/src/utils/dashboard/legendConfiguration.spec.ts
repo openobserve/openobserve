@@ -1250,6 +1250,26 @@ describe("pie and donut legend values", () => {
     },
   );
 
+  it("leaves a negative same-name slice out of an override-decimals percent", () => {
+    const options: any = pieOptions([
+      { name: "A", value: 10 },
+      { name: "A", value: -9 },
+      { name: "B", value: 10 },
+    ]);
+    applyLegendConfiguration(
+      pieSchema({
+        legend_values: ["percent"],
+        override_config: [
+          { field: { matchBy: "series", value: "A" }, config: [{ type: "decimals", value: 1 }] },
+        ],
+      }),
+      chartPanelRef,
+      hovered(),
+      options,
+    );
+    expect(options.legend.formatter("A")).toBe("{b|A}  50.0%");
+  });
+
   it("takes the percent over the slices the legend leaves visible", () => {
     const options: any = pieOptions([
       { name: "api", value: 10 },

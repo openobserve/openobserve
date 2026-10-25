@@ -19,6 +19,7 @@ import ChartRenderer from "./ChartRenderer.vue";
 import i18n from "@/locales";
 import { raw } from "@/types/i18n";
 import store from "@/test/unit/helpers/store";
+import { applyLegendConfiguration } from "@/utils/dashboard/legendConfiguration";
 
 // Mock ECharts with comprehensive functionality
 vi.mock("echarts/core", () => ({
@@ -1417,18 +1418,10 @@ describe("ChartRenderer", () => {
       });
     });
 
-    it.each([
-      ["pie", { a: true, b: false }],
-      ["line", undefined],
-    ])("hands a %s chart's legend selection to its source option", async (type, expected) => {
+    const isolateFirstSlice = async (options: any) => {
       const echarts = await import("echarts/core");
       wrapper.unmount();
       vi.clearAllMocks();
-      const options: any = {
-        ...mockChartData.options,
-        legend: { show: true },
-        series: [{ name: "s", type, data: [] }],
-      };
       wrapper = mount(ChartRenderer, {
         props: { data: { ...mockChartData, options }, renderType: "canvas", height: "100%" },
         global: {
@@ -1443,11 +1436,49 @@ describe("ChartRenderer", () => {
       )[1];
       chart.getOption.mockReturnValue({ legend: [{}] });
       const selected = { a: true, b: false };
-
       onLegend({ name: "a", selected });
+      return selected;
+    };
 
-      expect(options.legend.selected).toEqual(expected);
+    it("recomputes a pie legend's percents over the slice left visible", async () => {
+      const options: any = {
+        ...mockChartData.options,
+        series: [
+          {
+            type: "pie",
+            data: [
+              { name: "a", value: 10 },
+              { name: "b", value: 10 },
+            ],
+          },
+        ],
+      };
+      applyLegendConfiguration(
+        {
+          type: "pie",
+          config: { show_legends: true, legend_values: ["percent"], decimals: 0 },
+        },
+        { value: { offsetWidth: 800, offsetHeight: 400 } },
+        mockHoveredSeriesState,
+        options,
+      );
+      expect(options.legend.formatter("a")).toBe("{b|a}  50%");
+
+      const selected = await isolateFirstSlice(options);
+
+      expect(options.legend.selected).toEqual({ a: true, b: false });
       expect(options.legend.selected).not.toBe(selected);
+      expect(options.legend.formatter("a")).toBe("{b|a}  100%");
+    });
+
+    it("leaves a non-pie chart's source legend untouched", async () => {
+      const options: any = {
+        ...mockChartData.options,
+        legend: { show: true },
+        series: [{ name: "a", type: "line", data: [] }],
+      };
+      await isolateFirstSlice(options);
+      expect(options.legend.selected).toBeUndefined();
     });
   });
 });
