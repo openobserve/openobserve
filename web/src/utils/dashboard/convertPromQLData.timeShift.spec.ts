@@ -614,6 +614,25 @@ describe("convertPromQLData with time-shifted results", () => {
     expect(names(result)).toEqual(["api-1", "api-1 (1 day ago)"]);
   });
 
+  it.each(["area-stacked", "stacked", "h-stacked"])(
+    "gives each period its own stack in %s, so a past period never adds to current totals",
+    async (type) => {
+      const result = await convert(
+        panel(type),
+        [twoPods(), twoPods(DAY_S)],
+        meta([{ panelQueryIndex: 0 }, { panelQueryIndex: 0, gapMs: DAY_MS, period: "1 day ago" }]),
+        stepMeta(2, 60),
+      );
+
+      const stacks = new Map(
+        result.options.series.filter((s: any) => s.name).map((s: any) => [s.name, s.stack]),
+      );
+      expect(stacks.get("api-1")).toBe(stacks.get("api-2"));
+      expect(stacks.get("api-1 (1 day ago)")).toBe(stacks.get("api-2 (1 day ago)"));
+      expect(stacks.get("api-1 (1 day ago)")).not.toBe(stacks.get("api-1"));
+    },
+  );
+
   it("names and configures shifted series through the map on the modular (stacked) path", async () => {
     const result = await convert(
       panel("stacked", [

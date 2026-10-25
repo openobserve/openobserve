@@ -24,6 +24,7 @@ import {
   DEFAULT_EXPANDED_SECTIONS,
 } from "@/utils/dashboard/searchLabelsConfig";
 import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
+import { PROMQL_MODULAR_CHART_TYPES } from "@/utils/dashboard/promql/shared/types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -139,6 +140,11 @@ export function useConfigPanel(
       step: {
         label: t("dashboard.stepValue"),
         visible: !!promqlMode.value,
+      },
+      "promql-series-limit": {
+        label: t("dashboard.promqlSeriesLimit"),
+        visible:
+          !!promqlMode.value && PROMQL_MODULAR_CHART_TYPES.includes(dashboardPanelData.data.type),
       },
       "show-exemplars": {
         label: t("dashboard.showExemplarsLabel"),

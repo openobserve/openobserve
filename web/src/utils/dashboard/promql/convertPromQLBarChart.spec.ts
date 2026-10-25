@@ -508,6 +508,34 @@ describe("BarConverter", () => {
       expect(result.yAxis.type).toBe("value");
     });
 
+    it.each(["stacked", "h-stacked"])("stacks each time-shift period on its own in %s", (type) => {
+      const query = (nameSuffix?: string): any => ({
+        series: [
+          { name: nameSuffix ? `a (${nameSuffix})` : "a", values: [], data: { "1": "1" } },
+          { name: nameSuffix ? `b (${nameSuffix})` : "b", values: [], data: { "1": "2" } },
+        ],
+        timestamps: [[1, "2021-01-01 00:00:00"]],
+        queryIndex: 0,
+        ...(nameSuffix && { seriesRole: "shifted", nameSuffix }),
+      });
+
+      const result = converter.convert(
+        [query(), query("1d ago"), query("1w ago")],
+        { type, config: {} },
+        mockStore,
+        { legends: [] },
+      );
+
+      expect(result.series.map((s: any) => s.stack)).toEqual([
+        "total",
+        "total",
+        "total (1d ago)",
+        "total (1d ago)",
+        "total (1w ago)",
+        "total (1w ago)",
+      ]);
+    });
+
     it("should populate extras.legends for stacked chart", () => {
       const processedData: ProcessedPromQLData[] = [
         {

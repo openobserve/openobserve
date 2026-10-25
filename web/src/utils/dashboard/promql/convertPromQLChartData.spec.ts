@@ -14,7 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { ref } from "vue";
 import { convertPromQLChartData } from "./convertPromQLChartData";
+import { processPromQLData } from "./shared/dataProcessor";
 import { PromQLResponse, ConversionContext } from "./shared/types";
 
 vi.mock("./shared/dataProcessor", () => ({
@@ -311,250 +313,123 @@ describe("convertPromQLChartData", () => {
     });
   });
 
+  describe("series limit notice", () => {
+    const resultWith = (count: number): PromQLResponse => ({
+      status: "success",
+      data: {
+        resultType: "matrix",
+        result: Array.from({ length: count }, (_, i) => ({
+          metric: { pod: `p${i}` },
+          values: [[1, "1"]],
+        })),
+      },
+    });
+
+    it("reports current-period series dropped by the panel cap", async () => {
+      mockContext.panelSchema = {
+        type: "pie",
+        config: { promql_series_limit: 1 },
+        queries: [{ config: {} }],
+      };
+
+      const result = await convertPromQLChartData([resultWith(3)], mockContext);
+
+      expect(result.extras.seriesLimit).toEqual({ shown: 1, total: 3, cap: 1 });
+      expect(result.extras.limitNumberOfSeriesWarningMessage).toBeTruthy();
+    });
+
+    it("does not count a shifted period as dropped series", async () => {
+      mockContext.panelSchema = { type: "pie", config: {}, queries: [{ config: {} }] };
+      mockContext.nameSuffixes = ["", "1 day ago"];
+
+      const result = await convertPromQLChartData([resultWith(1), resultWith(1)], mockContext);
+
+      expect(result.extras.seriesLimit).toBeUndefined();
+    });
+
+    it("reports a drop made by the streaming loader", async () => {
+      mockContext.panelSchema = { type: "pie", config: {}, queries: [{ config: {} }] };
+      mockContext.metadata = { seriesLimiting: { metricsStored: 1, uniqueSeriesSeen: 250 } };
+
+      const result = await convertPromQLChartData([resultWith(1)], mockContext);
+
+      expect(result.extras.seriesLimit).toEqual({ shown: 1, total: 250, cap: 100 });
+    });
+  });
+
   describe("annotations", () => {
-    it("should apply line annotations", async () => {
-      mockContext.annotations = [
-        {
-          show: true,
-          type: "line",
-          axis: "y",
-          value: 50,
-          name: "Threshold",
-          show_label: true,
-          color: "#FF0000",
-          line_style: "solid",
-          width: 2,
-        },
-      ];
-
-      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
-
-      expect(result.options.series[0].markLine).toBeDefined();
-      expect(result.options.series[0].markLine.data.length).toBeGreaterThan(0);
-    });
-
-    it("should apply line annotation on x-axis", async () => {
-      mockContext.annotations = [
-        {
-          show: true,
-          type: "line",
-          axis: "x",
-          value: 1234567890000,
-          name: "Event",
-        },
-      ];
-
-      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
-
-      const markLine = result.options.series[0].markLine.data.find((m: any) => m.name === "Event");
-      expect(markLine.xAxis).toBe(1234567890000);
-      expect(markLine.yAxis).toBeNull();
-    });
-
-    it("should apply area annotations", async () => {
-      mockContext.annotations = [
-        {
-          show: true,
-          type: "area",
-          axis: "y",
-          start: 20,
-          end: 80,
-          name: "Normal Range",
-          color: "rgba(0, 255, 0, 0.1)",
-        },
-      ];
-
-      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
-
-      expect(result.options.series[0].markArea).toBeDefined();
-      expect(result.options.series[0].markArea.data).toHaveLength(1);
-    });
-
-    it("should skip annotations with show=false", async () => {
-      mockContext.annotations = [
-        {
-          show: false,
-          type: "line",
-          axis: "y",
-          value: 50,
-        },
-      ];
-
-      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
-
-      expect(result.options.series[0].markLine?.data?.length || 0).toBeLessThanOrEqual(0);
-    });
-
-    it("should use default values for annotation properties", async () => {
-      mockContext.annotations = [
-        {
-          show: true,
-          type: "line",
-          axis: "y",
-          value: 50,
-        },
-      ];
-
-      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
-
-      const markLine = result.options.series[0].markLine.data[0];
-      expect(markLine.lineStyle.color).toBe("#FF0000");
-      expect(markLine.lineStyle.type).toBe("solid");
-      expect(markLine.lineStyle.width).toBe(2);
-    });
-
-    it("should hide label when show_label is false", async () => {
-      mockContext.annotations = [
-        {
-          show: true,
-          type: "line",
-          axis: "y",
-          value: 50,
-          show_label: false,
-        },
-      ];
-
-      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
-
-      const markLine = result.options.series[0].markLine.data[0];
-      expect(markLine.label.show).toBe(false);
-    });
-
-    it("should use default label position", async () => {
-      mockContext.annotations = [
-        {
-          show: true,
-          type: "line",
-          axis: "y",
-          value: 50,
-          name: "Test",
-        },
-      ];
-
-      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
-
-      const markLine = result.options.series[0].markLine.data[0];
-      expect(markLine.label.position).toBe("insideEndTop");
-    });
-
-    it("should use custom label position", async () => {
-      mockContext.annotations = [
-        {
-          show: true,
-          type: "line",
-          axis: "y",
-          value: 50,
-          label_position: "start",
-        },
-      ];
-
-      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
-
-      const markLine = result.options.series[0].markLine.data[0];
-      expect(markLine.label.position).toBe("start");
-    });
-
-    it("should format label with name when provided", async () => {
-      mockContext.annotations = [
-        {
-          show: true,
-          type: "line",
-          axis: "y",
-          value: 50,
-          name: "Max",
-        },
-      ];
-
-      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
-
-      const markLine = result.options.series[0].markLine.data[0];
-      expect(markLine.label.formatter).toBe("{b}: {c}");
-    });
-
-    it("should format label without name when not provided", async () => {
-      mockContext.annotations = [
-        {
-          show: true,
-          type: "line",
-          axis: "y",
-          value: 50,
-        },
-      ];
-
-      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
-
-      const markLine = result.options.series[0].markLine.data[0];
-      expect(markLine.label.formatter).toBe("{c}");
-    });
-
-    it("should apply area annotation on x-axis", async () => {
-      mockContext.annotations = [
-        {
-          show: true,
-          type: "area",
-          axis: "x",
-          start: 1234567890000,
-          end: 1234567900000,
-        },
-      ];
-
-      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
-
-      const markArea = result.options.series[0].markArea.data[0];
-      expect(markArea[0].xAxis).toBe(1234567890000);
-      expect(markArea[1].xAxis).toBe(1234567900000);
-    });
-
-    it("should use default color for area annotation", async () => {
-      mockContext.annotations = [
-        {
-          show: true,
-          type: "area",
-          axis: "y",
-          start: 20,
-          end: 80,
-        },
-      ];
-
-      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
-
-      const markArea = result.options.series[0].markArea.data[0];
-      expect(markArea[1].itemStyle.color).toBe("rgba(255, 0, 0, 0.1)");
-    });
-
-    it("should not apply annotations when array is empty", async () => {
-      mockContext.annotations = [];
-
-      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
-
-      expect(result.options.series[0].markLine?.data?.length || 0).toBe(0);
-      expect(result.options.series[0].markArea).toBeUndefined();
-    });
-
-    it("should merge with existing markLine data", async () => {
-      mockContext.panelSchema.config = {
-        mark_lines: [
+    const stackedData = [
+      {
+        series: [
           {
-            show: true,
-            type: "yAxis",
-            value: 100,
-            name: "Existing",
+            metric: { job: "api" },
+            name: "test_metric",
+            data: { 100: "1", 160: "2", 220: "3" },
+            values: [
+              [100, "1"],
+              [160, "2"],
+              [220, "3"],
+            ],
           },
         ],
-      };
-      mockContext.annotations = [
-        {
-          show: true,
-          type: "line",
-          axis: "y",
-          value: 50,
-          name: "New",
-        },
-      ];
+        timestamps: [
+          [100, "00:01:40"],
+          [160, "00:02:40"],
+          [220, "00:03:40"],
+        ],
+        queryIndex: 0,
+        queryConfig: {},
+      },
+    ];
+    const annotationSeries = (options: any) =>
+      options.series.find((s: any) => s.markLine || s.markArea);
+
+    beforeEach(() => {
+      mockContext.panelSchema = { type: "stacked", config: {}, queries: [{ config: {} }] };
+      vi.mocked(processPromQLData).mockResolvedValueOnce(stackedData as any);
+    });
+
+    it("reads annotations from a Ref and snaps a point to the nearest step", async () => {
+      mockContext.annotations = ref([{ start_time: 150 * 1_000_000, title: "deploy" }]);
 
       const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
 
-      expect(result.options.series[0].markLine.data.length).toBeGreaterThan(1);
+      const line = annotationSeries(result.options).markLine.data[0];
+      expect(line.xAxis).toBe(1);
+      expect(line.name).toBe("deploy");
+      expect(line.annotationDetails.title).toBe("deploy");
+    });
+
+    it("clamps a range to the visible steps", async () => {
+      mockContext.annotations = ref([
+        { start_time: 50 * 1_000_000, end_time: 170 * 1_000_000, title: "incident" },
+      ]);
+
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
+
+      const [from, to] = annotationSeries(result.options).markArea.data[0];
+      expect(from.xAxis).toBe(0);
+      expect(to.xAxis).toBe(1);
+    });
+
+    it("drops annotations outside the time range", async () => {
+      mockContext.annotations = ref([
+        { start_time: 10 * 1_000_000, title: "early" },
+        { start_time: 900 * 1_000_000, end_time: 990 * 1_000_000, title: "late" },
+      ]);
+
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
+
+      expect(annotationSeries(result.options)).toBeUndefined();
+    });
+
+    it("draws nothing for chart types without a time axis", async () => {
+      mockContext.panelSchema = { type: "h-bar", config: {}, queries: [{ config: {} }] };
+      mockContext.annotations = ref([{ start_time: 150 * 1_000_000, title: "deploy" }]);
+
+      const result = await convertPromQLChartData(mockPromQLResponse, mockContext);
+
+      expect(annotationSeries(result.options)).toBeUndefined();
     });
   });
 

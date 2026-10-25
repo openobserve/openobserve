@@ -398,7 +398,7 @@ export default defineComponent({
     ];
 
     // Chart types that support aggregation
-    const chartsWithAggregation = ["pie", "donut", "geomap", "maps"];
+    const chartsWithAggregation = ["pie", "donut", "geomap", "maps", "metric", "gauge", "h-bar"];
 
     const showAggregationConfig = computed(() => chartsWithAggregation.includes(props.chartType));
 

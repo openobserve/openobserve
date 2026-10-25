@@ -641,6 +641,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <PromQLBuilderOptions :dashboardPanelData="dashboardPanelData" />
   </div>
+  <PromQLBuilderOptions
+    v-else-if="promqlMode"
+    :dashboardPanelData="dashboardPanelData"
+    query-type-only
+  />
 
   <DashboardGeoMapsQueryBuilder :dashboardData="dashboardData" />
   <DashboardMapsQueryBuilder :dashboardData="dashboardData" />

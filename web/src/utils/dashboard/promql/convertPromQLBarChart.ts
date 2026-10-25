@@ -114,7 +114,8 @@ export class BarConverter implements PromQLChartConverter {
             _panelQueryIndex: queryData.queryIndex,
             _seriesRole: queryData.seriesRole,
             type: "bar",
-            stack: "total",
+            // A past period stacks on its own, or it would add to the current totals.
+            stack: queryData.nameSuffix ? `total (${queryData.nameSuffix})` : "total",
             data,
             ...(color && { color }),
             // Label configuration (same as SQL charts)

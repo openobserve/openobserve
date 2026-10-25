@@ -39,6 +39,7 @@ import {
 } from "@/utils/chartTheme";
 import { calculateBottomLegendHeight, calculateRightLegendWidth } from "./legendConfiguration";
 import { convertPromQLChartData } from "./promql/convertPromQLChartData";
+import { PROMQL_MODULAR_CHART_TYPES } from "./promql/shared/types";
 import { calculateMetricFontSize, buildMetricSparkline } from "./sql/charts/convertSQLMetricChart";
 import { resolveMetricValueStyle } from "./tableConfigUtils";
 import {
@@ -258,19 +259,7 @@ export const convertPromQLData = async (
 
   // ========== NEW MODULAR CHART SYSTEM ==========
   // Delegate to new modular converter for newly supported chart types
-  const NEW_CHART_TYPES = [
-    "pie",
-    "donut",
-    "table",
-    "heatmap",
-    "h-bar",
-    "stacked",
-    "h-stacked",
-    "geomap",
-    "maps",
-  ];
-
-  if (NEW_CHART_TYPES.includes(panelSchema.type)) {
+  if (PROMQL_MODULAR_CHART_TYPES.includes(panelSchema.type)) {
     try {
       const result = await convertPromQLChartData(searchQueryData, {
         panelSchema,
@@ -286,13 +275,6 @@ export const convertPromQLData = async (
       if (result.options) applySeriesOverrides(result.options, panelSchema, store.state.theme);
       if (result.options) applyLineAreaThresholds(result.options, panelSchema);
 
-      // Apply annotations if present (only for ECharts-based charts)
-      if (annotations && annotations.length > 0 && panelSchema.type !== "table") {
-        const annotationResults = getAnnotationsData(annotations, store.state.timezone);
-        if (annotationResults && result.options) {
-          result.options.annotations = annotationResults;
-        }
-      }
       return result;
     } catch (error) {
       console.error(`Error converting ${panelSchema.type} chart:`, error);
@@ -944,6 +926,10 @@ export const convertPromQLData = async (
                   seriesDataObj[value[0]] ?? null,
                 ]),
                 ...seriesPropsBasedOnChartType,
+                // A past period stacks on its own, or it would add to the current totals.
+                ...(nameSuffixes[index] && seriesPropsBasedOnChartType?.stack
+                  ? { stack: `${seriesPropsBasedOnChartType.stack} (${nameSuffixes[index]})` }
+                  : {}),
                 // Twins share their primary's colour, so the line style is what tells them apart.
                 ...(nameSuffixes[index]
                   ? {

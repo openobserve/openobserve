@@ -457,6 +457,26 @@ describe("DashboardQueryBuilder", () => {
       mockUseDashboardPanelData.promqlMode = false;
     });
 
+    it("shows the Range/Instant selector for a custom PromQL query", () => {
+      mockUseDashboardPanelData.promqlMode = true;
+      wrapper = createWrapper({
+        "data.queryType": "promql",
+        "data.queries": [{ customQuery: true, query: "up", fields: {}, config: {} }],
+      });
+
+      expect(wrapper.find('[data-test="dashboard-promql-builder-query-type"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-promql-builder-legend"]').exists()).toBe(false);
+      mockUseDashboardPanelData.promqlMode = false;
+    });
+
+    it("shows no Range/Instant selector for an SQL query", () => {
+      wrapper = createWrapper();
+
+      expect(wrapper.find('[data-test="dashboard-promql-builder-query-type"]').exists()).toBe(
+        false,
+      );
+    });
+
     it("should not render main content for geomap type", () => {
       wrapper = createWrapper({ "data.type": "geomap" });
       // Should render child components like DashboardGeoMapsQueryBuilder

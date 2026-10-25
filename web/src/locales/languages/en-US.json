@@ -6726,6 +6726,8 @@
     "editJson": "Edit Dashboard JSON",
     "stepValue": "Step Value",
     "stepValueTooltip": "The interval between datapoints, which must be returned from the range query.",
+    "promqlSeriesLimit": "Series limit",
+    "promqlSeriesLimitTooltip": "The most series drawn per query. Extra series are dropped and the panel says how many it shows. The server limit of {max} still applies.",
     "stepValueTooltipInfo": "If not specified, the step value from Panel Configuration will be used.",
     "stepValueExample": "Eg: {example}",
     "groupMultiYAxisTrellis": "Group multi Y-axis for trellis",

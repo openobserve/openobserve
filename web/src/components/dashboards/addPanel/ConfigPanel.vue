@@ -122,6 +122,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OInput>
 
+        <OInput
+          v-if="promqlMode && promqlSeriesLimitEligible"
+          v-show="isConfigOptionVisible('general', 'promql-series-limit')"
+          v-model.number="dashboardPanelDataModel.data.config.promql_series_limit"
+          type="number"
+          :min="1"
+          :max="maxDashboardSeries"
+          @update:model-value="
+            (value: any) =>
+              (dashboardPanelDataModel.data.config.promql_series_limit = value ? value : null)
+          "
+          :placeholder="raw('100')"
+          :label="t('dashboard.promqlSeriesLimit')"
+          data-test="dashboard-config-promql-series-limit"
+        >
+          <template #tooltip>
+            <OTooltip
+              :content="t('dashboard.promqlSeriesLimitTooltip', { max: maxDashboardSeries })"
+              max-width="15.625rem"
+            />
+          </template>
+        </OInput>
+
         <OSwitch
           v-if="promqlMode && exemplarsSwitchEligible"
           v-show="isConfigOptionVisible('general', 'show-exemplars')"
@@ -2111,6 +2134,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import { PROMQL_MODULAR_CHART_TYPES } from "@/utils/dashboard/promql/shared/types";
 import { useStore } from "vuex";
 
 import {
@@ -2902,6 +2926,10 @@ export default defineComponent({
     };
 
     const exemplarsSwitchEligible = computed(() => isExemplarEligible(dashboardPanelData.data));
+    const promqlSeriesLimitEligible = computed(() =>
+      PROMQL_MODULAR_CHART_TYPES.includes(dashboardPanelData.data.type),
+    );
+    const maxDashboardSeries = computed(() => store.state?.zoConfig?.max_dashboard_series ?? 100);
 
     const {
       searchQuery,
@@ -3085,6 +3113,8 @@ export default defineComponent({
       isExpanded,
       isSectionVisible,
       exemplarsSwitchEligible,
+      promqlSeriesLimitEligible,
+      maxDashboardSeries,
       isConfigOptionVisible,
       anySectionVisible,
       allSectionsExpanded,

@@ -102,6 +102,7 @@ export async function processPromQLData(
       series,
       queryIndex: queryIndexOf(index),
       seriesRole: shift.nameSuffixes?.[index] ? "shifted" : "primary",
+      ...(shift.nameSuffixes?.[index] && { nameSuffix: shift.nameSuffixes[index] }),
       queryConfig: panelSchema.queries[queryIndexOf(index)]?.config || {},
     });
   });

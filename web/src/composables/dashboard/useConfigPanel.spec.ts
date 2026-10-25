@@ -422,6 +422,17 @@ describe("useConfigPanel – general section", () => {
     expect(c.isConfigOptionVisible("general", "promql-chart-config")).toBe(false);
   });
 
+  it.each([
+    ["stacked", true, true],
+    ["pie", true, true],
+    ["table", true, true],
+    ["line", true, false],
+    ["stacked", false, false],
+  ])("promql-series-limit for %s with promqlMode=%s is visible=%s", (type, promql, visible) => {
+    const c = makeComposable(makePanelData(type), ref(promql));
+    expect(c.isConfigOptionVisible("general", "promql-series-limit")).toBe(visible);
+  });
+
   it("general section is visible (isSectionVisible)", () => {
     const c = makeComposable();
     expect(c.isSectionVisible("general")).toBe(true);

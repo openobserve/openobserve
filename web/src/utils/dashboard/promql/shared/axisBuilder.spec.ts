@@ -279,6 +279,15 @@ describe("axisBuilder", () => {
         expect(result).not.toContain("100.00B");
       });
 
+      it("names a pie slice by its item name, not the unnamed series", () => {
+        const tooltip = buildTooltip({ config: {} }, "item", undefined, undefined, "name");
+
+        const result = tooltip.formatter({ seriesName: "series0", name: "api", value: 5 });
+
+        expect(result).toContain("api");
+        expect(result).not.toContain("series0");
+      });
+
       it("should format with custom unit", () => {
         const panelSchema = {
           config: {
@@ -341,10 +350,10 @@ describe("axisBuilder", () => {
       expect(result.axisLine.show).toBe(true);
     });
 
-    it("should hide grid lines when show_grid is false", () => {
+    it("should hide grid lines when show_gridlines is false", () => {
       const panelSchema = {
         config: {
-          show_grid: false,
+          show_gridlines: false,
         },
       };
 
@@ -413,10 +422,10 @@ describe("axisBuilder", () => {
       expect(result.splitLine.show).toBe(true);
     });
 
-    it("should hide grid lines when show_grid is false", () => {
+    it("should hide grid lines when show_gridlines is false", () => {
       const panelSchema = {
         config: {
-          show_grid: false,
+          show_gridlines: false,
         },
       };
 
@@ -618,11 +627,11 @@ describe("axisBuilder", () => {
       expect(result.axisLabel.rotate).toBe(45);
     });
 
-    it("should hide grid lines when show_grid is false", () => {
+    it("should hide grid lines when show_gridlines is false", () => {
       const categories = ["Category 1"];
       const panelSchema = {
         config: {
-          show_grid: false,
+          show_gridlines: false,
         },
       };
 
@@ -688,17 +697,18 @@ describe("axisBuilder", () => {
 
       const result = buildCategoryYAxis(categories, panelSchema);
 
+      expect(result.inverse).toBe(true);
       expect(result.type).toBe("category");
       expect(result.data).toEqual(categories);
       expect(result.axisLabel.show).toBe(true);
       expect(result.splitLine.show).toBe(true);
     });
 
-    it("should hide grid lines when show_grid is false", () => {
+    it("should hide grid lines when show_gridlines is false", () => {
       const categories = ["Category 1"];
       const panelSchema = {
         config: {
-          show_grid: false,
+          show_gridlines: false,
         },
       };
 
@@ -769,10 +779,10 @@ describe("axisBuilder", () => {
       expect(result.splitLine.show).toBe(true);
     });
 
-    it("should hide grid lines when show_grid is false", () => {
+    it("should hide grid lines when show_gridlines is false", () => {
       const panelSchema = {
         config: {
-          show_grid: false,
+          show_gridlines: false,
         },
       };
 
