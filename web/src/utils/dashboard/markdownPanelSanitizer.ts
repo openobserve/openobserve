@@ -33,8 +33,9 @@ export const isCrossOriginLink = (href: string, pageHref: string): boolean => {
 export const sanitizeMarkdownPanel = (html: string): string => markdownPanelPurifier.sanitize(html);
 
 markdownPanelPurifier.addHook("afterSanitizeAttributes", (node) => {
-  if (node.nodeName !== "A") return;
-  const href = node.getAttribute("href");
+  // localName, since an SVG anchor's nodeName is lowercase
+  if (node.localName !== "a") return;
+  const href = node.getAttribute("href") || node.getAttribute("xlink:href");
   if (href && isCrossOriginLink(href, window.location.href)) {
     node.setAttribute("target", "_blank");
     node.setAttribute("rel", "noopener noreferrer");

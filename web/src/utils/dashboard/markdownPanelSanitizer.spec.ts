@@ -64,6 +64,20 @@ describe("markdownPanelSanitizer", () => {
       expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
     });
 
+    it("opens a cross-origin SVG anchor in a new tab", () => {
+      const out = render(
+        '<svg><a href="https://docs.example.org/a"><text>a</text></a>' +
+          '<a xlink:href="https://docs.example.org/b"><text>b</text></a></svg>',
+      );
+      const anchors = Array.from(out.querySelectorAll("a"));
+
+      expect(anchors).toHaveLength(2);
+      anchors.forEach((a) => {
+        expect(a.getAttribute("target")).toBe("_blank");
+        expect(a.getAttribute("rel")).toBe("noopener noreferrer");
+      });
+    });
+
     it("keeps same-origin and relative links in the tab", () => {
       const out = render(
         `<a href="${window.location.origin}/web/logs">a</a><a href="/web/dashboards">b</a><a href="#top">c</a>`,
