@@ -41,9 +41,7 @@ export const layoutMetricGrid = (
   const sparkBackground = sparkOn && panelSpark?.layout === "background";
   const sparkBottom = sparkOn && !sparkBackground;
 
-  // The label renders below the value inside the same cell, so the value's
-  // vertical budget is the cell height minus the label line and gaps. With a
-  // bottom sparkline the value occupies only the top ~58% of the cell.
+  // The label sits below the value in the same cell, so it comes out of the value's height budget.
   const valueBandHeight = sparkBottom
     ? gridData.gridHeight * 0.58 - labelFontSize - 10
     : gridData.gridHeight - labelFontSize - 10;
@@ -142,8 +140,7 @@ export const layoutMetricGrid = (
     const labelY = sparkBottom
       ? valueY + sharedFontSize / 2 + labelFontSize / 2 + 4
       : cy + sharedFontSize / 2 + 4;
-    // Grid-cell rect (px) is the hover zone; cx/cy/fontSize place + size the
-    // copy icon beside the number, clamped inside the cell.
+    // The cell rect is the copy hover zone; cx/cy/fontSize place the copy icon beside the number.
     s._metricLayout = {
       left: cellLeft,
       top: cellTop,
@@ -152,8 +149,7 @@ export const layoutMetricGrid = (
       cx,
       cy: valueY,
       fontSize: sharedFontSize,
-      // vertical space under the value taken by the field label, so a
-      // below-the-value copy button clears it
+      // A copy button placed below the value must clear the field label.
       labelClearance: labelFontSize * 1.2 + 8,
     };
     s.renderItem = () => {

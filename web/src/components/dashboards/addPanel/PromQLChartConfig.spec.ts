@@ -128,6 +128,16 @@ describe("PromQLChartConfig", () => {
       wrapper = createWrapper({ chartType: "gauge" });
       expect(aggregation()).toBe(true);
     });
+
+    it("ignores a hidden range query when deciding the metric is all instant", () => {
+      mockDashboardPanelData.data.queries = [
+        { config: { query_type: "instant" } },
+        { config: { query_type: "range" } },
+      ];
+      mockDashboardPanelData.layout = { hiddenQueries: [1] };
+      wrapper = createWrapper({ chartType: "metric" });
+      expect(wrapper.find('[data-test="dashboard-config-aggregation"]').exists()).toBe(false);
+    });
   });
 
   describe("Aggregation Function", () => {

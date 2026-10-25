@@ -2936,7 +2936,11 @@ export default defineComponent({
       () =>
         dashboardPanelData.data.queryType === "promql" &&
         dashboardPanelData.data.queries?.length > 0 &&
-        dashboardPanelData.data.queries.every((q: any) => q?.config?.query_type === "instant"),
+        dashboardPanelData.data.queries.every(
+          (q: any, index: number) =>
+            q?.config?.query_type === "instant" ||
+            dashboardPanelData.layout?.hiddenQueries?.includes(index),
+        ),
     );
 
     const {

@@ -198,12 +198,12 @@ const layoutPromQLMetric = (
   options.yAxis = [];
   if (built.length !== 1) {
     const cells = built.map(({ cell }) => cell);
-    if (cells.length) {
+    if (cells.length && panelEl) {
       layoutMetricGrid(
         cells,
         panelSchema.config?.sparkline,
-        panelEl?.offsetWidth ?? 0,
-        panelEl?.offsetHeight ?? 0,
+        panelEl.offsetWidth,
+        panelEl.offsetHeight,
       );
     }
     options.backgroundColor = panelSchema.config?.background?.value?.color ?? "";

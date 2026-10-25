@@ -108,6 +108,20 @@ describe("convertPromQLData metric cells", () => {
     expect(result.options.polar.center).toBeDefined();
   });
 
+  it("draws each grid cell's own sparkline", async () => {
+    const result = await convert(
+      [matrix(series("api", ["1", "2", "3"]), series("web", ["3", "1", "2"]))],
+      { sparkline: { enabled: true, type: "line" } },
+    );
+    const cells = cellsOf(result);
+    expect(result.options.series).toHaveLength(2);
+    for (const cell of cells) {
+      expect(cell._metricSparkData).toHaveLength(3);
+      const drawn = cell.renderItem().children.map((child: any) => child.type);
+      expect(drawn).toContain("polyline");
+    }
+  });
+
   it("reduces a range series with the configured aggregation", async () => {
     const data = [matrix(series("api", ["4", "10", "1"]))];
     expect(cellsOf(await convert(data))[0]._metricText).toBe("1");
