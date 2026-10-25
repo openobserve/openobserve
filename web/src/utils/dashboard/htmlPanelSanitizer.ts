@@ -48,7 +48,7 @@ export const sanitizeHtmlPanel = (
 ): DocumentFragment => {
   const fragment = htmlPanelPurifier.sanitize(html, {
     ADD_TAGS: ["iframe", "style"],
-    ADD_ATTR: ["allowfullscreen", "frameborder", "loading", "csp"],
+    ADD_ATTR: ["allowfullscreen", "frameborder", "loading", "csp", "target"],
     // without it the parser hoists a top-level style into <head>, which DOMPurify drops
     FORCE_BODY: true,
     RETURN_DOM_FRAGMENT: true,
@@ -89,6 +89,17 @@ const prefixSelectors = (rules: CSSRuleList, prefix: string): void => {
   }
 };
 
+// a named target could steer a link or form into a panel iframe, past the embed origin check
+const keepOnlyBlankTarget = (node: Element): void => {
+  if (!node.hasAttribute("target")) return;
+  if (node.getAttribute("target")?.trim().toLowerCase() !== "_blank") {
+    node.removeAttribute("target");
+    return;
+  }
+  node.setAttribute("target", "_blank");
+  node.setAttribute("rel", "noopener noreferrer");
+};
+
 const scopeCss = (cssText: string, prefix: string): string => {
   try {
     const sheet = new CSSStyleSheet();
@@ -104,6 +115,7 @@ const scopeCss = (cssText: string, prefix: string): string => {
 };
 
 htmlPanelPurifier.addHook("afterSanitizeAttributes", (node) => {
+  keepOnlyBlankTarget(node);
   if (node.nodeName !== "IFRAME") return;
   node.removeAttribute("srcdoc");
   const src = node.getAttribute("src") || "";

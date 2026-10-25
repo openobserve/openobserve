@@ -113,6 +113,40 @@ describe("htmlPanelSanitizer", () => {
       expect(out.querySelector("style")?.textContent).toContain("(width < 37.5rem)");
     });
 
+    it("keeps target=_blank on links and forms and forces rel=noopener noreferrer", () => {
+      const out = render(
+        '<a href="https://example.com/a" target="_blank" rel="opener">a</a>' +
+          '<a href="https://example.com/b" target=" _BLANK ">b</a>' +
+          '<form action="https://example.com/f" target="_blank"></form>',
+      );
+      const [a, b] = Array.from(out.querySelectorAll("a"));
+      const form = out.querySelector("form");
+
+      expect(a.getAttribute("target")).toBe("_blank");
+      expect(a.getAttribute("rel")).toBe("noopener noreferrer");
+      expect(b.getAttribute("target")).toBe("_blank");
+      expect(b.getAttribute("rel")).toBe("noopener noreferrer");
+      expect(form?.getAttribute("target")).toBe("_blank");
+      expect(form?.getAttribute("rel")).toBe("noopener noreferrer");
+    });
+
+    it("drops any target other than _blank and leaves untargeted links alone", () => {
+      const out = render(
+        '<iframe name="f1" src="https://example.com"></iframe>' +
+          '<a href="/web/x" target="f1">named</a>' +
+          '<a href="https://example.com" target="_top">top</a>' +
+          '<form action="/web/x" target="f1"></form>' +
+          '<a href="https://example.com" rel="nofollow">plain</a>',
+      );
+      const [named, top, plain] = Array.from(out.querySelectorAll("a"));
+
+      expect(named.hasAttribute("target")).toBe(false);
+      expect(top.hasAttribute("target")).toBe(false);
+      expect(out.querySelector("form")?.hasAttribute("target")).toBe(false);
+      expect(plain.hasAttribute("target")).toBe(false);
+      expect(plain.getAttribute("rel")).toBe("nofollow");
+    });
+
     it("registers its iframe hook once, on a private DOMPurify instance", () => {
       const addHookSpy = vi.spyOn(htmlPanelPurifier, "addHook");
 
