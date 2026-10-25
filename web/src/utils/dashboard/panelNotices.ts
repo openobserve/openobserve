@@ -18,7 +18,8 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { addCommasToNumber } from "@/utils/formatters";
 import type { PanelDiagnostics, SeriesLimitInfo } from "./panelDiagnostics";
 
-export type PanelNoticeId = "function-error" | "series-cap" | "partial" | "interrupted";
+export type PanelNoticeId =
+  "function-error" | "series-cap" | "return-links" | "partial" | "interrupted";
 
 export type PanelNoticeActionId = "use-top-n" | "edit-function" | "refresh";
 
@@ -40,6 +41,8 @@ export interface PanelNoticeInput {
   seriesLimit?: SeriesLimitInfo | null;
   seriesLimitMessage?: string;
   seriesTotalBound?: SeriesTotalBound;
+  /** Sankey links redirected to a return node because they closed a cycle. */
+  returnLinks?: number;
   serverPartial?: boolean;
   partialReasons?: string[];
   interrupted?: boolean;
@@ -135,6 +138,19 @@ export const buildPanelNotices = (input: PanelNoticeInput, t: TranslateFn): Pane
   }
 
   if (input.seriesLimit || input.seriesLimitMessage) notices.push(seriesCapNotice(input, t));
+
+  if (input.returnLinks) {
+    const count = input.returnLinks;
+    notices.push({
+      id: "return-links",
+      tone: "warning",
+      icon: "alt-route",
+      chipLabel: t("dashboard.panelErrorButtons.returnLinksChip", { count }, count),
+      title: t("dashboard.panelErrorButtons.returnLinksTitle"),
+      body: t("dashboard.panelErrorButtons.returnLinksBody", { count }, count),
+      details: [],
+    });
+  }
 
   if (input.serverPartial) {
     notices.push({

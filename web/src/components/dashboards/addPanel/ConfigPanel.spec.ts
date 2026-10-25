@@ -2016,6 +2016,19 @@ describe("ConfigPanel", () => {
       expect(colorBySeriesStub.exists()).toBe(true);
     });
 
+    it("shows the palette for sankey panels but not the per-series colours", async () => {
+      wrapper = createWrapper({
+        dashboardPanelData: {
+          ...mockDashboardPanelData,
+          data: { ...mockDashboardPanelData.data, type: "sankey" },
+        },
+      });
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.showColorPalette).toBe(true);
+      expect(wrapper.find('[data-test="color-by-series-stub"]').exists()).toBe(false);
+    });
+
     it("should render stubbed components when they exist", () => {
       wrapper = createWrapper();
 

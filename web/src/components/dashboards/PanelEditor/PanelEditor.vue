@@ -298,6 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @result-metadata-update="onResultMetadataUpdate"
                         @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
                         @series-limit-update="handleSeriesLimitUpdate"
+                        @return-links-update="handleReturnLinksUpdate"
                         @limit-number-of-series-warning-message-update="
                           handleLimitNumberOfSeriesWarningMessage
                         "
@@ -612,6 +613,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @result-metadata-update="onResultMetadataUpdate"
                           @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
                           @series-limit-update="handleSeriesLimitUpdate"
+                          @return-links-update="handleReturnLinksUpdate"
                           @limit-number-of-series-warning-message-update="
                             handleLimitNumberOfSeriesWarningMessage
                           "
@@ -893,6 +895,7 @@ const {
   handleResultMetadataUpdate,
   handlePanelDiagnosticsUpdate,
   handleSeriesLimitUpdate,
+  handleReturnLinksUpdate,
   metaDataValue,
   seriesDataUpdate,
   collapseFieldList: baseCollapseFieldList,

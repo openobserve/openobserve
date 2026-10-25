@@ -304,6 +304,11 @@ export default defineComponent({
       type: Object as PropType<SeriesLimitInfo | null>,
       default: null,
     },
+    /** Sankey links redirected to a return node because they closed a cycle. */
+    returnLinks: {
+      type: Number,
+      default: 0,
+    },
     serverPartial: {
       type: Boolean,
       default: false,
@@ -386,6 +391,7 @@ export default defineComponent({
             rowsCapped: props.rowsCapped,
             serverPartial: props.serverPartial,
           }),
+          returnLinks: props.returnLinks,
           serverPartial: props.serverPartial,
           partialReasons: props.serverPartialReasons,
           interrupted: props.isPartialData && !props.isPanelLoading,

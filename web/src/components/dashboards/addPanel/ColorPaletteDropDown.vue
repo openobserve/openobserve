@@ -69,12 +69,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </OSelectItem>
 
-          <OSelectItem value="fixed" :label="t('dashboard.colorSingleColor')" />
-          <OSelectItem value="shades" :label="t('dashboard.colorShadesOfSpecificColor')" />
+          <template v-if="!categoricalOnly">
+            <OSelectItem value="fixed" :label="t('dashboard.colorSingleColor')" />
+            <OSelectItem value="shades" :label="t('dashboard.colorShadesOfSpecificColor')" />
+          </template>
         </OSelectGroup>
 
         <!-- By Value group -->
-        <OSelectGroup :label="t('dashboard.colorByValue')">
+        <OSelectGroup v-if="!categoricalOnly" :label="t('dashboard.colorByValue')">
           <OSelectItem
             v-for="opt in colorOptionsByGroup.byValue"
             :key="opt.value"
@@ -186,6 +188,9 @@ export default defineComponent({
     });
 
     const store = useStore();
+
+    // Sankey nodes have no series value, so only the categorical palettes apply.
+    const categoricalOnly = computed(() => dashboardPanelData.data.type === "sankey");
 
     const colorOptions: ColorOption[] = [
       {
@@ -319,6 +324,7 @@ export default defineComponent({
       promqlMode,
       colorOptions,
       colorOptionsByGroup,
+      categoricalOnly,
       onColorModeChange,
       selectedOptionLabel,
       selectedOptionPalette,

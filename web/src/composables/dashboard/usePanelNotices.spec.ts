@@ -64,9 +64,11 @@ describe("usePanelNotices", () => {
       partialReasons: ["Warn: results are capped to meet default limit"],
     });
     notices.handleSeriesLimitUpdate({ shown: 100, total: 1000, cap: 100 });
+    notices.handleReturnLinksUpdate(2);
 
     expect(notices.noticeProps.value).toEqual({
       seriesLimit: { shown: 100, total: 1000, cap: 100 },
+      returnLinks: 2,
       serverPartial: true,
       rowsCapped: true,
       serverPartialReasons: ["Warn: results are capped to meet default limit"],
@@ -75,6 +77,7 @@ describe("usePanelNotices", () => {
 
     notices.resetNotices();
     expect(notices.noticeProps.value.functionErrors).toEqual([]);
+    expect(notices.noticeProps.value.returnLinks).toBe(0);
     expect(notices.maxQueryRangeWarning.value).toBe("");
   });
 });

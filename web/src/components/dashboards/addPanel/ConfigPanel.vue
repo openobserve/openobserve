@@ -1846,7 +1846,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
         <ColorPaletteDropDown />
-        <ColorBySeries :colorBySeriesData="panelData" />
+        <ColorBySeries
+          v-if="dashboardPanelData.data.type !== 'sankey'"
+          :colorBySeriesData="panelData"
+        />
       </div>
     </OCollapsible>
 
@@ -2794,6 +2797,7 @@ export default defineComponent({
         "pie",
         "donut",
         "gauge",
+        "sankey",
       ].includes(dashboardPanelData.data.type);
     });
 

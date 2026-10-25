@@ -582,6 +582,7 @@ export default defineComponent({
     "loading-state-change",
     "limit-number-of-series-warning-message-update",
     "series-limit-update",
+    "return-links-update",
     "panel-diagnostics-update",
     "sparkline-warning-update",
     "is-partial-data-update",
@@ -648,6 +649,7 @@ export default defineComponent({
 
     const limitNumberOfSeriesWarningMessage: any = ref("");
     const seriesLimit = ref<SeriesLimitInfo | null>(null);
+    const returnLinks = ref(0);
 
     const chartPanelStyle = ref({
       height: "100%",
@@ -1470,6 +1472,7 @@ export default defineComponent({
           limitNumberOfSeriesWarningMessage.value =
             panelData.value?.extras?.limitNumberOfSeriesWarningMessage ?? "";
           seriesLimit.value = panelData.value?.extras?.seriesLimit ?? null;
+          returnLinks.value = panelData.value?.extras?.sankeyReturnLinks ?? 0;
 
           errorDetail.value = {
             message: "",
@@ -1817,6 +1820,10 @@ export default defineComponent({
 
     watch(seriesLimit, (value) => {
       emit("series-limit-update", value);
+    });
+
+    watch(returnLinks, (value) => {
+      emit("return-links-update", value);
     });
 
     watch(

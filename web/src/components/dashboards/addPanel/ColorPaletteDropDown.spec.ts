@@ -116,6 +116,43 @@ describe("ColorPaletteDropDown", () => {
     }
   });
 
+  describe("sankey panels", () => {
+    const mountWithItems = () =>
+      mount(ColorPaletteDropDown, {
+        global: {
+          provide: { dashboardPanelDataPageKey: "dashboard" },
+          stubs: {
+            OSelect: { template: "<div><slot /></div>" },
+            OSelectGroup: {
+              template: '<div data-test="select-group"><slot /></div>',
+              props: ["label"],
+            },
+            OSelectItem: {
+              template: '<div data-test="select-item" :data-value="value"><slot /></div>',
+              props: ["value", "label"],
+            },
+          },
+        },
+      });
+    const itemValues = (w: VueWrapper) =>
+      w.findAll('[data-test="select-item"]').map((item) => item.attributes("data-value"));
+
+    it("offers only the categorical palettes for a sankey panel", () => {
+      (mockDashboardPanelData.data as any).type = "sankey";
+      wrapper = mountWithItems();
+      expect(itemValues(wrapper)).toEqual(["palette-classic-by-series", "palette-classic"]);
+      expect(wrapper.findAll('[data-test="select-group"]')).toHaveLength(1);
+    });
+
+    it("keeps every palette mode for other chart types", () => {
+      (mockDashboardPanelData.data as any).type = "bar";
+      wrapper = mountWithItems();
+      expect(itemValues(wrapper)).toContain("fixed");
+      expect(itemValues(wrapper)).toContain("continuous-temperature");
+      expect(wrapper.findAll('[data-test="select-group"]')).toHaveLength(2);
+    });
+  });
+
   describe("Component Initialization", () => {
     it("should render the component", () => {
       wrapper = createWrapper();

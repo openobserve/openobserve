@@ -257,6 +257,83 @@ describe("usePanelDrilldown", () => {
     );
   });
 
+  describe("sankey return nodes", () => {
+    const sankeyDeps = (drilldown: any) => {
+      const deps = makeDeps();
+      deps.panelSchema.value.type = "sankey";
+      deps.panelSchema.value.config.drilldown = [drilldown];
+      return deps;
+    };
+    const returnEdge = {
+      componentType: "series",
+      componentSubType: "sankey",
+      dataType: "edge",
+      event: { offsetX: 40, offsetY: 50 },
+      data: {
+        source: "B",
+        target: "\u0000\u21a9A",
+        rawSource: "B",
+        rawTarget: "A",
+        value: 4,
+      },
+    };
+    const returnNode = {
+      componentType: "series",
+      componentSubType: "sankey",
+      dataType: "node",
+      event: { offsetX: 40, offsetY: 50 },
+      name: "\u0000\u21a9A",
+      value: 4,
+      data: { name: "\u0000\u21a9A", rawName: "A", isReturn: true },
+    };
+
+    it("passes the real names of a return link to a URL drilldown", async () => {
+      const open = vi.spyOn(window, "open").mockImplementation(() => null);
+      const deps = sankeyDeps({
+        name: "Edge",
+        type: "byUrl",
+        data: { url: "https://example.com/?s=${edge.__source}&t=${edge.__target}" },
+      });
+      const api = usePanelDrilldown(deps as any);
+
+      await api.onChartClick(returnEdge);
+      await api.openDrilldown(0);
+
+      expect(open).toHaveBeenCalledWith(
+        "https://example.com/?s=B&t=A",
+        expect.anything(),
+        expect.anything(),
+      );
+      open.mockRestore();
+    });
+
+    it("passes the real name of a return node to a custom logs drilldown", async () => {
+      const deps = sankeyDeps({
+        name: "Logs",
+        type: "logs",
+        targetBlank: false,
+        data: {
+          logsMode: "custom",
+          logsQuery: `SELECT * FROM "default" WHERE svc = \${node.__name}`,
+        },
+      });
+      const api = usePanelDrilldown(deps as any);
+
+      await api.onChartClick(returnNode);
+      await api.openDrilldown(0);
+
+      await vi.waitFor(() =>
+        expect(deps.router.push).toHaveBeenCalledWith(
+          expect.objectContaining({
+            query: expect.objectContaining({
+              query: `b64(SELECT * FROM "default" WHERE svc = 'A')`,
+            }),
+          }),
+        ),
+      );
+    });
+  });
+
   describe("state timeline segment", () => {
     const segmentClick = {
       componentType: "series",

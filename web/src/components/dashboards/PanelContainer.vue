@@ -426,6 +426,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         @sparkline-warning-update="handleSparklineWarningUpdate"
         @series-limit-update="handleSeriesLimitUpdate"
+        @return-links-update="handleReturnLinksUpdate"
         @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
         @result-metadata-update="handleResultMetadataUpdate"
         @last-triggered-at-update="handleLastTriggeredAtUpdate"
@@ -755,11 +756,13 @@ export default defineComponent({
     const {
       panelDiagnostics,
       seriesLimit,
+      returnLinks,
       maxQueryRangeWarning,
       noticeProps,
       handleResultMetadataUpdate,
       handlePanelDiagnosticsUpdate,
       handleSeriesLimitUpdate,
+      handleReturnLinksUpdate,
     } = usePanelNotices(() => store.state.timezone);
 
     // to store and show when the panel was last loaded
@@ -834,6 +837,7 @@ export default defineComponent({
       () =>
         !!limitNumberOfSeriesWarningMessage.value ||
         !!seriesLimit.value ||
+        returnLinks.value > 0 ||
         !!panelDiagnostics.value?.serverPartial ||
         !!panelDiagnostics.value?.functionErrors?.length ||
         (isPartialData.value && !isPanelLoading.value),
@@ -1293,6 +1297,7 @@ export default defineComponent({
       seriesLimit,
       noticeProps,
       handleSeriesLimitUpdate,
+      handleReturnLinksUpdate,
       canEditFromNotice,
       canRefreshFromNotice,
       canInspectFromNotice,

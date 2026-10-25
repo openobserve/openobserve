@@ -225,6 +225,7 @@
                   @result-metadata-update="handleResultMetadataUpdate"
                   @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
                   @series-limit-update="handleSeriesLimitUpdate"
+                  @return-links-update="handleReturnLinksUpdate"
                   @limit-number-of-series-warning-message-update="
                     handleLimitNumberOfSeriesWarningMessage
                   "
@@ -466,6 +467,7 @@ export default defineComponent({
       handleResultMetadataUpdate,
       handlePanelDiagnosticsUpdate,
       handleSeriesLimitUpdate,
+      handleReturnLinksUpdate,
     } = usePanelNotices(() => store.state.timezone);
     const limitNumberOfSeriesWarningMessage = ref("");
     const sparklineWarning = ref("");
@@ -1056,6 +1058,7 @@ export default defineComponent({
       noticeProps,
       handlePanelDiagnosticsUpdate,
       handleSeriesLimitUpdate,
+      handleReturnLinksUpdate,
       canEditFromNotice,
       onNoticeEditPanel,
       limitNumberOfSeriesWarningMessage,
