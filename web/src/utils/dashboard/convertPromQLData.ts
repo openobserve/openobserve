@@ -979,6 +979,8 @@ export const convertPromQLData = async (
 
   const primaryByMetric = new Map<any, any>();
   const shiftedTwins: [any, any][] = [];
+  // Metric cells past the cap are counted for the notice but never built.
+  let metricCellsSeen = 0;
 
   options.series = limitedSearchQueryData.map((it: any, index: number) => {
     // A stream that has not delivered yet is an undefined slot; the gauge fall-through would make it an undefined series.
@@ -1325,14 +1327,18 @@ export const convertPromQLData = async (
         isTimeSeriesFlag = false;
         // An instant query returns a "vector" (one `value` per series), a range query a "matrix".
         if (it?.resultType !== "vector" && it?.resultType !== "matrix") return [];
-        return (it?.result ?? []).map((metric: any) =>
-          buildPromQLMetricCell(
-            metric,
-            nameOf(seriesNames, metric.metric, index),
-            panelSchema,
-            seriesOverrides,
-          ),
-        );
+        const room = Math.max(0, METRIC_MAX_CELLS - metricCellsSeen);
+        metricCellsSeen += it?.result?.length ?? 0;
+        return (it?.result ?? [])
+          .slice(0, room)
+          .map((metric: any) =>
+            buildPromQLMetricCell(
+              metric,
+              nameOf(seriesNames, metric.metric, index),
+              panelSchema,
+              seriesOverrides,
+            ),
+          );
       }
       default: {
         return [];
@@ -1371,9 +1377,12 @@ export const convertPromQLData = async (
 
   if (panelSchema.type === "metric") {
     const built = options.series.flat();
-    if (built.length > METRIC_MAX_CELLS) {
-      setSeriesLimit(METRIC_MAX_CELLS, extras.seriesLimit?.total ?? built.length, METRIC_MAX_CELLS);
-      built.length = METRIC_MAX_CELLS;
+    if (metricCellsSeen > METRIC_MAX_CELLS) {
+      setSeriesLimit(
+        METRIC_MAX_CELLS,
+        extras.seriesLimit?.total ?? metricCellsSeen,
+        METRIC_MAX_CELLS,
+      );
     }
     options.series = layoutPromQLMetric(options, built, panelSchema, chartPanelRef?.value);
   }
