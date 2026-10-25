@@ -62,7 +62,7 @@ const collectLinks = (panelSchema: any, searchQueryData: any[]): Map<string, San
   return links;
 };
 
-/** Finds the links that close a cycle (self-loops included) with a DFS that visits natural sources first. */
+/** Finds links that close a cycle, self-loops included, starting the DFS at natural sources. */
 const findBackEdges = (nodes: string[], links: SankeyLink[]): Set<SankeyLink> => {
   const outgoing = new Map<string, SankeyLink[]>();
   const inDegree = new Map<string, number>();
@@ -126,10 +126,7 @@ const nodeColorResolver = (config: any) => {
   };
 };
 
-/**
- * Converts SQL rows into a sankey chart. Duplicate links are summed and every link that would
- * close a cycle is redirected to a return node, because the sankey layout only accepts a DAG.
- */
+/** Builds the sankey chart; links that close a cycle end at a return node, as the layout needs a DAG. */
 export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
   const hasValidQuery = panelSchema.queries?.some(
     (query: any) => query.fields?.source && query.fields?.target && query.fields?.value,
