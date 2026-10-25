@@ -15,7 +15,8 @@
 
 /** Value-axis max for a bar track: the set max, else the largest bar, so the largest bar fills its track. */
 export const barTrackMax = (configMax: unknown, dataMax: number): number | undefined => {
-  if (typeof configMax === "number" && Number.isFinite(configMax)) return configMax;
+  const set = typeof configMax === "string" && configMax.trim() !== "" ? Number(configMax) : configMax;
+  if (typeof set === "number" && Number.isFinite(set)) return set;
   return Number.isFinite(dataMax) && dataMax > 0 ? dataMax : undefined;
 };
 

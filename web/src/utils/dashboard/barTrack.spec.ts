@@ -19,6 +19,8 @@ import { barTrackMax, mergeBarTrackMax } from "./barTrack";
 describe("barTrackMax", () => {
   it("uses a numeric y_axis_max as is", () => {
     expect(barTrackMax(50, 70)).toBe(50);
+    expect(barTrackMax("50", 70)).toBe(50);
+    expect(barTrackMax("", 70)).toBe(70);
   });
 
   it("falls back to the largest bar when y_axis_max is unset or cleared", () => {

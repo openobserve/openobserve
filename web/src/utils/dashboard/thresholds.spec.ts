@@ -514,6 +514,26 @@ describe("axis reach for limit lines", () => {
     expect(colourOnly.yAxis.max).toBeUndefined();
   });
 
+  it("stretches a bar track pinned to the data max to a limit above it", () => {
+    const hBar = (max: number) => ({
+      series: [{ type: "bar", data: [{ value: 40 }, { value: 90 }] }],
+      yAxis: { type: "category", data: ["a", "b"] },
+      xAxis: { type: "value", max },
+    });
+    const options: any = hBar(90);
+    applyLineAreaThresholds(
+      options,
+      panel("h-bar", { steps: [{ value: 1000, color: RED }] }, { show_bar_track: true }),
+    );
+    expect(options.xAxis.max).toBe(1500);
+    const userMax: any = hBar(50);
+    applyLineAreaThresholds(
+      userMax,
+      panel("h-bar", { steps: [{ value: 1000, color: RED }] }, { show_bar_track: true, y_axis_max: 50 }),
+    );
+    expect(userMax.xAxis.max).toBe(50);
+  });
+
   it("stretches each trellis axis by its own limits", () => {
     const options: any = { ...lineOptions(), yAxis: [{}, {}] };
     options.series[1].yAxisIndex = 1;

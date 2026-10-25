@@ -403,7 +403,11 @@ const extendAxisToLimits = (
   const userMax = toNumber(config?.y_axis_max) !== null || typeof axis.max === "number";
   const userMin = toNumber(config?.y_axis_min) !== null || typeof axis.min === "number";
   // A bar track pinned to the data max still has to reach the limit lines.
-  if (config?.show_bar_track && toNumber(config?.y_axis_max) === null && typeof axis.max === "number") {
+  if (
+    config?.show_bar_track &&
+    toNumber(config?.y_axis_max) === null &&
+    typeof axis.max === "number"
+  ) {
     const target = high + (high - Math.min(low, 0)) * 0.1;
     if (axis.max < target) axis.max = niceBound(target, true);
   }
