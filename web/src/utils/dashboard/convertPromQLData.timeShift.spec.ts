@@ -633,7 +633,7 @@ describe("convertPromQLData with time-shifted results", () => {
     },
   );
 
-  it.each(["area-stacked", "stacked"])(
+  it.each(["area-stacked", "stacked", "h-stacked"])(
     "totals each period apart in the %s tooltip, so the past period never adds to the current Total",
     async (type) => {
       const pods = (shiftS: number, a: string, b: string) =>
