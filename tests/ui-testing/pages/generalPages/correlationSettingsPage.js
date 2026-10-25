@@ -83,9 +83,8 @@ export class CorrelationSettingsPage {
 
     /**
      * Ensure semantic groups exist in the backend for testing fingerprint checkboxes
-     * Uses PUT /api/{org}/alerts/deduplication/semantic-groups to set semantic groups
-     * AND POST /api/{org}/alerts/deduplication/config to include them in the config
-     * The frontend reads semantic groups from the config endpoint first
+     * Adds only the missing test groups to the org's current groups (GET then PUT) so the
+     * defaults other specs rely on (e.g. `host` for Downtimes) survive in the shared org
      * @param {string} orgId - Organization identifier
      * @returns {Promise<boolean>} - True if successful
      */
@@ -128,17 +127,34 @@ export class CorrelationSettingsPage {
         testLogger.info('Setting up test semantic groups via API', { orgId, groupCount: testSemanticGroups.length });
 
         try {
-            // Step 1: PUT semantic groups to the semantic-groups endpoint
-            const putUrl = `${baseUrl}/api/${orgId}/alerts/deduplication/semantic-groups`;
-            testLogger.info('PUT semantic groups', { url: putUrl });
+            const groupsUrl = `${baseUrl}/api/${orgId}/alerts/deduplication/semantic-groups`;
 
-            const putResponse = await fetch(putUrl, {
+            // A plain PUT replaces the whole list, wiping defaults that other specs in this org depend on
+            const getResponse = await fetch(groupsUrl, {
+                method: 'GET',
+                headers: { 'Authorization': authHeader }
+            });
+            if (!getResponse.ok) {
+                throw new Error(`GET semantic-groups failed: ${getResponse.status} ${await getResponse.text()}`);
+            }
+            const current = await getResponse.json();
+            const currentIds = new Set(current.map(g => g.id));
+            const missing = testSemanticGroups.filter(g => !currentIds.has(g.id));
+            if (missing.length === 0) {
+                testLogger.info('Test semantic groups already present', { orgId, existing: current.length });
+                return true;
+            }
+            const mergedGroups = current.concat(missing);
+
+            testLogger.info('PUT semantic groups', { url: groupsUrl, existing: current.length, adding: missing.map(g => g.id) });
+
+            const putResponse = await fetch(groupsUrl, {
                 method: 'PUT',
                 headers: {
                     'Authorization': authHeader,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(testSemanticGroups)
+                body: JSON.stringify(mergedGroups)
             });
 
             const putText = await putResponse.text();
