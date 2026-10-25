@@ -576,7 +576,6 @@ describe("convertCustomChartData", () => {
       theme: "dark" as const,
     };
 
-    // Runs the srcdoc's inline sandbox script against fake window/parent objects.
     const runSandbox = async (code: string, ctx?: typeof context) => {
       const acorn = await import("acorn");
       vi.mocked(acorn.parse).mockReturnValue({ type: "Program", body: [] } as any);

@@ -1413,6 +1413,8 @@ describe("PanelSchemaRenderer", () => {
               { name: "regions", value: ["eu", "us"] },
               { name: "env", value: "_o2_all_" },
               { name: "zones", value: ["_o2_all_"] },
+              { name: "picked", value: [] },
+              { name: "unset", value: null },
             ],
           },
           currentVariablesData: { values: [{ name: "service", value: "uncommitted" }] },
@@ -1429,7 +1431,14 @@ describe("PanelSchemaRenderer", () => {
         await flushPromises();
 
         expect(vi.mocked(convertPanelData).mock.calls.at(-1)?.[11]).toEqual({
-          variables: { service: "api", regions: ["eu", "us"], env: null, zones: null },
+          variables: {
+            service: "api",
+            regions: ["eu", "us"],
+            env: null,
+            zones: null,
+            picked: null,
+            unset: null,
+          },
           timeRange: { start: 1_700_000_000_000_000, end: 1_700_000_600_000_000 },
           timezone: "Asia/Kolkata",
           theme: "dark",
@@ -1456,6 +1465,36 @@ describe("PanelSchemaRenderer", () => {
 
         expect(convertPanelData).toHaveBeenCalled();
         expect(vi.mocked(convertPanelData).mock.calls.at(-1)?.[11]).toBeUndefined();
+      });
+
+      it("re-runs custom chart code when a variable the query does not use changes", async () => {
+        const isFirstLoadSettled = ref(false);
+        const data = ref<any[]>([]);
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ isFirstLoadSettled, data }) as any,
+        );
+        wrapper = createWrapper({
+          variablesData: { values: [{ name: "threshold", value: "5" }] },
+          panelSchema: {
+            ...defaultProps.panelSchema,
+            type: "custom_chart",
+            customChartContent: "option = {}",
+            queries: [{ query: "SELECT 1", customQuery: true, fields: {}, config: {} }],
+          },
+        });
+        await flushPromises();
+        data.value = [[{ count: 1 }]];
+        isFirstLoadSettled.value = true;
+        await flushPromises();
+        const callsBefore = vi.mocked(convertPanelData).mock.calls.length;
+
+        await wrapper.setProps({ variablesData: { values: [{ name: "threshold", value: "9" }] } });
+        await flushPromises();
+
+        expect(vi.mocked(convertPanelData).mock.calls.length).toBeGreaterThan(callsBefore);
+        expect(vi.mocked(convertPanelData).mock.calls.at(-1)?.[11]?.variables).toEqual({
+          threshold: "9",
+        });
       });
 
       it("re-runs custom chart code with the new theme when the theme changes", async () => {

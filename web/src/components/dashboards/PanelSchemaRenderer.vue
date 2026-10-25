@@ -1547,6 +1547,17 @@ export default defineComponent({
       { deep: true },
     );
 
+    // The loader reloads only for query-referenced variables, but chart code may read any of them.
+    watch(
+      () => props.variablesData?.values,
+      () => {
+        if (panelSchema.value?.type === "custom_chart" && data.value?.length) {
+          convertPanelDataCommon();
+        }
+      },
+      { deep: true },
+    );
+
     // Watch for hiddenQueries changes to re-render the chart
     watch(
       hiddenQueries,
@@ -2149,9 +2160,10 @@ export default defineComponent({
       for (const v of props.variablesData?.values ?? []) {
         if (!v?.name) continue;
         const isAll =
+          v.value == null ||
           v.value === SELECT_ALL_VALUE ||
-          (Array.isArray(v.value) && v.value.includes(SELECT_ALL_VALUE));
-        // Only queries resolve the All sentinel, so chart code gets null instead.
+          (Array.isArray(v.value) && (!v.value.length || v.value.includes(SELECT_ALL_VALUE)));
+        // Queries run an empty value or the All sentinel as All, so chart code gets null for both.
         variables[v.name] = isAll ? null : v.value;
       }
       return {
