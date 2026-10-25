@@ -15,6 +15,7 @@
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { convertGeoMapData } from "./convertGeoMapData";
+import { getUnitValue } from "./convertDataIntoUnitValue";
 
 // Mock the convertDataIntoUnitValue functions
 vi.mock("./convertDataIntoUnitValue", () => ({
@@ -1123,9 +1124,13 @@ describe("convertGeoMapData", () => {
         weight: { alias: "hits" },
       });
 
-      const result: any = convertGeoMapData(panelSchema, [[{ lat: 1, lng: 2, hits: 5 }]]);
+      const result: any = convertGeoMapData(
+        { ...panelSchema, config: { ...panelSchema.config, unit: "bytes", decimals: 1 } },
+        [[{ lat: 1, lng: 2, hits: 5 }]],
+      );
 
       expect(result.options.visualMap.formatter(1024)).toBe("100.00 KB");
+      expect(getUnitValue).toHaveBeenLastCalledWith(1024, "bytes", undefined, 1);
     });
   });
 });
