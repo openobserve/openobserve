@@ -695,6 +695,11 @@ describe("area fill opacity and gradient", () => {
     expect(typeof web.areaStyle.color).toBe("string");
   });
 
+  it("PromQL area with thresholds: the recoloured fill takes the set opacity", async () => {
+    const options = await runPromQL(promPanel("area", { ...flat, thresholds: STEPS }), two());
+    expect(named(options, "api").areaStyle).toEqual({ opacity: 0.4 });
+  });
+
   it("PromQL area: a set opacity with the gradient fades to transparent", async () => {
     const options = await runPromQL(promPanel("area", { fill_opacity: 70 }), two());
     const fill = named(options, "api").areaStyle;

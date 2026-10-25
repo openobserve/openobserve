@@ -268,12 +268,7 @@ export const shouldShowLineThickness = (dashboardPanelData: any, promqlMode: boo
   );
 };
 
-/**
- * Check if area fill opacity input and fill gradient toggle should be displayed
- * Used by: fill_opacity input, fill_gradient toggle
- * @param dashboardPanelData - The dashboard panel data
- * @returns boolean indicating if area fill config should be displayed
- */
+/** Fill opacity and gradient apply to the unstacked area chart only. */
 export const shouldShowAreaFillConfig = (dashboardPanelData: any): boolean => {
   return dashboardPanelData.data.type === "area";
 };

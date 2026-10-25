@@ -434,13 +434,7 @@ export const getAreaFillOpacity = (panelType: string, config: any): number | nul
   return Math.min(Math.max(percent, 0), 100) / 100;
 };
 
-/**
- * Builds the `{ areaStyle: {...} }` override for area charts — fades the fill
- * into a bottom-to-top transparent gradient. Returns `{}` for non-area charts
- * or when there's no base areaStyle. Resolves a concrete color from the palette
- * when the series color is null (auto-palette mode). Shared by the PromQL and
- * SQL chart builders so the area fill stays consistent.
- */
+/** The `{ areaStyle }` override for area charts: the theme gradient, or the `area` panel's own fill opacity and gradient; `{}` for other charts. */
 export const getAreaStyleOverride = (
   panelType: string,
   baseAreaStyle: any,
