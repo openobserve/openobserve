@@ -1,0 +1,1071 @@
+{
+  "version": 8,
+  "dashboardId": "",
+  "title": "MySQL / Overview",
+  "description": "Connections, transactions, row activity, locks and InnoDB buffer pool for MySQL and MariaDB servers reporting through the OpenTelemetry mysql receiver.",
+  "role": "ready-made:mysql/overview:1",
+  "owner": "",
+  "created": "2026-10-12T00:00:00.000Z",
+  "tabs": [
+    {
+      "tabId": "default",
+      "name": "Overview",
+      "panels": [
+        {
+          "id": "mysql_note",
+          "type": "markdown",
+          "title": "",
+          "description": "",
+          "config": {
+            "show_legends": false,
+            "legends_position": null
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "",
+              "vrlFunctionQuery": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 192,
+            "h": 4,
+            "i": 0
+          },
+          "htmlContent": "",
+          "markdownContent": "Ready-made by OpenObserve. Charts fill in within a few minutes of new data. Edit or delete anything, including this note."
+        },
+        {
+          "id": "mysql_uptime",
+          "type": "metric",
+          "title": "Uptime",
+          "description": "Time since each server started; a drop means it restarted.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "seconds",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "max by (mysql_instance_endpoint)(mysql_uptime{mysql_instance_endpoint=~\"$instance\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "mysql_uptime",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{mysql_instance_endpoint}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 4,
+            "w": 64,
+            "h": 6,
+            "i": 1
+          }
+        },
+        {
+          "id": "mysql_connections",
+          "type": "metric",
+          "title": "Connections",
+          "description": "Connected client threads per server.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (mysql_instance_endpoint)(mysql_threads{mysql_instance_endpoint=~\"$instance\",kind=\"connected\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "mysql_threads",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{mysql_instance_endpoint}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 64,
+            "y": 4,
+            "w": 64,
+            "h": 6,
+            "i": 2
+          }
+        },
+        {
+          "id": "mysql_connection_use",
+          "type": "metric",
+          "title": "Connection use",
+          "description": "Connected threads as a share of max_connections, per server. Uses mysql_connection_max from the setup page's sqlquery receiver; without that receiver this stays empty.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "percent",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "100 * sum by (mysql_instance_endpoint)(mysql_threads{mysql_instance_endpoint=~\"$instance\",kind=\"connected\"}) / max by (mysql_instance_endpoint)(mysql_connection_max{mysql_instance_endpoint=~\"$instance\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "mysql_threads",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{mysql_instance_endpoint}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 128,
+            "y": 4,
+            "w": 64,
+            "h": 6,
+            "i": 3
+          }
+        },
+        {
+          "id": "mysql_threads_running",
+          "type": "metric",
+          "title": "Running threads",
+          "description": "Threads executing a statement right now, per server.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (mysql_instance_endpoint)(mysql_threads{mysql_instance_endpoint=~\"$instance\",kind=\"running\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "mysql_threads",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{mysql_instance_endpoint}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 10,
+            "w": 64,
+            "h": 6,
+            "i": 4
+          }
+        },
+        {
+          "id": "mysql_rows_read_rate",
+          "type": "metric",
+          "title": "Rows read/s",
+          "description": "Rows read from InnoDB tables per second, per server.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (mysql_instance_endpoint)(rate(mysql_row_operations{mysql_instance_endpoint=~\"$instance\",operation=\"read\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "mysql_row_operations",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{mysql_instance_endpoint}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 64,
+            "y": 10,
+            "w": 64,
+            "h": 6,
+            "i": 5
+          }
+        },
+        {
+          "id": "mysql_rows_written_rate",
+          "type": "metric",
+          "title": "Rows written/s",
+          "description": "Rows inserted, updated and deleted in InnoDB tables per second, per server.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (mysql_instance_endpoint)(rate(mysql_row_operations{mysql_instance_endpoint=~\"$instance\",operation=~\"^(inserted|updated|deleted)$\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "mysql_row_operations",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{mysql_instance_endpoint}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 128,
+            "y": 10,
+            "w": 64,
+            "h": 6,
+            "i": 6
+          }
+        },
+        {
+          "id": "mysql_rollbacks",
+          "type": "line",
+          "title": "Rollbacks/s",
+          "description": "Transaction rollback requests per second (Handler_rollback), per server. Flat at 0 is healthy: nothing was rolled back.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 3,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (mysql_instance_endpoint)(rate(mysql_handlers{mysql_instance_endpoint=~\"$instance\",kind=\"rollback\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "mysql_handlers",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{mysql_instance_endpoint}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 16,
+            "w": 96,
+            "h": 14,
+            "i": 7
+          }
+        },
+        {
+          "id": "mysql_lock_waits",
+          "type": "line",
+          "title": "Lock waits/s",
+          "description": "Table locks that had to wait and InnoDB row lock waits per second. Flat at 0 is healthy: no query waited for a lock.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 3,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (mysql_instance_endpoint)(rate(mysql_locks{mysql_instance_endpoint=~\"$instance\",kind=\"waited\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "mysql_locks",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{mysql_instance_endpoint} table lock waits"
+              }
+            },
+            {
+              "query": "sum by (mysql_instance_endpoint)(rate(mysql_row_locks{mysql_instance_endpoint=~\"$instance\",kind=\"waits\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "mysql_row_locks",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{mysql_instance_endpoint} row lock waits"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 16,
+            "w": 96,
+            "h": 14,
+            "i": 8
+          }
+        },
+        {
+          "id": "mysql_row_lock_time",
+          "type": "line",
+          "title": "Row lock wait time",
+          "description": "Time spent waiting for InnoDB row locks, per second of wall time. Flat at 0 is healthy: no query waited for a row lock.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "milliseconds",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (mysql_instance_endpoint)(rate(mysql_row_locks{mysql_instance_endpoint=~\"$instance\",kind=\"time\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "mysql_row_locks",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{mysql_instance_endpoint}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 30,
+            "w": 96,
+            "h": 14,
+            "i": 9
+          }
+        },
+        {
+          "id": "mysql_tmp_disk_tables",
+          "type": "line",
+          "title": "Temporary tables on disk/s",
+          "description": "Internal temporary tables that spilled to disk per second; large sorts and GROUP BY queries usually cause them. Flat at 0 is healthy: every temporary table fit in memory.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 3,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (mysql_instance_endpoint)(rate(mysql_tmp_resources{mysql_instance_endpoint=~\"$instance\",resource=\"disk_tables\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "mysql_tmp_resources",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{mysql_instance_endpoint}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 30,
+            "w": 96,
+            "h": 14,
+            "i": 10
+          }
+        },
+        {
+          "id": "mysql_rows_read",
+          "type": "line",
+          "title": "Rows read/s",
+          "description": "Rows read from InnoDB tables per second.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (mysql_instance_endpoint)(rate(mysql_row_operations{mysql_instance_endpoint=~\"$instance\",operation=\"read\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "mysql_row_operations",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{mysql_instance_endpoint}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 44,
+            "w": 96,
+            "h": 16,
+            "i": 11
+          }
+        },
+        {
+          "id": "mysql_rows_written",
+          "type": "line",
+          "title": "Rows written/s",
+          "description": "Rows inserted, updated and deleted in InnoDB tables per second.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (mysql_instance_endpoint, operation)(rate(mysql_row_operations{mysql_instance_endpoint=~\"$instance\",operation=~\"^(inserted|updated|deleted)$\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "mysql_row_operations",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{mysql_instance_endpoint} {operation}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 44,
+            "w": 96,
+            "h": 16,
+            "i": 12
+          }
+        },
+        {
+          "id": "mysql_commits",
+          "type": "line",
+          "title": "Commits/s",
+          "description": "Transaction commit requests per second (Handler_commit).",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (mysql_instance_endpoint)(rate(mysql_handlers{mysql_instance_endpoint=~\"$instance\",kind=\"commit\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "mysql_handlers",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{mysql_instance_endpoint}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 60,
+            "w": 96,
+            "h": 16,
+            "i": 13
+          }
+        },
+        {
+          "id": "mysql_handler_reads",
+          "type": "line",
+          "title": "Handler reads/s",
+          "description": "Row reads by access path: a rising read_rnd_next means full table scans, read_key and read_next mean index lookups.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (kind)(rate(mysql_handlers{mysql_instance_endpoint=~\"$instance\",kind=~\"^read_.*$\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "mysql_handlers",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{kind}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 60,
+            "w": 96,
+            "h": 16,
+            "i": 14
+          }
+        },
+        {
+          "id": "mysql_innodb_io",
+          "type": "line",
+          "title": "InnoDB I/O operations/s",
+          "description": "InnoDB data file reads, writes and fsyncs per second.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (operation)(rate(mysql_operations{mysql_instance_endpoint=~\"$instance\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "mysql_operations",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{operation}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 76,
+            "w": 96,
+            "h": 16,
+            "i": 15
+          }
+        },
+        {
+          "id": "mysql_table_io_latency",
+          "type": "line",
+          "title": "Table I/O wait (average)",
+          "description": "Average wait per table I/O operation, per table (from performance_schema).",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "nanoseconds",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (schema, table)(rate(mysql_table_io_wait_time{mysql_instance_endpoint=~\"$instance\"}[5m])) / sum by (schema, table)(rate(mysql_table_io_wait_count{mysql_instance_endpoint=~\"$instance\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "mysql_table_io_wait_time",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{schema}.{table}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 76,
+            "w": 96,
+            "h": 16,
+            "i": 16
+          }
+        },
+        {
+          "id": "mysql_connections_vs_max",
+          "type": "line",
+          "title": "Connections vs max",
+          "description": "Connected threads against max_connections, per server. Uses mysql_connection_max from the setup page's sqlquery receiver; without that receiver this stays empty.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (mysql_instance_endpoint)(mysql_threads{mysql_instance_endpoint=~\"$instance\",kind=\"connected\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "mysql_threads",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{mysql_instance_endpoint} connected"
+              }
+            },
+            {
+              "query": "max by (mysql_instance_endpoint)(mysql_connection_max{mysql_instance_endpoint=~\"$instance\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "mysql_connection_max",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{mysql_instance_endpoint} max_connections"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 92,
+            "w": 96,
+            "h": 16,
+            "i": 17
+          }
+        },
+        {
+          "id": "mysql_threads",
+          "type": "line",
+          "title": "Threads",
+          "description": "Connected, running and cached threads per server; few cached threads under load means new connections pay to create one.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (mysql_instance_endpoint, kind)(mysql_threads{mysql_instance_endpoint=~\"$instance\",kind=~\"^(connected|running|cached)$\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "mysql_threads",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{mysql_instance_endpoint} {kind}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 92,
+            "w": 96,
+            "h": 16,
+            "i": 18
+          }
+        },
+        {
+          "id": "mysql_buffer_pool",
+          "type": "line",
+          "title": "Buffer pool usage",
+          "description": "InnoDB buffer pool bytes in use and dirty, against its configured size.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "bytes",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (mysql_instance_endpoint)(mysql_buffer_pool_usage{mysql_instance_endpoint=~\"$instance\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "mysql_buffer_pool_usage",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{mysql_instance_endpoint} used"
+              }
+            },
+            {
+              "query": "sum by (mysql_instance_endpoint)(mysql_buffer_pool_usage{mysql_instance_endpoint=~\"$instance\",status=\"dirty\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "mysql_buffer_pool_usage",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{mysql_instance_endpoint} dirty"
+              }
+            },
+            {
+              "query": "max by (mysql_instance_endpoint)(mysql_buffer_pool_limit{mysql_instance_endpoint=~\"$instance\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "mysql_buffer_pool_limit",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{mysql_instance_endpoint} size"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 108,
+            "w": 96,
+            "h": 16,
+            "i": 19
+          }
+        },
+        {
+          "id": "mysql_buffer_pool_hit_ratio",
+          "type": "line",
+          "title": "Buffer pool hit ratio",
+          "description": "Share of InnoDB read requests served from the buffer pool without reading from disk.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "percent",
+            "unit_custom": null,
+            "decimals": 2,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "100 * (1 - sum by (mysql_instance_endpoint)(rate(mysql_buffer_pool_operations{mysql_instance_endpoint=~\"$instance\",operation=\"reads\"}[5m])) / sum by (mysql_instance_endpoint)(rate(mysql_buffer_pool_operations{mysql_instance_endpoint=~\"$instance\",operation=\"read_requests\"}[5m])))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "mysql_buffer_pool_operations",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{mysql_instance_endpoint}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 108,
+            "w": 96,
+            "h": 16,
+            "i": 20
+          }
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "list": [
+      {
+        "type": "query_values",
+        "name": "instance",
+        "label": "Instance",
+        "query_data": {
+          "stream_type": "metrics",
+          "stream": "mysql_uptime",
+          "field": "mysql_instance_endpoint",
+          "max_record_size": 100,
+          "filter": []
+        },
+        "value": "",
+        "options": [],
+        "multiSelect": true,
+        "selectAllValueForMultiSelect": "all",
+        "scope": "global"
+      }
+    ],
+    "showDynamicFilters": true
+  },
+  "defaultDatetimeDuration": {
+    "type": "relative",
+    "relativeTimePeriod": "15m",
+    "startTime": 0,
+    "endTime": 0
+  }
+}

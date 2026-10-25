@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { AxiosRequestConfig } from "axios";
 import http from "./http";
 import analytics from "./product_analytics";
 
@@ -43,15 +44,25 @@ const dashboards = {
     }
     return http().get(`/api/${organization}/dashboards`, { params });
   },
-  create: (organization: string, data: any, folderId?: string) => {
+  create: (
+    organization: string,
+    data: any,
+    folderId?: string,
+    options?: Pick<AxiosRequestConfig, "silentForbidden">,
+  ) => {
     return http().post(`/api/${organization}/dashboards?folder=${folderId ?? "default"}`, data, {
       headers: { "Content-Type": "application/json; charset=UTF-8" },
+      ...options,
     });
   },
-  delete: (organization: string, dashboardID: string, folderId?: string) => {
-    return http().delete(
-      `/api/${organization}/dashboards/${dashboardID}?folder=${folderId ?? "default"}`,
-    );
+  delete: (
+    organization: string,
+    dashboardID: string,
+    folderId?: string,
+    options?: Pick<AxiosRequestConfig, "silentForbidden">,
+  ) => {
+    const url = `/api/${organization}/dashboards/${dashboardID}?folder=${folderId ?? "default"}`;
+    return options ? http().delete(url, options) : http().delete(url);
   },
   bulkDelete: (organization: string, data: any, folder?: string) => {
     let url = `/api/${organization}/dashboards/bulk`;
@@ -75,10 +86,26 @@ const dashboards = {
   list_Folders: (organization: string) => {
     return http().get(`/api/v2/${organization}/folders/dashboards`);
   },
-  new_Folder: (organization: string, data: any) => {
+  new_Folder: (
+    organization: string,
+    data: any,
+    options?: Pick<AxiosRequestConfig, "silentForbidden">,
+  ) => {
     return http().post(`/api/v2/${organization}/folders/dashboards`, data, {
       headers: { "Content-Type": "application/json; charset=UTF-8" },
+      ...options,
     });
+  },
+  /** Exact-name lookup; a missing folder is a 404. */
+  get_Folder_By_Name: (
+    organization: string,
+    name: string,
+    options?: Pick<AxiosRequestConfig, "silentForbidden">,
+  ) => {
+    return http().get(
+      `/api/v2/${organization}/folders/dashboards/name/${encodeURIComponent(name)}`,
+      options,
+    );
   },
   edit_Folder: (organization: string, folderId: any, data: any) => {
     return http().put(`/api/v2/${organization}/folders/dashboards/${folderId}`, data, {

@@ -55,6 +55,8 @@ export function workloadStateFromNames(
 export function useWorkloadDetection(): {
   states: ComputedRef<Record<WorkloadId, WorkloadState>>;
   refresh: (opts?: { force?: boolean }) => Promise<void>;
+  /** The metrics stream names the last refresh read; null until loaded or after a failed read. */
+  metricNames: ComputedRef<readonly string[] | null>;
 } {
   const { getStreams } = useStreams(gt);
   // Per-instance refs, never module state — org switches reset the stream cache upstream.
@@ -83,5 +85,5 @@ export function useWorkloadDetection(): {
     };
   });
 
-  return { states, refresh };
+  return { states, refresh, metricNames: computed(() => metricsNames.value) };
 }

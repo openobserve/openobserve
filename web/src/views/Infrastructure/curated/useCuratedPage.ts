@@ -29,6 +29,8 @@ import { useStore } from "vuex";
 import type { FieldAlias } from "@/services/service_streams";
 import useStreams from "@/composables/useStreams";
 import searchService from "@/services/search";
+import { queryClient } from "@/composables/query/queryClient";
+import { streamNameListQuery, streamSchemaQuery } from "@/services/stream.queries";
 import { loadSemanticGroups, clearSemanticGroupsCacheForOrg } from "@/utils/semanticGroupsCache";
 import { workloadStateFromNames, type WorkloadState } from "@/composables/useWorkloadDetection";
 import { gt, raw } from "@/types/i18n";
@@ -742,8 +744,49 @@ export function useCuratedPage(
   };
 }
 
+/** The page's resolution with no page or store: every manifest resolved against one read of lists, dictionary and schemas; probe groups stay hidden. */
+export async function resolveCuratedHeadless(args: {
+  orgId: string;
+  manifests: readonly CuratedPageManifest[];
+  /** MICROSECOND epochs, as refresh() takes them. */
+  range: { start: number; end: number };
+}): Promise<CuratedResolution[]> {
+  const { orgId, manifests, range } = args;
+  const types = [...new Set(manifests.flatMap((m) => m.groups.map((group) => group.streamType)))];
+  const read = await Promise.all(
+    types.map((type) => queryClient.fetchQuery(streamNameListQuery(orgId, type))),
+  );
+  // Copied entries, as on the page: schema merges below must never write into the shared cache.
+  const lists: Record<string, StreamListEntry[]> = Object.fromEntries(
+    types.map((type, index) => [
+      type,
+      ((read[index] ?? []) as StreamListEntry[]).map((entry) => ({ ...entry })),
+    ]),
+  );
+  const resolveWith = (
+    manifest: CuratedPageManifest,
+    semanticGroups: FieldAlias[],
+    extra: Partial<Parameters<typeof resolveManifest>[0]> = {},
+  ) =>
+    resolveManifest({ manifest, streams: lists, semanticGroups, range, now: range.end, ...extra });
+
+  const dryRuns = manifests.map((manifest) => resolveWith(manifest, []));
+  const [dictionary] = await Promise.all([
+    dryRuns.some((run) => run.needsSemanticGroups)
+      ? readDictionaryHeadless(orgId)
+      : Promise.resolve({ groups: [] as FieldAlias[], unavailable: false }),
+    mergeSchemasHeadless(orgId, lists, [...new Set(dryRuns.flatMap((run) => run.schemasNeeded))]),
+  ]);
+  return manifests.map((manifest) =>
+    resolveWith(manifest, dictionary.groups, {
+      probeVerdicts: {},
+      dictionaryUnavailable: dictionary.unavailable,
+    }),
+  );
+}
+
 /** Resolve the titleKeys buildDashboard emitted into copy the renderer prints, plus the author-JS theme tokens. */
-function translateTitles(
+export function translateTitles(
   built: Record<string, unknown>,
   manifest: CuratedPageManifest,
 ): Record<string, unknown> {
@@ -829,4 +872,43 @@ function resolutionHash(
       stale.noDataYet === true,
     ]),
   });
+}
+
+/** loadDictionary's outcomes without its page state: any failed read marks the dictionary unavailable. */
+async function readDictionaryHeadless(
+  orgId: string,
+): Promise<{ groups: FieldAlias[]; unavailable: boolean }> {
+  let failed = false;
+  const groups = await loadSemanticGroups(orgId, () => {
+    failed = true;
+  });
+  return failed ? { groups: [], unavailable: true } : { groups, unavailable: false };
+}
+
+/** loadSchemas' union merge, read through the shared schema query instead of the store. */
+async function mergeSchemasHeadless(
+  orgId: string,
+  lists: Record<string, StreamListEntry[]>,
+  names: string[],
+): Promise<void> {
+  await Promise.all(
+    names.map(async (name) => {
+      const type = Object.keys(lists).find((key) =>
+        lists[key].some((entry) => entry.name === name),
+      );
+      if (!type) return;
+      try {
+        const fetched = (await queryClient.fetchQuery(streamSchemaQuery(orgId, name, type))) as
+          StreamListEntry | undefined;
+        if (!fetched?.schema?.length) return;
+        const entries = lists[type];
+        const index = entries.findIndex((entry) => entry.name === name);
+        const merged = [...(entries[index].schema ?? []), ...fetched.schema];
+        const unique = new Map(merged.map((field) => [field.name, field]));
+        entries[index] = { ...entries[index], schema: [...unique.values()] };
+      } catch {
+        // A failed schema read resolves and renders, as on the page (§5.4 error paths).
+      }
+    }),
+  );
 }

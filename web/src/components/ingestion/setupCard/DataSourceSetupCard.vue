@@ -42,9 +42,32 @@ import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue"
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
 import SetupCardRenderer from "./SetupCardRenderer.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import type { CardSubstitutions } from "./types";
 import { getDataSourceCard } from "./registry";
 import { HOST_AGENT_SLUGS } from "./content/osAgent";
+import {
+  READY_MADE_SOURCE_BY_SETUP_SLUG,
+  getReadyMadeSource,
+  type ReadyMadeSourceId,
+} from "@/composables/readyMade/catalog";
+import {
+  installReadyMade,
+  type ReadyMadeInstallResult,
+} from "@/composables/readyMade/installReadyMade";
+import {
+  createdReadyMadeDashboards,
+  describeReadyMadeInstall,
+  isReadyMadeGapFill,
+  joinReadyMadeNames,
+} from "@/composables/readyMade/readyMadeMessages";
+import {
+  recallReadyMadeNotice,
+  storeReadyMadeNotice,
+  type ReadyMadeAutoAddNotice,
+} from "@/composables/readyMade/readyMadeNotice";
+import { readReadyMadeSettings } from "@/composables/readyMade/readyMadeSettings";
+import { useReadyMadeDetection } from "@/composables/readyMade/useReadyMadeDetection";
 
 const props = defineProps<{
   /**
@@ -61,7 +84,7 @@ const props = defineProps<{
 
 const store = useStore();
 const router = useRouter();
-const { t } = useI18nTyped();
+const { t, locale } = useI18nTyped();
 const { endpoint } = useIngestion();
 
 // Per-org url/org/token — the same Basic-auth token every Data Sources card
@@ -154,8 +177,129 @@ const onOpenSetupDashboard = async () => {
   openDashboard(org, target);
 };
 
+const readyMadeSourceId = computed(() => READY_MADE_SOURCE_BY_SETUP_SLUG[props.slug]);
+// Only Kubernetes re-checks its metrics; the slug is fixed for the card's lifetime.
+const readyMadeDetection =
+  readyMadeSourceId.value === "kubernetes" ? useReadyMadeDetection() : null;
+const readyMadeTarget = ref<{ org: string; id: string; folderId: string } | null>(null);
+// The shared start location (nothing matched) is no visit, and embeds mounted without a router get one of their own.
+const currentRoute = router?.currentRoute?.value;
+const readyMadeVisit: object = currentRoute?.matched?.length ? currentRoute : {};
+// Set only when the automatic add created something; it outlives the toast for a user who was looking elsewhere.
+const readyMadeNotice = ref<ReadyMadeAutoAddNotice | null>(
+  recallReadyMadeNotice(readyMadeVisit, props.slug),
+);
+const setReadyMadeNotice = (notice: ReadyMadeAutoAddNotice | null) => {
+  readyMadeNotice.value = notice;
+  storeReadyMadeNotice(readyMadeVisit, props.slug, notice);
+};
+const visibleReadyMadeNotice = computed(() =>
+  readyMadeNotice.value?.org === store.state.selectedOrganization?.identifier
+    ? readyMadeNotice.value
+    : null,
+);
+
+const rememberReadyMade = (org: string, result: ReadyMadeInstallResult) => {
+  if (result.status === "error") return null;
+  const first = result.dashboards[0];
+  readyMadeTarget.value = { org, id: first.dashboardId, folderId: first.folderId };
+  return readyMadeTarget.value;
+};
+
+// Forced: this read gates a write, and an answer given in another tab is not in this tab's cache.
+const isReadyMadeUnanswered = async (org: string, userId: string, sourceId: ReadyMadeSourceId) => {
+  if (!org || !userId) return false;
+  const memory = await readReadyMadeSettings(org, userId, { force: true }).catch(() => null);
+  return !!memory && !memory.sources[sourceId];
+};
+
+const onReadyMadeDetected = async () => {
+  const sourceId = readyMadeSourceId.value;
+  if (!sourceId) return;
+  const org = store.state.selectedOrganization?.identifier ?? "";
+  const userId = store.state.userInfo?.email ?? "";
+  // Detection fires on page open with no click, so an earlier answer or an unreadable memory keeps this silent.
+  if (!(await isReadyMadeUnanswered(org, userId, sourceId))) return;
+  // Kubernetes Test passes on logs alone; without the metrics its Cluster dashboard would open empty.
+  if (sourceId === "kubernetes") {
+    const detected = await readyMadeDetection?.detect({ force: true }).catch(() => null);
+    if (!detected?.includes("kubernetes")) return;
+  }
+  const result = await installReadyMade(org, sourceId, { userId });
+  // The user didn't invoke the install, so a failure here stays silent.
+  const target = rememberReadyMade(org, result);
+  if (!target || result.status === "error") return;
+  toast({
+    variant: "success",
+    message: describeReadyMadeInstall(result, t, locale.value),
+    timeout: 10000,
+    action: {
+      label: t("dashboard.readyMade.open"),
+      handler: () => openDashboard(org, target),
+    },
+  });
+  const created = createdReadyMadeDashboards(result);
+  if (created.length === 0) return;
+  setReadyMadeNotice({
+    org,
+    id: created[0].dashboardId,
+    folderId: created[0].folderId,
+    message: t("ingestion.setupCard.readyMadeAutoAdded", {
+      name: getReadyMadeSource(sourceId).name,
+      list: joinReadyMadeNames(
+        created.map((dashboard) => dashboard.title),
+        locale.value,
+      ),
+      folder: created[0].folderName,
+    }),
+  });
+};
+
+const openReadyMadeNotice = () => {
+  const notice = visibleReadyMadeNotice.value;
+  if (notice) openDashboard(notice.org, notice);
+};
+
+const dismissReadyMadeNotice = () => setReadyMadeNotice(null);
+
+const onOpenReadyMade = async () => {
+  const sourceId = readyMadeSourceId.value;
+  if (!sourceId) return;
+  const org = store.state.selectedOrganization?.identifier ?? "";
+  let target = readyMadeTarget.value?.org === org ? readyMadeTarget.value : null;
+  if (!target) {
+    const result = await installReadyMade(org, sourceId, {
+      userId: store.state.userInfo?.email,
+    });
+    if (result.status === "error") {
+      // User-invoked path: the failure must be visible and name its cause.
+      const count = getReadyMadeSource(sourceId).dashboards.length;
+      toast({
+        variant: "error",
+        message:
+          result.kind === "forbidden"
+            ? t("dashboard.readyMade.forbidden")
+            : t(
+                "ingestion.setupCard.readyMadeFailed",
+                { name: getReadyMadeSource(sourceId).name },
+                count,
+              ),
+      });
+      return;
+    }
+    if (result.status === "created") analytics.track("dashboard_created");
+    // The button reads "Open", so a dashboard it had to add back into an existing set is named out loud.
+    if (result.status !== "exists" && isReadyMadeGapFill(result)) {
+      toast({ variant: "success", message: describeReadyMadeInstall(result, t, locale.value) });
+    }
+    target = rememberReadyMade(org, result);
+  }
+  if (target) openDashboard(org, target);
+};
+
 const onDetected = async (count: number) => {
   emit("detected", count);
+  if (readyMadeSourceId.value) return onReadyMadeDetected();
   if (setupDashboard.value) return onSetupDashboardDetected();
   if (!isHostAgentSlug.value) return;
   // Captured at detect time — an org switch before the toast click must not retarget.
@@ -181,6 +325,7 @@ const onDetected = async (count: number) => {
 
 const onStepAction = async (actionId: string) => {
   if (actionId === "open-setup-dashboard") return onOpenSetupDashboard();
+  if (actionId === "open-ready-made-dashboard") return onOpenReadyMade();
   if (actionId !== "view-host-dashboard" || !isHostAgentSlug.value) return;
   const org = store.state.selectedOrganization?.identifier ?? "";
   let target = importedDashboard.value?.org === org ? importedDashboard.value : null;
@@ -211,6 +356,35 @@ const onStepAction = async (actionId: string) => {
   <!-- Mirrors AIIntegrationDetail's wrapper padding so data-source cards and AI
        integration cards sit identically in their panels. -->
   <div class="p-2">
+    <OBanner
+      v-if="visibleReadyMadeNotice"
+      variant="success"
+      dense
+      inline-actions
+      icon="check-circle"
+      class="mb-2"
+      data-test="data-source-setup-card-ready-made-added"
+      :content="visibleReadyMadeNotice.message"
+    >
+      <template #actions>
+        <OButton
+          variant="outline"
+          size="sm"
+          data-test="data-source-setup-card-ready-made-added-open"
+          @click="openReadyMadeNotice"
+        >
+          {{ t("dashboard.readyMade.open") }}
+        </OButton>
+        <OButton
+          variant="ghost"
+          size="icon-xs-sq"
+          icon-left="close"
+          :title="t('common.close')"
+          data-test="data-source-setup-card-ready-made-added-close"
+          @click="dismissReadyMadeNotice"
+        />
+      </template>
+    </OBanner>
     <OBanner
       v-if="passcodeForbidden && content"
       variant="warning"

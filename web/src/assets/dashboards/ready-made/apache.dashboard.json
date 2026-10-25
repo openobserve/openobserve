@@ -1,0 +1,759 @@
+{
+  "version": 8,
+  "dashboardId": "",
+  "title": "Apache / Overview",
+  "description": "Requests, traffic, request time, workers and load for Apache HTTP servers reporting through the OpenTelemetry apache receiver (mod_status). mod_status has no HTTP status codes.",
+  "role": "ready-made:apache/overview:1",
+  "owner": "",
+  "created": "2026-10-15T00:00:00.000Z",
+  "tabs": [
+    {
+      "tabId": "default",
+      "name": "Overview",
+      "panels": [
+        {
+          "id": "apache_note",
+          "type": "markdown",
+          "title": "",
+          "description": "",
+          "config": {
+            "show_legends": false,
+            "legends_position": null
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "",
+              "vrlFunctionQuery": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 192,
+            "h": 6,
+            "i": 0
+          },
+          "htmlContent": "",
+          "markdownContent": "Ready-made by OpenObserve. Charts fill in within a few minutes of new data. Edit or delete anything, including this note. The data comes from the apache receiver of the OpenTelemetry Collector Contrib."
+        },
+        {
+          "id": "apache_uptime",
+          "type": "metric",
+          "title": "Uptime",
+          "description": "Shortest uptime among the selected servers; a drop means one restarted.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "seconds",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "min(apache_uptime{apache_server_name=~\"$server\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "apache_uptime",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 6,
+            "w": 64,
+            "h": 6,
+            "i": 1
+          }
+        },
+        {
+          "id": "apache_requests_rate",
+          "type": "metric",
+          "title": "Requests/s",
+          "description": "Requests served per second (5-minute average). These counts have no HTTP status codes (mod_status does not report them); send the access log to OpenObserve for error rates.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(apache_requests{apache_server_name=~\"$server\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "apache_requests",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 64,
+            "y": 6,
+            "w": 64,
+            "h": 6,
+            "i": 2
+          }
+        },
+        {
+          "id": "apache_avg_request_time",
+          "type": "metric",
+          "title": "Average request time",
+          "description": "Time spent per request, averaged over the last 5 minutes.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "milliseconds",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(apache_request_time{apache_server_name=~\"$server\"}[5m])) / sum(rate(apache_requests{apache_server_name=~\"$server\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "apache_request_time",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 128,
+            "y": 6,
+            "w": 64,
+            "h": 6,
+            "i": 3
+          }
+        },
+        {
+          "id": "apache_busy_workers",
+          "type": "metric",
+          "title": "Busy workers",
+          "description": "Workers serving a request right now.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(apache_workers{apache_server_name=~\"$server\",state=\"busy\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "apache_workers",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 12,
+            "w": 64,
+            "h": 6,
+            "i": 4
+          }
+        },
+        {
+          "id": "apache_worker_use",
+          "type": "metric",
+          "title": "Worker use",
+          "description": "Busy workers as a share of all scoreboard slots (MaxRequestWorkers). Near 100% new requests wait for a free worker.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "percent",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "100 * sum(apache_workers{apache_server_name=~\"$server\",state=\"busy\"}) / sum(apache_scoreboard{apache_server_name=~\"$server\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "apache_workers",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 64,
+            "y": 12,
+            "w": 64,
+            "h": 6,
+            "i": 5
+          }
+        },
+        {
+          "id": "apache_traffic_rate",
+          "type": "metric",
+          "title": "Traffic",
+          "description": "Bytes served per second (5-minute average).",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "bps",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(apache_traffic{apache_server_name=~\"$server\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "apache_traffic",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 128,
+            "y": 12,
+            "w": 64,
+            "h": 6,
+            "i": 6
+          }
+        },
+        {
+          "id": "apache_requests",
+          "type": "line",
+          "title": "Requests/s",
+          "description": "Requests served per second, per server (5-minute average). These counts have no HTTP status codes (mod_status does not report them); send the access log to OpenObserve for error rates.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (apache_server_name, apache_server_port)(rate(apache_requests{apache_server_name=~\"$server\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "apache_requests",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{apache_server_name}:{apache_server_port}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 18,
+            "w": 96,
+            "h": 16,
+            "i": 7
+          }
+        },
+        {
+          "id": "apache_request_time",
+          "type": "line",
+          "title": "Average request time",
+          "description": "Time spent per request, per server, averaged over 5 minutes. A rise without more requests points at a slow backend or a busy machine.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "milliseconds",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (apache_server_name, apache_server_port)(rate(apache_request_time{apache_server_name=~\"$server\"}[5m])) / sum by (apache_server_name, apache_server_port)(rate(apache_requests{apache_server_name=~\"$server\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "apache_request_time",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{apache_server_name}:{apache_server_port}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 18,
+            "w": 96,
+            "h": 16,
+            "i": 8
+          }
+        },
+        {
+          "id": "apache_traffic",
+          "type": "line",
+          "title": "Traffic",
+          "description": "Bytes served per second, per server (5-minute average).",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "bps",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (apache_server_name, apache_server_port)(rate(apache_traffic{apache_server_name=~\"$server\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "apache_traffic",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{apache_server_name}:{apache_server_port}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 34,
+            "w": 96,
+            "h": 16,
+            "i": 9
+          }
+        },
+        {
+          "id": "apache_cpu_load",
+          "type": "line",
+          "title": "CPU load",
+          "description": "CPU used by Apache's processes, as mod_status reports it (percent of one CPU).",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "percent",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "max by (apache_server_name, apache_server_port)(apache_cpu_load{apache_server_name=~\"$server\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "apache_cpu_load",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{apache_server_name}:{apache_server_port}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 34,
+            "w": 96,
+            "h": 16,
+            "i": 10
+          }
+        },
+        {
+          "id": "apache_workers",
+          "type": "line",
+          "title": "Workers",
+          "description": "Busy and idle workers per server. Few idle workers under load means new requests will soon wait.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (apache_server_name, apache_server_port, state)(apache_workers{apache_server_name=~\"$server\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "apache_workers",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{apache_server_name}:{apache_server_port} {state}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 50,
+            "w": 96,
+            "h": 16,
+            "i": 11
+          }
+        },
+        {
+          "id": "apache_scoreboard",
+          "type": "line",
+          "title": "Worker slots by state",
+          "description": "Scoreboard slots by what they are doing (waiting is an idle worker, sending and reading serve requests, keepalive holds a connection); open slots, with no process yet, are left out.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (state)(apache_scoreboard{apache_server_name=~\"$server\",state!=\"open\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "apache_scoreboard",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{state}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 50,
+            "w": 96,
+            "h": 16,
+            "i": 12
+          }
+        },
+        {
+          "id": "apache_connections",
+          "type": "line",
+          "title": "Connections",
+          "description": "Open client connections per server (event and worker MPMs). 0 is normal under light load: short requests close between scrapes.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (apache_server_name, apache_server_port)(apache_current_connections{apache_server_name=~\"$server\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "apache_current_connections",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{apache_server_name}:{apache_server_port}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 66,
+            "w": 96,
+            "h": 16,
+            "i": 13
+          }
+        },
+        {
+          "id": "apache_load",
+          "type": "line",
+          "title": "Server load average",
+          "description": "1, 5 and 15 minute load average of the machine Apache runs on, as mod_status reports it.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 2,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "max by (apache_server_name, apache_server_port)(apache_load_1{apache_server_name=~\"$server\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "apache_load_1",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{apache_server_name}:{apache_server_port} 1m"
+              }
+            },
+            {
+              "query": "max by (apache_server_name, apache_server_port)(apache_load_5{apache_server_name=~\"$server\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "apache_load_5",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{apache_server_name}:{apache_server_port} 5m"
+              }
+            },
+            {
+              "query": "max by (apache_server_name, apache_server_port)(apache_load_15{apache_server_name=~\"$server\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "apache_load_15",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{apache_server_name}:{apache_server_port} 15m"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 66,
+            "w": 96,
+            "h": 16,
+            "i": 14
+          }
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "list": [
+      {
+        "type": "query_values",
+        "name": "server",
+        "label": "Server",
+        "query_data": {
+          "stream_type": "metrics",
+          "stream": "apache_uptime",
+          "field": "apache_server_name",
+          "max_record_size": 100,
+          "filter": []
+        },
+        "value": "",
+        "options": [],
+        "multiSelect": true,
+        "selectAllValueForMultiSelect": "all",
+        "scope": "global"
+      }
+    ],
+    "showDynamicFilters": true
+  },
+  "defaultDatetimeDuration": {
+    "type": "relative",
+    "relativeTimePeriod": "15m",
+    "startTime": 0,
+    "endTime": 0
+  }
+}

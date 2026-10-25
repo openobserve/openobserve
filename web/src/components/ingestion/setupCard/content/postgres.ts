@@ -19,6 +19,7 @@
 import { raw, type TranslateFn } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
+import { getReadyMadeSource } from "@/composables/readyMade/catalog";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
 import {
@@ -183,6 +184,14 @@ export default function postgresCard(subs: CardSubstitutions, t: TranslateFn): R
           t("ingestion.setupCard.pillDatabaseSize"),
           t("ingestion.setupCard.pillBlocksRead"),
         ],
+        action: {
+          id: "open-ready-made-dashboard",
+          label: t("ingestion.setupCard.readyMadeOpenOne", {
+            name: getReadyMadeSource("postgresql").name,
+          }),
+          icon: "dashboard",
+          showOnDetect: true,
+        },
       },
       // ── Database Monitoring (optional) ──────────────────────────────────
       // Everything above ingests METRICS. The steps below add the SERVER
