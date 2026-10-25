@@ -1200,6 +1200,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :placeholder="t('dashboard.lineThicknessDefault')"
           data-test="dashboard-config-line_thickness"
         />
+
+        <OInput
+          v-if="shouldShowAreaFillConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('lineStyle', 'fill-opacity')"
+          v-model.number="dashboardPanelDataModel.data.config.fill_opacity"
+          type="number"
+          :min="0"
+          :max="100"
+          @update:model-value="
+            (value: any) =>
+              (dashboardPanelDataModel.data.config.fill_opacity =
+                typeof value == 'number' && Number.isFinite(value)
+                  ? Math.min(Math.max(value, 0), 100)
+                  : null)
+          "
+          :label="t('dashboard.fillOpacity')"
+          :placeholder="t('dashboard.fillOpacityDefault')"
+          data-test="dashboard-config-fill_opacity"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.fillOpacityTooltip')" max-width="15.625rem" />
+          </template>
+        </OInput>
+
+        <OSwitch
+          v-if="shouldShowAreaFillConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('lineStyle', 'fill-gradient')"
+          :model-value="dashboardPanelData.data.config.fill_gradient !== false"
+          @update:model-value="
+            (value: unknown) => (dashboardPanelDataModel.data.config.fill_gradient = !!value)
+          "
+          :label="t('dashboard.fillGradient')"
+          data-test="dashboard-config-fill_gradient"
+          size="lg"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.fillGradientTooltip')" max-width="15.625rem" />
+          </template>
+        </OSwitch>
       </div>
     </OCollapsible>
 
@@ -2159,6 +2198,7 @@ import {
   shouldShowCartesianAxisConfig,
   shouldShowAxisLabelConfig,
   shouldShowLineThickness,
+  shouldShowAreaFillConfig,
   shouldShowDrilldown,
   shouldShowTimeShift,
 } from "@/utils/dashboard/configUtils";
@@ -3098,6 +3138,7 @@ export default defineComponent({
       shouldShowCartesianAxisConfig,
       shouldShowAxisLabelConfig,
       shouldShowLineThickness,
+      shouldShowAreaFillConfig,
       shouldShowDrilldown,
       shouldShowTimeShift,
       // Panel default time configuration (v4.0)

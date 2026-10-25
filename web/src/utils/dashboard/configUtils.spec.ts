@@ -31,6 +31,7 @@ import {
   shouldShowCartesianAxisConfig,
   shouldShowAxisLabelConfig,
   shouldShowLineThickness,
+  shouldShowAreaFillConfig,
   shouldShowDrilldown,
   shouldShowTimeShift,
   shouldShowPromQLQueryType,
@@ -1388,6 +1389,15 @@ describe("configUtils", () => {
 
     it("should return false for scatter chart", () => {
       expect(shouldShowLineThickness(makeData("scatter"), false)).toBe(false);
+    });
+  });
+
+  describe("shouldShowAreaFillConfig", () => {
+    it("is true only for the area chart", () => {
+      expect(shouldShowAreaFillConfig({ data: { type: "area" } })).toBe(true);
+      ["area-stacked", "line", "bar", "scatter"].forEach((type) =>
+        expect(shouldShowAreaFillConfig({ data: { type } })).toBe(false),
+      );
     });
   });
 

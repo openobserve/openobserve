@@ -441,6 +441,54 @@ describe("ConfigPanel", () => {
     });
   });
 
+  describe("Area fill", () => {
+    const panelOf = (type: string, config: Record<string, unknown> = {}) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type,
+        config: { ...mockDashboardPanelData.data.config, ...config },
+      },
+    });
+    const opacityInput = () => wrapper.findComponent('[data-test="dashboard-config-fill_opacity"]');
+    const gradientSwitch = () =>
+      wrapper.findComponent('[data-test="dashboard-config-fill_gradient"]');
+
+    it("stores the opacity clamped to 0-100 and clears an empty input to null", async () => {
+      const panel = panelOf("area");
+      wrapper = createWrapper({ dashboardPanelData: panel });
+
+      await opacityInput().vm.$emit("update:modelValue", 35);
+      expect(panel.data.config.fill_opacity).toBe(35);
+      await opacityInput().vm.$emit("update:modelValue", 140);
+      expect(panel.data.config.fill_opacity).toBe(100);
+      await opacityInput().vm.$emit("update:modelValue", -3);
+      expect(panel.data.config.fill_opacity).toBe(0);
+      await opacityInput().vm.$emit("update:modelValue", "");
+      expect(panel.data.config.fill_opacity).toBeNull();
+    });
+
+    it("shows the gradient on when unset and stores the toggle", async () => {
+      const panel = panelOf("area");
+      wrapper = createWrapper({ dashboardPanelData: panel });
+
+      expect(gradientSwitch().props("modelValue")).toBe(true);
+      await gradientSwitch().vm.$emit("update:modelValue", false);
+      expect(panel.data.config.fill_gradient).toBe(false);
+    });
+
+    it("shows the gradient off for a saved flat fill", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("area", { fill_gradient: false }) });
+      expect(gradientSwitch().props("modelValue")).toBe(false);
+    });
+
+    it.each(["area-stacked", "line", "bar"])("is absent for %s", (type) => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf(type) });
+      expect(opacityInput().exists()).toBe(false);
+      expect(gradientSwitch().exists()).toBe(false);
+    });
+  });
+
   describe("Axis labels mode", () => {
     const panelOf = (type: string, config: Record<string, unknown> = {}) => ({
       ...mockDashboardPanelData,

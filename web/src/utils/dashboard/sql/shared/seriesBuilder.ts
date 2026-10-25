@@ -194,6 +194,7 @@ export function createSeriesBuilders(deps: SeriesDeps) {
       seriesColor,
       yAxisName,
       store.state.theme,
+      panelSchema?.config,
     );
 
     return {

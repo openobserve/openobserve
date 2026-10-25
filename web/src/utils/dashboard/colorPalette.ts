@@ -399,6 +399,19 @@ export const getGridLineStyle = (_theme?: string) => ({
   color: chartColor("--color-chart-gridline"),
 });
 
+const verticalGradient = (topColor: string, bottomColor: string) => ({
+  type: "linear",
+  x: 0,
+  y: 0,
+  x2: 0,
+  y2: 1,
+  colorStops: [
+    { offset: 0, color: topColor },
+    { offset: 1, color: bottomColor },
+  ],
+  global: false,
+});
+
 /**
  * Builds a top-to-bottom vertical gradient for area chart fills that fades
  * from a translucent series color at the top to fully transparent at the
@@ -409,18 +422,16 @@ export const getAreaGradientColor = (color: string, _theme?: string) => {
   // tokens (base/dark css); `_theme` kept for call-site compatibility, ignored.
   const topAlpha = chartNumber("--chart-area-fill-top-opacity", 0.9);
   const bottomAlpha = chartNumber("--chart-area-fill-bottom-opacity", 0.4);
-  return {
-    type: "linear",
-    x: 0,
-    y: 0,
-    x2: 0,
-    y2: 1,
-    colorStops: [
-      { offset: 0, color: colorToRgba(color, topAlpha) },
-      { offset: 1, color: colorToRgba(color, bottomAlpha) },
-    ],
-    global: false,
-  };
+  return verticalGradient(colorToRgba(color, topAlpha), colorToRgba(color, bottomAlpha));
+};
+
+/** The `area` panel's `fill_opacity` as a 0-1 alpha, or null when unset so the theme tokens apply. */
+export const getAreaFillOpacity = (panelType: string, config: any): number | null => {
+  const value = config?.fill_opacity;
+  if (panelType !== "area" || value === null || value === undefined || value === "") return null;
+  const percent = Number(value);
+  if (!Number.isFinite(percent)) return null;
+  return Math.min(Math.max(percent, 0), 100) / 100;
 };
 
 /**
@@ -436,15 +447,29 @@ export const getAreaStyleOverride = (
   resolvedColor: any,
   seriesName: any,
   theme: string,
+  config?: any,
 ) => {
   const isAreaChart = panelType === "area" || panelType === "area-stacked";
   if (!isAreaChart || !baseAreaStyle) return {};
   const palette = getColorPalette(theme);
   const color = resolvedColor ?? palette[getSeriesHash(seriesName?.toString() ?? "", palette)];
+  const gradient = panelType !== "area" || config?.fill_gradient !== false;
+  const opacity = getAreaFillOpacity(panelType, config);
+  if (opacity === null) {
+    const topAlpha = chartNumber("--chart-area-fill-top-opacity", 0.9);
+    return {
+      areaStyle: {
+        ...baseAreaStyle,
+        color: gradient ? getAreaGradientColor(color, theme) : colorToRgba(color, topAlpha),
+      },
+    };
+  }
+  // The alpha rides on areaStyle.opacity, which also replaces ECharts' 0.7 default, so the percent is exact.
   return {
     areaStyle: {
       ...baseAreaStyle,
-      color: getAreaGradientColor(color, theme),
+      opacity,
+      color: gradient ? verticalGradient(colorToRgba(color, 1), colorToRgba(color, 0)) : color,
     },
   };
 };

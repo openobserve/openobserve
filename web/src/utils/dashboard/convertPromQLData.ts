@@ -958,6 +958,7 @@ export const convertPromQLData = async (
                   resolvedSeriesColor,
                   colorName,
                   store.state.theme,
+                  panelSchema?.config,
                 ),
                 // markLine if exist
                 markLine: {
@@ -1038,6 +1039,7 @@ export const convertPromQLData = async (
                   resolvedVectorColor,
                   seriesName,
                   store.state.theme,
+                  panelSchema?.config,
                 ),
                 markLine: {
                   silent: true,
@@ -1385,6 +1387,7 @@ export const convertPromQLData = async (
           primary.itemStyle.color,
           seriesNames.get(metric) ?? "",
           store.state.theme,
+          panelSchema?.config,
         ),
       );
     });
@@ -1412,6 +1415,7 @@ export const convertPromQLData = async (
         twin.itemStyle.color,
         seriesNames.get(metric) ?? "",
         store.state.theme,
+        panelSchema?.config,
       ),
     );
   }

@@ -269,6 +269,16 @@ export const shouldShowLineThickness = (dashboardPanelData: any, promqlMode: boo
 };
 
 /**
+ * Check if area fill opacity input and fill gradient toggle should be displayed
+ * Used by: fill_opacity input, fill_gradient toggle
+ * @param dashboardPanelData - The dashboard panel data
+ * @returns boolean indicating if area fill config should be displayed
+ */
+export const shouldShowAreaFillConfig = (dashboardPanelData: any): boolean => {
+  return dashboardPanelData.data.type === "area";
+};
+
+/**
  * Check if Drilldown component should be displayed
  * Used by: Drilldown component
  * @param dashboardPanelData - The dashboard panel data
