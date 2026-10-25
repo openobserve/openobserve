@@ -182,6 +182,45 @@ describe("ConfigPanel", () => {
     });
   };
 
+  describe("gauge section", () => {
+    const gaugeData = (queryConfig: Record<string, any> = {}) => {
+      const data = JSON.parse(JSON.stringify(mockDashboardPanelData));
+      data.data.type = "gauge";
+      data.data.queries[0].config = {
+        ...data.data.queries[0].config,
+        min: 0,
+        max: 100,
+        ...queryConfig,
+      };
+      return reactive(data);
+    };
+    const rangeSelect = () =>
+      wrapper
+        .findAllComponents({ name: "OSelect" })
+        .find((c: any) => c.props("label") === "Gauge range");
+    const hidden = (selector: string) =>
+      (wrapper.find(selector).attributes("style") ?? "").includes("display: none");
+
+    it("defaults the range mode to fixed and writes auto to the current query", async () => {
+      const data = gaugeData();
+      wrapper = createWrapper({ dashboardPanelData: data });
+      expect(rangeSelect().props("modelValue")).toBe("fixed");
+      expect(hidden('[data-test="dashboard-config-gauge-min"]')).toBe(false);
+
+      rangeSelect().vm.$emit("update:modelValue", "auto");
+      await wrapper.vm.$nextTick();
+      expect(data.data.queries[0].config.range_mode).toBe("auto");
+      expect(hidden('[data-test="dashboard-config-gauge-min"]')).toBe(true);
+      expect(hidden('[data-test="dashboard-config-gauge-max"]')).toBe(true);
+    });
+
+    it("offers the end labels switch and value mappings", () => {
+      wrapper = createWrapper({ dashboardPanelData: gaugeData() });
+      expect(wrapper.find('[data-test="dashboard-config-gauge-end-labels"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="value-mapping-stub"]').exists()).toBe(true);
+    });
+  });
+
   describe("state timeline options", () => {
     it("shows the defaults for a fresh panel that has none of its keys, and writes on change", async () => {
       const panelData = {
