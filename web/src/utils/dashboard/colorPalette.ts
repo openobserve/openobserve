@@ -412,13 +412,9 @@ const verticalGradient = (topColor: string, bottomColor: string) => ({
   global: false,
 });
 
-/**
- * Builds a top-to-bottom vertical gradient for area chart fills that fades
- * from a translucent series color at the top to fully transparent at the
- * bottom. `color` should be the resolved concrete series color.
- */
+/** Theme fade gradient for an area fill in the resolved series `color`; `stacked` reads the area-stacked opacity tokens. */
 export const getAreaGradientColor = (color: string, stacked = false) => {
-  // Dark keeps stacked layers opaque (they never overlap); unstacked areas overlap, so they stay translucent.
+  // Dark keeps a stack's layers opaque since they tile; unstacked areas overlap, so they stay translucent.
   const topAlpha = stacked
     ? chartNumber("--chart-area-stacked-fill-top-opacity", 0.9)
     : chartNumber("--chart-area-fill-top-opacity", 0.9);
