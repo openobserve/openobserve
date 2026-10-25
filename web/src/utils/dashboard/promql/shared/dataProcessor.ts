@@ -277,11 +277,8 @@ export function applyAggregation(
   }
 }
 
-/** True when the panel has queries and every one of them is an instant query. */
+/** True when the panel has visible queries and every one of them is an instant query; hidden ones never run. */
 export function everyQueryInstant(queries: any[] | undefined): boolean {
-  return (
-    Array.isArray(queries) &&
-    queries.length > 0 &&
-    queries.every((query) => query?.config?.query_type === "instant")
-  );
+  const visible = (queries ?? []).filter((query) => !query?.config?.hide);
+  return visible.length > 0 && visible.every((query) => query?.config?.query_type === "instant");
 }

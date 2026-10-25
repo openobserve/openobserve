@@ -154,6 +154,7 @@ describe("PieConverter", () => {
       const cases: Array<[any[], string]> = [
         [[instant, instant], "last"],
         [[instant, { config: { query_type: "range" } }], "count"],
+        [[instant, { config: { query_type: "range", hide: true } }], "last"],
         [[], "count"],
       ];
       for (const [queries, expected] of cases) {

@@ -123,11 +123,22 @@ describe("PromQLChartConfig", () => {
       ];
       for (const [chartType, queries, shown] of cases) {
         mockDashboardPanelData.data.queries = queries;
+        mockDashboardPanelData.layout = { hiddenQueries: [] };
         wrapper = createWrapper({ chartType });
         expect(wrapper.find('[data-test="dashboard-config-aggregation"]').exists()).toBe(shown);
         wrapper.unmount();
       }
       wrapper = null;
+    });
+
+    it("ignores hidden queries when deciding the pie aggregation is moot", () => {
+      mockDashboardPanelData.data.queries = [
+        { config: { query_type: "instant" } },
+        { config: { query_type: "range", hide: true } },
+      ];
+      mockDashboardPanelData.layout = { hiddenQueries: [1] };
+      wrapper = createWrapper({ chartType: "pie" });
+      expect(wrapper.find('[data-test="dashboard-config-aggregation"]').exists()).toBe(false);
     });
   });
 

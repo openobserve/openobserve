@@ -352,7 +352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, computed, ref, inject } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
-import { everyQueryInstant } from "@/utils/dashboard/promql/shared/dataProcessor";
+import { allVisibleQueriesInstant } from "@/utils/dashboard/configUtils";
 import ColumnOrderPopUp from "./ColumnOrderPopUp.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -406,8 +406,7 @@ export default defineComponent({
       () =>
         chartsWithAggregation.includes(props.chartType) &&
         !(
-          ["pie", "donut"].includes(props.chartType) &&
-          everyQueryInstant(dashboardPanelData.data.queries)
+          ["pie", "donut"].includes(props.chartType) && allVisibleQueriesInstant(dashboardPanelData)
         ),
     );
 
