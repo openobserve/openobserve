@@ -176,7 +176,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type == 'h-stacked' ||
           dashboardPanelData.data.type == 'scatter' ||
           dashboardPanelData.data.type == 'area-stacked' ||
-          dashboardPanelData.data.type == 'stacked'
+          dashboardPanelData.data.type == 'stacked' ||
+          dashboardPanelData.data.type == 'state-timeline'
         "
       >
         <div
@@ -206,6 +207,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   >{{ t("panel.breakdownTooltipHBar") }}</span
                 >
+                <span v-else-if="dashboardPanelData.data.type == 'state-timeline'">{{
+                  t("panel.breakdownTooltipStateTimeline")
+                }}</span>
                 <span v-else>{{ t("panel.breakdownTooltipDefault") }}</span>
               </template>
             </OTooltip>
@@ -1144,6 +1148,7 @@ export default defineComponent({
         case "scatter":
           return t("dashboard.twoFieldsMessage");
         case "heatmap":
+        case "state-timeline":
           return t("dashboard.oneFieldMessage");
         case "gauge":
           return t("dashboard.dashboardQueryBuilder.addZeroOrOneLabelField");
@@ -1172,6 +1177,7 @@ export default defineComponent({
         case "metric":
           return t("dashboard.oneValueFieldMessage");
         case "heatmap":
+        case "state-timeline":
           return t("dashboard.oneFieldMessage");
         default:
           return t("dashboard.oneOrMoreFieldsMessage");

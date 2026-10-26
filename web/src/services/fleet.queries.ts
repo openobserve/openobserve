@@ -35,6 +35,7 @@ import fleet, {
   type FleetSettings,
   type FleetSummary,
   type FleetToken,
+  type FleetPage,
 } from "./fleet";
 import { fleetKeys } from "./fleet.querykeys";
 import searchService from "./search";
@@ -95,6 +96,26 @@ async function settleAll(ids: string[], call: (id: string) => Promise<unknown>) 
   return { succeeded, failed, firstError } satisfies BulkResult;
 }
 
+/** The server's largest page; every list is read page by page until it ends. */
+export const FLEET_PAGE_LIMIT = 1000;
+
+/** Reads a whole list through its pages, so an org past one page is still complete. */
+export async function fetchAllPages<T>(
+  fetchPage: (page: FleetPage) => Promise<{ items?: T[]; total?: number } | undefined>,
+  limit = FLEET_PAGE_LIMIT,
+): Promise<T[]> {
+  const all: T[] = [];
+  for (let offset = 0; ; offset += limit) {
+    const page = await fetchPage({ offset, limit });
+    const items = page?.items;
+    if (!Array.isArray(items)) throw new Error("Malformed fleet list response");
+    all.push(...items);
+    const done =
+      items.length < limit || (typeof page?.total === "number" && all.length >= page.total);
+    if (done || !items.length) return all;
+  }
+}
+
 export const collectorsInFlight = (collectors: FleetCollector[] | undefined) =>
   !!collectors?.some((c) => inFlight(c.delivery));
 
@@ -102,9 +123,9 @@ export const fleetCollectorsQuery = (org: string) =>
   queryOptions({
     queryKey: fleetKeys.collectors(org),
     queryFn: async (): Promise<FleetCollector[]> => {
-      const items = (await fleet.listCollectors(org)).data?.items;
-      if (!Array.isArray(items)) throw new Error("Malformed fleet collectors response");
-      return items;
+      return fetchAllPages<FleetCollector>(
+        async (page) => (await fleet.listCollectors(org, page)).data,
+      );
     },
     staleTime: LIVE_STALE_TIME,
     refetchInterval: (query) =>
@@ -177,9 +198,7 @@ export const fleetTokensQuery = (org: string) =>
   queryOptions({
     queryKey: fleetKeys.tokens(org),
     queryFn: async (): Promise<FleetToken[]> => {
-      const items = (await fleet.listTokens(org)).data?.items;
-      if (!Array.isArray(items)) throw new Error("Malformed fleet tokens response");
-      return items;
+      return fetchAllPages<FleetToken>(async (page) => (await fleet.listTokens(org, page)).data);
     },
     staleTime: LIVE_STALE_TIME,
   });
@@ -188,9 +207,7 @@ export const fleetsQuery = (org: string) =>
   queryOptions({
     queryKey: fleetKeys.fleets(org),
     queryFn: async (): Promise<Fleet[]> => {
-      const items = (await fleet.listFleets(org)).data?.items;
-      if (!Array.isArray(items)) throw new Error("Malformed fleets response");
-      return items;
+      return fetchAllPages<Fleet>(async (page) => (await fleet.listFleets(org, page)).data);
     },
     staleTime: LIVE_STALE_TIME,
     refetchInterval: (query) => fleetPoll(query.state.data ?? []),
@@ -216,9 +233,9 @@ export const fleetConfigsQuery = (org: string) =>
   queryOptions({
     queryKey: fleetKeys.configs(org),
     queryFn: async (): Promise<FleetConfigItem[]> => {
-      const items = (await fleet.listConfigs(org)).data?.items;
-      if (!Array.isArray(items)) throw new Error("Malformed fleet configs response");
-      return items;
+      return fetchAllPages<FleetConfigItem>(
+        async (page) => (await fleet.listConfigs(org, page)).data,
+      );
     },
     staleTime: LIVE_STALE_TIME,
   });
@@ -261,9 +278,9 @@ export const fleetRolloutsQuery = (org: string) =>
   queryOptions({
     queryKey: fleetKeys.rollouts(org),
     queryFn: async (): Promise<FleetRollout[]> => {
-      const items = (await fleet.listRollouts(org)).data?.items;
-      if (!Array.isArray(items)) throw new Error("Malformed fleet rollouts response");
-      return items;
+      return fetchAllPages<FleetRollout>(
+        async (page) => (await fleet.listRollouts(org, page)).data,
+      );
     },
     staleTime: LIVE_STALE_TIME,
     refetchInterval: (query) => rolloutPoll(query.state.data ?? []),

@@ -424,6 +424,10 @@ describe("OButton", () => {
     "outline-primary",
     "dashed",
     "pricing-chip",
+    "tint-teal",
+    "tint-purple",
+    "tint-blue",
+    "tint-orange",
   ] satisfies ButtonVariant[])(
     "preserves native disabled styling for %s when unavailable",
     (variant) => {

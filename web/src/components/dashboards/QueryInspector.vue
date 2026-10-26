@@ -402,9 +402,11 @@ export default defineComponent({
     };
 
     const seriesLimitBody = computed(() =>
-      props.seriesLimit
-        ? describeSeriesLimit(props.seriesLimit, seriesTotalBoundOf(props.diagnostics), t).body
-        : raw(""),
+      props.seriesLimit?.displayCapMessage
+        ? raw(props.seriesLimit.displayCapMessage)
+        : props.seriesLimit
+          ? describeSeriesLimit(props.seriesLimit, seriesTotalBoundOf(props.diagnostics), t).body
+          : raw(""),
     );
 
     const diagnosticsFor = (index: number): QueryDiagnostics | undefined =>

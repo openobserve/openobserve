@@ -11,6 +11,7 @@ import {
   shouldShowAreaLineStyleConfig,
   shouldShowNoValueReplacement,
   shouldShowAxisConfig,
+  shouldShowAxisBorderConfig,
   shouldShowCartesianAxisConfig,
   shouldShowGridlines,
   shouldShowAxisLabelConfig,
@@ -24,6 +25,8 @@ import {
   DEFAULT_EXPANDED_SECTIONS,
 } from "@/utils/dashboard/searchLabelsConfig";
 import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
+import { PROMETHEUS_HISTOGRAM_MODE } from "@/utils/dashboard/promql/convertPromQLHeatmapChart";
+import { isNumericYField } from "@/utils/dashboard/heatmapYAxis";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -49,6 +52,7 @@ export const THRESHOLD_CHART_TYPES: readonly string[] = [
   "scatter",
   "gauge",
   "metric",
+  "state-timeline",
 ];
 
 export const shouldShowThresholds = (dashboardPanelData: any): boolean =>
@@ -68,10 +72,27 @@ export const SERIES_OVERRIDE_CHART_TYPES: readonly string[] = [
   "donut",
   "gauge",
   "metric",
+  "state-timeline",
 ];
 
 export const shouldShowSeriesOverrides = (dashboardPanelData: any): boolean =>
   SERIES_OVERRIDE_CHART_TYPES.includes(dashboardPanelData?.data?.type);
+
+// Histogram mode always orders rows by le, so the sort control would do nothing there.
+export const shouldShowHeatmapYSort = (dashboardPanelData: any, promqlMode: boolean): boolean =>
+  dashboardPanelData?.data?.type === "heatmap" &&
+  !(promqlMode && dashboardPanelData?.data?.config?.heatmap_mode === PROMETHEUS_HISTOGRAM_MODE);
+
+// Bucketing is generated in the builder's SQL, so custom SQL and PromQL keep the y values they return.
+export const shouldShowHeatmapYBucket = (dashboardPanelData: any, promqlMode: boolean): boolean => {
+  const query = dashboardPanelData?.data?.queries?.[dashboardPanelData?.layout?.currentQueryIndex];
+  return (
+    !promqlMode &&
+    dashboardPanelData?.data?.type === "heatmap" &&
+    !query?.customQuery &&
+    isNumericYField(query?.fields?.y?.[0], dashboardPanelData)
+  );
+};
 
 // ---------------------------------------------------------------------------
 // Pure filter helpers (exported so they can be unit-tested independently)
@@ -126,6 +147,8 @@ export function useConfigPanel(
   isPivotMode: ComputedRef<boolean>,
 ) {
   const { t, tm } = useI18nTyped();
+
+  const isStateTimeline = computed(() => dashboardPanelData.data.type === "state-timeline");
 
   // ── Config options ────────────────────────────────────────────────────────
 
@@ -249,12 +272,47 @@ export function useConfigPanel(
       },
     },
     data: {
-      unit: { label: t("dashboard.unitLabel") },
+      unit: { label: t("dashboard.unitLabel"), visible: !isStateTimeline.value },
       "custom-unit": {
         label: t("dashboard.customunitLabel"),
-        visible: dashboardPanelData.data.config.unit === "custom",
+        visible: !isStateTimeline.value && dashboardPanelData.data.config.unit === "custom",
       },
-      decimals: { label: t("dashboard.decimals") },
+      decimals: { label: t("dashboard.decimals"), visible: !isStateTimeline.value },
+      "heatmap-color-range": {
+        label: [t("dashboard.heatmapColorMin"), t("dashboard.heatmapColorMax")],
+        visible: dashboardPanelData.data.type === "heatmap",
+      },
+      "heatmap-palette": {
+        label: t("dashboard.heatmapPalette"),
+        visible: dashboardPanelData.data.type === "heatmap",
+      },
+      "heatmap-palette-reverse": {
+        label: t("dashboard.heatmapPaletteReverse"),
+        visible: dashboardPanelData.data.type === "heatmap",
+      },
+      "heatmap-color-scale": {
+        label: t("dashboard.heatmapColorScale"),
+        visible: dashboardPanelData.data.type === "heatmap",
+      },
+      "heatmap-histogram-mode": {
+        label: t("dashboard.heatmapHistogramMode"),
+        visible: !!promqlMode.value && dashboardPanelData.data.type === "heatmap",
+      },
+      "bucket-unit": {
+        label: t("dashboard.bucketUnit"),
+        visible:
+          !!promqlMode.value &&
+          dashboardPanelData.data.type === "heatmap" &&
+          dashboardPanelData.data.config?.heatmap_mode === PROMETHEUS_HISTOGRAM_MODE,
+      },
+      "bucket-unit-custom": {
+        label: t("dashboard.bucketUnitCustom"),
+        visible:
+          !!promqlMode.value &&
+          dashboardPanelData.data.type === "heatmap" &&
+          dashboardPanelData.data.config?.heatmap_mode === PROMETHEUS_HISTOGRAM_MODE &&
+          dashboardPanelData.data.config?.bucket_unit === "custom",
+      },
       limit: {
         label: t("dashboard.queryLimit"),
         visible:
@@ -287,14 +345,54 @@ export function useConfigPanel(
           dashboardPanelData.data.type !== "maps",
       },
     },
+    stateTimeline: {
+      "merge-gaps": {
+        label: t("dashboard.stateTimelineMergeGaps"),
+        visible: isStateTimeline.value,
+      },
+      "row-size": {
+        label: [t("dashboard.stateTimelineRowHeight"), t("dashboard.stateTimelineRowGap")],
+        visible: isStateTimeline.value,
+      },
+      "show-state-text": {
+        label: t("dashboard.stateTimelineShowStateText"),
+        visible: isStateTimeline.value,
+      },
+      "row-sort": {
+        label: t("dashboard.stateTimelineRowSort"),
+        visible: isStateTimeline.value,
+      },
+      "tooltip-mode": {
+        label: t("dashboard.stateTimelineTooltipMode"),
+        visible: isStateTimeline.value,
+      },
+    },
     axis: {
       "axis-width": {
         label: t("common.axisWidth"),
         visible: shouldShowAxisConfig(dashboardPanelData),
       },
+      "heatmap-y-sort": {
+        label: t("dashboard.heatmapYSort"),
+        visible: shouldShowHeatmapYSort(dashboardPanelData, !!promqlMode.value),
+      },
+      "heatmap-y-bucket": {
+        label: [
+          t("dashboard.heatmapYBucket"),
+          t("dashboard.heatmapYBucketSize"),
+          t("dashboard.heatmapYBucketBase"),
+        ],
+        visible: shouldShowHeatmapYBucket(dashboardPanelData, !!promqlMode.value),
+      },
+      "heatmap-y-range": {
+        label: [t("dashboard.heatmapYMin"), t("dashboard.heatmapYMax")],
+        visible:
+          shouldShowHeatmapYBucket(dashboardPanelData, !!promqlMode.value) &&
+          !!dashboardPanelData.data.config?.heatmap_y_bucket?.mode,
+      },
       "axis-border": {
         label: t("dashboard.showBorder"),
-        visible: shouldShowAxisConfig(dashboardPanelData),
+        visible: shouldShowAxisBorderConfig(dashboardPanelData),
       },
       "y-axis": {
         label: [t("common.yAxisMin"), t("common.yAxisMax")],

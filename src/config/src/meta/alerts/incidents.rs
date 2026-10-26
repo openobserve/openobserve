@@ -113,10 +113,10 @@ impl std::fmt::Display for CorrelationReason {
     }
 }
 
-impl TryFrom<&str> for CorrelationReason {
-    type Error = String;
+impl std::str::FromStr for CorrelationReason {
+    type Err = String;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value.to_lowercase().as_str() {
             "service_discovery" => Ok(Self::ServiceDiscovery),
             "primary_match" => Ok(Self::PrimaryMatch),
@@ -1710,14 +1710,14 @@ mod tests {
     #[test]
     fn test_correlation_reason_try_from() {
         assert_eq!(
-            CorrelationReason::try_from("service_discovery").unwrap(),
+            "service_discovery".parse::<CorrelationReason>().unwrap(),
             CorrelationReason::ServiceDiscovery
         );
         assert_eq!(
-            CorrelationReason::try_from("PRIMARY_MATCH").unwrap(),
+            "PRIMARY_MATCH".parse::<CorrelationReason>().unwrap(),
             CorrelationReason::PrimaryMatch
         );
-        assert!(CorrelationReason::try_from("bad_value").is_err());
+        assert!("bad_value".parse::<CorrelationReason>().is_err());
     }
 
     // ── KeyType ───────────────────────────────────────────────────────────────

@@ -1048,14 +1048,11 @@ fn update_mutable_fields(
     Ok(())
 }
 
-/// Deletes all alerts belonging to the given org.
-pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+/// Deletes all alerts of the org and returns their ids.
+pub async fn delete_by_org(org_id: &str) -> Result<Vec<String>, errors::Error> {
     let client = get_orm_client_rw().await;
-    alerts::Entity::delete_many()
-        .filter(alerts::Column::Org.eq(org_id))
-        .exec(client)
-        .await?;
-    Ok(())
+    let delete = alerts::Entity::delete_many().filter(alerts::Column::Org.eq(org_id));
+    Ok(super::delete_returning(client, delete, &[alerts::Column::Id]).await?)
 }
 
 #[derive(DeriveIden)]
@@ -1066,8 +1063,6 @@ enum Alerts {
 
 #[cfg(test)]
 pub(super) mod tests {
-    use svix_ksuid::KsuidLike as _;
-
     use super::*;
     use crate::table::entity::alerts::Model;
 
