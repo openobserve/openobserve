@@ -52,7 +52,7 @@ use infra::{
 };
 use ingestion_common::IngestionRequest;
 use proto::cluster_rpc::IngestionType;
-use schema::{check_for_schema, check_request_columns_limit};
+use schema::{check_for_schema, check_request_columns_limit, check_stream_key_len};
 use usage_reporting::publish_triggers_usage;
 use vrl::compiler::runtime::Runtime;
 
@@ -352,6 +352,8 @@ pub async fn check_batch_schema<'r>(
     Option<Schema>,
     Option<hashbrown::HashSet<&'r str>>,
 )> {
+    // an unchanged schema never reaches check_for_schema, so existing streams are caught here
+    check_stream_key_len(org_id, stream_type, stream_name)?;
     let min_timestamp = records.iter().map(|(ts, _)| *ts).min().unwrap_or_default();
     // a user-defined schema is applied by check_for_schema itself, so it cannot be skipped
     if has_uds {
@@ -1885,5 +1887,32 @@ mod tests {
             row.error.as_deref(),
             Some("error sending notification for alert: http 500")
         );
+    }
+
+    /// A stream created before the length check exists has an unchanged schema, so it skips
+    /// check_for_schema; the batch check must still reject it.
+    #[tokio::test]
+    async fn test_resolve_batch_schema_rejects_existing_too_long_stream() {
+        let stream_name = "s".repeat(schema::STREAM_KEY_MAX_LEN);
+        let fields = vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, true),
+            Field::new("a", DataType::Utf8, true),
+        ];
+        let mut map = HashMap::from([(stream_name.clone(), SchemaCache::new(Schema::new(fields)))]);
+        let records = vec![log_record(json!({"_timestamp": 1, "a": "x"}))];
+        let Err(err) = resolve_batch_schema(
+            "o",
+            &stream_name,
+            StreamType::Logs,
+            &mut map,
+            &records,
+            false,
+            false,
+        )
+        .await
+        else {
+            panic!("an existing too-long stream was accepted");
+        };
+        assert!(err.to_string().contains("Stream name too long"), "{err}");
     }
 }

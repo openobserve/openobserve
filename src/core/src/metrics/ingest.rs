@@ -436,7 +436,6 @@ pub(super) async fn write_streams(
     Ok(timings)
 }
 
-/// Records a successful request against `endpoint` in the HTTP metrics.
 /// The rejection message when a metrics stream's file_list key is too long; call once per batch.
 pub(super) fn reject_long_stream(org_id: &str, stream_name: &str) -> Option<String> {
     let message = schema::check_stream_key_len(org_id, StreamType::Metrics, stream_name)
@@ -446,6 +445,7 @@ pub(super) fn reject_long_stream(org_id: &str, stream_name: &str) -> Option<Stri
     Some(message)
 }
 
+/// Records a successful request against `endpoint` in the HTTP metrics.
 pub(super) fn observe_request(endpoint: &str, org_id: &str, start: &Instant) {
     let labels = [
         endpoint,

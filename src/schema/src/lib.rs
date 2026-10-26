@@ -61,7 +61,9 @@ pub use watcher::{
 
 const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
 const STREAM_NAME_TOO_LONG: &str = "stream_name_too_long";
-/// Longest `{org}/{stream_type}/{stream}` key the PostgreSQL file_list tables can store.
+/// Longest org id the file_list and schema_history `org` columns hold.
+pub const ORG_ID_MAX_LEN: usize = 100;
+/// Longest `{org}/{stream_type}/{stream}` key the file_list `stream` columns hold.
 pub const STREAM_KEY_MAX_LEN: usize = 256;
 /// Shared by both ingestion-window discard messages and the test for them.
 const WINDOW_DISCARD_MARKER: &str = " data can be ingested. Data discarded.";
@@ -121,21 +123,21 @@ pub fn check_request_columns_limit(
     ))
 }
 
-/// Whether a stream's file_list key is too long to store, without counting it as an ingest error.
+/// Whether a stream's file_list key or its org is too long to store, without counting an error.
 pub fn is_stream_key_too_long(org_id: &str, stream_type: StreamType, stream_name: &str) -> bool {
-    stream_key_len(org_id, stream_type, stream_name) > STREAM_KEY_MAX_LEN
+    stream_key_violation(org_id, stream_type, stream_name).is_some()
 }
 
-/// Rejects a stream whose file_list key cannot be stored, so its files would never be listed.
+/// Rejects a stream whose file_list key or org cannot be stored, so its files would never be
+/// listed.
 pub fn check_stream_key_len(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
 ) -> Result<(), anyhow::Error> {
-    let len = stream_key_len(org_id, stream_type, stream_name);
-    if len <= STREAM_KEY_MAX_LEN {
+    let Some(violation) = stream_key_violation(org_id, stream_type, stream_name) else {
         return Ok(());
-    }
+    };
     metrics::INGEST_ERRORS
         .with_label_values(&[
             org_id,
@@ -144,14 +146,27 @@ pub fn check_stream_key_len(
             STREAM_NAME_TOO_LONG,
         ])
         .inc();
-    Err(anyhow::anyhow!(
-        "Stream name too long: {org_id}/{stream_type}/{stream_name} is {len} characters, only {STREAM_KEY_MAX_LEN} accepted. Data discarded."
-    ))
+    Err(anyhow::anyhow!("{violation}. Data discarded."))
 }
 
-fn stream_key_len(org_id: &str, stream_type: StreamType, stream_name: &str) -> usize {
+fn stream_key_violation(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> Option<String> {
     // VARCHAR(n) counts characters, not bytes
-    org_id.chars().count() + stream_type.as_str().len() + stream_name.chars().count() + 2
+    let org_len = org_id.chars().count();
+    if org_len > ORG_ID_MAX_LEN {
+        return Some(format!(
+            "Organization id too long: {org_id} is {org_len} characters, only {ORG_ID_MAX_LEN} accepted"
+        ));
+    }
+    let len = org_len + stream_type.as_str().len() + stream_name.chars().count() + 2;
+    (len > STREAM_KEY_MAX_LEN).then(|| {
+        format!(
+            "Stream name too long: {org_id}/{stream_type}/{stream_name} is {len} characters, only {STREAM_KEY_MAX_LEN} accepted"
+        )
+    })
 }
 
 #[derive(Debug)]
@@ -1361,6 +1376,19 @@ mod tests {
         // a multi-byte name is measured in characters, as the VARCHAR column is
         let wide = "é".repeat(STREAM_KEY_MAX_LEN - 12);
         assert!(check_stream_key_len("org", StreamType::Metrics, &wide).is_ok());
+    }
+
+    #[test]
+    fn test_check_stream_key_len_org_boundary() {
+        let org = "o".repeat(ORG_ID_MAX_LEN);
+        assert!(check_stream_key_len(&org, StreamType::Logs, "s").is_ok());
+        let org = format!("{org}o");
+        assert!(is_stream_key_too_long(&org, StreamType::Logs, "s"));
+        let err = check_stream_key_len(&org, StreamType::Logs, "s").unwrap_err();
+        assert!(
+            err.to_string().starts_with("Organization id too long"),
+            "{err}"
+        );
     }
 
     /// A stream whose files could never be listed must not get a schema, so no data is written.

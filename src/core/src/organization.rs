@@ -747,6 +747,12 @@ fn validate_auto_created_org_id(org_id: &str) -> Result<(), anyhow::Error> {
     if org_id.is_empty() {
         return Err(anyhow::anyhow!("Organization identifier cannot be empty"));
     }
+    if org_id.chars().count() > schema::ORG_ID_MAX_LEN {
+        return Err(anyhow::anyhow!(
+            "Organization identifier cannot exceed {} characters",
+            schema::ORG_ID_MAX_LEN
+        ));
+    }
     if !org_id
         .chars()
         .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
@@ -1541,5 +1547,13 @@ mod tests {
                 "expected {org_id:?} to be rejected"
             );
         }
+    }
+
+    /// The file_list `org` column holds 100 characters, so a longer org could never store data.
+    #[test]
+    fn test_validate_auto_created_org_id_length() {
+        let org_id = "o".repeat(schema::ORG_ID_MAX_LEN);
+        assert!(validate_auto_created_org_id(&org_id).is_ok());
+        assert!(validate_auto_created_org_id(&format!("{org_id}o")).is_err());
     }
 }
