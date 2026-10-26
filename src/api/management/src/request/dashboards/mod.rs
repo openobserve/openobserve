@@ -867,6 +867,22 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_too_many_annotation_sources_is_bad_request() {
+        assert_eq!(
+            status(DashboardError::TooManyAnnotationSources(10)),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_invalid_annotation_source_is_bad_request() {
+        assert_eq!(
+            status(DashboardError::InvalidAnnotationSource("bad".to_string())),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
     // 409 Conflict
     #[test]
     fn test_update_conflicting_hash_is_conflict() {

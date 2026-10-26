@@ -21,6 +21,7 @@ import fleet from "@/services/fleet";
 import { queryClient } from "@/composables/query/queryClient";
 import FleetCollectorDrawer from "./FleetCollectorDrawer.vue";
 import { apiDetail } from "./fleet.fixtures";
+import { useRemoveRequest } from "./useCollectorActions";
 
 const { confirmMock, toastMock } = vi.hoisted(() => ({ confirmMock: vi.fn(), toastMock: vi.fn() }));
 
@@ -315,22 +316,25 @@ describe("FleetCollectorDrawer", () => {
     expect(wrapper.find(sel("restart")).attributes("disabled")).toBeDefined();
   });
 
-  it("removes after a confirm that warns an online host comes back, and closes", async () => {
+  it("removes after the remove dialog confirms an online host, and closes", async () => {
     vi.mocked(fleet.deleteCollector).mockResolvedValue({ status: 204 } as any);
     wrapper = mountDrawer();
     await flushPromises();
     await wrapper.find(sel("remove")).trigger("click");
+    const { request, answer } = useRemoveRequest();
+    expect(request.value?.targets.map((c) => c.id)).toEqual(["c1"]);
+    expect(request.value?.online).toBe(1);
+    answer(true);
     await flushPromises();
-    expect(confirmMock.mock.calls[0][0].message).toContain("reappears on its next heartbeat");
     expect(fleet.deleteCollector).toHaveBeenCalledWith(org(), "c1");
     expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
   });
 
   it("keeps the drawer open when the remove is cancelled", async () => {
-    confirmMock.mockResolvedValue(false);
     wrapper = mountDrawer();
     await flushPromises();
     await wrapper.find(sel("remove")).trigger("click");
+    useRemoveRequest().answer(false);
     await flushPromises();
     expect(fleet.deleteCollector).not.toHaveBeenCalled();
     expect(wrapper.emitted("update:open")).toBeUndefined();
