@@ -17,7 +17,7 @@ import { calculateWidthText } from "../../chartDimensionUtils";
 import { getAxisLabel } from "../../fieldLabel";
 import { largestLabel } from "../shared/contextBuilder";
 import { type SQLContext } from "../shared/types";
-import { barTrackMax } from "../../barTrack";
+import { barStyleSeriesProps, barTrackMax, pinBarTrackAxis, seriesDataMax } from "../../barTrack";
 
 /**
  * Applies chart-specific options for: h-bar
@@ -29,7 +29,6 @@ export function applyHBarChart(ctx: SQLContext): void {
     options,
     panelSchema,
     xAxisKeys,
-    yAxisKeys,
     breakDownKeys,
     dynamicXAxisNameGap,
     getSeries,
@@ -41,8 +40,7 @@ export function applyHBarChart(ctx: SQLContext): void {
   //generate trace based on the y axis keys
   options.series = getSeries({
     barMinHeight: 1,
-    ...(config.bar_width && { barWidth: config.bar_width }),
-    ...(config.show_bar_track && { showBackground: true }),
+    ...barStyleSeriesProps(config, { withTrack: true }),
   });
 
   if (panelSchema.config.trellis?.layout && breakDownKeys.length) {
@@ -55,15 +53,9 @@ export function applyHBarChart(ctx: SQLContext): void {
   options.yAxis = temp;
 
   if (config.show_bar_track) {
-    let dataMax = -Infinity;
-    for (const key of yAxisKeys) {
-      for (const v of getAxisDataFromKey(key)) {
-        if (typeof v === "number" && v > dataMax) dataMax = v;
-      }
-    }
-    const max = barTrackMax(config.y_axis_max, dataMax);
+    const max = barTrackMax(config.y_axis_max, seriesDataMax(options.series));
     // Replaces the max that grows past y_axis_max, so the track always spans the same range.
-    if (max !== undefined) [options.xAxis].flat().forEach((axis: any) => (axis.max = max));
+    if (max !== undefined) pinBarTrackAxis(options.xAxis, max);
     const dataZoom = options.toolbox?.feature?.dataZoom;
     // The brush zoom filters out bars past the axis max by default; a track clips them instead.
     if (dataZoom) dataZoom.filterMode = "none";

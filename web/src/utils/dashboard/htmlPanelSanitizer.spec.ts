@@ -113,6 +113,72 @@ describe("htmlPanelSanitizer", () => {
       expect(out.querySelector("style")?.textContent).toContain("(width < 37.5rem)");
     });
 
+    it("keeps target=_blank on links and forms and forces rel=noopener noreferrer", () => {
+      const out = render(
+        '<a href="https://example.com/a" target="_blank" rel="opener">a</a>' +
+          '<a href="https://example.com/b" target=" _BLANK ">b</a>' +
+          '<form action="https://example.com/f" target="_blank"></form>',
+      );
+      const [a, b] = Array.from(out.querySelectorAll("a"));
+      const form = out.querySelector("form");
+
+      expect(a.getAttribute("target")).toBe("_blank");
+      expect(a.getAttribute("rel")).toBe("noopener noreferrer");
+      expect(b.getAttribute("target")).toBe("_blank");
+      expect(b.getAttribute("rel")).toBe("noopener noreferrer");
+      expect(form?.getAttribute("target")).toBe("_blank");
+      expect(form?.getAttribute("rel")).toBe("noopener noreferrer");
+    });
+
+    it("applies the same target rule to area and SVG links", () => {
+      const out = render(
+        '<map name="m"><area href="https://example.com/a" target="_blank"><area href="/x" target="f1"></map>' +
+          '<svg><a href="https://example.com/s" target="_blank"><text>s</text></a><a href="/y" target="f1"><text>t</text></a></svg>',
+      );
+      const [area, namedArea] = Array.from(out.querySelectorAll("area"));
+      const [svgLink, namedSvgLink] = Array.from(out.querySelectorAll("svg a"));
+
+      expect(area.getAttribute("target")).toBe("_blank");
+      expect(area.getAttribute("rel")).toBe("noopener noreferrer");
+      expect(namedArea.hasAttribute("target")).toBe(false);
+      expect(svgLink.getAttribute("target")).toBe("_blank");
+      expect(svgLink.getAttribute("rel")).toBe("noopener noreferrer");
+      expect(namedSvgLink.hasAttribute("target")).toBe(false);
+    });
+
+    it("drops any target other than _blank and leaves untargeted links alone", () => {
+      const out = render(
+        '<iframe name="f1" src="https://example.com"></iframe>' +
+          '<a href="/web/x" target="f1">named</a>' +
+          '<a href="https://example.com" target="_top">top</a>' +
+          '<form action="/web/x" target="f1"></form>' +
+          '<a href="https://example.com" rel="nofollow">plain</a>',
+      );
+      const [named, top, plain] = Array.from(out.querySelectorAll("a"));
+
+      expect(named.hasAttribute("target")).toBe(false);
+      expect(top.hasAttribute("target")).toBe(false);
+      expect(out.querySelector("form")?.hasAttribute("target")).toBe(false);
+      expect(plain.hasAttribute("target")).toBe(false);
+      expect(plain.getAttribute("rel")).toBe("nofollow");
+    });
+
+    it("handles a form whose own attribute methods are shadowed by named controls", () => {
+      const proto = HTMLFormElement.prototype as any;
+      const shadow = () => {
+        throw new Error("shadowed");
+      };
+      // jsdom has no form named-property getters, so shadow the prototype instead
+      Object.defineProperty(proto, "getAttribute", { value: shadow, configurable: true });
+      try {
+        const form = render('<form action="https://example.com/f" target="_blank"></form>')
+          .firstElementChild as Element;
+        expect(Element.prototype.getAttribute.call(form, "rel")).toBe("noopener noreferrer");
+      } finally {
+        delete proto.getAttribute;
+      }
+    });
+
     it("registers its iframe hook once, on a private DOMPurify instance", () => {
       const addHookSpy = vi.spyOn(htmlPanelPurifier, "addHook");
 

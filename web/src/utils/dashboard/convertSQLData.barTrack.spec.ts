@@ -42,13 +42,20 @@ const query = (alias: string, breakdown: any[] = []) => ({
   config: {},
 });
 
-const run = async (config: Record<string, any>, data: any[][], breakdown: any[] = []) => {
-  const aliases = data.map((_, i) => `v${i + 1}`);
+const run = async (
+  config: Record<string, any>,
+  data: any[][],
+  breakdown: any[] = [],
+  gaps: number[] = [],
+) => {
+  // A time-shifted run reuses the panel query, so its rows carry the same alias.
+  const aliases = data.map((_, i) => (gaps[i] ? "v1" : `v${i + 1}`));
+  const panelQueries = [...new Set(aliases)];
   const panel = {
     id: "p",
     type: "h-bar",
     queryType: "sql",
-    queries: aliases.map((alias) => query(alias, breakdown)),
+    queries: panelQueries.map((alias) => query(alias, breakdown)),
     config,
   };
   const result: any = await convertMultiSQLData(
@@ -63,8 +70,8 @@ const run = async (config: Record<string, any>, data: any[][], breakdown: any[] 
         query: "SELECT 1",
         startTime: 1704067200000000,
         endTime: 1704068400000000,
-        timeRangeGap: { seconds: 0, periodAsStr: "" },
-        panelQueryIndex: i,
+        timeRangeGap: { seconds: gaps[i] ?? 0, periodAsStr: gaps[i] ? "15 Minutes ago" : "" },
+        panelQueryIndex: panelQueries.indexOf(aliases[i]),
       })),
     },
     { height: "400px" },
@@ -101,10 +108,42 @@ describe("SQL h-bar bar track and bar width", () => {
     expect(bars[0].barWidth).toBe(12);
   });
 
+  it("falls back to auto sizing for an invalid bar_width", async () => {
+    for (const width of [-3, 0, 12.6, 5000]) {
+      expect((await run({ bar_width: width }, oneQuery)).bars[0].barWidth).toBeUndefined();
+    }
+  });
+
   it("draws the track and pins the max to the largest bar when no max is set", async () => {
     const { valueAxis, bars } = await run({ show_bar_track: true, y_axis_max: null }, oneQuery);
     expect(bars[0].showBackground).toBe(true);
+    expect(bars[0].backgroundStyle.color).toBeTruthy();
     expect(valueAxis.max).toBe(70);
+    expect(valueAxis.axisLabel.hideOverlap).toBe(true);
+  });
+
+  it("leaves the axis automatic for all-negative data and pins mixed data to the largest bar", async () => {
+    const negative = [
+      [
+        { cat: "a", v1: -40 },
+        { cat: "b", v1: -70 },
+      ],
+    ];
+    expect((await run({ show_bar_track: true }, negative)).valueAxis.max).toBeUndefined();
+    const mixed = [
+      [
+        { cat: "a", v1: -40 },
+        { cat: "b", v1: 25 },
+      ],
+    ];
+    expect((await run({ show_bar_track: true }, mixed)).valueAxis.max).toBe(25);
+  });
+
+  it("pins a time-shifted track to the largest bar of either period", async () => {
+    const shifted = [...oneQuery, [{ cat: "a", v1: 120 }]];
+    const { valueAxis, bars } = await run({ show_bar_track: true }, shifted, [], [0, 900]);
+    expect(bars.some((bar: any) => bar.name.includes("15 Minutes ago"))).toBe(true);
+    expect(valueAxis.max).toBe(120);
   });
 
   it("pins the max to y_axis_max even below the data, instead of growing to the data", async () => {

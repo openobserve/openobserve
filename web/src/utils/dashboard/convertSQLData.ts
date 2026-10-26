@@ -23,14 +23,32 @@
  */
 import { convertSQLChartData } from "./sql";
 import { applySeriesColorMappings } from "./chartColorUtils";
-import { chartColor } from "@/utils/chartTheme";
-import { calculateMetricFontSize, METRIC_SPARKLINE } from "./sql/charts/convertSQLMetricChart";
+import { layoutMetricGrid } from "./metricGrid";
 import { calculateGridPositions, getTrellisGrid } from "./calculateGridForSubPlot";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { escapeHtml } from "@/utils/html";
 import { applyGaugeSeriesThresholds, applyLineAreaThresholds } from "./thresholds";
+import {
+  alignGaugeValueFonts,
+  gaugeAutoRange,
+  sizeGaugeDial,
+  type GaugeDialSeries,
+} from "./gaugeDial";
 import { applySeriesOverrides } from "./seriesOverrides";
+import {
+  HEATMAP_MAX_CELLS,
+  addHeatmapWarning,
+  heatmapColorRange,
+  heatmapColorScale,
+} from "./heatmapDefaults";
+import { sharedHeatmapTimeAxis } from "./heatmapTimeAxis";
+import {
+  applyPieDonutChartAlignment,
+  applyPieDonutLegendPositioning,
+  getChartDimensions,
+} from "./legendConfiguration";
 import { isTimeSeries, isTimeStamp } from "./dateTimeUtils";
+import { fitStackedAxisBounds } from "./stackTotals";
 import { mergeBarTrackMax } from "./barTrack";
 
 /**
@@ -244,6 +262,10 @@ export const convertMultiSQLData = async (
       ...panelSchema,
       queries: [panelSchema.queries[panelQueryIndex]],
       ...(isMultiQuery ? { config: { ...panelSchema.config, trellis: undefined } } : {}),
+      // Heatmap tiles draw side by side in one panel, so they split its cell budget.
+      ...(isMultiQuery && panelSchema.type === "heatmap"
+        ? { heatmapCellBudget: Math.floor(HEATMAP_MAX_CELLS / searchQueryData.length) }
+        : {}),
     };
 
     options.push(
@@ -304,8 +326,15 @@ export const convertMultiSQLData = async (
       });
     });
 
-    if (options[0]?.options?.series?.[0]) {
-      options[0].options.series[0].data = mergedData;
+    const merged = options[0]?.options;
+    if (merged?.series?.[0]) {
+      merged.series[0].data = mergedData;
+      // Query 0 sized the legend and placed the pie from its own slices; size them for every query's.
+      if (merged.legend?.show) {
+        applyPieDonutLegendPositioning(panelSchema, merged, chartPanelRef);
+        const { chartWidth, chartHeight } = getChartDimensions(chartPanelRef);
+        applyPieDonutChartAlignment(panelSchema, merged, chartWidth, chartHeight);
+      }
     }
 
     applySeriesColorMappings(
@@ -327,199 +356,12 @@ export const convertMultiSQLData = async (
       }
     });
 
-    // read the panel dimensions once — offsetWidth/offsetHeight are live DOM
-    // reads and this block references them for every grid cell
-    const panelW = chartPanelRef?.value?.offsetWidth ?? 0;
-    const panelH = chartPanelRef?.value?.offsetHeight ?? 0;
-    const gridData = calculateGridPositions(panelW, panelH, allMetricSeries.length);
-    const longestText = allMetricSeries.reduce(
-      (acc: string, s: any) =>
-        (s._metricText ?? "").length > acc.length ? (s._metricText ?? "") : acc,
-      "",
+    layoutMetricGrid(
+      allMetricSeries,
+      panelSchema?.config?.sparkline,
+      chartPanelRef?.value?.offsetWidth ?? 0,
+      chartPanelRef?.value?.offsetHeight ?? 0,
     );
-    const labelFontSize = Math.max(11, Math.min(14, Math.round(gridData.gridWidth / 30)));
-
-    // Panel-level sparkline (all metric cells share the same config).
-    const panelSpark = panelSchema?.config?.sparkline;
-    const sparkOn = !!panelSpark?.enabled;
-    const sparkBackground = sparkOn && panelSpark?.layout === "background";
-    const sparkBottom = sparkOn && !sparkBackground;
-
-    // The label renders below the value inside the same cell, so the value's
-    // vertical budget is the cell height minus the label line and gaps. With a
-    // bottom sparkline the value occupies only the top ~58% of the cell.
-    const valueBandHeight = sparkBottom
-      ? gridData.gridHeight * 0.58 - labelFontSize - 10
-      : gridData.gridHeight - labelFontSize - 10;
-    const sharedFontSize = calculateMetricFontSize(
-      longestText,
-      gridData.gridWidth,
-      Math.max(1, valueBandHeight),
-    );
-
-    // Draw a mini sparkline (line/area/bar) inside a cell rect.
-    const buildCellSparkline = (
-      data: number[],
-      cfg: any,
-      left: number,
-      top: number,
-      width: number,
-      height: number,
-    ): any[] => {
-      const n = data.length;
-      if (n < 2) return [];
-      const min = Math.min(...data);
-      const max = Math.max(...data);
-      const range = max - min || 1;
-      const hpad = width * 0.02;
-      const bandTop = sparkBackground
-        ? top
-        : top + height * (METRIC_SPARKLINE.bottomBandTopPct / 100);
-      // Band height is intentionally cell-specific (not shared with the series path).
-      const bandH = sparkBackground ? height : height * 0.33;
-      const vGap = sparkBackground ? bandH * 0.02 : 0;
-      const ceilY = bandTop + vGap;
-      const floorY = bandTop + bandH - vGap;
-      const xAt = (i: number) => left + hpad + (i / (n - 1)) * (width - 2 * hpad);
-      const yAt = (v: number) => floorY - ((v - min) / range) * (floorY - ceilY);
-      const color = cfg?.color || chartColor("--color-chart-metric-text");
-      const opacity = sparkBackground ? METRIC_SPARKLINE.faintOpacity : 1;
-      const out: any[] = [];
-      if (cfg?.type === "bar") {
-        const bw = ((width - 2 * hpad) / n) * 0.6;
-        for (let i = 0; i < n; i++) {
-          const x = xAt(i);
-          const y = yAt(data[i]);
-          out.push({
-            type: "rect",
-            shape: { x: x - bw / 2, y, width: bw, height: floorY - y },
-            style: { fill: color, opacity },
-            silent: true,
-          });
-        }
-      } else {
-        const points = data.map((v, i) => [xAt(i), yAt(v)]);
-        if (cfg?.type === "area") {
-          const fillOpacity =
-            typeof cfg?.fillOpacity === "number" ? cfg.fillOpacity : METRIC_SPARKLINE.fillOpacity;
-          out.push({
-            type: "polygon",
-            shape: {
-              points: [...points, [xAt(n - 1), floorY], [xAt(0), floorY]],
-            },
-            style: {
-              fill: color,
-              opacity: sparkBackground
-                ? fillOpacity * METRIC_SPARKLINE.faintAreaFactor
-                : fillOpacity,
-            },
-            silent: true,
-          });
-        }
-        out.push({
-          type: "polyline",
-          shape: { points },
-          style: {
-            stroke: color,
-            lineWidth:
-              typeof cfg?.lineWidth === "number" ? cfg.lineWidth : METRIC_SPARKLINE.lineWidth,
-            fill: "none",
-            opacity,
-          },
-          silent: true,
-        });
-      }
-      return out;
-    };
-
-    allMetricSeries.forEach((s: any, idx: number) => {
-      const cell = gridData?.gridArray?.[idx];
-      if (!cell) return;
-      const cellLeft = (parseFloat(cell.left) / 100) * panelW;
-      const cellTop = (parseFloat(cell.top) / 100) * panelH;
-      const cellWidth = (parseFloat(cell.width) / 100) * panelW;
-      const cellHeight = (parseFloat(cell.height) / 100) * panelH;
-      const cx = cellLeft + cellWidth / 2;
-      const cy = cellTop + cellHeight / 2;
-      const fill = s?._metricFillColor ?? chartColor("--color-text-heading");
-      const cellBg = s?._metricBgColor;
-      // With a bottom sparkline the value sits in the top band; otherwise centered.
-      const valueY = sparkBottom ? cellTop + cellHeight * 0.3 : cy - labelFontSize / 2 - 2;
-      const labelY = sparkBottom
-        ? valueY + sharedFontSize / 2 + labelFontSize / 2 + 4
-        : cy + sharedFontSize / 2 + 4;
-      // Grid-cell rect (px) is the hover zone; cx/cy/fontSize place + size the
-      // copy icon beside the number, clamped inside the cell.
-      s._metricLayout = {
-        left: cellLeft,
-        top: cellTop,
-        width: cellWidth,
-        height: cellHeight,
-        cx,
-        cy: valueY,
-        fontSize: sharedFontSize,
-        // vertical space under the value taken by the field label, so a
-        // below-the-value copy button clears it
-        labelClearance: labelFontSize * 1.2 + 8,
-      };
-      s.renderItem = () => {
-        try {
-          const children: any[] = [];
-          // per-cell mapped background drawn behind the value
-          if (cellBg) {
-            children.push({
-              type: "rect",
-              shape: { x: cellLeft, y: cellTop, width: cellWidth, height: cellHeight },
-              style: { fill: cellBg },
-              silent: true,
-            });
-          }
-          // per-cell sparkline trend (behind the value)
-          if (sparkOn && Array.isArray(s._metricSparkData)) {
-            children.push(
-              ...buildCellSparkline(
-                s._metricSparkData,
-                s._metricSparkConfig,
-                cellLeft,
-                cellTop,
-                cellWidth,
-                cellHeight,
-              ),
-            );
-          }
-          children.push({
-            type: "text",
-            style: {
-              text: s._metricText ?? "",
-              fontSize: sharedFontSize,
-              fontWeight: 500,
-              align: "center",
-              verticalAlign: "middle",
-              x: cx,
-              y: valueY,
-              fill,
-            },
-          });
-          children.push({
-            type: "text",
-            style: {
-              text: s._metricLabel ?? "",
-              fontSize: labelFontSize,
-              fontWeight: 400,
-              align: "center",
-              verticalAlign: "middle",
-              x: cx,
-              y: labelY,
-              fill,
-              opacity: 0.65,
-            },
-          });
-          return { type: "group", children };
-        } catch {
-          return "";
-        }
-      };
-    });
 
     // Canvas base = panel background; each cell paints its own mapped background.
     options[0].options.backgroundColor = panelSchema?.config?.background?.value?.color ?? "";
@@ -542,6 +384,7 @@ export const convertMultiSQLData = async (
       allSeries.length,
     );
     const minDim = Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight);
+    const autoRange = gaugeAutoRange(allSeries.map((s: GaugeDialSeries) => s?.data?.[0]?.value));
 
     allSeries.forEach((s: any, idx: number) => {
       const cell = gridDataForGauge.gridArray[idx];
@@ -550,17 +393,10 @@ export const convertMultiSQLData = async (
         `${parseFloat(cell.left) + parseFloat(cell.width) / 2}%`,
         `${parseFloat(cell.top) + parseFloat(cell.height) / 2}%`,
       ];
-      s.radius = `${minDim / 2 - 5}px`;
-      if (s.progress) {
-        s.progress.width = `${minDim / 6}`;
-      }
-      if (s.axisLine?.lineStyle) {
-        s.axisLine.lineStyle.width = `${minDim / 6}`;
-      }
-      if (s.title) {
-        s.title.width = `${gridDataForGauge.gridWidth}`;
-      }
+      if (s._autoRange && autoRange) Object.assign(s, autoRange);
+      sizeGaugeDial(s, minDim, gridDataForGauge.gridWidth);
     });
+    alignGaugeValueFonts(allSeries, minDim);
     options[0].options.series = allSeries;
     applySeriesColorMappings(
       options[0].options.series,
@@ -663,6 +499,30 @@ export const convertMultiSQLData = async (
       }
     });
 
+    // Each tile reports its own cell-limit and duplicate warnings; only options[0] reaches the panel.
+    options.slice(1).forEach((opt: any) => {
+      const message = opt?.extras?.limitNumberOfSeriesWarningMessage;
+      if (message) {
+        options[0].extras = options[0].extras ?? {};
+        addHeatmapWarning(options[0].extras, message);
+      }
+    });
+
+    options[0].extras = options[0].extras ?? {};
+    options[0].extras.heatmapRowValues = options.map(
+      (opt: any) => opt?.extras?.heatmapRowValues?.[0] ?? null,
+    );
+
+    // One zoom box or hovered time maps through a single column list, so tiles must share it.
+    if (
+      options[0].extras?.heatmapTimeAxis &&
+      !sharedHeatmapTimeAxis(options.map((opt: any) => opt?.extras?.heatmapTimeAxis))
+    ) {
+      delete options[0].extras.heatmapTimeAxis;
+      options[0].extras.isTimeSeries = false;
+      if (options[0].options.toolbox) options[0].options.toolbox.show = false;
+    }
+
     options[0].options.grid = allGrids;
     options[0].options.xAxis = allXAxes;
     options[0].options.yAxis = allYAxes;
@@ -676,8 +536,9 @@ export const convertMultiSQLData = async (
       trigger: "item",
       formatter: (params: any) => {
         try {
-          const yLabel =
-            allYAxes[params.seriesIndex]?.data?.[params?.value?.[1]] ?? params?.seriesName ?? "";
+          // An empty tile keeps its axis but loses its series, so series and axis indices can differ.
+          const yAxis = allYAxes[allSeries[params.seriesIndex]?.yAxisIndex];
+          const yLabel = yAxis?.data?.[params?.value?.[1]] ?? params?.seriesName ?? "";
           const rawVal = params?.value?.[2];
           const formatted =
             formatUnitValue(
@@ -696,8 +557,17 @@ export const convertMultiSQLData = async (
     };
 
     if (options[0].options.visualMap) {
-      options[0].options.visualMap.min = isFinite(globalMin) ? globalMin : 0;
-      options[0].options.visualMap.max = isFinite(globalMax) ? globalMax : 0;
+      // Re-resolved over the shared range: a pin one query rejected may still hold for the panel.
+      const { color, ...sharedRange } = heatmapColorScale(
+        panelSchema?.config,
+        heatmapColorRange(panelSchema?.config, {
+          min: isFinite(globalMin) ? globalMin : 0,
+          max: isFinite(globalMax) ? globalMax : 0,
+        }),
+        allSeries.map((series: any) => series.data ?? []),
+      );
+      Object.assign(options[0].options.visualMap, sharedRange);
+      options[0].options.visualMap.inRange = { color };
       options[0].options.visualMap.bottom = VISUAL_MAP_BOTTOM;
     }
 
@@ -870,6 +740,7 @@ export const convertMultiSQLData = async (
     }
     // Override colours first: a threshold step outranks them and recolours on top.
     applySeriesOverrides(options[0].options, panelSchema, store.state.theme);
+    fitStackedAxisBounds(chartType, options[0].options);
     applyLineAreaThresholds(options[0].options, panelSchema);
   }
 

@@ -1629,6 +1629,34 @@ describe("Convert PromQL Data Utils", () => {
       expect(result.options.yAxis.max).toBe(100); // Max of (100, dataMax) = 100
     });
 
+    it.each(["stacked", "area-stacked"])(
+      "widens a %s y_axis_max that would clip the stack total",
+      async (type) => {
+        const series = (job: string) => ({
+          metric: { job },
+          values: [
+            [1640435200, "70"],
+            [1640438800, "70"],
+          ],
+        });
+        const result = await convertPromQLData(
+          {
+            id: "panel1",
+            type,
+            config: { y_axis_max: 10 },
+            queries: [{ config: { promql_legend: "" } }],
+          },
+          [{ resultType: "matrix", result: [series("a"), series("b")] }],
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        expect(result.options.yAxis.max).toBe(140);
+      },
+    );
+
     it("should use getFinalAxisValue with null config values", async () => {
       const panelSchema = {
         id: "panel1",
@@ -1867,6 +1895,82 @@ describe("Convert PromQL Data Utils", () => {
       expect(scatterSeries.type).toBe("scatter");
       expect(scatterSeries.emphasis.focus).toBe("series");
       expect(scatterSeries.symbolSize).toBe(5);
+    });
+
+    it("applies scatter point size and opacity to an instant (vector) result", async () => {
+      const result = await convertPromQLData(
+        {
+          id: "panel1",
+          type: "scatter",
+          config: { symbol_size: 10, symbol_opacity: 40 },
+          queries: [{ config: { promql_legend: "" } }],
+        },
+        [
+          {
+            resultType: "vector",
+            result: [{ metric: { __name__: "test" }, value: [1640435200, "10"] }],
+          },
+        ],
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      const series = result.options.series.find((s: any) => s.name === '{"__name__":"test"}');
+      expect(series.symbolSize).toBe(10);
+      expect(series.itemStyle.opacity).toBe(0.4);
+    });
+
+    it.each([
+      ["line", { resultType: "matrix", values: [[1640435200, "10"]] }],
+      ["area", { resultType: "matrix", values: [[1640435200, "10"]] }],
+      ["area-stacked", { resultType: "matrix", values: [[1640435200, "10"]] }],
+      ["line", { resultType: "vector", value: [1640435200, "10"] }],
+    ])(
+      "applies the panel line_thickness to %s series (%o)",
+      async (type, { resultType, ...sample }) => {
+        const result = await convertPromQLData(
+          {
+            id: "panel1",
+            type,
+            config: { line_thickness: 4 },
+            queries: [{ config: { promql_legend: "" } }],
+          },
+          [{ resultType, result: [{ metric: { __name__: "test" }, ...sample }] }],
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        const series = result.options.series.find((s: any) => s.name === '{"__name__":"test"}');
+        expect(series.lineStyle.width).toBe(4);
+      },
+    );
+
+    it("draws a saved line_thickness of 0 at the default width instead of hiding the line", async () => {
+      const result = await convertPromQLData(
+        {
+          id: "panel1",
+          type: "line",
+          config: { line_thickness: 0 },
+          queries: [{ config: { promql_legend: "" } }],
+        },
+        [
+          {
+            resultType: "matrix",
+            result: [{ metric: { __name__: "test" }, values: [[1640435200, "10"]] }],
+          },
+        ],
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      const series = result.options.series.find((s: any) => s.name === '{"__name__":"test"}');
+      expect(series.lineStyle.width).toBe(1.5);
     });
 
     it("should use getLegendPosition function with bottom position", async () => {
@@ -2321,7 +2425,7 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      expect(result.options.series[0].data[0].value).toBe("80");
+      expect(result.options.series[0].data[0].value).toBe(80);
     });
 
     it("should test gauge tooltip valueFormatter function (lines 650-658)", async () => {

@@ -15,7 +15,9 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  allVisibleQueriesInstant,
   shouldApplyChartAlign,
+  shouldShowLegendValues,
   shouldShowGridlines,
   shouldShowLegendsToggle,
   shouldShowLegendPosition,
@@ -28,16 +30,32 @@ import {
   shouldShowAreaLineStyleConfig,
   shouldShowTopResultsConfig,
   shouldShowAxisConfig,
+  shouldShowAxisBorderConfig,
   shouldShowCartesianAxisConfig,
   shouldShowAxisLabelConfig,
-  shouldShowLineThickness,
+  shouldShowAreaFillConfig,
+  shouldShowScatterPointConfig,
   shouldShowBarStyleConfig,
+  shouldShowBarWidthConfig,
   shouldShowDrilldown,
   shouldShowTimeShift,
   shouldShowPromQLQueryType,
 } from "./configUtils";
 
 describe("configUtils", () => {
+  describe("shouldShowLegendValues", () => {
+    const panel = (type: string, show_legends: boolean) => ({
+      data: { type, config: { show_legends } },
+    });
+
+    it("is true only for pie and donut with the legend shown", () => {
+      expect(shouldShowLegendValues(panel("pie", true))).toBe(true);
+      expect(shouldShowLegendValues(panel("donut", true))).toBe(true);
+      expect(shouldShowLegendValues(panel("pie", false))).toBe(false);
+      expect(shouldShowLegendValues(panel("bar", true))).toBe(false);
+    });
+  });
+
   describe("shouldApplyChartAlign", () => {
     it("should return true for pie chart with right legend", () => {
       const dashboardPanelData = {
@@ -1242,6 +1260,14 @@ describe("configUtils", () => {
     });
   });
 
+  describe("shouldShowAxisBorderConfig", () => {
+    it("offers the axis border toggle where axis config shows, except on heatmaps", () => {
+      expect(shouldShowAxisBorderConfig({ data: { type: "line" } })).toBe(true);
+      expect(shouldShowAxisBorderConfig({ data: { type: "heatmap" } })).toBe(false);
+      expect(shouldShowAxisBorderConfig({ data: { type: "table" } })).toBe(false);
+    });
+  });
+
   describe("shouldShowAxisConfig", () => {
     it("should return true for line chart", () => {
       expect(shouldShowAxisConfig({ data: { type: "line" } })).toBe(true);
@@ -1354,41 +1380,20 @@ describe("configUtils", () => {
     });
   });
 
-  describe("shouldShowLineThickness", () => {
-    const makeData = (type: string, customQuery = false) => ({
-      data: {
-        type,
-        queries: [{ customQuery }],
-      },
-      layout: { currentQueryIndex: 0 },
+  describe("shouldShowAreaFillConfig", () => {
+    it("is true only for the area chart", () => {
+      expect(shouldShowAreaFillConfig({ data: { type: "area" } })).toBe(true);
+      ["area-stacked", "line", "bar", "scatter"].forEach((type) =>
+        expect(shouldShowAreaFillConfig({ data: { type } })).toBe(false),
+      );
     });
+  });
 
-    it("should return true for area chart in non-promql mode without customQuery", () => {
-      expect(shouldShowLineThickness(makeData("area"), false)).toBe(true);
-    });
-
-    it("should return true for area-stacked chart in non-promql mode without customQuery", () => {
-      expect(shouldShowLineThickness(makeData("area-stacked"), false)).toBe(true);
-    });
-
-    it("should return true for line chart in non-promql mode without customQuery", () => {
-      expect(shouldShowLineThickness(makeData("line"), false)).toBe(true);
-    });
-
-    it("should return false when promqlMode is true", () => {
-      expect(shouldShowLineThickness(makeData("area"), true)).toBe(false);
-    });
-
-    it("should return false when customQuery is true", () => {
-      expect(shouldShowLineThickness(makeData("area", true), false)).toBe(false);
-    });
-
-    it("should return false for bar chart", () => {
-      expect(shouldShowLineThickness(makeData("bar"), false)).toBe(false);
-    });
-
-    it("should return false for scatter chart", () => {
-      expect(shouldShowLineThickness(makeData("scatter"), false)).toBe(false);
+  describe("shouldShowScatterPointConfig", () => {
+    it("is true for scatter only", () => {
+      expect(shouldShowScatterPointConfig({ data: { type: "scatter" } })).toBe(true);
+      expect(shouldShowScatterPointConfig({ data: { type: "line" } })).toBe(false);
+      expect(shouldShowScatterPointConfig({ data: { type: "bar" } })).toBe(false);
     });
   });
 
@@ -1398,6 +1403,17 @@ describe("configUtils", () => {
       ["bar", "h-stacked", "stacked", "line"].forEach((type) =>
         expect(shouldShowBarStyleConfig({ data: { type } })).toBe(false),
       );
+    });
+  });
+
+  describe("shouldShowBarWidthConfig", () => {
+    it("is true for h-bar, and for PromQL bar, stacked and h-stacked", () => {
+      expect(shouldShowBarWidthConfig({ data: { type: "h-bar" } }, false)).toBe(true);
+      ["bar", "stacked", "h-stacked"].forEach((type) => {
+        expect(shouldShowBarWidthConfig({ data: { type } }, true)).toBe(true);
+        expect(shouldShowBarWidthConfig({ data: { type } }, false)).toBe(false);
+      });
+      expect(shouldShowBarWidthConfig({ data: { type: "line" } }, true)).toBe(false);
     });
   });
 
@@ -1487,6 +1503,28 @@ describe("configUtils", () => {
 
     it("should return false when pageKey is logs", () => {
       expect(shouldShowTimeShift({ data: { type: "area" } }, false, "logs")).toBe(false);
+    });
+  });
+
+  describe("allVisibleQueriesInstant", () => {
+    const panel = (types: string[], hiddenQueries?: number[]) => ({
+      data: { queries: types.map((query_type) => ({ config: { query_type } })) },
+      layout: { hiddenQueries },
+    });
+
+    it("is true only when every visible query is instant", () => {
+      expect(allVisibleQueriesInstant(panel(["instant", "instant"]))).toBe(true);
+      expect(allVisibleQueriesInstant(panel(["instant", "range"]))).toBe(false);
+      expect(allVisibleQueriesInstant(panel(["instant", "range"], [1]))).toBe(true);
+    });
+
+    it("is false with no queries or an unset query type", () => {
+      expect(allVisibleQueriesInstant(panel([]))).toBe(false);
+      expect(allVisibleQueriesInstant({ data: { queries: [{ config: {} }] } })).toBe(false);
+    });
+
+    it("is false when every query is hidden", () => {
+      expect(allVisibleQueriesInstant(panel(["range", "instant"], [0, 1]))).toBe(false);
     });
   });
 

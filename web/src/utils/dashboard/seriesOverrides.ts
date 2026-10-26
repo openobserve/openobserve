@@ -15,7 +15,7 @@
 
 import type { RE2JS } from "re2js";
 import { escapeHtml } from "@/utils/html";
-import { getAreaStyleOverride } from "./colorPalette";
+import { getAreaStyleOverride, type AreaFillConfig } from "./colorPalette";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { tryCompileLinearRegex } from "./tableConfigUtils";
 import type { ThresholdMode, ThresholdShowAs } from "./thresholds";
@@ -139,7 +139,13 @@ const isNamedSeries = (series: any): boolean =>
 // Time-series points are [time, value]; category points are the value itself.
 const pointValue = (value: unknown): unknown => (Array.isArray(value) ? value[1] : value);
 
-const recolourSeries = (series: any, color: string, panelType: string, theme: string) => {
+const recolourSeries = (
+  series: any,
+  color: string,
+  panelType: string,
+  theme: string,
+  config: AreaFillConfig | null | undefined,
+) => {
   if (series.itemStyle) series.itemStyle = { ...series.itemStyle, color };
   if (!series.itemStyle || "color" in series) series.color = color;
   if (series.lineStyle?.color !== undefined) series.lineStyle = { ...series.lineStyle, color };
@@ -147,7 +153,7 @@ const recolourSeries = (series: any, color: string, panelType: string, theme: st
   if (series.areaStyle) {
     Object.assign(
       series,
-      getAreaStyleOverride(panelType, series.areaStyle, color, series.name, theme),
+      getAreaStyleOverride(panelType, series.areaStyle, color, series.name, theme, config),
     );
   }
 };
@@ -157,10 +163,11 @@ const applyAxisSeriesOverride = (
   lookup: SeriesOverrideLookup,
   panelType: string,
   theme: string,
+  config: AreaFillConfig | null | undefined,
 ) => {
   const resolved = lookup.get(series.name);
   if (!resolved) return;
-  if (resolved.color) recolourSeries(series, resolved.color, panelType, theme);
+  if (resolved.color) recolourSeries(series, resolved.color, panelType, theme, config);
 };
 
 // Value labels take the panel unit and decimals, or the series override's.
@@ -178,34 +185,59 @@ const formatValueLabels = (series: any, lookup: SeriesOverrideLookup) => {
   };
 };
 
-const percentText = (value: unknown, total: number, decimals: number): string => {
+const sharePercent = (value: unknown, total: number): number => {
   const numeric = Number(value);
-  const percent = total > 0 && Number.isFinite(numeric) ? (numeric / total) * 100 : 0;
-  return `${percent.toFixed(decimals)}%`;
+  return total > 0 && Number.isFinite(numeric) ? (numeric / total) * 100 : 0;
 };
 
-const applyPieOverrides = (series: any, lookup: SeriesOverrideLookup) => {
+const applyPieOverrides = (
+  series: any,
+  lookup: SeriesOverrideLookup,
+  options: { legend?: { selected?: Record<string, boolean> } },
+) => {
   if (!Array.isArray(series?.data)) return;
-  // Only the `{d}%` label is unit-free; a custom label already reads the lookup itself.
+  // `{d}%` is replaced outright; a custom label reads the lookup itself and only needs the exact share.
   const percentLabel = series.label?.formatter === "{d}%";
-  const total = series.data.reduce((sum: number, item: any) => {
-    const numeric = Number(item?.value);
-    return Number.isFinite(numeric) && numeric > 0 ? sum + numeric : sum;
-  }, 0);
-  series.data = series.data.map((item: any) => {
+  const customLabel = typeof series.label?.formatter === "function" ? series.label.formatter : null;
+  const items = series.data;
+  // Like the legend, the share is of the slices still shown; ChartRenderer replaces legend.selected on each toggle.
+  let totalFor: { selected: unknown } | null = null;
+  let total = 0;
+  const visibleTotal = () => {
+    const selected = options.legend?.selected;
+    if (totalFor && totalFor.selected === selected) return total;
+    totalFor = { selected };
+    total = items.reduce((sum: number, item: { name?: string; value?: unknown } | null) => {
+      const numeric = Number(item?.value);
+      const shown = selected?.[item?.name ?? ""] !== false;
+      return shown && Number.isFinite(numeric) && numeric > 0 ? sum + numeric : sum;
+    }, 0);
+    return total;
+  };
+  let labelOverridden = false;
+  series.data = items.map((item: any) => {
     const resolved = lookup.get(item?.name);
     if (!resolved) return item;
     let next = item;
     if (resolved.color) next = { ...next, itemStyle: { ...next.itemStyle, color: resolved.color } };
     const decimals = resolved.decimals;
-    if (percentLabel && decimals !== undefined) {
+    if ((percentLabel || customLabel) && decimals !== undefined) {
+      labelOverridden = true;
+      const share = () => sharePercent(item.value, visibleTotal());
       next = {
         ...next,
-        label: { ...next.label, formatter: () => percentText(item.value, total, decimals) },
+        label: {
+          ...next.label,
+          formatter: customLabel
+            ? (params: Record<string, unknown>) => customLabel({ ...params, percent: share() })
+            : () => `${share().toFixed(decimals)}%`,
+        },
       };
     }
     return next;
   });
+  // A selection map is what makes ChartRenderer track legend clicks on a pie.
+  if (labelOverridden && options.legend && !options.legend.selected) options.legend.selected = {};
 };
 
 // A silent gauge drawn on top that shows only the title, so the real data item keeps its original name.
@@ -457,11 +489,11 @@ export const applySeriesOverrides = (options: any, panelSchema: any, theme: stri
   const displayNames = new Map<string, string>();
   for (const series of options.series) {
     if (panelType === "pie" || panelType === "donut") {
-      applyPieOverrides(series, lookup);
+      applyPieOverrides(series, lookup, options);
       continue;
     }
     if (!isNamedSeries(series)) continue;
-    applyAxisSeriesOverride(series, lookup, panelType, theme);
+    applyAxisSeriesOverride(series, lookup, panelType, theme, panelSchema?.config);
     const display = lookup.get(series.name)?.displayName;
     if (display !== undefined) displayNames.set(String(series.name), display);
   }
