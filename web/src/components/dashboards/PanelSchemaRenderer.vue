@@ -29,14 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="panelSchema.type == 'maps'"
           :data="panelData.chartType == 'maps' ? panelData : { options: {} }"
         ></MapsRenderer>
-        <GeoMapRenderer
-          v-else-if="panelSchema.type == 'geomap'"
-          :data="
-            panelData.chartType == 'geomap'
-              ? panelData
-              : { options: { backgroundColor: 'transparent' } }
-          "
-        />
+        <GeoMapRenderer v-else-if="panelSchema.type == 'geomap'" :data="geoMapRendererData" />
         <PromQLTableChart
           v-else-if="panelSchema.type == 'table' && panelSchema.queryType === 'promql'"
           ref="tableRendererRef"
@@ -166,7 +159,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           noData &&
           !isAwaitingFirstLoad &&
           !errorDetail?.message &&
-          panelSchema.type != 'geomap' &&
           panelSchema.type != 'maps' &&
           panelSchema.type != 'table' &&
           !loading &&
@@ -1870,6 +1862,11 @@ export default defineComponent({
       }
     };
 
+    const hasGeoPoints = (): boolean =>
+      (panelData.value?.options?.series ?? []).some(
+        (series: { data?: unknown[] } | null) => (series?.data?.length ?? 0) > 0,
+      );
+
     // Compute the value of the 'noData' variable.
     // Instead of re-scanning raw rows, this checks the conversion output
     // (panelData) which the pipeline already computed — O(1) property access.
@@ -1887,6 +1884,10 @@ export default defineComponent({
         const hasResults =
           filteredData.value?.length &&
           filteredData.value.some((item: any) => item?.result?.length);
+        // Series without the lat/lon labels convert to no points.
+        if (hasResults && type === "geomap" && panelData.value?.chartType === "geomap") {
+          return hasGeoPoints() ? "" : "No Data";
+        }
         if (hasResults) return "";
         // During a reload the executor clears state.data before the new results
         // stream in. Keep showing the previously rendered chart while loading
@@ -1919,8 +1920,13 @@ export default defineComponent({
         return panelData.value?.rows?.length > 0 ? "" : "No Data";
       }
 
-      // Maps/geomap handle their own empty state.
-      if (type === "geomap" || type === "maps") {
+      // Rows with null lat/lon are dropped, so raw rows can still mean no points.
+      if (type === "geomap") {
+        return hasGeoPoints() ? "" : "No Data";
+      }
+
+      // Maps handles its own empty state.
+      if (type === "maps") {
         return "";
       }
 
@@ -1962,6 +1968,13 @@ export default defineComponent({
         }),
       };
     };
+
+    // An empty layer list would still build a bare map, so it gets the placeholder too.
+    const geoMapRendererData = computed(() =>
+      panelData.value?.chartType === "geomap" && noData.value !== "No Data" && hasGeoPoints()
+        ? panelData.value
+        : { options: { backgroundColor: "transparent" } },
+    );
 
     const chartRendererData = computed(() => {
       if (noData.value === "No Data") {
@@ -2289,6 +2302,7 @@ export default defineComponent({
       errorDetail,
       panelData,
       noData,
+      geoMapRendererData,
       isAwaitingFirstLoad,
       chartRendererData,
       metadata,

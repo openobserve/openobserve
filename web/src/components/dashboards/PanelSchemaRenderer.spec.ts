@@ -713,6 +713,103 @@ describe("PanelSchemaRenderer", () => {
     });
   });
 
+  describe("Geomap No Data state", () => {
+    const loaderWith = (data: any, loading = false) =>
+      vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+        data: ref(data),
+        loading: ref(loading),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({}),
+        resultMetaData: ref({}),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+    const geomapPanel = (queryType = "sql") => ({
+      ...defaultProps.panelSchema,
+      type: "geomap",
+      queryType,
+    });
+
+    it("shows No Data when the rows hold no plottable points", async () => {
+      loaderWith([[{ lat: null, lon: null }]]);
+      wrapper = createWrapper({ panelSchema: geomapPanel() });
+      await flushPromises();
+      wrapper.vm.panelData = { chartType: "geomap", options: { series: [] } };
+      await flushPromises();
+
+      expect(wrapper.vm.noData).toBe("No Data");
+      expect(wrapper.find('[data-test="no-data"]').exists()).toBe(true);
+    });
+
+    it("keeps the map when at least one layer has points", async () => {
+      loaderWith([[{ lat: 1, lon: 2 }]]);
+      wrapper = createWrapper({ panelSchema: geomapPanel() });
+      await flushPromises();
+      wrapper.vm.panelData = {
+        chartType: "geomap",
+        options: { series: [{ data: [] }, { data: [[2, 1, 1]] }] },
+      };
+      await flushPromises();
+
+      expect(wrapper.vm.noData).toBe("");
+      expect(wrapper.find('[data-test="no-data"]').exists()).toBe(false);
+    });
+
+    it("shows No Data when lat/lon are not configured", async () => {
+      loaderWith([[{ lat: 1, lon: 2 }]]);
+      wrapper = createWrapper({ panelSchema: geomapPanel() });
+      await flushPromises();
+      wrapper.vm.panelData = { chartType: "geomap", options: null };
+      await flushPromises();
+
+      expect(wrapper.vm.noData).toBe("No Data");
+      expect(wrapper.find('[data-test="no-data"]').exists()).toBe(true);
+    });
+
+    it("hands the map a placeholder instead of an empty layer list", async () => {
+      loaderWith([[{ lat: 1, lon: 2 }]]);
+      wrapper = createWrapper({ panelSchema: geomapPanel() });
+      await flushPromises();
+      const withPoints = { chartType: "geomap", options: { series: [{ data: [[2, 1, 1]] }] } };
+      wrapper.vm.panelData = withPoints;
+      await flushPromises();
+      expect(wrapper.vm.geoMapRendererData).toEqual(withPoints);
+
+      wrapper.vm.panelData = { chartType: "geomap", options: { lmap: {}, series: [] } };
+      await flushPromises();
+      expect(wrapper.vm.geoMapRendererData).toEqual({
+        options: { backgroundColor: "transparent" },
+      });
+    });
+
+    it("keeps the previous points while a reload has cleared the rows", async () => {
+      loaderWith([], true);
+      wrapper = createWrapper({ panelSchema: geomapPanel() });
+      await flushPromises();
+      const withPoints = { chartType: "geomap", options: { series: [{ data: [[2, 1, 1]] }] } };
+      wrapper.vm.panelData = withPoints;
+      await flushPromises();
+
+      expect(wrapper.vm.noData).toBe("");
+      expect(wrapper.vm.geoMapRendererData).toEqual(withPoints);
+      expect(wrapper.find('[data-test="no-data"]').exists()).toBe(false);
+    });
+
+    it("shows No Data for PromQL series without geo labels", async () => {
+      loaderWith([{ result: [{ metric: { job: "a" }, values: [[1, "1"]] }] }]);
+      wrapper = createWrapper({ panelSchema: geomapPanel("promql") });
+      await flushPromises();
+      wrapper.vm.panelData = { chartType: "geomap", options: { series: [] } };
+      await flushPromises();
+
+      expect(wrapper.vm.noData).toBe("No Data");
+    });
+  });
+
   describe("Mouse Events", () => {
     it("should handle mouseenter event", async () => {
       wrapper = createWrapper();
