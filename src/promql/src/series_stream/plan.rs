@@ -23,8 +23,8 @@ use config::{
     meta::{
         plan::generate_plan_string,
         promql::{
-            BUCKET_LABEL, HASH_LABEL, MetricsBlockScan, NAME_LABEL, VALUE_LABEL,
-            is_metrics_hash_excluded_label, value::EvalContext,
+            BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, MetricsBlockScan, NAME_LABEL, VALUE_LABEL,
+            value::EvalContext,
         },
     },
 };
@@ -216,7 +216,10 @@ pub(crate) fn group_label_columns(
         .iter()
         .filter(|name| {
             let name = name.as_str();
-            !is_metrics_hash_excluded_label(name)
+            name != TIMESTAMP_COL_NAME
+                && name != HASH_LABEL
+                && name != VALUE_LABEL
+                && name != EXEMPLARS_LABEL
                 // range functions strip the metric name before aggregation
                 && (name != NAME_LABEL || keeps_metric_name(func_name))
                 && schema.field_with_name(name).is_ok()
@@ -229,7 +232,7 @@ pub(crate) fn group_label_columns(
 }
 
 /// The label columns an emitted series carries, in the sorted order the materializing loader
-/// uses: string columns other than the hash-excluded ones, narrowed by the label selector
+/// uses: string columns other than the hash and exemplars, narrowed by the label selector
 /// (which always keeps `le`), without the metric name unless the function keeps it.
 pub(crate) fn series_label_columns(
     schema: &Schema,
@@ -242,7 +245,8 @@ pub(crate) fn series_label_columns(
         .filter(|field| matches!(field.data_type(), DataType::Utf8 | DataType::Utf8View))
         .map(|field| field.name().clone())
         .filter(|name| {
-            !is_metrics_hash_excluded_label(name)
+            name != HASH_LABEL
+                && name != EXEMPLARS_LABEL
                 && (label_selector.is_empty()
                     || label_selector.contains(name)
                     || name == BUCKET_LABEL)
@@ -413,7 +417,6 @@ mod tests {
         time::Duration,
     };
 
-    use config::meta::promql::EXEMPLARS_LABEL;
     use datafusion::{
         arrow::{
             array::{AsArray, Float64Array, Int64Array, RecordBatch, UInt64Array},
@@ -532,13 +535,7 @@ mod tests {
             Field::new(BUCKET_LABEL, DataType::Utf8, true),
             Field::new("instance", DataType::Utf8, true),
             Field::new(EXEMPLARS_LABEL, DataType::Utf8, true),
-            Field::new("start_time", DataType::Utf8, true),
-            Field::new("flag", DataType::Utf8, true),
         ]);
-        assert_eq!(
-            group_label_columns(&by(&["instance", "start_time"]), &schema, "rate"),
-            Some(vec!["instance".to_string()])
-        );
         let all = HashSet::new();
         assert_eq!(
             series_label_columns(&schema, &all, "rate"),
