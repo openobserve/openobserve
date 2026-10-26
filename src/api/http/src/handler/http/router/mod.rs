@@ -5153,6 +5153,9 @@ mod tests {
         );
     }
 
+    // OSS documents the enterprise-only operations (search jobs, gen_ai, cipher keys, fleet...)
+    // but does not route them, so the spec-vs-router check only holds for the enterprise build.
+    #[cfg(feature = "enterprise")]
     /// `METHOD /path` OpenAPI operations a non-router node does not route.
     const UNROUTED_OPENAPI_OPERATIONS: &[&str] = &[
         // The deprecated v1 folder API is still documented; only `/v2/{org_id}/folders` is routed.
@@ -5166,6 +5169,7 @@ mod tests {
         "POST /{org_id}/service_streams/_correlate",
     ];
 
+    #[cfg(feature = "enterprise")]
     fn any_param(template: &str) -> String {
         template
             .split('/')
@@ -5174,6 +5178,7 @@ mod tests {
             .join("/")
     }
 
+    #[cfg(feature = "enterprise")]
     /// An unrouted documented path meets the auth layer's 401, so its MCP tool fails as
     /// unauthorized.
     #[tokio::test]
