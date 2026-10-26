@@ -20,6 +20,7 @@ import i18n from "@/locales";
 import { raw } from "@/types/i18n";
 import store from "@/test/unit/helpers/store";
 import { applyLegendConfiguration } from "@/utils/dashboard/legendConfiguration";
+import { applySeriesOverrides } from "@/utils/dashboard/seriesOverrides";
 
 // Mock ECharts with comprehensive functionality
 vi.mock("echarts/core", () => ({
@@ -1475,6 +1476,44 @@ describe("ChartRenderer", () => {
 
       expect(chart.dispatchAction).toHaveBeenCalledWith({ type: "restore" });
       expect(options.legend.formatter("a")).toBe("{b|a}  50%");
+    });
+
+    it("recomputes a pie slice's override-decimals label over the visible slices", async () => {
+      const options: any = {
+        ...mockChartData.options,
+        legend: { show: true },
+        series: [
+          {
+            type: "pie",
+            label: { show: true, formatter: "{d}%" },
+            data: [
+              { name: "a", value: 10 },
+              { name: "b", value: 10 },
+            ],
+          },
+        ],
+      };
+      applySeriesOverrides(
+        options,
+        {
+          type: "pie",
+          config: {
+            override_config: [
+              {
+                field: { matchBy: "series", value: "a" },
+                config: [{ type: "decimals", value: 1 }],
+              },
+            ],
+          },
+        },
+        "light",
+      );
+      const label = options.series[0].data[0].label;
+      expect(label.formatter()).toBe("50.0%");
+
+      await isolateFirstSlice(options);
+
+      expect(label.formatter()).toBe("100.0%");
     });
 
     it.each(["pie", "line"])(

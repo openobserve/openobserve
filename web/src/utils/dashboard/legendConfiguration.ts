@@ -38,7 +38,6 @@ const LEGEND_VALUES_TEXT_WIDTH = 180;
 
 // eslint-disable-next-line local/no-hardcoded-px -- the fixed size ECharts paints legend text at; canvas measurement has no rem
 const LEGEND_TEXT_FONT = "12px";
-const LEGEND_VALUES_MIN_NAME_WIDTH = 30;
 // Legend padding (30) plus the default icon (25) and its gap (5) beside each entry's text.
 const LEGEND_ITEM_CHROME_WIDTH = 60;
 // ECharts' largest-remainder percent loops forever once 100 * 10^precision passes 2^53.
@@ -494,8 +493,8 @@ const pieLegendValueKeys = (panelSchema: any): string[] => {
   return PIE_LEGEND_VALUE_KEYS.filter((key) => selected.includes(key));
 };
 
-// The panel decimals for a legend percent, defaulting like the slice label; toFixed throws above 100.
-const pieLegendPercentDecimals = (decimals: unknown): number => {
+// The panel decimals for a pie percent, defaulting like the slice label; toFixed throws above 100.
+export const pieLegendPercentDecimals = (decimals: unknown): number => {
   if (decimals === null || decimals === undefined || decimals === "") return 2;
   const parsed = Math.floor(Number(decimals));
   return Number.isFinite(parsed) && parsed >= 0 ? Math.min(parsed, 100) : 2;
@@ -503,7 +502,7 @@ const pieLegendPercentDecimals = (decimals: unknown): number => {
 
 const truncateLegendName = (text: string, maxWidth: number): string => {
   if (calculateWidthText(text, LEGEND_TEXT_FONT) <= maxWidth) return text;
-  let low = 0;
+  let low = Math.min(1, text.length);
   let high = text.length;
   while (low < high) {
     const mid = Math.ceil((low + high) / 2);
@@ -597,13 +596,10 @@ const buildPieLegendEntries = (
     const valueText = keys
       .map((key) => (key === "value" ? lookup.formatValue(values[index], name) : percentText()))
       .join("  ");
-    // The name gives way to the values, and drops out when too little room is left for it.
+    // The name gives way to the values; truncation keeps its first letter, so no entry loses its name.
     const nameWidth = textWidth - calculateWidthText(`  ${valueText}`, LEGEND_TEXT_FONT);
     entries.set(name, {
-      name:
-        nameWidth < LEGEND_VALUES_MIN_NAME_WIDTH
-          ? ""
-          : truncateLegendName(String(lookup.displayName(name)), nameWidth),
+      name: truncateLegendName(String(lookup.displayName(name)), nameWidth),
       valueText,
     });
   });
@@ -1272,6 +1268,36 @@ export const applyPieDonutChartAlignment = (
   }
 };
 
+// ECharts fits outside labels into the series box, so ending the box at a right legend keeps them off it.
+const fitPieBoxBesideRightLegend = (
+  panelSchema: any,
+  options: any,
+  chartWidth: number,
+  chartHeight: number,
+) => {
+  const series = options.series?.[0];
+  const legend = options.legend;
+  if (series?.type !== "pie" || !legend?.show || typeof legend.left !== "number") return;
+  if (panelSchema.config?.legends_position !== "right") return;
+  if (series.label?.show === false || series.label?.position === "inside") return;
+  const legendWidth = chartWidth - legend.left;
+  if (legendWidth <= 0 || legendWidth >= chartWidth) return;
+  const boxWidth = chartWidth - legendWidth;
+  // Center x is a share of the box width and radius of half its shorter side; rescale to keep the pie in place.
+  const rescale = (value: any, from: number, to: number) =>
+    typeof value === "string" && value.endsWith("%")
+      ? `${(parseFloat(value) * from) / to}%`
+      : value;
+  const center = series.center ?? ["50%", "50%"];
+  series.center = [rescale(center[0], chartWidth, boxWidth), center[1]];
+  const fromSize = Math.min(chartWidth, chartHeight);
+  const toSize = Math.min(boxWidth, chartHeight);
+  series.radius = Array.isArray(series.radius)
+    ? series.radius.map((radius: any) => rescale(radius, fromSize, toSize))
+    : rescale(series.radius, fromSize, toSize);
+  series.right = legendWidth;
+};
+
 /**
  * Helper function to calculate scroll legend width for pie/donut charts
  * This ensures consistency between legend positioning and center adjustment
@@ -1458,6 +1484,7 @@ export const applyLegendConfiguration = (
     // Adjust center positioning for pie/donut charts with chart alignment support
     const { chartWidth, chartHeight } = getChartDimensions(chartPanelRef);
     applyPieDonutChartAlignment(panelSchema, options, chartWidth, chartHeight);
+    fitPieBoxBesideRightLegend(panelSchema, options, chartWidth, chartHeight);
   }
 
   // truncate the rotated y-axis name to the final plot height so it never spills past the plot

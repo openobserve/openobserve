@@ -374,6 +374,16 @@ describe.each(["pie", "donut"])("SQL %s", (type) => {
     expect(options.legend.formatter("api")).toBe(`{b|${DISPLAY}}`);
   });
 
+  it("recomputes the override label over the slices the legend still shows", async () => {
+    const options = await runSQL(piePanel(overrides), [rows]);
+    const api = options.series[0].data[0];
+    expect(options.legend.selected).toEqual({});
+    options.legend.selected = { api: true, web: false };
+    expect(api.label.formatter()).toBe("100.0%");
+    options.legend.selected = {};
+    expect(api.label.formatter()).toBe("66.7%");
+  });
+
   it("multi-query: applies to the merged slices", async () => {
     const options = await runSQL(piePanel(overrides, 2), [rows, rows]);
     const apis = options.series[0].data.filter((d: any) => d.name === "api");
@@ -660,7 +670,7 @@ describe.each(["pie", "donut"])("PromQL %s", (type) => {
     const api = options.series[0].data.find((d: any) => d.name === "api");
     expect(api.itemStyle.color).toBe(OVERRIDE_COLOR);
     const label = options.series[0].label.formatter({ name: "api", value: 1200, percent: 57.14 });
-    expect(label).toBe(`${DISPLAY}: ${apiValue(1200)} (57.1%)`);
+    expect(label).toBe(`${DISPLAY}: ${apiValue(1200)} (57%)`);
     const html = options.tooltip.formatter({
       seriesName: "s",
       name: "api",

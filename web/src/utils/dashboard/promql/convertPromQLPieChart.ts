@@ -20,6 +20,7 @@ import { buildPieChartConfig } from "./shared/gridBuilder";
 import { getSeriesColor } from "../colorPalette";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
 import { createSeriesOverrideLookup } from "../seriesOverrides";
+import { MAX_SEATS_PRECISION, pieLegendPercentDecimals } from "../legendConfiguration";
 
 /**
  * Converter for pie and donut charts
@@ -38,6 +39,7 @@ export class PieConverter implements PromQLChartConverter {
     const chartType = panelSchema.type;
     const config = panelSchema.config || {};
     const seriesOverrides = createSeriesOverrideLookup(config);
+    const percentDecimals = pieLegendPercentDecimals(config.decimals);
     const data: any[] = [];
 
     // Calculate min/max for color scaling
@@ -115,6 +117,8 @@ export class PieConverter implements PromQLChartConverter {
 
         data,
 
+        percentPrecision: Math.min(percentDecimals, MAX_SEATS_PRECISION),
+
         emphasis: {
           itemStyle: {
             shadowBlur: 10,
@@ -139,11 +143,11 @@ export class PieConverter implements PromQLChartConverter {
                     getUnitValue(params.value, unit.unit, unit.unitCustom, unit.decimals),
                   ),
                 )
-                .replace("{d}", params.percent.toFixed(1));
+                .replace("{d}", params.percent.toFixed(percentDecimals));
             }
             // Default format: name: value (percentage%)
             const unitValue = getUnitValue(params.value, unit.unit, unit.unitCustom, unit.decimals);
-            return `${name}: ${formatUnitValue(unitValue)} (${params.percent.toFixed(1)}%)`;
+            return `${name}: ${formatUnitValue(unitValue)} (${params.percent.toFixed(percentDecimals)}%)`;
           },
           fontSize: config.label_font_size || 12,
         },

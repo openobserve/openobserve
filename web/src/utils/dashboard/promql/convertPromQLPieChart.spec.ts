@@ -568,6 +568,35 @@ describe("PieConverter", () => {
       expect(result.series[0].label.fontSize).toBe(12);
     });
 
+    describe.each(["pie", "donut"])("%s percent decimals", (type) => {
+      const convertWith = (config: Record<string, any>) =>
+        converter.convert(
+          [{ series: [{ name: "series1", values: [[1, "100"]] }], timestamps: [1], queryIndex: 0 }],
+          { type, config },
+          mockStore,
+          mockExtras,
+        ).series[0];
+      const params = { name: "series1", value: 100, percent: 33.3333 };
+
+      it("rounds the slice percents and prints the labels at the panel decimals", () => {
+        const series = convertWith({ decimals: 4 });
+        expect(series.percentPrecision).toBe(4);
+        expect(series.label.formatter(params)).toBe("series1: 100.0000 (33.3333%)");
+
+        const whole = convertWith({ decimals: 0, label_format: "{b} {d}%" });
+        expect(whole.percentPrecision).toBe(0);
+        expect(whole.label.formatter({ ...params, percent: 33 })).toBe("series1 33%");
+      });
+
+      it("defaults to two decimals and caps the rounding precision", () => {
+        expect(convertWith({}).percentPrecision).toBe(2);
+        expect(convertWith({}).label.formatter({ ...params, percent: 33.33 })).toBe(
+          "series1: 100.00 (33.33%)",
+        );
+        expect(convertWith({ decimals: 20 }).percentPrecision).toBe(13);
+      });
+    });
+
     describe("label formatter", () => {
       it("should format label with default format", () => {
         const processedData: ProcessedPromQLData[] = [
@@ -598,7 +627,7 @@ describe("PieConverter", () => {
 
         const formatted = result.series[0].label.formatter(params);
 
-        expect(formatted).toBe("series1: 100.00 (50.0%)");
+        expect(formatted).toBe("series1: 100.00 (50.00%)");
       });
 
       it("should format label with custom label_format", () => {
@@ -632,7 +661,7 @@ describe("PieConverter", () => {
 
         const formatted = result.series[0].label.formatter(params);
 
-        expect(formatted).toBe("series1: 100.00 (50.0%)");
+        expect(formatted).toBe("series1: 100.00 (50.00%)");
       });
 
       it("should format label with unit", () => {

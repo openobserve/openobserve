@@ -184,28 +184,39 @@ const percentText = (value: unknown, total: number, decimals: number): string =>
   return `${percent.toFixed(decimals)}%`;
 };
 
-const applyPieOverrides = (series: any, lookup: SeriesOverrideLookup) => {
+const applyPieOverrides = (series: any, lookup: SeriesOverrideLookup, options: any) => {
   if (!Array.isArray(series?.data)) return;
   // Only the `{d}%` label is unit-free; a custom label already reads the lookup itself.
   const percentLabel = series.label?.formatter === "{d}%";
-  const total = series.data.reduce((sum: number, item: any) => {
-    const numeric = Number(item?.value);
-    return Number.isFinite(numeric) && numeric > 0 ? sum + numeric : sum;
-  }, 0);
-  series.data = series.data.map((item: any) => {
+  const items = series.data;
+  // Like the legend, the share is of the slices still shown; ChartRenderer keeps legend.selected in step.
+  const visibleTotal = () =>
+    items.reduce((sum: number, item: any) => {
+      const numeric = Number(item?.value);
+      const shown = options.legend?.selected?.[item?.name] !== false;
+      return shown && Number.isFinite(numeric) && numeric > 0 ? sum + numeric : sum;
+    }, 0);
+  let labelOverridden = false;
+  series.data = items.map((item: any) => {
     const resolved = lookup.get(item?.name);
     if (!resolved) return item;
     let next = item;
     if (resolved.color) next = { ...next, itemStyle: { ...next.itemStyle, color: resolved.color } };
     const decimals = resolved.decimals;
     if (percentLabel && decimals !== undefined) {
+      labelOverridden = true;
       next = {
         ...next,
-        label: { ...next.label, formatter: () => percentText(item.value, total, decimals) },
+        label: {
+          ...next.label,
+          formatter: () => percentText(item.value, visibleTotal(), decimals),
+        },
       };
     }
     return next;
   });
+  // A selection map is what makes ChartRenderer track legend clicks on a pie.
+  if (labelOverridden && options.legend && !options.legend.selected) options.legend.selected = {};
 };
 
 // A silent gauge drawn on top that shows only the title, so the real data item keeps its original name.
@@ -457,7 +468,7 @@ export const applySeriesOverrides = (options: any, panelSchema: any, theme: stri
   const displayNames = new Map<string, string>();
   for (const series of options.series) {
     if (panelType === "pie" || panelType === "donut") {
-      applyPieOverrides(series, lookup);
+      applyPieOverrides(series, lookup, options);
       continue;
     }
     if (!isNamedSeries(series)) continue;

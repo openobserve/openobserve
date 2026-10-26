@@ -1436,8 +1436,8 @@ describe("pie and donut legend values", () => {
   });
 
   it.each([
-    [13, "75.0000000000000%"],
-    [25, "75.0000000000000000000000000%"],
+    [13, "{b|api}  75.0000000000000%"],
+    [25, "{b|a...}  75.0000000000000000000000000%"],
     [-1, "{b|api}  75.00%"],
     ["abc", "{b|api}  75.00%"],
     [1.7, "{b|api}  75.0%"],
@@ -1449,7 +1449,6 @@ describe("pie and donut legend values", () => {
       hovered(),
       options,
     );
-    // A long percent leaves no room for the name, so only the value is shown.
     expect(options.legend.formatter("api")).toBe(expected);
   });
 
@@ -1511,8 +1510,7 @@ describe("pie and donut legend values", () => {
     const reserved = 300 - options.legend.left;
     expect(options.legend.textStyle.width).toBe(reserved - 60);
     const text = options.legend.formatter("a-long-service-name");
-    expect(text.endsWith("75%")).toBe(true);
-    expect(text.replace(/\{[ab]\|([^}]*)\}/, "$1").length * 8).toBeLessThanOrEqual(reserved - 60);
+    expect(text).toBe("{b|a...}  30  75%");
   });
 
   it("lets a right scroll legend with values take up to half the chart", () => {
@@ -1579,5 +1577,103 @@ describe("pie and donut legend values", () => {
       many,
     );
     expect(valuesRight.legendWidth).toBeGreaterThan(plainRight.legendWidth);
+  });
+
+  it.each(["pie", "donut"])(
+    "keeps short %s names beside the percents in a narrow right legend",
+    (type) => {
+      const options: any = pieOptions([
+        { name: "A", value: 1 },
+        { name: "B", value: 3 },
+      ]);
+      applyLegendConfiguration(
+        pieSchema(
+          { legends_position: "right", legends_type: "scroll", legend_values: ["percent"] },
+          type,
+        ),
+        { value: { offsetWidth: 300, offsetHeight: 300 } },
+        hovered(),
+        options,
+      );
+      expect(options.legend.formatter("A")).toBe("{b|A}  25.00%");
+      expect(options.legend.formatter("B")).toBe("{b|B}  75.00%");
+    },
+  );
+
+  it("truncates a name to its first letters rather than dropping it when the values fill the legend", () => {
+    const options: any = pieOptions([
+      { name: "transcoding-service", value: 9837 },
+      { name: "payment-service", value: 9785 },
+    ]);
+    applyLegendConfiguration(
+      pieSchema({ legends_position: "right", legend_values: ["value", "percent"] }),
+      { value: { offsetWidth: 300, offsetHeight: 300 } },
+      hovered(),
+      options,
+    );
+    expect(options.legend.formatter("transcoding-service")).toBe("{b|t...}  9837.00  50.13%");
+  });
+});
+
+describe("pie outside labels beside a right legend", () => {
+  const panel = { value: { offsetWidth: 600, offsetHeight: 300 } };
+  const hovered = { value: { hoveredSeriesName: null, setHoveredSeriesName: vi.fn() } };
+  const schema = (type: string, config: any = {}) => ({
+    type,
+    config: { show_legends: true, legends_position: "right", ...config },
+  });
+  const pieSeries = (radius: any, label: any = { show: true }) => ({
+    type: "pie",
+    radius,
+    center: ["50%", "50%"],
+    label,
+    data: [
+      { name: "a-long-service-name", value: 2 },
+      { name: "b", value: 1 },
+    ],
+  });
+  // As ECharts lays it out: center x is a share of the box width, radius of half its shorter side.
+  const pixels = (series: any) => {
+    const boxWidth = 600 - (series.right ?? 0);
+    const radii = [series.radius].flat().map((r: string) => parseFloat(r) / 100);
+    return {
+      cx: (parseFloat(series.center[0]) / 100) * boxWidth,
+      radii: radii.map((r: number) => (r * Math.min(boxWidth, 300)) / 2),
+    };
+  };
+
+  it.each([
+    ["donut", "scroll", ["40%", "70%"]],
+    ["donut", "plain", ["40%", "70%"]],
+    ["pie", "scroll", "70%"],
+  ])(
+    "ends the %s series box at a %s legend without moving the pie",
+    (type, legendsType, radius) => {
+      const fitted: any = { series: [pieSeries(radius)] };
+      applyLegendConfiguration(schema(type, { legends_type: legendsType }), panel, hovered, fitted);
+      const inside: any = { series: [pieSeries(radius, { show: true, position: "inside" })] };
+      applyLegendConfiguration(schema(type, { legends_type: legendsType }), panel, hovered, inside);
+
+      const series = fitted.series[0];
+      expect(series.right).toBeGreaterThan(0);
+      expect(series.right).toBe(600 - fitted.legend.left);
+      const after = pixels(series);
+      const before = pixels(inside.series[0]);
+      expect(after.cx).toBeCloseTo(before.cx);
+      after.radii.forEach((r: number, i: number) => expect(r).toBeCloseTo(before.radii[i]));
+    },
+  );
+
+  it("leaves inside labels, hidden labels and bottom legends alone", () => {
+    const cases: [any, any][] = [
+      [schema("pie"), pieSeries("70%", { show: true, position: "inside" })],
+      [schema("donut"), pieSeries(["40%", "70%"], { show: false })],
+      [schema("donut", { legends_position: "bottom" }), pieSeries(["40%", "70%"])],
+    ];
+    for (const [panelSchema, series] of cases) {
+      const options: any = { series: [series] };
+      applyLegendConfiguration(panelSchema, panel, hovered, options);
+      expect(options.series[0].right).toBeUndefined();
+    }
   });
 });
