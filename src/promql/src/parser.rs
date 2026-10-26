@@ -73,11 +73,12 @@ fn normalize_names(expr: &mut Expr) {
         Expr::MatrixSelector(ms) => normalize_selector(&mut ms.vs),
         Expr::Aggregate(agg) => {
             normalize_names(&mut agg.expr);
-            match agg.param.as_deref_mut() {
+            if let Some(param) = agg.param.as_deref_mut() {
                 // only count_values takes a string parameter, and it names the output label
-                Some(Expr::StringLiteral(label)) => normalize_label(&mut label.val),
-                Some(param) => normalize_names(param),
-                None => {}
+                match label_literal(param) {
+                    Some(label) => normalize_label(label),
+                    None => normalize_names(param),
+                }
             }
             if let Some(modifier) = &mut agg.modifier {
                 normalize_modifier(modifier);
@@ -100,11 +101,9 @@ fn normalize_names(expr: &mut Expr) {
         Expr::Call(call) => {
             let func = call.func.name;
             for (index, arg) in call.args.args.iter_mut().enumerate() {
-                match &mut **arg {
-                    Expr::StringLiteral(label) if is_label_arg(func, index) => {
-                        normalize_label(&mut label.val)
-                    }
-                    arg => normalize_names(arg),
+                match label_literal(arg).filter(|_| is_label_arg(func, index)) {
+                    Some(label) => normalize_label(label),
+                    None => normalize_names(arg),
                 }
             }
         }
@@ -147,9 +146,19 @@ fn normalize_label(label: &mut String) {
     *label = format_label_name_owned(std::mem::take(label));
 }
 
+/// The string literal `expr` holds, looking through the parentheses the evaluator also unwraps.
+fn label_literal(expr: &mut Expr) -> Option<&mut String> {
+    match expr {
+        Expr::StringLiteral(label) => Some(&mut label.val),
+        Expr::Paren(paren) => label_literal(&mut paren.expr),
+        _ => None,
+    }
+}
+
 /// Whether argument `index` of `func` is a label name rather than a value.
 fn is_label_arg(func: &str, index: usize) -> bool {
     match func {
+        "histogram_quantiles" => index == 1,
         "label_replace" => index == 1 || index == 3,
         "label_join" => index == 1 || index >= 3,
         "sort_by_label" | "sort_by_label_desc" => index >= 1,
@@ -246,6 +255,18 @@ mod tests {
                 r#"label_join(m, "out", "-", "a", "b")"#,
             ),
             (r#"sort_by_label(m, "UUID")"#, r#"sort_by_label(m, "uuid")"#),
+            (
+                r#"sum by (Quantile) (histogram_quantiles(M_bucket, "Quantile", 0.5, 0.9))"#,
+                r#"sum by (quantile) (histogram_quantiles(m_bucket, "quantile", 0.5, 0.9))"#,
+            ),
+            (
+                r#"sum by (DST) (label_replace(vector(1), ("DST"), "A", "", ""))"#,
+                r#"sum by (dst) (label_replace(vector(1), ("dst"), "A", "", ""))"#,
+            ),
+            (
+                r#"count_values(("Version"), m)"#,
+                r#"count_values(("version"), m)"#,
+            ),
             ("max_over_time(M[5m:1m])", "max_over_time(m[5m:1m])"),
         ] {
             assert_eq!(
