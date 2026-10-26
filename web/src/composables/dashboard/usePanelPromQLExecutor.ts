@@ -22,6 +22,7 @@ import { HEATMAP_MAX_COLUMNS } from "@/utils/dashboard/heatmapDefaults";
 import { parseSearchError } from "@/utils/query/searchError";
 import { gt } from "@/types/i18n";
 import { convertOffsetToSeconds } from "@/utils/dashboard/dateTimeUtils";
+import { effectiveTimeShifts } from "@/utils/dashboard/metricOptions";
 import { formulaInputs, isFormulaQuery, substituteFormula } from "@/utils/dashboard/promql/formula";
 
 // Fixed-length units only (ms): a time shift moves both ends of the window by one delta.
@@ -168,10 +169,13 @@ export const usePanelPromQLExecutor = (ctx: {
       // Shifted streams follow every primary, so index i < queries.length stays panel query i.
       let nextShiftedIndex = queries.length;
       const shiftsByQuery = queries.map((it: any, i: number) =>
-        (it.config?.query_type === "instant" || plans[i].skip ? [] : (it.config?.time_shift ?? []))
+        (it.config?.query_type === "instant" || plans[i].skip
+          ? []
+          : effectiveTimeShifts(panelSchema.value, it, startISOTimestamp, endISOTimestamp)
+        )
           .map((shift: { offSet: string }) => fixedTimeRangeGap(shift?.offSet, endISOTimestamp))
-          .filter(Boolean)
-          .map((timeRangeGap: { seconds: number; periodAsStr: string }) => ({
+          .filter((gap): gap is { seconds: number; periodAsStr: string } => gap !== null)
+          .map((timeRangeGap) => ({
             index: nextShiftedIndex++,
             timeRangeGap,
           })),

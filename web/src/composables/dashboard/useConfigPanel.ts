@@ -33,6 +33,7 @@ import {
 import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
 import { PROMETHEUS_HISTOGRAM_MODE } from "@/utils/dashboard/promql/convertPromQLHeatmapChart";
 import { isNumericYField } from "@/utils/dashboard/heatmapYAxis";
+import { isStatChangeOn } from "@/utils/dashboard/metricOptions";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -61,8 +62,20 @@ export const THRESHOLD_CHART_TYPES: readonly string[] = [
   "state-timeline",
 ];
 
+const hasBarGaugeColumn = (panel: any): boolean =>
+  (Array.isArray(panel?.config?.override_config) ? panel.config.override_config : []).some(
+    (entry: any) =>
+      (entry?.config ?? []).some(
+        (item: any) => item?.type === "field_type" && item?.value === "bar_gauge",
+      ),
+  );
+
+/** Thresholds apply to the threshold chart types, and colour the bar gauge cells of a SQL table. */
 export const shouldShowThresholds = (dashboardPanelData: any): boolean =>
-  THRESHOLD_CHART_TYPES.includes(dashboardPanelData?.data?.type);
+  THRESHOLD_CHART_TYPES.includes(dashboardPanelData?.data?.type) ||
+  (dashboardPanelData?.data?.type === "table" &&
+    dashboardPanelData?.data?.queryType !== "promql" &&
+    hasBarGaugeColumn(dashboardPanelData?.data));
 
 // Charts whose series have names an override can match; tables keep Column Formatting.
 export const SERIES_OVERRIDE_CHART_TYPES: readonly string[] = [
@@ -155,6 +168,9 @@ export function useConfigPanel(
   const { t, tm } = useI18nTyped();
 
   const isStateTimeline = computed(() => dashboardPanelData.data.type === "state-timeline");
+  const isPieOrDonut = computed(
+    () => dashboardPanelData.data.type === "pie" || dashboardPanelData.data.type === "donut",
+  );
 
   // ── Config options ────────────────────────────────────────────────────────
 
@@ -308,6 +324,10 @@ export function useConfigPanel(
         label: t("dashboard.heatmapColorScale"),
         visible: dashboardPanelData.data.type === "heatmap",
       },
+      "heatmap-cells": {
+        label: [t("dashboard.heatmapCellGap"), t("dashboard.heatmapHideBelow")],
+        visible: dashboardPanelData.data.type === "heatmap",
+      },
       "heatmap-histogram-mode": {
         label: t("dashboard.heatmapHistogramMode"),
         visible: !!promqlMode.value && dashboardPanelData.data.type === "heatmap",
@@ -391,6 +411,10 @@ export function useConfigPanel(
       },
       "tooltip-mode": {
         label: t("dashboard.stateTimelineTooltipMode"),
+        visible: isStateTimeline.value,
+      },
+      "state-value-align": {
+        label: t("dashboard.stateValueAlign"),
         visible: isStateTimeline.value,
       },
     },
@@ -517,6 +541,15 @@ export function useConfigPanel(
           !!dashboardPanelData.data.config.table_pagination &&
           dashboardPanelData.data.type === "table",
       },
+      "table-density": {
+        label: t("dashboard.tableDensity"),
+        visible: dashboardPanelData.data.type === "table",
+      },
+      "table-footer-calcs": {
+        label: t("dashboard.tableFooterCalcs"),
+        visible:
+          !promqlMode.value && dashboardPanelData.data.type === "table" && !isPivotMode.value,
+      },
     },
     pivotTable: {
       "pivot-show-row-totals": {
@@ -578,6 +611,10 @@ export function useConfigPanel(
         visible:
           dashboardPanelData.data.type === "geomap" || dashboardPanelData.data.type === "maps",
       },
+      "map-cluster": {
+        label: [t("dashboard.mapCluster"), t("dashboard.mapClusterRadius")],
+        visible: dashboardPanelData.data.type === "geomap",
+      },
     },
     gauge: {
       "gauge-min": {
@@ -587,6 +624,40 @@ export function useConfigPanel(
       "gauge-max": {
         label: t("dashboard.gaugeMaxValue"),
         visible: dashboardPanelData.data.type === "gauge",
+      },
+      "gauge-style": {
+        label: t("dashboard.gaugeStyle"),
+        visible: dashboardPanelData.data.type === "gauge",
+      },
+      "gauge-segments": {
+        label: t("dashboard.gaugeSegments"),
+        visible: dashboardPanelData.data.type === "gauge",
+      },
+      "gauge-neutral": {
+        label: t("dashboard.gaugeNeutral"),
+        visible: dashboardPanelData.data.type === "gauge",
+      },
+      "gauge-round-cap": {
+        label: t("dashboard.gaugeRoundCap"),
+        visible: dashboardPanelData.data.type === "gauge",
+      },
+    },
+    pie: {
+      "pie-label-content": {
+        label: t("dashboard.pieLabelContent"),
+        visible: isPieOrDonut.value,
+      },
+      "pie-sort-order": {
+        label: t("dashboard.pieSortOrder"),
+        visible: isPieOrDonut.value,
+      },
+      "pie-other-threshold": {
+        label: t("dashboard.pieOtherThreshold"),
+        visible: isPieOrDonut.value,
+      },
+      "donut-inner-radius": {
+        label: t("dashboard.donutInnerRadius"),
+        visible: dashboardPanelData.data.type === "donut",
       },
     },
     layout: {
@@ -644,6 +715,24 @@ export function useConfigPanel(
           t("dashboard.thresholdAddStep"),
         ],
         visible: shouldShowThresholds(dashboardPanelData),
+      },
+    },
+    metric: {
+      "stat-change": {
+        label: t("dashboard.statChange"),
+        visible: dashboardPanelData.data.type === "metric",
+      },
+      "stat-change-color": {
+        label: t("dashboard.statChangeColor"),
+        visible: isStatChangeOn(dashboardPanelData.data),
+      },
+      "stat-text-mode": {
+        label: t("dashboard.statTextMode"),
+        visible: dashboardPanelData.data.type === "metric",
+      },
+      "value-font-size": {
+        label: t("dashboard.valueFontSize"),
+        visible: dashboardPanelData.data.type === "metric",
       },
     },
     background: {

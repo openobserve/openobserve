@@ -24,6 +24,10 @@ import { convertSankeyData } from "./convertSankeyData";
 import { convertStateTimelineData } from "./convertStateTimelineData";
 import { runJavaScriptCode, validateUserCode } from "./convertCustomChartData";
 import { applyCartesianOptions } from "./cartesianOptions";
+import { applyPanelTypeOptions } from "./panelTypeOptions";
+import { applyMetricOptions, isStatChangeOn, splitStatChangeResults } from "./metricOptions";
+import { applyGeoMapClusters, mapClusterRadius } from "./geoMapCluster";
+import { applyTableOptions } from "./tableOptions";
 /**
  * Converts panel data based on the panel schema and data.
  *
@@ -76,47 +80,77 @@ export const convertPanelData = async (
         throw new Error(gt("dashboard.utils.selectRequiredFields"));
       }
 
-      if (
-        // panelSchema?.fields?.stream_type == "metrics" &&
-        // panelSchema?.customQuery &&
-        panelSchema?.queryType == "promql"
-      ) {
-        // chartpanelref will be used to get width and height of the chart element from DOM
-        const result: any = await convertPromQLData(
-          panelSchema,
-          data,
-          store,
-          chartPanelRef,
-          hoveredSeriesState,
-          annotations,
-          metadata,
-          resultMetaData?.value,
-          loading,
-        );
-        applyCartesianOptions(result?.options, panelSchema);
-        return { chartType: panelSchema.type, ...result };
-      } else {
-        // chartpanelref will be used to get width and height of the chart element from DOM
-        try {
-          const result: any = await convertMultiSQLData(
+      const convert = async (rows: any, meta: any, sparkline: any, resultMeta: any) => {
+        if (panelSchema?.queryType == "promql") {
+          // chartpanelref will be used to get width and height of the chart element from DOM
+          return await convertPromQLData(
             panelSchema,
-            data,
+            rows,
             store,
             chartPanelRef,
             hoveredSeriesState,
-            resultMetaData,
-            metadata,
-            chartPanelStyle,
             annotations,
+            meta,
+            resultMeta?.value,
             loading,
-            sparklineData,
           );
-          applyCartesianOptions(result?.options, panelSchema);
-          return { chartType: panelSchema.type, ...result };
-        } catch (error) {
-          console.error(error);
-          return {};
         }
+        return await convertMultiSQLData(
+          panelSchema,
+          rows,
+          store,
+          chartPanelRef,
+          hoveredSeriesState,
+          resultMeta,
+          meta,
+          chartPanelStyle,
+          annotations,
+          loading,
+          sparkline,
+        );
+      };
+      try {
+        const split = isStatChangeOn(panelSchema) ? splitStatChangeResults(metadata) : null;
+        if (!split) {
+          const result: any = await convert(data, metadata, sparklineData, resultMetaData);
+          applyCartesianOptions(result?.options, panelSchema);
+          applyPanelTypeOptions(result?.options, panelSchema);
+          applyMetricOptions(result?.options, panelSchema);
+          return { chartType: panelSchema.type, ...result };
+        }
+        const pick = (indices: number[], source: any, empty: () => any) =>
+          indices.map((index) => (index >= 0 ? source?.[index] : empty()));
+        const emptyRows = () =>
+          panelSchema?.queryType == "promql" ? { resultType: "matrix", result: [] } : [];
+        const metaOf = (indices: number[]) => ({
+          ...metadata,
+          queries: indices.map(
+            (index, at) => metadata.queries[index >= 0 ? index : split.primary[at]],
+          ),
+        });
+        const resultMetaOf = (indices: number[]) => ({
+          value: pick(indices, resultMetaData?.value, () => []),
+        });
+        const result: any = await convert(
+          pick(split.primary, data, emptyRows),
+          metaOf(split.primary),
+          Array.isArray(sparklineData)
+            ? pick(split.primary, sparklineData, () => [])
+            : sparklineData,
+          resultMetaOf(split.primary),
+        );
+        const reference: any = await convert(
+          pick(split.reference, data, emptyRows),
+          metaOf(split.reference),
+          undefined,
+          resultMetaOf(split.reference),
+        );
+        applyMetricOptions(result?.options, panelSchema, reference?.options);
+        return { chartType: panelSchema.type, ...result };
+      } catch (error) {
+        if (panelSchema?.queryType == "promql") throw error;
+        console.error(error);
+        return {};
       }
     }
     case "table": {
@@ -153,43 +187,34 @@ export const convertPanelData = async (
         }
 
         // Multi-query UNION mode for non-pivot tables
-        if (Array.isArray(data) && data.length > 1) {
-          return {
-            chartType: panelSchema.type,
-            ...convertMultiQueryTableData(panelSchema, data, store),
-          };
-        }
-
-        return {
-          chartType: panelSchema.type,
-          ...convertTableData(panelSchema, data, store),
-        };
+        const table =
+          Array.isArray(data) && data.length > 1
+            ? convertMultiQueryTableData(panelSchema, data, store)
+            : convertTableData(panelSchema, data, store);
+        applyTableOptions(table, panelSchema);
+        return { chartType: panelSchema.type, ...table };
       }
     }
     case "geomap": {
-      // Check if PromQL query type
-      if (panelSchema?.queryType == "promql") {
-        return {
-          chartType: panelSchema.type,
-          ...(await convertPromQLData(
-            panelSchema,
-            data,
-            store,
-            chartPanelRef,
-            hoveredSeriesState,
-            annotations,
-            metadata,
-            resultMetaData?.value,
-            loading,
-          )),
-        };
-      } else {
-        // SQL query type
-        return {
-          chartType: panelSchema.type,
-          ...convertGeoMapData(panelSchema, data),
-        };
+      const result: any =
+        panelSchema?.queryType == "promql"
+          ? await convertPromQLData(
+              panelSchema,
+              data,
+              store,
+              chartPanelRef,
+              hoveredSeriesState,
+              annotations,
+              metadata,
+              resultMetaData?.value,
+              loading,
+            )
+          : convertGeoMapData(panelSchema, data);
+      const clusterRadius = mapClusterRadius(panelSchema?.config);
+      if (clusterRadius !== null && result?.options) {
+        applyGeoMapClusters(result.options, clusterRadius, panelSchema.config?.map_view?.zoom);
       }
+      return { chartType: panelSchema.type, ...result };
     }
     case "maps": {
       // Check if PromQL query type

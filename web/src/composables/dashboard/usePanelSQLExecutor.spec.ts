@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { ref } from "vue";
 import { usePanelSQLExecutor } from "./usePanelSQLExecutor";
 import { usePanelSearchHandlers } from "./usePanelSearchHandlers";
+import { convertOffsetToSeconds } from "@/utils/dashboard/dateTimeUtils";
 
 // ─── module mocks ─────────────────────────────────────────────────────────────
 
@@ -439,6 +440,21 @@ describe("usePanelSQLExecutor", () => {
       const [payload] = fetchQueryDataWithHttpStream.mock.calls[0];
       expect(Array.isArray(payload.queryReq.query.sql)).toBe(true);
       expect(payload.queryReq.query.sql).toHaveLength(2);
+    });
+
+    it("adds a previous-period query for a metric that compares with no time shift", async () => {
+      const panelSchema: any = makePanelSchema();
+      panelSchema.value.type = "metric";
+      panelSchema.value.config = { stat_change: "percent" };
+      const { ctx, state, fetchQueryDataWithHttpStream } = makeCtx({ panelSchema });
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      const [payload] = fetchQueryDataWithHttpStream.mock.calls[0];
+      expect(payload.queryReq.query.sql).toHaveLength(2);
+      expect(state.metadata.queries).toHaveLength(2);
+      expect(convertOffsetToSeconds).toHaveBeenCalledWith("300s", 300_000_000);
+      expect(panelSchema.value.queries[0].config.time_shift).toEqual([]);
     });
 
     it("propagates errors from applyDynamicVariables", async () => {

@@ -1250,6 +1250,8 @@ export const convertPromQLData = async (
               silent: true,
               coordinateSystem: "polar",
               _metricText: metricText,
+              _metricRawValue: values.length > 0 ? latestValue : null,
+              _metricStatName: metricName,
               z: 2,
               renderItem: function (params: any) {
                 return {

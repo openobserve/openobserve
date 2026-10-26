@@ -559,3 +559,96 @@ describe("validatePanel on cartesian settings", () => {
     expect(run({ y_axis_scale: "sqrt" }, { type: "pie" })).toEqual([]);
   });
 });
+
+describe("validatePanel on metric, gauge, pie, table, heatmap, state timeline and geomap settings", () => {
+  const run = (type: string, config: any) => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type,
+          queryType: "sql",
+          config,
+          queries: [
+            { customQuery: true, query: "SELECT 1", fields: { x: [], y: [{ alias: "y" }] } },
+          ],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      false,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+
+  it("accepts every supported value", () => {
+    expect(
+      run("metric", {
+        stat_change: "percent",
+        stat_change_color: "inverted",
+        stat_text_mode: "value_and_name",
+        value_font_size: 32,
+      }),
+    ).toEqual([]);
+    expect(run("gauge", { gauge_style: "circle", gauge_segments: 10, gauge_neutral: -5 })).toEqual(
+      [],
+    );
+    expect(
+      run("donut", {
+        pie_label_content: ["name", "percent"],
+        pie_other_threshold: 5,
+        donut_inner_radius: 60,
+        sort_order: "asc",
+      }),
+    ).toEqual([]);
+    expect(
+      run("table", { table_density: "comfortable", table_footer_calcs: ["sum", "last"] }),
+    ).toEqual([]);
+    expect(run("heatmap", { heatmap_cell_gap: 0, heatmap_hide_below: -1 })).toEqual([]);
+    expect(run("state-timeline", { state_value_align: "center" })).toEqual([]);
+    expect(run("geomap", { map_cluster: true, map_cluster_radius: 60 })).toEqual([]);
+  });
+
+  it("rejects unsupported choices and list entries", () => {
+    expect(run("metric", { stat_change: "ratio" })).toEqual([
+      gt("dashboard.utils.unsupportedConfigValue", { setting: "stat_change", value: "ratio" }),
+    ]);
+    expect(run("table", { table_footer_calcs: ["sum", "median"] })).toEqual([
+      gt("dashboard.utils.unsupportedConfigValue", {
+        setting: "table_footer_calcs",
+        value: "median",
+      }),
+    ]);
+    expect(run("gauge", { gauge_style: "dial" })).toHaveLength(1);
+    expect(run("state-timeline", { state_value_align: "justify" })).toHaveLength(1);
+  });
+
+  it("rejects out-of-range numbers", () => {
+    expect(run("gauge", { gauge_segments: 1 })).toEqual([
+      gt("dashboard.utils.configValueOutOfRange", {
+        setting: "gauge_segments",
+        min: "2",
+        max: "100",
+      }),
+    ]);
+    expect(run("donut", { donut_inner_radius: 99 })).toHaveLength(1);
+    expect(run("pie", { pie_other_threshold: -1 })).toHaveLength(1);
+    expect(run("metric", { value_font_size: 0 })).toHaveLength(1);
+    expect(run("geomap", { map_cluster_radius: 0 })).toHaveLength(1);
+    expect(run("heatmap", { heatmap_cell_gap: -2 })).toHaveLength(1);
+    expect(run("heatmap", { heatmap_hide_below: "low" })).toEqual([
+      gt("dashboard.utils.configValueNotNumeric", { setting: "heatmap_hide_below" }),
+    ]);
+  });
+
+  it("ignores settings of another chart type", () => {
+    expect(run("line", { stat_change: "ratio", gauge_segments: 1, table_density: "huge" })).toEqual(
+      [],
+    );
+  });
+});

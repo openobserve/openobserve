@@ -55,6 +55,7 @@ import {
 import { LabelLayout, UniversalTransition } from "echarts/features";
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
 import { withChartFont } from "@/utils/fonts";
+import { reclusterSeries } from "@/utils/dashboard/geoMapCluster";
 
 echarts.use([
   TitleComponent,
@@ -97,6 +98,18 @@ export default defineComponent({
     let lmap: any;
     let lmapComponent: any;
     const lmapOptions = props.data.options?.lmap ? { ...props.data.options.lmap } : {};
+
+    // Clusters are cut at one zoom level, so a zoom regroups the raw points for the new level.
+    const onZoomEnd = () => {
+      const series = props.data.options?.series;
+      if (!lmap || !Array.isArray(series) || !series.some((s: any) => s?._clusterSource)) return;
+      chart?.setOption({ series: reclusterSeries(series, lmap.getZoom()) });
+    };
+    const bindRecluster = () => {
+      if (!lmap) return;
+      lmap.off("zoomend", onZoomEnd);
+      lmap.on("zoomend", onZoomEnd);
+    };
 
     const windowResizeEventCallback = async () => {
       await nextTick();
@@ -146,6 +159,7 @@ export default defineComponent({
           props.data.options?.lmap?.zoom,
         );
       }
+      bindRecluster();
       // L.geoJson(mapData).addTo(lmap);
     });
     onUnmounted(() => {
@@ -192,6 +206,7 @@ export default defineComponent({
             props.data.options?.lmap?.zoom,
           );
         }
+        bindRecluster();
       },
       { deep: true },
     );

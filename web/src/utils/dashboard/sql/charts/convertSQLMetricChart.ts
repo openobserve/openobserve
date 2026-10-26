@@ -340,6 +340,7 @@ export function applyMetricChart(ctx: SQLContext): void {
   const textSeries: any = {
     ...defaultSeriesProps,
     _metricText: metricText,
+    _metricRawValue: yAxisValue?.length > 0 ? rawValue : null,
     _metricFillColor: metricFillColor,
     _metricBgColor: metricStyle.bgColor,
     _metricLabel: metricOverride?.displayName ?? metricFieldLabel,

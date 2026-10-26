@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @format-column="onFormatColumn"
           ref="tableRendererRef"
           :wrap-cells="panelSchema.config?.wrap_table_cells"
+          :density="panelSchema.config?.table_density"
           :show-pagination="panelSchema.config?.table_pagination && !store.state.printMode"
           :rows-per-page="panelSchema.config?.table_pagination_rows_per_page"
           :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"

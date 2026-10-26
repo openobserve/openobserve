@@ -1478,3 +1478,47 @@ describe("style review cases", () => {
     expect(legendNames(result)).not.toContain("Other");
   });
 });
+
+describe("state text alignment", () => {
+  const drawText = (config: Record<string, any>) => {
+    const panel = {
+      id: "align",
+      type: "state-timeline",
+      queryType: "promql",
+      config,
+      queries: [{ config: {} }],
+    };
+    const values = [0, 30, 60].map((s) => [1_700_000_000 + s, "1"]);
+    const data = [{ resultType: "matrix", result: [{ metric: { gpu: "0" }, values }] }];
+    const result = convertStateTimelineData(
+      panel,
+      data,
+      store,
+      null,
+      [[{ step: 30_000_000 }]],
+      null,
+    );
+    const [segment] = segmentsOf(result);
+    const api = {
+      value: (i: number) => segment.value[i],
+      coord: ([x]: number[]) => [x === segment.value[0] ? 100 : 300, 10],
+      size: () => [0, 20],
+    };
+    const drawn = result.options.series[0].renderItem(
+      { coordSys: { x: 0, y: 0, width: 1000, height: 100 } },
+      api,
+    );
+    return drawn.children[1].style;
+  };
+
+  it("keeps today's left-aligned text without the key", () => {
+    const style = drawText({});
+    expect(style.x).toBe(104);
+    expect(style.align).toBeUndefined();
+  });
+
+  it("centres or right-aligns the state text", () => {
+    expect(drawText({ state_value_align: "center" })).toMatchObject({ x: 200, align: "center" });
+    expect(drawText({ state_value_align: "right" })).toMatchObject({ x: 296, align: "right" });
+  });
+});

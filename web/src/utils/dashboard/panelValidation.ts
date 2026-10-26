@@ -20,6 +20,17 @@ import {
   Y_AXIS_SCALES,
 } from "@/utils/dashboard/cartesianOptions";
 import { TOOLTIP_SORT_VALUES } from "@/utils/dashboard/tooltipSort";
+import {
+  STAT_CHANGE_COLORS,
+  STAT_CHANGE_MODES,
+  STAT_TEXT_MODES,
+} from "@/utils/dashboard/metricOptions";
+import {
+  GAUGE_STYLES,
+  PIE_LABEL_CONTENTS,
+  STATE_VALUE_ALIGNS,
+} from "@/utils/dashboard/panelTypeOptions";
+import { TABLE_DENSITIES, TABLE_FOOTER_CALCS } from "@/utils/dashboard/tableOptions";
 
 /**
  * Validates a single condition item
@@ -1051,6 +1062,87 @@ const validateCartesianConfig = (
   validateScatterEncoding(t, panel, errors, isPromQLMode);
 };
 
+const PANEL_TYPE_CHOICE_KEYS: ReadonlyArray<[string, string[], readonly unknown[]]> = [
+  ["stat_change", ["metric"], STAT_CHANGE_MODES],
+  ["stat_change_color", ["metric"], STAT_CHANGE_COLORS],
+  ["stat_text_mode", ["metric"], STAT_TEXT_MODES],
+  ["gauge_style", ["gauge"], GAUGE_STYLES],
+  ["table_density", ["table"], TABLE_DENSITIES],
+  ["state_value_align", ["state-timeline"], STATE_VALUE_ALIGNS],
+  ["sort_order", ["pie", "donut"], SORT_ORDERS],
+];
+
+const PANEL_TYPE_LIST_KEYS: ReadonlyArray<[string, string[], readonly unknown[]]> = [
+  ["pie_label_content", ["pie", "donut"], PIE_LABEL_CONTENTS],
+  ["table_footer_calcs", ["table"], TABLE_FOOTER_CALCS],
+];
+
+// [key, chart types, lowest allowed, highest allowed, lowest is exclusive]
+const PANEL_TYPE_RANGE_KEYS: ReadonlyArray<[string, string[], number, number, boolean]> = [
+  ["value_font_size", ["metric"], 0, Infinity, true],
+  ["gauge_segments", ["gauge"], 2, 100, false],
+  ["pie_other_threshold", ["pie", "donut"], 0, 100, false],
+  ["donut_inner_radius", ["donut"], 0, 95, false],
+  ["heatmap_cell_gap", ["heatmap"], 0, Infinity, false],
+  ["map_cluster_radius", ["geomap"], 0, Infinity, true],
+];
+
+const validatePanelTypeChoices = (t: TranslateFn, panel: any, errors: string[]) => {
+  const config = panel.config;
+  const unsupported = (setting: string, value: unknown) =>
+    errors.push(t("dashboard.utils.unsupportedConfigValue", { setting, value: String(value) }));
+  for (const [key, types, allowed] of PANEL_TYPE_CHOICE_KEYS) {
+    if (types.includes(panel.type) && isSetValue(config[key]) && !allowed.includes(config[key])) {
+      unsupported(key, config[key]);
+    }
+  }
+  for (const [key, types, allowed] of PANEL_TYPE_LIST_KEYS) {
+    if (!types.includes(panel.type) || !isSetValue(config[key])) continue;
+    const values = Array.isArray(config[key]) ? config[key] : [config[key]];
+    values
+      .filter((value: unknown) => !allowed.includes(value))
+      .forEach((value: unknown) => {
+        unsupported(key, value);
+      });
+  }
+};
+
+const validatePanelTypeRanges = (t: TranslateFn, panel: any, errors: string[]) => {
+  const config = panel.config;
+  for (const [key, types, min, max, exclusive] of PANEL_TYPE_RANGE_KEYS) {
+    if (!types.includes(panel.type) || !isSetValue(config[key])) continue;
+    const value = asFiniteNumber(config[key]);
+    const tooLow = value === null || (exclusive ? value <= min : value < min);
+    if (tooLow || (value as number) > max) {
+      errors.push(
+        t("dashboard.utils.configValueOutOfRange", {
+          setting: key,
+          min: exclusive ? `> ${min}` : String(min),
+          max: Number.isFinite(max) ? String(max) : "∞",
+        }),
+      );
+    }
+  }
+  if (panel.type === "gauge" && isSetValue(config.gauge_neutral)) {
+    if (asFiniteNumber(config.gauge_neutral) === null) {
+      errors.push(t("dashboard.utils.configValueNotNumeric", { setting: "gauge_neutral" }));
+    }
+  }
+  if (panel.type === "heatmap" && isSetValue(config.heatmap_hide_below)) {
+    if (asFiniteNumber(config.heatmap_hide_below) === null) {
+      errors.push(t("dashboard.utils.configValueNotNumeric", { setting: "heatmap_hide_below" }));
+    }
+  }
+};
+
+/** Metric, gauge, pie, table, heatmap, state timeline and geomap settings the renderer would silently ignore or misread. */
+const validatePanelTypeConfig = (t: TranslateFn, panelData: any, errors: string[]) => {
+  const panel = panelData?.data;
+  if (!panel?.config) return;
+  validatePanelTypeChoices(t, panel, errors);
+  validatePanelTypeRanges(t, panel, errors);
+};
+
 /**
  * Validates a dashboard panel's configuration
  * @param {object} panelData - The panel data object to validate
@@ -1079,6 +1171,7 @@ export const validatePanel = (
   validatePanelContentByType(t, panelData?.data, errors);
   validateHeatmapConfig(t, panelData, errors, isPromQLMode);
   validateCartesianConfig(t, panelData, errors, isPromQLMode);
+  validatePanelTypeConfig(t, panelData, errors);
 
   // Validate timestamp alias for SQL queries with custom query mode
   if (panelData?.data?.queryType === "sql") {

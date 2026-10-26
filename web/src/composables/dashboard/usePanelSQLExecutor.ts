@@ -17,6 +17,7 @@ import { markRaw, toRaw, nextTick } from "vue";
 import { gt } from "@/types/i18n";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import { convertOffsetToSeconds } from "@/utils/dashboard/dateTimeUtils";
+import { effectiveTimeShifts, isStatChangeOn } from "@/utils/dashboard/metricOptions";
 import logsUtils from "@/composables/useLogs/logsUtils";
 import { detectChunkingDirection, shouldPrependChunk } from "@/utils/dashboard/chunkingDirection";
 
@@ -362,9 +363,15 @@ export const usePanelSQLExecutor = (ctx: {
 
         state.loading = true;
 
-        if (it.config?.time_shift && it.config?.time_shift?.length > 0) {
+        const timeShifts = effectiveTimeShifts(
+          panelSchema.value,
+          it,
+          startISOTimestamp,
+          endISOTimestamp,
+        );
+        if (timeShifts.length > 0) {
           // convert time shift to milliseconds
-          const timeShiftInMilliSecondsArray = it.config?.time_shift?.map((it: any) =>
+          const timeShiftInMilliSecondsArray = timeShifts.map((it: any) =>
             convertOffsetToSeconds(it.offSet, endISOTimestamp),
           );
 
@@ -911,9 +918,15 @@ export const usePanelSQLExecutor = (ctx: {
         continue;
       }
 
-      if (it.config?.time_shift && it.config?.time_shift?.length > 0) {
+      const timeShifts = effectiveTimeShifts(
+        panelSchema.value,
+        it,
+        startISOTimestamp,
+        endISOTimestamp,
+      );
+      if (timeShifts.length > 0) {
         // Expand time-shift query into N+1 entries (original + N shifts)
-        const timeShiftInMilliSecondsArray = it.config.time_shift.map((ts: any) =>
+        const timeShiftInMilliSecondsArray = timeShifts.map((ts: any) =>
           convertOffsetToSeconds(ts.offSet, endISOTimestamp),
         );
         timeShiftInMilliSecondsArray.unshift({
@@ -1043,6 +1056,9 @@ export const usePanelSQLExecutor = (ctx: {
       for (let i = 0; i < allSearchRequests.length; i++) {
         const it = panelSchema.value.queries[allMetadata[i]?.panelQueryIndex];
         if (!it) continue;
+        // A stat-change comparison result is never drawn, so its trend is not fetched.
+        if (isStatChangeOn(panelSchema.value) && allMetadata[i]?.timeRangeGap?.seconds > 0)
+          continue;
         fetchSparklineHistogram(
           allSearchRequests[i].sql,
           it,

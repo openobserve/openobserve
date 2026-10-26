@@ -401,6 +401,7 @@ import {
 } from "@/composables/dashboard/useColumnFormatting";
 import {
   parseOverrideConfigs,
+  resolveIsNumber,
   applyColumnOverrides,
   buildValueMappingCache,
   formatNumericValue,
@@ -602,11 +603,7 @@ export default defineComponent({
     };
 
     const isNumericColumn = (col: ColumnOverrideUI): boolean =>
-      col.fieldType === "num"
-        ? true
-        : col.fieldType === "text"
-          ? false
-          : detectedNumeric(col.field);
+      resolveIsNumber(detectedNumeric(col.field), col.fieldType);
 
     watch(
       () => columnOverrides.value.map((c) => `${c.field}|${c.fieldType}`),

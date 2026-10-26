@@ -61,9 +61,13 @@ const warnedValueMappingPatterns = new Set<string>();
 /** Why a value-mapping regex cannot be saved. */
 export type ValueMappingPatternError = "tooLong" | "unsupported";
 
-/** Apply a per-column field-type override ("num"/"text" force; "auto"/absent keep detected). */
+/** Apply a per-column field-type override ("num"/"bar_gauge" and "text"/"sparkline"/"json" force; "auto"/absent keep detected). */
 export const resolveIsNumber = (detected: boolean, fieldType: string | undefined): boolean =>
-  fieldType === "num" ? true : fieldType === "text" ? false : detected;
+  fieldType === "num" || fieldType === "bar_gauge"
+    ? true
+    : fieldType === "text" || fieldType === "sparkline" || fieldType === "json"
+      ? false
+      : detected;
 
 // ---------------------------------------------------------------------------
 // Value-mapping helpers

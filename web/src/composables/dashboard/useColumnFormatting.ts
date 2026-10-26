@@ -42,10 +42,12 @@ export const emptyConditionalRule = (): ConditionalRuleUI => ({
   bgColor: null,
 });
 
+export type ColumnFieldType = "auto" | "num" | "text" | "bar_gauge" | "sparkline" | "json";
+
 export interface ColumnOverrideUI {
   field: string;
-  // "auto" detects numeric-ness from the data; "num"/"text" force it.
-  fieldType: "auto" | "num" | "text";
+  // "auto" detects numeric-ness from the data; the others force it and may pick a cell renderer.
+  fieldType: ColumnFieldType;
   unit: string | null; // null === inherit panel-level unit
   customUnit: string | null;
   alignment: string | null;
@@ -287,6 +289,9 @@ export const useColumnFormattingOptions = () => {
     { value: "auto", label: t("dashboard.auto") },
     { value: "num", label: t("dashboard.typeNumeric") },
     { value: "text", label: t("dashboard.typeText") },
+    { value: "bar_gauge", label: t("dashboard.typeBarGauge") },
+    { value: "sparkline", label: t("dashboard.typeSparkline") },
+    { value: "json", label: t("dashboard.typeJson") },
   ];
 
   // "auto" maps to null alignment (renderer auto-aligns by type).

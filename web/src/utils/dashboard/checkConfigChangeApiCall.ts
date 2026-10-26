@@ -1,4 +1,6 @@
 // Whitelist of config keys that require API calls when changed
+import { isStatChangeOn } from "./metricOptions";
+
 const API_REQUIRING_CHANGES = new Set(["queries", "variables"]);
 
 // Keys under "queries" that are runtime metadata — changes to these
@@ -74,6 +76,9 @@ export const checkIfConfigChangeRequiredApiCallOrNot = (
     const leafKey = segments[segments.length - 1];
     return !IGNORED_QUERY_KEYS.has(leafKey);
   });
+
+  // Turning a metric's stat change on or off adds or drops the comparison query.
+  if (isStatChangeOn(oldConfig) !== isStatChangeOn(newConfig)) return true;
 
   const configNeedsApiCall = meaningfulChanges
     .filter((key) => !key.endsWith(".hide") || isUnhiddenPromQL(newConfig, key))

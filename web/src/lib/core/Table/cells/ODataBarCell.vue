@@ -21,13 +21,17 @@ const props = withDefaults(
     value: unknown;
     /** Column maximum (over the visible rows) — the bar's 100% reference. */
     max: number;
+    /** Column minimum — the bar's 0% reference. */
+    min?: number;
+    /** Bar colour from data (e.g. a threshold step); overrides the variant tone. */
+    color?: string | null;
     /** Pre-formatted text to show. Falls back to a grouped number. */
     display?: string | number;
     /** Bar tone. Default teal; "warning"/"danger" for threshold columns. */
     variant?: "default" | "warning" | "danger";
     emptyLabel?: I18nText;
   }>(),
-  { variant: "default", emptyLabel: raw("—") },
+  { variant: "default", emptyLabel: raw("—"), min: 0, color: null },
 );
 
 const num = computed<number | null>(() => {
@@ -45,8 +49,9 @@ const text = computed(() => {
 
 /** Bar width 0–100%. Hidden when no value, non-positive, or no valid max. */
 const widthPct = computed(() => {
-  if (num.value === null || props.max <= 0 || num.value <= 0) return 0;
-  return Math.min(100, (num.value / props.max) * 100);
+  const span = props.max - props.min;
+  if (num.value === null || span <= 0 || num.value <= props.min) return 0;
+  return Math.min(100, ((num.value - props.min) / span) * 100);
 });
 
 const barClass = computed(
@@ -73,7 +78,7 @@ const barClass = computed(
       v-if="widthPct > 0"
       class="pointer-events-none h-0.75 rounded-full opacity-80 transition-[width] duration-300"
       :class="barClass"
-      :style="{ width: widthPct + '%' }"
+      :style="{ width: widthPct + '%', ...(color ? { backgroundColor: color } : {}) }"
       aria-hidden="true"
     />
   </div>

@@ -648,6 +648,22 @@ describe("time shift (compare to a previous period)", () => {
     expect(state.resultMetaData[1][0].step).toBe(15_000_000);
   });
 
+  it("adds a previous-period stream for a metric that compares with no time shift", async () => {
+    const panelSchema = makePanelSchema([{ query: "up", config: {} }]);
+    panelSchema.value.type = "metric";
+    (panelSchema.value as any).config = { stat_change: "absolute" };
+    const { ctx, state, fetchQueryDataWithHttpStream } = makeCtx({ panelSchema });
+    (fetchQueryDataWithHttpStream as any).mockImplementation(() => {});
+    const { executePromQL } = usePanelPromQLExecutor(ctx as any);
+    await executePromQL(START_US, END_US, null);
+    const payloads = (fetchQueryDataWithHttpStream as any).mock.calls.map((c: any[]) => c[0]);
+
+    expect(payloads).toHaveLength(2);
+    expect(payloads[1].queryReq.start_time).toBe(START_US - (END_US - START_US));
+    expect(payloads[1].queryReq.end_time).toBe(START_US);
+    expect(state.metadata.queries[1].panelQueryIndex).toBe(0);
+  });
+
   it("ignores time_shift on an instant query and keeps the saved offsets", async () => {
     const queries = [
       { query: "up", config: { query_type: "instant", time_shift: [{ offSet: "1d" }] } },
