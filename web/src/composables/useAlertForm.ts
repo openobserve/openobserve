@@ -2479,7 +2479,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       analytics.track("Button Click", {
         button: "Update Alert",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         stream_name: formData.value.stream_name,
         alert_name: formData.value.name,
         page: "Add/Update Alert",
@@ -2519,7 +2518,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       analytics.track("Button Click", {
         button: "Save Alert",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         stream_name: formData.value.stream_name,
         alert_name: formData.value.name,
         page: "Add/Update Alert",

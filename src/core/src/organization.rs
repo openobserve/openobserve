@@ -391,15 +391,36 @@ pub async fn list_all_orgs(limit: Option<i64>) -> Result<Vec<Organization>, anyh
     db::organization::list(limit).await
 }
 
+/// Same as [`list_all_orgs`], paired with each org's creation time in microseconds.
+pub async fn list_all_orgs_with_created_at(
+    limit: Option<i64>,
+) -> Result<Vec<(Organization, i64)>, anyhow::Error> {
+    db::organization::list_with_created_at(limit).await
+}
+
 pub async fn list_orgs_by_user(user_email: &str) -> Result<Vec<Organization>, anyhow::Error> {
+    Ok(list_orgs_by_user_with_created_at(user_email)
+        .await?
+        .into_iter()
+        .map(|(org, _)| org)
+        .collect())
+}
+
+/// Same as [`list_orgs_by_user`], paired with each org's (not the membership's) creation time.
+pub async fn list_orgs_by_user_with_created_at(
+    user_email: &str,
+) -> Result<Vec<(Organization, i64)>, anyhow::Error> {
     let records = db::org_users::list_orgs_by_user(user_email).await?;
     Ok(records
         .into_iter()
-        .map(|record| Organization {
-            identifier: record.org_id.clone(),
-            name: record.org_name.clone(),
-            org_type: record.org_type.to_string(),
-            service_account: None,
+        .map(|record| {
+            let org = Organization {
+                identifier: record.org_id,
+                name: record.org_name,
+                org_type: record.org_type.to_string(),
+                service_account: None,
+            };
+            (org, record.org_created_at)
         })
         .collect())
 }

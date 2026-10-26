@@ -847,7 +847,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: "Refresh Streams",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         page: "Streams",
       });
     };
@@ -1023,7 +1022,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: "Actions",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         stream_name: props.row.name,
         page: "Streams",
       });
