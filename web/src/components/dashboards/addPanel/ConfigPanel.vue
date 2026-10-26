@@ -582,7 +582,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('dashboard.heatmapColorMin')"
             :error="isHeatmapColorRangeInvalid"
             @update:model-value="
-              (value: any) =>
+              (value: string | number) =>
                 (dashboardPanelDataModel.data.config.heatmap_color_min =
                   value !== '' ? value : null)
             "
@@ -607,7 +607,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :error="isHeatmapColorRangeInvalid"
             :error-message="t('dashboard.heatmapColorRangeInvalid')"
             @update:model-value="
-              (value: any) =>
+              (value: string | number) =>
                 (dashboardPanelDataModel.data.config.heatmap_color_max =
                   value !== '' ? value : null)
             "
@@ -698,7 +698,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             promqlMode &&
             dashboardPanelData.data.type === 'heatmap' &&
             heatmapHistogramModeModel &&
-            dashboardPanelData.data.config.bucket_unit == 'custom'
+            dashboardPanelData.data.config.bucket_unit === 'custom'
           "
           v-show="isConfigOptionVisible('data', 'bucket-unit-custom')"
           v-model="dashboardPanelDataModel.data.config.bucket_unit_custom"
@@ -1039,7 +1039,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <OSwitch
-          v-if="shouldShowAxisConfig(dashboardPanelData)"
+          v-if="shouldShowAxisBorderConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('axis', 'axis-border')"
           v-model="dashboardPanelDataModel.data.config.axis_border_show"
           :label="t('dashboard.showBorder')"
@@ -1111,7 +1111,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('dashboard.heatmapYBucketSize')"
             :error="!!heatmapYBucketErrorMessage"
             :error-message="heatmapYBucketErrorMessage"
-            @update:model-value="(value: any) => setHeatmapYBucket({ size: toNumberOrNull(value) })"
+            @update:model-value="
+              (value: string | number) => setHeatmapYBucket({ size: toNumberOrNull(value) })
+            "
             data-test="dashboard-config-heatmap_y_bucket_size"
           />
 
@@ -1149,7 +1151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('dashboard.heatmapYMin')"
               :error="isHeatmapYRangeInvalid"
               @update:model-value="
-                (value: any) =>
+                (value: string | number) =>
                   (dashboardPanelDataModel.data.config.heatmap_y_min = toNumberOrNull(value))
               "
               data-test="dashboard-config-heatmap_y_min"
@@ -1167,7 +1169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :error="isHeatmapYRangeInvalid"
               :error-message="t('dashboard.heatmapYRangeInvalid')"
               @update:model-value="
-                (value: any) =>
+                (value: string | number) =>
                   (dashboardPanelDataModel.data.config.heatmap_y_max = toNumberOrNull(value))
               "
               data-test="dashboard-config-heatmap_y_max"
@@ -2334,7 +2336,8 @@ import { DEFAULT_HEATMAP_PALETTE, HEATMAP_PALETTES } from "@/utils/dashboard/hea
 import {
   DEFAULT_HEATMAP_COLOR_SCALE,
   HEATMAP_COLOR_SCALES,
-  HEATMAP_MAX_CELLS,
+  HEATMAP_MAX_ROWS,
+  isHeatmapColorRangeInverted,
 } from "@/utils/dashboard/heatmapDefaults";
 import { addCommasToNumber } from "@/utils/formatters";
 import { PROMETHEUS_HISTOGRAM_MODE } from "@/utils/dashboard/promql/convertPromQLHeatmapChart";
@@ -2419,6 +2422,7 @@ import {
   shouldShowAreaLineStyleConfig,
   shouldShowNoValueReplacement,
   shouldShowAxisConfig,
+  shouldShowAxisBorderConfig,
   shouldShowCartesianAxisConfig,
   shouldShowAxisLabelConfig,
   shouldShowLineThickness,
@@ -3378,11 +3382,9 @@ export default defineComponent({
 
     const decimalsTouched = ref(false);
 
-    // Mirrors heatmapColorRange: an inverted pair is ignored by the renderer, so flag it here.
-    const isHeatmapColorRangeInvalid = computed(() => {
-      const { heatmap_color_min: min, heatmap_color_max: max } = dashboardPanelData.data.config;
-      return typeof min === "number" && typeof max === "number" && min >= max;
-    });
+    const isHeatmapColorRangeInvalid = computed(() =>
+      isHeatmapColorRangeInverted(dashboardPanelData.data.config),
+    );
 
     const isHeatmapYRangeInvalid = computed(() =>
       isHeatmapYRangeInverted(dashboardPanelData.data.config),
@@ -3400,7 +3402,7 @@ export default defineComponent({
       );
       return t("dashboard.heatmapYBucketTooMany", {
         count: addCommasToNumber(count ?? 0),
-        max: addCommasToNumber(HEATMAP_MAX_CELLS),
+        max: addCommasToNumber(HEATMAP_MAX_ROWS),
       });
     });
 
@@ -3507,6 +3509,7 @@ export default defineComponent({
       shouldShowAreaLineStyleConfig,
       shouldShowNoValueReplacement,
       shouldShowAxisConfig,
+      shouldShowAxisBorderConfig,
       shouldShowCartesianAxisConfig,
       shouldShowAxisLabelConfig,
       shouldShowLineThickness,

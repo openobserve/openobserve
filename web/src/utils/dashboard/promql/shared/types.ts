@@ -63,6 +63,8 @@ export interface ProcessedPromQLData {
   seriesRole?: "primary" | "shifted";
   /** The shifted period's name, e.g. "1 day ago", which its series names already carry. */
   nameSuffix?: string;
+  /** In histogram mode, the whole histograms the series limit kept out of all returned. */
+  histogramsLimited?: { shown: number; total: number };
   queryConfig: any;
 }
 

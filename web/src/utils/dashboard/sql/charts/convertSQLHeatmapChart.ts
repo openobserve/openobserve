@@ -25,7 +25,6 @@ import {
   HEATMAP_SPLIT_AREA,
   addHeatmapWarning,
   cutHeatmapToBudget,
-  heatmapAxisLine,
   heatmapBudgetWarning,
   heatmapCellItemStyle,
   heatmapColorRange,
@@ -35,6 +34,7 @@ import {
   visualMapRangeOf,
 } from "@/utils/dashboard/heatmapDefaults";
 import {
+  fillHeatmapYBuckets,
   heatmapYBucketInRange,
   heatmapYBucketLabel,
   heatmapYBucketing,
@@ -95,6 +95,7 @@ export function applyHeatmapChart(ctx: SQLContext): void {
     allColumns.length,
     allRows.map((yValue) => rowTotal(lookup.get(yValue), yAxisKey0)),
     budget,
+    !!yBucketing,
   );
   if (cut) {
     addHeatmapWarning(ctx.extras, heatmapBudgetWarning(cut, allColumns.length, allRows.length));
@@ -103,6 +104,8 @@ export function applyHeatmapChart(ctx: SQLContext): void {
   const xAxisFirstPositionUniqueValue: any[] = cut
     ? cut.rows.map((index) => allRows[index])
     : allRows;
+  // Drilldowns read the raw row value, not its "(empty)" or range label.
+  if (ctx.extras) ctx.extras.heatmapRowValues = [xAxisFirstPositionUniqueValue];
   if (columnTimesMs) {
     ctx.extras.heatmapTimeAxis = sqlHeatmapTimeAxis(
       cut ? columnTimesMs.slice(cut.firstColumn) : columnTimesMs,
@@ -241,7 +244,6 @@ export function applyHeatmapChart(ctx: SQLContext): void {
       type: "category",
       data: xAxisZerothPositionUniqueValue.map(categoryLabel),
       splitArea: HEATMAP_SPLIT_AREA,
-      ...heatmapAxisLine(panelSchema?.config),
     },
   ]),
     [
@@ -251,7 +253,6 @@ export function applyHeatmapChart(ctx: SQLContext): void {
           yBucketing ? heatmapYBucketLabel(value, yBucketing.bucket) : categoryLabel(value),
         ),
         splitArea: HEATMAP_SPLIT_AREA,
-        ...heatmapAxisLine(panelSchema?.config),
       }),
     ]);
   options.legend.show = false;
@@ -267,7 +268,7 @@ function categoryLabel(value: any): any {
 /** The builder's y bucketing when it applies to these rows: a bare y column whose every value came back as one of its bucket lower bounds. */
 function builderYBucketing(panelSchema: any, rows: any[], yKey: string): HeatmapYBucketing | null {
   const query = panelSchema?.queries?.[0];
-  if (query?.customQuery != false || !isPlainYField(query?.fields?.y?.[0])) return null;
+  if (query?.customQuery !== false || !isPlainYField(query?.fields?.y?.[0])) return null;
   const bucketing = heatmapYBucketing(panelSchema?.config);
   if (!bucketing) return null;
   for (const row of rows) {
@@ -280,14 +281,14 @@ function builderYBucketing(panelSchema: any, rows: any[], yKey: string): Heatmap
   return bucketing;
 }
 
-/** Y values in `heatmap_y_sort` order; bucket lower bounds are kept to the y range and read ascending unless sorted descending. */
+/** Y values in `heatmap_y_sort` order; bucket lower bounds are kept to the y range, gaps filled with empty buckets, and read ascending unless sorted descending. */
 function orderYValues(values: any[], bucketing: HeatmapYBucketing | null, config: any): any[] {
   if (!bucketing) return sortHeatmapCategories(values, (value) => value, config?.heatmap_y_sort);
   const kept = values.filter((value) =>
     heatmapYBucketInRange(value, bucketing.bucket, bucketing.range),
   );
   return sortHeatmapCategories(
-    kept,
+    fillHeatmapYBuckets(kept, bucketing.bucket, HEATMAP_MAX_CELLS),
     (value) => value,
     config?.heatmap_y_sort === "desc" ? "desc" : "asc",
   );

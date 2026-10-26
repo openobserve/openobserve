@@ -26,6 +26,7 @@ import {
   deaccumulateHistogramSeries,
   groupHistogramSeries,
   HistogramSeriesOutput,
+  PROMETHEUS_HISTOGRAM_MODE,
 } from "./shared/histogramBuckets";
 import { formatTimestamps } from "./shared/dataProcessor";
 import { formatDate } from "../dateTimeUtils";
@@ -35,7 +36,6 @@ import {
   addHeatmapWarning,
   cutHeatmapToBudget,
   cutHistogramsToBudget,
-  heatmapAxisLine,
   heatmapBudgetWarning,
   heatmapCellItemStyle,
   heatmapColorRange,
@@ -53,18 +53,19 @@ import {
 } from "../heatmapTimeAxis";
 import type { HeatmapExemplarGroup, HeatmapExemplarLayout } from "../exemplars/heatmapExemplars";
 import { gt } from "@/types/i18n";
+import { addCommasToNumber } from "@/utils/formatters";
 
-/**
- * Opt-in heatmap mode that treats the queried series as the cumulative buckets
- * of a Prometheus classic histogram (`sum by(le) (rate(x_bucket[W]))`).
- */
-export const PROMETHEUS_HISTOGRAM_MODE = "prometheus_histogram";
+export { PROMETHEUS_HISTOGRAM_MODE };
 
 const STACK_TITLE_PX = 20;
 
 const STACK_BOTTOM_PX = 60;
 
-const STACK_GAP_PCT = 2;
+const STACK_GAP_PX = 6;
+
+const STACK_X_LABEL_PX = 24;
+
+const STACK_MIN_GRID_PX = 30;
 
 const UNMEASURED_PANEL_PX = 400;
 
@@ -97,6 +98,7 @@ interface HistogramGroupBuckets {
 interface HistogramGrid {
   label: string;
   bucketLabels: string[];
+  bucketValues: string[];
   data: any[];
 }
 
@@ -264,17 +266,69 @@ function uniqueBucketLabels(buckets: HistogramSeriesOutput[], config: any): stri
   });
 }
 
+/** How many stacked histogram grids fit a `heightPx` panel with every grid at least STACK_MIN_GRID_PX tall. */
+function maxStackedGrids(heightPx: number): number {
+  const usable = heightPx - STACK_BOTTOM_PX - STACK_X_LABEL_PX;
+  return Math.max(1, Math.floor(usable / (STACK_TITLE_PX + STACK_MIN_GRID_PX + STACK_GAP_PX)));
+}
+
 function stackedGridLayout(
   count: number,
   heightPx: number,
 ): Array<{ titleTop: number; gridTop: number; height: number }> {
-  const titlePct = (STACK_TITLE_PX / heightPx) * 100;
-  const slot = (100 - (STACK_BOTTOM_PX / heightPx) * 100) / count;
+  const pct = (px: number) => (px / heightPx) * 100;
+  const slot = (heightPx - STACK_BOTTOM_PX - STACK_X_LABEL_PX) / count;
+  const gridPx = Math.max(slot - STACK_TITLE_PX - STACK_GAP_PX, STACK_MIN_GRID_PX);
+  // Only the bottom grid shows time labels, and containLabel takes their height out of its own.
   return Array.from({ length: count }, (_unused, index) => ({
-    titleTop: index * slot,
-    gridTop: index * slot + titlePct,
-    height: Math.max(slot - titlePct - STACK_GAP_PCT, 1),
+    titleTop: pct(index * slot),
+    gridTop: pct(index * slot + STACK_TITLE_PX),
+    height: pct(gridPx + (index === count - 1 ? STACK_X_LABEL_PX : 0)),
   }));
+}
+
+/** The groups (indices, in order) a panel can stack: the busiest ones that fit its height. */
+function groupsThatFit(groups: HistogramGroupBuckets[], heightPx: number): number[] {
+  const all = groups.map((_group, index) => index);
+  const fit = maxStackedGrids(heightPx);
+  if (all.length <= fit) return all;
+  return all
+    .sort((a, b) => histogramTotal(groups[b]) - histogramTotal(groups[a]) || a - b)
+    .slice(0, fit)
+    .sort((a, b) => a - b);
+}
+
+function warnDroppedHistograms(
+  processedData: ProcessedPromQLData[],
+  shownForHeight: number,
+  groupCount: number,
+  extras: any,
+): void {
+  let shown = 0;
+  let total = 0;
+  for (const queryData of processedData) {
+    if (!queryData.histogramsLimited) continue;
+    shown += queryData.histogramsLimited.shown;
+    total += queryData.histogramsLimited.total;
+  }
+  if (total > shown) {
+    addHeatmapWarning(
+      extras,
+      gt("dashboard.utils.heatmapHistogramsSeriesLimited", {
+        shown: addCommasToNumber(shown),
+        total: addCommasToNumber(total),
+      }),
+    );
+  }
+  if (shownForHeight < groupCount) {
+    addHeatmapWarning(
+      extras,
+      gt("dashboard.utils.heatmapHistogramsHeightCapped", {
+        shown: addCommasToNumber(shownForHeight),
+        total: addCommasToNumber(groupCount),
+      }),
+    );
+  }
 }
 
 /** The heatmap series for one histogram grid; `cellCount` is the whole chart's, which decides chunked rendering. */
@@ -361,14 +415,12 @@ function singleHistogramOptions(
         type: "category",
         data: xAxisData,
         splitArea: HEATMAP_SPLIT_AREA,
-        ...heatmapAxisLine(config),
       },
     ],
     yAxis: {
       type: "category",
       data: grid.bucketLabels,
       splitArea: HEATMAP_SPLIT_AREA,
-      ...heatmapAxisLine(config),
       axisLabel: {
         overflow: "truncate",
         width: config.axis_width || 150,
@@ -418,7 +470,6 @@ function stackedHistogramOptions(
       gridIndex: index,
       data: xAxisData,
       splitArea: HEATMAP_SPLIT_AREA,
-      ...heatmapAxisLine(config),
       // The grids share one time axis, so only the bottom one spends height on its labels.
       axisLabel: { show: index === last },
     })),
@@ -427,7 +478,6 @@ function stackedHistogramOptions(
       gridIndex: index,
       data: grid.bucketLabels,
       splitArea: HEATMAP_SPLIT_AREA,
-      ...heatmapAxisLine(config),
       axisLabel: {
         overflow: "truncate",
         width: config.axis_width || 150,
@@ -476,7 +526,7 @@ function buildXAxisData(timestamps: Array<[any, any]>): string[] {
 /** True while another panel is hovered, when a synced tooltip shows only its axis pointer. */
 function otherPanelHovered(extras: any, panelId: unknown): boolean {
   const state = extras?.hoveredSeriesState?.value;
-  return !!(state && panelId && state.panelId != panelId);
+  return !!(state && panelId && state.panelId !== panelId);
 }
 
 function applyTimeInteraction(
@@ -668,6 +718,7 @@ export class HeatmapConverter implements PromQLChartConverter {
     );
     const seriesNames = rows.map((row) => allSeries[row].name);
     seriesNames.forEach((name) => extras.legends.push(name));
+    extras.heatmapRowValues = [seriesNames];
     extras.heatmapExemplarLayout = {
       mode: "series",
       rows: rows.map((row) => {
@@ -728,14 +779,12 @@ export class HeatmapConverter implements PromQLChartConverter {
           type: "category",
           data: xAxisData,
           splitArea: HEATMAP_SPLIT_AREA,
-          ...heatmapAxisLine(config),
         },
       ],
       yAxis: {
         type: "category",
         data: seriesNames,
         splitArea: HEATMAP_SPLIT_AREA,
-        ...heatmapAxisLine(config),
         axisLabel: {
           overflow: "truncate",
           width: config.axis_width || 150,
@@ -815,17 +864,20 @@ export class HeatmapConverter implements PromQLChartConverter {
     const groups = histogramGroupsOf(processedData);
     const timeAxis = buildTimeAxis(processedData, grid, store?.state?.timezone);
 
+    const heightPx = chartPanelRef?.value?.offsetHeight || UNMEASURED_PANEL_PX;
+    const fitting = groupsThatFit(groups, heightPx).map((index) => groups[index]);
+    warnDroppedHistograms(processedData, fitting.length, groups.length, extras);
     const cut = cutHistogramsToBudget(
       timeAxis.length,
-      groups.map((group) => group.buckets.length),
-      groups.map(histogramTotal),
+      fitting.map((group) => group.buckets.length),
+      fitting.map(histogramTotal),
     );
     if (cut) {
-      for (const warning of histogramBudgetWarnings(cut, timeAxis.length, groups.length)) {
+      for (const warning of histogramBudgetWarnings(cut, timeAxis.length, fitting.length)) {
         addHeatmapWarning(extras, warning);
       }
     }
-    const kept = cut ? cut.groups.map((index) => groups[index]) : groups;
+    const kept = cut ? cut.groups.map((index) => fitting[index]) : fitting;
     const timestamps = cut ? timeAxis.slice(cut.firstColumn) : timeAxis;
 
     let minValue = Infinity;
@@ -841,12 +893,14 @@ export class HeatmapConverter implements PromQLChartConverter {
       return {
         label: group.label,
         bucketLabels: uniqueBucketLabels(group.buckets, config),
+        bucketValues: group.buckets.map((bucket) => bucket.le),
         data: cells.data,
       };
     });
     for (const histogram of grids) {
       for (const label of histogram.bucketLabels) extras.legends.push(label);
     }
+    extras.heatmapRowValues = grids.map((histogram) => histogram.bucketValues);
     extras.heatmapExemplarLayout = {
       mode: "histogram",
       groups: kept.map((group) =>
@@ -865,16 +919,9 @@ export class HeatmapConverter implements PromQLChartConverter {
 
     const options =
       grids.length > 1
-        ? stackedHistogramOptions(
-            grids,
-            xAxisData,
-            visualMapRange,
-            config,
-            store,
-            chartPanelRef?.value?.offsetHeight || UNMEASURED_PANEL_PX,
-          )
+        ? stackedHistogramOptions(grids, xAxisData, visualMapRange, config, store, heightPx)
         : singleHistogramOptions(
-            grids[0] ?? { label: "", bucketLabels: [], data: [] },
+            grids[0] ?? { label: "", bucketLabels: [], bucketValues: [], data: [] },
             xAxisData,
             visualMapRange,
             config,

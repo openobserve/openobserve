@@ -312,6 +312,46 @@ describe("usePanelDrilldown", () => {
       expect(url).toBe("https://example.com/?row=svc-a&col=10:01:00&v=7");
     });
 
+    it("passes the raw row value, not the label drawn for an empty category", async () => {
+      const deps = heatmapDeps(
+        {
+          xAxis: [{ data: ["GET"] }],
+          yAxis: { data: ["(empty)", "svc-b"] },
+          series: [{ type: "heatmap" }],
+        },
+        { heatmapRowValues: [["", "svc-b"]] },
+      );
+
+      const url = await clickAndOpen(deps, { seriesIndex: 0, name: "GET", value: [0, 0, 7] });
+
+      expect(url).toBe("https://example.com/?row=&col=GET&v=7");
+    });
+
+    it("opens a URL drilldown on a time column, passing the column start in epoch ms", async () => {
+      const start = Date.UTC(2026, 2, 18, 0, 30);
+      const deps = heatmapDeps(
+        {
+          xAxis: [{ data: ["2026-03-18 00:30:00"] }],
+          yAxis: { data: ["svc-a"] },
+          series: [{ type: "heatmap" }],
+        },
+        {
+          heatmapTimeAxis: {
+            endInclusive: false,
+            columns: [{ start, end: start + 60_000, x: null }],
+          },
+        },
+      );
+
+      const url = await clickAndOpen(deps, {
+        seriesIndex: 0,
+        name: "2026-03-18 00:30:00",
+        value: [0, 0, 7],
+      });
+
+      expect(url).toBe(`https://example.com/?row=svc-a&col=${start}&v=7`);
+    });
+
     it("reads the row from the clicked grid of a stacked histogram heatmap", async () => {
       const deps = heatmapDeps({
         xAxis: [{ data: ["10:00:00"] }, { gridIndex: 1, data: ["10:00:00"] }],

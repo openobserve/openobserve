@@ -28,6 +28,7 @@ import {
   shouldShowAreaLineStyleConfig,
   shouldShowTopResultsConfig,
   shouldShowAxisConfig,
+  shouldShowAxisBorderConfig,
   shouldShowCartesianAxisConfig,
   shouldShowAxisLabelConfig,
   shouldShowLineThickness,
@@ -1238,6 +1239,14 @@ describe("configUtils", () => {
 
     it("should return false for table chart", () => {
       expect(shouldShowTopResultsConfig({ data: { type: "table" } }, false)).toBe(false);
+    });
+  });
+
+  describe("shouldShowAxisBorderConfig", () => {
+    it("offers the axis border toggle where axis config shows, except on heatmaps", () => {
+      expect(shouldShowAxisBorderConfig({ data: { type: "line" } })).toBe(true);
+      expect(shouldShowAxisBorderConfig({ data: { type: "heatmap" } })).toBe(false);
+      expect(shouldShowAxisBorderConfig({ data: { type: "table" } })).toBe(false);
     });
   });
 

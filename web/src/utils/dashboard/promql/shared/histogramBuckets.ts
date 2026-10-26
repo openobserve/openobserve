@@ -54,6 +54,9 @@ export interface HistogramSeriesOutput {
  */
 const INFINITY_SPELLINGS = new Set(["inf", "infinity"]);
 
+/** The `heatmap_mode` that reads a PromQL heatmap's series as the cumulative buckets of classic histograms. */
+export const PROMETHEUS_HISTOGRAM_MODE = "prometheus_histogram";
+
 /** Labels that vary within one histogram rather than between histograms. */
 const BUCKET_LABELS = new Set(["le", "__name__"]);
 
@@ -133,6 +136,22 @@ export function groupHistogramSeries<T extends { metric?: Record<string, string>
     }
   }
   return [...groups.values()];
+}
+
+/** The first whole histograms of `series` that fit in `limit` series, at least one, in input order; a histogram missing a bucket would fold its counts into the next. */
+export function limitWholeHistograms<T extends { metric?: Record<string, string> }>(
+  series: T[],
+  limit: number,
+): { kept: T[]; shown: number; total: number } {
+  const groups = groupHistogramSeries(series);
+  const keep = new Set<T>();
+  let shown = 0;
+  for (const group of groups) {
+    if (shown > 0 && keep.size + group.series.length > limit) break;
+    for (const entry of group.series) keep.add(entry);
+    shown++;
+  }
+  return { kept: series.filter((entry) => keep.has(entry)), shown, total: groups.length };
 }
 
 /**

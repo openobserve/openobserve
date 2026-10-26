@@ -16,6 +16,7 @@
 import { describe, expect, it } from "vitest";
 import {
   HEATMAP_Y_NON_POSITIVE_LABEL,
+  fillHeatmapYBuckets,
   heatmapYBucketCount,
   heatmapYBucketError,
   heatmapYBucketInRange,
@@ -30,9 +31,30 @@ import {
   isPlainYField,
   sortHeatmapCategories,
 } from "@/utils/dashboard/heatmapYAxis";
-import { HEATMAP_MAX_CELLS } from "@/utils/dashboard/heatmapDefaults";
+import { HEATMAP_MAX_ROWS } from "@/utils/dashboard/heatmapDefaults";
 
 const identity = (value: unknown) => value;
+
+describe("fillHeatmapYBuckets", () => {
+  it("adds every empty bucket between the smallest and largest, keeping returned values as given", () => {
+    expect(
+      fillHeatmapYBuckets([30, 0], { mode: "size", size: 10 }, 100).sort((a, b) => a - b),
+    ).toEqual([0, 10, 20, 30]);
+    expect(
+      fillHeatmapYBuckets([0.30000000000000004, 0.1], { mode: "size", size: 0.1 }, 100),
+    ).toEqual([0.1, 0.2, 0.30000000000000004]);
+  });
+
+  it("fills log buckets by powers of the base and keeps the <= 0 bucket", () => {
+    expect(fillHeatmapYBuckets([1000, 0, 1], { mode: "log", base: 10 }, 100)).toEqual([
+      0, 1, 10, 100, 1000,
+    ]);
+  });
+
+  it("leaves the values alone when filling would pass the row cap", () => {
+    expect(fillHeatmapYBuckets([0, 1000], { mode: "size", size: 1 }, 50)).toEqual([0, 1000]);
+  });
+});
 
 describe("sortHeatmapCategories", () => {
   it.each([undefined, null, "data", "bogus"])("keeps data order for %s", (order) => {
@@ -108,14 +130,15 @@ describe("heatmapYBucketing / heatmapYBucketError", () => {
     expect(heatmapYBucketing({ heatmap_y_bucket: { mode: "log", base: 3 } })).toBeNull();
   });
 
-  it("rejects a size whose known range exceeds the cell budget, and not when an end is open", () => {
+  it("rejects a size whose known range makes more rows than a full-width heatmap keeps, and not when an end is open", () => {
     const tooMany = {
       heatmap_y_bucket: { mode: "size", size: 1 },
       heatmap_y_min: 0,
-      heatmap_y_max: HEATMAP_MAX_CELLS,
+      heatmap_y_max: HEATMAP_MAX_ROWS,
     };
+    expect(HEATMAP_MAX_ROWS).toBe(416);
     expect(heatmapYBucketError(tooMany)).toBe("tooManyBuckets");
-    expect(heatmapYBucketError({ ...tooMany, heatmap_y_max: HEATMAP_MAX_CELLS - 1 })).toBeNull();
+    expect(heatmapYBucketError({ ...tooMany, heatmap_y_max: HEATMAP_MAX_ROWS - 1 })).toBeNull();
     expect(heatmapYBucketError({ ...tooMany, heatmap_y_min: null })).toBeNull();
   });
 

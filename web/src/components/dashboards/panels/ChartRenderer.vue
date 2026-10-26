@@ -778,7 +778,7 @@ export default defineComponent({
         const heatmapTime = heatmapHoverTime(props.data?.extras?.heatmapTimeAxis, params);
         if (
           heatmapTime !== undefined &&
-          props.data.extras?.panelId == hoveredSeriesState?.value?.panelId
+          props.data.extras?.panelId === hoveredSeriesState?.value?.panelId
         ) {
           // The column, so a panel on the same time grid finds the instant at that index directly.
           throttledSetHoveredSeriesIndex(

@@ -40,6 +40,7 @@ vi.mock("@/utils/dashboard/configUtils", () => ({
   shouldShowAreaLineStyleConfig: vi.fn(() => false),
   shouldShowNoValueReplacement: vi.fn(() => false),
   shouldShowAxisConfig: vi.fn(() => false),
+  shouldShowAxisBorderConfig: vi.fn(() => false),
   shouldShowCartesianAxisConfig: vi.fn(() => false),
   shouldShowGridlines: vi.fn(() => false),
   shouldShowAxisLabelConfig: vi.fn(() => false),
@@ -648,12 +649,12 @@ describe("useConfigPanel – axis section", () => {
     expect(c.isConfigOptionVisible("axis", "axis-width")).toBe(true);
   });
 
-  it("axis-border visibility delegates to shouldShowAxisConfig", async () => {
-    const { shouldShowAxisConfig } = await import("@/utils/dashboard/configUtils");
-    vi.mocked(shouldShowAxisConfig).mockReturnValue(true);
+  it("axis-border visibility delegates to shouldShowAxisBorderConfig", async () => {
+    const { shouldShowAxisBorderConfig } = await import("@/utils/dashboard/configUtils");
+    vi.mocked(shouldShowAxisBorderConfig).mockReturnValue(true);
     const c = makeComposable();
     expect(c.isConfigOptionVisible("axis", "axis-border")).toBe(true);
-    vi.mocked(shouldShowAxisConfig).mockReturnValue(false);
+    vi.mocked(shouldShowAxisBorderConfig).mockReturnValue(false);
   });
 
   it("y-axis visibility delegates to shouldShowCartesianAxisConfig", async () => {

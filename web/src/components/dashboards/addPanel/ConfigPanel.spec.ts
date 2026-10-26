@@ -755,7 +755,17 @@ describe("ConfigPanel", () => {
         }),
       });
       expect(control("heatmap_y_bucket_size").props("error")).toBe(true);
-      expect(wrapper.text()).toContain("This makes 1,000,001 buckets, more than the 50,000");
+      expect(wrapper.text()).toContain("This makes 1,000,001 buckets, more than the 416");
+    });
+
+    it("does not offer the axis border toggle, as heatmaps always draw their axis lines", () => {
+      const line = panelOf();
+      line.data.type = "line";
+      wrapper = createWrapper({ dashboardPanelData: line });
+      expect(control("axis-border").exists()).toBe(true);
+      wrapper.unmount();
+      wrapper = createWrapper({ dashboardPanelData: panelOf() });
+      expect(control("axis-border").exists()).toBe(false);
     });
 
     it("defaults log to base 10, switches base, and clears everything for none", async () => {

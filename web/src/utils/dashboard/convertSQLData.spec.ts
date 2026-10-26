@@ -11182,6 +11182,11 @@ describe("multi-query heatmap tiles", () => {
     expect([visualMap.min, visualMap.max]).toEqual([-40, -2]);
   });
 
+  it("hands drilldowns each tile's raw row values by its y axis", async () => {
+    const result: any = await render([[{ x: "a", y: "", z: 1 }], [{ x: "a", y: "r2", z: 1 }]]);
+    expect(result.extras.heatmapRowValues).toEqual([[""], ["r2"]]);
+  });
+
   it("surfaces a later tile's duplicate-row warning on the panel", async () => {
     const result: any = await render([
       [{ x: "a", y: "r", z: 1 }],

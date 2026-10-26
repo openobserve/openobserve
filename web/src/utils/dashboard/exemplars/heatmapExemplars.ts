@@ -56,6 +56,7 @@ export interface HeatmapExemplarStyle {
   edgeColor?: string;
 }
 
+/** Maps a marker to the grid, marker series id and `[column, row]` cell holding it, or null when its time or series is off the heatmap. */
 export function heatmapExemplarPlacer(
   layout: HeatmapExemplarLayout,
   axis: HeatmapTimeAxis,

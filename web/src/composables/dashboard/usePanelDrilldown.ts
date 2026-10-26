@@ -200,15 +200,30 @@ export function usePanelDrilldown({
     );
   };
 
-  // A heatmap cell's value is [column index, row index, z]; its labels live on the axes of the grid its series is drawn in.
-  const heatmapCellLabels = (params: any): { column: any; row: any } => {
+  // A heatmap's value[0] is a column index, so its time range is that column's bounds on the heatmap time axis.
+  const heatmapColumnRange = (params: any) => {
+    const column = panelData?.value?.extras?.heatmapTimeAxis?.columns?.[params?.value?.[0]];
+    if (!column) return null;
+    const startTime = getUTCTimestampFromZonedTimestamp(column.start, store.state.timezone);
+    const endTime = getUTCTimestampFromZonedTimestamp(column.end, store.state.timezone);
+    return startTime && endTime ? { startTime, endTime } : null;
+  };
+
+  // A heatmap cell's value is [column index, row index, z]; its labels live on the axes of the grid its series is drawn in, its raw row values in extras.
+  const heatmapCellValues = (params: any): { column: any; row: any } => {
     const options = panelData?.value?.options;
     const series = options?.series?.[params?.seriesIndex];
     const axisOf = (axes: any, index: number) => (Array.isArray(axes) ? axes[index] : axes);
     const [column, row] = Array.isArray(params?.value) ? params.value : [];
+    const yAxisIndex = series?.yAxisIndex ?? 0;
+    const rawRow = panelData?.value?.extras?.heatmapRowValues?.[yAxisIndex]?.[row];
+    // A time column is its start in epoch ms, as state timelines give it: a formatted time has a space a URL cannot carry.
+    const columnRange = heatmapColumnRange(params);
     return {
-      column: axisOf(options?.xAxis, series?.xAxisIndex ?? 0)?.data?.[column] ?? params?.name,
-      row: axisOf(options?.yAxis, series?.yAxisIndex ?? 0)?.data?.[row],
+      column: columnRange
+        ? columnRange.startTime / 1000
+        : (axisOf(options?.xAxis, series?.xAxisIndex ?? 0)?.data?.[column] ?? params?.name),
+      row: rawRow !== undefined ? rawRow : axisOf(options?.yAxis, yAxisIndex)?.data?.[row],
     };
   };
 
@@ -217,7 +232,7 @@ export function usePanelDrilldown({
       ? params.value[params.value.length - 1]
       : params?.value;
     if (panelSchema.value.type === "heatmap") {
-      const { column, row } = heatmapCellLabels(params);
+      const { column, row } = heatmapCellValues(params);
       return { __name: row ?? params?.name, __value: value, __axisValue: column };
     }
     return {
@@ -225,15 +240,6 @@ export function usePanelDrilldown({
       __value: value,
       __axisValue: params?.value?.[0] ?? params?.name,
     };
-  };
-
-  // A heatmap's value[0] is a column index, so its time range is that column's bounds on the heatmap time axis.
-  const heatmapColumnRange = (params: any) => {
-    const column = panelData?.value?.extras?.heatmapTimeAxis?.columns?.[params?.value?.[0]];
-    if (!column) return null;
-    const startTime = getUTCTimestampFromZonedTimestamp(column.start, store.state.timezone);
-    const endTime = getUTCTimestampFromZonedTimestamp(column.end, store.state.timezone);
-    return startTime && endTime ? { startTime, endTime } : null;
   };
 
   // get offset from parent

@@ -1939,7 +1939,7 @@ export default defineComponent({
     // also get the transparent background instead of showing a skeleton.
     // Reused until the data, markers or colours change, since a new object makes the chart redraw every cell.
     const heatmapExemplarData = computed(
-      (previous?: { source: any; place: unknown; colors: string; data: any }) => {
+      (previous?: { source: unknown; place: unknown; colors: string; data: unknown }) => {
         const source = panelData.value;
         const place = heatmapExemplarPlace.value;
         const queryColors = exemplarQueryColors.value;

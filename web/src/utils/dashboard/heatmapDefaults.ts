@@ -102,12 +102,6 @@ export function heatmapLargeGridDefaults(cellCount: number) {
   };
 }
 
-/** The axis line `axis_border_show` asks for, spread into every heatmap axis; unset keeps the ECharts default, as the other PromQL axes do. */
-export function heatmapAxisLine(config: any): { axisLine?: { show: boolean } } {
-  if (config?.axis_border_show === undefined || config?.axis_border_show === null) return {};
-  return { axisLine: { show: !!config.axis_border_show } };
-}
-
 /**
  * The most columns a heatmap will ever ask the backend for.
  *
@@ -126,6 +120,21 @@ export const HEATMAP_MAX_COLUMNS = 120;
 /** The most cells a heatmap grid holds: 120 columns by ~400 rows, past which rows shrink below a pixel on a full-size panel. */
 export const HEATMAP_MAX_CELLS = 50_000;
 
+/** The most rows a full-width heatmap keeps within the cell budget. */
+export const HEATMAP_MAX_ROWS = Math.floor(HEATMAP_MAX_CELLS / HEATMAP_MAX_COLUMNS);
+
+export interface HeatmapConfig {
+  heatmap_color_min?: unknown;
+  heatmap_color_max?: unknown;
+  heatmap_palette?: string | null;
+  heatmap_palette_reverse?: boolean | null;
+  heatmap_color_scale?: string | null;
+  heatmap_y_sort?: string | null;
+  heatmap_y_bucket?: { mode?: unknown; size?: unknown; base?: unknown } | null;
+  heatmap_y_min?: unknown;
+  heatmap_y_max?: unknown;
+}
+
 export interface HeatmapGridCut {
   firstColumn: number;
   rows: number[];
@@ -142,9 +151,16 @@ function pinnedColorBound(value: unknown): number | undefined {
   return Number.isFinite(bound) ? bound : undefined;
 }
 
+/** Whether both colour pins are set with min >= max, which the renderer ignores. */
+export function isHeatmapColorRangeInverted(config: HeatmapConfig | null | undefined): boolean {
+  const min = pinnedColorBound(config?.heatmap_color_min);
+  const max = pinnedColorBound(config?.heatmap_color_max);
+  return min !== undefined && max !== undefined && min >= max;
+}
+
 /** The `visualMap` range with `heatmap_color_min` / `heatmap_color_max` applied over `baseRange`, ignoring pins that would leave min >= max. */
 export function heatmapColorRange(
-  config: any,
+  config: HeatmapConfig | null | undefined,
   baseRange: { min: number; max: number },
 ): { min: number; max: number } {
   const pinnedMin = pinnedColorBound(config?.heatmap_color_min);
@@ -159,12 +175,13 @@ export function heatmapColorRange(
 
 /** The `visualMap` range and `inRange.color` stops for `config`'s palette, reverse flag and colour scale over `range`; `cellSets` holds the `[x, y, value]` cells it colours. */
 export function heatmapColorScale(
-  config: any,
+  config: HeatmapConfig | null | undefined,
   range: { min: number; max: number },
   cellSets: any[][],
 ): { min: number; max: number; color: string[] } {
   const palette =
-    HEATMAP_PALETTES[config?.heatmap_palette] ?? HEATMAP_PALETTES[DEFAULT_HEATMAP_PALETTE];
+    HEATMAP_PALETTES[config?.heatmap_palette ?? DEFAULT_HEATMAP_PALETTE] ??
+    HEATMAP_PALETTES[DEFAULT_HEATMAP_PALETTE];
   const ramp = config?.heatmap_palette_reverse ? [...palette].reverse() : palette;
   const scale = config?.heatmap_color_scale ?? DEFAULT_HEATMAP_COLOR_SCALE;
 
@@ -190,17 +207,17 @@ export function visualMapRangeOf(minValue: number, maxValue: number): { min: num
   };
 }
 
-/** The cut that fits a `columnCount` x `rowTotals.length` grid into `budget` cells, or null when it already fits. */
+/** The cut that fits a `columnCount` x `rowTotals.length` grid into `budget` cells, or null when it already fits; `contiguous` keeps one unbroken run of rows, for ordered axes such as y buckets. */
 export function cutHeatmapToBudget(
   columnCount: number,
   rowTotals: number[],
   budget: number = HEATMAP_MAX_CELLS,
+  contiguous = false,
 ): HeatmapGridCut | null {
   if (columnCount * rowTotals.length <= budget) return null;
-  if (columnCount <= budget) {
-    return { firstColumn: 0, rows: largestRows(rowTotals, Math.floor(budget / columnCount)) };
-  }
-  return { firstColumn: columnCount - budget, rows: largestRows(rowTotals, 1) };
+  const keep = columnCount <= budget ? Math.floor(budget / columnCount) : 1;
+  const rows = contiguous ? largestRowRun(rowTotals, keep) : largestRows(rowTotals, keep);
+  return { firstColumn: Math.max(0, columnCount - budget), rows };
 }
 
 export function heatmapBudgetWarning(
@@ -290,6 +307,22 @@ function smallestPositiveCell(cellSets: any[][]): number {
     }
   }
   return smallest;
+}
+
+/** The `keep` adjacent rows with the largest summed total, earliest run on a tie. */
+function largestRowRun(rowTotals: number[], keep: number): number[] {
+  let sum = 0;
+  let bestSum = -Infinity;
+  let bestStart = 0;
+  for (let index = 0; index < rowTotals.length; index++) {
+    sum += rowTotals[index];
+    if (index >= keep) sum -= rowTotals[index - keep];
+    if (index >= keep - 1 && sum > bestSum) {
+      bestSum = sum;
+      bestStart = index - keep + 1;
+    }
+  }
+  return Array.from({ length: Math.min(keep, rowTotals.length) }, (_unused, i) => bestStart + i);
 }
 
 function largestRows(rowTotals: number[], keep: number): number[] {

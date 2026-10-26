@@ -31,11 +31,35 @@ import {
   histogramBudgetWarnings,
   heatmapLargeGridDefaults,
   heatmapValueLabel,
+  isHeatmapColorRangeInverted,
   visualMapRangeOf,
 } from "./heatmapDefaults";
 import { HEATMAP_PALETTES, HEATMAP_STOP_COUNT, samplePalette } from "./heatmapPalettes";
 import { HeatmapConverter } from "./promql/convertPromQLHeatmapChart";
 import { chartColor } from "@/utils/chartTheme";
+
+describe("isHeatmapColorRangeInverted", () => {
+  it("is true only when both pins are set with min >= max", () => {
+    expect(isHeatmapColorRangeInverted({ heatmap_color_min: 5, heatmap_color_max: 5 })).toBe(true);
+    expect(isHeatmapColorRangeInverted({ heatmap_color_min: "9", heatmap_color_max: 2 })).toBe(
+      true,
+    );
+    expect(isHeatmapColorRangeInverted({ heatmap_color_min: 1, heatmap_color_max: 2 })).toBe(false);
+    expect(isHeatmapColorRangeInverted({ heatmap_color_min: 5, heatmap_color_max: null })).toBe(
+      false,
+    );
+    expect(isHeatmapColorRangeInverted(undefined)).toBe(false);
+  });
+});
+
+describe("cutHeatmapToBudget contiguous", () => {
+  it("keeps the busiest unbroken run of rows instead of the busiest rows", () => {
+    const totals = [9, 1, 1, 5, 6, 1];
+    expect(cutHeatmapToBudget(1, totals, 2)?.rows).toEqual([0, 4]);
+    expect(cutHeatmapToBudget(1, totals, 2, true)?.rows).toEqual([3, 4]);
+    expect(cutHeatmapToBudget(1, totals, 6, true)).toBeNull();
+  });
+});
 
 describe("shared heatmap defaults", () => {
   it("runs the colour ramp cool-to-warm", () => {

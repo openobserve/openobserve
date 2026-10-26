@@ -78,6 +78,7 @@ export function promqlHeatmapTimeAxis(
   };
 }
 
+/** The index of the column holding chart time `t`, or -1; an `endInclusive` axis also matches `t === end`. */
 export function heatmapColumnAt(axis: HeatmapTimeAxis | null | undefined, t: number): number {
   const columns = axis?.columns ?? [];
   if (!Number.isFinite(t) || !columns.length) return -1;
@@ -144,7 +145,7 @@ export function heatmapSyncPointer(
   hoveredTime: unknown,
   pixelOfColumn: (column: number) => number[] | null | undefined,
 ): Record<string, unknown> {
-  const column = heatmapColumnAt(axis, new Date(hoveredTime as any).getTime());
+  const column = heatmapColumnAt(axis, new Date(hoveredTime as string | number | Date).getTime());
   const pixel = column < 0 ? null : pixelOfColumn(column);
   if (!pixel || !Number.isFinite(pixel[0]) || !Number.isFinite(pixel[1])) {
     return { type: "updateAxisPointer", currTrigger: "leave" };

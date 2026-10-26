@@ -305,12 +305,9 @@ describe("applyHeatmapChart axis border", () => {
     return [ctx.options.xAxis[0].axisLine, ctx.options.yAxis.axisLine];
   };
 
-  it("draws both axis lines only when the axis border toggle is on", () => {
-    expect(axisLines(true)).toEqual([{ show: true }, { show: true }]);
-    expect(axisLines(false)).toEqual([{ show: false }, { show: false }]);
-  });
-
-  it("keeps the ECharts default axis line when the toggle was never set", () => {
+  it("keeps the ECharts default axis lines whatever the stored toggle, so saved panels look unchanged", () => {
+    expect(axisLines(true)).toEqual([undefined, undefined]);
+    expect(axisLines(false)).toEqual([undefined, undefined]);
     expect(axisLines(undefined)).toEqual([undefined, undefined]);
   });
 });
@@ -530,7 +527,64 @@ describe("applyHeatmapChart y-axis order and buckets", () => {
   it("labels log buckets and the <= 0 bucket", () => {
     const ctx = contextOf(rowsOf([100, 0, 1]), { heatmap_y_bucket: { mode: "log" } }, false);
     applyHeatmapChart(ctx);
-    expect(ctx.options.yAxis.data).toEqual(["≤ 0", "1–10", "100–1000"]);
+    expect(ctx.options.yAxis.data).toEqual(["≤ 0", "1–10", "10–100", "100–1000"]);
+  });
+
+  it("fills empty buckets between returned ones so adjacent rows are adjacent ranges", () => {
+    const ctx = contextOf(rowsOf([90, 0]), { heatmap_y_bucket: { mode: "size", size: 10 } }, false);
+    applyHeatmapChart(ctx);
+    expect(ctx.options.yAxis.data).toEqual([
+      "0–10",
+      "10–20",
+      "20–30",
+      "30–40",
+      "40–50",
+      "50–60",
+      "60–70",
+      "70–80",
+      "80–90",
+      "90–100",
+    ]);
+    expect(zByLabel(ctx)).toMatchObject({ "0–10": 2, "50–60": "-", "90–100": 1 });
+  });
+
+  it("keeps one unbroken run of buckets when the cell budget cuts rows", () => {
+    const ctx = makeMockContext({
+      searchQueryData: [
+        [
+          { x: "A", y: 0, z: 1 },
+          { x: "A", y: 10, z: 1 },
+          { x: "A", y: 20, z: 50 },
+          { x: "A", y: 30, z: 1 },
+          { x: "A", y: 40, z: 40 },
+          { x: "A", y: 50, z: 40 },
+        ],
+      ],
+      panelSchema: {
+        type: "heatmap",
+        config: { heatmap_y_bucket: { mode: "size", size: 10 } },
+        heatmapCellBudget: 2,
+        queries: [{ customQuery: false, fields: { x: [], y: [plainY], z: [{ alias: "z" }] } }],
+      },
+    });
+    applyHeatmapChart(ctx);
+    expect(ctx.options.yAxis.data).toEqual(["40–50", "50–60"]);
+  });
+
+  it("hands drilldowns the raw row values, not their range or empty labels", () => {
+    const bucketed = contextOf(
+      rowsOf([20, 0]),
+      { heatmap_y_bucket: { mode: "size", size: 10 } },
+      false,
+    );
+    bucketed.extras = {};
+    applyHeatmapChart(bucketed);
+    expect(bucketed.extras.heatmapRowValues).toEqual([[0, 10, 20]]);
+    const empty = contextOf(rowsOf(["", "api"]), {}, true);
+    empty.extras = {};
+    applyHeatmapChart(empty);
+    expect(empty.options.yAxis.data[0]).not.toBe("");
+    expect(empty.extras.heatmapRowValues).toEqual([["", "api"]]);
   });
 
   it("drops buckets outside the y range", () => {
@@ -551,7 +605,7 @@ describe("applyHeatmapChart y-axis order and buckets", () => {
       false,
     );
     applyHeatmapChart(ctx);
-    expect(ctx.options.yAxis.data).toEqual(["0–10", "20–30"]);
+    expect(ctx.options.yAxis.data).toEqual(["0–10", "10–20", "20–30"]);
   });
 
   it("keeps plain categories when a y value is not a bucket lower bound, as an unbucketed stored query returns", () => {
@@ -581,10 +635,19 @@ describe("applyHeatmapChart y-axis order and buckets", () => {
       false,
     );
     applyHeatmapChart(ctx);
-    expect(ctx.options.yAxis.data).toEqual(["0.1–0.2", "0.3–0.4"]);
+    expect(ctx.options.yAxis.data).toEqual(["0.1–0.2", "0.2–0.3", "0.3–0.4"]);
+    expect(zByLabel(ctx)).toEqual({ "0.1–0.2": 2, "0.2–0.3": "-", "0.3–0.4": 1 });
     const log = contextOf(rowsOf([0.001, 1000]), { heatmap_y_bucket: { mode: "log" } }, false);
     applyHeatmapChart(log);
-    expect(log.options.yAxis.data).toEqual(["0.001–0.01", "1000–10000"]);
+    expect(log.options.yAxis.data).toEqual([
+      "0.001–0.01",
+      "0.01–0.1",
+      "0.1–1",
+      "1–10",
+      "10–100",
+      "100–1000",
+      "1000–10000",
+    ]);
   });
 
   it("does not treat custom SQL, an aggregated y or text values as buckets", () => {

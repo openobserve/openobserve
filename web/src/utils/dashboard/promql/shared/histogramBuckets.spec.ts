@@ -19,7 +19,27 @@ import {
   deaccumulateHistogramSeries,
   groupHistogramSeries,
   HistogramSeriesInput,
+  limitWholeHistograms,
 } from "./histogramBuckets";
+
+describe("limitWholeHistograms", () => {
+  const bucket = (pod: string, le: string) => ({ metric: { pod, le } });
+
+  it("keeps the first histograms that fit whole, in input order", () => {
+    const series = [bucket("a", "1"), bucket("b", "1"), bucket("a", "+Inf"), bucket("b", "+Inf")];
+    expect(limitWholeHistograms(series, 3)).toEqual({
+      kept: [series[0], series[2]],
+      shown: 1,
+      total: 2,
+    });
+    expect(limitWholeHistograms(series, 4).kept).toEqual(series);
+  });
+
+  it("keeps one histogram whole even when it alone passes the limit", () => {
+    const series = [bucket("a", "1"), bucket("a", "2"), bucket("a", "+Inf")];
+    expect(limitWholeHistograms(series, 2)).toEqual({ kept: series, shown: 1, total: 1 });
+  });
+});
 
 describe("parseLe", () => {
   it("parses finite bounds", () => {

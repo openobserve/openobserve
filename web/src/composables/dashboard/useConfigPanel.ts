@@ -11,6 +11,7 @@ import {
   shouldShowAreaLineStyleConfig,
   shouldShowNoValueReplacement,
   shouldShowAxisConfig,
+  shouldShowAxisBorderConfig,
   shouldShowCartesianAxisConfig,
   shouldShowGridlines,
   shouldShowAxisLabelConfig,
@@ -391,7 +392,7 @@ export function useConfigPanel(
       },
       "axis-border": {
         label: t("dashboard.showBorder"),
-        visible: shouldShowAxisConfig(dashboardPanelData),
+        visible: shouldShowAxisBorderConfig(dashboardPanelData),
       },
       "y-axis": {
         label: [t("common.yAxisMin"), t("common.yAxisMax")],

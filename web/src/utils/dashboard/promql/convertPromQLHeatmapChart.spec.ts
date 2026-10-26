@@ -1947,14 +1947,11 @@ describe("prometheus_histogram mode with several histograms in one query", () =>
       value: { offsetHeight: 500 },
     });
 
-  it("honours the axis border toggle on every stacked grid's axes", () => {
+  it("keeps the default axis lines on every stacked grid even when the editor stored the toggle off", () => {
     const processed = [query([...pod("a", [2, 5]), ...pod("b", [1, 1, 7])])];
-    const lines = (axisBorderShow: boolean) => {
-      const result = convert(processed, { ...histogramConfig, axis_border_show: axisBorderShow });
-      return [...result.xAxis, ...result.yAxis].map((axis: any) => axis.axisLine?.show);
-    };
-    expect(lines(true)).toEqual([true, true, true, true]);
-    expect(lines(false)).toEqual([false, false, false, false]);
+    const result = convert(processed, { ...histogramConfig, axis_border_show: false });
+    const lines = [...result.xAxis, ...result.yAxis].map((axis: any) => axis.axisLine);
+    expect(lines).toEqual([undefined, undefined, undefined, undefined]);
   });
 
   it("leaves stacked grids out of the legend, whose entries would cover the colour bar", () => {
@@ -2025,6 +2022,54 @@ describe("prometheus_histogram mode with several histograms in one query", () =>
     // 60px of a 500px panel is left for the colour bar.
     expect(grids.at(-1).bottom).toBeLessThanOrEqual(88);
     expect(result.xAxis.map((axis: any) => axis.axisLabel.show)).toEqual([false, false, true]);
+  });
+
+  it("caps the stacked grids to the busiest that fit at a readable height, and warns", () => {
+    const pods = ["a", "b", "c", "d", "e", "f"].map((name, index) => pod(name, [1, index + 1]));
+    const extras: any = { legends: [] };
+    const result = new HeatmapConverter().convert(
+      [query(pods.flat())],
+      { config: histogramConfig },
+      store,
+      extras,
+      { value: { offsetHeight: 365 } },
+    );
+    expect(result.title.map((title: any) => title.text)).toEqual([
+      'pod="b"',
+      'pod="c"',
+      'pod="d"',
+      'pod="e"',
+      'pod="f"',
+    ]);
+    for (const grid of result.grid) {
+      expect((parseFloat(grid.height) / 100) * 365).toBeGreaterThanOrEqual(30);
+    }
+    expect(extras.limitNumberOfSeriesWarningMessage).toContain("5");
+    expect(extras.limitNumberOfSeriesWarningMessage).toContain("6");
+  });
+
+  it("warns when the series limit left whole histograms out", () => {
+    const extras: any = { legends: [] };
+    convert(
+      [
+        {
+          ...query([...pod("a", [1, 2]), ...pod("b", [1, 2])]),
+          histogramsLimited: { shown: 2, total: 9 },
+        },
+      ],
+      histogramConfig,
+      extras,
+    );
+    expect(extras.limitNumberOfSeriesWarningMessage).toContain("9");
+  });
+
+  it("hands drilldowns each grid's raw le values", () => {
+    const extras: any = { legends: [] };
+    convert([query([...pod("a", [2, 5]), ...pod("b", [1, 1, 7])])], histogramConfig, extras);
+    expect(extras.heatmapRowValues).toEqual([
+      ["1", "+Inf"],
+      ["1", "2", "+Inf"],
+    ]);
   });
 
   it("shares one colour range across the grids, with pins applied to it", () => {
@@ -2264,15 +2309,9 @@ describe("heatmap axis border", () => {
   it.each([
     ["a generic heatmap", {}],
     ["a single histogram", { heatmap_mode: PROMETHEUS_HISTOGRAM_MODE }],
-  ])("draws the axis lines of %s only when the axis border toggle is on", (_name, config) => {
-    expect(axisLines({ ...config, axis_border_show: true })).toEqual([
-      { show: true },
-      { show: true },
-    ]);
-    expect(axisLines({ ...config, axis_border_show: false })).toEqual([
-      { show: false },
-      { show: false },
-    ]);
+  ])("keeps the default axis lines of %s whatever the stored toggle", (_name, config) => {
+    expect(axisLines({ ...config, axis_border_show: true })).toEqual([undefined, undefined]);
+    expect(axisLines({ ...config, axis_border_show: false })).toEqual([undefined, undefined]);
     expect(axisLines(config)).toEqual([undefined, undefined]);
   });
 });

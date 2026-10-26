@@ -681,6 +681,11 @@ export const convertMultiSQLData = async (
       }
     });
 
+    options[0].extras = options[0].extras ?? {};
+    options[0].extras.heatmapRowValues = options.map(
+      (opt: any) => opt?.extras?.heatmapRowValues?.[0] ?? null,
+    );
+
     // One zoom box or hovered time maps through a single column list, so tiles must share it.
     if (
       options[0].extras?.heatmapTimeAxis &&

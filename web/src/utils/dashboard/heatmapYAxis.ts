@@ -15,7 +15,7 @@
 
 /** Heatmap y-axis ordering (`heatmap_y_sort`), and the numeric y bucketing (`heatmap_y_bucket`) and range (`heatmap_y_min` / `heatmap_y_max`) the SQL builder generates. */
 
-import { HEATMAP_MAX_CELLS } from "./heatmapDefaults";
+import { HEATMAP_MAX_ROWS, type HeatmapConfig } from "./heatmapDefaults";
 
 /** The orders `heatmap_y_sort` accepts; unset is "data". ECharts draws category 0 at the bottom, so "asc" puts the smallest value there. */
 export const HEATMAP_Y_SORTS = ["data", "asc", "desc"] as const;
@@ -42,6 +42,23 @@ export interface HeatmapYBucketing {
 
 export type HeatmapYBucketError = "invalidSize" | "tooManyBuckets";
 
+export interface HeatmapYField {
+  isDerived?: boolean;
+  functionName?: string | null;
+  args?: Array<{ type?: string; value?: { field?: string; streamAlias?: string } }>;
+}
+
+export interface HeatmapYFieldSchema {
+  meta?: {
+    streamFields?: {
+      groupedFields?: Array<{
+        stream_alias?: string | null;
+        schema?: Array<{ name: string; type?: string }>;
+      }>;
+    };
+  };
+}
+
 /** `items` ordered by `keyOf` per `order`: numerically when every key is a finite number, else by locale string compare; "data" or unset keeps them as given. */
 export function sortHeatmapCategories<T>(
   items: T[],
@@ -63,19 +80,24 @@ export function sortHeatmapCategories<T>(
     .map((index) => items[index]);
 }
 
-export function heatmapYBucketing(config: any): HeatmapYBucketing | null {
+/** The bucketing `config` asks for with its y range, or null when bucketing is off or its settings are unusable. */
+export function heatmapYBucketing(
+  config: HeatmapConfig | null | undefined,
+): HeatmapYBucketing | null {
   const bucket = heatmapYBucketOf(config?.heatmap_y_bucket);
   return bucket ? { bucket, range: heatmapYRangeOf(config) } : null;
 }
 
 /** Why `config`'s bucketing must not run: a size that is not a finite number > 0, or a known range that makes more buckets than a grid can hold. */
-export function heatmapYBucketError(config: any): HeatmapYBucketError | null {
+export function heatmapYBucketError(
+  config: HeatmapConfig | null | undefined,
+): HeatmapYBucketError | null {
   const mode = config?.heatmap_y_bucket?.mode;
   if (mode !== "size") return null;
-  const size = finiteNumberOf(config.heatmap_y_bucket.size);
+  const size = finiteNumberOf(config?.heatmap_y_bucket?.size);
   if (size === undefined || size <= 0) return "invalidSize";
   const count = heatmapYBucketCount({ mode, size }, heatmapYRangeOf(config));
-  return count !== null && count > HEATMAP_MAX_CELLS ? "tooManyBuckets" : null;
+  return count !== null && count > HEATMAP_MAX_ROWS ? "tooManyBuckets" : null;
 }
 
 /** How many buckets `bucket` makes over `range`, or null when an open end leaves it unknown until the data arrives. */
@@ -89,7 +111,7 @@ export function heatmapYBucketCount(
 }
 
 /** `heatmap_y_min` / `heatmap_y_max` as numbers, or null when neither is set or they are inverted (min >= max). */
-export function heatmapYRangeOf(config: any): HeatmapYRange | null {
+export function heatmapYRangeOf(config: HeatmapConfig | null | undefined): HeatmapYRange | null {
   const min = finiteNumberOf(config?.heatmap_y_min);
   const max = finiteNumberOf(config?.heatmap_y_max);
   if (min === undefined && max === undefined) return null;
@@ -98,30 +120,34 @@ export function heatmapYRangeOf(config: any): HeatmapYRange | null {
 }
 
 /** Whether both y range ends are set with min >= max, which the builder and converter ignore. */
-export function isHeatmapYRangeInverted(config: any): boolean {
+export function isHeatmapYRangeInverted(config: HeatmapConfig | null | undefined): boolean {
   const min = finiteNumberOf(config?.heatmap_y_min);
   const max = finiteNumberOf(config?.heatmap_y_max);
   return min !== undefined && max !== undefined && min >= max;
 }
 
 /** Whether `field` is a bare column of the builder, the only y the converter treats as bucketed. */
-export function isPlainYField(field: any): boolean {
+export function isPlainYField(field: HeatmapYField | null | undefined): boolean {
   return (
     !!field &&
     !field.isDerived &&
     !field.functionName &&
     field.args?.[0]?.type === "field" &&
-    !!field.args[0].value?.field
+    !!field.args[0]?.value?.field
   );
 }
 
-export function isNumericYField(field: any, dashboardPanelData: any): boolean {
+/** Whether `field` is a bare builder column whose stream schema types it as an integer or float. */
+export function isNumericYField(
+  field: HeatmapYField | null | undefined,
+  dashboardPanelData: HeatmapYFieldSchema | null | undefined,
+): boolean {
   if (!isPlainYField(field)) return false;
-  const { field: name, streamAlias } = field.args[0].value;
-  const streamFields = dashboardPanelData?.meta?.streamFields?.groupedFields?.find((it: any) =>
-    streamAlias ? it.stream_alias === streamAlias : it.stream_alias == null,
+  const { field: name, streamAlias } = field?.args?.[0]?.value ?? {};
+  const streamFields = dashboardPanelData?.meta?.streamFields?.groupedFields?.find((it) =>
+    streamAlias ? it.stream_alias === streamAlias : (it.stream_alias ?? null) === null,
   );
-  const type = streamFields?.schema?.find((it: any) => it.name === name)?.type;
+  const type = streamFields?.schema?.find((it) => it.name === name)?.type;
   return NUMERIC_SCHEMA_TYPE.test(String(type ?? ""));
 }
 
@@ -169,7 +195,32 @@ export function isHeatmapYBucketLowerBound(value: number, bucket: HeatmapYBucket
   return value > 0 && isNearInteger(Math.log(value) / Math.log(bucket.base));
 }
 
-function heatmapYBucketOf(raw: any): HeatmapYBucket | null {
+/** `lowerBounds` plus every empty bucket between the smallest and largest, so adjacent rows are adjacent ranges; returned as given when that would pass `maxRows`. */
+export function fillHeatmapYBuckets(
+  lowerBounds: number[],
+  bucket: HeatmapYBucket,
+  maxRows: number,
+): number[] {
+  // Keyed by bucket index so a returned float such as 0.30000000000000004 stays the row its cells are looked up by.
+  const byIndex = new Map<number, number>();
+  const extra: number[] = [];
+  for (const value of lowerBounds) {
+    if (bucket.mode === "log" && value <= 0) extra.push(value);
+    else byIndex.set(bucketIndexOf(value, bucket), value);
+  }
+  if (!byIndex.size) return lowerBounds;
+  const indices = [...byIndex.keys()];
+  const first = Math.min(...indices);
+  const last = Math.max(...indices);
+  if (last - first + 1 + extra.length > maxRows) return lowerBounds;
+  const filled = [...extra];
+  for (let index = first; index <= last; index++) {
+    filled.push(byIndex.get(index) ?? bucketLowerOf(index, bucket));
+  }
+  return filled;
+}
+
+function heatmapYBucketOf(raw: HeatmapConfig["heatmap_y_bucket"]): HeatmapYBucket | null {
   if (raw?.mode === "size") {
     const size = finiteNumberOf(raw.size);
     return size !== undefined && size > 0 ? { mode: "size", size } : null;
@@ -179,6 +230,15 @@ function heatmapYBucketOf(raw: any): HeatmapYBucket | null {
     return base === 2 || base === 10 ? { mode: "log", base } : null;
   }
   return null;
+}
+
+function bucketIndexOf(lower: number, bucket: HeatmapYBucket): number {
+  if (bucket.mode === "size") return Math.round(lower / bucket.size);
+  return Math.round(Math.log(lower) / Math.log(bucket.base));
+}
+
+function bucketLowerOf(index: number, bucket: HeatmapYBucket): number {
+  return bucket.mode === "size" ? index * bucket.size : Math.pow(bucket.base, index);
 }
 
 function bucketUpper(lower: number, bucket: HeatmapYBucket): number {

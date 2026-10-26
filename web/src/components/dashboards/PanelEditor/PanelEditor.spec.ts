@@ -80,11 +80,13 @@ const mockDashboardPanelData = reactive({
 });
 
 const mockMakeAutoSQLQuery = vi.fn(async () => undefined);
+const mockRegenerateOtherBuilderQueries = vi.fn();
 
 vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: () => ({
     dashboardPanelData: mockDashboardPanelData,
     makeAutoSQLQuery: mockMakeAutoSQLQuery,
+    regenerateOtherBuilderQueries: mockRegenerateOtherBuilderQueries,
     resetAggregationFunction: vi.fn(),
     resetDashboardPanelData: vi.fn(),
     updateGroupedFields: vi.fn(),
@@ -932,10 +934,12 @@ describe("PanelEditor.vue", () => {
       });
       await nextTick();
       mockMakeAutoSQLQuery.mockClear();
+      mockRegenerateOtherBuilderQueries.mockClear();
 
       config[key] = value;
       await nextTick();
       expect(mockMakeAutoSQLQuery).toHaveBeenCalledTimes(1);
+      expect(mockRegenerateOtherBuilderQueries).toHaveBeenCalledTimes(1);
       delete config[key];
       wrapper.unmount();
     });
