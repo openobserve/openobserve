@@ -173,11 +173,11 @@ const pausedMessage = computed(() => {
   if (!id) return t("about.banner_paused_no_id");
   const d = licenseData.value?.decision;
   if (d?.blocks?.includes("usage_over_limit")) {
-    return t("about.banner_paused_usage", {
-      exceeded: d.exceeded_days,
-      allowed: d.allowed_days,
-      licenseId: id,
-    });
+    return t(
+      "about.banner_paused_usage",
+      { exceeded: d.exceeded_days, allowed: d.allowed_days, licenseId: id },
+      d.exceeded_days,
+    );
   }
   return t("about.banner_paused_other", { licenseId: id });
 });

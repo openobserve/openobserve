@@ -51,6 +51,34 @@ describe("LicenseStatusCard", () => {
     expect(text).toContain("Usage reports are failing");
   });
 
+  it("usage reason pluralizes the over-limit day count", () => {
+    const reason = (exceeded: number) =>
+      mountCard({
+        decision: decision({
+          search_allowed: false,
+          blocks: ["usage_over_limit"],
+          exceeded_days: exceeded,
+          allowed_days: 0,
+        }),
+      })
+        .find("[data-test=license-status-reason]")
+        .text();
+    expect(reason(1)).toBe("Over the daily limit on 1 day this month (0 allowed)");
+    expect(reason(4)).toBe("Over the daily limit on 4 days this month (0 allowed)");
+  });
+
+  it("restored-by-waiver line pluralizes the allowed day count", () => {
+    const line = (allowed: number) =>
+      mountCard({
+        decision: decision({ waiver_ids_applied: ["wv_1"] }),
+        base: decision({ search_allowed: false, exceeded_days: 2, allowed_days: allowed }),
+      })
+        .find("[data-test=license-status-search]")
+        .text();
+    expect(line(1)).toContain("(2 of 1 allowed day used)");
+    expect(line(3)).toContain("(2 of 3 allowed days used)");
+  });
+
   it("an unknown block renders no reason line", () => {
     const w = mountCard({
       decision: decision({ search_allowed: false, blocks: ["unknown"] }),

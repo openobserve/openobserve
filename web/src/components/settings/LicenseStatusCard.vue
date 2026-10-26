@@ -62,10 +62,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OBadge>
             <div v-if="restoredByWaiver && base" class="mt-2 text-sm">
               {{
-                t("about.license_status_on_by_waiver", {
-                  exceeded: base.exceeded_days,
-                  allowed: base.allowed_days,
-                })
+                t(
+                  "about.license_status_on_by_waiver",
+                  { exceeded: base.exceeded_days, allowed: base.allowed_days },
+                  base.allowed_days,
+                )
               }}
             </div>
             <ul v-if="reasons.length" class="mt-2 list-disc ps-5 text-sm">
@@ -213,10 +214,11 @@ const reasons = computed<{ key: string; text: string }[]>(() => {
         return [
           {
             key: block,
-            text: t("about.license_status_reason_usage", {
-              exceeded: d.exceeded_days,
-              allowed: d.allowed_days,
-            }),
+            text: t(
+              "about.license_status_reason_usage",
+              { exceeded: d.exceeded_days, allowed: d.allowed_days },
+              d.exceeded_days,
+            ),
           },
         ];
       case "report_failure":

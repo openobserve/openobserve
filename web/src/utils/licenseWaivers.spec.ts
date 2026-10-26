@@ -65,6 +65,13 @@ describe("licenseWaivers", () => {
     expect(waiverStatus({ ...unblock, type: "ingestion_limit" }, unblock.ends_at)).toBe("past");
   });
 
+  it("search_unblock window shows the start only while scheduled", () => {
+    const label = (nowUs: number) => waiverWindowLabel(unblock, nowUs, "en-US", gt);
+    expect(label(unblock.starts_at - 1)).toBe("Oct 20, 00:00 → Oct 27, 00:00");
+    expect(label(unblock.starts_at)).toBe("until Oct 27, 00:00");
+    expect(label(unblock.ends_at)).toBe("until Oct 27, 00:00");
+  });
+
   it("knownWaivers drops kinds this release does not know", () => {
     expect(
       knownWaivers([
@@ -255,7 +262,7 @@ describe("O14 new waiver kinds", () => {
     expect(waiverSummary(grace, grace.starts_at, "en-US", gt)).toBe(
       "Ends Oct 30 at 00:00 UTC; reports continue.",
     );
-    expect(waiverWindowLabel(breach, "en-US", gt)).toBe("Oct 20 through Oct 26");
+    expect(waiverWindowLabel(breach, breach.starts_at, "en-US", gt)).toBe("Oct 20 through Oct 26");
     expect(waiverSummary(breach, breach.ends_at, "en-US", gt)).toBe(
       "Past day coverage; 2 extra allowed days retained through Oct 31.",
     );
@@ -269,7 +276,9 @@ describe("O14 new waiver kinds", () => {
     expect(isDayWaiver(breach)).toBe(true);
     expect(isDayWaiver(raise)).toBe(true);
     expect(isDayWaiver(unblock)).toBe(false);
-    expect(waiverWindowLabel(grace, "en-US", gt)).toBe("Oct 23, 12:00 → Oct 30, 00:00");
+    expect(waiverWindowLabel(grace, grace.starts_at, "en-US", gt)).toBe(
+      "Oct 23, 12:00 → Oct 30, 00:00",
+    );
     expect(waiverSummary(grace, grace.starts_at - 1, "en-US", gt)).toBe(
       "Grace starts Oct 23 at 12:00 UTC.",
     );
