@@ -376,7 +376,7 @@ describe("Date Utilities", () => {
         });
         expect(getConsumableRelativeTime("calendar:day:-1", "America/New_York")).toEqual({
           startTime: Date.parse("2026-10-06T04:00:00Z") * 1000,
-          endTime: Date.parse("2026-10-07T03:59:59.999Z") * 1000,
+          endTime: Date.parse("2026-10-07T04:00:00.000Z") * 1000,
         });
       });
 
@@ -416,7 +416,7 @@ describe("Date Utilities", () => {
           }),
         ).toEqual({
           startTime: Date.parse("2025-01-01T00:00:00Z") * 1000,
-          endTime: Date.parse("2025-12-31T23:59:59.999Z") * 1000,
+          endTime: Date.parse("2026-01-01T00:00:00.000Z") * 1000,
         });
       });
     });

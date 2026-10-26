@@ -370,6 +370,7 @@ import {
 } from "@/utils/dashboard/panelValidation";
 import { restoreDashboardPanelStreamType, saveDashboardPanelStream } from "@/utils/streamPersist";
 import { findPanelById } from "@/utils/dashboard/findPanel";
+import { parseCalendarToken } from "@/utils/dashboard/calendarPeriods";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { createDashboardsContextProvider, contextRegistry } from "@/composables/contextProviders";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
@@ -1333,9 +1334,12 @@ export default defineComponent({
       };
     };
     // A relative range is the same selection whatever "now" it last ended at.
+    // A calendar period also keys on its start, which moves when the timezone changes.
     const dateSelectionKey = (date: any) =>
       date?.valueType === "relative"
-        ? `relative:${date.relativeTimePeriod}`
+        ? parseCalendarToken(date.relativeTimePeriod)
+          ? `relative:${date.relativeTimePeriod}:${date.startTime}`
+          : `relative:${date.relativeTimePeriod}`
         : `absolute:${date?.startTime}:${date?.endTime}`;
     const appliedDateKey = ref<string | null>(null);
     const isTimeChangePending = computed(

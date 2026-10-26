@@ -104,23 +104,23 @@ describe("calendarPeriods", () => {
   describe("resolveCalendarPeriod in Asia/Calcutta", () => {
     it.each([
       ["calendar:day:0", "2026-10-07T18:30:00.000Z", "2026-10-08T03:00:00.000Z"],
-      ["calendar:day:-1", "2026-10-06T18:30:00.000Z", "2026-10-07T18:29:59.999Z"],
-      ["calendar:day:-2", "2026-10-05T18:30:00.000Z", "2026-10-06T18:29:59.999Z"],
+      ["calendar:day:-1", "2026-10-06T18:30:00.000Z", "2026-10-07T18:30:00.000Z"],
+      ["calendar:day:-2", "2026-10-05T18:30:00.000Z", "2026-10-06T18:30:00.000Z"],
       ["calendar:week:0", "2026-10-04T18:30:00.000Z", "2026-10-08T03:00:00.000Z"],
-      ["calendar:week:-1", "2026-09-27T18:30:00.000Z", "2026-10-04T18:29:59.999Z"],
-      ["calendar:week:-2", "2026-09-20T18:30:00.000Z", "2026-09-27T18:29:59.999Z"],
+      ["calendar:week:-1", "2026-09-27T18:30:00.000Z", "2026-10-04T18:30:00.000Z"],
+      ["calendar:week:-2", "2026-09-20T18:30:00.000Z", "2026-09-27T18:30:00.000Z"],
       ["calendar:month:0", "2026-09-30T18:30:00.000Z", "2026-10-08T03:00:00.000Z"],
-      ["calendar:month:-1", "2026-08-31T18:30:00.000Z", "2026-09-30T18:29:59.999Z"],
-      ["calendar:month:-2", "2026-07-31T18:30:00.000Z", "2026-08-31T18:29:59.999Z"],
-      ["calendar:month:-13", "2025-08-31T18:30:00.000Z", "2025-09-30T18:29:59.999Z"],
+      ["calendar:month:-1", "2026-08-31T18:30:00.000Z", "2026-09-30T18:30:00.000Z"],
+      ["calendar:month:-2", "2026-07-31T18:30:00.000Z", "2026-08-31T18:30:00.000Z"],
+      ["calendar:month:-13", "2025-08-31T18:30:00.000Z", "2025-09-30T18:30:00.000Z"],
       ["calendar:quarter:0", "2026-09-30T18:30:00.000Z", "2026-10-08T03:00:00.000Z"],
-      ["calendar:quarter:-1", "2026-06-30T18:30:00.000Z", "2026-09-30T18:29:59.999Z"],
-      ["calendar:quarter:-2", "2026-03-31T18:30:00.000Z", "2026-06-30T18:29:59.999Z"],
-      ["calendar:quarter:-13", "2023-06-30T18:30:00.000Z", "2023-09-30T18:29:59.999Z"],
+      ["calendar:quarter:-1", "2026-06-30T18:30:00.000Z", "2026-09-30T18:30:00.000Z"],
+      ["calendar:quarter:-2", "2026-03-31T18:30:00.000Z", "2026-06-30T18:30:00.000Z"],
+      ["calendar:quarter:-13", "2023-06-30T18:30:00.000Z", "2023-09-30T18:30:00.000Z"],
       ["calendar:year:0", "2025-12-31T18:30:00.000Z", "2026-10-08T03:00:00.000Z"],
-      ["calendar:year:-1", "2024-12-31T18:30:00.000Z", "2025-12-31T18:29:59.999Z"],
-      ["calendar:year:-2", "2023-12-31T18:30:00.000Z", "2024-12-31T18:29:59.999Z"],
-      ["calendar:year:-13", "2012-12-31T18:30:00.000Z", "2013-12-31T18:29:59.999Z"],
+      ["calendar:year:-1", "2024-12-31T18:30:00.000Z", "2025-12-31T18:30:00.000Z"],
+      ["calendar:year:-2", "2023-12-31T18:30:00.000Z", "2024-12-31T18:30:00.000Z"],
+      ["calendar:year:-13", "2012-12-31T18:30:00.000Z", "2013-12-31T18:30:00.000Z"],
     ])("%s", (token, start, end) => {
       expect(range(token, IST)).toEqual({ start, end });
     });
@@ -134,23 +134,23 @@ describe("calendarPeriods", () => {
   describe("resolveCalendarPeriod in UTC", () => {
     it.each([
       ["calendar:day:0", "2026-10-08T00:00:00.000Z", "2026-10-08T03:00:00.000Z"],
-      ["calendar:day:-1", "2026-10-07T00:00:00.000Z", "2026-10-07T23:59:59.999Z"],
-      ["calendar:day:-2", "2026-10-06T00:00:00.000Z", "2026-10-06T23:59:59.999Z"],
+      ["calendar:day:-1", "2026-10-07T00:00:00.000Z", "2026-10-08T00:00:00.000Z"],
+      ["calendar:day:-2", "2026-10-06T00:00:00.000Z", "2026-10-07T00:00:00.000Z"],
       ["calendar:week:0", "2026-10-05T00:00:00.000Z", "2026-10-08T03:00:00.000Z"],
-      ["calendar:week:-1", "2026-09-28T00:00:00.000Z", "2026-10-04T23:59:59.999Z"],
-      ["calendar:week:-2", "2026-09-21T00:00:00.000Z", "2026-09-27T23:59:59.999Z"],
+      ["calendar:week:-1", "2026-09-28T00:00:00.000Z", "2026-10-05T00:00:00.000Z"],
+      ["calendar:week:-2", "2026-09-21T00:00:00.000Z", "2026-09-28T00:00:00.000Z"],
       ["calendar:month:0", "2026-10-01T00:00:00.000Z", "2026-10-08T03:00:00.000Z"],
-      ["calendar:month:-1", "2026-09-01T00:00:00.000Z", "2026-09-30T23:59:59.999Z"],
-      ["calendar:month:-2", "2026-08-01T00:00:00.000Z", "2026-08-31T23:59:59.999Z"],
-      ["calendar:month:-13", "2025-09-01T00:00:00.000Z", "2025-09-30T23:59:59.999Z"],
+      ["calendar:month:-1", "2026-09-01T00:00:00.000Z", "2026-10-01T00:00:00.000Z"],
+      ["calendar:month:-2", "2026-08-01T00:00:00.000Z", "2026-09-01T00:00:00.000Z"],
+      ["calendar:month:-13", "2025-09-01T00:00:00.000Z", "2025-10-01T00:00:00.000Z"],
       ["calendar:quarter:0", "2026-10-01T00:00:00.000Z", "2026-10-08T03:00:00.000Z"],
-      ["calendar:quarter:-1", "2026-07-01T00:00:00.000Z", "2026-09-30T23:59:59.999Z"],
-      ["calendar:quarter:-2", "2026-04-01T00:00:00.000Z", "2026-06-30T23:59:59.999Z"],
-      ["calendar:quarter:-13", "2023-07-01T00:00:00.000Z", "2023-09-30T23:59:59.999Z"],
+      ["calendar:quarter:-1", "2026-07-01T00:00:00.000Z", "2026-10-01T00:00:00.000Z"],
+      ["calendar:quarter:-2", "2026-04-01T00:00:00.000Z", "2026-07-01T00:00:00.000Z"],
+      ["calendar:quarter:-13", "2023-07-01T00:00:00.000Z", "2023-10-01T00:00:00.000Z"],
       ["calendar:year:0", "2026-01-01T00:00:00.000Z", "2026-10-08T03:00:00.000Z"],
-      ["calendar:year:-1", "2025-01-01T00:00:00.000Z", "2025-12-31T23:59:59.999Z"],
-      ["calendar:year:-2", "2024-01-01T00:00:00.000Z", "2024-12-31T23:59:59.999Z"],
-      ["calendar:year:-13", "2013-01-01T00:00:00.000Z", "2013-12-31T23:59:59.999Z"],
+      ["calendar:year:-1", "2025-01-01T00:00:00.000Z", "2026-01-01T00:00:00.000Z"],
+      ["calendar:year:-2", "2024-01-01T00:00:00.000Z", "2025-01-01T00:00:00.000Z"],
+      ["calendar:year:-13", "2013-01-01T00:00:00.000Z", "2014-01-01T00:00:00.000Z"],
     ])("%s", (token, start, end) => {
       expect(range(token, "UTC")).toEqual({ start, end });
     });
@@ -159,14 +159,14 @@ describe("calendarPeriods", () => {
   describe("resolveCalendarPeriod in America/New_York", () => {
     it.each([
       ["calendar:day:0", "2026-10-07T04:00:00.000Z", "2026-10-08T03:00:00.000Z"],
-      ["calendar:day:-1", "2026-10-06T04:00:00.000Z", "2026-10-07T03:59:59.999Z"],
-      ["calendar:day:-2", "2026-10-05T04:00:00.000Z", "2026-10-06T03:59:59.999Z"],
+      ["calendar:day:-1", "2026-10-06T04:00:00.000Z", "2026-10-07T04:00:00.000Z"],
+      ["calendar:day:-2", "2026-10-05T04:00:00.000Z", "2026-10-06T04:00:00.000Z"],
       ["calendar:week:0", "2026-10-05T04:00:00.000Z", "2026-10-08T03:00:00.000Z"],
-      ["calendar:week:-1", "2026-09-28T04:00:00.000Z", "2026-10-05T03:59:59.999Z"],
+      ["calendar:week:-1", "2026-09-28T04:00:00.000Z", "2026-10-05T04:00:00.000Z"],
       ["calendar:month:0", "2026-10-01T04:00:00.000Z", "2026-10-08T03:00:00.000Z"],
-      ["calendar:month:-1", "2026-09-01T04:00:00.000Z", "2026-10-01T03:59:59.999Z"],
-      ["calendar:quarter:-1", "2026-07-01T04:00:00.000Z", "2026-10-01T03:59:59.999Z"],
-      ["calendar:year:-1", "2025-01-01T05:00:00.000Z", "2026-01-01T04:59:59.999Z"],
+      ["calendar:month:-1", "2026-09-01T04:00:00.000Z", "2026-10-01T04:00:00.000Z"],
+      ["calendar:quarter:-1", "2026-07-01T04:00:00.000Z", "2026-10-01T04:00:00.000Z"],
+      ["calendar:year:-1", "2025-01-01T05:00:00.000Z", "2026-01-01T05:00:00.000Z"],
     ])("resolves %s on the previous local day", (token, start, end) => {
       expect(range(token, NY)).toEqual({ start, end });
     });
@@ -181,12 +181,12 @@ describe("calendarPeriods", () => {
       expect(range("calendar:week:0", NY, tue)?.start).toBe("2026-03-09T04:00:00.000Z");
       expect(range("calendar:week:-1", NY, tue)).toEqual({
         start: "2026-03-02T05:00:00.000Z",
-        end: "2026-03-09T03:59:59.999Z",
+        end: "2026-03-09T04:00:00.000Z",
       });
       const mon = Date.parse("2026-03-09T15:00:00Z");
       expect(range("calendar:day:-1", NY, mon)).toEqual({
         start: "2026-03-08T05:00:00.000Z",
-        end: "2026-03-09T03:59:59.999Z",
+        end: "2026-03-09T04:00:00.000Z",
       });
     });
 
@@ -194,12 +194,12 @@ describe("calendarPeriods", () => {
       const tue = Date.parse("2026-11-03T15:00:00Z");
       expect(range("calendar:week:-1", NY, tue)).toEqual({
         start: "2026-10-26T04:00:00.000Z",
-        end: "2026-11-02T04:59:59.999Z",
+        end: "2026-11-02T05:00:00.000Z",
       });
       const mon = Date.parse("2026-11-02T15:00:00Z");
       expect(range("calendar:day:-1", NY, mon)).toEqual({
         start: "2026-11-01T04:00:00.000Z",
-        end: "2026-11-02T04:59:59.999Z",
+        end: "2026-11-02T05:00:00.000Z",
       });
     });
   });
@@ -212,28 +212,28 @@ describe("calendarPeriods", () => {
         "calendar:day:-1",
         "2026-09-07T15:00:00Z",
         "2026-09-06T04:00:00.000Z",
-        "2026-09-07T02:59:59.999Z",
+        "2026-09-07T03:00:00.000Z",
       ],
       [
         "America/Santiago",
         "calendar:day:-2",
         "2026-09-07T15:00:00Z",
         "2026-09-05T04:00:00.000Z",
-        "2026-09-06T03:59:59.999Z",
+        "2026-09-06T04:00:00.000Z",
       ],
       [
         "America/Santiago",
         "calendar:week:-1",
         "2026-09-07T15:00:00Z",
         "2026-08-31T04:00:00.000Z",
-        "2026-09-07T02:59:59.999Z",
+        "2026-09-07T03:00:00.000Z",
       ],
       [
         "America/Santiago",
         "calendar:month:-1",
         "2026-10-07T15:00:00Z",
         "2026-09-01T04:00:00.000Z",
-        "2026-10-01T02:59:59.999Z",
+        "2026-10-01T03:00:00.000Z",
       ],
       // Havana skips 2026-03-08 00:00 (−05 → −04).
       [
@@ -241,21 +241,21 @@ describe("calendarPeriods", () => {
         "calendar:day:-1",
         "2026-03-09T15:00:00Z",
         "2026-03-08T05:00:00.000Z",
-        "2026-03-09T03:59:59.999Z",
+        "2026-03-09T04:00:00.000Z",
       ],
       [
         "America/Havana",
         "calendar:day:-2",
         "2026-03-09T15:00:00Z",
         "2026-03-07T05:00:00.000Z",
-        "2026-03-08T04:59:59.999Z",
+        "2026-03-08T05:00:00.000Z",
       ],
       [
         "America/Havana",
         "calendar:week:-1",
         "2026-03-09T15:00:00Z",
         "2026-03-02T05:00:00.000Z",
-        "2026-03-09T03:59:59.999Z",
+        "2026-03-09T04:00:00.000Z",
       ],
       // Havana repeats 2026-11-01 00:00 (−04 → −05): the day starts at the first one.
       [
@@ -263,14 +263,14 @@ describe("calendarPeriods", () => {
         "calendar:day:-1",
         "2026-11-02T15:00:00Z",
         "2026-11-01T04:00:00.000Z",
-        "2026-11-02T04:59:59.999Z",
+        "2026-11-02T05:00:00.000Z",
       ],
       [
         "America/Havana",
         "calendar:day:-2",
         "2026-11-02T15:00:00Z",
         "2026-10-31T04:00:00.000Z",
-        "2026-11-01T03:59:59.999Z",
+        "2026-11-01T04:00:00.000Z",
       ],
       [
         "America/Havana",
@@ -284,7 +284,7 @@ describe("calendarPeriods", () => {
         "calendar:month:-1",
         "2026-11-02T15:00:00Z",
         "2026-10-01T04:00:00.000Z",
-        "2026-11-01T03:59:59.999Z",
+        "2026-11-01T04:00:00.000Z",
       ],
       // Beirut skips 2026-03-29 00:00 (+02 → +03) and falls back across midnight on 2026-10-25.
       [
@@ -292,28 +292,28 @@ describe("calendarPeriods", () => {
         "calendar:day:-1",
         "2026-03-30T10:00:00Z",
         "2026-03-28T22:00:00.000Z",
-        "2026-03-29T20:59:59.999Z",
+        "2026-03-29T21:00:00.000Z",
       ],
       [
         "Asia/Beirut",
         "calendar:day:-2",
         "2026-03-30T10:00:00Z",
         "2026-03-27T22:00:00.000Z",
-        "2026-03-28T21:59:59.999Z",
+        "2026-03-28T22:00:00.000Z",
       ],
       [
         "Asia/Beirut",
         "calendar:week:-1",
         "2026-03-30T10:00:00Z",
         "2026-03-22T22:00:00.000Z",
-        "2026-03-29T20:59:59.999Z",
+        "2026-03-29T21:00:00.000Z",
       ],
       [
         "Asia/Beirut",
         "calendar:day:-1",
         "2026-10-26T10:00:00Z",
         "2026-10-24T22:00:00.000Z",
-        "2026-10-25T21:59:59.999Z",
+        "2026-10-25T22:00:00.000Z",
       ],
       // Asunción skipped 2023-10-01 00:00, the first day of a month and a quarter.
       [
@@ -335,7 +335,7 @@ describe("calendarPeriods", () => {
         "calendar:month:-1",
         "2023-10-02T15:00:00Z",
         "2023-09-01T04:00:00.000Z",
-        "2023-10-01T03:59:59.999Z",
+        "2023-10-01T04:00:00.000Z",
       ],
     ])("%s %s at %s", (zone, token, now, start, end) => {
       expect(range(token, zone, Date.parse(now))).toEqual({ start, end });
@@ -364,7 +364,7 @@ describe("calendarPeriods", () => {
       const now = Date.parse("2028-03-15T12:00:00Z");
       expect(range("calendar:month:-1", "UTC", now)).toEqual({
         start: "2028-02-01T00:00:00.000Z",
-        end: "2028-02-29T23:59:59.999Z",
+        end: "2028-03-01T00:00:00.000Z",
       });
       expect(label("calendar:month:-2", "UTC", Date.parse("2028-04-02T12:00:00Z"))).toBe(
         "Feb 2028",
@@ -393,7 +393,7 @@ describe("calendarPeriods", () => {
       );
       expect(range("calendar:quarter:-1", "UTC", firstMinuteQ2)).toEqual({
         start: "2026-01-01T00:00:00.000Z",
-        end: "2026-03-31T23:59:59.999Z",
+        end: "2026-04-01T00:00:00.000Z",
       });
       const istQ2 = Date.parse("2026-03-31T19:00:00Z");
       expect(range("calendar:quarter:0", IST, istQ2)?.start).toBe("2026-03-31T18:30:00.000Z");
@@ -470,6 +470,23 @@ describe("calendarPeriods", () => {
 
     it("honours the locale", () => {
       expect(formatCalendarLabel("calendar:month:-2", IST, gt, "de-DE", NOW)).toBe("Aug. 2026");
+    });
+  });
+
+  describe("contiguity", () => {
+    it.each([
+      ["calendar:day:-1", "calendar:day:0"],
+      ["calendar:day:-2", "calendar:day:-1"],
+      ["calendar:week:-2", "calendar:week:-1"],
+      ["calendar:month:-2", "calendar:month:-1"],
+      ["calendar:quarter:-1", "calendar:quarter:0"],
+      ["calendar:year:-1", "calendar:year:0"],
+    ])("%s ends exactly where %s starts, so no event falls between them", (older, newer) => {
+      for (const zone of [IST, NY, "UTC"]) {
+        expect(resolveCalendarPeriod(older, zone, NOW)!.endTime).toBe(
+          resolveCalendarPeriod(newer, zone, NOW)!.startTime,
+        );
+      }
     });
   });
 

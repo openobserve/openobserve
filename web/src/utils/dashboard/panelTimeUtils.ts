@@ -216,7 +216,16 @@ export const arePickerValuesEqual = (first: any, second: any): boolean => {
 
   const type = pickerValueType(first);
   if (type !== pickerValueType(second)) return false;
-  if (type === "relative") return first.relativeTimePeriod === second.relativeTimePeriod;
+  if (type === "relative") {
+    if (first.relativeTimePeriod !== second.relativeTimePeriod) return false;
+    // A calendar period's start moves with the timezone, so the same token can name another window.
+    const bothResolved = first.startTime != null && second.startTime != null;
+    return (
+      !bothResolved ||
+      parseCalendarToken(first.relativeTimePeriod) === null ||
+      Number(first.startTime) === Number(second.startTime)
+    );
+  }
 
   return (
     Number(first.startTime) === Number(second.startTime) &&

@@ -55,9 +55,13 @@ export function nextWiderPeriod(period: string): string {
     M: 43200,
   };
   const calendar = resolveCalendarPeriod(period);
-  const mins = calendar
-    ? (calendar.endTime - calendar.startTime) / 60_000_000
-    : value * (toMins[unit] ?? 1);
+  if (calendar) {
+    // Suggestions are windows ending now, so the smallest one reaching back to the period's start covers it.
+    const sinceStart = (Date.now() * 1000 - calendar.startTime) / 60_000_000;
+    if (sinceStart <= 1440) return "1d";
+    return sinceStart <= 10080 ? "7d" : "30d";
+  }
+  const mins = value * (toMins[unit] ?? 1);
   if (mins <= 60) return "1d";
   if (mins <= 1440) return "7d";
   return "30d";

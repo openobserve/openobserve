@@ -1889,7 +1889,7 @@ describe("ViewDashboard", () => {
       const moved = wrapper.vm.currentTimeObjPerPanel.__global;
       expect(moved).not.toBe(settled);
       expect(moved.start_time.getTime()).toBe(Date.parse("2026-10-07T00:00:00Z") * 1000);
-      expect(moved.end_time.getTime()).toBe(Date.parse("2026-10-07T23:59:59.999Z") * 1000);
+      expect(moved.end_time.getTime()).toBe(Date.parse("2026-10-08T00:00:00.000Z") * 1000);
     });
 
     it("still refreshes __global on a forced recompute", async () => {

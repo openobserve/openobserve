@@ -383,13 +383,13 @@ describe("periods", () => {
     const now = Date.parse("2026-10-08T03:00:00Z") * 1000;
     expect(relativeWindow("calendar:day:-1", now)).toEqual({
       startUs: Date.parse("2026-10-07T00:00:00Z") * 1000,
-      endUs: Date.parse("2026-10-07T23:59:59.999Z") * 1000,
+      endUs: Date.parse("2026-10-08T00:00:00.000Z") * 1000,
     });
     expect(relativeWindow("calendar:day:0", now)).toEqual({
       startUs: Date.parse("2026-10-08T00:00:00Z") * 1000,
       endUs: now,
     });
-    expect(periodToMicros("calendar:week:-1")).toBe(7 * MICROS_PER_DAY - 1000);
+    expect(periodToMicros("calendar:week:-1")).toBe(7 * MICROS_PER_DAY);
     localStorage.removeItem("timezone");
   });
 });

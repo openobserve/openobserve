@@ -34,7 +34,7 @@ describe("calendar periods resolve in the store's timezone", () => {
     const picker = resolveCalendarPeriod("calendar:day:-1", store.state.timezone);
     expect(picker).toEqual({
       startTime: Date.parse("2026-10-25T15:00:00Z") * 1000,
-      endTime: Date.parse("2026-10-26T14:59:59.999Z") * 1000,
+      endTime: Date.parse("2026-10-26T15:00:00.000Z") * 1000,
     });
     expect(getConsumableRelativeTime("calendar:day:-1")).toEqual(picker);
     expect(relativeWindow("calendar:day:-1", Date.now() * 1000)).toEqual({

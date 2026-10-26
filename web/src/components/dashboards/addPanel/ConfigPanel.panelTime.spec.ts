@@ -33,8 +33,9 @@ vi.mock("@/utils/dashboard/searchLabelsConfig", async (importOriginal) => {
 // JSDOM has no layout, so the real virtualizer renders no rows; render them all.
 vi.mock("@tanstack/vue-virtual", async () => {
   const { computed: vueComputed, unref } = await import("vue");
+  type MaybeRef<T> = T | { value: T };
   return {
-    useVirtualizer: (options: any) =>
+    useVirtualizer: (options: MaybeRef<{ count: number }>) =>
       vueComputed(() => {
         const count = unref(options).count;
         return {
@@ -100,7 +101,7 @@ const makePanel = (panelTime: Record<string, unknown> = {}) =>
   });
 
 describe("ConfigPanel panel-specific time range (real picker)", { timeout: 30_000 }, () => {
-  let wrapper: VueWrapper<any> | undefined;
+  let wrapper: VueWrapper | undefined;
 
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ["Date"] });
@@ -122,7 +123,7 @@ describe("ConfigPanel panel-specific time range (real picker)", { timeout: 30_00
       promqlMode: false,
       isPivotMode: computed(() => false),
       selectedStreamFields: [],
-    } as any);
+    } as unknown as ReturnType<typeof useDashboardPanelData>);
     store.state.selectedOrganization = { identifier: "test-org" };
     wrapper = mount(ConfigPanel, {
       attachTo: document.body,

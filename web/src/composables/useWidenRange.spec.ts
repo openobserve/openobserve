@@ -40,10 +40,10 @@ describe("useWidenRange", () => {
     expect(periodToLabel("calendar:month:-1")).not.toContain("NaN");
   });
 
-  it("widens a calendar period by its resolved length", () => {
-    expect(nextWiderPeriod("calendar:day:0")).toBe("7d");
+  it("suggests the smallest window ending now that still contains the calendar period", () => {
+    expect(nextWiderPeriod("calendar:day:0")).toBe("1d");
     expect(nextWiderPeriod("calendar:day:-1")).toBe("7d");
+    expect(nextWiderPeriod("calendar:day:-6")).toBe("7d");
     expect(nextWiderPeriod("calendar:week:-1")).toBe("30d");
-    expect(nextWiderPeriod("calendar:month:-1")).toBe("30d");
   });
 });

@@ -24,6 +24,17 @@ import {
 const MINUTE = 60 * 1_000_000;
 
 describe("arePickerValuesEqual", () => {
+  it("tells the same calendar token apart by its start, which the timezone moves", () => {
+    const yesterday = (startTime?: number) => ({
+      valueType: "relative",
+      relativeTimePeriod: "calendar:day:-1",
+      startTime,
+    });
+    expect(arePickerValuesEqual(yesterday(1), yesterday(1))).toBe(true);
+    expect(arePickerValuesEqual(yesterday(1), yesterday(2))).toBe(false);
+    expect(arePickerValuesEqual(yesterday(1), yesterday())).toBe(true);
+  });
+
   it("compares relative ranges by period only", () => {
     expect(
       arePickerValuesEqual(

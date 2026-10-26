@@ -391,7 +391,9 @@ import {
   ref,
   defineComponent,
   computed,
+  onActivated,
   onBeforeUnmount,
+  onDeactivated,
   onMounted,
   watch,
   nextTick,
@@ -409,6 +411,7 @@ import {
   formatCalendarLabel,
   formatCalendarTooltip,
   formatRangeTooltip,
+  formatResolvedCalendarTooltip,
   parseCalendarToken,
   resolveCalendarPeriod,
   shiftCalendarToken,
@@ -710,12 +713,10 @@ export default defineComponent({
       tooltipNow.value = Date.now();
     };
 
-    // Calendar labels name a day, so the clock they read must move on its own, not only on hover.
-    const clockTick = setInterval(refreshTooltipNow, 60_000);
-    onBeforeUnmount(() => clearInterval(clockTick));
-
     const calendarTooltip = (token: string | null) =>
-      formatCalendarTooltip(token, store.state.timezone, tooltipNow.value) ?? undefined;
+      token === null
+        ? undefined
+        : (formatCalendarTooltip(token, store.state.timezone, tooltipNow.value) ?? undefined);
 
     const calendarExceedsRestriction = (token: string | null) => {
       const range = resolveCalendarPeriod(token, store.state.timezone, tooltipNow.value);
@@ -730,7 +731,7 @@ export default defineComponent({
       const range = resolveCalendarPeriod(token, store.state.timezone, nowMs);
       if (!range) return { tooltip: undefined, disabled: false };
       return {
-        tooltip: formatRangeTooltip(range.startTime, range.endTime, store.state.timezone),
+        tooltip: formatResolvedCalendarTooltip(token, range, store.state.timezone),
         disabled: exceedsRangeRestriction(
           range.startTime,
           range.endTime,
@@ -962,12 +963,6 @@ export default defineComponent({
     const onCustomValueBlur = () => {
       if (!isValidCustomValue(relativeValue.value))
         relativeValue.value = lastValidCustomValue.value;
-    };
-
-    const setCalendarPeriod = (token: string) => {
-      selectedType.value = "relative";
-      calendarToken.value = token;
-      if (props.autoApply) saveDate("relative");
     };
 
     const setRelativeTime = (period: string) => {
@@ -1372,15 +1367,16 @@ export default defineComponent({
     const triggerLabel = computed(() => {
       const showsApplied = !props.autoApply && !menuOpen.value;
       // A calendar label is re-derived so an older period keeps naming the right day after midnight.
-      const appliedCalendarLabel = showsApplied
-        ? formatCalendarLabel(
-            appliedCalendarToken.value,
-            store.state.timezone,
-            t,
-            intlLocale.value,
-            tooltipNow.value,
-          )
-        : null;
+      const appliedCalendarLabel =
+        showsApplied && appliedCalendarToken.value !== null
+          ? formatCalendarLabel(
+              appliedCalendarToken.value,
+              store.state.timezone,
+              t,
+              intlLocale.value,
+              tooltipNow.value,
+            )
+          : null;
       const label = showsApplied
         ? appliedCalendarLabel || appliedDisplayValue.value || getDisplayValue.value
         : getDisplayValue.value;
@@ -1395,7 +1391,7 @@ export default defineComponent({
 
     const getDisplayValue = computed(() => {
       const calendarLabel =
-        !props.disableRelative && selectedType.value === "relative"
+        !props.disableRelative && selectedType.value === "relative" && calendarToken.value !== null
           ? formatCalendarLabel(
               calendarToken.value,
               store.state.timezone,
@@ -1796,8 +1792,14 @@ export default defineComponent({
         });
 
         if (calendarExceedsRestriction(calendarToken.value)) {
-          calendarToken.value = null;
-          if (props.autoApply) saveDate("relative");
+          // Clamped like a too-long rolling range: to the largest window the page allows, not whatever the custom fields held.
+          const unit = [...periodUnits].reverse().find((u) => relativePeriodsMaxValue.value[u] > 0);
+          if (unit) {
+            setRelativeDate(unit, relativePeriodsMaxValue.value[unit]);
+          } else {
+            calendarToken.value = null;
+            if (props.autoApply) saveDate("relative");
+          }
         }
 
         if (props.queryRangeRestrictionInHour > 0) {
@@ -1854,6 +1856,28 @@ export default defineComponent({
     // An auto-applied absolute range is final only when the panel closes, not after every edit.
     let rangeKeyAtOpen: string | null = null;
     const menuOpen = ref(false);
+
+    // Calendar labels name a day and the rail ends "so far" ranges at now, so the clock runs only while one is shown.
+    const needsClock = computed(
+      () =>
+        props.calendarPresets &&
+        (menuOpen.value || calendarToken.value !== null || appliedCalendarToken.value !== null),
+    );
+    let clockTick: ReturnType<typeof setInterval> | null = null;
+    const stopClock = () => {
+      if (clockTick !== null) clearInterval(clockTick);
+      clockTick = null;
+    };
+    const syncClock = () => {
+      if (!needsClock.value) return stopClock();
+      if (clockTick !== null) return;
+      refreshTooltipNow();
+      clockTick = setInterval(refreshTooltipNow, 60_000);
+    };
+    watch(needsClock, syncClock, { immediate: true });
+    onActivated(syncClock);
+    onDeactivated(stopClock);
+    onBeforeUnmount(stopClock);
     const onMenuOpenChange = (open: boolean) => {
       if (open) {
         refreshTooltipNow();
@@ -1880,7 +1904,7 @@ export default defineComponent({
       onMenuOpenChange(false);
     };
 
-    // One clicked day means that day; without this the calendar's unfinished range left the old dates in place.
+    // A single clicked day applies as that day.
     const commitPendingDay = (): boolean => {
       const day = pendingDay.value;
       pendingDay.value = null;
@@ -1962,7 +1986,6 @@ export default defineComponent({
       applyAndClose,
       pendingDay,
       calendarToken,
-      setCalendarPeriod,
       calendarTooltip,
       triggerTooltip,
       refreshTooltipNow,

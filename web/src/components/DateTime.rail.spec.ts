@@ -254,7 +254,7 @@ describe("DateTime rail", () => {
       expect(wrapper!.vm.calendarToken).toBeNull();
       expect(lastEmit().relativeTimePeriod).toBe("3h");
 
-      wrapper!.vm.setCalendarPeriod("calendar:day:0");
+      wrapper!.vm.setRelativeTime("calendar:day:0");
       wrapper!.vm.relativeValue = 7;
       wrapper!.vm.onCustomPeriodSelect();
       expect(wrapper!.vm.calendarToken).toBeNull();
@@ -268,7 +268,7 @@ describe("DateTime rail", () => {
       expect(lastEmit()).toMatchObject({
         relativeTimePeriod: "calendar:quarter:-2",
         startTime: micros("2026-03-31T18:30:00Z"),
-        endTime: micros("2026-06-30T18:29:59.999Z"),
+        endTime: micros("2026-06-30T18:30:00.000Z"),
       });
 
       wrapper!.vm.setSavedDate({ type: "relative", relativeTimePeriod: "calendar:year:-2" });
@@ -298,7 +298,7 @@ describe("DateTime rail", () => {
       expect(wrapper!.vm.selectedType).toBe("absolute");
       expect(wrapper!.vm.getConsumableDateTime()).toMatchObject({
         startTime: micros("2026-10-06T18:30:00Z"),
-        endTime: micros("2026-10-07T18:29:59Z"),
+        endTime: micros("2026-10-07T18:30:00Z"),
       });
     });
 
@@ -338,6 +338,45 @@ describe("DateTime rail", () => {
       expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(emitsBefore);
     });
 
+    it("clamps a calendar range to the largest allowed window when a limit arrives", async () => {
+      createWrapper({ autoApply: true, defaultRelativeTime: "calendar:month:-1" });
+      await flushPromises();
+
+      await wrapper!.setProps({ queryRangeRestrictionInHour: 72 });
+      await flushPromises();
+
+      expect(wrapper!.vm.calendarToken).toBeNull();
+      expect(lastEmit().relativeTimePeriod).toBe("3d");
+      expect(wrapper!.vm.triggerLabel).toBe("Past 3 Days");
+    });
+
+    it("runs the minute clock only while a calendar range can be on screen", async () => {
+      const minuteTimers = () => setIntervalSpy.mock.calls.filter(([, ms]) => ms === 60_000).length;
+      const setIntervalSpy = vi.spyOn(globalThis, "setInterval");
+      const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
+
+      createWrapper({ calendarPresets: false });
+      await flushPromises();
+      expect(minuteTimers()).toBe(0);
+      wrapper!.unmount();
+      wrapper = null;
+
+      createWrapper({ defaultRelativeTime: "15m" });
+      await flushPromises();
+      expect(minuteTimers()).toBe(0);
+      await openMenu();
+      expect(minuteTimers()).toBe(1);
+      wrapper!.unmount();
+      wrapper = null;
+      expect(clearIntervalSpy).toHaveBeenCalled();
+
+      createWrapper({ defaultRelativeTime: "calendar:day:-2" });
+      await flushPromises();
+      expect(minuteTimers()).toBe(2);
+      setIntervalSpy.mockRestore();
+      clearIntervalSpy.mockRestore();
+    });
+
     it("moves an older period's label to the right day once the clock passes midnight", async () => {
       createWrapper({ autoApply: false, defaultRelativeTime: "calendar:day:-2" });
       await flushPromises();
@@ -364,7 +403,7 @@ describe("DateTime rail", () => {
       expect(lastEmit()).toMatchObject({
         relativeTimePeriod: "calendar:month:-2",
         startTime: micros("2026-07-31T18:30:00Z"),
-        endTime: micros("2026-08-31T18:29:59.999Z"),
+        endTime: micros("2026-08-31T18:30:00.000Z"),
       });
       expect(wrapper!.vm.triggerLabel).toBe("Aug 2026");
       expect(el("date-time-next-btn")?.disabled).toBe(false);
@@ -533,15 +572,15 @@ describe("DateTime rail", () => {
 
       el("date-time-absolute-tab")!.click();
       await flushPromises();
-      expect(wrapper!.vm.selectedDate).toEqual({ from: "2026/09/01", to: "2026/09/30" });
-      expect(wrapper!.vm.selectedTime).toEqual({ startTime: "00:00:00", endTime: "23:59:59" });
+      expect(wrapper!.vm.selectedDate).toEqual({ from: "2026/09/01", to: "2026/10/01" });
+      expect(wrapper!.vm.selectedTime).toEqual({ startTime: "00:00:00", endTime: "00:00:00" });
 
-      wrapper!.vm.selectedTime.endTime = "12:00:00";
+      wrapper!.vm.selectedTime.startTime = "06:00:00";
       await flushPromises();
       expect(lastEmit()).toMatchObject({
         valueType: "absolute",
-        startTime: micros("2026-08-31T18:30:00Z"),
-        endTime: micros("2026-09-30T06:30:00Z"),
+        startTime: micros("2026-09-01T00:30:00Z"),
+        endTime: micros("2026-09-30T18:30:00Z"),
       });
     });
   });

@@ -73,7 +73,7 @@ export const shiftCalendarToken = (token: string, step: number): string | null =
   return parseCalendarToken(next) ? next : null;
 };
 
-/** Resolves a calendar token to a microsecond range, in the given zone or else the picker's zone, then the browser's. */
+/** Resolves a calendar token to a microsecond range with an exclusive end, in the given zone or else the picker's zone, then the browser's. */
 export const resolveCalendarPeriod = (
   token: unknown,
   timezone?: string | null,
@@ -85,7 +85,8 @@ export const resolveCalendarPeriod = (
   const bounds = civilBounds(period, zone, nowMs);
   if (!bounds) return null;
   const startMs = zonedMidnight(bounds.start, zone);
-  const endMs = period.offset === 0 ? nowMs : zonedMidnight(bounds.next, zone) - 1;
+  // The search end bound is exclusive, so a finished period ends at the next one's start and periods tile with no gap.
+  const endMs = period.offset === 0 ? nowMs : zonedMidnight(bounds.next, zone);
   if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return null;
   return { startTime: startMs * 1000, endTime: endMs * 1000 };
 };
@@ -121,7 +122,17 @@ export const formatCalendarTooltip = (
 ): I18nText | null => {
   const range = resolveCalendarPeriod(token, timezone, nowMs);
   if (!range) return null;
-  return formatRangeTooltip(range.startTime, range.endTime, timezone);
+  return formatResolvedCalendarTooltip(token, range, timezone);
+};
+
+/** Tooltip for an already resolved calendar range; a finished period shows its last second, not the next start. */
+export const formatResolvedCalendarTooltip = (
+  token: unknown,
+  range: CalendarRange,
+  timezone?: string | null,
+): I18nText => {
+  const finished = (parseCalendarToken(token)?.offset ?? 0) < 0;
+  return formatRangeTooltip(range.startTime, range.endTime - (finished ? 1 : 0), timezone);
 };
 
 /** Absolute range (microseconds) in the product's absolute format plus the timezone, for tooltips. */
