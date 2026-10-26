@@ -14,7 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import { INSTALL_ENV, installCommand, opampEndpoint, resolveBaseUrl } from "./fleetInstall";
+import {
+  GATEWAY_RELEASE,
+  INSTALL_ENV,
+  installCommand,
+  opampEndpoint,
+  resolveBaseUrl,
+} from "./fleetInstall";
 
 const target = {
   baseUrl: "https://o2.example.com",
@@ -90,6 +96,29 @@ describe("installCommand", () => {
     expect(cmd).toContain("--set image.repository=o2cr.ai/openobserve/otel-fleet-collector");
     expect(cmd).toContain("--set image.tag='0.163.1'");
     expect(cmd).toContain("--set opamp.endpoint='wss://o2.example.com/api/acme/v1/opamp'");
+  });
+
+  it("installs agents as the otel-fleet-collector release with the chart's agent default", () => {
+    const cmd = installCommand("kubernetes", { ...target, role: "agent" });
+    expect(cmd).toContain("helm upgrade --install otel-fleet-collector openobserve/");
+    expect(cmd).not.toContain("gateway");
+  });
+
+  it("installs a gateway as its own release with agents off and the chart's single replica", () => {
+    const cmd = installCommand("kubernetes", { ...target, role: "gateway" });
+    expect(cmd).toContain(
+      `helm upgrade --install ${GATEWAY_RELEASE} openobserve/otel-fleet-collector`,
+    );
+    expect(cmd).toContain("--set agent.enabled=false");
+    expect(cmd).toContain("--set gateway.enabled=true");
+    expect(cmd).not.toContain("replicas");
+    expect(cmd).toContain("--set opamp.token='o2ft_abc123'");
+  });
+
+  it("ignores the role outside Kubernetes", () => {
+    expect(installCommand("docker", { ...target, role: "gateway" })).toBe(
+      installCommand("docker", target),
+    );
   });
 });
 

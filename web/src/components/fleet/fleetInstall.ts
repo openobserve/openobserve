@@ -15,6 +15,14 @@
 
 export type InstallPlatform = "linux" | "macos" | "windows" | "docker" | "kubernetes";
 
+/** What the Helm chart runs: node agents (DaemonSet) or cluster gateways (StatefulSet). */
+export type KubernetesRole = "agent" | "gateway";
+
+export const KUBERNETES_ROLES: KubernetesRole[] = ["agent", "gateway"];
+
+/** The gateway release's name, which is also its OTLP Service. */
+export const GATEWAY_RELEASE = "otel-fleet-collector-gateway";
+
 /** Environment every install command gives the collector. */
 export const INSTALL_ENV = ["O2_ENDPOINT", "O2_TOKEN"];
 /** Environment only the Helm chart adds, from the pod's downward API. */
@@ -44,6 +52,8 @@ export interface InstallTarget {
   version: string | null;
   /** HTTP polling for proxies that cannot carry WebSocket. */
   http: boolean;
+  /** Kubernetes only; agents when unset. */
+  role?: KubernetesRole;
 }
 
 const SCRIPT_BASE = "https://raw.githubusercontent.com/openobserve/agents/main";
@@ -90,8 +100,11 @@ function windowsCommand(t: InstallTarget): string {
   ].join("\n");
 }
 
+// One release runs one role: its token enrols every pod into one fleet, and a fleet shares one configuration.
 function helmCommand(t: InstallTarget): string {
+  const gateway = t.role === "gateway";
   const sets = [
+    ...(gateway ? ["--set agent.enabled=false", "--set gateway.enabled=true"] : []),
     `--set image.repository=${IMAGE}`,
     ...(t.version ? [`--set image.tag=${q(t.version)}`] : []),
     `--set opamp.endpoint=${q(opampEndpoint(t))}`,
@@ -99,7 +112,7 @@ function helmCommand(t: InstallTarget): string {
   ];
   return [
     "helm repo add openobserve https://charts.openobserve.ai && helm repo update",
-    "helm upgrade --install otel-fleet-collector openobserve/otel-fleet-collector \\",
+    `helm upgrade --install ${gateway ? GATEWAY_RELEASE : "otel-fleet-collector"} openobserve/otel-fleet-collector \\`,
     "  --namespace openobserve-collector --create-namespace \\",
     ...sets.map((s, i) => `  ${s}${i < sets.length - 1 ? " \\" : ""}`),
   ].join("\n");
