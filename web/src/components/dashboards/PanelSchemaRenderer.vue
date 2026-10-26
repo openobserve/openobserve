@@ -386,6 +386,7 @@ import type { ExemplarMarker, InjectedExemplars, TraceVerdict } from "@/ts/inter
 import { detectChunkingDirection } from "@/utils/dashboard/chunkingDirection";
 import type { SeriesLimitInfo } from "@/utils/dashboard/panelDiagnostics";
 import type { RegionJoinInfo } from "@/utils/dashboard/convertMapsData";
+import type { SankeyNotice } from "@/utils/dashboard/convertSankeyData";
 
 interface CustomChartVariable {
   name: string;
@@ -626,6 +627,7 @@ export default defineComponent({
     "limit-number-of-series-warning-message-update",
     "series-limit-update",
     "region-join-update",
+    "sankey-notice-update",
     "panel-diagnostics-update",
     "sparkline-warning-update",
     "is-partial-data-update",
@@ -693,6 +695,7 @@ export default defineComponent({
     const limitNumberOfSeriesWarningMessage: any = ref("");
     const seriesLimit = ref<SeriesLimitInfo | null>(null);
     const regionJoin = shallowRef<RegionJoinInfo | null>(null);
+    const sankeyNotice = ref<SankeyNotice | null>(null);
 
     const chartPanelStyle = ref({
       height: "100%",
@@ -1587,6 +1590,7 @@ export default defineComponent({
             panelData.value?.extras?.limitNumberOfSeriesWarningMessage ?? "";
           seriesLimit.value = panelData.value?.extras?.seriesLimit ?? null;
           regionJoin.value = panelData.value?.extras?.regionJoin ?? null;
+          sankeyNotice.value = panelData.value?.extras?.sankeyNotice ?? null;
 
           errorDetail.value = {
             message: "",
@@ -1599,6 +1603,7 @@ export default defineComponent({
             return;
           }
           regionJoin.value = null;
+          sankeyNotice.value = null;
           errorDetail.value = {
             message: error?.message,
             code: error?.code || "",
@@ -1606,6 +1611,7 @@ export default defineComponent({
         }
       } else {
         regionJoin.value = null;
+        sankeyNotice.value = null;
         // if no data is available, then show the default data
         // if there is an error config in the panel schema, then show the default data on error
         // if no default data on error is set, then show the custom error message
@@ -1974,6 +1980,13 @@ export default defineComponent({
       regionJoin,
       (value) => {
         emit("region-join-update", value);
+      },
+      { immediate: true },
+    );
+    watch(
+      sankeyNotice,
+      (value) => {
+        emit("sankey-notice-update", value);
       },
       { immediate: true },
     );

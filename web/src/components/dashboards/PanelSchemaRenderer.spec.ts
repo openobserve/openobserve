@@ -3737,6 +3737,11 @@ describe("PanelSchemaRenderer", () => {
       return { data, loading, errorDetail };
     };
 
+    it("emits an empty sankey notice on mount, clearing a previous chart's chip", async () => {
+      await mountRacing();
+      expect(wrapper.emitted("sankey-notice-update")?.[0]).toEqual([null]);
+    });
+
     it("keeps the latest conversion when an earlier, slower one resolves after it", async () => {
       const { data, loading } = await mountRacing();
 

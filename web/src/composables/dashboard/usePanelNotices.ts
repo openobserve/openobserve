@@ -21,6 +21,7 @@ import {
   type SeriesLimitInfo,
 } from "@/utils/dashboard/panelDiagnostics";
 import type { RegionJoinInfo } from "@/utils/dashboard/convertMapsData";
+import type { SankeyNotice } from "@/utils/dashboard/convertSankeyData";
 
 /**
  * The notice state a PanelSchemaRenderer host keeps for PanelErrorButtons: server diagnostics,
@@ -31,6 +32,7 @@ export const usePanelNotices = (timezone: () => string) => {
   const panelDiagnostics = shallowRef<PanelDiagnostics | null>(null);
   const seriesLimit = shallowRef<SeriesLimitInfo | null>(null);
   const regionJoin = shallowRef<RegionJoinInfo | null>(null);
+  const sankeyNotice = shallowRef<SankeyNotice | null>(null);
   // Writable, so a host can still clear it with its other warnings.
   const maxQueryRangeWarning = ref("");
 
@@ -62,11 +64,16 @@ export const usePanelNotices = (timezone: () => string) => {
     regionJoin.value = join;
   };
 
+  const handleSankeyNoticeUpdate = (notice: SankeyNotice | null) => {
+    sankeyNotice.value = notice;
+  };
+
   const resetNotices = () => {
     resultMetadata.value = null;
     panelDiagnostics.value = null;
     seriesLimit.value = null;
     regionJoin.value = null;
+    sankeyNotice.value = null;
     maxQueryRangeWarning.value = "";
   };
 
@@ -74,6 +81,7 @@ export const usePanelNotices = (timezone: () => string) => {
   const noticeProps = computed(() => ({
     seriesLimit: seriesLimit.value,
     regionJoin: regionJoin.value,
+    sankeyNotice: sankeyNotice.value,
     serverPartial: panelDiagnostics.value?.serverPartial ?? false,
     rowsCapped: panelDiagnostics.value?.rowsCapped ?? false,
     serverPartialReasons: panelDiagnostics.value?.partialReasons ?? [],
@@ -83,12 +91,14 @@ export const usePanelNotices = (timezone: () => string) => {
   return {
     panelDiagnostics,
     seriesLimit,
+    sankeyNotice,
     maxQueryRangeWarning,
     noticeProps,
     handleResultMetadataUpdate,
     handlePanelDiagnosticsUpdate,
     handleSeriesLimitUpdate,
     handleRegionJoinUpdate,
+    handleSankeyNoticeUpdate,
     resetNotices,
   };
 };

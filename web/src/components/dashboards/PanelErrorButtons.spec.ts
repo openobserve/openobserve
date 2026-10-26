@@ -466,6 +466,41 @@ describe("PanelErrorButtons", () => {
       wrapper.unmount();
     });
 
+    it("counts sankey return links in a chip whose tooltip explains them without an action", async () => {
+      const wrapper = mountAttached({
+        sankeyNotice: { returnLinks: 3, skippedRows: 0 },
+        canEdit: true,
+        canRefresh: true,
+      });
+      const chip = wrapper.find('[data-test="panel-notice-chip-return-links"]');
+      expect(chip.text()).toBe("3 return links");
+      await openTooltip(chip.element);
+      expect(bubble()?.textContent).toContain("Loops shown as return nodes");
+      expect(bubble()?.textContent).toContain("3 links loop back to earlier nodes");
+      expect(bubble()?.querySelector('[data-test^="panel-notice-action-"]')).toBeNull();
+      wrapper.unmount();
+    });
+
+    it("uses the singular for one return link and no chip for none", async () => {
+      const wrapper = mountAttached({ sankeyNotice: { returnLinks: 1, skippedRows: 0 } });
+      expect(wrapper.find('[data-test="panel-notice-chip-return-links"]').text()).toBe(
+        "1 return link",
+      );
+      await wrapper.setProps({ sankeyNotice: { returnLinks: 0, skippedRows: 0 } });
+      expect(wrapper.find('[data-test="panel-notice-chip-return-links"]').exists()).toBe(false);
+      wrapper.unmount();
+    });
+
+    it("counts sankey rows skipped for a missing endpoint or a non-positive value", async () => {
+      const wrapper = mountAttached({ sankeyNotice: { returnLinks: 0, skippedRows: 1200 } });
+      const chip = wrapper.find('[data-test="panel-notice-chip-skipped-rows"]');
+      expect(chip.text()).toBe("1,200 rows skipped");
+      expect(wrapper.find('[data-test="panel-notice-chip-return-links"]').exists()).toBe(false);
+      await openTooltip(chip.element);
+      expect(bubble()?.textContent).toContain("1,200 rows have no source or target");
+      wrapper.unmount();
+    });
+
     it("shows server partial and client interruption as separate chips", () => {
       const wrapper = mountAttached({
         serverPartial: true,

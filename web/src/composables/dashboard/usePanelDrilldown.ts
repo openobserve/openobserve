@@ -879,13 +879,15 @@ export function usePanelDrilldown({
           } else if (panelSchema.value.type == "sankey") {
             if (drilldownParams[0].dataType == "node") {
               drilldownVariables.node = {
-                __name: drilldownParams[0]?.name ?? "",
+                __name: drilldownParams[0]?.data?.rawName ?? drilldownParams[0]?.name ?? "",
                 __value: drilldownParams[0]?.value ?? "",
               };
             } else {
               drilldownVariables.edge = {
-                __source: drilldownParams[0]?.data?.source ?? "",
-                __target: drilldownParams[0]?.data?.target ?? "",
+                __source:
+                  drilldownParams[0]?.data?.rawSource ?? drilldownParams[0]?.data?.source ?? "",
+                __target:
+                  drilldownParams[0]?.data?.rawTarget ?? drilldownParams[0]?.data?.target ?? "",
                 __value: drilldownParams[0]?.data?.value ?? "",
               };
             }
@@ -996,14 +998,14 @@ export function usePanelDrilldown({
         if (drilldownParams[0].dataType == "node") {
           // set node data
           drilldownVariables.node = {
-            __name: drilldownParams[0]?.name ?? "",
+            __name: drilldownParams[0]?.data?.rawName ?? drilldownParams[0]?.name ?? "",
             __value: drilldownParams[0]?.value ?? "",
           };
         } else {
           // set edge data
           drilldownVariables.edge = {
-            __source: drilldownParams[0]?.data?.source ?? "",
-            __target: drilldownParams[0]?.data?.target ?? "",
+            __source: drilldownParams[0]?.data?.rawSource ?? drilldownParams[0]?.data?.source ?? "",
+            __target: drilldownParams[0]?.data?.rawTarget ?? drilldownParams[0]?.data?.target ?? "",
             __value: drilldownParams[0]?.data?.value ?? "",
           };
         }

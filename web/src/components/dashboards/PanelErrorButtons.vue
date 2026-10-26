@@ -260,6 +260,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import PanelNoticeContent from "@/components/dashboards/PanelNoticeContent.vue";
 import type { SeriesLimitInfo } from "@/utils/dashboard/panelDiagnostics";
 import type { RegionJoinInfo } from "@/utils/dashboard/convertMapsData";
+import type { SankeyNotice } from "@/utils/dashboard/convertSankeyData";
 import {
   buildPanelNotices,
   seriesTotalBoundOf,
@@ -307,6 +308,10 @@ export default defineComponent({
     },
     regionJoin: {
       type: Object as PropType<RegionJoinInfo | null>,
+      default: null,
+    },
+    sankeyNotice: {
+      type: Object as PropType<SankeyNotice | null>,
       default: null,
     },
     serverPartial: {
@@ -391,6 +396,7 @@ export default defineComponent({
             rowsCapped: props.rowsCapped,
             serverPartial: props.serverPartial,
           }),
+          sankeyNotice: props.sankeyNotice,
           serverPartial: props.serverPartial,
           partialReasons: props.serverPartialReasons,
           interrupted: props.isPartialData && !props.isPanelLoading,

@@ -17,10 +17,17 @@ import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { addCommasToNumber } from "@/utils/formatters";
 import type { RegionJoinInfo } from "./convertMapsData";
+import type { SankeyNotice } from "./convertSankeyData";
 import type { PanelDiagnostics, SeriesLimitInfo } from "./panelDiagnostics";
 
 export type PanelNoticeId =
-  "function-error" | "series-cap" | "unmatched-regions" | "partial" | "interrupted";
+  | "function-error"
+  | "series-cap"
+  | "unmatched-regions"
+  | "return-links"
+  | "skipped-rows"
+  | "partial"
+  | "interrupted";
 
 export type PanelNoticeActionId = "use-top-n" | "edit-function" | "refresh";
 
@@ -42,6 +49,7 @@ export interface PanelNoticeInput {
   seriesLimit?: SeriesLimitInfo | null;
   seriesLimitMessage?: string;
   seriesTotalBound?: SeriesTotalBound;
+  sankeyNotice?: SankeyNotice | null;
   serverPartial?: boolean;
   partialReasons?: string[];
   interrupted?: boolean;
@@ -190,6 +198,37 @@ export const buildPanelNotices = (input: PanelNoticeInput, t: TranslateFn): Pane
   if (input.seriesLimit || input.seriesLimitMessage) notices.push(seriesCapNotice(input, t));
 
   if (input.regionJoin) notices.push(unmatchedRegionsNotice(input.regionJoin, t));
+
+  const returnLinks = input.sankeyNotice?.returnLinks ?? 0;
+  if (returnLinks) {
+    notices.push({
+      id: "return-links",
+      tone: "warning",
+      icon: "alt-route",
+      chipLabel: t(
+        "dashboard.panelErrorButtons.returnLinksChip",
+        { count: returnLinks },
+        returnLinks,
+      ),
+      title: t("dashboard.panelErrorButtons.returnLinksTitle"),
+      body: t("dashboard.panelErrorButtons.returnLinksBody", { count: returnLinks }, returnLinks),
+      details: [],
+    });
+  }
+
+  const skippedRows = input.sankeyNotice?.skippedRows ?? 0;
+  if (skippedRows) {
+    const count = addCommasToNumber(skippedRows);
+    notices.push({
+      id: "skipped-rows",
+      tone: "warning",
+      icon: "visibility-off",
+      chipLabel: t("dashboard.panelErrorButtons.skippedRowsChip", { count }, skippedRows),
+      title: t("dashboard.panelErrorButtons.skippedRowsTitle"),
+      body: t("dashboard.panelErrorButtons.skippedRowsBody", { count }, skippedRows),
+      details: [],
+    });
+  }
 
   if (input.serverPartial) {
     notices.push({

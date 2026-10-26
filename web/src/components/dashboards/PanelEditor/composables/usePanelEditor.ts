@@ -135,6 +135,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     handlePanelDiagnosticsUpdate,
     handleSeriesLimitUpdate,
     handleRegionJoinUpdate,
+    handleSankeyNoticeUpdate,
   } = usePanelNotices(() => store.state.timezone);
 
   /** Series limit warning message */
@@ -867,6 +868,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     handlePanelDiagnosticsUpdate,
     handleSeriesLimitUpdate,
     handleRegionJoinUpdate,
+    handleSankeyNoticeUpdate,
     metaDataValue,
     seriesDataUpdate,
     collapseFieldList,

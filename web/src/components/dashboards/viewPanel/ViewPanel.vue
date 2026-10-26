@@ -226,6 +226,7 @@
                   @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
                   @series-limit-update="handleSeriesLimitUpdate"
                   @region-join-update="handleRegionJoinUpdate"
+                  @sankey-notice-update="handleSankeyNoticeUpdate"
                   @limit-number-of-series-warning-message-update="
                     handleLimitNumberOfSeriesWarningMessage
                   "
@@ -468,6 +469,7 @@ export default defineComponent({
       handlePanelDiagnosticsUpdate,
       handleSeriesLimitUpdate,
       handleRegionJoinUpdate,
+      handleSankeyNoticeUpdate,
     } = usePanelNotices(() => store.state.timezone);
     const limitNumberOfSeriesWarningMessage = ref("");
     const sparklineWarning = ref("");
@@ -1059,6 +1061,7 @@ export default defineComponent({
       handlePanelDiagnosticsUpdate,
       handleSeriesLimitUpdate,
       handleRegionJoinUpdate,
+      handleSankeyNoticeUpdate,
       canEditFromNotice,
       onNoticeEditPanel,
       limitNumberOfSeriesWarningMessage,
