@@ -315,7 +315,11 @@ pub struct Incident {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub resolved_at: Option<i64>,
 
+    /// Every firing linked to the incident.
     pub alert_count: i32,
+    /// Distinct alerts among those firings; the list and detail responses set it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unique_alert_count: Option<i32>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
@@ -1793,6 +1797,7 @@ mod tests {
             last_alert_at: 2000,
             resolved_at,
             alert_count: 1,
+            unique_alert_count: None,
             title,
             assigned_to,
             acknowledged_by: None,

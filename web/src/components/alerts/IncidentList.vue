@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
         <template #cell-alert_count="{ row }">
-          <OTag type="countChip" value="neutral">{{ row.alert_count }}</OTag>
+          <OTag type="countChip" value="neutral">{{ row.unique_alert_count }}</OTag>
         </template>
         <template #cell-last_alert_at="{ row }">
           <OTimeCell
@@ -542,7 +542,7 @@ export default defineComponent({
       {
         id: "alert_count",
         header: t("alerts.incidents.alertCount"),
-        accessorKey: "alert_count",
+        accessorKey: "unique_alert_count",
         resizable: true,
         hideable: true,
         size: 80,

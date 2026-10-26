@@ -42,6 +42,8 @@ export interface Incident {
   last_alert_at: number;
   resolved_at?: number;
   alert_count: number;
+  /** Distinct alerts among the firings; set on list and detail responses. */
+  unique_alert_count?: number;
   title?: string;
   assigned_to?: string;
   acknowledged_by?: string;

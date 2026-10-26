@@ -110,6 +110,7 @@ const createIncident = (overrides: Partial<Incident> = {}): Incident => ({
   title: "Test Incident",
   group_values: { service: "test-service" },
   alert_count: 5,
+  unique_alert_count: 2,
   last_alert_at: 1700000000000000,
   created_at: 1700000000000000,
   updated_at: 1700000000000000,
