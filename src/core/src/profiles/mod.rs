@@ -913,7 +913,7 @@ fn format_location_frames(location_index: i32, dictionary: &ProfilesDictionary) 
     }
 }
 
-/// Format an unsymbolized location as `{mapping_id}+0x{rel}` (+ optional `/{frame_type}`).
+/// Format an unsymbolized location as `{file}@{build_id}+0x{rel}` (+ optional `/{frame_type}`).
 ///
 /// eBPF native frames omit Line/Function and expect backends to retain mapping metadata
 /// for later symbolization. Bare `0x{va}` collapses frames across different binaries.
@@ -951,6 +951,23 @@ fn relative_file_offset(
 
 fn resolve_mapping_identity(mapping_index: i32, dictionary: &ProfilesDictionary) -> Option<String> {
     let mapping = mapping_at(mapping_index, dictionary)?;
+    let file = lookup_string(&dictionary.string_table, mapping.filename_strindex).map(|path| {
+        std::path::Path::new(&path)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .map(|name| name.to_string())
+            .unwrap_or(path)
+    });
+    match (file, mapping_build_id(mapping, dictionary)) {
+        (Some(file), Some(build_id)) => Some(format!("{file}@{build_id}")),
+        (file, build_id) => build_id.or(file),
+    }
+}
+
+fn mapping_build_id(
+    mapping: &opentelemetry_proto::tonic::profiles::v1development::Mapping,
+    dictionary: &ProfilesDictionary,
+) -> Option<String> {
     for &attr_index in &mapping.attribute_indices {
         if attr_index <= 0 {
             continue;
@@ -970,13 +987,7 @@ fn resolve_mapping_identity(mapping_index: i32, dictionary: &ProfilesDictionary)
             return Some(value);
         }
     }
-    lookup_string(&dictionary.string_table, mapping.filename_strindex).map(|path| {
-        std::path::Path::new(&path)
-            .file_name()
-            .and_then(|name| name.to_str())
-            .map(|name| name.to_string())
-            .unwrap_or(path)
-    })
+    None
 }
 
 fn location_frame_type(
@@ -1549,7 +1560,7 @@ mod tests {
 
         // rel = address - memory_start + file_offset = 0x1000 - 0x1000 + 0x100
         let (stack, frame_count) = resolve_stack(1, Some(&dictionary));
-        assert_eq!(stack, "deadbeefcafebabe+0x100/native");
+        assert_eq!(stack, "libexample.so@deadbeefcafebabe+0x100/native");
         assert_eq!(frame_count, 1);
 
         let (other, _) = resolve_stack(2, Some(&dictionary));
@@ -1557,7 +1568,10 @@ mod tests {
         assert_ne!(stack, other);
 
         let (combined, combined_count) = resolve_stack(3, Some(&dictionary));
-        assert_eq!(combined, "deadbeefcafebabe+0x100/native;libc.so.6+0x100");
+        assert_eq!(
+            combined,
+            "libexample.so@deadbeefcafebabe+0x100/native;libc.so.6+0x100"
+        );
         assert_eq!(combined_count, 2);
     }
 
@@ -1671,7 +1685,7 @@ mod tests {
         };
 
         let (stack, frame_count) = resolve_stack(1, Some(&dictionary));
-        assert_eq!(stack, "deadbeefcafebabe+0x100");
+        assert_eq!(stack, "libexample.so@deadbeefcafebabe+0x100");
         assert_eq!(frame_count, 1);
     }
 
