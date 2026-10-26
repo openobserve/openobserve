@@ -36,6 +36,7 @@ const ENV_KEY_CONFLICT_MSG: &str = "This instance uses the license key in the O2
 const ENV_KEY_CONFLICT: &str = "env_key_conflict";
 const KEY_CHANGED_MSG: &str = "Another license key was applied while this one was being checked. Reload the license page and paste the key again.";
 const KEY_CHANGED: &str = "key_changed";
+const STORE_OUTCOME_UNKNOWN_MSG: &str = "The license key may or may not have been saved: storing it failed and it could not be read back. Paste the same key again; that is safe.";
 const KEY_ACCEPTED: &str = "accept";
 const KEY_ACCEPTED_MSG: &str = "This key can be applied.";
 
@@ -379,25 +380,44 @@ fn verdict_outcome(verdict: &Result<(), Rollback>) -> (&'static str, String) {
     }
 }
 
-// a write can commit before its acknowledgement is lost, so only a proven miss undoes the raise
-async fn undo_unless_landed<R, RF>(raise: &HwmRaise, raw_key: &str, read_back: R)
+async fn key_landed<R, RF>(raw_key: &str, read_back: R) -> Result<bool, infra::errors::Error>
 where
     R: FnOnce() -> RF,
     RF: std::future::Future<Output = Result<Option<bytes::Bytes>, infra::errors::Error>>,
 {
-    match read_back().await {
-        Ok(Some(stored)) if stored.as_ref() == raw_key.as_bytes() => {
+    Ok(read_back()
+        .await?
+        .is_some_and(|stored| stored.as_ref() == raw_key.as_bytes()))
+}
+
+// a write can commit before its acknowledgement is lost, so only a proven miss undoes the raise
+async fn undo_unless_landed<R, RF>(
+    raise: &HwmRaise,
+    raw_key: &str,
+    read_back: R,
+    error: anyhow::Error,
+) -> Response
+where
+    R: FnOnce() -> RF,
+    RF: std::future::Future<Output = Result<Option<bytes::Bytes>, infra::errors::Error>>,
+{
+    match key_landed(raw_key, read_back).await {
+        Ok(true) => {
             log::warn!("[LICENSE] the key landed despite its store error; keeping the rev raise");
         }
-        Ok(_) => {
+        Ok(false) => {
             if let Err(undo) = undo_raise(raise).await {
                 log::error!("[LICENSE] could not undo the rev high-water mark raise : {undo}");
             }
         }
         Err(e) => {
             log::error!("[LICENSE] cannot read back the license key, keeping the rev raise : {e}");
+            return MetaHttpResponse::internal_error(format!(
+                "{STORE_OUTCOME_UNKNOWN_MSG} Store error: {error}"
+            ));
         }
     }
+    MetaHttpResponse::internal_error(error)
 }
 
 // the gate raises the hwm before the key lands, so a failed store must lower it again
@@ -418,18 +438,19 @@ where
         Ok(Err(r)) => return (StatusCode::CONFLICT, Json(rollback_body(&r))).into_response(),
         Err(e) => return MetaHttpResponse::internal_error(e),
     };
-    match commit(fence).await {
-        Ok(true) => {}
-        // the raise may already back a newer paste's key, so a stale judgment never undoes it
-        Ok(false) => {
-            return (StatusCode::CONFLICT, Json(key_changed_body(pasted))).into_response();
-        }
+    let committed = match commit(fence).await {
+        Ok(committed) => committed,
         Err(e) => {
-            if let Some(raise) = raise {
-                undo_unless_landed(&raise, raw_key, read_back).await;
-            }
-            return MetaHttpResponse::internal_error(e);
+            return match raise {
+                Some(raise) => undo_unless_landed(&raise, raw_key, read_back, e).await,
+                None => MetaHttpResponse::internal_error(e),
+            };
         }
+    };
+    // a landed write whose acknowledgement was lost also reports a moved revision
+    if !committed && !matches!(key_landed(raw_key, read_back).await, Ok(true)) {
+        // the raise may already back a newer paste's key, so a stale judgment never undoes it
+        return (StatusCode::CONFLICT, Json(key_changed_body(pasted))).into_response();
     }
     match license::update().await {
         Ok(_) => (StatusCode::CREATED, Json("")).into_response(),
@@ -1688,7 +1709,14 @@ mod tests {
             || async { Err(infra::errors::Error::Message("meta store down".to_string())) },
         )
         .await;
-        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let (status, body) = body_of(resp).await;
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(
+            body["message"].as_str(),
+            Some(
+                "The license key may or may not have been saved: storing it failed and it could not be read back. Paste the same key again; that is safe. Store error: disk full"
+            )
+        );
         assert_eq!(hwm_rev(&load_rev_hwm().await.unwrap()), Some(9));
     }
 
@@ -1759,6 +1787,81 @@ mod tests {
         .await;
         assert_eq!(resp.status(), StatusCode::CONFLICT);
         assert_eq!(stored(LICENSE_DB_KEY).await, Some(json::json!("other-key")));
+    }
+
+    async fn license_reload_signalled() -> bool {
+        infra::db::get_coordinator()
+            .await
+            .get_if_exists(db::license::LICENSE_KEY_PREFIX)
+            .await
+            .unwrap()
+            .is_some()
+    }
+
+    #[tokio::test]
+    async fn a_write_that_landed_but_lost_its_ack_is_stored_and_reloads_the_nodes() {
+        let _store = store_setup().await;
+        let coordinator = infra::db::get_coordinator().await;
+        let _ = coordinator
+            .delete(db::license::LICENSE_KEY_PREFIX, false, false, None)
+            .await;
+        assert!(!license_reload_signalled().await);
+        let resp = store_gated(
+            &lic("lic-1", 9),
+            "key-9",
+            |fence| async move {
+                assert!(fence.commit("key-9").await.unwrap());
+                Ok(false)
+            },
+            stored_license_key,
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::CREATED);
+        assert_eq!(stored(LICENSE_DB_KEY).await, Some(json::json!("key-9")));
+        assert_eq!(hwm_rev(&load_rev_hwm().await.unwrap()), Some(9));
+        assert!(license_reload_signalled().await);
+    }
+
+    #[tokio::test]
+    async fn a_moved_revision_stays_409_unless_this_key_is_read_back() {
+        let _store = store_setup().await;
+        let coordinator = infra::db::get_coordinator().await;
+        let _ = coordinator
+            .delete(db::license::LICENSE_KEY_PREFIX, false, false, None)
+            .await;
+        let other = store_gated(
+            &lic("lic-1", 9),
+            "key-9",
+            |_| async { Ok(false) },
+            || async { Ok(Some(bytes::Bytes::from_static(b"key-12"))) },
+        )
+        .await;
+        let (status, body) = body_of(other).await;
+        assert_eq!(
+            (status, body["reason"].as_str()),
+            (StatusCode::CONFLICT, Some("key_changed"))
+        );
+        let unreadable = store_gated(
+            &lic("lic-1", 9),
+            "key-9",
+            |_| async { Ok(false) },
+            || async { Err(infra::errors::Error::Message("meta store down".to_string())) },
+        )
+        .await;
+        let (status, body) = body_of(unreadable).await;
+        assert_eq!(
+            (status, body["reason"].as_str()),
+            (StatusCode::CONFLICT, Some("key_changed"))
+        );
+        let missing = store_gated(
+            &lic("lic-1", 9),
+            "key-9",
+            |_| async { Ok(false) },
+            || async { Ok(None) },
+        )
+        .await;
+        assert_eq!(missing.status(), StatusCode::CONFLICT);
+        assert!(!license_reload_signalled().await);
     }
 
     #[tokio::test]
