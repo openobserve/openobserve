@@ -356,7 +356,7 @@ jobs:
           ref: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'benchmark-ui-unit-tests') && github.event.pull_request.head.sha || github.sha }}
       - uses: actions/checkout@v5
         with:
-          ref: f9fc46502d689096a7c8be356f33c4b126ff1684
+          ref: 9e6066e6d6f567729c7213a5c2ba4e3f5657347a
           path: baseline
           persist-credentials: false
       - uses: actions/setup-node@v7
