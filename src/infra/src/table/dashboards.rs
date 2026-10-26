@@ -653,6 +653,20 @@ mod tests {
     }
 
     #[test]
+    fn default_refresh_interval_survives_db_save_and_load() {
+        let inner: DashboardV8 = serde_json::from_value(serde_json::json!({
+            "version": 8,
+            "title": "My Dashboard",
+            "description": "",
+            "defaultRefreshInterval": 30
+        }))
+        .unwrap();
+        let data = inner_data_as_json(inner.into()).unwrap();
+        let loaded = Dashboard::try_from(make_model(8, data)).unwrap();
+        assert_eq!(loaded.v8.unwrap().default_refresh_interval, Some(30));
+    }
+
+    #[test]
     fn convert_skipping_invalid_drops_only_the_bad_row() {
         let folder = folders::Model {
             id: "folder-1".to_string(),

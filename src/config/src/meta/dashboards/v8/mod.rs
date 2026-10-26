@@ -49,6 +49,9 @@ pub struct Dashboard {
     pub variables: Option<Variables>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_datetime_duration: Option<DateTimeOptions>,
+    /// Auto-refresh interval in seconds applied when the dashboard opens; `0` or absent is Off.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_refresh_interval: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annotation_sources: Option<Vec<AnnotationSource>>,
     #[serde(default, skip_serializing)]
@@ -1183,6 +1186,45 @@ mod tests {
                 .unwrap()
                 .contains_key("defaultDatetimeDuration")
         );
+    }
+
+    #[test]
+    fn test_default_refresh_interval_skipped_when_none() {
+        let d = make_dashboard();
+        assert!(d.default_refresh_interval.is_none());
+        let json = serde_json::to_value(&d).unwrap();
+        assert!(
+            !json
+                .as_object()
+                .unwrap()
+                .contains_key("defaultRefreshInterval")
+        );
+    }
+
+    #[test]
+    fn test_default_refresh_interval_serde_roundtrip() {
+        let input = serde_json::json!({
+            "version": 8,
+            "title": "T",
+            "description": "",
+            "defaultDatetimeDuration": { "type": "relative", "relativeTimePeriod": "15m" },
+            "defaultRefreshInterval": 60
+        });
+        let d: Dashboard = serde_json::from_value(input).unwrap();
+        assert_eq!(d.default_refresh_interval, Some(60));
+        let back = serde_json::to_value(&d).unwrap();
+        assert_eq!(back["defaultRefreshInterval"], 60);
+        let again: Dashboard = serde_json::from_value(back).unwrap();
+        assert_eq!(again, d);
+    }
+
+    #[test]
+    fn test_default_refresh_interval_changes_hash() {
+        let plain: super::super::Dashboard = make_dashboard().into();
+        let mut d = make_dashboard();
+        d.default_refresh_interval = Some(30);
+        let with_refresh: super::super::Dashboard = d.into();
+        assert_ne!(plain.hash, with_refresh.hash);
     }
 
     #[test]
