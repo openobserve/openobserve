@@ -272,6 +272,7 @@ import analytics from "@/services/product_analytics";
 import ShareButton from "@/components/common/ShareButton.vue";
 import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
 import { getDashboard } from "@/utils/commons.ts";
+import { setPickerTimezoneSource } from "@/utils/dashboard/calendarPeriods";
 import { getManager } from "@/lib/vue-shortcut-manager";
 import { DASHBOARD_FRESH_PANEL_TIME } from "@/composables/dashboard/dashboardFreshPanelTime";
 
@@ -1890,6 +1891,47 @@ describe("ViewDashboard", () => {
       expect(moved).not.toBe(settled);
       expect(moved.start_time.getTime()).toBe(Date.parse("2026-10-07T00:00:00Z") * 1000);
       expect(moved.end_time.getTime()).toBe(Date.parse("2026-10-08T00:00:00.000Z") * 1000);
+    });
+
+    it("re-resolves a panel's own calendar range when the header timezone changes", async () => {
+      await mountWithPicker();
+      setPickerTimezoneSource(() => store.state.timezone);
+      try {
+        wrapper.vm.currentDashboardData.data = {
+          ...baseDashboard,
+          tabs: [
+            {
+              tabId: "tab-1",
+              name: "Tab 1",
+              panels: [
+                {
+                  id: "p1",
+                  type: "line",
+                  config: {
+                    panel_time_enabled: true,
+                    panel_time_range: { type: "relative", relativeTimePeriod: "calendar:day:-1" },
+                  },
+                },
+              ],
+            },
+          ],
+        };
+        wrapper.vm.selectedDate = { valueType: "relative", relativeTimePeriod: "15m" };
+        wrapper.vm.computeAllPanelTimes(true);
+        expect(wrapper.vm.currentTimeObjPerPanel.p1.start_time.getTime()).toBe(
+          Date.parse("2026-10-07T00:00:00Z") * 1000,
+        );
+
+        store.state.timezone = "Asia/Kolkata";
+        wrapper.vm.onHeaderTimezoneChange();
+        const moved = wrapper.vm.currentTimeObjPerPanel.p1;
+        expect(moved.start_time.getTime()).toBe(Date.parse("2026-10-06T18:30:00Z") * 1000);
+
+        wrapper.vm.onHeaderTimezoneChange();
+        expect(wrapper.vm.currentTimeObjPerPanel.p1).toBe(moved);
+      } finally {
+        setPickerTimezoneSource(() => localStorage.getItem("timezone"));
+      }
     });
 
     it("still refreshes __global on a forced recompute", async () => {

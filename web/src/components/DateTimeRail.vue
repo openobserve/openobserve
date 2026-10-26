@@ -57,11 +57,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="item.selected ? 'bg-button-primary! text-button-primary-foreground!' : ''"
             :disabled="item.disabled"
             :aria-pressed="item.selected"
-            :aria-keyshortcuts="raw('Delete')"
+            :aria-keyshortcuts="raw('Delete ArrowRight')"
             @mouseenter="emit('hover')"
             @focus="onItemFocus(`recent-${item.id}`)"
             @click="emit('select-recent', item.id)"
             @keydown.delete.prevent="removeFocusedRecent(item.id, $event)"
+            @keydown.right.prevent="focusSibling($event, '[data-test$=\'-remove\']')"
           >
             <OTruncatedText :tooltip="false" class="min-w-0">{{ item.label }}</OTruncatedText>
             <span
@@ -77,9 +78,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon-left="close"
             :data-test="`date-time-rail-recent-${item.id}-remove`"
             tabindex="-1"
-            :aria-label="t('common.timeRangeRemoveRecent')"
+            :aria-label="t('common.timeRangeRemoveRecent', { range: item.label })"
+            @keydown.left.prevent="focusSibling($event, '[data-date-time-rail-recent]')"
             class="absolute! end-1.5 top-1/2 -translate-y-1/2 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 max-md:opacity-100"
-            @click.stop="emit('remove-recent', item.id)"
+            @click.stop="removeFocusedRecent(item.id, $event)"
           />
         </div>
       </div>
@@ -210,8 +212,14 @@ const onItemFocus = (key: string) => {
   emit("hover");
 };
 
+// The × stays out of the Tab order; ArrowRight from its row reaches it and ArrowLeft returns.
+const focusSibling = (event: KeyboardEvent, selector: string) => {
+  const row = (event.currentTarget as HTMLElement).parentElement;
+  row?.querySelector<HTMLElement>(selector)?.focus();
+};
+
 // The × is out of the Tab order, so Delete on the focused row removes it and focus stays in the list.
-const removeFocusedRecent = async (id: string, event: KeyboardEvent) => {
+const removeFocusedRecent = async (id: string, event: Event) => {
   const list = (event.currentTarget as HTMLElement).closest("[data-test='date-time-rail']");
   const index = visibleRecent.value.findIndex((item) => item.id === id);
   emit("remove-recent", id);

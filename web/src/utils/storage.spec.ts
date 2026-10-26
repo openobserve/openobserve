@@ -38,6 +38,7 @@ import {
   useLocalUserInfo,
   useLocalTimezone,
   useLocalWrapContent,
+  applyTimezone,
 } from "./storage";
 
 beforeEach(() => {
@@ -395,5 +396,23 @@ describe("useLocalStorage internals (via useLocalCurrentUser)", () => {
     useLocalCurrentUser("new-value");
 
     expect(localStorageMock.setItem).toHaveBeenCalled();
+  });
+});
+
+describe("applyTimezone", () => {
+  it("sets the store and the stored key together, so a linked timezone reaches the picker and its queries", () => {
+    const dispatch = vi.fn();
+    applyTimezone({ dispatch }, "America/New_York");
+
+    expect(localStorageMock.setItem).toHaveBeenCalledWith("timezone", "America/New_York");
+    expect(dispatch).toHaveBeenCalledWith("setTimezone", "America/New_York");
+  });
+
+  it("leaves both alone when no timezone is given", () => {
+    const dispatch = vi.fn();
+    applyTimezone({ dispatch }, undefined);
+
+    expect(localStorageMock.setItem).not.toHaveBeenCalled();
+    expect(dispatch).not.toHaveBeenCalled();
   });
 });

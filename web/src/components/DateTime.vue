@@ -965,6 +965,10 @@ export default defineComponent({
         relativeValue.value = lastValidCustomValue.value;
     };
 
+    // A finished calendar period ends at the next one's start; second-precision fields show its last second, as its tooltip does.
+    const lastInstant = (token: string | null, endUs: number) =>
+      (parseCalendarToken(token)?.offset ?? 0) < 0 ? endUs - 1 : endUs;
+
     const setRelativeTime = (period: string) => {
       const calendarRange = resolveCalendarPeriod(period, store.state.timezone);
       if (calendarRange && props.calendarPresets) {
@@ -977,7 +981,7 @@ export default defineComponent({
         // A picker without calendar presets keeps a shared calendar range as its dates instead of dropping it.
         selectedType.value = "absolute";
         calendarToken.value = null;
-        setAbsoluteTime(calendarRange.startTime, calendarRange.endTime);
+        setAbsoluteTime(calendarRange.startTime, lastInstant(period, calendarRange.endTime));
         return;
       }
 
@@ -1412,7 +1416,10 @@ export default defineComponent({
           // If single date is selected we get string with date value
           // So have added check for from and to
           if (selectedDate.value?.from && selectedDate.value?.to && !props.disableRelative) {
-            return `${selectedDate.value.from} ${selectedTime.value.startTime} - ${selectedDate.value.to} ${selectedTime.value.endTime}`;
+            // A pending single clicked day is what Apply will use, so the label shows it already.
+            const from = pendingDay.value ?? selectedDate.value.from;
+            const to = pendingDay.value ?? selectedDate.value.to;
+            return `${from} ${selectedTime.value.startTime} - ${to} ${selectedTime.value.endTime}`;
           } else if (selectedDate.value?.from && selectedDate.value?.to && props.disableRelative) {
             return `${selectedDate.value.from} - ${selectedDate.value.to}`;
           } else {
@@ -1551,7 +1558,7 @@ export default defineComponent({
       const { startTime, endTime } = getConsumableDateTime();
       if (!Number.isFinite(startTime) || !Number.isFinite(endTime)) return;
       const start = convertUnixTime(startTime);
-      const end = convertUnixTime(endTime);
+      const end = convertUnixTime(lastInstant(calendarToken.value, endTime));
       isSeedingAbsolute = true;
       selectedDate.value.from = start.date;
       selectedDate.value.to = end.date;
@@ -1792,7 +1799,7 @@ export default defineComponent({
         });
 
         if (calendarExceedsRestriction(calendarToken.value)) {
-          // Clamped like a too-long rolling range: to the largest window the page allows, not whatever the custom fields held.
+          // Clamped like a too-long rolling range: to the largest window the page allows.
           const unit = [...periodUnits].reverse().find((u) => relativePeriodsMaxValue.value[u] > 0);
           if (unit) {
             setRelativeDate(unit, relativePeriodsMaxValue.value[unit]);

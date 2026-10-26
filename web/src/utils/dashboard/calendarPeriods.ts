@@ -125,6 +125,9 @@ export const formatCalendarTooltip = (
   return formatResolvedCalendarTooltip(token, range, timezone);
 };
 
+/** A period as plain text for a reader without the picker, e.g. an AI prompt: calendar tokens become their dates and zone. */
+export const describePeriod = (period: string): string => formatCalendarTooltip(period) ?? period;
+
 /** Tooltip for an already resolved calendar range; a finished period shows its last second, not the next start. */
 export const formatResolvedCalendarTooltip = (
   token: unknown,

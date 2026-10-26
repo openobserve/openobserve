@@ -219,7 +219,9 @@ export const arePickerValuesEqual = (first: any, second: any): boolean => {
   if (type === "relative") {
     if (first.relativeTimePeriod !== second.relativeTimePeriod) return false;
     // A calendar period's start moves with the timezone, so the same token can name another window.
-    const bothResolved = first.startTime != null && second.startTime != null;
+    const bothResolved =
+      Number.isFinite(Number(first.startTime ?? NaN)) &&
+      Number.isFinite(Number(second.startTime ?? NaN));
     return (
       !bothResolved ||
       parseCalendarToken(first.relativeTimePeriod) === null ||

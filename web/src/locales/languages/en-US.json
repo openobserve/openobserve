@@ -686,7 +686,7 @@
     "timeRangeRecent": "Recent",
     "timeRangeCalendar": "Calendar",
     "timeRangeRecentEmpty": "Ranges you apply will show up here.",
-    "timeRangeRemoveRecent": "Remove from recent ranges",
+    "timeRangeRemoveRecent": "Remove {range} from recent ranges",
     "timeRangeShowMore": "Show more",
     "timeRangeShowLess": "Show less",
     "plusDays": "+{count}d",

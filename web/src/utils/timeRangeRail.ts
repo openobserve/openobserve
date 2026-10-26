@@ -71,7 +71,11 @@ export const formatRecentRange = (
 ): RecentRangeLabel => {
   const zone = safeTimezone(timezone);
   const startMs = Math.floor(startUs / 1000);
-  const endMs = Math.floor(endUs / 1000);
+  // An end exactly at midnight is exclusive, so the range ends on the previous day, as calendar tooltips show it.
+  const endsAtMidnight =
+    endUs > startUs &&
+    formatInTimeZone(Math.floor(endUs / 1000), zone, "HH:mm:ss.SSS") === "00:00:00.000";
+  const endMs = Math.floor((endsAtMidnight ? endUs - 1 : endUs) / 1000);
   const currentYear = formatInTimeZone(nowMs, zone, "yyyy");
   const day = (ms: number) => {
     const withYear = formatInTimeZone(ms, zone, "yyyy") !== currentYear;

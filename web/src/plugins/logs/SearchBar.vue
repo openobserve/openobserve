@@ -1840,6 +1840,7 @@ import { sortSavedViews } from "@/components/savedViews/savedViewsSort";
 import SavedViewsListDialog from "@/components/savedViews/SavedViewsListDialog.vue";
 import { useFavoriteSavedViews } from "@/composables/useFavoriteSavedViews";
 import { makeSavedFunctionSchema, type SavedFunctionForm } from "./SearchBar.SavedFunction.schema";
+import { applyTimezone } from "@/utils/storage";
 
 const defaultValue: any = () => {
   return {
@@ -3556,9 +3557,7 @@ export default defineComponent({
               ];
             }
 
-            if (extractedObj.data?.timezone) {
-              store.dispatch("setTimezone", extractedObj.data.timezone);
-            }
+            applyTimezone(store, extractedObj.data?.timezone);
 
             if (!Object.prototype.hasOwnProperty.call(extractedObj.data.stream, "streamType")) {
               extractedObj.data.stream.streamType = "logs";

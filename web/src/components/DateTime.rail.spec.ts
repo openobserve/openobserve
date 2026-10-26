@@ -298,7 +298,7 @@ describe("DateTime rail", () => {
       expect(wrapper!.vm.selectedType).toBe("absolute");
       expect(wrapper!.vm.getConsumableDateTime()).toMatchObject({
         startTime: micros("2026-10-06T18:30:00Z"),
-        endTime: micros("2026-10-07T18:30:00Z"),
+        endTime: micros("2026-10-07T18:29:59Z"),
       });
     });
 
@@ -471,6 +471,7 @@ describe("DateTime rail", () => {
       wrapper!.vm.selectedTime.startTime = "09:15:00";
       wrapper!.vm.selectedTime.endTime = "10:30:00";
       await flushPromises();
+      expect(wrapper!.vm.triggerLabel).toBe("2026/10/03 09:15:00 - 2026/10/03 10:30:00");
       el("date-time-apply-btn")!.click();
       await flushPromises();
 
@@ -565,6 +566,23 @@ describe("DateTime rail", () => {
       expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(emitsBefore);
     });
 
+    it("keeps typed times while the clock ticks; only switching to the tab seeds the fields", async () => {
+      createWrapper({ autoApply: true, defaultRelativeTime: "calendar:day:0" });
+      await flushPromises();
+      await openMenu();
+      el("date-time-absolute-tab")!.click();
+      await flushPromises();
+
+      wrapper!.vm.selectedTime.startTime = "09:00:00";
+      wrapper!.vm.selectedTime.endTime = "10:00:00";
+      await flushPromises();
+      vi.setSystemTime(new Date("2026-10-08T03:05:00Z"));
+      wrapper!.vm.refreshTooltipNow();
+      await flushPromises();
+
+      expect(wrapper!.vm.selectedTime).toEqual({ startTime: "09:00:00", endTime: "10:00:00" });
+    });
+
     it("applies the seeded range once the user edits it", async () => {
       createWrapper({ autoApply: true, defaultRelativeTime: "calendar:month:-1" });
       await flushPromises();
@@ -572,15 +590,15 @@ describe("DateTime rail", () => {
 
       el("date-time-absolute-tab")!.click();
       await flushPromises();
-      expect(wrapper!.vm.selectedDate).toEqual({ from: "2026/09/01", to: "2026/10/01" });
-      expect(wrapper!.vm.selectedTime).toEqual({ startTime: "00:00:00", endTime: "00:00:00" });
+      expect(wrapper!.vm.selectedDate).toEqual({ from: "2026/09/01", to: "2026/09/30" });
+      expect(wrapper!.vm.selectedTime).toEqual({ startTime: "00:00:00", endTime: "23:59:59" });
 
       wrapper!.vm.selectedTime.startTime = "06:00:00";
       await flushPromises();
       expect(lastEmit()).toMatchObject({
         valueType: "absolute",
         startTime: micros("2026-09-01T00:30:00Z"),
-        endTime: micros("2026-09-30T18:30:00Z"),
+        endTime: micros("2026-09-30T18:29:59Z"),
       });
     });
   });
@@ -697,7 +715,7 @@ describe("DateTime rail", () => {
       await openMenu();
 
       expect(el("date-time-rail-recent-0")?.textContent?.trim()).toBe("Oct 8 · 04:30–05:00");
-      expect(el("date-time-rail-recent-1")?.textContent?.trim()).toBe("Oct 6 23:30–00:00+1d");
+      expect(el("date-time-rail-recent-1")?.textContent?.trim()).toBe("Oct 6 · 23:30–23:59");
 
       el("date-time-rail-recent-1")!.click();
       await flushPromises();
@@ -729,6 +747,33 @@ describe("DateTime rail", () => {
 
       expect(storedHistory()).toEqual([hourRange(1), hourRange(3)]);
       expect(document.activeElement?.getAttribute("data-test")).toBe("date-time-rail-recent-1");
+    });
+
+    it("reaches a row's remove button with ArrowRight and returns with ArrowLeft", async () => {
+      vi.useRealTimers();
+      seedHistory([hourRange(1), hourRange(2)]);
+      createWrapper();
+      await openMenu();
+      const key = (target: HTMLElement, k: string) =>
+        target.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true }));
+
+      const row = el("date-time-rail-recent-1")!;
+      row.focus();
+      key(row, "ArrowRight");
+      const remove = el("date-time-rail-recent-1-remove")!;
+      expect(document.activeElement).toBe(remove);
+      expect(remove.getAttribute("aria-label")).toBe(
+        `Remove ${row.textContent?.trim()} from recent ranges`,
+      );
+
+      key(remove, "ArrowLeft");
+      expect(document.activeElement).toBe(el("date-time-rail-recent-1"));
+
+      key(el("date-time-rail-recent-1")!, "ArrowRight");
+      el("date-time-rail-recent-1-remove")!.click();
+      await flushPromises();
+      expect(storedHistory()).toEqual([hourRange(1)]);
+      expect(document.activeElement?.getAttribute("data-test")).toBe("date-time-rail-recent-0");
     });
 
     it("opens on the first rail item and keeps the rail a single Tab stop", async () => {

@@ -1333,8 +1333,7 @@ export default defineComponent({
         end_time: endTime,
       };
     };
-    // A relative range is the same selection whatever "now" it last ended at.
-    // A calendar period also keys on its start, which moves when the timezone changes.
+    // A relative range is the same selection whatever "now" it ended at; a calendar one also keys on its zone-dependent start.
     const dateSelectionKey = (date: any) =>
       date?.valueType === "relative"
         ? parseCalendarToken(date.relativeTimePeriod)

@@ -54,6 +54,14 @@ describe("timeRangeRail", () => {
       );
     });
 
+    it("reads an end at exactly midnight as the end of the previous day", () => {
+      expect(label("2026-10-26T00:00:00Z", "2026-10-27T00:00:00Z")).toEqual({
+        label: "Oct 26 · 00:00–23:59",
+        extraDays: 0,
+      });
+      expect(label("2026-10-19T00:00:00Z", "2026-10-26T00:00:00Z").label).toBe("Oct 19 – Oct 25");
+    });
+
     it("reads days and times in the picker timezone", () => {
       expect(label("2026-10-26T20:00:00Z", "2026-10-26T21:00:00Z", "Asia/Calcutta")).toEqual({
         label: "Oct 27 · 01:30–02:30",

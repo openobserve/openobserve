@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { nextWiderPeriod, periodToLabel } from "./useWidenRange";
+import useWidenRange, { nextWiderPeriod, periodToLabel } from "./useWidenRange";
 
 describe("useWidenRange", () => {
   beforeEach(() => {
@@ -45,5 +45,18 @@ describe("useWidenRange", () => {
     expect(nextWiderPeriod("calendar:day:-1")).toBe("7d");
     expect(nextWiderPeriod("calendar:day:-6")).toBe("7d");
     expect(nextWiderPeriod("calendar:week:-1")).toBe("30d");
+  });
+
+  it("offers no widening for a calendar period that began more than 30 days ago", () => {
+    vi.setSystemTime(new Date("2026-10-27T03:00:00Z"));
+    expect(nextWiderPeriod("calendar:month:-1")).toBe("");
+    expect(nextWiderPeriod("calendar:year:-1")).toBe("");
+
+    const { suggestedPeriod, expandRangeSublabel } = useWidenRange(
+      () => "relative",
+      () => "calendar:month:-1",
+    );
+    expect(suggestedPeriod.value).toBe("");
+    expect(expandRangeSublabel.value).toBe("");
   });
 });

@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:modelValue="timeGate.onPick"
             @show="timeGate.onShow"
             @hide="onTimePickerHide"
-            @timezone-change="timeGate.flush"
+            @timezone-change="onHeaderTimezoneChange"
             data-test="dashboard-global-date-time-picker"
           />
           <!-- Kiosk keeps this mounted on every width: it owns the refresh value and its URL sync. -->
@@ -1461,6 +1461,29 @@ export default defineComponent({
     };
 
     // Compute time for a single specific panel (for panel-level refresh)
+    // The global range re-applies through the gate when its window moves; a panel's own calendar range has no such path.
+    const onHeaderTimezoneChange = () => {
+      timeGate.flush();
+      const globalTime = getAppliedGlobalTime();
+      if (!globalTime) return;
+      for (const tab of currentDashboardData.data?.tabs ?? []) {
+        for (const panel of tab.panels ?? []) {
+          if (
+            !hasPanelTime(panel) ||
+            !isEffectivePanelTimeCalendar(panel, route.query, selectedDate.value)
+          ) {
+            continue;
+          }
+          const next = computePanelTime(panel, globalTime);
+          const current = currentTimeObjPerPanel.value[panel.id];
+          // Only a moved start re-queries; a "so far" end always differs by the moment it was read.
+          if (next && current?.start_time?.getTime() !== next.start_time?.getTime()) {
+            currentTimeObjPerPanel.value[panel.id] = next;
+          }
+        }
+      }
+    };
+
     const computeSinglePanelTime = (panelId: string) => {
       if (!currentDashboardData.data?.tabs || !dateTimePicker.value) {
         return;
@@ -2718,6 +2741,7 @@ export default defineComponent({
       currentTimeObj,
       currentTimeObjPerPanel,
       computeAllPanelTimes,
+      onHeaderTimezoneChange,
       shouldRefreshWithoutCachePerPanel,
       refreshInterval,
       // ----------------

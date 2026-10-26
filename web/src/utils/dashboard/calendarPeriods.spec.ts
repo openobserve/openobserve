@@ -13,10 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { gt } from "@/types/i18n";
 import {
   buildCalendarToken,
+  describePeriod,
   formatCalendarLabel,
   formatCalendarTooltip,
   parseCalendarToken,
@@ -470,6 +471,23 @@ describe("calendarPeriods", () => {
 
     it("honours the locale", () => {
       expect(formatCalendarLabel("calendar:month:-2", IST, gt, "de-DE", NOW)).toBe("Aug. 2026");
+    });
+  });
+
+  describe("describePeriod", () => {
+    it("spells out a calendar token as its dates and zone and leaves a rolling period as is", () => {
+      localStorage.setItem("timezone", "UTC");
+      try {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(NOW);
+        expect(describePeriod("calendar:day:-1")).toBe(
+          "2026/10/07 00:00:00 - 2026/10/07 23:59:59 (UTC)",
+        );
+        expect(describePeriod("15m")).toBe("15m");
+      } finally {
+        vi.useRealTimers();
+        localStorage.removeItem("timezone");
+      }
     });
   });
 
