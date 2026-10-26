@@ -25,7 +25,7 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { formatAge } from "./kubernetesModel";
 import { KIND_INFO } from "./kubernetesQueries";
-import type { DetailsRef } from "./kubernetesUrlState";
+import type { DetailsRef, K8sUrlState } from "./kubernetesUrlState";
 import type { AttentionItem } from "./overviewModel";
 
 const props = defineProps<{
@@ -39,6 +39,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   open: [ref: DetailsRef];
   action: [type: "logs" | "explain", ref: DetailsRef];
+  navigate: [patch: Partial<K8sUrlState>];
 }>();
 
 const { t } = useI18nTyped();
@@ -58,7 +59,11 @@ function reasonLine(item: AttentionItem): I18nText {
   if (item.restarts) {
     parts.push(t("infra.k8s2.overviewAttentionRestarts", { count: item.restarts }, item.restarts));
   }
-  if (item.createdAt != null) {
+  if (item.sinceUs != null && item.sinceUs <= props.endUs) {
+    parts.push(
+      t("infra.k8s2.overviewAttentionFor", { age: formatAge(props.endUs - item.sinceUs) }),
+    );
+  } else if (item.createdAt != null) {
     const age = formatAge(props.endUs - item.createdAt);
     parts.push(t("infra.k8s2.overviewAttentionAge", { age }));
   }
@@ -76,13 +81,22 @@ function reasonLine(item: AttentionItem): I18nText {
       <OText variant="meta" class="text-text-secondary">{{
         t("infra.k8s2.overviewAttentionSub")
       }}</OText>
-      <OText
+      <span
         v-if="total > items.length"
-        variant="meta"
-        class="text-text-secondary ms-auto"
+        class="ms-auto flex items-center gap-1"
         data-test="k8s2-overview-attention-showing"
-        >{{ t("infra.k8s2.overviewAttentionShowing", { shown: items.length, total }) }}</OText
       >
+        <OText variant="meta" class="text-text-secondary">{{
+          t("infra.k8s2.overviewAttentionShowing", { shown: items.length })
+        }}</OText>
+        <OButton
+          variant="ghost-primary"
+          size="xs"
+          data-test="k8s2-overview-attention-all"
+          @click="emit('navigate', { view: 'pods', status: 'failing' })"
+          >{{ raw(String(total)) }}</OButton
+        >
+      </span>
     </div>
     <div v-if="loading" class="flex flex-col gap-3 p-3" data-test="k8s2-overview-attention-loading">
       <OSkeleton v-for="n in 3" :key="n" type="text" class="h-9" />
@@ -139,21 +153,17 @@ function reasonLine(item: AttentionItem): I18nText {
           >
             {{ t("infra.k8s2.overviewAttentionLogs") }}
           </OButton>
-          <span
-            class="inline-flex"
-            :data-test="`k8s2-overview-attention-explain-wrap-${row.item.key}`"
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-left="auto-awesome"
+            disabled
+            focusable-unavailable
+            :data-test="`k8s2-overview-attention-explain-${row.item.key}`"
           >
-            <OButton
-              variant="outline"
-              size="sm"
-              icon-left="auto-awesome"
-              disabled
-              :data-test="`k8s2-overview-attention-explain-${row.item.key}`"
-            >
-              {{ t("infra.k8s2.overviewAttentionExplain") }}
-            </OButton>
+            {{ t("infra.k8s2.overviewAttentionExplain") }}
             <OTooltip :content="t('infra.k8s2.overviewAttentionExplainUnavailable')" />
-          </span>
+          </OButton>
         </div>
       </li>
     </ul>

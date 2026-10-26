@@ -32,7 +32,12 @@ import K8sListHeader from "./K8sListHeader.vue";
 import K8sRowMenu from "./K8sRowMenu.vue";
 import { TONE_PILL } from "./k8sTone";
 import type { K8sAction } from "./k8sActions";
-import { matchesStatusChip, statusChipsFor, type StatusChipId } from "./kubernetesStatusChips";
+import {
+  hasStatusChip,
+  matchesStatusChip,
+  statusChipsFor,
+  type StatusChipId,
+} from "./kubernetesStatusChips";
 import type { View } from "./kubernetesQueries";
 import {
   TONE_TEXT_CLASS,
@@ -43,6 +48,7 @@ import {
   usageBarVariant,
   warningLabel,
   type AnyRow,
+  type PodRow,
   type Warning,
 } from "./kubernetesModel";
 import type { EventRow } from "./kubernetesEvents";
@@ -62,6 +68,7 @@ const props = withDefaults(
   defineProps<{
     view: ListView;
     rows: any[];
+    pods?: PodRow[];
     state: K8sUrlState;
     endUs: number;
     cluster: string | null;
@@ -74,7 +81,7 @@ const props = withDefaults(
     chip?: I18nText;
     lastUpdatedAt: number | null;
   }>(),
-  { chip: undefined },
+  { chip: undefined, pods: () => [] },
 );
 
 const emit = defineEmits<{
@@ -140,11 +147,8 @@ const defaultVisibility = computed(() =>
 const eventMatches = (e: EventRow, needle: string) =>
   [e.note, e.reason, e.object.name].some((v) => v.toLowerCase().includes(needle));
 
-const statusFilter = ref<StatusChipId>("all");
-
-watch(
-  () => props.view,
-  () => (statusFilter.value = "all"),
+const statusFilter = computed<StatusChipId>(() =>
+  hasStatusChip(props.view, props.state.status) ? props.state.status : "all",
 );
 
 const inNamespaces = computed<any[]>(() =>
@@ -153,14 +157,14 @@ const inNamespaces = computed<any[]>(() =>
     : filterRows(props.rows as AnyRow[], { cluster: null, namespaces: activeNamespaces.value }, ""),
 );
 
-const statusChips = computed(() => statusChipsFor(props.view, inNamespaces.value));
+const statusChips = computed(() => statusChipsFor(props.view, inNamespaces.value, props.pods));
 
 const filtered = computed<any[]>(() => {
   const needle = props.state.search.trim().toLowerCase();
   const byStatus = (rows: any[]) =>
     statusFilter.value === "all"
       ? rows
-      : rows.filter((r) => matchesStatusChip(props.view, r, statusFilter.value));
+      : rows.filter((r) => matchesStatusChip(props.view, r, statusFilter.value, props.pods));
   if (props.view === "events") {
     const rows = byStatus(props.rows);
     return needle ? rows.filter((e: EventRow) => eventMatches(e, needle)) : rows;
@@ -212,8 +216,12 @@ const onRow = (row: any) => {
 };
 
 const clear = () => {
-  statusFilter.value = "all";
-  emit("update", namespaced.value ? { search: "", namespaces: [] } : { search: "" });
+  emit(
+    "update",
+    namespaced.value
+      ? { search: "", namespaces: [], status: "all" }
+      : { search: "", status: "all" },
+  );
 };
 
 const setNamespace = (namespace: string) => {
@@ -255,7 +263,6 @@ const searchPlaceholder = computed<I18nText>(() =>
 
 const onAction = (type: K8sAction, ref: DetailsRef) => {
   emit("action", type, ref);
-  if (type === "details") emit("open", ref);
 };
 
 const toneOfCell = (c: K8sColumn, row: any) => c.meta.tone?.(row) ?? null;
@@ -309,7 +316,7 @@ const namespaceOf = (row: any): string =>
         :filtered="statusFilter !== 'all'"
         :status-chips="statusChips"
         :status-filter="statusFilter"
-        @update:status-filter="(id: StatusChipId) => (statusFilter = id)"
+        @update:status-filter="(status: StatusChipId) => emit('update', { status })"
         @update:namespaces="(namespaces: string[]) => emit('update', { namespaces })"
         @update:search="(search: string) => emit('update', { search })"
         @clear="clear"

@@ -124,8 +124,8 @@ describe("WorkloadsOverview", () => {
 
   const segments = (kind: string) =>
     find(`k8s2-workloads-bar-${kind}`)
-      .findAll('[data-test^="k8s2-segment-"]')
-      .map((s) => s.attributes("data-test")?.replace("k8s2-segment-", ""));
+      .findAll('[data-test^="o-segmented-bar-segment-"]')
+      .map((s) => s.attributes("data-test")?.replace("o-segmented-bar-segment-", ""));
 
   const statusRows = (kind: string) =>
     wrapper
@@ -158,14 +158,16 @@ describe("WorkloadsOverview", () => {
 
     it("draws one bar segment and legend entry per non-zero status", async () => {
       await mountView();
-      expect(statusRows("pod")).toEqual(["Running: 2", "Pending: 1", "Unknown: 1"]);
-      expect(segments("pod")).toEqual(["running", "pending", "unknown"]);
+      expect(statusRows("pod")).toEqual(["Ready: 2", "Pending: 1", "Unknown: 1"]);
+      expect(segments("pod")).toEqual(["ready", "pending", "unknown"]);
       const widths = find("k8s2-workloads-bar-pod")
-        .findAll('[data-test^="k8s2-segment-"]')
+        .findAll('[data-test^="o-segmented-bar-segment-"]')
         .map((s) => s.attributes("style"));
       expect(widths).toEqual(["width: 50%;", "width: 25%;", "width: 25%;"]);
       expect(statusRows("cronjob")).toEqual(["Suspended: 1"]);
-      expect(find("k8s2-segment-suspended").classes()).toContain("bg-progress-bar-warning");
+      expect(find("o-segmented-bar-segment-suspended").classes()).toContain(
+        "bg-status-warning-text",
+      );
     });
 
     it("shows None for a kind with no objects, and mounts no chart component", async () => {
@@ -180,9 +182,9 @@ describe("WorkloadsOverview", () => {
       await mountView();
       const tip = (testId: string) => find(testId).find('[data-test="tooltip"]');
       expect(tip("k8s2-workloads-status-pod-unknown").text()).toContain("OpenObserve rule");
-      expect(tip("k8s2-workloads-status-pod-running").exists()).toBe(false);
+      expect(tip("k8s2-workloads-status-pod-ready").exists()).toBe(false);
       // `idle` is scaled to zero with no pods, so the Deployment running row used the zero-pod rule.
-      expect(statusRows("deployment")).toEqual(["Running: 2"]);
+      expect(statusRows("deployment")).toEqual(["Healthy: 2"]);
       expect(tip("k8s2-workloads-status-deployment-running").exists()).toBe(true);
       expect(tip("k8s2-workloads-status-replicaset-running").exists()).toBe(false);
     });
@@ -190,9 +192,17 @@ describe("WorkloadsOverview", () => {
     it("the namespace selection changes the counts", async () => {
       await mountView({ namespaces: ["shop"] });
       expect(find("k8s2-workloads-total-pod").text()).toBe("3");
-      expect(statusRows("pod")).toEqual(["Running: 2", "Pending: 1"]);
+      expect(statusRows("pod")).toEqual(["Ready: 2", "Pending: 1"]);
       expect(find("k8s2-workloads-total-deployment").text()).toBe("1");
       expect(find("k8s2-workloads-card-cronjob").text()).toContain("None");
+    });
+
+    it("names the pods in the header count, filtered or not", async () => {
+      await mountView();
+      const count = () => find("k8s2-list-count").text().replace(/\s+/g, " ");
+      expect(count()).toBe("4 pods");
+      await wrapper.setProps({ namespaces: ["shop"] });
+      expect(count()).toMatch(/^Filtered:? 3 \/ 4 pods$/);
     });
 
     it("writes the namespace selection back as an update", async () => {
@@ -221,6 +231,7 @@ describe("WorkloadsOverview", () => {
         .findAll('[data-test^="k8s2-workloads-problem-name-"]')
         .map((n) => n.text());
       expect(names).toEqual(["web"]);
+      expect(wrapper.find('[data-test^="k8s2-workloads-problem-status-"]').text()).toBe("Degraded");
       await find("k8s2-workloads-problems-table").find("tbody tr").trigger("click");
       expect(wrapper.emitted("open")?.[0]).toEqual([
         { kind: "deployment", cluster: "prod", namespace: "shop", name: "web" },

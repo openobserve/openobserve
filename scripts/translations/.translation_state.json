@@ -13610,7 +13610,6 @@
       "kindReplicaSet": "78b72a5e9b82180d",
       "kindStatefulSet": "34cbec34ca367e4e",
       "limitMarker": "198a27bda7be9fcb",
-      "logsNoClusterField": "28e848d185fe30f0",
       "logsNoStream": "b2c794b395d114db",
       "mapAnchorNeeds": "9687b45f2a839d5d",
       "mapAnchorNodes": "e1e9fc8570d974b3",

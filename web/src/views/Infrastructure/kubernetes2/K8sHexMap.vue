@@ -56,7 +56,7 @@ const props = defineProps<{
   fill: MapFill;
   groups: RowGroup[];
   headers: GroupHeader[];
-  highlight: FillClass[];
+  hidden: FillClass[];
   selectedKey: string | null;
   label: I18nText;
 }>();
@@ -73,6 +73,7 @@ const CLASSES: readonly FillClass[] = [
   "warning",
   "error",
   "noReq",
+  "notRunning",
   "noData",
 ];
 
@@ -86,6 +87,7 @@ const CLASS_TOKEN: Record<FillClass, `--${string}`> = {
   warning: "--color-status-warning-text",
   error: "--color-status-negative",
   noReq: "--color-surface-subtle",
+  notRunning: "--color-border-strong",
   noData: "--color-surface-subtle",
 };
 
@@ -106,7 +108,7 @@ const HEX_SCALE = 0.9;
 
 const ZOOM_STEP = 1.5;
 
-const DIMMED = 0.2;
+const HIDDEN_OPACITY = 0.12;
 
 // eslint-disable-next-line local/no-hardcoded-px -- canvas geometry
 const TITLE_FONT = "600 13px sans-serif";
@@ -255,7 +257,7 @@ const fitState = computed(() => {
 const hexData = computed(() => {
   const l = layout.value;
   if (!l) return markRaw([] as number[][]);
-  const lit = new Set(props.highlight);
+  const hidden = new Set(props.hidden);
   return markRaw(
     rows.value.map((row, i) => {
       const cls = fillClass(row, props.fill);
@@ -264,7 +266,7 @@ const hexData = computed(() => {
         l.y[i],
         CLASSES.indexOf(cls),
         Number(row.key === props.selectedKey),
-        Number(lit.size > 0 && !lit.has(cls)),
+        Number(hidden.has(cls)),
         Number(isFailing(row)),
       ];
     }),
@@ -532,9 +534,11 @@ function buildOptions() {
           const unit = api.size([1, 1])[0] * HEX_SCALE;
           const cls = api.value(2);
           const selected = api.value(3) === 1;
-          const opacity = api.value(4) === 1 ? DIMMED : 1;
+          const faded = api.value(4) === 1;
+          const opacity = faded ? HIDDEN_OPACITY : 1;
           const hex = {
             type: "polygon",
+            silent: faded,
             shape: { points: hexPoints(cx, cy, unit) },
             z2: selected ? 10 : 0,
             cursor: "pointer",
@@ -734,7 +738,7 @@ function resetZoom() {
     <div
       v-if="$slots.legend"
       ref="legendRef"
-      class="bg-surface-overlay border-border-subtle rounded-surface absolute start-3 bottom-3 flex max-w-[calc(100%-10rem)] items-center gap-2 overflow-x-auto border px-3 py-1.5 whitespace-nowrap shadow-sm max-md:max-w-[calc(100%-4.5rem)]"
+      class="bg-surface-overlay border-border-subtle rounded-surface absolute start-3 bottom-3 flex max-w-[calc(100%-10rem)] items-center gap-2 border px-3 py-1.5 shadow-sm max-md:max-w-[calc(100%-4.5rem)]"
       data-test="k8s2-map-legend"
     >
       <slot name="legend" />

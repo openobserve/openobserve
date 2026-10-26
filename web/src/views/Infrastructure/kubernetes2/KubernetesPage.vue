@@ -22,6 +22,7 @@ import { gt, raw, useI18nTyped } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -51,14 +52,15 @@ import K8sResourceTree from "./K8sResourceTree.vue";
 import {
   buildTree,
   clusterCodes,
-  completeWarnings,
+  clusterSeen,
   clusterStatsOf,
   clusterTone,
   nodeSummary,
 } from "./k8sTree";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
-import { buildPaletteItems, type PaletteItem } from "./k8sPalette";
+import { buildPaletteItems, mergePaletteItems, type PaletteItem } from "./k8sPalette";
+import { usePaletteIndex } from "./usePaletteIndex";
 import { useKubernetesInventory, type K8sTime } from "./useKubernetesInventory";
 import { KIND_INFO, MAP_ANCHOR, groupsPodsByNode, type View } from "./kubernetesQueries";
 import {
@@ -140,8 +142,10 @@ const treeGroups = computed(() =>
     inventory: k8s.inventory.value,
     cluster: k8s.effectiveCluster.value,
     events: {
-      total: k8s.hasEvents.value && state.value.view === "events" ? k8s.events.value.length : null,
-      warnings: completeWarnings(state.value.view, k8s.warnings.value.rows.length),
+      total:
+        k8s.eventCounts.value?.total ??
+        (k8s.hasEvents.value && state.value.view === "events" ? k8s.events.value.length : null),
+      warnings: k8s.eventCounts.value?.warnings ?? 0,
     },
     stats: stats.value,
   }),
@@ -169,7 +173,13 @@ const crumbs = computed(() => {
 const viewOptions = computed(() =>
   treeGroups.value.flatMap((group) => [
     { label: t(group.label), header: true },
-    ...group.items.map((item) => ({ label: t(item.label), value: item.view })),
+    ...group.items.map((item) => ({
+      label:
+        item.count == null
+          ? t(item.label)
+          : t("infra.k8s2.viewOptionCount", { label: t(item.label), count: item.count }),
+      value: item.view,
+    })),
   ]),
 );
 
@@ -210,6 +220,9 @@ const closeDetails = () => replace({ ...state.value, details: null });
 const onNavigate = (next: K8sUrlState) => push(next);
 
 const onView = (view: View) => push(withView(state.value, view));
+
+const onPatch = (patch: Partial<K8sUrlState>) =>
+  push({ ...withView(state.value, patch.view ?? state.value.view), ...patch });
 
 const scopedRows = (rows: AnyRow[]) => {
   const cluster = k8s.effectiveCluster.value;
@@ -336,15 +349,26 @@ const openClusterSwitcher = () => {
   paletteOpen.value = true;
 };
 
+const paletteIndex = usePaletteIndex({
+  open: paletteOpen,
+  cluster: computed(() => k8s.effectiveCluster.value),
+  orgId,
+  refreshNonce: k8s.refreshNonce,
+  has: k8s.has,
+});
+
 // Built only while open: every pod becomes an item, which a large cluster should not pay for idly.
 const paletteItems = computed(() =>
   paletteOpen.value
-    ? buildPaletteItems({
-        inventory: k8s.inventory.value,
-        clusters: k8s.clusters.value,
-        activeCluster: k8s.effectiveCluster.value,
-        t,
-      })
+    ? mergePaletteItems(
+        buildPaletteItems({
+          inventory: k8s.inventory.value,
+          clusters: k8s.clusters.value,
+          activeCluster: k8s.effectiveCluster.value,
+          t,
+        }),
+        paletteIndex.items.value,
+      )
     : [],
 );
 
@@ -366,18 +390,18 @@ const dock = ref(emptyDock());
 const DAY_US = 24 * 3_600_000_000;
 const lastKnown = ref(false);
 
-// Only the Overview (nodes and pods) and Nodes (nodes) views can tell a silent cluster from an empty filter.
-const offline = computed(
-  () =>
-    ready.value &&
-    k8s.loaded.value &&
-    !k8s.loading.value &&
-    !k8s.failed.value.size &&
+// Silent on every view when no cross-cluster query saw the cluster; on Overview and Nodes also when it has no rows.
+const offline = computed(() => {
+  const cluster = k8s.effectiveCluster.value;
+  if (!ready.value || !k8s.loaded.value || k8s.loading.value || k8s.failed.value.size) return false;
+  if (cluster == null) return false;
+  if (!clusterSeen(k8s.clusterResults.value, cluster)) return true;
+  return (
     ["cluster", "nodes"].includes(state.value.view) &&
-    k8s.effectiveCluster.value != null &&
     !mapNodes.value.length &&
-    !mapPods.value.length,
-);
+    !mapPods.value.length
+  );
+});
 
 const showLastKnown = () => {
   lastKnown.value = true;
@@ -399,6 +423,13 @@ const openTraces = async (ref: DetailsRef) => {
   if (!stream) {
     toast({ variant: "warning", message: t("infra.k8s2.tracesNoStream") });
     return;
+  }
+  const names = ((list?.list ?? []) as Array<{ name: string }>).length;
+  if (names > 1) {
+    toast({
+      variant: "info",
+      message: t("infra.k8s2.tracesStreamPicked", { stream: raw(stream) }),
+    });
   }
   router.push(
     tracesRoute(ref, {
@@ -446,6 +477,7 @@ k8s.loadStreams();
       <div class="flex items-center gap-2">
         <OButton
           v-if="ready"
+          class="max-md:hidden"
           variant="outline"
           size="sm"
           icon-left="search"
@@ -453,6 +485,17 @@ k8s.loadStreams();
           @click="openPalette"
         >
           {{ t("infra.k8s2.paletteButton") }}
+        </OButton>
+        <OButton
+          v-if="ready"
+          class="md:hidden"
+          variant="outline"
+          size="icon-sm"
+          :aria-label="t('infra.k8s2.paletteButton')"
+          data-test="k8s2-palette-open-compact"
+          @click="openPalette"
+        >
+          <OIcon name="search" size="sm" />
         </OButton>
         <OSelect
           v-if="ready"
@@ -509,7 +552,7 @@ k8s.loadStreams();
           data-test="k8s2-banner-last-known"
         />
         <OBanner
-          v-for="banner in k8s.banners.value"
+          v-for="banner in offline ? [] : k8s.banners.value"
           :key="banner.id"
           :variant="banner.variant"
           dense
@@ -526,7 +569,7 @@ k8s.loadStreams();
             :description="
               t(lastKnown ? 'infra.k8s2.offlineLastKnownEmpty' : 'infra.k8s2.offlineDescription')
             "
-            :action-label="t('infra.k8s2.offlineShowLast')"
+            :action-label="lastKnown ? undefined : t('infra.k8s2.offlineShowLast')"
             :secondary-action-label="t('infra.k8s2.offlineGuide')"
             data-test="k8s2-offline"
             @action="showLastKnown"
@@ -542,9 +585,10 @@ k8s.loadStreams();
             :refresh-nonce="k8s.refreshNonce.value"
             :has-stream="k8s.has"
             :loading="k8s.loading.value"
+            :forbidden="k8s.forbidden.value"
             :last-updated-at="k8s.lastUpdatedAt.value"
             @open="onOpen"
-            @navigate="(patch) => push({ ...state, ...patch })"
+            @navigate="onPatch"
             @action="onAction"
             @refresh="onRefresh"
           />
@@ -586,6 +630,7 @@ k8s.loadStreams();
             v-else-if="isList"
             :view="state.view as ListView"
             :rows="listRows"
+            :pods="k8s.inventory.value.pods"
             :state="state"
             :end-us="range.end"
             :cluster="k8s.effectiveCluster.value"
@@ -658,6 +703,9 @@ k8s.loadStreams();
       v-model:open="paletteOpen"
       :group="paletteGroup"
       :items="paletteItems"
+      :loading="paletteIndex.loading.value"
+      :index-failed="paletteIndex.failed.value"
+      :truncated="paletteIndex.truncated.value"
       @select="onPaletteSelect"
     />
 
@@ -679,6 +727,7 @@ k8s.loadStreams();
       :anchor="BODY_ANCHOR"
       @close="closeDetails"
       @open="onDrawerLink"
+      @navigate="onPatch"
       @action="onAction"
     />
   </OPageLayout>

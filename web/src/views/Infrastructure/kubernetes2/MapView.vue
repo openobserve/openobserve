@@ -27,6 +27,7 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import { SEGMENT_SWATCH } from "@/lib/data/SegmentedBar/OSegmentedBar.types";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import K8sHexMap from "./K8sHexMap.vue";
@@ -57,6 +58,7 @@ import {
   noLabelCounts,
   SHORT_KIND,
   statusCounts,
+  toggleHidden,
   type FillClass,
   type GroupHeader,
   type MapRow,
@@ -112,6 +114,7 @@ const STATUS_LABEL: Partial<Record<FillClass, I18nKey>> = {
   ok: "infra.k8s2.mapStatusOk",
   warning: "infra.k8s2.mapStatusWarning",
   error: "infra.k8s2.mapStatusError",
+  notRunning: "infra.k8s2.mapNotRunning",
   noData: "infra.k8s2.mapNoData",
 };
 
@@ -121,10 +124,11 @@ const SWATCH: Record<FillClass, string> = {
   b3: "bg-map-seq-3",
   b4: "bg-map-seq-4",
   b5: "bg-map-seq-5",
-  ok: "bg-status-positive",
-  warning: "bg-status-warning-text",
-  error: "bg-status-negative",
+  ok: SEGMENT_SWATCH.success,
+  warning: SEGMENT_SWATCH.warning,
+  error: SEGMENT_SWATCH.danger,
   noReq: "bg-hatched border border-border-default",
+  notRunning: SEGMENT_SWATCH.muted,
   noData: "bg-surface-subtle border border-border-default",
 };
 
@@ -139,7 +143,7 @@ const NOT_OK_TEXT: Record<string, I18nKey> = {
 
 const { t } = useI18nTyped();
 
-const highlight = ref<FillClass[]>([]);
+const hidden = ref<FillClass[]>([]);
 
 const dismissed = ref(new Set<string>());
 
@@ -322,9 +326,14 @@ const ariaLabel = computed(() => {
 watch(
   () => [props.state.fill, props.state.entity],
   () => {
-    highlight.value = [];
+    hidden.value = [];
   },
 );
+
+function toggleBucket(cls: FillClass) {
+  const present = legend.value.filter((item) => item.count > 0).map((item) => item.cls);
+  hidden.value = toggleHidden(hidden.value, cls, present);
+}
 
 function noReqLabel(fill: MapFill): I18nText {
   return fill === "cpuLim" || fill === "memLim"
@@ -619,37 +628,51 @@ function linkText(g: RowGroup): I18nText {
         :fill="state.fill"
         :groups="groups"
         :headers="headers"
-        :highlight="highlight"
+        :hidden="hidden"
         :selected-key="selectedKey"
         :label="ariaLabel"
         @select="onSelect"
         @header="onHeader"
       >
         <template #legend>
-          <OText tag="span" class="text-text-secondary text-xs">
+          <OText tag="span" class="text-text-secondary shrink-0 text-xs">
             {{ t(FILL_LABEL[state.fill]) }}
           </OText>
-          <OToggleGroup
-            v-model="highlight"
-            class="shrink-0"
-            type="multiple"
+          <div
+            role="group"
+            class="flex min-w-0 flex-wrap items-center gap-x-1"
             :aria-label="t('infra.k8s2.mapLegendOf', { fill: t(FILL_LABEL[state.fill]) })"
             data-test="k8s2-map-scale"
           >
-            <OToggleGroupItem
+            <OButton
               v-for="item in legend"
               :key="item.cls"
-              :value="item.cls"
-              size="sm"
+              :variant="hidden.includes(item.cls) ? 'ghost-muted' : 'ghost'"
+              size="xs"
+              :aria-pressed="!hidden.includes(item.cls)"
               :data-test="`k8s2-map-legend-${item.cls}`"
+              @click="toggleBucket(item.cls)"
             >
               <span class="rounded-default h-3 w-4 shrink-0" :class="SWATCH[item.cls]" />
-              <span data-test="k8s2-map-range">{{ item.label }}</span>
+              <span
+                :class="{ 'line-through': hidden.includes(item.cls) }"
+                data-test="k8s2-map-range"
+                >{{ item.label }}</span
+              >
               <span class="text-text-secondary" data-test="k8s2-map-count">{{
                 raw(item.count)
               }}</span>
-            </OToggleGroupItem>
-          </OToggleGroup>
+            </OButton>
+            <OButton
+              v-if="hidden.length"
+              variant="ghost-primary"
+              size="xs"
+              data-test="k8s2-map-legend-show-all"
+              @click="hidden = []"
+            >
+              {{ t("infra.k8s2.mapLegendShowAll") }}
+            </OButton>
+          </div>
         </template>
       </K8sHexMap>
       <!-- not-sr-only resets position to static, so this wrapper does the overlay positioning. -->

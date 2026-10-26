@@ -90,7 +90,7 @@ function readyOf(row: DeploymentRow | DaemonSetRow | StatefulSetRow | JobRow) {
   }
 }
 
-function worstPod(members: PodRow[]): PodRow | null {
+export function worstPod(members: PodRow[]): PodRow | null {
   const bad = members.filter((p) => ["failed", "evicted", "pending"].includes(lensPodStatus(p)));
   const failing = bad.find((p) => lensPodStatus(p) !== "pending");
   return failing ?? bad[0] ?? members[0] ?? null;

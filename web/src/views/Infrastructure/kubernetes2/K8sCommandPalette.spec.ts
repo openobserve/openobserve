@@ -119,6 +119,9 @@ describe("K8sCommandPalette", () => {
   it("points the input at the highlighted option and keeps headers out of the listbox roles", async () => {
     await open();
     await type("s");
+    expect(input().getAttribute("role")).toBe("combobox");
+    expect(input().getAttribute("aria-haspopup")).toBe("listbox");
+    expect(input().getAttribute("aria-expanded")).toBe("true");
     expect(input().getAttribute("aria-controls")).toBe("k8s2-palette-listbox");
     expect(input().getAttribute("aria-activedescendant")).toBe(option(0)!.id);
     await press("ArrowDown");
@@ -143,17 +146,30 @@ describe("K8sCommandPalette", () => {
     expect(q('[data-test="k8s2-palette-group-goTo"]')).toBeNull();
   });
 
-  it("states the search scope beside the cut-off note, except in the cluster switcher", async () => {
-    const wrapper = await open({
-      items: Array.from({ length: 20 }, (_, i) => entry(`m${i}`, "pods", `match ${i}`)),
-    });
-    await type("match");
-    expect(q('[data-test="k8s2-palette-scope"]')!.textContent).toContain(
-      "Searches the resources this view has loaded.",
+  it("shows no status line when the index is complete", async () => {
+    await open();
+    expect(q('[data-test="k8s2-palette-status"]')).toBeNull();
+  });
+
+  it("says resources are loading while the index loads", async () => {
+    await open({ loading: true });
+    expect(q('[data-test="k8s2-palette-status"]')!.textContent).toContain("Loading resources…");
+  });
+
+  it("notes the fallback when the index failed, ahead of the loading note", async () => {
+    await open({ indexFailed: true, loading: true });
+    expect(q('[data-test="k8s2-palette-status"]')!.textContent).toContain(
+      "Showing only the resources this view has loaded.",
     );
-    expect(q('[data-test="k8s2-palette-more"]')).not.toBeNull();
-    await wrapper.setProps({ items, group: "clusters" });
-    await flushPromises();
-    expect(q('[data-test="k8s2-palette-scope"]')).toBeNull();
+  });
+
+  it("notes a truncated index", async () => {
+    await open({ truncated: true });
+    expect(q('[data-test="k8s2-palette-status"]')!.textContent).toContain("20,000");
+  });
+
+  it("hides the status line in the cluster switcher", async () => {
+    await open({ loading: true, group: "clusters" });
+    expect(q('[data-test="k8s2-palette-status"]')).toBeNull();
   });
 });

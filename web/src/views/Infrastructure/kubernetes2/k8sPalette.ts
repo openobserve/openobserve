@@ -156,6 +156,27 @@ const detailsOf = (row: {
   name: row.name,
 });
 
+const identityOf = (item: PaletteItem) => {
+  const target = item.target;
+  if (target.type !== "details") return item.id;
+  const { kind, cluster, namespace, name } = target.details;
+  return `${kind}/${cluster}/${namespace}/${name}`;
+};
+
+// Primary items win over extras with the same resource identity; extras fill in the rest.
+export function mergePaletteItems(primary: PaletteItem[], extra: PaletteItem[]): PaletteItem[] {
+  if (!extra.length) return primary;
+  const seen = new Set(primary.map(identityOf));
+  const out = [...primary];
+  for (const item of extra) {
+    const identity = identityOf(item);
+    if (seen.has(identity)) continue;
+    seen.add(identity);
+    out.push(item);
+  }
+  return out;
+}
+
 // Every whitespace-separated token must appear somewhere in the item's text.
 export function searchPalette(
   items: PaletteItem[],

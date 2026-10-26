@@ -48,7 +48,11 @@ import { ATTENTION_LIMIT, attentionItems, pctOf, podBuckets } from "./overviewMo
 import { useOverviewSignals } from "./useOverviewSignals";
 import K8sAttentionList from "./K8sAttentionList.vue";
 import K8sCapacityCard from "./K8sCapacityCard.vue";
-import K8sSegmentedBar from "./K8sSegmentedBar.vue";
+import OSegmentedBar from "@/lib/data/SegmentedBar/OSegmentedBar.vue";
+import {
+  SEGMENT_SWATCH,
+  type SegmentedBarVariant,
+} from "@/lib/data/SegmentedBar/OSegmentedBar.types";
 import K8sSignalCards from "./K8sSignalCards.vue";
 
 type Resource = "cpu" | "memory";
@@ -64,6 +68,7 @@ const props = defineProps<{
   hasStream: (stream: string) => boolean;
   loading: boolean;
   lastUpdatedAt: number | null;
+  forbidden?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -144,38 +149,44 @@ const podSlots = computed(() => {
 const podSegments = computed(() => {
   const b = buckets.value;
   const share = (n: number) => (b.total ? (n / b.total) * 100 : 0);
-  return [
+  const segments: {
+    id: string;
+    count: number;
+    variant: SegmentedBarVariant;
+    label: I18nText;
+  }[] = [
     {
       id: "ready",
       count: b.ready,
-      class: "bg-status-positive",
+      variant: "success",
       label: t("infra.k8s2.overviewPodsReady", { count: b.ready }),
     },
     {
       id: "pending",
       count: b.pending,
-      class: "bg-status-warning-text",
+      variant: "warning",
       label: t("infra.k8s2.overviewPodsPending", { count: b.pending }),
     },
     {
       id: "failing",
       count: b.failing,
-      class: "bg-status-negative",
+      variant: "danger",
       label: t("infra.k8s2.overviewPodsFailing", { count: b.failing }),
     },
     {
       id: "completed",
       count: b.completed,
-      class: "bg-status-neutral-text",
+      variant: "neutral",
       label: t("infra.k8s2.overviewPodsCompleted", { count: b.completed }),
     },
     {
       id: "unknown",
       count: b.unknown,
-      class: "bg-border-strong",
+      variant: "muted",
       label: t("infra.k8s2.overviewPodsUnknown", { count: b.unknown }),
     },
-  ].map((seg) => ({ ...seg, pct: share(seg.count) }));
+  ];
+  return segments.map((seg) => ({ ...seg, pct: share(seg.count) }));
 });
 
 const podLegend = computed(() => podSegments.value.filter((s) => s.id !== "unknown" || s.count));
@@ -204,7 +215,9 @@ const nodesTile = computed(() => {
     ? "error"
     : ready < nodes.length
       ? "warning"
-      : "success";
+      : nodes.length
+        ? "success"
+        : "neutral";
   return { value: `${ready} / ${nodes.length}`, tone };
 });
 
@@ -349,239 +362,260 @@ function onAlertsTile() {
       />
     </div>
 
-    <div class="grid grid-cols-2 gap-3 lg:grid-cols-4" data-test="k8s2-overview-kpis">
-      <OStatCard
-        clickable
-        icon="dns"
-        :label="t('infra.k8s2.overviewKpiNodes')"
-        :value="nodesTile.value"
-        :sub="t('infra.k8s2.overviewKpiNodesSub')"
-        :tone="nodesTile.tone"
-        :loading="awaiting"
-        data-test="k8s2-overview-kpi-nodes"
-        @click="emit('navigate', { view: 'nodes' })"
-      />
-      <OStatCard
-        clickable
-        icon="hub"
-        :label="t('infra.k8s2.overviewPods')"
-        :value="`${buckets.ready} / ${buckets.total}`"
-        sub-icon="info"
-        :sub="
-          t('infra.k8s2.overviewKpiPodsSub', {
-            pending: buckets.pending,
-            failing: buckets.failing,
-          })
-        "
-        :tone="podsTone"
-        :loading="awaiting"
-        data-test="k8s2-overview-kpi-pods"
-        @click="emit('navigate', { view: 'pods' })"
-      />
-      <OStatCard
-        clickable
-        icon="notifications"
-        :label="t('infra.k8s2.overviewKpiWarnings')"
-        :value="warningRows.length"
-        sub-icon="info"
-        :sub="t('infra.k8s2.overviewKpiWarningsSub')"
-        :tone="warningRows.length ? 'warning' : 'success'"
-        :loading="awaiting"
-        data-test="k8s2-overview-kpi-warnings"
-        @click="emit('navigate', { view: 'events' })"
-      />
-      <OStatCard
-        clickable
-        icon="campaign"
-        :label="t('infra.k8s2.overviewKpiAlerts')"
-        :value="alertsTile.value"
-        :sub="alertsTile.sub"
-        :tone="alertsTile.tone"
-        :loading="signals.alertsLoading.value"
-        data-test="k8s2-overview-kpi-alerts"
-        @click="onAlertsTile"
-      />
-    </div>
+    <OEmptyState v-if="forbidden" preset="no-access" data-test="k8s2-overview-forbidden" />
 
-    <div class="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
-      <div class="flex min-w-0 flex-col gap-3">
-        <section
-          class="bg-surface-panel border-border-default rounded-surface flex min-w-0 flex-col gap-2 border p-3"
-          data-test="k8s2-overview-chart-card"
-        >
-          <div class="flex min-w-0 flex-wrap items-center gap-2">
-            <OText variant="card-title">{{ t("infra.k8s2.overviewChartTitle") }}</OText>
-            <OText variant="meta" class="text-text-secondary">{{
-              resource === "cpu"
-                ? t("infra.k8s2.overviewChartCoresHint")
-                : t("infra.k8s2.overviewChartBytesHint")
-            }}</OText>
-            <OToggleGroup v-model="resource" class="ms-auto" data-test="k8s2-overview-chart-toggle">
-              <OToggleGroupItem value="cpu" size="sm">{{
-                t("infra.k8s2.overviewCpu")
-              }}</OToggleGroupItem>
-              <OToggleGroupItem value="memory" size="sm">{{
-                t("infra.k8s2.overviewMemory")
-              }}</OToggleGroupItem>
-            </OToggleGroup>
-          </div>
-          <div class="h-60 min-w-0" data-test="k8s2-overview-chart">
-            <OSkeleton v-if="awaiting" class="h-full" data-test="k8s2-overview-chart-loading" />
-            <PanelSchemaRenderer
-              v-else-if="hasStream(USAGE[resource].stream)"
-              :key="`${resource}-${refreshNonce}`"
-              :panel-schema="chartSchema"
-              :selected-time-obj="chartTime"
-              :variables-data="{}"
-              :force-load="true"
-              search-type="ui"
-            />
-            <OEmptyState
-              v-else
-              size="inline"
-              preset="no-data"
-              :title="t('infra.k8s2.overviewMetricsUnavailable')"
-            />
-          </div>
-        </section>
-
-        <K8sAttentionList
-          :items="attention.slice(0, ATTENTION_LIMIT)"
-          :total="attention.length"
+    <template v-else>
+      <div class="grid grid-cols-2 gap-3 lg:grid-cols-4" data-test="k8s2-overview-kpis">
+        <OStatCard
+          clickable
+          icon="dns"
+          :label="t('infra.k8s2.overviewKpiNodes')"
+          :value="nodesTile.value"
+          :sub="t('infra.k8s2.overviewKpiNodesSub')"
+          :tone="nodesTile.tone"
           :loading="awaiting"
-          :end-us="range.end"
-          @open="emit('open', $event)"
-          @action="(type, ref) => emit('action', type, ref)"
+          data-test="k8s2-overview-kpi-nodes"
+          @click="emit('navigate', { view: 'nodes' })"
+        />
+        <OStatCard
+          clickable
+          icon="hub"
+          :label="t('infra.k8s2.overviewPods')"
+          :value="`${buckets.ready} / ${buckets.total}`"
+          sub-icon="info"
+          :sub="
+            t('infra.k8s2.overviewKpiPodsSub', {
+              pending: buckets.pending,
+              failing: buckets.failing,
+            })
+          "
+          :tone="podsTone"
+          :loading="awaiting"
+          data-test="k8s2-overview-kpi-pods"
+          @click="emit('navigate', { view: 'pods', status: 'failing' })"
+        />
+        <OStatCard
+          clickable
+          icon="notifications"
+          :label="t('infra.k8s2.overviewKpiWarnings')"
+          :value="warningRows.length"
+          sub-icon="info"
+          :sub="t('infra.k8s2.overviewKpiWarningsSub')"
+          :tone="warningRows.length ? 'warning' : 'success'"
+          :loading="awaiting"
+          data-test="k8s2-overview-kpi-warnings"
+          @click="emit('navigate', { view: 'events', status: 'warnings' })"
+        />
+        <OStatCard
+          clickable
+          icon="campaign"
+          :label="t('infra.k8s2.overviewKpiAlerts')"
+          :value="alertsTile.value"
+          :sub="alertsTile.sub"
+          :tone="alertsTile.tone"
+          :loading="signals.alertsLoading.value"
+          data-test="k8s2-overview-kpi-alerts"
+          @click="onAlertsTile"
         />
       </div>
 
-      <div class="flex min-w-0 flex-col gap-3" data-test="k8s2-overview-side">
-        <template v-if="awaiting">
-          <OSkeleton v-for="n in 3" :key="n" class="h-32" data-test="k8s2-overview-side-loading" />
-        </template>
-        <section
-          v-else-if="!hasNodes"
-          class="bg-surface-panel border-border-default rounded-surface flex min-w-0 items-center justify-center border p-3"
-          data-test="k8s2-overview-no-nodes"
-        >
-          <OEmptyState size="inline" preset="no-data" :title="t('infra.k8s2.overviewNoNodes')" />
-        </section>
-        <template v-else>
-          <OText
-            v-if="partial"
-            variant="meta"
-            class="text-status-warning-text"
-            data-test="k8s2-overview-partial"
-            >{{ t("infra.k8s2.overviewPartialNotice") }}</OText
-          >
-          <K8sCapacityCard v-for="c in capacity" :key="c.kind" v-bind="c" />
+      <div class="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
+        <div class="flex min-w-0 flex-col gap-3">
           <section
-            class="bg-surface-panel border-border-default rounded-surface flex min-w-0 flex-col gap-3 border p-3"
-            data-test="k8s2-overview-pods-card"
+            class="bg-surface-panel border-border-default rounded-surface flex min-w-0 flex-col gap-2 border p-3"
+            data-test="k8s2-overview-chart-card"
           >
-            <div class="flex min-w-0 items-baseline justify-between gap-2">
-              <OText variant="card-title">{{ t("infra.k8s2.overviewPods") }}</OText>
-              <OText
-                variant="meta"
-                class="text-text-secondary"
-                data-test="k8s2-overview-pods-slots"
-                >{{ podSlotText }}</OText
+            <div class="flex min-w-0 flex-wrap items-center gap-2">
+              <OText variant="card-title">{{ t("infra.k8s2.overviewChartTitle") }}</OText>
+              <OText variant="meta" class="text-text-secondary">{{
+                resource === "cpu"
+                  ? t("infra.k8s2.overviewChartCoresHint")
+                  : t("infra.k8s2.overviewChartBytesHint")
+              }}</OText>
+              <OToggleGroup
+                v-model="resource"
+                class="ms-auto"
+                data-test="k8s2-overview-chart-toggle"
               >
+                <OToggleGroupItem value="cpu" size="sm">{{
+                  t("infra.k8s2.overviewCpu")
+                }}</OToggleGroupItem>
+                <OToggleGroupItem value="memory" size="sm">{{
+                  t("infra.k8s2.overviewMemory")
+                }}</OToggleGroupItem>
+              </OToggleGroup>
             </div>
-            <K8sSegmentedBar :segments="podBarSegments" tall data-test="k8s2-overview-pods-bar" />
-            <div
-              class="flex flex-wrap gap-x-4 gap-y-1 text-xs"
-              data-test="k8s2-overview-pods-legend"
-            >
-              <span
-                v-for="seg in podLegend"
-                :key="seg.id"
-                class="text-text-secondary flex items-center gap-1.5"
-                :data-test="`k8s2-overview-pods-legend-${seg.id}`"
-              >
-                <span class="rounded-default size-2 shrink-0" :class="seg.class" />{{ seg.label }}
-              </span>
+            <div class="h-60 min-w-0" data-test="k8s2-overview-chart">
+              <OSkeleton v-if="awaiting" class="h-full" data-test="k8s2-overview-chart-loading" />
+              <PanelSchemaRenderer
+                v-else-if="hasStream(USAGE[resource].stream)"
+                :key="`${resource}-${refreshNonce}`"
+                :panel-schema="chartSchema"
+                :selected-time-obj="chartTime"
+                :variables-data="{}"
+                :force-load="true"
+                search-type="ui"
+              />
+              <OEmptyState
+                v-else
+                size="inline"
+                preset="no-data"
+                :title="t('infra.k8s2.overviewMetricsUnavailable')"
+              />
             </div>
           </section>
-        </template>
-        <K8sSignalCards
-          :incidents="signals.openIncidents.value"
-          :incidents-visible="signals.incidentsAvailable.value"
-          :incidents-loading="signals.incidentsLoading.value"
-          :alerts="signals.firingAlerts.value"
-          :alerts-visible="signals.alertsAvailable.value"
-          :alerts-loading="signals.alertsLoading.value"
-          :end-us="range.end"
-          @open-incident="openIncident"
-          @open-incidents="openIncidents"
-          @open-alerts="openAlerts"
-        />
-      </div>
-    </div>
 
-    <section
-      class="bg-surface-panel border-border-default rounded-surface flex min-w-0 flex-col gap-2 border p-3"
-      data-test="k8s2-overview-warnings-card"
-    >
-      <OText variant="card-title" data-test="k8s2-overview-warnings-title">
-        {{
-          awaiting
-            ? t("infra.k8s2.overviewKpiWarnings")
-            : t("infra.k8s2.overviewWarnings", { count: warningRows.length })
-        }}
-      </OText>
-      <div v-if="awaiting" class="flex flex-col gap-2" data-test="k8s2-overview-warnings-loading">
-        <OSkeleton v-for="n in 3" :key="n" type="text" class="h-6" />
-      </div>
-      <OTable
-        v-else
-        :data="warningRows"
-        :columns="columns"
-        row-key="key"
-        dense
-        :row-height="32"
-        :frame="false"
-        :show-global-filter="false"
-        pagination="none"
-        sorting="client"
-        sort-by="object"
-        sort-order="asc"
-        :row-class="
-          (row: WarningListRow) => (detailKindOf(row.object.kind) ? 'cursor-pointer' : '')
-        "
-        data-test="k8s2-overview-warnings-table"
-        @row-click="openRow"
-      >
-        <template #cell-message="{ row }">
-          <span class="min-w-0 truncate" :data-test="`k8s2-overview-warning-message-${row.key}`"
-            >{{ messageText(row)
-            }}<OTooltip
-              v-if="!detailKindOf(row.object.kind)"
-              :content="t('infra.k8s2.overviewNoDetails', { kind: row.object.kind })"
-          /></span>
-        </template>
-        <template #cell-object="{ row }">
-          <span class="min-w-0 truncate">{{ raw(row.object.name) }}</span>
-        </template>
-        <template #cell-type="{ row }">
-          <span :data-test="`k8s2-overview-warning-type-${row.key}`">{{
-            raw(row.object.kind)
-          }}</span>
-        </template>
-        <template #cell-age="{ row }">
-          <span class="tabular-nums" :data-test="`k8s2-overview-warning-age-${row.key}`">{{
-            raw(ageText(row))
-          }}</span>
-        </template>
-        <template #empty>
-          <OEmptyState
-            size="inline"
-            preset="no-data"
-            :title="t('infra.k8s2.overviewNoIssues')"
-            :description="t('infra.k8s2.overviewNoIssuesDesc')"
+          <K8sAttentionList
+            :items="attention.slice(0, ATTENTION_LIMIT)"
+            :total="attention.length"
+            :loading="awaiting"
+            :end-us="range.end"
+            @open="emit('open', $event)"
+            @action="(type, ref) => emit('action', type, ref)"
+            @navigate="emit('navigate', $event)"
           />
-        </template>
-      </OTable>
-    </section>
+        </div>
+
+        <div class="flex min-w-0 flex-col gap-3" data-test="k8s2-overview-side">
+          <template v-if="awaiting">
+            <OSkeleton
+              v-for="n in 3"
+              :key="n"
+              class="h-32"
+              data-test="k8s2-overview-side-loading"
+            />
+          </template>
+          <section
+            v-else-if="!hasNodes"
+            class="bg-surface-panel border-border-default rounded-surface flex min-w-0 items-center justify-center border p-3"
+            data-test="k8s2-overview-no-nodes"
+          >
+            <OEmptyState size="inline" preset="no-data" :title="t('infra.k8s2.overviewNoNodes')" />
+          </section>
+          <template v-else>
+            <OText
+              v-if="partial"
+              variant="meta"
+              class="text-status-warning-text"
+              data-test="k8s2-overview-partial"
+              >{{ t("infra.k8s2.overviewPartialNotice") }}</OText
+            >
+            <K8sCapacityCard v-for="c in capacity" :key="c.kind" v-bind="c" />
+            <section
+              class="bg-surface-panel border-border-default rounded-surface flex min-w-0 flex-col gap-3 border p-3"
+              data-test="k8s2-overview-pods-card"
+            >
+              <div class="flex min-w-0 items-baseline justify-between gap-2">
+                <OText variant="card-title">{{ t("infra.k8s2.overviewPods") }}</OText>
+                <OText
+                  variant="meta"
+                  class="text-text-secondary"
+                  data-test="k8s2-overview-pods-slots"
+                  >{{ podSlotText }}</OText
+                >
+              </div>
+              <OSegmentedBar
+                :segments="podBarSegments"
+                size="md"
+                data-test="k8s2-overview-pods-bar"
+              />
+              <div
+                class="flex flex-wrap gap-x-4 gap-y-1 text-xs"
+                data-test="k8s2-overview-pods-legend"
+              >
+                <span
+                  v-for="seg in podLegend"
+                  :key="seg.id"
+                  class="text-text-secondary flex items-center gap-1.5"
+                  :data-test="`k8s2-overview-pods-legend-${seg.id}`"
+                >
+                  <span
+                    class="rounded-default size-2 shrink-0"
+                    :class="SEGMENT_SWATCH[seg.variant]"
+                  />{{ seg.label }}
+                </span>
+              </div>
+            </section>
+          </template>
+          <K8sSignalCards
+            :incidents="signals.openIncidents.value"
+            :incidents-visible="signals.incidentsAvailable.value"
+            :incidents-loading="signals.incidentsLoading.value"
+            :alerts="signals.firingAlerts.value"
+            :alerts-visible="signals.alertsAvailable.value"
+            :alerts-loading="signals.alertsLoading.value"
+            :end-us="range.end"
+            @open-incident="openIncident"
+            @open-incidents="openIncidents"
+            @open-alerts="openAlerts"
+          />
+        </div>
+      </div>
+
+      <section
+        class="bg-surface-panel border-border-default rounded-surface flex min-w-0 flex-col gap-2 border p-3"
+        data-test="k8s2-overview-warnings-card"
+      >
+        <OText variant="card-title" data-test="k8s2-overview-warnings-title">
+          {{
+            awaiting
+              ? t("infra.k8s2.overviewKpiWarnings")
+              : t("infra.k8s2.overviewWarnings", { count: warningRows.length })
+          }}
+        </OText>
+        <div v-if="awaiting" class="flex flex-col gap-2" data-test="k8s2-overview-warnings-loading">
+          <OSkeleton v-for="n in 3" :key="n" type="text" class="h-6" />
+        </div>
+        <OTable
+          v-else
+          :data="warningRows"
+          :columns="columns"
+          row-key="key"
+          dense
+          :row-height="32"
+          :frame="false"
+          :show-global-filter="false"
+          pagination="none"
+          sorting="client"
+          sort-by="object"
+          sort-order="asc"
+          :row-class="
+            (row: WarningListRow) => (detailKindOf(row.object.kind) ? 'cursor-pointer' : '')
+          "
+          data-test="k8s2-overview-warnings-table"
+          @row-click="openRow"
+        >
+          <template #cell-message="{ row }">
+            <span class="min-w-0 truncate" :data-test="`k8s2-overview-warning-message-${row.key}`"
+              >{{ messageText(row)
+              }}<OTooltip
+                v-if="!detailKindOf(row.object.kind)"
+                :content="t('infra.k8s2.overviewNoDetails', { kind: row.object.kind })"
+            /></span>
+          </template>
+          <template #cell-object="{ row }">
+            <span class="min-w-0 truncate">{{ raw(row.object.name) }}</span>
+          </template>
+          <template #cell-type="{ row }">
+            <span :data-test="`k8s2-overview-warning-type-${row.key}`">{{
+              raw(row.object.kind)
+            }}</span>
+          </template>
+          <template #cell-age="{ row }">
+            <span class="tabular-nums" :data-test="`k8s2-overview-warning-age-${row.key}`">{{
+              raw(ageText(row))
+            }}</span>
+          </template>
+          <template #empty>
+            <OEmptyState
+              size="inline"
+              preset="no-data"
+              :title="t('infra.k8s2.overviewNoIssues')"
+              :description="t('infra.k8s2.overviewNoIssuesDesc')"
+            />
+          </template>
+        </OTable>
+      </section>
+    </template>
   </div>
 </template>

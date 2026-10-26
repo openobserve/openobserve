@@ -48,12 +48,7 @@ const HEALTH_KEY: Record<ClusterTone, I18nKey> = {
   neutral: "infra.k8s2.healthSilent",
 };
 
-const HUE_CLASS = [
-  "bg-badge-teal-soft-bg! text-badge-teal-soft-text!",
-  "bg-badge-purple-soft-bg! text-badge-purple-soft-text!",
-  "bg-badge-blue-soft-bg! text-badge-blue-soft-text!",
-  "bg-badge-orange-soft-bg! text-badge-orange-soft-text!",
-];
+const HUE_VARIANT = ["tint-teal", "tint-purple", "tint-blue", "tint-orange"] as const;
 </script>
 
 <template>
@@ -72,13 +67,10 @@ const HUE_CLASS = [
       <OButton
         v-for="cluster in clusters"
         :key="cluster.name"
-        variant="ghost"
+        :variant="HUE_VARIANT[clusterHue(cluster.name)]"
         size="icon-lg"
         class="rounded-surface relative size-10 shrink-0 transition-shadow"
-        :class="[
-          HUE_CLASS[clusterHue(cluster.name)],
-          cluster.name === active ? 'ring-accent shadow-md ring-2' : '',
-        ]"
+        :class="cluster.name === active ? 'ring-accent shadow-md ring-2' : ''"
         :aria-label="
           t('infra.k8s2.hotbarTileLabel', {
             name: raw(cluster.name),

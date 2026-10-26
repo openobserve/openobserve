@@ -92,7 +92,13 @@ const ageOf = (us: number | null | undefined) =>
           data-test="k8s2-overview-incident-more"
           @click="emit('open-incidents')"
         >
-          {{ t("infra.k8s2.overviewIncidentMore", { count: incidents.length - 1 }) }}
+          {{
+            t(
+              "infra.k8s2.overviewIncidentMore",
+              { count: incidents.length - 1 },
+              incidents.length - 1,
+            )
+          }}
         </OButton>
       </div>
     </template>

@@ -2,7 +2,12 @@
 
 import { describe, expect, it } from "vitest";
 import { raw } from "@/types/i18n";
-import { buildPaletteItems, searchPalette, type PaletteItem } from "./k8sPalette";
+import {
+  buildPaletteItems,
+  mergePaletteItems,
+  searchPalette,
+  type PaletteItem,
+} from "./k8sPalette";
 import { VIEW_ICON } from "./k8sTree";
 import type { Inventory } from "./kubernetesModel";
 
@@ -148,5 +153,43 @@ describe("searchPalette", () => {
     const result = searchPalette(build({}), "", 3);
     expect(result.items).toHaveLength(3);
     expect(result.total).toBe(6);
+  });
+});
+
+describe("mergePaletteItems", () => {
+  const detail = (id: string, name: string, hot = false): PaletteItem => ({
+    ...build({})[0],
+    id,
+    group: "pods",
+    hot,
+    target: {
+      type: "details",
+      details: { kind: "pod", cluster: "c", namespace: "ns", name },
+    },
+  });
+
+  it("keeps the primary item when both describe the same resource", () => {
+    const merged = mergePaletteItems([detail("a", "web", true)], [detail("idx:a", "web")]);
+    expect(merged.map((i) => i.id)).toEqual(["a"]);
+    expect(merged[0].hot).toBe(true);
+  });
+
+  it("appends extras the primary list does not have", () => {
+    const merged = mergePaletteItems(
+      [detail("a", "web")],
+      [detail("idx:a", "web"), detail("idx:b", "db")],
+    );
+    expect(merged.map((i) => i.id)).toEqual(["a", "idx:b"]);
+  });
+
+  it("drops duplicate extras and returns primary untouched when there are none", () => {
+    const primary = [detail("a", "web")];
+    expect(mergePaletteItems(primary, [])).toBe(primary);
+    expect(mergePaletteItems([], [detail("x", "db"), detail("y", "db")])).toHaveLength(1);
+  });
+
+  it("dedupes non-resource items by id", () => {
+    const view = build({})[0];
+    expect(mergePaletteItems([view], [{ ...view }])).toHaveLength(1);
   });
 });

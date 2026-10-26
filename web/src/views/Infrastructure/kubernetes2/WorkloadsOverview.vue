@@ -29,12 +29,26 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import K8sListHeader from "./K8sListHeader.vue";
-import K8sSegmentedBar from "./K8sSegmentedBar.vue";
+import OSegmentedBar from "@/lib/data/SegmentedBar/OSegmentedBar.vue";
+import {
+  SEGMENT_SWATCH,
+  type SegmentedBarVariant,
+} from "@/lib/data/SegmentedBar/OSegmentedBar.types";
 import { KIND_INFO, type View } from "./kubernetesQueries";
 import type { DetailsRef, K8sUrlState } from "./kubernetesUrlState";
 import { detailKindOf, type EventRow } from "./kubernetesEvents";
-import { INVENTORY_KEY, chipLabel, filterRows, formatAge, type Inventory } from "./kubernetesModel";
+import {
+  INVENTORY_KEY,
+  chipLabel,
+  filterRows,
+  formatAge,
+  podBucket,
+  type Inventory,
+  type PodBucket,
+  type PodRow,
+} from "./kubernetesModel";
 import { workloadProblems, type WorkloadProblem } from "./workloadProblems";
+import { problemStatusWord, workloadStatusWord } from "./workloadStatusLabel";
 import {
   statusCounts,
   type StatusKind,
@@ -86,13 +100,21 @@ const KIND_TITLE: Record<WorkloadProblem["kind"], I18nKey> = {
   job: "infra.k8s2.kindJob",
 };
 
-const DOT: Record<string, string> = {
-  success: "bg-progress-bar-success",
-  warning: "bg-progress-bar-warning",
-  danger: "bg-progress-bar-danger",
-  default: "bg-progress-bar-neutral",
-  neutral: "bg-progress-bar-neutral",
+const SEGMENT_VARIANT: Record<string, SegmentedBarVariant> = {
+  success: "success",
+  warning: "warning",
+  danger: "danger",
+  default: "neutral",
+  neutral: "neutral",
 };
+
+const POD_BUCKETS: Array<{ id: PodBucket; label: I18nKey; variant: SegmentedBarVariant }> = [
+  { id: "ready", label: "infra.k8s2.workloadsLegendReady", variant: "success" },
+  { id: "pending", label: "infra.k8s2.workloadsLegendPending", variant: "warning" },
+  { id: "failing", label: "infra.k8s2.workloadsLegendFailing", variant: "danger" },
+  { id: "completed", label: "infra.k8s2.workloadsLegendCompleted", variant: "neutral" },
+  { id: "unknown", label: "infra.k8s2.workloadsLegendUnknown", variant: "muted" },
+];
 
 const LEGEND_LABEL: Record<WorkloadStatus, I18nKey> = {
   running: "infra.k8s2.workloadsLegendRunning",
@@ -111,14 +133,32 @@ const clusterPods = computed(() =>
   filterRows(props.inventory.pods, { cluster: props.cluster, namespaces: [] }, ""),
 );
 
+function podCounts(rows: PodRow[]) {
+  const tally = new Map<PodBucket, number>();
+  for (const row of rows) tally.set(podBucket(row), (tally.get(podBucket(row)) ?? 0) + 1);
+  return POD_BUCKETS.flatMap(({ id, label, variant }) =>
+    tally.has(id)
+      ? [{ status: id, count: tally.get(id)!, rule: id === "unknown", variant, label }]
+      : [],
+  );
+}
+
+function controllerCounts(kind: StatusKind, rows: StatusRow[]) {
+  return statusCounts(kind, rows, props.inventory.pods).map((c) => ({
+    status: c.status as string,
+    count: c.count,
+    rule: c.rule,
+    variant: SEGMENT_VARIANT[c.variant],
+    label: workloadStatusWord(kind, c.status) ?? LEGEND_LABEL[c.status],
+  }));
+}
+
 const cards = computed(() =>
   CARDS.map(({ kind, title, icon }) => {
     const rows = filterRows(props.inventory[INVENTORY_KEY[kind]] as StatusRow[], scope.value, "");
-    const counts = statusCounts(kind, rows, props.inventory.pods).map((c) => ({
-      ...c,
-      label: LEGEND_LABEL[c.status],
-      dot: DOT[c.variant],
-    }));
+    const counts = (
+      kind === "pod" ? podCounts(rows as PodRow[]) : controllerCounts(kind, rows)
+    ).map((c) => ({ ...c, dot: SEGMENT_SWATCH[c.variant] }));
     return {
       kind,
       title,
@@ -129,7 +169,7 @@ const cards = computed(() =>
       segments: counts.map((c) => ({
         id: c.status,
         pct: (c.count / rows.length) * 100,
-        class: c.dot,
+        variant: c.variant,
       })),
     };
   }),
@@ -296,7 +336,8 @@ function setNamespaces(namespaces: string[]) {
       :title="t('infra.k8s2.workloadsTitle')"
       :count="podCount"
       :total="clusterPods.length"
-      :count-label="raw('')"
+      :count-label="t('infra.k8s2.podCount', { count: podCount }, podCount)"
+      :count-noun="t('infra.k8s2.podNoun', {}, clusterPods.length)"
       namespaced
       :namespace-options="namespaceOptions"
       :namespaces="namespaces"
@@ -338,10 +379,7 @@ function setNamespaces(namespaces: string[]) {
           >
         </div>
         <template v-if="card.counts.length">
-          <K8sSegmentedBar
-            :segments="card.segments"
-            :data-test="`k8s2-workloads-bar-${card.kind}`"
-          />
+          <OSegmentedBar :segments="card.segments" :data-test="`k8s2-workloads-bar-${card.kind}`" />
           <div class="flex flex-wrap gap-x-3 gap-y-1 text-xs">
             <span
               v-for="row in card.counts"
@@ -415,11 +453,7 @@ function setNamespaces(namespaces: string[]) {
             size="xs"
             :variant="row.severity === 'failed' ? 'error-soft' : 'warning-soft'"
             :data-test="`k8s2-workloads-problem-status-${row.key}`"
-            >{{
-              row.severity === "failed"
-                ? t("infra.k8s2.workloadsStatusFailedChip")
-                : t("infra.k8s2.workloadsStatusDegradedChip")
-            }}</OTag
+            >{{ t(problemStatusWord(row.kind, row.severity)) }}</OTag
           >
         </template>
         <template #cell-actions="{ row }">

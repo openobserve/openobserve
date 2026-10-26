@@ -212,7 +212,7 @@ describe("MapView fill buckets (AC 43)", () => {
     expect(fillValue(inv, "memLim")).toBeCloseTo(92, 6);
     const classes = pods
       .map((p) => fillClass(p, "memLim"))
-      .filter((c) => c !== "noData" && c !== "noReq")
+      .filter((c) => c !== "noData" && c !== "noReq" && c !== "notRunning")
       .sort();
     expect(fillClass(inv, "memLim")).toBe(classes[classes.length - 1]);
     for (const p of pods)
@@ -471,7 +471,7 @@ describe("MapView on phones (§4.8)", () => {
     await mountView();
     expect(wrapper.find('[data-test="k8s2-map-area"]').classes()).toContain("max-md:min-h-96");
     expect(wrapper.find('[data-test="k8s2-map-filter"]').classes()).toContain("max-md:w-full");
-    expect(wrapper.find('[data-test="k8s2-map-scale"]').classes()).toContain("shrink-0");
+    expect(wrapper.find('[data-test="k8s2-map-scale"]').classes()).toContain("flex-wrap");
     for (const id of ["k8s2-map-fill", "k8s2-map-group"])
       expect(wrapper.find(`[data-test="${id}"]`).classes()).toEqual(
         expect.arrayContaining(["max-md:min-w-0", "max-md:flex-1"]),
@@ -503,13 +503,16 @@ describe("MapView empty states (AC 49)", () => {
     expect(wrapper.emitted("update")).toEqual([[{ namespaces: [], search: "", filter: [] }]]);
   });
 
-  it("draws every hex as No data with fill=cpuReq when k8s_pod_cpu_usage is absent", async () => {
+  it("draws running pods as No data and the rest as Not running with fill=cpuReq when k8s_pod_cpu_usage is absent", async () => {
     const results = generatorResults();
     results.delete("K1");
     await mountView(mapState(), inventory(results));
     const classes = new Set(options().series[0].data.map((d: number[]) => d[2]));
-    expect(classes.size).toBe(1);
-    expect(hexRows().every((r) => fillClass(r, "cpuReq") === "noData")).toBe(true);
+    expect(classes.size).toBeLessThanOrEqual(2);
+    expect(hexRows().every((r) => ["noData", "notRunning"].includes(fillClass(r, "cpuReq")))).toBe(
+      true,
+    );
+    expect(hexRows().some((r) => fillClass(r, "cpuReq") === "noData")).toBe(true);
   });
 });
 
@@ -923,7 +926,7 @@ describe("MapView partial failure notice", () => {
 describe("MapView legend (AC 86)", () => {
   it("scales cpuReq in 6 steps and status in 4, each with a range and a count summing to the hexes", async () => {
     await mountView();
-    expect(legendItems()).toHaveLength(7);
+    expect(legendItems()).toHaveLength(8);
     expect(legendItems().reduce((sum, item) => sum + legendCount(item), 0)).toBe(41);
     for (const item of legendItems())
       expect(item.find('[data-test="k8s2-map-range"]').text()).not.toBe("");
@@ -935,13 +938,26 @@ describe("MapView legend (AC 86)", () => {
     );
   });
 
-  it("highlights the picked classes and clears them on a fill change", async () => {
+  it("hides a clicked bucket, strikes its swatch label, and Show all restores it", async () => {
     await mountView();
-    byTest(OToggleGroup, "k8s2-map-scale").vm.$emit("update:modelValue", ["b5"]);
-    await flushPromises();
-    expect(hexMap().props("highlight")).toEqual(["b5"]);
+    const b5 = () => wrapper.find('[data-test="k8s2-map-legend-b5"]');
+    expect(b5().attributes("aria-pressed")).toBe("true");
+    await b5().trigger("click");
+    expect(hexMap().props("hidden")).toEqual(["b5"]);
+    expect(b5().attributes("aria-pressed")).toBe("false");
+    expect(b5().find('[data-test="k8s2-map-range"]').classes()).toContain("line-through");
+    await wrapper.find('[data-test="k8s2-map-legend-show-all"]').trigger("click");
+    expect(hexMap().props("hidden")).toEqual([]);
+    expect(wrapper.find('[data-test="k8s2-map-legend-show-all"]').exists()).toBe(false);
+  });
+
+  it("keeps at least one bucket visible and clears hidden buckets on a fill change", async () => {
+    await mountView();
+    const present = legendItems().filter((item) => legendCount(item) > 0);
+    for (const item of present) await item.trigger("click");
+    expect(hexMap().props("hidden")).toHaveLength(present.length - 1);
     await wrapper.setProps({ state: mapState({ fill: "memLim" }) });
-    expect(hexMap().props("highlight")).toEqual([]);
+    expect(hexMap().props("hidden")).toEqual([]);
   });
 });
 

@@ -80,6 +80,7 @@ const scroller = ref<HTMLElement | null>(null);
 let pinned = true;
 let timer: ReturnType<typeof setInterval> | null = null;
 let inFlight = false;
+let unresolved = false;
 
 const visible = computed(() =>
   filterLines(lines.value, {
@@ -159,7 +160,10 @@ async function load() {
   failed.value = false;
   inFlight = true;
   try {
-    if (!link.value) await resolve();
+    if (!link.value && !unresolved) {
+      await resolve();
+      unresolved = !link.value;
+    }
     await fetchLines();
   } catch {
     failed.value = true;
@@ -170,9 +174,9 @@ async function load() {
   }
 }
 
-// Overlapping searches can land out of order and flash stale lines.
+// Overlapping searches can land out of order and flash stale lines; a failed stream resolution is not retried until the target or range changes.
 const poll = () => {
-  if (!inFlight) load();
+  if (!inFlight && !unresolved) load();
 };
 
 const startPolling = () => {
@@ -206,6 +210,7 @@ watch(
   [() => props.target, () => props.range.start, () => props.range.end, () => props.range.relative],
   () => {
     link.value = null;
+    unresolved = false;
     lines.value = [];
     pinned = true;
     loading.value = true;

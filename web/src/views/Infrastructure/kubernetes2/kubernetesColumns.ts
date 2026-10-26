@@ -446,10 +446,35 @@ function nodeBar(
   );
 }
 
+const NODE_POOL_LABELS = [
+  "eks.amazonaws.com/nodegroup",
+  "cloud.google.com/gke-nodepool",
+  "kubernetes.azure.com/agentpool",
+  "karpenter.sh/nodepool",
+  "node.kubernetes.io/instance-type",
+];
+
+const NODE_ZONE_LABELS = ["topology.kubernetes.io/zone", "failure-domain.beta.kubernetes.io/zone"];
+
+const firstLabel = (labels: Record<string, string>, keys: string[]) =>
+  keys.map((k) => labels[k]).find((v) => typeof v === "string" && v !== "") ?? null;
+
+/** "<pool> · <zone>" from the observed node labels, else the internal IP. */
+export function nodeSub(r: NodeRow): I18nText | null {
+  const labels = labelsOf(r.object);
+  const parts = labels
+    ? [firstLabel(labels, NODE_POOL_LABELS), firstLabel(labels, NODE_ZONE_LABELS)].filter(
+        (v): v is string => v != null,
+      )
+    : [];
+  if (parts.length) return raw(parts.join(" · "));
+  return r.info?.internal_ip ? raw(r.info.internal_ip) : null;
+}
+
 function nodeColumns(ctx: ColumnContext): K8sColumn[] {
   const t = ctx.t;
   return [
-    nameCol(ctx, (r: NodeRow) => (r.info?.internal_ip ? raw(r.info.internal_ip) : null)),
+    nameCol(ctx, nodeSub),
     warnCol(),
     nodeBar(
       "cpu",

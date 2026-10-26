@@ -35,6 +35,7 @@ const props = withDefaults(
     count: number;
     total: number;
     countLabel?: I18nText;
+    countNoun?: I18nText;
     countSuffix?: I18nText;
     filtered?: boolean;
     capped?: boolean;
@@ -50,6 +51,7 @@ const props = withDefaults(
   }>(),
   {
     countLabel: undefined,
+    countNoun: undefined,
     countSuffix: undefined,
     filtered: false,
     capped: false,
@@ -111,7 +113,8 @@ const onNamespaces = (value: unknown) =>
             data-test="k8s2-list-filtered-clear"
             @click="emit('clear')"
             >{{ t("infra.k8s2.filtered") }}</OButton
-          >{{ raw(` ${count} / ${total}`) }}
+          >{{ raw(` ${count} / ${total}`)
+          }}<template v-if="countNoun">{{ raw(" ") }}{{ countNoun }}</template>
           <span v-if="capped" data-test="k8s2-list-capped">
             {{ t("infra.k8s2.limitMarker") }}
             <OTooltip :content="t('infra.k8s2.itemsCappedTip')" />

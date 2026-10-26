@@ -203,7 +203,7 @@ describe("ClusterOverview", () => {
   describe("capacity cards", () => {
     const barOf = (testId: string) =>
       wrapper
-        .findAllComponents({ name: "K8sSegmentedBar" })
+        .findAllComponents({ name: "OSegmentedBar" })
         .find((c) => c.attributes("data-test") === testId)!;
 
     it("shows CPU Usage, Requests and Limits as cores over allocatable", async () => {
@@ -290,9 +290,23 @@ describe("ClusterOverview", () => {
       await wrapper.find('[data-test="k8s2-overview-kpi-warnings"]').trigger("click");
       expect(wrapper.emitted("navigate")).toEqual([
         [{ view: "nodes" }],
-        [{ view: "pods" }],
-        [{ view: "events" }],
+        [{ view: "pods", status: "failing" }],
+        [{ view: "events", status: "warnings" }],
       ]);
+    });
+
+    it("shows a no-access state instead of tiles when forbidden", async () => {
+      await mountView(BASE, { forbidden: true });
+      expect(wrapper.find('[data-test="k8s2-overview-forbidden"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="k8s2-overview-kpis"]').exists()).toBe(false);
+    });
+
+    it("keeps the nodes tile neutral when no node is reported", async () => {
+      await mountView({ ...BASE, N1: [], O1: [] });
+      expect(text("k8s2-overview-kpi-nodes")).toContain("0 / 0");
+      expect(
+        wrapper.find('[data-test="k8s2-overview-kpi-nodes"]').classes().join(" "),
+      ).not.toContain("success");
     });
 
     it("counts firing alerts and open incidents, and links to them", async () => {
@@ -333,9 +347,9 @@ describe("ClusterOverview", () => {
       });
       await mountView();
       await vi.waitFor(() =>
-        expect(text("k8s2-overview-kpi-alerts")).toContain("firing · 1 open incident"),
+        expect(text("k8s2-overview-kpi-alerts")).toContain("Firing · 1 open incident"),
       );
-      expect(text("k8s2-overview-kpi-alerts")).toContain("firing · 1 open incident");
+      expect(text("k8s2-overview-kpi-alerts")).toContain("Firing · 1 open incident");
       expect(text("k8s2-overview-incident-card")).toContain("Checkout degraded");
       expect(text("k8s2-overview-alert-a1")).toContain("High error rate");
       expect(wrapper.find('[data-test="k8s2-overview-alert-a2"]').exists()).toBe(false);
@@ -376,10 +390,8 @@ describe("ClusterOverview", () => {
       const row = wrapper.find(`[data-test^="k8s2-overview-attention-row-"]`);
       expect(row.exists()).toBe(true);
       const explain = wrapper.find('button[data-test^="k8s2-overview-attention-explain-"]');
-      expect(explain.attributes("disabled")).toBeDefined();
-      expect(wrapper.find('[data-test^="k8s2-overview-attention-explain-wrap-"]').text()).toContain(
-        "AI explanations are not available yet",
-      );
+      expect(explain.attributes("aria-disabled")).toBe("true");
+      expect(explain.text()).toContain("AI explanations are not available yet");
     });
 
     it("makes the workload name the one focusable control, not the row", async () => {

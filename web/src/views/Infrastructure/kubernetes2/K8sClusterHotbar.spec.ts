@@ -83,7 +83,7 @@ describe("K8sClusterHotbar", () => {
 
   it("does not dim inactive tiles", () => {
     const tile = mountBar("stage").find('[data-test="k8s2-hotbar-dev"]');
-    expect(tile.classes().some((c) => c.includes("opacity"))).toBe(false);
+    expect(tile.classes().some((c) => c.startsWith("opacity"))).toBe(false);
   });
 
   it("names each tile with its health, so the dot is not the only signal", () => {

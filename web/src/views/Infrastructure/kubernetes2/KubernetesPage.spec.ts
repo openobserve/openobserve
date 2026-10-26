@@ -20,6 +20,7 @@ import { createMemoryHistory, createRouter } from "vue-router";
 import { defineComponent, h } from "vue";
 import i18n from "@/locales";
 import searchService from "@/services/search";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import { queryClient } from "@/composables/query/queryClient";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import K8sClusterHotbar from "./K8sClusterHotbar.vue";
@@ -85,7 +86,7 @@ const recorder = (name: string, emits: string[] = []) =>
 
 const ListStub = recorder("K8sListView", ["open", "update", "refresh", "action"]);
 const MapStub = recorder("MapView", ["open", "update", "navigate", "refresh"]);
-const ClusterStub = recorder("ClusterOverview", ["open", "refresh"]);
+const ClusterStub = recorder("ClusterOverview", ["open", "refresh", "navigate"]);
 const WorkloadsStub = recorder("WorkloadsOverview", ["open", "update", "view", "refresh"]);
 const DrawerStub = recorder("K8sDetailsDrawer", ["close", "open"]);
 
@@ -471,6 +472,7 @@ describe("KubernetesPage", () => {
       ["unscoped", { eventFields: [] }],
       ["anchor", { metrics: ALL_STREAMS.filter((s) => s !== "kube_pod_status_phase") }],
     ])("is skipped with reason %s", async (reason, streams) => {
+      fixture = { ...fixture, CL1N: [{ metric: { k8s_cluster: "alpha" }, value: 1 }] };
       await mountPage({ view: "map", cluster: "alpha" }, streams);
       expect(objects()).toEqual({ state: "skipped", reason });
     });
@@ -574,6 +576,18 @@ describe("KubernetesPage", () => {
     });
   });
 
+  describe("overview navigation", () => {
+    it("opens the failing pods filter from a KPI tile without carrying the old search", async () => {
+      await mountPage({ view: "cluster", cluster: "alpha", search: "stale" });
+      wrapper
+        .findComponent({ name: "ClusterOverview" })
+        .vm.$emit("navigate", { view: "pods", status: "failing" });
+      await flushPromises();
+      expect(query()).toMatchObject({ view: "pods", status: "failing" });
+      expect(query().search).toBeUndefined();
+    });
+  });
+
   describe("cluster", () => {
     it("lists CL1 ∪ CL2 clusters on the Events view and defaults to the first alphabetically", async () => {
       await mountPage({ view: "events" });
@@ -626,6 +640,33 @@ describe("KubernetesPage", () => {
     expect(wrapper.findComponent(ListStub).props("loading")).toBe(true);
   });
 
+  describe("phone chrome", () => {
+    it("offers an icon-only palette button for narrow screens", async () => {
+      await mountPage();
+      const compact = wrapper.find('[data-test="k8s2-palette-open-compact"]');
+      expect(compact.exists()).toBe(true);
+      expect(compact.classes()).toContain("md:hidden");
+      expect(compact.attributes("aria-label")).toBeTruthy();
+      expect(wrapper.find('[data-test="k8s2-palette-open"]').classes()).toContain("max-md:hidden");
+    });
+
+    it("opens the palette from the compact button", async () => {
+      await mountPage();
+      await wrapper.find('[data-test="k8s2-palette-open-compact"]').trigger("click");
+      expect(wrapper.findComponent({ name: "K8sCommandPalette" }).props("open")).toBe(true);
+    });
+
+    it("shows totals in the view select options", async () => {
+      await mountPage();
+      const options = wrapper
+        .findComponent('[data-test="k8s2-view-select"]')
+        .props("options") as any[];
+      expect(options.some((o) => typeof o.label === "string" && /\(\d+\)$/.test(o.label))).toBe(
+        true,
+      );
+    });
+  });
+
   describe("row actions", () => {
     const pod = { kind: "pod", cluster: "alpha", namespace: "shop", name: "web-1" };
 
@@ -650,6 +691,19 @@ describe("KubernetesPage", () => {
     it("falls back to the first trace stream when there is no default", async () => {
       const push = await act("traces", { traces: ["zeta", "alpha-traces"] });
       expect(push.mock.calls[0][0]).toMatchObject({ query: { stream: "alpha-traces" } });
+    });
+
+    it("says which trace stream it opened when the org has several", async () => {
+      await act("traces", { traces: ["zeta", "default"] });
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "info", message: expect.stringContaining("default") }),
+      );
+    });
+
+    it("stays quiet when the org has a single trace stream", async () => {
+      vi.mocked(toast).mockClear();
+      await act("traces", { traces: ["default"] });
+      expect(toast).not.toHaveBeenCalled();
     });
 
     it("does not navigate when the org has no trace stream", async () => {

@@ -3,9 +3,9 @@
 import { describe, expect, it } from "vitest";
 import {
   buildTree,
-  completeWarnings,
   clusterCodes,
   clusterHue,
+  clusterSeen,
   clusterStatsOf,
   clusterTone,
   filterTree,
@@ -112,11 +112,25 @@ describe("buildTree", () => {
     expect(find(groups, "pods")).toMatchObject({ count: 2, bad: 1 });
   });
 
-  it("keeps the Events badge only on the views that load every warning", () => {
-    expect(completeWarnings("cluster", 57)).toBe(57);
-    expect(completeWarnings("events", 12)).toBe(12);
-    expect(completeWarnings("pods", 12)).toBe(0);
-    expect(completeWarnings("namespaces", 0)).toBe(0);
+  it("takes the other kinds' problem counts from the stats, ahead of loaded rows", () => {
+    const stats = {
+      daemonsets: 4,
+      daemonsetsBad: 3,
+      statefulsets: 2,
+      statefulsetsBad: 2,
+      replicasets: 9,
+      replicasetsBad: 7,
+      jobs: 5,
+      jobsBad: 1,
+      pvcs: 7,
+      pvcsBad: 1,
+      hpas: 4,
+      hpasBad: 1,
+    };
+    const groups = buildTree({ inventory: inventory(), cluster: "prod", events, stats });
+    const bad = (view: string) => find(groups, view).bad;
+    expect([bad("daemonsets"), bad("statefulsets"), bad("replicasets")]).toEqual([3, 2, 7]);
+    expect([bad("jobs"), bad("pvcs"), bad("hpas")]).toEqual([1, 1, 1]);
   });
 
   it("counts zero for a kind the present stats do not mention", () => {
@@ -181,6 +195,15 @@ describe("rowIsBad", () => {
     expect(rowIsBad(pod("prod", "a", "Failed"))).toBe(true);
     expect(rowIsBad(pod("prod", "a", "Pending"))).toBe(true);
     expect(rowIsBad(pod("prod", "a", "Running"))).toBe(false);
+  });
+
+  it("flags a running pod that carries an error waiting reason", () => {
+    const crash = {
+      ...pod("prod", "a", "Running"),
+      status: { text: "CrashLoopBackOff", variant: "error-soft" },
+      containers: [{ name: "app", waitingReason: "CrashLoopBackOff" }],
+    };
+    expect(rowIsBad(crash as any)).toBe(true);
   });
 });
 
@@ -327,5 +350,33 @@ describe("nodeSummary", () => {
       region: null,
       version: null,
     });
+  });
+});
+
+describe("clusterSeen", () => {
+  const results = new Map<string, any[]>([
+    ["CL1N", [{ metric: { k8s_cluster: "prod" }, value: 1 }]],
+    ["CL2P", [{ metric: { k8s_cluster_name: "edge" }, value: 1 }]],
+    ["CST", [{ metric: { k8s_cluster_name: "dev", stat: "pods" }, value: 3 }]],
+  ]);
+
+  it("is true for no selected cluster", () => {
+    expect(clusterSeen(new Map(), null)).toBe(true);
+  });
+
+  it("finds a cluster in any cross-cluster query under either label spelling", () => {
+    expect(clusterSeen(results, "prod")).toBe(true);
+    expect(clusterSeen(results, "edge")).toBe(true);
+    expect(clusterSeen(results, "dev")).toBe(true);
+  });
+
+  it("is false for a cluster no series names, and for empty results", () => {
+    expect(clusterSeen(results, "ghost")).toBe(false);
+    expect(clusterSeen(new Map(), "prod")).toBe(false);
+  });
+
+  it("ignores series of queries that are not cross-cluster", () => {
+    const other = new Map<string, any[]>([["P1", [{ metric: { k8s_cluster: "prod" }, value: 1 }]]]);
+    expect(clusterSeen(other as any, "prod")).toBe(false);
   });
 });

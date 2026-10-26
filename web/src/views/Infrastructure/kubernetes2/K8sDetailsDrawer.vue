@@ -37,10 +37,11 @@ import WorkloadDetails from "./WorkloadDetails.vue";
 import { KIND_INFO } from "./kubernetesQueries";
 import { detailKindOf, type EventRow } from "./kubernetesEvents";
 import { labelsOf } from "./kubernetesObjects";
-import { encodeDetails, type DetailsRef } from "./kubernetesUrlState";
+import { encodeDetails, type DetailsRef, type K8sUrlState } from "./kubernetesUrlState";
 import {
   chipLabel,
   formatAge,
+  membersOf,
   severityOf,
   toneOf,
   warningLabel,
@@ -50,6 +51,7 @@ import {
   type Tone,
 } from "./kubernetesModel";
 import { TONE_PILL } from "./k8sTone";
+import { worstPod } from "./workloadProblems";
 import type { K8sAction } from "./k8sActions";
 
 const props = defineProps<{
@@ -73,12 +75,21 @@ const emit = defineEmits<{
   close: [];
   open: [ref: DetailsRef];
   action: [type: K8sAction, ref: DetailsRef];
+  navigate: [patch: Partial<K8sUrlState>];
 }>();
 
 const store = useStore();
 const { t } = useI18nTyped();
 
 const EVENT_LIMIT = 100;
+
+const MEMBER_KINDS: ReadonlySet<string> = new Set([
+  "deployment",
+  "daemonset",
+  "statefulset",
+  "replicaset",
+  "job",
+]);
 
 const PHASE_TONE: Record<string, Tone> = {
   Active: "success",
@@ -203,11 +214,33 @@ const insight = computed(() => {
   };
 });
 
-const hasLogs = computed(() => props.details.kind === "pod");
+const isWorkload = computed(() => MEMBER_KINDS.has(props.details.kind));
 
-const hasTraces = computed(() => props.details.kind === "pod");
+const worstMember = computed(() =>
+  isWorkload.value && props.row ? worstPod(membersOf(props.inventory.pods, props.row)) : null,
+);
 
-const act = (type: K8sAction) => emit("action", type, props.details);
+const hasLogs = computed(() => props.details.kind === "pod" || isWorkload.value);
+
+const hasTraces = computed(() => hasLogs.value);
+
+const noMember = computed(() => isWorkload.value && !worstMember.value);
+
+const act = (type: K8sAction) => {
+  const pod = worstMember.value;
+  if (pod && (type === "logs" || type === "traces")) {
+    emit("action", type, {
+      kind: "pod",
+      cluster: pod.cluster,
+      namespace: pod.namespace,
+      name: pod.name,
+    });
+    return;
+  }
+  emit("action", type, props.details);
+};
+
+const showPods = () => emit("navigate", { view: "pods", search: props.details.name });
 </script>
 
 <template>
@@ -264,14 +297,26 @@ const act = (type: K8sAction) => emit("action", type, props.details);
       <template v-else>
         <div class="flex flex-wrap items-center gap-2" data-test="k8s2-drawer-actions">
           <OButton
+            v-if="details.kind === 'node'"
+            variant="primary"
+            size="sm-action"
+            icon-left="view-in-ar"
+            data-test="k8s2-drawer-action-pods"
+            @click="showPods"
+            >{{ t("infra.k8s2.drawerActionPods") }}</OButton
+          >
+          <OButton
             v-if="hasLogs"
             variant="primary"
             size="sm-action"
             icon-left="article"
+            :disabled="noMember"
+            focusable-unavailable
             data-test="k8s2-drawer-view-logs"
             @click="act('logs')"
-            >{{ t("infra.k8s2.drawerActionLogs") }}</OButton
-          >
+            >{{ t("infra.k8s2.drawerActionLogs") }}
+            <OTooltip v-if="noMember" :content="t('infra.k8s2.drawerNoMemberPods')"
+          /></OButton>
           <OButton
             variant="outline"
             size="sm-action"
@@ -285,10 +330,13 @@ const act = (type: K8sAction) => emit("action", type, props.details);
             variant="outline"
             size="sm-action"
             icon-left="account-tree"
+            :disabled="noMember"
+            focusable-unavailable
             data-test="k8s2-drawer-action-traces"
             @click="act('traces')"
-            >{{ t("infra.k8s2.drawerActionTraces") }}</OButton
-          >
+            >{{ t("infra.k8s2.drawerActionTraces") }}
+            <OTooltip v-if="noMember" :content="t('infra.k8s2.drawerNoMemberPods')"
+          /></OButton>
           <OButton
             variant="outline"
             size="sm-action"

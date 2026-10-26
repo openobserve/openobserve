@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -25,7 +26,8 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { filterTree, type NodeSummary, type TreeGroup } from "./k8sTree";
-import K8sSegmentedBar from "./K8sSegmentedBar.vue";
+import OSegmentedBar from "@/lib/data/SegmentedBar/OSegmentedBar.vue";
+import type { SegmentedBarSegment } from "@/lib/data/SegmentedBar/OSegmentedBar.types";
 import type { View } from "./kubernetesQueries";
 
 const props = defineProps<{
@@ -37,12 +39,12 @@ const emit = defineEmits<{ select: [view: View] }>();
 
 const { t } = useI18nTyped();
 
-const nodeSegments = computed(() => {
+const nodeSegments = computed<SegmentedBarSegment[]>(() => {
   const { ready = 0, total = 0 } = props.nodes ?? {};
   const pct = (count: number) => (total ? (count / total) * 100 : 0);
   return [
-    { id: "ready", pct: pct(ready), class: "bg-status-success-text" },
-    { id: "not-ready", pct: pct(total - ready), class: "bg-status-error-text" },
+    { id: "ready", pct: pct(ready), variant: "success" },
+    { id: "not-ready", pct: pct(total - ready), variant: "danger" },
   ];
 });
 
@@ -106,7 +108,7 @@ const setOpen = (id: string, open: boolean) => {
             }}</span
           >
         </div>
-        <K8sSegmentedBar :segments="nodeSegments" />
+        <OSegmentedBar :segments="nodeSegments" />
       </div>
       <OSearchInput
         v-model="query"
@@ -147,11 +149,13 @@ const setOpen = (id: string, open: boolean) => {
                   <OTruncatedText class="min-w-0 flex-1 text-left">{{
                     t(item.label)
                   }}</OTruncatedText>
-                  <span
+                  <OBadge
                     v-if="item.bad > 0"
-                    class="bg-status-error-bg text-status-error-text text-2xs rounded-full px-1.5 font-semibold tabular-nums"
+                    variant="error-soft"
+                    size="xs"
+                    class="tabular-nums"
                     :data-test="`k8s2-tree-bad-${item.view}`"
-                    >{{ item.bad }}</span
+                    >{{ item.bad }}</OBadge
                   >
                   <span
                     v-if="item.count != null"

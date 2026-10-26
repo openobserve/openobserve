@@ -18,6 +18,7 @@ import {
   ERROR_REASONS,
   inScope,
   lensPodStatus,
+  podBucket,
   podWarnings,
   type Inventory,
   type NodeRow,
@@ -49,6 +50,8 @@ export interface AttentionItem {
   restarts: number | null;
   // µs; the object's creation time, the only "since" the inventory carries.
   createdAt: number | null;
+  // µs; when the object entered its current problem state, from its observed snapshot.
+  sinceUs: number | null;
   canLogs: boolean;
 }
 
@@ -86,6 +89,41 @@ const podReasons = (pod: PodRow) =>
     pod.containers.map((c) => c.waitingReason).find((r) => r && !ERROR_REASONS.has(r)),
   ]);
 
+const toUs = (time: unknown) => {
+  const ms = typeof time === "string" ? Date.parse(time) : NaN;
+  return Number.isFinite(ms) ? ms * 1000 : null;
+};
+
+const latest = (times: (number | null)[]) => {
+  const found = times.filter((t): t is number => t != null);
+  return found.length ? Math.max(...found) : null;
+};
+
+const transitionOf = (status: Record<string, any> | undefined, types: string[]) =>
+  latest(
+    (status?.conditions ?? [])
+      .filter((c: any) => types.includes(c?.type) && c?.status !== "True")
+      .map((c: any) => toUs(c.lastTransitionTime)),
+  );
+
+/** µs since the pod's current problem began, or null when its snapshot does not say. */
+export function podSinceUs(pod: PodRow): number | null {
+  const status = pod.object?.status;
+  if (!status) return null;
+  const containers: any[] = status.containerStatuses ?? [];
+  const finished = (key: "state" | "lastState") =>
+    latest(containers.map((c) => toUs(c?.[key]?.terminated?.finishedAt)));
+  if (pod.phase === "Pending") {
+    return transitionOf(status, ["PodScheduled"]) ?? transitionOf(status, ["Ready"]);
+  }
+  if (pod.phase === "Failed" || pod.phase === "Succeeded") return finished("state");
+  return (
+    transitionOf(status, ["Ready", "ContainersReady"]) ??
+    finished("lastState") ??
+    latest(containers.map((c) => toUs(c?.state?.running?.startedAt)))
+  );
+}
+
 function scorePod(pod: PodRow): { score: number; severity: Severity } | null {
   const status = lensPodStatus(pod);
   const failing =
@@ -116,6 +154,7 @@ function podItem(pod: PodRow, score: number, severity: Severity): AttentionItem 
     notReady: pod.phase === "Running" && pod.ready !== "true" && status === "pending",
     restarts: pod.restarts,
     createdAt: pod.createdAt,
+    sinceUs: podSinceUs(pod),
     canLogs: pod.phase !== "Pending",
   };
 }
@@ -134,6 +173,7 @@ function nodeItem(node: NodeRow): AttentionItem | null {
     notReady: true,
     restarts: null,
     createdAt: node.createdAt,
+    sinceUs: transitionOf(node.object?.status, ["Ready"]),
     canLogs: false,
   };
 }
@@ -160,13 +200,7 @@ export function podBuckets(inventory: Inventory, cluster: string | null): PodBuc
   for (const pod of inventory.pods) {
     if (!inScope(pod, { cluster, namespaces: [] })) continue;
     out.total += 1;
-    const status = lensPodStatus(pod);
-    if (status === "running") out.ready += 1;
-    else if (status === "succeeded") out.completed += 1;
-    else if (status === "unknown") out.unknown += 1;
-    else if (status === "failed" || status === "evicted") out.failing += 1;
-    else if (podWarnings(pod).some((w) => w.severity === "error")) out.failing += 1;
-    else out.pending += 1;
+    out[podBucket(pod)] += 1;
   }
   return out;
 }

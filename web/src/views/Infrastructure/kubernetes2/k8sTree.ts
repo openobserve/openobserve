@@ -2,15 +2,15 @@
 
 import type { I18nKey } from "@/types/i18n";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import { podStatusOf } from "./kubernetesStatus";
 import {
   clusterLabelOf,
+  isProblemPod,
   type AnyRow,
   type Inventory,
   type NodeRow,
   type QueryResults,
 } from "./kubernetesModel";
-import type { ClusterStat, View } from "./kubernetesQueries";
+import { CLUSTER_QUERIES, type ClusterStat, type View } from "./kubernetesQueries";
 
 export type ClusterStats = Partial<Record<ClusterStat, number>>;
 
@@ -55,8 +55,6 @@ export interface TreeSource {
   stats?: ClusterStats | null;
 }
 
-const BAD_POD_STATUS = new Set(["failed", "evicted", "pending"]);
-
 const inCluster = <T extends { cluster: string }>(rows: T[], cluster: string | null) =>
   cluster == null ? rows : rows.filter((row) => row.cluster === cluster);
 
@@ -66,7 +64,7 @@ const nodeIsBad = (node: NodeRow) => node.ready !== "true";
 export function rowIsBad(row: AnyRow): boolean {
   switch (row.kind) {
     case "pod":
-      return BAD_POD_STATUS.has(podStatusOf(row).status);
+      return isProblemPod(row);
     case "node":
       return nodeIsBad(row);
     case "deployment":
@@ -106,6 +104,18 @@ export function clusterStatsOf(results: QueryResults, cluster: string | null): C
   return found ? out : null;
 }
 
+// True for a null cluster; otherwise whether any cross-cluster series names it, whatever the label spelling.
+export function clusterSeen(results: QueryResults, cluster: string | null): boolean {
+  if (cluster == null) return true;
+  for (const id of CLUSTER_QUERIES) {
+    for (const series of results.get(id) ?? []) {
+      const label = clusterLabelOf(series.metric);
+      if (label && series.metric[label] === cluster) return true;
+    }
+  }
+  return false;
+}
+
 type CountedKey = Exclude<keyof Inventory, "unlabelledFamilies">;
 
 const STAT_OF: Partial<Record<CountedKey, ClusterStat>> = {
@@ -126,11 +136,13 @@ const BAD_STAT_OF: Partial<Record<CountedKey, ClusterStat>> = {
   nodes: "nodesBad",
   pods: "podsBad",
   deployments: "deploymentsBad",
+  daemonsets: "daemonsetsBad",
+  statefulsets: "statefulsetsBad",
+  replicasets: "replicasetsBad",
+  jobs: "jobsBad",
+  pvcs: "pvcsBad",
+  hpas: "hpasBad",
 };
-
-// Only the Overview and Events views load every warning; elsewhere the count would shift with the view.
-export const completeWarnings = (view: View, loaded: number): number =>
-  view === "cluster" || view === "events" ? loaded : 0;
 
 export function buildTree({ inventory, cluster, events, stats }: TreeSource): TreeGroup[] {
   const item = (view: View, label: I18nKey, key: CountedKey | null): TreeItem => {

@@ -167,7 +167,9 @@ describe("K8sListView", () => {
     await mountList({}, { namespace: "shop" });
     expect(wrapper.find('[data-test="k8s2-list-count"]').text()).toBe("Filtered: 2 / 3");
     await wrapper.find('[data-test="k8s2-list-filtered-clear"]').trigger("click");
-    expect(wrapper.emitted("update")).toContainEqual([{ search: "", namespaces: [] }]);
+    expect(wrapper.emitted("update")).toContainEqual([
+      { search: "", namespaces: [], status: "all" },
+    ]);
   });
 
   it.each(["nodes", "namespaces"])("hides the namespace select on %s", async (view) => {
@@ -197,7 +199,7 @@ describe("K8sListView", () => {
     wrapper.unmount();
     await mountList({ view: "nodes", rows: [] }, { namespace: "shop", search: "x" });
     await wrapper.find('[data-test="k8s2-list-filtered-clear"]').trigger("click");
-    expect(wrapper.emitted("update")).toEqual([[{ search: "" }]]);
+    expect(wrapper.emitted("update")).toEqual([[{ search: "", status: "all" }]]);
   });
 
   it("searches the node and IP text, not just the name", async () => {
@@ -277,7 +279,9 @@ describe("K8sListView", () => {
     await mountList({}, { search: "zzz" });
     expect(wrapper.findComponent({ name: "OEmptyState" }).props("filtered")).toBe(true);
     wrapper.findComponent({ name: "OEmptyState" }).vm.$emit("action", "clear-filters");
-    expect(wrapper.emitted("update")).toContainEqual([{ search: "", namespaces: [] }]);
+    expect(wrapper.emitted("update")).toContainEqual([
+      { search: "", namespaces: [], status: "all" },
+    ]);
   });
 
   it("opens a row's drawer on click, and a link opens its own target without the row's", async () => {
@@ -362,15 +366,54 @@ describe("K8sListView", () => {
     expect(chip("running").text()).toContain("0");
     expect(chip("pending").text()).toContain("1");
     await chip("pending").trigger("click");
-    await flushPromises();
+    expect(wrapper.emitted("update")).toContainEqual([{ status: "pending" }]);
+  });
+
+  it("filters by the chip in the URL state and keeps it out of the counts", async () => {
+    await mountList({}, { status: "pending" });
     expect(order()).toEqual(["db"]);
-    await chip("all").trigger("click");
+    expect(wrapper.find('[data-test="k8s2-status-chip-all"]').text()).toContain("3");
+    expect(wrapper.find('[data-test="k8s2-list-count"]').text()).toBe("Filtered: 1 / 3");
+    await wrapper.setProps({ state: parseUrlState({ view: "pods" }) });
     await flushPromises();
     expect(order()).toHaveLength(3);
   });
 
+  it("ignores a URL chip the view does not offer", async () => {
+    await mountList({}, { status: "pending" });
+    await wrapper.setProps({
+      view: "events",
+      rows: [],
+      state: { ...parseUrlState({ view: "events" }), status: "lost" },
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="k8s2-status-chip-all"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="k8s2-list-filtered-clear"]').exists()).toBe(false);
+  });
+
+  it("counts controller chips from the member pods it is given", async () => {
+    const inventory = buildInventory(
+      results({
+        P1: [ksm({ namespace: "shop", pod: "a", uid: "a", phase: "Failed" })],
+        P4: [
+          ksm({
+            namespace: "shop",
+            pod: "a",
+            uid: "a",
+            owner_kind: "ReplicaSet",
+            owner_name: "web",
+          }),
+        ],
+        RS2: [ksm({ namespace: "shop", replicaset: "web" }, 1)],
+      }),
+    );
+    await mountList({ view: "replicasets", rows: inventory.replicasets, pods: inventory.pods });
+    expect(wrapper.find('[data-test="k8s2-status-chip-failed"]').text()).toContain("1");
+    expect(wrapper.find('[data-test="k8s2-status-chip-running"]').text()).toContain("0");
+  });
+
   it("shows no status chips on views without them", async () => {
-    await mountList({ view: "nodes", rows: [] });
+    await mountList({ view: "namespaces", rows: [] });
     expect(wrapper.find('[data-test="k8s2-status-chips"]').exists()).toBe(false);
   });
 
@@ -405,13 +448,13 @@ describe("K8sListView", () => {
     expect(none.text()).toBe("No request");
   });
 
-  it("emits action from the row menu and opens the row for Details", async () => {
+  it("emits only action for Details so an open drawer is not toggled shut", async () => {
     await mountList({});
     await wrapper.find('[data-test="k8s2-row-menu-trigger"]').trigger("click");
     await flushPromises();
     (document.body.querySelector('[data-test="k8s2-row-menu-details"]') as HTMLElement).click();
     await flushPromises();
     expect(wrapper.emitted("action")?.[0]?.[0]).toBe("details");
-    expect(wrapper.emitted("open")).toHaveLength(1);
+    expect(wrapper.emitted("open")).toBeUndefined();
   });
 });

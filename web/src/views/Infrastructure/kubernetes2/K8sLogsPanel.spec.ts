@@ -123,6 +123,26 @@ describe("K8sLogsPanel", () => {
     const liveButton = (wrapper: Awaited<ReturnType<typeof mountPanel>>) =>
       wrapper.find('[data-test="k8s2-logs-live"]');
 
+    it("does not re-resolve the stream on polls when none qualifies", async () => {
+      fakeTimers();
+      resolve.mockResolvedValue(null);
+      await mountPanel();
+      expect(resolve).toHaveBeenCalledTimes(1);
+      await advance(POLL_MS * 3);
+      expect(resolve).toHaveBeenCalledTimes(1);
+      expect(search).not.toHaveBeenCalled();
+    });
+
+    it("resolves again when the target changes after a failed resolution", async () => {
+      resolve.mockResolvedValue(null);
+      const wrapper = await mountPanel();
+      await wrapper.setProps({
+        target: { kind: "pod", cluster: "prod", namespace: "shop", name: "web-2" },
+      });
+      await flushPromises();
+      expect(resolve).toHaveBeenCalledTimes(2);
+    });
+
     it("polls every 5s while Live", async () => {
       fakeTimers();
       await mountPanel();

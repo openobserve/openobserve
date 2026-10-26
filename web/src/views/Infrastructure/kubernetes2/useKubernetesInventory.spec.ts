@@ -159,13 +159,13 @@ describe("useKubernetesInventory", () => {
   describe("per-view sets (§7.2) plus CL and NS1", () => {
     const CL_IDS = [...CLUSTER_QUERIES];
     it.each([
-      ["pods", 17 + 7, ["W:Pod", "O:pod"]],
-      ["cluster", 10 + 7, ["W:*"]],
-      ["workloads", 16 + 7, ["E"]],
-      ["hpas", 5 + 7, ["W:HorizontalPodAutoscaler"]],
-      ["replicasets", 5 + 7, ["W:ReplicaSet"]],
-      ["nodes", 9 + 7, ["W:Node", "O:node"]],
-      ["events", 0 + 7, ["E"]],
+      ["pods", 17 + 7, ["EC", "W:Pod", "O:pod"]],
+      ["cluster", 10 + 7, ["EC", "W:*", "O:pod", "O:node"]],
+      ["workloads", 16 + 7, ["EC", "E"]],
+      ["hpas", 5 + 7, ["EC", "W:HorizontalPodAutoscaler"]],
+      ["replicasets", 5 + 7, ["EC", "W:ReplicaSet"]],
+      ["nodes", 9 + 7, ["EC", "W:Node", "O:node"]],
+      ["events", 0 + 7, ["EC", "E"]],
     ] as const)("%s sends %i PromQL and %j", async (view, count, sqlNames) => {
       const { inv } = await setup({ view });
       await inv.load();
@@ -452,6 +452,35 @@ describe("useKubernetesInventory", () => {
       await label.inv.load();
       expect([sentIds().sort(), sentSql().map((q: any) => q.sql)]).toEqual(sent);
       expect(sentIds()).not.toContain("N1");
+    });
+  });
+
+  describe("event counts", () => {
+    it("sends one cluster-scoped count over the picker range and parses it", async () => {
+      sqlHits = (sql) => (sql.includes("count(*) AS total") ? [{ total: 14, warnings: "8" }] : []);
+      const { inv } = await setup({ view: "pods" });
+      expect(inv.eventCounts.value).toBeNull();
+      await inv.load();
+      const counts = sentSql().filter((q: any) => q.sql.includes("count(*) AS total"));
+      expect(counts).toHaveLength(1);
+      expect(counts[0].sql).toContain("k8s_cluster = 'prod'");
+      expect(counts[0].start_time).toBe(START);
+      expect(inv.eventCounts.value).toEqual({ total: 14, warnings: 8 });
+    });
+
+    it("stays null when the count returns no row, and is not sent for unscoped events", async () => {
+      const scoped = await setup({ view: "cluster" });
+      await scoped.inv.load();
+      expect(scoped.inv.eventCounts.value).toBeNull();
+      vi.clearAllMocks();
+      queryClient.clear();
+      const { inv } = await setup(
+        { view: "events" },
+        { eventFields: ["body_object_note"], metrics: [] },
+      );
+      await inv.load();
+      expect(sentSql().some((q: any) => q.sql.includes("count(*) AS total"))).toBe(false);
+      expect(inv.eventCounts.value).toBeNull();
     });
   });
 

@@ -25,7 +25,17 @@ import OText from "@/lib/core/Typography/OText.vue";
 import { searchPalette, type PaletteGroup, type PaletteItem } from "./k8sPalette";
 
 // `group` narrows the palette to one group, as the cluster switcher does.
-const props = defineProps<{ open: boolean; items: PaletteItem[]; group?: PaletteGroup | null }>();
+const props = withDefaults(
+  defineProps<{
+    open: boolean;
+    items: PaletteItem[];
+    group?: PaletteGroup | null;
+    loading?: boolean;
+    indexFailed?: boolean;
+    truncated?: boolean;
+  }>(),
+  { group: null, loading: false, indexFailed: false, truncated: false },
+);
 const emit = defineEmits<{
   (_e: "update:open", _value: boolean): void;
   (_e: "select", _item: PaletteItem): void;
@@ -64,6 +74,13 @@ const results = computed(() =>
     header: index === 0 || all[index - 1].group !== item.group,
   })),
 );
+
+const statusKey = computed<I18nKey | null>(() => {
+  if (props.group === "clusters") return null;
+  if (props.indexFailed) return "infra.k8s2.paletteIndexFailed";
+  if (props.loading) return "infra.k8s2.paletteLoading";
+  return props.truncated ? "infra.k8s2.paletteTruncated" : null;
+});
 
 const activeOptionId = computed(() => (results.value.length ? optionId(active.value) : undefined));
 
@@ -113,6 +130,9 @@ const onKeydown = (event: KeyboardEvent) => {
         v-model="query"
         size="md"
         :placeholder="t('infra.k8s2.palettePlaceholder')"
+        role="combobox"
+        aria-haspopup="listbox"
+        aria-expanded="true"
         :aria-controls="LISTBOX_ID"
         :aria-activedescendant="activeOptionId"
         data-test="k8s2-palette-input"
@@ -171,11 +191,11 @@ const onKeydown = (event: KeyboardEvent) => {
         {{ t("infra.k8s2.paletteMore", { shown: results.length, total: ranked.total }) }}
       </OText>
       <OText
-        v-if="group !== 'clusters'"
+        v-if="statusKey"
         class="text-text-secondary px-2 text-xs"
-        data-test="k8s2-palette-scope"
+        data-test="k8s2-palette-status"
       >
-        {{ t("infra.k8s2.paletteScope") }}
+        {{ t(statusKey) }}
       </OText>
     </div>
   </ODialog>

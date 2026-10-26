@@ -120,6 +120,61 @@ describe("attentionItems", () => {
   });
 });
 
+describe("attention since", () => {
+  const iso = (us: number) => new Date(us / 1000).toISOString();
+  const T = 1_759_000_000_000_000;
+  const cond = (type: string, status: string, at: number) => ({
+    type,
+    status,
+    lastTransitionTime: iso(at),
+  });
+  const since = (over: Record<string, unknown>) =>
+    attentionItems(inventory([pod("p", over)]), "prod")[0]?.sinceUs;
+
+  it("reads a not-ready pod's Ready condition transition", () => {
+    const object = {
+      status: { conditions: [cond("Ready", "False", T), cond("Initialized", "True", 1)] },
+    };
+    expect(since({ ready: "false", phase: "Running", restarts: 9, object })).toBe(T);
+  });
+
+  it("reads a Pending pod's PodScheduled transition before Ready", () => {
+    const object = {
+      status: { conditions: [cond("PodScheduled", "False", T), cond("Ready", "False", T + 5e6)] },
+    };
+    expect(since({ phase: "Pending", ready: null, object })).toBe(T);
+  });
+
+  it("reads a failed pod's last container finish, and a restarty ready pod's last crash", () => {
+    const failed = {
+      status: { containerStatuses: [{ state: { terminated: { finishedAt: iso(T) } } }] },
+    };
+    expect(since({ phase: "Failed", object: failed })).toBe(T);
+    const restarty = {
+      status: {
+        conditions: [cond("Ready", "True", 1)],
+        containerStatuses: [
+          { lastState: { terminated: { finishedAt: iso(T) } }, state: { running: {} } },
+        ],
+      },
+    };
+    expect(since({ restarts: 9, object: restarty })).toBe(T);
+  });
+
+  it("is null without an observed snapshot or timestamps", () => {
+    expect(since({ phase: "Pending", ready: null })).toBeNull();
+    expect(since({ restarts: 9, object: { status: {} } })).toBeNull();
+  });
+
+  it("reads a NotReady node's Ready condition", () => {
+    const n = {
+      ...node("n1", "false"),
+      object: { status: { conditions: [cond("Ready", "Unknown", T)] } },
+    } as NodeRow;
+    expect(attentionItems(inventory([], [n]), "prod")[0].sinceUs).toBe(T);
+  });
+});
+
 describe("podBuckets", () => {
   it("splits pods into ready, pending, failing and completed", () => {
     const buckets = podBuckets(

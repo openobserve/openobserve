@@ -21,7 +21,12 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import { formatBytes, formatPct } from "./kubernetesModel";
 import { capacityScale, pctOf } from "./overviewModel";
-import K8sSegmentedBar from "./K8sSegmentedBar.vue";
+import OSegmentedBar from "@/lib/data/SegmentedBar/OSegmentedBar.vue";
+import { SEGMENT_SWATCH } from "@/lib/data/SegmentedBar/OSegmentedBar.types";
+import type {
+  SegmentedBarMarker,
+  SegmentedBarSegment,
+} from "@/lib/data/SegmentedBar/OSegmentedBar.types";
 
 const props = defineProps<{
   kind: "cpu" | "memory";
@@ -39,18 +44,23 @@ const scale = computed(() =>
 
 const columns = computed(() =>
   [
-    { id: "usage", label: t("infra.k8s2.overviewUsage"), value: props.usage, swatch: "bg-accent" },
+    {
+      id: "usage",
+      label: t("infra.k8s2.overviewUsage"),
+      value: props.usage,
+      swatch: SEGMENT_SWATCH.default,
+    },
     {
       id: "requests",
       label: t("infra.k8s2.overviewRequests"),
       value: props.requests,
-      swatch: "bg-status-info-text",
+      swatch: SEGMENT_SWATCH.info,
     },
     {
       id: "limits",
       label: t("infra.k8s2.overviewLimits"),
       value: props.limits,
-      swatch: "bg-status-negative",
+      swatch: SEGMENT_SWATCH.danger,
     },
   ].map((col) => ({
     ...col,
@@ -59,19 +69,20 @@ const columns = computed(() =>
   })),
 );
 
-const segments = computed(() => [
-  { id: "usage", pct: scale.value?.usagePct ?? 0, class: "bg-accent" },
+const segments = computed<SegmentedBarSegment[]>(() => [
+  { id: "usage", pct: scale.value?.usagePct ?? 0, variant: "default" },
 ]);
 
-const markers = computed(() => {
+const markers = computed<SegmentedBarMarker[]>(() => {
   const s = scale.value;
   if (!s) return [];
-  const out = [{ id: "allocatable", pct: s.allocatablePct, class: "bg-text-secondary" }];
+  const out: SegmentedBarMarker[] = [
+    { id: "allocatable", pct: s.allocatablePct, variant: "contrast" },
+  ];
   if (s.requestsPct != null) {
-    out.push({ id: "requests", pct: s.requestsPct, class: "bg-status-info-text" });
+    out.push({ id: "requests", pct: s.requestsPct, variant: "info" });
   }
-  if (s.limitsPct != null)
-    out.push({ id: "limits", pct: s.limitsPct, class: "bg-status-negative" });
+  if (s.limitsPct != null) out.push({ id: "limits", pct: s.limitsPct, variant: "danger" });
   return out;
 });
 
@@ -107,10 +118,10 @@ const allocatableText = computed<I18nText>(() => {
         >{{ allocatableText }}</OText
       >
     </div>
-    <K8sSegmentedBar
+    <OSegmentedBar
       :segments="segments"
       :markers="markers"
-      tall
+      size="md"
       :data-test="`k8s2-overview-${kind}-bar`"
     />
     <div class="grid grid-cols-3 gap-2">
