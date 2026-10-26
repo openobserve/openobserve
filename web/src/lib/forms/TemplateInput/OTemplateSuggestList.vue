@@ -129,7 +129,7 @@ function onSelect(event: Event, name: string) {
                     name="suggestion"
                     :suggestion="matches[row.index]"
                     :active="row.index === highlightedIndex"
-                    >{{ tokenFor(matches[row.index].name) }}</slot
+                    >{{ (format ?? tokenFor)(matches[row.index].name) }}</slot
                   >
                 </ListboxItem>
               </div>
