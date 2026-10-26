@@ -6167,6 +6167,23 @@
     "gpuExporter": "GPU-exporter"
   },
   "dashboard": {
+    "panelDraft": {
+      "restoreTitle": "Niet-opgeslagen paneelconcept",
+      "restoreMessage": "Je hebt niet-opgeslagen wijzigingen van {date}.",
+      "changedOnServer": "Dit paneel is gewijzigd nadat je concept is opgeslagen. Als je het concept opslaat, worden die wijzigingen vervangen.",
+      "continueDraft": "Concept voortzetten",
+      "startFresh": "Opnieuw beginnen",
+      "panelDeleted": "Dit paneel bestaat niet meer, dus het niet-opgeslagen concept is verwijderd.",
+      "variablesSkipped": "{count} variabele uit je concept is niet toegevoegd omdat de naam al in gebruik is | {count} variabelen uit je concept zijn niet toegevoegd omdat de namen al in gebruik zijn",
+      "leaveTitle": "Verlaten met niet-opgeslagen wijzigingen?",
+      "leaveMessage": "Sla het paneel op, bewaar je wijzigingen als concept in deze browser of verwijder ze.",
+      "keepDraft": "Concept bewaren",
+      "addPanelDot": "Paneel toevoegen · niet-opgeslagen concept",
+      "panelDot": "Niet-opgeslagen wijzigingen in deze browser",
+      "panelActionsDot": "Paneelacties · niet-opgeslagen concept",
+      "keepFailed": "Het concept kon niet worden bewaard omdat de opslag van deze browser vol of niet beschikbaar is. Sla het paneel op of verwijder je wijzigingen.",
+      "panelMissingOnSave": "Dit paneel bestaat niet meer op het dashboard. Laad het dashboard opnieuw en voeg het opnieuw toe."
+    },
     "sortByClear": "Sortering wissen",
     "sortByAsc": "Oplopend sorteren",
     "sortByDesc": "Aflopend sorteren",
@@ -7902,6 +7919,7 @@
     "showExemplarsHelp": "Tekent trace-voorbeelden op deze grafiek voor iedereen die het dashboard opent. Kijkers kunnen ze nog steeds verbergen via de paneelheader."
   },
   "panel": {
+    "saveAndStay": "Opslaan en verder bewerken",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
     "addZAxisShort": "+Z",
@@ -19830,7 +19848,7 @@
       "logsSearchHistory": "Zoekgeschiedenis openen",
       "alertsImport": "Alarm importeren",
       "panelEditorRun": "Query uitvoeren/toepassen",
-      "panelEditorSave": "Paneel opslaan",
+      "panelEditorSave": "Opslaan en verder bewerken",
       "panelEditorBack": "Gooi weg en ga terug",
       "traceNextSpan": "Volgende span",
       "tracePrevSpan": "Vorige span",
@@ -20694,6 +20712,7 @@
       "updatingSyntheticsSteps": "Synthetics-stappen bijwerken..."
     },
     "dashboard": {
+      "panelSaved": "Paneel opgeslagen",
       "clickOnTheChartDataOr": "Klik op de grafiekgegevens of selecteer een bereik om een annotatie toe te voegen",
       "runningQueryCanceledSuccessfully": "Actieve query succesvol geannuleerd",
       "panelQueryHasNoStreamToAlertOn": "De query van dit paneel heeft geen stream om een alarm op te baseren."

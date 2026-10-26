@@ -9310,6 +9310,23 @@
       "refreshCacheReload": "2ac4f8a9601ba6c7",
       "showLegends": "c1954dafcf36b6b6"
     },
+    "panelDraft": {
+      "addPanelDot": "e09e8f526435d047",
+      "changedOnServer": "9ae8d0d5e9488699",
+      "continueDraft": "84ab20d6d5098bb2",
+      "keepDraft": "bbcc810f654fd360",
+      "keepFailed": "9d2829036f00d895",
+      "leaveMessage": "b31a14e8f8d5922f",
+      "leaveTitle": "44e4660b5596bd91",
+      "panelActionsDot": "88466df69951dc76",
+      "panelDeleted": "a91c6bb862b8ecfd",
+      "panelDot": "6a1c2a0d34bfca6c",
+      "panelMissingOnSave": "3acc7cca019a070b",
+      "restoreMessage": "5229790c9163ca91",
+      "restoreTitle": "be738438f6ab898c",
+      "startFresh": "652aceea790a47a6",
+      "variablesSkipped": "5a6241881d321fb2"
+    },
     "panelError": "15ae393ab2332845",
     "panelErrorButtons": {
       "cachedDataDiffers": "ba32a2f7535a7153",
@@ -19071,6 +19088,7 @@
     "rightJoin": "805132a534cf175d",
     "rowFields": "849ea764f1d166cc",
     "save": "1509f561f2416598",
+    "saveAndStay": "36cde213a1f9122d",
     "source": "0e570ca6fabe24f9",
     "target": "978354db0c00fc78",
     "unsupportedPanelTypeAlert": "7293beda0a3b203f",
@@ -22585,7 +22603,7 @@
       "panelEditorBack": "7d45eec54cee5555",
       "panelEditorQueryInspector": "fb1ddbb81d8cce82",
       "panelEditorRun": "7dfed5a2bbdda1df",
-      "panelEditorSave": "90c2aca45dd26a66",
+      "panelEditorSave": "36cde213a1f9122d",
       "panelQueryInspector": "fb1ddbb81d8cce82",
       "panelView": "ad58d812d898575e",
       "pipelineDestinationsRefresh": "3cf8d66227384dc2",
@@ -25619,6 +25637,7 @@
     "dashboard": {
       "clickOnTheChartDataOr": "2312f0d7427a9482",
       "panelQueryHasNoStreamToAlertOn": "b7b3ff8012762728",
+      "panelSaved": "37db9e5682ce2525",
       "runningQueryCanceledSuccessfully": "acddcf9ab55be3b4"
     },
     "downtimes": {

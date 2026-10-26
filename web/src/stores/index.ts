@@ -23,6 +23,7 @@ import logs from "./logs";
 import incidents from "./incidents";
 import { getDefaultTheme } from "@/constants/themes";
 import { purgeAllQueries } from "@/composables/query/queryClient";
+import { clearAllPanelDrafts } from "@/composables/dashboard/usePanelDraft";
 import { setSeverityInferenceEnabled } from "@/utils/logs/statusParser";
 
 const pos = window.location.pathname.indexOf("/web/");
@@ -453,6 +454,7 @@ export default createStore({
       // Nothing from the previous session may survive — including anything the
       // query layer persisted to localStorage/IndexedDB.
       purgeAllQueries();
+      clearAllPanelDrafts();
     },
     endpoint(context, payload) {
       context.commit("endpoint", payload);
