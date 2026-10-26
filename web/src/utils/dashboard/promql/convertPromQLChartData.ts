@@ -104,7 +104,14 @@ export async function convertPromQLChartData(
 
   // Step 4: Delegate to chart-specific converter
   // Each converter knows how to transform data for its chart type(s)
-  const chartConfig = converter.convert(processedData, panelSchema, store, extras, chartPanelRef);
+  const chartConfig = converter.convert(
+    processedData,
+    panelSchema,
+    store,
+    extras,
+    chartPanelRef,
+    context,
+  );
 
   // Step 5: Apply common chart configurations
   const options: { series?: any[]; columns?: unknown[]; [key: string]: any } = {
@@ -113,10 +120,9 @@ export async function convertPromQLChartData(
 
     // Apply panel-level overrides
     ...(panelSchema.config?.axis_width && {
-      grid: {
-        ...chartConfig.grid,
-        left: panelSchema.config.axis_width,
-      },
+      grid: Array.isArray(chartConfig.grid)
+        ? chartConfig.grid.map((grid: any) => ({ ...grid, left: panelSchema.config.axis_width }))
+        : { ...chartConfig.grid, left: panelSchema.config.axis_width },
     }),
   };
 

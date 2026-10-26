@@ -282,6 +282,7 @@ export const convertPromQLData = async (
         metadata,
         parentQueryIndex,
         nameSuffixes,
+        stepSeconds,
       });
 
       if (result.options) applySeriesOverrides(result.options, panelSchema, store.state.theme);

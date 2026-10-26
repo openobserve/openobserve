@@ -372,6 +372,58 @@ describe("validatePanel on a PromQL formula", () => {
   });
 });
 
+describe("validatePanel on heatmap settings", () => {
+  const numericY = { alias: "y", args: [{ type: "field", value: { field: "took" } }] };
+  const run = (config: any, { queryType = "sql", customQuery = false } = {}) => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type: "heatmap",
+          queryType,
+          config,
+          queries: [{ customQuery, query: "", fields: { y: [numericY] } }],
+        },
+        layout: { currentQueryIndex: 0 },
+        meta: {
+          streamFields: { groupedFields: [{ schema: [{ name: "took", type: "Int64" }] }] },
+        },
+      },
+      errors,
+      false,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+
+  it("blocks a bucket size that would leave the builder query empty", () => {
+    expect(run({ heatmap_y_bucket: { mode: "size", size: 0 } })).toEqual([
+      gt("dashboard.utils.heatmapYBucketSizeInvalid"),
+    ]);
+    expect(
+      run({ heatmap_y_bucket: { mode: "size", size: 1 }, heatmap_y_min: 0, heatmap_y_max: 1e6 }),
+    ).toHaveLength(1);
+  });
+
+  it("blocks inverted y and colour ranges, which the renderer would silently ignore", () => {
+    expect(
+      run({ heatmap_y_bucket: { mode: "log", base: 10 }, heatmap_y_min: 9, heatmap_y_max: 1 }),
+    ).toEqual([gt("dashboard.utils.heatmapYRangeInverted")]);
+    expect(run({ heatmap_color_min: 50, heatmap_color_max: 5 }, { queryType: "promql" })).toContain(
+      gt("dashboard.utils.heatmapColorRangeInverted"),
+    );
+  });
+
+  it("ignores bucket settings that do not apply to custom SQL", () => {
+    expect(run({ heatmap_y_bucket: { mode: "size", size: 0 } }, { customQuery: true })).toEqual([]);
+    expect(run({ heatmap_color_min: 1, heatmap_color_max: 5 })).toEqual([]);
+  });
+});
+
 describe("validateConditions", () => {
   const t = gt as any;
 

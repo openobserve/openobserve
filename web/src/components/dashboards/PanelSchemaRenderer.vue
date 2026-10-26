@@ -361,6 +361,10 @@ import {
   toChartTimeMs,
 } from "@/utils/dashboard/exemplars/applyExemplarSeries";
 import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
+import {
+  applyHeatmapExemplarSeries,
+  cachedHeatmapExemplarPlacement,
+} from "@/utils/dashboard/exemplars/heatmapExemplars";
 import { buildExemplarTraceRoute } from "@/utils/dashboard/exemplars/exemplarTraceRoute";
 import {
   exemplarBaseUnit,
@@ -1097,6 +1101,18 @@ export default defineComponent({
       );
     };
 
+    // A heatmap's markers sit on its cells, so they follow the converter's columns and rows.
+    const placeHeatmapCells = cachedHeatmapExemplarPlacement(toExemplarChartX);
+    const heatmapExemplarPlace = computed(() => {
+      const extras = panelData.value?.extras;
+      if (panelSchema.value?.type !== "heatmap" || !extras?.heatmapExemplarLayout) return null;
+      if (!extras.heatmapTimeAxis) return null;
+      return placeHeatmapCells(
+        extras.heatmapExemplarLayout,
+        extras.heatmapTimeAxis,
+        exemplarMarkers.value,
+      );
+    });
     const exemplarInteraction = usePanelExemplarInteraction({
       chartRendererRef,
       markers: exemplarMarkers,
@@ -1106,6 +1122,7 @@ export default defineComponent({
       toChartX: toExemplarChartX,
       navigate: navigateToExemplarTrace,
       placeY: placeExemplarY,
+      gridPlacer: heatmapExemplarPlace,
     });
     const hoveredQueryAnnotation = ref<{
       marker: QueryAnnotationMarker;
@@ -2004,9 +2021,40 @@ export default defineComponent({
     // Determines what data to pass to ChartRenderer.
     // noData check is evaluated first so promql panels with no results
     // also get the transparent background instead of showing a skeleton.
+    // Reused until the data, markers or colours change, since a new object makes the chart redraw every cell.
+    const heatmapExemplarData = computed(
+      (previous?: { source: unknown; place: unknown; colors: string; data: unknown }) => {
+        const source = panelData.value;
+        const place = heatmapExemplarPlace.value;
+        const queryColors = exemplarQueryColors.value;
+        const haloColor = (void isDark.value, chartColor("--color-surface-base"));
+        const edgeColor = (void isDark.value, chartColor("--color-text-heading"));
+        const colors = [...queryColors, haloColor, edgeColor].join("|");
+        if (
+          previous &&
+          previous.source === source &&
+          previous.place === place &&
+          previous.colors === colors
+        ) {
+          return previous;
+        }
+        const data = place
+          ? {
+              ...source,
+              options: applyHeatmapExemplarSeries(source.options, exemplarMarkers.value, place, {
+                queryColors,
+                haloColor,
+                edgeColor,
+              }),
+            }
+          : source;
+        return { source, place, colors, data };
+      },
+    );
     const withExemplars = (value: any) => {
       if (!exemplarMarkers.value.length || !value?.options) return value;
       if (!exemplarsEligible.value && !injectedExemplars.value) return value;
+      if (panelSchema.value?.type === "heatmap") return heatmapExemplarData.value.data;
       return {
         ...value,
         options: applyExemplarSeries(value.options, exemplarMarkers.value, {

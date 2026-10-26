@@ -1021,6 +1021,24 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
     }
     return;
   };
+  // Heatmap y bucketing is panel config, so every builder tab's SQL must carry it, not only the active tab's.
+  const regenerateOtherBuilderQueries = () => {
+    if (
+      dashboardPanelData.data.type !== "heatmap" ||
+      dashboardPanelData.data.queryType === "promql"
+    ) {
+      return;
+    }
+    if (!dashboardPanelData?.meta?.streamFields?.groupedFields?.length) return;
+    dashboardPanelData.data.queries.forEach((queryData: any, index: number) => {
+      if (index === dashboardPanelData.layout.currentQueryIndex || queryData?.customQuery) return;
+      queryData.query = buildSQLChartQuery({
+        queryData,
+        chartType: dashboardPanelData.data.type,
+        dashboardPanelData,
+      });
+    });
+  };
   const { checkTimestampAlias } = logsUtils();
   // Replace the existing validatePanel function with a wrapper that calls the generic function
   const validatePanelWrapper = (errors: string[], isFieldsValidationRequired: boolean = true) => {
@@ -1619,6 +1637,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
     getDefaultQueries,
     validatePanel: validatePanelWrapper,
     makeAutoSQLQuery,
+    regenerateOtherBuilderQueries,
     currentXLabel,
     currentYLabel,
     generateLabelFromName,

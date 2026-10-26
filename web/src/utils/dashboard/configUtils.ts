@@ -222,6 +222,10 @@ export const shouldShowAxisConfig = (dashboardPanelData: any): boolean => {
   );
 };
 
+// The editor stores axis_border_show false by default, so honouring it on heatmaps would strip the axis lines of every saved one.
+export const shouldShowAxisBorderConfig = (dashboardPanelData: any): boolean =>
+  shouldShowAxisConfig(dashboardPanelData) && dashboardPanelData.data.type !== "heatmap";
+
 /**
  * Check if cartesian chart axis/label/markline config should be displayed
  * Used by: y_axis_min/max div, label_option position select, label_option rotate input, MarkLineConfig
