@@ -99,6 +99,7 @@ export function applyPieDonutChart(ctx: SQLContext): void {
                     chartMax,
                     store.state.theme,
                     panelSchema?.config?.color?.colorBySeries,
+                    panelSchema?.config,
                   ) ?? null
                 );
               },
@@ -236,6 +237,7 @@ export function applyPieDonutChart(ctx: SQLContext): void {
                     chartMax,
                     store.state.theme,
                     panelSchema?.config?.color?.colorBySeries,
+                    panelSchema?.config,
                   ) ?? null
                 );
               },

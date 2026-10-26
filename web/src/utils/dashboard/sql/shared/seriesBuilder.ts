@@ -187,6 +187,7 @@ export function createSeriesBuilders(deps: SeriesDeps) {
         chartMax,
         store.state.theme,
         panelSchema?.config?.color?.colorBySeries,
+        panelSchema?.config,
       ) ?? null;
 
     // For area charts, fade the fill into a bottom-to-top transparent

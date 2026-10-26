@@ -288,5 +288,25 @@ describe(
       await emit("dashboard-config-map_cluster", false);
       expect("map_cluster" in panel.data.config).toBe(false);
     });
+
+    it.each([
+      ["metric", false],
+      ["gauge", false],
+      ["table", false],
+      ["metric", true],
+      ["table", true],
+    ])("shows No value replacement on %s (PromQL %s) and writes it", async (chart, promql) => {
+      const panel = mountPanel(chart, { no_value_replacement: "" }, promql as boolean);
+      await flushPromises();
+      expect(has("dashboard-config-no-value-replacement")).toBe(true);
+      await type("dashboard-config-no-value-replacement", "N/A");
+      expect(panel.data.config.no_value_replacement).toBe("N/A");
+    });
+
+    it("keeps No value replacement hidden on PromQL line charts", async () => {
+      mountPanel("line", { no_value_replacement: "" }, true);
+      await flushPromises();
+      expect(has("dashboard-config-no-value-replacement")).toBe(false);
+    });
   },
 );

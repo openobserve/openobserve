@@ -168,10 +168,9 @@ export const shouldShowNoValueReplacement = (
   dashboardPanelData: any,
   promqlMode: boolean,
 ): boolean => {
-  return (
-    ["area", "line", "area-stacked", "bar", "stacked"].includes(dashboardPanelData.data.type) &&
-    !promqlMode
-  );
+  const type = dashboardPanelData.data.type;
+  if (["metric", "gauge", "table"].includes(type)) return true;
+  return ["area", "line", "area-stacked", "bar", "stacked"].includes(type) && !promqlMode;
 };
 
 /**

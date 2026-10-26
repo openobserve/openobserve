@@ -16,7 +16,7 @@
 import { calculateOptimalFontSize } from "../../chartDimensionUtils";
 import { getContrastColor } from "../../chartColorUtils";
 import { getFieldLabel } from "../../fieldLabel";
-import { resolveMetricValueStyle } from "../../tableConfigUtils";
+import { resolveMetricValueStyle, showsMissingValue } from "../../tableConfigUtils";
 import { getSeriesThresholds } from "../../thresholds";
 import { createSeriesOverrideLookup } from "../../seriesOverrides";
 import { type SQLContext } from "../shared/types";
@@ -279,7 +279,10 @@ export function applyMetricChart(ctx: SQLContext): void {
   const seriesOverrides = createSeriesOverrideLookup(panelSchema?.config);
   const metricOverride = seriesOverrides.get(metricFieldLabel);
   const metricUnit = seriesOverrides.unitArgs(metricFieldLabel);
-  const metricStyle = resolveMetricValueStyle(rawValue, {
+  // A row without a value is dropped from the axis data; it reads as 0 unless the panel names what a missing value shows.
+  const metricValue =
+    yAxisValue?.length > 0 || !showsMissingValue(panelSchema?.config) ? rawValue : null;
+  const metricStyle = resolveMetricValueStyle(metricValue, {
     mappings: panelSchema?.config?.mappings,
     unit: metricUnit.unit,
     customUnit: metricUnit.unitCustom,
@@ -287,6 +290,7 @@ export function applyMetricChart(ctx: SQLContext): void {
     // An override colour stands in for the panel Background of this value; mappings and steps still win.
     panelBackground: metricOverride?.color ?? panelSchema?.config?.background?.value?.color ?? "",
     thresholds: getSeriesThresholds(panelSchema?.config, String(metricFieldLabel ?? "")),
+    missingValue: panelSchema?.config?.no_value_replacement,
   });
   const metricText = metricStyle.text;
   options.backgroundColor = metricStyle.bgColor;

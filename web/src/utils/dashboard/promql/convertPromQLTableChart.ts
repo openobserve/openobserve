@@ -92,6 +92,11 @@ export class TableConverter implements PromQLChartConverter {
     // Value text-replacement mappings.
     const mappings = panelSchema.config?.mappings || [];
     const valueMappingCache = buildValueMappingCache(mappings);
+    const missingValue = String(config.no_value_replacement ?? "");
+    // An empty replacement keeps today's text for missing values.
+    const isReplaced = (val: any) =>
+      missingValue !== "" &&
+      (val === null || val === undefined || val === "" || String(val) === "NaN");
 
     // ── Shared column factories (one definition per column kind) ──────────────
     const baseColumn = (name: string, label: string, defaultAlign: string): any => {
@@ -102,12 +107,14 @@ export class TableConverter implements PromQLChartConverter {
 
     const textFormat = (val: any) => {
       const mapped = lookupValueMapping(val, valueMappingCache);
-      return mapped != null ? mapped : val;
+      if (mapped != null) return mapped;
+      return isReplaced(val) ? missingValue : val;
     };
 
     const valueFormat = (colNameLower: string) => (val: any) => {
       const mapped = lookupValueMapping(val, valueMappingCache);
       if (mapped != null) return mapped;
+      if (isReplaced(val)) return missingValue;
       const unitToUse = unitConfigMap[colNameLower]?.unit || config?.unit;
       const customUnitToUse = unitConfigMap[colNameLower]?.customUnit || config?.unit_custom;
       return formatUnitValue(getUnitValue(val, unitToUse, customUnitToUse, config?.decimals));

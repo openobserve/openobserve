@@ -36,7 +36,7 @@ export type SeriesDraftMatch = "name" | "regex";
 /** Thresholds as an override stores them; same shape as `config.thresholds`. */
 export interface SeriesOverrideThresholds {
   mode?: "absolute" | "percentage";
-  showAs?: "color_line" | "color" | "line" | "color_band";
+  showAs?: "color_line" | "color" | "line" | "color_band" | "dashed_line";
   baseColor?: string | null;
   steps?: { value: number; color: string }[];
 }

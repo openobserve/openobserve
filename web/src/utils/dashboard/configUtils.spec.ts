@@ -1172,9 +1172,10 @@ describe("configUtils", () => {
       expect(shouldShowNoValueReplacement(data, false)).toBe(false);
     });
 
-    it("should return false for table chart in non-promql mode", () => {
-      const data = { data: { type: "table" } };
-      expect(shouldShowNoValueReplacement(data, false)).toBe(false);
+    it.each(["metric", "gauge", "table"])("shows for %s in SQL and PromQL mode", (type) => {
+      const data = { data: { type } };
+      expect(shouldShowNoValueReplacement(data, false)).toBe(true);
+      expect(shouldShowNoValueReplacement(data, true)).toBe(true);
     });
   });
 

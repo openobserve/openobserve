@@ -79,6 +79,15 @@ const applyGaugeSegments = (gauge: any, segments: number) => {
   };
 };
 
+const isMissingValue = (value: unknown) =>
+  value === null || value === undefined || value === "" || String(value) === "NaN";
+
+const applyGaugeNoValue = (gauge: any, text: string) => {
+  const item = gauge?.data?.[0];
+  if (!item || !isMissingValue(item.value)) return;
+  item.detail = { ...item.detail, formatter: () => text };
+};
+
 /** Applies the gauge shape settings to converted gauge options; a no-op while every key is absent. */
 export const applyGaugeOptions = (options: any, panelSchema: any): void => {
   if (panelSchema?.type !== "gauge") return;
@@ -86,8 +95,10 @@ export const applyGaugeOptions = (options: any, panelSchema: any): void => {
   const angles = GAUGE_ANGLES[config.gauge_style];
   const segments = toNumber(config.gauge_segments);
   const neutral = toNumber(config.gauge_neutral);
+  const noValue = String(config.no_value_replacement ?? "");
   seriesOfType(options, ["gauge"]).forEach((gauge: any, index: number) => {
     if (!Array.isArray(gauge.data) || gauge.data.length === 0) return;
+    if (noValue !== "") applyGaugeNoValue(gauge, noValue);
     if (angles) Object.assign(gauge, angles);
     if (config.gauge_round_cap === true) {
       gauge.progress = { ...gauge.progress, roundCap: true };

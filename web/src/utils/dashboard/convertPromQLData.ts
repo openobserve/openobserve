@@ -897,6 +897,7 @@ export const convertPromQLData = async (
                     chartMax,
                     store.state.theme,
                     panelSchema?.config?.color?.colorBySeries,
+                    panelSchema?.config,
                   );
                 } catch (error) {
                   console.warn("Failed to get series color:", error);
@@ -1003,6 +1004,7 @@ export const convertPromQLData = async (
                     chartMax,
                     store.state.theme,
                     panelSchema?.config?.color?.colorBySeries,
+                    panelSchema?.config,
                   );
                 } catch (error) {
                   console.warn("Failed to get series color:", error);
@@ -1136,6 +1138,7 @@ export const convertPromQLData = async (
                         chartMax,
                         store.state.theme,
                         panelSchema?.config?.color?.colorBySeries,
+                        panelSchema?.config,
                       ) ?? defaultColor
                     );
                   })(),
@@ -1226,6 +1229,7 @@ export const convertPromQLData = async (
                 panelSchema.config?.background?.value?.color ??
                 "",
               thresholds: getSeriesThresholds(panelSchema?.config, metricName),
+              missingValue: panelSchema.config?.no_value_replacement,
             });
             options.backgroundColor = metricStyle.bgColor;
             const metricText = metricStyle.text;

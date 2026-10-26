@@ -94,7 +94,9 @@ export function applyGaugeChart(ctx: SQLContext): void {
   // for each gauge we have separate grid
   options.grid = gridDataForGauge.gridArray;
 
-  const gaugeData = yAxisValue.length > 0 ? yAxisValue : [0];
+  // Gauges apply no value mappings, so only a no-value replacement turns an empty dial into a missing one.
+  const hasNoValueText = String(panelSchema?.config?.no_value_replacement ?? "") !== "";
+  const gaugeData = yAxisValue.length > 0 ? yAxisValue : [hasNoValueText ? null : 0];
   const gaugeNames = xAxisValue.length > 0 ? xAxisValue : [""];
 
   options.series = gaugeData.map((it: any, index: any) => {
@@ -162,6 +164,7 @@ export function applyGaugeChart(ctx: SQLContext): void {
                 chartMax,
                 store.state.theme,
                 panelSchema?.config?.color?.colorBySeries,
+                panelSchema?.config,
               ) ??
               null,
           },

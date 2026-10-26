@@ -1022,7 +1022,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-no-value-replacement"
         >
           <template #tooltip>
-            <OTooltip :content="t('dashboard.noValueReplacementTooltip')" />
+            <OTooltip
+              :content="
+                ['metric', 'gauge', 'table'].includes(dashboardPanelData.data.type)
+                  ? t('dashboard.noValueReplacementTooltipValue')
+                  : t('dashboard.noValueReplacementTooltip')
+              "
+            />
           </template>
         </OInput>
       </div>

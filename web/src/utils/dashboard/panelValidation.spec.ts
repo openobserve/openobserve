@@ -614,6 +614,22 @@ describe("validatePanel on metric, gauge, pie, table, heatmap, state timeline an
     expect(run("geomap", { map_cluster: true, map_cluster_radius: 60 })).toEqual([]);
   });
 
+  it("accepts special value mappings with a known match and rejects any other", () => {
+    const mappings = (match: unknown) => [
+      { type: "value", value: "1", text: "One" },
+      { type: "special", match, text: "x" },
+    ];
+    for (const match of ["null", "nan", "empty", "true", "false"]) {
+      expect(run("table", { mappings: mappings(match) })).toEqual([]);
+    }
+    expect(run("metric", { mappings: mappings("zero") })).toEqual([
+      gt("dashboard.utils.valueMappingSpecialInvalid", { index: 2 }),
+    ]);
+    expect(run("table", { mappings: mappings(undefined) })).toEqual([
+      gt("dashboard.utils.valueMappingSpecialInvalid", { index: 2 }),
+    ]);
+  });
+
   it("rejects unsupported choices and list entries", () => {
     expect(run("metric", { stat_change: "ratio" })).toEqual([
       gt("dashboard.utils.unsupportedConfigValue", { setting: "stat_change", value: "ratio" }),

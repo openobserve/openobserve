@@ -107,6 +107,7 @@ export class BarConverter implements PromQLChartConverter {
             chartMax,
             store.state.theme,
             config.color?.colorBySeries,
+            config,
           );
 
           series.push({
@@ -181,6 +182,7 @@ export class BarConverter implements PromQLChartConverter {
             chartMax,
             store.state.theme,
             config.color?.colorBySeries,
+            config,
           );
 
         dataItems.push(

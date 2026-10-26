@@ -31,6 +31,7 @@ import {
   STATE_VALUE_ALIGNS,
 } from "@/utils/dashboard/panelTypeOptions";
 import { TABLE_DENSITIES, TABLE_FOOTER_CALCS } from "@/utils/dashboard/tableOptions";
+import { SPECIAL_VALUE_MATCHES } from "@/utils/dashboard/tableConfigUtils";
 
 /**
  * Validates a single condition item
@@ -1135,12 +1136,24 @@ const validatePanelTypeRanges = (t: TranslateFn, panel: any, errors: string[]) =
   }
 };
 
+/** A special value mapping that names no known match would never apply. */
+const validateSpecialMappings = (t: TranslateFn, panel: any, errors: string[]) => {
+  const mappings = panel?.config?.mappings;
+  if (!Array.isArray(mappings)) return;
+  mappings.forEach((mapping: any, index: number) => {
+    if (mapping?.type === "special" && !SPECIAL_VALUE_MATCHES.includes(mapping.match)) {
+      errors.push(t("dashboard.utils.valueMappingSpecialInvalid", { index: index + 1 }));
+    }
+  });
+};
+
 /** Metric, gauge, pie, table, heatmap, state timeline and geomap settings the renderer would silently ignore or misread. */
 const validatePanelTypeConfig = (t: TranslateFn, panelData: any, errors: string[]) => {
   const panel = panelData?.data;
   if (!panel?.config) return;
   validatePanelTypeChoices(t, panel, errors);
   validatePanelTypeRanges(t, panel, errors);
+  validateSpecialMappings(t, panel, errors);
 };
 
 /**

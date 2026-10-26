@@ -22,7 +22,7 @@ import { gt } from "@/types/i18n";
 import echartsTokens from "echarts/lib/visual/tokens.js";
 
 export type ThresholdMode = "absolute" | "percentage";
-export type ThresholdShowAs = "color_line" | "color" | "line" | "color_band";
+export type ThresholdShowAs = "color_line" | "color" | "line" | "color_band" | "dashed_line";
 
 export interface ThresholdStep {
   value: number;
@@ -46,7 +46,15 @@ export type GaugeColorStop = [number, string];
 /** The axis that carries values: y for vertical charts, x for h-bar. */
 export type ValueAxisKey = "xAxis" | "yAxis";
 
-const SHOW_AS: readonly ThresholdShowAs[] = ["color_line", "color", "line", "color_band"];
+const SHOW_AS: readonly ThresholdShowAs[] = [
+  "color_line",
+  "color",
+  "line",
+  "color_band",
+  "dashed_line",
+];
+/** Show-as values that draw limit lines without colouring the series. */
+const LINE_ONLY_SHOW_AS: readonly ThresholdShowAs[] = ["line", "dashed_line"];
 const THRESHOLD_CHART_TYPES = new Set(["line", "area", "area-stacked", "bar", "h-bar", "scatter"]);
 const GAUGE_BAND_ALPHA = 0.28;
 const AREA_BAND_ALPHA = 0.12;
@@ -58,6 +66,7 @@ const LIMIT_DASHES: number[][] = [
   [5, 3],
   [2, 2],
 ];
+const UNIFORM_DASH = [6, 4];
 // Override lines label on the left (alternating) so they never sit on the panel's right-hand labels.
 const OVERRIDE_LABEL_POSITIONS = ["insideStartTop", "insideMiddleTop"];
 
@@ -188,7 +197,10 @@ export const buildLimitLineData = (
       [axis]: step.value,
       lineStyle: {
         color: step.color,
-        type: limitDash(index, thresholds.steps.length),
+        type:
+          thresholds.showAs === "dashed_line"
+            ? UNIFORM_DASH
+            : limitDash(index, thresholds.steps.length),
         width: LIMIT_LINE_WIDTH,
       },
       label: {
@@ -514,7 +526,7 @@ export const applyLineAreaThresholds = (options: any, panelSchema: any): void =>
     const resolved = resolveStepValues(thresholds, rangeFor(thresholds));
     if (!resolved) continue;
     stepsBySeries.set(name, resolved);
-    const colours = !stacked && resolved.showAs !== "line";
+    const colours = !stacked && !LINE_ONLY_SHOW_AS.includes(resolved.showAs);
     if (colours && item) {
       // A bar's own itemStyle outranks a visualMap, so item-coloured bars are recoloured directly.
       const color = stepColorFor(pointValue(item, dimension), resolved, null);

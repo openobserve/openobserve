@@ -166,7 +166,7 @@ import { getColorPalette } from "@/utils/dashboard/colorPalette";
 import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 
 type ThresholdMode = "absolute" | "percentage";
-type ThresholdShowAs = "color_line" | "color" | "line" | "color_band";
+type ThresholdShowAs = "color_line" | "color" | "line" | "color_band" | "dashed_line";
 
 interface ThresholdStep {
   value: number;
@@ -243,7 +243,7 @@ const isPercent = computed(() => !isMetric.value && storedMode.value === "percen
 const modeValue = computed<ThresholdMode>(() => (isPercent.value ? "percentage" : "absolute"));
 const storedShowAs = computed(() => (props.modelValue ? props.modelValue.showAs : pending.showAs));
 const stackedShowAs = (value: ThresholdShowAs | undefined): ThresholdShowAs =>
-  value === "color_band" ? "color_band" : "line";
+  value === "color_band" || value === "dashed_line" ? value : "line";
 const showAsValue = computed<ThresholdShowAs>(() =>
   isStacked.value ? stackedShowAs(storedShowAs.value) : (storedShowAs.value ?? "color_line"),
 );
@@ -269,12 +269,14 @@ const showAsOptions = computed(() =>
   isStacked.value
     ? [
         { label: t("dashboard.thresholdShowAsLine"), value: "line" },
+        { label: t("dashboard.thresholdShowAsDashedLine"), value: "dashed_line" },
         { label: t("dashboard.thresholdShowAsBand"), value: "color_band" },
       ]
     : [
         { label: t("dashboard.thresholdShowAsColorLine"), value: "color_line" },
         { label: t("dashboard.thresholdShowAsColor"), value: "color" },
         { label: t("dashboard.thresholdShowAsLine"), value: "line" },
+        { label: t("dashboard.thresholdShowAsDashedLine"), value: "dashed_line" },
         { label: t("dashboard.thresholdShowAsColorBand"), value: "color_band" },
       ],
 );

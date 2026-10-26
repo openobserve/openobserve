@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- color by button group -->
-    <div class="pt-3" v-if="dashboardPanelData.data.config.color.mode.startsWith('continuous')">
+    <div class="pt-3" v-if="isByValueMode(dashboardPanelData.data.config.color.mode)">
       {{ t("dashboard.colorSeriesBy") }}
       <div>
         <OToggleGroup v-model="dashboardPanelData.data.config.color.seriesBy">
@@ -137,7 +137,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 <script lang="ts">
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
-import { getColorPalette } from "@/utils/dashboard/colorPalette";
+import {
+  CATEGORY10_PALETTE,
+  TABLEAU10_PALETTE,
+  getColorPalette,
+} from "@/utils/dashboard/colorPalette";
 import { computed, inject, onBeforeMount, defineComponent } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
@@ -218,6 +222,16 @@ export default defineComponent({
         value: "palette-classic",
       },
       {
+        label: t("dashboard.colorPaletteCategory10"),
+        colorPalette: CATEGORY10_PALETTE,
+        value: "palette-category10",
+      },
+      {
+        label: t("dashboard.colorPaletteTableau10"),
+        colorPalette: TABLEAU10_PALETTE,
+        value: "palette-tableau10",
+      },
+      {
         label: t("dashboard.colorSingleColor"),
         subLabel: t("dashboard.colorSingleColorSubLabel"),
         value: "fixed",
@@ -261,7 +275,23 @@ export default defineComponent({
         colorPalette: ["#B8CCE0", "#96AFCD", "#7392BA", "#5175A7", "#2E5894"],
         value: "continuous-light-to-dark-blue",
       },
+      {
+        label: t("dashboard.colorFromThresholds"),
+        value: "palette-from-thresholds",
+      },
     ];
+
+    // Modes whose colours live in code, so none are stored in fixedColor.
+    const PALETTE_IN_CODE = [
+      "palette-classic-by-series",
+      "palette-classic",
+      "palette-category10",
+      "palette-tableau10",
+      "palette-from-thresholds",
+    ];
+
+    const isByValueMode = (mode: string) =>
+      mode.startsWith("continuous") || mode === "palette-from-thresholds";
 
     const selectedOptionLabel = computed(() => {
       const selectedOption = colorOptions.find(
@@ -277,12 +307,12 @@ export default defineComponent({
         (o): o is SelectableColorOption =>
           !o.header &&
           !!o.value &&
-          !o.value.startsWith("continuous") &&
+          !isByValueMode(o.value) &&
           o.value !== "fixed" &&
           o.value !== "shades",
       ),
       byValue: colorOptions.filter(
-        (o): o is SelectableColorOption => !!o.value && o.value.startsWith("continuous"),
+        (o): o is SelectableColorOption => !!o.value && isByValueMode(o.value),
       ),
     }));
 
@@ -304,8 +334,7 @@ export default defineComponent({
       if (["fixed", "shades"].includes(value)) {
         dashboardPanelData.data.config.color.fixedColor = ["#53ca53"];
         dashboardPanelData.data.config.color.seriesBy = "last";
-      } else if (["palette-classic-by-series", "palette-classic"].includes(value)) {
-        // do not store fixedcolor in config for palette-classic-by-series and palette-classic
+      } else if (PALETTE_IN_CODE.includes(value)) {
         dashboardPanelData.data.config.color.fixedColor = [];
       } else {
         // else assign sublabel to fixedcolor
@@ -322,6 +351,7 @@ export default defineComponent({
       onColorModeChange,
       selectedOptionLabel,
       selectedOptionPalette,
+      isByValueMode,
     };
   },
 });
