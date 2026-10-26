@@ -44,7 +44,7 @@ pub enum EvalJobError {
     #[error("Job not found")]
     NotFound,
 
-    #[error("Invalid status '{0}'. Must be one of: draft, active, paused, degraded, archived")]
+    #[error("Invalid status '{0}'. Must be one of: draft, active, paused, archived")]
     InvalidStatus(String),
 
     #[error("Invalid status transition from '{from}' to '{to}'")]
@@ -186,6 +186,16 @@ async fn validate_online_scorers(
 #[tracing::instrument(skip(job))]
 pub async fn create_job(
     org_id: &str,
+    job: table::online_eval_jobs::OnlineEvalJob,
+) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
+    let job = prepare_new_job(org_id, job).await?;
+    insert_job(org_id, job).await
+}
+
+/// Runs every check [`create_job`] makes, so a caller can refuse the job before it is stored.
+#[tracing::instrument(skip(job))]
+pub async fn prepare_new_job(
+    org_id: &str,
     mut job: table::online_eval_jobs::OnlineEvalJob,
 ) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
     job.id = ider::generate();
@@ -205,7 +215,15 @@ pub async fn create_job(
         .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
     validate_online_scorers(org_id, &job.scorers).await?;
     validate_source_stream(org_id, &job).await?;
+    Ok(job)
+}
 
+/// Stores a job [`prepare_new_job`] accepted.
+#[tracing::instrument(skip(job))]
+pub async fn insert_job(
+    org_id: &str,
+    mut job: table::online_eval_jobs::OnlineEvalJob,
+) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
     let now = Utc::now().timestamp_millis();
     job.created_at = now;
     job.updated_at = now;
@@ -218,6 +236,17 @@ pub async fn create_job(
 
 #[tracing::instrument(skip(job))]
 pub async fn update_job(
+    org_id: &str,
+    job_id: &str,
+    job: table::online_eval_jobs::OnlineEvalJob,
+) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
+    let job = prepare_job_update(org_id, job_id, job).await?;
+    store_job_update(job).await
+}
+
+/// Runs every check [`update_job`] makes, so a caller can refuse the edit before it is stored.
+#[tracing::instrument(skip(job))]
+pub async fn prepare_job_update(
     org_id: &str,
     job_id: &str,
     mut job: table::online_eval_jobs::OnlineEvalJob,
@@ -248,11 +277,18 @@ pub async fn update_job(
     job.created_at = existing.created_at;
     job.version = existing.version + 1;
     job.updated_at = Utc::now().timestamp_millis();
+    Ok(job)
+}
 
-    // If the job is currently bound to a pipeline (active/paused/degraded),
+/// Stores an edit [`prepare_job_update`] accepted.
+#[tracing::instrument(skip(job))]
+pub async fn store_job_update(
+    mut job: table::online_eval_jobs::OnlineEvalJob,
+) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
+    // If the job is currently bound to a pipeline (active/paused),
     // re-reconcile so span pipelines pick up changes, or are torn down when
     // switching to trace/session scope.
-    if matches!(job.status.as_str(), "active" | "paused" | "degraded") {
+    if matches!(job.status.as_str(), "active" | "paused") {
         job.pipeline_id = reconciler::reconcile(&job)
             .await
             .map_err(|e| EvalJobError::ReconcilerError(e.to_string()))?;
@@ -308,6 +344,10 @@ pub async fn delete_job(org_id: &str, job_id: &str) -> Result<(), EvalJobError> 
         .map_err(|e| EvalJobError::ReconcilerError(e.to_string()))?;
 
     table::online_eval_jobs::delete(job_id).await?;
+    // A leftover health row is never listed, so its cleanup must not fail the delete.
+    if let Err(e) = table::eval_job_states::delete_by_job(job_id).await {
+        log::warn!("[EvalJobHealth] failed to delete health state for job {job_id}: {e}");
+    }
     remove_ownership(org_id, "eval_jobs", Authz::new(job_id)).await;
     publish_eval_job_delete(org_id, job_id).await;
     Ok(())
@@ -322,10 +362,32 @@ pub async fn transition_status(
     new_status: &str,
 ) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
     let job = get_job(org_id, job_id).await?;
+    let target = check_transition(org_id, &job, new_status).await?;
+    let pipeline_id = reconciler::reconcile(&target)
+        .await
+        .map_err(|e| EvalJobError::ReconcilerError(e.to_string()))?;
 
+    // Persist the new status (and any pipeline_id allocated by reconcile).
+    let now = Utc::now().timestamp_millis();
+    table::online_eval_jobs::update_status(job_id, new_status, pipeline_id.as_deref(), now).await?;
+
+    let mut updated = job;
+    updated.status = new_status.to_string();
+    updated.updated_at = now;
+    updated.pipeline_id = pipeline_id;
+    publish_eval_job_put(&updated).await;
+    Ok(updated)
+}
+
+/// The checks [`transition_status`] makes before reconciling; returns the job as it would become.
+pub async fn check_transition(
+    org_id: &str,
+    job: &table::online_eval_jobs::OnlineEvalJob,
+    new_status: &str,
+) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
     if !table::online_eval_jobs::is_valid_transition(&job.status, new_status) {
         return Err(EvalJobError::InvalidStatusTransition {
-            from: job.status,
+            from: job.status.clone(),
             to: new_status.to_string(),
         });
     }
@@ -343,20 +405,19 @@ pub async fn transition_status(
         validate_source_stream(org_id, &target).await?;
         validate_online_scorers(org_id, &target.scorers).await?;
     }
-    let pipeline_id = reconciler::reconcile(&target)
-        .await
-        .map_err(|e| EvalJobError::ReconcilerError(e.to_string()))?;
+    Ok(target)
+}
 
-    // Persist the new status (and any pipeline_id allocated by reconcile).
-    let now = Utc::now().timestamp_millis();
-    table::online_eval_jobs::update_status(job_id, new_status, pipeline_id.as_deref(), now).await?;
-
-    let mut updated = job;
-    updated.status = new_status.to_string();
-    updated.updated_at = now;
-    updated.pipeline_id = pipeline_id;
-    publish_eval_job_put(&updated).await;
-    Ok(updated)
+/// The checks [`manual_evaluate`] makes before it runs, so a caller can answer them first.
+#[cfg(feature = "enterprise")]
+pub async fn check_manual_evaluate(
+    org_id: &str,
+    job: &table::online_eval_jobs::OnlineEvalJob,
+    body: &ManualEvalJobRequestBody,
+) -> Result<(), EvalJobError> {
+    check_manual_job(org_id, job).await?;
+    normalize_manual_target_id(&body.target_id)?;
+    validate_manual_query_window(body.start_time, body.end_time)
 }
 
 #[cfg(feature = "enterprise")]
@@ -368,15 +429,7 @@ pub async fn manual_evaluate(
     author: Option<String>,
 ) -> Result<ManualEvalJobResponseBody, EvalJobError> {
     let job = get_job(org_id, job_id).await?;
-    if job.status == "archived" {
-        return Err(EvalJobError::InvalidJob(
-            "Archived eval jobs cannot be manually evaluated".to_string(),
-        ));
-    }
-    job.validate()
-        .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
-    validate_online_scorers(org_id, &job.scorers).await?;
-    validate_source_stream(org_id, &job).await?;
+    check_manual_job(org_id, &job).await?;
 
     let target_id = normalize_manual_target_id(&body.target_id)?;
     validate_manual_query_window(body.start_time, body.end_time)?;
@@ -439,6 +492,22 @@ pub async fn manual_evaluate(
     Err(EvalJobError::InvalidJob(
         "Manual evaluation requires enterprise features".to_string(),
     ))
+}
+
+#[cfg(feature = "enterprise")]
+async fn check_manual_job(
+    org_id: &str,
+    job: &table::online_eval_jobs::OnlineEvalJob,
+) -> Result<(), EvalJobError> {
+    if job.status == "archived" {
+        return Err(EvalJobError::InvalidJob(
+            "Archived eval jobs cannot be manually evaluated".to_string(),
+        ));
+    }
+    job.validate()
+        .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
+    validate_online_scorers(org_id, &job.scorers).await?;
+    validate_source_stream(org_id, job).await
 }
 
 #[cfg(feature = "enterprise")]

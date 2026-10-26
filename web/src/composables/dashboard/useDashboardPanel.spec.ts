@@ -184,6 +184,53 @@ describe("useDashboardPanel", () => {
     expect(panel.dashboardPanelData.layout.vrlFunctionToggle).toBe(false);
   });
 
+  it("drops formulas when the panel leaves PromQL", async () => {
+    const panel = useDashboardPanelData("dashboard-panel-test-formula");
+    panel.dashboardPanelData.data.queryType = "promql";
+    panel.addQuery();
+    panel.dashboardPanelData.data.queries[1].config.formula = "A * 2";
+    await nextTick();
+
+    panel.dashboardPanelData.data.queryType = "sql";
+    await nextTick();
+
+    expect(panel.dashboardPanelData.data.queries[1].config).not.toHaveProperty("formula");
+  });
+
+  it("rebuilds every other builder tab of a heatmap with its y bucketing, leaving custom SQL alone", () => {
+    const panel = useDashboardPanelData("dashboard-panel-test-heatmap-tabs");
+    const data = panel.dashboardPanelData;
+    data.data.type = "heatmap";
+    data.data.queryType = "sql";
+    data.data.config.heatmap_y_bucket = { mode: "size", size: 10 };
+    data.meta.streamFields.groupedFields = [
+      { name: "logs", stream_alias: null, schema: [{ name: "took", type: "Int64" }] },
+    ];
+    const builderQuery = () => ({
+      customQuery: false,
+      query: "stale",
+      joins: [],
+      fields: {
+        stream: "logs",
+        stream_type: "logs",
+        x: [],
+        y: [{ alias: "y_axis_1", args: [{ type: "field", value: { field: "took" } }] }],
+        z: [],
+        breakdown: [],
+        filter: { filterType: "group", logicalOperator: "AND", conditions: [] },
+      },
+      config: {},
+    });
+    data.data.queries = [builderQuery(), builderQuery(), { ...builderQuery(), customQuery: true }];
+    data.layout.currentQueryIndex = 0;
+
+    panel.regenerateOtherBuilderQueries();
+
+    expect(data.data.queries[0].query).toBe("stale");
+    expect(data.data.queries[1].query).toContain("floor(CAST(took AS DOUBLE) / 10) * 10");
+    expect(data.data.queries[2].query).toBe("stale");
+  });
+
   it("uses user defined schema when enabled", () => {
     const panel = useDashboardPanelData("dashboard-panel-test-4");
 

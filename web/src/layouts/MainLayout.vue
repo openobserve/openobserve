@@ -29,7 +29,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       'flex-col',
     ]"
   >
-    <header class="o2-app-header shrink-0" :class="store.state.printMode === true ? 'hidden' : ''">
+    <header
+      class="o2-app-header shrink-0"
+      :class="store.state.printMode === true || store.state.kioskMode ? 'hidden' : ''"
+    >
       <!-- Every bar that sits above the toolbar, in one measured wrapper so
            `--navbar-height` accounts for whichever of them is actually showing.
            The wrapper always renders — an unconditional ref keeps the observer
@@ -46,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Operator-authored announcement bars (enterprise) -->
         <AnnouncementBanner v-if="config.isEnterprise === 'true'" />
         <PasswordExpiryBanner v-if="config.isEnterprise === 'true'" />
+        <LicenseSearchBanner v-if="config.isEnterprise === 'true' && config.isCloud === 'false'" />
       </div>
 
       <!-- Header component containing logo, navigation, and user controls -->
@@ -82,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="flex min-h-0 flex-1">
       <ONavbar
-        v-if="store.state.printMode !== true"
+        v-if="store.state.printMode !== true && !store.state.kioskMode"
         class="max-md:hidden"
         :links-list="navLinks"
         :mini-mode="miniMode"
@@ -114,6 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :alt="raw('OpenObserve')"
             />
             <OButton
+              :aria-label="t('common.close')"
               variant="ghost"
               size="icon"
               icon-left="close"
@@ -134,10 +139,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Main Panel -->
         <main
           data-test="main-content"
-          class="bg-surface-chrome-deeper flex min-h-0 flex-col pe-2 pb-2 max-md:pe-0"
+          class="bg-surface-chrome-deeper flex min-h-0 flex-col"
+          :class="store.state.kioskMode ? '' : 'pe-2 pb-2 max-md:pe-0'"
           :style="{
             width:
-              !store.state.isAiChatEnabled || isChatOverlay
+              !store.state.isAiChatEnabled || isChatOverlay || store.state.kioskMode
                 ? '100%'
                 : store.state.isAiChatExpanded
                   ? '50%'
@@ -147,14 +153,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Content card — all pages render inside this. The border stays present in both
                themes (transparent in light) so toggling dark mode can't shift page content by 1px. -->
           <div
-            class="bg-surface-base rounded-surface flex min-h-0 flex-1 flex-col overflow-hidden border shadow-md"
-            :class="isDark ? 'border-border-default' : 'border-transparent'"
+            class="bg-surface-base flex min-h-0 flex-1 flex-col overflow-hidden"
+            :class="[
+              store.state.kioskMode ? '' : 'rounded-surface border shadow-md',
+              isDark ? 'border-border-default' : 'border-transparent',
+            ]"
           >
             <div
               v-if="isLoading"
               :key="store.state.selectedOrganization?.identifier"
               class="o2-content-scroll h-full flex-1 overflow-y-auto"
             >
+              <FirstDataNotice
+                v-if="
+                  firstDataNotice.visible.value &&
+                  router.currentRoute.value.name !== 'home' &&
+                  !store.state.kioskMode
+                "
+                class="mx-3 mt-3"
+                :stream="firstDataNotice.stream.value"
+                :arrived-at="firstDataNotice.arrivedAt.value"
+                @open="firstDataNotice.open"
+                @dismiss="firstDataNotice.dismiss"
+              />
               <router-view v-slot="{ Component }">
                 <keep-alive :include="KEPT_ALIVE_VIEWS">
                   <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
@@ -166,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
         <aside
-          v-show="store.state.isAiChatEnabled && isLoading"
+          v-show="store.state.isAiChatEnabled && isLoading && !store.state.kioskMode"
           class="o2-sidebar o2-sidebar-right bg-surface-chrome-deeper shrink-0 overflow-y-auto"
           :class="[
             isDark ? 'dark-mode-chat-container' : 'light-mode-chat-container',
@@ -208,7 +229,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODialog
       data-test="main-layout-get-started-dialog"
       v-model:open="showGetStarted"
-      size="full"
+      size="lg"
+      persistent
       :show-close="false"
     >
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
@@ -218,6 +240,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <PredefinedThemes />
     <ShortcutCheatsheet v-model:open="showShortcuts" />
     <PaidOverageConsentDialog v-if="config.isCloud == 'true'" />
+    <DashboardSaveConflictDialog
+      v-if="dashboardSaveConflict.mounted"
+      :key="dashboardSaveConflict.openSeq"
+    />
   </div>
 </template>
 
@@ -226,6 +252,7 @@ import { configFullQuery } from "@/services/config.queries";
 import { orgSettingsQuery } from "@/services/organizations.queries";
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
+import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import AppHeader from "../components/Header.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
@@ -237,6 +264,10 @@ import {
   shouldPaywallRoute,
   isEmptyDataExempt,
 } from "../utils/zincutils";
+import { isPaywalledDestination } from "@/utils/auth";
+import { withDisambiguatedOrgLabels } from "@/utils/organizationLabel";
+import { notifyTrialBlocked } from "@/utils/trialPaywallNotice";
+import { runBeforeAppReloadHooks } from "@/utils/beforeAppReload";
 
 import {
   ref,
@@ -249,6 +280,8 @@ import {
   markRaw,
   nextTick,
   onBeforeMount,
+  provide,
+  defineAsyncComponent,
 } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
@@ -274,6 +307,14 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
 import useStreams from "@/composables/useStreams";
+import { userDataStreams } from "@/utils/internalStreams";
+import FirstDataNotice from "@/components/ingestion/FirstDataNotice.vue";
+import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
+import {
+  FIRST_DATA_NOTICE,
+  useFirstDataNotice,
+  type OrgStreamList,
+} from "@/composables/firstEvent/useFirstDataNotice";
 import { openobserveRum } from "@openobserve/browser-rum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
@@ -281,6 +322,7 @@ import PaidOverageConsentDialog from "@/components/PaidOverageConsentDialog.vue"
 import WebinarBanner from "@/components/WebinarBanner.vue";
 import AnnouncementBanner from "@/components/announcements/AnnouncementBanner.vue";
 import PasswordExpiryBanner from "@/components/common/PasswordExpiryBanner.vue";
+import LicenseSearchBanner from "@/enterprise/components/billings/LicenseSearchBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
 import { purgeOrgQueries, queryClient } from "@/composables/query/queryClient";
@@ -305,6 +347,7 @@ export default defineComponent({
     WebinarBanner,
     AnnouncementBanner,
     PasswordExpiryBanner,
+    LicenseSearchBanner,
     "keep-alive": KeepAlive,
     ONavbar,
     "router-view": RouterView,
@@ -321,6 +364,10 @@ export default defineComponent({
     ODialog,
     ODrawer,
     OButton,
+    FirstDataNotice,
+    DashboardSaveConflictDialog: defineAsyncComponent(
+      () => import("@/components/dashboards/DashboardSaveConflictDialog.vue"),
+    ),
   },
   methods: {
     navigateToDocs() {
@@ -379,7 +426,8 @@ export default defineComponent({
         },
       });
     },
-    changeLanguage(item: { code: string; label: string }) {
+    async changeLanguage(item: { code: string; label: string }) {
+      await runBeforeAppReloadHooks();
       setLanguage(item.code);
       window.location.reload();
     },
@@ -420,6 +468,9 @@ export default defineComponent({
       text: string;
       autoSend: boolean;
       id: number;
+      chipName?: string;
+      newChat?: boolean;
+      context?: Record<string, unknown> | null;
     } | null>(null);
     let customOrganization = Object.prototype.hasOwnProperty.call(
       router.currentRoute.value.query,
@@ -429,6 +480,13 @@ export default defineComponent({
       : undefined;
     const selectedOrg = ref(store.state.selectedOrganization);
     const userClickedOrg = ref(store.state.selectedOrganization);
+    // The list verifyStreamExist already fetches; the next-visit banner reuses it instead of asking again.
+    const layoutStreams = ref<OrgStreamList | undefined>();
+    const firstDataNotice = useFirstDataNotice(
+      computed(() => store.state.selectedOrganization?.identifier ?? ""),
+      layoutStreams,
+    );
+    provide(FIRST_DATA_NOTICE, firstDataNotice);
     const isIncidentsEnabled = computed(() => {
       return (
         (config.isEnterprise == "true" || config.isCloud == "true") &&
@@ -461,9 +519,10 @@ export default defineComponent({
 
     // The AI Observability menu entry itself ships on true OSS builds too —
     // Monitor (LLM Insights + Sessions) needs no backend flag, unlike the rest
-    // of the module. AIObservabilityShell (Index.vue) shows only the Monitor
-    // group there; Evaluate/Experiment/Annotate/Agent Graph/Agent Behavior stay
-    // behind `isOnlineEvalsEnabled` as before.
+    // of the module. AIObservabilityShell (Index.vue) renders Evaluate/
+    // Experiment/Annotate/Agent Graph/Agent Behavior too, but locked (lock
+    // icon + tooltip) rather than hidden, so this entry point itself doesn't
+    // need to wait on `isOnlineEvalsEnabled` for those.
     const isOssBuild = !(config.isEnterprise == "true" || config.isCloud == "true");
     const isAiObservabilityMenuVisible = computed(() => isOnlineEvalsEnabled.value || isOssBuild);
 
@@ -478,6 +537,10 @@ export default defineComponent({
     // `ZO_FEATURE_PROFILING_ENABLED` is off by default while Profiles is early-stage.
     const isProfilingEnabled = computed(() => {
       return Boolean(store.state.zoConfig?.profiling_enabled);
+    });
+
+    const isExperimentalEnabled = computed(() => {
+      return Boolean(store.state.zoConfig?.experimental);
     });
 
     // Real entries carry `identifier`; the placeholder literal only sets label/value.
@@ -733,14 +796,23 @@ export default defineComponent({
         () => store.state.selectedOrganization?.identifier,
         () => store.state.selectedOrganization?.label,
         () => store.state.selectedOrganization?.subscription_type,
+        // Login and stored selections carry only the org identity, so read created_at from the org list too.
+        () =>
+          store.state.selectedOrganization?.created_at ??
+          (store.state.organizations ?? []).find(
+            (o: { identifier?: string }) =>
+              o?.identifier === store.state.selectedOrganization?.identifier,
+          )?.created_at,
         () => store.state.zoConfig?.rum?.enabled,
       ],
-      ([identifier, name, subscriptionType, rumEnabled]) => {
+      ([identifier, name, subscriptionType, createdAt, rumEnabled]) => {
         if (!identifier || !rumEnabled) return;
         openobserveRum.setAccount({
           id: identifier,
           name,
           subscription_type: subscriptionType,
+          // Unix microseconds, the same unit as _timestamp.
+          created_at: createdAt || undefined,
         });
       },
       { immediate: true },
@@ -766,45 +838,108 @@ export default defineComponent({
       }
     });
 
-    const updateIncidentsMenu = () => {
-      if (isIncidentsEnabled.value) {
-        const alertIndex = linksList.value.findIndex((link) => link.name === "alertList");
+    // Shows the entry — locked, if this edition doesn't unlock `featureKey` —
+    // whenever `enabledByRuntimeFlag` is true OR the edition flat-out doesn't
+    // unlock it (so the locked entry stays discoverable rather than only
+    // appearing once an admin has also flipped the runtime flag on). Hides it
+    // only when the edition allows the feature but the runtime flag is off —
+    // that's a deployment choice, not something to upsell.
+    const syncGatedMenuEntry = (
+      name: string,
+      featureKey: "incidents" | "workflows",
+      enabledByRuntimeFlag: boolean,
+      anchorName: string,
+      entry: Omit<NavItem, "locked" | "lockedMessage">,
+    ) => {
+      const existingIndex = linksList.value.findIndex((link) => link.name === name);
+      const access = checkFeatureAccess(featureKey, buildFeatureGateContext(store.state.zoConfig));
+      const shouldShow = enabledByRuntimeFlag || !access.allowed;
 
-        const incidentExists = linksList.value.some((link) => link.name === "incidentList");
-
-        if (alertIndex !== -1 && !incidentExists) {
-          linksList.value.splice(alertIndex + 1, 0, {
-            title: t("menu.incidents"),
-            icon: "notifications-active",
-            link: "/incidents",
-            name: "incidentList",
-          });
-        }
+      if (!shouldShow) {
+        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
+        return;
       }
+
+      if (existingIndex !== -1) {
+        linksList.value[existingIndex].locked = !access.allowed;
+        linksList.value[existingIndex].lockedMessage = access.message;
+        return;
+      }
+
+      const anchor = linksList.value.findIndex((link) => link.name === anchorName);
+      if (anchor === -1) return;
+      linksList.value.splice(anchor + 1, 0, {
+        ...entry,
+        locked: !access.allowed,
+        lockedMessage: access.message,
+      });
     };
+
+    const updateIncidentsMenu = () => {
+      syncGatedMenuEntry(
+        "incidentList",
+        "incidents",
+        Boolean(isIncidentsEnabled.value),
+        "alertList",
+        {
+          title: t("menu.incidents"),
+          icon: "notifications-active",
+          link: "/incidents",
+          name: "incidentList",
+        },
+      );
+    };
+
+    const updateAutoObserveMenu = () => {
+      const existingIndex = linksList.value.findIndex((link) => link.name === "autoobserve");
+      if (config.isEnterprise != "true" || !isExperimentalEnabled.value) {
+        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
+        return;
+      }
+      if (existingIndex !== -1) return;
+      const alertIndex = linksList.value.findIndex((link) => link.name === "alertList");
+      linksList.value.splice(alertIndex === -1 ? linksList.value.length : alertIndex, 0, {
+        title: t("menu.autoobserve"),
+        icon: "navigation",
+        link: "/autoobserve",
+        name: "autoobserve",
+      });
+    };
+
+    watch(isExperimentalEnabled, () => updateAutoObserveMenu(), { immediate: false });
+
+    // Absorbed into the Reliability flyout (navGroups.ts), which places it after Incidents.
+    const isDowntimesEnabled = computed(
+      () =>
+        (config.isEnterprise == "true" || config.isCloud == "true") &&
+        store.state.zoConfig?.downtimes_enabled === true,
+    );
+    const updateDowntimesMenu = () => {
+      const existingIndex = linksList.value.findIndex((link) => link.name === "downtimes");
+      if (!isDowntimesEnabled.value) {
+        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
+        return;
+      }
+      if (existingIndex !== -1) return;
+      const anchor = linksList.value.findIndex((link) => link.name === "alertList");
+      if (anchor === -1) return;
+      linksList.value.splice(anchor + 1, 0, {
+        title: t("menu.downtimes"),
+        icon: "notifications-paused",
+        link: "/downtimes",
+        name: "downtimes",
+      });
+    };
+    watch(isDowntimesEnabled, () => updateDowntimesMenu(), { immediate: false });
 
     // Insert the Workflows entry after Alerts. Idempotent.
     const updateWorkflowsMenu = () => {
-      const existingIndex = linksList.value.findIndex((link) => link.name === "workflows");
-
-      if (isWorkflowsEnabled.value) {
-        if (existingIndex !== -1) return;
-
-        const anchor = linksList.value.findIndex((link) => link.name === "alertList");
-        if (anchor === -1) return;
-
-        linksList.value.splice(anchor + 1, 0, {
-          title: t("menu.workflows"),
-          icon: "schema",
-          link: "/workflows",
-          name: "workflows",
-        });
-      } else if (existingIndex !== -1) {
-        // The entry must be REMOVED, not just skipped: the menu is rebuilt on
-        // org switch and `workflows_enabled` can differ per deployment, so an
-        // add-only guard would leave a stale entry behind.
-        linksList.value.splice(existingIndex, 1);
-      }
+      syncGatedMenuEntry("workflows", "workflows", isWorkflowsEnabled.value, "alertList", {
+        title: t("menu.workflows"),
+        icon: "schema",
+        link: "/workflows",
+        name: "workflows",
+      });
     };
 
     // If `/config` resolves after this component mounted (or the flag flips),
@@ -887,7 +1022,7 @@ export default defineComponent({
 
       linksList.value.splice(insertAt, 0, {
         title: t("menu.profiles"),
-        icon: "account-tree",
+        icon: "memory",
         link: "/profiles",
         name: "profiles",
       });
@@ -900,7 +1035,9 @@ export default defineComponent({
     // A separate top-level rail item here would be a second gate to keep in
     // sync.
     const filterMenus = () => {
+      updateAutoObserveMenu();
       updateIncidentsMenu();
+      updateDowntimesMenu();
       updateWorkflowsMenu();
       updateSyntheticMenu();
       updateProfilesMenu();
@@ -997,14 +1134,24 @@ export default defineComponent({
     };
 
     const verifyStreamExist = async (selectedOrgData: any) => {
+      // getStreams reads the store's org when it starts, so the list belongs to that org even if the selection moves on
+      const listOrg: string = store.state.selectedOrganization?.identifier ?? "";
       await getStreams("", false).then((response: any) => {
+        const listIsCurrent = listOrg === (store.state.selectedOrganization?.identifier ?? "");
         store.dispatch("setSelectedOrganization", {
           ...selectedOrgData,
         });
-        if (response.list.length == 0) {
+        layoutStreams.value = { org: listOrg, list: response.list ?? [] };
+        if (userDataStreams(response.list).length === 0) {
           store.dispatch("setIsDataIngested", false);
-          if (isEmptyDataExempt(router.currentRoute.value)) return;
-          router.push({ name: "ingestion" });
+          // a deep link or reload ran the route guard before the flag or this list was known
+          if (
+            store.state.zoConfig?.restricted_routes_on_empty_data === true &&
+            listIsCurrent &&
+            !isEmptyDataExempt(router.currentRoute.value)
+          ) {
+            router.push({ name: "ingestion", query: { org_identifier: listOrg } });
+          }
         } else {
           store.dispatch("setIsDataIngested", true);
         }
@@ -1059,7 +1206,8 @@ export default defineComponent({
               user_email: store.state.userInfo.email,
             };
           }
-          orgOptions.value = store.state.organizations
+          const labeledOrgs = withDisambiguatedOrgLabels(store.state.organizations);
+          orgOptions.value = labeledOrgs
             .map(
               (data: {
                 id: any;
@@ -1071,7 +1219,10 @@ export default defineComponent({
                 search_threshold: number;
                 CustomerBillingObj: { subscription_type: string; note: string };
                 status: string;
+                label: string;
+                created_at?: number;
               }) => {
+                // `label` is the real name here — General.vue's delete-confirm gate matches it; disambiguation is applied only on the dropdown copy below.
                 const optiondata: any = {
                   label: data.name,
                   id: data.id,
@@ -1089,6 +1240,7 @@ export default defineComponent({
                   note: Object.prototype.hasOwnProperty.call(data, "CustomerBillingObj")
                     ? data.CustomerBillingObj.note
                     : "",
+                  created_at: data.created_at,
                 };
 
                 if (
@@ -1130,7 +1282,8 @@ export default defineComponent({
                   tempDefaultOrg = optiondata;
                 }
 
-                return optiondata;
+                // Disambiguated label only for the dropdown entry — optiondata itself keeps the real name.
+                return { ...optiondata, label: data.label };
               },
             )
             .sort((a: any, b: any) => a.label.localeCompare(b.label));
@@ -1142,8 +1295,8 @@ export default defineComponent({
           store.dispatch("setSelectedOrganization", tempDefaultOrg);
         }
 
-        if (Object.keys(selectedOrg.value).length == 0 && store.state.organizations.length > 0) {
-          let data = store.state.organizations[0];
+        if (Object.keys(selectedOrg.value).length == 0 && store.state.organizations?.length > 0) {
+          let data = withDisambiguatedOrgLabels(store.state.organizations)[0];
           let optiondata = {
             label: data.name,
             id: data.id,
@@ -1158,6 +1311,7 @@ export default defineComponent({
             note: Object.prototype.hasOwnProperty.call(data, "CustomerBillingObj")
               ? data.CustomerBillingObj.note
               : "",
+            created_at: data.created_at,
           };
           selectedOrg.value = optiondata;
           useLocalOrganization(optiondata);
@@ -1205,6 +1359,7 @@ export default defineComponent({
         org_storage_enabled: false,
         domain_org_mappings: [],
         red_insights_enabled: false,
+        ai_rca_thread_tool_output: false,
       };
 
       try {
@@ -1251,6 +1406,9 @@ export default defineComponent({
           domain_org_mappings: orgSettings?.data?.data?.domain_org_mappings ?? [],
           red_insights_enabled:
             orgSettings?.data?.data?.red_insights_enabled ?? defaultSettings.red_insights_enabled,
+          ai_rca_thread_tool_output:
+            orgSettings?.data?.data?.ai_rca_thread_tool_output ??
+            defaultSettings.ai_rca_thread_tool_output,
         });
 
         // Load the org's home dashboard (settings/v2 KV) alongside the legacy org
@@ -1263,6 +1421,13 @@ export default defineComponent({
             router.currentRoute.value.name,
           )
         ) {
+          // Name the page only when its own guard would block it; Home has none, so it gets the generic copy.
+          const current = router.currentRoute.value;
+          notifyTrialBlocked(
+            isPaywalledDestination(orgSettings?.data?.data?.free_trial_expiry, current)
+              ? current
+              : {},
+          );
           router.push({
             name: "plans",
             query: {
@@ -1332,9 +1497,7 @@ export default defineComponent({
           if (res.data.rum.enabled) {
             setRumUser();
           }
-          // The empty-data → /ingestion redirect depends on
-          // restricted_routes_on_empty_data, which only arrives with the full
-          // config — the first navigation ran before it landed, so re-check now.
+          // restricted_routes_on_empty_data arrives only with the full config, so the first navigation could not record isDataIngested
           if (
             res.data.restricted_routes_on_empty_data === true &&
             store.state.organizationData.isDataIngested === false
@@ -1456,20 +1619,43 @@ export default defineComponent({
       localStorage.removeItem("isFirstTimeLogin");
     };
 
+    /** `value` is a query string or `{ query, autoSend?, chipName?, newChat?, context? }`; a chip never auto-sends. */
     const sendToAiChat = (value: any, append: boolean = true, autoSend: boolean = false) => {
-      if (!store.state.isAiChatEnabled) {
+      const wasOpen = store.state.isAiChatEnabled;
+      if (!wasOpen) {
         store.dispatch("setIsAiChatEnabled", true);
       }
 
       // Support object payload { query, autoSend } from OverviewTab
       let text = value;
       let shouldAutoSend = autoSend;
+      let handoff: {
+        chipName: string;
+        newChat: boolean;
+        context: Record<string, unknown> | null;
+      } | null = null;
       if (value && typeof value === "object" && "query" in value) {
         text = value.query;
         shouldAutoSend = value.autoSend ?? false;
+        if (typeof value.chipName === "string" && value.chipName) {
+          handoff = {
+            chipName: value.chipName,
+            newChat: !!value.newChat,
+            context: value.context && typeof value.context === "object" ? value.context : null,
+          };
+        }
       }
 
       aiChatAppendMode.value = append;
+
+      if (handoff) {
+        // Named-chip hand-off: O2AIChat builds the chip itself, so the legacy "Log Entry" channel stays silent.
+        const payload = { text, autoSend: false, id: Date.now(), ...handoff };
+        // A chat opened just now mounts on the next render; deliver after it so its watcher sees the change.
+        if (wasOpen) aiChatPayload.value = payload;
+        else nextTick(() => (aiChatPayload.value = payload));
+        return;
+      }
 
       // Deliver text + autoSend atomically in a single object so O2AIChat
       // watcher always sees both values together — no timing race.
@@ -1533,6 +1719,8 @@ export default defineComponent({
       isDark,
       t,
       raw,
+      dashboardSaveConflict: dashboardSaveConflictState,
+      firstDataNotice,
       layoutMixin,
       router,
       store,

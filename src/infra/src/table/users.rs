@@ -19,7 +19,7 @@ use config::{
 };
 use sea_orm::{
     ColumnTrait, EntityTrait, Order, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Schema,
-    Set,
+    Set, TransactionTrait,
     entity::prelude::*,
     sea_query::{Func, Query, SimpleExpr},
 };
@@ -261,14 +261,17 @@ pub async fn flag_all_for_password_reset(reason: &str) -> Result<u64, errors::Er
 }
 
 pub async fn remove(email: &str) -> Result<(), errors::Error> {
-    let client = get_orm_client_rw().await;
-    Entity::delete_many()
-        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
-        .exec(client)
+    remove_on(get_orm_client_rw().await, &[email.to_string()], false)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
-    drop_auth_side_tables(&[email.to_string()]).await;
+    Ok(())
+}
+
+pub async fn remove_with_memberships(email: &str) -> Result<(), errors::Error> {
+    remove_on(get_orm_client_rw().await, &[email.to_string()], true)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
     Ok(())
 }
@@ -283,6 +286,54 @@ pub async fn get(email: &str) -> Result<UserRecord, errors::Error> {
         .ok_or_else(|| Error::DbError(DbError::SeaORMError("User not found".to_string())))?;
 
     Ok(UserRecord::from(record))
+}
+
+/// The stable `users.id` for an email (uncached: a re-registered email gets a new id).
+pub async fn get_id_by_email(email: &str) -> Result<Option<String>, errors::Error> {
+    get_id_by_email_with(get_orm_client_ro().await, email).await
+}
+
+pub async fn get_id_by_email_with<C: ConnectionTrait>(
+    conn: &C,
+    email: &str,
+) -> Result<Option<String>, errors::Error> {
+    let db_err = |e: sea_orm::DbErr| Error::DbError(DbError::SeaORMError(e.to_string()));
+    let lowered = email.to_lowercase();
+    // Exact spellings first, through the unique email index; lower() only for a mixed-case row.
+    let id = Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .filter(Column::Email.is_in([email.to_string(), lowered.clone()]))
+        .order_by_desc(Expr::col(Column::Email).eq(email))
+        .into_tuple::<String>()
+        .one(conn)
+        .await
+        .map_err(db_err)?;
+    if id.is_some() {
+        return Ok(id);
+    }
+    Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(lowered))
+        .into_tuple::<String>()
+        .one(conn)
+        .await
+        .map_err(db_err)
+}
+
+/// The `(first_name, last_name)` of the user with stable id `id`, if any.
+pub async fn get_name_by_id(id: &str) -> Result<Option<(String, String)>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    Entity::find()
+        .select_only()
+        .column(Column::FirstName)
+        .column(Column::LastName)
+        .filter(Column::Id.eq(id))
+        .into_tuple::<(String, String)>()
+        .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
 pub async fn get_root_user() -> Result<UserRecord, errors::Error> {
@@ -342,28 +393,36 @@ pub async fn is_empty() -> bool {
 }
 
 pub async fn batch_remove(emails: Vec<String>) -> Result<(), errors::Error> {
-    let client = get_orm_client_rw().await;
-    let lowered_emails: Vec<String> = emails.iter().map(|e| e.to_lowercase()).collect();
-    Entity::delete_many()
-        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).is_in(lowered_emails))
-        .exec(client)
+    remove_on(get_orm_client_rw().await, &emails, false)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-
-    drop_auth_side_tables(&emails).await;
 
     Ok(())
 }
 
-async fn drop_auth_side_tables(emails: &[String]) {
-    for email in emails {
-        if let Err(e) = super::user_password_history::delete_all_for_user(email).await {
-            log::error!("Error deleting password history for {email}: {e}");
-        }
-        if let Err(e) = super::user_auth_state::delete(email).await {
-            log::error!("Error deleting lockout state for {email}: {e}");
-        }
+async fn remove_on<C: TransactionTrait>(
+    client: &C,
+    emails: &[String],
+    with_memberships: bool,
+) -> Result<(), sea_orm::DbErr> {
+    let lowered: Vec<String> = emails.iter().map(|e| e.to_lowercase()).collect();
+    let txn = client.begin().await?;
+    // In the user's transaction: once the users row is gone, no retry can find these by email.
+    super::user_password_history::delete_all_for_users_on(&txn, emails).await?;
+    super::user_auth_state::delete_for_users_on(&txn, emails).await?;
+    if with_memberships {
+        org_users::Entity::delete_many()
+            .filter(
+                Expr::expr(Func::lower(Expr::col(org_users::Column::Email))).is_in(lowered.clone()),
+            )
+            .exec(&txn)
+            .await?;
     }
+    Entity::delete_many()
+        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).is_in(lowered))
+        .exec(&txn)
+        .await?;
+    txn.commit().await
 }
 
 /// Matches users that hold no service-account role in any organization. The role lives on
@@ -386,6 +445,7 @@ mod tests {
     use config::meta::user::{DBUser, UserOrg, UserRole, UserType};
 
     use super::*;
+    use crate::table::entity::{user_auth_state, user_password_history};
 
     #[test]
     fn test_not_a_service_account_excludes_both_service_account_roles() {
@@ -400,6 +460,178 @@ mod tests {
         assert!(sql.contains("org_users"), "{sql}");
         // ServiceAccount = 5, SreAgent = 6
         assert!(sql.contains("IN (5, 6)"), "{sql}");
+    }
+
+    async fn user_and_membership_db(email: &str) -> sea_orm::DatabaseConnection {
+        let db = sea_orm::Database::connect("sqlite::memory:").await.unwrap();
+        let schema = Schema::new(db.get_database_backend());
+        db.execute_unprepared("PRAGMA foreign_keys = OFF")
+            .await
+            .unwrap();
+        for stmt in [
+            schema.create_table_from_entity(Entity),
+            schema.create_table_from_entity(org_users::Entity),
+            schema.create_table_from_entity(user_auth_state::Entity),
+            schema.create_table_from_entity(user_password_history::Entity),
+        ] {
+            db.execute(db.get_database_backend().build(&stmt))
+                .await
+                .unwrap();
+        }
+        ActiveModel {
+            id: Set("u1".to_string()),
+            email: Set(email.to_string()),
+            first_name: Set(String::new()),
+            last_name: Set(String::new()),
+            password: Set(String::new()),
+            salt: Set(String::new()),
+            is_root: Set(false),
+            password_ext: Set(None),
+            user_type: Set(UserType::Internal.into()),
+            created_at: Set(0),
+            updated_at: Set(0),
+            must_reset_password: Set(false),
+            password_reset_reason: Set(None),
+            flagged_at: Set(None),
+            password_updated_at: Set(None),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+        org_users::ActiveModel {
+            id: Set("m1".to_string()),
+            email: Set(email.to_string()),
+            org_id: Set("org1".to_string()),
+            role: Set(UserRole::Admin.into()),
+            token: Set(String::new()),
+            rum_token: Set(None),
+            created_at: Set(0),
+            updated_at: Set(0),
+            allow_static_token: Set(false),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+        db
+    }
+
+    #[tokio::test]
+    async fn test_remove_with_memberships_rolls_back_when_the_user_delete_fails() {
+        let db = user_and_membership_db("Member@Example.com").await;
+        db.execute_unprepared(
+            "CREATE TRIGGER users_delete_fails BEFORE DELETE ON users \
+             BEGIN SELECT RAISE(ABORT, 'injected'); END",
+        )
+        .await
+        .unwrap();
+
+        assert!(
+            remove_on(&db, &["member@example.com".to_string()], true)
+                .await
+                .is_err()
+        );
+        assert_eq!(org_users::Entity::find().count(&db).await.unwrap(), 1);
+        assert_eq!(Entity::find().count(&db).await.unwrap(), 1);
+
+        db.execute_unprepared("DROP TRIGGER users_delete_fails")
+            .await
+            .unwrap();
+        remove_on(&db, &["member@example.com".to_string()], true)
+            .await
+            .unwrap();
+        assert_eq!(org_users::Entity::find().count(&db).await.unwrap(), 0);
+        assert_eq!(Entity::find().count(&db).await.unwrap(), 0);
+    }
+
+    async fn user_with_auth_side_rows_db(email: &str) -> sea_orm::DatabaseConnection {
+        let db = user_and_membership_db(email).await;
+        user_auth_state::ActiveModel {
+            email: Set(email.to_lowercase()),
+            failed_attempts: Set(3),
+            lockout_level: Set(1),
+            locked_until: Set(None),
+            last_failed_at: Set(Some(0)),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+        user_password_history::ActiveModel {
+            id: Set("h1".to_string()),
+            email: Set(email.to_string()),
+            password_hash: Set(String::new()),
+            created_at: Set(0),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+        db
+    }
+
+    async fn side_row_counts(db: &sea_orm::DatabaseConnection) -> [u64; 4] {
+        [
+            Entity::find().count(db).await.unwrap(),
+            org_users::Entity::find().count(db).await.unwrap(),
+            user_auth_state::Entity::find().count(db).await.unwrap(),
+            user_password_history::Entity::find()
+                .count(db)
+                .await
+                .unwrap(),
+        ]
+    }
+
+    #[tokio::test]
+    async fn test_removing_a_user_deletes_its_auth_side_rows() {
+        for with_memberships in [true, false] {
+            let db = user_with_auth_side_rows_db("Member@Example.com").await;
+
+            remove_on(&db, &["member@example.com".to_string()], with_memberships)
+                .await
+                .unwrap();
+
+            let memberships_left = u64::from(!with_memberships);
+            assert_eq!(
+                side_row_counts(&db).await,
+                [0, memberships_left, 0, 0],
+                "with_memberships={with_memberships}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_a_failed_auth_side_delete_keeps_the_user_for_the_retry() {
+        for side_table in ["user_auth_state", "user_password_history"] {
+            for with_memberships in [true, false] {
+                let db = user_with_auth_side_rows_db("Member@Example.com").await;
+                db.execute_unprepared(&format!(
+                    "CREATE TRIGGER side_delete_fails BEFORE DELETE ON {side_table} \
+                     BEGIN SELECT RAISE(ABORT, 'injected'); END"
+                ))
+                .await
+                .unwrap();
+
+                let case = format!("{side_table}, with_memberships={with_memberships}");
+                assert!(
+                    remove_on(&db, &["member@example.com".to_string()], with_memberships)
+                        .await
+                        .is_err(),
+                    "a failed side delete must fail the removal: {case}"
+                );
+                assert_eq!(side_row_counts(&db).await, [1, 1, 1, 1], "{case}");
+
+                db.execute_unprepared("DROP TRIGGER side_delete_fails")
+                    .await
+                    .unwrap();
+                remove_on(&db, &["member@example.com".to_string()], with_memberships)
+                    .await
+                    .unwrap();
+                let memberships_left = u64::from(!with_memberships);
+                assert_eq!(
+                    side_row_counts(&db).await,
+                    [0, memberships_left, 0, 0],
+                    "{case}"
+                );
+            }
+        }
     }
 
     fn make_db_user(is_external: bool, role: UserRole) -> DBUser {
@@ -418,6 +650,56 @@ mod tests {
             }],
             is_external,
             password_ext: None,
+        }
+    }
+
+    async fn users_db(emails: &[(&str, &str)]) -> sea_orm::DatabaseConnection {
+        use sea_orm::{ActiveModelTrait, Database, Schema, Set};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        for (id, email) in emails {
+            ActiveModel {
+                id: Set((*id).to_owned()),
+                email: Set((*email).to_owned()),
+                first_name: Set(String::new()),
+                last_name: Set(String::new()),
+                password: Set(String::new()),
+                salt: Set(String::new()),
+                is_root: Set(false),
+                password_ext: Set(None),
+                user_type: Set(0),
+                created_at: Set(0),
+                updated_at: Set(0),
+                must_reset_password: Set(false),
+                password_reset_reason: Set(None),
+                flagged_at: Set(None),
+                password_updated_at: Set(None),
+            }
+            .insert(&db)
+            .await
+            .unwrap();
+        }
+        db
+    }
+
+    #[tokio::test]
+    async fn an_email_resolves_to_its_id_whatever_its_case() {
+        let db = users_db(&[("a", "alice@x.com"), ("b", "Bob@X.com")]).await;
+        for (email, id) in [
+            ("alice@x.com", Some("a")),
+            ("ALICE@x.com", Some("a")),
+            ("Bob@X.com", Some("b")),
+            ("bob@x.com", Some("b")),
+            ("carol@x.com", None),
+        ] {
+            assert_eq!(
+                get_id_by_email_with(&db, email).await.unwrap().as_deref(),
+                id,
+                "{email}"
+            );
         }
     }
 

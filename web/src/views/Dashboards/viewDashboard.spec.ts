@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { writePanelDraft } from "@/composables/dashboard/usePanelDraft";
 import { shallowMount, flushPromises } from "@vue/test-utils";
+import { inject, type Ref } from "vue";
+import { DASHBOARD_FRESH_ON_OPEN } from "@/composables/dashboard/dashboardFreshOnOpen";
 // Comprehensive service mocks - these prevent real API calls
 vi.mock("@/services/dashboards", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
@@ -57,6 +60,11 @@ vi.mock("@/services/reports", async (importOriginal) => {
     },
   });
 });
+
+vi.mock("@/services/health", () => ({
+  pingBackend: vi.fn().mockResolvedValue(true),
+  default: { pingBackend: vi.fn().mockResolvedValue(true) },
+}));
 
 vi.mock("@/services/short_url", () => ({
   default: {
@@ -108,9 +116,13 @@ const mockRouterReplace = vi.fn().mockResolvedValue(undefined);
 const mockRouterBack = vi.fn();
 // Captures the leave guard ViewDashboard registers so tests can invoke it.
 const routeLeaveGuards: Array<() => unknown> = [];
+type RouteLike = { query: Record<string, string> };
+const routeUpdateGuards: Array<(to: RouteLike, from: RouteLike) => unknown> = [];
 // Mutable so a test can say what the previous history entry was; the back
 // button prefers real history over rebuilding the folder-scoped list route.
 const mockHistoryState: { back: string | null } = { back: null };
+// Extra query params a test wants on the route it mounts with (cleared before every test).
+const mockExtraRouteQuery: Record<string, string> = {};
 
 // Comprehensive Vue composable mocks
 vi.mock("vue-router", () => ({
@@ -136,9 +148,17 @@ vi.mock("vue-router", () => ({
   onBeforeRouteLeave: (guard: () => unknown) => {
     routeLeaveGuards.push(guard);
   },
+  onBeforeRouteUpdate: (guard: (to: RouteLike, from: RouteLike) => unknown) => {
+    routeUpdateGuards.push(guard);
+  },
   useRoute: () => ({
     params: { dashboardId: "test-dashboard-1", folderId: "default" },
-    query: { dashboard: "test-dashboard-1", folder: "default", tab: "tab-1" },
+    query: {
+      dashboard: "test-dashboard-1",
+      folder: "default",
+      tab: "tab-1",
+      ...mockExtraRouteQuery,
+    },
     path: "/dashboard/test-dashboard-1",
   }),
 }));
@@ -246,9 +266,14 @@ vi.mock("moment-timezone", () => ({
 
 import ViewDashboard from "@/views/Dashboards/ViewDashboard.vue";
 import i18n from "@/locales";
+import enUS from "@/locales/languages/en-US.json";
 import store from "@/test/unit/helpers/store";
 import analytics from "@/services/product_analytics";
 import ShareButton from "@/components/common/ShareButton.vue";
+import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
+import { getDashboard } from "@/utils/commons.ts";
+import { getManager } from "@/lib/vue-shortcut-manager";
+import { DASHBOARD_FRESH_PANEL_TIME } from "@/composables/dashboard/dashboardFreshPanelTime";
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
@@ -280,6 +305,7 @@ describe("ViewDashboard", () => {
     global.mockRouterReplace.mockClear();
     global.mockRouterBack.mockClear();
     global.mockHistoryState.back = null;
+    Object.keys(mockExtraRouteQuery).forEach((key) => delete mockExtraRouteQuery[key]);
     global.mockStoreCommit.mockClear();
     global.mockStoreDispatch.mockClear();
     global.mockShowPositiveNotification.mockClear();
@@ -363,6 +389,323 @@ describe("ViewDashboard", () => {
       ...options,
     });
   };
+
+  describe("Auto Run", () => {
+    const setAutoQuery = (enabled: boolean) => {
+      global.mockStoreState.zoConfig = {
+        ...global.mockStoreState.zoConfig,
+        auto_query_enabled: enabled,
+      };
+    };
+
+    afterEach(() => {
+      localStorage.removeItem("oo_toggle_auto_run");
+      setAutoQuery(false);
+    });
+
+    it("is on by default when the server enables auto query", async () => {
+      setAutoQuery(true);
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.vm.isAutoRunAvailable).toBe(true);
+      expect(wrapper.vm.isAutoRunOn).toBe(true);
+    });
+
+    it("never shows the apply-changes state while Auto Run is on", async () => {
+      setAutoQuery(true);
+      wrapper = createWrapper();
+      await flushPromises();
+      await wrapper.vm.onVariablesManagerReady({ hasUncommittedChanges: true });
+
+      expect(wrapper.vm.isVariablesChanged).toBe(false);
+    });
+
+    it("keeps Refresh-to-apply when the user turned Auto Run off", async () => {
+      setAutoQuery(true);
+      localStorage.setItem("oo_toggle_auto_run", "false");
+      wrapper = createWrapper();
+      await flushPromises();
+      await wrapper.vm.onVariablesManagerReady({ hasUncommittedChanges: true });
+
+      expect(wrapper.vm.isAutoRunOn).toBe(false);
+      expect(wrapper.vm.isVariablesChanged).toBe(true);
+    });
+
+    describe("a panel's time for an Auto Run reload", () => {
+      const MINUTE_MICROS = 60_000_000;
+      const lastRefreshEnd = (Date.now() - 45 * 60_000) * 1000;
+
+      const mountWithAppliedRange = async (appliedRange: Record<string, unknown>) => {
+        setAutoQuery(true);
+        wrapper = createWrapper();
+        await flushPromises();
+        wrapper.vm.currentDashboardData.data = {
+          tabs: [{ tabId: "tab-1", name: "Tab 1", panels: [{ id: "p-1", type: "line" }] }],
+        };
+        // The picker still holds an hour that was picked but never applied.
+        wrapper.vm.dateTimePicker = {
+          getConsumableDateTime: () => ({
+            startTime: lastRefreshEnd - 60 * MINUTE_MICROS,
+            endTime: lastRefreshEnd,
+          }),
+        };
+        wrapper.vm.selectedDate = appliedRange;
+        await flushPromises();
+        return wrapper.vm.$.provides[DASHBOARD_FRESH_PANEL_TIME as symbol];
+      };
+
+      it("moves the applied relative range up to now, ignoring a range nobody applied", async () => {
+        const resolveFreshPanelTime = await mountWithAppliedRange({
+          valueType: "relative",
+          relativeTimePeriod: "15m",
+          startTime: lastRefreshEnd - 15 * MINUTE_MICROS,
+          endTime: lastRefreshEnd,
+        });
+
+        const askedAt = Date.now() * 1000;
+        const time = resolveFreshPanelTime("p-1");
+
+        expect(time.end_time.getTime()).toBeGreaterThanOrEqual(askedAt);
+        expect(time.end_time.getTime() - time.start_time.getTime()).toBe(15 * MINUTE_MICROS);
+        expect(resolveFreshPanelTime("not-on-this-dashboard")).toBeUndefined();
+      });
+
+      it("returns an applied absolute range unchanged", async () => {
+        const resolveFreshPanelTime = await mountWithAppliedRange({
+          valueType: "absolute",
+          startTime: lastRefreshEnd - 30 * MINUTE_MICROS,
+          endTime: lastRefreshEnd,
+        });
+
+        expect(resolveFreshPanelTime("p-1")).toEqual({
+          start_time: new Date(lastRefreshEnd - 30 * MINUTE_MICROS),
+          end_time: new Date(lastRefreshEnd),
+        });
+      });
+
+      it("resolves nothing once Auto Run is off", async () => {
+        const resolveFreshPanelTime = await mountWithAppliedRange({
+          valueType: "relative",
+          relativeTimePeriod: "15m",
+        });
+
+        wrapper.vm.toggleAutoRun();
+
+        expect(resolveFreshPanelTime("p-1")).toBeUndefined();
+      });
+    });
+
+    it("is unavailable and off when the server flag is off", async () => {
+      setAutoQuery(false);
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.vm.isAutoRunAvailable).toBe(false);
+      expect(wrapper.vm.isAutoRunOn).toBe(false);
+    });
+
+    it("toggling writes the key shared with logs", async () => {
+      setAutoQuery(true);
+      wrapper = createWrapper();
+      await flushPromises();
+
+      wrapper.vm.toggleAutoRun();
+      expect(localStorage.getItem("oo_toggle_auto_run")).toBe("false");
+      expect(wrapper.vm.isAutoRunOn).toBe(false);
+    });
+
+    describe("on open", () => {
+      let freshOnOpen: any;
+      const mountWithToolbar = () =>
+        createWrapper({
+          global: {
+            plugins: [i18n, store],
+            renderStubDefaultSlot: true,
+            stubs: {
+              OPageLayout: {
+                setup() {
+                  freshOnOpen = inject(DASHBOARD_FRESH_ON_OPEN, null);
+                },
+                template: '<div><slot name="actions" /></div>',
+              },
+              ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
+            },
+          },
+        });
+      const relativePanel = {
+        id: "P1",
+        config: {
+          panel_time_enabled: true,
+          panel_time_range: { type: "relative", relativeTimePeriod: "1h" },
+        },
+      };
+
+      beforeEach(() => {
+        freshOnOpen = null;
+      });
+
+      it("keeps the refresh options reachable while panels load", async () => {
+        setAutoQuery(true);
+        wrapper = mountWithToolbar();
+        await flushPromises();
+
+        wrapper.vm.handleEmittedData(false);
+        await flushPromises();
+
+        const option = (dataTest: string) => wrapper.findComponent(`[data-test="${dataTest}"]`);
+        expect(wrapper.vm.arePanelsLoading).toBe(true);
+        expect(option("dashboard-refresh-options-btn").props("disabled")).toBe(false);
+        expect(option("dashboard-refresh-without-cache-btn").props("disabled")).toBe(true);
+        expect(option("dashboard-auto-run-toggle-btn").props("disabled")).toBe(false);
+      });
+
+      it("enables Refresh cache & reload again once panels finish", async () => {
+        setAutoQuery(true);
+        wrapper = mountWithToolbar();
+        await flushPromises();
+
+        wrapper.vm.handleEmittedData(false);
+        wrapper.vm.handleEmittedData(true);
+        await flushPromises();
+
+        expect(
+          wrapper
+            .findComponent('[data-test="dashboard-refresh-without-cache-btn"]')
+            .props("disabled"),
+        ).toBe(false);
+      });
+
+      it("describes Auto Run on dashboards with the dashboard-only copy", async () => {
+        setAutoQuery(true);
+        wrapper = mountWithToolbar();
+        await flushPromises();
+
+        const toggle = wrapper.find('[data-test="dashboard-auto-run-toggle-btn"]');
+        expect(toggle.text()).toContain("dashboard.viewDashboard.autoRunDescription");
+        expect(toggle.text()).not.toContain("search.liveModeTooltip");
+        const tooltips = wrapper
+          .findAllComponents({ name: "OTooltip" })
+          .map((tooltip: any) => tooltip.props("content"));
+        expect(tooltips).toContain("dashboard.viewDashboard.autoRunDescription");
+        expect(tooltips).not.toContain("dashboard.viewDashboard.autoRunScope");
+        expect(tooltips).not.toContain("search.autoRunEnabled");
+      });
+
+      it("says below the description that Auto Run applies beyond this dashboard", async () => {
+        setAutoQuery(true);
+        wrapper = mountWithToolbar();
+        await flushPromises();
+
+        const toggle = wrapper.find('[data-test="dashboard-auto-run-toggle-btn"]');
+        const lines = toggle.findAll("div").map((line: any) => line.text());
+        expect(lines).toEqual([
+          "search.turnOffLiveMode",
+          "dashboard.viewDashboard.autoRunDescription",
+          "dashboard.viewDashboard.autoRunScope",
+        ]);
+        expect(toggle.find('[data-test="dashboard-auto-run-scope"]').classes()).toEqual(
+          expect.arrayContaining(["text-text-secondary", "text-xs"]),
+        );
+      });
+
+      it("keeps the scope line whether Auto Run is on or off", async () => {
+        setAutoQuery(true);
+        wrapper = mountWithToolbar();
+        await flushPromises();
+        const toggle = () => wrapper.find('[data-test="dashboard-auto-run-toggle-btn"]');
+        const scope = () => toggle().find('[data-test="dashboard-auto-run-scope"]');
+
+        expect(toggle().text()).toContain("search.turnOffLiveMode");
+        expect(scope().text()).toBe("dashboard.viewDashboard.autoRunScope");
+
+        wrapper.vm.toggleAutoRun();
+        await flushPromises();
+
+        expect(toggle().text()).toContain("search.turnOnLiveMode");
+        expect(scope().text()).toBe("dashboard.viewDashboard.autoRunScope");
+      });
+
+      it("ships the approved English copy for both lines", () => {
+        expect(enUS.dashboard.viewDashboard.autoRunDescription).toBe(
+          "Runs queries on open and on filter/time changes",
+        );
+        expect(enUS.dashboard.viewDashboard.autoRunScope).toBe(
+          "Applies to all dashboards, Logs and Traces",
+        );
+      });
+
+      it("provides a gate that needs Auto Run and a relative effective range", async () => {
+        setAutoQuery(true);
+        wrapper = mountWithToolbar();
+        await flushPromises();
+        const globalPanel = { id: "P2", config: {} };
+
+        wrapper.vm.selectedDate = { valueType: "relative", relativeTimePeriod: "15m" };
+        expect(freshOnOpen.appliesTo(globalPanel)).toBe(true);
+
+        wrapper.vm.selectedDate = { valueType: "absolute", startTime: 1, endTime: 2 };
+        expect(freshOnOpen.appliesTo(globalPanel)).toBe(false);
+        expect(freshOnOpen.appliesTo(relativePanel)).toBe(true);
+
+        wrapper.vm.toggleAutoRun();
+        expect(freshOnOpen.appliesTo(relativePanel)).toBe(false);
+      });
+
+      it("reports each panel's effective range whether or not Auto Run is on", async () => {
+        setAutoQuery(false);
+        wrapper = mountWithToolbar();
+        await flushPromises();
+        const globalPanel = { id: "P2", config: {} };
+
+        wrapper.vm.selectedDate = { valueType: "absolute", startTime: 1, endTime: 2 };
+        expect(freshOnOpen.isRelativeRange(globalPanel)).toBe(false);
+        expect(freshOnOpen.isRelativeRange(relativePanel)).toBe(true);
+
+        wrapper.vm.selectedDate = { valueType: "relative", relativeTimePeriod: "15m" };
+        expect(freshOnOpen.isRelativeRange(globalPanel)).toBe(true);
+      });
+
+      it("never applies while the server flag is off", async () => {
+        setAutoQuery(false);
+        wrapper = mountWithToolbar();
+        await flushPromises();
+
+        expect(freshOnOpen.appliesTo(relativePanel)).toBe(false);
+      });
+    });
+  });
+
+  describe("save conflict resolution", () => {
+    it("marks the page not saved while this dashboard's conflict is unresolved", async () => {
+      wrapper = shallowMount(ViewDashboard, {
+        global: {
+          plugins: [i18n, store],
+          config: { globalProperties: { store } },
+          stubs: {
+            OPageLayout: { template: "<div><slot /></div>" },
+            OBanner: { template: "<div><slot /><slot name='actions' /></div>" },
+          },
+        },
+      });
+      await flushPromises();
+      const banner = () => wrapper.find('[data-test="dashboard-unsaved-conflict-banner"]');
+      expect(banner().exists()).toBe(false);
+
+      dashboardSaveConflictState.myChange = 'Deleted panel "CPU"';
+      dashboardSaveConflictState.unresolvedDashboardId = "test-dashboard-1";
+      await flushPromises();
+      expect(banner().exists()).toBe(true);
+      // This spec's i18n has no messages, so the banner carries its key.
+      expect(banner().text()).toContain("dashboard.saveConflict.notSavedChange");
+      expect(wrapper.find('[data-test="dashboard-unsaved-conflict-resolve"]').exists()).toBe(true);
+
+      dashboardSaveConflictState.unresolvedDashboardId = "other-dashboard";
+      await flushPromises();
+      expect(banner().exists()).toBe(false);
+      dashboardSaveConflictState.unresolvedDashboardId = "";
+    });
+  });
 
   describe("Basic Component Tests", () => {
     it("should create component without crashing", async () => {
@@ -1511,6 +1854,898 @@ describe("ViewDashboard", () => {
       wrapper.findComponent(ShareButton).vm.$emit("shorten:error", { error: "x" });
 
       expect(analytics.track).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("layout edit mode", () => {
+    const mockSaveExecute = vi.fn();
+    const mockSyncGrid = vi.fn();
+
+    const RenderDashboardChartsStub = {
+      name: "RenderDashboardCharts",
+      props: ["layoutMode", "viewOnly", "dashboardData"],
+      emits: ["layoutChange"],
+      template: '<div data-test="render-dashboard-charts-stub" :data-mode="layoutMode" />',
+      setup() {
+        return {
+          saveDashboardData: { execute: mockSaveExecute },
+          syncGridToLayout: mockSyncGrid,
+        };
+      },
+    };
+
+    const mountDashboard = async () => {
+      vi.mocked(getDashboard).mockResolvedValueOnce({
+        dashboardId: "test-dashboard-1",
+        title: "Test Dashboard",
+        variables: { list: [] },
+        tabs: [
+          {
+            tabId: "tab-1",
+            name: "Tab 1",
+            panels: [{ id: "p-1", type: "line", layout: { x: 0, y: 0, w: 96, h: 18, i: "p-1" } }],
+          },
+          { tabId: "tab-2", name: "Tab 2", panels: [] },
+        ],
+      });
+      wrapper = createWrapper({
+        global: {
+          plugins: [i18n, store],
+          stubs: {
+            OPageLayout: {
+              template:
+                '<div><slot name="title" /><slot name="actions" /><slot name="actions-overflow" /><slot /></div>',
+            },
+            RenderDashboardCharts: RenderDashboardChartsStub,
+            OBanner: {
+              props: ["dataTest"],
+              template: '<div :data-test="dataTest"><slot /><slot name="actions" /></div>',
+            },
+          },
+        },
+      });
+      await flushPromises();
+    };
+
+    const panelLayout = () => wrapper.vm.currentDashboardData.data.tabs[0].panels[0].layout;
+    const has = (dataTest: string) => wrapper.find(`[data-test="${dataTest}"]`).exists();
+
+    const dragPanelTo = async (x: number) => {
+      panelLayout().x = x;
+      wrapper.findComponent({ name: "RenderDashboardCharts" }).vm.$emit("layoutChange");
+      await flushPromises();
+    };
+
+    beforeEach(() => {
+      mockSaveExecute.mockReset();
+      mockSyncGrid.mockReset();
+      routeLeaveGuards.length = 0;
+      routeUpdateGuards.length = 0;
+    });
+
+    it("opens in view mode with the layout locked", async () => {
+      await mountDashboard();
+
+      expect(
+        wrapper.find('[data-test="render-dashboard-charts-stub"]').attributes("data-mode"),
+      ).toBe("view");
+      expect(has("dashboard-edit-btn")).toBe(true);
+      expect(has("dashboard-panel-add")).toBe(true);
+      expect(has("dashboard-edit-save-btn")).toBe(false);
+      expect(has("dashboard-edit-badge")).toBe(false);
+    });
+
+    it("marks Add panel with a dot while this dashboard has a new-panel draft", async () => {
+      localStorage.clear();
+      await mountDashboard();
+      expect(wrapper.vm.hasNewPanelDraft).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-panel-add"]').attributes("aria-label")).toBe(
+        "panel.add",
+      );
+
+      writePanelDraft(
+        { userEmail: "", org: "test-org", dashboardId: "test-dashboard-1" },
+        {
+          tabId: "tab-1",
+          data: {},
+          layout: { currentQueryIndex: 0, vrlFunctionToggle: false },
+          sessionVariables: [],
+          variablesWithCurrentPanel: [],
+        },
+      );
+      await flushPromises();
+      expect(wrapper.vm.hasNewPanelDraft).toBe(true);
+      // A button's children are presentational, so the draft state must be in the button's own name.
+      expect(wrapper.find('[data-test="dashboard-panel-add"]').attributes("aria-label")).toBe(
+        "dashboard.panelDraft.addPanelDot",
+      );
+
+      // The dot lives inside the Add panel button, which layout editing removes.
+      wrapper.vm.enterLayoutEdit();
+      await flushPromises();
+      expect(has("dashboard-panel-add")).toBe(false);
+      localStorage.clear();
+    });
+
+    it("swaps the header actions when entering edit mode", async () => {
+      await mountDashboard();
+
+      wrapper.vm.enterLayoutEdit();
+      await flushPromises();
+
+      expect(
+        wrapper.find('[data-test="render-dashboard-charts-stub"]').attributes("data-mode"),
+      ).toBe("edit");
+      expect(has("dashboard-edit-badge")).toBe(true);
+      expect(has("dashboard-edit-undo-btn")).toBe(true);
+      expect(has("dashboard-edit-redo-btn")).toBe(true);
+      expect(has("dashboard-edit-discard-btn")).toBe(true);
+      expect(has("dashboard-edit-save-btn")).toBe(true);
+      expect(has("dashboard-edit-btn")).toBe(false);
+      expect(has("dashboard-panel-add")).toBe(false);
+      expect(has("dashboard-setting-btn")).toBe(false);
+      expect(has("dashboard-json-edit-btn")).toBe(false);
+      expect(has("dashboard-edit-changes-count")).toBe(true);
+      expect(wrapper.vm.layoutChangeCount).toBe(0);
+      expect(wrapper.find('[data-test="dashboard-edit-save-btn"]').attributes("disabled")).toBe(
+        "true",
+      );
+    });
+
+    it("does not enter edit mode in print mode", async () => {
+      await mountDashboard();
+      Object.assign(global.mockStoreState, { printMode: true });
+
+      wrapper.vm.enterLayoutEdit();
+
+      expect(wrapper.vm.isEditingLayout).toBe(false);
+      Object.assign(global.mockStoreState, { printMode: false });
+    });
+
+    it("counts drafted moves and saves them in one call, then returns to view mode", async () => {
+      await mountDashboard();
+      wrapper.vm.enterLayoutEdit();
+      await dragPanelTo(10);
+      await dragPanelTo(20);
+
+      expect(wrapper.vm.layoutChangeCount).toBe(2);
+      expect(wrapper.find('[data-test="dashboard-edit-save-btn"]').attributes("disabled")).toBe(
+        "false",
+      );
+      expect(mockSaveExecute).not.toHaveBeenCalled();
+
+      mockSaveExecute.mockResolvedValueOnce(true);
+      await wrapper.vm.saveLayout();
+      await flushPromises();
+
+      expect(mockSaveExecute).toHaveBeenCalledTimes(1);
+      expect(wrapper.vm.isEditingLayout).toBe(false);
+      expect(panelLayout().x).toBe(20);
+    });
+
+    it("keeps the draft when the save fails", async () => {
+      await mountDashboard();
+      wrapper.vm.enterLayoutEdit();
+      await dragPanelTo(10);
+
+      mockSaveExecute.mockResolvedValueOnce(false);
+      await wrapper.vm.saveLayout();
+
+      expect(wrapper.vm.isEditingLayout).toBe(true);
+      expect(wrapper.vm.layoutChangeCount).toBe(1);
+    });
+
+    it("undo and redo move the grid back and forth", async () => {
+      await mountDashboard();
+      wrapper.vm.enterLayoutEdit();
+      await dragPanelTo(10);
+
+      wrapper.vm.undoLayout();
+      expect(panelLayout().x).toBe(0);
+      expect(mockSyncGrid).toHaveBeenCalledTimes(1);
+
+      wrapper.vm.redoLayout();
+      expect(panelLayout().x).toBe(10);
+      expect(mockSyncGrid).toHaveBeenCalledTimes(2);
+    });
+
+    it("drafts the Edit layout dialog result instead of saving it", async () => {
+      await mountDashboard();
+      wrapper.vm.enterLayoutEdit();
+      wrapper.vm.openLayoutConfig("p-1");
+
+      await wrapper.vm.savePanelLayout({ x: 0, y: 0, w: 96, h: 40, i: "p-1" });
+
+      expect(panelLayout().h).toBe(40);
+      expect(mockSyncGrid).toHaveBeenCalled();
+      expect(mockSaveExecute).not.toHaveBeenCalled();
+      expect(wrapper.vm.layoutChangeCount).toBe(1);
+    });
+
+    it("leaves at once when there is nothing to discard", async () => {
+      await mountDashboard();
+      wrapper.vm.enterLayoutEdit();
+
+      await wrapper.vm.requestExitLayoutEdit();
+
+      expect(wrapper.vm.isEditingLayout).toBe(false);
+      expect(wrapper.vm.discardDialog.open).toBe(false);
+    });
+
+    it("asks before discarding changes and restores the saved layout", async () => {
+      await mountDashboard();
+      wrapper.vm.enterLayoutEdit();
+      await dragPanelTo(30);
+
+      const exiting = wrapper.vm.requestExitLayoutEdit();
+      await flushPromises();
+      expect(wrapper.vm.discardDialog.open).toBe(true);
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      expect(dialog.props("open")).toBe(true);
+      // Enter must keep the draft: the safe action takes the initial focus, not the destructive one.
+      expect(dialog.props("initialFocus")).toBe("secondary");
+      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+
+      wrapper.vm.settleDiscard(true);
+      await exiting;
+
+      expect(wrapper.vm.isEditingLayout).toBe(false);
+      expect(panelLayout().x).toBe(0);
+      expect(mockSaveExecute).not.toHaveBeenCalled();
+    });
+
+    it("keeps editing when the discard is cancelled", async () => {
+      await mountDashboard();
+      wrapper.vm.enterLayoutEdit();
+      await dragPanelTo(30);
+
+      const exiting = wrapper.vm.requestExitLayoutEdit();
+      wrapper.vm.settleDiscard(false);
+      await exiting;
+
+      expect(wrapper.vm.isEditingLayout).toBe(true);
+      expect(panelLayout().x).toBe(30);
+    });
+
+    it("lets the route leave without asking when the draft is clean", async () => {
+      await mountDashboard();
+      wrapper.vm.enterLayoutEdit();
+
+      expect(routeLeaveGuards.at(-1)!()).toBeUndefined();
+      expect(wrapper.vm.discardDialog.open).toBe(false);
+    });
+
+    it("blocks the route leave until the user confirms discarding", async () => {
+      await mountDashboard();
+      wrapper.vm.enterLayoutEdit();
+      await dragPanelTo(30);
+      const guard = routeLeaveGuards.at(-1)!;
+
+      const stay = guard() as Promise<boolean>;
+      expect(wrapper.vm.discardDialog.reason).toBe("leave");
+      wrapper.vm.settleDiscard(false);
+      await expect(stay).resolves.toBe(false);
+      expect(panelLayout().x).toBe(30);
+
+      const leave = guard() as Promise<boolean>;
+      wrapper.vm.settleDiscard(true);
+      await expect(leave).resolves.toBe(true);
+      expect(panelLayout().x).toBe(0);
+    });
+
+    it("asks before a drilldown or Back/Forward to another dashboard drops the draft", async () => {
+      await mountDashboard();
+      wrapper.vm.enterLayoutEdit();
+      await dragPanelTo(30);
+      const guard = routeUpdateGuards.at(-1)!;
+      const toOther = { query: { dashboard: "other-dashboard", tab: "tab-1" } };
+      const from = { query: { dashboard: "test-dashboard-1", tab: "tab-1" } };
+
+      const stay = guard(toOther, from) as Promise<boolean>;
+      expect(wrapper.vm.discardDialog.open).toBe(true);
+      expect(wrapper.vm.discardDialog.reason).toBe("leave");
+      wrapper.vm.settleDiscard(false);
+      await expect(stay).resolves.toBe(false);
+      expect(wrapper.vm.isEditingLayout).toBe(true);
+      expect(panelLayout().x).toBe(30);
+
+      const leave = guard(toOther, from) as Promise<boolean>;
+      wrapper.vm.settleDiscard(true);
+      await expect(leave).resolves.toBe(true);
+      expect(wrapper.vm.isEditingLayout).toBe(false);
+      expect(panelLayout().x).toBe(0);
+    });
+
+    it("does not ask when the dashboard stays the same or the draft is clean", async () => {
+      await mountDashboard();
+      wrapper.vm.enterLayoutEdit();
+      const guard = routeUpdateGuards.at(-1)!;
+      const from = { query: { dashboard: "test-dashboard-1", tab: "tab-1" } };
+
+      expect(guard({ query: { dashboard: "other-dashboard" } }, from)).toBeUndefined();
+
+      await dragPanelTo(30);
+      expect(
+        guard({ query: { dashboard: "test-dashboard-1", tab: "tab-2" } }, from),
+      ).toBeUndefined();
+      expect(wrapper.vm.discardDialog.open).toBe(false);
+      expect(panelLayout().x).toBe(30);
+    });
+
+    it("moves the grid to a layout saved from the JSON editor", async () => {
+      await mountDashboard();
+      const edited = JSON.parse(JSON.stringify(wrapper.vm.currentDashboardData.data));
+      edited.tabs[0].panels[0].layout.w = 48;
+      vi.mocked(getDashboard).mockResolvedValueOnce(edited);
+      mockSaveExecute.mockResolvedValueOnce(true);
+
+      await wrapper.vm.saveJsonDashboard.execute(edited);
+
+      expect(mockSaveExecute).toHaveBeenCalledTimes(1);
+      expect(panelLayout().w).toBe(48);
+      expect(mockSyncGrid).toHaveBeenCalledTimes(1);
+      expect(mockSyncGrid.mock.invocationCallOrder[0]).toBeGreaterThan(
+        vi.mocked(getDashboard).mock.invocationCallOrder.at(-1)!,
+      );
+    });
+
+    it("keeps my JSON on screen when its save hits a conflict, naming it in the dialog", async () => {
+      await mountDashboard();
+      const edited = JSON.parse(JSON.stringify(wrapper.vm.currentDashboardData.data));
+      edited.tabs[0].panels[0].layout.w = 48;
+      const loadsBefore = vi.mocked(getDashboard).mock.calls.length;
+      mockSaveExecute.mockResolvedValueOnce(false);
+
+      await wrapper.vm.saveJsonDashboard.execute(edited);
+
+      expect(mockSaveExecute).toHaveBeenCalledWith("dashboard.saveConflict.change.editedJson");
+      expect(vi.mocked(getDashboard).mock.calls.length).toBe(loadsBefore);
+      expect(panelLayout().w).toBe(48);
+    });
+
+    it("warns on page unload only while the draft has changes", async () => {
+      await mountDashboard();
+      wrapper.vm.enterLayoutEdit();
+
+      const clean = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(clean);
+      expect(clean.defaultPrevented).toBe(false);
+
+      await dragPanelTo(30);
+      const dirty = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(dirty);
+      expect(dirty.defaultPrevented).toBe(true);
+    });
+
+    it("binds Ctrl+S, Ctrl+Z, Ctrl+Shift+Z and Esc only while editing", async () => {
+      await mountDashboard();
+      const press = (init: KeyboardEventInit) =>
+        window.dispatchEvent(new KeyboardEvent("keydown", init));
+
+      press({ key: "s", ctrlKey: true });
+      await flushPromises();
+      expect(mockSaveExecute).not.toHaveBeenCalled();
+
+      wrapper.vm.enterLayoutEdit();
+      await dragPanelTo(10);
+      press({ key: "z", ctrlKey: true });
+      expect(panelLayout().x).toBe(0);
+      press({ key: "Z", ctrlKey: true, shiftKey: true });
+      expect(panelLayout().x).toBe(10);
+
+      mockSaveExecute.mockResolvedValueOnce(true);
+      press({ key: "s", ctrlKey: true });
+      await flushPromises();
+      expect(mockSaveExecute).toHaveBeenCalledTimes(1);
+      expect(wrapper.vm.isEditingLayout).toBe(false);
+
+      wrapper.vm.enterLayoutEdit();
+      press({ key: "Escape" });
+      await flushPromises();
+      expect(wrapper.vm.isEditingLayout).toBe(false);
+    });
+
+    it("leaves Esc to the global shortcuts, like closing the AI chat, outside edit mode", async () => {
+      await mountDashboard();
+      const manager = getManager()!;
+      const closeChat = vi.fn();
+      const chatId = manager.register({ key: "escape", handler: closeChat, allowInInput: true });
+      const pressEscape = () =>
+        window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+
+      try {
+        pressEscape();
+        expect(closeChat).toHaveBeenCalledTimes(1);
+
+        wrapper.vm.enterLayoutEdit();
+        pressEscape();
+        await flushPromises();
+        expect(wrapper.vm.isEditingLayout).toBe(false);
+        expect(closeChat).toHaveBeenCalledTimes(1);
+
+        pressEscape();
+        expect(closeChat).toHaveBeenCalledTimes(2);
+
+        wrapper.vm.enterLayoutEdit();
+        wrapper.unmount();
+        wrapper = null;
+        pressEscape();
+        expect(closeChat).toHaveBeenCalledTimes(3);
+      } finally {
+        manager.unregisterById(chatId);
+      }
+    });
+
+    describe("save conflict on Save", () => {
+      const conflictLost = async () => {
+        await mountDashboard();
+        wrapper.vm.enterLayoutEdit();
+        await dragPanelTo(10);
+        // What saveDashboardData does on a 409: open the dialog (which marks the dashboard unresolved) and report failure.
+        mockSaveExecute.mockImplementationOnce(async () => {
+          dashboardSaveConflictState.unresolvedDashboardId = "test-dashboard-1";
+          return false;
+        });
+        await wrapper.vm.saveLayout();
+        await flushPromises();
+      };
+
+      const resolve = async (outcome: "reloaded" | "overwritten") => {
+        dashboardSaveConflictState.unresolvedDashboardId = "";
+        dashboardSaveConflictState.resolvedDashboardId = "test-dashboard-1";
+        dashboardSaveConflictState.resolvedOutcome = outcome;
+        dashboardSaveConflictState.resolvedSeq += 1;
+        await flushPromises();
+      };
+
+      afterEach(() => {
+        dashboardSaveConflictState.unresolvedDashboardId = "";
+      });
+
+      it("keeps edit mode, the draft and its undo history while the dialog is open or closed", async () => {
+        await conflictLost();
+
+        expect(wrapper.vm.isEditingLayout).toBe(true);
+        expect(wrapper.vm.layoutChangeCount).toBe(1);
+        expect(wrapper.vm.canUndoLayout).toBe(true);
+        expect(panelLayout().x).toBe(10);
+        expect(has("dashboard-unsaved-conflict-banner")).toBe(true);
+        expect(has("dashboard-edit-badge")).toBe(true);
+      });
+
+      it("a time-range change applies without saving and leaves the not-saved banner up", async () => {
+        await conflictLost();
+        const loadsBefore = vi.mocked(getDashboard).mock.calls.length;
+
+        wrapper.vm.timeGate.onShow();
+        wrapper.vm.timeGate.onPick({ valueType: "relative", relativeTimePeriod: "1h" });
+        wrapper.vm.onTimePickerHide();
+        wrapper.vm.timeGate.apply();
+        await flushPromises();
+
+        expect(wrapper.vm.selectedDate).toMatchObject({ relativeTimePeriod: "1h" });
+        expect(mockSaveExecute).toHaveBeenCalledTimes(1);
+        expect(vi.mocked(getDashboard).mock.calls.length).toBe(loadsBefore);
+        expect(dashboardSaveConflictState.unresolvedDashboardId).toBe("test-dashboard-1");
+        expect(has("dashboard-unsaved-conflict-banner")).toBe(true);
+        expect(wrapper.vm.isEditingLayout).toBe(true);
+        expect(wrapper.vm.layoutChangeCount).toBe(1);
+      });
+
+      it("Reload leaves edit mode, drops the draft and shows the latest version", async () => {
+        await conflictLost();
+        const drafted = wrapper.vm.currentDashboardData.data;
+        const callsBefore = vi.mocked(getDashboard).mock.calls.length;
+
+        await resolve("reloaded");
+
+        expect(wrapper.vm.isEditingLayout).toBe(false);
+        expect(wrapper.vm.layoutChangeCount).toBe(0);
+        expect(wrapper.vm.canUndoLayout).toBe(false);
+        expect(drafted.tabs[0].panels[0].layout.x).toBe(0);
+        expect(vi.mocked(getDashboard).mock.calls.length).toBe(callsBefore + 1);
+        expect(has("dashboard-unsaved-conflict-banner")).toBe(false);
+      });
+
+      it("Overwrite ends edit mode like a normal save, keeping my layout", async () => {
+        await conflictLost();
+        const drafted = wrapper.vm.currentDashboardData.data;
+
+        await resolve("overwritten");
+
+        expect(wrapper.vm.isEditingLayout).toBe(false);
+        expect(wrapper.vm.layoutChangeCount).toBe(0);
+        expect(drafted.tabs[0].panels[0].layout.x).toBe(10);
+      });
+
+      it("the banner's Resolve reopens the dialog without saving again, and edit mode stays", async () => {
+        await conflictLost();
+        await dragPanelTo(20);
+
+        await wrapper.find('[data-test="dashboard-unsaved-conflict-resolve"]').trigger("click");
+        await flushPromises();
+
+        expect(mockSaveExecute).toHaveBeenCalledTimes(1);
+        expect(wrapper.vm.isEditingLayout).toBe(true);
+        expect(panelLayout().x).toBe(20);
+      });
+    });
+  });
+
+  describe("time range carried by a link", () => {
+    // A link with ?refresh= rewrites the URL on mount, before the dashboard (and its picker value) has loaded.
+    it.each(["1w", "15m", "2h", "7d", "1M"])(
+      "keeps period=%s when the link also sets a refresh interval",
+      async (period) => {
+        Object.assign(mockExtraRouteQuery, { period, refresh: "1m" });
+        let resolveDashboard: (value: unknown) => void = () => {};
+        vi.mocked(getDashboard).mockImplementationOnce(
+          () => new Promise((resolve) => (resolveDashboard = resolve)),
+        );
+        wrapper = createWrapper();
+        await flushPromises();
+
+        const rewrites = global.mockRouterReplace.mock.calls.map((call) => call[0]?.query);
+        expect(rewrites.length).toBeGreaterThan(0);
+        rewrites.forEach((query) => expect(query?.period).toBe(period));
+
+        resolveDashboard({
+          dashboardId: "test-dashboard-1",
+          title: "Test Dashboard",
+          variables: { list: [] },
+          defaultDatetimeDuration: { type: "relative", relativeTimePeriod: "15m" },
+          tabs: [{ tabId: "tab-1", name: "Tab 1", panels: [] }],
+        });
+        await flushPromises();
+        expect(wrapper.vm.selectedDate).toMatchObject({
+          valueType: "relative",
+          relativeTimePeriod: period,
+        });
+      },
+    );
+
+    it("keeps an absolute from/to when the link also sets a refresh interval", async () => {
+      Object.assign(mockExtraRouteQuery, {
+        from: "1700000000000",
+        to: "1700003600000",
+        refresh: "1m",
+      });
+      vi.mocked(getDashboard).mockImplementationOnce(() => new Promise(() => {}));
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const rewrites = global.mockRouterReplace.mock.calls.map((call) => call[0]?.query);
+      expect(rewrites.length).toBeGreaterThan(0);
+      rewrites.forEach((query) => {
+        expect(query?.from).toBe("1700000000000");
+        expect(query?.to).toBe("1700003600000");
+      });
+    });
+  });
+
+  describe("Kiosk / TV mode", () => {
+    const mountKiosk = async () => {
+      wrapper = createWrapper({
+        global: {
+          plugins: [i18n, store],
+          stubs: {
+            OPageLayout: {
+              name: "OPageLayout",
+              props: ["headerClass"],
+              template:
+                '<div><slot name="title" /><slot name="actions" /><slot name="actions-overflow" /><slot /></div>',
+            },
+            RenderDashboardCharts: {
+              name: "RenderDashboardCharts",
+              props: ["viewOnly", "kiosk", "fitToScreen", "showTabs", "readOnlySelectors"],
+              setup() {
+                return { applyLive: inject<Ref<boolean> | null>("dashboardAutoRun", null) };
+              },
+              template: '<div :data-apply-live="String(applyLive)" />',
+            },
+          },
+        },
+      });
+      await flushPromises();
+    };
+
+    afterEach(() => {
+      global.mockStoreState.kioskMode = false;
+    });
+
+    it("keeps the normal view unchanged: no strip, header shown, panels editable", async () => {
+      await mountKiosk();
+
+      expect(wrapper.vm.kioskMode).toBe(false);
+      expect(wrapper.findComponent({ name: "KioskStrip" }).exists()).toBe(false);
+      const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
+      expect(charts.props("viewOnly")).toBe(false);
+      expect(charts.props("kiosk")).toBe(false);
+      expect(charts.props("readOnlySelectors")).toBe(false);
+      expect(wrapper.findComponent({ name: "OPageLayout" }).props("headerClass")).toBe("shrink-0");
+    });
+
+    it("opens TV mode with a link that keeps the relative range and adds the chosen options", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      global.mockRouterPush.mockClear();
+
+      await wrapper.vm.enterKiosk({ refreshSeconds: 300, theme: "dark", fit: true });
+
+      expect(global.mockStoreDispatch).toHaveBeenCalledWith("setKioskMode", true);
+      expect(global.mockStoreCommit).toHaveBeenCalledWith("setThemeOverride", "dark");
+      expect(wrapper.vm.refreshInterval).toBe(300);
+      const { query } = global.mockRouterPush.mock.calls.at(-1)[0];
+      expect(query).toMatchObject({
+        dashboard: "test-dashboard-1",
+        tab: "tab-1",
+        kiosk: "true",
+        theme: "dark",
+        fit: "true",
+        refresh: "5m",
+      });
+      expect(query.print).toBeUndefined();
+      expect(query.from).toBeUndefined();
+    });
+
+    it("renders the read-only strip and view-only panels without the toolbar", async () => {
+      global.mockStoreState.kioskMode = true;
+      await mountKiosk();
+
+      expect(wrapper.findComponent({ name: "KioskStrip" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OPageLayout" }).props("headerClass")).toBe("hidden");
+      const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
+      expect(charts.props("viewOnly")).toBe(true);
+      expect(charts.props("kiosk")).toBe(true);
+      expect(charts.props("readOnlySelectors")).toBe(false);
+    });
+
+    it("passes the strip its countdown and loading state and exits when it asks to", async () => {
+      global.mockStoreState.kioskMode = true;
+      await mountKiosk();
+      global.mockRouterReplace.mockClear();
+
+      const strip = wrapper.findComponent({ name: "KioskStrip" });
+      expect(strip.props("loading")).toBe(wrapper.vm.arePanelsLoading);
+      expect(strip.props()).toHaveProperty("countdown");
+      expect(strip.props()).not.toHaveProperty("exitVisible");
+      strip.vm.$emit("exit");
+      await flushPromises();
+
+      expect(global.mockStoreDispatch).toHaveBeenCalledWith("setKioskMode", false);
+      expect(global.mockRouterReplace.mock.calls.at(-1)[0].query.kiosk).toBeUndefined();
+    });
+
+    it("keeps the tab bar on and applies variable changes live, since a wall has no Refresh button", async () => {
+      global.mockStoreState.kioskMode = true;
+      await mountKiosk();
+      const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
+      expect(charts.props("showTabs")).toBe(true);
+      expect(charts.attributes("data-apply-live")).toBe("true");
+      expect(wrapper.vm.isVariablesChanged).toBe(false);
+    });
+
+    it("lets Esc close an open variable dropdown without leaving TV mode", async () => {
+      global.mockStoreState.kioskMode = true;
+      wrapper = createWrapper();
+      await flushPromises();
+      global.mockStoreDispatch.mockClear();
+
+      const listbox = document.createElement("div");
+      listbox.setAttribute("role", "listbox");
+      document.body.appendChild(listbox);
+      // The dropdown closes itself on the same keypress, before the shortcut runs.
+      const closeFirst = () => listbox.remove();
+      document.addEventListener("keydown", closeFirst, { once: true });
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      await flushPromises();
+
+      expect(listbox.isConnected).toBe(false);
+      expect(global.mockStoreDispatch).not.toHaveBeenCalledWith("setKioskMode", false);
+    });
+
+    it("exits on the next Esc while a closed dropdown's trigger still has focus", async () => {
+      global.mockStoreState.kioskMode = true;
+      wrapper = createWrapper();
+      await flushPromises();
+      global.mockStoreDispatch.mockClear();
+
+      const trigger = document.createElement("button");
+      trigger.setAttribute("role", "combobox");
+      document.body.appendChild(trigger);
+      trigger.focus();
+      trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      await flushPromises();
+      trigger.remove();
+
+      expect(global.mockStoreDispatch).toHaveBeenCalledWith("setKioskMode", false);
+    });
+
+    it("keeps TV mode on Esc while typing in a text field", async () => {
+      global.mockStoreState.kioskMode = true;
+      wrapper = createWrapper();
+      await flushPromises();
+      global.mockStoreDispatch.mockClear();
+
+      const input = document.createElement("input");
+      document.body.appendChild(input);
+      input.focus();
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      await flushPromises();
+      input.remove();
+
+      expect(global.mockStoreDispatch).not.toHaveBeenCalledWith("setKioskMode", false);
+    });
+
+    it("restores the normal view's refresh on exit when TV mode was opened from the toolbar", async () => {
+      // The mock store is not reactive, so kiosk state is set up front.
+      global.mockStoreState.kioskMode = true;
+      wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.refreshInterval = 300;
+      await flushPromises();
+      await wrapper.vm.enterKiosk({ refreshSeconds: 30, theme: "current", fit: false });
+      expect(wrapper.vm.refreshInterval).toBe(30);
+      await flushPromises();
+      global.mockRouterReplace.mockClear();
+
+      await wrapper.vm.exitKiosk();
+      await flushPromises();
+
+      expect(wrapper.vm.refreshInterval).toBe(300);
+      const { query } = global.mockRouterReplace.mock.calls[0][0];
+      expect(query.kiosk).toBeUndefined();
+      expect(query.refresh).toBe("5m");
+    });
+
+    it("keeps the TV link's refresh on exit when the link was opened directly", async () => {
+      global.mockStoreState.kioskMode = true;
+      wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.refreshInterval = 30;
+      await flushPromises();
+      global.mockRouterReplace.mockClear();
+
+      await wrapper.vm.exitKiosk();
+      await flushPromises();
+
+      expect(wrapper.vm.refreshInterval).toBe(30);
+    });
+
+    it("exits on Esc back to the normal view with kiosk params removed", async () => {
+      global.mockStoreState.kioskMode = true;
+      wrapper = createWrapper();
+      await flushPromises();
+      global.mockRouterReplace.mockClear();
+
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      await flushPromises();
+
+      expect(global.mockStoreDispatch).toHaveBeenCalledWith("setKioskMode", false);
+      const { query } = global.mockRouterReplace.mock.calls.at(-1)[0];
+      expect(query.kiosk).toBeUndefined();
+      expect(query.theme).toBeUndefined();
+    });
+
+    it("never shows an invalid range in the strip before the picker resolves", async () => {
+      await mountKiosk();
+      wrapper.vm.selectedDate = { valueType: "absolute", startTime: null, endTime: null };
+      // The selectedDate watcher fills the range from the mocked picker, so the unresolved state is set after it.
+      await flushPromises();
+      wrapper.vm.currentTimeObj = {};
+      wrapper.vm.timeString = " Invalid date - Invalid date ";
+      expect(wrapper.vm.kioskTimeRange).toBe("");
+    });
+
+    it("leaves kiosk when the page is left", async () => {
+      global.mockStoreState.kioskMode = true;
+      wrapper = createWrapper();
+      await flushPromises();
+      global.mockStoreDispatch.mockClear();
+
+      routeLeaveGuards.at(-1)?.();
+
+      expect(global.mockStoreDispatch).toHaveBeenCalledWith("setKioskMode", false);
+    });
+
+    describe("TV playlist slide", () => {
+      const realParent = window.parent;
+      const postMessage = vi.fn();
+
+      beforeEach(() => {
+        postMessage.mockClear();
+        global.mockShowErrorNotification.mockClear();
+        global.mockRouterPush.mockClear();
+        global.mockRouterBack.mockClear();
+        global.mockStoreState.kioskMode = true;
+      });
+
+      afterEach(() => {
+        Object.defineProperty(window, "parent", { value: realParent, configurable: true });
+      });
+
+      const insideFrame = () =>
+        Object.defineProperty(window, "parent", { value: { postMessage }, configurable: true });
+
+      it("inside the player frame hides the strip and reports a deleted dashboard instead of leaving for the list", async () => {
+        insideFrame();
+        Object.assign(mockExtraRouteQuery, { kiosk: "true", embed: "true" });
+        vi.mocked(getDashboard).mockRejectedValueOnce({ response: { status: 404 }, message: "x" });
+        await mountKiosk();
+
+        expect(wrapper.findComponent({ name: "KioskStrip" }).exists()).toBe(false);
+        expect(postMessage).toHaveBeenCalledWith(
+          { source: "o2-tv-playlist", type: "missing", reason: "notFound" },
+          window.location.origin,
+        );
+        expect(global.mockShowErrorNotification).not.toHaveBeenCalled();
+        expect(global.mockRouterPush).not.toHaveBeenCalled();
+        expect(global.mockRouterBack).not.toHaveBeenCalled();
+      });
+
+      it("inside the player frame shows the tabs and pickers read-only", async () => {
+        insideFrame();
+        Object.assign(mockExtraRouteQuery, { kiosk: "true", embed: "true" });
+        await mountKiosk();
+
+        const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
+        expect(charts.props("readOnlySelectors")).toBe(true);
+        expect(charts.props("kiosk")).toBe(true);
+      });
+
+      it("reports a server error as a load failure so the player retries it", async () => {
+        insideFrame();
+        Object.assign(mockExtraRouteQuery, { kiosk: "true", embed: "true" });
+        vi.mocked(getDashboard).mockRejectedValueOnce({ response: { status: 502 }, message: "x" });
+        await mountKiosk();
+
+        expect(postMessage).toHaveBeenCalledWith(
+          { source: "o2-tv-playlist", type: "error" },
+          window.location.origin,
+        );
+        expect(global.mockShowErrorNotification).not.toHaveBeenCalled();
+      });
+
+      it("a normal kiosk link still shows the error and goes back to the list", async () => {
+        Object.assign(mockExtraRouteQuery, { kiosk: "true", embed: "true" });
+        vi.mocked(getDashboard).mockRejectedValueOnce({
+          response: { status: 404 },
+          message: "gone",
+        });
+        await mountKiosk();
+
+        expect(wrapper.findComponent({ name: "KioskStrip" }).exists()).toBe(true);
+        expect(global.mockShowErrorNotification).toHaveBeenCalled();
+      });
+
+      it("the page fallback keeps the playlist in the URL rewrite and shows the slide position", async () => {
+        Object.assign(mockExtraRouteQuery, {
+          kiosk: "true",
+          refresh: "5m",
+          playlist: "test-dashboard-1:default,d2:ops",
+          interval: "1m",
+          slide: "1",
+          tvpage: "1",
+        });
+        await mountKiosk();
+
+        const rewrites = global.mockRouterReplace.mock.calls.map((call) => call[0]?.query);
+        expect(rewrites.length).toBeGreaterThan(0);
+        rewrites.forEach((query) =>
+          expect(query).toMatchObject({
+            playlist: "test-dashboard-1:default,d2:ops",
+            interval: "1m",
+            slide: "1",
+            tvpage: "1",
+          }),
+        );
+        expect(wrapper.findComponent({ name: "KioskStrip" }).props("position")).toBe(
+          "dashboard.playlist.position",
+        );
+        expect(
+          wrapper.findComponent({ name: "RenderDashboardCharts" }).props("readOnlySelectors"),
+        ).toBe(true);
+      });
     });
   });
 });

@@ -101,7 +101,7 @@ describe("ValueMappingPopUp", () => {
         plugins: [i18n],
         stubs: {
           ODialog: ODialogStub,
-          draggable: {
+          VueDraggableNext: {
             name: "draggable",
             template: "<div><slot></slot></div>",
             props: ["modelValue", "options"],
@@ -269,7 +269,8 @@ describe("ValueMappingPopUp", () => {
 
     it("should configure dragOptions with animation 200", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.dragOptions).toEqual({ animation: 200 });
+      const draggable = wrapper.findComponent({ name: "draggable" });
+      expect(draggable.props("options")).toEqual({ animation: 200 });
     });
 
     it('should render "cancel" icon in the page', () => {
@@ -285,7 +286,8 @@ describe("ValueMappingPopUp", () => {
   describe("Mapping Types", () => {
     it("should have the value/range/regex mapping types defined", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.mappingTypes).toEqual([
+      const select = wrapper.findAllComponents({ name: "OSelect" })[0];
+      expect(select.props("options")).toEqual([
         { label: "Equals", value: "value" },
         { label: "Between", value: "range" },
         { label: "Matches regex", value: "regex" },
@@ -520,6 +522,78 @@ describe("ValueMappingPopUp", () => {
       wrapper.vm.applyValueMapping();
       expect(wrapper.emitted("save")).toBeTruthy();
       expect(wrapper.emitted("save")![0]).toEqual([wrapper.vm.editedValueMapping]);
+    });
+
+    it("rejects saving a lookaround regex and shows the reason", async () => {
+      wrapper = createWrapper({
+        valueMapping: [{ type: "regex", pattern: "^(?=.*err).*$", text: "bad", color: null }],
+      });
+      await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
+
+      expect(wrapper.emitted("save")).toBeFalsy();
+      const error = wrapper.find(
+        '[data-test="dashboard-addpanel-config-value-mapping-pattern-input-0-error"]',
+      );
+      expect(error.exists()).toBe(true);
+      expect(error.text()).toBe(i18n.global.t("dashboard.valueMappingRegexUnsupported"));
+    });
+
+    it("rejects saving a regex longer than 256 characters and shows the reason", async () => {
+      wrapper = createWrapper({
+        valueMapping: [{ type: "regex", pattern: "a".repeat(257), text: "long", color: null }],
+      });
+      await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
+
+      expect(wrapper.emitted("save")).toBeFalsy();
+      expect(
+        wrapper
+          .find('[data-test="dashboard-addpanel-config-value-mapping-pattern-input-0-error"]')
+          .text(),
+      ).toBe(i18n.global.t("dashboard.valueMappingRegexTooLong"));
+    });
+
+    it("saves once an unsupported regex is fixed", async () => {
+      wrapper = createWrapper({
+        valueMapping: [{ type: "regex", pattern: "(a)\\1", text: "bad", color: null }],
+      });
+      const dialog = wrapper.findComponent(ODialogStub);
+      await dialog.vm.$emit("click:primary");
+      wrapper.vm.editedValueMapping[0].pattern = "^a+$";
+      await dialog.vm.$emit("click:primary");
+
+      expect(wrapper.emitted("save")).toHaveLength(1);
+      expect(
+        wrapper
+          .find('[data-test="dashboard-addpanel-config-value-mapping-pattern-input-0-error"]')
+          .exists(),
+      ).toBe(false);
+    });
+
+    it("saves common patterns that repeat a group", async () => {
+      wrapper = createWrapper({
+        valueMapping: [
+          { type: "regex", pattern: "^(\\d+\\.){3}\\d+$", text: "ip", color: null },
+          {
+            type: "regex",
+            pattern: "^[\\w.+-]+@([\\w-]+\\.)+[a-z]{2,}$",
+            text: "mail",
+            color: null,
+          },
+          { type: "regex", pattern: "^(/[^/]+)+$", text: "path", color: null },
+        ],
+      });
+      await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
+
+      expect(wrapper.emitted("save")).toHaveLength(1);
+    });
+
+    it("ignores the pattern of a mapping that is not a regex", async () => {
+      wrapper = createWrapper({
+        valueMapping: [{ type: "value", value: "1", pattern: "^(a+)+$", text: "one", color: null }],
+      });
+      await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
+
+      expect(wrapper.emitted("save")).toHaveLength(1);
     });
 
     it("should emit close when cancelEdit is called", () => {

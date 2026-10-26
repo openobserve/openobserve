@@ -4,6 +4,7 @@
     "actual_folder": "Alerts",
     "browser": "chrome",
     "run_files": [
+      "alerts-help-drawer.spec.js",
       "alerts-ui-operations.spec.js",
       "alerts-import.spec.js",
       "alerts-metrics-notification.spec.js",
@@ -27,7 +28,10 @@
       "alertsPagination.spec.js",
       "alertTemplatesPagination.spec.js",
       "alertDestinationsPagination.spec.js",
-      "alerts-destinations-usage.spec.js"
+      "alerts-destinations-usage.spec.js",
+      "alerts-save-query-mode.spec.js",
+      "alerts-no-destination.spec.js",
+      "alerts-from-panel.spec.js"
     ],
     "disabled": [
       {
@@ -90,6 +94,7 @@
     "actual_folder": "Dashboards",
     "browser": "chrome",
     "run_files": [
+      "dashboard-sql-autocomplete-values.spec.js",
       "dashboard.spec.js",
       "dashboard2.spec.js",
       "dashboardtype.spec.js",
@@ -105,9 +110,15 @@
       "crossLinkMultiStream.spec.js",
       "dashboards-form-validation.spec.js",
       "dashboard-panel-unsaved-changes.spec.js",
+      "dashboard-panel-live-preview.spec.js",
       "dashboard-refresh-without-cache.spec.js",
       "dashboard-print-layout.spec.js",
-      "dashboardPagination.spec.js"
+      "dashboard-layout-edit-mode.spec.js",
+      "dashboardPagination.spec.js",
+      "dashboard-save-conflict.spec.js",
+      "refreshCancelButtons.spec.js",
+      "dashboard-refresh-button.spec.js",
+      "panelNotices.spec.js"
     ],
     "disabled": [
       {
@@ -134,7 +145,8 @@
       "dashboard-panel-time-url-priority.spec.js",
       "dashboard-panel-time-advanced-edge-cases.spec.js",
       "dashboard-panel-time-apply-behavior.spec.js",
-      "dashboard-panel-time-variables-behavior.spec.js"
+      "dashboard-panel-time-variables-behavior.spec.js",
+      "dashboard-time-range-apply.spec.js"
     ],
     "disabled": []
   },
@@ -198,7 +210,8 @@
       "dashboard-variables-custom-parents.spec.js",
       "dashboard-variables-stream-field.spec.js",
       "dashboard-mustache-variables.spec.js",
-      "dashboard-variable-select-all.spec.js"
+      "dashboard-variable-select-all.spec.js",
+      "dashboard-variables-auto-run.spec.js"
     ],
     "disabled": []
   },
@@ -236,6 +249,9 @@
     "actual_folder": "GeneralTests",
     "browser": "chrome",
     "run_files": [
+      "navRailShortScreen.spec.js",
+      "navRailKeyboard.spec.js",
+      "navRailGeometry.spec.js",
       "sanity.spec.js",
       "landingPage.spec.js",
       "datetime-picker-copy-paste.spec.js",
@@ -245,7 +261,8 @@
       "shared-components-form-validation.spec.js",
       "ai-toolsets-form-validation.spec.js",
       "annotationQueueInputPreview.spec.js",
-      "login-form-validation.spec.js"
+      "login-form-validation.spec.js",
+      "runningQueriesCancel.spec.js"
     ],
     "disabled": []
   },
@@ -287,7 +304,8 @@
       "logsQueryBuilder-filters-advanced.spec.js",
       "logsquickmode.spec.js",
       "logshistogram.spec.js",
-      "logsQuickPick.spec.js"
+      "logsQuickPick.spec.js",
+      "logs-jk-navigation.spec.js"
     ],
     "disabled": []
   },
@@ -299,7 +317,9 @@
       "logsQueryBuilder-chart.spec.js",
       "logsQueryBuilder-filters-basic.spec.js",
       "pagination.spec.js",
-      "unflattened.spec.js"
+      "unflattened.spec.js",
+      "logsFreeText.spec.js",
+      "logsNoFtsRecovery.spec.js"
     ],
     "disabled": []
   },
@@ -308,6 +328,7 @@
     "actual_folder": "Logs",
     "browser": "chrome",
     "run_files": [
+      "streamsExploreLogsTypePersistence.spec.js",
       "logspage.spec.js",
       "logstable.spec.js",
       "logsqueries.spec.js",
@@ -336,6 +357,7 @@
     "actual_folder": "Logs",
     "browser": "chrome",
     "run_files": [
+      "logs-autocomplete-quote-enter.spec.js",
       "logs-autocomplete-suggestions.spec.js",
       "logs-sql-autocomplete.spec.js",
       "logsqueries.cte.spec.js",
@@ -345,12 +367,24 @@
       "indexquery.spec.js",
       "region.spec.js",
       "timezoneDisplay.spec.js",
-      "searchPatternsMultiStream.spec.js"
+      "searchPatternsMultiStream.spec.js",
+      "logsActionReasons.spec.js",
+      "logsSearchCancelled.spec.js",
+      "logsToolbarPins.spec.js",
+      "logs-query-editor-keyboard.spec.js"
     ],
     "disabled": [
       {
         "file": "searchJobInspector.spec.js",
         "reason": "TODO: update for new correlation feature"
+      },
+      {
+        "file": "logsShippedDefaults.spec.js",
+        "reason": "Backend phase: /config must expose auto_query_max_scan_mb (the spec skips itself without it), and its beforeAll waits 120s for stream stats, which the server default ZO_CALCULATE_STATS_INTERVAL=600 cannot deliver."
+      },
+      {
+        "file": "logsAutoRunGuard.spec.js",
+        "reason": "Same backend-phase prerequisite as logsShippedDefaults, and it seeds 24h of backdated rows, so it also needs a shard with ingest_allowed_upto >= 24 (the workflow default is 5h)."
       }
     ]
   },
@@ -371,6 +405,7 @@
     "actual_folder": "Metrics",
     "browser": "chrome",
     "run_files": [
+      "metrics-explorer-exemplars.spec.js",
       "metrics.spec.js",
       "metrics-queries.spec.js",
       "metrics-aggregations.spec.js",
@@ -386,7 +421,12 @@
       "metrics-explorer-stream-cache.spec.js",
       "metrics-promql-time-shift.spec.js",
       "metrics-explorer-detail-view.spec.js",
-      "metrics-query-history.spec.js"
+      "metrics-query-history.spec.js",
+      "metrics-explorer-create-alert.spec.js",
+      "metrics-explorer-drilldown.spec.js",
+      "metrics-explorer-used-in.spec.js",
+      "metrics-promql-builder-roundtrip.spec.js",
+      "metrics-promql-formula.spec.js"
     ],
     "disabled": [],
     "paths": [
@@ -408,7 +448,8 @@
       "pipeline-backfill.spec.js",
       "pipeline-history.spec.js",
       "scheduled-pipeline-query-builder.spec.js",
-      "pipelines-form-validation.spec.js"
+      "pipelines-form-validation.spec.js",
+      "pipeline-function-bundling.spec.js"
     ],
     "disabled": [
       {
@@ -428,7 +469,8 @@
       "reports-bulk-operations.spec.js",
       "reports-form-validation.spec.js",
       "reportCsvMediaType.spec.js",
-      "scheduledReportsDrawer.spec.js"
+      "scheduledReportsDrawer.spec.js",
+      "reportHistory.spec.js"
     ],
     "disabled": [],
     "paths": [
@@ -494,7 +536,8 @@
       "connectDataSourcePopup.spec.js",
       "splunk-hec-ingestion-window.spec.js",
       "enrichment.spec.js",
-      "schema.spec.js"
+      "schema.spec.js",
+      "first-event-status.spec.js"
     ],
     "disabled": []
   },
@@ -503,17 +546,21 @@
     "actual_folder": "Traces",
     "browser": "chrome",
     "run_files": [
+      "traces-autocomplete-filter-mode.spec.js",
       "service-catalog.spec.js",
       "tracesSearch.spec.js",
       "traceQueryEditor.spec.js",
       "traceErrorFilter.spec.js",
       "traceDetails.spec.js",
+      "traceDetailsPaging.spec.js",
       "traceAdvancedFiltering.spec.js",
-      "tracesAnalyzeDimensions.spec.js",
+      "tracesTriageLoop.spec.js",
       "traces-autocomplete-suggestions.spec.js",
       "traceGenAiParts.spec.js",
       "tracesCharts.spec.js",
-      "traceSessionReplay.spec.js"
+      "traceSessionReplay.spec.js",
+      "traces-jk-navigation.spec.js",
+      "service-graph-side-panel.spec.js"
     ],
     "disabled": []
   },
@@ -529,6 +576,26 @@
       "slo-form-validation.spec.js",
       "slo-required-fields.spec.js",
       "slo-alert-sli.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Synthetics",
+    "_comment": "Own shard because the synthetics routes only exist when the server runs with ZO_SYNTHETICS_ENABLED=true (router registers /api/{org}/synthetics* conditionally). The flag is read once at process start, so it cannot vary between tests sharing a backend \u2014 each shard gets its own OpenObserve process; every other shard omits synthetics_enabled and keeps the default (false). Pinned to 3 workers: every create/list test writes a check and 5 concurrent writers trip SQLite's 'database is locked' (SLO shard precedent). Results/run-detail pages are fed by seeding the synthetics_results streams in beforeAll \u2014 no probe runs on CI. status-pages-enterprise-gating lives here because the status-page routes sit inside the same gate.",
+    "actual_folder": "Synthetics",
+    "browser": "chrome",
+    "synthetics_enabled": "true",
+    "workers": 3,
+    "run_files": [
+      "synthetics-list.spec.js",
+      "synthetics-create-http.spec.js",
+      "synthetics-create-protocol.spec.js",
+      "synthetics-create-browser.spec.js",
+      "synthetics-results.spec.js",
+      "synthetics-run-detail.spec.js",
+      "synthetics-settings.spec.js",
+      "synthetics-oss-gating.spec.js",
+      "status-pages-enterprise-gating.spec.js"
     ],
     "disabled": []
   },

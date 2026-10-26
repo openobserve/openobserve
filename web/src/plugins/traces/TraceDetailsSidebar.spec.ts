@@ -328,6 +328,27 @@ describe("TraceDetailsSidebar", async () => {
     expect(serviceName.text()).toContain(mockSpan.service_name);
   });
 
+  describe("span start offset", () => {
+    const startText = () => wrapper.vm.getStartTime;
+
+    it("measures the start from the trace root, not the waterfall axis start", async () => {
+      // A RUM view root begins 10 min before the axis, which fits only the request.
+      const rootStartUs = mockSpan.start_time / 1000;
+      await wrapper.setProps({
+        baseTracePosition: {
+          ...mockBaseTracePosition,
+          startTimeUs: rootStartUs + 600_000_000,
+          traceStartUs: rootStartUs,
+        },
+      });
+      expect(startText()).toBe("0us");
+    });
+
+    it("falls back to the axis start when no trace start is given", () => {
+      expect(startText()).toBe("0us");
+    });
+  });
+
   describe("service icon", () => {
     it("should render service icon img inside the service chip", () => {
       const serviceChip = wrapper.find(
@@ -2663,14 +2684,14 @@ describe("TraceDetailsSidebar — span to profile link", () => {
     w.unmount();
   });
 
-  it("shows View profile only when a stream has matching samples", async () => {
+  it("shows View Profile only when a stream has matching samples", async () => {
     setStreams({ prof: FULL_SCHEMA });
     profileHits.prof = [
       { profile_type: "cpu", profile_unit: "nanoseconds", service_name: "api", c: 3 },
     ];
     const w = await mountWith();
     expect(w.find(BUTTON).exists()).toBe(true);
-    expect(w.find(BUTTON).text()).toBe("View profile");
+    expect(w.find(BUTTON).text()).toBe("View Profile");
     w.unmount();
   });
 
@@ -2682,7 +2703,7 @@ describe("TraceDetailsSidebar — span to profile link", () => {
         (profileHits.prof = Object.assign(new Error("forbidden"), { response: { status: 403 } })),
     ],
     ["listing the streams fails", () => mockStreamNameList.mockRejectedValue(new Error("boom"))],
-  ])("hides View profile when %s", async (_label, arrange) => {
+  ])("hides View Profile when %s", async (_label, arrange) => {
     setStreams({ prof: FULL_SCHEMA });
     arrange();
     const w = await mountWith();
@@ -2690,7 +2711,7 @@ describe("TraceDetailsSidebar — span to profile link", () => {
     w.unmount();
   });
 
-  it("neither detects nor shows View profile outside standalone mode", async () => {
+  it("neither detects nor shows View Profile outside standalone mode", async () => {
     setStreams({ prof: FULL_SCHEMA });
     profileHits.prof = [{ profile_type: "cpu", profile_unit: "nanoseconds", c: 1 }];
     const w = await mountWith({}, { parentMode: "embedded" });

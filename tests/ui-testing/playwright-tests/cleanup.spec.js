@@ -1,6 +1,7 @@
 const { test } = require('./utils/enhanced-baseFixtures.js');
 const PageManager = require('../pages/page-manager.js');
 const testLogger = require('./utils/test-logger.js');
+const { E2E_LOCATION_ID } = require('./utils/synthetics-helpers.js');
 
 test.describe("Pre-Test Cleanup", () => {
   /**
@@ -177,7 +178,9 @@ test.describe("Pre-Test Cleanup", () => {
         /^condition-pipeline-/,         // condition-pipeline-* (scheduled pipeline tests)
         /^metrics-condition-pipeline-/,  // metrics-condition-pipeline-* (scheduled pipeline tests)
         /^e2e_backfill_test_\d+$/,      // e2e_backfill_test_<timestamp> (pipeline-backfill.spec.js)
-        /^fn_e2e_pl_/                   // functions-import-export.spec.js (pipeline holding an imported function)
+        /^fn_e2e_pl_/,                  // functions-import-export.spec.js (pipeline holding an imported function)
+        /^pl_bundle_/,                  // pipeline-function-bundling.spec.js (exported and re-imported pipelines)
+        /^ui_auto_pfb_/                 // pipeline-function-bundling-rbac.spec.js (enterprise shard)
       ]
     );
 
@@ -221,6 +224,8 @@ test.describe("Pre-Test Cleanup", () => {
       /^fn_clash_/,                  // seeded functions used to provoke a name clash
       /^fn_regr_nonobj_/,            // non-object entry repaired by the inline fixers
       /^fn_regr_reject_/,            // rejections that cannot be fixed inline (#15069)
+      /^fn_bundle_/,                 // pipeline-function-bundling.spec.js (bundled functions and their _N copies)
+      /^ui_auto_pfb_/                // pipeline-function-bundling-rbac.spec.js (enterprise shard)
     ];
 
     // Patterns from Functions folder tests (row-expansion.spec.js)
@@ -326,6 +331,7 @@ test.describe("Pre-Test Cleanup", () => {
     await pm.apiCleanup.cleanupStreams(
       [
         /^e2e_slo_14269_/,             // slo-error-messages.spec.js (#14269) seeded stream
+        /^cloud_api_smoke$/,           // Cloud/cloudApiSmoke.spec.js seed stream (re-seeded each run)
         /^e2e_13354_/,                 // logs-field-value-rendering.spec.js (#13354)
         /^e2e_13896_/,                 // logs-result-display.spec.js (#13896)
         /^e2e_13990_other_/,           // logs-bugs.spec.js (#13990)
@@ -389,7 +395,8 @@ test.describe("Pre-Test Cleanup", () => {
         /^backfill_dest_\d+$/,                         // Backfill dest streams (backfill_dest_<number>)
         /^e2e_backfill_dest_\d+$/,                     // e2e_backfill_dest_<timestamp> (pipeline-backfill.spec.js)
         /^e2e_time_test_\d+$/,                      // e2e_time_test_<timestamp>
-        /^pw_lib_(ready|absent)_/                   // alert-library.spec.js (Alert Library e2e readiness streams)
+        /^pw_lib_(ready|absent)_/,                  // alert-library.spec.js (Alert Library e2e readiness streams)
+        /^e2e_panel_notices_/                       // panelNotices.spec.js (high-cardinality series-cap streams)
       ],
       // Protected streams to never delete
       ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate', 'k8s_json']
@@ -463,6 +470,9 @@ test.describe("Pre-Test Cleanup", () => {
       ['service-graph-', 'tree-view-', 'graph-view-', 'graph-debug'],
       screenshotDir
     );
+
+    // The shared location is named explicitly because per-worker cleanup never removes it
+    await pm.apiCleanup.cleanupSynthetics(['synth_e2e_'], { locationIds: [E2E_LOCATION_ID] });
 
     // Clean up model pricing test records (mp_* names and cloned built-in "(Copy)" org models)
     await pm.apiCleanup.cleanupModelPricingModels([

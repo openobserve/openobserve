@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import http from "./http";
+import http, { attemptTokenRefresh } from "./http";
+import store from "@/stores";
 import analytics from "./product_analytics";
 import type { TranslateFn } from "@/types/i18n";
 import serviceStreamsApi, {
@@ -47,13 +48,616 @@ export interface Incident {
   acknowledged_at?: number;
   created_at: number;
   updated_at: number;
+  /** Set while a downtime mutes the incident; cleared by the first firing after the window. */
+  muted_by_downtime_id?: string | null;
+  /** Summary of the latest RCA run, or null when the incident has none. */
+  rca: RcaSummary | null;
+  /** Why no automatic run started for this incident (e.g. "l0_off"), or null. */
+  rca_off_reason?: string | null;
+}
+
+export type RcaRunState = "running" | "waiting_input" | "completed" | "failed" | "cancelled";
+
+export type RcaTrigger =
+  | "auto_new_incident"
+  | "auto_new_alert_type"
+  | "auto_reopen"
+  | "manual"
+  | "reanalyze"
+  | "oncall_page"
+  | "resume"
+  | "legacy";
+
+export type RcaRunMode = "fresh" | "build_on_previous";
+
+/** `v1`: a pre-upgrade report served as markdown only; `v2`: an `rca_runs` row. */
+export type RcaReportFormat = "v1" | "v2";
+
+/** Outcome of a completed run. */
+export type RcaOutcome =
+  | "root_cause_identified"
+  | "multiple_root_causes"
+  | "contributing_factor"
+  | "inconclusive"
+  | "blocked";
+
+/** Graded confidence band. */
+export type RcaBand = "high" | "medium" | "low";
+
+export type RcaRunSubjectType = "incident" | "alert";
+
+/** The finished result shown while a newer run is live, failed or cancelled. */
+export interface RcaPreviousResult {
+  run_id: string;
+  outcome: RcaOutcome | null;
+  confidence: RcaBand | null;
+  /** Microseconds since epoch. */
+  ended_at: number;
+}
+
+/** The `rca_summary` fields stored on the incident row. */
+export interface RcaSummaryFields {
+  stage: string | null;
+  stage_index: number | null;
+  stage_count: number;
+  steps: number;
+  tool_calls: number;
+  steered_by: string[];
+  unblocked_by: string | null;
+  /** The error reason of a failed run, or the blocked detail. */
+  detail: string | null;
+  deadline_at: number | null;
+  /** Display name of the user who cancelled the run. */
+  cancelled_by?: string | null;
+  previous: RcaPreviousResult | null;
+}
+
+/** Run summary of an incident's latest run. Times are microseconds since epoch. */
+export interface RcaSummary {
+  run_id: string;
+  state: RcaRunState;
+  /** Computed by the server: a running run with no update past the stale threshold. */
+  stale: boolean;
+  started_at: number;
+  updated_at: number;
+  outcome: RcaOutcome | null;
+  confidence: RcaBand | null;
+  summary: RcaSummaryFields;
+  /** Detail endpoint only: the newest run, without its report. */
+  current_run?: RcaRun | null;
+  /** Detail endpoint only: the newest completed run, without its report. */
+  report_run?: RcaRunItem | null;
+  /** Detail endpoint only: runs newest first. */
+  history?: RcaRunItem[];
+  resume_run_id?: string | null;
+  report_format: RcaReportFormat;
+}
+
+export interface RcaRunItem {
+  run_id: string;
+  subject_type: RcaRunSubjectType;
+  trigger: RcaTrigger;
+  mode: RcaRunMode;
+  started_by: string;
+  state: RcaRunState;
+  started_at: number;
+  ended_at: number | null;
+  outcome: RcaOutcome | null;
+  confidence: RcaBand | null;
+  cancelled_by: string | null;
+  error_reason: string | null;
+  report_format: RcaReportFormat;
+  /** The run stored a record: a cancelled or failed run with a partial ledger can be opened. */
+  has_record: boolean;
+}
+
+export interface RcaRunError {
+  code: string;
+  reason: string;
+  details: string | null;
+  trigger_type: string | null;
+}
+
+export interface RcaRunStats {
+  steps?: number;
+  tool_calls?: number;
+  duration_ms?: number;
+  tokens?: unknown;
+  credits?: number;
+  steered?: number;
+}
+
+export interface RcaRun {
+  run_id: string;
+  subject_type: RcaRunSubjectType;
+  subject_id: string;
+  incident_id: string | null;
+  trigger: RcaTrigger;
+  mode: RcaRunMode;
+  started_by: string;
+  guidance: string | null;
+  state: RcaRunState;
+  started_at: number;
+  updated_at: number;
+  ended_at: number | null;
+  cancelled_by: string | null;
+  outcome: RcaOutcome | null;
+  confidence: RcaBand | null;
+  /** Absent while the run has no report. */
+  report?: string;
+  result?: unknown;
+  error: RcaRunError | null;
+  session_id: string | null;
+  stats: RcaRunStats | null;
+  /** Current stage of the seven-stage protocol. */
+  stage?: string | null;
+  /** 1-based index of `stage`. */
+  stage_index?: number | null;
+  /** What the run was given as leads: past causes, skills, AI toolsets. */
+  context_used?: RcaContextUsed | null;
+  /** Continuation turns the run used. */
+  continuations?: number;
+  report_format: RcaReportFormat;
+}
+
+/** `rca_runs.context_used`: the leads the run started with, not evidence. */
+export interface RcaContextUsed {
+  past_causes?: { id: string; summary: string }[];
+  skills?: string[];
+  toolsets?: string[];
+  /** A resumed run (J8): the source run, the steps it reused and the step it redid first. */
+  resumed_from?: {
+    run_id: string;
+    steps: number;
+    from_step: { index: number; stage: string; title: string };
+  };
+}
+
+/** Whether a run's transcript can be read. */
+export type RcaTranscriptState = "available" | "expired" | "none";
+
+export type RcaToolCallStatus = "ok" | "error" | "running";
+
+/** One tool call of a thread step. Times are microseconds since epoch. */
+export interface RcaToolCall {
+  call_id: string;
+  tool: string;
+  key_arg: string | null;
+  status: RcaToolCallStatus;
+  started_at: number | null;
+  interrupted?: boolean;
+  duration_ms: number | null;
+  result_summary: string | null;
+  error: string | null;
+  /** Present only with the org setting `ai_rca_thread_tool_output`. */
+  input?: unknown;
+  /** Present only with the org setting `ai_rca_thread_tool_output`. */
+  output?: string | null;
+}
+
+/** One step the agent recorded with `record_step`. */
+export interface RcaStep {
+  index: number;
+  stage: string | null;
+  title: string;
+  started_at: number | null;
+  /** Null while the step runs. */
+  ended_at: number | null;
+  note: string | null;
+  note_truncated: boolean;
+  /** Evidence ids cited in the note, e.g. "e3". */
+  citations: string[];
+  from_steering?: boolean;
+  tool_calls: RcaToolCall[];
+}
+
+export interface RcaThreadStats {
+  steps: number;
+  tool_calls: number;
+  duration_ms: number;
+  tokens?: { input: number; output: number; reasoning: number; cache_read: number };
+}
+
+/** A responder message the thread decoded from the transcript; text without the header lines. */
+export interface RcaThreadUserMessage {
+  /** Microseconds since epoch. */
+  at: number | null;
+  text: string;
+  steer_id?: string | null;
+  author?: string | null;
+  kind?: RcaSteerKind | null;
+  question_id?: string | null;
+  read_at?: number | null;
+}
+
+/** An `ask_responders` call of the run: a "Needs input" entry. */
+export interface RcaThreadQuestion {
+  /** The tool call's `callID`. */
+  question_id: string;
+  question: string;
+  need: string;
+  hypothesis_id?: string | null;
+  /** Microseconds since epoch; null when the transcript has no time for it. */
+  at: number | null;
+  /** Email of the first answer's author. */
+  answered_by?: string | null;
+  answered_at?: number | null;
+}
+
+/** `GET …/rca/runs/{run_id}/thread`. */
+export interface RcaThread {
+  run_id: string;
+  state_version: string;
+  not_modified: false;
+  active: boolean;
+  transcript: RcaTranscriptState;
+  started: { at: number | null; prompt: string } | null;
+  steps: RcaStep[];
+  user_messages: RcaThreadUserMessage[];
+  questions: RcaThreadQuestion[];
+  report_submitted: boolean;
+  stats: RcaThreadStats;
+  /** The end of the transcript was lost; the thread is the part that was saved. */
+  truncated: boolean;
+  /** With `truncated`: the last saved seq (-1: none). */
+  saved_through_seq?: number;
+}
+
+export type RcaSteerKind = "message" | "answer" | "hypothesis_action" | "guidance";
+
+/** Status of a steering row. */
+export type RcaSteerStatus =
+  "queued" | "delivered" | "read" | "applied" | "declined" | "not_read" | "rejected";
+
+export type RcaSteerAction = "disprove" | "reopen" | "test_first";
+
+export type RcaSteerStatusReason =
+  | "finalizing"
+  | "no_active_turn"
+  | "agent_unreachable"
+  | "run_completed"
+  | "run_cancelled"
+  | "run_failed";
+
+/** One `rca_steering` row with the transcript state merged in. Times are µs. */
+export interface RcaSteerRecord {
+  org_id: string;
+  steer_id: string;
+  run_id: string;
+  incident_id: string;
+  author_email: string;
+  kind: RcaSteerKind;
+  action?: RcaSteerAction | null;
+  hypothesis_id?: string | null;
+  question_id?: string | null;
+  text: string;
+  status: RcaSteerStatus;
+  status_reason?: RcaSteerStatusReason | null;
+  created_at: number;
+  delivered_at?: number | null;
+  read_at?: number | null;
+  acted_at?: number | null;
+  agent_note?: string | null;
+  opencode_message_id?: string | null;
+}
+
+/** The question a paused run waits on. */
+export interface RcaOpenQuestion {
+  question_id: string;
+  question: string;
+  need: string;
+  hypothesis_id?: string | null;
+  /** Answer deadline, microseconds since epoch. */
+  deadline_at: number | null;
+}
+
+/** `GET …/rca/runs/{run_id}/steering`. */
+export interface RcaSteering {
+  items: RcaSteerRecord[];
+  open_question: RcaOpenQuestion | null;
+  /** The run takes messages and the user may send them. */
+  can_steer: boolean;
+}
+
+/** Body of `POST …/rca/runs/{run_id}/steer`. */
+export interface RcaSteerRequest {
+  text: string;
+  kind: "message" | "hypothesis_action";
+  action?: RcaSteerAction;
+  hypothesis_id?: string;
+}
+
+export interface RcaSteerResponse {
+  steer: RcaSteerRecord;
+  run_state: RcaRunState;
+}
+
+/** Why the outcome was derived. */
+export type RcaOutcomeReason =
+  | "answer_deadline"
+  | "root_cause_graded"
+  | "root_causes_graded"
+  | "leading_blocked"
+  | "contributing_graded"
+  | "cause_below_medium"
+  | "no_hypothesis"
+  | "no_confirmed_cause";
+
+export type RcaHypothesisStatus =
+  | "testing"
+  | "untested"
+  | "likely"
+  | "root_cause"
+  | "contributing"
+  | "symptom"
+  | "ruled_out"
+  | "inconclusive"
+  | "blocked";
+
+/** Signal class of a tool call. */
+export type RcaSignalClass =
+  "logs" | "metrics" | "traces" | "change" | "infra" | "context" | "unclassified";
+
+export type RcaPolarity = "supports" | "contradicts" | "rules_out";
+export type RcaStrength = "decisive" | "supporting";
+
+/** Timeline status after the evidence check. */
+export type RcaTimelineStatus = "confirmed" | "refuted" | "likely" | "unverified";
+
+export type RcaBlindSpotAxis = "change" | "logs" | "metrics" | "traces" | "infra" | "other";
+export type RcaBlindSpotFix =
+  "connect_toolset" | "ingest_data" | "open_pipeline" | "sampling_rules" | "resume_run" | "none";
+
+export type RcaChangeKind = "deploy" | "commit" | "config_change" | "feature_flag" | "infra";
+
+/** Code-derived state of the suspect change. */
+export type RcaSuspectShownState = "confirmed" | "not_read";
+
+export interface RcaLeadingEntry {
+  id: string;
+  statement: string;
+}
+
+/** Live card label. */
+export interface RcaVerdictSoFar {
+  label: "preliminary" | "revised";
+  was?: string;
+}
+
+export interface RcaSummarySuspectChange {
+  kind: RcaChangeKind;
+  reference: string;
+  author?: string;
+  /** Microseconds since epoch. */
+  occurred_at: number;
+  shown_state: RcaSuspectShownState;
+  /** Author of the steering lead behind the subject hypothesis ("(from <author>)"). */
+  lead_author?: string;
+}
+
+export interface RcaImpact {
+  summary: string;
+  peak?: string;
+  /** Microseconds since epoch. */
+  window?: { start: number; end: number };
+}
+
+/** Why the band is what it is, built by the server from the grade. */
+export interface RcaConfidenceBreakdown {
+  /** The level the agent claimed for itself. */
+  claimed: RcaBand;
+  /** The level the evidence rules allow, before any cap. */
+  evidence: RcaBand;
+  /** Why the evidence allows that level, e.g. "1 decisive source (logs)". */
+  evidence_reason: string;
+  /** What the next level up needs, e.g. "High needs a ruled-out alternative". */
+  next_level?: string;
+  /** The caps that lowered the evidence level to medium. */
+  caps: string[];
+}
+
+/** The verdict card of a summary; the server omits each field it has no value for. */
+export interface RcaSummaryCard {
+  outcome?: RcaOutcome;
+  outcome_reason?: RcaOutcomeReason;
+  headline?: string;
+  leading?: RcaLeadingEntry;
+  verdict_so_far?: RcaVerdictSoFar;
+  band?: RcaBand;
+  confidence?: RcaConfidenceBreakdown;
+  suspect_change?: RcaSummarySuspectChange;
+  impact?: RcaImpact;
+  needs?: string;
+  /** `multiple_root_causes` only: each root cause, in first-seen order. */
+  causes?: RcaSummaryCause[];
+}
+
+/** One root cause of a run with several. */
+export interface RcaSummaryCause {
+  id: string;
+  statement: string;
+  /** Microseconds since epoch; the agent's claim. */
+  onset_us?: number;
+  /** This cause's own band. */
+  band: RcaBand;
+}
+
+/** `verdict.proposed_actions[].kind`; an unknown kind reads as `other`. */
+export type RcaActionKind = "rollback" | "scale" | "restart" | "runbook" | "other";
+
+/** A next step the agent proposed: inert text, never executed (README non-goal). */
+export interface RcaProposedAction {
+  title: string;
+  kind: RcaActionKind;
+  detail: string;
+}
+
+/** What the card shows from a completed run's stored verdict (`rca_runs.result.verdict`). */
+export interface RcaVerdictDetails {
+  impactedServices: string[];
+  proposedActions: RcaProposedAction[];
+}
+
+export interface RcaSummaryTimelineEntry {
+  /** Microseconds since epoch. */
+  at: number;
+  text: string;
+  status: RcaTimelineStatus;
+  evidence_numbers: number[];
+}
+
+export interface RcaSummaryStatusChange {
+  /** Microseconds since epoch. */
+  at: number;
+  status: RcaHypothesisStatus;
+  run_ended?: boolean;
+  /** Author of the steering message that caused the change, if any. */
+  steered_by?: string;
+}
+
+export interface RcaSummaryHypothesis {
+  id: string;
+  statement: string;
+  status: RcaHypothesisStatus;
+  reason: string;
+  evidence_numbers: number[];
+  unverified_ids: string[];
+  lead_ids: string[];
+  first_seen_seq: number;
+  /** Microseconds since epoch; the agent's claim. */
+  onset_us?: number;
+  history: RcaSummaryStatusChange[];
+}
+
+/** Where an evidence entry's query ran; the UI builds the link. */
+export interface RcaEvidenceTarget {
+  signal: RcaSignalClass;
+  streams: string[];
+  sql?: string;
+  promql?: string;
+  filter?: string;
+  /** Shell or CLI command of change and infra evidence; never linked. */
+  command?: string;
+  /** Microseconds since epoch. */
+  start_us?: number;
+  end_us?: number;
+}
+
+export interface RcaCitation {
+  hypothesis_id: string;
+  evidence_id: string;
+  polarity: RcaPolarity;
+  strength: RcaStrength;
+  observation: string;
+}
+
+export interface RcaEvidenceEntry {
+  number: number;
+  ids: string[];
+  call_id: string;
+  kind: string;
+  target: RcaSignalClass;
+  link: RcaEvidenceTarget;
+  result_summary: string;
+  duration_ms: number;
+  decisive: boolean;
+  citations: RcaCitation[];
+}
+
+export interface RcaUnverifiedCitation {
+  hypothesis_id: string;
+  evidence_id: string;
+  tool: string;
+  /** The cited call's ref; runs before refs cite by `query`. */
+  ref?: string;
+  query: string;
+  reason: "not_run" | "failed" | "ambiguous";
+}
+
+export interface RcaBlindSpot {
+  id: string;
+  axis: RcaBlindSpotAxis;
+  title: string;
+  why: string;
+  fix: RcaBlindSpotFix;
+}
+
+/** `GET …/rca/runs/{run_id}/summary`. */
+export interface RcaRunSummary {
+  run_id: string;
+  state: RcaRunState;
+  state_version: string;
+  not_modified: false;
+  /** A finished run with no stored record. */
+  legacy: boolean;
+  card: RcaSummaryCard;
+  timeline: RcaSummaryTimelineEntry[];
+  hypotheses: RcaSummaryHypothesis[];
+  evidence: RcaEvidenceEntry[];
+  unverified: RcaUnverifiedCitation[];
+  blind_spots: RcaBlindSpot[];
+}
+
+/** The `data` of an `error` event of the live stream. */
+export interface RcaLiveError {
+  /** `transcript` covers the thread and the summary. */
+  part: "transcript" | "steering" | "rca";
+  /** The status the part's GET route answers with for the same fault. */
+  status: number;
+  error_code: string | null;
+  message: string;
+}
+
+/** One event of `GET …/rca/live_stream`; each part is a full snapshot. */
+export type RcaLiveEvent =
+  | { event: "rca"; data: RcaSummary | null }
+  | { event: "thread"; data: RcaThread }
+  | { event: "summary"; data: RcaRunSummary }
+  | { event: "steering"; data: RcaSteering }
+  | { event: "error"; data: RcaLiveError }
+  | { event: "end"; data: { state: RcaRunState | null } };
+
+/** The live stream did not open: `status` is the server's answer. */
+export class RcaLiveStreamRefused extends Error {
+  readonly status: number;
+
+  constructor(status: number) {
+    super(`The live stream was refused with status ${status}`);
+    this.name = "RcaLiveStreamRefused";
+    this.status = status;
+  }
+}
+
+export interface ListRcaRunsResponse {
+  runs: RcaRunItem[];
+  has_more: boolean;
+}
+
+/** POST …/rca: 202 `{message, run_id}`. */
+export interface TriggerRcaResponse {
+  message: string;
+  run_id: string;
+}
+
+/** DELETE …/rca. */
+export interface CancelRcaResponse {
+  run_id: string;
+  cancelled: boolean;
+}
+
+/** `POST …/rca/runs/{run_id}/resume`: 202 (J7). */
+export interface ResumeRcaResponse {
+  message: string;
+  run_id: string;
+  resumed_from: string;
+  reused_steps: number;
+  from_step: { index: number; stage: string; title: string };
 }
 
 export interface IncidentTopology {
   nodes: AlertNode[];
   edges: AlertEdge[];
   related_incident_ids: string[];
-  suggested_root_cause?: string;
 }
 
 export interface AlertNode {
@@ -116,20 +720,6 @@ export interface ListIncidentsResponse {
   total: number;
 }
 
-/** A superseded RCA report retained for an incident. */
-export interface ArchivedRcaReport {
-  content: string;
-  /** Microseconds since epoch. */
-  archived_at: number;
-}
-
-export interface RcaHistoryResponse {
-  /** The report currently shown on the incident, or null if none has run. */
-  current: string | null;
-  /** Superseded reports, newest first. */
-  previous: ArchivedRcaReport[];
-}
-
 export interface IncidentStats {
   total_incidents: number;
   open_incidents: number;
@@ -151,6 +741,31 @@ export interface IncidentCorrelatedStreams {
   traceStreams: StreamInfo[];
   correlationData: CorrelationResponse | null;
 }
+
+const LIVE_EVENTS: Record<RcaLiveEvent["event"], true> = {
+  rca: true,
+  thread: true,
+  summary: true,
+  steering: true,
+  error: true,
+  end: true,
+};
+
+/** One `event:`/`data:` frame of the live stream; null for a heartbeat or an unknown event. */
+const parseLiveFrame = (frame: string): RcaLiveEvent | null => {
+  let name = "";
+  const data: string[] = [];
+  for (const line of frame.split("\n")) {
+    if (line.startsWith("event:")) name = line.slice(6).trim();
+    else if (line.startsWith("data:")) data.push(line.slice(5).trim());
+  }
+  if (!Object.hasOwn(LIVE_EVENTS, name) || data.length === 0) return null;
+  try {
+    return { event: name, data: JSON.parse(data.join("\n")) } as RcaLiveEvent;
+  } catch {
+    return null;
+  }
+};
 
 const incidents = {
   /**
@@ -238,20 +853,19 @@ const incidents = {
     return http().get<IncidentStats>(`/api/v2/${org_identifier}/alerts/incidents/stats`);
   },
 
-  /**
-   * Trigger RCA analysis and return the complete result
-   */
+  /** Start an RCA run in the background (202); `guidance` becomes the run's first message. */
   triggerRca: (
     org_identifier: string,
     incident_id: string,
-    params: { reanalysis?: boolean; build_on_previous?: boolean } = {},
+    params: { build_on_previous?: boolean; guidance?: string } = {},
     config: { signal?: AbortSignal } = {},
   ) => {
+    const { guidance, ...query } = params;
     return http()
-      .post<{ rca_content: string }>(
+      .post<TriggerRcaResponse>(
         `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca`,
-        null,
-        { params, signal: config.signal },
+        guidance ? { guidance } : null,
+        { params: query, signal: config.signal },
       )
       .then((res) => {
         analytics.track("incident_rca_requested", {
@@ -261,26 +875,99 @@ const incidents = {
       });
   },
 
-  /**
-   * Fetch the current RCA report plus any superseded reports retained for this
-   * incident, newest first. Loaded on demand so the incident list stays light.
-   */
-  getRcaHistory: (org_identifier: string, incident_id: string) => {
-    return http().get<RcaHistoryResponse>(
-      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/history`,
+  /** List an incident's RCA runs, newest first; `before` is a run id for paging. */
+  listRcaRuns: (
+    org_identifier: string,
+    incident_id: string,
+    params: { limit?: number; before?: string } = {},
+  ) => {
+    return http().get<ListRcaRunsResponse>(
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/runs`,
+      { params },
     );
   },
 
-  /**
-   * Cancel the in-flight RCA analysis for an incident.
-   *
-   * Aborts the server-side run when the handling node owns it, and always records a
-   * terminal cancellation event so the in-flight guard is released immediately —
-   * this is what unblocks a retry after a run was stranded by a restart.
-   */
+  /** Get one RCA run of an incident, including its report. */
+  getRcaRun: (org_identifier: string, incident_id: string, run_id: string) => {
+    return http().get<RcaRun>(
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/runs/${run_id}`,
+    );
+  },
+
+  /** Stream the incident's analysis into `onEvent`; rejects with RcaLiveStreamRefused if refused. */
+  openRcaLiveStream: async (
+    org_identifier: string,
+    incident_id: string,
+    run_id: string | null,
+    options: { onEvent: (event: RcaLiveEvent) => void; signal?: AbortSignal },
+  ): Promise<{ ended: boolean }> => {
+    const query = run_id ? `?run_id=${encodeURIComponent(run_id)}` : "";
+    const url = `${store.state.API_ENDPOINT}/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/live_stream${query}`;
+    const init: RequestInit = {
+      method: "GET",
+      credentials: "include",
+      headers: { Accept: "text/event-stream" },
+      signal: options.signal,
+    };
+    // The axios interceptor never sees a fetch: refresh the token here, once.
+    let response = await fetch(url, init);
+    if (response.status === 401) {
+      await attemptTokenRefresh(url);
+      response = await fetch(url, init);
+    }
+    const reader = response.ok ? response.body?.getReader() : undefined;
+    if (!reader) throw new RcaLiveStreamRefused(response.status);
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let ended = false;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) return { ended };
+      buffer += decoder.decode(value, { stream: true });
+      // Events end with a blank line; a partial tail stays buffered.
+      const frames = buffer.split("\n\n");
+      buffer = frames.pop() ?? "";
+      for (const frame of frames) {
+        const event = parseLiveFrame(frame);
+        if (!event) continue;
+        if (event.event === "end") ended = true;
+        options.onEvent(event);
+      }
+    }
+  },
+
+  /** Cancel the live RCA run of an incident through its session. */
   cancelRca: (org_identifier: string, incident_id: string) => {
-    return http().delete<{ message: string; aborted_local_task: boolean }>(
+    return http().delete<CancelRcaResponse>(
       `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca`,
+    );
+  },
+
+  /** Send a steering message or hypothesis action to a live run; a 201 can carry a `rejected` row. */
+  steerRca: (
+    org_identifier: string,
+    incident_id: string,
+    run_id: string,
+    body: RcaSteerRequest,
+  ) => {
+    return http().post<RcaSteerResponse>(
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/runs/${run_id}/steer`,
+      body,
+    );
+  },
+
+  /** Resume a failed or cancelled run as a new run (202) that reuses its finished steps. */
+  resumeRca: (
+    org_identifier: string,
+    incident_id: string,
+    run_id: string,
+    config: { signal?: AbortSignal } = {},
+  ) => {
+    return http().post<ResumeRcaResponse>(
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/runs/${run_id}/resume`,
+      null,
+      { signal: config.signal },
     );
   },
 

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
@@ -53,7 +54,8 @@ vi.mock("vue-router", () => ({
   }),
 }));
 
-vi.mock("@/utils/zincutils", () => ({
+vi.mock("@/utils/zincutils", async (importOriginal) => ({
+  ...(await importOriginal<any>()),
   getImageURL: (path: string) => `mock://${path}`,
 }));
 
@@ -248,24 +250,28 @@ const mockI18n = createI18n({
     en: {
       modelPricing: {
         header: "LLM Model Pricing",
-        matchingPriorityTooltip: "Your Org > Global > Built-in",
+        ruleOpIn: "is one of",
+        matchingPriorityTooltip: "Your org > Global > Built-in",
         searchPlaceholder: "Search models...",
-        refresh: "Refresh",
-        testBtn: "Test",
+        syncBuiltInPrices: "Sync built-in prices",
+        testMatch: "Test match",
+        moreActions: "More actions",
+        modelDetails: "Model details",
         importBtn: "Import",
-        newModel: "New Model",
+        newModel: "New model",
         noModels: "No model pricing",
         noModelsDesc: "Add a custom model pricing",
         tabAll: "All",
         tabCustom: "Custom",
         tabSystem: "System",
         colModel: "Model",
-        colMatchPattern: "Match Pattern",
+        colMatchPattern: "Match pattern",
         colPricing: "Pricing (per 1M tokens)",
+        colPrice: "Price",
         colActions: "Actions",
         colPricingSimple: "Pricing",
         colPattern: "Pattern",
-        usageType: "Usage Type",
+        usageType: "Usage type",
         colModelTooltip: "Display name",
         colMatchPatternTooltip: "Regex pattern",
         colPricingTooltip: "Per-token prices",
@@ -287,12 +293,12 @@ const mockI18n = createI18n({
         deletedModelsNotif: "Deleted {count} models",
         modelEnabledNotif: "Enabled {name}",
         modelDisabledNotif: "Disabled {name}",
-        builtInRefreshed: "Built-in refreshed",
+        builtInPricesSynced: "Built-in prices synced",
         errLoadModels: "Failed to load models",
         errUpdate: "Failed to update",
         errDelete: "Failed to delete",
         errDeleteNamed: "Failed to delete {name}",
-        errRefresh: "Failed to refresh",
+        errSync: "Sync failed",
         errUnknown: "Unknown error",
         noModelsSelected: "No models selected",
         shadowBannerPrefix: "Shadowed by",
@@ -328,10 +334,13 @@ const globalStubs: Record<string, any> = {
 
 let store: any;
 
-function mountComponent(extra: { store?: any; query?: Record<string, any> } = {}) {
+function mountComponent(
+  extra: { store?: any; query?: Record<string, any>; attachTo?: HTMLElement } = {},
+) {
   store = extra.store ?? createMockStore();
   currentRouteRef.value.query = extra.query ?? {};
   return mount(ModelPricingList, {
+    attachTo: extra.attachTo,
     global: {
       plugins: [mockI18n],
       provide: { store },
@@ -344,6 +353,8 @@ function mountComponent(extra: { store?: any; query?: Record<string, any> } = {}
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
+
+beforeEach(() => resetListViewState());
 
 describe("ModelPricingList.vue", () => {
   let wrapper: VueWrapper;
@@ -495,6 +506,188 @@ describe("ModelPricingList.vue", () => {
 
       const drawer = wrapper.findComponent(ODrawerStub);
       expect(drawer.text()).toContain(mockModels[0].match_pattern);
+    });
+  });
+
+  describe("rows and the pricing drawer", () => {
+    // OTable keeps its loading skeleton up for a minimum real-time window.
+    async function waitForRow(w: VueWrapper, name: string) {
+      return vi.waitFor(() => {
+        const row = w.findAll('[data-test^="o2-table-row-"]').find((r) => r.text().includes(name));
+        expect(row).toBeTruthy();
+        return row!;
+      });
+    }
+
+    it("opens the pricing drawer when the name or pattern cell is clicked", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const row = await waitForRow(wrapper, "GPT-4o (org)");
+
+      await row.find('[data-test="o-truncated-text"]').trigger("click");
+      await nextTick();
+      expect(wrapper.vm.showPricingDialog).toBe(true);
+      expect(wrapper.vm.pricingDialogRow?.id).toBe("org-1");
+
+      wrapper.vm.showPricingDialog = false;
+      wrapper.vm.pricingDialogRow = null;
+      const patternCell = row.findAll("td").find((td) => td.text() === "^gpt-4o.*");
+      await patternCell!.trigger("click");
+      await nextTick();
+      expect(wrapper.vm.showPricingDialog).toBe(true);
+      expect(wrapper.vm.pricingDialogRow?.id).toBe("org-1");
+    });
+
+    it("does not open the drawer from the tree toggle or the checkbox", async () => {
+      vi.mocked(modelPricingService.list).mockResolvedValue({
+        data: [orgModel({ children: [orgModel({ id: "org-child", name: "Shadowed child" })] })],
+      } as any);
+      wrapper = mountComponent();
+      await flushPromises();
+      const row = await waitForRow(wrapper, "GPT-4o (org)");
+
+      await row.find('[data-test="o2-table-tree-toggle-name"]').trigger("click");
+      await row.find('button[role="checkbox"]').trigger("click");
+      await nextTick();
+
+      expect(wrapper.vm.showPricingDialog).toBe(false);
+      await waitForRow(wrapper, "Shadowed child");
+    });
+
+    it("keeps the duplicate and delete row shortcuts working from the hovered row", async () => {
+      wrapper = mountComponent({ attachTo: document.body });
+      await flushPromises();
+      const row = await waitForRow(wrapper, "GPT-4o (org)");
+      (row.element as HTMLElement).focus();
+
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "d" }));
+      await nextTick();
+      expect(routerPushMock).toHaveBeenLastCalledWith({
+        name: "modelPricingEditor",
+        query: { org_identifier: "test-org", id: "org-1", duplicate: "true" },
+      });
+
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Delete" }));
+      await nextTick();
+      expect(wrapper.vm.confirmDialogMeta.show).toBe(true);
+      expect(wrapper.vm.confirmDialogMeta.message).toBe("Delete GPT-4o (org)?");
+      expect(wrapper.vm.showPricingDialog).toBe(false);
+    });
+
+    it("mutes disabled rows and tags them Disabled", async () => {
+      vi.mocked(modelPricingService.list).mockResolvedValue({
+        data: [orgModel({ id: "org-off", name: "Paused model", enabled: false }), orgModel()],
+      } as any);
+      wrapper = mountComponent();
+      await flushPromises();
+      const disabledRow = await waitForRow(wrapper, "Paused model");
+      const enabledRow = await waitForRow(wrapper, "GPT-4o (org)");
+
+      expect(disabledRow.classes()).toContain("bg-surface-panel");
+      expect(disabledRow.find('[data-test="model-pricing-disabled-tag"]').exists()).toBe(true);
+      expect(enabledRow.classes()).not.toContain("bg-surface-panel");
+      expect(enabledRow.find('[data-test="model-pricing-disabled-tag"]').exists()).toBe(false);
+    });
+
+    it("keeps toggle and edit inline and moves duplicate and delete into the row menu", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const row = await waitForRow(wrapper, "GPT-4o (org)");
+
+      expect(row.find('[data-test="model-pricing-toggle-btn"]').exists()).toBe(true);
+      expect(row.find('[data-test="model-pricing-edit-btn"]').exists()).toBe(true);
+      expect(row.find('[data-test="model-pricing-row-more-actions"]').exists()).toBe(true);
+      expect(row.find('[data-test="model-pricing-duplicate-btn"]').exists()).toBe(false);
+      expect(row.find('[data-test="model-pricing-delete-btn"]').exists()).toBe(false);
+    });
+
+    it("titles the drawer with the model name, not its pattern", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      wrapper.vm.openPricingDialog(mockModels[0]);
+      await nextTick();
+
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.props("title")).toBe("GPT-4o (org)");
+      expect(drawer.text()).toContain(mockModels[0].match_pattern);
+    });
+
+    it("offers Edit and Duplicate in the drawer footer for the org's own model", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      wrapper.vm.openPricingDialog(mockModels[0]);
+      await nextTick();
+
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.props("primaryButtonLabel")).toBe("Edit");
+      expect(drawer.props("secondaryButtonLabel")).toBe("Duplicate");
+      expect(drawer.props("secondaryButtonVariant")).toBe("outline");
+
+      drawer.vm.$emit("click:primary");
+      await nextTick();
+      expect(routerPushMock).toHaveBeenLastCalledWith({
+        name: "modelPricingEditor",
+        query: { org_identifier: "test-org", id: "org-1" },
+      });
+
+      wrapper.vm.openPricingDialog(mockModels[0]);
+      await nextTick();
+      drawer.vm.$emit("click:secondary");
+      await nextTick();
+      expect(routerPushMock).toHaveBeenLastCalledWith({
+        name: "modelPricingEditor",
+        query: { org_identifier: "test-org", id: "org-1", duplicate: "true" },
+      });
+    });
+
+    it("offers only Clone in the drawer footer for a read-only model", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      wrapper.vm.openPricingDialog(builtInModel());
+      await nextTick();
+
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.props("primaryButtonLabel")).toBeUndefined();
+      expect(drawer.props("secondaryButtonLabel")).toBe("Clone");
+      expect(drawer.props("secondaryButtonVariant")).toBe("outline");
+
+      drawer.vm.$emit("click:secondary");
+      await nextTick();
+      expect(routerPushMock).toHaveBeenLastCalledWith({
+        name: "modelPricingEditor",
+        query: { org_identifier: "test-org", id: "bi-1", duplicate: "true" },
+      });
+    });
+
+    it("closes the drawer before leaving for the editor, so the cached list does not reopen it", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const openAtPush: boolean[] = [];
+      routerPushMock.mockImplementation(() => openAtPush.push(wrapper.vm.showPricingDialog));
+      const drawer = wrapper.findComponent(ODrawerStub);
+
+      for (const [model, event] of [
+        [mockModels[0], "click:primary"],
+        [mockModels[0], "click:secondary"],
+        [builtInModel(), "click:secondary"],
+      ] as const) {
+        wrapper.vm.openPricingDialog(model);
+        await nextTick();
+        drawer.vm.$emit(event);
+        await nextTick();
+      }
+
+      expect(openAtPush).toEqual([false, false, false]);
+      expect(drawer.props("open")).toBe(false);
+    });
+
+    it("labels the catalogue sync and test buttons by what they do", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      expect(wrapper.find('[data-test="model-pricing-refresh-btn"]').text()).toBe(
+        "Sync built-in prices",
+      );
+      expect(wrapper.find('[data-test="model-pricing-test-match-btn"]').text()).toBe("Test match");
     });
   });
 
@@ -724,6 +917,61 @@ describe("ModelPricingList.vue", () => {
       wrapper = mountComponent();
       await flushPromises();
       expect(wrapper.vm.getDefaultTier({ tiers: [] })).toBeUndefined();
+    });
+
+    it("skips tiers restricted only by attribute rules", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const model = {
+        tiers: [
+          {
+            condition: null,
+            rules: [{ keys: ["service_tier"], op: "in", values: ["flex"] }],
+            prices: { input: 0.1 },
+          },
+          { condition: null, prices: { input: 0.5 } },
+        ],
+      };
+      expect(wrapper.vm.getDefaultTier(model).prices.input).toBe(0.5);
+    });
+  });
+
+  describe("attribute-rule (service tier) pricing", () => {
+    const flexModel = () => ({
+      id: "flex",
+      name: "GPT-6 Sol",
+      match_pattern: "(?i)gpt-6-sol",
+      enabled: true,
+      source: "org",
+      tiers: [
+        { name: "Default", condition: null, prices: { input: 0.000002 } },
+        {
+          name: "Flex",
+          condition: null,
+          rules: [
+            {
+              keys: ["openai.response.service_tier", "openai.request.service_tier"],
+              op: "in",
+              values: ["flex"],
+            },
+          ],
+          prices: { input: 0.000001 },
+        },
+      ],
+    });
+
+    it("renders each rule of a tier in the drawer and no always-active label for it", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+
+      wrapper.vm.openPricingDialog(flexModel());
+      await nextTick();
+
+      const rules = wrapper.findAll('[data-test="model-pricing-drawer-tier-rule"]');
+      expect(rules).toHaveLength(1);
+      expect(rules[0].text()).toBe("openai.response.service_tier +1 is one of flex");
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.text().match(/Always active \(default\)/g)).toHaveLength(1);
     });
   });
 
@@ -1000,7 +1248,9 @@ describe("ModelPricingList.vue", () => {
 
       expect(modelPricingService.refreshBuiltIn).toHaveBeenCalledWith("test-org");
       expect(modelPricingService.list).toHaveBeenCalled();
-      expect(mockToastFn).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "success", message: "Built-in prices synced" }),
+      );
     });
 
     it("notifies negative when refresh fails", async () => {
@@ -1329,6 +1579,45 @@ describe("ModelPricingList.vue", () => {
       expect(wrapper.vm.hasTimeBasedTiers(peakOffPeakModel())).toBe(true);
       expect(wrapper.vm.hasTimeBasedTiers(orgModel())).toBe(false);
       expect(wrapper.vm.hasTimeBasedTiers({ tiers: [{ utc_windows: [] }] })).toBe(false);
+    });
+  });
+});
+
+describe("list view state", () => {
+  it("restores search, page size, page and sort from the saved view", async () => {
+    Object.assign(useListViewState("model-pricing", {}), {
+      filterQuery: "abc",
+      selectedTab: "org",
+      pageSize: 50,
+      currentPage: 2,
+      sortBy: "name",
+      sortOrder: "desc",
+    });
+    const w: any = mountComponent();
+    await flushPromises();
+    expect(w.vm.filterQuery).toBe("abc");
+    expect(w.vm.selectedTab).toBe("org");
+    expect(w.vm.pageSize).toBe(50);
+    expect(w.vm.currentPage).toBe(2);
+    expect(w.vm.sortBy).toBe("name");
+    expect(w.vm.sortOrder).toBe("desc");
+    w.unmount();
+  });
+
+  it("saves list state so it survives unmount", async () => {
+    const w: any = mountComponent();
+    await flushPromises();
+    w.vm.filterQuery = "xyz";
+    w.vm.pageSize = 100;
+    w.vm.sortBy = "name";
+    w.vm.sortOrder = "desc";
+    await flushPromises();
+    w.unmount();
+    expect(useListViewState("model-pricing", {})).toMatchObject({
+      filterQuery: "xyz",
+      pageSize: 100,
+      sortBy: "name",
+      sortOrder: "desc",
     });
   });
 });

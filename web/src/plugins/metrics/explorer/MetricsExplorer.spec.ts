@@ -89,6 +89,7 @@ const grid = vi.hoisted(() => {
     runDialogQuery: vi.fn(),
     cancelDialogQueries: vi.fn(),
     runDetailQuery: vi.fn(),
+    detailStepFor: vi.fn(() => 30),
     rateWindowFor: vi.fn(() => "4m"),
     labelsByStream: { value: {} },
     prefixAssignment: { value: { groupOf: new Map() } },
@@ -115,11 +116,14 @@ vi.mock("@/composables/metrics/useMetricsExplorerGrid", async (importOriginal) =
 
 // Keep the real vuex (src/stores/index.ts calls createStore at import time);
 // override only the hook the component uses.
+const storeState = vi.hoisted(() => ({
+  selectedOrganization: { identifier: "org1" },
+  theme: "light",
+  zoConfig: { auto_query_enabled: false },
+}));
 vi.mock("vuex", async (importOriginal) => ({
   ...(await importOriginal<any>()),
-  useStore: () => ({
-    state: { selectedOrganization: { identifier: "org1" }, theme: "light" },
-  }),
+  useStore: () => ({ state: storeState }),
 }));
 // Controllable route/router so the URL-state tests can seed `route.query` before
 // mount (hydration) and inspect `router.replace` (sync). `name` must be "metrics"
@@ -1191,6 +1195,19 @@ describe("MetricsExplorer wiring", () => {
       expect(grid.paused.value).toBe(true);
     });
 
+    it("keeps the Used in tab in the URL", async () => {
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+      routerState.replace.mockClear();
+
+      (wrapper.vm as any).onDetailTab("used_in");
+      await wrapper.vm.$nextTick();
+      expect(routerState.replace.mock.calls.at(-1)[0].query).toMatchObject({
+        metric: CARD.name,
+        tab: "used_in",
+      });
+    });
+
     it("REPLACES the entry on a tab or breakdown-label change", async () => {
       routerState.query = { metric: CARD.name };
       const wrapper = mountExplorer();
@@ -1536,6 +1553,64 @@ describe("MetricsExplorer wiring", () => {
       expect(chart.chartType).toBe("line");
     });
 
+    it("restores compare from a deep link and writes a change to the URL without re-querying the grid", async () => {
+      routerState.query = { metric: CARD.name, compare: "1d" };
+      const wrapper = mountExplorer();
+      expect(detailView(wrapper).props("compare")).toBe("1d");
+      expect(detailView(wrapper).props("stepSeconds")).toBe(30);
+      routerState.push.mockClear();
+      routerState.replace.mockClear();
+      grid.requestPreview.mockClear();
+
+      detailView(wrapper).vm.$emit("update:compare", "1w");
+      await wrapper.vm.$nextTick();
+      expect(detailView(wrapper).props("compare")).toBe("1w");
+      expect(routerState.replace.mock.calls.at(-1)[0].query).toMatchObject({
+        metric: CARD.name,
+        compare: "1w",
+      });
+      expect(routerState.push).not.toHaveBeenCalled();
+
+      const prefixes = grid.selectedPrefixes.value;
+      const labels = grid.labelFilters.value;
+      routerState.query = { metric: CARD.name, compare: "1h" };
+      (wrapper.vm as any).onRouteQueryChange();
+      await wrapper.vm.$nextTick();
+      expect(detailView(wrapper).props("compare")).toBe("1h");
+      expect(grid.selectedPrefixes.value).toBe(prefixes);
+      expect(grid.labelFilters.value).toBe(labels);
+      expect(grid.requestPreview).not.toHaveBeenCalled();
+      expect(grid.sweepSlice).not.toHaveBeenCalled();
+    });
+
+    it("restores the forecast from a deep link and writes a change without re-querying the grid", async () => {
+      routerState.query = { metric: CARD.name, forecast: "linear", forecast_h: "6h" };
+      const wrapper = mountExplorer();
+      expect(detailView(wrapper).props("forecast")).toBe("linear");
+      expect(detailView(wrapper).props("forecastHorizon")).toBe("6h");
+      routerState.replace.mockClear();
+      grid.requestPreview.mockClear();
+
+      detailView(wrapper).vm.$emit("update:forecast", "smoothed");
+      detailView(wrapper).vm.$emit("update:forecastHorizon", null);
+      await wrapper.vm.$nextTick();
+      const query = routerState.replace.mock.calls.at(-1)[0].query;
+      expect(query).toMatchObject({ metric: CARD.name, forecast: "smoothed" });
+      expect(query.forecast_h).toBeUndefined();
+
+      const prefixes = grid.selectedPrefixes.value;
+      routerState.query = { metric: CARD.name, forecast: "linear", forecast_h: "1d" };
+      (wrapper.vm as any).onRouteQueryChange();
+      await wrapper.vm.$nextTick();
+      expect(detailView(wrapper).props("forecastHorizon")).toBe("1d");
+      expect(grid.selectedPrefixes.value).toBe(prefixes);
+      expect(grid.requestPreview).not.toHaveBeenCalled();
+      detailView(wrapper).vm.$emit("update:forecast", null);
+      await wrapper.vm.$nextTick();
+      expect(detailView(wrapper).props("forecastHorizon")).toBeNull();
+      expect(routerState.replace.mock.calls.at(-1)[0].query.forecast_h).toBeUndefined();
+    });
+
     it("Back to the label grid clears the breakdown label, replacing the entry", async () => {
       routerState.query = { metric: CARD.name, tab: "breakdown", breakdown_label: "route" };
       const wrapper = mountExplorer();
@@ -1712,6 +1787,116 @@ describe("MetricsExplorer wiring", () => {
       shortcuts.handlers = {};
     });
 
+    it("applies a picked range at once in Visualize and keeps the picker's Apply in Explore", async () => {
+      const wrapper = mountExplorer();
+      const picker = () => wrapper.findComponent({ name: "DateTimePickerDashboard" });
+      expect(picker().props("autoApplyDashboard")).toBe(false);
+      (wrapper.vm as any).setMode("visualize");
+      await flushPromises();
+      expect(picker().props("autoApplyDashboard")).toBe(true);
+      (wrapper.vm as any).setMode("explore");
+      await flushPromises();
+      expect(picker().props("autoApplyDashboard")).toBe(false);
+    });
+
+    describe("the Run query split button", () => {
+      const OPTIONS = '[data-test="metrics-explorer-run-options"]';
+      const REFRESH_CACHE = '[data-test="metrics-explorer-refresh-cache-run"]';
+      const AUTO_RUN = '[data-test="metrics-explorer-auto-run-toggle"]';
+      const mountSplit = async (autoRunAvailable: boolean) => {
+        storeState.zoConfig.auto_query_enabled = autoRunAvailable;
+        const wrapper = mountExplorer({
+          OButton: { template: '<button v-bind="$attrs"><slot /></button>' },
+          ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
+          ODropdownItem: {
+            emits: ["select"],
+            template:
+              '<button v-bind="$attrs" @click="$emit(\'select\')"><slot name="icon-left" /><slot /></button>',
+          },
+        });
+        (wrapper.vm as any).setMode("visualize");
+        await flushPromises();
+        return wrapper;
+      };
+
+      afterEach(() => {
+        storeState.zoConfig.auto_query_enabled = false;
+        localStorage.removeItem("oo_toggle_auto_run");
+      });
+
+      it("renders Run with a caret whose Refresh Cache & Run records an uncached run", async () => {
+        const wrapper = await mountSplit(false);
+        expect(wrapper.find(RUN).exists()).toBe(true);
+        expect(wrapper.find(OPTIONS).attributes("aria-label")).toBe("metrics.runQueryOptions");
+        expect(wrapper.find(OPTIONS).attributes("variant")).toBe("primary");
+        expect(wrapper.find(AUTO_RUN).exists()).toBe(false);
+
+        await wrapper.find(REFRESH_CACHE).trigger("click");
+        expect(visualizeOnUserRun).toHaveBeenCalledWith(
+          expect.objectContaining({ relativeTimePeriod: "15m" }),
+          true,
+        );
+      });
+
+      it("offers the Auto Run toggle when the server allows it, and the toggle flips the shared choice", async () => {
+        const wrapper = await mountSplit(true);
+        const vm = wrapper.vm as any;
+        const startedOn = vm.isAutoRunOn;
+        expect(wrapper.find(AUTO_RUN).text()).toContain(
+          startedOn ? "search.turnOffLiveMode" : "search.turnOnLiveMode",
+        );
+        expect(wrapper.find(RUN).attributes("aria-label")).toBeUndefined();
+
+        await wrapper.find(AUTO_RUN).trigger("click");
+        expect(vm.isAutoRunOn).toBe(!startedOn);
+        expect(localStorage.getItem("oo_toggle_auto_run")).toBe(String(!startedOn));
+      });
+
+      it("words the Run tooltip for pending, Auto Run on, and the plain state", async () => {
+        const wrapper = await mountSplit(true);
+        const vm = wrapper.vm as any;
+        if (!vm.isAutoRunOn) vm.toggleAutoRun();
+        await flushPromises();
+        expect(vm.visualizeRunTooltip).toBe("search.autoRunEnabled");
+        vm.toggleAutoRun();
+        await flushPromises();
+        expect(vm.visualizeRunTooltip).toBe("metrics.runQuery");
+      });
+    });
+
+    it("marks Run pending while the Visualize pane reports a stale chart, only in Visualize", async () => {
+      const stale = ref(false);
+      const wrapper = mountExplorer({
+        OButton: { template: '<button v-bind="$attrs"><slot /></button>' },
+        MetricsVisualize: {
+          setup: () => ({
+            runQuery: visualizeRunQuery,
+            onUserRun: visualizeOnUserRun,
+            applyPanelData: visualizeApplyPanelData,
+            dashboardPanelData: visualizePanel,
+            isRunQueryPending: stale,
+          }),
+          emits: ["run"],
+          template: '<div data-test="metrics-explorer-visualize">visualize</div>',
+        },
+      });
+      (wrapper.vm as any).setMode("visualize");
+      await flushPromises();
+      expect(wrapper.find(RUN).attributes("variant")).toBe("primary");
+      expect(wrapper.find(RUN).attributes("aria-label")).toBeUndefined();
+
+      stale.value = true;
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find(RUN).attributes("variant")).toBe("pending");
+      expect(wrapper.find(RUN).attributes("aria-label")).toBe("search.runQueryPendingLabel");
+      expect(wrapper.find(RUN).attributes("data-run-pending")).toBe("true");
+      expect((wrapper.vm as any).visualizeRunTooltip).toBe("search.autoRunPendingDot");
+
+      (wrapper.vm as any).setMode("explore");
+      await flushPromises();
+      expect((wrapper.vm as any).isVisualizePending).toBe(false);
+    });
+
     it("Visualize has a Run button and History; the grid modes do not", async () => {
       const wrapper = withButtons();
       expect(wrapper.find(RUN).exists()).toBe(false);
@@ -1753,17 +1938,24 @@ describe("MetricsExplorer wiring", () => {
       );
     });
 
-    it("Visualize keeps the Refresh button beside Run; Refresh re-runs without recording", async () => {
+    it("Visualize shows Run but no Refresh button; the refresh shortcut still re-runs without recording", async () => {
       const wrapper = withButtons();
       (wrapper.vm as any).setMode("visualize");
       await wrapper.vm.$nextTick();
 
       expect(wrapper.find(RUN).exists()).toBe(true);
-      const refresh = wrapper.find('[data-test="metrics-explorer-refresh"]');
-      expect(refresh.exists()).toBe(true);
-      await refresh.trigger("click");
+      expect(wrapper.find('[data-test="metrics-explorer-refresh"]').exists()).toBe(false);
+      shortcuts.handlers.metricsRefresh();
       expect(visualizeRunQuery).toHaveBeenCalledTimes(1);
       expect(visualizeOnUserRun).not.toHaveBeenCalled();
+    });
+
+    it("Explore and Workspace keep the Refresh button", async () => {
+      const wrapper = withButtons();
+      expect(wrapper.find('[data-test="metrics-explorer-refresh"]').exists()).toBe(true);
+      (wrapper.vm as any).setMode("workspace");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="metrics-explorer-refresh"]').exists()).toBe(true);
     });
 
     it("the run shortcut in Explore refreshes the grid and records nothing", async () => {

@@ -30,13 +30,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ formatEventTimestamp(sourceEvent.timestamp) }}
     </span>
     <OSeparator v-if="sourceEvent.message" vertical class="mx-0" />
-    <span
+    <OTruncatedText
       v-if="sourceEvent.message"
-      class="text-typography-meta line-clamp-2 flex-1 font-mono text-xs leading-[1.4] wrap-break-word text-ellipsis whitespace-normal"
-      :title="sourceEvent.message"
+      :lines="2"
+      class="text-typography-meta flex-1 font-mono text-xs leading-[1.4] wrap-break-word whitespace-normal"
     >
       {{ sourceEvent.message }}
-    </span>
+    </OTruncatedText>
   </div>
 
   <!-- Chips Row -->
@@ -157,6 +157,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { AcceptableValue } from "reka-ui";

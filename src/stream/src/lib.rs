@@ -28,7 +28,7 @@ use config::{
     meta::{
         promql,
         promql::get_metadata_from_schema as get_prom_metadata_from_schema,
-        self_reporting::usage::AUDIT_STREAM,
+        self_reporting::{ai_chat::is_protected_ai_chat_stream, usage::AUDIT_STREAM},
         stream::{
             DistinctField, PartitionTimeLevel, StreamField, StreamSettings, StreamStats,
             StreamType, TimeRange, UpdateStreamSettings,
@@ -235,6 +235,15 @@ pub async fn create_stream(
     stream_type: StreamType,
     mut stream: StreamCreate,
 ) -> Result<HttpResponse, Error> {
+    // The AI chat-events stream is created and written only by server-side
+    // chat persistence, in every edition.
+    if is_protected_ai_chat_stream(stream_name) {
+        return Ok(MetaHttpResponse::error_with_header(
+            http::StatusCode::BAD_REQUEST,
+            format!("stream name '{stream_name}' is reserved and cannot be created"),
+        ));
+    }
+
     // check if the stream already exists
     let schema = match infra::schema::get(org_id, stream_name, stream_type).await {
         Ok(schema) => schema,
@@ -426,6 +435,12 @@ pub async fn update_stream_settings(
     stream_type: StreamType,
     mut new_settings: UpdateStreamSettings,
 ) -> Result<HttpResponse, Error> {
+    if is_protected_ai_chat_stream(stream_name) {
+        return Ok(MetaHttpResponse::error_with_header(
+            http::StatusCode::BAD_REQUEST,
+            format!("stream '{stream_name}' is reserved and cannot be modified"),
+        ));
+    }
     let Some(settings) = infra::schema::get_settings(org_id, stream_name, stream_type).await else {
         return Ok(MetaHttpResponse::not_found("stream not found"));
     };
@@ -477,6 +492,14 @@ pub async fn update_stream_settings(
     }
     if let Some(v) = new_settings.approx_partition {
         settings.approx_partition = v;
+    }
+    if let Some(v) = new_settings.dynamic_merge {
+        if !stream_type.support_dynamic_merge() {
+            return Ok(MetaHttpResponse::bad_request(
+                "dynamic_merge is only supported for logs, metrics and traces streams",
+            ));
+        }
+        settings.dynamic_merge = Some(v);
     }
     if let Some(v) = new_settings.index_original_data {
         settings.index_original_data = v;
@@ -747,6 +770,15 @@ where
             "Cannot delete the audit stream",
         ));
     }
+    // Chat history is deleted through the Chat API (which tombstones the
+    // session index and lets retention remove the rows), never by dropping
+    // the whole org's stream from the streams UI.
+    if is_protected_ai_chat_stream(stream_name) {
+        return Ok(MetaHttpResponse::error_with_header(
+            http::StatusCode::BAD_REQUEST,
+            format!("stream '{stream_name}' is reserved and cannot be deleted"),
+        ));
+    }
 
     let schema = infra::schema::get_versions(org_id, stream_name, stream_type, None)
         .await
@@ -890,7 +922,7 @@ pub async fn stream_delete_inner(
     w.remove(&key);
     drop(w);
     let mut w = STREAM_SCHEMAS_LATEST.write().await;
-    w.remove(&key);
+    infra::schema::remove_latest(&mut w, &key);
     drop(w);
 
     // delete stream settings cache
@@ -922,6 +954,11 @@ pub async fn delete_stream_data_by_time_range(
         return Err(infra::errors::Error::Message(
             "Cannot delete the audit stream".to_string(),
         ));
+    }
+    if is_protected_ai_chat_stream(stream_name) {
+        return Err(infra::errors::Error::Message(format!(
+            "stream '{stream_name}' is reserved and cannot be deleted"
+        )));
     }
 
     if time_range.start > time_range.end {
@@ -1033,6 +1070,9 @@ pub async fn delete_fields(
     stream_type: Option<StreamType>,
     fields: &[String],
 ) -> Result<(), anyhow::Error> {
+    if is_protected_ai_chat_stream(stream_name) {
+        anyhow::bail!("stream '{stream_name}' is reserved and cannot be modified");
+    }
     if fields.is_empty() {
         return Ok(());
     }
@@ -1072,6 +1112,9 @@ pub async fn update_fields_type(
     stream_type: Option<StreamType>,
     field_updates: &[FieldUpdate],
 ) -> Result<(), anyhow::Error> {
+    if is_protected_ai_chat_stream(stream_name) {
+        anyhow::bail!("stream '{stream_name}' is reserved and cannot be modified");
+    }
     if field_updates.is_empty() {
         return Ok(());
     }
@@ -1142,23 +1185,17 @@ pub async fn update_fields_type(
     Ok(())
 }
 
-pub async fn get_stream_retention(
-    org_id: &str,
-    stream_type: StreamType,
-    stream: &str,
-) -> Option<i64> {
-    infra::schema::get_settings(org_id, stream, stream_type)
-        .await
-        .map(|s| s.data_retention)
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
 
     use arrow_schema::{DataType, Field};
+    use config::meta::stream::UpdateSettingsWrapper;
 
     use super::*;
+
+    // unique org so the process-wide schema caches can host these tests in parallel
+    const SETTINGS_TEST_ORG: &str = "settings_cache_test_org";
 
     #[test]
     fn test_associated_metadata_streams() {
@@ -1810,5 +1847,107 @@ mod tests {
         .await
         .expect_err("start after end is rejected by the later validation");
         assert!(err.to_string().contains("Start time must be less than end"));
+    }
+
+    async fn create_settings_test_stream(name: &str, fields: &[&str]) {
+        let _ = infra::db::create_table().await;
+        let stream = StreamCreate {
+            fields: fields
+                .iter()
+                .map(|f| StreamField {
+                    name: f.to_string(),
+                    r#type: "Utf8".to_string(),
+                })
+                .collect(),
+            settings: StreamSettings {
+                enable_distinct_fields: false,
+                ..Default::default()
+            },
+        };
+        let resp = create_stream(SETTINGS_TEST_ORG, name, StreamType::Logs, stream)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+    }
+
+    async fn evict_settings_test_stream(name: &str) {
+        let key = format!("{SETTINGS_TEST_ORG}/{}/{name}", StreamType::Logs);
+        STREAM_SCHEMAS_LATEST.write().await.remove(&key);
+        infra::schema::remove_stream_settings(&key).await;
+    }
+
+    async fn update_settings_test_stream(name: &str, update: UpdateStreamSettings) {
+        let resp = update_stream_settings(SETTINGS_TEST_ORG, name, StreamType::Logs, update)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+    }
+
+    async fn settings_test_stream(name: &str) -> StreamSettings {
+        get_stream(SETTINGS_TEST_ORG, name, StreamType::Logs)
+            .await
+            .unwrap()
+            .settings
+    }
+
+    #[tokio::test]
+    async fn test_settings_update_is_read_back_without_waiting_for_the_watcher() {
+        // the test DB outlives the run, so each run needs fresh stream names
+        let name = &format!("read_back_{}", now_micros());
+        create_settings_test_stream(name, &[]).await;
+        // cold caches, as after a restart; no schema watcher runs in unit tests
+        evict_settings_test_stream(name).await;
+        update_settings_test_stream(
+            name,
+            UpdateStreamSettings {
+                enable_distinct_fields: Some(true),
+                data_retention: Some(17),
+                ..Default::default()
+            },
+        )
+        .await;
+        let settings = settings_test_stream(name).await;
+        assert!(settings.enable_distinct_fields);
+        assert_eq!(settings.data_retention, 17);
+    }
+
+    #[tokio::test]
+    async fn test_settings_update_right_after_create_finds_the_stream() {
+        let name = &format!("right_after_create_{}", now_micros());
+        create_settings_test_stream(name, &[]).await;
+        update_settings_test_stream(
+            name,
+            UpdateStreamSettings {
+                data_retention: Some(17),
+                ..Default::default()
+            },
+        )
+        .await;
+        assert_eq!(settings_test_stream(name).await.data_retention, 17);
+    }
+
+    #[tokio::test]
+    async fn test_back_to_back_settings_updates_keep_both_changes() {
+        let name = &format!("back_to_back_{}", now_micros());
+        create_settings_test_stream(name, &["fa", "fb"]).await;
+        evict_settings_test_stream(name).await;
+        for field in ["fa", "fb"] {
+            update_settings_test_stream(
+                name,
+                UpdateStreamSettings {
+                    index_fields: UpdateSettingsWrapper {
+                        add: vec![field.to_string()],
+                        remove: vec![],
+                    },
+                    ..Default::default()
+                },
+            )
+            .await;
+        }
+        // read what was persisted, not what this node cached
+        evict_settings_test_stream(name).await;
+        let index_fields = settings_test_stream(name).await.index_fields;
+        assert!(index_fields.contains(&"fa".to_string()), "{index_fields:?}");
+        assert!(index_fields.contains(&"fb".to_string()), "{index_fields:?}");
     }
 }

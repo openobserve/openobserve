@@ -52,7 +52,7 @@ pub async fn signing_key() -> Option<&'static [u8]> {
     SIGNING_KEY
         .get_or_try_init(|| async {
             let cfg = config::get_config();
-            let salt = cfg.auth.ext_auth_salt.as_str();
+            let salt = &config::get_ext_auth_salt();
             if !cfg.auth.alert_chart_signing_key.is_empty() {
                 return Ok(payload::derive_signing_key(
                     &cfg.auth.alert_chart_signing_key,

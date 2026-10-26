@@ -15,11 +15,13 @@
 
 import { describe, expect, it, vi } from "vitest";
 import {
-  findFirstValidMappedValue,
+  validateConditions,
   validateDashboardJson,
+  validatePanel,
   validateSQLPanelFields,
 } from "@/utils/dashboard/panelValidation";
 import { gt } from "@/types/i18n";
+import { MAX_ANNOTATION_SOURCES } from "@/utils/dashboard/annotationSources";
 
 vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
   CURRENT_DASHBOARD_SCHEMA_VERSION: "v3",
@@ -30,109 +32,6 @@ vi.mock("@/components/dashboards/addPanel/dynamicFunction/functionValidation.jso
 }));
 
 describe("panelValidation", () => {
-  describe("findFirstValidMappedValue", () => {
-    describe("value type mappings", () => {
-      it("matches exact value and returns mapping", () => {
-        const mappings = [{ type: "value", value: "critical", color: "#FF0000" }];
-        const result = findFirstValidMappedValue("critical", mappings, "color");
-        expect(result).toBeDefined();
-        expect(result?.color).toBe("#FF0000");
-      });
-
-      it("does not match different value", () => {
-        const mappings = [{ type: "value", value: "critical", color: "#FF0000" }];
-        const result = findFirstValidMappedValue("warning", mappings, "color");
-        expect(result).toBeUndefined();
-      });
-
-      it("returns undefined when fieldToCheck is missing from mapping", () => {
-        const mappings = [{ type: "value", value: "critical" }]; // no color
-        const result = findFirstValidMappedValue("critical", mappings, "color");
-        expect(result).toBeUndefined();
-      });
-    });
-
-    describe("range type mappings", () => {
-      it("matches value within range", () => {
-        const mappings = [{ type: "range", from: "0", to: "100", color: "#00FF00" }];
-        const result = findFirstValidMappedValue(50, mappings, "color");
-        expect(result).toBeDefined();
-      });
-
-      it("matches boundary value (from)", () => {
-        const mappings = [{ type: "range", from: "0", to: "100", color: "#00FF00" }];
-        const result = findFirstValidMappedValue(0, mappings, "color");
-        expect(result).toBeDefined();
-      });
-
-      it("matches boundary value (to)", () => {
-        const mappings = [{ type: "range", from: "0", to: "100", color: "#00FF00" }];
-        const result = findFirstValidMappedValue(100, mappings, "color");
-        expect(result).toBeDefined();
-      });
-
-      it("does not match value outside range", () => {
-        const mappings = [{ type: "range", from: "0", to: "100", color: "#00FF00" }];
-        const result = findFirstValidMappedValue(150, mappings, "color");
-        expect(result).toBeUndefined();
-      });
-
-      it("does not match when from/to are NaN", () => {
-        const mappings = [{ type: "range", from: "abc", to: "xyz", color: "#00FF00" }];
-        const result = findFirstValidMappedValue(50, mappings, "color");
-        expect(result).toBeUndefined();
-      });
-    });
-
-    describe("regex type mappings", () => {
-      it("matches value against regex pattern", () => {
-        const mappings = [{ type: "regex", pattern: "^error.*", text: "Error!" }];
-        const result = findFirstValidMappedValue("error_500", mappings, "text");
-        expect(result).toBeDefined();
-      });
-
-      it("does not match value that doesn't fit pattern", () => {
-        const mappings = [{ type: "regex", pattern: "^error.*", text: "Error!" }];
-        const result = findFirstValidMappedValue("warning_404", mappings, "text");
-        expect(result).toBeUndefined();
-      });
-
-      it("uses empty pattern when pattern is null (matches everything)", () => {
-        const mappings = [{ type: "regex", pattern: null, text: "Default" }];
-        const result = findFirstValidMappedValue("anything", mappings, "text");
-        expect(result).toBeDefined();
-      });
-    });
-
-    describe("first match wins", () => {
-      it("returns first matching mapping", () => {
-        const mappings = [
-          { type: "value", value: "critical", color: "#FF0000" },
-          { type: "value", value: "critical", color: "#00FF00" },
-        ];
-        const result = findFirstValidMappedValue("critical", mappings, "color");
-        expect(result?.color).toBe("#FF0000");
-      });
-    });
-
-    describe("null/undefined input", () => {
-      it("returns undefined for null mappings", () => {
-        const result = findFirstValidMappedValue("critical", null as any, "color");
-        expect(result).toBeUndefined();
-      });
-
-      it("returns undefined for undefined mappings", () => {
-        const result = findFirstValidMappedValue("critical", undefined as any, "color");
-        expect(result).toBeUndefined();
-      });
-
-      it("returns undefined for empty mappings", () => {
-        const result = findFirstValidMappedValue("critical", [], "color");
-        expect(result).toBeUndefined();
-      });
-    });
-  });
-
   describe("validateDashboardJson", () => {
     const validDashboard = {
       dashboardId: "dash-001",
@@ -170,6 +69,62 @@ describe("panelValidation", () => {
       ];
       const errors = validateDashboardJson(gt, { ...validDashboard, tabs });
       expect(errors).toEqual([]);
+    });
+
+    it("accepts valid annotationSources and reports broken ones", () => {
+      const source = {
+        id: "s1",
+        name: "Deploys",
+        enabled: true,
+        mode: "builder",
+        streamType: "logs",
+        stream: "k8s_events",
+        title: "{service}",
+      };
+      expect(validateDashboardJson(gt, { ...validDashboard, annotationSources: [source] })).toEqual(
+        [],
+      );
+      expect(
+        validateDashboardJson(gt, {
+          ...validDashboard,
+          annotationSources: [{ ...source, mode: "sql", query: "" }],
+        }),
+      ).toEqual(["Annotation source 1: Enter a query"]);
+      expect(validateDashboardJson(gt, { ...validDashboard, annotationSources: "x" })).toEqual([
+        "annotationSources must be an array",
+      ]);
+    });
+
+    it("rejects annotationSources over the cap and a duplicate id", () => {
+      const source = {
+        id: "s1",
+        name: "Deploys",
+        enabled: true,
+        mode: "builder",
+        streamType: "logs",
+        stream: "k8s_events",
+        title: "{service}",
+      };
+      const atCap = Array.from({ length: MAX_ANNOTATION_SOURCES }, (_, i) => ({
+        ...source,
+        id: `s${i}`,
+        name: `Source ${i}`,
+      }));
+      expect(validateDashboardJson(gt, { ...validDashboard, annotationSources: atCap })).toEqual(
+        [],
+      );
+
+      const overCap = [...atCap, { ...source, id: "over", name: "Over" }];
+      expect(validateDashboardJson(gt, { ...validDashboard, annotationSources: overCap })).toEqual([
+        `A dashboard can have at most ${MAX_ANNOTATION_SOURCES} annotation sources.`,
+      ]);
+
+      expect(
+        validateDashboardJson(gt, {
+          ...validDashboard,
+          annotationSources: [source, { ...source, name: "Deploys again" }],
+        }),
+      ).toEqual(["Annotation source 2: ID s1 is used more than once"]);
     });
 
     it("returns error for null dashboard", () => {
@@ -379,5 +334,130 @@ describe("panelValidation", () => {
       );
       expect(errors).toEqual([]);
     });
+  });
+});
+
+describe("validatePanel on a PromQL formula", () => {
+  const run = (queries: any[]) => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      { data: { type: "line", queryType: "promql", queries }, layout: { currentQueryIndex: 0 } },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors.filter((e) => e.includes("is empty"));
+  };
+
+  it("accepts a formula whose query field is empty", () => {
+    expect(
+      run([
+        { query: "up", config: {} },
+        { query: "", config: { formula: "A * 2" } },
+      ]),
+    ).toEqual([]);
+  });
+
+  it("flags an empty formula", () => {
+    expect(
+      run([
+        { query: "up", config: {} },
+        { query: "", config: { formula: "" } },
+      ]),
+    ).toHaveLength(1);
+  });
+});
+
+describe("validatePanel on heatmap settings", () => {
+  const numericY = { alias: "y", args: [{ type: "field", value: { field: "took" } }] };
+  const run = (config: any, { queryType = "sql", customQuery = false } = {}) => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type: "heatmap",
+          queryType,
+          config,
+          queries: [{ customQuery, query: "", fields: { y: [numericY] } }],
+        },
+        layout: { currentQueryIndex: 0 },
+        meta: {
+          streamFields: { groupedFields: [{ schema: [{ name: "took", type: "Int64" }] }] },
+        },
+      },
+      errors,
+      false,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+
+  it("blocks a bucket size that would leave the builder query empty", () => {
+    expect(run({ heatmap_y_bucket: { mode: "size", size: 0 } })).toEqual([
+      gt("dashboard.utils.heatmapYBucketSizeInvalid"),
+    ]);
+    expect(
+      run({ heatmap_y_bucket: { mode: "size", size: 1 }, heatmap_y_min: 0, heatmap_y_max: 1e6 }),
+    ).toHaveLength(1);
+  });
+
+  it("blocks inverted y and colour ranges, which the renderer would silently ignore", () => {
+    expect(
+      run({ heatmap_y_bucket: { mode: "log", base: 10 }, heatmap_y_min: 9, heatmap_y_max: 1 }),
+    ).toEqual([gt("dashboard.utils.heatmapYRangeInverted")]);
+    expect(run({ heatmap_color_min: 50, heatmap_color_max: 5 }, { queryType: "promql" })).toContain(
+      gt("dashboard.utils.heatmapColorRangeInverted"),
+    );
+  });
+
+  it("ignores bucket settings that do not apply to custom SQL", () => {
+    expect(run({ heatmap_y_bucket: { mode: "size", size: 0 } }, { customQuery: true })).toEqual([]);
+    expect(run({ heatmap_color_min: 1, heatmap_color_max: 5 })).toEqual([]);
+  });
+});
+
+describe("validateConditions", () => {
+  const t = gt as any;
+
+  it("flags a filter added without a value, including inside groups", () => {
+    const errors: string[] = [];
+    validateConditions(
+      t,
+      [
+        {
+          filterType: "group",
+          conditions: [
+            {
+              filterType: "condition",
+              type: "condition",
+              column: "level",
+              operator: "=",
+              value: "",
+            },
+            { filterType: "condition", type: "list", column: "job", values: [] },
+          ],
+        },
+      ],
+      errors,
+    );
+    expect(errors).toHaveLength(2);
+  });
+
+  it("accepts complete conditions", () => {
+    const errors: string[] = [];
+    validateConditions(
+      t,
+      [{ filterType: "condition", type: "condition", column: "a", operator: "Is Null" }],
+      errors,
+    );
+    expect(errors).toHaveLength(0);
   });
 });

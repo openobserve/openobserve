@@ -39,10 +39,12 @@ use promql::{
     },
     exec::PromqlContext,
     micros,
+    utils::absent_label_rejects_all,
 };
 use promql_parser::{label::Matchers, parser};
 use proto::cluster_rpc;
 use rayon::slice::ParallelSliceMut;
+use search_service::QueryTracker;
 use tokio::sync::mpsc;
 
 mod storage;
@@ -58,6 +60,8 @@ struct GroupPlan {
 
 struct StorageProvider {
     trace_id: String,
+    #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+    query_tracker: QueryTracker,
     need_wal: bool,
 }
 
@@ -73,6 +77,9 @@ impl TableProvider for StorageProvider {
         filters: &mut [(String, Vec<String>)],
         streaming: bool,
     ) -> datafusion::error::Result<Vec<ScanContext>> {
+        if matches_nothing(org_id, stream_name, &matchers).await? {
+            return Ok(vec![]);
+        }
         let mut ctxs = Vec::new();
         let trace_id = self.trace_id.to_owned() + "-storage-" + stream_name;
         let ctx = storage::create_context(
@@ -114,18 +121,16 @@ impl TableProvider for StorageProvider {
         &self,
         trace_id: &str,
     ) -> datafusion::error::Result<Option<tokio::sync::oneshot::Receiver<()>>> {
-        let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
-        if search_service::SEARCH_SERVER
-            .insert_sender(trace_id, abort_sender, true)
-            .await
-            .is_err()
-        {
+        let Ok(abort_receiver) = self
+            .query_tracker
+            .abort_receiver(search_service::QueryPhase::Running)
+        else {
             log::info!("[trace_id {trace_id}] [PromQL] grpc search canceled before execution plan");
             return Err(infra::errors::ErrorCodes::SearchCancelQuery(format!(
                 "[trace_id {trace_id}] [PromQL] grpc search canceled before execution plan"
             ))
             .into());
-        }
+        };
         Ok(Some(abort_receiver))
     }
 }
@@ -133,6 +138,7 @@ impl TableProvider for StorageProvider {
 #[tracing::instrument(name = "promql:search:grpc:search", skip_all, fields(org_id = req.org_id))]
 pub async fn search(
     req: &cluster_rpc::MetricsQueryRequest,
+    query_tracker: &QueryTracker,
 ) -> Result<cluster_rpc::MetricsQueryResponse> {
     let cfg = config::get_config();
     let start_ts = std::time::Instant::now();
@@ -146,11 +152,20 @@ pub async fn search(
 
     let mut results = Vec::new();
     if start == end {
-        results.push(search_inner(req).await?);
+        results.push(search_inner(req, query_tracker).await?);
     } else {
         // 1. get max records stream
         let start_ts = std::time::Instant::now();
-        let plan = match get_max_file_list(&trace_id, org_id, &query.query, start, end).await {
+        let plan = match get_max_file_list(
+            &trace_id,
+            org_id,
+            &query.query,
+            start,
+            end,
+            query.query_exemplars,
+        )
+        .await
+        {
             Ok(v) => v,
             Err(e) => {
                 log::error!(
@@ -213,7 +228,7 @@ pub async fn search(
             req.need_wal = plan.window.reaches(end, wal_floor);
             req.query.as_mut().unwrap().start = start;
             req.query.as_mut().unwrap().end = end;
-            let resp = search_inner(&req).await?;
+            let resp = search_inner(&req, query_tracker).await?;
             log::info!(
                 "[trace_id {trace_id}] promql->search->grpc: group[{start}, {end}] get resp, took: {} ms",
                 start_ts.elapsed().as_millis()
@@ -230,9 +245,10 @@ pub async fn search(
     };
 
     let mut scan_stats = ScanStats::default();
-    for (value, _result_type, stats, _took) in results {
+    for (value, _result_type, stats, _took, warnings) in results {
         add_value(&mut resp, value);
         scan_stats.add(&stats);
+        resp.warnings.extend(warnings);
     }
     resp.scan_stats = Some(cluster_rpc::ScanStats::from(&scan_stats));
 
@@ -242,6 +258,7 @@ pub async fn search(
 #[tracing::instrument(name = "promql:search:grpc:data", skip_all, fields(org_id = req.org_id))]
 pub async fn data(
     req: &cluster_rpc::MetricsQueryRequest,
+    query_tracker: &QueryTracker,
     tx: mpsc::Sender<Result<cluster_rpc::MetricsQueryResponse, tonic::Status>>,
 ) -> Result<()> {
     let cfg = config::get_config();
@@ -253,7 +270,8 @@ pub async fn data(
     let trace_id = req.job.as_ref().unwrap().trace_id.to_string();
     let org_id = &req.org_id;
 
-    let (data_tx, mut data_rx) = mpsc::channel::<(value::Value, String, ScanStats, i64)>(2);
+    let (data_tx, mut data_rx) =
+        mpsc::channel::<(value::Value, String, ScanStats, i64, Vec<String>)>(2);
     let data_trace_id = trace_id.clone();
     let job = req.job.clone();
     tokio::task::spawn(async move {
@@ -263,11 +281,12 @@ pub async fn data(
                     log::info!("[trace_id {data_trace_id}] promql->data->grpc: data streaming end");
                     break;
                 }
-                Some((value, result_type, stats, took)) => {
+                Some((value, result_type, stats, took, warnings)) => {
                     let mut resp = cluster_rpc::MetricsQueryResponse {
                         job: job.clone(),
                         took: took as i32,
                         result_type: result_type.clone(),
+                        warnings,
                         ..Default::default()
                     };
 
@@ -285,7 +304,7 @@ pub async fn data(
 
     let start_ts = std::time::Instant::now();
     if start == end {
-        let ret = search_inner(req).await?;
+        let ret = search_inner(req, query_tracker).await?;
         if let Err(e) = data_tx.send(ret).await {
             log::error!("[trace_id {trace_id}] promql->data->grpc: send data error: {e}");
         }
@@ -296,7 +315,16 @@ pub async fn data(
         return Ok(());
     }
     // 1. get max records stream
-    let plan = match get_max_file_list(&trace_id, org_id, &query.query, start, end).await {
+    let plan = match get_max_file_list(
+        &trace_id,
+        org_id,
+        &query.query,
+        start,
+        end,
+        query.query_exemplars,
+    )
+    .await
+    {
         Ok(v) => v,
         Err(e) => {
             log::error!(
@@ -339,7 +367,7 @@ pub async fn data(
         req.need_wal = plan.window.reaches(end, wal_floor);
         req.query.as_mut().unwrap().start = start;
         req.query.as_mut().unwrap().end = end;
-        let resp = search_inner(&req).await?;
+        let resp = search_inner(&req, query_tracker).await?;
         log::info!(
             "[trace_id {trace_id}] promql->data->grpc: group[{start}, {end}] get resp, took: {} ms",
             start_ts.elapsed().as_millis()
@@ -365,12 +393,13 @@ pub async fn data(
 #[tracing::instrument(name = "promql:search:grpc:search_inner", skip_all, fields(org_id = req.org_id))]
 pub async fn search_inner(
     req: &cluster_rpc::MetricsQueryRequest,
-) -> Result<(value::Value, String, ScanStats, i64)> {
+    query_tracker: &QueryTracker,
+) -> Result<(value::Value, String, ScanStats, i64, Vec<String>)> {
     let start = std::time::Instant::now();
     let trace_id = req.job.as_ref().unwrap().trace_id.to_string();
     let org_id = &req.org_id;
     let query = req.query.as_ref().unwrap();
-    let prom_expr = parser::parse(&query.query).map_err(DataFusionError::Execution)?;
+    let prom_expr = promql::parse(&query.query).map_err(DataFusionError::Execution)?;
 
     let eval_stmt = parser::EvalStmt {
         expr: prom_expr,
@@ -398,7 +427,7 @@ pub async fn search_inner(
         need_wal: req.need_wal,
         use_cache: req.use_cache,
         timeout,
-        search_event_type: SearchEventType::try_from(req.search_event_type.as_str()).ok(),
+        search_event_type: req.search_event_type.parse::<SearchEventType>().ok(),
         regions: req.regions.clone(),
         clusters: req.clusters.clone(),
         is_super_cluster: req.is_super_cluster,
@@ -408,12 +437,13 @@ pub async fn search_inner(
         query_ctx,
         StorageProvider {
             trace_id: trace_id.to_string(),
+            query_tracker: query_tracker.clone(),
             need_wal: req.need_wal,
         },
         query.label_selector.clone(),
     );
 
-    let (value, result_type, mut scan_stats) = if query.query_exemplars {
+    let (value, result_type, mut scan_stats, warnings) = if query.query_exemplars {
         ctx.query_exemplars(&trace_id, eval_stmt).await?
     } else {
         ctx.exec(&trace_id, eval_stmt).await?
@@ -428,7 +458,7 @@ pub async fn search_inner(
 
     scan_stats.format_to_mb();
     let took = start.elapsed().as_millis() as i64;
-    Ok((value, result_type, scan_stats, took))
+    Ok((value, result_type, scan_stats, took, warnings))
 }
 
 async fn get_max_file_list(
@@ -437,12 +467,20 @@ async fn get_max_file_list(
     query: &str,
     start: i64,
     end: i64,
+    query_exemplars: bool,
 ) -> Result<GroupPlan> {
     // 1. get metrics name
-    let ast = parser::parse(query).map_err(DataFusionError::Execution)?;
+    let ast = promql::parse(query).map_err(DataFusionError::Execution)?;
     let mut visitor = name_visitor::MetricNameVisitor::default();
     walk_expr(&mut visitor, &ast).map_err(|e| DataFusionError::Execution(e.to_string()))?;
-    let metrics_name = visitor.into_names();
+    let mut metrics_name = visitor.into_names();
+    if query_exemplars {
+        let mut mapped = std::collections::HashSet::with_capacity(metrics_name.len());
+        for name in &metrics_name {
+            mapped.insert(promql::utils::exemplars_stream_for(org_id, name).await);
+        }
+        metrics_name = mapped;
+    }
     let window = selector_window(&ast);
 
     // 2. get max records stream
@@ -470,6 +508,21 @@ async fn get_max_file_list(
         files: file_list,
         window,
     })
+}
+
+/// A label the stream lacks reads as "", so a matcher rejecting "" leaves nothing to scan.
+async fn matches_nothing(
+    org_id: &str,
+    stream_name: &str,
+    matchers: &Matchers,
+) -> datafusion::error::Result<bool> {
+    let schema = infra::schema::get_cache(org_id, stream_name, StreamType::Metrics)
+        .await
+        .map_err(|err| DataFusionError::Execution(err.to_string()))?;
+    Ok(matchers
+        .matchers
+        .iter()
+        .any(|mat| absent_label_rejects_all(schema.schema(), mat)))
 }
 
 /// The time from which a group must also read the WAL.
@@ -851,5 +904,42 @@ mod tests {
                 .unwrap(),
             vec![(0, 410), (420, 430)]
         );
+    }
+
+    #[tokio::test]
+    async fn test_matches_nothing_on_a_label_the_stream_lacks() {
+        use datafusion::arrow::datatypes::{DataType, Field, Schema};
+
+        let (org_id, stream_name) = ("test_org_absent_label", "absent_label_metric");
+        {
+            let mut w = infra::schema::STREAM_SCHEMAS_LATEST.write().await;
+            infra::schema::insert_latest(
+                &mut w,
+                format!("{org_id}/{}/{stream_name}", StreamType::Metrics),
+                infra::schema::SchemaCache::new(Schema::new(vec![Field::new(
+                    "job",
+                    DataType::Utf8,
+                    true,
+                )])),
+            );
+        }
+        for (query, nothing) in [
+            (r#"absent_label_metric{uuid="x"}"#, true),
+            (r#"absent_label_metric{uuid=~"x.+"}"#, true),
+            (r#"absent_label_metric{uuid!="x"}"#, false),
+            (r#"absent_label_metric{uuid=""}"#, false),
+            (r#"absent_label_metric{job="x"}"#, false),
+        ] {
+            let parser::Expr::VectorSelector(selector) = parser::parse(query).unwrap() else {
+                panic!("expected a vector selector");
+            };
+            assert_eq!(
+                matches_nothing(org_id, stream_name, &selector.matchers)
+                    .await
+                    .unwrap(),
+                nothing,
+                "{query}"
+            );
+        }
     }
 }

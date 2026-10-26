@@ -82,7 +82,13 @@ pub async fn schema(
         stream_name = format_stream_name(stream_name);
     }
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
-    let schema = stream_service::get_stream(&org_id, &stream_name, stream_type).await;
+    // Hidden like it is from listing and search: its schema is not for users.
+    let schema = if config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(&stream_name)
+    {
+        None
+    } else {
+        stream_service::get_stream(&org_id, &stream_name, stream_type).await
+    };
     let Some(mut schema) = schema else {
         return (
             StatusCode::NOT_FOUND,
@@ -513,6 +519,8 @@ pub async fn list(
         // Get List of allowed objects ends
     }
 
+    #[cfg(feature = "enterprise")]
+    let listed_by_permission = _stream_list_from_rbac.is_some();
     let mut indices = stream_service::get_streams(
         org_id.as_str(),
         stream_type,
@@ -520,6 +528,11 @@ pub async fn list(
         _stream_list_from_rbac,
     )
     .await;
+
+    // The AI chat-events stream is internal: readable only through the Chat
+    // API, so it is not offered in the streams UI/API either.
+    indices
+        .retain(|s| !config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(&s.name));
 
     // filter by keyword
     if let Some(keyword) = query
@@ -574,6 +587,22 @@ pub async fn list(
         indices.drain(..offset);
     }
 
+    #[cfg(feature = "enterprise")]
+    if !listed_by_permission
+        && !db::user::is_root_user(&_user_email.user_id)
+        && openobserve_core::authz::rbac_enforced().await
+    {
+        let (org_id, user_id) = (org_id.as_str(), _user_email.user_id.as_str());
+        let role = openobserve_core::users::get_user(Some(org_id), user_id)
+            .await
+            .map(|user| user.role.to_string());
+        let granted = granted_ids_by_type(&indices, |stream_type| {
+            list_readable_stream_ids(org_id, user_id, role.as_deref(), stream_type)
+        })
+        .await;
+        hide_unreadable_schemas(&mut indices, |s| is_readable(&granted, org_id, s));
+    }
+
     (
         StatusCode::OK,
         Json(ListStream {
@@ -582,6 +611,86 @@ pub async fn list(
         }),
     )
         .into_response()
+}
+
+/// Keeps only the name and stats of each stream `can_read` refuses: settings name fields too.
+#[cfg(any(feature = "enterprise", test))]
+fn hide_unreadable_schemas(
+    streams: &mut [meta::stream::Stream],
+    can_read: impl Fn(&meta::stream::Stream) -> bool,
+) {
+    for stream in streams.iter_mut().filter(|s| !can_read(s)) {
+        stream.schema.clear();
+        stream.uds_schema.clear();
+        stream.total_fields = 0;
+        stream.settings = Default::default();
+        stream.pattern_associations.clear();
+    }
+}
+
+/// Granted object ids per stream type, looked up once per type present in `streams`.
+#[cfg(any(feature = "enterprise", test))]
+async fn granted_ids_by_type<F, Fut>(
+    streams: &[meta::stream::Stream],
+    list_granted: F,
+) -> HashMap<StreamType, Vec<String>>
+where
+    F: Fn(StreamType) -> Fut,
+    Fut: std::future::Future<Output = Vec<String>>,
+{
+    let mut granted = HashMap::new();
+    for stream in streams {
+        if !granted.contains_key(&stream.stream_type) {
+            let ids = list_granted(stream.stream_type).await;
+            granted.insert(stream.stream_type, ids);
+        }
+    }
+    granted
+}
+
+/// Mirrors `check_stream_permissions`: a grant on the stream or on all streams of its type.
+#[cfg(any(feature = "enterprise", test))]
+fn is_readable(
+    granted: &HashMap<StreamType, Vec<String>>,
+    org_id: &str,
+    stream: &meta::stream::Stream,
+) -> bool {
+    let Some(ids) = granted.get(&stream.stream_type) else {
+        return false;
+    };
+    let all = format!("_all_{org_id}");
+    let own = config::utils::str::into_ofga_supported_format(&stream.name);
+    ids.iter().any(|id| *id == all || *id == own)
+}
+
+/// An unknown user or a failed lookup grants nothing, as the per-stream check denies both.
+#[cfg(feature = "enterprise")]
+async fn list_readable_stream_ids(
+    org_id: &str,
+    user_id: &str,
+    role: Option<&str>,
+    stream_type: StreamType,
+) -> Vec<String> {
+    use o2_openfga::meta::mapping::OFGA_MODELS;
+
+    let Some(role) = role else {
+        return vec![];
+    };
+    let object_type = OFGA_MODELS
+        .get(stream_type.as_str())
+        .map_or(stream_type.as_str(), |model| model.key);
+    match o2_openfga::authorizer::authz::list_objects(user_id, "GET", object_type, org_id, role)
+        .await
+    {
+        Ok(objects) => objects
+            .into_iter()
+            .filter_map(|object| object.split_once(':').map(|(_, id)| id.to_string()))
+            .collect(),
+        Err(e) => {
+            log::warn!("stream list: listing {object_type} grants for {user_id} failed: {e}");
+            vec![]
+        }
+    }
 }
 
 /// Compares two streams for sorting based on the field and ASC/DESC
@@ -1045,6 +1154,124 @@ mod tests {
             pattern_associations: vec![],
             is_derived: None,
         }
+    }
+
+    #[tokio::test]
+    async fn listing_drops_the_fields_of_streams_the_caller_cannot_read() {
+        let field = config::meta::stream::StreamField {
+            name: "card_bin".to_string(),
+            r#type: "Utf8".to_string(),
+        };
+        let mut streams = vec![
+            make_stream("hidden", 3, 1.0, 1.0, 0.0),
+            make_stream("readable", 3, 1.0, 1.0, 0.0),
+        ];
+        for s in streams.iter_mut() {
+            s.schema = vec![field.clone()];
+            s.total_fields = 1;
+        }
+        hide_unreadable_schemas(&mut streams, |s| s.name == "readable");
+        assert_eq!(streams[0].name, "hidden");
+        assert!(streams[0].schema.is_empty());
+        assert_eq!(streams[0].total_fields, 0);
+        assert_eq!(streams[0].stats.doc_num, 3);
+        assert_eq!(streams[1].schema.len(), 1);
+        assert_eq!(streams[1].total_fields, 1);
+    }
+
+    #[test]
+    fn listing_drops_the_settings_of_streams_the_caller_cannot_read() {
+        let field = config::meta::stream::StreamField {
+            name: "card_bin".to_string(),
+            r#type: "Utf8".to_string(),
+        };
+        let mut streams = vec![
+            make_stream("hidden", 3, 1.0, 1.0, 0.0),
+            make_stream("readable", 3, 1.0, 1.0, 0.0),
+        ];
+        for s in streams.iter_mut() {
+            s.uds_schema = vec![field.clone()];
+            s.settings.partition_keys =
+                vec![config::meta::stream::StreamPartition::new("card_bin")];
+            s.settings.full_text_search_keys = vec!["card_bin".to_string()];
+            s.settings.index_fields = vec!["card_bin".to_string()];
+            s.settings.bloom_filter_fields = vec!["card_bin".to_string()];
+            s.settings.defined_schema_fields = vec!["card_bin".to_string()];
+            s.settings.data_retention = 7;
+        }
+        let readable_settings = streams[1].settings.clone();
+        hide_unreadable_schemas(&mut streams, |s| s.name == "readable");
+        assert_eq!(streams[0].settings, Default::default());
+        assert!(streams[0].uds_schema.is_empty());
+        assert!(!format!("{:?}", streams[0]).contains("card_bin"));
+        assert_eq!(streams[0].name, "hidden");
+        assert_eq!(streams[0].stats.doc_num, 3);
+        assert_eq!(streams[1].settings, readable_settings);
+        assert_eq!(streams[1].uds_schema.len(), 1);
+    }
+
+    fn typed_stream(name: &str, stream_type: StreamType) -> meta::stream::Stream {
+        let mut stream = make_stream(name, 1, 1.0, 1.0, 0.0);
+        stream.stream_type = stream_type;
+        stream
+    }
+
+    #[tokio::test]
+    async fn stream_list_looks_up_grants_once_per_stream_type() {
+        let types = [StreamType::Logs, StreamType::Metrics, StreamType::Traces];
+        let mut streams: Vec<_> = (0..30)
+            .map(|i| typed_stream(&format!("s{i}"), types[i % 3]))
+            .collect();
+        streams.push(typed_stream("http:requests", StreamType::Metrics));
+        let calls = std::sync::atomic::AtomicUsize::new(0);
+        let granted = granted_ids_by_type(&streams, |stream_type| {
+            calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let ids: Vec<String> = match stream_type {
+                StreamType::Logs => vec!["_all_org1".into()],
+                StreamType::Metrics => vec!["s1".into(), "s4".into(), "http.requests".into()],
+                _ => vec!["_all_org2".into(), "s2x".into()],
+            };
+            async move { ids }
+        })
+        .await;
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), types.len());
+
+        let per_stream_check = |s: &meta::stream::Stream| match s.stream_type {
+            StreamType::Logs => true,
+            StreamType::Metrics => ["s1", "s4", "http:requests"].contains(&s.name.as_str()),
+            _ => false,
+        };
+        for stream in &streams {
+            assert_eq!(
+                is_readable(&granted, "org1", stream),
+                per_stream_check(stream),
+                "{}",
+                stream.name
+            );
+        }
+    }
+
+    #[test]
+    fn a_stream_type_without_a_grant_lookup_is_unreadable() {
+        let granted = HashMap::new();
+        assert!(!is_readable(
+            &granted,
+            "org1",
+            &typed_stream("a", StreamType::Logs)
+        ));
+    }
+
+    #[test]
+    fn stream_list_checks_read_permission_before_returning_schemas() {
+        let text = include_str!("mod.rs");
+        let start = text.find("pub async fn list(").expect("list handler");
+        let body = &text[start..];
+        let body = &body[..body.find("\n}\n").expect("handler end")];
+        assert!(body.contains("hide_unreadable_schemas("));
+        assert!(
+            !body.contains("if fetch_schema"),
+            "settings carry field names, so the guard runs with or without fetchSchema"
+        );
     }
 
     #[test]

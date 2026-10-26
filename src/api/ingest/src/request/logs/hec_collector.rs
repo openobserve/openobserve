@@ -35,7 +35,7 @@ use ingestion_common::IngestUser;
 use serde::{Deserialize, Serialize};
 
 use crate::service::{
-    ingestion::{check_ingestion_allowed, get_thread_id},
+    ingestion::{check_ingestion_allowed, get_thread_id, rejections::RejectionOrg},
     logs::hec::{HecParseError, parse_body, preflight_records, preflight_streams},
 };
 
@@ -312,8 +312,13 @@ pub async fn splunk_auth_middleware(mut req: Request, next: Next) -> Response {
     metrics::HEC_AUTH_TOTAL
         .with_label_values(&["success", &org_id])
         .inc();
-    req.extensions_mut().insert(HecAuth { org_id, token_id });
-    next.run(req).await
+    req.extensions_mut().insert(HecAuth {
+        org_id: org_id.clone(),
+        token_id,
+    });
+    let mut response = next.run(req).await;
+    response.extensions_mut().insert(RejectionOrg(org_id));
+    response
 }
 
 /// Cap the body on the wire, outside decompression, with the Splunk 413 triple.
@@ -598,6 +603,10 @@ fn admission_status(e: &infra::errors::Error) -> HecCollectorStatus {
         // Not an ingester, and a cloud trial that has run out, are both conditions
         // of the receiving side rather than of the batch.
         infra::errors::Error::TrialPeriodExpired => HecCollectorStatus::ServerBusy,
+        // Same answer the auth middleware gives a blocked org, for a block that lands mid-request.
+        infra::errors::Error::Ingestion(infra::errors::IngestionError::OrgBlocked(_)) => {
+            HecCollectorStatus::TokenDisabled
+        }
         infra::errors::Error::IngestionError(msg) if is_retryable_admission(msg) => {
             HecCollectorStatus::ServerBusy
         }
@@ -999,6 +1008,14 @@ mod tests {
                 "{e:?}"
             );
         }
+    }
+
+    #[test]
+    fn a_blocked_org_admission_is_token_disabled() {
+        let e = infra::errors::Error::from(infra::errors::IngestionError::OrgBlocked(
+            "acme".to_string(),
+        ));
+        assert_eq!(admission_status(&e), HecCollectorStatus::TokenDisabled);
     }
 
     #[test]

@@ -13,12 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, afterEach } from "vitest";
-import { mount } from "@vue/test-utils";
+import { describe, expect, it, afterEach, vi } from "vitest";
+import { flushPromises, mount } from "@vue/test-utils";
 import i18n from "@/locales";
 
 import CreateAlertFromSourceDialog from "@/components/alerts/CreateAlertFromSourceDialog.vue";
 import { ALERT_PREFILL_VERSION, type AlertPrefill } from "@/ts/interfaces/alertPrefill";
+import { buildPrefillFromPanel, panelQueryChoices } from "@/utils/alerts/prefill/fromPanel";
+import { normalizePrefill } from "@/utils/alerts/alertPrefill";
+
+const { copyToClipboard } = vi.hoisted(() => ({ copyToClipboard: vi.fn() }));
+vi.mock("@/utils/clipboard", () => ({ copyToClipboard }));
+// Monaco's tokenizer does not run in jsdom; the markup it yields is all this dialog renders.
+const colorized = async (query: string, lang: string) =>
+  `<span class="text-query-syntax-keyword" data-lang="${lang}">${query}</span><script>x</script>`;
+const { colorizeQuery } = vi.hoisted(() => ({ colorizeQuery: vi.fn() }));
+vi.mock("@/utils/query/colorizeQuery", () => ({ colorizeQuery }));
+colorizeQuery.mockImplementation(colorized);
 
 // ODialog and OCodeBlock are portal/highlighter heavy — stub them down to what
 // this component's own logic needs.
@@ -43,6 +54,12 @@ const stubs = {
     props: ["modelValue", "type"],
     emits: ["update:modelValue"],
     template: `<div><slot /></div>`,
+  },
+  OSelect: {
+    name: "OSelect",
+    props: ["modelValue", "options", "dropdownStyle"],
+    emits: ["update:modelValue"],
+    template: `<div data-test="query-select-stub" />`,
   },
   OToggleGroupItem: {
     name: "OToggleGroupItem",
@@ -230,6 +247,276 @@ describe("CreateAlertFromSourceDialog", () => {
         .vm.$emit("update:modelValue", "exclude");
 
       expect(wrapper.emitted("rebuild")).toBeUndefined();
+    });
+  });
+
+  describe("query choice", () => {
+    const twoQueries = (queryIndex = 0) =>
+      prefill({
+        source: "panel",
+        queryType: "promql",
+        sql: undefined,
+        promql: queryIndex ? "sum(rate(io_ops[1m]))" : "avg(disk_used)",
+        queryIndex,
+        queryChoices: [
+          { index: 0, query: "avg(disk_used)" },
+          { index: 1, tabName: "IO", query: "sum(rate(io_ops[1m]))" },
+        ],
+      });
+
+    it("offers a query select when the panel has two queries", () => {
+      wrapper = mountDialog(twoQueries());
+      const select = wrapper.findComponent({ name: "OSelect" });
+      expect(select.exists()).toBe(true);
+      expect(select.props("modelValue")).toBe(0);
+      expect(select.props("options").map((o: any) => [o.value, String(o.label)])).toEqual([
+        [0, "A: avg(disk_used)"],
+        [1, "IO: sum(rate(io_ops[1m]))"],
+      ]);
+    });
+
+    it("names a query by its legend, else its formula letter", () => {
+      wrapper = mountDialog(
+        prefill({
+          queryType: "promql",
+          sql: undefined,
+          promql: "sum(rate(requests[5m]))",
+          queryIndex: 0,
+          queryChoices: [
+            { index: 0, legend: "requests", ref: "A", query: "sum(rate(requests[5m]))" },
+            { index: 1, ref: "C", query: "sum(rate(errors[5m]))" },
+          ],
+        }),
+      );
+      const labels = wrapper
+        .findComponent({ name: "OSelect" })
+        .props("options")
+        .map((o: any) => String(o.label));
+      expect(labels).toEqual(["requests: sum(rate(requests[5m]))", "C: sum(rate(errors[5m]))"]);
+    });
+
+    it("keeps the whole query in its option label, collapsed to one line, for the select to cut", () => {
+      const long = `SELECT histogram(_timestamp, '1 minute') as "x_axis_1",\n  sum(${"a".repeat(80)}) as "y_axis_1"`;
+      wrapper = mountDialog(
+        prefill({
+          queryIndex: 0,
+          queryChoices: [
+            { index: 0, tabName: "Total retries", query: long },
+            { index: 1, query: "SELECT 1" },
+          ],
+        }),
+      );
+      const select = wrapper.findComponent({ name: "OSelect" });
+      expect(String(select.props("options")[0].label)).toBe(
+        `Total retries: ${long.replace(/\s+/g, " ")}`,
+      );
+      expect(select.props("dropdownStyle")).toEqual({ width: "var(--reka-select-trigger-width)" });
+    });
+
+    it("rebuilds the prefill for the chosen query", async () => {
+      wrapper = mountDialog(twoQueries());
+      await wrapper.findComponent({ name: "OSelect" }).vm.$emit("update:modelValue", 1);
+
+      expect(wrapper.emitted("rebuild")![0][0]).toEqual({ queryIndex: 1 });
+
+      await wrapper.setProps({ prefill: twoQueries(1) });
+      expect(wrapper.findComponent({ name: "OSelect" }).props("modelValue")).toBe(1);
+    });
+
+    it("has no query select for a single query", () => {
+      wrapper = mountDialog(prefill());
+      expect(wrapper.findComponent({ name: "OSelect" }).exists()).toBe(false);
+    });
+  });
+
+  describe("dashboard panel with several queries", () => {
+    const choices = [
+      { index: 0, query: "avg(disk_used)" },
+      { index: 1, tabName: "IO", query: "sum(rate(io_ops[1m]))" },
+    ];
+    const panelPick = (overrides: Partial<AlertPrefill> = {}) =>
+      prefill({
+        source: "panel",
+        queryType: "promql",
+        sql: undefined,
+        promql: "sum(rate(io_ops[1m]))",
+        queryIndex: 1,
+        queryChoices: choices,
+        warnings: [{ key: "absoluteToRolling", level: "warning", params: { minutes: 30 } }],
+        ...overrides,
+      });
+    const has = (dataTest: string) => wrapper!.find(`[data-test="${dataTest}"]`).exists();
+
+    it("asks only which query, with the one line of context", () => {
+      wrapper = mountDialog(panelPick());
+
+      expect(wrapper.find('[data-test="create-alert-query-picker-intro"]').text()).toBe(
+        "There are multiple queries. Select which one to create the alert from.",
+      );
+      const select = wrapper.findComponent({ name: "OSelect" });
+      expect(select.props("modelValue")).toBe(1);
+      expect(has("create-alert-threshold-shape")).toBe(false);
+      expect(has("create-alert-window")).toBe(false);
+      expect(has("create-alert-query-preview")).toBe(false);
+      expect(has("create-alert-warning-absoluteToRolling")).toBe(false);
+    });
+
+    it("shows the whole picked query, colorized like the Query Inspector, and copies it", async () => {
+      const multiLine = "sum by (instance) (\n  rate(io_ops[1m])\n)";
+      wrapper = mountDialog(
+        panelPick({
+          queryChoices: [choices[0], { ...choices[1], query: multiLine }],
+        }),
+      );
+      await flushPromises();
+
+      const block = wrapper.find('[data-test="create-alert-picked-query"]');
+      expect(block.text()).toContain("Query");
+      const text = wrapper.find('[data-test="create-alert-picked-query-text"]');
+      expect(text.classes()).toEqual(
+        expect.arrayContaining(["font-mono", "whitespace-pre-wrap", "break-all", "max-h-40"]),
+      );
+      const keyword = text.find(".text-query-syntax-keyword");
+      expect(keyword.attributes("data-lang")).toBe("promql");
+      expect(keyword.element.textContent).toBe(multiLine);
+      expect(text.find("script").exists()).toBe(false);
+
+      await wrapper.find('[data-test="create-alert-picked-query-copy"]').trigger("click");
+      expect(copyToClipboard).toHaveBeenCalledWith(multiLine, expect.any(Function));
+    });
+
+    it("follows the pick, showing the newly chosen query", async () => {
+      wrapper = mountDialog(panelPick());
+      await flushPromises();
+      expect(wrapper.find('[data-test="create-alert-picked-query-text"]').text()).toBe(
+        "sum(rate(io_ops[1m]))",
+      );
+
+      await wrapper.setProps({ prefill: panelPick({ queryIndex: 0, promql: "avg(disk_used)" }) });
+      await flushPromises();
+      expect(wrapper.find('[data-test="create-alert-picked-query-text"]').text()).toBe(
+        "avg(disk_used)",
+      );
+    });
+
+    it("keeps the plain query when the colorizer fails to load", async () => {
+      colorizeQuery.mockRejectedValueOnce(new Error("chunk failed"));
+      wrapper = mountDialog(
+        panelPick({ queryChoices: [choices[0], { ...choices[1], query: "a < b" }] }),
+      );
+      await flushPromises();
+
+      const text = wrapper.find('[data-test="create-alert-picked-query-text"]');
+      expect(text.text()).toBe("a < b");
+      expect(text.find(".text-query-syntax-keyword").exists()).toBe(false);
+    });
+
+    it("keeps the latest coloring when an earlier run for the same text finishes last", async () => {
+      let finishFirst: (html: string) => void = () => {};
+      colorizeQuery.mockImplementationOnce(
+        () => new Promise<string>((resolve) => (finishFirst = resolve)),
+      );
+      wrapper = mountDialog(panelPick());
+      await flushPromises();
+      await wrapper.setProps({ prefill: panelPick({ queryType: "sql" }) });
+      await flushPromises();
+
+      finishFirst('<span class="stale">sum(rate(io_ops[1m]))</span>');
+      await flushPromises();
+      const text = wrapper.find('[data-test="create-alert-picked-query-text"]');
+      expect(text.find(".stale").exists()).toBe(false);
+      expect(text.find(".text-query-syntax-keyword").attributes("data-lang")).toBe("sql");
+    });
+
+    it("hands the hidden non-blocking warnings on to the form", async () => {
+      wrapper = mountDialog(panelPick());
+      await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
+
+      const confirmed = wrapper.emitted("confirm")![0][0] as AlertPrefill;
+      expect(confirmed.warnings.map((w) => w.key)).toEqual(["absoluteToRolling"]);
+      expect(confirmed.queryIndex).toBe(1);
+    });
+
+    it("still states a blocking warning and keeps Continue disabled", () => {
+      wrapper = mountDialog(
+        panelPick({
+          warnings: [
+            { key: "absoluteToRolling", level: "warning", params: { minutes: 30 } },
+            { key: "unresolvedQuery", level: "blocking" },
+          ],
+        }),
+      );
+
+      expect(has("create-alert-warning-unresolvedQuery")).toBe(true);
+      expect(has("create-alert-warning-absoluteToRolling")).toBe(false);
+      expect(wrapper.findComponent(ODialogStub).props("primaryButtonDisabled")).toBe(true);
+    });
+
+    it("is minimal for a metrics-explorer chart too", () => {
+      wrapper = mountDialog(panelPick({ source: "explorer" }));
+      expect(has("create-alert-query-picker-intro")).toBe(true);
+      expect(has("create-alert-query-preview")).toBe(false);
+    });
+
+    it("leaves a single-query panel's dialog as it was", () => {
+      wrapper = mountDialog(
+        panelPick({
+          queryChoices: undefined,
+          queryIndex: undefined,
+          warnings: [{ key: "unresolvedQuery", level: "blocking" }],
+        }),
+      );
+      expect(has("create-alert-query-picker-intro")).toBe(false);
+      expect(has("create-alert-picked-query")).toBe(false);
+      expect(has("create-alert-threshold-shape")).toBe(true);
+      expect(has("create-alert-query-preview")).toBe(true);
+    });
+
+    it("leaves other sources' query choice dialog unchanged", () => {
+      wrapper = mountDialog(panelPick({ source: "logs" }));
+      expect(has("create-alert-picked-query")).toBe(false);
+      expect(has("create-alert-query-picker-intro")).toBe(false);
+      expect(has("create-alert-threshold-shape")).toBe(true);
+      expect(has("create-alert-window")).toBe(true);
+      expect(has("create-alert-query-preview")).toBe(true);
+      expect(has("create-alert-warning-absoluteToRolling")).toBe(true);
+    });
+
+    it("labels the real query select with the intro and shows the preselected query", async () => {
+      const queries = [
+        { query: "avg(disk_used)", fields: { stream: "disk_used", stream_type: "metrics" } },
+        {
+          query: "sum(rate(io_ops[1m]))",
+          tabName: "IO",
+          fields: { stream: "io_ops", stream_type: "metrics" },
+        },
+      ];
+      const built = normalizePrefill(
+        buildPrefillFromPanel({
+          panelTitle: "Disk and IO",
+          queries,
+          queryType: "promql",
+          queryIndex: 1,
+          queryChoices: panelQueryChoices(queries, undefined),
+          executedQuery: "sum(rate(io_ops[1m]))",
+          timeRange: { value_type: "relative", relative_value: 15, relative_period: "Minutes" },
+        }),
+      );
+      const { OSelect: _select, ...withoutSelectStub } = stubs;
+      wrapper = mount(CreateAlertFromSourceDialog, {
+        props: { open: true, prefill: built },
+        global: { plugins: [i18n], stubs: withoutSelectStub },
+      });
+
+      await flushPromises();
+
+      const intro = wrapper.find('[data-test="create-alert-query-picker-intro"]');
+      const trigger = wrapper.find(`#${intro.attributes("for")}`);
+      expect(trigger.exists()).toBe(true);
+      expect(trigger.text()).toContain("IO: sum(rate(io_ops[1m]))");
+      expect(trigger.find('[data-test="o-truncated-text"]').text()).toBe(
+        "IO: sum(rate(io_ops[1m]))",
+      );
     });
   });
 

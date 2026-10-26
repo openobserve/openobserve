@@ -19,7 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="enrichment-tables-list-page" class="flex h-full min-h-0 flex-col">
     <OPageLayout
-      v-if="!showAddJSTransformDialog"
       :title="t('function.enrichmentTables')"
       icon="dataset"
       :subtitle="t('function.enrichmentTablesSubtitle')"
@@ -55,7 +54,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :page-size-options="perPageOptionsList"
             :current-page="currentPage"
             @update:current-page="onPageChange"
+            @update:page-size="selectedPerPage = $event"
             sorting="client"
+            :sort-by="sortBy"
+            :sort-order="sortOrder"
+            @update:sort-by="sortBy = $event"
+            @update:sort-order="sortOrder = $event"
             filter-mode="client"
             show-index
             :show-global-filter="false"
@@ -284,6 +288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ODropdown side="bottom" align="end">
                   <template #trigger>
                     <OButton
+                      :aria-label="t('common.moreActions')"
                       icon-left="more-vert"
                       variant="ghost"
                       size="icon-xs-sq"
@@ -376,14 +381,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </OPageLayout>
-    <div v-else>
-      <AddEnrichmentTable
-        v-model="formData"
-        :isUpdating="isUpdated"
-        @update:list="refreshList"
-        @cancel:hideform="hideForm"
-      />
-    </div>
+    <!-- Keyed per open: the form reads its defaults from modelValue only at setup. -->
+    <AddEnrichmentTable
+      :key="formKey"
+      :open="showAddJSTransformDialog"
+      v-model="formData"
+      :isUpdating="isUpdated"
+      @update:list="refreshList"
+      @cancel:hideform="hideForm"
+    />
     <ConfirmDialog
       :title="t('function.deleteEnrichmentTableTitle')"
       :message="t('function.deleteEnrichmentTableConfirm')"
@@ -475,9 +481,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { streamKeys } from "@/services/stream.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { enrichmentTableStatusesQuery } from "@/services/jstransform.queries";
-import { computed, defineComponent, onBeforeMount, onMounted, ref } from "vue";
+import { computed, defineComponent, onBeforeMount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import { useListViewState } from "@/composables/useListViewState";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 import AddEnrichmentTable from "./AddEnrichmentTable.vue";
@@ -541,6 +548,7 @@ export default defineComponent({
     const jsTransforms: any = ref([]);
     const formData: any = ref({});
     const showAddJSTransformDialog: any = ref(false);
+    const formKey = ref(0);
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
@@ -550,15 +558,22 @@ export default defineComponent({
     const showEnrichmentSchema = ref<boolean>(false);
     const showUrlJobsDialogState = ref<boolean>(false);
     const selectedTableForUrlJobs = ref<any>(null);
-    const filterQuery = ref("");
+    const viewState = useListViewState("enrichmentTables", {
+      filterQuery: "",
+      filter: "all",
+      pageSize: 20,
+      currentPage: 1,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+    });
+    const filterQuery = ref(viewState.filterQuery);
     const loading = ref(false);
     // Request in flight with rows still on screen — the refresh button's
     // spinner. `loading` is the skeleton, for a cold read only.
     const fetching = ref(false);
     const lastUpdatedAt = ref<number | null>(null);
     const forbidden = ref(false);
-    // Plain ref, not URL/store-backed: only the OTable v-if branch unmounts on add/edit, not EnrichmentTableList itself.
-    const currentPage = ref(1);
+    const currentPage = ref(viewState.currentPage);
     const onPageChange = (page: number) => {
       currentPage.value = page;
     };
@@ -824,9 +839,22 @@ export default defineComponent({
     };
 
     const maxRecordToReturn = ref<number>(100);
-    const selectedPerPage = ref<number>(20);
+    const selectedPerPage = ref<number>(viewState.pageSize);
     const selectedEnrichmentTable = ref<any>(null);
-    const selectedFilter = ref<string>("all");
+    const selectedFilter = ref<string>(viewState.filter);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
+    watch([filterQuery, selectedFilter], () => (currentPage.value = 1));
+    watch([filterQuery, selectedFilter, selectedPerPage, currentPage, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        filterQuery: filterQuery.value,
+        filter: selectedFilter.value,
+        pageSize: selectedPerPage.value,
+        currentPage: currentPage.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
+    });
 
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
@@ -838,6 +866,7 @@ export default defineComponent({
     };
 
     const addLookupTable = () => {
+      formKey.value += 1;
       showAddJSTransformDialog.value = true;
     };
 
@@ -879,7 +908,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: action,
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         page: "Functions",
       });
     };
@@ -943,7 +971,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: "Delete Enrichment Table",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         function_name: selectedDelete.value.name,
         is_ingest_func: selectedDelete.value.ingest,
         page: "Functions",
@@ -1176,6 +1203,7 @@ export default defineComponent({
       changePagination,
       maxRecordToReturn,
       showAddJSTransformDialog,
+      formKey,
       delete: "delete",
       filterQuery,
       filterData,
@@ -1196,6 +1224,8 @@ export default defineComponent({
       bulkDeleteEnrichmentTables,
       bulkDeleteLoading,
       selectedFilter,
+      sortBy,
+      sortOrder,
       showUrlJobsDialog,
       showUrlJobsDialogState,
       selectedTableForUrlJobs,

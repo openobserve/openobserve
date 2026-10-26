@@ -4,8 +4,6 @@ export const SELECT_ALL_VALUE = "_o2_all_";
 export const CUSTOM_VALUE = "::_o2_custom";
 
 // add panel general constants
-export const MAX_FIELD_LABEL_CHARS = 50;
-
 export const TABLE_ROWS_PER_PAGE_DEFAULT_VALUE = 10;
 
 // Pivot table constants
@@ -25,3 +23,6 @@ export const FIELD_FUNCTION_MENU_WIDTH = "min(48.1875rem, calc(100vw - 1.5rem))"
 // Chart types whose queries are always hand-written (custom) rather than
 // builder-generated. Add future custom-query chart types here.
 export const CUSTOM_QUERY_CHART_TYPES = ["custom_chart"];
+
+/** Keeps annotation bands above series (bars z 2, lines/area fills z 3) on the shared zlevel; markLine's own zlevel always renders above both regardless of z. */
+export const ANNOTATION_MARK_AREA_Z = 4;

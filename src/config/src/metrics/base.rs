@@ -220,6 +220,19 @@ pub static SYNTHETICS_ORPHANED_CHECKS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static ORG_CLEANUP_FAILED_STEPS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "org_cleanup_failed_steps",
+            "Org deletion steps that exhausted their attempts, per org.",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["org"],
+    )
+    .expect("Metric created")
+});
+
 /// Completed orphan-detection passes. A dead-man's switch, not a workload count.
 ///
 /// The detector runs only on scheduler nodes and reads only its own region's
@@ -1394,6 +1407,19 @@ pub static ALERT_DEDUP_ERRORS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static ALERT_RUNS_SUPPRESSED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "alert_runs_suppressed_total",
+            "Total number of runs whose notification a downtime suppressed",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["org", "module"],
+    )
+    .expect("Metric created")
+});
+
 // Alert grouping/batching metrics
 pub static ALERT_GROUPING_BATCHES_PENDING: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
@@ -2494,6 +2520,534 @@ pub static EVAL_SCHEDULER_WATERMARK_LAG_SECONDS: Lazy<IntGaugeVec> = Lazy::new(|
     .expect("Metric created")
 });
 
+// AI chat persistence (server-side chat history; see core::ai_chat)
+pub static AI_CHAT_TURNS_ACTIVE: Lazy<IntGauge> = Lazy::new(|| {
+    IntGauge::with_opts(
+        Opts::new(
+            "ai_chat_turns_active",
+            "Persisted AI chat turns currently running as background tasks",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_TURN_RESULT_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_turn_result_total",
+            "Persisted AI chat turns by outcome (result=persisted|persistence_failed|cancelled|deleted|error|busy|turn_limit|timeout|interrupted)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "result"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_PERSIST_BATCHES_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_persist_batches_total",
+            "Durable-event batches written for AI chats (status=ok|retry|failed|fenced|deleted)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "status"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_PERSIST_EVENTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_persist_events_total",
+            "Durable events committed to the protected chat-events stream",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_PERSIST_BATCH_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "ai_chat_persist_batch_latency_seconds",
+            "Time to durably write one batch of AI chat events, including the watermark update",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_UI_DISCONNECTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_ui_disconnects_total",
+            "Browsers that went away while a persisted turn kept running (reason=closed|lagged)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "reason"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_SEQUENCE_GAPS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_sequence_gaps_total",
+            "Turns whose durable events did not continue the committed prefix (persistence refused, not patched)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_RESTORES_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_restores_total",
+            "o2-ai replicas rebuilt from the chat-events stream before a turn (result=ok|failed)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "result"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_RESTORE_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "ai_chat_restore_seconds",
+            "Time to read a chat's committed history and replay it into an o2-ai replica",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_READ_INTEGRITY_ERRORS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_read_integrity_errors_total",
+            "Committed chat history that could not be read back intact (reason=gap|divergence|hash|decode)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "reason"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_TURN_LEASE_CONFLICTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_turn_lease_conflicts_total",
+            "Chat turns refused with 409 session_busy because another turn held the session",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_PERSIST_LAG_MILLISECONDS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "ai_chat_persist_lag_milliseconds",
+            "Time from writing an AI chat event batch to committing its watermark, last batch per org",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_PERSIST_PENDING_EVENTS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "ai_chat_persist_pending_events",
+            "Durable AI chat events received from o2-ai but not yet committed, per org",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_OWNER_WAIT_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "ai_chat_owner_wait_seconds",
+            "Time a persisted turn waited for an unreachable o2-ai session owner",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_OWNER_WAIT_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_owner_wait_total",
+            "Owner waits of persisted turns by outcome (outcome=recovered|taken_over|gave_up|cancelled)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "outcome"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_RESTORE_EVENTS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "ai_chat_restore_events",
+            "Durable events replayed into an o2-ai replica by one restore",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![
+            10.0, 50.0, 100.0, 500.0, 1000.0, 5000.0, 10000.0, 50000.0,
+        ]),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_RESTORE_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "ai_chat_restore_bytes",
+            "Payload bytes replayed into an o2-ai replica by one restore",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(prometheus::exponential_buckets(16384.0, 4.0, 8).expect("valid buckets")),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_REPLICA_PURGES_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_replica_purges_total",
+            "Deferred removals of deleted chats' o2-ai copies by the retention sweep (result=ok|failed)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["result"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_SHARE_OPS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_share_ops_total",
+            "AI chat share operations (op=create|update|revoke|fork)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["op"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_SHARE_READS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_share_reads_total",
+            "Shared AI chats served (visibility=org|public)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["visibility"],
+    )
+    .expect("Metric created")
+});
+// RCA runs (incident analysis; see core::alerts::rca_turn)
+pub static RCA_RUNS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_runs_total",
+            "Ended RCA runs by trigger, end state and error code (empty when none)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "trigger", "state", "error_code"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_RUN_DURATION_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "rca_run_duration_seconds",
+            "Wall time of an ended RCA run by end state",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![
+            10.0, 30.0, 60.0, 120.0, 300.0, 600.0, 1200.0, 1800.0, 3600.0,
+        ]),
+        &["organization", "state"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_RUN_STEPS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "rca_run_steps",
+            "Narrated steps recorded by an ended RCA run",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 30.0]),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_RUN_TOOL_CALLS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new("rca_run_tool_calls", "Tool calls made by an ended RCA run")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels())
+            .buckets(vec![1.0, 5.0, 10.0, 20.0, 40.0, 80.0, 150.0, 300.0]),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_RUN_CONTINUATIONS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_run_continuations_total",
+            "Continuation turns started for RCA runs that ended without a report",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_RUNS_WITHOUT_REPORT_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_runs_without_report_total",
+            "RCA runs whose turns ended without a submitted report",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+// RCA verdicts; counted by the finalizer's winning end write.
+pub static RCA_OUTCOME_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_outcome_total",
+            "Outcomes that code derived for completed RCA runs",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "outcome", "trigger"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_OUTCOME_CLAIM_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_outcome_claim_total",
+            "Outcomes the agent claimed against the outcomes code derived for completed RCA runs",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "claimed", "derived"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_HYPOTHESIS_LEFT_TESTING_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_hypothesis_left_testing_total",
+            "Hypotheses still testing when their RCA run ended, rewritten to untested",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_LEDGER_TRUNCATED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_ledger_truncated_total",
+            "Evidence ledger items and strings cut at their limits, by field",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "field"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_LEDGER_INVALID_CALL_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_ledger_invalid_call_total",
+            "Evidence ledger calls dropped as invalid, by tool",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "tool"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_TIMELINE_UNVERIFIED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_timeline_unverified_total",
+            "Submitted timeline entries shown as unverified",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_VERDICT_REVISED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_verdict_revised_total",
+            "RCA runs whose leading hypothesis changed during the run",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_CONFIDENCE_GRADE_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_confidence_grade_total",
+            "Confidence bands the agent claimed against the bands code graded",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "claimed", "graded"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_UNVERIFIED_CITATIONS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_unverified_citations_total",
+            "Evidence citations that matched no successful tool call, by reason",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "reason"],
+    )
+    .expect("Metric created")
+});
+// RCA steering and questions (see core::alerts::rca_steering)
+pub static RCA_STEERING_MESSAGES_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_steering_messages_total",
+            "Steering rows of ended RCA runs, by kind and final status",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "kind", "final_status"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_STEERING_READ_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "rca_steering_read_latency_seconds",
+            "Time from a steering message's delivery to the agent reading it",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0, 600.0]),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_STEERING_NOT_READ_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_steering_not_read_total",
+            "Steering messages the agent never read, by reason",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "status_reason"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_STEERING_ACKS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_steering_acks_total",
+            "Read steering messages by the agent's action: applied, declined or unacknowledged",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "action"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_QUESTIONS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_questions_total",
+            "Questions RCA runs asked responders, by result: answered or deadline",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "result"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_ANSWER_WAIT_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "rca_answer_wait_seconds",
+            "Time an RCA run waited for an answer to its question",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![
+            30.0, 60.0, 120.0, 300.0, 600.0, 900.0, 1800.0, 3600.0, 7200.0,
+        ]),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+// RCA resume
+pub static RCA_RESUME_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_resume_total",
+            "Requests to resume an RCA run, by result: started or refused",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "result"],
+    )
+    .expect("Metric created")
+});
+// RCA live stream (see core::alerts::rca_live)
+pub static RCA_LIVE_STREAMS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new("rca_live_streams", "Open RCA live streams on this node")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
 // Deliberate: spec §14.1 says `org_id` and four `result` values; `organization` is the house label.
 pub static HEC_AUTH_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -2593,6 +3147,9 @@ pub(crate) fn register(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(SYNTHETICS_ORPHANED_CHECKS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(ORG_CLEANUP_FAILED_STEPS.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(SYNTHETICS_ORPHAN_SCANS_TOTAL.clone()))
@@ -2886,6 +3443,9 @@ pub(crate) fn register(registry: &Registry) {
     registry
         .register(Box::new(ALERT_DEDUP_ERRORS_TOTAL.clone()))
         .expect("Metric registered");
+    registry
+        .register(Box::new(ALERT_RUNS_SUPPRESSED_TOTAL.clone()))
+        .expect("Metric registered");
 
     // alert grouping metrics
     registry
@@ -3152,6 +3712,55 @@ pub(crate) fn register(registry: &Registry) {
     registry
         .register(Box::new(EVAL_SCHEDULER_WATERMARK_LAG_SECONDS.clone()))
         .expect("Metric registered");
+
+    // AI chat persistence
+    for metric in [
+        Box::new(AI_CHAT_TURN_RESULT_TOTAL.clone()) as Box<dyn prometheus::core::Collector>,
+        Box::new(AI_CHAT_PERSIST_BATCHES_TOTAL.clone()),
+        Box::new(AI_CHAT_PERSIST_EVENTS_TOTAL.clone()),
+        Box::new(AI_CHAT_UI_DISCONNECTS_TOTAL.clone()),
+        Box::new(AI_CHAT_SEQUENCE_GAPS_TOTAL.clone()),
+        Box::new(AI_CHAT_TURN_LEASE_CONFLICTS_TOTAL.clone()),
+        Box::new(AI_CHAT_TURNS_ACTIVE.clone()),
+        Box::new(AI_CHAT_PERSIST_BATCH_LATENCY_SECONDS.clone()),
+        Box::new(AI_CHAT_RESTORES_TOTAL.clone()),
+        Box::new(AI_CHAT_RESTORE_SECONDS.clone()),
+        Box::new(AI_CHAT_READ_INTEGRITY_ERRORS_TOTAL.clone()),
+        Box::new(AI_CHAT_SHARE_OPS_TOTAL.clone()),
+        Box::new(AI_CHAT_SHARE_READS_TOTAL.clone()),
+        Box::new(AI_CHAT_PERSIST_LAG_MILLISECONDS.clone()),
+        Box::new(AI_CHAT_PERSIST_PENDING_EVENTS.clone()),
+        Box::new(AI_CHAT_OWNER_WAIT_SECONDS.clone()),
+        Box::new(AI_CHAT_OWNER_WAIT_TOTAL.clone()),
+        Box::new(AI_CHAT_RESTORE_EVENTS.clone()),
+        Box::new(AI_CHAT_RESTORE_BYTES.clone()),
+        Box::new(AI_CHAT_REPLICA_PURGES_TOTAL.clone()),
+        Box::new(RCA_RUNS_TOTAL.clone()),
+        Box::new(RCA_RUN_DURATION_SECONDS.clone()),
+        Box::new(RCA_RUN_STEPS.clone()),
+        Box::new(RCA_RUN_TOOL_CALLS.clone()),
+        Box::new(RCA_RUN_CONTINUATIONS_TOTAL.clone()),
+        Box::new(RCA_RUNS_WITHOUT_REPORT_TOTAL.clone()),
+        Box::new(RCA_OUTCOME_TOTAL.clone()),
+        Box::new(RCA_OUTCOME_CLAIM_TOTAL.clone()),
+        Box::new(RCA_HYPOTHESIS_LEFT_TESTING_TOTAL.clone()),
+        Box::new(RCA_LEDGER_TRUNCATED_TOTAL.clone()),
+        Box::new(RCA_LEDGER_INVALID_CALL_TOTAL.clone()),
+        Box::new(RCA_TIMELINE_UNVERIFIED_TOTAL.clone()),
+        Box::new(RCA_VERDICT_REVISED_TOTAL.clone()),
+        Box::new(RCA_CONFIDENCE_GRADE_TOTAL.clone()),
+        Box::new(RCA_UNVERIFIED_CITATIONS_TOTAL.clone()),
+        Box::new(RCA_STEERING_MESSAGES_TOTAL.clone()),
+        Box::new(RCA_STEERING_READ_LATENCY_SECONDS.clone()),
+        Box::new(RCA_STEERING_NOT_READ_TOTAL.clone()),
+        Box::new(RCA_STEERING_ACKS_TOTAL.clone()),
+        Box::new(RCA_QUESTIONS_TOTAL.clone()),
+        Box::new(RCA_ANSWER_WAIT_SECONDS.clone()),
+        Box::new(RCA_RESUME_TOTAL.clone()),
+        Box::new(RCA_LIVE_STREAMS.clone()),
+    ] {
+        registry.register(metric).expect("Metric registered");
+    }
 }
 
 #[cfg(test)]
@@ -3197,6 +3806,7 @@ mod tests {
         let _ = SYNTHETICS_PENDING_JOBS.clone();
         let _ = SYNTHETICS_OLDEST_PENDING_AGE_SECONDS.clone();
         let _ = SYNTHETICS_ORPHANED_CHECKS.clone();
+        let _ = ORG_CLEANUP_FAILED_STEPS.clone();
         let _ = SYNTHETICS_ORPHAN_SCANS_TOTAL.clone();
         let _ = SYNTHETICS_UNREADABLE_CHECKS_TOTAL.clone();
         let _ = O2_SERVICE_GRAPH_RESOLVED_TOTAL.clone();
@@ -3310,6 +3920,7 @@ mod tests {
         let _ = ALERT_DEDUP_SUPPRESSED_TOTAL.clone();
         let _ = ALERT_DEDUP_PASSED_TOTAL.clone();
         let _ = ALERT_DEDUP_ERRORS_TOTAL.clone();
+        let _ = ALERT_RUNS_SUPPRESSED_TOTAL.clone();
         let _ = ALERT_GROUPING_BATCHES_PENDING.clone();
         let _ = ALERT_GROUPING_NOTIFICATIONS_SENT_TOTAL.clone();
         let _ = ALERT_GROUPING_BATCH_SIZE.clone();
@@ -3411,6 +4022,20 @@ mod tests {
                     .collect()
             };
             assert_eq!(labels, expected, "{}", family.name());
+        }
+    }
+
+    #[test]
+    fn test_org_cleanup_failed_steps_help_names_only_its_org_label() {
+        use prometheus::core::Collector;
+        let desc = ORG_CLEANUP_FAILED_STEPS.desc();
+        assert_eq!(desc[0].variable_labels, ["org"]);
+        let help = &desc[0].help;
+        for absent in ["'organization", "'stream type'", "'stream'"] {
+            assert!(
+                !help.contains(absent),
+                "help names a label it lacks: {help}"
+            );
         }
     }
 }

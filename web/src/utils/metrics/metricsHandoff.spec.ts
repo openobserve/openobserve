@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import { buildPanelDataForCard } from "./metricsHandoff";
+import { buildPanelDataForCard, withBareMetricNames } from "./metricsHandoff";
 import { buildMetricCards, type MetricStream } from "./metricFamily";
 import { getMetricDefaults, resolveVariant } from "./metricDefaults";
 
@@ -396,5 +396,45 @@ describe("legends follow the SERIES a query returns, not the query count", () =>
         expect(Array.isArray(query.fields.y)).toBe(true);
       }
     });
+  });
+});
+
+describe("withBareMetricNames", () => {
+  it("writes a selector on a legal metric name as the bare name", () => {
+    expect(withBareMetricNames('sum(rate({__name__="http_requests_total"}[5m]))')).toBe(
+      "sum(rate(http_requests_total[5m]))",
+    );
+    expect(withBareMetricNames('{__name__="up",job="api"} / {__name__="up"}')).toBe(
+      'up{job="api"} / up',
+    );
+  });
+
+  it("keeps the selector form for a name PromQL cannot spell bare", () => {
+    const expr = '{__name__="1st_stream",job="api"}';
+    expect(withBareMetricNames(expr)).toBe(expr);
+  });
+
+  it("keeps the selector form for a name PromQL reads as a keyword", () => {
+    for (const name of ["sum", "count", "offset", "bool", "on", "by", "without", "inf", "nan"]) {
+      const expr = `rate({__name__="${name}"}[5m])`;
+      expect(withBareMetricNames(expr)).toBe(expr);
+    }
+  });
+
+  it("keeps a regex or negated name matcher as it is", () => {
+    for (const expr of ['{__name__=~"http_.*"}', '{__name__!="up",job="api"}']) {
+      expect(withBareMetricNames(expr)).toBe(expr);
+    }
+  });
+
+  it("lifts the name out wherever it sits among the matchers", () => {
+    expect(withBareMetricNames('{job="api", __name__="up", path="/a,b}"}')).toBe(
+      'up{job="api",path="/a,b}"}',
+    );
+  });
+
+  it("leaves a selector written inside a string alone", () => {
+    const expr = 'label_replace(up, "q", "{__name__=\\"up\\"}", "", "")';
+    expect(withBareMetricNames(expr)).toBe(expr);
   });
 });

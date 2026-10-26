@@ -54,6 +54,28 @@ pub enum TriggerModule {
     /// next rung's delay. Its own lane so a paging timer is never queued
     /// behind an alert evaluation backlog.
     OncallEscalation,
+    /// Periodic alert calibration pass, one job per org config.
+    AlertCalibration,
+    /// Fleet rollout engine: one job per rollout with work left, region-local.
+    FleetRollout,
+}
+
+impl TriggerModule {
+    /// Exhaustive, so a new module has to choose; keep-alive must renew the claim it completes by.
+    pub fn completes_by_claim(&self) -> bool {
+        match self {
+            Self::CompositeAlert | Self::AlertCalibration | Self::FleetRollout => true,
+            Self::Report
+            | Self::Alert
+            | Self::DerivedStream
+            | Self::QueryRecommendations
+            | Self::Backfill
+            | Self::AnomalyDetection
+            | Self::Slo
+            | Self::SloBackfill
+            | Self::OncallEscalation => false,
+        }
+    }
 }
 
 impl std::fmt::Display for TriggerModule {
@@ -69,6 +91,8 @@ impl std::fmt::Display for TriggerModule {
             Self::SloBackfill => write!(f, "slo_backfill"),
             Self::CompositeAlert => write!(f, "composite_alert"),
             Self::OncallEscalation => write!(f, "oncall_escalation"),
+            Self::AlertCalibration => write!(f, "alert_calibration"),
+            Self::FleetRollout => write!(f, "fleet_rollout"),
         }
     }
 }
@@ -101,6 +125,13 @@ pub struct Trigger {
     pub retries: i32,
     #[serde(default)]
     pub data: String,
+}
+
+impl Trigger {
+    /// The due time, or `None` once the trigger is Completed and will not run again.
+    pub fn pending_next_run_at(&self) -> Option<i64> {
+        (self.status != TriggerStatus::Completed).then_some(self.next_run_at)
+    }
 }
 
 impl MemorySize for Trigger {
@@ -220,6 +251,20 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_completed_trigger_has_no_pending_next_run() {
+        let waiting = Trigger {
+            next_run_at: 42,
+            ..Default::default()
+        };
+        assert_eq!(waiting.pending_next_run_at(), Some(42));
+        let completed = Trigger {
+            status: TriggerStatus::Completed,
+            ..waiting
+        };
+        assert_eq!(completed.pending_next_run_at(), None);
+    }
+
+    #[test]
     fn test_trigger_module_display() {
         assert_eq!(TriggerModule::Alert.to_string(), "alert");
         assert_eq!(TriggerModule::Report.to_string(), "report");
@@ -253,6 +298,9 @@ mod tests {
         assert_eq!(TriggerModule::SloBackfill as i32, 7);
         assert_eq!(TriggerModule::CompositeAlert as i32, 8);
         assert_eq!(TriggerModule::OncallEscalation as i32, 9);
+        assert_eq!(TriggerModule::AlertCalibration as i32, 10);
+        assert_eq!(TriggerModule::FleetRollout as i32, 11);
+        assert_eq!(TriggerModule::FleetRollout.to_string(), "fleet_rollout");
     }
 
     #[test]

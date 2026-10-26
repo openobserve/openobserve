@@ -15,6 +15,8 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import store from "./index";
+import { resolveLogSeverity } from "@/utils/logs/statusParser";
+import { readPanelDraft, writePanelDraft } from "@/composables/dashboard/usePanelDraft";
 
 // `store` is an imported singleton mutated by every test in this file, so the
 // DECLARED initial state cannot be observed from inside a test that has already
@@ -36,6 +38,45 @@ const declaredAlertLibrary = {
 };
 
 describe("root store", () => {
+  describe("setConfig severity kill switch", () => {
+    afterEach(() => store.commit("setConfig", {}));
+
+    it("turns message inference off when /config sets ui_logs_severity_inference to false", () => {
+      store.commit("setConfig", { ui_logs_severity_inference: false });
+      expect(resolveLogSeverity({ message: "[ERROR] x" }).level).toBe("unknown");
+      expect(resolveLogSeverity({ status: 500 }).level).toBe("error");
+    });
+
+    it("keeps inference on when the field is absent or true", () => {
+      store.commit("setConfig", { ui_logs_severity_inference: false });
+      store.commit("setConfig", {});
+      expect(resolveLogSeverity({ message: "[ERROR] x" }).level).toBe("error");
+      store.commit("setConfig", { ui_logs_severity_inference: false });
+      store.commit("setConfig", { ui_logs_severity_inference: true });
+      expect(resolveLogSeverity({ message: "[WARN] x" }).level).toBe("warning");
+    });
+  });
+
+  describe("logout", () => {
+    it("clears every panel draft stored in this browser", async () => {
+      const scope = { userEmail: "me@x.io", org: "o", dashboardId: "d", panelId: "p" };
+      writePanelDraft(scope, {
+        tabId: "t",
+        data: {},
+        layout: { currentQueryIndex: 0, vrlFunctionToggle: false },
+        sessionVariables: [],
+        variablesWithCurrentPanel: [],
+      });
+      localStorage.setItem("unrelated", "keep");
+
+      await store.dispatch("logout");
+
+      expect(readPanelDraft(scope)).toBeNull();
+      expect(localStorage.getItem("unrelated")).toBe("keep");
+      localStorage.removeItem("unrelated");
+    });
+  });
+
   describe("setFoldersByType", () => {
     it("keeps other modules' folders when one module commits its own", () => {
       // Every module (dashboards, alerts, reports, synthetics) caches its
@@ -239,6 +280,21 @@ describe("root store", () => {
       expect(cache().byTraceId).toEqual({});
       expect(cache().knownStreams).toEqual([]);
     });
+  });
+});
+
+describe("setOrganizations", () => {
+  afterEach(() => store.commit("setOrganizations", []));
+
+  it.each([undefined, null, { data: [] }, "oops"])("stores an empty list for %s", (payload) => {
+    store.commit("setOrganizations", payload);
+    expect(store.state.organizations).toEqual([]);
+  });
+
+  it("keeps a real organization list", () => {
+    const orgs = [{ identifier: "default" }];
+    store.commit("setOrganizations", orgs);
+    expect(store.state.organizations).toEqual(orgs);
   });
 });
 

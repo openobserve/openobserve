@@ -17,11 +17,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div
-    class="rounded-default tracePage h-full max-h-full! min-h-full! overflow-hidden!"
+    class="rounded-default tracePage flex h-full max-h-full! min-h-full! flex-col overflow-hidden!"
     id="tracePage"
     style="min-height: auto"
   >
-    <div id="tracesSecondLevel" class="h-full">
+    <FirstDataPanel
+      v-if="firstDataArrival"
+      signal="traces"
+      variant="full"
+      :arrived="firstDataArrival"
+      class="mx-2.5 mt-2.5 shrink-0"
+      @dismiss="firstDataArrival = null"
+    />
+    <div id="tracesSecondLevel" class="h-full min-h-0 flex-1">
       <OSplitter
         :class="[
           'traces-horizontal-splitter h-full',
@@ -70,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @apply-saved-view="onApplySavedView"
               @service-graph-refresh="serviceGraphRef?.refresh()"
               @services-catalog-refresh="servicesCatalogRef?.loadServicesCatalog()"
-              @drill-down="searchResultRef?.openUnifiedAnalysisDashboard()"
+              @drill-down="searchResultRef?.openComparison()"
             />
           </div>
         </template>
@@ -136,16 +144,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #after>
                   <div class="h-full pb-2.5">
                     <!-- No trace streams in org yet -->
-                    <TracesNoDataState
+                    <FirstDataPanel
                       v-if="
                         !searchObj.loadingStream &&
                         searchObj.data.stream.streamLists.length === 0 &&
                         !searchObj.loading
                       "
-                      :ai-enabled="isAiEnabled"
-                      data-test="traces-no-streams-in-org-text"
-                      @ask-ai="onAskAiSetupTracing"
-                    />
+                      v-slot="{ layout, statusLine }"
+                      signal="traces"
+                      variant="full"
+                      status-in-slot
+                      @detected="onFirstDataDetected"
+                    >
+                      <TracesNoDataState
+                        :ai-enabled="isAiEnabled"
+                        :alternatives-only="layout === 'panel'"
+                        data-test="traces-no-streams-in-org-text"
+                        @ask-ai="onAskAiSetupTracing"
+                      >
+                        <template v-if="layout === 'status'" #status>
+                          <component :is="statusLine" />
+                        </template>
+                      </TracesNoDataState>
+                    </FirstDataPanel>
                     <!-- Stable loading state while streams load / auto-run fires,
                        so the empties don't flash in between. -->
                     <div
@@ -205,7 +226,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:scroll="getMoreData"
                         @update:sort="runQueryOnSort"
                         @shareLink="(range: any) => copyTracesUrl(t, range)"
-                        @metrics:filters-updated="onMetricsFiltersUpdated"
+                        @metrics:editor-filter-set="onMetricsEditorFilterSet"
+                        @metrics:editor-filter-run="onMetricsEditorFilterRun"
                         @run-query="searchData"
                         @remove-filter="onRemoveTracesFilter"
                         @jump-to-stream-data="onJumpToTracesStreamData"
@@ -259,6 +281,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <p>{{ t("traces.index.changeStreamMessage") }}</p>
     </ODialog>
+    <div class="sr-only" aria-live="polite" aria-atomic="true" data-test="traces-row-nav-live">
+      {{ tracesRowNavAnnouncement }}
+    </div>
   </div>
 </template>
 
@@ -311,7 +336,9 @@ import {
 import { parseSpanKindWhereClause } from "@/utils/traces/constants";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
+import { tracesRowNavAnnouncement } from "./composables/tracesRowNav";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
+import { isRangeSelectionCurrent } from "@/plugins/traces/metrics/latencyHeatmap";
 import { isLLMTrace } from "@/utils/llmUtils";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -321,12 +348,15 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import QueryErrorState from "@/components/common/QueryErrorState.vue";
 import TracesNoDataState from "@/plugins/traces/TracesNoDataState.vue";
+import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
+import type { FirstEventResult } from "@/composables/firstEvent/useFirstEventWatch";
 import TracesNoStreamState from "@/plugins/traces/TracesNoStreamState.vue";
 import { saveTracesStream, restoreTracesStream } from "@/utils/streamPersist";
 import { resolveTraceStream } from "@/utils/traces/streamSelection";
 import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { recordPageLoad, recordPageRequest, type PageLoadReason } from "@/utils/pageCrossing";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 interface TracesSavedView {
@@ -386,7 +416,6 @@ const correlationFilters = useCorrelationFilters({
 });
 correlationFilters.watchQuery();
 
-let refreshIntervalID = 0;
 const searchResultRef = ref<any>(null);
 const searchBarRef = ref(null);
 const serviceGraphRef = ref<any>(null);
@@ -596,10 +625,13 @@ const getDefaultRequest = () => {
 
 function resolveSearchWindow(reuseLastWindow: boolean) {
   const lastQuery = searchObj.data.queryPayload?.query;
-  if (reuseLastWindow && lastQuery?.start_time && lastQuery?.end_time) {
+  const datetime = searchObj.data.datetime;
+  // An unsearched box or brush moves the picker with the editor, so a sort takes that window, never the old one.
+  const pickerMoved =
+    datetime.startTime !== lastQuery?.start_time || datetime.endTime !== lastQuery?.end_time;
+  if (reuseLastWindow && !pickerMoved && lastQuery?.start_time && lastQuery?.end_time) {
     return { startTime: lastQuery.start_time, endTime: lastQuery.end_time };
   }
-  const datetime = searchObj.data.datetime;
   if (datetime.type !== "relative") return cloneDeep(datetime);
 
   const timestamps: any = getConsumableRelativeTime(datetime.relativeTimePeriod);
@@ -739,8 +771,9 @@ function fetchTracesCount() {
           searchObj.meta.resultGrid.showPagination = count > 0;
         }
       },
-      error: (_payload: any, _err: any) => {
-        console.error("Failed to fetch traces count");
+      error: (_payload: any, err: any) => {
+        // The count is a best-effort badge; the main search reports its own failures.
+        console.warn("Failed to fetch traces count", err);
         currentCountTraceId = null;
       },
       complete: (_payload: any) => {
@@ -782,11 +815,32 @@ function buildEditorFilter() {
   return parseSpanKindWhereClause(filter, tracesParser.value, streamName);
 }
 
+// Every new search and sort (stream, mode, editor) rebuilds its filter in getQueryData, so the selection is checked there.
+const dropStaleSelection = () => {
+  const filters = searchObj.meta.metricsRangeFilters;
+  let dropped = false;
+  for (const [id, entry] of filters) {
+    const current = isRangeSelectionCurrent(entry, {
+      startTime: searchObj.data.datetime.startTime,
+      endTime: searchObj.data.datetime.endTime,
+      stream: searchObj.data.stream.selectedStream.value,
+      searchMode: searchObj.meta.searchMode,
+      editorText: searchObj.data.editorValue,
+    });
+    if (current) continue;
+    filters.delete(id);
+    dropped = true;
+  }
+  if (dropped) searchResultRef.value?.metricsDashboardRef?.clearOriginalTimeRange();
+};
+
 async function getQueryData(isPagination: boolean = false, isSort: boolean = false) {
+  let boundTraceId: string | null = null;
   try {
     if (searchObj.data.stream.selectedStream.value == "") {
       return false;
     }
+    if (!isPagination) resetTraceRowSelection();
     searchObj.data.errorMsg = "";
     searchObj.data.errorDetail = "";
     searchObj.data.sqlSyntaxErrorRanges = [];
@@ -830,7 +884,11 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
 
     queryReq.query.size = searchObj.meta.resultGrid.rowsPerPage;
 
-    if (!isPagination) submittedFilter = buildEditorFilter();
+    // A search or sort reads the editor and the resolved window; a page fetch keeps page 1's, so its selection still holds.
+    if (!isPagination) {
+      submittedFilter = buildEditorFilter();
+      dropStaleSelection();
+    }
     const combinedFilter = submittedFilter;
 
     if (!isPagination && !isSort) searchResultRef?.value?.getDashboardData();
@@ -850,6 +908,14 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
     const searchTraceId = getUUID().replace(/-/g, "");
     currentSearchTraceId = searchTraceId;
     tracesRequestState[searchTraceId] = { hasWritten: false };
+    if (isPagination) {
+      recordPageRequest(
+        searchObj.meta.resultGrid.navigation,
+        searchObj.data.resultGrid,
+        searchTraceId,
+      );
+      boundTraceId = searchTraceId;
+    }
 
     const isSpansMode = searchObj.meta.searchMode === "spans";
     const sortCol = searchObj.meta.resultGrid.sortBy || "start_time";
@@ -983,6 +1049,7 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
           if (!tracesRequestState[searchTraceId]) return;
 
           searchObj.loading = false;
+          if (isPagination) noteTracesPageLoad(searchTraceId, "error");
 
           const errData = err?.content || err;
           const { message, trace_id, code, error_detail } = errData ?? {};
@@ -1028,8 +1095,11 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
             isLLMSpanPresent.value = false;
           }
           delete tracesRequestState[searchTraceId];
+          if (isPagination) noteTracesPageLoad(searchTraceId, "done");
           if (!isPagination) {
-            analytics.track("traces_search_completed");
+            analytics.track("traces_search_completed", {
+              hits: searchObj.data.queryResults?.hits?.length ?? 0,
+            });
             fetchTracesCount();
           }
           correlationFilters.save().catch((e) => console.error("[correlation:save] error:", e));
@@ -1045,7 +1115,19 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
     searchObj.loading = false;
     searchObj.data.errorMsg = e?.message || t("traces.index.searchRequestFailed");
     searchObj.data.errorDetail = "";
+    if (boundTraceId) noteTracesPageLoad(boundTraceId, "error");
   }
+}
+
+function resetTraceRowSelection() {
+  const navigation = searchObj.meta.resultGrid.navigation;
+  navigation.selectionActive = false;
+  navigation.currentRowIndex = null;
+  navigation.pendingPageSelection = null;
+}
+
+function noteTracesPageLoad(requestId: string, reason: PageLoadReason) {
+  recordPageLoad(searchObj.data.resultGrid, { requestId, ok: reason === "done", reason });
 }
 
 const updateFieldVisibility = async (field: any) => {
@@ -1080,6 +1162,9 @@ const cancelSearch = () => {
   });
   // Cancelling tears down the listeners, so no terminal event will release this entry.
   delete tracesRequestState[currentSearchTraceId];
+  if (searchObj.data.resultGrid.pageRequest?.requestId === currentSearchTraceId) {
+    noteTracesPageLoad(currentSearchTraceId, "cancelled");
+  }
   currentSearchTraceId = null;
   searchObj.loading = false;
 };
@@ -1288,7 +1373,10 @@ function generateHistogramData() {
   // }
 }
 
+const isAutoRunOff = () => !!store.state.zoConfig?.auto_query_enabled && !searchObj.meta.liveMode;
+
 async function loadPageData() {
+  const streamFromUrl = typeof router.currentRoute.value.query.stream === "string";
   searchObj.loadingStream = true;
   if (!searchObj.data?.queryResults?.hits?.length) searchObj.data.resultGrid.currentPage = 0;
 
@@ -1299,7 +1387,7 @@ async function loadPageData() {
 
   //get stream list
   await getStreamList();
-  if (searchObj.data.stream.selectedStream.value) {
+  if (searchObj.data.stream.selectedStream.value && (streamFromUrl || !isAutoRunOff())) {
     searchData();
   }
 }
@@ -1324,7 +1412,6 @@ onBeforeMount(async () => {
 
 onDeactivated(() => {
   cleanupContextProvider();
-  clearInterval(refreshIntervalID);
 });
 
 onUnmounted(() => {
@@ -1351,10 +1438,11 @@ onActivated(async () => {
     await loadPageData();
   }
 
-  // Arriving from Service Graph / Services Catalog: this view is keep-alive, so
-  // a handoff navigation re-activates it without remounting. Apply the incoming
-  // stream/time/filter and run the query.
-  if (typeof params.filter === "string" && params.filter) {
+  // Arriving from Service Graph / Services Catalog / RCA evidence: this view is
+  // keep-alive, so a handoff navigation re-activates it without remounting. Apply
+  // the incoming stream/time/filter and run the query. An empty `filter` is an
+  // unfiltered handoff (stream + range only) and still clears and runs.
+  if (typeof params.filter === "string") {
     restoreUrlQueryParams();
     if (applyHandoffFilter()) {
       await loadPageData();
@@ -1440,7 +1528,13 @@ const restoreFilters = (query: string) => {
 
   const defaultQuery = `SELECT * FROM "${selectedStreamName.value}" WHERE `;
 
-  const parsedQuery = tracesParser.value.astify(defaultQuery + query);
+  let parsedQuery;
+  try {
+    parsedQuery = tracesParser.value.astify(defaultQuery + query);
+  } catch {
+    // A filter the parser rejects just leaves the field-value selections as they are.
+    return;
+  }
 
   restoreFiltersFromQuery(parsedQuery.where);
 };
@@ -1449,25 +1543,18 @@ const setHistogramDate = async (date: any) => {
   searchBarRef.value.dateTimeRef.setCustomDate("absolute", date);
 };
 
-// Handler for metrics dashboard brush selection filters
-// Simply replace the query editor content with metrics filters
-// User can manually add their own filters before clicking "Run Query"
-const onMetricsFiltersUpdated = (filters: string[]) => {
-  const allFilters = [...filters];
-  // Add error filter only if span_status='ERROR' is currently active and not already present
-  if (showErrorOnly.value && !allFilters.includes("span_status = 'ERROR'")) {
-    allFilters.push("span_status = 'ERROR'");
-  }
-  // Apply each filter term independently so replace-or-append works per field.
-  // applyFilters owns the single trigger: it emits `searchdata` (one search) only
-  // in live mode. The brush also sets a time range programmatically, which the
-  // DateTime picker stamps userChangedValue=false, so it never adds a competing
-  // search — this filter apply is the sole trigger.
-  if (searchBarRef.value?.applyFilters) {
-    searchBarRef.value.applyFilters(allFilters);
-  } else {
-    console.warn("SearchBar not ready for filter application");
-  }
+// A selection replaces the whole editor text; the programmatic date change never searches, so this is the one search.
+const onMetricsEditorFilterSet = (text: string) => {
+  searchObj.data.editorValue = text;
+  searchBarRef.value?.setEditorValue?.(text);
+  if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) searchData();
+};
+
+// A comparison filter is an explicit apply from a page the search closes, so it searches in manual mode too.
+const onMetricsEditorFilterRun = (text: string) => {
+  searchObj.data.editorValue = text;
+  searchBarRef.value?.setEditorValue?.(text);
+  searchData();
 };
 
 // Handler for Error Only toggle — only adds/removes span_status condition,
@@ -1526,9 +1613,8 @@ watch(
 // Handler for Reset Filters button
 // Clears all filters including brush selections
 const onFiltersReset = () => {
-  // Brush selections already cleared in SearchBar.vue
-  // metricsRangeFilters.clear() was called
-  // No additional action needed here
+  // SearchBar already cleared the map; a later baseline-only Drill down must use the current range.
+  searchResultRef.value?.metricsDashboardRef?.clearOriginalTimeRange();
 };
 
 const isStreamSelected = computed(() => {
@@ -1687,6 +1773,13 @@ const onConfigureTracesStream = () => {
   if (stream) router.push(`/streams?dialog=${stream}`);
 };
 
+const firstDataArrival = ref<FirstEventResult | null>(null);
+// the first traces stream arrived on an empty org: list it and search, no reload
+const onFirstDataDetected = async (result: FirstEventResult) => {
+  firstDataArrival.value = result;
+  await loadPageData();
+};
+
 // "Ask AI" from the no-streams empty state: open the AI chat asking how to
 // start sending traces, instead of navigating away to the ingestion page.
 const onAskAiSetupTracing = () => {
@@ -1839,42 +1932,28 @@ const searchData = () => {
 
   if (activeTab.value === "service-graph" || activeTab.value === "services-catalog") return;
 
-  // Clear brush selections when running query
-  // The filters are now part of the query, so brush selections should be cleared
-  searchObj.meta.metricsRangeFilters.clear();
-
   runQueryFn();
 
-  analytics.track("Button Click", {
-    button: "Search Data",
-    user_org: store.state.selectedOrganization.identifier,
-    user_id: store.state.userInfo.email,
+  analytics.track("traces_search_run", {
     stream_name: searchObj.data.stream.selectedStream.value,
     show_query: searchObj.meta.showQuery,
     show_histogram: searchObj.meta.showHistogram,
-    sqlMode: searchObj.meta.sqlMode,
-    showFields: searchObj.meta.showFields,
-    page: "Search Logs",
+    sql_mode: searchObj.meta.sqlMode,
+    show_fields: searchObj.meta.showFields,
   });
 };
 
 const getMoreData = () => {
-  if (searchObj.meta.refreshInterval == 0) {
-    getQueryData(true);
+  getQueryData(true);
 
-    analytics.track("Button Click", {
-      button: "Get More Data",
-      user_org: store.state.selectedOrganization.identifier,
-      user_id: store.state.userInfo.email,
-      stream_name: searchObj.data.stream.selectedStream.value,
-      page: "Search Logs",
-    });
-  }
+  analytics.track("traces_more_rows_loaded", {
+    stream_name: searchObj.data.stream.selectedStream.value,
+  });
 };
 
 const onChangeStream = async () => {
   await extractFields();
-  runQueryFn();
+  if (!isAutoRunOff()) runQueryFn();
 };
 
 const syncSavedViewDateTime = async (datetime: TracesSavedView["datetime"]) => {
@@ -2096,11 +2175,12 @@ const handleServicesCatalogViewTraces = (data: string | Record<string, any>) => 
 
 /**
  * Hydrate a bookmarkable filter handoff. `restoreUrlQueryParams` applies the
- * stream, time range and tab; this restores the prebuilt filter.
+ * stream, time range and tab; this restores the prebuilt filter. A present but
+ * empty `filter` clears the editor, so the handoff shows every span in range.
  */
 const applyHandoffFilter = (): boolean => {
   const filter = router.currentRoute.value.query.filter;
-  if (typeof filter !== "string" || !filter) return false;
+  if (typeof filter !== "string") return false;
 
   searchObj.data.editorValue = filter;
   searchObj.meta.sqlMode = false; // Traces doesn't use SQL mode
@@ -2157,6 +2237,18 @@ useShortcuts([
   {
     id: "tracesCopyUrl",
     handler: () => copyTracesUrl(t),
+  },
+  {
+    id: "tracesNextRow",
+    handler: (e?: KeyboardEvent) => {
+      if (activeTab.value === "search") searchResultRef.value?.stepTraceRow?.(1, !!e?.repeat);
+    },
+  },
+  {
+    id: "tracesPrevRow",
+    handler: (e?: KeyboardEvent) => {
+      if (activeTab.value === "search") searchResultRef.value?.stepTraceRow?.(-1, !!e?.repeat);
+    },
   },
 ]);
 </script>

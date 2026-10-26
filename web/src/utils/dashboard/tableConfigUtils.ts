@@ -25,6 +25,9 @@ import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { toZonedTime } from "date-fns-tz";
 import { formatDate, isTimeSeries, isTimeStamp } from "./dateTimeUtils";
 import { getDataValue } from "./aliasUtils";
+import { RE2JS } from "re2js";
+import { metricThresholdColor, type Thresholds } from "./thresholds";
+import { isSeriesOverrideEntry } from "./seriesOverrides";
 
 /** Persisted `override_config` item type discriminants (mirrored in the Rust schema). */
 export const OVERRIDE_CONFIG_TYPES = {
@@ -36,6 +39,27 @@ export const OVERRIDE_CONFIG_TYPES = {
   CONDITIONAL_STYLES: "conditional_styles",
   FIELD_TYPE: "field_type",
 } as const;
+
+// Value-mapping regexes run synchronously on every table cell, so both sides are bounded.
+const MAX_VALUE_MAPPING_PATTERN_LENGTH = 256;
+const MAX_VALUE_MAPPING_TEST_LENGTH = 1024;
+
+const REGEX_KEY_PREFIX = "__regex_";
+
+// Compiled at cache build so a table never recompiles a pattern per cell.
+const compiledRegexByCache = new WeakMap<Map<any, any>, Map<string, RE2JS | null>>();
+
+// g and y have no counterpart: RE2JS.test is stateless and searches the whole value.
+const RE2_FLAG_BY_JS_FLAG: Record<string, number> = {
+  i: RE2JS.CASE_INSENSITIVE,
+  m: RE2JS.MULTILINE,
+  s: RE2JS.DOTALL,
+};
+
+const warnedValueMappingPatterns = new Set<string>();
+
+/** Why a value-mapping regex cannot be saved. */
+export type ValueMappingPatternError = "tooLong" | "unsupported";
 
 /** Apply a per-column field-type override ("num"/"text" force; "auto"/absent keep detected). */
 export const resolveIsNumber = (detected: boolean, fieldType: string | undefined): boolean =>
@@ -57,6 +81,12 @@ export const parseRegexPattern = (input: string): { pattern: string; flags: stri
   return { pattern: input, flags: "" };
 };
 
+/** Why a value-mapping regex cannot run: over the length cap, or syntax the linear-time engine rejects such as lookaround or backreferences. */
+export const valueMappingPatternError = (input: string): ValueMappingPatternError | null => {
+  if (input.length > MAX_VALUE_MAPPING_PATTERN_LENGTH) return "tooLong";
+  return tryCompileLinearRegex(input) ? null : "unsupported";
+};
+
 /** Build a fast-lookup cache from `config.mappings`, storing the full mapping object. */
 export const buildValueMappingCache = (mappings: any): Map<any, any> | null => {
   if (!mappings || !Array.isArray(mappings)) {
@@ -64,6 +94,7 @@ export const buildValueMappingCache = (mappings: any): Map<any, any> | null => {
   }
 
   const cache = new Map<any, any>();
+  const compiled = new Map<string, RE2JS | null>();
 
   mappings.forEach((mapping: any) => {
     if (!mapping) return;
@@ -82,8 +113,9 @@ export const buildValueMappingCache = (mappings: any): Map<any, any> | null => {
     const type = mapping.type ?? (mapping.pattern ? "regex" : hasRange ? "range" : "value");
 
     if (type === "regex") {
-      // Regex mapping – stored with a special prefix; pattern tested during lookup
-      cache.set(`__regex_${mapping.pattern ?? ""}`, mapping);
+      const key = `${REGEX_KEY_PREFIX}${mapping.pattern ?? ""}`;
+      cache.set(key, mapping);
+      compiled.set(key, compileValueMappingRegex(String(mapping.pattern ?? "")));
     } else if (type === "range") {
       // Range mapping – encoded key so direct + range share the same Map
       cache.set(`__range_${mapping.from}_${mapping.to}`, mapping);
@@ -94,7 +126,9 @@ export const buildValueMappingCache = (mappings: any): Map<any, any> | null => {
     }
   });
 
-  return cache.size > 0 ? cache : null;
+  if (cache.size === 0) return null;
+  compiledRegexByCache.set(cache, compiled);
+  return cache;
 };
 
 /**
@@ -156,17 +190,13 @@ export const lookupValueMappingFull = (
     if (thresholdHit) return thresholdHit;
   }
 
-  // Regex match
+  if (strValue.length > MAX_VALUE_MAPPING_TEST_LENGTH) return null;
+  const compiled = compiledRegexByCache.get(cache);
   for (const [key, mapping] of cache.entries()) {
-    if (typeof key === "string" && key.startsWith("__regex_")) {
-      const rawPattern = key.slice(8); // "__regex_".length === 8
-      try {
-        const { pattern, flags } = parseRegexPattern(rawPattern);
-        if (new RegExp(pattern, flags).test(strValue) && ok(mapping)) {
-          return mapping;
-        }
-      } catch {
-        // invalid regex pattern, skip
+    if (typeof key === "string" && key.startsWith(REGEX_KEY_PREFIX)) {
+      const regex = compiled?.get(key);
+      if (regex && regex.test(strValue) && ok(mapping)) {
+        return mapping;
       }
     }
   }
@@ -310,6 +340,8 @@ export const parseOverrideConfigs = (overrideConfigs: any[] | undefined): Overri
     return { colorConfigMap, unitConfigMap, styleConfigMap, conditionalRulesMap, fieldTypeMap };
 
   for (const o of overrideConfigs) {
+    // Chart series overrides share the array; they never style a table column.
+    if (isSeriesOverrideEntry(o)) continue;
     const alias = o?.field?.value;
     if (!alias) continue;
     const aliasLower = alias.toLowerCase();
@@ -427,6 +459,8 @@ export interface MetricStyleOptions {
   customUnit: string | null | undefined;
   decimals: number | null | undefined;
   panelBackground: string;
+  /** Panel threshold steps; a step colour sits between a mapping colour and the panel background. */
+  thresholds?: Thresholds | null;
 }
 
 /**
@@ -434,13 +468,13 @@ export interface MetricStyleOptions {
  * `config.mappings` (value / range / regex / thresholds → text + colors). Precedence:
  *   text: mapping text → unit-formatted value
  *   fill: mapping textColor → (caller contrast fallback)
- *   bg:   mapping color → panel background
+ *   bg:   mapping color → threshold step color → panel background
  */
 export const resolveMetricValueStyle = (
   rawValue: unknown,
   opts: MetricStyleOptions,
 ): ResolvedMetricStyle => {
-  const { mappings, unit, customUnit, decimals, panelBackground } = opts;
+  const { mappings, unit, customUnit, decimals, panelBackground, thresholds } = opts;
   const cache = buildValueMappingCache(mappings);
   let mapping = lookupValueMappingFull(rawValue, cache);
 
@@ -463,7 +497,30 @@ export const resolveMetricValueStyle = (
   const mappedText = mapping?.text;
   const text = mappedText != null && mappedText !== "" ? mappedText : formatted;
   const textColor = mapping?.textColor || undefined;
-  const bgColor = mapping?.color || panelBackground || "";
+  const bgColor =
+    mapping?.color || metricThresholdColor(rawValue, thresholds ?? null) || panelBackground || "";
 
   return { text, textColor, bgColor };
+};
+
+/** Compile a `/pattern/flags` or plain pattern with the linear-time engine; null when it does not compile. */
+export const tryCompileLinearRegex = (input: string): RE2JS | null => {
+  const { pattern, flags } = parseRegexPattern(input);
+  let re2Flags = 0;
+  for (const flag of flags) re2Flags |= RE2_FLAG_BY_JS_FLAG[flag] ?? 0;
+  try {
+    return RE2JS.compile(RE2JS.translateRegExp(pattern), re2Flags);
+  } catch {
+    return null;
+  }
+};
+
+const compileValueMappingRegex = (input: string): RE2JS | null => {
+  const regex =
+    input.length <= MAX_VALUE_MAPPING_PATTERN_LENGTH ? tryCompileLinearRegex(input) : null;
+  if (!regex && !warnedValueMappingPatterns.has(input)) {
+    warnedValueMappingPatterns.add(input);
+    console.warn(`Value mapping regex skipped, it is too long or unsupported: ${input}`);
+  }
+  return regex;
 };

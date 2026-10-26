@@ -42,14 +42,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Branch-arm label — opt-in (Workflows pass `label`), positioned off the same
        midpoint CSS var as the insert chip. -->
   <EdgeLabelRenderer v-if="label">
-    <div
+    <OTruncatedText
+      as="div"
       data-test="workflow-edge-label"
-      :title="label"
-      class="bg-surface-panel border-border-default text-text-secondary rounded-default text-2xs absolute top-0 left-0 max-w-40 [transform:var(--wf-edge-mid,none)] truncate border px-1.5 py-0.5"
+      class="bg-surface-panel border-border-default text-text-secondary rounded-default text-2xs pointer-events-auto absolute top-0 left-0 max-w-40 [transform:var(--wf-edge-mid,none)] border px-1.5 py-0.5"
       :style="{ '--wf-edge-mid': `translate(-50%, -160%) translate(${path[1]}px, ${path[2]}px)` }"
     >
       {{ label }}
-    </div>
+    </OTruncatedText>
   </EdgeLabelRenderer>
 </template>
 
@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, Position } from "@vue-flow/core";
 import { computed, type PropType } from "vue";
 import type { I18nText } from "@/types/i18n";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import FlowAddButton from "./FlowAddButton.vue";
 
 const props = defineProps({

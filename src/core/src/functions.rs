@@ -35,6 +35,7 @@ use db::{
 use transform::compile_vrl_function;
 
 use crate::{
+    authz::WriteCheck,
     common::meta::{
         authz::Authz,
         http::{ERROR_HEADER, HttpResponse as MetaHttpResponse, error_header_value},
@@ -54,7 +55,16 @@ pub enum FunctionDeleteError {
     PipelineDependencies(String),
 }
 
-pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpResponse, Error> {
+pub async fn save_function(org_id: String, func: Transform) -> Result<HttpResponse, Error> {
+    save_function_checked(org_id, func, None).await
+}
+
+/// [`save_function`], running `check` after every check of its own and before the write.
+pub async fn save_function_checked(
+    org_id: String,
+    mut func: Transform,
+    check: Option<&dyn WriteCheck<Transform>>,
+) -> Result<HttpResponse, Error> {
     if func.name.is_empty() {
         return Ok(MetaHttpResponse::bad_request(
             "Function name cannot be empty",
@@ -94,6 +104,11 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
                     "Invalid transform type. Use 0 for VRL or 1 for JS.",
                 ));
             }
+        }
+        if let Some(check) = check
+            && let Err(refused) = check.check(&func).await
+        {
+            return Ok(refused);
         }
         extract_num_args(&mut func);
         if let Err(error) = db::functions::set(&org_id, &func.name, &func).await {
@@ -324,7 +339,17 @@ fn run_js_test(org_id: &str, function: &str, events: Vec<Value>) -> Result<Vec<V
 pub async fn update_function(
     org_id: &str,
     fn_name: &str,
+    func: Transform,
+) -> Result<HttpResponse, Error> {
+    update_function_checked(org_id, fn_name, func, None).await
+}
+
+/// [`update_function`], running `check` after every check of its own and before the write.
+pub async fn update_function_checked(
+    org_id: &str,
+    fn_name: &str,
     mut func: Transform,
+    check: Option<&dyn WriteCheck<Transform>>,
 ) -> Result<HttpResponse, Error> {
     if func.name.is_empty() {
         return Ok(MetaHttpResponse::bad_request(
@@ -374,6 +399,22 @@ pub async fn update_function(
                 "Invalid transform type. Use 0 for VRL or 1 for JS.",
             ));
         }
+    }
+    // Refused before the write: a persisted JS body survives into the next pipeline rebuild.
+    if !func.is_vrl() {
+        let dependencies = match get_dependencies(org_id, &func.name).await {
+            Ok(dependencies) => dependencies,
+            // Refuse rather than let an unreadable pipeline list wave JavaScript through.
+            Err(e) => return Ok(MetaHttpResponse::internal_error(e)),
+        };
+        if let Some(message) = js_in_pipelines_refusal(&func, &dependencies) {
+            return Ok(MetaHttpResponse::bad_request(message));
+        }
+    }
+    if let Some(check) = check
+        && let Err(refused) = check.check(&func).await
+    {
+        return Ok(refused);
     }
     extract_num_args(&mut func);
     if let Err(error) = db::functions::set(org_id, &func.name, &func).await {
@@ -461,7 +502,8 @@ pub async fn delete_function(org_id: &str, fn_name: &str) -> Result<(), Function
             )));
         }
     }
-    let pipeline_dep = get_dependencies(org_id, fn_name).await;
+    // Unchanged from before this guard existed: an unreadable list must not block a delete.
+    let pipeline_dep = get_dependencies(org_id, fn_name).await.unwrap_or_default();
     if !pipeline_dep.is_empty() {
         let pipeline_data =
             serde_json::to_string(&pipeline_dep).unwrap_or_else(|_| "[]".to_string());
@@ -486,23 +528,44 @@ pub async fn get_pipeline_dependencies(
     org_id: &str,
     func_name: &str,
 ) -> Result<HttpResponse, Error> {
-    let list = get_dependencies(org_id, func_name).await;
+    let list = get_dependencies(org_id, func_name)
+        .await
+        .unwrap_or_default();
     Ok(MetaHttpResponse::json(PipelineDependencyResponse { list }))
 }
 
-async fn get_dependencies(org_id: &str, func_name: &str) -> Vec<PipelineDependencyItem> {
-    infra::pipeline::list_by_org(org_id)
-        .await
-        .map_or(vec![], |mut pipelines| {
-            pipelines.retain(|pl| pl.contains_function(func_name));
-            pipelines
-                .into_iter()
-                .map(|pl| PipelineDependencyItem {
-                    id: pl.id,
-                    name: pl.name,
-                })
-                .collect()
+async fn get_dependencies(
+    org_id: &str,
+    func_name: &str,
+) -> Result<Vec<PipelineDependencyItem>, infra::errors::Error> {
+    let mut pipelines = infra::pipeline::list_by_org(org_id).await?;
+    pipelines.retain(|pl| pl.contains_function(func_name));
+    Ok(pipelines
+        .into_iter()
+        .map(|pl| PipelineDependencyItem {
+            id: pl.id,
+            name: pl.name,
         })
+        .collect())
+}
+
+/// Why a function the given pipelines use cannot become JavaScript, if it cannot. [pure]
+fn js_in_pipelines_refusal(
+    func: &Transform,
+    dependencies: &[PipelineDependencyItem],
+) -> Option<String> {
+    if func.is_vrl() || dependencies.is_empty() {
+        return None;
+    }
+    let names = dependencies
+        .iter()
+        .map(|pipeline| pipeline.name.as_str())
+        .collect::<Vec<_>>()
+        .join(", ");
+    Some(format!(
+        "Pipelines run VRL only, so '{}' cannot become a JavaScript function while pipeline(s) {} use it. Remove it from them first.",
+        func.name, names
+    ))
 }
 
 fn extract_num_args(func: &mut Transform) {
@@ -674,5 +737,136 @@ mod tests {
             .unwrap();
 
         assert_eq!(meta_response.status(), http::StatusCode::OK);
+    }
+
+    struct Unreached;
+
+    #[async_trait::async_trait]
+    impl crate::authz::WriteCheck<Transform> for Unreached {
+        async fn check(&self, _: &Transform) -> Result<(), axum::response::Response> {
+            panic!("the write check must run only after every check of the save's own");
+        }
+    }
+
+    #[tokio::test]
+    async fn the_save_s_own_errors_answer_before_the_write_check() {
+        let empty = Transform {
+            name: "write_check_fn".to_string(),
+            function: String::new(),
+            params: "row".to_string(),
+            num_args: 1,
+            trans_type: Some(0),
+            streams: None,
+        };
+        let saved = save_function_checked(
+            "write_check_org".to_string(),
+            empty.clone(),
+            Some(&Unreached),
+        )
+        .await
+        .unwrap();
+        assert_eq!(saved.status(), http::StatusCode::BAD_REQUEST);
+        let updated =
+            update_function_checked("write_check_org", "write_check_fn", empty, Some(&Unreached))
+                .await
+                .unwrap();
+        assert_eq!(updated.status(), http::StatusCode::BAD_REQUEST);
+    }
+
+    async fn stored_vrl_function(org: &str, name: &str) -> Transform {
+        let func = Transform {
+            name: name.to_string(),
+            function: ".a = 1".to_string(),
+            params: "row".to_string(),
+            num_args: 1,
+            trans_type: Some(0),
+            streams: None,
+        };
+        let saved = save_function(org.to_string(), func.clone()).await.unwrap();
+        assert_eq!(saved.status(), http::StatusCode::OK);
+        func
+    }
+
+    fn transform_of_type(trans_type: u8) -> Transform {
+        Transform {
+            name: "referenced_fn".to_string(),
+            function: "row.a = 1;".to_string(),
+            params: "row".to_string(),
+            num_args: 1,
+            trans_type: Some(trans_type),
+            streams: None,
+        }
+    }
+
+    fn dependency(name: &str) -> PipelineDependencyItem {
+        PipelineDependencyItem {
+            id: format!("{name}_id"),
+            name: name.to_string(),
+        }
+    }
+
+    #[test]
+    fn a_js_function_is_refused_only_while_pipelines_use_it() {
+        let cases = [
+            (1, vec![], None),
+            (0, vec![dependency("pl_a")], None),
+            (
+                1,
+                vec![dependency("pl_a")],
+                Some(
+                    "'referenced_fn' cannot become a JavaScript function while pipeline(s) pl_a use it",
+                ),
+            ),
+            (
+                1,
+                vec![dependency("pl_a"), dependency("pl_b")],
+                Some("while pipeline(s) pl_a, pl_b use it"),
+            ),
+            // Only VRL is allowed through, so a type this endpoint does not know stays out too.
+            (
+                2,
+                vec![dependency("pl_a")],
+                Some(
+                    "'referenced_fn' cannot become a JavaScript function while pipeline(s) pl_a use it",
+                ),
+            ),
+        ];
+        for (trans_type, dependencies, expected) in cases {
+            let refusal = js_in_pipelines_refusal(&transform_of_type(trans_type), &dependencies);
+            match expected {
+                None => assert_eq!(refusal, None, "trans_type {trans_type}"),
+                Some(names) => {
+                    let message = refusal.expect("a refusal");
+                    assert!(message.starts_with("Pipelines run VRL only,"), "{message}");
+                    assert!(message.contains(names), "{message}");
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn a_js_switch_is_allowed_when_no_pipeline_uses_the_function() {
+        let org = "js_switch_allowed_org";
+        let name = "unreferenced_fn";
+        infra::db::create_table().await.unwrap();
+        infra::pipeline::init().await.unwrap();
+        stored_vrl_function(org, name).await;
+
+        let as_js = Transform {
+            name: name.to_string(),
+            function: "row.a = 1;".to_string(),
+            params: "row".to_string(),
+            num_args: 1,
+            trans_type: Some(1),
+            streams: None,
+        };
+        let updated = update_function(org, name, as_js).await.unwrap();
+        assert_eq!(updated.status(), http::StatusCode::OK);
+        assert_eq!(
+            db::functions::get(org, name).await.unwrap().trans_type,
+            Some(1)
+        );
+
+        assert!(delete_function(org, name).await.is_ok());
     }
 }

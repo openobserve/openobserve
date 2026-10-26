@@ -26,12 +26,13 @@ use config::{
         },
         cluster::RoleGroup,
         search::{SearchEventContext, SearchEventType, SqlQuery},
-        sql::resolve_stream_names,
+        sql::{TableReferenceExt, resolve_stream_names_with_type},
         stream::StreamType,
     },
     utils::{
         base64,
         json::{Map, Value},
+        sql::quote_identifier,
     },
 };
 use search::utils::is_permissable_function_error;
@@ -41,6 +42,8 @@ use usage_reporting::http_report_metrics;
 use crate::{search as SearchService, service::setup_tracing_with_trace_id};
 
 pub mod alert;
+#[cfg(feature = "enterprise")]
+pub mod alert_calibration;
 pub mod backfill;
 pub mod composite;
 pub mod composite_graph_lock;
@@ -49,6 +52,7 @@ pub mod deduplication;
 pub mod derived_streams;
 pub mod destination_usage;
 pub mod destinations;
+pub mod downtimes;
 pub mod external_alerts;
 #[cfg(feature = "enterprise")]
 pub mod grouping;
@@ -57,6 +61,17 @@ pub mod incidents;
 pub mod notifications;
 #[cfg(feature = "enterprise")]
 pub mod org_config;
+mod prom_rule;
+#[cfg(feature = "enterprise")]
+pub mod rca_live;
+#[cfg(feature = "enterprise")]
+pub mod rca_resume;
+#[cfg(feature = "enterprise")]
+pub mod rca_runs;
+#[cfg(feature = "enterprise")]
+pub mod rca_steering;
+#[cfg(feature = "enterprise")]
+pub mod rca_turn;
 pub mod recovery;
 pub mod scheduler;
 pub mod templates;
@@ -164,6 +179,16 @@ impl QueryConditionExt for QueryCondition {
                 return Ok(eval_results);
             }
             QueryType::PromQL => {
+                if self.promql_rule_mode {
+                    return prom_rule::evaluate(
+                        self,
+                        org_id,
+                        end_time,
+                        &trace_id,
+                        search_event_context,
+                    )
+                    .await;
+                }
                 let Some(v) = self.promql.as_ref() else {
                     return Ok(eval_results);
                 };
@@ -242,7 +267,13 @@ impl QueryConditionExt for QueryCondition {
                 )
                 .await
                 {
-                    Ok(v) => v,
+                    Ok(v) if !v.warnings.is_empty() => {
+                        return Err(anyhow::anyhow!(
+                            "Partial response: {}",
+                            v.warnings.join(", ")
+                        ));
+                    }
+                    Ok(v) => v.value,
                     // A failed search is an ERROR, not an empty result. Returning
                     // Ok here would record outcome=Normal/level=Ok and refresh
                     // `level_at`, silently clearing a prior Critical — an error
@@ -343,30 +374,7 @@ impl QueryConditionExt for QueryCondition {
             }
         };
 
-        let stream_names = resolve_stream_names(&sql)
-            .map_err(|e| anyhow::anyhow!("Error resolving stream names in SQL query: {e}"))?;
-
-        // SQL may contain multiple stream names, check for each stream
-        // if the query period is greater than the max query range
-        for stream in stream_names.iter() {
-            if infra::schema::get_stream_schema_from_cache(org_id, stream, stream_type)
-                .await
-                .is_none()
-            {
-                return Err(anyhow::anyhow!(
-                    "Stream \"{stream}\" not found in schema, skipping alert evaluation"
-                ));
-            };
-
-            if let Some(settings) = infra::schema::get_settings(org_id, stream, stream_type).await {
-                let max_query_range = settings.max_query_range;
-                if max_query_range > 0 && trigger_condition.period > max_query_range * 60 {
-                    return Err(anyhow::anyhow!(
-                        "Query period is greater than max query range of {max_query_range} hours for stream \"{stream}\""
-                    ));
-                }
-            }
-        }
+        check_query_streams(org_id, stream_type, &sql, trigger_condition.period).await?;
 
         let mut time_diff = Duration::try_minutes(trigger_condition.period)
             .unwrap()
@@ -856,6 +864,41 @@ impl QueryConditionExt for QueryCondition {
 
         Ok(eval_results)
     }
+}
+
+/// Checks that every stream in the alert SQL exists and allows the alert period.
+async fn check_query_streams(
+    org_id: &str,
+    stream_type: StreamType,
+    sql: &str,
+    period: i64,
+) -> Result<(), anyhow::Error> {
+    let stream_refs = resolve_stream_names_with_type(sql)
+        .map_err(|e| anyhow::anyhow!("Error resolving stream names in SQL query: {e}"))?;
+
+    for stream_ref in stream_refs.iter() {
+        let stream = stream_ref.stream_name();
+        // A JOIN may name another type, e.g. "enrichment_tables".tbl in a logs alert.
+        let stream_type = stream_ref.get_stream_type(stream_type);
+        if infra::schema::get_stream_schema_from_cache(org_id, &stream, stream_type)
+            .await
+            .is_none()
+        {
+            return Err(anyhow::anyhow!(
+                "Stream \"{stream}\" not found in schema, skipping alert evaluation"
+            ));
+        };
+
+        if let Some(settings) = infra::schema::get_settings(org_id, &stream, stream_type).await {
+            let max_query_range = settings.max_query_range;
+            if max_query_range > 0 && period > max_query_range * 60 {
+                return Err(anyhow::anyhow!(
+                    "Query period is greater than max query range of {max_query_range} hours for stream \"{stream}\""
+                ));
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Run the COUNT(*) decision query for a hybrid count-based alert.
@@ -1519,13 +1562,19 @@ pub async fn build_sql(
                 ))?
         )
     };
-    if query_condition.aggregation.is_none() {
+    let Some(agg) = query_condition.aggregation.as_ref() else {
         return Ok(format!("SELECT * FROM \"{stream_name}\" {where_sql}"));
     };
+    build_aggregation_sql(stream_name, &schema, agg, &where_sql)
+}
 
-    // handle aggregation
-    let mut sql = String::new();
-    let agg = query_condition.aggregation.as_ref().unwrap();
+/// Only columns of `schema` reach the SQL; any other `group_by`/`having` entry is refused.
+fn build_aggregation_sql(
+    stream_name: &str,
+    schema: &Schema,
+    agg: &config::meta::alerts::Aggregation,
+    where_sql: &str,
+) -> Result<String, anyhow::Error> {
     let having_expr = {
         let data_type = match schema.field_with_name(&agg.having.column) {
             Ok(field) => field.data_type(),
@@ -1539,69 +1588,56 @@ pub async fn build_sql(
         build_having_expr(agg, data_type)?
     };
 
+    let col = quote_identifier(&agg.having.column);
     let func_expr = match agg.function {
-        AggFunction::Avg => format!("AVG(\"{}\")", agg.having.column),
-        AggFunction::Max => format!("MAX(\"{}\")", agg.having.column),
-        AggFunction::Min => format!("MIN(\"{}\")", agg.having.column),
-        AggFunction::Sum => format!("SUM(\"{}\")", agg.having.column),
-        AggFunction::Count => format!("COUNT(\"{}\")", agg.having.column),
-        AggFunction::Median => format!("MEDIAN(\"{}\")", agg.having.column),
-        AggFunction::P50 => format!(
-            "approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY \"{}\")",
-            agg.having.column
-        ),
-        AggFunction::P75 => format!(
-            "approx_percentile_cont(0.75) WITHIN GROUP (ORDER BY \"{}\")",
-            agg.having.column
-        ),
-        AggFunction::P90 => format!(
-            "approx_percentile_cont(0.9) WITHIN GROUP (ORDER BY \"{}\")",
-            agg.having.column
-        ),
-        AggFunction::P95 => format!(
-            "approx_percentile_cont(0.95) WITHIN GROUP (ORDER BY \"{}\")",
-            agg.having.column
-        ),
-        AggFunction::P99 => format!(
-            "approx_percentile_cont(0.99) WITHIN GROUP (ORDER BY \"{}\")",
-            agg.having.column
-        ),
+        AggFunction::Avg => format!("AVG({col})"),
+        AggFunction::Max => format!("MAX({col})"),
+        AggFunction::Min => format!("MIN({col})"),
+        AggFunction::Sum => format!("SUM({col})"),
+        AggFunction::Count => format!("COUNT({col})"),
+        AggFunction::Median => format!("MEDIAN({col})"),
+        AggFunction::P50 => format!("approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY {col})"),
+        AggFunction::P75 => format!("approx_percentile_cont(0.75) WITHIN GROUP (ORDER BY {col})"),
+        AggFunction::P90 => format!("approx_percentile_cont(0.9) WITHIN GROUP (ORDER BY {col})"),
+        AggFunction::P95 => format!("approx_percentile_cont(0.95) WITHIN GROUP (ORDER BY {col})"),
+        AggFunction::P99 => format!("approx_percentile_cont(0.99) WITHIN GROUP (ORDER BY {col})"),
     };
 
-    if let Some(group) = agg.group_by.as_ref()
-        && !group.is_empty()
-    {
-        let cols = group.join(", ");
-        if agg.multi_alert {
-            // Multi-alerts drop the HAVING filter. A group that falls back
-            // under the threshold must still be RETURNED: otherwise its
-            // recovery is indistinguishable from it vanishing, and it would
-            // only resolve later via the reaper timeout, with a NULL value
-            // where the real reading should be.
-            //
-            // The page stays bounded, so it is ordered worst-first. That
-            // ordering keeps the rollup level exact and lets the cap admit the
-            // true top of the distribution rather than an arbitrary slice. The
-            // group columns are the deterministic tiebreak within a severity
-            // band.
-            let severity_order =
-                config::meta::alerts::aggregation_level::severity_order_sql(agg, "alert_agg_value")
-                    .map_err(|e| anyhow::anyhow!("Invalid aggregation threshold: {e}"))?;
-            sql = format!(
-                "SELECT {cols}, {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"{where_sql} GROUP BY {cols} ORDER BY {severity_order}, {cols}"
-            );
-        } else {
-            sql = format!(
-                "SELECT {cols}, {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"{where_sql} GROUP BY {cols} HAVING {having_expr}"
-            );
-        }
-    }
-    if sql.is_empty() {
-        sql = format!(
+    let group = agg.group_by.as_deref().unwrap_or(&[]);
+    if group.is_empty() {
+        return Ok(format!(
             "SELECT {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"{where_sql} HAVING {having_expr}"
-        );
+        ));
     }
-    Ok(sql)
+    let cols = quoted_group_by(schema, group)
+        .map_err(|column| {
+            anyhow::anyhow!("Group by column {column} not found on stream {stream_name}")
+        })?
+        .join(", ");
+    if agg.multi_alert {
+        // No HAVING: a group back under the threshold must still be returned to show recovery.
+        // Worst-first order keeps the bounded page exact; group columns are the tiebreak.
+        let severity_order =
+            config::meta::alerts::aggregation_level::severity_order_sql(agg, "alert_agg_value")
+                .map_err(|e| anyhow::anyhow!("Invalid aggregation threshold: {e}"))?;
+        return Ok(format!(
+            "SELECT {cols}, {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"{where_sql} GROUP BY {cols} ORDER BY {severity_order}, {cols}"
+        ));
+    }
+    Ok(format!(
+        "SELECT {cols}, {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"{where_sql} GROUP BY {cols} HAVING {having_expr}"
+    ))
+}
+
+/// Quoted, escaped identifiers; `Err` carries the first entry that is not a column of `schema`.
+fn quoted_group_by(schema: &Schema, group_by: &[String]) -> Result<Vec<String>, String> {
+    group_by
+        .iter()
+        .map(|col| match schema.field_with_name(col) {
+            Ok(_) => Ok(quote_identifier(col)),
+            Err(_) => Err(col.clone()),
+        })
+        .collect()
 }
 
 /// `HAVING` clause filtering the `alert_agg_value` aggregate.
@@ -1665,11 +1701,11 @@ fn build_expr(
     field_alias: &str,
     field_type: &DataType,
 ) -> Result<String, anyhow::Error> {
-    let field_alias = if !field_alias.is_empty() {
-        field_alias
-    } else {
+    let field_alias = quote_identifier(if field_alias.is_empty() {
         cond.column.as_str()
-    };
+    } else {
+        field_alias
+    });
     // Null/empty checks take no value. On non-string columns "empty" can only
     // mean null, so the empty checks degrade to the null checks there.
     let is_string_type = matches!(
@@ -1677,20 +1713,20 @@ fn build_expr(
         DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View
     );
     match cond.operator {
-        Operator::IsNull => return Ok(format!("\"{field_alias}\" IS NULL")),
-        Operator::IsNotNull => return Ok(format!("\"{field_alias}\" IS NOT NULL")),
+        Operator::IsNull => return Ok(format!("{field_alias} IS NULL")),
+        Operator::IsNotNull => return Ok(format!("{field_alias} IS NOT NULL")),
         Operator::IsEmpty => {
             return Ok(if is_string_type {
-                format!("(\"{field_alias}\" IS NULL OR \"{field_alias}\" = '')")
+                format!("({field_alias} IS NULL OR {field_alias} = '')")
             } else {
-                format!("\"{field_alias}\" IS NULL")
+                format!("{field_alias} IS NULL")
             });
         }
         Operator::IsNotEmpty => {
             return Ok(if is_string_type {
-                format!("(\"{field_alias}\" IS NOT NULL AND \"{field_alias}\" != '')")
+                format!("({field_alias} IS NOT NULL AND {field_alias} != '')")
             } else {
-                format!("\"{field_alias}\" IS NOT NULL")
+                format!("{field_alias} IS NOT NULL")
             });
         }
         _ => {}
@@ -1706,17 +1742,17 @@ fn build_expr(
             // terminate the SQL string literal early.
             let val = val.replace('\'', "''");
             match cond.operator {
-                Operator::EqualTo => format!("\"{field_alias}\" = '{val}'"),
-                Operator::NotEqualTo => format!("\"{field_alias}\" != '{val}'"),
-                Operator::GreaterThan => format!("\"{field_alias}\" > '{val}'"),
+                Operator::EqualTo => format!("{field_alias} = '{val}'"),
+                Operator::NotEqualTo => format!("{field_alias} != '{val}'"),
+                Operator::GreaterThan => format!("{field_alias} > '{val}'"),
                 Operator::GreaterThanEquals => {
-                    format!("\"{field_alias}\" >= '{val}'")
+                    format!("{field_alias} >= '{val}'")
                 }
-                Operator::LessThan => format!("\"{field_alias}\" < '{val}'"),
-                Operator::LessThanEquals => format!("\"{field_alias}\" <= '{val}'"),
-                Operator::Contains => format!("str_match(\"{field_alias}\", '{val}')"),
+                Operator::LessThan => format!("{field_alias} < '{val}'"),
+                Operator::LessThanEquals => format!("{field_alias} <= '{val}'"),
+                Operator::Contains => format!("str_match({field_alias}, '{val}')"),
                 Operator::NotContains => {
-                    format!("\"{field_alias}\" NOT LIKE '%{val}%'")
+                    format!("{field_alias} NOT LIKE '%{val}%'")
                 }
                 // Null checks returned above; keep the dead arm panic-free.
                 _ => {
@@ -1765,15 +1801,15 @@ fn build_expr(
                     .to_string()
             };
             match cond.operator {
-                Operator::EqualTo => format!("\"{field_alias}\" = {val}"),
-                Operator::NotEqualTo => format!("\"{field_alias}\" != {val}"),
-                Operator::GreaterThan => format!("\"{field_alias}\" > {val}"),
+                Operator::EqualTo => format!("{field_alias} = {val}"),
+                Operator::NotEqualTo => format!("{field_alias} != {val}"),
+                Operator::GreaterThan => format!("{field_alias} > {val}"),
                 Operator::GreaterThanEquals => {
-                    format!("\"{field_alias}\" >= {val}")
+                    format!("{field_alias} >= {val}")
                 }
-                Operator::LessThan => format!("\"{field_alias}\" < {val}"),
+                Operator::LessThan => format!("{field_alias} < {val}"),
                 Operator::LessThanEquals => {
-                    format!("\"{field_alias}\" <= {val}")
+                    format!("{field_alias} <= {val}")
                 }
                 _ => {
                     return Err(anyhow::anyhow!(
@@ -1801,15 +1837,15 @@ fn build_expr(
                     })?
             };
             match cond.operator {
-                Operator::EqualTo => format!("\"{field_alias}\" = {val}"),
-                Operator::NotEqualTo => format!("\"{field_alias}\" != {val}"),
-                Operator::GreaterThan => format!("\"{field_alias}\" > {val}"),
+                Operator::EqualTo => format!("{field_alias} = {val}"),
+                Operator::NotEqualTo => format!("{field_alias} != {val}"),
+                Operator::GreaterThan => format!("{field_alias} > {val}"),
                 Operator::GreaterThanEquals => {
-                    format!("\"{field_alias}\" >= {val}")
+                    format!("{field_alias} >= {val}")
                 }
-                Operator::LessThan => format!("\"{field_alias}\" < {val}"),
+                Operator::LessThan => format!("{field_alias} < {val}"),
                 Operator::LessThanEquals => {
-                    format!("\"{field_alias}\" <= {val}")
+                    format!("{field_alias} <= {val}")
                 }
                 _ => {
                     return Err(anyhow::anyhow!(
@@ -1837,8 +1873,8 @@ fn build_expr(
                     })?
             };
             match cond.operator {
-                Operator::EqualTo => format!("\"{field_alias}\" = {val}"),
-                Operator::NotEqualTo => format!("\"{field_alias}\" != {val}"),
+                Operator::EqualTo => format!("{field_alias} = {val}"),
+                Operator::NotEqualTo => format!("{field_alias} != {val}"),
                 _ => {
                     return Err(anyhow::anyhow!(
                         "Column {} has data_type [{field_type}] and it does not supported operator [{:?}]",
@@ -2091,28 +2127,6 @@ mod tests {
 
         let sql = condition_group.to_sql(&schema).await.unwrap();
         assert_eq!(sql, "");
-    }
-
-    #[tokio::test]
-    async fn test_condition_group_to_sql_single_condition() {
-        let schema = Schema::new(vec![Field::new("level", DataType::Utf8, false)]);
-
-        // Single condition should be wrapped in parentheses
-        let condition_group = ConditionGroup {
-            filter_type: "group".to_string(),
-            logical_operator: LogicalOperator::And,
-            conditions: vec![ConditionItem::Condition(ConditionItemCondition {
-                column: "level".to_string(),
-                operator: Operator::EqualTo,
-                value: Value::String("error".to_string()),
-                ignore_case: None,
-                logical_operator: LogicalOperator::And,
-            })],
-        };
-
-        let sql = condition_group.to_sql(&schema).await.unwrap();
-
-        assert_eq!(sql, "(\"level\" = 'error')");
     }
 
     #[tokio::test]
@@ -2953,6 +2967,129 @@ mod tests {
         assert_eq!(expr, "\"code\" < 1.5");
     }
 
+    // ── Aggregation SQL: group_by identifiers ───────────────────────────────
+
+    fn agg_schema() -> Schema {
+        Schema::new(vec![
+            Field::new("host", DataType::Utf8, false),
+            Field::new("region", DataType::Utf8, false),
+            Field::new("latency", DataType::Int64, false),
+        ])
+    }
+
+    fn group_agg(group_by: &[&str], multi_alert: bool) -> Aggregation {
+        Aggregation {
+            group_by: Some(group_by.iter().map(|s| s.to_string()).collect()),
+            function: AggFunction::Avg,
+            having: make_cond(
+                "latency",
+                Operator::GreaterThan,
+                Value::Number(serde_json::Number::from(100)),
+            ),
+            warning_value: None,
+            multi_alert,
+        }
+    }
+
+    #[test]
+    fn test_build_aggregation_sql_quotes_group_by_columns() {
+        let agg = group_agg(&["host", "region"], false);
+        let sql = build_aggregation_sql("svc", &agg_schema(), &agg, "").unwrap();
+        assert_eq!(
+            sql,
+            "SELECT \"host\", \"region\", AVG(\"latency\") AS alert_agg_value, MIN(_timestamp) as zo_sql_min_time, MAX(_timestamp) AS zo_sql_max_time FROM \"svc\" GROUP BY \"host\", \"region\" HAVING \"alert_agg_value\" > 100"
+        );
+    }
+
+    #[test]
+    fn test_build_aggregation_sql_multi_alert_quotes_group_by_in_order_by() {
+        let agg = group_agg(&["host"], true);
+        let sql = build_aggregation_sql("svc", &agg_schema(), &agg, " WHERE 1 = 1").unwrap();
+        assert_eq!(
+            sql,
+            "SELECT \"host\", AVG(\"latency\") AS alert_agg_value, MIN(_timestamp) as zo_sql_min_time, MAX(_timestamp) AS zo_sql_max_time FROM \"svc\" WHERE 1 = 1 GROUP BY \"host\" ORDER BY CASE WHEN \"alert_agg_value\" > 100 THEN 2 ELSE 0 END DESC, \"host\""
+        );
+    }
+
+    #[test]
+    fn test_build_aggregation_sql_rejects_group_by_entry_not_in_schema() {
+        for entry in [
+            "nonexistent",
+            "host, (SELECT secret FROM \"other\" LIMIT 1)",
+            "host\" FROM \"other\" --",
+            "",
+        ] {
+            let agg = group_agg(&["host", entry], false);
+            let err = build_aggregation_sql("svc", &agg_schema(), &agg, "")
+                .unwrap_err()
+                .to_string();
+            assert_eq!(
+                err,
+                format!("Group by column {entry} not found on stream svc"),
+                "entry {entry:?} must be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn test_build_aggregation_sql_escapes_quotes_inside_schema_backed_identifiers() {
+        let tricky = "host\" FROM \"other\" --";
+        let schema = Schema::new(vec![
+            Field::new(tricky, DataType::Utf8, false),
+            Field::new("lat\"ency", DataType::Int64, false),
+        ]);
+        let mut agg = group_agg(&[tricky], false);
+        agg.having.column = "lat\"ency".to_string();
+        let sql = build_aggregation_sql("svc", &schema, &agg, "").unwrap();
+        assert_eq!(
+            sql,
+            "SELECT \"host\"\" FROM \"\"other\"\" --\", AVG(\"lat\"\"ency\") AS alert_agg_value, MIN(_timestamp) as zo_sql_min_time, MAX(_timestamp) AS zo_sql_max_time FROM \"svc\" GROUP BY \"host\"\" FROM \"\"other\"\" --\" HAVING \"alert_agg_value\" > 100"
+        );
+    }
+
+    #[test]
+    fn test_build_expr_escapes_quotes_inside_column_name() {
+        let cond = make_cond(
+            "lev\"el",
+            Operator::EqualTo,
+            Value::String("error".to_string()),
+        );
+        let expr = build_expr(&cond, "", &DataType::Utf8).unwrap();
+        assert_eq!(expr, "\"lev\"\"el\" = 'error'");
+        let expr = build_expr(&cond, "al\"ias", &DataType::Utf8).unwrap();
+        assert_eq!(expr, "\"al\"\"ias\" = 'error'");
+    }
+
+    #[test]
+    fn test_build_aggregation_sql_empty_group_by_collapses_to_single_row() {
+        let mut agg = group_agg(&[], false);
+        let sql = build_aggregation_sql("svc", &agg_schema(), &agg, "").unwrap();
+        assert!(!sql.contains("GROUP BY"), "{sql}");
+        agg.group_by = None;
+        assert_eq!(
+            build_aggregation_sql("svc", &agg_schema(), &agg, "").unwrap(),
+            sql
+        );
+    }
+
+    #[test]
+    fn test_quoted_group_by_reports_first_unknown_column() {
+        let schema = agg_schema();
+        assert_eq!(
+            quoted_group_by(&schema, &["host".into(), "region".into()]),
+            Ok(vec!["\"host\"".to_string(), "\"region\"".to_string()])
+        );
+        assert_eq!(
+            quoted_group_by(&schema, &["host".into(), "a".into(), "b".into()]),
+            Err("a".to_string())
+        );
+        let quoted = Schema::new(vec![Field::new("a\"b", DataType::Utf8, false)]);
+        assert_eq!(
+            quoted_group_by(&quoted, &["a\"b".into()]),
+            Ok(vec!["\"a\"\"b\"".to_string()])
+        );
+    }
+
     // ── HAVING clause type resolution ───────────────────────────────────────
 
     fn make_agg(function: AggFunction, operator: Operator, value: Value) -> Aggregation {
@@ -3228,6 +3365,42 @@ mod tests {
         );
         assert!(
             evaluate_condition(&row, "meta_absent", &Operator::IsNull, &Value::Null, false).await
+        );
+    }
+
+    #[tokio::test]
+    async fn test_check_query_streams_join_enrichment_table() {
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = "test_org_alert_join_enrich";
+        let logs_key = format!("{org_id}/{}/app", StreamType::Logs);
+        let enrich_key = format!("{org_id}/{}/geo", StreamType::EnrichmentTables);
+        let schema = Schema::new(vec![Field::new("ip", DataType::Utf8, true)]);
+        {
+            let mut w = STREAM_SCHEMAS_LATEST.write().await;
+            w.insert(logs_key.clone(), SchemaCache::new(schema.clone()));
+            w.insert(enrich_key.clone(), SchemaCache::new(schema));
+        }
+
+        let sql =
+            r#"SELECT a.ip FROM "app" AS a JOIN "enrichment_tables"."geo" AS b ON a.ip = b.ip"#;
+        let missing_sql =
+            r#"SELECT a.ip FROM "app" AS a JOIN "enrichment_tables"."nope" AS b ON a.ip = b.ip"#;
+        let ok = check_query_streams(org_id, StreamType::Logs, sql, 10).await;
+        let missing = check_query_streams(org_id, StreamType::Logs, missing_sql, 10).await;
+
+        {
+            let mut w = STREAM_SCHEMAS_LATEST.write().await;
+            w.remove(&logs_key);
+            w.remove(&enrich_key);
+        }
+
+        assert!(ok.is_ok(), "join with enrichment table rejected: {ok:?}");
+        assert!(
+            missing
+                .unwrap_err()
+                .to_string()
+                .contains("\"nope\" not found")
         );
     }
 }

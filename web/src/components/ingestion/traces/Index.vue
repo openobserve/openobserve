@@ -45,7 +45,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="h-full w-full">
       <div class="bg-card-glass-bg h-full overflow-y-auto pt-0.5">
         <router-view
-          :title="t('ingestion.metricsLabel')"
           :currOrgIdentifier="currOrgIdentifier"
           :currUserEmail="currentUserEmail"
           @copy-to-clipboard-fn="copyToClipboardFn"
@@ -144,7 +143,6 @@ export default defineComponent({
             button: "Copy to Clipboard",
             ingestion: router.currentRoute.value.name,
             user_org: store.state.selectedOrganization.identifier,
-            user_id: store.state.userInfo.email,
             page: "Ingestion",
           });
         }

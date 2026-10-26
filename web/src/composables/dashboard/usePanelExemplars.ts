@@ -34,6 +34,8 @@ interface QueryMetadata {
   query?: string;
   startTime?: number | string;
   endTime?: number | string;
+  /** Set by the executor on a hidden query's slot, which it never sends. */
+  notSent?: boolean;
 }
 
 interface PanelExemplarsArgs {
@@ -72,6 +74,7 @@ export function usePanelExemplars(args: PanelExemplarsArgs) {
     const out: FetchPlan[] = [];
     for (const index of indexes) {
       const entry = queries[index];
+      if (entry?.notSent) continue;
       const startUs = Number(entry?.startTime);
       const endUs = Number(entry?.endTime);
       if (!entry?.query || !Number.isFinite(startUs) || !Number.isFinite(endUs)) return null;

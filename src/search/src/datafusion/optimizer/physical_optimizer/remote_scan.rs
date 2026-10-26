@@ -973,4 +973,109 @@ mod tests {
             assert_ne!(plan.name(), "RemoteScanExec");
         });
     }
+
+    async fn cluster_plan(sql: &str) -> (SessionContext, Arc<dyn ExecutionPlan>) {
+        use tracing_opentelemetry::OpenTelemetrySpanExt;
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("k8s_cluster", DataType::Utf8, true),
+            Field::new("k8s_resource_name", DataType::Utf8, true),
+            Field::new("k8s_namespace_name", DataType::Utf8, true),
+            Field::new("event_name", DataType::Utf8, true),
+            Field::new("value", DataType::Int64, true),
+        ]));
+        let mut file_id_lists = HashMap::new();
+        file_id_lists.insert(TableReference::from("t"), vec![]);
+        let nodes = (0..3)
+            .map(|_| Arc::new(config::meta::cluster::Node::default()) as Arc<dyn NodeInfo>)
+            .collect();
+        let remote_scan_nodes = Arc::new(RemoteScanNodes::new(
+            Request::default(),
+            nodes,
+            file_id_lists,
+            HashMap::new(),
+            false,
+            tracing::Span::current().context(),
+            None,
+        ));
+        let rule = RemoteScanRule {
+            remote_scan_nodes,
+            single_node_optimizer_enable: false,
+        };
+        let state = SessionStateBuilder::new()
+            .with_config(SessionConfig::new().with_target_partitions(4))
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
+            .with_physical_optimizer_rule(Arc::new(rule))
+            .with_default_features()
+            .build();
+        let ctx = SessionContext::new_with_state(state);
+        let table = NewEmptyTable::new("t", schema)
+            .with_partitions(4)
+            .with_sort_order(crate::datafusion::sort_order::FileSortOrder::TimestampDesc);
+        ctx.register_table("t", Arc::new(table)).unwrap();
+        let logical = ctx.state().create_logical_plan(sql).await.unwrap();
+        let plan = ctx.state().create_physical_plan(&logical).await.unwrap();
+        (ctx, plan)
+    }
+
+    #[tokio::test]
+    async fn test_cluster_window_partitioned_by_filtered_constants_executes() {
+        use datafusion::physical_plan::windows::BoundedWindowAggExec;
+        let latest = "SELECT event_name, _timestamp FROM (SELECT event_name, _timestamp, \
+            ROW_NUMBER() OVER (PARTITION BY k8s_cluster, k8s_resource_name, \
+            COALESCE(k8s_namespace_name, ''), event_name ORDER BY _timestamp DESC) AS rn \
+            FROM t WHERE k8s_resource_name = 'nodes' AND k8s_cluster = 'c1'{terms}) \
+            WHERE rn = 1 ORDER BY _timestamp DESC LIMIT {limit}";
+        for (terms, limit) in [
+            ("", "5000"),
+            (" AND event_name = 'n1' AND k8s_namespace_name = 'ns1'", "1"),
+        ] {
+            let sql = latest.replace("{terms}", terms).replace("{limit}", limit);
+            let (ctx, plan) = cluster_plan(&sql).await;
+            let mut windows = vec![];
+            plan.apply(|node| {
+                if node.downcast_ref::<BoundedWindowAggExec>().is_some() {
+                    windows.push(Arc::clone(node));
+                }
+                Ok(TreeNodeRecursion::Continue)
+            })
+            .unwrap();
+            assert_eq!(windows.len(), 1, "{sql}");
+            assert!(decode_every_remote_scan(&ctx, &plan) >= 1, "{sql}");
+            if let Err(e) = windows[0].execute(0, ctx.task_ctx()) {
+                panic!("{sql}: {e}");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_cluster_union_literal_column_keeps_sort_requirement() {
+        let sql = "SELECT event_name, value, 'a' AS origin FROM t WHERE value > 1 \
+            UNION ALL SELECT event_name, value, 'b' AS origin FROM t WHERE value < 0 \
+            ORDER BY origin, value DESC LIMIT 15";
+        let (ctx, plan) = cluster_plan(sql).await;
+        assert!(decode_every_remote_scan(&ctx, &plan) >= 2);
+        plan.apply(|node| {
+            for (child, required) in node
+                .children()
+                .into_iter()
+                .zip(node.required_input_ordering())
+            {
+                // A merge over a remote scan trusts each follower's stream to be sorted.
+                let Some(required) =
+                    required.filter(|_| child.downcast_ref::<RemoteScanExec>().is_none())
+                else {
+                    continue;
+                };
+                let (alternatives, _) = required.into_alternatives();
+                let eq = child.equivalence_properties();
+                let satisfied = alternatives
+                    .iter()
+                    .any(|r| eq.ordering_satisfy_requirement(r.iter().cloned()).unwrap());
+                assert!(satisfied, "{} <- {}", node.name(), child.name());
+            }
+            Ok(TreeNodeRecursion::Continue)
+        })
+        .unwrap();
+    }
 }

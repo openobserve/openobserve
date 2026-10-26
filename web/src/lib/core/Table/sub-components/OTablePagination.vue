@@ -28,11 +28,13 @@ const props = withDefaults(
     loading?: boolean;
     /** Rows currently selected; read only when `#selection-actions` is provided. */
     selectedCount?: number;
+    bordered?: boolean;
   }>(),
   {
     position: "bottom",
     totalCountExact: true,
     selectedCount: 0,
+    bordered: true,
   },
 );
 
@@ -75,7 +77,10 @@ const selectionLabel = computed(() => {
 <template>
   <div
     :data-test="`o2-table-pagination-${position}`"
-    class="border-border-default flex flex-wrap items-center gap-x-3 gap-y-1 border-t px-3 py-1"
+    :class="[
+      'flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1',
+      bordered ? 'border-border-default border-t' : '',
+    ]"
   >
     <!-- Slot presence is read here, not in a computed: slots are not reactive, so a cached answer would miss a slot the page adds later. -->
     <div
@@ -133,15 +138,17 @@ const selectionLabel = computed(() => {
           :options="pageSizeSelectOptions"
           :searchable="false"
           size="sm"
+          :aria-label="t('search.recordsPerPage')"
           data-test="o2-table-page-size-select"
         />
       </div>
 
-      <div class="flex items-center gap-1">
+      <nav class="flex items-center gap-1" :aria-label="t('components.pagination.pagination')">
         <OButton
           variant="outline"
           size="icon"
           :disabled="isFirstPage"
+          :aria-label="t('search.firstPage')"
           data-test="o2-table-first-page-btn"
           @click="emit('first-page')"
         >
@@ -151,6 +158,7 @@ const selectionLabel = computed(() => {
           variant="outline"
           size="icon"
           :disabled="isFirstPage"
+          :aria-label="t('components.pagination.previousPage')"
           data-test="o2-table-prev-page-btn"
           @click="emit('prev-page')"
         >
@@ -160,6 +168,7 @@ const selectionLabel = computed(() => {
           variant="outline"
           size="icon"
           :disabled="isLastPage"
+          :aria-label="t('components.pagination.nextPage')"
           data-test="o2-table-next-page-btn"
           @click="emit('next-page')"
         >
@@ -170,12 +179,13 @@ const selectionLabel = computed(() => {
           variant="outline"
           size="icon"
           :disabled="isLastPage"
+          :aria-label="t('search.lastPage')"
           data-test="o2-table-last-page-btn"
           @click="emit('last-page')"
         >
           <OIcon name="last-page" size="sm" />
         </OButton>
-      </div>
+      </nav>
     </div>
   </div>
 </template>

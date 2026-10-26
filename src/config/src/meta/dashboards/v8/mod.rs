@@ -22,6 +22,9 @@ use utoipa::ToSchema;
 use super::{OrdF64, datetime_now};
 use crate::meta::stream::StreamType;
 
+/// Caps total defined `annotationSources` (enabled or not), bounding fan-out if all were enabled.
+pub const MAX_ANNOTATION_SOURCES: usize = 10;
+
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
@@ -46,6 +49,8 @@ pub struct Dashboard {
     pub variables: Option<Variables>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_datetime_duration: Option<DateTimeOptions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub annotation_sources: Option<Vec<AnnotationSource>>,
     #[serde(default, skip_serializing)]
     pub updated_at: i64,
 }
@@ -74,6 +79,113 @@ impl From<Dashboard> for super::Dashboard {
             updated_at,
         }
     }
+}
+
+/// A dashboard-level query whose rows are drawn as annotation markers on time-series panels.
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(default)]
+#[serde(rename_all = "camelCase")]
+pub struct AnnotationSource {
+    pub id: String,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    pub enabled: bool,
+    pub mode: AnnotationSourceMode,
+    pub stream_type: StreamType,
+    pub stream: String,
+    // Opaque in the doc (like Condition.value): MCP's schema walker rejects any recursive ref.
+    #[schema(value_type = Object)]
+    pub filters: AnnotationConditionGroup,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub query: Option<String>,
+    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_time_field: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub panels: Option<Vec<String>>,
+}
+
+impl Default for AnnotationSource {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            name: String::new(),
+            color: None,
+            enabled: true,
+            mode: AnnotationSourceMode::default(),
+            stream_type: StreamType::default(),
+            stream: String::new(),
+            filters: AnnotationConditionGroup::default(),
+            query: None,
+            title: String::new(),
+            description: None,
+            end_time_field: None,
+            panels: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum AnnotationSourceMode {
+    #[default]
+    Builder,
+    Sql,
+}
+
+/// Mirrors alerts' `ConditionGroup`; separate since alerts' `Value` can't derive `Hash`.
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AnnotationConditionGroup {
+    pub filter_type: String, // Always "group"
+    pub logical_operator: AnnotationLogicalOperator,
+    pub conditions: Vec<AnnotationConditionItem>,
+}
+
+impl Default for AnnotationConditionGroup {
+    fn default() -> Self {
+        Self {
+            filter_type: "group".to_string(),
+            logical_operator: AnnotationLogicalOperator::And,
+            conditions: Vec::new(),
+        }
+    }
+}
+
+/// A leaf condition or a nested group inside an annotation source's filter tree.
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(tag = "filterType", rename_all = "lowercase")]
+pub enum AnnotationConditionItem {
+    Condition(AnnotationConditionLeaf),
+    Group {
+        #[serde(rename = "logicalOperator")]
+        logical_operator: AnnotationLogicalOperator,
+        // Self-referential: without this, utoipa's schema walk recurses forever at startup.
+        #[schema(no_recursion)]
+        conditions: Vec<AnnotationConditionItem>,
+    },
+}
+
+/// One leaf condition in an annotation source's filter tree.
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+pub struct AnnotationConditionLeaf {
+    pub column: String,
+    pub operator: String,
+    pub value: String,
+    #[serde(rename = "logicalOperator")]
+    pub logical_operator: AnnotationLogicalOperator,
+}
+
+/// AND/OR logical operator joining sibling conditions in an annotation source's filter tree.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum AnnotationLogicalOperator {
+    #[default]
+    And,
+    Or,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -497,6 +609,67 @@ pub struct PanelConfig {
     panel_time_range: Option<PanelTimeRange>,
     #[serde(skip_serializing_if = "Option::is_none")]
     show_exemplars: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    axis_label_mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    heatmap_mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bucket_unit: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bucket_unit_custom: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    heatmap_color_min: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    heatmap_color_max: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    heatmap_palette: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    heatmap_palette_reverse: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    heatmap_color_scale: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    heatmap_y_sort: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    heatmap_y_bucket: Option<HeatmapYBucket>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    heatmap_y_min: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    heatmap_y_max: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    thresholds: Option<Thresholds>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    merge_gaps: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    row_height: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    row_gap: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    show_state_text: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    row_sort: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tooltip_mode: Option<String>,
+}
+
+/// Heatmap y buckets: "size" mode is fixed-width, "log" mode one per power of `base` (2 or 10).
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(default)]
+pub struct HeatmapYBucket {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    size: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    base: Option<OrdF64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -627,6 +800,27 @@ pub enum Config {
         #[serde(skip_serializing_if = "Option::is_none")]
         rules: Option<Vec<ConditionalRule>>,
     },
+    Decimals {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        #[schema(value_type = Option<f64>)]
+        value: Option<OrdF64>,
+    },
+    DisplayName {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<String>,
+    },
+    SeriesColor {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<String>,
+    },
+    Thresholds {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<Thresholds>,
+    },
+    ValueMappings {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<Vec<Mapping>>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -650,6 +844,31 @@ pub struct Value {
     unit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     custom_unit: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(default)]
+#[serde(rename_all = "camelCase")]
+pub struct Thresholds {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    show_as: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    base_color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    steps: Option<Vec<ThresholdStep>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(default)]
+#[serde(rename_all = "camelCase")]
+pub struct ThresholdStep {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    value: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    color: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -704,6 +923,16 @@ pub struct QueryConfig {
     time_shift: Option<Vec<TimeShift>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     query_label: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    formula: Option<String>,
+    #[serde(rename = "ref", default, skip_serializing_if = "Option::is_none")]
+    query_ref: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    hide: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    query_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    promql_legend_fallback: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -954,6 +1183,118 @@ mod tests {
                 .unwrap()
                 .contains_key("defaultDatetimeDuration")
         );
+    }
+
+    #[test]
+    fn test_annotation_sources_skipped_when_none() {
+        let json = serde_json::to_value(make_dashboard()).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("annotationSources"));
+    }
+
+    #[test]
+    fn test_annotation_sources_serde_roundtrip() {
+        let input = serde_json::json!({
+            "version": 8,
+            "title": "T",
+            "description": "",
+            "annotationSources": [
+                {
+                    "id": "s1",
+                    "name": "Deploys",
+                    "color": "#5b8ef0",
+                    "enabled": false,
+                    "mode": "builder",
+                    "streamType": "logs",
+                    "stream": "k8s_events",
+                    "filters": {
+                        "filterType": "group",
+                        "logicalOperator": "AND",
+                        "conditions": [
+                            {
+                                "filterType": "condition",
+                                "column": "event",
+                                "operator": "=",
+                                "value": "deploy",
+                                "logicalOperator": "AND"
+                            }
+                        ]
+                    },
+                    "title": "{service} deployed",
+                    "description": "by {author}",
+                    "endTimeField": "end_time",
+                    "panels": ["p1", "p2"]
+                },
+                {
+                    "id": "s2",
+                    "name": "Incidents",
+                    "mode": "sql",
+                    "streamType": "traces",
+                    "stream": "",
+                    "query": "SELECT _timestamp FROM \"incidents\"",
+                    "title": "{title}"
+                }
+            ]
+        });
+        let d: Dashboard = serde_json::from_value(input).unwrap();
+        let sources = d.annotation_sources.as_ref().unwrap();
+        assert_eq!(sources.len(), 2);
+        assert!(!sources[0].enabled);
+        assert_eq!(sources[0].mode, AnnotationSourceMode::Builder);
+        assert_eq!(sources[0].filters.filter_type, "group");
+        assert_eq!(sources[0].filters.conditions.len(), 1);
+        match &sources[0].filters.conditions[0] {
+            AnnotationConditionItem::Condition(leaf) => assert_eq!(leaf.column, "event"),
+            AnnotationConditionItem::Group { .. } => panic!("expected a leaf condition"),
+        }
+        assert_eq!(
+            sources[0].panels.as_deref(),
+            Some(&["p1".to_string(), "p2".to_string()][..])
+        );
+        assert!(sources[1].enabled, "enabled defaults to true when omitted");
+        assert_eq!(sources[1].mode, AnnotationSourceMode::Sql);
+        assert_eq!(sources[1].stream_type, StreamType::Traces);
+        assert!(sources[1].panels.is_none());
+
+        let back = serde_json::to_value(&d).unwrap();
+        assert_eq!(back["annotationSources"][0]["endTimeField"], "end_time");
+        assert_eq!(back["annotationSources"][1]["mode"], "sql");
+        assert!(
+            !back["annotationSources"][1]
+                .as_object()
+                .unwrap()
+                .contains_key("panels")
+        );
+        let again: Dashboard = serde_json::from_value(back).unwrap();
+        assert_eq!(again, d);
+    }
+
+    #[test]
+    fn test_annotation_sources_change_the_hash() {
+        let plain: super::super::Dashboard = make_dashboard().into();
+        let mut with_sources = make_dashboard();
+        with_sources.annotation_sources = Some(vec![AnnotationSource::default()]);
+        let with_sources: super::super::Dashboard = with_sources.into();
+        assert_ne!(plain.hash, with_sources.hash);
+    }
+
+    // Regression: without `#[schema(no_recursion)]` this walk recurses forever and aborts.
+    #[test]
+    fn test_annotation_condition_item_schema_walk_terminates() {
+        let mut schemas = Vec::new();
+        AnnotationConditionGroup::schemas(&mut schemas);
+        let names: Vec<&str> = schemas.iter().map(|(name, _)| name.as_str()).collect();
+        assert!(names.contains(&"AnnotationConditionItem"));
+        assert!(names.contains(&"AnnotationConditionLeaf"));
+    }
+
+    // `filters` is opaque in the doc, so MCP's tool-schema walker never reaches the self-reference.
+    #[test]
+    fn test_annotation_filters_opaque_in_dashboard_schema_walk() {
+        let mut schemas = Vec::new();
+        Dashboard::schemas(&mut schemas);
+        let names: Vec<&str> = schemas.iter().map(|(name, _)| name.as_str()).collect();
+        assert!(!names.contains(&"AnnotationConditionGroup"));
+        assert!(!names.contains(&"AnnotationConditionItem"));
     }
 
     #[test]
@@ -1386,6 +1727,11 @@ mod tests {
             max: None,
             time_shift: None,
             query_label: None,
+            formula: None,
+            query_ref: None,
+            hide: None,
+            query_type: None,
+            promql_legend_fallback: None,
         };
         let json = serde_json::to_string(&qc).unwrap();
         assert!(!json.contains("step_value"));
@@ -1771,6 +2117,8 @@ mod tests {
         assert!(!json.contains("panel_time_enabled"));
         assert!(!json.contains("panel_time_range"));
         assert!(!json.contains("show_exemplars"));
+        assert!(!json.contains("heatmap_mode"));
+        assert!(!json.contains("bucket_unit"));
     }
 
     #[test]
@@ -1804,5 +2152,460 @@ mod tests {
         assert_eq!(cfg.show_exemplars, None);
         let json = serde_json::to_value(&cfg).unwrap();
         assert!(json.get("show_exemplars").is_none());
+    }
+
+    #[test]
+    fn test_panel_config_axis_label_mode_round_trip() {
+        for mode in ["auto", "show", "hide"] {
+            let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+                "show_legends": true,
+                "legends_position": null,
+                "base_map": null,
+                "map_view": null,
+                "axis_label_mode": mode
+            }))
+            .unwrap();
+            assert_eq!(cfg.axis_label_mode.as_deref(), Some(mode));
+            let json = serde_json::to_value(&cfg).unwrap();
+            assert_eq!(json["axis_label_mode"], serde_json::json!(mode));
+            let back: PanelConfig = serde_json::from_value(json).unwrap();
+            assert_eq!(back, cfg);
+        }
+    }
+
+    #[test]
+    fn test_panel_config_axis_label_mode_absent_when_none() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": false,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null
+        }))
+        .unwrap();
+        assert_eq!(cfg.axis_label_mode, None);
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert!(json.get("axis_label_mode").is_none());
+    }
+
+    #[test]
+    fn test_panel_config_heatmap_histogram_round_trip() {
+        for custom in [None, Some("req")] {
+            let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+                "show_legends": true,
+                "legends_position": null,
+                "base_map": null,
+                "map_view": null,
+                "heatmap_mode": "prometheus_histogram",
+                "bucket_unit": "seconds",
+                "bucket_unit_custom": custom
+            }))
+            .unwrap();
+            assert_eq!(cfg.heatmap_mode.as_deref(), Some("prometheus_histogram"));
+            assert_eq!(cfg.bucket_unit.as_deref(), Some("seconds"));
+            assert_eq!(cfg.bucket_unit_custom.as_deref(), custom);
+            let json = serde_json::to_value(&cfg).unwrap();
+            assert_eq!(
+                json["heatmap_mode"],
+                serde_json::json!("prometheus_histogram")
+            );
+            assert_eq!(json["bucket_unit"], serde_json::json!("seconds"));
+            let back: PanelConfig = serde_json::from_value(json).unwrap();
+            assert_eq!(back, cfg);
+        }
+    }
+
+    #[test]
+    fn test_panel_config_heatmap_histogram_absent_when_none() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": false,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null
+        }))
+        .unwrap();
+        assert_eq!(cfg.heatmap_mode, None);
+        assert_eq!(cfg.bucket_unit, None);
+        assert_eq!(cfg.bucket_unit_custom, None);
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert!(json.get("heatmap_mode").is_none());
+        assert!(json.get("bucket_unit").is_none());
+        assert!(json.get("bucket_unit_custom").is_none());
+    }
+
+    #[test]
+    fn test_panel_config_heatmap_color_range_round_trip() {
+        for (min, max) in [
+            (Some(-2.5), Some(40.0)),
+            (Some(0.0), None),
+            (None, Some(1e9)),
+        ] {
+            let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+                "show_legends": true,
+                "legends_position": null,
+                "base_map": null,
+                "map_view": null,
+                "heatmap_color_min": min,
+                "heatmap_color_max": max
+            }))
+            .unwrap();
+            assert_eq!(cfg.heatmap_color_min, min.map(OrdF64::from));
+            assert_eq!(cfg.heatmap_color_max, max.map(OrdF64::from));
+            let json = serde_json::to_value(&cfg).unwrap();
+            assert_eq!(json.get("heatmap_color_min").and_then(|v| v.as_f64()), min);
+            assert_eq!(json.get("heatmap_color_max").and_then(|v| v.as_f64()), max);
+            let back: PanelConfig = serde_json::from_value(json).unwrap();
+            assert_eq!(back, cfg);
+        }
+    }
+
+    #[test]
+    fn test_panel_config_heatmap_color_range_absent_when_none() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": false,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null,
+            "heatmap_color_min": null
+        }))
+        .unwrap();
+        assert_eq!(cfg.heatmap_color_min, None);
+        assert_eq!(cfg.heatmap_color_max, None);
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert!(json.get("heatmap_color_min").is_none());
+        assert!(json.get("heatmap_color_max").is_none());
+    }
+
+    #[test]
+    fn test_panel_config_heatmap_palette_and_scale_round_trip() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": true,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null,
+            "heatmap_palette": "viridis",
+            "heatmap_palette_reverse": true,
+            "heatmap_color_scale": "log"
+        }))
+        .unwrap();
+        assert_eq!(cfg.heatmap_palette.as_deref(), Some("viridis"));
+        assert_eq!(cfg.heatmap_palette_reverse, Some(true));
+        assert_eq!(cfg.heatmap_color_scale.as_deref(), Some("log"));
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert_eq!(json["heatmap_palette"], serde_json::json!("viridis"));
+        assert_eq!(json["heatmap_palette_reverse"], serde_json::json!(true));
+        assert_eq!(json["heatmap_color_scale"], serde_json::json!("log"));
+        let back: PanelConfig = serde_json::from_value(json).unwrap();
+        assert_eq!(back, cfg);
+    }
+
+    #[test]
+    fn test_panel_config_heatmap_palette_and_scale_absent_when_none() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": false,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null
+        }))
+        .unwrap();
+        assert_eq!(cfg.heatmap_palette, None);
+        assert_eq!(cfg.heatmap_palette_reverse, None);
+        assert_eq!(cfg.heatmap_color_scale, None);
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert!(json.get("heatmap_palette").is_none());
+        assert!(json.get("heatmap_palette_reverse").is_none());
+        assert!(json.get("heatmap_color_scale").is_none());
+    }
+
+    #[test]
+    fn test_panel_config_heatmap_y_axis_round_trip() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": true,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null,
+            "heatmap_y_sort": "desc",
+            "heatmap_y_bucket": { "mode": "size", "size": 2.5, "base": 10 },
+            "heatmap_y_min": -10.0,
+            "heatmap_y_max": 500.0
+        }))
+        .unwrap();
+        assert_eq!(cfg.heatmap_y_sort.as_deref(), Some("desc"));
+        let bucket = cfg.heatmap_y_bucket.as_ref().unwrap();
+        assert_eq!(bucket.mode.as_deref(), Some("size"));
+        assert_eq!(bucket.size, Some(OrdF64::from(2.5)));
+        assert_eq!(bucket.base, Some(OrdF64::from(10.0)));
+        assert_eq!(cfg.heatmap_y_min, Some(OrdF64::from(-10.0)));
+        assert_eq!(cfg.heatmap_y_max, Some(OrdF64::from(500.0)));
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert_eq!(json["heatmap_y_sort"], serde_json::json!("desc"));
+        assert_eq!(
+            json["heatmap_y_bucket"],
+            serde_json::json!({ "mode": "size", "size": 2.5, "base": 10.0 })
+        );
+        assert_eq!(json["heatmap_y_min"], serde_json::json!(-10.0));
+        assert_eq!(json["heatmap_y_max"], serde_json::json!(500.0));
+        let back: PanelConfig = serde_json::from_value(json).unwrap();
+        assert_eq!(back, cfg);
+    }
+
+    #[test]
+    fn test_panel_config_heatmap_y_axis_absent_when_none() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": false,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null,
+            "heatmap_y_bucket": { "mode": "log" }
+        }))
+        .unwrap();
+        assert_eq!(cfg.heatmap_y_sort, None);
+        assert_eq!(cfg.heatmap_y_min, None);
+        assert_eq!(cfg.heatmap_y_max, None);
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert_eq!(
+            json["heatmap_y_bucket"],
+            serde_json::json!({ "mode": "log" })
+        );
+        for key in ["heatmap_y_sort", "heatmap_y_min", "heatmap_y_max"] {
+            assert!(json.get(key).is_none(), "{key} should be omitted");
+        }
+    }
+
+    #[test]
+    fn test_panel_config_thresholds_round_trip() {
+        for base_color in [None, Some("#22C55E")] {
+            let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+                "show_legends": true,
+                "legends_position": null,
+                "base_map": null,
+                "map_view": null,
+                "thresholds": {
+                    "mode": "absolute",
+                    "showAs": "color_line",
+                    "baseColor": base_color,
+                    "steps": [
+                        {"value": 500, "color": "#F59E0B"},
+                        {"value": 1000, "color": "#EF4444"}
+                    ]
+                }
+            }))
+            .unwrap();
+            let thresholds = cfg.thresholds.as_ref().unwrap();
+            assert_eq!(thresholds.mode.as_deref(), Some("absolute"));
+            assert_eq!(thresholds.show_as.as_deref(), Some("color_line"));
+            assert_eq!(thresholds.base_color.as_deref(), base_color);
+            let steps = thresholds.steps.as_ref().unwrap();
+            assert_eq!(steps.len(), 2);
+            assert_eq!(steps[0].value, Some(OrdF64::from(500.0)));
+            assert_eq!(steps[1].color.as_deref(), Some("#EF4444"));
+
+            // OrdF64 writes an integer step back as a float and a null baseColor is not written.
+            let mut expected = serde_json::json!({
+                "mode": "absolute",
+                "showAs": "color_line",
+                "steps": [
+                    {"value": 500.0, "color": "#F59E0B"},
+                    {"value": 1000.0, "color": "#EF4444"}
+                ]
+            });
+            if let Some(color) = base_color {
+                expected["baseColor"] = serde_json::json!(color);
+            }
+            let json = serde_json::to_value(&cfg).unwrap();
+            assert_eq!(json["thresholds"], expected);
+            let back: PanelConfig = serde_json::from_value(json).unwrap();
+            assert_eq!(back, cfg);
+        }
+    }
+
+    #[test]
+    fn test_panel_config_thresholds_absent_when_none() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": false,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null
+        }))
+        .unwrap();
+        assert_eq!(cfg.thresholds, None);
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert!(json.get("thresholds").is_none());
+    }
+
+    #[test]
+    fn test_panel_config_state_timeline_round_trip() {
+        let input = serde_json::json!({
+            "show_legends": true,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null,
+            "merge_gaps": 90.0,
+            "row_height": 24.0,
+            "row_gap": 4.0,
+            "show_state_text": false,
+            "row_sort": "non_ok_time",
+            "tooltip_mode": "all_rows"
+        });
+        let cfg: PanelConfig = serde_json::from_value(input.clone()).unwrap();
+        assert_eq!(cfg.merge_gaps, Some(OrdF64::from(90.0)));
+        assert_eq!(cfg.row_height, Some(OrdF64::from(24.0)));
+        assert_eq!(cfg.row_gap, Some(OrdF64::from(4.0)));
+        assert_eq!(cfg.show_state_text, Some(false));
+        assert_eq!(cfg.row_sort.as_deref(), Some("non_ok_time"));
+        assert_eq!(cfg.tooltip_mode.as_deref(), Some("all_rows"));
+
+        let json = serde_json::to_value(&cfg).unwrap();
+        for key in [
+            "merge_gaps",
+            "row_height",
+            "row_gap",
+            "show_state_text",
+            "row_sort",
+            "tooltip_mode",
+        ] {
+            assert_eq!(json[key], input[key], "{key}");
+        }
+        let back: PanelConfig = serde_json::from_value(json).unwrap();
+        assert_eq!(back, cfg);
+    }
+
+    #[test]
+    fn test_panel_config_state_timeline_absent_when_none() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": false,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null
+        }))
+        .unwrap();
+        let json = serde_json::to_value(&cfg).unwrap();
+        for key in [
+            "merge_gaps",
+            "row_height",
+            "row_gap",
+            "show_state_text",
+            "row_sort",
+            "tooltip_mode",
+        ] {
+            assert!(json.get(key).is_none(), "{key}");
+        }
+    }
+
+    #[test]
+    fn test_override_config_series_entry_round_trip() {
+        let entry: OverrideConfig = serde_json::from_value(serde_json::json!({
+            "field": {"matchBy": "series_regex", "value": "/^checkout/i"},
+            "config": [
+                {"type": "unit", "value": {"unit": "milliseconds", "customUnit": ""}},
+                {"type": "decimals", "value": 2},
+                {"type": "display_name", "value": "Checkout API"},
+                {"type": "series_color", "value": "#EF4444"},
+                {"type": "thresholds", "value": {
+                    "mode": "absolute",
+                    "showAs": "color_line",
+                    "baseColor": null,
+                    "steps": [{"value": 800, "color": "#F59E0B"}]
+                }}
+            ]
+        }))
+        .unwrap();
+        let config = entry.config.as_ref().unwrap();
+        assert_eq!(config.len(), 5);
+        assert_eq!(
+            config[1],
+            Config::Decimals {
+                value: Some(OrdF64::from(2.0))
+            }
+        );
+        assert_eq!(
+            config[2],
+            Config::DisplayName {
+                value: Some("Checkout API".to_string())
+            }
+        );
+        assert_eq!(
+            config[3],
+            Config::SeriesColor {
+                value: Some("#EF4444".to_string())
+            }
+        );
+        assert!(
+            matches!(&config[4], Config::Thresholds { value: Some(t) } if t.base_color.is_none())
+        );
+
+        // OrdF64 writes integers back as floats and a null baseColor is not written.
+        let json = serde_json::to_value(&entry).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "field": {"matchBy": "series_regex", "value": "/^checkout/i"},
+                "config": [
+                    {"type": "unit", "value": {"unit": "milliseconds", "customUnit": ""}},
+                    {"type": "decimals", "value": 2.0},
+                    {"type": "display_name", "value": "Checkout API"},
+                    {"type": "series_color", "value": "#EF4444"},
+                    {"type": "thresholds", "value": {
+                        "mode": "absolute",
+                        "showAs": "color_line",
+                        "steps": [{"value": 800.0, "color": "#F59E0B"}]
+                    }}
+                ]
+            })
+        );
+        let back: OverrideConfig = serde_json::from_value(json).unwrap();
+        assert_eq!(back, entry);
+    }
+
+    #[test]
+    fn test_override_config_new_types_skip_unset_value() {
+        let cases = [
+            (Config::Decimals { value: None }, "decimals"),
+            (Config::DisplayName { value: None }, "display_name"),
+            (Config::SeriesColor { value: None }, "series_color"),
+            (Config::Thresholds { value: None }, "thresholds"),
+            (Config::ValueMappings { value: None }, "value_mappings"),
+        ];
+        for (cfg, typ) in cases {
+            let json = serde_json::to_value(&cfg).unwrap();
+            assert_eq!(json, serde_json::json!({"type": typ}));
+        }
+    }
+
+    #[test]
+    fn test_override_config_value_mappings_round_trip() {
+        let input = serde_json::json!({
+            "field": {"matchBy": "series_regex", "value": "/^gpu/"},
+            "config": [
+                {"type": "display_name", "value": "GPU"},
+                {"type": "value_mappings", "value": [
+                    {"type": "value", "value": "thermal", "text": "Hot", "color": "#ff0000"},
+                    {"type": "regex", "pattern": "^power", "color": "#ffaa00"}
+                ]}
+            ]
+        });
+        let entry: OverrideConfig = serde_json::from_value(input.clone()).unwrap();
+        let config = entry.config.as_ref().unwrap();
+        assert!(matches!(&config[1], Config::ValueMappings { value: Some(m) } if m.len() == 2));
+        assert_eq!(serde_json::to_value(&entry).unwrap(), input);
+    }
+
+    #[test]
+    fn test_override_config_table_entry_round_trips_unchanged() {
+        let input = serde_json::json!({
+            "field": {"matchBy": "name", "value": "status"},
+            "config": [
+                {"type": "unit", "value": {"unit": "bytes", "customUnit": ""}},
+                {"type": "unique_value_color", "autoColor": true},
+                {"type": "alignment", "value": "right"},
+                {"type": "text_color", "value": "#ffffff"},
+                {"type": "background_color", "value": "#000000"},
+                {"type": "field_type", "value": "number"},
+                {"type": "conditional_styles", "rules": [
+                    {"operator": ">", "threshold": 10.5, "bgColor": "#f00"}
+                ]}
+            ]
+        });
+        let entry: OverrideConfig = serde_json::from_value(input.clone()).unwrap();
+        assert_eq!(serde_json::to_value(&entry).unwrap(), input);
     }
 }

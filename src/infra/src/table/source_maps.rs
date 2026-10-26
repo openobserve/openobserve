@@ -83,57 +83,6 @@ impl From<i32> for FileType {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_file_type_to_i32() {
-        assert_eq!(i32::from(FileType::SourceMap), 0);
-    }
-
-    #[test]
-    fn test_i32_to_file_type_zero() {
-        assert!(matches!(FileType::from(0), FileType::SourceMap));
-    }
-
-    #[test]
-    fn test_i32_to_file_type_unknown_defaults_to_source_map() {
-        assert!(matches!(FileType::from(99), FileType::SourceMap));
-        assert!(matches!(FileType::from(-1), FileType::SourceMap));
-    }
-
-    #[test]
-    fn test_from_model_to_source_map() {
-        use super::super::entity::source_maps::Model;
-        let model = Model {
-            id: 42,
-            org: "myorg".to_string(),
-            service: Some("api".to_string()),
-            env: Some("prod".to_string()),
-            version: Some("1.0.0".to_string()),
-            source_file_name: "app.js".to_string(),
-            source_map_file_name: "app.js.map".to_string(),
-            file_store_id: "store-1".to_string(),
-            file_type: 0,
-            created_at: 1_000_000,
-            cluster: "us-east".to_string(),
-        };
-        let sm = SourceMap::from(model);
-        assert_eq!(sm.id, 42);
-        assert_eq!(sm.org, "myorg");
-        assert_eq!(sm.service.as_deref(), Some("api"));
-        assert_eq!(sm.env.as_deref(), Some("prod"));
-        assert_eq!(sm.version.as_deref(), Some("1.0.0"));
-        assert_eq!(sm.source_file_name, "app.js");
-        assert_eq!(sm.source_map_file_name, "app.js.map");
-        assert_eq!(sm.file_store_id, "store-1");
-        assert_eq!(sm.created_at, 1_000_000);
-        assert_eq!(sm.cluster, "us-east");
-        assert!(matches!(sm.file_type, FileType::SourceMap));
-    }
-}
-
 #[derive(FromQueryResult)]
 struct Value {
     value: Option<String>,
@@ -141,6 +90,16 @@ struct Value {
 
 pub fn get_file_path(org_id: &str, name: &str) -> String {
     format!("files/{org_id}/sourcemaps/{name}")
+}
+
+/// Only a sourcemap file stored under the requesting org's own prefix may be read back.
+pub fn is_sourcemap_path_for_org(org_id: &str, path: &str) -> bool {
+    use std::path::{Component, Path};
+    let prefix = format!("files/{org_id}/sourcemaps/");
+    path.starts_with(&prefix)
+        && Path::new(path)
+            .components()
+            .all(|c| matches!(c, Component::Normal(_)))
 }
 
 pub async fn add_many(entries: Vec<SourceMap>) -> Result<(), errors::Error> {
@@ -275,6 +234,14 @@ pub async fn list_files(
     Ok(res)
 }
 
+/// Deletes every source map of the org and returns the removed rows, so callers release files.
+pub async fn delete_by_org(org: &str) -> Result<Vec<SourceMap>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let delete = Entity::delete_many().filter(Column::Org.eq(org));
+    let rows = super::delete_returning_models(client, delete).await?;
+    Ok(rows.into_iter().map(SourceMap::from).collect())
+}
+
 pub async fn update_cluster(entry: SourceMap) -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;
 
@@ -339,4 +306,129 @@ pub async fn get_values(
         .collect();
 
     Ok((services, envs, versions))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_file_type_to_i32() {
+        assert_eq!(i32::from(FileType::SourceMap), 0);
+    }
+
+    #[test]
+    fn test_i32_to_file_type_zero() {
+        assert!(matches!(FileType::from(0), FileType::SourceMap));
+    }
+
+    #[test]
+    fn test_i32_to_file_type_unknown_defaults_to_source_map() {
+        assert!(matches!(FileType::from(99), FileType::SourceMap));
+        assert!(matches!(FileType::from(-1), FileType::SourceMap));
+    }
+
+    #[test]
+    fn test_from_model_to_source_map() {
+        use super::super::entity::source_maps::Model;
+        let model = Model {
+            id: 42,
+            org: "myorg".to_string(),
+            service: Some("api".to_string()),
+            env: Some("prod".to_string()),
+            version: Some("1.0.0".to_string()),
+            source_file_name: "app.js".to_string(),
+            source_map_file_name: "app.js.map".to_string(),
+            file_store_id: "store-1".to_string(),
+            file_type: 0,
+            created_at: 1_000_000,
+            cluster: "us-east".to_string(),
+        };
+        let sm = SourceMap::from(model);
+        assert_eq!(sm.id, 42);
+        assert_eq!(sm.org, "myorg");
+        assert_eq!(sm.service.as_deref(), Some("api"));
+        assert_eq!(sm.env.as_deref(), Some("prod"));
+        assert_eq!(sm.version.as_deref(), Some("1.0.0"));
+        assert_eq!(sm.source_file_name, "app.js");
+        assert_eq!(sm.source_map_file_name, "app.js.map");
+        assert_eq!(sm.file_store_id, "store-1");
+        assert_eq!(sm.created_at, 1_000_000);
+        assert_eq!(sm.cluster, "us-east");
+        assert!(matches!(sm.file_type, FileType::SourceMap));
+    }
+
+    #[test]
+    fn test_is_sourcemap_path_for_org() {
+        assert!(is_sourcemap_path_for_org(
+            "org1",
+            "files/org1/sourcemaps/abc123"
+        ));
+        assert!(!is_sourcemap_path_for_org(
+            "org1",
+            "files/otherorg/sourcemaps/abc123"
+        ));
+        assert!(!is_sourcemap_path_for_org(
+            "org1",
+            "files/org1/sourcemaps/../../otherorg/sourcemaps/abc123"
+        ));
+        assert!(!is_sourcemap_path_for_org(
+            "org1",
+            "/files/org1/sourcemaps/abc123"
+        ));
+        assert!(!is_sourcemap_path_for_org(
+            "org1",
+            "files/org1/other/abc123"
+        ));
+    }
+
+    fn source_map(org: &str, file: &str) -> SourceMap {
+        SourceMap {
+            id: 0,
+            org: org.to_string(),
+            service: None,
+            env: None,
+            version: None,
+            source_file_name: file.to_string(),
+            source_map_file_name: format!("{file}.map"),
+            file_store_id: format!("{org}/{file}"),
+            file_type: FileType::SourceMap,
+            created_at: 1,
+            cluster: "c".to_string(),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_org_delete_returns_the_whole_rows_it_removed() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("t_smap");
+        let other = format!("{org}_other");
+        let rows = vec![
+            source_map(&org, "a.js"),
+            source_map(&org, "b.js"),
+            source_map(&other, "a.js"),
+        ];
+        add_many(rows).await.unwrap();
+
+        let mut removed = delete_by_org(&org).await.unwrap();
+        removed.sort_by(|x, y| x.source_file_name.cmp(&y.source_file_name));
+        let again = delete_by_org(&org).await.unwrap();
+        let kept = delete_by_org(&other).await.unwrap();
+
+        let files: Vec<(&str, &str)> = removed
+            .iter()
+            .map(|m| (m.source_file_name.as_str(), m.file_store_id.as_str()))
+            .collect();
+        assert_eq!(files.len(), 2);
+        assert_eq!(files[0].0, "a.js");
+        assert_eq!(files[1].1, format!("{org}/b.js"));
+        assert!(again.is_empty());
+        assert_eq!(
+            kept.len(),
+            1,
+            "another org's source map went with this org's"
+        );
+    }
 }

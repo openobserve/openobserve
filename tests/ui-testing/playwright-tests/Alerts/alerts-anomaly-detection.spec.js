@@ -36,8 +36,8 @@ test.describe('Anomaly Detection', () => {
   let seq = 0;
   const anomalyName = (suffix) => `E2E_Anomaly_${suffix}${++seq}_${randomValue}`;
 
-  // The Add button is disabled while the org has no destination, so both must
-  // exist before any wizard test can open.
+  // The Add button needs a template, and the alerting tests pick a destination,
+  // so both exist before any wizard test opens.
   const prerequisiteTemplateName = `e2e_anomaly_template_${randomValue}`;
   const prerequisiteDestinationName = `e2e_anomaly_dest_${randomValue}`;
 
@@ -122,16 +122,15 @@ test.describe('Anomaly Detection', () => {
       await expect(pm.anomalyDetectionPage.getListTableLocator()).toBeVisible();
     });
 
-    test('destination is required once notifications are enabled', {
+    test('notifications with no destination show a note, not an error', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async () => {
       await pm.anomalyDetectionPage.openAddAnomalyWizard();
       await pm.anomalyDetectionPage.fillBasicSetup(anomalyName('destreq'), 'logs', testStreamName);
       await pm.anomalyDetectionPage.openAlertingTab();
       await pm.anomalyDetectionPage.toggleNotifications(true);
-      await pm.anomalyDetectionPage.save();
 
-      await expect(pm.anomalyDetectionPage.getDestinationErrorLocator()).toBeVisible();
+      await expect(pm.anomalyDetectionPage.getDestinationNoteLocator()).toBeVisible();
       await pm.anomalyDetectionPage.cancel();
     });
 
@@ -198,26 +197,36 @@ test.describe('Anomaly Detection', () => {
       }
     });
 
-    test('a new alert starts at Auto, with the level blank', {
+    test('a new alert starts at Auto, with a read-only auto level', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async () => {
-      expect(await pm.anomalyDetectionPage.getSensitivityLevel()).toBe('');
       expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBe('auto');
+      const autoLevel = pm.anomalyDetectionPage.getSensitivityAutoLevelLocator();
+      await expect(autoLevel).toBeVisible();
+      await expect(autoLevel).toContainText('Auto level');
+      await expect(autoLevel).toContainText('Available after training');
+      await expect(pm.anomalyDetectionPage.getSensitivityLevelLocator()).toBeHidden();
     });
 
-    test('Auto clears an override back to a blank level', {
+    test('Auto clears an override back to the read-only auto level', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async () => {
       await pm.anomalyDetectionPage.selectSensitivityTier(4);
+      expect(await pm.anomalyDetectionPage.getSensitivityLevel()).toBe('4');
       await pm.anomalyDetectionPage.selectSensitivityTier('auto');
-      expect(await pm.anomalyDetectionPage.getSensitivityLevel()).toBe('');
       expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBe('auto');
-      await expect(pm.anomalyDetectionPage.getSensitivityHintLocator()).toBeHidden();
+      await expect(pm.anomalyDetectionPage.getSensitivityLevelLocator()).toBeHidden();
+      await expect(pm.anomalyDetectionPage.getSensitivityAutoLevelLocator()).toBeVisible();
+      await expect(pm.anomalyDetectionPage.getSensitivityHintLocator()).toHaveText(
+        'Auto will learn a level from your history.',
+      );
     });
 
     test('typing a tier value lights that tier up', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async () => {
+      // The level input renders only for a non-Auto tier.
+      await pm.anomalyDetectionPage.selectSensitivityTier(4);
       await pm.anomalyDetectionPage.setSensitivityLevel(2.5);
       expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBe(2.5);
     });
@@ -225,23 +234,22 @@ test.describe('Anomaly Detection', () => {
     test('an off-tier level is accepted with no tier selected', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async () => {
+      await pm.anomalyDetectionPage.selectSensitivityTier(3);
       await pm.anomalyDetectionPage.setSensitivityLevel(3.5);
       await expect(pm.anomalyDetectionPage.getSensitivityErrorLocator()).toBeHidden();
       expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBeNull();
+      await expect(pm.anomalyDetectionPage.getSensitivityCustomLocator()).toHaveText('Custom sensitivity');
     });
 
-    test('the hint names the band the buckets are judged against', {
+    test('a manual level on an untrained config says a trained model is required', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async () => {
-      await pm.anomalyDetectionPage.selectSensitivityTier(3);
-
       const hint = pm.anomalyDetectionPage.getSensitivityHintLocator();
-      await expect(hint).toBeVisible();
-      await expect(hint).toContainText('± 3σ');
-
-      // The number is interpolated, not baked into the string: a stale hint would keep 3.
-      await pm.anomalyDetectionPage.selectSensitivityTier(4);
-      await expect(hint).toContainText('± 4σ');
+      for (const tier of [3, 4]) {
+        await pm.anomalyDetectionPage.selectSensitivityTier(tier);
+        await expect(hint).toBeVisible();
+        await expect(hint).toHaveText('A trained model is required before detection can run.');
+      }
     });
 
     test('the hint does not vary with the resolution', {
@@ -259,6 +267,7 @@ test.describe('Anomaly Detection', () => {
       test(`rejects a ${label} band width`, {
         tag: ['@anomaly', '@P1', '@functional', '@all'],
       }, async () => {
+        await pm.anomalyDetectionPage.selectSensitivityTier(3);
         await pm.anomalyDetectionPage.setSensitivityLevel(value);
         await pm.anomalyDetectionPage.save();
         await expect(pm.anomalyDetectionPage.getSensitivityErrorLocator()).toHaveText(
@@ -270,6 +279,7 @@ test.describe('Anomaly Detection', () => {
     test('the hint is suppressed while the level is invalid', {
       tag: ['@anomaly', '@P2', '@functional', '@all'],
     }, async () => {
+      await pm.anomalyDetectionPage.selectSensitivityTier(3);
       await pm.anomalyDetectionPage.setSensitivityLevel(0.5);
       await expect(pm.anomalyDetectionPage.getSensitivityHintLocator()).toBeHidden();
     });
@@ -277,10 +287,87 @@ test.describe('Anomaly Detection', () => {
     test('the level control is labeled Level and measured in σ', {
       tag: ['@anomaly', '@P0', '@smoke', '@all'],
     }, async () => {
+      await pm.anomalyDetectionPage.selectSensitivityTier(3);
       const label = pm.anomalyDetectionPage.getSensitivityLevelLabelLocator();
       await expect(label).toBeVisible();
       await expect(label).toHaveText('Level');
       await expect(pm.anomalyDetectionPage.getSensitivityLevelLocator()).toContainText('σ');
+    });
+
+    test('clearing a manual level keeps manual mode and blocks save', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.selectSensitivityTier(3);
+      await pm.anomalyDetectionPage.setSensitivityLevel('');
+
+      // Clearing must not silently revert to Auto: the manual input stays and
+      // the Auto readout stays hidden.
+      await expect(pm.anomalyDetectionPage.getSensitivityLevelLocator()).toBeVisible();
+      await expect(pm.anomalyDetectionPage.getSensitivityAutoLevelLocator()).toBeHidden();
+
+      await pm.anomalyDetectionPage.save();
+
+      await expect(pm.anomalyDetectionPage.getSensitivityErrorLocator()).toHaveText(
+        'Enter a band width from 1 to 10.',
+      );
+      await expect(pm.anomalyDetectionPage.getSensitivityHintLocator()).toBeHidden();
+    });
+  });
+
+  // ════════════════════════════════════════════════════════════════════════
+  // Trained Auto level readout — a model's learned k read back from the readout
+  // ════════════════════════════════════════════════════════════════════════
+
+  test.describe('Trained Auto level readout', () => {
+    test.describe.configure({ mode: 'parallel' });
+
+    test('a trained config shows Current level with the learned k in the Auto readout', {
+      tag: ['@anomaly', '@P2', '@functional', '@all'],
+    }, async ({ page }) => {
+      test.slow();
+
+      const seededStream = `anomaly_autolevel_${randomValue}`;
+      const seed = await seedAnomalyStream(page, seededStream, {
+        hours: 4,
+        bucketSeconds: 60,
+        baseline: 10,
+        spikeValue: 120,
+        spikeBuckets: 4,
+        spikeOffset: 70,
+      });
+      expect(seed.status, `seeding ${seededStream} failed: ${JSON.stringify(seed.data)}`).toBe(200);
+      await waitForStream(page, seededStream);
+
+      // No band_width on an API-created config: it stays Auto, so the readout
+      // is the only sensitivity control that can surface the learned level.
+      const name = anomalyName('autolevel');
+      const id = await createAnomalyViaApi(page, name, {
+        streamName: seededStream,
+        histogramInterval: '1m',
+      });
+
+      const trainStarted = await triggerAnomalyTraining(page, id);
+      expect([200, 202]).toContain(trainStarted.status);
+      const trained = await waitForAnomalyTrained(page, id);
+      expect(trained.is_trained).toBe(true);
+
+      // The list is fetched once when the tab mounts, so reload before opening
+      // the editor — the freshly created config is otherwise absent.
+      await waitForAnomalyListed(page, name);
+      await page.reload();
+      await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
+      await pm.anomalyDetectionPage.navigateToAnomalyTab();
+      await pm.anomalyDetectionPage.searchAnomaly(name);
+      await pm.anomalyDetectionPage.openEdit(name);
+      await pm.anomalyDetectionPage.openConfigTab();
+
+      // The learned value depends on the seed, so assert the shape, not a literal.
+      const autoLevel = pm.anomalyDetectionPage.getSensitivityAutoLevelLocator();
+      await expect(autoLevel).toContainText('Current level');
+      await expect(autoLevel).toContainText(/\d+(\.\d+)?σ/);
+      await expect(pm.anomalyDetectionPage.getSensitivityLevelLocator()).toBeHidden();
+
+      await pm.anomalyDetectionPage.cancel();
     });
   });
 
@@ -1131,8 +1218,9 @@ test.describe('Anomaly Detection', () => {
       await expect(pm.anomalyDetectionPage.getSensitivityTierLocator()).toBeVisible();
       await expect(pm.anomalyDetectionPage.getBudgetTiersLocator()).toBeHidden();
       // No band_width on an API-created config: Auto, so an untouched save cannot pin band_k.
-      expect(await pm.anomalyDetectionPage.getSensitivityLevel()).toBe('');
       expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBe('auto');
+      await expect(pm.anomalyDetectionPage.getSensitivityAutoLevelLocator()).toBeVisible();
+      await expect(pm.anomalyDetectionPage.getSensitivityLevelLocator()).toBeHidden();
 
       await pm.anomalyDetectionPage.cancel();
     });
@@ -1152,16 +1240,15 @@ test.describe('Anomaly Detection', () => {
       await pm.anomalyDetectionPage.cancel();
     });
 
-    test('budget mode still requires a destination when notifications are enabled', {
+    test('budget mode notes when notifications have no destination', {
       tag: ['@anomaly', '@P2', '@functional', '@all'],
     }, async ({ page }) => {
       const name = await ownConfig(page, 'destreq', 4);
       await pm.anomalyDetectionPage.openEdit(name);
       await pm.anomalyDetectionPage.openAlertingTab();
       await pm.anomalyDetectionPage.toggleNotifications(true);
-      await pm.anomalyDetectionPage.save();
 
-      await expect(pm.anomalyDetectionPage.getDestinationErrorLocator()).toBeVisible();
+      await expect(pm.anomalyDetectionPage.getDestinationNoteLocator()).toBeVisible();
 
       await pm.anomalyDetectionPage.cancel();
     });
@@ -1289,6 +1376,9 @@ test.describe('Anomaly Detection', () => {
       // Template after the destination that references it. Both are named per
       // worker, so this only ever removes what this run created.
       await deleteTemplate(page, prerequisiteTemplateName);
+      // Seeded streams are per-worker-unique and cleanup.spec.js has no anomaly_ sweep, so delete them here or they accumulate every run.
+      await cleanupPm.apiCleanup.deleteStream(`anomaly_autolevel_${randomValue}`, 'logs').catch(() => {});
+      await cleanupPm.apiCleanup.deleteStream(`anomaly_e2e_${randomValue}`, 'logs').catch(() => {});
     } catch (error) {
       testLogger.warn('Cleanup failed', { error: error.message });
     } finally {

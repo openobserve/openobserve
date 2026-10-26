@@ -17,17 +17,21 @@ use std::collections::HashMap;
 
 use axum::{
     extract::{OriginalUri, Path, Query},
-    response::Response,
+    http::StatusCode,
+    response::{IntoResponse, Response},
 };
 use config::meta::{
     dashboards::reports::{Report, ReportListFilters},
     folder::DEFAULT_FOLDER,
+    self_reporting::usage::{RunOutcome, TriggerData},
     triggers::{Trigger, TriggerModule},
 };
 use db::scheduler;
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::{check_folder_write_permissions, check_permissions};
+#[cfg(feature = "enterprise")]
+use openobserve_core::background_access::{ReportRefusal, guard_report, rbac_enforced};
 use openobserve_core::{
     auth::UserEmail,
     dashboards::reports::{self, ReportError},
@@ -36,14 +40,27 @@ use serde::Deserialize;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    models::reports::{ListReportsResponseBody, ListReportsResponseBodyItem},
-    request::{BulkDeleteRequest, BulkDeleteResponse, dashboards::get_folder},
+    models::reports::{
+        GetReportResponseBody, LastRunFields, ListReportsResponseBody, ListReportsResponseBodyItem,
+    },
+    request::{
+        BulkDeleteRequest, BulkDeleteResponse,
+        dashboards::{get_folder, reports_history::ReportRunHit},
+    },
 };
 
 #[derive(Debug, serde::Serialize, Deserialize, utoipa::ToSchema)]
 pub struct MoveReportsRequestBody {
     pub report_ids: Vec<String>,
     pub dst_folder_id: String,
+}
+
+/// Reply to Run now: the run is returned before the stream copy becomes searchable.
+#[derive(Debug, serde::Serialize, Deserialize, utoipa::ToSchema)]
+pub struct TriggerReportResponse {
+    pub code: u16,
+    pub message: String,
+    pub run: ReportRunHit,
 }
 
 /// CreateReport
@@ -89,11 +106,25 @@ pub async fn create_report(
 ) -> Response {
     let mut report = report;
     if report.owner.is_empty() {
-        report.owner = user_email.user_id;
+        report.owner = user_email.user_id.clone();
     }
-    match reports::save(&org_id, DEFAULT_FOLDER, "", report, true).await {
+    #[cfg(feature = "enterprise")]
+    let saved = save_checked(
+        &org_id,
+        &user_email.user_id,
+        (DEFAULT_FOLDER, ""),
+        report,
+        true,
+        MetaHttpResponse::bad_request,
+    )
+    .await;
+    #[cfg(not(feature = "enterprise"))]
+    let saved = reports::save(&org_id, DEFAULT_FOLDER, "", report, true)
+        .await
+        .map_err(MetaHttpResponse::bad_request);
+    match saved {
         Ok(_) => MetaHttpResponse::ok("Report saved"),
-        Err(e) => MetaHttpResponse::bad_request(e),
+        Err(resp) => resp,
     }
 }
 
@@ -137,10 +168,24 @@ pub async fn update_report(
     axum::Json(report): axum::Json<Report>,
 ) -> Response {
     let mut report = report;
-    report.last_edited_by = user_email.user_id;
-    match reports::save(&org_id, DEFAULT_FOLDER, &name, report, false).await {
+    report.last_edited_by = user_email.user_id.clone();
+    #[cfg(feature = "enterprise")]
+    let saved = save_checked(
+        &org_id,
+        &user_email.user_id,
+        (DEFAULT_FOLDER, &name),
+        report,
+        false,
+        MetaHttpResponse::bad_request,
+    )
+    .await;
+    #[cfg(not(feature = "enterprise"))]
+    let saved = reports::save(&org_id, DEFAULT_FOLDER, &name, report, false)
+        .await
+        .map_err(MetaHttpResponse::bad_request);
+    match saved {
         Ok(_) => MetaHttpResponse::ok("Report saved"),
-        Err(e) => MetaHttpResponse::bad_request(e),
+        Err(resp) => resp,
     }
 }
 
@@ -228,7 +273,10 @@ pub async fn list_reports(
                     let scheduled_job = scheduled_jobs.remove(&d.report_id);
                     match ListReportsResponseBodyItem::try_from(d) {
                         Ok(mut item) => {
-                            item.last_triggered_at = scheduled_job.and_then(|t| t.start_time);
+                            item.last_triggered_at =
+                                scheduled_job.as_ref().and_then(|t| t.start_time);
+                            item.last_run.next_run_at =
+                                scheduled_job.and_then(|t| t.pending_next_run_at());
                             Some(item)
                         }
                         Err(e) => {
@@ -433,11 +481,24 @@ pub async fn delete_report_bulk(
 pub async fn enable_report(
     Path((org_id, name)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     let enable = match query.get("value") {
         Some(v) => v.parse::<bool>().unwrap_or_default(),
         None => false,
     };
+    #[cfg(feature = "enterprise")]
+    if enable
+        && let Err(resp) = guard_stored_report(
+            &org_id,
+            &user_email.user_id,
+            reports::get(&org_id, DEFAULT_FOLDER, &name),
+            report_error_response,
+        )
+        .await
+    {
+        return resp;
+    }
     let mut resp = HashMap::new();
     resp.insert("enabled".to_string(), enable);
     match reports::enable(&org_id, DEFAULT_FOLDER, &name, enable).await {
@@ -470,17 +531,31 @@ pub async fn enable_report(
         ("name" = String, Path, description = "Report name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Report sent; `run` is the history row of the run", content_type = "application/json", body = inline(TriggerReportResponse)),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
-        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+        (status = 500, description = "Send failed; `run` carries the error", content_type = "application/json", body = inline(TriggerReportResponse)),
     ),
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-pub async fn trigger_report(Path((org_id, name)): Path<(String, String)>) -> Response {
-    match reports::trigger(&org_id, DEFAULT_FOLDER, &name).await {
-        Ok(_) => MetaHttpResponse::ok("Report triggered"),
+pub async fn trigger_report(
+    Path((org_id, name)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = guard_stored_report(
+        &org_id,
+        &user_email.user_id,
+        sendable(reports::get(&org_id, DEFAULT_FOLDER, &name)),
+        report_error_response,
+    )
+    .await
+    {
+        return resp;
+    }
+    match reports::trigger(&org_id, DEFAULT_FOLDER, &name, &user_email.user_id).await {
+        Ok(run) => manual_run_response(&run),
         Err(e) => match e {
             ReportError::ReportNotFound => MetaHttpResponse::not_found(e),
             e => MetaHttpResponse::internal_error(e),
@@ -522,11 +597,25 @@ pub async fn create_report_v2(
 ) -> Response {
     let folder_id = get_folder(uri.query().unwrap_or(""));
     if report.owner.is_empty() {
-        report.owner = user_email.user_id;
+        report.owner = user_email.user_id.clone();
     }
-    match reports::save(&org_id, &folder_id, "", report, true).await {
+    #[cfg(feature = "enterprise")]
+    let saved = save_checked(
+        &org_id,
+        &user_email.user_id,
+        (&folder_id, ""),
+        report,
+        true,
+        Response::from,
+    )
+    .await;
+    #[cfg(not(feature = "enterprise"))]
+    let saved = reports::save(&org_id, &folder_id, "", report, true)
+        .await
+        .map_err(Response::from);
+    match saved {
         Ok(_) => MetaHttpResponse::ok("Report saved"),
-        Err(e) => e.into(),
+        Err(resp) => resp,
     }
 }
 
@@ -605,7 +694,10 @@ pub async fn list_reports_v2(
                     let scheduled_job = scheduled_jobs.remove(&d.report_id);
                     match ListReportsResponseBodyItem::try_from(d) {
                         Ok(mut item) => {
-                            item.last_triggered_at = scheduled_job.and_then(|t| t.start_time);
+                            item.last_triggered_at =
+                                scheduled_job.as_ref().and_then(|t| t.start_time);
+                            item.last_run.next_run_at =
+                                scheduled_job.and_then(|t| t.pending_next_run_at());
                             Some(item)
                         }
                         Err(e) => {
@@ -636,7 +728,7 @@ pub async fn list_reports_v2(
         ("report_id" = String, Path, description = "Report ID (KSUID)"),
     ),
     responses(
-        (status = StatusCode::OK, body = inline(Report)),
+        (status = StatusCode::OK, body = inline(GetReportResponseBody)),
         (status = StatusCode::NOT_FOUND, description = "Not found", body = ()),
     ),
     extensions(
@@ -644,10 +736,25 @@ pub async fn list_reports_v2(
     )
 )]
 pub async fn get_report_v2(Path((org_id, report_id)): Path<(String, String)>) -> Response {
-    match reports::get_by_id(&org_id, &report_id).await {
-        Ok((_, report)) => MetaHttpResponse::json(report),
-        Err(e) => e.into(),
-    }
+    let report = match reports::get_by_id(&org_id, &report_id).await {
+        Ok((_, report)) => report,
+        Err(e) => return e.into(),
+    };
+    let last_run =
+        infra::table::reports::get_last_run(infra::db::get_orm_client_ro().await, &report_id)
+            .await
+            .unwrap_or_else(|e| {
+                log::error!("Error reading the last run of report {report_id}: {e}");
+                None
+            });
+    let next_run_at = scheduler::get(&org_id, TriggerModule::Report, &report_id)
+        .await
+        .ok()
+        .and_then(|t| t.pending_next_run_at());
+    MetaHttpResponse::json(GetReportResponseBody {
+        report,
+        last_run: LastRunFields::new(last_run, next_run_at),
+    })
 }
 
 /// UpdateReportV2
@@ -717,9 +824,16 @@ pub async fn update_report_v2(
         }
     }
 
-    match reports::update_by_id(&org_id, &report_id, new_folder.as_deref(), report).await {
+    #[cfg(feature = "enterprise")]
+    let updated =
+        update_checked(&org_id, &user_id, &report_id, new_folder.as_deref(), report).await;
+    #[cfg(not(feature = "enterprise"))]
+    let updated = reports::update_by_id(&org_id, &report_id, new_folder.as_deref(), report)
+        .await
+        .map_err(Response::from);
+    match updated {
         Ok(_) => MetaHttpResponse::ok("Report updated"),
-        Err(e) => e.into(),
+        Err(resp) => resp,
     }
 }
 
@@ -848,11 +962,24 @@ pub async fn delete_report_bulk_v2(
 pub async fn enable_report_v2(
     Path((org_id, report_id)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     let enable = query
         .get("value")
         .and_then(|v| v.parse::<bool>().ok())
         .unwrap_or(false);
+    #[cfg(feature = "enterprise")]
+    if enable
+        && let Err(resp) = guard_stored_report(
+            &org_id,
+            &user_email.user_id,
+            report_by_id(&org_id, &report_id),
+            Response::from,
+        )
+        .await
+    {
+        return resp;
+    }
     match reports::enable_by_id(&org_id, &report_id, enable).await {
         Ok(_) => {
             let mut resp = HashMap::new();
@@ -877,16 +1004,31 @@ pub async fn enable_report_v2(
         ("report_id" = String, Path, description = "Report ID (KSUID)"),
     ),
     responses(
-        (status = 200, description = "Success", body = Object),
+        (status = 200, description = "Report sent; `run` is the history row of the run", body = inline(TriggerReportResponse)),
         (status = 404, description = "Not found", body = ()),
+        (status = 500, description = "Send failed; `run` carries the error", body = inline(TriggerReportResponse)),
     ),
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-pub async fn trigger_report_v2(Path((org_id, report_id)): Path<(String, String)>) -> Response {
-    match reports::trigger_by_id(&org_id, &report_id).await {
-        Ok(_) => MetaHttpResponse::ok("Report triggered"),
+pub async fn trigger_report_v2(
+    Path((org_id, report_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = guard_stored_report(
+        &org_id,
+        &user_email.user_id,
+        sendable(report_by_id(&org_id, &report_id)),
+        Response::from,
+    )
+    .await
+    {
+        return resp;
+    }
+    match reports::trigger_by_id(&org_id, &report_id, &user_email.user_id).await {
+        Ok(run) => manual_run_response(&run),
         Err(e) => e.into(),
     }
 }
@@ -966,10 +1108,172 @@ pub async fn move_reports(
     }
 }
 
+/// 200 when the send succeeded, 500 with the error when it failed; the run row rides along.
+fn manual_run_response(row: &TriggerData) -> Response {
+    let run = ReportRunHit::from_trigger(row);
+    let (status, message) = match (&row.status, &run.error) {
+        (RunOutcome::Error, error) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            error
+                .clone()
+                .unwrap_or_else(|| "Report send failed".to_string()),
+        ),
+        _ => (StatusCode::OK, "Report triggered".to_string()),
+    };
+    let body = TriggerReportResponse {
+        code: status.as_u16(),
+        message,
+        run,
+    };
+    (status, axum::Json(body)).into_response()
+}
+
+/// Saves as `reports::save` does, refusing between its checks and its write.
+#[cfg(feature = "enterprise")]
+async fn save_checked(
+    org_id: &str,
+    user_id: &str,
+    (folder_id, name): (&str, &str),
+    report: Report,
+    create: bool,
+    answer: fn(ReportError) -> Response,
+) -> Result<(), Response> {
+    let report = reports::prepare_save(org_id, folder_id, name, report, create)
+        .await
+        .map_err(answer)?;
+    guard_saved_report(org_id, user_id, &report, answer).await?;
+    reports::write_save(org_id, folder_id, report, create)
+        .await
+        .map_err(answer)
+}
+
+/// Updates as `reports::update_by_id` does, refusing between its checks and its write.
+#[cfg(feature = "enterprise")]
+async fn update_checked(
+    org_id: &str,
+    user_id: &str,
+    report_id: &str,
+    new_folder: Option<&str>,
+    report: Report,
+) -> Result<(), Response> {
+    let (curr_folder, report) = reports::prepare_update_by_id(org_id, report_id, report)
+        .await
+        .map_err(Response::from)?;
+    guard_saved_report(org_id, user_id, &report, Response::from).await?;
+    reports::write_update_by_id(org_id, report_id, new_folder, curr_folder, report)
+        .await
+        .map_err(Response::from)
+}
+
+/// A disabled report renders only once enabled or triggered, and both of those are checked.
+#[cfg(feature = "enterprise")]
+async fn guard_saved_report(
+    org_id: &str,
+    user_id: &str,
+    report: &Report,
+    answer: fn(ReportError) -> Response,
+) -> Result<(), Response> {
+    if !report.enabled {
+        return Ok(());
+    }
+    match guard_report(org_id, user_id, report).await {
+        Ok(()) => Ok(()),
+        Err(ReportRefusal::Forbidden(resp)) => Err(resp),
+        // the save's own dashboard read answers a failed read this way
+        Err(ReportRefusal::DashboardLoad(_)) => Err(answer(ReportError::DashboardTabNotFound)),
+    }
+}
+
+/// `load` is the action's own first read, run only under RBAC; it fails as the action would.
+#[cfg(feature = "enterprise")]
+async fn guard_stored_report(
+    org_id: &str,
+    user_id: &str,
+    load: impl Future<Output = Result<Report, ReportError>>,
+    answer: fn(ReportError) -> Response,
+) -> Result<(), Response> {
+    if !rbac_enforced().await {
+        return Ok(());
+    }
+    let stored = load.await.map_err(answer)?;
+    match guard_report(org_id, user_id, &stored).await {
+        Err(ReportRefusal::Forbidden(resp)) => Err(resp),
+        // enabling or running reads no dashboard itself, so a failed read refuses nothing
+        Ok(()) | Err(ReportRefusal::DashboardLoad(_)) => Ok(()),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+async fn report_by_id(org_id: &str, report_id: &str) -> Result<Report, ReportError> {
+    reports::get_by_id(org_id, report_id)
+        .await
+        .map(|(_, report)| report)
+}
+
+/// The report `load` reads, once the send's own checks pass, so their error answers first.
+#[cfg(feature = "enterprise")]
+async fn sendable(
+    load: impl Future<Output = Result<Report, ReportError>>,
+) -> Result<Report, ReportError> {
+    let report = load.await?;
+    reports::check_send(&report).await?;
+    Ok(report)
+}
+
+#[cfg(feature = "enterprise")]
+fn report_error_response(e: ReportError) -> Response {
+    match e {
+        ReportError::ReportNotFound => MetaHttpResponse::not_found(e),
+        e => MetaHttpResponse::internal_error(e),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use axum::{http::StatusCode, response::Response};
+    use config::meta::self_reporting::usage::{RunOutcome, TriggerData};
     use openobserve_core::dashboards::reports::ReportError;
+
+    use super::manual_run_response;
+
+    #[test]
+    fn manual_run_response_is_200_with_the_run_on_success() {
+        let row = TriggerData {
+            key: "r/abc".to_string(),
+            ..Default::default()
+        };
+        assert_eq!(manual_run_response(&row).status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn manual_run_response_names_a_failure_that_carries_no_error_text() {
+        let row = TriggerData {
+            key: "r/abc".to_string(),
+            status: RunOutcome::Error,
+            ..Default::default()
+        };
+        let resp = manual_run_response(&row);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["message"], "Report send failed");
+        assert_eq!(json["run"]["status"], "error");
+    }
+
+    #[test]
+    fn manual_run_response_is_500_when_the_send_failed() {
+        let row = TriggerData {
+            key: "r/abc".to_string(),
+            status: RunOutcome::Error,
+            error: Some("error processing report: report server 500: boom".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(
+            manual_run_response(&row).status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
 
     fn status(err: ReportError) -> StatusCode {
         Response::from(err).status()
@@ -1072,6 +1376,32 @@ mod tests {
         assert_eq!(status(ReportError::NoDestinations), StatusCode::BAD_REQUEST);
     }
 
+    #[test]
+    fn test_tz_offset_out_of_range_is_bad_request() {
+        assert_eq!(
+            status(ReportError::TzOffsetOutOfRange),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_cron_has_no_future_occurrence_is_bad_request() {
+        assert_eq!(
+            status(ReportError::CronHasNoFutureOccurrence {
+                cron: "0 0 0 1 1 * 2020".to_string()
+            }),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_negative_interval_is_bad_request() {
+        assert_eq!(
+            status(ReportError::NegativeInterval),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
     // 404 Not Found
     #[test]
     fn test_report_not_found_is_not_found() {
@@ -1110,5 +1440,36 @@ mod tests {
             status(ReportError::SendReportError(SendReportError::NoDashboards)),
             StatusCode::INTERNAL_SERVER_ERROR
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_trigger_answers_the_send_s_own_check_before_the_stream_check() {
+        use config::meta::dashboards::reports::{Report, ReportDashboard};
+
+        openobserve_core::authz::fake_checker();
+        let report = Report {
+            org_id: "rt_org1".to_string(),
+            dashboards: vec![ReportDashboard {
+                dashboard: "rt_missing".to_string(),
+                folder: "default".to_string(),
+                tabs: vec!["t1".to_string()],
+                variables: Vec::new(),
+                timerange: Default::default(),
+                report_type: Default::default(),
+                email_attachment_type: Default::default(),
+                attachment_dimensions: None,
+            }],
+            ..Default::default()
+        };
+        let resp = super::guard_stored_report(
+            "rt_org1",
+            "denied@example.com",
+            super::sendable(std::future::ready(Ok(report))),
+            Response::from,
+        )
+        .await
+        .unwrap_err();
+        assert_ne!(resp.status(), StatusCode::FORBIDDEN);
     }
 }

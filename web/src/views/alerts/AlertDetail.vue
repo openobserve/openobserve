@@ -454,7 +454,7 @@ const backTarget = computed(() => ({
   to: {
     name: "alertList",
     query: {
-      // Spread first so page/tab/search survive — folder still needs its own explicit fallback below since an absent query.folder must resolve to "default", not itself disappear.
+      // Spread first so the tab the list pushed survives — folder still needs its own explicit fallback below since an absent query.folder must resolve to "default", not itself disappear.
       ...route.query,
       org_identifier: orgId.value,
       folder: route.query.folder || "default",
@@ -674,6 +674,7 @@ const editAlert = () => {
       query: {
         org_identifier: orgId.value,
         folder: route.query.folder || "default",
+        tab: route.query.tab,
       },
     });
     return;
@@ -687,6 +688,7 @@ const editAlert = () => {
       // navigated with; "default" is the folder every org is created with. The
       // editor needs it to send the user back to the right folder on save.
       folder: route.query.folder || "default",
+      tab: route.query.tab,
     },
   });
 };

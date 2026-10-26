@@ -37,10 +37,14 @@ export default class DashboardPanel {
       '[data-test="dashboard-panel-refresh-panel-btn"]'
     );
     this.editLayout = page.locator('[data-test="dashboard-edit-layout"]');
+    this.layoutEditBtn = page.locator('[data-test="dashboard-edit-btn"]');
+    this.layoutEditSaveBtn = page.locator('[data-test="dashboard-edit-save-btn"]');
     this.panelHeight = page.locator(
-      '[data-test="panel-layout-settings-height-input"]'
+      '[data-test="panel-layout-settings-height-input-field"]'
     );
-    this.saveLayout = page.locator('[data-test="panel-layout-settings-save"]');
+    this.saveLayout = page.locator(
+      '[data-test="panel-layout-settings-drawer"] [data-test="o-dialog-primary-btn"]'
+    );
     this.cancelLayout = page.locator(
       '[data-test="panel-layout-settings-cancel"]'
     );
@@ -187,6 +191,8 @@ export default class DashboardPanel {
 
   //edit layout
   async editLayoutPanel(panelName, height) {
+    await this.layoutEditBtn.waitFor({ state: "visible" });
+    await this.layoutEditBtn.click();
     const dropdownBtn = this.page.locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`);
     await dropdownBtn.waitFor({ state: "visible" });
     await dropdownBtn.click();
@@ -196,6 +202,9 @@ export default class DashboardPanel {
     await this.panelHeight.click();
     await this.panelHeight.fill(height);
     await this.saveLayout.click();
+    await expect(this.layoutEditSaveBtn).toBeEnabled();
+    await this.layoutEditSaveBtn.click();
+    await this.layoutEditSaveBtn.waitFor({ state: "hidden" });
   }
 
   //Edit Panel: Go to logs
@@ -314,6 +323,18 @@ export default class DashboardPanel {
   // Return the dashboard panel container locator (hover target for panel menu).
   getPanelContainer() {
     return this.page.locator('[data-test="dashboard-panel-container"]');
+  }
+
+  // Create Alert menu item (dropdown item) for disabled/state assertions.
+  getCreateAlertFromPanelItem() {
+    return this.createAlertFromPanel;
+  }
+
+  // The disabled-reason description rendered under the item (ODropdownItem).
+  getCreateAlertFromPanelReason() {
+    return this.page.locator(
+      '[data-test="dashboard-create-alert-from-panel-reason"]'
+    );
   }
 
   // Alert context menu options (shown on chart right-click).

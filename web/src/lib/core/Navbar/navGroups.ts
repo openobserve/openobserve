@@ -55,6 +55,12 @@ export const GATE_PREDICATES: Record<string, (c: NavGateContext) => boolean> = {
   // isEnterprise conjunct at this level would take the four OSS tabs down with
   // them and hide the section from a build that still serves most of it.
   databaseMonitoring: (c) => c.databaseMonitoring,
+  // Enterprise/cloud plus `/config` `downtimes_enabled`, the same rule as the route guard.
+  downtimes: (c) => (c.isEnterprise || c.isCloud) && c.downtimesEnabled,
+  // Enterprise/cloud plus `/config` `alert_calibration_enabled`, the same rule as the route guard.
+  alertCalibration: (c) => (c.isEnterprise || c.isCloud) && c.alertCalibrationEnabled,
+  // Enterprise plus `/config` `fleet_enabled`; the route stays so management reads keep working.
+  fleet: (c) => c.isEnterprise && c.fleetEnabled,
 };
 
 /**
@@ -134,7 +140,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
     titleKey: "menu.reliability",
     icon: "shield",
     parentLink: "/alerts",
-    absorbs: ["alertList", "sloList", "incidentList", "onCallResponses"],
+    absorbs: ["alertList", "sloList", "incidentList", "downtimes", "onCallResponses"],
     children: [
       // ── Alerts ──────────────────────────────────────────────────────────
       // These four are the alerting cluster, and they carry a peer tab strip
@@ -194,14 +200,37 @@ export const NAV_GROUPS: NavGroupDef[] = [
         icon: "notifications-active",
         name: "incidentList",
         requires: "incidentList",
+        gate: "incidents",
+      },
+      {
+        titleKey: "menu.downtimes",
+        icon: "notifications-paused",
+        name: "downtimes",
+        requires: "downtimes",
+        gate: "downtimes",
+        activeOnRoutes: ["addDowntime", "editDowntime", "downtimeDetail"],
+        beta: true,
+      },
+      {
+        titleKey: "menu.alertCalibration",
+        icon: "tune",
+        name: "alertCalibration",
+        requires: "alertList",
+        gate: "alertCalibration",
+        activeOnRoutes: [
+          "alertCalibrationRuns",
+          "alertCalibrationDigest",
+          "alertCalibrationSettings",
+        ],
+        beta: true,
       },
       // A page is where an alert escalates to a person, so On-Call sits in the
       // same workflow tile rather than as its own rail entry. Pages, Teams and
       // Routing share the "On-Call" category header so the flyout reads as one
       // module with three destinations, not three unrelated reliability
-      // entries. `gate: "oncall"` is the single place the O2_ONCALL_ENABLED
-      // flag is read for navigation, and `router.hasRoute` already limits this
-      // to the enterprise/cloud build.
+      // entries. `gate: "oncall"` is a FeatureKey, so it resolves via
+      // checkFeatureAccess (edition only) — the on-call routes are always
+      // registered and separately redirect home on the oncall_enabled flag.
       {
         titleKey: "oncall.pagesNav",
         icon: "notifications-active",
@@ -325,9 +354,17 @@ export const NAV_GROUPS: NavGroupDef[] = [
       },
       // Sits with Pipelines — the two are the same kind of thing (a flow canvas)
       // and share the canvas code. `requires` keys off the top-level entry
-      // MainLayout adds/removes from `workflows_enabled`, so the flag still owns
-      // visibility and no gate is duplicated here.
-      { titleKey: "menu.workflows", icon: "schema", name: "workflows", requires: "workflows" },
+      // MainLayout always keeps present now (locked when the edition doesn't
+      // unlock it, hidden only when an allowed edition's own runtime flag is
+      // off) — `gate: "workflows"` mirrors that locked state here too, so the
+      // flyout child dims instead of silently navigating to the placeholder.
+      {
+        titleKey: "menu.workflows",
+        icon: "schema",
+        name: "workflows",
+        requires: "workflows",
+        gate: "workflows",
+      },
       { titleKey: "function.header", icon: "function", name: "functionList", requires: "pipeline" },
       {
         titleKey: "function.enrichmentTables",
@@ -340,6 +377,14 @@ export const NAV_GROUPS: NavGroupDef[] = [
         icon: "data-plus-line",
         name: "ingestion",
         requires: "ingestion",
+      },
+      // Lit on the config editor too, which is its own route rather than a tab of /fleet.
+      {
+        titleKey: "menu.fleet",
+        icon: "workspaces",
+        name: "fleet",
+        gate: "fleet",
+        activeOnRoutes: ["fleetConfigEditor"],
       },
     ],
   },
@@ -519,6 +564,7 @@ export function groupNavLinks(
   const emitGroup = (def: NavGroupDef) => {
     if (emittedGroups.has(def.key)) return;
     emittedGroups.add(def.key);
+    const children = groupChildren.get(def.key)!;
     result.push({
       type: "linkGroup",
       item: {
@@ -527,7 +573,9 @@ export function groupNavLinks(
         link: def.parentLink,
         name: def.key,
       },
-      children: groupChildren.get(def.key)!,
+      children,
+      // The removed children still light the tile and retarget its link.
+      filtered: def.children.filter((c) => !children.includes(c)),
     });
     // Groups anchored after THIS group (e.g. Data follows Reliability).
     emitAnchored(def.key);

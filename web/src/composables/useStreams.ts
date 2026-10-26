@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { CancelledError } from "@tanstack/vue-query";
 import { streamNameListQuery } from "@/services/stream.queries";
 import { streamKeys } from "@/services/stream.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
@@ -20,13 +21,31 @@ import { useStore } from "vuex";
 import StreamService from "@/services/stream";
 import { computed, ComputedRef } from "vue";
 import { deepCopy } from "@/utils/zincutils";
+import { isUserDataStream } from "@/utils/internalStreams";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { TranslateFn, I18nText } from "@/types/i18n";
+
+// The "all" read fetches only these types; a profiles list is cached only when a page asks for that type.
+const ALL_STREAM_TYPES = ["logs", "metrics", "traces", "enrichment_tables", "index", "metadata"];
 
 // Keep the HTTP status on the rejection: callers need it to tell a denial (403)
 // apart from any other failure, and a bare Error would drop it.
 const withResponse = (err: Error, source: any): Error =>
   Object.assign(err, { response: source?.response, status: source?.status });
+
+// A cancelled fetch stays a CancelledError so callers can ignore superseded requests.
+const toStreamError = (e: any): Error =>
+  e instanceof CancelledError
+    ? e
+    : withResponse(
+        new Error(
+          e?.response?.data?.message ||
+            e?.message ||
+            (typeof e === "string" && e) ||
+            "Stream request failed",
+        ),
+        e,
+      );
 
 const useStreams = (t: TranslateFn) => {
   const store = useStore();
@@ -50,6 +69,7 @@ const useStreams = (t: TranslateFn) => {
     enrichment_tables: computed(() => store.state.streams.enrichment_tables),
     index: computed(() => store.state.streams.index),
     metadata: computed(() => store.state.streams.metadata),
+    profiles: computed(() => store.state.streams.profiles),
   };
 
   const getStreams = async (
@@ -102,14 +122,7 @@ const useStreams = (t: TranslateFn) => {
             // As in RBAC there can be permission on certain types of streams
             // So here added some additional logic to handle those
 
-            const streamList = [
-              "logs",
-              "metrics",
-              "traces",
-              "enrichment_tables",
-              "index",
-              "metadata",
-            ];
+            const streamList = ALL_STREAM_TYPES;
 
             // Every type, every time: each is its own query, so a fresh one
             // resolves from cache and only an expired one reaches the server.
@@ -136,7 +149,7 @@ const useStreams = (t: TranslateFn) => {
               })
               .catch((e: any) => {
                 dismiss();
-                reject(withResponse(new Error(e.message), e));
+                reject(toStreamError(e));
               });
           } else {
             queryClient
@@ -155,11 +168,11 @@ const useStreams = (t: TranslateFn) => {
               })
               .catch((e: any) => {
                 dismiss();
-                reject(withResponse(new Error(e.message), e));
+                reject(toStreamError(e));
               });
           }
         } catch (e: any) {
-          reject(withResponse(new Error(e.message), e));
+          reject(toStreamError(e));
         }
       })();
     });
@@ -215,10 +228,10 @@ const useStreams = (t: TranslateFn) => {
             })
             .catch((e: any) => {
               dismiss();
-              reject(withResponse(new Error(e.message), e));
+              reject(toStreamError(e));
             });
         } catch (e: any) {
-          reject(withResponse(new Error(e.message), e));
+          reject(toStreamError(e));
         }
       })();
     });
@@ -229,7 +242,7 @@ const useStreams = (t: TranslateFn) => {
     streamObject.name = "all";
     streamObject.schema = false;
 
-    Object.keys(streamsCache).forEach((key) => {
+    ALL_STREAM_TYPES.forEach((key) => {
       streamObject.list.push(...(streamsCache[key].value?.list || []));
     });
 
@@ -254,7 +267,7 @@ const useStreams = (t: TranslateFn) => {
         try {
           await getStreams(streamType, false);
         } catch (e: any) {
-          reject(withResponse(new Error(e.message), e));
+          reject(toStreamError(e));
         }
 
         try {
@@ -310,7 +323,7 @@ const useStreams = (t: TranslateFn) => {
             );
           }
         } catch (e: any) {
-          reject(withResponse(new Error(e.message), e));
+          reject(toStreamError(e));
         }
       })();
     });
@@ -362,7 +375,7 @@ const useStreams = (t: TranslateFn) => {
           return streamsCache[streamType].value?.list?.[streamIndex] || {};
         } catch (e: any) {
           // Use reject in Promise.all to catch errors specifically.
-          throw withResponse(new Error(e.message), e);
+          throw toStreamError(e);
         }
       }),
     );
@@ -370,9 +383,12 @@ const useStreams = (t: TranslateFn) => {
 
   function removeSchemaFields(streamData: any) {
     if (streamData.schema) {
-      streamData.schema = streamData.schema.filter((field: any) => {
-        return field.name != "_o2_id" && field.name != "_original" && field.name != "_all_values";
-      });
+      const isRemoved = (field: any) =>
+        field.name === "_o2_id" || field.name === "_original" || field.name === "_all_values";
+      streamData.removedSchemaFields = streamData.schema
+        .filter(isRemoved)
+        .map((field: any) => ({ name: field.name, type: field.type }));
+      streamData.schema = streamData.schema.filter((field: any) => !isRemoved(field));
     }
     return streamData;
   }
@@ -391,7 +407,7 @@ const useStreams = (t: TranslateFn) => {
   // "all" is one query per type, so its age is the oldest of them.
   const getStreamsFetchedAt = async (streamType: string = "all"): Promise<number | undefined> => {
     const org = store.state.selectedOrganization.identifier;
-    const types = streamType === "all" ? Object.keys(streamsCache) : [streamType];
+    const types = streamType === "all" ? ALL_STREAM_TYPES : [streamType];
     const times = types
       .map((type) => queryClient.getQueryState(streamKeys.nameList(org, type))?.dataUpdatedAt)
       .filter((t): t is number => !!t);
@@ -401,8 +417,12 @@ const useStreams = (t: TranslateFn) => {
   // No "already fetched" bail-out: the caller only reaches here with a list the
   // query just produced, and refusing to store it would discard a refetch.
   const setStreams = (streamName: string = "all", streamList: any[] = []) => {
-    if (!store.state.organizationData.isDataIngested && !!streamList.length)
-      store.dispatch("setIsDataIngested", !!streamList.length);
+    // only user data flips the flag: internal streams such as usage exist before any ingest
+    if (
+      !store.state.organizationData.isDataIngested &&
+      streamList.some((s) => isUserDataStream(s?.name ?? "", s?.stream_type ?? streamName))
+    )
+      store.dispatch("setIsDataIngested", true);
 
     const streamObject = getStreamPayload();
     streamObject.name = streamName;

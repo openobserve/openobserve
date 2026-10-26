@@ -62,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <OButton
+            :aria-label="t('common.dragToReorder')"
             variant="ghost"
             size="icon-chip"
             class="!w-4 !cursor-grab"
@@ -120,6 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </ODropdown>
           <OButton
+            :aria-label="t('common.remove')"
             variant="ghost"
             size="icon-chip"
             class="!w-4"
@@ -188,6 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <OButton
+            :aria-label="t('common.dragToReorder')"
             variant="ghost"
             size="icon-chip"
             class="!w-4 !cursor-grab"
@@ -246,6 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </ODropdown>
           <OButton
+            :aria-label="t('common.remove')"
             variant="ghost"
             size="icon-chip"
             class="!w-4"
@@ -313,6 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <OButton
+            :aria-label="t('common.dragToReorder')"
             variant="ghost"
             size="icon-chip"
             class="!w-4 !cursor-grab"
@@ -371,6 +376,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </ODropdown>
           <OButton
+            :aria-label="t('common.remove')"
             variant="ghost"
             size="icon-chip"
             class="!w-4"
@@ -412,7 +418,6 @@ import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFilters
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
 import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
-import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -642,9 +647,7 @@ export default defineComponent({
           : "",
       );
 
-      return label?.length > MAX_FIELD_LABEL_CHARS
-        ? label.substring(0, MAX_FIELD_LABEL_CHARS) + "..."
-        : label;
+      return label;
     };
 
     const sourceLabel = computed(() => {

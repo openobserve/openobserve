@@ -522,12 +522,13 @@ export default class DashboardVariablesScoped {
   }
 
   /**
-   * Get a dashboard-list entry locator by its title text
+   * Get a dashboard-list entry locator by its name
    * @param {string} title - Dashboard title
    * @returns {import('@playwright/test').Locator}
    */
   getDashboardTitleLocator(title) {
-    return this.page.getByTitle(title, { exact: true });
+    const name = String(title).replace(/["\\]/g, "\\$&");
+    return this.page.locator(`[data-test="dashboard-name-cell-${name}"]`);
   }
 
   /**
@@ -568,6 +569,17 @@ export default class DashboardVariablesScoped {
    */
   getDashboardRefreshBtnLocator() {
     return this.page.locator(SELECTORS.REFRESH_BTN);
+  }
+
+  /**
+   * Assert the dashboard header Refresh button is visible, enabled, and carries
+   * the visible "Refresh" text label (the icon -> labelled change).
+   */
+  async expectDashboardRefreshLabel() {
+    const btn = this.getDashboardRefreshBtnLocator();
+    await expect(btn).toBeVisible();
+    await expect(btn).toContainText("Refresh");
+    await expect(btn).toBeEnabled();
   }
 
   /**

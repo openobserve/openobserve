@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     class="qp-2"
-    :title="sessionDetails.id ? raw(sessionDetails.id) : t('rum.sessionReplay')"
     :back="{
       label: t('rum.sessionReplay'),
       onClick: () => router.back(),
@@ -27,9 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #title>
       <span class="inline-flex max-w-full min-w-0 items-center gap-2">
-        <span class="truncate">{{
+        <OTruncatedText>{{
           sessionDetails.id ? raw(sessionDetails.id) : t("rum.sessionReplay")
-        }}</span>
+        }}</OTruncatedText>
         <OBadge
           v-if="isLive && loadState !== 'error'"
           variant="success"
@@ -46,33 +45,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
         data-test="session-viewer-subtitle"
       >
-        <div class="flex items-center gap-1.5 truncate text-xs">
+        <div class="flex min-w-0 items-center gap-1.5 text-xs">
           <OIcon name="language" size="sm" />
-          {{ sessionDetails.ip }}
+          <OTruncatedText>{{ sessionDetails.ip }}</OTruncatedText>
         </div>
-        <div class="flex items-center gap-1.5 truncate text-xs">
+        <div class="flex min-w-0 items-center gap-1.5 text-xs">
           <OIcon name="calendar-month" size="sm" />
-          {{ sessionDetails.date }}
+          <OTruncatedText>{{ sessionDetails.date }}</OTruncatedText>
         </div>
         <div
           v-if="sessionDetails.duration"
-          class="flex items-center gap-1.5 truncate text-xs"
+          class="flex min-w-0 items-center gap-1.5 text-xs"
           data-test="session-viewer-duration"
         >
           <OIcon name="access-time" size="sm" />
-          {{ sessionDetails.duration }}
+          <OTruncatedText>{{ sessionDetails.duration }}</OTruncatedText>
         </div>
-        <div class="flex items-center gap-1.5 truncate text-xs">
+        <div class="flex min-w-0 items-center gap-1.5 text-xs">
           <OIcon name="person" size="sm" />
-          {{ sessionDetails.user_email || t("common.unknownUser") }}
+          <OTruncatedText>{{
+            sessionDetails.user_email || t("common.unknownUser")
+          }}</OTruncatedText>
         </div>
-        <div class="flex items-center gap-1.5 truncate text-xs">
+        <div class="flex min-w-0 items-center gap-1.5 text-xs">
           <OIcon name="location-on" size="sm" />
-          {{ sessionDetails.city }}, {{ sessionDetails.country }}
+          <OTruncatedText>{{ sessionDetails.city }}, {{ sessionDetails.country }}</OTruncatedText>
         </div>
-        <div class="flex items-center gap-1.5 truncate text-xs">
+        <div class="flex min-w-0 items-center gap-1.5 text-xs">
           <OIcon name="settings" size="sm" />
-          {{ sessionDetails.browser }}, {{ sessionDetails.os }}
+          <OTruncatedText>{{ sessionDetails.browser }}, {{ sessionDetails.os }}</OTruncatedText>
         </div>
         <div
           v-if="frustrationCount > 0"
@@ -168,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OSplitter
         v-model="splitterSize"
-        :limits="[200, 1400]"
+        :limits="SPLITTER_LIMITS"
         unit="px"
         class="h-full w-full"
         separatorClass="bg-card-glass-border w-px! hover:bg-theme-accent"
@@ -195,6 +196,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="reloadPage"
                 >{{ t("rum.sessionReplayReload") }}</OButton
               >
+            </div>
+            <div
+              v-if="tabNotice"
+              class="bg-card-glass-bg text-text-secondary border-card-glass-border border-b px-3 py-1 text-xs"
+              data-test="session-viewer-tab-notice"
+            >
+              {{ tabNotice }}
             </div>
             <!-- Mobile SDKs record wireframes (not a DOM); play them with the wireframe
                  player. Browser sessions use the rrweb-based VideoPlayer. -->
@@ -223,8 +231,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model:intent="replayIntent"
               :events="segmentEvents"
               :segments="segments"
-              :is-loading="!!isLoading.length"
+              :is-loading="segmentsLoading"
               :single-snapshot="singleSnapshot"
+              :watermark="replayWatermark"
+              :anchor-moved-for-tabs="anchorMovedForTabs"
+              :view-ends="replayViewEnds"
               class="min-h-0 flex-1"
               @ready="handlePlayerReady"
               @seek-request="requestSeek"
@@ -232,6 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @playback-state="playerPlaybackState = $event"
               @loaded-end-change="playerLoadedEndMs = $event"
               @segments-taken="playerTakenCount = $event"
+              @tab-notice="tabNotice = $event"
             />
           </div>
         </template>
@@ -275,6 +287,7 @@ import EventDetailDrawer from "@/components/rum/EventDetailDrawer.vue";
 import { cloneDeep } from "lodash-es";
 import { computed, onBeforeMount, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import { useRouter } from "vue-router";
+import { watchDebounced } from "@vueuse/core";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import searchService from "@/services/search";
@@ -287,6 +300,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import useStreams from "@/composables/useStreams";
 import { sessionEventsProbeSql, type StepKind } from "@/utils/rum/productAnalyticsQueries";
@@ -308,8 +322,10 @@ import { rumField } from "@/utils/rum/fields";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import {
   dedupManifest,
+  lastEndByView,
   trimBeforeReplayStart,
   segmentId,
+  replayWatermark as watermarkFor,
   selectInitialWindow,
   snapshotStarts,
   summarizeManifest,
@@ -483,7 +499,35 @@ const isMobileReplay = computed(() =>
 const { sessionState } = useSessionsReplay();
 const videoPlayerRef = ref<any>(null);
 const mobilePlayerRef = ref<any>(null);
-const splitterSize = ref(600);
+const SPLITTER_STORAGE_KEY = "o2.rum.sessionReplay.splitterWidth";
+const SPLITTER_LIMITS: [number, number] = [200, 1400];
+const SPLITTER_DEFAULT = 600;
+
+// Storage can throw (private mode); the default width is a fine fallback.
+function readSplitterWidth(): number {
+  try {
+    const stored = Number(window.localStorage.getItem(SPLITTER_STORAGE_KEY) ?? NaN);
+    if (!Number.isFinite(stored)) return SPLITTER_DEFAULT;
+    return Math.min(Math.max(stored, SPLITTER_LIMITS[0]), SPLITTER_LIMITS[1]);
+  } catch {
+    return SPLITTER_DEFAULT;
+  }
+}
+
+const splitterSize = ref(readSplitterWidth());
+
+// OSplitter emits on every drag frame and has no drag-end event, so writes are debounced.
+watchDebounced(
+  splitterSize,
+  (value) => {
+    try {
+      window.localStorage.setItem(SPLITTER_STORAGE_KEY, String(Math.round(value)));
+    } catch {
+      // Unavailable storage keeps the width for this visit only.
+    }
+  },
+  { debounce: 300 },
+);
 const { performanceState } = usePerformance();
 const { getStream } = useStreams(t);
 
@@ -562,6 +606,19 @@ const sessionEndMs = computed(
 
 // Absolute start of the run's anchor segment, which is the player's own time origin.
 const windowStart = computed(() => Number(manifest.value[run.value.anchorIndex]?.start) || 0);
+
+const replayWatermark = computed(() =>
+  watermarkFor(manifest.value, run.value.appendedThroughIndex, isLive.value),
+);
+
+// A live view's newest row is not its end yet, so implicit view ends wait for the session to finish.
+const replayViewEnds = computed(() =>
+  isLive.value ? new Map<string, number>() : lastEndByView(manifest.value),
+);
+
+const anchorMovedForTabs = ref(false);
+
+const tabNotice = ref("");
 
 const singleSnapshot = computed(() => snapshotStarts(manifest.value).length <= 1);
 
@@ -1049,6 +1106,8 @@ const resetLoader = () => {
   playerLoadedEndMs.value = null;
   playerTakenCount.value = 0;
   unreachableSeek.value = false;
+  anchorMovedForTabs.value = false;
+  tabNotice.value = "";
   bumpLoader();
 };
 
@@ -1111,6 +1170,10 @@ const skipMarkerFor = (index: number): SkipMarker => ({
   segmentId: segmentIds[index],
   start: manifest.value[index].start,
   end: manifest.value[index].end,
+  viewId:
+    typeof manifest.value[index].view_id === "string"
+      ? (manifest.value[index].view_id as string)
+      : undefined,
 });
 
 // The player can only be fed forward, so segment k goes in only once every earlier one in the run is stored or skipped.
@@ -1232,6 +1295,7 @@ const getSessionSegments = async () => {
 
     // Only the window from the nearest full snapshot to the target, so the first frame does not wait on the whole session.
     const firstWindow = selectInitialWindow(rows, initialTarget())!;
+    anchorMovedForTabs.value = !isMobileReplay.value && firstWindow.movedForViews;
     // Rows tied on the session start could put a later snapshot ahead of segment 0, and mobile must never skip it.
     const anchorIndex = isMobileReplay.value ? 0 : firstWindow.anchorIndex;
     run.value = {

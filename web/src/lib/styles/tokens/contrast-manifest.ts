@@ -1075,6 +1075,12 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     why: "a filled button's label sits on the button",
   },
   {
+    fg: "--color-button-pending-text",
+    bg: "--color-button-pending-bg",
+    category: "text",
+    why: "a filled button's label sits on the button",
+  },
+  {
     fg: "--color-checkbox-checked-fg",
     bg: "--color-checkbox-checked-bg",
     category: "text",
@@ -1225,6 +1231,12 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     why: "a field-type tag is a filled chip in the field list",
   },
   {
+    fg: "--color-flame-frame-text",
+    bg: "--color-chart-series-1",
+    category: "text",
+    why: "a flame graph frame label is painted on the frame fill (FlameGraphView.vue: chart series 1, 5, 7, 9), never on the page; series 1 is the darkest of the four, so it is the pair that must clear 4.5:1",
+  },
+  {
     fg: "--color-icon-chip-error-text",
     bg: "--color-icon-chip-error-bg",
     under: ["--color-surface-base"],
@@ -1344,6 +1356,13 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     under: ["--color-surface-base"],
     category: "text",
     why: "a language pill's label is painted on the translucent pill",
+  },
+  {
+    fg: "--color-nav-label-accent",
+    bg: "--color-tabs-hover-bg",
+    category: "text",
+    why: "the hover label is painted on the tile's hover tint, which is darker than the page",
+    themes: ["light"],
   },
   {
     fg: "--color-lang-vrl-text",

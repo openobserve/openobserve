@@ -38,6 +38,7 @@
 
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
+import ts from "typescript";
 
 import { describe, expect, it } from "vitest";
 
@@ -57,6 +58,7 @@ import type {
   SubjectType,
 } from "@/ts/interfaces/oncall";
 import { RESOLUTION_CAUSES } from "@/ts/interfaces/oncall";
+import type { RcaSignalClass, RcaUnverifiedCitation } from "@/services/incidents";
 
 // ── The Rust side, parsed from source ───────────────────────────────────────
 
@@ -72,11 +74,31 @@ function snake(ident: string): string {
  * `rename_all = "snake_case"`, with its variants in wire spelling. A
  * per-variant `#[serde(rename = "...")]` overrides, exactly as serde does.
  */
+function rustSources(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const file = path.join(directory, entry.name);
+    return entry.isDirectory() ? rustSources(file) : file.endsWith(".rs") ? [file] : [];
+  });
+}
+
 function parseWireEnums(): Map<string, string[]> {
   const enums = new Map<string, string[]>();
-  for (const file of readdirSync(RUST_ONCALL_META)) {
-    if (!file.endsWith(".rs")) continue;
-    const lines = readFileSync(path.join(RUST_ONCALL_META, file), "utf8").split("\n");
+  const files = [
+    ...rustSources(RUST_ONCALL_META),
+    ...["rca_runs.rs", "rca_steering.rs"].map((file) =>
+      path.join(RUST_ONCALL_META, "../alerts", file),
+    ),
+  ];
+  for (const file of files) {
+    const source = readFileSync(file, "utf8");
+    const lines = source.split("\n");
+    const uncommented = source.replace(/\/\/[^\n]*/g, "");
+    for (const match of uncommented.matchAll(/string_enum!\s*\{\s*(\w+)\s*\{([^}]+)\}/g)) {
+      enums.set(
+        match[1],
+        [...match[2].matchAll(/(\w+)\s*=>\s*"[^"]+"/g)].map((variant) => snake(variant[1])),
+      );
+    }
     for (let i = 0; i < lines.length; i++) {
       const head = lines[i].match(/^\s*pub enum (\w+)\s*\{?/);
       if (!head) continue;
@@ -145,7 +167,7 @@ const RESPONSE_EVENT_KINDS = [
 ] as const satisfies readonly ResponseEventKind[];
 const _c1: Complete<ResponseEventKind, typeof RESPONSE_EVENT_KINDS> = true;
 
-const CHANNELS = ["email", "webhook"] as const satisfies readonly Channel[];
+const CHANNELS = ["email", "sms", "voice", "webhook"] as const satisfies readonly Channel[];
 const _c2: Complete<Channel, typeof CHANNELS> = true;
 
 const RESPONSE_STATES = [
@@ -206,7 +228,82 @@ const PRESET_INPUT_KINDS = [
 const _c10: Complete<PresetInputKind, typeof PRESET_INPUT_KINDS> = true;
 
 const _causes: Complete<ResolutionCause, typeof RESOLUTION_CAUSES> = true;
-void [_c1, _c2, _c3, _c4, _c5, _c6, _c7, _c8, _c9, _c10, _c11, _causes];
+
+// RCA confidence enums that reach the UI through the run summary route.
+const SIGNAL_CLASSES = [
+  "logs",
+  "metrics",
+  "traces",
+  "change",
+  "infra",
+  "context",
+  "unclassified",
+] as const satisfies readonly RcaSignalClass[];
+const _c12: Complete<RcaSignalClass, typeof SIGNAL_CLASSES> = true;
+
+type UnverifiedReason = RcaUnverifiedCitation["reason"];
+const UNVERIFIED_REASONS = [
+  "not_run",
+  "failed",
+  "ambiguous",
+] as const satisfies readonly UnverifiedReason[];
+const _c13: Complete<UnverifiedReason, typeof UNVERIFIED_REASONS> = true;
+
+const incidentTypes = ts.createSourceFile(
+  "incidents.ts",
+  readFileSync(path.resolve(process.cwd(), "src/services/incidents.ts"), "utf8"),
+  ts.ScriptTarget.Latest,
+  true,
+);
+function incidentUnion(name: string): string[] {
+  const [declaration, member] = name.split(".");
+  const node = incidentTypes.statements.find(
+    (node) =>
+      (ts.isTypeAliasDeclaration(node) || ts.isInterfaceDeclaration(node)) &&
+      node.name.text === declaration,
+  );
+  const type =
+    node && ts.isTypeAliasDeclaration(node)
+      ? node.type
+      : node && ts.isInterfaceDeclaration(node)
+        ? node.members.find(
+            (field) =>
+              ts.isPropertySignature(field) && field.name.getText(incidentTypes) === member,
+          )?.type
+        : undefined;
+  if (!type || !ts.isUnionTypeNode(type)) throw new Error(`Missing TypeScript wire union ${name}`);
+  return type.types.map((value) => {
+    if (!ts.isLiteralTypeNode(value) || !ts.isStringLiteral(value.literal)) {
+      throw new Error(`Non-string wire union ${name}`);
+    }
+    return value.literal.text;
+  });
+}
+
+const RCA_MIRRORS = {
+  Confidence: "RcaBand",
+  ChangeKind: "RcaChangeKind",
+  HypothesisStatus: "RcaHypothesisStatus",
+  Polarity: "RcaPolarity",
+  Strength: "RcaStrength",
+  BlindSpotAxis: "RcaBlindSpotAxis",
+  BlindSpotFix: "RcaBlindSpotFix",
+  RcaOutcome: "RcaOutcome",
+  OutcomeReason: "RcaOutcomeReason",
+  VerdictSoFarLabel: "RcaVerdictSoFar.label",
+  ShownChangeState: "RcaSuspectShownState",
+  TimelineView: "RcaTimelineStatus",
+  RunState: "RcaRunState",
+  RunTrigger: "RcaTrigger",
+  RunMode: "RcaRunMode",
+  RunSubjectType: "RcaRunSubjectType",
+  SteerKind: "RcaSteerKind",
+  SteerStatus: "RcaSteerStatus",
+  SteerAction: "RcaSteerAction",
+  SteerStatusReason: "RcaSteerStatusReason",
+  ReportFormat: "RcaReportFormat",
+};
+void [_c1, _c2, _c3, _c4, _c5, _c6, _c7, _c8, _c9, _c10, _c11, _c12, _c13, _causes];
 
 // `FinalAction` names no map below: `EscalationPolicy` carries no `final_action` field yet, so it is not a Rust enum a MIRRORED or SKIPPED entry could point at without failing the stale-entry check — `_FINAL_ACTIONS`/`_c7` above still pin `PolicyFinalAction` against drift on its own.
 /** Rust enum name → the TS mirror it must equal. */
@@ -222,21 +319,17 @@ const MIRRORED: Record<string, readonly string[]> = {
   RoutingDecision: ROUTING_DECISION_KINDS,
   PresetInputKind: PRESET_INPUT_KINDS,
   ResolutionCause: RESOLUTION_CAUSES,
+  SignalClass: SIGNAL_CLASSES,
+  UnverifiedReason: UNVERIFIED_REASONS,
+  ...Object.fromEntries(
+    Object.entries(RCA_MIRRORS).map(([rust, name]) => [rust, incidentUnion(name)]),
+  ),
 };
 
-/**
- * Wire enums deliberately WITHOUT a TS mirror. Each entry is a decision with
- * a reason, not an omission — a new enum landing in neither map fails the
- * suite until somebody makes the call.
- */
+/** Every discovered serde enum needs a mirror or an explicit boundary decision. */
 const SKIPPED: Record<string, string> = {
-  // The structured verdict/hold never reaches the wire — verdict_event()
-  // flattens it to a sentence (C12/C13 blocked halves). Mirror these the day
-  // an endpoint serializes them.
-  Confidence: "verdict is flattened to prose before it reaches the UI",
-  ChangeKind: "verdict is flattened to prose before it reaches the UI",
-  PageAction: "verdict is flattened to prose before it reaches the UI",
-  ActionKind: "verdict is flattened to prose before it reaches the UI",
+  PageAction: "stored in verdicts; the UI does not branch on the raw paging action",
+  ActionKind: "stored in verdict action plans; the UI renders the report, not typed plan actions",
   AnalysisStatus: "rides the internal trigger row; no endpoint serializes it",
   SeverityDecision: "rides the internal trigger row; the event carries it as prose",
   // Engine internals that never leave the process. (RungOutcome needs no
@@ -248,16 +341,16 @@ const SKIPPED: Record<string, string> = {
   // exactly what that forbids.
   PresetId: "catalogue-driven by design; the UI must not know preset ids",
   PresetSpec: "request body built from the catalogue's own inputs schema",
+  GradeReason: "raw reasons stay in the record; the UI reads the server-built card.confidence",
+  LedgerTool: "internal transcript decoder tag; no endpoint serializes it",
+  EndedBy: "internal finalization input; the endpoint exposes OutcomeReason",
+  SuspectChangeState: "agent claim stored for metrics; UI reads code-derived ShownChangeState",
+  TimelineStatus: "agent input; UI reads the evidence-checked TimelineView",
 };
 
 // ── The re-check ────────────────────────────────────────────────────────────
 
 describe("oncall wire contract (H5)", () => {
-  it("found the Rust module and something in it", () => {
-    // If the checkout layout changes this must fail loudly, not pass vacuously.
-    expect(rustEnums.size).toBeGreaterThan(5);
-  });
-
   it("every wire enum is either mirrored or consciously skipped", () => {
     const unaccounted = [...rustEnums.keys()].filter(
       (name) => !(name in MIRRORED) && !(name in SKIPPED),

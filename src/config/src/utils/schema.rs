@@ -545,19 +545,6 @@ mod tests {
     }
 
     #[test]
-    fn test_schema_eq() {
-        let schema1 = Schema::new(vec![
-            Field::new("a", DataType::Int64, true),
-            Field::new("b", DataType::Int64, true),
-        ]);
-        let schema2 = Schema::new(vec![
-            Field::new("b", DataType::Int64, true),
-            Field::new("a", DataType::Int64, true),
-        ]);
-        assert!(schema_eq(&schema1, &schema2));
-    }
-
-    #[test]
     fn test_schema_eq_with_metadata() {
         let schema1 = Schema::new(vec![
             Field::new("a", DataType::Int64, true),

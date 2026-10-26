@@ -19,7 +19,6 @@
     <div class="h-full w-full">
       <div class="bg-card-glass-bg h-full overflow-y-auto pt-0.5">
         <router-view
-          :title="ingestiontabs"
           :currOrgIdentifier="currOrgIdentifier"
           :currUserEmail="currentUserEmail"
           @copy-to-clipboard-fn="copyToClipboardFn"
@@ -112,7 +111,6 @@ export default defineComponent({
             button: "Copy to Clipboard",
             ingestion: currentRouteName(),
             user_org: store.state.selectedOrganization.identifier,
-            user_id: store.state.userInfo.email,
             page: "Ingestion",
           });
         }

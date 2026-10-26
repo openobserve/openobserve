@@ -3,6 +3,7 @@ const https = require('https');
 const fetch = require('node-fetch');
 const testLogger = require('../playwright-tests/utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment } = require('../playwright-tests/utils/cloud-auth.js');
+const { ingestBase } = require('../playwright-tests/utils/ingest-url.js');
 
 // node-fetch v2 keep-alive pooling + gzip decompression is the root cause of
 // "Premature close" / ECONNRESET flakiness in CI.
@@ -260,14 +261,14 @@ class APICleanup {
      */
     async seedAlertsInFolder(folderId, count, prefix) {
         const streamName = `${prefix}_stream`;
-        await this._fetch(`${this.baseUrl}/api/${this.org}/${streamName}/_json`, {
+        await this._fetch(`${ingestBase(this.baseUrl)}/api/${this.org}/${streamName}/_json`, {
             method: 'POST',
             headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
             body: JSON.stringify([{ message: 'e2e pagination seed row' }])
         });
         await this.waitForStreamSchema(streamName);
 
-        // Alert creation requires at least one destination (or workflow) attached.
+        // Seed alerts deliver somewhere, so they get a destination.
         const templateName = `${prefix}_tmpl`;
         const destinationName = `${prefix}_dest`;
         await this.createAlertTemplate(templateName);
@@ -1048,6 +1049,51 @@ class APICleanup {
     }
 
     /**
+     * Create a realtime pipeline with no function node — stream straight to
+     * stream. The counterpart to createPipelineUsingFunction, for showing that a
+     * pipeline calling nothing is exported without a `functions` key.
+     * @param {string} pipelineName
+     * @param {string} [sourceStream]
+     * @param {string} [org]
+     * @returns {Promise<string>} the new pipeline's id
+     */
+    async createPlainPipeline(pipelineName, sourceStream = 'e2e_automate', org = null) {
+        const targetOrg = org || this.org;
+        const stamp = Date.now();
+        const inputId = `in-${stamp}`;
+        const outputId = `out-${stamp}`;
+        const payload = {
+            pipeline_id: '', version: 0, enabled: true, org: targetOrg,
+            name: pipelineName, description: 'E2E pipeline with no function node',
+            source: { source_type: 'realtime' }, paused_at: null,
+            nodes: [
+                { id: inputId, position: { x: 100, y: 100 }, io_type: 'input',
+                  data: { node_type: 'stream', stream_type: 'logs', stream_name: sourceStream, org_id: targetOrg } },
+                { id: outputId, position: { x: 500, y: 300 }, io_type: 'output',
+                  data: { node_type: 'stream', stream_type: 'logs', stream_name: `${pipelineName}_dest`, org_id: targetOrg } },
+            ],
+            edges: [{
+                id: `e1-${stamp}`, source: inputId, target: outputId, type: 'custom',
+                animated: true, updatable: true,
+                markerEnd: { type: 'arrowclosed', width: 20, height: 20 },
+                style: { strokeWidth: 2 },
+            }],
+        };
+        const response = await this._fetch(`${this.baseUrl}/api/${targetOrg}/pipelines`, {
+            method: 'POST',
+            headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+            const body = await response.text();
+            throw new Error(`createPlainPipeline: HTTP ${response.status} — ${body}`);
+        }
+        const result = await response.json().catch(() => ({}));
+        testLogger.info('Created pipeline with no function node', { pipelineName, org: targetOrg });
+        return result.id;
+    }
+
+    /**
      * Create a JavaScript function (transType 1) via API.
      * @param {string} functionName
      * @param {string} jsCode - Function body; JS is not VRL, so it is stored verbatim
@@ -1065,6 +1111,32 @@ class APICleanup {
             throw new Error(`createJsFunction: HTTP ${response.status} — ${body}`);
         }
         testLogger.info('Created JS function via API', { functionName, org: targetOrg });
+        return await response.json().catch(() => ({}));
+    }
+
+    /**
+     * Replace a function's body in place (PUT), leaving every pipeline that
+     * calls it pointing at it.
+     *
+     * The alternative — delete and recreate — is refused with a 409 while any
+     * pipeline depends on the function, so this is the only way to change the
+     * logic behind a live dependent.
+     * @param {string} functionName - must already exist
+     * @param {string} vrlCode
+     * @param {string} [org]
+     */
+    async updateFunction(functionName, vrlCode, org = null) {
+        const targetOrg = org || this.org;
+        const response = await this._fetch(`${this.baseUrl}/api/${targetOrg}/functions/${functionName}`, {
+            method: 'PUT',
+            headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: functionName, function: vrlCode, params: 'row', transType: 0 })
+        });
+        if (!response.ok) {
+            const body = await response.text();
+            throw new Error(`updateFunction: HTTP ${response.status} — ${body}`);
+        }
+        testLogger.info('Updated function via API', { functionName, org: targetOrg });
         return await response.json().catch(() => ({}));
     }
 
@@ -3309,7 +3381,7 @@ class APICleanup {
             const record = data[i];
 
             try {
-                const response = await this._fetch(`${process.env.INGESTION_URL}/api/${this.org}/${streamName}/_json`, {
+                const response = await this._fetch(`${ingestBase(process.env.INGESTION_URL)}/api/${this.org}/${streamName}/_json`, {
                     method: 'POST',
                     headers: {
                         'Authorization': this.authHeader,
@@ -3843,6 +3915,91 @@ class APICleanup {
         } catch (err) {
             testLogger.warn('Model pricing cleanup failed (non-fatal)', { error: err.message });
         }
+    }
+
+    // A 404 on the checks list means ZO_SYNTHETICS_ENABLED is off, so there is nothing else to sweep.
+    async cleanupSynthetics(prefixes = [], { locationIds = [] } = {}) {
+        if (!prefixes.length) return;
+        testLogger.info('Starting synthetics cleanup', { prefixes: prefixes.map(p => p.source || p) });
+        const apiBase = `${this.baseUrl}/api/${this.org}/synthetics`;
+        const headers = { 'Authorization': this.authHeader, 'Content-Type': 'application/json' };
+        const matches = (name) => typeof name === 'string' &&
+            prefixes.some(p => (p instanceof RegExp) ? p.test(name) : name.startsWith(p));
+        try {
+            await this._sweepStatusPages(matches, headers);
+            const listRes = await this._fetch(apiBase, { method: 'GET', headers });
+            if (listRes.status === 404) {
+                testLogger.info('Synthetics endpoint not available — skipping cleanup');
+                return;
+            }
+            if (!listRes.ok) {
+                testLogger.warn('Failed to list synthetics checks', { status: listRes.status });
+                return;
+            }
+            const ids = ((await listRes.json()).checks || []).filter(c => matches(c.name)).map(c => c.id);
+            if (ids.length) {
+                const delRes = await this._fetch(apiBase, { method: 'DELETE', headers, body: JSON.stringify({ ids }) });
+                testLogger.info('Synthetics checks cleanup completed', { count: ids.length, status: delRes.status });
+            } else {
+                testLogger.info('No synthetics checks matched cleanup patterns');
+            }
+            await this._sweepSyntheticsLocations(apiBase, headers, matches, locationIds);
+            await this._sweepSyntheticsFolders(headers, matches);
+            await this._disableSyntheticsTokens(apiBase, headers, matches);
+        } catch (err) {
+            testLogger.warn('Synthetics cleanup failed (non-fatal)', { error: err.message });
+        }
+    }
+
+    // Per-worker public locations are ids of `<provider>-<prefixed region>`; shared ones are only removed when named in locationIds.
+    async _sweepSyntheticsLocations(apiBase, headers, matches, locationIds) {
+        const locRes = await this._fetch(`${apiBase}/locations`, { method: 'GET', headers });
+        if (!locRes.ok) return;
+        const locations = ((await locRes.json()).locations || [])
+            .filter(l => typeof l.id === 'string' && (locationIds.includes(l.id) || matches(l.id.replace(/^[^-]+-/, ''))));
+        let deleted = 0;
+        for (const l of locations) {
+            const res = await this._fetch(`${apiBase}/locations/${encodeURIComponent(l.id)}`, { method: 'DELETE', headers });
+            // The server refuses to delete a location that a check still uses.
+            if (res.ok) deleted++;
+            else testLogger.warn('Synthetics location not deleted', { id: l.id, status: res.status });
+        }
+        if (locations.length) testLogger.info('Synthetics locations cleanup completed', { deleted, matched: locations.length });
+    }
+
+    async _sweepSyntheticsFolders(headers, matches) {
+        const folderBase = `${this.baseUrl}/api/v2/${this.org}/folders/synthetics`;
+        const folderRes = await this._fetch(folderBase, { method: 'GET', headers });
+        if (!folderRes.ok) return;
+        const folders = ((await folderRes.json()).list || []).filter(f => matches(f.name));
+        for (const f of folders) {
+            await this._fetch(`${folderBase}/${encodeURIComponent(f.folderId)}`, { method: 'DELETE', headers });
+        }
+        if (folders.length) testLogger.info('Synthetics folders cleanup completed', { count: folders.length });
+    }
+
+    // Agent tokens have no delete endpoint, so disabling is the strongest cleanup available.
+    async _disableSyntheticsTokens(apiBase, headers, matches) {
+        const tokRes = await this._fetch(`${apiBase}/agent-tokens`, { method: 'GET', headers });
+        if (!tokRes.ok) return;
+        const tokens = ((await tokRes.json()).tokens || []).filter(t => matches(t.name) && t.enabled);
+        for (const t of tokens) {
+            await this._fetch(`${apiBase}/agent-tokens/${encodeURIComponent(t.name)}`, {
+                method: 'PATCH', headers, body: JSON.stringify({ enabled: false }),
+            });
+        }
+        if (tokens.length) testLogger.info('Synthetics tokens disabled', { count: tokens.length });
+    }
+
+    async _sweepStatusPages(matches, headers) {
+        const base = `${this.baseUrl}/api/${this.org}/status_pages`;
+        const listRes = await this._fetch(base, { method: 'GET', headers });
+        if (!listRes.ok) return;
+        const pages = ((await listRes.json()).pages || []).filter(p => matches(p.name));
+        for (const p of pages) {
+            await this._fetch(`${base}/${encodeURIComponent(p.id)}`, { method: 'DELETE', headers });
+        }
+        if (pages.length) testLogger.info('Status pages cleanup completed', { count: pages.length });
     }
 }
 

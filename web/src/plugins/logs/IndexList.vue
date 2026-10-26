@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="min-w-0 flex-1">
         <OSelect
           ref="streamSelect"
+          :aria-label="t('search.selectStream')"
           data-test="log-search-index-list-select-stream"
           :model-value="
             selectionMode === 'single'
@@ -83,8 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="w-full justify-start"
               @click="quickSelectStream(stream.value)"
             >
-              <span class="min-w-0 flex-1 truncate text-left">{{ stream.label }}</span>
-              <OTooltip :content="raw(stream.label)" side="right" align="center" />
+              <OTruncatedText class="flex-1 text-left">{{ stream.label }}</OTruncatedText>
             </OButton>
             <span
               v-if="streamList.length > quickPickStreams.length"
@@ -287,14 +287,22 @@ import { useStreamFields } from "@/composables/useLogs/useStreamFields";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { captureFromValuesApi } from "@/composables/fieldValueStore";
-import { saveLogsStreamType, saveLogsStream } from "@/utils/streamPersist";
+import { saveLogsStreamType } from "@/utils/streamPersist";
+import { bumpSelectionToken, currentSelectionToken } from "@/composables/useLogs/useSearchBar";
+import { compareStreamsByLatest } from "@/utils/logs/estimateScanMb";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import {
+  filterForParsing,
+  freeTextWhereByStream,
+  isFilterHeld,
+} from "@/composables/useLogs/freeTextSearch";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
@@ -317,6 +325,7 @@ export default defineComponent({
     OSelect,
     OIcon,
     OTooltip,
+    OTruncatedText,
     OEmptyState,
     OSkeleton,
   },
@@ -335,7 +344,7 @@ export default defineComponent({
           indexListSelectField.updateInputValue("");
         }
       });
-      this.onStreamChange("");
+      this.onStreamChange("", { origin: "selector" });
       this.resetPagination();
     },
     // One-click stream pick from the empty state — mirrors a dropdown
@@ -442,12 +451,19 @@ export default defineComponent({
     });
 
     const onStreamTypeChange = async (newType: string) => {
+      const token = bumpSelectionToken();
+      const org = store.state.selectedOrganization.identifier;
       searchObj.data.stream.streamType = newType;
       searchObj.data.stream.selectedStream = [];
       searchObj.data.stream.selectedStreamFields = [];
-      saveLogsStreamType(store.state.selectedOrganization.identifier, newType);
-      saveLogsStream(store.state.selectedOrganization.identifier, []);
-      await getStreamList(true);
+      saveLogsStreamType(org, newType);
+      const isCurrent = () =>
+        token === currentSelectionToken() &&
+        searchObj.data.stream.streamType === newType &&
+        store.state.selectedOrganization.identifier === org;
+      await getStreamList(true, { isCurrent });
+      if (!isCurrent()) return;
+      if (searchObj.data.stream.selectedStream.length) onStreamChange("", { origin: "selector" });
     };
 
     const showUserDefinedSchemaToggle = computed(() => {
@@ -471,7 +487,7 @@ export default defineComponent({
       const detailed = searchObj.data.streamResults?.list;
       if (Array.isArray(detailed) && detailed.length) {
         return [...detailed]
-          .sort((a: any, b: any) => (b?.stats?.doc_time_max ?? 0) - (a?.stats?.doc_time_max ?? 0))
+          .sort(compareStreamsByLatest)
           .slice(0, QUICK_PICK_LIMIT)
           .map((item: any) => ({ label: item.name, value: item.name }));
       }
@@ -505,12 +521,22 @@ export default defineComponent({
      *
      * Used to pre-check the corresponding checkboxes (blue) in the field sidebar.
      */
+    const sidebarFieldNames = computed(
+      () =>
+        new Set<string>([
+          ...searchObj.data.stream.selectedStream,
+          ...searchObj.data.stream.selectedStreamFields.map((field: any) => field.name),
+        ]),
+    );
+
     const activeIncludeFilterValues = computed((): Record<string, string[]> => {
       const result: Record<string, string[]> = {};
       const query = searchObj.data.query;
       if (!query) return result;
       try {
-        const queryToParse = searchObj.meta.sqlMode ? query : `select * from stream where ${query}`;
+        const queryToParse = searchObj.meta.sqlMode
+          ? query
+          : `select * from stream where ${filterForParsing(query, sidebarFieldNames.value)}`;
         const parsed = fnParsedSQL(queryToParse);
         if (!parsed?.where) return result;
         const walkNode = (node: any) => {
@@ -559,7 +585,9 @@ export default defineComponent({
       const query = searchObj.data.query;
       if (!query) return result;
       try {
-        const queryToParse = searchObj.meta.sqlMode ? query : `select * from stream where ${query}`;
+        const queryToParse = searchObj.meta.sqlMode
+          ? query
+          : `select * from stream where ${filterForParsing(query, sidebarFieldNames.value)}`;
         const parsed = fnParsedSQL(queryToParse);
         if (!parsed?.where) return result;
         const walkNode = (node: any) => {
@@ -949,7 +977,7 @@ export default defineComponent({
         let whereClause = "";
         let queries: any = {};
         searchObj.data.filterErrMsg = "";
-        searchObj.data.missingStreamMessage = "";
+        searchObj.data.missingStreamMessage = raw("");
         searchObj.data.stream.missingStreamMultiStreamFilter = [];
         if (searchObj.meta.sqlMode == true && query.trim().length) {
           const parsedSQL: any = fnParsedSQL(query);
@@ -1033,9 +1061,26 @@ export default defineComponent({
           }
         }
 
+        if (isFilterHeld(searchObj, store.state.zoConfig)) {
+          fieldValues.value[name]["isLoading"] = false;
+          fieldValues.value[name]["errMsg"] = t("search.searchQueryEmptyOrInvalid");
+          return;
+        }
+        const textWhere = freeTextWhereByStream(searchObj, store.state.zoConfig);
+        if (textWhere && streams.every((stream: string) => textWhere.get(stream) === "FALSE")) {
+          fieldValues.value[name]["isLoading"] = false;
+          fieldValues.value[name]["errMsg"] = streams
+            .map((stream: string) => t("search.noFtsRecovery.skipped", { stream }))
+            .join(" ");
+        }
         for (const selectedStream of streams) {
           if (streams.length > 1) {
             query_context = "select * from [INDEX_NAME]";
+          }
+          if (textWhere) {
+            const where = textWhere.get(selectedStream) ?? "";
+            if (where === "FALSE") continue;
+            query_context = `SELECT * FROM "[INDEX_NAME]"${where ? ` WHERE ${where}` : ""}`;
           }
           if (
             searchObj.data.stream.selectedStream.length > 1 &&

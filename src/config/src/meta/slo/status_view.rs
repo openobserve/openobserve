@@ -29,6 +29,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use super::math::{burn_rate, error_budget_remaining, sli, time_to_exhaust_secs};
+use crate::meta::downtimes::CorrectionRef;
 
 /// What the UI and the API render for one SLO or one group.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -79,6 +80,8 @@ pub struct SloStatusView {
     /// not exist.
     #[serde(default)]
     pub measuring_since: Option<i64>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub corrections: Vec<CorrectionRef>,
 }
 
 impl SloStatusView {
@@ -144,6 +147,7 @@ impl SloStatusView {
             stale_watermark: false,
             watermark_end: None,
             measuring_since: None,
+            corrections: Vec::new(),
         }
     }
 

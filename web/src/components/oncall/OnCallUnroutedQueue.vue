@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("oncall.unroutedDismissedTag") }}
           </OTag>
-          <span class="text-text-heading truncate">{{ titleOf(row) }}</span>
+          <OTruncatedText class="text-text-heading">{{ titleOf(row) }}</OTruncatedText>
         </span>
       </template>
 
@@ -230,6 +230,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type { UnroutedSignal } from "@/ts/interfaces/oncall";

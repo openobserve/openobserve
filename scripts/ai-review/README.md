@@ -23,9 +23,9 @@ the rest of this README covers **setup, activation, and rollback** of the brande
 
 ## The Frontend UI Reviewer
 
-`frontend` is the one **conditional** agent: it is appended to whatever the tier selected whenever
-the diff touches `web/src` (excluding specs), so a 6-line UI change still gets reviewed even at the
-`trivial` tier. `requiresFocus: true` is the other half of that contract — the generic focus filter
+`frontend` is one of the **conditional** agents (see `qa` below): it is appended to whatever the
+tier selected whenever the diff touches `web/src` (excluding specs), so a 6-line UI change still
+gets reviewed even at the `trivial` tier. `requiresFocus: true` is the other half of that contract — the generic focus filter
 falls back to the *full* diff when an agent matches no files, which would otherwise have the
 frontend reviewer opining on Rust; with the flag set it skips the PR entirely instead.
 
@@ -37,6 +37,21 @@ but wrong (`text-[0.8125rem]`, a `parseInt`-read px converted to rem), and i18n 
 (`raw()` on real copy, a catalogue key for `Kafka`). Everything `local/no-hardcoded-px`,
 `lint:design:strict`, stylelint or `type-check:app` already fails the build on is explicitly
 out of scope — see the "What NOT to Flag" table in `agents/frontend.md`.
+
+## The QA / Test Reviewer
+
+`qa` is a conditional agent on the same contract as `frontend`, appended whenever the diff touches
+the Playwright E2E test code under `tests/ui-testing/` — a spec or helper under `playwright-tests/`,
+a page object under `pages/`, a util under `utils/` (`.js`/`.ts`), or a `playwright*.config`. Committed app fixtures
+(`fixtures/**`) and the other suites under `tests/` are deliberately excluded, so the agent never
+applies POM/selector rules to sample application code. It is
+a **static** review of the *tests themselves* — it never runs them, so a green CI run clears none of
+its findings. It folds in the Council's Sentinel rules (POM compliance incl. selectors inside
+`expect(...)`, `testLogger` not `console.log`, real assertions — no `expect(true).toBe(true)`,
+awaited async, no hardcoded creds) plus the Test Inspector's highest-value check: **`data-test` ↔
+component selector cross-validation** (grep each added selector across `web/src` and flag any the
+test relies on that no component renders — the "19 broken selectors, 14/14 green" failure mode).
+Actually executing the suite stays with `playwright.yml`; this agent only reads.
 
 Adding another conditional agent: define it in `AGENTS` (with `requiresFocus` if it is
 domain-scoped), add a `{ agent, matches }` entry to `CONDITIONAL_AGENTS`, register

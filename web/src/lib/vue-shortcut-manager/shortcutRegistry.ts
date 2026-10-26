@@ -42,6 +42,8 @@ export interface ShortcutEntry {
   display?: string;
   /** Fire even while a text input has focus (see `Shortcut.allowInInput`). */
   allowInInput?: boolean;
+  /** Never fire while a text input has focus, even as a modifier combo (see `Shortcut.skipInInput`). */
+  skipInInput?: boolean;
   /** Hide this entry in the cheatsheet unless the edition/config exposes it. */
   visible?: (caps: ShortcutCapabilities) => boolean;
 }
@@ -66,6 +68,7 @@ export interface ShortcutCapabilities {
   modelPricingEnabled: boolean;
   rbacEnabled: boolean;
   aiEnabled: boolean;
+  downtimesEnabled: boolean;
 }
 
 export interface ShortcutModule {
@@ -90,6 +93,7 @@ const onlineEvals = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.onlin
 const modelPricing = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.modelPricingEnabled;
 const rbac = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.rbacEnabled;
 const aiChat = (c: ShortcutCapabilities) => c.isEnterprise && c.aiEnabled;
+const downtimes = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.downtimesEnabled;
 // Cluster-scoped admin surfaces only render inside the _meta org.
 const metaAdmin = (c: ShortcutCapabilities) => c.isEnterprise && c.isMetaOrg;
 const cloudMetaAdmin = (c: ShortcutCapabilities) => c.isCloud && c.isMetaOrg;
@@ -114,6 +118,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
       "shortcuts.pages.dashboardsList",
       "shortcuts.pages.dashboards",
       "shortcuts.pages.dashboardsPanel",
+      "shortcuts.pages.dashboardTvPlaylist",
       "shortcuts.pages.panelEditor",
     ],
   },
@@ -130,6 +135,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
       "shortcuts.pages.alertSources",
       "shortcuts.pages.alertTemplates",
       "shortcuts.pages.alertIncidents",
+      "shortcuts.pages.downtimes",
     ],
   },
   {
@@ -147,6 +153,11 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
   },
   { titleKey: "shortcuts.modules.reports", pages: ["shortcuts.pages.reports"] },
   { titleKey: "shortcuts.modules.synthetics", pages: ["shortcuts.pages.syntheticsJourney"] },
+  { titleKey: "shortcuts.modules.kubernetes", pages: ["shortcuts.pages.kubernetes"] },
+  {
+    titleKey: "shortcuts.modules.fleet",
+    pages: ["shortcuts.pages.fleetOverview", "shortcuts.pages.fleetConfigEditor"],
+  },
   {
     titleKey: "shortcuts.modules.iam",
     title: "IAM",
@@ -254,6 +265,19 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         keyForMac: "meta+shift+d",
         descriptionKey: "shortcuts.actions.logsExport",
       },
+      { id: "logsNextRow", key: "j", descriptionKey: "shortcuts.actions.logsNextRow" },
+      { id: "logsPrevRow", key: "k", descriptionKey: "shortcuts.actions.logsPrevRow" },
+      {
+        id: "logsRowFocusMove",
+        display: "↑ / ↓",
+        descriptionKey: "shortcuts.actions.logsRowFocusMove",
+      },
+      { id: "logsRowOpen", display: "enter", descriptionKey: "shortcuts.actions.logsRowOpen" },
+      {
+        id: "logsDetailClose",
+        display: "escape",
+        descriptionKey: "shortcuts.actions.logsDetailClose",
+      },
     ],
   },
 
@@ -304,12 +328,67 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         keyForMac: "meta+s",
         descriptionKey: "shortcuts.actions.dashboardSave",
       },
+      // The manager builds combos as ctrl, shift, alt, meta, so the Mac redo is shift+meta.
+      {
+        id: "dashboardLayoutUndo",
+        keyForWindows: "ctrl+z",
+        keyForMac: "meta+z",
+        descriptionKey: "shortcuts.actions.dashboardLayoutUndo",
+        skipInInput: true,
+      },
+      {
+        id: "dashboardLayoutRedo",
+        keyForWindows: "ctrl+shift+z",
+        keyForMac: "shift+meta+z",
+        descriptionKey: "shortcuts.actions.dashboardLayoutRedo",
+        skipInInput: true,
+      },
+      {
+        id: "dashboardLayoutExit",
+        key: "escape",
+        descriptionKey: "shortcuts.actions.dashboardLayoutExit",
+      },
+      {
+        id: "dashboardKioskExit",
+        key: "escape",
+        descriptionKey: "shortcuts.actions.dashboardKioskExit",
+      },
       {
         id: "dashboardFullscreen",
         key: "f",
         descriptionKey: "shortcuts.actions.dashboardFullscreen",
       },
       { id: "dashboardExport", key: "x", descriptionKey: "shortcuts.actions.dashboardExport" },
+    ],
+  },
+
+  // ── Dashboard TV playlist ────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.dashboardTvPlaylist",
+    scope: "dashboard-tv",
+    shortcuts: [
+      {
+        id: "dashboardPlaylistPrev",
+        key: "left",
+        display: "←",
+        descriptionKey: "shortcuts.actions.dashboardPlaylistPrev",
+      },
+      {
+        id: "dashboardPlaylistNext",
+        key: "right",
+        display: "→",
+        descriptionKey: "shortcuts.actions.dashboardPlaylistNext",
+      },
+      {
+        id: "dashboardPlaylistPause",
+        key: "space",
+        descriptionKey: "shortcuts.actions.dashboardPlaylistPause",
+      },
+      {
+        id: "dashboardPlaylistExit",
+        key: "escape",
+        descriptionKey: "shortcuts.actions.dashboardPlaylistExit",
+      },
     ],
   },
 
@@ -400,6 +479,9 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         keyForMac: "meta+shift+c",
         descriptionKey: "shortcuts.actions.tracesCopyUrl",
       },
+      { id: "tracesNextRow", key: "j", descriptionKey: "shortcuts.actions.tracesNextRow" },
+      { id: "tracesPrevRow", key: "k", descriptionKey: "shortcuts.actions.tracesPrevRow" },
+      { id: "tracesRowOpen", display: "enter", descriptionKey: "shortcuts.actions.tracesRowOpen" },
     ],
   },
 
@@ -412,13 +494,13 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         id: "traceNextSpan",
         keys: ["j", "down"],
         display: "J / ↓",
-        descriptionKey: "shortcuts.actions.traceNextSpan",
+        descriptionKey: "shortcuts.actions.traceNextVisibleSpan",
       },
       {
         id: "tracePrevSpan",
         keys: ["k", "up"],
         display: "K / ↑",
-        descriptionKey: "shortcuts.actions.tracePrevSpan",
+        descriptionKey: "shortcuts.actions.tracePrevVisibleSpan",
       },
     ],
   },
@@ -572,6 +654,21 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         id: "pipelinesRowDelete",
         display: "del / ⌫",
         descriptionKey: "shortcuts.actions.tableRowDelete",
+      },
+    ],
+  },
+
+  // ── Kubernetes ──────────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.kubernetes",
+    scope: "kubernetes",
+    shortcuts: [
+      {
+        id: "k8sPalette",
+        keyForWindows: "ctrl+k",
+        keyForMac: "meta+k",
+        descriptionKey: "shortcuts.actions.k8sPalette",
+        allowInInput: true,
       },
     ],
   },
@@ -791,6 +888,18 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         key: "r",
         descriptionKey: "shortcuts.actions.alertIncidentsRefresh",
       },
+    ],
+  },
+
+  // ── Downtimes ───────────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.downtimes",
+    scope: "downtimes",
+    visible: downtimes,
+    shortcuts: [
+      { id: "downtimesCreate", key: "n", descriptionKey: "shortcuts.actions.downtimesCreate" },
+      { id: "downtimesRefresh", key: "r", descriptionKey: "shortcuts.actions.downtimesRefresh" },
+      { id: "downtimesFocusSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
     ],
   },
 
@@ -1096,6 +1205,33 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { id: "sourceMapsRefresh", key: "r", descriptionKey: "shortcuts.actions.sourceMapsRefresh" },
     ],
   },
+
+  // ── Fleet — Overview flow map ───────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.fleetOverview",
+    scope: "fleet-overview",
+    shortcuts: [
+      {
+        id: "fleetFlowCloseDetails",
+        key: "escape",
+        descriptionKey: "shortcuts.actions.fleetFlowCloseDetails",
+      },
+    ],
+  },
+
+  // ── Fleet — Configuration editor ────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.fleetConfigEditor",
+    scope: "fleet-config-editor",
+    shortcuts: [
+      {
+        id: "fleetEditorDeleteNode",
+        keys: ["delete", "backspace"],
+        display: "del / ⌫",
+        descriptionKey: "shortcuts.actions.fleetEditorDeleteNode",
+      },
+    ],
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -1112,6 +1248,7 @@ export interface ShortcutDef {
   keyForMac?: string;
   keys?: string[];
   allowInInput?: boolean;
+  skipInInput?: boolean;
 }
 
 function isRegisterable(e: ShortcutEntry): boolean {
@@ -1135,6 +1272,7 @@ const DEFS: Map<string, ShortcutDef> = (() => {
         keyForMac: e.keyForMac,
         keys: e.keys,
         allowInInput: e.allowInInput,
+        skipInInput: e.skipInInput,
       });
     }
   }

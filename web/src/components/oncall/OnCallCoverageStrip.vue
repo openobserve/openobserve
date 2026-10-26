@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            shift. -->
       <template #band="{ band }">
         <OTooltip v-if="tooltipFor(band.key).length" side="top">
-          <OScheduleBand :band="band" />
+          <OScheduleBand :band="band" :tooltip="false" />
           <template #content>
             <div class="flex flex-col">
               <template v-for="(segment, index) in tooltipFor(band.key)" :key="segment.key">

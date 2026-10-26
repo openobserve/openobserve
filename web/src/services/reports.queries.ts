@@ -14,10 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
+import { quantizeRange } from "@/composables/query/queryClient";
 import reports from "./reports";
-import type { ReportListFilters } from "./reports";
+import type {
+  ReportHistoryQuery,
+  ReportHistoryResponse,
+  ReportListFilters,
+  TriggerReportResponse,
+} from "./reports";
 import { reportKeys } from "./reports.querykeys";
-import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
+import { LIVE_STALE_TIME, NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 
 export const reportsQuery = (org: string, filters: ReportListFilters) =>
   queryOptions({
@@ -35,6 +41,58 @@ export const reportsQuery = (org: string, filters: ReportListFilters) =>
     staleTime: NORMAL_STALE_TIME,
   });
 
+/** Background callers pass `silentForbidden` so a 403 stays out of the grouped access toast. */
+export const reportByIdQuery = (
+  org: string,
+  reportId: string,
+  options?: { silentForbidden?: boolean },
+) =>
+  queryOptions({
+    queryKey: reportKeys.detail(org, reportId),
+    queryFn: async () => (await reports.getReportById(org, reportId, options)).data,
+    staleTime: NORMAL_STALE_TIME,
+  });
+
+export const reportHistoryQuery = (org: string, query: ReportHistoryQuery) => {
+  // Callers anchor the range to a raw `now`; only the key buckets, so this minute's runs stay in.
+  const bucketed = quantizeRange(query.start_time, query.end_time);
+  return queryOptions({
+    queryKey: reportKeys.history(org, {
+      ...query,
+      start_time: bucketed.start,
+      end_time: bucketed.end,
+    }),
+    queryFn: async (): Promise<ReportHistoryResponse> =>
+      (await reports.getHistory(org, query)).data,
+    staleTime: LIVE_STALE_TIME,
+  });
+};
+
+export const reportRunQuery = (
+  org: string,
+  reportId: string | undefined,
+  timestamp: number,
+  retries: number,
+  orgWide = false,
+) =>
+  queryOptions({
+    queryKey: reportKeys.run(org, reportId, timestamp, retries, orgWide),
+    queryFn: async (): Promise<ReportHistoryResponse> =>
+      (
+        await reports.getHistory(org, {
+          ...(orgWide ? { run_report_id: reportId } : { report_id: reportId }),
+          start_time: timestamp,
+          end_time: timestamp + 1,
+          retries,
+          size: 3,
+          from: 0,
+          sort_by: "_timestamp",
+          sort_order: "asc",
+        })
+      ).data,
+    staleTime: LIVE_STALE_TIME,
+  });
+
 // ── Writes ──────────────────────────────────────────────────────────────────
 
 /** Three save shapes, one scope: `reportKeys.all` also covers the cross-folder search entry a Vuex prune never reached. */
@@ -49,4 +107,24 @@ export const saveReportMutation = (org: string) =>
     },
     // The form composes create-vs-update wording for both outcomes itself.
     meta: { invalidates: [reportKeys.all(org)], silentError: true },
+  });
+
+type ReportRunOperation = Readonly<{ org: string; reportId: string }>;
+
+/** A recorded error changes metadata too; variables pin settlement across option changes. */
+export const triggerReportMutation = (org: string) =>
+  mutationOptions({
+    onMutate: (variables: string | ReportRunOperation): ReportRunOperation =>
+      typeof variables === "string" ? { org, reportId: variables } : { ...variables },
+    mutationFn: async (variables: string | ReportRunOperation) => {
+      const operation = typeof variables === "string" ? { org, reportId: variables } : variables;
+      return (await reports.triggerReportById(operation.org, operation.reportId)).data;
+    },
+    onSettled: (_data, error, _variables, operation, context) => {
+      const recorded = (error as { response?: { data?: TriggerReportResponse } } | null)?.response
+        ?.data?.run;
+      if (!operation || (error && !recorded)) return;
+      void context.client.invalidateQueries({ queryKey: reportKeys.all(operation.org) });
+    },
+    meta: { silentError: true },
   });

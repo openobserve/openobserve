@@ -178,7 +178,6 @@ impl Ingest for Ingester {
                 }
             }
             StreamType::EnrichmentTables => {
-                let json_records = parse_enrichment_records(&in_data.data);
                 let append_data = match req.metadata {
                     Some(metadata) => metadata
                         .data
@@ -187,32 +186,8 @@ impl Ingest for Ingester {
                         .unwrap_or(true),
                     None => true,
                 };
-                match enrichment_data::enrichment_table::save_enrichment_data(
-                    &org_id,
-                    &stream_name,
-                    json_records,
-                    append_data,
-                )
-                .await
-                {
-                    Err(e) => Err(Error::IngestionError(format!(
-                        "Internal gPRC ingestion service errors saving enrichment data: {e}"
-                    ))),
-                    Ok(res) => {
-                        if res.status() != StatusCode::OK {
-                            let status: StatusCode = res.status();
-                            log::error!(
-                                "Internal gPRC ingestion service errors saving enrichment data: code: {status}, body: {:?}",
-                                res.into_body()
-                            );
-                            Err(Error::IngestionError(format!(
-                                "Internal gPRC ingestion service errors saving enrichment data: http code {status}"
-                            )))
-                        } else {
-                            Ok(())
-                        }
-                    }
-                }
+                ingest_enrichment_records(&org_id, &stream_name, &in_data.data, append_data)
+                    .await
             }
             StreamType::ServiceGraph => {
                 // Service graph edges - use same pattern as Logs
@@ -268,17 +243,54 @@ fn ok_reply() -> IngestionResponse {
     }
 }
 
-fn parse_enrichment_records(data: &[u8]) -> Vec<json::Map<String, json::Value>> {
-    json::from_slice(data).unwrap_or_else(|_| {
-        let vec_value: Vec<json::Value> = json::from_slice(data).unwrap();
-        vec_value
-            .into_iter()
-            .filter_map(|v| match v {
-                json::Value::Object(map) => Some(map),
-                _ => None,
-            })
-            .collect()
-    })
+async fn ingest_enrichment_records(
+    org_id: &str,
+    stream_name: &str,
+    data: &[u8],
+    append_data: bool,
+) -> Result<()> {
+    let json_records = parse_enrichment_records(data)?;
+    match enrichment_data::enrichment_table::save_enrichment_data(
+        org_id,
+        stream_name,
+        json_records,
+        append_data,
+    )
+    .await
+    {
+        Err(e) => Err(Error::IngestionError(format!(
+            "Internal gPRC ingestion service errors saving enrichment data: {e}"
+        ))),
+        Ok(res) => {
+            if res.status() != StatusCode::OK {
+                let status: StatusCode = res.status();
+                log::error!(
+                    "Internal gPRC ingestion service errors saving enrichment data: code: {status}, body: {:?}",
+                    res.into_body()
+                );
+                Err(Error::IngestionError(format!(
+                    "Internal gPRC ingestion service errors saving enrichment data: http code {status}"
+                )))
+            } else {
+                Ok(())
+            }
+        }
+    }
+}
+
+fn parse_enrichment_records(data: &[u8]) -> Result<Vec<json::Map<String, json::Value>>> {
+    if let Ok(records) = json::from_slice(data) {
+        return Ok(records);
+    }
+    let values: Vec<json::Value> = json::from_slice(data)
+        .map_err(|e| Error::IngestionError(format!("enrichment data must be a JSON array: {e}")))?;
+    Ok(values
+        .into_iter()
+        .filter_map(|v| match v {
+            json::Value::Object(map) => Some(map),
+            _ => None,
+        })
+        .collect())
 }
 
 /// The proto has only `status_code` + `message`, so `207` carries the partial-failure JSON.
@@ -387,31 +399,37 @@ mod tests {
     #[test]
     fn test_parse_enrichment_records_object_array() {
         let records =
-            parse_enrichment_records(br#"[{"id": 1}, {"id": 2, "nested": {"ok": true}}]"#);
+            parse_enrichment_records(br#"[{"id": 1}, {"id": 2, "nested": {"ok": true}}]"#).unwrap();
         assert_eq!(
             json::to_value(records).unwrap(),
             json::json!([
                 {"id": 1}, {"id": 2, "nested": {"ok": true}}
             ])
         );
-        assert!(parse_enrichment_records(b"[]").is_empty());
+        assert!(parse_enrichment_records(b"[]").unwrap().is_empty());
     }
 
     #[test]
     fn test_parse_enrichment_records_mixed_array() {
         let records =
-            parse_enrichment_records(br#"[null, {"id": 1}, 2, "text", false, [], {"id": 2}]"#);
+            parse_enrichment_records(br#"[null, {"id": 1}, 2, "text", false, [], {"id": 2}]"#)
+                .unwrap();
         assert_eq!(
             json::to_value(records).unwrap(),
             json::json!([{"id": 1}, {"id": 2}])
         );
-        assert!(parse_enrichment_records(b"[null, 1, false]").is_empty());
+        assert!(
+            parse_enrichment_records(b"[null, 1, false]")
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]
-    #[should_panic]
     fn test_parse_enrichment_records_rejects_non_array() {
-        parse_enrichment_records(br#"{"id": 1}"#);
+        for input in [&b"{}"[..], b"42", b"null", br#""x""#] {
+            assert!(parse_enrichment_records(input).is_err());
+        }
     }
 
     #[test]

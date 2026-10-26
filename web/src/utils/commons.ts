@@ -27,11 +27,29 @@ import { subtractRelativeTime } from "@/utils/date";
 import { convertDashboardSchemaVersion } from "./dashboard/convertDashboardSchemaVersion";
 import { normalizeReservedTimestampAlias } from "./dashboard/timestampAliasRewrite";
 import commonService from "../services/common";
-import type { TranslateFn } from "@/types/i18n";
-import type { Ref } from "vue";
+import { gt, type TranslateFn } from "@/types/i18n";
+import { findPanelById } from "./dashboard/findPanel";
+import { deletePanelDraftsFor } from "@/composables/dashboard/usePanelDraft";
+import { toRaw, type Ref } from "vue";
+import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
+import { pruneAnnotationSourcePanels } from "@/utils/dashboard/pruneAnnotationSourcePanels";
 
 let moment: any;
 let momentInitialized = false;
+
+export interface LoadedDashboardVersion {
+  hash: string;
+  updatedAt: number | null;
+  snapshot: any;
+}
+
+const loadedDashboardVersions = new Map<string, LoadedDashboardVersion>();
+
+// A dashboard object that lost a save conflict keeps saving against its own base hash, so a stale screen can never silently overwrite.
+const staleDashboardHashes = new WeakMap<object, string>();
+
+// A conflict closed without a choice keeps every later save on the old base hash, so it reopens the dialog instead of saving silently.
+const unresolvedDashboardConflicts = new Map<string, LoadedDashboardVersion>();
 
 const importMoment = async () => {
   if (!momentInitialized) {
@@ -301,9 +319,24 @@ export const addPanel = async (
 
   // find tab from tabId
   const tab = getTabDataFromTabId(currentDashboard, tabId);
+  if (!tab) return;
 
   if (!tab.panels) {
     tab.panels = [];
+  }
+
+  // A save that lost a conflict left this panel in the working copy; saving it again replaces it instead of adding a twin.
+  const existingIndex = tab.panels.findIndex((panel: any) => panel.id === panelData.id);
+  if (existingIndex !== -1) {
+    panelData.layout = tab.panels[existingIndex].layout;
+    tab.panels[existingIndex] = panelData;
+    return await updateDashboard(
+      store,
+      store.state.selectedOrganization.identifier,
+      dashboardId,
+      currentDashboard,
+      folderId ?? "default",
+    );
   }
 
   const { maxI, maxY, lastPanel } = getMaxIAndMaxYFromTab(tab);
@@ -393,6 +426,7 @@ export const deleteVariable = async (
   const variableIndex = currentDashboard.variables.list.findIndex(
     (variable: any) => variable.name == variableName,
   );
+  if (variableIndex === -1) return;
   currentDashboard.variables.list.splice(variableIndex, 1);
 
   return await updateDashboard(
@@ -420,7 +454,9 @@ export const deletePanel = async (
   const tab = getTabDataFromTabId(currentDashboard, tabId);
 
   //remove panel from current dashboard
-  const panelIndex = tab.panels.findIndex((panel: any) => panel.id == panelId);
+  const panelIndex = tab?.panels?.findIndex((panel: any) => panel.id == panelId) ?? -1;
+  // The panel may already be gone from this copy; splice(-1, 1) would drop the last panel instead.
+  if (panelIndex === -1) return;
   tab.panels.splice(panelIndex, 1);
   // currentDashboard.panels = currentDashboard.panels;
 
@@ -442,6 +478,11 @@ export const deletePanel = async (
   // The panel is gone, so its cached results are unreachable — without this they
   // sit in IndexedDB until the 24 h TTL or the record cap reclaims them.
   await dropPanelCache(store.state.selectedOrganization.identifier, folderId, dashboardId, panelId);
+  deletePanelDraftsFor({
+    org: store.state.selectedOrganization.identifier,
+    dashboardId: String(dashboardId),
+    panelId: String(panelId),
+  });
 };
 
 export const updateVariable = async (
@@ -461,6 +502,7 @@ export const updateVariable = async (
   const variableIndex = currentDashboard.variables.list.findIndex(
     (variable: any) => variable.name == variableName,
   );
+  if (variableIndex === -1) return;
   //if name already exists
   const variableExists = currentDashboard.variables.list.filter(
     (it: any) => it.name == variableData.name,
@@ -494,11 +536,10 @@ export const updatePanel = async (
   // call the update dashboard function
   const currentDashboard = await getDashboard(store, dashboardId, folderId);
 
-  // find tab from tabId
-  const tab = getTabDataFromTabId(currentDashboard, tabId);
-
-  const panelIndex = tab.panels.findIndex((panel: any) => panel.id == panelData.id);
-  tab.panels[panelIndex] = panelData;
+  // A teammate may have moved the panel to another tab since the editor opened.
+  const found = findPanelById(currentDashboard, panelData.id, tabId);
+  if (!found) throw new Error(gt("dashboard.panelDraft.panelMissingOnSave"));
+  found.tab.panels[found.index] = panelData;
   return await updateDashboard(
     store,
     store.state.selectedOrganization.identifier,
@@ -507,6 +548,16 @@ export const updatePanel = async (
     folderId,
   );
 };
+
+const clearUnresolvedDashboardConflict = (dashboardId: any) => {
+  unresolvedDashboardConflicts.delete(String(dashboardId));
+  if (dashboardSaveConflictState.unresolvedDashboardId === String(dashboardId))
+    dashboardSaveConflictState.unresolvedDashboardId = "";
+};
+
+// The dashboard model serialises camelCase; snake_case is kept for older servers.
+const updatedAtOf = (data: any): number | null =>
+  Number(data?.updatedAt ?? data?.updated_at) || null;
 
 const retrieveAndStoreDashboardData = async (
   store: any,
@@ -520,6 +571,13 @@ const retrieveAndStoreDashboardData = async (
   const hash = apiResponse.data.hash.toString();
 
   const convertedData = convertDashboardSchemaVersion(dashboardData);
+
+  loadedDashboardVersions.clear();
+  loadedDashboardVersions.set(String(dashboardId), {
+    hash,
+    updatedAt: updatedAtOf(apiResponse.data),
+    snapshot: structuredClone(toRaw(convertedData ?? null)),
+  });
 
   store.dispatch("setAllDashboardListHash", {
     [dashboardId]: hash,
@@ -539,14 +597,27 @@ export const updateDashboard = async (
   dashboardId: any,
   currentDashboardData: any,
   folderId: any,
+  hash?: string,
 ) => {
+  // Every panel deletion path ends here, so a deleted panel never lingers in an annotation source.
+  pruneAnnotationSourcePanels(currentDashboardData);
+  const isObject = !!currentDashboardData && typeof currentDashboardData === "object";
+  // The server only stamps updatedAt on create and stores the client's value on update, so the save carries its own time.
+  const body = isObject
+    ? { ...toRaw(currentDashboardData), updatedAt: Date.now() * 1000 }
+    : currentDashboardData;
   const res = await dashboardService.save(
     org,
     dashboardId,
-    currentDashboardData,
+    body,
     folderId,
-    store.state.organizationData.allDashboardListHash[dashboardId],
+    hash ??
+      (isObject ? staleDashboardHashes.get(toRaw(currentDashboardData)) : undefined) ??
+      unresolvedDashboardConflicts.get(String(dashboardId))?.hash ??
+      store.state.organizationData.allDashboardListHash[dashboardId],
   );
+  if (isObject) staleDashboardHashes.delete(toRaw(currentDashboardData));
+  clearUnresolvedDashboardConflict(dashboardId);
 
   const apiResponse = await dashboardService.get_Dashboard(
     store.state.selectedOrganization.identifier,
@@ -558,6 +629,74 @@ export const updateDashboard = async (
   await getAllDashboards(store, folderId, true);
 
   return res;
+};
+
+/** The server version the cached dashboard was last loaded from, captured before any in-place edit. */
+export const getLoadedDashboardVersion = (dashboardId: any): LoadedDashboardVersion | null =>
+  loadedDashboardVersions.get(String(dashboardId)) ?? null;
+
+/** This object keeps saving with its old hash, so it conflicts again instead of overwriting. */
+export const markDashboardStale = (dashboardData: any, hash: string | undefined) => {
+  if (!dashboardData || typeof dashboardData !== "object" || !hash) return;
+  staleDashboardHashes.set(toRaw(dashboardData), hash);
+};
+
+export const getUnresolvedDashboardConflict = (dashboardId: any) =>
+  unresolvedDashboardConflicts.get(String(dashboardId)) ?? null;
+
+/** Records the base an unresolved conflict saves against; null clears it. */
+export const setUnresolvedDashboardConflict = (
+  dashboardId: any,
+  base: LoadedDashboardVersion | null,
+) => {
+  if (base) unresolvedDashboardConflicts.set(String(dashboardId), base);
+  else clearUnresolvedDashboardConflict(dashboardId);
+};
+
+/** Reads the server's current version without touching the cache, which stays the user's working copy. */
+export const fetchServerDashboard = async (store: any, dashboardId: any, folderId: any) => {
+  const apiResponse = await dashboardService.get_Dashboard(
+    store.state.selectedOrganization.identifier,
+    dashboardId,
+    folderId,
+  );
+  const version = apiResponse.data.version;
+  return {
+    data: convertDashboardSchemaVersion(apiResponse.data[`v${version}`]),
+    hash: apiResponse.data.hash.toString() as string,
+    updatedAt: updatedAtOf(apiResponse.data),
+  };
+};
+
+/** Makes the cached dashboard equal to `source` in place, so views holding the cached object show it too. */
+export const adoptDashboardWorkingCopy = (store: any, dashboardId: any, source: any) => {
+  const target = store.state.organizationData.allDashboardData?.[dashboardId];
+  if (!target || !source || toRaw(target) === toRaw(source)) return;
+  const next = JSON.parse(JSON.stringify(toRaw(source)));
+  // The source can be JSON-editor input, so keys that reach Object.prototype are never copied or deleted.
+  for (const key of Object.keys(target)) {
+    if (key === "__proto__" || key === "constructor" || key === "prototype") continue;
+    if (!Object.prototype.hasOwnProperty.call(next, key)) delete target[key];
+  }
+  for (const key of Object.keys(next)) {
+    if (key === "__proto__" || key === "constructor" || key === "prototype") continue;
+    target[key] = next[key];
+  }
+};
+
+/** Re-fetches a dashboard into the store, replacing the cached copy and its hash. */
+export const fetchLatestDashboard = async (store: any, dashboardId: any, folderId: any) => {
+  const apiResponse = await dashboardService.get_Dashboard(
+    store.state.selectedOrganization.identifier,
+    dashboardId,
+    folderId,
+  );
+  const data = await retrieveAndStoreDashboardData(store, dashboardId, folderId, apiResponse);
+  return {
+    data,
+    hash: apiResponse.data.hash.toString() as string,
+    updatedAt: updatedAtOf(apiResponse.data),
+  };
 };
 
 // Helper function to ensure variables structure exists with proper defaults
@@ -584,6 +723,7 @@ export const getDashboard = async (store: any, dashboardId: any, folderId: any) 
   let dashboardJson = store.state.organizationData.allDashboardData[dashboardId];
 
   if (!dashboardJson && dashboardId) {
+    clearUnresolvedDashboardConflict(dashboardId);
     const apiResponse = await dashboardService.get_Dashboard(
       store.state.selectedOrganization.identifier,
       dashboardId,
@@ -755,6 +895,10 @@ export const deleteDashboardById = async (store: any, dashboardId: any, folderId
   pruneDashboardQueryCache(store, folderId, [dashboardId]);
 
   await dropDashboardPanelCache(store.state.selectedOrganization.identifier, folderId, dashboardId);
+  deletePanelDraftsFor({
+    org: store.state.selectedOrganization.identifier,
+    dashboardId: String(dashboardId),
+  });
 
   const allDashboardData = store.state.organizationData.allDashboardData;
 
@@ -794,6 +938,7 @@ export const evictDashboardsFromCache = (store: any, idsByFolder: Map<string, st
     pruneDashboardQueryCache(store, folderId, ids);
     for (const id of ids) {
       void dropDashboardPanelCache(store.state.selectedOrganization.identifier, folderId, id);
+      deletePanelDraftsFor({ org: store.state.selectedOrganization.identifier, dashboardId: id });
     }
 
     const cached = next[folderId];
@@ -817,12 +962,7 @@ export const getPanel = async (
 ) => {
   const currentDashboard = await getDashboard(store, dashboardId, folderId);
 
-  // find tab from tabId
-  const tab = getTabDataFromTabId(currentDashboard, tabId);
-
-  const paneldata = tab?.panels?.find((it: any) => it?.id == panelId);
-
-  return paneldata;
+  return findPanelById(currentDashboard, panelId, tabId)?.panel;
 };
 
 export const getPanelId = () => {
@@ -849,33 +989,47 @@ export const deleteTab = async (
   moveToTabId?: any,
 ) => {
   const currentDashboard = await getDashboard(store, dashboardId, folderId);
+  const deleteTabData = getTabDataFromTabId(currentDashboard, deleteTabId);
+  if (!deleteTabData) return;
 
   if (moveToTabId) {
-    const deleteTabData = getTabDataFromTabId(currentDashboard, deleteTabId);
     // move panels to other tab
     const moveToTabData = getTabDataFromTabId(currentDashboard, moveToTabId);
+    if (!moveToTabData) return;
+    if (!moveToTabData.panels) moveToTabData.panels = [];
 
     let { maxI, maxY } = getMaxIAndMaxYFromTab(moveToTabData);
 
     // for each panel, need to recalculate layout object
-    deleteTabData.panels.forEach((panel: any) => {
+    (deleteTabData.panels ?? []).forEach((panel: any) => {
       maxY += 20;
       panel.layout.i = ++maxI;
       panel.layout.y = maxY;
     });
 
-    moveToTabData.panels.push(...deleteTabData.panels);
+    moveToTabData.panels.push(...(deleteTabData.panels ?? []));
   }
   // delete the tab
   currentDashboard.tabs = currentDashboard.tabs.filter((tab: any) => tab.tabId != deleteTabId);
 
-  return await updateDashboard(
+  const result = await updateDashboard(
     store,
     store.state.selectedOrganization.identifier,
     dashboardId,
     currentDashboard,
     folderId ?? "default",
   );
+  // Moved panels live on in the other tab, so only panels deleted with the tab lose their drafts.
+  if (!moveToTabId) {
+    (deleteTabData.panels ?? []).forEach((panel: any) =>
+      deletePanelDraftsFor({
+        org: store.state.selectedOrganization.identifier,
+        dashboardId: String(dashboardId),
+        panelId: String(panel.id),
+      }),
+    );
+  }
+  return result;
 };
 
 export const editTab = async (
@@ -887,6 +1041,7 @@ export const editTab = async (
 ) => {
   const currentDashboardData = await getDashboard(store, dashboardId, folderId);
   const tab = getTabDataFromTabId(currentDashboardData, tabId);
+  if (!tab) return;
 
   // only name will change
   tab.name = tabData.name;
@@ -938,7 +1093,8 @@ export const movePanelToAnotherTab = async (
   const moveToTabData = getTabDataFromTabId(currentDashboard, moveToTabId);
 
   // panel data
-  const panelData = currentTabData.panels.find((it: any) => it.id == panelId);
+  const panelData = currentTabData?.panels?.find((it: any) => it.id == panelId);
+  if (!moveToTabData || !panelData) return;
 
   // delete panel in currentTab
   currentTabData.panels = currentTabData.panels.filter((panel: any) => panel.id != panelId);

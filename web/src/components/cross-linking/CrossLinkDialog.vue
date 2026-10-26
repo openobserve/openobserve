@@ -56,7 +56,7 @@
             class="max-w-62.5"
             :data-test="`cross-link-field-chip-${idx}`"
           >
-            <span class="truncate text-xs" :title="field.name">{{ field.name }}</span>
+            <OTruncatedText class="text-xs">{{ field.name }}</OTruncatedText>
             <template #trailing>
               <button
                 type="button"
@@ -97,6 +97,7 @@
             data-test="cross-link-field-input"
           />
           <OButton
+            :aria-label="t('common.add')"
             variant="ghost"
             size="icon-sm"
             icon-left="add"
@@ -118,6 +119,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -141,6 +143,7 @@ export default defineComponent({
     OForm,
     OFormInput,
     OIcon,
+    OTruncatedText,
   },
   props: {
     modelValue: {

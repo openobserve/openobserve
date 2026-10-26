@@ -40,9 +40,52 @@ pub struct Model {
     pub updated_by: String,
     pub created_at: i64,
     pub updated_at: i64,
+    /// Hash of the app's exclusion rules `sql` was compiled with; `None` counts as changed.
+    #[serde(default)]
+    pub rules_hash: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn payload() -> serde_json::Value {
+        serde_json::json!({
+            "id": "f1",
+            "org_id": "acme",
+            "app": "web",
+            "name": "Signup",
+            "name_key": "signup",
+            "description": null,
+            "definition": {},
+            "sql": "SELECT 1",
+            "event_ids": [],
+            "version": 1,
+            "created_by": "a@x.io",
+            "updated_by": "a@x.io",
+            "created_at": 10,
+            "updated_at": 10
+        })
+    }
+
+    #[test]
+    fn p1_r6_a_payload_without_rules_hash_reads_as_none() {
+        let row: Model = serde_json::from_value(payload()).unwrap();
+        let back = serde_json::to_value(&row).unwrap();
+        assert_eq!(back.get("rules_hash"), Some(&serde_json::Value::Null));
+    }
+
+    #[test]
+    fn p1_r6_a_payload_with_rules_hash_keeps_it() {
+        let mut sent = payload();
+        sent["rules_hash"] = "0123456789abcdef".into();
+        let row: Model = serde_json::from_value(sent).unwrap();
+        let back = serde_json::to_value(&row).unwrap();
+        assert_eq!(back["rules_hash"], "0123456789abcdef");
+    }
+}

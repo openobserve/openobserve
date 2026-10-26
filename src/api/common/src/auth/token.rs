@@ -54,18 +54,30 @@ fn may_skip_permission_check(
     is_list_invite_call || is_reject_invite_call || is_member_subscription || is_org_list_call
 }
 
+/// Only the top-level org list filters by the caller's email; an org-scoped list does not.
+#[cfg(any(feature = "enterprise", test))]
+fn is_top_level_org_list(path_columns: &[&str], method: &str) -> bool {
+    matches!(path_columns, ["organizations"]) && method == "LIST"
+}
+
+/// A license path names no org, and like the other license writes it needs a `_meta` member.
+#[cfg(any(feature = "enterprise", test))]
+fn user_lookup_org<'a>(path_columns: &[&'a str]) -> &'a str {
+    if openobserve_core::auth::is_license_path_without_org(path_columns) {
+        config::META_ORG_ID
+    } else {
+        openobserve_core::auth::org_from_path(path_columns)
+    }
+}
+
 /// Foreign-`aud` MCP tokens pass only on /{org}/mcp or our own loopback calls.
 #[cfg(any(feature = "enterprise", test))]
 fn relaxes_audience_check(path_columns: &[&str], mcp_marker: Option<&[u8]>) -> bool {
     let is_mcp_endpoint = path_columns.len() == 2 && path_columns[1] == "mcp";
     is_mcp_endpoint
-        || mcp_marker
-            .is_some_and(|v| constant_time_eq(v, config::cluster::MCP_LOOPBACK_SECRET.as_bytes()))
-}
-
-#[cfg(any(feature = "enterprise", test))]
-fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
-    a.len() == b.len() && a.iter().zip(b).fold(0u8, |diff, (x, y)| diff | (x ^ y)) == 0
+        || mcp_marker.is_some_and(|v| {
+            config::utils::str::constant_time_eq(v, config::cluster::MCP_LOOPBACK_SECRET.as_bytes())
+        })
 }
 
 #[cfg(feature = "enterprise")]
@@ -73,19 +85,11 @@ pub async fn token_validator(
     req_data: &RequestData,
     auth_info: &AuthExtractor,
 ) -> Result<AuthValidationResult, AuthError> {
-    use openobserve_core::{auth::V2_API_PREFIX, authz::check_permissions};
+    use openobserve_core::{auth::routed_path, authz::check_permissions};
 
     let user;
     let keys = get_dex_jwks().await;
-    let path = match req_data
-        .uri
-        .path()
-        .strip_prefix(format!("{}/api/", config::get_config().common.base_uri).as_str())
-    {
-        Some(path) => path,
-        None => req_data.uri.path(),
-    };
-    let path = path.strip_prefix("/").unwrap_or(path);
+    let path = routed_path(req_data.uri.path());
     let path_columns = path.split('/').collect::<Vec<&str>>();
 
     let mcp_marker = req_data.headers.get("x-o2-mcp").map(|v| v.as_bytes());
@@ -166,14 +170,8 @@ pub async fn token_validator(
                     }
                 } else {
                     user = match path.find('/') {
-                        Some(index) => {
-                            let org_id =
-                                if path_columns.len() > 1 && path_columns[0].eq(V2_API_PREFIX) {
-                                    path_columns[1]
-                                } else {
-                                    &path[0..index]
-                                };
-                            users::get_user(Some(org_id), user_id).await
+                        Some(_) => {
+                            users::get_user(Some(user_lookup_org(&path_columns)), user_id).await
                         }
                         None => {
                             if path_columns.len() == 1 && path_columns[0] == "license" {
@@ -221,7 +219,7 @@ pub async fn token_validator(
                         is_list_invite_call,
                         is_reject_invite_call,
                         is_member_subscription,
-                        path_suffix.eq(&"organizations") && auth_info.method.eq("LIST"),
+                        is_top_level_org_list(&path_columns, &auth_info.method),
                     ) =>
                     {
                         // Allow these special cases without requiring user in DB
@@ -229,6 +227,8 @@ pub async fn token_validator(
                             user_email: res.0.user_email.clone(),
                             user_role: None,
                             is_internal_user: false,
+                            token_name: None,
+                            delegation: None,
                         })
                     }
                     Some(user) => {
@@ -249,6 +249,8 @@ pub async fn token_validator(
                                 user_email,
                                 user_role: Some(user_role),
                                 is_internal_user: !is_external,
+                                token_name: None,
+                                delegation: None,
                             })
                         } else {
                             Err(AuthError::Forbidden("Forbidden".to_string()))
@@ -334,6 +336,15 @@ mod tests {
     }
 
     #[test]
+    fn only_the_top_level_org_list_is_exempt() {
+        assert!(is_top_level_org_list(&["organizations"], "LIST"));
+        assert!(!is_top_level_org_list(&["_meta", "organizations"], "LIST"));
+        assert!(!is_top_level_org_list(&["acme", "organizations"], "LIST"));
+        assert!(!is_top_level_org_list(&["organizations"], "POST"));
+        assert!(!is_top_level_org_list(&["organizations"], "GET"));
+    }
+
+    #[test]
     fn mcp_endpoint_relaxes_audience_check() {
         assert!(relaxes_audience_check(&["default", "mcp"], None));
     }
@@ -358,6 +369,15 @@ mod tests {
                 Some(forged)
             ));
         }
+    }
+
+    #[test]
+    fn license_refresh_looks_the_user_up_in_meta() {
+        assert_eq!(user_lookup_org(&["license", "refresh"]), "_meta");
+        assert_eq!(user_lookup_org(&["acme", "license", "refresh"]), "acme");
+        assert_eq!(user_lookup_org(&["license", "refresh", ""]), "license");
+        assert_eq!(user_lookup_org(&["acme", "streams"]), "acme");
+        assert_eq!(user_lookup_org(&["v2", "acme", "downtimes"]), "acme");
     }
 
     #[test]

@@ -32,7 +32,7 @@ use bytes::Bytes;
 use config::{
     meta::{
         promql::{
-            MetricsBlockScan,
+            MetricsBlockScan, STALE_NAN_BITS,
             value::{EvalContext, Labels, Sample},
         },
         stream::FileKey,
@@ -282,6 +282,7 @@ pub(crate) struct BlockSeriesStream {
     decoder: Option<BlockDecoder>,
     local_stats: PartitionReadStats,
     stats: Arc<ReadStats>,
+    stale_markers: bool,
 }
 
 impl BlockSeriesStream {
@@ -312,6 +313,7 @@ impl BlockSeriesStream {
             decoder: None,
             local_stats: PartitionReadStats::default(),
             stats: partition.stats,
+            stale_markers: config::get_config().prom.staleness_markers_enabled,
         }
     }
 }
@@ -372,7 +374,9 @@ impl SeriesStream for BlockSeriesStream {
                         .copied()
                         .zip(block.value_bits.iter().copied())
                     {
-                        if timestamp >= self.window.0 && timestamp <= self.window.1 {
+                        // markers compacted while the flag was on stay invisible once it is off
+                        let dropped = !self.stale_markers && bits == STALE_NAN_BITS;
+                        if timestamp >= self.window.0 && timestamp <= self.window.1 && !dropped {
                             let timestamp =
                                 timestamp.checked_add(self.offset).ok_or_else(|| {
                                     DataFusionError::Execution(
@@ -758,7 +762,7 @@ async fn load_entry(
     sidecar: &str,
     cached: Option<Arc<CachedIndex>>,
 ) -> Result<Arc<CachedIndex>> {
-    Ok(metrics_index::fetch_parsed_index(
+    metrics_index::fetch_parsed_index(
         &file.account,
         sidecar,
         parent.metadata(),
@@ -766,7 +770,7 @@ async fn load_entry(
         labels,
         cached,
     )
-    .await?)
+    .await
 }
 
 pub(crate) fn query_window(eval: &EvalContext, offset: i64, lookback: i64) -> Option<(i64, i64)> {
@@ -1243,7 +1247,7 @@ mod tests {
         .unwrap()
     }
     fn file(rows: &[Row]) -> (FileKey, Vec<u8>) {
-        file_batch(batch(rows), vec!["group".into()])
+        file_batch(batch(rows))
     }
 
     #[tokio::test]
@@ -1284,7 +1288,7 @@ mod tests {
         );
     }
 
-    fn file_batch(batch: RecordBatch, label_columns: Vec<String>) -> (FileKey, Vec<u8>) {
+    fn file_batch(batch: RecordBatch) -> (FileKey, Vec<u8>) {
         let records = batch.num_rows();
         let timestamps = batch
             .column_by_name("_timestamp")
@@ -1303,16 +1307,11 @@ mod tests {
             rows: records as u64,
             compressed_size: 123,
         };
-        let mut writer = BlockWriter::new(
-            Vec::new(),
-            batch.schema(),
-            label_columns,
-            parent.metadata(),
-            2,
-        )
-        .unwrap();
+        let mut writer = BlockWriter::new(Vec::new(), batch.schema(), 2).unwrap();
         writer.write(&batch).unwrap();
-        let bytes = writer.finish().unwrap();
+        let bytes = writer
+            .finish_for_vortex(parent.metadata(), batch.schema())
+            .unwrap();
         let mut file = FileKey::new(
             0,
             String::new(),
@@ -1593,6 +1592,45 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn stale_markers_are_dropped_on_read_when_markers_are_off() {
+        let stale = config::meta::promql::STALE_NAN_BITS;
+        let data = file(&[
+            (1, 20, 1.0, Some("a")),
+            (1, 30, f64::from_bits(stale), Some("a")),
+        ]);
+        let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
+        let scan = fixture.scan([data.0]);
+        for stale_markers in [true, false] {
+            let prepared = prepare(
+                &scan,
+                &Matchers::empty(),
+                columns(),
+                &intervals(),
+                100,
+                20,
+                &eval(),
+            )
+            .await
+            .unwrap();
+            let mut actual = Vec::new();
+            for partition in prepared {
+                let mut stream = BlockSeriesStream::new(partition);
+                stream.stale_markers = stale_markers;
+                let mut samples = Vec::new();
+                while stream.advance().await.unwrap().is_some() {
+                    stream.consume(&mut samples).await.unwrap();
+                    actual.extend(samples.iter().map(|s| (s.timestamp, s.value.to_bits())));
+                }
+            }
+            let mut expected = vec![(120, 1f64.to_bits())];
+            if stale_markers {
+                expected.push((130, stale));
+            }
+            assert_eq!(actual, expected, "stale_markers: {stale_markers}");
+        }
+    }
+
+    #[tokio::test]
     async fn merge_orders_shared_hashes_and_exhausted_files() {
         let first = file(&[(1, 10, 1.0, Some("a")), (4, 10, 4.0, Some("d"))]);
         let second = file(&[(1, 20, 2.0, Some("a")), (2, 10, 3.0, Some("b"))]);
@@ -1757,11 +1795,7 @@ mod tests {
         bytes[index.blocks.block(1).block_offset as usize] ^= 1;
         key.selection = None;
         let fixture = Fixture::new(&[(key.clone(), bytes)], false).await;
-        let matchers = Matchers::new(vec![Matcher::new(
-            MatchOp::Re("first|last".parse().unwrap()),
-            "group",
-            "first|last",
-        )]);
+        let matchers = parsed_matchers(r#"m{group=~"first|last"}"#);
         let prepared = prepare(
             &fixture.scan([key]),
             &matchers,
@@ -1808,6 +1842,42 @@ mod tests {
         );
     }
 
+    #[test]
+    fn midx_regex_selection_preserves_parser_anchoring_and_normalization() {
+        let (_, bytes) = file(&[
+            (1, 10, 1.0, Some("first")),
+            (2, 10, 2.0, Some("last")),
+            (3, 10, 3.0, Some("first-extra")),
+            (4, 10, 4.0, Some("prefix-last")),
+            (5, 10, 5.0, Some("middle")),
+            (6, 10, 6.0, Some("bc{abc}")),
+            (7, 10, 7.0, Some("xbc{abc}")),
+            (8, 10, 8.0, Some("bc{abc}x")),
+        ]);
+        let index = metrics_index::block::decode_file(
+            &bytes,
+            &ParentMetadata {
+                rows: 8,
+                compressed_size: 123,
+            },
+            &["group".into()],
+        )
+        .unwrap();
+        for (pattern, operator, expected) in [
+            ("first|last", "=~", vec![0, 1]),
+            ("first|last", "!~", vec![2, 3, 4, 5, 6, 7]),
+            ("bc{abc}", "=~", vec![5]),
+            ("bc{abc}", "!~", vec![0, 1, 2, 3, 4, 6, 7]),
+        ] {
+            let query = format!(r#"m{{group{operator}"{pattern}"}}"#);
+            let matchers = parsed_matchers(&query);
+            assert_eq!(
+                metrics_index::matching_blocks(&index, &matchers).unwrap(),
+                expected
+            );
+        }
+    }
+
     #[tokio::test]
     async fn filtered_block_selection_reuses_one_decode_without_global_cache() {
         let data = file(&[
@@ -1847,8 +1917,8 @@ mod tests {
             Matcher::new(MatchOp::Equal, "path", "/api/bar"),
             Matcher::new(MatchOp::Equal, "path", ""),
             Matcher::new(MatchOp::NotEqual, "path", "/api/bar"),
-            Matcher::new(MatchOp::Re(".*".parse().unwrap()), "path", ".*"),
-            Matcher::new(MatchOp::NotRe("api.*".parse().unwrap()), "path", "api.*"),
+            parsed_matchers(r#"m{path=~".*"}"#).matchers.remove(0),
+            parsed_matchers(r#"m{path!~"api.*"}"#).matchers.remove(0),
         ] {
             let prepared = prepare(
                 &fixture.scan([data.0.clone()]),
@@ -1871,6 +1941,54 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn not_equal_empty_skips_null_label_series_in_a_mixed_file() {
+        let data = file(&[
+            (1, 10, 1.0, Some("default")),
+            (2, 10, 2.0, None),
+            (2, 20, 3.0, None),
+            (3, 10, 4.0, Some("traces")),
+        ]);
+        let index = metrics_index::block::decode_file(
+            &data.1,
+            &ParentMetadata {
+                rows: 4,
+                compressed_size: 123,
+            },
+            &["group".into()],
+        )
+        .unwrap();
+        let matchers = parsed_matchers(r#"m{group!=""}"#);
+        assert_eq!(
+            metrics_index::matching_blocks(&index, &matchers).unwrap(),
+            vec![0, 2]
+        );
+
+        let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
+        let prepared = prepare(
+            &fixture.scan([data.0.clone()]),
+            &matchers,
+            columns(),
+            &intervals(),
+            100,
+            20,
+            &eval(),
+        )
+        .await
+        .unwrap();
+        let mut values = Vec::new();
+        for partition in prepared {
+            let mut stream = BlockSeriesStream::new(partition);
+            while stream.advance().await.unwrap().is_some() {
+                let mut samples = Vec::new();
+                stream.consume(&mut samples).await.unwrap();
+                values.extend(samples.iter().map(|sample| sample.value));
+            }
+        }
+        values.sort_by(f64::total_cmp);
+        assert_eq!(values, [1.0, 4.0]);
+    }
+
+    #[tokio::test]
     async fn new_label_selects_only_new_schema_file() {
         let old = file(&[(1, 10, 1.0, Some("old"))]);
         let source = batch(&[(2, 10, 3.0, Some("new")), (2, 20, 4.0, Some("new"))]);
@@ -1878,10 +1996,7 @@ mod tests {
         fields.push(Arc::new(Field::new("env", DataType::Utf8, true)));
         let mut arrays = source.columns().to_vec();
         arrays.push(Arc::new(StringArray::from(vec!["prod", "prod"])));
-        let new = file_batch(
-            RecordBatch::try_new(Arc::new(Schema::new(fields)), arrays).unwrap(),
-            vec!["group".into(), "env".into()],
-        );
+        let new = file_batch(RecordBatch::try_new(Arc::new(Schema::new(fields)), arrays).unwrap());
         let fixture = Fixture::new(&[old.clone(), new.clone()], false).await;
         let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "env", "prod")]);
         let prepared = prepare(
@@ -2080,6 +2195,12 @@ mod tests {
             "stddev_over_time",
             "stdvar_over_time",
             "sum_over_time",
+            "first_over_time",
+            "mad_over_time",
+            "ts_of_first_over_time",
+            "ts_of_last_over_time",
+            "ts_of_max_over_time",
+            "ts_of_min_over_time",
         ] {
             let mut outputs = Vec::new();
             for (ctx, source) in &contexts {
@@ -2280,101 +2401,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn legacy_new_mixed_and_disabled_sources_preserve_same_series_fragments() {
-        use datafusion::arrow::{array::UInt32Array, ipc::writer::FileWriter};
-        let rows = [
-            (1, 10, 1.0, Some("x")),
-            (1, 20, -0.0, Some("x")),
-            (1, 30, 3.0, Some("x")),
-            (1, 40, 4.0, Some("x")),
-        ];
-        let legacy_schema = Arc::new(Schema::new(vec![
-            Field::new("__oo_midx_row_count", DataType::UInt32, false),
-            Field::new("group", DataType::Utf8, true),
-        ]));
-        let legacy_batch = RecordBatch::try_new(
-            Arc::clone(&legacy_schema),
-            vec![
-                Arc::new(UInt32Array::from(vec![2])),
-                Arc::new(StringArray::from(vec!["x"])),
-            ],
-        )
-        .unwrap();
-        let mut legacy = Vec::new();
-        let mut writer = FileWriter::try_new(&mut legacy, &legacy_schema).unwrap();
-        writer.write(&legacy_batch).unwrap();
-        writer.finish().unwrap();
-        for legacy_count in [0, 1, 2] {
-            for enabled in [false, true] {
-                let mut files = vec![file(&rows[..2]), file(&rows[2..])];
-                for source in files.iter_mut().take(legacy_count) {
-                    source.1 = legacy.clone();
-                }
-                let fixture = Fixture::new(&files, false).await;
-                let source = if enabled {
-                    ScanSource::Blocks(Arc::new(fixture.scan(files.iter().map(|v| v.0.clone()))))
-                } else {
-                    ScanSource::HashSorted
-                };
-                let ctx =
-                    SessionContext::new_with_config(SessionConfig::new().with_target_partitions(2));
-                let table = MemTable::try_new(schema(), vec![vec![batch(&rows)]])
-                    .unwrap()
-                    .with_sort_order(vec![vec![
-                        col("__hash__").sort(true, false),
-                        col("_timestamp").sort(true, false),
-                    ]]);
-                ctx.register_table("m", Arc::new(table)).unwrap();
-                let matchers = Matchers::empty();
-                let selector = StreamingSelector {
-                    table_name: "m",
-                    matchers: &matchers,
-                    offset: 0,
-                };
-                let result = execute_partitioned(
-                    &ctx,
-                    &source,
-                    &selector,
-                    LabelColumns::grouped(vec!["group".into()]),
-                    20,
-                    &EvalContext::new(10, 40, 10, "compatibility".into()),
-                )
-                .await;
-                if enabled && legacy_count > 0 {
-                    assert!(result.is_err());
-                    assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
-                    continue;
-                }
-                let sources = result.unwrap();
-                let mut actual = Vec::new();
-                for source in sources {
-                    let mut source = source.await.unwrap();
-                    assert_eq!(
-                        matches!(&source, SeriesSource::Block(_)),
-                        enabled && legacy_count == 0
-                    );
-                    while source.advance().await.unwrap().is_some() {
-                        let mut samples = Vec::new();
-                        source.consume(&mut samples).await.unwrap();
-                        actual.extend(samples.iter().map(|s| (s.timestamp, s.value.to_bits())));
-                    }
-                }
-                actual.sort_unstable();
-                assert_eq!(
-                    actual,
-                    rows.iter()
-                        .map(|r| (r.1, r.2.to_bits()))
-                        .collect::<Vec<_>>()
-                );
-                assert_eq!(
-                    fixture.calls.load(Ordering::SeqCst) > 0,
-                    enabled && legacy_count == 0
-                );
-            }
-        }
-    }
-
-    #[tokio::test]
     async fn schema_evolution_distinguishes_absent_null_and_empty_labels() {
         let original = batch(&[(1, 10, 1.0, None), (1, 20, 2.0, None)]);
         let absent = RecordBatch::try_new(
@@ -2382,7 +2408,7 @@ mod tests {
             original.columns()[..3].to_vec(),
         )
         .unwrap();
-        let absent = file_batch(absent, vec![]);
+        let absent = file_batch(absent);
         let null = file(&[(1, 30, 3.0, None), (1, 40, 4.0, None)]);
         let empty = file(&[(1, 30, 3.0, Some("")), (1, 40, 4.0, Some(""))]);
         let fixture = Fixture::new(&[absent.clone(), null.clone(), empty.clone()], false).await;
@@ -2600,7 +2626,7 @@ mod tests {
         assert!(cached.is_none());
         assert!(!complete);
         let partial = Arc::new(CachedIndex {
-            index: Arc::new(entry.index.project(&[]).unwrap().for_cache()),
+            index: Arc::new(entry.index.project(&[]).unwrap()),
             binding: entry.binding.clone(),
         });
         cache.insert(key.clone(), partial, weight.total).unwrap();
@@ -2631,7 +2657,7 @@ mod tests {
         let cache = Mutex::new(cache);
         let (key, entry, weight) = cache_entry();
         let partial = Arc::new(CachedIndex {
-            index: Arc::new(entry.index.project(&[]).unwrap().for_cache()),
+            index: Arc::new(entry.index.project(&[]).unwrap()),
             binding: entry.binding.clone(),
         });
         let lookup = {
@@ -2963,5 +2989,14 @@ mod tests {
         cache.trim(0);
         assert!(cache.get(&key).is_none());
         assert_eq!(cache.bytes, 0);
+    }
+
+    fn parsed_matchers(query: &str) -> Matchers {
+        let promql_parser::parser::Expr::VectorSelector(selector) =
+            promql_parser::parser::parse(query).unwrap()
+        else {
+            panic!("expected vector selector");
+        };
+        selector.matchers
     }
 }

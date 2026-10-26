@@ -20,14 +20,14 @@
 //! Streams are split into four typed columns.
 
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, QueryFilter, Schema, Set,
+    ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, QueryFilter, Set,
     entity::prelude::*, sea_query::Expr,
 };
 use serde::{Deserialize, Serialize};
 use svix_ksuid::KsuidLike;
 
 use crate::{
-    db::{get_orm_client_ddl, get_orm_client_ro, get_orm_client_rw},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
 };
 
@@ -135,6 +135,10 @@ pub struct PutOutcome {
     pub orphans: Vec<serde_json::Value>,
     /// True iff a data column changed, a row inserted, or an orphan deleted; not last_seen alone.
     pub changed: bool,
+    /// The row as stored after this put, so callers can cache it without re-reading.
+    pub stored: ServiceRecord,
+    /// The stored row's previous `disambiguation` when the upgrade branch rewrote it.
+    pub replaced_disambiguation: Option<serde_json::Value>,
 }
 
 impl ServiceRecord {
@@ -159,24 +163,6 @@ impl ServiceRecord {
             last_seen: 0,
         }
     }
-}
-
-pub async fn create_table() -> Result<(), errors::Error> {
-    let client = get_orm_client_ddl().await;
-    let builder = client.get_database_backend();
-
-    let schema = Schema::new(builder);
-    let create_table_stmt = schema
-        .create_table_from_entity(Entity)
-        .if_not_exists()
-        .take();
-
-    client
-        .execute(builder.build(&create_table_stmt))
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-
-    Ok(())
 }
 
 /// Upsert a service record.
@@ -278,7 +264,7 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
         }
         active.last_seen = Set(record.last_seen);
 
-        active
+        let updated = active
             .update(client)
             .await
             .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
@@ -296,7 +282,12 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
         )
         .await?;
         let changed = dirty || !orphans.is_empty();
-        Ok(PutOutcome { orphans, changed })
+        Ok(PutOutcome {
+            orphans,
+            changed,
+            stored: model_to_record(updated),
+            replaced_disambiguation: None,
+        })
     } else {
         // No exact match. Check if an existing row can be upgraded:
         // A row is upgradeable if its disambiguation is a subset of the incoming one
@@ -338,6 +329,7 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
 
         if let Some(existing_model) = upgradeable {
             let kept_id = existing_model.id.clone();
+            let previous_disambiguation = existing_model.disambiguation.clone();
             let logs = union_stream_array(
                 &existing_model.logs_streams,
                 &record.logs_streams,
@@ -399,7 +391,7 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
             }
             active.last_seen = Set(record.last_seen);
 
-            active
+            let updated = active
                 .update(client)
                 .await
                 .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
@@ -415,20 +407,28 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
             )
             .await?;
             let changed = dirty || !orphans.is_empty();
-            Ok(PutOutcome { orphans, changed })
+            let replaced_disambiguation = (updated.disambiguation != previous_disambiguation)
+                .then_some(previous_disambiguation);
+            Ok(PutOutcome {
+                orphans,
+                changed,
+                stored: model_to_record(updated),
+                replaced_disambiguation,
+            })
         } else {
+            record.org_id = org_id.to_owned();
             let active_model = ActiveModel {
-                id: Set(record.id),
-                org_id: Set(org_id.to_owned()),
+                id: Set(record.id.clone()),
+                org_id: Set(record.org_id.clone()),
                 service_name: Set(record.service_name.clone()),
-                set_id: Set(record.set_id),
-                disambiguation: Set(record.disambiguation),
-                all_dimensions: Set(record.all_dimensions),
-                logs_streams: Set(record.logs_streams),
-                traces_streams: Set(record.traces_streams),
-                metrics_streams: Set(record.metrics_streams),
-                profiles_streams: Set(record.profiles_streams),
-                field_name_mapping: Set(record.field_name_mapping),
+                set_id: Set(record.set_id.clone()),
+                disambiguation: Set(record.disambiguation.clone()),
+                all_dimensions: Set(record.all_dimensions.clone()),
+                logs_streams: Set(record.logs_streams.clone()),
+                traces_streams: Set(record.traces_streams.clone()),
+                metrics_streams: Set(record.metrics_streams.clone()),
+                profiles_streams: Set(record.profiles_streams.clone()),
+                field_name_mapping: Set(record.field_name_mapping.clone()),
                 last_seen: Set(record.last_seen),
             };
 
@@ -441,6 +441,8 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
             Ok(PutOutcome {
                 orphans: Vec::new(),
                 changed: true,
+                stored: record,
+                replaced_disambiguation: None,
             })
         }
     }
@@ -1876,5 +1878,131 @@ mod tests {
             outcome.changed,
             "a row was deleted, so caches must evict its key even though the kept row was a no-op"
         );
+    }
+
+    async fn fresh_read(db: &sea_orm::DatabaseConnection, id: &str) -> serde_json::Value {
+        let model = Entity::find_by_id(id).one(db).await.unwrap().unwrap();
+        serde_json::to_value(model_to_record(model)).unwrap()
+    }
+
+    #[tokio::test]
+    async fn exact_match_returns_the_stored_row_and_keeps_its_key() {
+        let db = db().await;
+        let first = service_record(serde_json::json!({"k8s-cluster": "prod"}), 1_000);
+        let id = first.id.clone();
+        let _ = put_with(&db, "org1", first, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        let mut repeat = service_record(serde_json::json!({"k8s-cluster": "prod"}), 2_000);
+        repeat.logs_streams = serde_json::json!(["checkout-service-logs-v2"]);
+        let outcome = put_with(&db, "org1", repeat, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        assert_eq!(outcome.stored.id, id);
+        assert_eq!(
+            serde_json::to_value(&outcome.stored).unwrap(),
+            fresh_read(&db, &id).await
+        );
+        assert_eq!(
+            outcome.stored.logs_streams,
+            serde_json::json!(["checkout-service-logs", "checkout-service-logs-v2"])
+        );
+        assert_eq!(outcome.replaced_disambiguation, None);
+    }
+
+    #[tokio::test]
+    async fn upgrade_to_richer_incoming_returns_the_stored_row_and_the_replaced_key() {
+        let db = db().await;
+        let sparse = service_record(serde_json::json!({"k8s-cluster": "prod"}), 1_000);
+        let id = sparse.id.clone();
+        let _ = put_with(&db, "org1", sparse, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        let mut richer = service_record(
+            serde_json::json!({"k8s-namespace": "ecommerce", "k8s-cluster": "prod"}),
+            2_000,
+        );
+        richer.logs_streams = serde_json::json!([]);
+        let outcome = put_with(&db, "org1", richer, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        assert_eq!(outcome.stored.id, id);
+        assert_eq!(
+            serde_json::to_value(&outcome.stored).unwrap(),
+            fresh_read(&db, &id).await
+        );
+        assert_eq!(
+            outcome.stored.disambiguation,
+            serde_json::json!({"k8s-cluster": "prod", "k8s-namespace": "ecommerce"})
+        );
+        assert_eq!(
+            outcome.stored.logs_streams,
+            serde_json::json!(["checkout-service-logs"]),
+            "the returned row must carry the merged streams, not the incoming partial ones"
+        );
+        assert_eq!(
+            outcome.replaced_disambiguation,
+            Some(serde_json::json!({"k8s-cluster": "prod"}))
+        );
+    }
+
+    #[tokio::test]
+    async fn subset_incoming_returns_the_richer_stored_row_and_no_replaced_key() {
+        let db = db().await;
+        let richer = service_record(
+            serde_json::json!({"k8s-cluster": "prod", "k8s-namespace": "ecommerce"}),
+            1_000,
+        );
+        let id = richer.id.clone();
+        let _ = put_with(&db, "org1", richer, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        let mut subset = service_record(serde_json::json!({"k8s-cluster": "prod"}), 2_000);
+        subset.logs_streams = serde_json::json!([]);
+        subset.traces_streams = serde_json::json!(["checkout-service-traces-v2"]);
+        let outcome = put_with(&db, "org1", subset, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        assert_eq!(outcome.stored.id, id);
+        assert_eq!(
+            serde_json::to_value(&outcome.stored).unwrap(),
+            fresh_read(&db, &id).await
+        );
+        assert_eq!(
+            outcome.stored.disambiguation,
+            serde_json::json!({"k8s-cluster": "prod", "k8s-namespace": "ecommerce"})
+        );
+        assert_eq!(
+            outcome.stored.logs_streams,
+            serde_json::json!(["checkout-service-logs"])
+        );
+        assert_eq!(outcome.replaced_disambiguation, None);
+    }
+
+    #[tokio::test]
+    async fn insert_returns_the_inserted_row_and_no_replaced_key() {
+        let db = db().await;
+        let record = service_record(
+            serde_json::json!({"k8s-namespace": "ecommerce", "k8s-cluster": "prod"}),
+            1_000,
+        );
+        let id = record.id.clone();
+
+        let outcome = put_with(&db, "org1", record, DEFAULT_MAX_STREAMS_PER_TYPE)
+            .await
+            .unwrap();
+
+        assert_eq!(outcome.stored.id, id);
+        assert_eq!(
+            serde_json::to_value(&outcome.stored).unwrap(),
+            fresh_read(&db, &id).await
+        );
+        assert_eq!(outcome.replaced_disambiguation, None);
     }
 }

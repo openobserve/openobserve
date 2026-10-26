@@ -13,7 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{
+    hash::{DefaultHasher, Hash, Hasher},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+};
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -213,6 +219,39 @@ pub trait Db: Sync + Send + 'static {
         }
     }
 
+    /// The value with a revision for `put_if_revision`, or `None` when `key` is missing.
+    async fn get_with_revision(&self, key: &str) -> Result<Option<(Bytes, u64)>> {
+        Ok(self.get_if_exists(key).await?.map(|value| {
+            let revision = value_revision(&value);
+            (value, revision)
+        }))
+    }
+
+    /// Writes `value` only while `key` still holds `revision` (`None`: only while missing).
+    async fn put_if_revision(
+        &self,
+        key: &str,
+        value: Bytes,
+        revision: Option<u64>,
+    ) -> Result<bool> {
+        let applied = Arc::new(AtomicBool::new(false));
+        let written = applied.clone();
+        self.get_for_update(
+            key,
+            false,
+            None,
+            Box::new(move |current| {
+                if current.as_deref().map(value_revision) != revision {
+                    return Ok(None);
+                }
+                written.store(true, Ordering::Release);
+                Ok(Some((Some(value), None)))
+            }),
+        )
+        .await?;
+        Ok(applied.load(Ordering::Acquire))
+    }
+
     async fn put(
         &self,
         key: &str,
@@ -291,6 +330,17 @@ pub fn parse_key(mut key: &str) -> (String, String, String) {
     (module, key1, key2)
 }
 
+pub fn escape_like_prefix(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        if matches!(c, '\\' | '%' | '_') {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out
+}
+
 pub fn build_key(module: &str, key1: &str, key2: &str, start_dt: i64) -> String {
     if key1.is_empty() {
         format!("/{module}/")
@@ -301,6 +351,12 @@ pub fn build_key(module: &str, key1: &str, key2: &str, start_dt: i64) -> String 
     } else {
         format!("/{module}/{key1}/{key2}/{start_dt}")
     }
+}
+
+fn value_revision(value: &[u8]) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    value.hash(&mut hasher);
+    hasher.finish()
 }
 
 #[derive(Debug, Default)]
@@ -360,6 +416,12 @@ impl<'a> IndexStatement<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_escape_like_prefix_escapes_wildcards() {
+        assert_eq!(escape_like_prefix("a_b%c\\d"), "a\\_b\\%c\\\\d");
+        assert_eq!(escape_like_prefix("acme-prod"), "acme-prod");
+    }
 
     #[test]
     fn test_parse_key_three_parts() {

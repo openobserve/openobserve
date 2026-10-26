@@ -14,6 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed } from "vue";
+import { generateLabelFromName } from "@/utils/dashboard/fieldLabel";
+import { STATE_TIMELINE_Y_FUNCTION } from "@/utils/dashboard/defaultFields";
 
 const colors = [
   "#5960b2",
@@ -41,15 +43,6 @@ export const usePanelFields = ({
 }) => {
   const promqlMode = computed(() => dashboardPanelData.data.queryType == "promql");
 
-  const generateLabelFromName = (name: string) => {
-    return name
-      .replace(/[_\-\s.]/g, " ")
-      .split(" ")
-      .map((string) => string.charAt(0).toUpperCase() + string.slice(1))
-      .filter((it) => it)
-      .join(" ");
-  };
-
   const isPivotMode = computed(() => {
     if (dashboardPanelData.data.type !== "table") return false;
     const currentQuery =
@@ -67,6 +60,7 @@ export const usePanelFields = ({
       case "donut":
       case "heatmap":
       case "gauge":
+      case "state-timeline":
       case "area":
       case "bar":
       case "h-bar":
@@ -104,6 +98,7 @@ export const usePanelFields = ({
       case "area-stacked":
       case "stacked":
       case "h-stacked":
+      case "state-timeline":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
             .breakdown?.length >= 1
@@ -135,6 +130,7 @@ export const usePanelFields = ({
         );
       case "area-stacked":
       case "heatmap":
+      case "state-timeline":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y
             .length >= 1
@@ -187,10 +183,7 @@ export const usePanelFields = ({
     const isDerived = checkIsDerivedField(row.name) ?? false;
 
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.push({
-      label: !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-        .customQuery
-        ? generateLabelFromName(row.name)
-        : row.name,
+      label: "",
       alias:
         !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery &&
         !isDerived
@@ -263,10 +256,7 @@ export const usePanelFields = ({
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields.breakdown.push({
-      label: !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-        .customQuery
-        ? generateLabelFromName(row.name)
-        : row.name,
+      label: "",
       alias:
         !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery &&
         !isDerived
@@ -328,10 +318,7 @@ export const usePanelFields = ({
     const isDerived = checkIsDerivedField(row.name) ?? false;
 
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.push({
-      label: !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-        .customQuery
-        ? generateLabelFromName(row.name)
-        : row.name,
+      label: "",
       alias:
         !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery &&
         !isDerived
@@ -343,7 +330,12 @@ export const usePanelFields = ({
       // column: row.name,
       color: getNewColorValue(),
       type: "build",
-      functionName: dashboardPanelData.data.type == "heatmap" || isDerived ? null : "count",
+      functionName:
+        dashboardPanelData.data.type == "heatmap" || isDerived
+          ? null
+          : dashboardPanelData.data.type == "state-timeline"
+            ? STATE_TIMELINE_Y_FUNCTION
+            : "count",
       args: [
         {
           type: "field",
@@ -376,10 +368,7 @@ export const usePanelFields = ({
     const isDerived = checkIsDerivedField(row.name) ?? false;
 
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z.push({
-      label: !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-        .customQuery
-        ? generateLabelFromName(row.name)
-        : row.name,
+      label: "",
       alias:
         !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery &&
         !isDerived

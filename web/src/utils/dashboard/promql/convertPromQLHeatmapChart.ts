@@ -13,24 +13,94 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { PromQLChartConverter, ProcessedPromQLData, TOOLTIP_SCROLL_STYLE } from "./shared/types";
+import {
+  ConversionContext,
+  PromQLChartConverter,
+  ProcessedPromQLData,
+  TOOLTIP_SCROLL_STYLE,
+} from "./shared/types";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
 import { chartColor } from "@/utils/chartTheme";
 import { escapeHtml } from "@/utils/html";
-import { deaccumulateHistogramSeries, HistogramSeriesInput } from "./shared/histogramBuckets";
 import {
+  deaccumulateHistogramSeries,
+  groupHistogramSeries,
+  HistogramSeriesOutput,
+  PROMETHEUS_HISTOGRAM_MODE,
+} from "./shared/histogramBuckets";
+import { formatTimestamps } from "./shared/dataProcessor";
+import { formatDate } from "../dateTimeUtils";
+import {
+  HEATMAP_MAX_CELLS,
   HEATMAP_SPLIT_AREA,
-  HEATMAP_VISUAL_MAP_COLORS,
+  addHeatmapWarning,
+  cutHeatmapToBudget,
+  cutHistogramsToBudget,
+  heatmapBudgetWarning,
   heatmapCellItemStyle,
+  heatmapColorRange,
+  heatmapColorScale,
   heatmapLargeGridDefaults,
   heatmapValueLabel,
+  histogramBudgetWarnings,
+  visualMapRangeOf,
 } from "../heatmapDefaults";
+import { sortHeatmapCategories } from "../heatmapYAxis";
+import {
+  applyHeatmapTimePointer,
+  heatmapZoomToolbox,
+  promqlHeatmapTimeAxis,
+} from "../heatmapTimeAxis";
+import type { HeatmapExemplarGroup, HeatmapExemplarLayout } from "../exemplars/heatmapExemplars";
+import { gt } from "@/types/i18n";
+import { addCommasToNumber } from "@/utils/formatters";
 
-/**
- * Opt-in heatmap mode that treats the queried series as the cumulative buckets
- * of a Prometheus classic histogram (`sum by(le) (rate(x_bucket[W]))`).
- */
-export const PROMETHEUS_HISTOGRAM_MODE = "prometheus_histogram";
+export { PROMETHEUS_HISTOGRAM_MODE };
+
+const STACK_TITLE_PX = 20;
+
+const STACK_BOTTOM_PX = 60;
+
+const STACK_GAP_PX = 6;
+
+const STACK_X_LABEL_PX = 24;
+
+const STACK_MIN_GRID_PX = 30;
+
+const UNMEASURED_PANEL_PX = 400;
+
+interface PromQLTimeGrid {
+  startSec: number;
+  endSec: number;
+  stepSec: number;
+}
+
+interface HeatmapGrid {
+  data: any[];
+  rows: number[];
+  timeAxis: Array<[any, any]>;
+  min: number;
+  max: number;
+}
+
+interface HeatmapCells {
+  data: any[];
+  min: number;
+  max: number;
+}
+
+interface HistogramGroupBuckets {
+  label: string;
+  source: Omit<HeatmapExemplarGroup, "bounds"> | null;
+  buckets: HistogramSeriesOutput[];
+}
+
+interface HistogramGrid {
+  label: string;
+  bucketLabels: string[];
+  bucketValues: string[];
+  data: any[];
+}
 
 /**
  * The X axis for a heatmap: every timestamp any query reported, ascending.
@@ -40,7 +110,11 @@ export const PROMETHEUS_HISTOGRAM_MODE = "prometheus_histogram";
  * different grids, later samples get looked up against query 0's timestamps and
  * read as 0. The union degrades to the truth instead of to blankness.
  */
-function buildTimeAxis(processedData: ProcessedPromQLData[]): Array<[any, any]> {
+function buildTimeAxis(
+  processedData: ProcessedPromQLData[],
+  grid?: PromQLTimeGrid | null,
+  timezone?: string,
+): Array<[any, any]> {
   const byTs = new Map<string, [any, any]>();
 
   for (const queryData of processedData ?? []) {
@@ -52,51 +126,442 @@ function buildTimeAxis(processedData: ProcessedPromQLData[]): Array<[any, any]> 
     }
   }
 
+  if (grid && byTs.size > 0) {
+    const missing = new Set<number>();
+    for (const ts of gridTimestamps(Number(byTs.keys().next().value), grid)) {
+      if (!byTs.has(String(ts))) missing.add(ts);
+    }
+    for (const entry of formatTimestamps(missing, timezone ?? "UTC")) {
+      byTs.set(String(entry[0]), entry);
+    }
+  }
+
   return [...byTs.values()].sort((a, b) => Number(a[0]) - Number(b[0]));
 }
 
-/**
- * The `visualMap` range for a set of cell values.
- *
- * Zero is the floor whenever the data is non-negative — which is the ordinary
- * case, and the only case for a de-accumulated histogram, whose cells are counts
- * clamped at zero. But a heatmap of a metric that is negative throughout (a
- * delta, a `deriv()`, a temperature) has a max below zero, and a hardcoded floor
- * of 0 handed ECharts the inverted range [0, negative]: every cell came out the
- * same colour. Both paths ask this one question so neither can answer it wrongly
- * on its own.
- */
-function visualMapRangeOf(minValue: number, maxValue: number): { min: number; max: number } {
+/** Every evaluation instant of `grid` on the step lattice through `anchor`, capped to the cell budget's column count. */
+function gridTimestamps(anchor: number, grid: PromQLTimeGrid): number[] {
+  const { startSec, endSec, stepSec } = grid;
+  let first = anchor - Math.floor((anchor - startSec) / stepSec) * stepSec;
+  const last = anchor + Math.floor((endSec - anchor) / stepSec) * stepSec;
+  if ((last - first) / stepSec + 1 > HEATMAP_MAX_CELLS) {
+    first = last - (HEATMAP_MAX_CELLS - 1) * stepSec;
+  }
+  const timestamps: number[] = [];
+  for (let ts = first; ts <= last; ts += stepSec) timestamps.push(ts);
+  return timestamps;
+}
+
+function timeGridOf(context?: ConversionContext): PromQLTimeGrid | null {
+  const startSec = Number(context?.metadata?.queries?.[0]?.startTime) / 1_000_000;
+  const endSec = Number(context?.metadata?.queries?.[0]?.endTime) / 1_000_000;
+  const stepSec = Number(context?.stepSeconds);
+  if (!(stepSec > 0) || !Number.isFinite(startSec) || !Number.isFinite(endSec)) return null;
+  return endSec >= startSec ? { startSec, endSec, stepSec } : null;
+}
+
+/** The summed magnitude of a series' samples, which ranks its row for the cell budget so strongly negative rows count as strong. */
+function sampleMagnitude(data: Record<string, unknown>): number {
+  let total = 0;
+  for (const raw of Object.values(data ?? {})) {
+    const value = sampleValue(raw);
+    if (value !== "-") total += Math.abs(value);
+  }
+  return total;
+}
+
+/** A sample as a cell value; a missing or non-numeric sample is an empty cell, never 0. */
+function sampleValue(raw: unknown): number | "-" {
+  if (raw === null || raw === undefined || raw === "") return "-";
+  const value = typeof raw === "number" ? raw : parseFloat(String(raw));
+  return Number.isFinite(value) ? value : "-";
+}
+
+/** The cells of a `rowCount` x `timeAxis` grid, cut to the cell budget before any cell is allocated. */
+function buildHeatmapGrid(
+  rowTotals: number[],
+  timeAxis: Array<[any, any]>,
+  valueAt: (row: number, ts: any) => number | "-",
+  extras: any,
+): HeatmapGrid {
+  const cut = cutHeatmapToBudget(timeAxis.length, rowTotals);
+  if (cut) addHeatmapWarning(extras, heatmapBudgetWarning(cut, timeAxis.length, rowTotals.length));
+  const rows = cut ? cut.rows : rowTotals.map((_total, row) => row);
+  const keptAxis = cut ? timeAxis.slice(cut.firstColumn) : timeAxis;
+  return { ...fillHeatmapCells(rows, keptAxis, valueAt), rows, timeAxis: keptAxis };
+}
+
+function fillHeatmapCells(
+  rows: number[],
+  timeAxis: Array<[any, any]>,
+  valueAt: (row: number, ts: any) => number | "-",
+): HeatmapCells {
+  const data: any[] = [];
+  let min = Infinity;
+  let max = -Infinity;
+  rows.forEach((row, rowIndex) => {
+    timeAxis.forEach(([ts], timeIndex) => {
+      const value = valueAt(row, ts);
+      data.push([timeIndex, rowIndex, value]);
+      if (value === "-") return;
+      if (value > max) max = value;
+      if (value < min) min = value;
+    });
+  });
+  return { data, min, max };
+}
+
+/** Each query's histograms, split by their non-`le` labels and de-accumulated on their own, in query order; titles name the query once there are several. */
+function histogramGroupsOf(processedData: ProcessedPromQLData[]): HistogramGroupBuckets[] {
+  return processedData.flatMap((queryData, queryPosition) =>
+    groupHistogramSeries(queryData.series ?? []).map((group) => ({
+      label: [
+        [
+          processedData.length > 1
+            ? gt("common.queryNumber", { index: (queryData.queryIndex ?? queryPosition) + 1 })
+            : "",
+          group.label,
+        ]
+          .filter(Boolean)
+          .join(", "),
+        queryData.nameSuffix ? `(${queryData.nameSuffix})` : "",
+      ]
+        .filter(Boolean)
+        .join(" "),
+      source:
+        queryData.seriesRole === "shifted"
+          ? null
+          : { queryIndex: queryData.queryIndex ?? queryPosition, labels: group.labels },
+      buckets: deaccumulateHistogramSeries(
+        group.series.map((seriesData) => ({
+          le: extractLeLabel(seriesData),
+          data: seriesData.data ?? {},
+        })),
+      ),
+    })),
+  );
+}
+
+/** The sum of every bucket of a histogram, which ranks it against the others for the cell budget. */
+function histogramTotal(group: HistogramGroupBuckets): number {
+  let total = 0;
+  for (const bucket of group.buckets) {
+    for (const value of Object.values(bucket.data)) total += value;
+  }
+  return total;
+}
+
+/** Y-axis labels for a histogram's buckets in ascending `le` order, widened until unique as ECharts category axes require. */
+function uniqueBucketLabels(buckets: HistogramSeriesOutput[], config: any): string[] {
+  const usedLabels = new Set<string>();
+  return buckets.map((bucket) => {
+    const base = formatBucketLabel(bucket.le, bucket.leValue, config);
+    let label = base;
+    if (usedLabels.has(label)) label = `${base} (${bucket.le})`;
+    for (let n = 2; usedLabels.has(label); n++) {
+      label = `${base} (${bucket.le}) #${n}`;
+    }
+    usedLabels.add(label);
+    return label;
+  });
+}
+
+/** How many stacked histogram grids fit a `heightPx` panel with every grid at least STACK_MIN_GRID_PX tall. */
+function maxStackedGrids(heightPx: number): number {
+  const usable = heightPx - STACK_BOTTOM_PX - STACK_X_LABEL_PX;
+  return Math.max(1, Math.floor(usable / (STACK_TITLE_PX + STACK_MIN_GRID_PX + STACK_GAP_PX)));
+}
+
+function stackedGridLayout(
+  count: number,
+  heightPx: number,
+): Array<{ titleTop: number; gridTop: number; height: number }> {
+  const pct = (px: number) => (px / heightPx) * 100;
+  const slot = (heightPx - STACK_BOTTOM_PX - STACK_X_LABEL_PX) / count;
+  const gridPx = Math.max(slot - STACK_TITLE_PX - STACK_GAP_PX, STACK_MIN_GRID_PX);
+  // Only the bottom grid shows time labels, and containLabel takes their height out of its own.
+  return Array.from({ length: count }, (_unused, index) => ({
+    titleTop: pct(index * slot),
+    gridTop: pct(index * slot + STACK_TITLE_PX),
+    height: pct(gridPx + (index === count - 1 ? STACK_X_LABEL_PX : 0)),
+  }));
+}
+
+/** The groups (indices, in order) a panel can stack: the busiest ones that fit its height. */
+function groupsThatFit(groups: HistogramGroupBuckets[], heightPx: number): number[] {
+  const all = groups.map((_group, index) => index);
+  const fit = maxStackedGrids(heightPx);
+  if (all.length <= fit) return all;
+  return all
+    .sort((a, b) => histogramTotal(groups[b]) - histogramTotal(groups[a]) || a - b)
+    .slice(0, fit)
+    .sort((a, b) => a - b);
+}
+
+function warnDroppedHistograms(
+  processedData: ProcessedPromQLData[],
+  shownForHeight: number,
+  groupCount: number,
+  extras: any,
+): void {
+  let shown = 0;
+  let total = 0;
+  for (const queryData of processedData) {
+    if (!queryData.histogramsLimited) continue;
+    shown += queryData.histogramsLimited.shown;
+    total += queryData.histogramsLimited.total;
+  }
+  if (total > shown) {
+    addHeatmapWarning(
+      extras,
+      gt("dashboard.utils.heatmapHistogramsSeriesLimited", {
+        shown: addCommasToNumber(shown),
+        total: addCommasToNumber(total),
+      }),
+    );
+  }
+  if (shownForHeight < groupCount) {
+    addHeatmapWarning(
+      extras,
+      gt("dashboard.utils.heatmapHistogramsHeightCapped", {
+        shown: addCommasToNumber(shownForHeight),
+        total: addCommasToNumber(groupCount),
+      }),
+    );
+  }
+}
+
+/** The heatmap series for one histogram grid; `cellCount` is the whole chart's, which decides chunked rendering. */
+function histogramSeries(data: any[], cellCount: number, store: any): any {
   return {
-    min: Number.isFinite(minValue) ? Math.min(0, minValue) : 0,
-    max: Number.isFinite(maxValue) ? maxValue : 0,
+    type: "heatmap",
+    data,
+    ...heatmapLargeGridDefaults(cellCount),
+    // Histogram heatmaps are far too dense for per-cell labels.
+    label: {
+      show: false,
+    },
+    itemStyle: heatmapCellItemStyle(store),
+    emphasis: {
+      itemStyle: {
+        shadowBlur: 10,
+        shadowColor: "rgba(0, 0, 0, 0.5)",
+      },
+    },
   };
 }
 
-/**
- * Format timestamps to extract the time portion (consistent with bar charts)
- */
+function histogramVisualMap(
+  config: any,
+  range: { min: number; max: number },
+  grids: HistogramGrid[],
+): any {
+  const { color, ...scaledRange } = heatmapColorScale(
+    config,
+    range,
+    grids.map((grid) => grid.data),
+  );
+  return {
+    ...scaledRange,
+    calculable: true,
+    orient: "horizontal",
+    left: "center",
+    inRange: { color },
+  };
+}
+
+/** The histogram tooltip; `rowTitle` names the hovered cell's row, as HTML-safe text. */
+function histogramTooltip(config: any, rowTitle: (params: any) => string): any {
+  return {
+    position: "top",
+    // Rendered into <body> so the panel's overflow does not clip it.
+    appendToBody: true,
+    // ChartRenderer's mouseleave skips this class, so entering the tooltip does not reset every panel's hover.
+    className: "o2-echarts-tooltip",
+    textStyle: {
+      color: chartColor("--color-tooltip-text"),
+      fontSize: 12,
+    },
+    enterable: true,
+    backgroundColor: chartColor("--color-tooltip-bg"),
+    extraCssText: TOOLTIP_SCROLL_STYLE,
+    formatter: (params: any) => {
+      try {
+        // config.unit remains the CELL INTENSITY unit (e.g. count/s).
+        const value =
+          formatUnitValue(
+            getUnitValue(params?.value?.[2], config?.unit, config?.unit_custom, config?.decimals),
+          ) || params?.value?.[2];
+        return `${rowTitle(params)} <br/> ${params?.marker} ${escapeHtml(params?.name)} : ${escapeHtml(value)}`;
+      } catch (error) {
+        return "";
+      }
+    },
+  };
+}
+
+/** A single histogram grid, the layout every one-histogram panel has always had. */
+function singleHistogramOptions(
+  grid: HistogramGrid,
+  xAxisData: string[],
+  visualMapRange: { min: number; max: number },
+  config: any,
+  store: any,
+): any {
+  return {
+    series: [histogramSeries(grid.data, grid.data.length, store)],
+    xAxis: [
+      {
+        type: "category",
+        data: xAxisData,
+        splitArea: HEATMAP_SPLIT_AREA,
+      },
+    ],
+    yAxis: {
+      type: "category",
+      data: grid.bucketLabels,
+      splitArea: HEATMAP_SPLIT_AREA,
+      axisLabel: {
+        overflow: "truncate",
+        width: config.axis_width || 150,
+      },
+    },
+    visualMap: histogramVisualMap(config, visualMapRange, [grid]),
+    tooltip: histogramTooltip(
+      config,
+      (params) => `le ${escapeHtml(grid.bucketLabels[params?.value?.[1]] ?? params?.seriesName)}`,
+    ),
+    grid: {
+      left: "3%",
+      right: "4%",
+      bottom: 60,
+      containLabel: true,
+    },
+  };
+}
+
+function stackedHistogramOptions(
+  grids: HistogramGrid[],
+  xAxisData: string[],
+  visualMapRange: { min: number; max: number },
+  config: any,
+  store: any,
+  heightPx: number,
+): any {
+  const layout = stackedGridLayout(grids.length, heightPx);
+  const cellCount = grids.reduce((count, grid) => count + grid.data.length, 0);
+  const last = grids.length - 1;
+  return {
+    title: grids.map((grid, index) => ({
+      text: grid.label,
+      top: `${layout[index].titleTop}%`,
+      left: "3%",
+      textStyle: { fontSize: 12, fontWeight: "bold" },
+    })),
+    grid: layout.map((cell) => ({
+      left: "3%",
+      right: "4%",
+      top: `${cell.gridTop}%`,
+      height: `${cell.height}%`,
+      containLabel: true,
+    })),
+    xAxis: grids.map((_grid, index) => ({
+      type: "category",
+      gridIndex: index,
+      data: xAxisData,
+      splitArea: HEATMAP_SPLIT_AREA,
+      // The grids share one time axis, so only the bottom one spends height on its labels.
+      axisLabel: { show: index === last },
+    })),
+    yAxis: grids.map((grid, index) => ({
+      type: "category",
+      gridIndex: index,
+      data: grid.bucketLabels,
+      splitArea: HEATMAP_SPLIT_AREA,
+      axisLabel: {
+        overflow: "truncate",
+        width: config.axis_width || 150,
+      },
+    })),
+    series: grids.map((grid, index) => ({
+      // Unnamed, so no legend entry overlaps the colour bar; each grid's title names it.
+      ...histogramSeries(grid.data, cellCount, store),
+      xAxisIndex: index,
+      yAxisIndex: index,
+    })),
+    visualMap: histogramVisualMap(config, visualMapRange, grids),
+    tooltip: histogramTooltip(config, (params) => {
+      const grid = grids[params?.seriesIndex];
+      const bucket = grid?.bucketLabels[params?.value?.[1]] ?? params?.seriesName;
+      return `${escapeHtml(grid?.label ?? "")} <br/> le ${escapeHtml(bucket)}`;
+    }),
+  };
+}
+
+/** The calendar day of a formatted axis timestamp, in the zone it was formatted for. */
+function dayOf(formatted: Date | string): string {
+  if (formatted instanceof Date) {
+    return `${formatted.getFullYear()}-${formatted.getMonth()}-${formatted.getDate()}`;
+  }
+  return String(formatted).slice(0, 10);
+}
+
+/** X labels: the time of day, or the full date and time when the axis spans more than one calendar day. */
 function buildXAxisData(timestamps: Array<[any, any]>): string[] {
+  const days = new Set((timestamps ?? []).map(([, formatted]) => dayOf(formatted)));
+  const withDate = days.size > 1;
   return (
     timestamps?.map(([, formatted]) => {
-      // formatted can be Date object or ISO string
-      let timeString: string;
       if (formatted instanceof Date) {
-        // Format as HH:MM:SS
-        const hours = String(formatted.getHours()).padStart(2, "0");
-        const minutes = String(formatted.getMinutes()).padStart(2, "0");
-        const seconds = String(formatted.getSeconds()).padStart(2, "0");
-        timeString = `${hours}:${minutes}:${seconds}`;
-      } else {
-        // ISO string - extract time portion
-        const dateStr = formatted.toString();
-        // Try to extract time (HH:MM:SS) from datetime string
-        const timeMatch = dateStr.match(/(\d{2}:\d{2}:\d{2})/);
-        timeString = timeMatch ? timeMatch[1] : dateStr;
+        return withDate ? formatDate(formatted) : formatDate(formatted).slice(11);
       }
-      return timeString;
+      const dateStr = formatted.toString();
+      const match = dateStr.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})/);
+      if (match) return withDate ? `${match[1]} ${match[2]}` : match[2];
+      return dateStr.match(/(\d{2}:\d{2}:\d{2})/)?.[1] ?? dateStr;
     }) || []
   );
+}
+
+/** True while another panel is hovered, when a synced tooltip shows only its axis pointer. */
+function otherPanelHovered(extras: any, panelId: unknown): boolean {
+  const state = extras?.hoveredSeriesState?.value;
+  return !!(state && panelId && state.panelId !== panelId);
+}
+
+function applyTimeInteraction(
+  options: any,
+  extras: any,
+  panelId: unknown,
+  timestamps: Array<[any, any]>,
+  grid: PromQLTimeGrid | null,
+  context: ConversionContext | undefined,
+  store: any,
+): any {
+  const axis = promqlHeatmapTimeAxis(
+    timestamps,
+    grid?.stepSec ?? Number(context?.stepSeconds),
+    grid?.startSec ?? Number(context?.metadata?.queries?.[0]?.startTime) / 1_000_000,
+    store?.state?.timezone ?? "UTC",
+  );
+  extras.panelId = panelId;
+  if (!axis) return options;
+  extras.heatmapTimeAxis = axis;
+  extras.isTimeSeries = true;
+  options.toolbox = heatmapZoomToolbox();
+  const formatter = options.tooltip?.formatter;
+  options.tooltip = {
+    ...options.tooltip,
+    formatter: (params: any) => (otherPanelHovered(extras, panelId) ? "" : formatter?.(params)),
+  };
+  applyHeatmapTimePointer(options);
+  return options;
+}
+
+/** Labels that identify a series' row, without the metric name a function result drops. */
+function rowLabels(metric: Record<string, string> | undefined): Record<string, string> {
+  const { __name__: _name, ...labels } = metric ?? {};
+  return labels;
 }
 
 /**
@@ -163,12 +628,13 @@ function applyCompactPreview(options: any): any {
       precision: 2,
       textStyle: { fontSize: 9 },
     };
-    options.grid = { ...(options.grid ?? {}), top: 8, bottom: 48 };
+    if (!Array.isArray(options.grid))
+      options.grid = { ...(options.grid ?? {}), top: 8, bottom: 48 };
   }
 
-  const yAxis = Array.isArray(options.yAxis) ? options.yAxis[0] : options.yAxis;
-  const rowCount = yAxis?.data?.length ?? 0;
-  if (yAxis && rowCount) {
+  for (const yAxis of Array.isArray(options.yAxis) ? options.yAxis : [options.yAxis]) {
+    const rowCount = yAxis?.data?.length ?? 0;
+    if (!yAxis || !rowCount) continue;
     // Thin the bucket labels to what a card can render, but ALWAYS keep the top
     // row: a histogram's `+Inf` bucket is the "everything slower than this" row,
     // and ECharts' hideOverlap would otherwise drop it. Count DOWN from the top
@@ -184,8 +650,8 @@ function applyCompactPreview(options: any): any {
     };
   }
 
-  const xAxis = Array.isArray(options.xAxis) ? options.xAxis[0] : options.xAxis;
-  if (xAxis) {
+  for (const xAxis of Array.isArray(options.xAxis) ? options.xAxis : [options.xAxis]) {
+    if (!xAxis) continue;
     xAxis.axisLabel = {
       ...(xAxis.axisLabel ?? {}),
       fontSize: 9,
@@ -203,56 +669,70 @@ function applyCompactPreview(options: any): any {
 export class HeatmapConverter implements PromQLChartConverter {
   supportedTypes = ["heatmap"];
 
-  convert(processedData: ProcessedPromQLData[], panelSchema: any, store: any, extras: any) {
+  convert(
+    processedData: ProcessedPromQLData[],
+    panelSchema: any,
+    store: any,
+    extras: any,
+    chartPanelRef?: any,
+    context?: ConversionContext,
+  ) {
     const config = panelSchema.config || {};
+    const grid = timeGridOf(context);
 
     // Opt-in only: Prometheus classic-histogram mode. Generic heatmaps keep
     // their existing behavior untouched.
     if (config?.heatmap_mode === PROMETHEUS_HISTOGRAM_MODE) {
-      return this.convertHistogram(processedData, config, store, extras);
+      return this.convertHistogram(
+        processedData,
+        panelSchema,
+        store,
+        extras,
+        grid,
+        chartPanelRef,
+        context,
+      );
     }
 
-    // Heatmap requires 3D data: [x, y, value]
-    // X-axis: timestamps
-    // Y-axis: series names
-    // Value: metric values
+    // Rows span every query because per-query series indices overlap.
+    const sourceOf = new Map<object, ProcessedPromQLData>();
+    const allSeries = sortHeatmapCategories(
+      processedData.flatMap((queryData) => {
+        for (const series of queryData.series) sourceOf.set(series, queryData);
+        return queryData.series;
+      }),
+      (series) => series.name,
+      config?.heatmap_y_sort,
+    );
+    const {
+      data,
+      rows,
+      timeAxis,
+      min: minValue,
+      max: maxValue,
+    } = buildHeatmapGrid(
+      allSeries.map((series) => sampleMagnitude(series.data)),
+      buildTimeAxis(processedData, grid, store?.state?.timezone),
+      (row, ts) => sampleValue(allSeries[row].data[ts]),
+      extras,
+    );
+    const seriesNames = rows.map((row) => allSeries[row].name);
+    seriesNames.forEach((name) => extras.legends.push(name));
+    extras.heatmapRowValues = [seriesNames];
+    extras.heatmapExemplarLayout = {
+      mode: "series",
+      rows: rows.map((row) => {
+        const source = sourceOf.get(allSeries[row]);
+        if (!source || source.seriesRole === "shifted") return null;
+        return { queryIndex: source.queryIndex, labels: rowLabels(allSeries[row].metric) };
+      }),
+    } satisfies HeatmapExemplarLayout;
 
-    const seriesNames: string[] = [];
-    const data: any[] = [];
-    let maxValue = -Infinity;
-    let minValue = Infinity;
-
-    // Shared across every query, so a cell's column is its INSTANT — not its
-    // offset within whichever query happened to report it.
-    const timeAxis = buildTimeAxis(processedData);
-    const columnOfTs = new Map(timeAxis.map(([ts], index) => [String(ts), index]));
-
-    processedData.forEach((queryData) => {
-      queryData.series.forEach((seriesData) => {
-        seriesNames.push(seriesData.name);
-        extras.legends.push(seriesData.name);
-
-        // The row is the series' position on the Y AXIS — which spans every
-        // query — not its position within its own query (per-query indices
-        // overlap when there are multiple queries).
-        const rowIndex = seriesNames.length - 1;
-
-        queryData.timestamps.forEach(([ts]) => {
-          // The column is this timestamp's slot on the SHARED axis, not the
-          // per-query loop index (which diverges when queries use different grids).
-          const timeIndex = columnOfTs.get(String(ts));
-          if (timeIndex === undefined) return;
-
-          const value = parseFloat(seriesData.data[ts] ?? "0");
-          data.push([timeIndex, rowIndex, value]);
-
-          if (value > maxValue) maxValue = value;
-          if (value < minValue) minValue = value;
-        });
-      });
-    });
-
-    const visualMapRange = visualMapRangeOf(minValue, maxValue);
+    const { color, ...visualMapRange } = heatmapColorScale(
+      config,
+      heatmapColorRange(config, visualMapRangeOf(minValue, maxValue)),
+      [data],
+    );
 
     // Format timestamps to extract time portion (consistent with bar charts)
     const xAxisData = buildXAxisData(timeAxis);
@@ -316,7 +796,7 @@ export class HeatmapConverter implements PromQLChartConverter {
         orient: "horizontal",
         left: "center",
         inRange: {
-          color: HEATMAP_VISUAL_MAP_COLORS,
+          color,
         },
       },
       tooltip: {
@@ -324,6 +804,8 @@ export class HeatmapConverter implements PromQLChartConverter {
         // render into <body> so the tooltip is not clipped by the panel's
         // overflow — same container treatment as the other PromQL charts
         appendToBody: true,
+        // ChartRenderer's mouseleave skips this class, so entering the tooltip does not reset every panel's hover.
+        className: "o2-echarts-tooltip",
         textStyle: {
           color: chartColor("--color-tooltip-text"),
           fontSize: 12,
@@ -357,6 +839,7 @@ export class HeatmapConverter implements PromQLChartConverter {
       },
     };
 
+    applyTimeInteraction(options, extras, panelSchema.id, timeAxis, grid, context, store);
     return config?.compact_preview ? applyCompactPreview(options) : options;
   }
 
@@ -370,153 +853,81 @@ export class HeatmapConverter implements PromQLChartConverter {
    */
   private convertHistogram(
     processedData: ProcessedPromQLData[],
-    config: any,
+    panelSchema: any,
     store: any,
     extras: any,
+    grid: PromQLTimeGrid | null,
+    chartPanelRef?: any,
+    context?: ConversionContext,
   ) {
-    // De-accumulate PER QUERY, then concatenate. deaccumulateHistogramSeries
-    // sorts and de-duplicates by `le`, so flattening all queries first would
-    // interleave two histograms' buckets. Each query is its own cumulative
-    // histogram.
-    const buckets = processedData.flatMap((queryData) => {
-      const inputs: HistogramSeriesInput[] = (queryData.series ?? []).map((seriesData) => ({
-        le: extractLeLabel(seriesData),
-        data: seriesData.data ?? {},
-      }));
-      return deaccumulateHistogramSeries(inputs);
-    });
+    const config = panelSchema.config || {};
+    const groups = histogramGroupsOf(processedData);
+    const timeAxis = buildTimeAxis(processedData, grid, store?.state?.timezone);
 
-    // Y-axis categories: formatted bucket bounds, in ascending le order.
-    // Formatting can collapse two distinct bounds onto the same label (e.g.
-    // rounding), and ECharts category axes need unique names, so disambiguate
-    // collisions with the raw le value.
-    const usedLabels = new Set<string>();
-    const bucketLabels: string[] = buckets.map((bucket) => {
-      const base = formatBucketLabel(bucket.le, bucket.leValue, config);
-
-      // ECharts category axes need UNIQUE names, but two bounds can round to the
-      // same label and two histograms can carry the identical `le`. Keep widening
-      // until it is unique.
-      let label = base;
-      if (usedLabels.has(label)) label = `${base} (${bucket.le})`;
-      for (let n = 2; usedLabels.has(label); n++) {
-        label = `${base} (${bucket.le}) #${n}`;
+    const heightPx = chartPanelRef?.value?.offsetHeight || UNMEASURED_PANEL_PX;
+    const fitting = groupsThatFit(groups, heightPx).map((index) => groups[index]);
+    warnDroppedHistograms(processedData, fitting.length, groups.length, extras);
+    const cut = cutHistogramsToBudget(
+      timeAxis.length,
+      fitting.map((group) => group.buckets.length),
+      fitting.map(histogramTotal),
+    );
+    if (cut) {
+      for (const warning of histogramBudgetWarnings(cut, timeAxis.length, fitting.length)) {
+        addHeatmapWarning(extras, warning);
       }
+    }
+    const kept = cut ? cut.groups.map((index) => fitting[index]) : fitting;
+    const timestamps = cut ? timeAxis.slice(cut.firstColumn) : timeAxis;
 
-      usedLabels.add(label);
-      return label;
-    });
-
-    bucketLabels.forEach((label) => extras.legends.push(label));
-
-    // Every query's timestamps, not just the first query's — the buckets above
-    // were flat-mapped across ALL of them, and looking their samples up against
-    // one query's grid is what dropped them.
-    const timestamps = buildTimeAxis(processedData);
-
-    const data: any[] = [];
-    let maxValue = -Infinity;
     let minValue = Infinity;
-
-    buckets.forEach((bucket, bucketIndex) => {
-      timestamps.forEach(([ts], timeIndex) => {
-        const value = bucket.data[String(ts)] ?? 0;
-        data.push([timeIndex, bucketIndex, value]);
-        if (value > maxValue) maxValue = value;
-        if (value < minValue) minValue = value;
-      });
+    let maxValue = -Infinity;
+    const grids: HistogramGrid[] = kept.map((group) => {
+      const cells = fillHeatmapCells(
+        group.buckets.map((_bucket, row) => row),
+        timestamps,
+        (row, ts) => sampleValue(group.buckets[row].data[String(ts)]),
+      );
+      minValue = Math.min(minValue, cells.min);
+      maxValue = Math.max(maxValue, cells.max);
+      return {
+        label: group.label,
+        bucketLabels: uniqueBucketLabels(group.buckets, config),
+        bucketValues: group.buckets.map((bucket) => bucket.le),
+        data: cells.data,
+      };
     });
+    for (const histogram of grids) {
+      for (const label of histogram.bucketLabels) extras.legends.push(label);
+    }
+    extras.heatmapRowValues = grids.map((histogram) => histogram.bucketValues);
+    extras.heatmapExemplarLayout = {
+      mode: "histogram",
+      groups: kept.map((group) =>
+        group.source
+          ? { ...group.source, bounds: group.buckets.map((bucket) => bucket.leValue) }
+          : null,
+      ),
+    } satisfies HeatmapExemplarLayout;
 
     // [0, max] for clamped counts, unless heatmaps drawn side by side share a range so colours compare.
-    const visualMapRange = config?.visual_map_range ?? visualMapRangeOf(minValue, maxValue);
-
+    const visualMapRange = heatmapColorRange(
+      config,
+      config?.visual_map_range ?? visualMapRangeOf(minValue, maxValue),
+    );
     const xAxisData = buildXAxisData(timestamps);
 
-    const options: any = {
-      series: [
-        {
-          type: "heatmap",
-          data,
-          // Dense by construction: chunk the render and skip the animation once
-          // the grid gets big.
-          ...heatmapLargeGridDefaults(data.length),
-          // Histogram heatmaps are far too dense for per-cell labels.
-          label: {
-            show: false,
-          },
-          itemStyle: heatmapCellItemStyle(store),
-          emphasis: {
-            itemStyle: {
-              shadowBlur: 10,
-              shadowColor: "rgba(0, 0, 0, 0.5)",
-            },
-          },
-        },
-      ],
-      xAxis: [
-        {
-          type: "category",
-          data: xAxisData,
-          splitArea: HEATMAP_SPLIT_AREA,
-        },
-      ],
-      yAxis: {
-        type: "category",
-        data: bucketLabels,
-        splitArea: HEATMAP_SPLIT_AREA,
-        axisLabel: {
-          overflow: "truncate",
-          width: config.axis_width || 150,
-        },
-      },
-      visualMap: {
-        ...visualMapRange,
-        calculable: true,
-        orient: "horizontal",
-        left: "center",
-        inRange: {
-          color: HEATMAP_VISUAL_MAP_COLORS,
-        },
-      },
-      tooltip: {
-        position: "top",
-        // render into <body> so the tooltip is not clipped by the panel's
-        // overflow — same container treatment as the other PromQL charts
-        appendToBody: true,
-        textStyle: {
-          color: chartColor("--color-tooltip-text"),
-          fontSize: 12,
-        },
-        enterable: true,
-        backgroundColor: chartColor("--color-tooltip-bg"),
-        extraCssText: TOOLTIP_SCROLL_STYLE,
-        formatter: (params: any) => {
-          try {
-            const bucketLabel = bucketLabels[params?.value?.[1]] ?? params?.seriesName;
-            // config.unit remains the CELL INTENSITY unit (e.g. count/s).
-            const value =
-              formatUnitValue(
-                getUnitValue(
-                  params?.value?.[2],
-                  config?.unit,
-                  config?.unit_custom,
-                  config?.decimals,
-                ),
-              ) || params?.value?.[2];
-            return `le ${escapeHtml(bucketLabel)} <br/> ${params?.marker} ${escapeHtml(params?.name)} : ${escapeHtml(value)}`;
-          } catch (error) {
-            return "";
-          }
-        },
-      },
-      grid: {
-        left: "3%",
-        right: "4%",
-        bottom: 60,
-        containLabel: true,
-      },
-    };
-
+    const options =
+      grids.length > 1
+        ? stackedHistogramOptions(grids, xAxisData, visualMapRange, config, store, heightPx)
+        : singleHistogramOptions(
+            grids[0] ?? { label: "", bucketLabels: [], bucketValues: [], data: [] },
+            xAxisData,
+            visualMapRange,
+            config,
+            store,
+          );
+    applyTimeInteraction(options, extras, panelSchema.id, timestamps, grid, context, store);
     return config?.compact_preview ? applyCompactPreview(options) : options;
   }
 }

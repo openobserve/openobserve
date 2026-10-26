@@ -30,8 +30,10 @@ import cipherKeysService from "@/services/cipher_keys";
 import RePatternsService from "@/services/regex_pattern";
 import commonService from "@/services/common";
 import syntheticsService from "@/services/synthetics";
+import downtimesService from "@/services/downtimes";
 import type { SyntheticsEnvironment } from "@/types/synthetics";
 import workflowService from "@/services/workflows";
+import fleetService from "@/services/fleet";
 import onlineEvalsService from "@/services/online-evals.service";
 import llmQueuesService from "@/services/llm-queues.service";
 import llmDatasetsService from "@/services/llm-datasets.service";
@@ -115,9 +117,12 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
       rfolder: getReportFolders,
       synthetic_folder: getSyntheticsFolders,
       synthetics: getSynthetics,
+      downtime_folder: getDowntimeFolders,
+      downtime: getDowntimes,
       synthetic_environment: getSyntheticEnvironments,
       workflow_folder: getWorkflowFolders,
       workflows: getWorkflows,
+      fleets: getFleets,
       re_patterns: getRePatterns,
       provider: getProviders,
       score_config: getScoreConfigs,
@@ -295,6 +300,44 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
       resolve(true);
     });
   };
+  const getDowntimeFolders = async () => {
+    // Same shape as getSyntheticsFolders — downtime folders live under folder type "downtimes".
+    const folders: any = await commonService.list_Folders(
+      store.state.selectedOrganization.identifier,
+      "downtimes",
+    );
+
+    let isDefaultPresent = folders.data.list.find((folder: any) => folder.folderId === "default");
+
+    if (!isDefaultPresent) {
+      folders.data.list.unshift({ folderId: "default", name: "default" });
+    }
+
+    updateResourceEntities(
+      "downtime_folder",
+      ["folderId"],
+      [...folders.data.list],
+      true,
+      "name",
+      "downtime",
+    );
+    return new Promise((resolve) => {
+      resolve(true);
+    });
+  };
+  const getDowntimes = async (resource: Entity | Resource) => {
+    // Downtimes of one folder. Their FGA entities are plain downtime ids, as synthetics.
+    const res: any = await downtimesService.list(store.state.selectedOrganization.identifier, {
+      folder_id: resource.name,
+      page_size: 500,
+    });
+
+    updateEntityEntities(resource, ["id"], [...(res.data?.items ?? [])], false, "name");
+
+    return new Promise((resolve) => {
+      resolve(true);
+    });
+  };
   const getSynthetics = async (resource: Entity | Resource) => {
     // Monitors of one folder. Unlike alerts, synthetics FGA entities are plain
     // monitor ids (no folder prefix) — matches backend set_ownership objects.
@@ -358,6 +401,15 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
     return new Promise((resolve) => {
       resolve(true);
     });
+  };
+  // Collectors are not FGA objects, so a fleet has no child entities to expand.
+  // Fleets have their own API; the folders API no longer exposes them.
+  const getFleets = async () => {
+    const res = await fleetService.listFleets(store.state.selectedOrganization.identifier);
+    const list = (res.data?.items ?? []).map((f) => ({ id: f.id, name: f.name }));
+    if (!list.some((f) => f.id === "default")) list.unshift({ id: "default", name: "default" });
+    updateResourceEntities("fleets", ["id"], list, false, "name");
+    return true;
   };
   const _getGroups = async () => {
     const groups = await getGroups(store.state.selectedOrganization.identifier);
@@ -738,9 +790,12 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
     getAlertFolders,
     getSyntheticsFolders,
     getSynthetics,
+    getDowntimeFolders,
+    getDowntimes,
     getSyntheticEnvironments,
     getWorkflowFolders,
     getWorkflows,
+    getFleets,
     _getGroups,
     _getRoles,
     getFunctions,

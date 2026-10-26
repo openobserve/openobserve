@@ -34,6 +34,22 @@ pub struct Model {
 
     pub created_at: i64,
     pub updated_at: i64,
+
+    /// Set while a downtime mutes this incident; nothing about it notifies.
+    pub muted_by_downtime_id: Option<String>,
+
+    /// Run summary of the latest analysis run (`rca_runs`); NULL when never analyzed.
+    pub rca_run_id: Option<String>,
+    pub rca_state: Option<String>,
+    pub rca_started_at: Option<i64>,
+    pub rca_updated_at: Option<i64>,
+    pub rca_outcome: Option<String>,
+    pub rca_confidence: Option<String>,
+    /// `RunSummaryFields` JSON.
+    #[sea_orm(column_type = "Text", nullable)]
+    pub rca_summary: Option<String>,
+    /// Why automatic runs never start for this incident (`l0_off`); written once at creation.
+    pub rca_off_reason: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -74,6 +90,15 @@ mod tests {
             acknowledged_at: None,
             created_at: 1000,
             updated_at: 2000,
+            muted_by_downtime_id: None,
+            rca_run_id: None,
+            rca_state: None,
+            rca_started_at: None,
+            rca_updated_at: None,
+            rca_outcome: None,
+            rca_confidence: None,
+            rca_summary: None,
+            rca_off_reason: None,
         };
         assert_eq!(m.id, "inc-1");
         assert_eq!(m.status, "open");
@@ -105,6 +130,15 @@ mod tests {
             acknowledged_at: Some(1500),
             created_at: 1000,
             updated_at: 1500,
+            muted_by_downtime_id: Some("2f9K".to_string()),
+            rca_run_id: None,
+            rca_state: None,
+            rca_started_at: None,
+            rca_updated_at: None,
+            rca_outcome: None,
+            rca_confidence: None,
+            rca_summary: None,
+            rca_off_reason: None,
         };
         assert_eq!(m.acknowledged_by.as_deref(), Some("user@example.com"));
         assert_eq!(m.acknowledged_at, Some(1500));

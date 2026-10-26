@@ -227,6 +227,15 @@
   --color-chart-series-11: #e879f9;
   --color-chart-series-12: #facc15;
 
+  /* Map heat ramp, calm low (1) to hot high (5): every step keeps 3:1 against surface-base. */
+  --color-map-seq-1: #05a92e;
+  --color-map-seq-2: #819307;
+  --color-map-seq-3: #a57c04;
+  --color-map-seq-4: #bd6100;
+  --color-map-seq-5: #d72601;
+  /* Map group card header band: 1.2:1 or more against surface-base, so it reads as a header. */
+  --color-map-card-header: var(--color-grey-200);
+
   --color-chart-markline-shadow: rgba(255, 255, 255, 0.7);
 
   /* --- Dashboard table row-highlight palette — light values (dark overrides in
@@ -316,6 +325,7 @@
   --chart-area-fill-top-opacity: 0.9;
   --chart-area-fill-bottom-opacity: 0.4;
   --chart-metric-contrast-threshold: 0.5;
+  --chart-threshold-band-opacity: 0.28;
 
   /* --- White / Black --- */
   --color-white: #ffffff;
@@ -591,6 +601,17 @@
   --color-json-object: #4b5563;
   --color-json-string: #047857;
   --color-latency-p95: #0a4ce8;
+  /* Logs severity spine/border: non-text, so each clears 3:1 on the page surface. */
+  --color-log-severity-emergency-indicator: #e53935;
+  --color-log-severity-alert-indicator: #ea580c;
+  --color-log-severity-critical-indicator: #f4511e;
+  --color-log-severity-error-indicator: #ef5350;
+  --color-log-severity-warning-indicator: #dd7b00;
+  --color-log-severity-notice-indicator: #16a34a;
+  --color-log-severity-info-indicator: #1e88e5;
+  --color-log-severity-debug-indicator: #00a3b7;
+  --color-log-severity-trace-indicator: #8497a0;
+  --color-log-severity-ok-indicator: #43a047;
   --color-log-table-header-bg: #f1f3f7;
   --color-log-table-row-bg: #ffffff;
   --color-log-table-row-border: #e4e6ec;

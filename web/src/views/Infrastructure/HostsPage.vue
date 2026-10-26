@@ -30,6 +30,7 @@ import type { OTableColumnDef, OTableSortParams } from "@/lib/core/Table/OTable.
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -538,9 +539,7 @@ const osToggleLabel = (slug: string) =>
                 @update:model-value="toggleOs(facet.value)"
               >
                 <template #label>
-                  <span class="truncate text-xs" :title="raw(facet.value)">{{
-                    raw(facet.value)
-                  }}</span>
+                  <OTruncatedText class="block text-xs">{{ raw(facet.value) }}</OTruncatedText>
                 </template>
               </OCheckbox>
               <OTag type="countChip" value="neutral" size="xs" shape="rounded">{{

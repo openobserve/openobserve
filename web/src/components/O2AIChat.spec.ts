@@ -21,7 +21,7 @@ import i18n from "@/locales";
 
 // ── Module mocks (hoisted) ───────────────────────────────────────────────────
 
-vi.mock("highlight.js", () => ({
+vi.mock("@/lib/core/Code/highlighter", () => ({
   default: {
     highlight: vi.fn(() => ({ value: "" })),
     highlightAuto: vi.fn(() => ({ value: "" })),
@@ -69,6 +69,8 @@ vi.mock("@/composables/useAiChat", () => ({
     registerAiChatHandler: vi.fn(),
     removeAiChatHandler: vi.fn(),
     getStructuredContext: vi.fn().mockResolvedValue(null),
+    // Server-side chat persistence off: history stays in IndexedDB.
+    chatHistoryServer: vi.fn(() => ({ enabled: () => false })),
   })),
 }));
 
@@ -908,8 +910,114 @@ describe("O2AIChat", () => {
           contentBlocks?: Array<{ message: string }>;
         };
         expect(last?.contentBlocks?.at(-1)?.message).toBe(
-          "Paid AI usage was not authorized. No paid request was started.",
+          "Paid AI usage is off, so this request wasn't sent.",
         );
+      });
+    });
+
+    describe("AI credits exhausted (402)", () => {
+      const sendAndGetLast = async (remedy?: string) => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        // The new-chat reset runs on the next tick; sending before it would wipe the prompt.
+        await flushPromises();
+        const vm = wrapper.vm as any;
+        mockFetchAiChat.mockResolvedValueOnce({
+          ok: false,
+          status: 402,
+          json: vi.fn().mockResolvedValue({
+            code: 402,
+            message: "Free trial quota exhausted (1000/1000 used).",
+            error_type: "ai_credits_exhausted",
+            remedy,
+          }),
+        });
+        vm.inputMessage = "count errors";
+        await vm.sendMessage();
+        await flushPromises();
+        return vm.chatMessages.at(-1).contentBlocks.at(-1);
+      };
+
+      it("offers Plans when the org can subscribe, and keeps the notice out of history", async () => {
+        const block = await sendAndGetLast("subscribe");
+
+        expect(block).toMatchObject({
+          type: "error",
+          ephemeral: true,
+          suggestion:
+            "Subscribe to keep using AI. Further usage is billed on this organization's invoice.",
+          navigationAction: { action: "navigate_direct", target: { path: "/billings/plans" } },
+        });
+      });
+
+      it("points contract orgs to their account manager, with no Plans button", async () => {
+        const block = await sendAndGetLast("contact_account_manager");
+
+        expect(block.suggestion).toBe("Contact your account manager to add more AI credits");
+        expect(block.navigationAction).toBeUndefined();
+      });
+
+      it("keeps the server wording when the remedy is unknown", async () => {
+        const block = await sendAndGetLast();
+
+        expect(block.suggestion).toBe("Free trial quota exhausted (1000/1000 used).");
+        expect(block.navigationAction).toBeUndefined();
+        expect(block.recoverable).toBe(false);
+      });
+
+      it("marks a mid-request exhaustion as retryable", async () => {
+        const block = await sendAndGetLast("retry");
+
+        expect(block.recoverable).toBe(true);
+        expect(block.navigationAction).toBeUndefined();
+      });
+
+      it("restores the draft so it can be resent", async () => {
+        await sendAndGetLast("subscribe");
+
+        expect((wrapper.vm as any).inputMessage).toBe("count errors");
+      });
+
+      it("gives back the attached images with the draft", async () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        const vm = wrapper.vm as any;
+        const image = { data: "aGVsbG8=", mimeType: "image/png", filename: "chart.png" };
+        vm.pendingImages = [image];
+        vm.inputMessage = "what does this chart show";
+        mockFetchAiChat.mockResolvedValueOnce({
+          ok: false,
+          status: 402,
+          json: vi
+            .fn()
+            .mockResolvedValue({ error_type: "ai_credits_exhausted", remedy: "subscribe" }),
+        });
+
+        await vm.sendMessage();
+        await flushPromises();
+
+        expect(vm.inputMessage).toBe("what does this chart show");
+        expect(vm.pendingImages).toEqual([image]);
+      });
+
+      it("keeps the refused prompt in the chat when the draft is resent", async () => {
+        await sendAndGetLast("subscribe");
+        const vm = wrapper.vm as any;
+        mockFetchAiChat.mockResolvedValueOnce({
+          ok: false,
+          status: 402,
+          json: vi
+            .fn()
+            .mockResolvedValue({ error_type: "ai_credits_exhausted", remedy: "subscribe" }),
+        });
+
+        await vm.sendMessage();
+        await flushPromises();
+
+        expect(vm.chatMessages.map((m: any) => m.role)).toEqual([
+          "user",
+          "assistant",
+          "user",
+          "assistant",
+        ]);
       });
     });
 

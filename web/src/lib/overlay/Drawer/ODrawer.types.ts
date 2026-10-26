@@ -105,6 +105,8 @@ export interface DrawerProps {
 
   /** Label for the primary action button (right side). Omit to hide. */
   primaryButtonLabel?: I18nText;
+  /** data-test for the primary button. @default "o-drawer-primary-btn" */
+  primaryButtonDataTest?: string;
   /** Label for the secondary action button (right of neutral, left of primary). Omit to hide. */
   secondaryButtonLabel?: I18nText;
   /** Label for the neutral action button (left side). Omit to hide. */
@@ -157,6 +159,11 @@ export interface DrawerProps {
 
   /** Render the portal in place for a contained drawer surface. Default: false. */
   inline?: boolean;
+
+  /** When false, the page behind stays interactive and only the close button or Escape outside a field closes it. Default: true. */
+  modal?: boolean;
+
+  returnFocusTo?: () => HTMLElement | null;
 }
 
 export interface DrawerEmits {
@@ -168,6 +175,7 @@ export interface DrawerEmits {
   (e: "click:secondary"): void;
   /** Fires when the neutral inbuilt button is clicked. */
   (e: "click:neutral"): void;
+  (e: "after-close"): void;
 }
 
 export interface DrawerSlots {

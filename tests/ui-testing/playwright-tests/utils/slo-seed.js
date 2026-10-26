@@ -23,6 +23,7 @@
 const { expect } = require('@playwright/test');
 const testLogger = require('./test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
+const { ingestBase } = require('./ingest-url.js');
 
 /** Seed span. 8 days against a 7-day window clears the 0.9 coverage floor. */
 const SEED_DAYS = 8;
@@ -143,7 +144,7 @@ function expectedGoodFraction() {
 async function ingestBatch(page, streamName, records) {
   const org = getOrgIdentifier();
   const res = await postWithRetry(
-    page, `${baseUrl()}/api/${org}/${streamName}/_json`, records,
+    page, `${ingestBase(baseUrl())}/api/${org}/${streamName}/_json`, records,
   );
   const status = res.status();
   if (status < 200 || status >= 300) {
@@ -573,8 +574,7 @@ async function waitForSloMeasured(page, sloId, {
 /**
  * Create a notification template + destination for burn-rate alerts.
  *
- * An SLO alert cannot be saved without one: the form rejects a submit with
- * "Alert destination or workflows is required". By default the destination
+ * Specs that pick a destination need one to exist. By default the destination
  * points at this instance's OWN ingest endpoint so delivery is self-contained
  * and needs no external service — the same trick
  * `alerts-api-helpers.seedAlertFixtures` uses.
@@ -656,7 +656,7 @@ async function seedSloMetric(page, metricName, { minutes = 120 } = {}) {
   }
 
   const res = await postWithRetry(
-    page, `${baseUrl()}/api/${org}/ingest/metrics/_json`, rows,
+    page, `${ingestBase(baseUrl())}/api/${org}/ingest/metrics/_json`, rows,
   );
   if (!res.ok()) {
     throw new Error(

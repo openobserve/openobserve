@@ -46,6 +46,7 @@ const ODialogStub = {
     "secondaryButtonLoading",
     "neutralButtonLoading",
     "primaryButtonColor",
+    "initialFocus",
   ],
   emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
   template: `
@@ -264,10 +265,68 @@ describe("ConfirmDialog", () => {
     expect(dialog.props("primaryButtonColor")).toBe("destructive");
   });
 
+  it("starts on the primary button unless a destructive confirm asks for Cancel", () => {
+    expect(wrapper.findComponent(ODialogStub).props("initialFocus")).toBe("primary");
+    wrapper.unmount();
+    wrapper = buildWrapper({ focusCancel: true, okVariant: "destructive" });
+    const dialog = wrapper.findComponent(ODialogStub);
+    expect(dialog.props("initialFocus")).toBe("secondary");
+    expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+    expect(dialog.props("persistent")).toBeFalsy();
+  });
+
+  it("closes when the dialog is dismissed with Escape", async () => {
+    await wrapper.findComponent(ODialogStub).vm.$emit("update:open", false);
+    expect(wrapper.emitted("update:modelValue")?.[0]).toEqual([false]);
+  });
+
   it("preserves default OK label when okLabel is not provided", () => {
     wrapper.unmount();
     wrapper = buildWrapper();
     const dialog = wrapper.findComponent(ODialogStub);
     expect(dialog.props("primaryButtonLabel")).toBe("OK");
+  });
+
+  describe("type to confirm", () => {
+    const input = () => wrapper.find('[data-test="confirm-dialog-type-to-confirm"] input');
+    const primary = () => wrapper.findComponent(ODialogStub);
+
+    it("has no input and an enabled confirm without confirmText", () => {
+      expect(wrapper.find('[data-test="confirm-dialog-type-to-confirm"]').exists()).toBe(false);
+      expect(primary().props("primaryButtonDisabled")).toBe(false);
+    });
+
+    it("keeps confirm disabled and ignores a click until the exact text is typed", async () => {
+      wrapper.unmount();
+      wrapper = buildWrapper({ confirmText: "test1" });
+      expect(wrapper.text()).toContain("To confirm, type test1 below");
+      expect(primary().props("primaryButtonDisabled")).toBe(true);
+      await wrapper.find('[data-test="o-dialog-stub-primary"]').trigger("click");
+      expect(wrapper.emitted("update:ok")).toBeUndefined();
+      await input().setValue("test");
+      expect(primary().props("primaryButtonDisabled")).toBe(true);
+      await input().setValue("test1");
+      expect(primary().props("primaryButtonDisabled")).toBe(false);
+      await wrapper.find('[data-test="o-dialog-stub-primary"]').trigger("click");
+      expect(wrapper.emitted("update:ok")).toHaveLength(1);
+    });
+
+    it("labels the input with the instruction", () => {
+      wrapper.unmount();
+      wrapper = buildWrapper({ confirmText: "test1" });
+      const label = wrapper.find("label");
+      expect(label.text()).toContain("To confirm, type test1 below");
+      expect(label.attributes("for")).toBe(input().attributes("id"));
+    });
+
+    it("clears what was typed when the dialog closes", async () => {
+      wrapper.unmount();
+      wrapper = buildWrapper({ confirmText: "test1" });
+      await input().setValue("test1");
+      await wrapper.setProps({ modelValue: false });
+      await wrapper.setProps({ modelValue: true });
+      expect((input().element as HTMLInputElement).value).toBe("");
+      expect(primary().props("primaryButtonDisabled")).toBe(true);
+    });
   });
 });

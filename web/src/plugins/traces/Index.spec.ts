@@ -26,6 +26,10 @@ import router from "@/test/unit/helpers/router";
 import * as useDurationPercentilesModule from "@/composables/useDurationPercentiles";
 import { buildViewTracesFilter } from "@/plugins/traces/viewTracesHandoff";
 import analytics from "@/services/product_analytics";
+import {
+  announceTracesRowNav,
+  tracesRowNavAnnouncement,
+} from "@/plugins/traces/composables/tracesRowNav";
 
 // Create DOM node for mounting
 const node = document.createElement("div");
@@ -162,8 +166,13 @@ const mockSearchObj = {
       rowsPerPage: 25,
       sortBy: "start_time" as string,
       sortOrder: "desc" as "asc" | "desc",
+      navigation: {
+        currentRowIndex: 0 as number | null,
+        selectionActive: false,
+        pendingPageSelection: null as any,
+        lastOpenedId: null as string | null,
+      },
     },
-    refreshInterval: 0,
     liveMode: false,
     serviceColors: {},
     metricsRangeFilters: new Map(),
@@ -192,6 +201,8 @@ const mockSearchObj = {
     resultGrid: {
       currentPage: 0,
       columns: [],
+      pageRequest: null as any,
+      pageLoad: null as any,
     },
     datetime: {
       startTime: new Date().getTime() * 1000 - 900000000,
@@ -779,6 +790,91 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockSearchObj.data.editorValue).toBe("service_name = 'checkout'");
       expect(mockSearchObj.meta.sqlMode).toBe(false);
     });
+
+    it("clears a stale editor for an empty handoff ?filter= (unfiltered RCA evidence)", async () => {
+      routerCurrentRouteSpy.mockReturnValue(
+        ref({
+          query: { filter: "" },
+          name: "traces",
+          path: "/traces",
+        }) as typeof router.currentRoute,
+      );
+      mockSearchObj.data.editorValue = "service_name = 'stale'";
+
+      wrapper = mountIndex();
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toBe("");
+    });
+  });
+
+  describe("Auto Run off (#14760)", () => {
+    const mountTraces = () =>
+      mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+    beforeEach(() => localStorage.setItem("oo_toggle_auto_run", "false"));
+
+    afterEach(() => {
+      delete store.state.zoConfig.auto_query_enabled;
+      localStorage.removeItem("oo_toggle_auto_run");
+    });
+
+    it("restores the last stream on page load without running a search", async () => {
+      store.state.zoConfig.auto_query_enabled = true;
+      mockSearchObj.meta.liveMode = false;
+      mockRestoreTracesStream.mockReturnValue("default");
+      wrapper = mountTraces();
+      await vi.waitFor(() =>
+        expect(mockSearchObj.data.stream.selectedStream.value).toBe("default"),
+      );
+      await flushPromises();
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+    });
+
+    it("does not run when the stream changes, and runs once Auto Run is on", async () => {
+      store.state.zoConfig.auto_query_enabled = true;
+      mockSearchObj.meta.liveMode = false;
+      wrapper = mountTraces();
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+      await flushPromises();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      await wrapper.vm.onChangeStream();
+      await flushPromises();
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+
+      mockSearchObj.meta.liveMode = true;
+      localStorage.setItem("oo_toggle_auto_run", "true");
+      await wrapper.vm.onChangeStream();
+      await flushPromises();
+      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+    });
+
+    it("still loads a shared link's stream with Auto Run off", async () => {
+      store.state.zoConfig.auto_query_enabled = true;
+      mockSearchObj.meta.liveMode = false;
+      routerCurrentRouteSpy.mockReturnValue({
+        value: { query: { stream: "default" }, name: "traces", path: "/traces" },
+      } as any);
+      wrapper = mountTraces();
+      await vi.waitFor(() => expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled(), {
+        timeout: 3000,
+      });
+    });
   });
 
   describe("Stream Selection", () => {
@@ -964,6 +1060,250 @@ describe("Index.vue (Main Traces Page)", () => {
     });
   });
 
+  describe("Heatmap selection across searches", () => {
+    const mockClearOriginalTimeRange = vi.fn();
+    // Mirrors applyFilterTerm's append, so the Error Only toggle edits the editor text.
+    const mockApplyFiltersAppend = vi.fn((terms: string[]) => {
+      mockSearchObj.data.editorValue = `${mockSearchObj.data.editorValue} and ${terms.join(" and ")}`;
+    });
+    const composed = "(service_name = 'a') and duration >= '100ms' and duration < '500ms'";
+    const APPLIED = { startTime: 1_700_000_000_000_000, endTime: 1_700_000_060_000_000 };
+    const heatmapEntry = (overrides: Record<string, unknown> = {}) => ({
+      panelTitle: "Duration",
+      start: 100_000,
+      end: 500_000,
+      timeStart: APPLIED.startTime,
+      timeEnd: APPLIED.endTime,
+      appliedStart: APPLIED.startTime,
+      appliedEnd: APPLIED.endTime,
+      baselineFilter: "service_name = 'a'",
+      stream: "default",
+      searchMode: "traces",
+      ...overrides,
+    });
+    const savedDatetime = { ...mockSearchObj.data.datetime };
+    const filters = mockSearchObj.meta.metricsRangeFilters as Map<string, any>;
+
+    const mountPage = async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": {
+              template: "<div />",
+              setup() {
+                return {
+                  applyFilters: mockApplyFiltersAppend,
+                  removeFilterByField: vi.fn(),
+                  setEditorValue: vi.fn(),
+                };
+              },
+            },
+            "search-result": true,
+            "index-list": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      // SearchResult is not rendered before a search has run, so its ref is set the way the drill-down test does.
+      wrapper.vm.searchResultRef = {
+        metricsDashboardRef: { clearOriginalTimeRange: mockClearOriginalTimeRange },
+        getDashboardData: vi.fn(),
+      };
+      // The state a heatmap box leaves behind, set after mount so page loading cannot disturb it.
+      mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      mockSearchObj.meta.searchMode = "traces";
+      mockSearchObj.data.editorValue = composed;
+      Object.assign(mockSearchObj.data.datetime, APPLIED, { type: "absolute" });
+      filters.clear();
+      mockClearOriginalTimeRange.mockClear();
+    };
+
+    afterEach(() => {
+      Object.assign(mockSearchObj.data.datetime, savedDatetime);
+      filters.clear();
+    });
+
+    it("keeps a matching Duration entry across the search", async () => {
+      await mountPage();
+      filters.set("heatmap", heatmapEntry());
+
+      wrapper.vm.searchData();
+      await flushPromises();
+
+      expect([...filters.keys()]).toEqual(["heatmap"]);
+      expect(mockClearOriginalTimeRange).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["Errors", "(service_name = 'a') and span_status = 'ERROR'"],
+      ["Rate", "service_name = 'a'"],
+    ])("keeps a current %s entry across the search it triggers", async (panelTitle, editor) => {
+      await mountPage();
+      mockSearchObj.data.editorValue = editor;
+      filters.set("brush", heatmapEntry({ panelTitle, start: null, end: null }));
+
+      wrapper.vm.searchData();
+      await flushPromises();
+
+      expect([...filters.keys()]).toEqual(["brush"]);
+      expect(mockClearOriginalTimeRange).not.toHaveBeenCalled();
+    });
+
+    it.each(["Errors", "Rate"])(
+      "drops a stale %s entry and its original range",
+      async (panelTitle) => {
+        await mountPage();
+        mockSearchObj.data.editorValue = "service_name = 'b'";
+        filters.set("brush", heatmapEntry({ panelTitle, start: null, end: null }));
+
+        wrapper.vm.searchData();
+        await flushPromises();
+
+        expect(filters.size).toBe(0);
+        expect(mockClearOriginalTimeRange).toHaveBeenCalled();
+      },
+    );
+
+    it.each([
+      ["applied range", { appliedEnd: APPLIED.endTime - 1_000_000 }],
+      ["editor text", { baselineFilter: "service_name = 'b'" }],
+      ["stream", { stream: "test-stream" }],
+      ["search mode", { searchMode: "spans" }],
+    ])("drops a Duration entry whose %s no longer matches", async (_label, overrides) => {
+      await mountPage();
+      filters.set("heatmap", heatmapEntry(overrides));
+
+      wrapper.vm.searchData();
+      await flushPromises();
+
+      expect(filters.size).toBe(0);
+      expect(mockClearOriginalTimeRange).toHaveBeenCalled();
+    });
+
+    it("drops the entry when Error Only is toggled before the next search", async () => {
+      await mountPage();
+      filters.set("heatmap", heatmapEntry());
+
+      wrapper.vm.onErrorOnlyToggled(true);
+      wrapper.vm.searchData();
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toBe(`${composed} and span_status = 'ERROR'`);
+      expect(filters.size).toBe(0);
+    });
+
+    it("drops an entry captured in spans mode on a switch to traces mode", async () => {
+      await mountPage();
+      mockSearchObj.meta.searchMode = "spans";
+      filters.set("heatmap", heatmapEntry({ searchMode: "spans" }));
+
+      wrapper.vm.onSearchModeChange("traces");
+      await flushPromises();
+
+      expect(filters.size).toBe(0);
+      expect(mockClearOriginalTimeRange).toHaveBeenCalled();
+    });
+
+    it("drops an entry captured on another stream on a stream change", async () => {
+      await mountPage();
+      filters.set("heatmap", heatmapEntry({ stream: "test-stream" }));
+
+      await wrapper.vm.onChangeStream();
+      await flushPromises();
+
+      expect(filters.size).toBe(0);
+      expect(mockClearOriginalTimeRange).toHaveBeenCalled();
+    });
+
+    it("runs exactly one search for a comparison filter, with live mode off", async () => {
+      await mountPage();
+      mockSearchObj.meta.liveMode = false;
+      mockSearchObj.meta.searchMode = "spans";
+      mockFetchQueryDataWithHttpStream.mockClear();
+      vi.mocked(analytics.track).mockClear();
+
+      wrapper.vm.onMetricsEditorFilterRun("(service_name = 'a') and http_method = 'GET'");
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toBe("(service_name = 'a') and http_method = 'GET'");
+      const runs = vi
+        .mocked(analytics.track)
+        .mock.calls.filter(([event]: any[]) => event === "traces_search_run");
+      expect(runs).toHaveLength(1);
+      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+    });
+
+    it("drops an entry made stale by an unsearched filter edit on a sort", async () => {
+      await mountPage();
+      filters.set("heatmap", heatmapEntry());
+      mockSearchObj.data.editorValue = `${composed} and service_name = 'b'`;
+
+      wrapper.vm.runQueryOnSort();
+      await flushPromises();
+
+      expect(filters.size).toBe(0);
+      expect(mockClearOriginalTimeRange).toHaveBeenCalled();
+    });
+
+    it("keeps the entry on a page fetch after an unsearched filter edit, as the page keeps page 1's filter", async () => {
+      await mountPage();
+      filters.set("heatmap", heatmapEntry());
+      mockSearchObj.data.editorValue = `${composed} and service_name = 'b'`;
+
+      wrapper.vm.getQueryData(true);
+      await flushPromises();
+
+      expect([...filters.keys()]).toEqual(["heatmap"]);
+      expect(mockClearOriginalTimeRange).not.toHaveBeenCalled();
+    });
+
+    it("sorts an unsearched manual-mode box over its own window and keeps it", async () => {
+      await mountPage();
+      // The last search ran over the wider pre-box range; the box moved the picker and the editor only.
+      mockSearchObj.data.queryPayload = {
+        query: {
+          start_time: APPLIED.startTime - 600_000_000,
+          end_time: APPLIED.endTime + 600_000_000,
+        },
+      };
+      filters.set("heatmap", heatmapEntry());
+      mockFetchQueryDataWithHttpStream.mockClear();
+
+      wrapper.vm.runQueryOnSort();
+      await flushPromises();
+
+      const req: any = mockFetchQueryDataWithHttpStream.mock.calls.at(-1)?.[0];
+      const query = req.queryReq.query ?? req.queryReq;
+      expect([query.start_time, query.end_time]).toEqual([APPLIED.startTime, APPLIED.endTime]);
+      expect([...filters.keys()]).toEqual(["heatmap"]);
+    });
+
+    it("keeps a current entry across a sort", async () => {
+      await mountPage();
+      filters.set("heatmap", heatmapEntry());
+
+      wrapper.vm.runQueryOnSort();
+      await flushPromises();
+
+      expect([...filters.keys()]).toEqual(["heatmap"]);
+    });
+
+    it("clears the original range on Reset", async () => {
+      await mountPage();
+
+      wrapper.vm.onFiltersReset();
+
+      expect(mockClearOriginalTimeRange).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("Error Handling", () => {
     const mountForErrors = async () => {
       mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
@@ -1076,6 +1416,18 @@ describe("Index.vue (Main Traces Page)", () => {
       );
     });
 
+    it("keeps the J/K live region outside the results the error state replaces", async () => {
+      await mountForErrors();
+
+      await failSearch({ content: { message: "boom", code: 500 } });
+      announceTracesRowNav("Couldn't load page 2");
+      await flushPromises();
+
+      expect(errorState().exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-row-nav-live"]').text()).toBe("Couldn't load page 2");
+      tracesRowNavAnnouncement.value = "";
+    });
+
     it("keeps an application error code for the shared error state", async () => {
       await mountForErrors();
 
@@ -1164,7 +1516,6 @@ describe("Index.vue (Main Traces Page)", () => {
         label: "default",
         value: "default",
       };
-      mockSearchObj.meta.refreshInterval = 0;
 
       wrapper = mount(Index, {
         attachTo: node,
@@ -1257,6 +1608,97 @@ describe("Index.vue (Main Traces Page)", () => {
       const calls = mockFetchQueryDataWithHttpStream.mock.calls;
       return calls[calls.length - 1][1];
     };
+
+    describe("J/K page crossing signals (4a §3.4)", () => {
+      const navigation = () => mockSearchObj.meta.resultGrid.navigation;
+      const pend = () => {
+        navigation().pendingPageSelection = { page: 2, position: "first", requestId: null };
+      };
+      const sentTraceId = () => {
+        const calls = mockFetchQueryDataWithHttpStream.mock.calls;
+        return calls[calls.length - 1][0].traceId;
+      };
+
+      afterEach(() => {
+        navigation().pendingPageSelection = null;
+        navigation().selectionActive = false;
+        navigation().currentRowIndex = 0;
+        mockSearchObj.data.resultGrid.pageRequest = null;
+        mockSearchObj.data.resultGrid.pageLoad = null;
+      });
+
+      it("binds the crossing to the page request it sends and records its completion", async () => {
+        await mountPage();
+        mockFetchQueryDataWithHttpStream.mockClear();
+        pend();
+        await wrapper.vm.getQueryData(true);
+        const traceId = sentTraceId();
+        expect(navigation().pendingPageSelection?.requestId).toBe(traceId);
+        expect(mockSearchObj.data.resultGrid.pageRequest).toEqual({ requestId: traceId });
+
+        lastCallbacks().complete(null);
+        expect(mockSearchObj.data.resultGrid.pageLoad).toEqual({
+          requestId: traceId,
+          ok: true,
+          reason: "done",
+        });
+      });
+
+      it("records `error` from the page request's error callback", async () => {
+        await mountPage();
+        mockFetchQueryDataWithHttpStream.mockClear();
+        pend();
+        await wrapper.vm.getQueryData(true);
+        lastCallbacks().error(null, { content: { message: "boom", code: 500 } });
+        expect(mockSearchObj.data.resultGrid.pageLoad).toEqual({
+          requestId: sentTraceId(),
+          ok: false,
+          reason: "error",
+        });
+      });
+
+      it("records `error` when the request throws after it was bound (outer catch)", async () => {
+        await mountPage();
+        mockFetchQueryDataWithHttpStream.mockImplementationOnce(() => {
+          throw new Error("init");
+        });
+        pend();
+        await wrapper.vm.getQueryData(true);
+        const bound = navigation().pendingPageSelection?.requestId;
+        expect(bound).toBeTruthy();
+        expect(mockSearchObj.data.resultGrid.pageLoad).toEqual({
+          requestId: bound,
+          ok: false,
+          reason: "error",
+        });
+      });
+
+      it("records `cancelled` when the user cancels the bound page request", async () => {
+        await mountPage();
+        mockFetchQueryDataWithHttpStream.mockClear();
+        pend();
+        await wrapper.vm.getQueryData(true);
+        wrapper.vm.cancelSearch();
+        expect(mockSearchObj.data.resultGrid.pageLoad).toEqual({
+          requestId: sentTraceId(),
+          ok: false,
+          reason: "cancelled",
+        });
+      });
+
+      it("a new search drops the selection and any crossing", async () => {
+        await mountPage();
+        pend();
+        navigation().selectionActive = true;
+        navigation().currentRowIndex = 7;
+        await wrapper.vm.getQueryData(false);
+        expect(navigation()).toMatchObject({
+          selectionActive: false,
+          currentRowIndex: null,
+          pendingPageSelection: null,
+        });
+      });
+    });
 
     it("replaces the previous page when the stream opens with an empty batch", async () => {
       await mountPage();
@@ -1365,9 +1807,25 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
       vi.mocked(analytics.track).mockClear();
 
+      const { data, complete } = lastCallbacks();
+      data(null, meta([]));
+      data(null, chunk(spans("a", 7)));
+      complete(null);
+
+      expect(analytics.track).toHaveBeenCalledWith("traces_search_completed", { hits: 7 });
+    });
+
+    it("reports zero hits when the search writes no rows", async () => {
+      await mountPage();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      await wrapper.vm.getQueryData(false);
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+      mockSearchObj.data.queryResults.hits = spans("old", 5);
+
       lastCallbacks().complete(null);
 
-      expect(analytics.track).toHaveBeenCalledWith("traces_search_completed");
+      expect(analytics.track).toHaveBeenCalledWith("traces_search_completed", { hits: 0 });
     });
 
     it("does not track traces_search_completed when a page completes", async () => {
@@ -1379,7 +1837,8 @@ describe("Index.vue (Main Traces Page)", () => {
 
       lastCallbacks().complete(null);
 
-      expect(analytics.track).not.toHaveBeenCalledWith("traces_search_completed");
+      const events = vi.mocked(analytics.track).mock.calls.map((c) => c[0]);
+      expect(events).not.toContain("traces_search_completed");
     });
   });
 
@@ -1387,6 +1846,7 @@ describe("Index.vue (Main Traces Page)", () => {
     // Spies for SearchBar ref methods exposed via stub
     const mockApplyFilters = vi.fn();
     const mockRemoveFilterByField = vi.fn();
+    const mockSetEditorValue = vi.fn();
 
     function mountWithSearchBarStub() {
       return mount(Index, {
@@ -1401,6 +1861,7 @@ describe("Index.vue (Main Traces Page)", () => {
                 return {
                   applyFilters: mockApplyFilters,
                   removeFilterByField: mockRemoveFilterByField,
+                  setEditorValue: mockSetEditorValue,
                 };
               },
             },
@@ -1417,6 +1878,7 @@ describe("Index.vue (Main Traces Page)", () => {
     beforeEach(() => {
       mockApplyFilters.mockReset();
       mockRemoveFilterByField.mockReset();
+      mockSetEditorValue.mockReset();
       mockSearchObj.data.editorValue = "";
       mockSearchObj.meta.metricsRangeFilters.clear();
       // Reset auto_query_enabled to undefined for each test
@@ -1434,48 +1896,60 @@ describe("Index.vue (Main Traces Page)", () => {
     it("should open the analysis dashboard on SearchResult when SearchBar emits drill-down", async () => {
       wrapper = mountWithSearchBarStub();
       await flushPromises();
-      const openUnifiedAnalysisDashboard = vi.fn();
-      wrapper.vm.searchResultRef = { openUnifiedAnalysisDashboard };
+      const openComparison = vi.fn();
+      wrapper.vm.searchResultRef = { openComparison };
 
       wrapper.findComponent('[data-test="logs-search-bar"]').vm.$emit("drill-down");
       await flushPromises();
 
-      expect(openUnifiedAnalysisDashboard).toHaveBeenCalledTimes(1);
+      expect(openComparison).toHaveBeenCalledTimes(1);
     });
 
-    it("should call applyFilters with all filter terms when metrics filters are updated", async () => {
+    it("has no filters-updated handler: brushes write the editor through editor-filter-set", async () => {
       wrapper = mountWithSearchBarStub();
       await flushPromises();
-
-      wrapper.vm.onMetricsFiltersUpdated(["duration >= 100", "service_name = 'test'"]);
-      await flushPromises();
-
-      expect(mockApplyFilters).toHaveBeenCalledWith(["duration >= 100", "service_name = 'test'"]); // applyFilters owns the single trigger; no skipSearch arg
+      expect(wrapper.vm.onMetricsFiltersUpdated).toBeUndefined();
     });
 
-    it("should append error filter to applyFilters call when span_status = 'ERROR' is in the query", async () => {
-      mockSearchObj.data.editorValue = "span_status = 'ERROR'";
-      wrapper = mountWithSearchBarStub();
-      await flushPromises();
+    describe("onMetricsEditorFilterSet", () => {
+      const searchDataRuns = () =>
+        vi
+          .mocked(analytics.track)
+          .mock.calls.filter(([event]: any[]) => event === "traces_search_run").length;
 
-      wrapper.vm.onMetricsFiltersUpdated(["duration >= 100"]);
-      await flushPromises();
+      beforeEach(() => {
+        mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
+        mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      });
 
-      expect(mockApplyFilters).toHaveBeenCalledWith(["duration >= 100", "span_status = 'ERROR'"]); // applyFilters owns the single trigger; no skipSearch arg
-    });
+      it("sets the editor text and runs exactly one search in live mode", async () => {
+        mockSearchObj.meta.liveMode = true;
+        store.state.zoConfig.auto_query_enabled = true;
+        wrapper = mountWithSearchBarStub();
+        await flushPromises();
+        vi.mocked(analytics.track).mockClear();
 
-    it("should not duplicate error filter when it is already present in incoming filters", async () => {
-      mockSearchObj.data.editorValue = "span_status = 'ERROR'";
-      wrapper = mountWithSearchBarStub();
-      await flushPromises();
+        wrapper.vm.onMetricsEditorFilterSet("(a = '1') and duration < '1ms'");
 
-      // Error panel brush already emitted span_status filter
-      wrapper.vm.onMetricsFiltersUpdated(["duration >= 100", "span_status = 'ERROR'"]);
-      await flushPromises();
+        expect(mockSearchObj.data.editorValue).toBe("(a = '1') and duration < '1ms'");
+        expect(mockSetEditorValue).toHaveBeenCalledWith("(a = '1') and duration < '1ms'");
+        expect(searchDataRuns()).toBe(1);
+      });
 
-      // span_status = 'ERROR' must appear exactly once
-      const calledWith = mockApplyFilters.mock.calls[0][0] as string[];
-      expect(calledWith.filter((f) => f === "span_status = 'ERROR'")).toHaveLength(1);
+      it("sets the editor text and runs no search with live mode off", async () => {
+        store.state.zoConfig.auto_query_enabled = true;
+        wrapper = mountWithSearchBarStub();
+        await flushPromises();
+        // Mount derives liveMode from auto_query_enabled, so switch it off afterwards.
+        mockSearchObj.meta.liveMode = false;
+        vi.mocked(analytics.track).mockClear();
+
+        wrapper.vm.onMetricsEditorFilterSet("duration < '1ms'");
+
+        expect(mockSearchObj.data.editorValue).toBe("duration < '1ms'");
+        expect(mockSetEditorValue).toHaveBeenCalledWith("duration < '1ms'");
+        expect(searchDataRuns()).toBe(0);
+      });
     });
 
     it("should call applyFilters with error condition when error only toggle is turned on", async () => {
@@ -1496,73 +1970,6 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(mockRemoveFilterByField).toHaveBeenCalledWith("span_status");
-    });
-
-    // Index no longer branches on liveMode / passes a skipSearch flag — it always
-    // calls applyFilters with just the filters; the live-mode search-gating now
-    // lives inside SearchBar.applyFilters (covered in SearchBar.spec).
-    it("should call applyFilters with only the filters when live mode is ON", async () => {
-      mockSearchObj.meta.liveMode = true;
-      store.state.zoConfig.auto_query_enabled = true;
-      wrapper = mountWithSearchBarStub();
-      await flushPromises();
-
-      const testFilters = ["duration > 100ms", 'service_name = "api"'];
-      wrapper.vm.onMetricsFiltersUpdated(testFilters);
-      await flushPromises();
-
-      expect(mockApplyFilters).toHaveBeenCalledWith(testFilters);
-    });
-
-    it("should call applyFilters with only the filters when live mode is OFF", async () => {
-      mockSearchObj.meta.liveMode = false;
-      wrapper = mountWithSearchBarStub();
-      await flushPromises();
-
-      const testFilters = ['span_status = "ERROR"'];
-      wrapper.vm.onMetricsFiltersUpdated(testFilters);
-      await flushPromises();
-
-      expect(mockApplyFilters).toHaveBeenCalledWith(testFilters);
-    });
-
-    it("should call applyFilters with only the filters when liveMode is undefined", async () => {
-      mockSearchObj.meta.liveMode = undefined;
-      wrapper = mountWithSearchBarStub();
-      await flushPromises();
-
-      const testFilters = ['http_method = "POST"'];
-      wrapper.vm.onMetricsFiltersUpdated(testFilters);
-      await flushPromises();
-
-      expect(mockApplyFilters).toHaveBeenCalledWith(testFilters);
-    });
-
-    it("should handle searchBarRef not available", async () => {
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true, // No exposed methods
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            "services-catalog": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-      await flushPromises();
-
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-
-      wrapper.vm.onMetricsFiltersUpdated(["test"]);
-      await flushPromises();
-
-      expect(consoleSpy).toHaveBeenCalledWith("SearchBar not ready for filter application");
-      consoleSpy.mockRestore();
     });
   });
 
@@ -1780,9 +2187,7 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(result).toBeUndefined();
     });
 
-    it("should handle refresh interval of 0 correctly", async () => {
-      mockSearchObj.meta.refreshInterval = 5;
-
+    it("getMoreData fetches the next page", async () => {
       wrapper = mount(Index, {
         attachTo: node,
         global: {
@@ -1798,14 +2203,58 @@ describe("Index.vue (Main Traces Page)", () => {
           },
         },
       });
+      await flushPromises();
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      mockFetchQueryDataWithHttpStream.mockClear();
 
+      await wrapper.vm.getMoreData();
       await flushPromises();
 
-      // Should not call getQueryData when refresh interval is not 0
-      await wrapper.vm.getMoreData();
+      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
+    });
 
-      // No error should be thrown
-      expect(wrapper.vm).toBeTruthy();
+    it("tracks traces_search_run and traces_more_rows_loaded without user or page fields", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+      mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      mockSearchObj.meta.showQuery = true;
+      mockSearchObj.meta.showHistogram = false;
+      mockSearchObj.meta.sqlMode = false;
+      mockSearchObj.meta.showFields = true;
+      vi.mocked(analytics.track).mockClear();
+
+      wrapper.vm.searchData();
+      await wrapper.vm.getMoreData();
+      await flushPromises();
+
+      expect(analytics.track).toHaveBeenCalledWith("traces_search_run", {
+        stream_name: "default",
+        show_query: true,
+        show_histogram: false,
+        sql_mode: false,
+        show_fields: true,
+      });
+      expect(analytics.track).toHaveBeenCalledWith("traces_more_rows_loaded", {
+        stream_name: "default",
+      });
+      expect(analytics.track).not.toHaveBeenCalledWith("Button Click", expect.anything());
     });
   });
 
@@ -1989,6 +2438,8 @@ describe("Index.vue (Main Traces Page)", () => {
     });
 
     it("should not call cancelStreamQueryBasedOnRequestId when there is no active trace id", async () => {
+      // With a stream list, mount starts a search a variable number of macrotask hops later; no streams means none.
+      mockGetStreams.mockResolvedValueOnce({ list: [] });
       wrapper = mount(Index, {
         attachTo: node,
         global: {
@@ -2005,12 +2456,20 @@ describe("Index.vue (Main Traces Page)", () => {
         },
       });
 
-      await flushPromises();
+      for (let i = 0; i < 3; i++) {
+        await flushPromises();
+        await new Promise((r) => setTimeout(r, 0));
+      }
+      // Unmounted instances from earlier tests can still search on the shared mocks, so only this instance counts.
+      const ownSearches = mockFetchQueryDataWithHttpStream.mock.contexts.filter(
+        (owner) => owner === wrapper.vm.$,
+      );
+      expect(ownSearches).toHaveLength(0);
 
+      // cancelSearch is synchronous, so bracketing it keeps a leftover instance's cancel out of the count.
+      const cancelsBefore = mockCancelStreamQueryBasedOnRequestId.mock.calls.length;
       wrapper.vm.cancelSearch();
-      await flushPromises();
-
-      expect(mockCancelStreamQueryBasedOnRequestId).not.toHaveBeenCalled();
+      expect(mockCancelStreamQueryBasedOnRequestId.mock.calls.length).toBe(cancelsBefore);
     });
 
     it.skip("should call cancelStreamQueryBasedOnRequestId with trace id and org id when a search is in-flight", async () => {
@@ -3555,6 +4014,70 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       mockFetchQueryDataWithHttpStream.mockReset();
+    });
+  });
+
+  describe("restoreFilters with unparsable SQL", () => {
+    it("returns without touching filters when the saved filter does not parse", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      const parser = createdTracesParsers.at(-1) as { astify: ReturnType<typeof vi.fn> };
+      parser.astify.mockImplementationOnce(() => {
+        throw new Error("Expected end of input");
+      });
+
+      expect(() => wrapper.vm.restoreFilters("service_name = ")).not.toThrow();
+    });
+  });
+
+  describe("traces count failure logging", () => {
+    it("warns with the error instead of logging a bare console error", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      mockSearchObj.data.queryPayload = { query: { start_time: 1, end_time: 2 } };
+      mockFetchQueryDataWithHttpStream.mockClear();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const err = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      wrapper.vm.fetchTracesCount();
+      const [, handlers] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+      const failure = { content: { message: "network error" } };
+      handlers.error({}, failure);
+
+      expect(warn).toHaveBeenCalledWith("Failed to fetch traces count", failure);
+      expect(err).not.toHaveBeenCalledWith("Failed to fetch traces count");
+      warn.mockRestore();
+      err.mockRestore();
+      mockSearchObj.data.queryPayload = null;
     });
   });
 });

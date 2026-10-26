@@ -17,27 +17,29 @@ use std::time::Duration;
 
 use axum::{
     Router,
-    extract::{DefaultBodyLimit, FromRequestParts, Path, Request},
-    http::{Method, StatusCode, Uri, header},
+    extract::{DefaultBodyLimit, FromRequestParts, Path, RawPathParams, Request},
+    http::{Method, StatusCode, Uri, header, request::Parts},
     middleware::{self, Next},
     response::{IntoResponse, Redirect, Response},
     routing::{delete, get, patch, post, put},
 };
 use config::get_config;
-use openobserve_api_common::X_O2_ASSISTANT_SESSION_ID;
+use openobserve_api_common::{X_O2_ASSISTANT_SESSION_ID, X_O2_ASSISTANT_TURN_ID};
 use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
-#[cfg(feature = "cloud")]
-use openobserve_api_management::request::cloud;
 #[cfg(feature = "profiling")]
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
-    alerts, announcements, authz, dashboards, db_monitoring, folders, kv, model_pricing,
-    organization, query_history, rum_analytics, service_accounts, short_url, slos, sourcemaps,
-    status, status_pages, stream, synthetics, users,
+    alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, ingest_rejections,
+    kv, metrics_usage, model_pricing, organization, query_history, rum_analytics, service_accounts,
+    short_url, slack, slos, sourcemaps, status, status_pages, stream, synthetics, users,
 };
+#[cfg(feature = "cloud")]
+use openobserve_api_management::request::{cloud, organization::billing_group};
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
-use openobserve_api_search::{profiles as profiles_query, promql, search, traces};
-use openobserve_core::auth::AuthExtractor;
+use openobserve_api_search::{
+    profiles as profiles_query, promql, rum as rum_query, search, traces,
+};
+use openobserve_core::auth::{AuthExtractor, org_from_path, routed_path};
 use tower_http::{
     cors::{AllowOrigin, CorsLayer},
     decompression::RequestDecompressionLayer,
@@ -49,14 +51,19 @@ use {
     audit::audit,
     axum::body::{Body, to_bytes},
     config::utils::time::now_micros,
-    o2_enterprise::enterprise::common::{
-        auditor::{AuditMessage, Protocol, ResponseMeta},
-        config::get_config as get_o2_config,
+    o2_enterprise::enterprise::{
+        common::{
+            auditor::{AuditMessage, DelegatedAudit, Protocol, ResponseMeta},
+            config::get_config as get_o2_config,
+        },
+        fleet::opamp,
     },
+    openobserve_api_common::auth::delegation::DelegatedCaller,
     openobserve_api_management::request::{
-        ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
-        domain_management, eval_jobs, experiments, gen_ai, keys, license, oncall, playground,
-        prompts, providers, remote_tasks, score_configs, scorers, service_streams, workflows,
+        ai, alert_calibration, annotation_queues, annotations, anomaly_detection, datasets,
+        discovery, domain_management, eval_jobs, experiments, fleet, gen_ai, keys, license, oncall,
+        playground, prompts, providers, remote_tasks, score_configs, scorers, service_streams,
+        workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -69,10 +76,13 @@ use crate::{
     common::meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
     handler::http::{
         auth::validator::{
-            RequestData, oo_validator, validator_aws, validator_gcp, validator_proxy_url,
-            validator_rum,
+            AuthError, RequestData, oo_validator, validator_aws, validator_gcp,
+            validator_proxy_url, validator_rum,
         },
-        router::middlewares::{blocked_orgs_middleware, password_policy_middleware},
+        router::middlewares::{
+            blocked_org_param, blocked_orgs_middleware, ingest_rejections_middleware,
+            password_policy_middleware, root_only_middleware,
+        },
     },
 };
 
@@ -81,6 +91,10 @@ pub mod middlewares;
 pub mod openapi;
 
 use common::meta::http::ERROR_HEADER;
+
+/// How long a refused agent waits before reconnecting while fleet management is off.
+#[cfg(feature = "enterprise")]
+const FLEET_RETRY_AFTER_SECS: &str = "60";
 
 /// Create CORS layer for axum
 pub fn cors_layer() -> CorsLayer {
@@ -113,6 +127,7 @@ pub fn cors_layer() -> CorsLayer {
             header::HeaderName::from_static("x-openobserve-parent-id"),
             header::HeaderName::from_static("x-openobserve-sampling-priority"),
             X_O2_ASSISTANT_SESSION_ID,
+            X_O2_ASSISTANT_TURN_ID,
         ])
         // Restrict CORS to the configured web_url origin, plus any extra origins in
         // ZO_CORS_ALLOWED_ORIGINS (comma-separated).  mirror_request() + allow_credentials(true)
@@ -250,6 +265,26 @@ fn attach_mcp_www_authenticate(_org_id: &str, resp: Response) -> Response {
     resp
 }
 
+/// Rejects missing organizations and disagreements between routing and auth.
+async fn validate_routed_org(parts: &mut Parts) -> Result<(), AuthError> {
+    let Ok(params) = RawPathParams::from_request_parts(parts, &()).await else {
+        return Ok(());
+    };
+    let Some((_, routed_org)) = params.iter().find(|(name, _)| *name == "org_id") else {
+        return Ok(());
+    };
+    // The nest strip drops an empty `{org_id}` segment from the URI, so auth checks the next one.
+    if routed_org.is_empty() {
+        return Err(AuthError::NotFound("Organization not found".to_string()));
+    }
+    let path_columns: Vec<&str> = routed_path(parts.uri.path()).split('/').collect();
+    // The router hands over the decoded param, so compare it with the decoded segment.
+    if !urlencoding::decode(org_from_path(&path_columns)).is_ok_and(|org| org == routed_org) {
+        return Err(AuthError::Forbidden("Unauthorized Access".to_string()));
+    }
+    Ok(())
+}
+
 /// Authentication middleware for API routes.
 ///
 /// Pair it with `password_policy_middleware` layered inside it on every router that uses it: this
@@ -266,6 +301,10 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
     // Extract auth info from request (synchronous now, no await)
     let (mut parts, body) = request.into_parts();
     let uri = req_data.uri.clone();
+    // The auth layers check one org, so the handler must serve that same org.
+    if let Err(error) = validate_routed_org(&mut parts).await {
+        return error.into_response();
+    }
     let auth_info = match AuthExtractor::from_request_parts(&mut parts, &()).await {
         Ok(info) => info,
         Err(e) => return maybe_add_mcp_www_authenticate(&uri, e.into_response()),
@@ -289,7 +328,17 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
                 );
             }
 
-            next.run(Request::from_parts(parts, body)).await
+            if let Some(caller) = result.delegation {
+                parts.extensions.insert(caller);
+            }
+
+            let mut response = next.run(Request::from_parts(parts, body)).await;
+            if let Some(token_name) = result.token_name {
+                response.extensions_mut().insert(
+                    openobserve_core::ingestion::rejections::RejectionTokenName(token_name),
+                );
+            }
+            response
         }
         Err(e) => maybe_add_mcp_www_authenticate(&uri, e.into_response()),
     }
@@ -402,6 +451,9 @@ fn is_secret_write(method: &Method, path: &str) -> bool {
     if method == Method::PUT && segments.ends_with(&["prompts", "settings", "secret"]) {
         return true;
     }
+    if let Some(slack) = slack_path(&segments) {
+        return is_slack_secret_write(method, slack);
+    }
     let Some(tasks) = segments.iter().position(|segment| *segment == "tasks") else {
         return false;
     };
@@ -412,12 +464,82 @@ fn is_secret_write(method: &Method, path: &str) -> bool {
             .any(|segment| matches!(*segment, "auth" | "headers" | "signing"))
 }
 
+/// The segments after `{org}/slack/`: the audit layer runs below `/api` and the base URI.
+#[cfg(any(feature = "enterprise", test))]
+fn slack_path<'a>(segments: &'a [&'a str]) -> Option<&'a [&'a str]> {
+    let segments = match segments {
+        ["api", rest @ ..] if rest.get(1) == Some(&"slack") => rest,
+        _ => segments,
+    };
+    (segments.get(1) == Some(&"slack")).then(|| &segments[2..])
+}
+
+/// Slack bodies that carry an OAuth code, a connect ticket or app credentials.
+#[cfg(any(feature = "enterprise", test))]
+fn is_slack_secret_write(method: &Method, slack: &[&str]) -> bool {
+    matches!(
+        (method, slack),
+        (
+            &Method::POST,
+            ["install", "exchange"]
+                | ["installations"]
+                | ["connection", "confirm"]
+                | ["link-requests", "confirm"]
+                | ["installations", _, "connection"]
+        ) | (&Method::PUT, ["installations", _, "credentials"])
+    )
+}
+
+/// The path as `audit_middleware` sees it, already below `/api` and the base URI.
+#[cfg(any(feature = "enterprise", test))]
+fn audited_path(uri: &Uri) -> String {
+    let path = uri.path();
+    path.strip_prefix('/').unwrap_or(path).to_string()
+}
+
+#[cfg(any(feature = "enterprise", test))]
+fn audit_org_and_next<'a>(path_columns: &[&'a str]) -> (&'a str, &'a str) {
+    let org = org_from_path(path_columns);
+    // Pointer equality finds the org's own slot even when an earlier segment has the same text.
+    let next = path_columns
+        .iter()
+        .position(|column| std::ptr::eq(*column, org))
+        .and_then(|at| path_columns.get(at + 1))
+        .copied()
+        .unwrap_or("");
+    (org, next)
+}
+
+/// A delegated `/ai/chat` is audited like a Slack `chat_stream` turn: no question text.
+#[cfg(feature = "enterprise")]
+fn delegated_chat_audit_body(
+    method: &Method,
+    path: &str,
+    delegated: bool,
+    slack_event: Option<&str>,
+    body: &[u8],
+) -> Option<String> {
+    let is_chat = method == Method::POST && path.split('/').skip(1).eq(["ai", "chat"]);
+    (delegated && is_chat).then(|| {
+        openobserve_api_management::request::ai::chat::slack_audit_body(
+            serde_json::from_slice(body).unwrap_or_default(),
+            slack_event,
+        )
+    })
+}
+
 /// The request body as the audit trail may store it.
 #[cfg(any(feature = "enterprise", test))]
 fn audit_body(method: &Method, path: &str, content_type: Option<&str>, body: Vec<u8>) -> String {
     use base64::Engine as _;
     if is_secret_write(method, path) {
         return "[REDACTED: secret write]".to_string();
+    }
+    #[cfg(feature = "enterprise")]
+    if let Some(body) =
+        o2_enterprise::enterprise::fleet::audit::redact_config_write(method, path, &body)
+    {
+        return body;
     }
     if path.ends_with("/settings/logo") {
         return base64::engine::general_purpose::STANDARD.encode(&body);
@@ -499,12 +621,23 @@ fn is_secret_field(name: &str) -> bool {
             .any(|word| name.contains(word))
 }
 
+/// A fleet change is published at once, so the Audit tab shows it before the periodic publish.
+#[cfg(feature = "enterprise")]
+fn fleet_mutation(method: &Method, path: &str) -> bool {
+    if matches!(*method, Method::GET | Method::HEAD | Method::OPTIONS) {
+        return false;
+    }
+    let segments: Vec<&str> = path.split('/').collect();
+    let org_at = usize::from(segments.first() == Some(&"api"));
+    let module = segments.get(org_at + 1).copied();
+    module == Some("fleet") || (segments.get(org_at) == Some(&"v2") && module == Some("fleets"))
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn audit_middleware(request: Request, next: Next) -> Response {
     let http_method = request.method().clone();
     let method = http_method.to_string();
-    let path = request.uri().path();
-    let path = path.strip_prefix("/").unwrap_or(path).to_string();
+    let path = audited_path(request.uri());
     let path_columns = path.split('/').collect::<Vec<&str>>();
 
     let ingestion_path = if path.starts_with("api/") {
@@ -515,23 +648,18 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
         &path
     };
 
+    let (audit_org, after_org) = audit_org_and_next(&path_columns);
+
     if get_o2_config().common.audit_enabled
-        && !(path_columns
-            .get(1)
-            .unwrap_or(&"")
-            .to_string()
-            .ends_with("_stream")
+        && !(after_org.ends_with("_stream")
             || path.ends_with("ai/chat_stream")
             || common::meta::ingestion_routes::is_ingestion_write(&http_method, ingestion_path))
     {
         let query_params = request.uri().query().unwrap_or("").to_string();
-        let org_id = {
-            let org = path_columns.first().unwrap_or(&"");
-            if org.eq(&"organizations") {
-                "".to_string()
-            } else {
-                org.to_string()
-            }
+        let org_id = if audit_org == "organizations" {
+            String::new()
+        } else {
+            audit_org.to_string()
         };
 
         let user_email = request
@@ -546,6 +674,20 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
             .get(header::CONTENT_TYPE)
             .and_then(|v| v.to_str().ok())
             .map(str::to_string);
+        let slack_event = request
+            .headers()
+            .get(openobserve_api_management::request::ai::chat::SLACK_EVENT_HEADER)
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_string);
+
+        let delegated =
+            request
+                .extensions()
+                .get::<DelegatedCaller>()
+                .map(|caller| DelegatedAudit {
+                    link_id: caller.link_id.clone(),
+                    jti: caller.jti.clone(),
+                });
 
         // Extract body
         let (parts, body) = request.into_parts();
@@ -573,24 +715,42 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
         response.headers_mut().remove(ERROR_HEADER);
 
         if response.status().is_success() || response.status().is_redirection() {
-            let body = audit_body(&http_method, &path, content_type.as_deref(), request_body);
+            let slack_chat = delegated_chat_audit_body(
+                &http_method,
+                &path,
+                delegated.is_some(),
+                slack_event.as_deref(),
+                &request_body,
+            );
+            let protocol = if slack_chat.is_some() {
+                Protocol::Slack
+            } else {
+                Protocol::Http
+            };
+            let body = slack_chat.unwrap_or_else(|| {
+                audit_body(&http_method, &path, content_type.as_deref(), request_body)
+            });
 
             audit(AuditMessage {
                 user_email,
                 org_id,
                 _timestamp: now_micros(),
-                protocol: Protocol::Http,
+                protocol,
                 response_meta: ResponseMeta {
                     http_method: method,
-                    http_path: path,
+                    http_path: config::axum::middlewares::mask_share_tokens(&path),
                     http_body: body,
                     http_query_params: query_params,
                     http_response_code: response.status().as_u16(),
                     error_msg,
                     trace_id: None,
                 },
+                delegated,
             })
             .await;
+            if fleet_mutation(&http_method, &path) {
+                tokio::spawn(audit::flush());
+            }
         }
         response
     } else {
@@ -732,24 +892,7 @@ pub fn basic_routes() -> Router {
         .route("/invites/{token}", delete(users::decline_invitation));
     router = router.nest("/auth", auth_routes);
 
-    // Node routes with auth
-    let mut node_routes = Router::new()
-        .route("/status", get(status::cache_status))
-        .route("/enable", put(status::enable_node))
-        .route("/flush", put(status::flush_node))
-        .route("/reload", get(status::cache_reload))
-        .route("/list", get(status::list_node))
-        .route("/metrics", get(status::node_metrics));
-
-    #[cfg(feature = "enterprise")]
-    {
-        node_routes = node_routes.route("/drain_status", get(status::drain_status));
-    }
-
-    node_routes = node_routes
-        .route("/consistent_hash", post(status::consistent_hash))
-        .route("/refresh_nodes_list", get(status::refresh_nodes_list))
-        .route("/refresh_user_sessions", get(status::refresh_user_sessions))
+    let node_routes = node_routes()
         // Listed first, so it wraps closer to the route and runs after authentication.
         .layer(middleware::from_fn(password_policy_middleware))
         .layer(middleware::from_fn(auth_middleware));
@@ -794,6 +937,11 @@ pub fn basic_routes() -> Router {
             "/api/v2/{org_id}/oncall/ack",
             get(oncall::ack_page).post(oncall::acknowledge),
         );
+        // Unauthenticated like the email link: the signed token in the path is the credential.
+        router = router.route(
+            "/api/v2/{org_id}/oncall/ack/voice/{token}",
+            post(oncall::voice_ack),
+        );
     }
 
     // External alert source webhooks — token-authenticated inside the handler itself
@@ -812,6 +960,24 @@ pub fn basic_routes() -> Router {
         .route_layer(DefaultBodyLimit::max(
             alerts::external_events::MAX_BODY_BYTES,
         ));
+
+    // Slack signs these requests; ENT verifies the signature, so they stay out of auth_middleware.
+    router = router
+        .route(
+            "/api/slack/events",
+            post(slack::inbound::events)
+                .layer(DefaultBodyLimit::max(slack::inbound::MAX_BODY_BYTES)),
+        )
+        .route(
+            "/api/slack/commands",
+            post(slack::inbound::commands)
+                .layer(DefaultBodyLimit::max(slack::inbound::MAX_BODY_BYTES)),
+        )
+        .route(
+            "/api/slack/interactions",
+            post(slack::inbound::interactions)
+                .layer(DefaultBodyLimit::max(slack::inbound::MAX_BODY_BYTES)),
+        );
 
     // Public status pages — unauthenticated by design, like chart_render
     // above: existence and visibility are checked inside the handler, and the
@@ -838,6 +1004,15 @@ pub fn basic_routes() -> Router {
                 get(status_pages::public::feed),
             )
             .route("/status/{slug}", get(status_pages::public::page));
+    }
+
+    // Unauthenticated like status pages: the share token is checked in the handler.
+    #[cfg(feature = "enterprise")]
+    if get_config().public_ai_chat.enabled {
+        router = router.route(
+            "/api/public/ai_chats/{token}",
+            get(openobserve_api_management::request::ai::shares::get_public),
+        );
     }
 
     router
@@ -871,6 +1046,58 @@ pub fn config_routes() -> Router {
 }
 
 /// Create main API service routes
+/// The AI assistant's chat, chat history and chat sharing routes.
+#[cfg(feature = "enterprise")]
+fn ai_chat_routes(router: Router) -> Router {
+    router
+        .route("/{org_id}/ai/chat", post(ai::chat::chat))
+        .route("/{org_id}/ai/chat_stream", post(ai::chat::chat_stream))
+        .route("/{org_id}/ai/feedback", post(ai::chat::feedback))
+        .route(
+            "/{org_id}/ai/confirm/{session_id}",
+            post(ai::chat::confirm_action),
+        )
+        .route(
+            "/{org_id}/ai/chats",
+            get(ai::chats::list).delete(ai::chats::delete_all),
+        )
+        .route(
+            "/{org_id}/ai/chats/{session_id}",
+            get(ai::chats::get)
+                .patch(ai::chats::rename)
+                .delete(ai::chats::delete),
+        )
+        .route(
+            "/{org_id}/ai/chats/{session_id}/cancel",
+            post(ai::chat::cancel),
+        )
+        .route(
+            "/{org_id}/ai/chats/{session_id}/shares",
+            get(ai::shares::list_for_chat).post(ai::shares::create),
+        )
+        .route("/{org_id}/ai/shares", get(ai::shares::list_mine))
+        .route(
+            "/{org_id}/ai/shares/{share_id}",
+            patch(ai::shares::update).delete(ai::shares::revoke),
+        )
+        .route("/{org_id}/ai/shared/{token}", get(ai::shares::get_shared))
+        .route("/{org_id}/ai/shared/{token}/fork", post(ai::shares::fork))
+}
+
+#[cfg(feature = "enterprise")]
+#[rustfmt::skip]
+fn alert_calibration_routes(router: Router) -> Router {
+    router
+        .route("/v2/{org_id}/alert_calibration/config", get(alert_calibration::config::get_alert_calibration_config).put(alert_calibration::config::update_alert_calibration_config))
+        .route("/v2/{org_id}/alert_calibration/status", get(alert_calibration::digests::get_status))
+        .route("/v2/{org_id}/alert_calibration/digests", get(alert_calibration::digests::list_runs))
+        .route("/v2/{org_id}/alert_calibration/digests/alerts", get(alert_calibration::digests::list_runs_for_alert))
+        .route("/v2/{org_id}/alert_calibration/digests/records", get(alert_calibration::digests::get_run_records))
+        .route("/v2/{org_id}/alert_calibration/digests/rules", get(alert_calibration::digests::count_findings_by_rule))
+        .route("/v2/{org_id}/alert_calibration/digests/run", post(alert_calibration::digests::run_alert_calibration))
+}
+
+#[rustfmt::skip]
 pub fn service_routes() -> Router {
     let cfg = get_config();
 
@@ -884,7 +1111,8 @@ pub fn service_routes() -> Router {
     #[cfg(not(feature = "enterprise"))]
     let server = cfg.common.instance_name_short.to_string();
 
-    let mut router = Router::new();
+    // Downtimes and Slack live in their own tables to keep this function under the line limit.
+    let mut router = Router::new().merge(downtime_routes()).merge(slack_routes());
     // Full UI configuration — authenticated counterpart of the unauthenticated
     // `/config` bootstrap in config_routes()
     router = router.route("/{org_id}/config", get(status::zo_config));
@@ -921,6 +1149,7 @@ pub fn service_routes() -> Router {
         .route("/organizations", get(organization::org::organizations).post(organization::org::create_org))
         .route("/{org_id}/organizations/assume_service_account", post(organization::assume_service_account::assume_service_account))
         .route("/{org_id}/org_cleanup_tasks/{target_org_id}", get(organization::org::list_org_cleanup_tasks))
+        .route("/{org_id}/org_cleanup_tasks/{target_org_id}/retry", post(organization::org::retry_org_cleanup))
         .route(
             "/{org_id}/organizations/{target_org_id}/resurrect",
             post(organization::org::resurrect_org_deletion),
@@ -941,6 +1170,7 @@ pub fn service_routes() -> Router {
 
         // Org info
         .route("/{org_id}/summary", get(organization::org::org_summary))
+        .route("/{org_id}/ingest/recent_rejections", get(ingest_rejections::recent_rejections))
         .route("/{org_id}/passcode", get(organization::org::get_user_passcode).put(organization::org::update_user_passcode))
         .route("/{org_id}/rumtoken", get(organization::org::get_user_rumtoken).post(organization::org::create_user_rumtoken).put(organization::org::update_user_rumtoken))
         .route("/{org_id}/ingestion-tokens", get(organization::ingestion_tokens::list_ingestion_tokens).post(organization::ingestion_tokens::create_ingestion_token))
@@ -950,13 +1180,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/rename", put(organization::org::rename_org))
 
         // ES compatibility
-        .route("/{org_id}/", get(organization::es::org_index).head(organization::es::org_index))
-        .route("/{org_id}/_license", get(organization::es::org_license))
-        .route("/{org_id}/_xpack", get(organization::es::org_xpack))
-        .route("/{org_id}/_ilm/policy/{name}", get(organization::es::org_ilm_policy).head(organization::es::org_ilm_policy))
-        .route("/{org_id}/_index_template/{name}", get(organization::es::org_index_template).head(organization::es::org_index_template).post(organization::es::org_index_template_create))
-        .route("/{org_id}/_data_stream/{name}", get(organization::es::org_data_stream).head(organization::es::org_data_stream).post(organization::es::org_data_stream_create))
-        .route("/{org_id}/_ingest/pipeline/{name}", get(organization::es::org_pipeline).head(organization::es::org_pipeline).post(organization::es::org_pipeline_create))
+        .merge(es_compat_routes())
 
         // Streams
         .route("/{org_id}/streams", get(stream::list))
@@ -968,6 +1192,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/streams/{stream_name}/cache/results", delete(stream::delete_stream_cache))
         .route("/{org_id}/streams/{stream_name}/data_by_time_range", delete(stream::delete_stream_data_by_time_range))
         .route("/{org_id}/streams/{stream_name}/data_by_time_range/status/{id}", get(stream::get_delete_stream_data_status))
+        .route("/{org_id}/metrics/{metric_name}/usage", get(metrics_usage::get_metric_usage))
 
         // Logs ingestion
         .route("/{org_id}/_bulk", post(logs::ingest::bulk))
@@ -979,10 +1204,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/v1/metrics", post(metrics::ingest::otlp_metrics_write))
         .route("/{org_id}/v1/profiles", post(profiles::ingest::otlp_profiles_write))
         // OTLP Profiles is still development; otlp_http exporter defaults to this path.
-        .route(
-            "/{org_id}/v1development/profiles",
-            post(profiles::ingest::otlp_profiles_write),
-        )
+        .route("/{org_id}/v1development/profiles", post(profiles::ingest::otlp_profiles_write))
         .route("/{org_id}/v1/traces", post(traces::traces_write))
         .route("/{org_id}/traces", post(traces::traces_write))
         .route("/{org_id}/otel/v1/traces", post(traces::traces_write))
@@ -1003,6 +1225,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/{stream_name}/profiles/tag_values", get(profiles_query::get_profiles_tag_values))
         .route("/{org_id}/{stream_name}/profiles/series", get(profiles_query::profiles_series_get).post(profiles_query::profiles_series))
         .route("/{org_id}/{stream_name}/profiles/merge", get(profiles_query::merge_profiles_get).post(profiles_query::merge_profiles))
+        .route("/{org_id}/{stream_name}/profiles/diff", post(profiles_query::diff_profiles))
 
         // Database Monitoring — its own top-level module, not under /traces.
         // The path segment must stay `db_monitoring` to match the OFGA resource
@@ -1062,6 +1285,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/prometheus/api/v1/labels", get(promql::labels_get).post(promql::labels_post))
         .route("/{org_id}/prometheus/api/v1/label/{label_name}/values", get(promql::label_values))
         .route("/{org_id}/prometheus/api/v1/format_query", get(promql::format_query_get).post(promql::format_query_post))
+        .route("/{org_id}/prometheus/api/v1/parse_tree", post(promql::parse_tree))
 
         // Search
         .route("/{org_id}/_search", post(search::search))
@@ -1104,25 +1328,12 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/dashboards/{dashboard_id}/panels", post(dashboards::add_panel))
         .route("/{org_id}/dashboards/{dashboard_id}/panels/{panel_id}", put(dashboards::update_panel).delete(dashboards::delete_panel))
 
-        // Reports
-        .route("/{org_id}/reports", get(dashboards::reports::list_reports).post(dashboards::reports::create_report))
-        .route("/{org_id}/reports/{name}", get(dashboards::reports::get_report).put(dashboards::reports::update_report).delete(dashboards::reports::delete_report))
-        .route("/{org_id}/reports/bulk", delete(dashboards::reports::delete_report_bulk))
-        .route("/{org_id}/reports/{name}/enable", put(dashboards::reports::enable_report))
-        .route("/{org_id}/reports/{name}/trigger", put(dashboards::reports::trigger_report))
+        .merge(report_routes())
 
         // Timed annotations
         .route("/{org_id}/dashboards/{dashboard_id}/annotations", get(dashboards::timed_annotations::get_annotations).post(dashboards::timed_annotations::create_annotations).delete(dashboards::timed_annotations::delete_annotations))
         .route("/{org_id}/dashboards/{dashboard_id}/annotations/{timed_annotation_id}", put(dashboards::timed_annotations::update_annotations))
         .route("/{org_id}/dashboards/{dashboard_id}/annotations/panels/{timed_annotation_id}", delete(dashboards::timed_annotations::delete_annotation_panels))
-
-        // Reports (v2) — /bulk and /move must precede /{report_id} to avoid route conflicts
-        .route("/v2/{org_id}/reports", get(dashboards::reports::list_reports_v2).post(dashboards::reports::create_report_v2))
-        .route("/v2/{org_id}/reports/bulk", delete(dashboards::reports::delete_report_bulk_v2))
-        .route("/v2/{org_id}/reports/move", patch(dashboards::reports::move_reports))
-        .route("/v2/{org_id}/reports/{report_id}", get(dashboards::reports::get_report_v2).put(dashboards::reports::update_report_v2).delete(dashboards::reports::delete_report_v2))
-        .route("/v2/{org_id}/reports/{report_id}/enable", patch(dashboards::reports::enable_report_v2))
-        .route("/v2/{org_id}/reports/{report_id}/trigger", put(dashboards::reports::trigger_report_v2))
 
         // SLOs. Deliberately NOT enterprise-gated: nothing about SLO
         // measurement is an enterprise capability. Literal segments are
@@ -1178,7 +1389,14 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/incidents/external-alerts/{external_alert_id}/payload", get(alerts::incidents::get_external_alert_payload))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}", get(alerts::incidents::get_incident))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca", post(alerts::incidents::trigger_incident_rca).delete(alerts::incidents::cancel_incident_rca))
-        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/history", get(alerts::incidents::get_incident_rca_history))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs", get(alerts::incidents::list_incident_rca_runs))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/live_stream", get(alerts::incidents::get_incident_rca_live_stream))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}", get(alerts::incidents::get_incident_rca_run))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/thread", get(alerts::incidents::get_incident_rca_thread))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/steer", post(alerts::incidents::steer_incident_rca_run))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/steering", get(alerts::incidents::get_incident_rca_steering))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/resume", post(alerts::incidents::resume_incident_rca_run))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/summary", get(alerts::incidents::get_incident_rca_summary))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/update", patch(alerts::incidents::update_incident))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events", get(alerts::incidents::get_incident_events))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events/comment", post(alerts::incidents::post_incident_comment))
@@ -1227,6 +1445,7 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/anomaly_detection/{config_id}/detect", post(anomaly_detection::detect_anomalies))
             .route("/{org_id}/anomaly_detection/{config_id}/history", get(anomaly_detection::get_detection_history))
             .route("/{org_id}/anomaly_detection/history", get(alerts::history::get_all_anomaly_history));
+        router = alert_calibration_routes(router);
     }
 
     router = router
@@ -1289,12 +1508,17 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/sourcemaps/values",get(sourcemaps::list_values))
         .route("/{org_id}/sourcemaps/stacktrace",post(sourcemaps::translate_stacktrace))
 
+        // RUM trace lookup
+        .route("/{org_id}/rum/lookup", post(rum_query::lookup::lookup))
+
         // RUM Product Analytics
         .route("/{org_id}/rum/analytics/named_events", get(rum_analytics::list_named_events).post(rum_analytics::create_named_event))
+        .route("/{org_id}/rum/analytics/named_events/deleted_names", get(rum_analytics::deleted_event_names))
         .route("/{org_id}/rum/analytics/named_events/{id}", get(rum_analytics::get_named_event).put(rum_analytics::update_named_event).delete(rum_analytics::delete_named_event))
         .route("/{org_id}/rum/analytics/named_events/{id}/funnels", get(rum_analytics::named_event_funnels))
         .route("/{org_id}/rum/analytics/funnels", get(rum_analytics::list_funnels).post(rum_analytics::create_funnel))
-        .route("/{org_id}/rum/analytics/funnels/{id}", get(rum_analytics::get_funnel).put(rum_analytics::update_funnel).delete(rum_analytics::delete_funnel));
+        .route("/{org_id}/rum/analytics/funnels/{id}", get(rum_analytics::get_funnel).put(rum_analytics::update_funnel).delete(rum_analytics::delete_funnel))
+        .route("/{org_id}/rum/analytics/settings", get(rum_analytics::get_app_settings).put(rum_analytics::put_app_settings));
 
     #[cfg(feature = "enterprise")]
     {
@@ -1503,7 +1727,7 @@ pub fn service_routes() -> Router {
 
     #[cfg(feature = "enterprise")]
     {
-        router = router
+        router = fleet_routes(router)
             // Search jobs
             .route("/{org_id}/search_jobs", get(search::search_job::list_status).post(search::search_job::submit_job))
             .route("/{org_id}/search_jobs/{job_id}", get(search::search_job::get_status).delete(search::search_job::delete_job))
@@ -1513,8 +1737,7 @@ pub fn service_routes() -> Router {
 
             // Query manager
             .route("/{org_id}/query_manager/status", get(search::query_manager::query_status))
-            .route("/{org_id}/query_manager/cancel", put(search::query_manager::cancel_multiple_query))
-            .route("/{org_id}/query_manager/{query_id}/cancel", delete(search::query_manager::cancel_query))
+            .route("/{org_id}/query_manager/cancel", put(search::query_manager::cancel_query))
 
             // search inspector
             .route("/{org_id}/search/profile", get(search::search_inspector::get_search_profile))
@@ -1531,10 +1754,6 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/ratelimit/update", put(ratelimit::update_ratelimit))
 
             // AI
-            .route("/{org_id}/ai/chat", post(ai::chat::chat))
-            .route("/{org_id}/ai/chat_stream", post(ai::chat::chat_stream))
-            .route("/{org_id}/ai/feedback", post(ai::chat::feedback))
-            .route("/{org_id}/ai/confirm/{session_id}", post(ai::chat::confirm_action))
             .route("/{org_id}/ai/toolsets", get(ai::toolsets::list).post(ai::toolsets::create))
             .route("/{org_id}/ai/toolsets/{id}", get(ai::toolsets::get).put(ai::toolsets::update).delete(ai::toolsets::delete))
 
@@ -1569,6 +1788,7 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/service_streams/config/identity", get(service_streams::get_identity_config).put(service_streams::save_identity_config))
             .route("/{org_id}/service_streams/_reset", delete(service_streams::reset_services))
             .route("/{org_id}/storage",get(organization::storage::get).post(organization::storage::save).put(organization::storage::update));
+        router = ai_chat_routes(router);
 
         if get_o2_config().common.workflows_enabled {
             // workflows
@@ -1747,209 +1967,7 @@ pub fn service_routes() -> Router {
 
     #[cfg(feature = "enterprise")]
     if get_o2_config().oncall.enabled {
-        router = router
-            .route(
-                "/{org_id}/oncall/teams",
-                get(oncall::list_teams).post(oncall::create_team),
-            )
-            .route(
-                "/{org_id}/oncall/teams/{team_id}",
-                get(oncall::get_team)
-                    .put(oncall::update_team)
-                    .delete(oncall::delete_team),
-            )
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/members",
-                get(oncall::list_members)
-                    .post(oncall::add_member)
-                    .delete(oncall::remove_member),
-            )
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/schedule",
-                get(oncall::get_schedule).put(oncall::set_schedule),
-            )
-            .route(
-                "/{org_id}/oncall/schedule-presets",
-                get(oncall::list_schedule_presets),
-            )
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/schedule/from-preset",
-                post(oncall::apply_schedule_preset),
-            )
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/on-call",
-                get(oncall::who_is_on_call),
-            )
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/overrides",
-                get(oncall::list_overrides).post(oncall::create_override),
-            )
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/overrides/{override_id}",
-                delete(oncall::delete_override),
-            )
-            // Org-scoped, not hung off a team: somebody on two teams is away from both.
-            .route(
-                "/{org_id}/oncall/unavailability",
-                get(oncall::list_unavailability).post(oncall::create_unavailability),
-            )
-            .route(
-                "/{org_id}/oncall/unavailability/{unavailability_id}",
-                delete(oncall::delete_unavailability),
-            )
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/resolved-schedule",
-                get(oncall::get_resolved_schedule),
-            )
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/policy",
-                get(oncall::get_policy).put(oncall::set_policy),
-            )
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/channel",
-                get(oncall::get_team_channel).put(oncall::set_team_channel),
-            )
-            // Derived on every read, never stored: a saved list argues with the config beside it.
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/reachability",
-                get(oncall::get_team_reachability),
-            )
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/config-risks",
-                get(oncall::list_team_config_risks),
-            )
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/overview",
-                get(oncall::get_team_overview),
-            )
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/load",
-                get(oncall::get_team_load),
-            )
-            // A dry run: must stay free of side effects, `test-page` is what actually delivers.
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/escalation-preview",
-                get(oncall::get_escalation_preview),
-            )
-            .route("/{org_id}/oncall/responses", get(oncall::list_responses))
-            .route(
-                "/{org_id}/oncall/responses/{response_id}",
-                get(oncall::get_response),
-            )
-            .route(
-                "/{org_id}/oncall/responses/{response_id}/resolve",
-                post(oncall::resolve_response),
-            )
-            .route(
-                "/{org_id}/oncall/ownership",
-                get(oncall::list_ownership_rules).post(oncall::create_ownership_rule),
-            )
-            // A sibling of the list: the counts cost a grouped read the routing path must not pay.
-            .route(
-                "/{org_id}/oncall/ownership/stats",
-                get(oncall::list_ownership_rule_stats),
-            )
-            .route(
-                "/{org_id}/oncall/ownership/{rule_id}",
-                put(oncall::update_ownership_rule).delete(oncall::delete_ownership_rule),
-            )
-            .route(
-                "/{org_id}/oncall/responses/{response_id}/notes",
-                post(oncall::add_note),
-            )
-            .route(
-                "/{org_id}/oncall/incidents/{incident_id}/responses",
-                get(oncall::list_responses_for_incident),
-            )
-            .route(
-                "/{org_id}/oncall/responses/{response_id}/escalation",
-                get(oncall::get_escalation_progress),
-            )
-            .route(
-                "/{org_id}/oncall/responses/{response_id}/prior-causes",
-                get(oncall::get_prior_causes),
-            )
-            .route(
-                "/{org_id}/oncall/responses/{response_id}/report",
-                get(oncall::get_response_report),
-            )
-            .route(
-                "/{org_id}/oncall/responses/{response_id}/acknowledge",
-                post(oncall::acknowledge_response),
-            )
-            .route(
-                "/{org_id}/oncall/responses/{response_id}/snooze",
-                post(oncall::snooze_response),
-            )
-            .route(
-                "/{org_id}/oncall/responses/{response_id}/handoff",
-                post(oncall::handoff_response),
-            )
-            .route(
-                "/{org_id}/oncall/responses/{response_id}/history",
-                get(oncall::get_response_history),
-            )
-            .route(
-                "/{org_id}/oncall/responses/{response_id}/deliveries",
-                get(oncall::list_deliveries),
-            )
-            .route(
-                "/{org_id}/oncall/routing/config",
-                get(oncall::get_routing_config).put(oncall::set_routing_config),
-            )
-            .route(
-                "/{org_id}/oncall/routing/preview",
-                post(oncall::preview_routing),
-            )
-            .route(
-                "/{org_id}/oncall/unrouted",
-                get(oncall::list_unrouted_signals),
-            )
-            .route(
-                "/{org_id}/oncall/unrouted/{signal_id}",
-                delete(oncall::dismiss_unrouted_signal),
-            )
-            .route(
-                "/{org_id}/oncall/coverage-gaps",
-                get(oncall::list_coverage_gaps),
-            )
-            .route(
-                "/{org_id}/oncall/responses/{response_id}/promote",
-                post(oncall::promote_to_incident),
-            )
-            // Storage only: no SMS or voice transport exists, so nothing saved here can page.
-            .route(
-                "/{org_id}/oncall/contacts/{user_email}",
-                get(oncall::get_contact)
-                    .put(oncall::set_contact)
-                    .delete(oncall::delete_contact),
-            )
-            .route(
-                "/{org_id}/oncall/my/deliveries",
-                get(oncall::list_my_deliveries),
-            )
-            .route(
-                "/{org_id}/oncall/my/deliveries/read",
-                post(oncall::mark_deliveries_read),
-            )
-            .route("/{org_id}/oncall/my/teams", get(oncall::list_my_teams))
-            .route(
-                "/{org_id}/oncall/analytics/causes",
-                get(oncall::cause_analytics),
-            )
-            .route(
-                "/{org_id}/oncall/responses/{response_id}/confirm-recovery",
-                post(oncall::confirm_recovery),
-            )
-            .route(
-                "/{org_id}/oncall/responses/{response_id}/escalate",
-                post(oncall::escalate_response),
-            )
-            // Goes down the real dispatch path but must leave no response record behind.
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/test-page",
-                post(oncall::send_test_page),
-            );
+        router = oncall_routes(router);
     }
 
     #[cfg(feature = "cloud")]
@@ -2058,24 +2076,24 @@ pub fn service_routes() -> Router {
             )
             .route(
                 "/{org_id}/billing_group/invites",
-                get(organization::billing_group::list_invites)
-                    .post(organization::billing_group::invite),
+                get(billing_group::list_invites).post(billing_group::invite),
             )
             .route(
                 "/{org_id}/billing_group/invites/{token}/accept",
-                post(organization::billing_group::accept),
+                post(billing_group::accept),
             )
             .route(
                 "/{org_id}/billing_group/invites/{token}/reject",
-                delete(organization::billing_group::reject),
+                delete(billing_group::reject),
             )
             .route(
                 "/{org_id}/billing_group/membership",
-                get(organization::billing_group::check_membership),
+                get(billing_group::check_membership).delete(billing_group::leave_group),
             )
+            .route("/{org_id}/billing_group/members", get(billing_group::check_members))
             .route(
-                "/{org_id}/billing_group/members",
-                get(organization::billing_group::check_members),
+                "/{org_id}/billing_group/members/{member_org_id}",
+                delete(billing_group::remove_member),
             );
     }
 
@@ -2088,6 +2106,7 @@ pub fn service_routes() -> Router {
         .layer(middleware::from_fn(password_policy_middleware))
         .layer(middleware::from_fn(auth_middleware))
         .layer(RequestDecompressionLayer::new())
+        .layer(middleware::from_fn(ingest_rejections_middleware))
         .layer(middleware::from_fn(
             decompression::preprocess_encoding_middleware,
         ))
@@ -2105,6 +2124,434 @@ pub fn service_routes() -> Router {
         }))
 }
 
+/// Downtimes routes; the literal segments stay before the {downtime_id} catch-all.
+#[rustfmt::skip]
+pub fn downtime_routes() -> Router {
+    Router::new()
+        .route("/v2/{org_id}/downtimes", get(downtimes::list_downtimes).post(downtimes::create_downtime))
+        .route("/v2/{org_id}/downtimes/preview", post(downtimes::preview_downtime))
+        .route("/v2/{org_id}/downtimes/resources", post(downtimes::downtime_resources))
+        .route("/v2/{org_id}/downtimes/values", post(downtimes::downtime_values))
+        .route("/v2/{org_id}/downtimes/move", patch(downtimes::move_downtimes))
+        .route("/v2/{org_id}/downtimes/{downtime_id}", get(downtimes::get_downtime).put(downtimes::update_downtime).delete(downtimes::delete_downtime))
+        .route("/v2/{org_id}/downtimes/{downtime_id}/cancel", post(downtimes::cancel_downtime))
+        .route("/v2/{org_id}/downtimes/{downtime_id}/extend", post(downtimes::extend_downtime))
+}
+
+/// Dashboard report routes, v1 by name and v2 by id.
+#[rustfmt::skip]
+fn report_routes() -> Router {
+    Router::new()
+        .route("/{org_id}/reports", get(dashboards::reports::list_reports).post(dashboards::reports::create_report))
+        .route("/{org_id}/reports/{name}", get(dashboards::reports::get_report).put(dashboards::reports::update_report).delete(dashboards::reports::delete_report))
+        .route("/{org_id}/reports/bulk", delete(dashboards::reports::delete_report_bulk))
+        .route("/{org_id}/reports/{name}/enable", put(dashboards::reports::enable_report))
+        .route("/{org_id}/reports/{name}/trigger", put(dashboards::reports::trigger_report))
+        // /bulk, /move and /history must precede /{report_id} to avoid route conflicts
+        .route("/v2/{org_id}/reports", get(dashboards::reports::list_reports_v2).post(dashboards::reports::create_report_v2))
+        .route("/v2/{org_id}/reports/bulk", delete(dashboards::reports::delete_report_bulk_v2))
+        .route("/v2/{org_id}/reports/move", patch(dashboards::reports::move_reports))
+        .route("/v2/{org_id}/reports/history", get(dashboards::reports_history::get_report_history))
+        .route("/v2/{org_id}/reports/{report_id}", get(dashboards::reports::get_report_v2).put(dashboards::reports::update_report_v2).delete(dashboards::reports::delete_report_v2))
+        .route("/v2/{org_id}/reports/{report_id}/enable", patch(dashboards::reports::enable_report_v2))
+        .route("/v2/{org_id}/reports/{report_id}/trigger", put(dashboards::reports::trigger_report_v2))
+}
+
+/// On-call management routes; the caller mounts them only when on-call is enabled.
+#[cfg(feature = "enterprise")]
+fn oncall_routes(router: Router) -> Router {
+    router
+        .route(
+            "/{org_id}/oncall/teams",
+            get(oncall::list_teams).post(oncall::create_team),
+        )
+        .route(
+            "/{org_id}/oncall/teams/{team_id}",
+            get(oncall::get_team)
+                .put(oncall::update_team)
+                .delete(oncall::delete_team),
+        )
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/members",
+            get(oncall::list_members)
+                .post(oncall::add_member)
+                .delete(oncall::remove_member),
+        )
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/schedule",
+            get(oncall::get_schedule).put(oncall::set_schedule),
+        )
+        .route(
+            "/{org_id}/oncall/schedule-presets",
+            get(oncall::list_schedule_presets),
+        )
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/schedule/from-preset",
+            post(oncall::apply_schedule_preset),
+        )
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/on-call",
+            get(oncall::who_is_on_call),
+        )
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/overrides",
+            get(oncall::list_overrides).post(oncall::create_override),
+        )
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/overrides/{override_id}",
+            delete(oncall::delete_override),
+        )
+        // Org-scoped, not hung off a team: somebody on two teams is away from both.
+        .route(
+            "/{org_id}/oncall/unavailability",
+            get(oncall::list_unavailability).post(oncall::create_unavailability),
+        )
+        .route(
+            "/{org_id}/oncall/unavailability/{unavailability_id}",
+            delete(oncall::delete_unavailability),
+        )
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/resolved-schedule",
+            get(oncall::get_resolved_schedule),
+        )
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/resolved-schedule/preview",
+            post(oncall::preview_resolved_schedule),
+        )
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/policy",
+            get(oncall::get_policy).put(oncall::set_policy),
+        )
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/channel",
+            get(oncall::get_team_channel).put(oncall::set_team_channel),
+        )
+        // Derived on every read, never stored: a saved list argues with the config beside it.
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/reachability",
+            get(oncall::get_team_reachability),
+        )
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/config-risks",
+            get(oncall::list_team_config_risks),
+        )
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/overview",
+            get(oncall::get_team_overview),
+        )
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/load",
+            get(oncall::get_team_load),
+        )
+        // A dry run: must stay free of side effects, `test-page` is what actually delivers.
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/escalation-preview",
+            get(oncall::get_escalation_preview),
+        )
+        .route("/{org_id}/oncall/responses", get(oncall::list_responses))
+        .route(
+            "/{org_id}/oncall/responses/{response_id}",
+            get(oncall::get_response),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/resolve",
+            post(oncall::resolve_response),
+        )
+        .route(
+            "/{org_id}/oncall/ownership",
+            get(oncall::list_ownership_rules).post(oncall::create_ownership_rule),
+        )
+        // A sibling of the list: the counts cost a grouped read the routing path must not pay.
+        .route(
+            "/{org_id}/oncall/ownership/stats",
+            get(oncall::list_ownership_rule_stats),
+        )
+        .route(
+            "/{org_id}/oncall/ownership/{rule_id}",
+            put(oncall::update_ownership_rule).delete(oncall::delete_ownership_rule),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/notes",
+            post(oncall::add_note),
+        )
+        .route(
+            "/{org_id}/oncall/incidents/{incident_id}/responses",
+            get(oncall::list_responses_for_incident),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/escalation",
+            get(oncall::get_escalation_progress),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/prior-causes",
+            get(oncall::get_prior_causes),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/report",
+            get(oncall::get_response_report),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/acknowledge",
+            post(oncall::acknowledge_response),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/snooze",
+            post(oncall::snooze_response),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/handoff",
+            post(oncall::handoff_response),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/history",
+            get(oncall::get_response_history),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/deliveries",
+            get(oncall::list_deliveries),
+        )
+        .route(
+            "/{org_id}/oncall/routing/config",
+            get(oncall::get_routing_config).put(oncall::set_routing_config),
+        )
+        .route(
+            "/{org_id}/oncall/routing/preview",
+            post(oncall::preview_routing),
+        )
+        .route(
+            "/{org_id}/oncall/unrouted",
+            get(oncall::list_unrouted_signals),
+        )
+        .route(
+            "/{org_id}/oncall/unrouted/{signal_id}",
+            delete(oncall::dismiss_unrouted_signal),
+        )
+        .route(
+            "/{org_id}/oncall/coverage-gaps",
+            get(oncall::list_coverage_gaps),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/promote",
+            post(oncall::promote_to_incident),
+        )
+        // A saved phone pages only after the code texted to it is confirmed below.
+        .route(
+            "/{org_id}/oncall/contacts/{user_email}",
+            get(oncall::get_contact)
+                .put(oncall::set_contact)
+                .delete(oncall::delete_contact),
+        )
+        .route(
+            "/{org_id}/oncall/contacts/{user_email}/verify",
+            post(oncall::send_contact_code),
+        )
+        .route(
+            "/{org_id}/oncall/contacts/{user_email}/verify/confirm",
+            post(oncall::confirm_contact_code),
+        )
+        .route(
+            "/{org_id}/oncall/my/deliveries",
+            get(oncall::list_my_deliveries),
+        )
+        .route(
+            "/{org_id}/oncall/my/deliveries/read",
+            post(oncall::mark_deliveries_read),
+        )
+        .route("/{org_id}/oncall/my/teams", get(oncall::list_my_teams))
+        .route(
+            "/{org_id}/oncall/analytics/causes",
+            get(oncall::cause_analytics),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/confirm-recovery",
+            post(oncall::confirm_recovery),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/escalate",
+            post(oncall::escalate_response),
+        )
+        // Goes down the real dispatch path but must leave no response record behind.
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/test-page",
+            post(oncall::send_test_page),
+        )
+        .route(
+            "/{org_id}/telephony",
+            get(oncall::get_telephony)
+                .put(oncall::put_telephony)
+                .delete(oncall::delete_telephony),
+        )
+}
+
+// Private and before the next `pub fn`, so the ROUTE_PERMISSIONS router scrape still reads it.
+#[cfg(feature = "enterprise")]
+fn fleet_routes(router: Router) -> Router {
+    router.merge(fleet_router())
+}
+
+// Its own router, so the gate layer covers exactly the fleet routes.
+#[cfg(feature = "enterprise")]
+fn fleet_router() -> Router {
+    Router::new()
+        .route("/{org_id}/v1/opamp", get(opamp::serve).post(opamp::serve))
+        .route("/{org_id}/fleet/collectors", get(fleet::list_collectors))
+        .route(
+            "/{org_id}/fleet/collectors/{id}",
+            get(fleet::get_collector)
+                .patch(fleet::rename_collector)
+                .delete(fleet::delete_collector),
+        )
+        .route(
+            "/{org_id}/fleet/collectors/{id}/restart",
+            post(fleet::restart_collector),
+        )
+        .route(
+            "/{org_id}/fleet/collectors/{id}/redeliver",
+            post(fleet::redeliver_collector),
+        )
+        .route(
+            "/{org_id}/fleet/fleets",
+            get(fleet::list_fleets).post(fleet::create_fleet),
+        )
+        .route("/{org_id}/fleet/fleets/move", post(fleet::move_collectors))
+        .route(
+            "/{org_id}/fleet/fleets/{fleet_id}",
+            get(fleet::get_fleet)
+                .patch(fleet::rename_fleet)
+                .delete(fleet::delete_fleet),
+        )
+        .route(
+            "/{org_id}/fleet/fleets/{fleet_id}/settings",
+            get(fleet::get_fleet_settings).put(fleet::put_fleet_settings),
+        )
+        .route(
+            "/{org_id}/fleet/fleets/{fleet_id}/desired",
+            put(fleet::set_desired),
+        )
+        .route(
+            "/{org_id}/fleet/fleets/{fleet_id}/desired/preview",
+            post(fleet::preview_desired),
+        )
+        .route(
+            "/{org_id}/fleet/tokens",
+            get(fleet::list_tokens).post(fleet::create_token),
+        )
+        .route(
+            "/{org_id}/fleet/tokens/{id}/revoke",
+            post(fleet::revoke_token),
+        )
+        .route(
+            "/{org_id}/fleet/configs",
+            get(fleet::list_configs).post(fleet::create_config),
+        )
+        .route(
+            "/{org_id}/fleet/configs/validate",
+            post(fleet::validate_config),
+        )
+        .route(
+            "/{org_id}/fleet/configs/{id}",
+            get(fleet::get_config).delete(fleet::delete_config),
+        )
+        .route(
+            "/{org_id}/fleet/configs/{id}/draft",
+            put(fleet::save_config_draft),
+        )
+        .route(
+            "/{org_id}/fleet/configs/{id}/versions",
+            post(fleet::publish_config_version),
+        )
+        .route(
+            "/{org_id}/fleet/configs/{id}/versions/{version}",
+            get(fleet::get_config_version),
+        )
+        .route("/{org_id}/fleet/rollouts", get(fleet::list_rollouts))
+        .route("/{org_id}/fleet/rollouts/{id}", get(fleet::get_rollout))
+        .route(
+            "/{org_id}/fleet/rollouts/{id}/resume",
+            post(fleet::resume_rollout),
+        )
+        .route(
+            "/{org_id}/fleet/rollouts/{id}/skip",
+            post(fleet::skip_rollout),
+        )
+        .route(
+            "/{org_id}/fleet/rollouts/{id}/rollback",
+            post(fleet::rollback_rollout),
+        )
+        .route("/{org_id}/fleet/summary", get(fleet::summary))
+        .route("/{org_id}/fleet/pipelines", get(fleet::get_pipelines))
+        .route("/{org_id}/fleet/audit", get(fleet::list_audit))
+        .route(
+            "/{org_id}/fleet/settings",
+            get(fleet::get_settings).put(fleet::update_settings),
+        )
+        .route_layer(middleware::from_fn(fleet_gate))
+}
+
+/// §17: with `O2_FLEET_ENABLED` off, OpAMP answers 503 and management reads work but writes do not.
+#[cfg(feature = "enterprise")]
+async fn fleet_gate(request: Request, next: Next) -> Response {
+    if openobserve_core::fleet::enabled() || request.method() == Method::GET && !is_opamp(&request)
+    {
+        return next.run(request).await;
+    }
+    let mut response = (
+        StatusCode::SERVICE_UNAVAILABLE,
+        "fleet management is disabled",
+    )
+        .into_response();
+    if is_opamp(&request) {
+        response.headers_mut().insert(
+            header::RETRY_AFTER,
+            header::HeaderValue::from_static(FLEET_RETRY_AFTER_SECS),
+        );
+    }
+    response
+}
+
+#[cfg(feature = "enterprise")]
+fn is_opamp(request: &Request) -> bool {
+    request
+        .uri()
+        .path()
+        .trim_end_matches('/')
+        .ends_with("/v1/opamp")
+}
+
+/// Slack install and settings routes (section 7.2); the paths match the ENT `SLACK_ROUTE_ROWS`.
+#[rustfmt::skip]
+pub fn slack_routes() -> Router {
+    use slack::{installations as inst, links as lnk, settings as set};
+    Router::new()
+        .route("/{org_id}/slack/link-requests/confirm", post(lnk::confirm))
+        .route("/{org_id}/slack/link-requests/{request_id}/start", post(lnk::start))
+        .route("/{org_id}/slack/link-requests/{request_id}/resend", post(lnk::resend))
+        .route("/{org_id}/slack/links/me", get(lnk::links_me))
+        .route("/{org_id}/slack/links/{link_id}", delete(lnk::delete_link))
+        .route("/{org_id}/slack/links", get(lnk::list_links))
+        .route("/{org_id}/slack/install/start", post(inst::install_start))
+        .route("/{org_id}/slack/install/exchange", post(inst::install_exchange))
+        .route("/{org_id}/slack/prerequisites", get(inst::prerequisites))
+        .route("/{org_id}/slack/connectivity", post(inst::connectivity))
+        .route("/{org_id}/slack/manifest", get(inst::manifest))
+        .route("/{org_id}/slack/connection/confirm", post(inst::connection_confirm))
+        .route("/{org_id}/slack/installations", get(inst::list_installations).post(inst::create_installation))
+        .route("/{org_id}/slack/installations/{installation_id}", delete(inst::uninstall))
+        .route("/{org_id}/slack/installations/{installation_id}/install-url", post(inst::install_url))
+        .route("/{org_id}/slack/installations/{installation_id}/credentials", put(inst::update_credentials))
+        .route("/{org_id}/slack/installations/{installation_id}/test", post(inst::test_installation))
+        .route("/{org_id}/slack/installations/{installation_id}/connection/start", post(inst::connection_start))
+        .route("/{org_id}/slack/installations/{installation_id}/connection", post(inst::connect).delete(inst::disconnect))
+        .route("/{org_id}/slack/installations/{installation_id}/linking", get(set::get_linking).put(set::put_linking))
+        .route("/{org_id}/slack/installations/{installation_id}/links/matches", get(set::link_matches))
+        .route("/{org_id}/slack/installations/{installation_id}/link-all", post(set::link_all))
+        .route("/{org_id}/slack/installations/{installation_id}/channels", get(set::channels))
+        .route("/{org_id}/slack/installations/{installation_id}/channel-defaults", get(set::channel_defaults))
+        .route("/{org_id}/slack/installations/{installation_id}/channel-defaults/{channel_id}", get(set::get_channel_default).put(set::put_channel_default).delete(set::delete_channel_default))
+        .route("/{org_id}/slack/installations/{installation_id}/help-contact", get(set::get_help_contact).put(set::put_help_contact))
+        .route("/{org_id}/slack/installations/{installation_id}/org-access", get(inst::get_org_access).put(inst::put_org_access))
+}
+
 /// Create other service routes (AWS, GCP, RUM)
 pub fn other_service_routes() -> Router {
     let aws_routes = Router::new()
@@ -2112,6 +2559,7 @@ pub fn other_service_routes() -> Router {
             "/{org_id}/{stream_name}/_kinesis_firehose",
             post(logs::ingest::handle_kinesis_request),
         )
+        .route_layer(middleware::from_fn(blocked_org_param))
         .layer(middleware::from_fn(aws_auth_middleware))
         .layer(RequestDecompressionLayer::new());
 
@@ -2120,6 +2568,7 @@ pub fn other_service_routes() -> Router {
             "/{org_id}/{stream_name}/_sub",
             post(logs::ingest::handle_gcp_request),
         )
+        .route_layer(middleware::from_fn(blocked_org_param))
         .layer(middleware::from_fn(gcp_auth_middleware))
         .layer(RequestDecompressionLayer::new());
 
@@ -2127,6 +2576,7 @@ pub fn other_service_routes() -> Router {
         .route("/v1/{org_id}/logs", post(rum::ingest::log))
         .route("/v1/{org_id}/replay", post(rum::ingest::sessionreplay))
         .route("/v1/{org_id}/rum", post(rum::ingest::data))
+        .route_layer(middleware::from_fn(blocked_org_param))
         .layer(middleware::from_fn(RumExtraData::extractor_middleware))
         .layer(middleware::from_fn(rum_auth_middleware))
         .layer(RequestDecompressionLayer::new());
@@ -2172,7 +2622,10 @@ pub fn splunk_collector_routes() -> Router {
         .layer(RequestDecompressionLayer::new())
         // Outermost, so the 10 MiB cap is measured on the wire before any
         // decompression can amplify an unauthenticated body.
-        .layer(middleware::from_fn(hec_collector::wire_body_limit_middleware))
+        .layer(middleware::from_fn(
+            hec_collector::wire_body_limit_middleware,
+        ))
+        .layer(middleware::from_fn(ingest_rejections_middleware))
 }
 
 /// Create the full application router
@@ -2269,6 +2722,39 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
     outer
 }
 
+/// Root-only node management routes, before the authentication layers `basic_routes` adds.
+fn node_routes() -> Router {
+    let node_routes = Router::new()
+        .route("/status", get(status::cache_status))
+        .route("/enable", put(status::enable_node))
+        .route("/flush", put(status::flush_node))
+        .route("/reload", get(status::cache_reload))
+        .route("/list", get(status::list_node))
+        .route("/metrics", get(status::node_metrics));
+
+    #[cfg(feature = "enterprise")]
+    let node_routes = node_routes.route("/drain_status", get(status::drain_status));
+
+    node_routes
+        .route("/consistent_hash", post(status::consistent_hash))
+        .route("/refresh_nodes_list", get(status::refresh_nodes_list))
+        .route("/refresh_user_sessions", get(status::refresh_user_sessions))
+        .layer(middleware::from_fn(root_only_middleware))
+}
+
+/// Elasticsearch-compatibility handshake routes, merged into `service_routes` under its layers.
+#[rustfmt::skip]
+fn es_compat_routes() -> Router {
+    Router::new()
+        .route("/{org_id}/", get(organization::es::org_index).head(organization::es::org_index))
+        .route("/{org_id}/_license", get(organization::es::org_license))
+        .route("/{org_id}/_xpack", get(organization::es::org_xpack))
+        .route("/{org_id}/_ilm/policy/{name}", get(organization::es::org_ilm_policy).head(organization::es::org_ilm_policy))
+        .route("/{org_id}/_index_template/{name}", get(organization::es::org_index_template).head(organization::es::org_index_template).post(organization::es::org_index_template_create))
+        .route("/{org_id}/_data_stream/{name}", get(organization::es::org_data_stream).head(organization::es::org_data_stream).post(organization::es::org_data_stream_create))
+        .route("/{org_id}/_ingest/pipeline/{name}", get(organization::es::org_pipeline).head(organization::es::org_pipeline).post(organization::es::org_pipeline_create))
+}
+
 #[cfg(test)]
 mod tests {
     use axum::{body::Body, http::Request};
@@ -2343,6 +2829,297 @@ mod tests {
             &Method::GET,
             "api/org/prompts/settings/secret"
         ));
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn every_slack_route_reaches_its_oss_stub() {
+        let routes = [
+            (Method::POST, "/default/slack/install/start"),
+            (Method::POST, "/default/slack/install/exchange"),
+            (Method::GET, "/default/slack/prerequisites"),
+            (Method::POST, "/default/slack/connectivity"),
+            (Method::GET, "/default/slack/manifest"),
+            (Method::POST, "/default/slack/connection/confirm"),
+            (Method::GET, "/default/slack/installations"),
+            (Method::POST, "/default/slack/installations"),
+            (Method::DELETE, "/default/slack/installations/I1"),
+            (Method::POST, "/default/slack/installations/I1/install-url"),
+            (Method::PUT, "/default/slack/installations/I1/credentials"),
+            (Method::POST, "/default/slack/installations/I1/test"),
+            (
+                Method::POST,
+                "/default/slack/installations/I1/connection/start",
+            ),
+            (Method::POST, "/default/slack/installations/I1/connection"),
+            (Method::DELETE, "/default/slack/installations/I1/connection"),
+            (Method::GET, "/default/slack/installations/I1/linking"),
+            (Method::PUT, "/default/slack/installations/I1/linking"),
+            (Method::GET, "/default/slack/installations/I1/links/matches"),
+            (Method::POST, "/default/slack/installations/I1/link-all"),
+            (Method::GET, "/default/slack/installations/I1/channels"),
+            (
+                Method::GET,
+                "/default/slack/installations/I1/channel-defaults",
+            ),
+            (
+                Method::GET,
+                "/default/slack/installations/I1/channel-defaults/C1",
+            ),
+            (
+                Method::PUT,
+                "/default/slack/installations/I1/channel-defaults/C1",
+            ),
+            (
+                Method::DELETE,
+                "/default/slack/installations/I1/channel-defaults/C1",
+            ),
+            (Method::GET, "/default/slack/installations/I1/help-contact"),
+            (Method::PUT, "/default/slack/installations/I1/help-contact"),
+            (Method::GET, "/_meta/slack/installations/I1/org-access"),
+            (Method::PUT, "/_meta/slack/installations/I1/org-access"),
+            (Method::POST, "/default/slack/link-requests/R1/start"),
+            (Method::POST, "/default/slack/link-requests/confirm"),
+            (Method::POST, "/default/slack/link-requests/R1/resend"),
+            (Method::GET, "/default/slack/links/me"),
+            (Method::DELETE, "/default/slack/links/L1"),
+            (Method::GET, "/default/slack/links"),
+        ];
+        for (method, path) in routes {
+            let req = Request::builder()
+                .method(method.clone())
+                .uri(path)
+                .header("user_id", "root@example.com")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from("{}"))
+                .unwrap();
+            let response = slack_routes().oneshot(req).await.unwrap();
+            assert_eq!(response.status(), StatusCode::FORBIDDEN, "{method} {path}");
+        }
+        let req = Request::builder()
+            .method(Method::PATCH)
+            .uri("/default/slack/installations")
+            .body(Body::empty())
+            .unwrap();
+        let response = slack_routes().oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+    }
+
+    /// Requests whose body or query axum's extractors refuse, one per extractor shape.
+    fn slack_requests_the_extractors_refuse() -> Vec<Request<Body>> {
+        let mut requests = Vec::new();
+        for (method, path) in [
+            (Method::POST, "/default/slack/install/start"),
+            (Method::POST, "/default/slack/installations"),
+            (Method::PUT, "/default/slack/installations/I1/credentials"),
+            (Method::PUT, "/default/slack/installations/I1/linking"),
+            (Method::PUT, "/_meta/slack/installations/I1/org-access"),
+            (Method::POST, "/default/slack/link-requests/confirm"),
+        ] {
+            for (content_type, body) in [("application/json", "{not json"), ("text/plain", "{}")] {
+                requests.push(
+                    Request::builder()
+                        .method(method.clone())
+                        .uri(path)
+                        .header("user_id", "root@example.com")
+                        .header(header::CONTENT_TYPE, content_type)
+                        .body(Body::from(body))
+                        .unwrap(),
+                );
+            }
+        }
+        requests.push(
+            Request::builder()
+                .uri("/default/slack/manifest?channel_history=maybe")
+                .header("user_id", "root@example.com")
+                .body(Body::empty())
+                .unwrap(),
+        );
+        requests
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn a_bad_body_or_query_is_still_not_supported_in_the_oss_build() {
+        for req in slack_requests_the_extractors_refuse() {
+            let what = format!("{} {}", req.method(), req.uri());
+            let response = slack_routes().oneshot(req).await.unwrap();
+            assert_eq!(response.status(), StatusCode::FORBIDDEN, "{what}");
+            let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let json: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(json["message"], "Not Supported", "{what}");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_bad_body_or_query_is_404_while_slack_is_off() {
+        for req in slack_requests_the_extractors_refuse() {
+            let what = format!("{} {}", req.method(), req.uri());
+            let response = slack_routes().oneshot(req).await.unwrap();
+            assert_eq!(response.status(), StatusCode::NOT_FOUND, "{what}");
+            let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let json: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(
+                json,
+                serde_json::json!({"code": 404, "message": "Slack is not enabled"}),
+                "{what}"
+            );
+        }
+    }
+
+    #[test]
+    fn slack_secret_writes_are_redacted() {
+        for (method, path) in [
+            (Method::POST, "org/slack/install/exchange"),
+            (Method::POST, "org/slack/installations"),
+            (Method::PUT, "org/slack/installations/I1/credentials"),
+            (Method::POST, "org/slack/connection/confirm"),
+            (Method::POST, "org/slack/installations/I1/connection"),
+            (Method::POST, "org/slack/link-requests/confirm"),
+            (Method::POST, "api/org/slack/installations"),
+            (Method::POST, "api/slack/installations"),
+        ] {
+            assert!(is_secret_write(&method, path), "{method} {path}");
+            assert_eq!(
+                audited(method, path, r#"{"code":"c-1","state":"s-1"}"#),
+                "[REDACTED: secret write]"
+            );
+        }
+        for (method, path) in [
+            (Method::GET, "org/slack/installations"),
+            (Method::POST, "org/slack/install/start"),
+            (Method::POST, "org/slack/installations/I1/connection/start"),
+            (Method::DELETE, "org/slack/installations/I1/connection"),
+            (Method::POST, "org/slack/installations/I1/link-all"),
+            (Method::PUT, "org/slack/installations/I1/linking"),
+            (Method::PUT, "_meta/slack/installations/I1/org-access"),
+            (Method::GET, "org/slack/installations/I1/credentials"),
+            (Method::POST, "org/slack/link-requests/R1/start"),
+            (Method::POST, "org/slack/link-requests/R1/resend"),
+            (Method::POST, "org/streams/slack/installations"),
+            (Method::POST, "slack/installations"),
+        ] {
+            assert!(!is_secret_write(&method, path), "{method} {path}");
+        }
+    }
+
+    /// What `audit_middleware` would store, seen from inside the `/api` and base-URI nesting.
+    async fn audited_through_the_router(
+        base: &str,
+        method: Method,
+        uri: &str,
+        body: &str,
+    ) -> String {
+        let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let record = {
+            let seen = seen.clone();
+            move |request: Request<Body>, next: Next| {
+                let seen = seen.clone();
+                async move {
+                    let path = audited_path(request.uri());
+                    let method = request.method().clone();
+                    let (parts, body) = request.into_parts();
+                    let bytes = axum::body::to_bytes(body, usize::MAX).await.unwrap();
+                    seen.lock()
+                        .unwrap()
+                        .push(audit_body(&method, &path, None, bytes.to_vec()));
+                    next.run(Request::from_parts(parts, Body::from(bytes)))
+                        .await
+                }
+            }
+        };
+        let api = Router::new().nest("/api", slack_routes().layer(middleware::from_fn(record)));
+        let app = if base.is_empty() {
+            api
+        } else {
+            Router::new().nest(base, api)
+        };
+        let req = Request::builder()
+            .method(method)
+            .uri(uri)
+            .header("user_id", "root@example.com")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(body.to_string()))
+            .unwrap();
+        app.oneshot(req).await.unwrap();
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.len(), 1, "{uri} reached the audit layer once");
+        seen[0].clone()
+    }
+
+    #[tokio::test]
+    async fn a_slack_secret_write_is_redacted_as_the_audit_layer_sees_it() {
+        let secret =
+            r#"{"code":"c-1","state":"s-1","client_secret":"cs-1","signing_secret":"ss-1"}"#;
+        for (base, method, uri) in [
+            ("", Method::POST, "/api/default/slack/install/exchange"),
+            ("", Method::POST, "/api/default/slack/installations"),
+            (
+                "",
+                Method::PUT,
+                "/api/default/slack/installations/I1/credentials",
+            ),
+            ("", Method::POST, "/api/default/slack/connection/confirm"),
+            (
+                "",
+                Method::POST,
+                "/api/default/slack/installations/I1/connection",
+            ),
+            ("", Method::POST, "/api/default/slack/link-requests/confirm"),
+            (
+                "/o2",
+                Method::POST,
+                "/o2/api/default/slack/install/exchange",
+            ),
+            (
+                "/o2",
+                Method::PUT,
+                "/o2/api/api/slack/installations/I1/credentials",
+            ),
+        ] {
+            let stored = audited_through_the_router(base, method.clone(), uri, secret).await;
+            assert_eq!(stored, "[REDACTED: secret write]", "{method} {uri}");
+        }
+        let start = audited_through_the_router(
+            "",
+            Method::POST,
+            "/api/default/slack/install/start",
+            r#"{"source":"settings"}"#,
+        )
+        .await;
+        assert_eq!(start, r#"{"source":"settings"}"#);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_delegated_chat_is_audited_without_the_question() {
+        let body = br#"{"messages":[{"role":"user","content":"why is checkout slow?"}],"context":{"currentPage":"slack"}}"#;
+        let stored =
+            delegated_chat_audit_body(&Method::POST, "org/ai/chat", true, Some("T0:C0:Ev1"), body)
+                .expect("a delegated /ai/chat gets the Slack record");
+        assert!(!stored.contains("checkout"), "{stored}");
+        let json: Value = serde_json::from_str(&stored).unwrap();
+        assert_eq!(json["messages"], "[REDACTED: slack]");
+        assert_eq!(json["slack_event"], "T0:C0:Ev1");
+        assert_eq!(json["context"]["currentPage"], "slack");
+        for (method, path, delegated) in [
+            (Method::POST, "org/ai/chat", false),
+            (Method::POST, "org/ai/chat_stream", true),
+            (Method::POST, "org/ai/chats", true),
+            (Method::GET, "org/ai/chat", true),
+            (Method::POST, "org/streams/ai/chat", true),
+        ] {
+            assert_eq!(
+                delegated_chat_audit_body(&method, path, delegated, None, body),
+                None,
+                "{method} {path} delegated={delegated}"
+            );
+        }
     }
 
     fn audited(method: Method, path: &str, body: &str) -> String {
@@ -2470,6 +3247,63 @@ mod tests {
             audited(Method::POST, "api/org/settings/logo", "png"),
             "cG5n"
         );
+    }
+
+    #[tokio::test]
+    async fn the_routed_org_must_be_the_org_the_auth_layers_check() {
+        async fn guard(request: axum::extract::Request, next: Next) -> Response {
+            let (mut parts, body) = request.into_parts();
+            if let Err(error) = validate_routed_org(&mut parts).await {
+                return error.into_response();
+            }
+            next.run(Request::from_parts(parts, body)).await
+        }
+        let app = Router::new()
+            .route("/v2/{org_id}/alerts", get(|| async { "ok" }))
+            .route("/v2/{org_id}/folders/{folder_type}", get(|| async { "ok" }))
+            .route("/{org_id}/kv/{key}", get(|| async { "ok" }))
+            .layer(middleware::from_fn(guard));
+        for (uri, expected) in [
+            ("/v2/acme/alerts", StatusCode::OK),
+            ("/acme/kv/note", StatusCode::OK),
+            ("/acme%20labs/kv/note", StatusCode::OK),
+            ("/v2/acme%2Dlabs/alerts", StatusCode::OK),
+            ("/v2/kv/note", StatusCode::OK),
+            ("/v2/kv/folders", StatusCode::FORBIDDEN),
+        ] {
+            let request = Request::get(uri).body(Body::empty()).unwrap();
+            let status = app.clone().oneshot(request).await.unwrap().status();
+            assert_eq!(status, expected, "{uri}");
+        }
+        let nested = Router::new().nest(
+            "/api",
+            Router::new()
+                .route("/{org_id}/kv/{key}", get(|| async { "ok" }))
+                .layer(middleware::from_fn(guard)),
+        );
+        for (uri, expected) in [
+            ("/api//kv/note", StatusCode::NOT_FOUND),
+            ("/api/acme/kv/note", StatusCode::OK),
+        ] {
+            let request = Request::get(uri).body(Body::empty()).unwrap();
+            let status = nested.clone().oneshot(request).await.unwrap().status();
+            assert_eq!(status, expected, "{uri}");
+        }
+    }
+
+    #[test]
+    fn a_v2_request_is_audited_under_the_org_it_serves() {
+        for (path, org, next) in [
+            ("v2/acme/alerts/a1", "acme", "alerts"),
+            ("v2/v2/folders/alerts", "v2", "folders"),
+            ("v2/acme/_search_stream", "v2", "acme"),
+            ("acme/_search_stream", "acme", "_search_stream"),
+            ("organizations", "organizations", ""),
+            ("", "", ""),
+        ] {
+            let columns: Vec<&str> = path.split('/').collect();
+            assert_eq!(audit_org_and_next(&columns), (org, next), "{path}");
+        }
     }
 
     #[tokio::test]
@@ -2830,6 +3664,28 @@ mod tests {
         }
     }
 
+    // the Loki handler does not inflate bodies itself, so this layer pair is the only cap
+    #[tokio::test]
+    async fn loki_body_that_decompresses_over_the_limit_is_413() {
+        let limit = 64 * 1024;
+        let app = Router::new()
+            .route("/{org_id}/loki/api/v1/push", post(logs::loki::loki_push))
+            .layer(RequestDecompressionLayer::new())
+            .layer(DefaultBodyLimit::max(limit));
+        let compressed = zstd::encode_all(&vec![b' '; limit + 1][..], 3).unwrap();
+        assert!(compressed.len() < limit);
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri("/default/loki/api/v1/push")
+            .header(header::CONTENT_ENCODING, "zstd")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(compressed))
+            .unwrap();
+
+        let status = app.oneshot(req).await.unwrap().status();
+        assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+    }
+
     // ── unauthenticated /config bootstrap ─────────────────────────────────
     //
     // GET /config is served WITHOUT auth so the login page can render. Its
@@ -2867,12 +3723,19 @@ mod tests {
                 "custom_logo_dark_img",
                 "custom_logo_img",
                 "custom_logo_text",
+                "editor_suggest_mode",
                 "native_login_enabled",
                 "rum",
                 "sso_enabled",
                 "telemetry_enabled",
             ],
             "unauthenticated /config must expose exactly the login-page bootstrap fields"
+        );
+
+        assert_eq!(
+            payload.get("editor_suggest_mode").and_then(Value::as_str),
+            Some("automatic"),
+            "the editors need the suggest mode before the authenticated config arrives"
         );
 
         // build_type (enterprise/cloud/opensource) is not sensitive and the o2
@@ -3218,6 +4081,150 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn recent_rejections_route_reads_the_org_key_for_members_and_root_and_is_get_only() {
+        use common::{
+            infra::config::{ORG_USERS, USERS},
+            meta::ingest_rejections::{IngestRejection, RejectionReason},
+        };
+        use config::meta::user::{UserRole, UserType};
+
+        let org = "rej-route-acme";
+        let member = "member@rej-route.test";
+        let root = "root@rej-route.test";
+        let stranger = "stranger@rej-route.test";
+        USERS.insert(
+            member.to_string(),
+            infra::table::users::UserRecord {
+                email: member.to_string(),
+                first_name: "M".to_string(),
+                last_name: "R".to_string(),
+                password: "hash".to_string(),
+                salt: "salt".to_string(),
+                is_root: false,
+                password_ext: None,
+                user_type: UserType::Internal,
+                created_at: 0,
+                updated_at: 0,
+                must_reset_password: false,
+                password_reset_reason: None,
+                flagged_at: None,
+                password_updated_at: None,
+            },
+        );
+        for (org_id, email, role) in [
+            (org, member, UserRole::Viewer),
+            (config::DEFAULT_ORG, root, UserRole::Root),
+        ] {
+            ORG_USERS.insert(
+                format!("{org_id}/{email}"),
+                infra::table::org_users::OrgUserRecord {
+                    role,
+                    token: "token".to_string(),
+                    rum_token: None,
+                    org_id: org_id.to_string(),
+                    email: email.to_string(),
+                    created_at: 0,
+                    allow_static_token: true,
+                },
+            );
+        }
+        let now = config::utils::time::now_micros();
+        let entries = [
+            (now - 30, 400, RejectionReason::MalformedBody, None),
+            (
+                now - 10,
+                401,
+                RejectionReason::InvalidCredentials,
+                Some("ci"),
+            ),
+            (now - 20, 413, RejectionReason::BatchTooLarge, None),
+            (
+                now - 2 * 3_600_000_000,
+                429,
+                RejectionReason::RateOrQuota,
+                None,
+            ),
+        ]
+        .map(|(first_seen, status, reason, token)| {
+            IngestRejection::new(
+                first_seen,
+                status,
+                reason,
+                &format!("/api/{org}/default/_json"),
+                token,
+            )
+        });
+        infra::db::create_table().await.unwrap();
+        infra::coordinator::ingest_rejection::delete(org)
+            .await
+            .unwrap();
+        let value = bytes::Bytes::from(serde_json::to_vec(&entries).unwrap());
+        assert!(
+            infra::coordinator::ingest_rejection::put_if_revision(org, value, None)
+                .await
+                .unwrap()
+        );
+
+        let app = Router::new().route(
+            "/{org_id}/ingest/recent_rejections",
+            get(ingest_rejections::recent_rejections),
+        );
+        let call = |method: &str, user: &str| {
+            Request::builder()
+                .method(method)
+                .uri(format!("/{org}/ingest/recent_rejections"))
+                .header("user_id", user)
+                .body(Body::empty())
+                .unwrap()
+        };
+
+        let ok = app.clone().oneshot(call("GET", member)).await.unwrap();
+        assert_eq!(ok.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(ok.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["tracked"], Value::Bool(true));
+        let list = json["list"].as_array().unwrap();
+        assert_eq!(list.len(), 3, "the entry older than an hour is absent");
+        assert_eq!(
+            list[0],
+            serde_json::json!({
+                "first_seen": now - 10,
+                "status": 401,
+                "reason": "invalid_credentials",
+                "path": format!("/api/{org}/default/_json"),
+                "token_name": "ci"
+            })
+        );
+        let reasons = list
+            .iter()
+            .map(|r| r["reason"].as_str().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            reasons,
+            ["invalid_credentials", "batch_too_large", "malformed_body"],
+            "newest first"
+        );
+
+        let as_root = app.clone().oneshot(call("GET", root)).await.unwrap();
+        assert_eq!(as_root.status(), StatusCode::OK, "root has no org row");
+
+        let refused = app.clone().oneshot(call("GET", stranger)).await.unwrap();
+        assert_eq!(refused.status(), StatusCode::FORBIDDEN);
+
+        let wrong_method = app.oneshot(call("POST", member)).await.unwrap();
+        assert_eq!(wrong_method.status(), StatusCode::METHOD_NOT_ALLOWED);
+
+        USERS.remove(member);
+        ORG_USERS.remove(&format!("{org}/{member}"));
+        ORG_USERS.remove(&format!("{}/{root}", config::DEFAULT_ORG));
+        infra::coordinator::ingest_rejection::delete(org)
+            .await
+            .unwrap();
+    }
+
     #[test]
     fn query_functions_is_published_in_the_openapi_surface() {
         // Discriminating: this fails if the handler is dropped from openapi.rs.
@@ -3340,15 +4347,6 @@ mod tests {
     }
 
     #[test]
-    fn test_cors_web_url_trailing_slash_stripped() {
-        // Caller trims trailing slashes on web_url before calling us.
-        assert!(is_origin_allowed(
-            b"https://app.example.com",
-            "https://app.example.com"
-        ));
-    }
-
-    #[test]
     fn test_cors_prefix_bypass_denied() {
         // https://app.example.com.evil.com must NOT match https://app.example.com
         assert!(!is_origin_allowed(
@@ -3394,6 +4392,47 @@ mod tests {
     fn test_cors_empty_web_url_allows_all() {
         // Empty web_url is permissive (dev mode)
         assert!(is_origin_allowed(b"https://any.origin.com", ""));
+    }
+
+    #[tokio::test]
+    async fn test_cors_preflight_allows_assistant_chat_headers() {
+        // One header missing from the allow-list fails the preflight and the POST is never sent.
+        let app = Router::new()
+            .route(
+                "/default/ai/chat_stream",
+                axum::routing::post(|| async { "ok" }),
+            )
+            .layer(cors_layer());
+        let req = Request::builder()
+            .method(Method::OPTIONS)
+            .uri("/default/ai/chat_stream")
+            .header(header::ORIGIN, "http://localhost:8081")
+            .header(header::ACCESS_CONTROL_REQUEST_METHOD, "POST")
+            .header(
+                header::ACCESS_CONTROL_REQUEST_HEADERS,
+                "content-type,traceparent,x-o2-assistant-session-id,x-o2-assistant-turn-id",
+            )
+            .body(Body::empty())
+            .unwrap();
+
+        let response = app.oneshot(req).await.unwrap();
+        let allowed = response
+            .headers()
+            .get(header::ACCESS_CONTROL_ALLOW_HEADERS)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        for name in [
+            "content-type",
+            "traceparent",
+            X_O2_ASSISTANT_SESSION_ID.as_str(),
+            X_O2_ASSISTANT_TURN_ID.as_str(),
+        ] {
+            assert!(
+                allowed.split(',').any(|h| h.trim() == name),
+                "{name} missing from access-control-allow-headers: {allowed}"
+            );
+        }
     }
 
     #[test]
@@ -3515,5 +4554,469 @@ mod tests {
 
         let response = app.oneshot(req).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    /// `service_routes()` minus comments, whitespace and wrap commas.
+    fn service_routes_registrations() -> String {
+        let source = include_str!("mod.rs");
+        let start = source.find("pub fn service_routes() -> Router {").unwrap();
+        let end = start + source[start..].find("\npub fn ").unwrap();
+        let mut body = String::new();
+        let mut rest = &source[start..end];
+        while let Some(at) = rest.find("/*") {
+            body.push_str(&rest[..at]);
+            rest = rest[at..]
+                .find("*/")
+                .map_or("", |close| &rest[at + close + 2..]);
+        }
+        body.push_str(rest);
+        body.lines()
+            .map(|line| line.split("//").next().unwrap_or_default())
+            .collect::<String>()
+            .split_whitespace()
+            .collect::<String>()
+            .replace(",)", ")")
+    }
+
+    #[test]
+    fn metric_usage_route_is_registered_in_service_routes() {
+        assert!(
+            service_routes_registrations().contains(
+                r#".route("/{org_id}/metrics/{metric_name}/usage",get(metrics_usage::get_metric_usage))"#
+            ),
+            "GET /{{org_id}}/metrics/{{metric_name}}/usage must be registered in service_routes()"
+        );
+    }
+
+    #[test]
+    fn metric_usage_is_published_in_the_openapi_surface() {
+        let spec = super::openapi::ApiDoc::openapi();
+        let path = spec
+            .paths
+            .paths
+            .get("/api/{org_id}/metrics/{metric_name}/usage")
+            .expect("metric usage is missing from the OpenAPI surface");
+        assert_eq!(
+            path.get.as_ref().and_then(|op| op.operation_id.as_deref()),
+            Some("GetMetricUsage")
+        );
+    }
+
+    #[test]
+    fn parse_tree_is_published_in_the_openapi_surface() {
+        let spec = super::openapi::ApiDoc::openapi();
+        let path = spec
+            .paths
+            .paths
+            .get("/api/{org_id}/prometheus/api/v1/parse_tree")
+            .expect("parse_tree is missing from the OpenAPI surface");
+        assert_eq!(
+            path.post.as_ref().and_then(|op| op.operation_id.as_deref()),
+            Some("PrometheusParseTree")
+        );
+    }
+
+    #[test]
+    fn parse_tree_route_is_registered_in_service_routes() {
+        assert!(
+            service_routes_registrations().contains(
+                r#".route("/{org_id}/prometheus/api/v1/parse_tree",post(promql::parse_tree))"#
+            ),
+            "POST /{{org_id}}/prometheus/api/v1/parse_tree must be registered in service_routes()"
+        );
+    }
+
+    #[tokio::test]
+    async fn metric_usage_route_dispatches_get_and_rejects_other_methods() {
+        let app = Router::new().route(
+            "/{org_id}/metrics/{metric_name}/usage",
+            get(metrics_usage::get_metric_usage),
+        );
+        let request = |method: &str| {
+            Request::builder()
+                .method(method)
+                .uri("/myorg/metrics/http_requests_total/usage")
+                .body(Body::empty())
+                .unwrap()
+        };
+
+        // No user header: the handler's own extractor answers, before any scan.
+        let get = app.clone().oneshot(request("GET")).await.unwrap();
+        assert_eq!(get.status(), StatusCode::BAD_REQUEST);
+
+        let post = app.oneshot(request("POST")).await.unwrap();
+        assert_eq!(post.status(), StatusCode::METHOD_NOT_ALLOWED);
+    }
+
+    #[tokio::test]
+    async fn rca_steer_route_refuses_put_and_delete() {
+        const STEER_PATH: &str =
+            "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/steer";
+        assert!(
+            service_routes_registrations().contains(&format!(
+                r#".route("{STEER_PATH}",post(alerts::incidents::steer_incident_rca_run))"#
+            )),
+            "the steer path must be registered in service_routes() for POST only"
+        );
+        let app = Router::new().route(STEER_PATH, post(alerts::incidents::steer_incident_rca_run));
+        for method in ["PUT", "DELETE"] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method(method)
+                        .uri("/v2/myorg/alerts/incidents/inc1/rca/runs/run1/steer")
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                response.status(),
+                StatusCode::METHOD_NOT_ALLOWED,
+                "{method}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn rca_resume_route_takes_only_post() {
+        const RESUME_PATH: &str =
+            "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/resume";
+        let registrations = service_routes_registrations();
+        assert!(
+            registrations.contains(&format!(
+                r#".route("{RESUME_PATH}",post(alerts::incidents::resume_incident_rca_run))"#
+            )),
+            "the resume path must be registered in service_routes() for POST only"
+        );
+
+        let app = Router::new().route(
+            RESUME_PATH,
+            post(alerts::incidents::resume_incident_rca_run),
+        );
+        for (method, uri) in [
+            (
+                "GET",
+                "/v2/myorg/alerts/incidents/inc1/rca/runs/run1/resume",
+            ),
+            (
+                "PUT",
+                "/v2/myorg/alerts/incidents/inc1/rca/runs/run1/resume",
+            ),
+            (
+                "DELETE",
+                "/v2/myorg/alerts/incidents/inc1/rca/runs/run1/resume",
+            ),
+        ] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method(method)
+                        .uri(uri)
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                response.status(),
+                StatusCode::METHOD_NOT_ALLOWED,
+                "{method} {uri}"
+            );
+        }
+    }
+
+    fn node_request(user_id: &str) -> Request<Body> {
+        Request::builder()
+            .uri("/metrics")
+            .header("user_id", user_id)
+            .body(Body::empty())
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn node_routes_refuse_a_non_root_caller() {
+        let response = node_routes()
+            .oneshot(node_request("member@node-routes.test"))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn node_routes_serve_the_root_user() {
+        let root = "root@node-routes.test";
+        common::infra::config::ORG_USERS.insert(
+            format!("{}/{root}", config::DEFAULT_ORG),
+            infra::table::org_users::OrgUserRecord {
+                role: config::meta::user::UserRole::Root,
+                token: "token".to_string(),
+                rum_token: None,
+                org_id: config::DEFAULT_ORG.to_string(),
+                email: root.to_string(),
+                created_at: 0,
+                allow_static_token: true,
+            },
+        );
+        let response = node_routes().oneshot(node_request(root)).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    /// Every (method, template) the `/api` tree serves, parsed from this file's production code.
+    fn api_routes() -> std::collections::BTreeMap<String, std::collections::BTreeSet<String>> {
+        let src = include_str!("mod.rs");
+        let (production, _) = src.split_once("\n#[cfg(test)]\nmod tests {").unwrap();
+        let section = |from: &str, to: &str| {
+            let start = production.find(from).unwrap();
+            let end = start + production[start..].find(to).unwrap();
+            &production[start..end]
+        };
+        let api_tree = [
+            section("fn ai_chat_routes(", "pub fn other_service_routes("),
+            section("fn es_compat_routes(", "\n}\n"),
+        ];
+        let methods =
+            regex::Regex::new(r"(?:^|[\s(.,])(get|post|put|delete|patch|head)\(").unwrap();
+        let mut routes =
+            std::collections::BTreeMap::<String, std::collections::BTreeSet<String>>::new();
+        for text in api_tree {
+            for (at, _) in text.match_indices(".route(") {
+                let args = &text[at + ".route(".len()..];
+                let mut depth = 1;
+                let end = args
+                    .char_indices()
+                    .find(|(_, c)| {
+                        depth += match c {
+                            '(' => 1,
+                            ')' => -1,
+                            _ => 0,
+                        };
+                        depth == 0
+                    })
+                    .unwrap()
+                    .0;
+                let args = &args[..end];
+                let template = args.split('"').nth(1).unwrap().to_string();
+                let found: Vec<String> = methods
+                    .captures_iter(args)
+                    .map(|c| c[1].to_uppercase())
+                    .collect();
+                assert!(!found.is_empty(), "no method parsed for {template}");
+                routes.entry(template).or_default().extend(found);
+            }
+        }
+        routes
+    }
+
+    fn template_segments(template: &str) -> Vec<&str> {
+        template.trim_start_matches('/').split('/').collect()
+    }
+
+    fn is_param(segment: &str) -> bool {
+        segment.starts_with('{')
+    }
+
+    fn neutral_path(template: &str) -> String {
+        template_segments(template)
+            .iter()
+            .map(|s| if is_param(s) { "zz" } else { s })
+            .collect::<Vec<_>>()
+            .join("/")
+    }
+
+    /// The route axum dispatches to: at the first differing segment a literal beats a parameter.
+    fn owner<'a>(templates: &[&'a str], path: &[&str]) -> Option<&'a str> {
+        let matches = |t: &&str| {
+            let segs = template_segments(t);
+            segs.len() == path.len() && segs.iter().zip(path).all(|(s, p)| is_param(s) || s == p)
+        };
+        templates.iter().copied().filter(matches).max_by(|a, b| {
+            let rank = |t: &str| -> Vec<bool> {
+                template_segments(t).iter().map(|s| !is_param(s)).collect()
+            };
+            rank(a).cmp(&rank(b))
+        })
+    }
+
+    #[test]
+    fn assistant_scope_is_exactly_these_router_routes() {
+        use openobserve_api_common::auth::delegation::in_assistant_scope;
+
+        let mut allowed = Vec::new();
+        for (template, methods) in api_routes() {
+            for method in methods {
+                let m = Method::from_bytes(method.as_bytes()).unwrap();
+                if in_assistant_scope(&m, &neutral_path(&template)) {
+                    allowed.push(format!("{method} {template}"));
+                }
+            }
+        }
+        let expected = [
+            "GET /v2/{org_id}/alerts",
+            "GET /v2/{org_id}/alerts/history",
+            "GET /v2/{org_id}/alerts/incidents",
+            "GET /v2/{org_id}/alerts/incidents/stats",
+            "GET /v2/{org_id}/alerts/incidents/{incident_id}",
+            "GET /v2/{org_id}/alerts/incidents/{incident_id}/events",
+            "GET /v2/{org_id}/alerts/incidents/{incident_id}/rca/runs",
+            "GET /v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}",
+            "GET /v2/{org_id}/alerts/tags",
+            "GET /v2/{org_id}/alerts/{alert_id}",
+            "GET /v2/{org_id}/alerts/{alert_id}/groups",
+            "GET /v2/{org_id}/alerts/{alert_id}/groups/transitions",
+            "GET /v2/{org_id}/folders/{folder_type}",
+            "GET /v2/{org_id}/folders/{folder_type}/name/{folder_name}",
+            "GET /v2/{org_id}/folders/{folder_type}/{folder_id}",
+            "GET /{org_id}/dashboards",
+            "GET /{org_id}/dashboards/{dashboard_id}",
+            "GET /{org_id}/functions",
+            "GET /{org_id}/mcp",
+            "GET /{org_id}/oncall/incidents/{incident_id}/responses",
+            "GET /{org_id}/oncall/responses",
+            "GET /{org_id}/oncall/responses/{response_id}",
+            "GET /{org_id}/oncall/responses/{response_id}/escalation",
+            "GET /{org_id}/oncall/responses/{response_id}/history",
+            "GET /{org_id}/oncall/teams",
+            "GET /{org_id}/oncall/teams/{team_id}",
+            "GET /{org_id}/oncall/teams/{team_id}/members",
+            "GET /{org_id}/oncall/teams/{team_id}/on-call",
+            "GET /{org_id}/oncall/teams/{team_id}/overrides",
+            "GET /{org_id}/oncall/teams/{team_id}/overview",
+            "GET /{org_id}/oncall/teams/{team_id}/resolved-schedule",
+            "GET /{org_id}/oncall/teams/{team_id}/schedule",
+            "GET /{org_id}/prometheus/api/v1/query",
+            "GET /{org_id}/prometheus/api/v1/query_range",
+            "GET /{org_id}/streams",
+            "GET /{org_id}/streams/{stream_name}/schema",
+            "GET /{org_id}/{stream_name}/_around",
+            "GET /{org_id}/{stream_name}/_values",
+            "GET /{org_id}/{stream_name}/traces/latest",
+            "GET /{org_id}/{stream_name}/traces/latest_stream",
+            "GET /{org_id}/{stream_name}/traces/session",
+            "GET /{org_id}/{stream_name}/traces/session/details",
+            "GET /{org_id}/{stream_name}/traces/time_range",
+            "GET /{org_id}/{stream_name}/traces/user",
+            "GET /{org_id}/{stream_name}/traces/{trace_id}/dag",
+            "GET /{org_id}/{stream_name}/traces/{trace_id}/details",
+            "PATCH /v2/{org_id}/alerts/incidents/{incident_id}/update",
+            "POST /v2/{org_id}/alerts/incidents/{incident_id}/events/comment",
+            "POST /v2/{org_id}/downtimes",
+            "POST /v2/{org_id}/downtimes/{downtime_id}/cancel",
+            "POST /{org_id}/_search",
+            "POST /{org_id}/ai/chat",
+            "POST /{org_id}/ai/chat_stream",
+            "POST /{org_id}/ai/chats/{session_id}/cancel",
+            "POST /{org_id}/ai/confirm/{session_id}",
+            "POST /{org_id}/ai/feedback",
+            "POST /{org_id}/mcp",
+            "POST /{org_id}/oncall/responses/{response_id}/acknowledge",
+            "POST /{org_id}/oncall/responses/{response_id}/resolve",
+            "POST /{org_id}/oncall/responses/{response_id}/snooze",
+            "POST /{org_id}/prometheus/api/v1/query",
+            "POST /{org_id}/prometheus/api/v1/query_range",
+            "POST /{org_id}/{stream_name}/_around",
+        ];
+        allowed.sort();
+        let mut expected: Vec<String> = expected.iter().map(|s| s.to_string()).collect();
+        expected.sort();
+        assert_eq!(allowed, expected);
+    }
+
+    /// A pattern parameter must not admit a path that axum hands to a more specific route.
+    #[test]
+    fn assistant_scope_agrees_with_axum_dispatch() {
+        use openobserve_api_common::auth::delegation::in_assistant_scope;
+
+        let routes = api_routes();
+        let templates: Vec<&str> = routes.keys().map(String::as_str).collect();
+        let mut wrong = Vec::new();
+        for r in &templates {
+            for a in &templates {
+                let (rs, as_) = (template_segments(r), template_segments(a));
+                if rs.len() != as_.len() {
+                    continue;
+                }
+                let merged: Option<Vec<&str>> = rs
+                    .iter()
+                    .zip(&as_)
+                    .map(|(x, y)| match (is_param(x), is_param(y)) {
+                        (false, false) => (x == y).then_some(*x),
+                        (false, true) => Some(*x),
+                        (true, false) => Some(*y),
+                        (true, true) => Some("zz"),
+                    })
+                    .collect();
+                let Some(path) = merged else { continue };
+                let Some(owner) = owner(&templates, &path) else {
+                    continue;
+                };
+                for method in &routes[owner] {
+                    let m = Method::from_bytes(method.as_bytes()).unwrap();
+                    let joined = path.join("/");
+                    if in_assistant_scope(&m, &joined)
+                        != in_assistant_scope(&m, &neutral_path(owner))
+                    {
+                        wrong.push(format!("{method} {joined} dispatches to {owner}"));
+                    }
+                }
+            }
+        }
+        wrong.sort();
+        wrong.dedup();
+        assert!(
+            wrong.is_empty(),
+            "add the literal to RESERVED_STREAM_SLOTS in api/common auth/delegation.rs: {wrong:#?}"
+        );
+    }
+
+    // Router-role pods merge basic_routes the same way, so this covers both node shapes.
+    #[tokio::test]
+    async fn slack_inbound_routes_need_no_o2_auth_and_cap_the_body_at_1_mib() {
+        let app = Router::new()
+            .merge(basic_routes())
+            .nest("/api", service_routes());
+        for path in [
+            "/api/slack/events",
+            "/api/slack/commands",
+            "/api/slack/interactions",
+        ] {
+            let req = Request::builder()
+                .method(Method::POST)
+                .uri(path)
+                .body(Body::from("{}"))
+                .unwrap();
+            let resp = app.clone().oneshot(req).await.unwrap();
+            assert_eq!(resp.status(), StatusCode::NOT_FOUND, "{path}");
+            let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let body: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(body["message"], "Slack is not enabled", "{path}");
+
+            let big = vec![b' '; slack::inbound::MAX_BODY_BYTES + 1];
+            let req = Request::builder()
+                .method(Method::POST)
+                .uri(path)
+                .body(Body::from(big))
+                .unwrap();
+            let status = app.clone().oneshot(req).await.unwrap().status();
+            assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE, "{path}");
+        }
+    }
+
+    #[tokio::test]
+    async fn an_org_named_slack_still_reaches_its_own_routes() {
+        let app = Router::new()
+            .merge(basic_routes())
+            .nest("/api", service_routes());
+        let req = Request::builder()
+            .method(Method::GET)
+            .uri("/api/slack/streams")
+            .body(Body::empty())
+            .unwrap();
+        let status = app.oneshot(req).await.unwrap().status();
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
     }
 }

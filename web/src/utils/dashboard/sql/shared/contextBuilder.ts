@@ -23,6 +23,7 @@ import {
 } from "../../chartDimensionUtils";
 import { ColorModeWithoutMinMax, getSQLMinMaxValue, getGridLineStyle } from "../../colorPalette";
 import { getDataValue } from "../../aliasUtils";
+import { getAxisLabel } from "../../fieldLabel";
 import {
   createBaseLegendConfig,
   getChartDimensions,
@@ -37,6 +38,7 @@ import { buildDataLookupMap, createSeriesBuilders } from "./seriesBuilder";
 import { createTrellisHelpers } from "./trellisConfig";
 import { type SQLContext } from "./types";
 import { escapeHtml } from "@/utils/html";
+import { createSeriesOverrideLookup } from "../../seriesOverrides";
 
 /**
  * Finds the largest label in the given data array.
@@ -231,6 +233,8 @@ export function buildSQLContext(
 
   const legendConfig = createBaseLegendConfig(panelSchema, hoveredSeriesState);
 
+  const seriesOverrides = createSeriesOverrideLookup(panelSchema?.config);
+
   const isHorizontalChart = panelSchema.type === "h-bar" || panelSchema.type === "h-stacked";
 
   const defaultGrid = {
@@ -331,7 +335,9 @@ export function buildSQLContext(
   const panelHeightPx = chartPanelRef?.value?.offsetHeight ?? 0;
   const xAxisNameFits = !panelHeightPx || panelHeightPx >= 150;
 
-  const hasXAxisName = xAxisNameFits && panelSchema?.queries?.[0]?.fields?.x?.[0]?.label;
+  const axisLabelOf = (field: any) => getAxisLabel(field, panelSchema?.config);
+
+  const hasXAxisName = xAxisNameFits && axisLabelOf(panelSchema?.queries?.[0]?.fields?.x?.[0]);
 
   // Drop the y-axis name on panels too narrow for name inset (36) + labels +
   // right margin (20) + a usable plot (~84); below that ECharts squeezes the
@@ -342,7 +348,7 @@ export function buildSQLContext(
   const hasYAxisName =
     yAxisNameFits &&
     panelSchema?.queries?.[0]?.fields?.y?.length == 1 &&
-    panelSchema?.queries?.[0]?.fields?.y?.[0]?.label;
+    axisLabelOf(panelSchema?.queries?.[0]?.fields?.y?.[0]);
 
   // Check if x-axis will be time-based by looking for timestamp fields
   const hasTimestampField = panelSchema.queries[0].fields?.x?.some(
@@ -573,29 +579,15 @@ export function buildSQLContext(
               // if have than bold it
               if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
                 hoverText.push(
-                  `<strong>${it.marker} ${escapeHtml(it.seriesName)} : ${escapeHtml(
-                    formatUnitValue(
-                      getUnitValue(
-                        it.value,
-                        panelSchema.config?.unit,
-                        panelSchema.config?.unit_custom,
-                        panelSchema.config?.decimals,
-                      ),
-                    ),
+                  `<strong>${it.marker} ${escapeHtml(seriesOverrides.displayName(it.seriesName))} : ${escapeHtml(
+                    seriesOverrides.formatValue(it.value, it.seriesName),
                   )} </strong>`,
                 );
               // else normal text
               else
                 hoverText.push(
-                  `${it.marker} ${escapeHtml(it.seriesName)} : ${escapeHtml(
-                    formatUnitValue(
-                      getUnitValue(
-                        it.value,
-                        panelSchema.config?.unit,
-                        panelSchema.config?.unit_custom,
-                        panelSchema.config?.decimals,
-                      ),
-                    ),
+                  `${it.marker} ${escapeHtml(seriesOverrides.displayName(it.seriesName))} : ${escapeHtml(
+                    seriesOverrides.formatValue(it.value, it.seriesName),
                   )}`,
                 );
             }

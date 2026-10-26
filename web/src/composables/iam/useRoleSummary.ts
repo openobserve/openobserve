@@ -161,6 +161,21 @@ export const useRoleSummary = (deps: SummaryDeps) => {
     return { count: inside.length, names };
   };
 
+  // An All Modules row shows only the module-wide grant, so it reports every other grant the module holds: `logs:_all_` and `dashboard:f1/d1` both count.
+  const moduleInnerGrants = (node: any, nameLimit: number): { count: number; names: string[] } => {
+    const module = roleModules.value.find((candidate) => candidate.key === node?.name);
+    if (!module) return { count: 0, names: [] };
+    const inside = module.countedKeys.flatMap((resource) =>
+      heldGrants(resource)
+        .filter(([entity]) => resource !== module.key || !isWideEntity(entity))
+        .map(([entity]) => ({ resource, entity })),
+    );
+    const names = inside
+      .slice(0, nameLimit)
+      .map(({ resource, entity }) => String(entityLabel(resource, entity)));
+    return { count: inside.length, names };
+  };
+
   const actionsOf = (held: ReturnType<typeof heldGrants>) =>
     summaryActions(held.flatMap(([, grants]) => grants.map((grant) => grant.action)));
 
@@ -258,6 +273,7 @@ export const useRoleSummary = (deps: SummaryDeps) => {
     knownTotal,
     heldGrants,
     innerGrants,
+    moduleInnerGrants,
     actionsOf,
     specificReach,
     moduleDescription,

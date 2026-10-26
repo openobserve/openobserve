@@ -120,9 +120,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <!-- Right: dashboards table -->
       <div class="h-full min-w-0 flex-1 max-md:h-auto max-md:min-h-0">
-        <div class="bg-card-glass-bg h-full">
+        <div class="bg-card-glass-bg flex h-full flex-col">
+          <div
+            v-show="showFirstData"
+            class="shrink-0 px-5 pt-5 empty:hidden"
+            data-test="dashboards-first-data"
+          >
+            <FirstDataPanel v-if="showFirstData" signal="any" variant="compact" />
+          </div>
           <OTable
-            class="h-full w-full"
+            class="min-h-0 w-full flex-1"
             ref="oTableRef"
             :data="dashboards"
             :columns="columns"
@@ -134,8 +141,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             show-index
             :global-filter="filterQuery"
             :show-global-filter="false"
-            :page-size="20"
+            :page-size="pageSize"
             :page-size-options="[20, 50, 100, 250, 500]"
+            @update:page-size="pageSize = $event"
+            :sort-by="sortBy"
+            :sort-order="sortOrder"
+            @update:sort-by="sortBy = $event"
+            @update:sort-order="sortOrder = $event"
             :current-page="currentPage"
             @update:current-page="onPageChange"
             selection="multiple"
@@ -209,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template #cell-name="{ row, value }">
-              <span class="inline-flex items-center gap-1">
+              <span class="flex min-w-0 items-center gap-1">
                 <!-- One-click favorite toggle — filled gold star when
                      favorited, neutral outline otherwise. -->
                 <OButton
@@ -225,11 +237,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`dashboard-favorite-toggle-${value}`"
                   @click.stop="toggleFavorite(row)"
                 />
-                <span
+                <OTruncatedText
                   class="text-text-body"
                   :data-test="`dashboard-name-cell-${value}`"
-                  :title="value"
-                  >{{ value }}</span
+                  >{{ value }}</OTruncatedText
                 >
                 <!-- At-a-glance indicator: shows which dashboard is the org
                      home dashboard without an interactive icon on every row. -->
@@ -251,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-body font-mono text-xs" :title="value">{{ value }}</span>
             </template>
             <template #cell-description="{ value }">
-              <span class="text-text-body" :title="value">{{ value || "—" }}</span>
+              <span class="text-text-body">{{ value || "—" }}</span>
             </template>
             <template #cell-owner="{ value }">
               <OUserCell :value="value" />
@@ -270,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop="updateActiveFolderId(row.folder_id)"
               >
                 <OIcon name="folder-outline" size="xs" />
-                <span class="truncate">{{ row.folder }}</span>
+                <OTruncatedText>{{ row.folder }}</OTruncatedText>
               </button>
             </template>
             <template #cell-actions="{ row }">
@@ -403,6 +414,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="outline"
                 size="sm"
+                icon-left="tv"
+                data-test="dashboard-list-tv-playlist-btn"
+                @click="openPlaylistDialog"
+              >
+                {{ t("dashboard.playlist.action") }}
+                <OTooltip :content="t('dashboard.playlist.actionTooltip')" />
+              </OButton>
+              <OButton
+                variant="outline"
+                size="sm"
                 data-test="dashboard-list-move-across-folders-btn"
                 @click="moveMultipleDashboards"
                 icon-left="drive-file-move"
@@ -513,6 +534,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
     />
+
+    <PlaylistDialog
+      v-model:open="showPlaylistDialog"
+      :entries="playlistEntries"
+      @open="openPlaylist"
+    />
   </OPageLayout>
 </template>
 
@@ -542,6 +569,7 @@ import {
   toRaw,
 } from "vue";
 import { useStore } from "vuex";
+import { isCancelledError } from "@tanstack/vue-query";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { formatDate } from "@/utils/date";
 
@@ -552,6 +580,7 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
 import { useRoute, useRouter } from "vue-router";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import ConfirmDialog from "../../components/ConfirmDialog.vue";
@@ -574,6 +603,7 @@ import useNotifications from "@/composables/useNotifications";
 import { debounce } from "lodash-es";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import { useLoading } from "@/composables/useLoading";
+import { useListViewState } from "@/composables/useListViewState";
 import { useReo } from "@/services/reodotdev_analytics";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
@@ -583,6 +613,14 @@ import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import analytics from "@/services/product_analytics";
 import { useFavoriteDashboards, FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import PlaylistDialog from "@/components/dashboards/kiosk/PlaylistDialog.vue";
+import {
+  PLAYLIST_TV_PATH,
+  buildPlaylistQuery,
+  type PlaylistConfig,
+  type PlaylistDialogEntry,
+} from "@/utils/dashboard/playlist";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
@@ -629,6 +667,8 @@ const asCaughtError = (e: unknown): CaughtError => (e ?? {}) as CaughtError;
 export default defineComponent({
   name: "Dashboards",
   components: {
+    FirstDataPanel,
+    OTruncatedText,
     OUserCell,
     OTimeCell,
     OPageLayout,
@@ -652,6 +692,7 @@ export default defineComponent({
     FolderList,
     OToggleGroup,
     OToggleGroupItem,
+    PlaylistDialog,
   },
   setup() {
     const store = useStore();
@@ -675,14 +716,35 @@ export default defineComponent({
     const isFolderEditMode = ref(false);
     const selectedFolderDelete = ref<string | null>(null);
     const selectedFolderToEdit = ref<string | null>(null);
-    const searchQuery = ref("");
+    const savedView = useListViewState("dashboards", {
+      searchQuery: "",
+      filterQuery: "",
+      searchAcrossFolders: false,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+      pageSize: 20,
+    });
+    const searchQuery = ref(savedView.searchQuery);
     const filteredResults = ref<DashboardSearchResult[]>([]);
     const confirmDeleteFolderDialog = ref<boolean>(false);
     const selectedDashboardToMove = ref<DashboardRow | null>(null);
     const selectedDashboardIdToMove = ref<string[] | null>(null);
     const showMoveDashboardDialog = ref(false);
-    const searchAcrossFolders = ref(false);
-    const filterQuery = ref("");
+    const searchAcrossFolders = ref(savedView.searchAcrossFolders);
+    const filterQuery = ref(savedView.filterQuery);
+    const sortBy = ref<string>(savedView.sortBy);
+    const sortOrder = ref<"asc" | "desc">(savedView.sortOrder);
+    const pageSize = ref<number>(savedView.pageSize);
+    watch([searchQuery, filterQuery, searchAcrossFolders, sortBy, sortOrder, pageSize], () => {
+      Object.assign(savedView, {
+        searchQuery: searchQuery.value,
+        filterQuery: filterQuery.value,
+        searchAcrossFolders: searchAcrossFolders.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+        pageSize: pageSize.value,
+      });
+    });
     const folderSearchQuery = ref("");
     const selectedIds = ref<string[]>([]);
     const { track } = useReo();
@@ -957,7 +1019,7 @@ export default defineComponent({
             // A folder switched away from mid-flight must not stamp over the one now active.
             if (activeFolderId.value === FAVORITES_FOLDER_ID) stampFolders(favFolders);
           });
-          searchAcrossFolders.value = false;
+          if (switching) searchAcrossFolders.value = false;
           router.push({
             path: "/dashboards",
             query: {
@@ -980,6 +1042,8 @@ export default defineComponent({
           // A folder switched away from mid-flight must not stamp over the one now active.
           if (activeFolderId.value === folderId) stampFolders([folderId ?? "default"]);
         } catch (error) {
+          // A newer folder switch cancelled this load; the newer one reports its own outcome.
+          if (isCancelledError(error)) return;
           console.error("Error loading dashboards:", error);
           forbidden.value = asCaughtError(error).response?.status === 403;
           // The grouped access toast already reports a 403; a second red toast adds nothing.
@@ -990,7 +1054,9 @@ export default defineComponent({
           }
         } finally {
           loading.value = false;
-          searchAcrossFolders.value = false;
+          // The landing run is the return-from-detail restore, which keeps the saved cross-folder search.
+          if (switching) searchAcrossFolders.value = false;
+          else if (searchAcrossFolders.value && searchQuery.value) void runAcrossFoldersSearch();
           router.push({
             path: "/dashboards",
             query: {
@@ -1018,6 +1084,26 @@ export default defineComponent({
       }
     });
 
+    const runAcrossFoldersSearch = async () => {
+      loading.value = true;
+      try {
+        // Cancel any in-flight search
+        if (currentSearchAbortController) {
+          currentSearchAbortController.abort();
+        }
+        currentSearchAbortController = new AbortController();
+        const searchResults = await fetchSearchResults.execute(searchQuery.value);
+        // fetchSearchResults resolves undefined when the request fails.
+        filteredResults.value = toRaw(searchResults ?? []);
+      } catch (error) {
+        if (asCaughtError(error).name !== "AbortError") {
+          filteredResults.value = [];
+        }
+      } finally {
+        loading.value = false;
+      }
+    };
+
     watch(searchAcrossFolders, async (newVal) => {
       if (newVal) {
         // If searching across folders, use searchQuery
@@ -1026,23 +1112,7 @@ export default defineComponent({
           filterQuery.value = "";
         }
         if (searchQuery.value) {
-          loading.value = true;
-          try {
-            // Cancel any in-flight search
-            if (currentSearchAbortController) {
-              currentSearchAbortController.abort();
-            }
-            currentSearchAbortController = new AbortController();
-            const searchResults = await fetchSearchResults.execute(searchQuery.value);
-            filteredResults.value = toRaw(searchResults);
-          } catch (error) {
-            if (asCaughtError(error).name !== "AbortError") {
-              filteredResults.value = [];
-              // Handle error state
-            }
-          } finally {
-            loading.value = false;
-          }
+          await runAcrossFoldersSearch();
         } else {
           // If no search query, clear filtered results
           filteredResults.value = [];
@@ -1382,6 +1452,14 @@ export default defineComponent({
       { flush: "sync" },
     );
 
+    // mounted only while it can show, so a list with dashboards or an org with data runs no hidden watcher
+    const showFirstData = computed(
+      () =>
+        !loading.value &&
+        !dashboards.value.length &&
+        store.state.organizationData?.isDataIngested === false,
+    );
+
     const deleteDashboard = async () => {
       if (selectedDelete.value) {
         // Capture before the row reference is cleared — used below to drop a
@@ -1528,7 +1606,7 @@ export default defineComponent({
       loading.value = true;
       try {
         const results = await fetchSearchResults.execute(query);
-        filteredResults.value = toRaw(results);
+        filteredResults.value = toRaw(results ?? []);
       } finally {
         loading.value = false;
       }
@@ -1608,6 +1686,51 @@ export default defineComponent({
 
     const confirmBulkDelete = ref<boolean>(false);
     const bulkDeleteLoading = ref(false);
+
+    const showPlaylistDialog = ref(false);
+    const playlistEntries = ref<PlaylistDialogEntry[]>([]);
+
+    // The table reports selection in row order; a playlist follows the order rows were ticked in.
+    const selectionOrder = ref<string[]>([]);
+    watch(
+      selectedIds,
+      (ids) => {
+        const selected = new Set(ids);
+        const kept = selectionOrder.value.filter((id) => selected.has(id));
+        const known = new Set(kept);
+        selectionOrder.value = [...kept, ...ids.filter((id) => !known.has(id))];
+      },
+      { flush: "sync" },
+    );
+
+    const openPlaylistDialog = () => {
+      const folderNames = new Map<string, string>(
+        (store.state.organizationData?.folders ?? []).map((f: any) => [f.folderId, f.name]),
+      );
+      const rows = new Map<string, any>(dashboards.value.map((row: any) => [row.id, row]));
+      playlistEntries.value = selectionOrder.value
+        .filter((id) => rows.has(id))
+        .map((id) => {
+          const row = rows.get(id);
+          const folderId = row.folder_id || activeFolderId.value || "default";
+          return {
+            dashboardId: row.id,
+            folderId,
+            title: row.name,
+            folderName: row.folder || folderNames.get(folderId) || null,
+          };
+        });
+      showPlaylistDialog.value = true;
+    };
+
+    // A new tab keeps the list where it was; the TV tab is the one that goes full screen.
+    const openPlaylist = (config: PlaylistConfig) => {
+      const href = router.resolve({
+        path: PLAYLIST_TV_PATH,
+        query: buildPlaylistQuery(config),
+      }).href;
+      window.open(href, "_blank", "noopener");
+    };
 
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
@@ -1808,6 +1931,7 @@ export default defineComponent({
       dashboard,
       columns,
       loading,
+      showFirstData,
       refreshing,
       lastUpdatedAt,
       forbidden,
@@ -1859,10 +1983,17 @@ export default defineComponent({
       selectedIds,
       currentPage,
       onPageChange,
+      pageSize,
+      sortBy,
+      sortOrder,
       multipleExportDashboard,
       moveMultipleDashboards,
       openBulkDeleteDialog,
       bulkDeleteDashboards,
+      showPlaylistDialog,
+      playlistEntries,
+      openPlaylistDialog,
+      openPlaylist,
       confirmBulkDelete,
       bulkDeleteLoading,
       isHome,

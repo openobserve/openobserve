@@ -1,37 +1,15 @@
 import type { TranslateFn } from "@/types/i18n";
 import { CURRENT_DASHBOARD_SCHEMA_VERSION } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
-import { parseRegexPattern } from "@/utils/dashboard/tableConfigUtils";
-
-// will find first valid mapped value based on given fieldToCheck
-export const findFirstValidMappedValue = (value: any, mappings: any[], fieldToCheck: string) => {
-  return mappings?.find((v: any) => {
-    let isMatch = false;
-
-    // Check based on type
-    if (v?.type == "value") {
-      isMatch = v?.value == value;
-    } else if (v?.type == "range") {
-      if (v?.from && v?.to && !Number.isNaN(+v?.from) && !Number.isNaN(+v?.to)) {
-        isMatch = +v?.from <= +value && +v?.to >= +value;
-      }
-    } else if (v?.type == "regex") {
-      try {
-        const { pattern, flags } = parseRegexPattern(v?.pattern ?? "");
-        isMatch = new RegExp(pattern, flags).test(value);
-      } catch {
-        // invalid regex pattern, skip
-      }
-    }
-
-    // If a match is found, check if the required field (color or text) is valid
-    if (isMatch && v[fieldToCheck] != null && v[fieldToCheck] !== "") {
-      return true;
-    }
-
-    return false;
-  });
-};
+import { isFormulaQuery } from "@/utils/dashboard/promql/formula";
+import { HEATMAP_MAX_ROWS, isHeatmapColorRangeInverted } from "@/utils/dashboard/heatmapDefaults";
+import {
+  heatmapYBucketError,
+  isHeatmapYRangeInverted,
+  isNumericYField,
+} from "@/utils/dashboard/heatmapYAxis";
+import { addCommasToNumber } from "@/utils/formatters";
+import { validateAnnotationSources } from "@/utils/dashboard/validateAnnotationSources";
 
 /**
  * Validates a single condition item
@@ -150,7 +128,7 @@ const validateHistogramIntervalArgument = (
  * @param conditions the conditions array
  * @param errors the array to push the errors to
  */
-function validateConditions(t: TranslateFn, conditions: any, errors: any) {
+export function validateConditions(t: TranslateFn, conditions: any, errors: any) {
   conditions.forEach((it: any) => {
     if (it.filterType === "condition") {
       validateConditionItem(t, it, errors);
@@ -506,6 +484,23 @@ const validateChartFieldsConfiguration = (
       }
       break;
     }
+    case "state-timeline": {
+      if (fields?.y?.length !== 1) {
+        const errorMsg =
+          pageKey === "logs"
+            ? t("dashboard.utils.unableToExtractValueField")
+            : t("dashboard.utils.addOneFieldFor", { label: yAxisLabel });
+        errors.push(errorMsg);
+      }
+      if (fields?.x?.length !== 1) {
+        const errorMsg =
+          pageKey === "logs"
+            ? t("dashboard.utils.unableToExtractGroupingField")
+            : t("dashboard.utils.addOneFieldFor", { label: xAxisLabel });
+        errors.push(errorMsg);
+      }
+      break;
+    }
     case "stacked":
     case "h-stacked": {
       if (fields?.y?.length === 0) {
@@ -681,7 +676,7 @@ const validateQueriesNotEmpty = (
   customMessage?: string,
 ) => {
   queries.forEach((q: any, index: number) => {
-    if (q && q?.query === "") {
+    if (q && (isFormulaQuery(q) ? q.config.formula : q?.query) === "") {
       errors.push(customMessage || t("dashboard.utils.queryIsEmpty", { index: index + 1 }));
     }
   });
@@ -788,7 +783,7 @@ const validateJoinField = (t: TranslateFn, join: any, errors: string[], joinInde
   });
 };
 
-const validateJoinFields = (t: TranslateFn, joins: any, errors: string[]) => {
+export const validateJoinFields = (t: TranslateFn, joins: any, errors: string[]) => {
   // validate join fields
   if (joins) {
     joins.forEach((join: any, index: number) => validateJoinField(t, join, errors, index));
@@ -866,6 +861,7 @@ const validatePanelContent = (t: TranslateFn, panel: any): string[] => {
     "stacked",
     "h-stacked",
     "heatmap",
+    "state-timeline",
     "metric",
     "gauge",
     "geomap",
@@ -904,6 +900,34 @@ const validatePanelContent = (t: TranslateFn, panel: any): string[] => {
   return errors;
 };
 
+/** Heatmap settings the renderer would silently ignore, or under which the builder generates an empty query. */
+const validateHeatmapConfig = (
+  t: TranslateFn,
+  panelData: any,
+  errors: string[],
+  isPromQLMode: boolean,
+) => {
+  if (panelData?.data?.type !== "heatmap") return;
+  const config = panelData.data.config;
+  if (isHeatmapColorRangeInverted(config)) {
+    errors.push(t("dashboard.utils.heatmapColorRangeInverted"));
+  }
+  if (isPromQLMode || !config?.heatmap_y_bucket?.mode) return;
+  // Only a builder query over a numeric y column is bucketed; elsewhere the setting is hidden and unused.
+  const bucketed = (panelData.data.queries ?? []).some(
+    (query: any) => !query?.customQuery && isNumericYField(query?.fields?.y?.[0], panelData),
+  );
+  if (!bucketed) return;
+  const bucketError = heatmapYBucketError(config);
+  if (bucketError === "invalidSize") errors.push(t("dashboard.utils.heatmapYBucketSizeInvalid"));
+  if (bucketError === "tooManyBuckets") {
+    errors.push(
+      t("dashboard.utils.heatmapYBucketTooMany", { max: addCommasToNumber(HEATMAP_MAX_ROWS) }),
+    );
+  }
+  if (isHeatmapYRangeInverted(config)) errors.push(t("dashboard.utils.heatmapYRangeInverted"));
+};
+
 /**
  * Validates a dashboard panel's configuration
  * @param {object} panelData - The panel data object to validate
@@ -930,6 +954,7 @@ export const validatePanel = (
 
   // Validate panel content based on type
   validatePanelContentByType(t, panelData?.data, errors);
+  validateHeatmapConfig(t, panelData, errors, isPromQLMode);
 
   // Validate timestamp alias for SQL queries with custom query mode
   if (panelData?.data?.queryType === "sql") {
@@ -960,6 +985,7 @@ export const validatePanel = (
       "table",
       "maps",
       "heatmap",
+      "state-timeline",
       "geomap",
       "donut",
       "pie",
@@ -1072,6 +1098,8 @@ export const validateDashboardJson = (t: TranslateFn, dashboardJson: any): strin
       }),
     );
   }
+
+  errors.push(...validateAnnotationSources(t, dashboardJson?.annotationSources));
 
   // Check tabs
   if (!Array.isArray(dashboardJson?.tabs) || dashboardJson?.tabs?.length === 0) {

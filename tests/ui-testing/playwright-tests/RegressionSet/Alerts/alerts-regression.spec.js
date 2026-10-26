@@ -4,6 +4,7 @@ const PageManager = require('../../../pages/page-manager.js');
 const { getHeaders, getIngestionUrl, sendRequest } = require('../../utils/data-ingestion.js');
 const logData = require("../../../fixtures/log.json");
 const { getOrgIdentifier, getAuthHeaders, refreshCloudConfig } = require('../../utils/cloud-auth.js');
+const { ingestBase } = require('../../utils/ingest-url.js');
 
 /**
  * Alerts Regression Bugs Test Suite
@@ -22,10 +23,9 @@ test.describe("Alerts Regression Bugs", () => {
   // Unique per-run token for the template/destination. On the shared cloud org the fixed
   // names left ghost records that a concurrent run's cleanup couldn't fully delete (delete
   // stuck / destinations_templates_fk 500), so the beforeAll create returned 400
-  // "already exists" yet AlertList loaded ZERO destinations — and the revamped Add Alert
-  // button is disabled (`title="No destinations available"`) when destinations.length===0,
-  // failing every test at clickAddAlertButton. A fresh unique name always creates a real,
-  // loadable destination. Keeps the `e2e_promql_` prefix so cleanup.spec.js reclaims it.
+  // "already exists" and the tests had no destination to pick. A fresh unique name always
+  // creates a real, loadable destination. Keeps the `e2e_promql_` prefix so cleanup.spec.js
+  // reclaims it.
   const RUN_TOKEN = Date.now().toString(36);
   const DESTINATION_NAME = `e2e_promql_dest_${RUN_TOKEN}`;
   const TEMPLATE_NAME = `e2e_promql_template_${RUN_TOKEN}`;
@@ -645,7 +645,7 @@ async function ingestMetricsData(page) {
   const orgId = getOrgIdentifier();
   const streamName = 'e2e_test_cpu_usage';
   const baseUrl = process.env.INGESTION_URL || process.env.ZO_BASE_URL || 'http://localhost:5080';
-  const ingestionUrl = `${baseUrl}/api/${orgId}/ingest/metrics/_json`;
+  const ingestionUrl = `${ingestBase(baseUrl)}/api/${orgId}/ingest/metrics/_json`;
 
   // Cloud ingestion authenticates with the per-org passcode (email:passcode), NOT the
   // Dex login password. getAuthHeaders() returns passcode Basic-auth on cloud and

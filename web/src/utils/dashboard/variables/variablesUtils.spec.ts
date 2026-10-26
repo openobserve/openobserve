@@ -19,6 +19,7 @@ import {
   getTimeInSecondsBasedOnUnit,
   formatRateInterval,
   processVariableContent,
+  escapeHtmlValue,
   normalizeVariableSyntax,
   replaceVariablePlaceholders,
   getReferencedVariableNames,
@@ -338,6 +339,22 @@ describe("Variables Utils", () => {
       const specialCharContent = "test ${region} test";
       const result = processVariableContent(specialCharContent, mockVariablesData);
       expect(result).toBe("test us-east-1 test");
+    });
+
+    it("passes each formatted value through escapeValue", () => {
+      const data = {
+        values: [
+          { name: "x", value: '<b a="1">\'&' },
+          { name: "list", value: ["<a>", "b"] },
+          { name: "none", value: null },
+        ],
+      };
+
+      expect(
+        processVariableContent("$x ${list:doublequote} $none", data, undefined, escapeHtmlValue),
+      ).toBe(
+        "&lt;b&#32;a&#61;&quot;1&quot;&gt;&#39;&amp; &quot;&lt;a&gt;&quot;,&quot;b&quot; _o2_all_",
+      );
     });
   });
 
@@ -764,6 +781,15 @@ describe("Variables Utils", () => {
 
     it("returns undefined without variables", () => {
       expect(getVariablesReferencedInQueries(undefined, [{ query: "$a" }])).toBeUndefined();
+    });
+
+    it("includes variables used only in a formula", () => {
+      expect(
+        getVariablesReferencedInQueries(
+          [{ name: "factor", type: "textbox" }],
+          [{ query: "", config: { formula: "A * $factor" } }],
+        )?.map((v) => v.name),
+      ).toEqual(["factor"]);
     });
   });
 

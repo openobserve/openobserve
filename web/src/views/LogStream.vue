@@ -108,9 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   value="profiles"
                   size="sm"
                 >
-                  <template #icon-left
-                    ><OIcon name="bar-chart" size="xs" class="shrink-0"
-                  /></template>
+                  <template #icon-left><OIcon name="memory" size="xs" class="shrink-0" /></template>
                   {{ t("logStream.labelProfiles") }}
                 </OToggleGroupItem>
                 <OToggleGroupItem value="metadata" size="sm">
@@ -217,6 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdown side="bottom" align="end">
                 <template #trigger>
                   <OButton
+                    :aria-label="t('common.moreActions')"
                     icon-left="more-vert"
                     variant="ghost"
                     size="icon-xs-sq"
@@ -373,7 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :secondary-button-label="t('logStream.cancel')"
       :primary-button-label="t('logStream.ok')"
       primary-button-variant="destructive"
-      @click:secondary="confirmDelete = false"
+      @click:secondary="cancelDelete"
       @click:primary="
         () => {
           deleteStream();
@@ -382,7 +381,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
     >
       <div class="flex flex-col gap-3 py-1">
-        <p class="text-sm">{{ t("logStream.confirmDeleteMsg") }}</p>
+        <i18n-t
+          keypath="logStream.confirmDeleteMsg"
+          tag="p"
+          class="text-text-body text-sm"
+          data-test="log-stream-delete-dialog-message"
+        >
+          <template #name
+            ><span class="text-text-heading font-semibold break-all">{{
+              deleteStreamName
+            }}</span></template
+          >
+        </i18n-t>
         <div class="text-text-secondary flex w-full items-center gap-2 text-sm">
           <OCheckbox v-model="deleteAssociatedAlertsPipelines" />
           <span class="text-text-secondary text-xs font-medium">
@@ -400,7 +410,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :secondary-button-label="t('logStream.cancel')"
       :primary-button-label="t('logStream.ok')"
       primary-button-variant="destructive"
-      @click:secondary="confirmBatchDelete = false"
+      @click:secondary="cancelBatchDelete"
       @click:primary="
         () => {
           deleteBatchStream();
@@ -429,6 +439,7 @@ import { orgSummaryQuery } from "@/services/organizations.queries";
 import { computed, defineComponent, ref, onActivated, onBeforeMount, type Ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import { useListViewState } from "@/composables/useListViewState";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -498,9 +509,17 @@ export default defineComponent({
     const selectedIds = ref<string[]>([]);
     const orgData: any = ref(store.state.selectedOrganization);
     const previousOrgIdentifier = ref("");
-    const filterQuery = ref("");
+    const viewState = useListViewState("logStreams", {
+      filterQuery: "",
+      streamType: "logs",
+      pageSize: 20,
+      currentPage: 1,
+      sortBy: "name",
+      sortOrder: "asc" as "asc" | "desc",
+    });
+    const filterQuery = ref(viewState.filterQuery);
     const duplicateStreamList: Ref<any[]> = ref([]);
-    const selectedStreamType = ref("logs");
+    const selectedStreamType = ref(viewState.streamType);
     const loadingState = ref(true);
     // A refresh with rows already on screen: the button spins, the table does not
     // go back to a skeleton.
@@ -508,15 +527,15 @@ export default defineComponent({
     const lastUpdatedAt = ref<number | null>(null);
     const forbidden = ref(false);
     const searchKeyword = ref("");
-    const deleteAssociatedAlertsPipelines = ref(true);
-    const streamActiveTab = ref("logs");
+    const deleteAssociatedAlertsPipelines = ref(false);
+    const streamActiveTab = ref(viewState.streamType);
     const { track } = useReo();
 
-    const pageSize = ref(20);
+    const pageSize = ref(viewState.pageSize);
     const pageSizeOptions = [20, 50, 100, 250, 500];
-    const currentPage = ref(1);
-    const sortBy = ref("name");
-    const sortOrder = ref<"asc" | "desc">("asc");
+    const currentPage = ref(viewState.currentPage);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
     const totalCount = ref(0);
 
     const selectedItems = computed(() =>
@@ -670,7 +689,7 @@ export default defineComponent({
       },
     });
 
-    let deleteStreamName = "";
+    const deleteStreamName = ref("");
     let deleteStreamType = "";
 
     onBeforeMount(() => {
@@ -828,7 +847,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: "Refresh Streams",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         page: "Streams",
       });
     };
@@ -1004,19 +1022,28 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: "Actions",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         stream_name: props.row.name,
         page: "Streams",
       });
     };
 
     const confirmDeleteAction = (props: any) => {
-      confirmDelete.value = true;
-      deleteStreamName = props.row.name;
+      deleteAssociatedAlertsPipelines.value = false;
+      deleteStreamName.value = props.row.name;
       deleteStreamType = props.row.stream_type;
+      confirmDelete.value = true;
     };
     const confirmBatchDeleteAction = () => {
+      deleteAssociatedAlertsPipelines.value = false;
       confirmBatchDelete.value = true;
+    };
+    const cancelDelete = () => {
+      deleteAssociatedAlertsPipelines.value = false;
+      confirmDelete.value = false;
+    };
+    const cancelBatchDelete = () => {
+      deleteAssociatedAlertsPipelines.value = false;
+      confirmBatchDelete.value = false;
     };
 
     // Prune deleted streams locally; re-fetch is racy (list is async-cached).
@@ -1062,10 +1089,11 @@ export default defineComponent({
 
     const deleteStream = () => {
       isDeleting.value = true;
+      const name = deleteStreamName.value;
       streamService
         .delete(
           store.state.selectedOrganization.identifier,
-          deleteStreamName,
+          name,
           deleteStreamType,
           deleteAssociatedAlertsPipelines.value,
         )
@@ -1076,7 +1104,7 @@ export default defineComponent({
               message: t("toastMessages.views.streamDeletedSuccessfully"),
               variant: "success",
             });
-            removeStreamsFromTable([{ name: deleteStreamName, stream_type: deleteStreamType }]);
+            removeStreamsFromTable([{ name, stream_type: deleteStreamType }]);
           }
         })
         .catch((err: any) => {
@@ -1088,7 +1116,7 @@ export default defineComponent({
           }
         })
         .finally(() => {
-          deleteAssociatedAlertsPipelines.value = true;
+          deleteAssociatedAlertsPipelines.value = false;
           isDeleting.value = false;
         });
     };
@@ -1153,13 +1181,24 @@ export default defineComponent({
           }
         })
         .finally(() => {
-          deleteAssociatedAlertsPipelines.value = true;
+          deleteAssociatedAlertsPipelines.value = false;
           isDeleting.value = false;
         });
     };
 
     watch([currentPage, pageSize, sortBy, sortOrder], () => {
       getLogStream();
+    });
+
+    watch([filterQuery, selectedStreamType, pageSize, currentPage, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        filterQuery: filterQuery.value,
+        streamType: selectedStreamType.value,
+        pageSize: pageSize.value,
+        currentPage: currentPage.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
     });
 
     watch(filterQuery, () => {
@@ -1372,6 +1411,9 @@ export default defineComponent({
       deleteBatchStream,
       confirmDeleteAction,
       confirmBatchDeleteAction,
+      cancelDelete,
+      cancelBatchDelete,
+      deleteStreamName,
       confirmDelete,
       confirmBatchDelete,
       schemaData,

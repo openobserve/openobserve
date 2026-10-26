@@ -21,6 +21,7 @@
               {{ t("aiObservability.experiments.rowDetail.input") }}
             </h4>
             <OButton
+              :aria-label="t('aiObservability.experiments.rowDetail.copyInput')"
               variant="outline"
               size="sm"
               :disabled="!hasContent(detail.input)"
@@ -58,6 +59,7 @@
               {{ t("aiObservability.experiments.rowDetail.expectedOutput") }}
             </h4>
             <OButton
+              :aria-label="t('aiObservability.experiments.rowDetail.copyExpected')"
               variant="outline"
               size="sm"
               :disabled="!hasContent(detail.expectedOutput)"
@@ -149,6 +151,7 @@
                   {{ t("aiObservability.experiments.rowDetail.output") }}
                 </h4>
                 <OButton
+                  :aria-label="t('aiObservability.experiments.rowDetail.copyOutput')"
                   variant="outline"
                   size="sm"
                   :disabled="!hasContent(activeTrial.execution.output)"
@@ -239,9 +242,9 @@
               class="border-border-default rounded-default border p-3"
             >
               <div class="flex items-center justify-between gap-3">
-                <div class="text-text-heading min-w-0 truncate text-xs font-semibold">
+                <OTruncatedText as="div" class="text-text-heading text-xs font-semibold">
                   {{ raw(score.dimension) }}
-                </div>
+                </OTruncatedText>
                 <div class="flex shrink-0 items-center gap-2">
                   <span
                     class="border-border-default text-text-body rounded-default border px-2 py-1 text-xs font-semibold tabular-nums"
@@ -315,11 +318,13 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import LLMContentRenderer from "@/plugins/traces/LLMContentRenderer.vue";
 import ExperimentRowNav from "./ExperimentRowNav.vue";
 import { durationLabel } from "./experimentRowContent";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import {
   experimentScoreSummaryValue,
   experimentScoreValue,
 } from "@/enterprise/views/AIObservability/experimentResults";
 import type {
+  ExperimentClientScoreSummary,
   ExperimentExecution,
   ExperimentResultSlot,
   ExperimentRowDetail,
@@ -408,17 +413,52 @@ const scoreColumns = computed<OTableColumnDef[]>(() => [
     : []),
 ]);
 
+/** One score-matrix row: a pinned Scorer or a dimension the customer's own
+ *  code reported. Both render the same; only how a trial's Score is found and
+ *  whether it has an evaluator trace differ. */
+interface ScoreDimensionRow {
+  key: string;
+  dimension: string;
+  aggregate: unknown;
+  /** Client Scores carry a generated evaluator trace id, not a real trace. */
+  traceable: boolean;
+  /** The successful Score record for this dimension on `trial`, if any. */
+  successFor: (trial: ExperimentResultSlot) => Record<string, unknown> | null;
+}
+
+const scoreDimensions = computed<ScoreDimensionRow[]>(() => [
+  ...(props.detail?.scoreSummaries ?? []).map((summary) => ({
+    key: `${summary.scorerId}:${summary.scorerVersion}`,
+    dimension: scoreDimension(summary),
+    aggregate: summary.value,
+    traceable: true,
+    successFor: (trial: ExperimentResultSlot) => {
+      const result = scoreFor(trial, summary);
+      return result?.status === "success" ? result.score : null;
+    },
+  })),
+  ...(props.detail?.clientScoreSummaries ?? []).map((summary) => ({
+    key: `client:${summary.clientScorerKey}:${summary.scoreConfigId}`,
+    dimension:
+      summary.scoreConfigName ||
+      summary.clientScorerKey ||
+      t("aiObservability.experiments.rowDetail.unknownDimension"),
+    aggregate: summary.value,
+    traceable: false,
+    successFor: (trial: ExperimentResultSlot) => clientScoreFor(trial, summary),
+  })),
+]);
+
 const scoreRows = computed(() =>
-  (props.detail?.scoreSummaries ?? []).map((summary) => {
+  scoreDimensions.value.map((dimension) => {
     const row: Record<string, string> = {
-      key: `${summary.scorerId}:${summary.scorerVersion}`,
-      dimension: scoreDimension(summary),
-      aggregate: experimentScoreSummaryValue(summary.value),
+      key: dimension.key,
+      dimension: dimension.dimension,
+      aggregate: experimentScoreSummaryValue(dimension.aggregate),
     };
     for (const trial of props.detail?.trials ?? []) {
-      const result = scoreFor(trial, summary);
-      row[`trial-${trial.trialIndex}`] =
-        result?.status === "success" ? experimentScoreValue(result.score) : "—";
+      const record = dimension.successFor(trial);
+      row[`trial-${trial.trialIndex}`] = record ? experimentScoreValue(record) : "—";
     }
     return row;
   }),
@@ -427,18 +467,19 @@ const scoreRows = computed(() =>
 const activeScoreDetails = computed(() => {
   const trial = activeTrial.value;
   if (!trial) return [];
-  return (props.detail?.scoreSummaries ?? []).flatMap((summary) => {
-    const result = scoreFor(trial, summary);
-    if (result?.status !== "success" || !result.score) return [];
-    const record = result.score;
+  return scoreDimensions.value.flatMap((dimension) => {
+    const record = dimension.successFor(trial);
+    if (!record) return [];
     const reasoning = stringField(record, "reasoning");
-    const traceId = stringField(record, "evaluatorTraceId", "evaluator_trace_id");
+    const traceId = dimension.traceable
+      ? stringField(record, "evaluatorTraceId", "evaluator_trace_id")
+      : "";
     const timestamp = numberField(record, "timestamp", "_timestamp") ?? trial.execution?.timestamp;
     if (!reasoning && !traceId) return [];
     return [
       {
-        key: `${summary.scorerId}:${summary.scorerVersion}`,
-        dimension: scoreDimension(summary),
+        key: dimension.key,
+        dimension: dimension.dimension,
         value: experimentScoreValue(record),
         reasoning,
         trace: traceId && timestamp != null ? { traceId, timestamp } : null,
@@ -506,6 +547,20 @@ function navigate(rowId: string | null) {
 function scoreFor(trial: ExperimentResultSlot, summary: ExperimentScoreSummary) {
   return trial.scores.find(
     (score) => score.scorerId === summary.scorerId && score.scorerVersion === summary.scorerVersion,
+  );
+}
+
+function clientScoreFor(
+  trial: ExperimentResultSlot,
+  summary: ExperimentClientScoreSummary,
+): Record<string, unknown> | null {
+  return (
+    (trial.clientScores ?? []).find(
+      (record) =>
+        stringField(record, "clientScorerKey", "client_scorer_key") === summary.clientScorerKey &&
+        stringField(record, "scoreConfigId", "score_config_id") === summary.scoreConfigId &&
+        stringField(record, "status") === "success",
+    ) ?? null
   );
 }
 

@@ -59,6 +59,12 @@ export interface ProcessedPromQLData {
     data: Record<number, string>; // timestamp -> value map
   }>;
   queryIndex: number;
+  /** "shifted" for a past period drawn over its panel query. */
+  seriesRole?: "primary" | "shifted";
+  /** The shifted period's name, e.g. "1 day ago", which its series names already carry. */
+  nameSuffix?: string;
+  /** In histogram mode, the whole histograms the series limit kept out of all returned. */
+  histogramsLimited?: { shown: number; total: number };
   queryConfig: any;
 }
 
@@ -75,6 +81,7 @@ export interface PromQLChartConverter {
     store: any,
     extras: any,
     chartPanelRef?: any,
+    context?: ConversionContext,
   ): {
     // Optional: metric/table converters return values/columns instead of ECharts series
     series?: any[];
@@ -106,6 +113,7 @@ export interface ConversionContext {
   parentQueryIndex?: number[];
   /** periodAsStr per expanded result, "" for a current-period one. */
   nameSuffixes?: string[];
+  stepSeconds?: number;
 }
 
 /**

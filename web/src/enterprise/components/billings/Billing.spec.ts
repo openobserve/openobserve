@@ -1,4 +1,4 @@
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import Billing from "@/enterprise/components/billings/Billing.vue";
 import i18n from "@/locales";
@@ -40,10 +40,7 @@ const mockRouter = {
   currentRoute: {
     value: {
       name: "billings",
-      query: {
-        data_type: "gb",
-        usage_date: "30days",
-      },
+      query: {},
     },
   },
   push: vi.fn(),
@@ -66,6 +63,7 @@ vi.mock("@/services/billings", async (importOriginal) => {
 
 // Import after mocking
 import BillingService from "@/services/billings";
+import config from "@/aws-exports";
 
 describe("Billing Component", () => {
   let wrapper: any = null;
@@ -81,10 +79,7 @@ describe("Billing Component", () => {
 
     // Reset router state
     mockRouter.currentRoute.value.name = "billings";
-    mockRouter.currentRoute.value.query = {
-      data_type: "gb",
-      usage_date: "30days",
-    };
+    mockRouter.currentRoute.value.query = {};
 
     wrapper = mount(Billing, {
       global: {
@@ -125,13 +120,6 @@ describe("Billing Component", () => {
       expect(wrapper.vm.$options.name).toBe("PageIngestion");
     });
 
-    it("should initialize with correct data", () => {
-      expect(wrapper.vm.billingtab).toBe("plans"); // Should be set to "plans" in onMounted after fetchBillingInfo
-      expect(wrapper.vm.usageDataType).toBe("gb");
-      expect(wrapper.vm.splitterModel).toBe(220);
-      expect(wrapper.vm.usageDate).toBe("30days");
-    });
-
     it("should expose all required properties from setup", () => {
       expect(wrapper.vm.t).toBeDefined();
       expect(wrapper.vm.store).toBeDefined();
@@ -140,26 +128,7 @@ describe("Billing Component", () => {
       expect(wrapper.vm.billingtab).toBeDefined();
       expect(wrapper.vm.getImageURL).toBeDefined();
       expect(wrapper.vm.headerBasedOnRoute).toBeDefined();
-      expect(wrapper.vm.selectUsageDate).toBeDefined();
-      expect(wrapper.vm.updateActiveTab).toBeDefined();
-    });
-
-    it("should have correct tabs configuration", () => {
-      expect(wrapper.vm.tabs).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ label: "GB", value: "gb" }),
-          expect.objectContaining({ label: "MB", value: "mb" }),
-        ]),
-      );
-    });
-
-    it("should have correct options configuration", () => {
-      expect(wrapper.vm.options).toEqual([
-        { label: "30 Days", value: "30days" },
-        { label: "60 Days", value: "60days" },
-        { label: "3 Months", value: "3months" },
-        { label: "6 Months", value: "6months" },
-      ]);
+      expect(wrapper.vm.isUsageRoute).toBeDefined();
     });
   });
 
@@ -176,10 +145,7 @@ describe("Billing Component", () => {
     it("should redirect to plans when route is plans", async () => {
       // Reset router state and clear mocks before mounting
       mockRouter.currentRoute.value.name = "plans";
-      mockRouter.currentRoute.value.query = {
-        data_type: "gb",
-        usage_date: "30days",
-      };
+      mockRouter.currentRoute.value.query = {};
 
       // Mock billing service response for this test
       (BillingService.list_subscription as any).mockResolvedValue({
@@ -247,6 +213,122 @@ describe("Billing Component", () => {
     });
   });
 
+  describe("trial landing and strip", () => {
+    const DAY_US = 24 * 60 * 60 * 1_000_000;
+    let savedSettings: any;
+
+    const mountAt = async (routeName: string, provider: string, expiry?: number) => {
+      wrapper?.unmount();
+      wrapper = null;
+      mockRouter.push.mockClear();
+      mockRouter.currentRoute.value.name = routeName;
+      mockRouter.currentRoute.value.query = {};
+      store.state.organizationData.organizationSettings = {
+        ...savedSettings,
+        free_trial_expiry: expiry,
+      };
+      (BillingService.list_subscription as any).mockClear();
+      (BillingService.list_subscription as any).mockResolvedValue({ data: { provider } });
+      const testWrapper = mount(Billing, {
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            "router-view": true,
+            OIcon: true,
+            ConfirmDialog: true,
+            Usage: true,
+            AppTabs: { template: "<div></div>", props: ["tabs", "activeTab"] },
+          },
+        },
+      });
+      await flushPromises();
+      return testWrapper;
+    };
+
+    beforeEach(() => {
+      savedSettings = { ...store.state.organizationData.organizationSettings };
+    });
+
+    afterEach(() => {
+      store.state.organizationData.organizationSettings = savedSettings;
+    });
+
+    it("lands a trial org on Usage", async () => {
+      const w = await mountAt("billings", "stripe", Date.now() * 1000 + 9 * DAY_US);
+
+      expect(w.vm.billingtab).toBe("usage");
+      expect(mockRouter.push).toHaveBeenCalledTimes(1);
+      expect(mockRouter.push).toHaveBeenCalledWith(
+        expect.objectContaining({ path: "/billings/usage" }),
+      );
+      w.unmount();
+    });
+
+    it("lands an org without free_trial_expiry on Plans exactly as today", async () => {
+      const w = await mountAt("billings", "stripe", undefined);
+
+      expect(w.vm.billingtab).toBe("plans");
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        path: "/billings/plans",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
+      w.unmount();
+    });
+
+    it("lands an AWS-billed trial org on Plans", async () => {
+      const w = await mountAt("billings", "aws", Date.now() * 1000 + 9 * DAY_US);
+
+      expect(w.vm.billingtab).toBe("plans");
+      expect(mockRouter.push).toHaveBeenCalledWith(
+        expect.objectContaining({ path: "/billings/plans" }),
+      );
+      w.unmount();
+    });
+
+    it("keeps an explicit Plans route on Plans for a trial org", async () => {
+      const w = await mountAt("plans", "stripe", Date.now() * 1000 + 9 * DAY_US);
+
+      expect(w.vm.billingtab).toBe("plans");
+      w.unmount();
+    });
+
+    it("shows the trial strip on Usage with the provider it already loaded", async () => {
+      const w = await mountAt("usage", "stripe", Date.now() * 1000 + 9 * DAY_US);
+
+      const strip = w.find('[data-test="trial-period-container"]');
+      expect(strip.exists()).toBe(true);
+      expect(strip.attributes("data-tone")).toBe("info");
+      expect(w.find('[data-test="trial-period-compare-plans-btn"]').exists()).toBe(true);
+      expect(w.find('[data-test="trial-period-end-rule"]').exists()).toBe(true);
+      expect(BillingService.list_subscription).toHaveBeenCalledTimes(1);
+      w.unmount();
+    });
+
+    it("renders each billing tab id exactly once", async () => {
+      (config as { isCloud?: string }).isCloud = "true";
+      const w = await mountAt("usage", "stripe", undefined);
+
+      for (const id of [
+        "billing-tab-plans",
+        "billing-tab-usage",
+        "billing-tab-invoices",
+        "billing-tab-group",
+      ]) {
+        expect(w.findAll(`[data-test="${id}"]`)).toHaveLength(1);
+      }
+      w.unmount();
+      delete (config as { isCloud?: string }).isCloud;
+    });
+
+    it("hides the trial strip for an AWS-billed org", async () => {
+      const w = await mountAt("usage", "aws", Date.now() * 1000 + 9 * DAY_US);
+
+      expect(w.find('[data-test="trial-period-container"]').exists()).toBe(false);
+      w.unmount();
+    });
+  });
+
   describe("headerBasedOnRoute Function", () => {
     it("should return usage label when route is usage", () => {
       mockRouter.currentRoute.value.name = "usage";
@@ -264,12 +346,6 @@ describe("Billing Component", () => {
       mockRouter.currentRoute.value.name = "invoice_history";
       const result = wrapper.vm.headerBasedOnRoute();
       expect(result).toBe(wrapper.vm.t("billing.invoiceHistoryLabel"));
-    });
-
-    it("should return paid usage label when route is paidUsage", () => {
-      mockRouter.currentRoute.value.name = "paidUsage";
-      const result = wrapper.vm.headerBasedOnRoute();
-      expect(result).toBe(wrapper.vm.t("paidUsage.settingsTitle"));
     });
 
     it("should return empty string for unknown route", () => {
@@ -327,126 +403,12 @@ describe("Billing Component", () => {
     });
   });
 
-  describe("selectUsageDate Function", () => {
-    it("should navigate to usage route with correct parameters", () => {
-      wrapper.vm.usageDate = "60days";
-      wrapper.vm.usageDataType = "mb";
-
-      wrapper.vm.selectUsageDate();
-
-      expect(mockRouter.push).toHaveBeenCalledWith({
-        path: "/billings/usage",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          usage_date: "60days",
-          data_type: "mb",
-        },
-      });
-    });
-
-    it("should use default values when properties are not set", () => {
-      wrapper.vm.usageDate = undefined;
-      wrapper.vm.usageDataType = undefined;
-
-      wrapper.vm.selectUsageDate();
-
-      expect(mockRouter.push).toHaveBeenCalledWith({
-        path: "/billings/usage",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          usage_date: undefined,
-          data_type: undefined,
-        },
-      });
-    });
-
-    it("should handle empty string values", () => {
-      wrapper.vm.usageDate = "";
-      wrapper.vm.usageDataType = "";
-
-      wrapper.vm.selectUsageDate();
-
-      expect(mockRouter.push).toHaveBeenCalledWith({
-        path: "/billings/usage",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          usage_date: "",
-          data_type: "",
-        },
-      });
-    });
-  });
-
-  describe("updateActiveTab Function", () => {
-    it("should update usageDataType and call router push", () => {
-      mockRouter.push.mockClear();
-
-      wrapper.vm.updateActiveTab("mb");
-
-      expect(wrapper.vm.usageDataType).toBe("mb");
-      expect(mockRouter.push).toHaveBeenCalledWith({
-        path: "/billings/usage",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          usage_date: wrapper.vm.usageDate,
-          data_type: "mb",
-        },
-      });
-    });
-
-    it("should handle different tab values", () => {
-      mockRouter.push.mockClear();
-
-      wrapper.vm.updateActiveTab("gb");
-
-      expect(wrapper.vm.usageDataType).toBe("gb");
-      expect(mockRouter.push).toHaveBeenCalledWith({
-        path: "/billings/usage",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          usage_date: wrapper.vm.usageDate,
-          data_type: "gb",
-        },
-      });
-    });
-
-    it("should handle null value", () => {
-      mockRouter.push.mockClear();
-
-      wrapper.vm.updateActiveTab(null);
-
-      expect(wrapper.vm.usageDataType).toBe(null);
-      expect(mockRouter.push).toHaveBeenCalledWith({
-        path: "/billings/usage",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          usage_date: wrapper.vm.usageDate,
-          data_type: null,
-        },
-      });
-    });
-  });
-
   describe("Reactive Data Properties", () => {
     it("should have reactive billingtab", async () => {
       wrapper.vm.billingtab = "usage";
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.billingtab).toBe("usage");
-    });
-
-    it("should have reactive usageDataType", async () => {
-      wrapper.vm.usageDataType = "mb";
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.usageDataType).toBe("mb");
-    });
-
-    it("should have reactive usageDate", async () => {
-      wrapper.vm.usageDate = "60days";
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.usageDate).toBe("60days");
     });
 
     it("should have reactive splitterModel", async () => {
@@ -461,18 +423,6 @@ describe("Billing Component", () => {
     it("should access correct store state properties", () => {
       expect(wrapper.vm.store.state.selectedOrganization).toBeDefined();
       expect(wrapper.vm.store.state.selectedOrganization.identifier).toBeDefined();
-    });
-
-    it("should use store state in router navigation", () => {
-      wrapper.vm.selectUsageDate();
-
-      expect(mockRouter.push).toHaveBeenCalledWith(
-        expect.objectContaining({
-          query: expect.objectContaining({
-            org_identifier: store.state.selectedOrganization.identifier,
-          }),
-        }),
-      );
     });
   });
 
@@ -492,134 +442,6 @@ describe("Billing Component", () => {
     });
   });
 
-  describe("Query Parameter Initialization", () => {
-    it("should initialize usageDataType from router query", async () => {
-      mockRouter.currentRoute.value.query.data_type = "mb";
-
-      const testWrapper = mount(Billing, {
-        global: {
-          plugins: [i18n],
-          provide: { store },
-          stubs: {
-            "router-view": true,
-            OIcon: true,
-            ConfirmDialog: true,
-            Usage: true,
-            AppTabs: {
-              template: "<div></div>",
-              props: ["tabs", "activeTab"],
-              emits: ["update:activeTab"],
-            },
-          },
-        },
-      });
-
-      await testWrapper.vm.$nextTick();
-
-      expect(testWrapper.vm.usageDataType).toBe("mb");
-      testWrapper.unmount();
-    });
-
-    it("should initialize usageDate from router query", async () => {
-      mockRouter.currentRoute.value.query.usage_date = "3months";
-
-      const testWrapper = mount(Billing, {
-        global: {
-          plugins: [i18n],
-          provide: { store },
-          stubs: {
-            "router-view": true,
-            OIcon: true,
-            ConfirmDialog: true,
-            Usage: true,
-            AppTabs: {
-              template: "<div></div>",
-              props: ["tabs", "activeTab"],
-              emits: ["update:activeTab"],
-            },
-          },
-        },
-      });
-
-      await testWrapper.vm.$nextTick();
-
-      expect(testWrapper.vm.usageDate).toBe("3months");
-      testWrapper.unmount();
-    });
-
-    it("should use default values when query parameters are missing", async () => {
-      mockRouter.currentRoute.value.query = {};
-
-      const testWrapper = mount(Billing, {
-        global: {
-          plugins: [i18n],
-          provide: { store },
-          stubs: {
-            "router-view": true,
-            OIcon: true,
-            ConfirmDialog: true,
-            Usage: true,
-            AppTabs: {
-              template: "<div></div>",
-              props: ["tabs", "activeTab"],
-              emits: ["update:activeTab"],
-            },
-          },
-        },
-      });
-
-      await testWrapper.vm.$nextTick();
-
-      expect(testWrapper.vm.usageDataType).toBe("gb");
-      expect(testWrapper.vm.usageDate).toBe("30days");
-      testWrapper.unmount();
-    });
-  });
-
-  describe("Return Object from Setup", () => {
-    it("should return all required properties", () => {
-      const expectedProps = [
-        "t",
-        "store",
-        "router",
-        "config",
-        "billingtab",
-        "getImageURL",
-        "splitterModel",
-        "headerBasedOnRoute",
-        "options",
-        "usageDate",
-        "selectUsageDate",
-        "isUsageRoute",
-        "tabs",
-        "usageDataType",
-        "updateActiveTab",
-      ];
-
-      expectedProps.forEach((prop) => {
-        expect(wrapper.vm).toHaveProperty(prop);
-      });
-    });
-
-    it("should have correct types for returned properties", () => {
-      expect(typeof wrapper.vm.t).toBe("function");
-      expect(typeof wrapper.vm.store).toBe("object");
-      expect(typeof wrapper.vm.router).toBe("object");
-      expect(typeof wrapper.vm.config).toBe("object");
-      expect(typeof wrapper.vm.billingtab).toBe("string");
-      expect(typeof wrapper.vm.getImageURL).toBe("function");
-      expect(typeof wrapper.vm.splitterModel).toBe("number");
-      expect(typeof wrapper.vm.headerBasedOnRoute).toBe("function");
-      expect(Array.isArray(wrapper.vm.options)).toBe(true);
-      expect(typeof wrapper.vm.usageDate).toBe("string");
-      expect(typeof wrapper.vm.selectUsageDate).toBe("function");
-      expect(typeof wrapper.vm.isUsageRoute).toBe("boolean");
-      expect(Array.isArray(wrapper.vm.tabs)).toBe(true);
-      expect(typeof wrapper.vm.usageDataType).toBe("string");
-      expect(typeof wrapper.vm.updateActiveTab).toBe("function");
-    });
-  });
-
   describe("Edge Cases and Error Handling", () => {
     it("should handle missing router gracefully", () => {
       expect(wrapper.vm.router).toBeDefined();
@@ -629,10 +451,6 @@ describe("Billing Component", () => {
     it("should handle empty store state gracefully", () => {
       expect(wrapper.vm.store).toBeDefined();
       expect(wrapper.vm.store.state).toBeDefined();
-    });
-
-    it("should handle function calls with undefined parameters", () => {
-      expect(() => wrapper.vm.updateActiveTab(undefined)).not.toThrow();
     });
   });
 
@@ -740,7 +558,41 @@ describe("Billing Component", () => {
       testWrapper.unmount();
     });
 
-    it("still logs non-401 billing errors", async () => {
+    it("does not log a 403, which only means the user has no billing access", async () => {
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const forbiddenError: any = new Error("Request failed with status code 403");
+      forbiddenError.response = { status: 403 };
+      (BillingService.list_subscription as any).mockRejectedValue(forbiddenError);
+
+      const testWrapper = mount(Billing, {
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            "router-view": true,
+            OIcon: true,
+            ConfirmDialog: true,
+            Usage: true,
+            AppTabs: {
+              template: "<div></div>",
+              props: ["tabs", "activeTab"],
+              emits: ["update:activeTab"],
+            },
+          },
+        },
+      });
+
+      await testWrapper.vm.$nextTick();
+      await testWrapper.vm.$nextTick();
+
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+      expect(testWrapper.vm.billingProvider).toBe("");
+
+      consoleErrorSpy.mockRestore();
+      testWrapper.unmount();
+    });
+
+    it("still logs billing errors other than 401 and 403", async () => {
       const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       (BillingService.list_subscription as any).mockRejectedValue(new Error("Network error"));
 
@@ -772,27 +624,6 @@ describe("Billing Component", () => {
 
       consoleErrorSpy.mockRestore();
       testWrapper.unmount();
-    });
-  });
-
-  describe("Daily-view date range", () => {
-    it("exposes usageStreamEnabled from org settings", () => {
-      store.state.organizationData.organizationSettings.usage_stream_enabled = true;
-      expect(wrapper.vm.usageStreamEnabled).toBe(true);
-      store.state.organizationData.organizationSettings.usage_stream_enabled = false;
-    });
-
-    it("resolves a relative range into micros and bumps the key", () => {
-      const before = wrapper.vm.usageStreamEnabled;
-      wrapper.vm.dateRange = {
-        valueType: "relative",
-        relativeTimePeriod: "7d",
-      };
-      wrapper.vm.onRangeChange();
-      // getConsumableRelativeTime returns start<end micros
-      // (usageRange is provided to the child; here we just assert the handler ran)
-      expect(typeof wrapper.vm.onRangeChange).toBe("function");
-      expect(before).toBeDefined();
     });
   });
 });

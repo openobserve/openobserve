@@ -25,13 +25,18 @@ import useAnalyticsSearch, {
 import { gt } from "@/types/i18n";
 import useNamedEvents, { type NamedEventsStatus } from "@/composables/rum/useNamedEvents";
 import { getConsumableRelativeTime } from "@/utils/date";
+import api from "@/services/rumProductAnalytics";
+import { rumPaError } from "@/utils/rum/rumPaApiError";
 import {
   appProbeSql,
   entryExitSql,
+  errorPickerSql,
   facetOptionsSql,
   identityTopSql,
+  namedEventPreviewSql,
   stepPickerSql,
   summarySql,
+  userAgentSuggestionSql,
   IDENTITY_FIELDS,
   type AnalyticsScope,
   type FunnelDef,
@@ -50,6 +55,7 @@ import {
   identityGapMessage,
   identityLabels,
   isEntityId,
+  newUsersSearchRange,
   parseFunnelDef,
   parsePathsDef,
   parseRetentionDef,
@@ -59,19 +65,25 @@ import {
   stepRefParam,
   decodeDef,
   type AnalyticsScopeState,
+  type AppSettings,
   type IdentityNote,
   type IdentityResolution,
   type IdentityTopRow,
+  type NamedRule,
+  type PutAppSettingsBody,
   type SavedFunnel,
+  type UaSuggestionRow,
 } from "@/utils/rum/productAnalyticsModel";
 import { PA_ROUTES, type AnalyticsSubTab } from "@/utils/rum/productAnalyticsRoutes";
 
 export type { AnalyticsScopeState } from "@/utils/rum/productAnalyticsModel";
 export type { AnalyticsSubTab } from "@/utils/rum/productAnalyticsRoutes";
-export type SavedLinkIssue = "failed" | "forbidden";
+export type SavedLinkIssue = "failed" | "forbidden" | "unreadable";
 export interface AnalyticsSummary {
   sessions: number;
   prevSessions: number;
+  totalSessions: number;
+  builtinKeptSessions: number;
   views: number;
   vaRows: number;
   syntheticSessions: number;
@@ -82,10 +94,15 @@ export interface PickerOption {
   key: string;
   sessions: number | null;
   name?: string;
+  custom?: true;
 }
 export interface PickerResult {
   status: PanelStatus;
   options: PickerOption[];
+}
+export interface UaSuggestionResult {
+  status: PanelStatus;
+  rows: UaSuggestionRow[];
 }
 interface FacetRow {
   value: string;
@@ -106,6 +123,9 @@ const defaultState = (): AnalyticsScopeState => ({
   datetime: { valueType: "relative", relativeTimePeriod: DEFAULT_PERIOD, startTime: 0, endTime: 0 },
   includeAllIdentities: false,
   exact: false,
+  includeExcluded: false,
+  newUsers: false,
+  apps: [],
 });
 const defaultFunnel = (): FunnelDef => ({
   steps: [],
@@ -146,6 +166,12 @@ const identityTops = ref<Record<string, IdentityTopRow[]>>({});
 const pickerCache = new Map<string, PickerOption[]>();
 const entryExitCache = new Map<string, Record<string, unknown>[]>();
 const entryExitInflight = new Map<string, Promise<Record<string, unknown>[]>>();
+// User-agent rows ignore the rules, so a Save keeps them; only a refresh or a reset drops them.
+const uaCache = new Map<string, UaSuggestionRow[]>();
+const uaInflight = new Map<string, Promise<UaSuggestionResult>>();
+// Keyed by org and app, so an org switch never reads another org's rules.
+const appSettings = ref<Record<string, AppSettings>>({});
+let settingsFor = "";
 let loadedKey: string | null = null;
 let loadGeneration = 0;
 // Each part of a scope load is keyed by only what its SQL reads, so a toggle reruns only what it changes.
@@ -222,6 +248,10 @@ export function resetProductAnalytics(): void {
   pickerCache.clear();
   entryExitCache.clear();
   entryExitInflight.clear();
+  uaCache.clear();
+  uaInflight.clear();
+  appSettings.value = {};
+  settingsFor = "";
   loadedKey = null;
   loadGeneration++;
   Object.assign(partKeys, { apps: "", facets: "", summary: "" });
@@ -258,12 +288,73 @@ export default function useProductAnalytics() {
     return Object.fromEntries(Object.keys(fields).map((f) => [f, true]));
   });
 
-  const scope = computed<AnalyticsScope>(() => ({
-    app: state.app,
-    env: [...state.env],
-    version: [...state.version],
-    schema: schema.value,
-  }));
+  const schemaTypes = computed<Record<string, string>>(() => {
+    const fields: Record<string, { type?: unknown }> =
+      performanceState.data.streams?._rumdata?.schema ?? {};
+    return Object.fromEntries(
+      Object.entries(fields).map(([f, v]) => [f, typeof v?.type === "string" ? v.type : ""]),
+    );
+  });
+
+  const comparedApps = computed(() =>
+    [...new Set(state.apps)].filter((a) => a !== state.app).sort(),
+  );
+
+  const settingsOf = (app: string): AppSettings | undefined => appSettings.value[`${org()}|${app}`];
+
+  const scope = computed<AnalyticsScope>(() => {
+    const primary = settingsOf(state.app);
+    const compared = comparedApps.value;
+    return {
+      app: state.app,
+      env: [...state.env],
+      version: [...state.version],
+      schema: schema.value,
+      ...(primary ? { exclusions: primary } : {}),
+      ...(state.includeExcluded ? { xall: true } : {}),
+      ...(compared.length
+        ? {
+            apps: compared,
+            appExclusions: Object.fromEntries(
+              compared.flatMap((a) => {
+                const ex = settingsOf(a);
+                return ex ? [[a, ex] as const] : [];
+              }),
+            ),
+          }
+        : {}),
+      ...(state.newUsers && range.value
+        ? { newSince: Math.trunc(range.value.startUs / 1000) }
+        : {}),
+    };
+  });
+
+  /** The loaded settings of the primary and compared apps, in this org only. */
+  const scopeSettings = computed(() =>
+    [state.app, ...comparedApps.value].flatMap((a) => {
+      const s = settingsOf(a);
+      return s ? [s] : [];
+    }),
+  );
+
+  // No query is compiled for an app whose rules are not known yet.
+  const rulesReady = computed(() =>
+    [state.app, ...comparedApps.value].every((a) => !a || !!settingsOf(a)),
+  );
+
+  const settingsPart = (app: string): string => {
+    const s = settingsOf(app);
+    return s ? `${s.rulesHash}:${JSON.stringify(s.pages)}` : "";
+  };
+
+  const rulesKey = computed(() =>
+    [
+      settingsPart(state.app),
+      state.includeExcluded ? 1 : 0,
+      comparedApps.value.map((a) => `${a}=${settingsPart(a)}`).join(","),
+      state.newUsers ? 1 : 0,
+    ].join("|"),
+  );
 
   const identitySql = computed<IdentitySql | null>(() =>
     identity.value?.field
@@ -294,6 +385,7 @@ export default function useProductAnalytics() {
       range.value?.endUs ?? "",
       state.includeAllIdentities ? 1 : 0,
       state.exact ? 1 : 0,
+      rulesKey.value,
     ].join("|"),
   );
 
@@ -366,6 +458,9 @@ export default function useProductAnalytics() {
     }
     if (state.includeAllIdentities) q.idall = "1";
     if (state.exact) q.exact = "1";
+    if (state.includeExcluded) q.xall = "1";
+    if (state.newUsers) q.new = "1";
+    if (state.apps.length) q.apps = [...state.apps];
     // A copied list link must open the list, so only other routes carry the funnel being built.
     const sf = openedFunnel.value?.id ?? pendingSavedId.value;
     if (routeName !== PA_ROUTES.funnels) {
@@ -534,6 +629,8 @@ export default function useProductAnalytics() {
     summary.value = {
       sessions: num(row.sessions),
       prevSessions: num(row.prev_sessions),
+      totalSessions: num(row.total_sessions),
+      builtinKeptSessions: num(row.builtin_kept_sessions),
       views: num(row.views),
       vaRows: num(row.va_rows),
       syntheticSessions: num(row.synthetic_sessions),
@@ -564,7 +661,7 @@ export default function useProductAnalytics() {
     stale: () => boolean,
   ): Promise<PanelStatus | null> => {
     const facetsKey = `${org()}|${state.app}|${cur.startUs}|${cur.endUs}`;
-    const key = `${facetsKey}|${state.env.join(",")}|${state.version.join(",")}`;
+    const key = `${facetsKey}|${state.env.join(",")}|${state.version.join(",")}|${rulesKey.value}`;
     const needFacets = force || partKeys.facets !== facetsKey;
     const needSummary = force || partKeys.summary !== key || !summaryRow.value;
     const [facetsSettled, sum] = await Promise.all([
@@ -578,6 +675,34 @@ export default function useProductAnalytics() {
       return sum.status;
     }
     return null;
+  };
+
+  const loadSettings = async (
+    force: boolean,
+    stale: () => boolean,
+  ): Promise<PanelStatus | null> => {
+    const forOrg = org();
+    const wanted = [state.app, ...comparedApps.value];
+    const key = `${forOrg}|${wanted.join(",")}`;
+    const same = settingsFor === key;
+    if (!force && same) return null;
+    // A refresh keeps the rules it is replacing, so the scope key does not change under the load.
+    if (!same) appSettings.value = {};
+    settingsFor = "";
+    try {
+      const rows = await Promise.all(wanted.map((a) => api.getAppSettings(forOrg, a)));
+      if (stale()) return null;
+      appSettings.value = Object.fromEntries(
+        wanted.map((a, i) => [`${forOrg}|${a}`, rows[i].data]),
+      );
+      settingsFor = key;
+      return null;
+    } catch (e) {
+      if (stale()) return null;
+      const status = rumPaError(e).status;
+      scopeError.value = e instanceof Error ? e.message : null;
+      return status === 403 ? "forbidden" : "error";
+    }
   };
 
   const doLoad = async (force: boolean) => {
@@ -601,15 +726,22 @@ export default function useProductAnalytics() {
     state.app = pickApp(apps.value.map((a) => a.app));
     // The same app's load already started above; a second call after a fast failure would retry and toast twice.
     if (state.app && state.app !== before) void namedEvents.ensure(org(), state.app, force);
-    // Stamped from this load's own scope: a newer load makes this one stale before it can commit.
-    const key = scopeKey.value;
     if (!state.app) {
       summary.value = null;
       identity.value = null;
       scopeStatus.value = "ok";
-      loadedKey = key;
+      loadedKey = scopeKey.value;
       return;
     }
+    const settingsFailed = await loadSettings(force, stale);
+    if (stale()) return;
+    if (settingsFailed) {
+      scopeStatus.value = settingsFailed;
+      return;
+    }
+    // Stamped once the rules are known, from this load's own scope: a newer load makes this one stale first.
+    const key = scopeKey.value;
+    if (inflight) inflight.key = key;
     const failed = await loadSummary(cur, force, stale);
     if (stale()) return;
     if (failed) {
@@ -744,19 +876,32 @@ export default function useProductAnalytics() {
   const refresh = async () => {
     pickerCache.clear();
     entryExitCache.clear();
+    uaCache.clear();
+    uaInflight.clear();
     await loadScope(true);
     refreshTick.value++;
   };
 
-  const toPickerRows = (rows: { kind: string; k: string; sessions: number }[]): PickerOption[] =>
+  const toPickerRows = (
+    rows: { kind: string; k: string; sessions: number; at?: string | null }[],
+  ): PickerOption[] =>
     rows.map((r) => ({
       kind: r.kind === "c" ? "c" : "p",
       key: String(r.k),
       sessions: num(r.sessions),
+      ...(r.at === "custom" ? { custom: true as const } : {}),
     }));
+
+  const rulesPending = (): PanelStatus | null => {
+    if (rulesReady.value) return null;
+    const s = scopeStatus.value;
+    return s === "error" || s === "forbidden" ? s : "loading";
+  };
 
   /** Pages and clicks in scope; only a successful read is cached, so a failure is retried on the next call. */
   const loadPicker = async (force = false): Promise<PickerResult> => {
+    const pending = rulesPending();
+    if (pending) return { status: pending, options: [] };
     const key = scopeKey.value;
     const cached = pickerCache.get(key);
     if (!force && cached) return { status: "ok", options: cached };
@@ -784,6 +929,8 @@ export default function useProductAnalytics() {
   };
 
   const searchPicker = async (term: string): Promise<PickerResult> => {
+    const pending = rulesPending();
+    if (pending) return { status: pending, options: [] };
     const cur = resolveRange();
     const res = await search.run<{ kind: string; k: string; sessions: number }>(
       "scope-picker-term",
@@ -791,6 +938,31 @@ export default function useProductAnalytics() {
       `${scopeKey.value}|${term}`,
     );
     return { status: res.status, options: res.status === "ok" ? toPickerRows(res.rows) : [] };
+  };
+
+  /** Top error messages in scope as `r` steps; a `term` narrows them on the server. */
+  const loadErrorPicker = async (term = ""): Promise<PickerResult> => {
+    const pending = rulesPending();
+    if (pending) return { status: pending, options: [] };
+    const key = `r|${scopeKey.value}|${term}`;
+    const cached = pickerCache.get(key);
+    if (cached) return { status: "ok", options: cached };
+    const res = await search.run<{ k: string; sessions: number }>(
+      term ? "scope-picker-errors-term" : "scope-picker-errors",
+      {
+        sql: errorPickerSql(scope.value, term || undefined),
+        ...resolveRange(),
+        limit: 50,
+        sampled: 1,
+      },
+      key,
+    );
+    if (res.status !== "ok") return { status: res.status, options: [] };
+    const options = res.rows
+      .filter((r) => r.k)
+      .map((r): PickerOption => ({ kind: "r", key: String(r.k), sessions: num(r.sessions) }));
+    if (!term) pickerCache.set(key, options);
+    return { status: "ok", options };
   };
 
   const readEntryExit = async (key: string): Promise<Record<string, unknown>[]> => {
@@ -814,6 +986,9 @@ export default function useProductAnalytics() {
 
   /** Overview and Paths share one panel, so a second caller for the same scope joins the read in flight. */
   const entryExit = async (force = false): Promise<Record<string, unknown>[]> => {
+    const pending = rulesPending();
+    if (pending)
+      throw Object.assign(new Error(scopeError.value ?? ""), { state: { status: pending } });
     const key = `${scopeKey.value}|${identitySql.value ? identitySql.value.field : ""}`;
     if (!force && entryExitCache.has(key)) return entryExitCache.get(key) ?? [];
     const joined = entryExitInflight.get(key);
@@ -827,11 +1002,69 @@ export default function useProductAnalytics() {
     }
   };
 
+  /** Top user agents without any rule, shared by Overview and the drawer; one read per range. */
+  const loadUaSuggestions = async (): Promise<UaSuggestionResult> => {
+    const cur = resolveRange();
+    const key = [
+      org(),
+      state.app,
+      state.env.join(","),
+      state.version.join(","),
+      cur.startUs,
+      cur.endUs,
+    ].join("|");
+    const cached = uaCache.get(key);
+    if (cached) return { status: "ok", rows: cached };
+    const joined = uaInflight.get(key);
+    if (joined) return joined;
+    const read = search
+      .run<UaSuggestionRow>(
+        "scope-ua",
+        { sql: userAgentSuggestionSql(scope.value), ...cur, limit: 15, sampled: 1 },
+        key,
+      )
+      .then((res): UaSuggestionResult => {
+        // A refresh while this read ran disowns it, so it must not refill the cleared cache.
+        if (res.status === "ok" && uaInflight.get(key) === read) uaCache.set(key, res.rows);
+        return { status: res.status, rows: res.status === "ok" ? res.rows : [] };
+      })
+      .finally(() => {
+        if (uaInflight.get(key) === read) uaInflight.delete(key);
+      });
+    uaInflight.set(key, read);
+    return read;
+  };
+
+  /** The editor preview's SQL, or null while the app's rules are not known, so it never counts without them. */
+  const eventPreviewSql = (rules: NamedRule[]): string | null =>
+    rulesReady.value ? namedEventPreviewSql(scope.value, { rules }) : null;
+
+  /** The search range of a builder that applies new users: it reaches back so earlier activity is seen. */
+  const newUsersRange = (r: UsRange, applies = true): UsRange =>
+    applies && scope.value.newSince !== undefined ? newUsersSearchRange(r) : r;
+
+  /** Saves the app's settings, reloads them, then re-runs only what the new rules change. */
+  const saveAppSettings = async (body: PutAppSettingsBody): Promise<AppSettings> => {
+    const saved = (await api.putAppSettings(org(), state.app, body)).data;
+    appSettings.value = {};
+    settingsFor = "";
+    await loadScope();
+    return saved;
+  };
+
   return {
     state,
     scope,
+    rulesReady,
+    scopeSettings,
+    loadUaSuggestions,
+    saveAppSettings,
+    newUsersRange,
+    eventPreviewSql,
     schema,
+    schemaTypes,
     identity: readonly(identity),
+    identityTops: readonly(identityTops),
     identityNote,
     usersUnit,
     identityGapText,
@@ -867,6 +1100,7 @@ export default function useProductAnalytics() {
     pickerOptions,
     loadPicker,
     searchPicker,
+    loadErrorPicker,
     entryExit,
     eventsStatus,
     eventsGate,

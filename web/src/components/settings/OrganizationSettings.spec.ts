@@ -399,6 +399,27 @@ describe("OrganizationSettings", () => {
         expect.objectContaining({ red_insights_enabled: false }),
       );
     });
+    it("prefills the switch off when the server value is false", () => {
+      config.isEnterprise = "true";
+      mockStore.state.organizationData.organizationSettings = {
+        trace_id_field_name: "trace_id",
+        span_id_field_name: "span_id",
+        red_insights_enabled: false,
+      };
+      const wrapper = createWrapper();
+      expect(getForm(wrapper).vm.form.state.values.redInsightsEnabled).toBe(false);
+    });
+
+    it("prefills the switch off when the settings carry no value", () => {
+      config.isEnterprise = "true";
+      mockStore.state.organizationData.organizationSettings = {
+        trace_id_field_name: "trace_id",
+        span_id_field_name: "span_id",
+      };
+      const wrapper = createWrapper();
+      expect(getForm(wrapper).vm.form.state.values.redInsightsEnabled).toBe(false);
+    });
+
     it("keeps the help text in a hover tooltip on the info icon, under a Traces heading", () => {
       config.isEnterprise = "true";
       config.isCloud = "false";
@@ -412,6 +433,81 @@ describe("OrganizationSettings", () => {
       expect(section.find('[data-test="settings-traces-heading"]').text()).toBe(
         String(i18n.global.t("settings.tracesHeading")),
       );
+    });
+  });
+
+  describe("RCA thread tool output setting (02 TH34)", () => {
+    afterEach(() => {
+      config.isEnterprise = "false";
+      config.isCloud = "false";
+    });
+
+    it("hides the switch outside enterprise and does not post the field", async () => {
+      config.isEnterprise = "false";
+      const wrapper = createWrapper();
+      expect(wrapper.find('[data-test="settings-ai-rca-thread-tool-output"]').exists()).toBe(false);
+
+      await getForm(wrapper).vm.form.handleSubmit();
+      await flushPromises();
+
+      expect(mockPostOrganizationSettings.mock.calls[0][1]).not.toHaveProperty(
+        "ai_rca_thread_tool_output",
+      );
+    });
+
+    it("renders under its own Incidents heading in enterprise, not the Traces block", () => {
+      config.isEnterprise = "true";
+      const wrapper = createWrapper();
+      const section = wrapper.find('[data-test="settings-ai-rca-thread-tool-output"]');
+
+      expect(section.find('[data-test="settings-incidents-heading"]').text()).toBe(
+        String(i18n.global.t("settings.incidentsHeading")),
+      );
+      const heading = section.find('[data-test="settings-incidents-heading"]').element;
+      const toggle = section.find('[data-test="settings-ai-rca-thread-tool-output-btn"]').element;
+      expect(
+        heading.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        wrapper
+          .find('[data-test="settings-red-insights"]')
+          .find('[data-test="settings-ai-rca-thread-tool-output-btn"]')
+          .exists(),
+      ).toBe(false);
+      expect(section.findComponent({ name: "OTooltip" }).props("content")).toBe(
+        String(i18n.global.t("settings.aiRcaThreadToolOutputHelp")),
+      );
+    });
+
+    it("seeds the switch from the store (default off) and posts the field", async () => {
+      config.isEnterprise = "true";
+      const wrapper = createWrapper();
+      const form = getForm(wrapper);
+      expect(form.vm.form.state.values.aiRcaThreadToolOutput).toBe(false);
+
+      form.vm.form.setFieldValue("aiRcaThreadToolOutput", true);
+      await form.vm.form.handleSubmit();
+      await flushPromises();
+
+      expect(mockPostOrganizationSettings).toHaveBeenCalledWith(
+        "test-org-123",
+        expect.objectContaining({ ai_rca_thread_tool_output: true }),
+      );
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "setOrganizationSettings",
+        expect.objectContaining({ ai_rca_thread_tool_output: true }),
+      );
+    });
+
+    it("prefills the switch on when the server value is true", () => {
+      config.isEnterprise = "true";
+      mockStore.state.organizationData.organizationSettings = {
+        trace_id_field_name: "trace_id",
+        span_id_field_name: "span_id",
+        ai_rca_thread_tool_output: true,
+      };
+      const wrapper = createWrapper();
+      expect(getForm(wrapper).vm.form.state.values.aiRcaThreadToolOutput).toBe(true);
     });
   });
 

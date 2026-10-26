@@ -447,6 +447,7 @@ pub async fn list_synthetics(
     match openobserve_synthetics::service::list_synthetics(&org_id, &params).await {
         Ok(mut resp) => {
             last_check::enrich(&org_id, &mut resp.checks).await;
+            openobserve_core::synthetics::fill_active_downtimes(&org_id, &mut resp.checks);
             MetaHttpResponse::json(resp)
         }
         Err(e) => {
@@ -598,14 +599,6 @@ async fn composition_error_response(
         return Err(e);
     };
     Ok(match ce {
-        CE::WritesDisabled => (
-            StatusCode::CONFLICT,
-            Json(serde_json::json!({
-                "code": "subtests_disabled",
-                "message": ce.to_string(),
-            })),
-        )
-            .into_response(),
         CE::Invalid(msg) => MetaHttpResponse::bad_request(format!("validation: {msg}")),
         CE::Lock(_) => (
             StatusCode::SERVICE_UNAVAILABLE,
@@ -1577,12 +1570,20 @@ async fn process_ack(
         key: format!("{}/{}", resp.synthetics_name, resp.synthetics_id),
         start_time: checked_at,
         end_time: checked_at,
-        status: config::meta::self_reporting::usage::RunOutcome::Succeeded,
+        status: if resp.suppressed_by.is_some() {
+            config::meta::self_reporting::usage::RunOutcome::Suppressed
+        } else {
+            config::meta::self_reporting::usage::RunOutcome::Succeeded
+        },
+        downtime_id: resp.suppressed_by.clone(),
         success_response: Some(status.clone()),
         error: error.clone(),
         evaluation_took_in_secs: Some(response_time_ms / 1000.0),
         ..Default::default()
     });
+    if resp.suppressed_by.is_some() {
+        openobserve_core::alerts::alert::count_suppressed_run(&resp.org_id, "synthetics");
+    }
 
     // Notify once per run, not once per job ack — and only when the check's own
     // `alert_if_fails` / `cooldown_mins` settings say so. This used to fire on
@@ -1600,7 +1601,8 @@ async fn process_ack(
     #[cfg(feature = "enterprise")]
     let degraded = matches!(resp.alert, AlertDecision::Degraded);
     #[cfg(feature = "enterprise")]
-    let should_notify = !matches!(resp.alert, AlertDecision::Silent);
+    let should_notify =
+        !matches!(resp.alert, AlertDecision::Silent) && resp.suppressed_by.is_none();
     // Enterprise-gated because alert *destinations* are: the dispatch it ends in
     // (`alerts::alert::dispatch_notification`) is not built in OSS. An OSS build
     // runs the check, records the run and serves the result — it just has
@@ -1679,7 +1681,12 @@ async fn probe_token_id(headers: &axum::http::HeaderMap) -> Option<String> {
 /// job's org must all agree; the service layer enforces the last leg).
 async fn authorize_probe(headers: &axum::http::HeaderMap, org_id: &str) -> Result<(), Response> {
     match probe_token_org(headers).await {
-        Some(token_org) if token_org == org_id => Ok(()),
+        Some(token_org) if token_org == org_id => {
+            match crate::request::alerts::external_events::inactive_org_response(&token_org).await {
+                Some(refusal) => Err(refusal),
+                None => Ok(()),
+            }
+        }
         Some(_) => Err(MetaHttpResponse::forbidden(
             "probe token does not belong to this org",
         )),
@@ -2229,11 +2236,6 @@ mod tests {
 
     #[tokio::test]
     async fn every_composition_error_maps_to_its_status_and_code() {
-        let (status, body) = mapped(CE::WritesDisabled).await;
-        assert_eq!(
-            (status, body["code"].as_str()),
-            (409, Some("subtests_disabled"))
-        );
         let (status, body) = mapped(CE::Lock("down".into())).await;
         assert_eq!(
             (status, body["code"].as_str()),
@@ -2281,6 +2283,7 @@ mod tests {
             passing_locations: Vec::new(),
             failing_environments: Vec::new(),
             usage_events,
+            suppressed_by: None,
         }
     }
 

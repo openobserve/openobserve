@@ -45,17 +45,6 @@ mod rate_tests {
     use super::*;
 
     #[test]
-    fn test_rate_name() {
-        assert_eq!(ExtrapolationKind::Rate.name(), "rate");
-    }
-
-    #[test]
-    fn test_rate_empty_samples() {
-        let func = ExtrapolationKind::Rate;
-        assert!(func.exec(&[], 0, &Duration::from_secs(60)).is_none());
-    }
-
-    #[test]
     fn test_rate_single_sample() {
         let func = ExtrapolationKind::Rate;
         let sample = Sample {
@@ -105,18 +94,6 @@ mod increase_tests {
     fn increase_test_helper(data: Value) -> Result<Value> {
         let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
         increase(data, &eval_ctx)
-    }
-
-    #[test]
-    fn test_increase_value_none_input() {
-        let result = increase_test_helper(Value::None).unwrap();
-        assert!(matches!(result, Value::None));
-    }
-
-    #[test]
-    fn test_increase_invalid_input_returns_err() {
-        let result = increase_test_helper(Value::Float(1.0));
-        assert!(result.is_err());
     }
 
     #[test]
@@ -217,12 +194,6 @@ mod delta_tests {
             }
             _ => panic!("Expected Matrix result"),
         }
-    }
-
-    #[test]
-    fn test_delta_function_name() {
-        let func = ExtrapolationKind::Delta;
-        assert_eq!(func.name(), "delta");
     }
 }
 

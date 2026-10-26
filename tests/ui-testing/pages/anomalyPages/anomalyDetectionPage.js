@@ -75,6 +75,10 @@ class AnomalyDetectionPage {
             retrainInterval: '[data-test="anomaly-retrain-interval"]',
             sensitivityTier: '[data-test="anomaly-sensitivity-tier"]',
             sensitivityLevel: '[data-test="anomaly-sensitivity-level"]',
+            // Auto shows a read-only learned level in place of the level input.
+            sensitivityAutoLevel: '[data-test="anomaly-sensitivity-auto-level"]',
+            sensitivityCustom: '[data-test="anomaly-sensitivity-custom"]',
+            sensitivityLevelLabel: 'label[for="anomaly-manual-level"]',
             sensitivityError: '[data-test="anomaly-sensitivity-error"]',
             sensitivityHint: '[data-test="anomaly-sensitivity-hint"]',
             // Budget mode (edit-only sensitivity): renders when the config
@@ -89,7 +93,7 @@ class AnomalyDetectionPage {
             tagsInput: '[data-test="anomaly-tags-input"]',
             alertEnabled: '[data-test="anomaly-alert-enabled"]',
             destination: '[data-test="anomaly-destination"]',
-            destinationError: '[data-test="anomaly-destination-error"]',
+            destinationNote: '[data-test="anomaly-destination-note"]',
             refreshDestinations: '[data-test="anomaly-refresh-destinations"]',
 
             // Right rail
@@ -483,7 +487,7 @@ class AnomalyDetectionPage {
         return (await this.page.locator(this.selectors.sensitivityTier).count()) > 0;
     }
 
-    /** Tier toggle and level input share the `band_width` field. */
+    /** Tier toggle and level input share the `band_width` field; the input renders only for a non-Auto tier. */
     async setSensitivityLevel(k) {
         await this.fillFormInput(this.selectors.sensitivityLevel, k);
     }
@@ -515,9 +519,17 @@ class AnomalyDetectionPage {
         return this.page.locator(this.selectors.sensitivityLevel);
     }
 
-    /** The inline "Level" label span; it carries no data-test and sits just before the input. */
+    /** The "Level" label of the manual level input; it carries no data-test. */
     getSensitivityLevelLabelLocator() {
-        return this.page.locator(this.selectors.sensitivityLevel).locator('xpath=preceding-sibling::span[1]');
+        return this.page.locator(this.selectors.sensitivityLevelLabel);
+    }
+
+    getSensitivityAutoLevelLocator() {
+        return this.page.locator(this.selectors.sensitivityAutoLevel);
+    }
+
+    getSensitivityCustomLocator() {
+        return this.page.locator(this.selectors.sensitivityCustom);
     }
 
     // Budget mode (edit-only sensitivity)
@@ -582,8 +594,8 @@ class AnomalyDetectionPage {
      *
      * OSwitch toggles from a click handler on its WRAPPER, not on the inner
      * role=switch button, so a click on the button is not self-evidently a
-     * state change. Assert the end state — silently leaving this on makes the
-     * save fail much later with "At least one destination is required".
+     * state change. Assert the end state — silently leaving this on saves an
+     * anomaly config that notifies nobody.
      */
     async toggleNotifications(enabled) {
         const root = this.page.locator(this.selectors.alertEnabled);
@@ -641,8 +653,8 @@ class AnomalyDetectionPage {
         ]);
     }
 
-    getDestinationErrorLocator() {
-        return this.page.locator(this.selectors.destinationError);
+    getDestinationNoteLocator() {
+        return this.page.locator(this.selectors.destinationNote);
     }
 
     // Save / cancel

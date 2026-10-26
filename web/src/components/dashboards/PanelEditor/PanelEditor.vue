@@ -123,10 +123,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="panel-editor-add-to-dashboard-btn"
                         variant="primary"
                         size="xs"
+                        :disabled="!!addToDashboardDisabledReason"
+                        focusable-unavailable
                         @click="emit('addToDashboard')"
-                        :title="t('search.addToDashboard')"
+                        :title="
+                          addToDashboardDisabledReason ? undefined : t('search.addToDashboard')
+                        "
                       >
                         {{ t("search.addToDashboard") }}
+                        <OTooltip
+                          v-if="addToDashboardDisabledReason"
+                          :content="addToDashboardDisabledReason"
+                        />
+                        <template #unavailable-reason>{{ addToDashboardDisabledReason }}</template>
                       </OButton>
                     </div>
                   </div>
@@ -212,6 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'scatter',
                           'stacked',
                           'h-stacked',
+                          'state-timeline',
                         ].includes(dashboardPanelData.data.type) &&
                         panelSchemaRendererRef?.checkIfPanelIsTimeSeries === true
                       "
@@ -221,7 +231,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="panel-editor-annotation-btn"
                     >
                       <OIcon
-                        :name="panelSchemaRendererRef?.isAddAnnotationMode ? 'cancel' : 'edit'"
+                        :name="
+                          panelSchemaRendererRef?.isAddAnnotationMode ? 'cancel' : 'bookmark-add'
+                        "
                         size="sm"
                       />
                       <OTooltip
@@ -239,6 +251,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :error="errorMessage"
                       :maxQueryRangeWarning="maxQueryRangeWarning"
                       :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+                      v-bind="noticeActionProps"
+                      @open-inspector="emit('openQueryInspector')"
+                      @edit-panel="onNoticeEdit"
+                      @refresh-panel="onNoticeRefresh"
                       :sparklineWarning="sparklineWarning"
                       :isCachedDataDifferWithCurrentTimeRange="
                         isCachedDataDifferWithCurrentTimeRange
@@ -279,7 +295,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :is_ui_histogram="props.isUiHistogram"
                         :enableColumnFormat="true"
                         @metadata-update="metaDataValue"
-                        @result-metadata-update="handleResultMetadataUpdate"
+                        @result-metadata-update="onResultMetadataUpdate"
+                        @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
+                        @series-limit-update="handleSeriesLimitUpdate"
                         @limit-number-of-series-warning-message-update="
                           handleLimitNumberOfSeriesWarningMessage
                         "
@@ -334,6 +352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :variablesData="resolvedVariablesData"
                     :panelData="seriesData"
                     @open-field-overrides="overrideConfigRef?.openOverrideConfigPopup()"
+                    @open-series-overrides="overrideConfigRef?.openOverrideConfigPopup()"
                   />
                 </PanelSidebar>
               </div>
@@ -496,7 +515,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                 </div>
                 <!-- Editor/Preview splitter -->
-                <div class="h-125 shrink-0 overflow-hidden">
+                <div
+                  class="overflow-hidden"
+                  :class="resolvedConfig.showQueryEditor ? 'h-125 shrink-0' : 'min-h-0 flex-1'"
+                >
                   <OSplitter
                     class="query-editor-splitter h-full"
                     v-model="splitterModel"
@@ -553,6 +575,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :error="errorMessage"
                             :maxQueryRangeWarning="maxQueryRangeWarning"
                             :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+                            v-bind="noticeActionProps"
+                            @open-inspector="emit('openQueryInspector')"
+                            @edit-panel="onNoticeEdit"
+                            @refresh-panel="onNoticeRefresh"
                             :sparklineWarning="sparklineWarning"
                             :isCachedDataDifferWithCurrentTimeRange="
                               isCachedDataDifferWithCurrentTimeRange
@@ -581,7 +607,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :searchResponse="props.searchResponse"
                           :is_ui_histogram="props.isUiHistogram"
                           @metadata-update="metaDataValue"
-                          @result-metadata-update="handleResultMetadataUpdate"
+                          @result-metadata-update="onResultMetadataUpdate"
+                          @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
+                          @series-limit-update="handleSeriesLimitUpdate"
                           @limit-number-of-series-warning-message-update="
                             handleLimitNumberOfSeriesWarningMessage
                           "
@@ -664,9 +692,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <OverrideConfig
-      v-if="dashboardPanelData.data.type === 'table'"
+      v-if="overrideConfigMode"
+      :key="overrideConfigMode"
       ref="overrideConfigRef"
+      :mode="overrideConfigMode"
       :panelData="seriesData"
+      :preview-source="seriesOverridePreviewSource"
     />
   </div>
 </template>
@@ -677,6 +708,8 @@ import {
   computed,
   provide,
   defineAsyncComponent,
+  getCurrentInstance,
+  shallowRef,
   toRef,
   watch,
   type CSSProperties,
@@ -693,6 +726,7 @@ import { resolveConfig } from "./types/panelEditor";
 import { usePanelEditor } from "./composables/usePanelEditor";
 import useBreakpoint from "@/composables/useBreakpoint";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
+import { SERIES_OVERRIDE_CHART_TYPES } from "@/composables/dashboard/useConfigPanel";
 
 // ============================================================================
 // Component Imports
@@ -705,6 +739,8 @@ import DashboardQueryBuilder from "@/components/dashboards/addPanel/DashboardQue
 import DashboardErrorsComponent from "@/components/dashboards/addPanel/DashboardErrors.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
+import { usePanelEditorFocus } from "@/composables/dashboard/usePanelEditorFocus";
+import type { PanelNoticeActionId } from "@/utils/dashboard/panelNotices";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -757,6 +793,7 @@ const props = withDefaults(defineProps<PanelEditorProps>(), {
   showLastRefreshedTime: undefined,
   showOutdatedWarning: undefined,
   showAddToDashboardButton: undefined,
+  addToDashboardDisabledReason: null,
   allowedChartTypes: undefined,
   externalChartData: undefined,
   searchResponse: undefined,
@@ -767,6 +804,7 @@ const props = withDefaults(defineProps<PanelEditorProps>(), {
   variablesData: undefined,
   dashboardData: undefined,
   editMode: false,
+  holdQueries: false,
 });
 
 const emit = defineEmits<PanelEditorEmits>();
@@ -782,8 +820,13 @@ const resolvedConfig = computed<PanelEditorConfig>(() => resolveConfig(props));
 
 // Get dashboard panel data composable
 const pageKey = computed(() => props.pageType);
-const { dashboardPanelData, resetAggregationFunction, makeAutoSQLQuery, validatePanel } =
-  useDashboardPanelData(pageKey.value, t);
+const {
+  dashboardPanelData,
+  resetAggregationFunction,
+  makeAutoSQLQuery,
+  regenerateOtherBuilderQueries,
+  validatePanel,
+} = useDashboardPanelData(pageKey.value, t);
 
 // Provide page key for child components
 provide("dashboardPanelDataPageKey", pageKey.value);
@@ -819,6 +862,9 @@ const {
   showLegendsDialog,
   shouldRefreshWithoutCache,
   maxQueryRangeWarning,
+  panelDiagnostics,
+  seriesLimit,
+  noticeProps,
   limitNumberOfSeriesWarningMessage,
   sparklineWarning,
   errorMessage,
@@ -831,12 +877,14 @@ const {
 
   // Computed
   isOutDated,
+  sparklinePendingApply,
   isLoading,
   currentPanelData,
 
   // Actions
   initChartData,
   runQuery,
+  reportValidationErrors,
   handleChartApiError,
   handleLastTriggeredAtUpdate,
   handleLimitNumberOfSeriesWarningMessage,
@@ -845,6 +893,8 @@ const {
   handleLoadingStateChange,
   handleIsCachedDataDifferWithCurrentTimeRangeUpdate,
   handleResultMetadataUpdate,
+  handlePanelDiagnosticsUpdate,
+  handleSeriesLimitUpdate,
   metaDataValue,
   seriesDataUpdate,
   collapseFieldList: baseCollapseFieldList,
@@ -867,6 +917,33 @@ const {
   dateTimePickerRef: undefined, // Managed by parent
   selectedDate: undefined, // Managed by parent
   validatePanel,
+  holdQueries: () => props.holdQueries,
+});
+
+// Tables open Column Formatting; charts with named series open Series Formatting in the same dialog.
+const overrideConfigMode = computed<"table" | "chart" | null>(() => {
+  const type = dashboardPanelData.data.type;
+  if (type === "table") return "table";
+  return SERIES_OVERRIDE_CHART_TYPES.includes(type) ? "chart" : null;
+});
+
+// The renderer keeps no copy of its result metadata, so the Series Formatting preview reads it from the event.
+const lastResultMetaData = shallowRef<any>(null);
+const onResultMetadataUpdate = (metadata: any): void => {
+  handleResultMetadataUpdate(metadata);
+  lastResultMetaData.value = metadata;
+};
+
+const seriesOverridePreviewSource = computed(() => {
+  if (overrideConfigMode.value !== "chart" || !chartData.value) return null;
+  const renderer = panelSchemaRendererRef.value;
+  return {
+    panelSchema: chartData.value,
+    data: renderer?.data,
+    metadata: renderer?.metadata,
+    resultMetaData: lastResultMetaData.value,
+    hiddenQueries: dashboardPanelData.layout.hiddenQueries ?? [],
+  };
 });
 
 // The desktop 20% field-list splitter is unusable on a phone, so there it opens at ~half width.
@@ -1125,6 +1202,28 @@ const fieldListInnerStyle = computed(() => {
   return { width: "100%", height: "100%" };
 });
 
+// ---- Preview notice actions: the editor fixes things in place ----
+const { focusInEditor } = usePanelEditorFocus();
+const hostListens = (event: string) => !!getCurrentInstance()?.vnode.props?.[event];
+const canInspectPreview = hostListens("onOpenQueryInspector");
+const hostRunsApply = hostListens("onApplyRequested");
+
+const noticeActionProps = computed(() => ({
+  ...noticeProps.value,
+  canEdit: resolvedConfig.value.showQueryEditor,
+  canInspect: canInspectPreview,
+  canRefresh: true,
+}));
+
+const onNoticeEdit = (action: PanelNoticeActionId) => {
+  focusInEditor(dashboardPanelData.layout, action === "edit-function" ? "vrl" : "top-n");
+};
+
+const onNoticeRefresh = () => {
+  if (hostRunsApply) emit("applyRequested");
+  else runQuery();
+};
+
 // Search type for PanelSchemaRenderer
 const searchType = computed(() => {
   switch (props.pageType) {
@@ -1259,6 +1358,10 @@ watch(
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.config?.limit,
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.joins,
     dashboardPanelData.data.type,
+    // The builder generates the heatmap y bucketing and range into the SQL itself.
+    dashboardPanelData.data.config?.heatmap_y_bucket,
+    dashboardPanelData.data.config?.heatmap_y_min,
+    dashboardPanelData.data.config?.heatmap_y_max,
   ],
   async () => {
     // Only auto-generate SQL if in builder mode (customQuery = false)
@@ -1275,6 +1378,16 @@ watch(
       }
     }
   },
+  { deep: true },
+);
+
+watch(
+  () => [
+    dashboardPanelData.data.config?.heatmap_y_bucket,
+    dashboardPanelData.data.config?.heatmap_y_min,
+    dashboardPanelData.data.config?.heatmap_y_max,
+  ],
+  () => regenerateOtherBuilderQueries(),
   { deep: true },
 );
 
@@ -1314,6 +1427,7 @@ defineExpose({
   // Actions
   initChartData,
   runQuery,
+  reportValidationErrors,
   resetErrors,
   collapseFieldList,
   updateDateTime,
@@ -1329,6 +1443,7 @@ defineExpose({
   // Panel data
   dashboardPanelData,
   isOutDated,
+  sparklinePendingApply,
 
   // Loading state
   isLoading,
@@ -1336,6 +1451,8 @@ defineExpose({
 
   // Warning messages
   maxQueryRangeWarning,
+  panelDiagnostics,
+  seriesLimit,
   limitNumberOfSeriesWarningMessage,
   sparklineWarning,
   errorMessage,

@@ -23,6 +23,8 @@ import logs from "./logs";
 import incidents from "./incidents";
 import { getDefaultTheme } from "@/constants/themes";
 import { purgeAllQueries } from "@/composables/query/queryClient";
+import { clearAllPanelDrafts } from "@/composables/dashboard/usePanelDraft";
+import { setSeverityInferenceEnabled } from "@/utils/logs/statusParser";
 
 const pos = window.location.pathname.indexOf("/web/");
 
@@ -72,6 +74,7 @@ const organizationObj = {
     cross_links: [],
     usage_stream_enabled: false,
     red_insights_enabled: false,
+    ai_rca_thread_tool_output: false,
   },
   isDataIngested: false,
   regexPatterns: [],
@@ -101,6 +104,9 @@ export default createStore({
     searchCollapsibleSection: 20,
     theme: localStorage.getItem("theme") === "dark" ? "dark" : "light",
     printMode: false,
+    kioskMode: false,
+    // A per-screen theme forced by a kiosk URL; never persisted as the user's preference.
+    themeOverride: null,
     organizationData: JSON.parse(JSON.stringify(organizationObj)),
     zoConfig: <{ [key: string]: any }>{},
     timezone: useLocalTimezone()
@@ -163,13 +169,6 @@ export default createStore({
     // Share URL state for Safari-compatible clipboard copy
     // Polling mechanism checks this value and copies when available
     pendingShortURL: null,
-    // Alert list filter state — persisted across navigation so returning
-    // from add/edit alert screens restores the previous search & toggle state
-    alertListFilters: {
-      searchQuery: "",
-      filterQuery: "",
-      searchAcrossFolders: false,
-    },
   },
   mutations: {
     login(state, payload) {
@@ -195,7 +194,9 @@ export default createStore({
       state.selectedOrganization = payload;
     },
     setOrganizations(state, payload) {
-      state.organizations = payload;
+      // Callers read .length unguarded; a failed org fetch must not store undefined.
+      const organizations: any = Array.isArray(payload) ? payload : [];
+      state.organizations = organizations;
     },
     setCurrentUser(state, payload) {
       state.currentuser = payload;
@@ -281,6 +282,7 @@ export default createStore({
     // },
     setConfig(state, payload) {
       state.zoConfig = payload;
+      setSeverityInferenceEnabled(payload?.ui_logs_severity_inference !== false);
     },
     setFolders(state, payload) {
       state.organizationData.folders = payload;
@@ -298,6 +300,12 @@ export default createStore({
     },
     setPrintMode(state, payload) {
       state.printMode = payload;
+    },
+    setKioskMode(state, payload) {
+      state.kioskMode = payload;
+    },
+    setThemeOverride(state, payload) {
+      state.themeOverride = payload;
     },
     setTimezone(state, payload) {
       state.timezone = payload;
@@ -382,9 +390,6 @@ export default createStore({
     clearPendingShortURL(state) {
       state.pendingShortURL = null;
     },
-    setAlertListFilters(state, payload) {
-      state.alertListFilters = { ...state.alertListFilters, ...payload };
-    },
     /**
      * Cache the alert library manifest, stamping the time the TTL is measured
      * from. Leaving lastFetched unset would make a warm cache look permanently
@@ -449,6 +454,7 @@ export default createStore({
       // Nothing from the previous session may survive — including anything the
       // query layer persisted to localStorage/IndexedDB.
       purgeAllQueries();
+      clearAllPanelDrafts();
     },
     endpoint(context, payload) {
       context.commit("endpoint", payload);
@@ -548,6 +554,9 @@ export default createStore({
     },
     setPrintMode(context, payload) {
       context.commit("setPrintMode", payload);
+    },
+    setKioskMode(context, payload) {
+      context.commit("setKioskMode", payload);
     },
     setTimezone(context, payload) {
       context.commit("setTimezone", payload);

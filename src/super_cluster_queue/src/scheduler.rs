@@ -208,6 +208,13 @@ async fn update(msg: Message) -> Result<()> {
         TriggerModule::QueryRecommendations => {
             todo!("We will get here eventually")
         }
+        // D21: rollouts are region-local, like the collectors and connections they act on.
+        TriggerModule::FleetRollout => {
+            log::debug!(
+                "[SUPER_CLUSTER:sync] fleet rollout jobs are region-local: {}",
+                trigger.module_key
+            );
+        }
         // Keyed on the response record. Pushing a timer for a record this
         // region has not synced yet would create a job that escalates
         // nothing; the handler drops such a job, but not creating it is
@@ -229,6 +236,28 @@ async fn update(msg: Message) -> Result<()> {
             } else {
                 log::warn!(
                     "[SUPER_CLUSTER:sync] On-call response not found for module_key: {}. No need to sync this trigger",
+                    trigger.module_key
+                );
+            }
+        }
+        // Keyed on the org's config; a trigger whose config has not synced would only back off.
+        TriggerModule::AlertCalibration => {
+            if infra::table::alert_calibration::get_by_id(conn, &trigger.org, &trigger.module_key)
+                .await
+                .unwrap_or(None)
+                .is_some()
+            {
+                scheduler::push(trigger.clone()).await.map_err(|e| {
+                    let error_msg = format!(
+                        "[SUPER_CLUSTER:sync] Failed to push scheduler: {}/{:?}/{}, error: {}",
+                        trigger.org, trigger.module, trigger.module_key, e
+                    );
+                    log::error!("{error_msg}");
+                    Error::Message(error_msg)
+                })?;
+            } else {
+                log::warn!(
+                    "[SUPER_CLUSTER:sync] Alert calibration config not found for module_key: {}. No need to sync this trigger",
                     trigger.module_key
                 );
             }

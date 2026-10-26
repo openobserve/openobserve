@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="md"
     :title="beingUpdated ? t('user.editUser') : t('user.add')"
     :primaryButtonLabel="t('user.save')"
+    primary-button-data-test="add-user-submit-btn"
     :secondaryButtonLabel="t('user.cancel')"
     form-id="add-user-form"
     @click:secondary="$emit('update:open', false)"
@@ -33,16 +34,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="w-full">
       <OForm id="add-user-form" :form="form">
-        <p class="mt-2 truncate" v-if="!existingUser">
+        <OTruncatedText as="p" class="mt-2" v-if="!existingUser">
           {{ t("user.email") }} : <strong>{{ formEmail }}</strong>
-        </p>
-        <p class="mt-2 truncate" v-if="!existingUser && !beingUpdated">
+        </OTruncatedText>
+        <OTruncatedText as="p" class="mt-2" v-if="!existingUser && !beingUpdated">
           {{ t("user.roles") }} : <strong>{{ formRole }}</strong>
-        </p>
-        <p class="mt-2 truncate" v-if="!existingUser && !beingUpdated && formCustomRole?.length">
+        </OTruncatedText>
+        <OTruncatedText
+          as="p"
+          class="mt-2"
+          v-if="!existingUser && !beingUpdated && formCustomRole?.length"
+        >
           {{ t("user.customRole") }} :
           <strong>{{ formCustomRole.join(", ") }}</strong>
-        </p>
+        </OTruncatedText>
         <OFormInput
           v-if="existingUser && !beingUpdated"
           name="email"
@@ -277,6 +282,7 @@ import { setServerFieldErrors, useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeAddUserSchema, type AddUserForm } from "./AddUser.schema";
 import { usePasswordComplexity } from "@/composables/usePasswordComplexity";
@@ -311,6 +317,7 @@ export default defineComponent({
     OFormInput,
     OFormSelect,
     OFormSwitch,
+    OTruncatedText,
     PasswordRequirementList,
   },
   props: {

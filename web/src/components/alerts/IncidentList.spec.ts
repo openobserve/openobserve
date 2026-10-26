@@ -24,8 +24,14 @@ vi.mock("@/services/incidents", async (importOriginal) => {
     default: {
       list: vi.fn(),
       updateStatus: vi.fn(),
+      triggerRca: vi.fn(),
     },
   });
+});
+
+vi.mock("@/services/downtimes", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: { list: vi.fn() } });
 });
 
 vi.mock("@/utils/date", () => ({
@@ -51,10 +57,13 @@ vi.mock("@/composables/useConfirmDialog", () => ({
 }));
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import IncidentList from "./IncidentList.vue";
 import incidentsService from "@/services/incidents";
+import downtimesService from "@/services/downtimes";
+import { queryClient } from "@/composables/query/queryClient";
 import type { Incident } from "@/services/incidents";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -68,6 +77,9 @@ const OTableStub = {
     data: { default: () => [] },
     columns: { default: () => [] },
     loading: { default: false },
+    tableId: { default: undefined },
+    persistColumns: { default: false },
+    keepPageOnDataChange: { type: Boolean, default: false },
   },
   emits: ["row-click"],
   template: `
@@ -78,6 +90,7 @@ const OTableStub = {
       <template v-for="row in data" :key="row.id">
         <div :data-test="'row-' + row.id" @click="$emit('row-click', row)">
           <slot name="cell-status" :row="row" />
+          <slot name="cell-ai_analysis" :row="row" />
           <slot name="cell-severity" :row="row" />
           <slot name="cell-title" :row="row" />
           <slot name="cell-dimensions" :row="row" />
@@ -101,7 +114,7 @@ const createIncident = (overrides: Partial<Incident> = {}): Incident => ({
   created_at: 1700000000000000,
   updated_at: 1700000000000000,
   related_incidents: [],
-  rca_summary: null,
+  rca: null,
   ...overrides,
 });
 
@@ -116,7 +129,7 @@ function createWrapper() {
         NoData: { template: '<div data-test="no-data-stub" />' },
         OEmptyState: { template: '<div data-test="no-data-stub" />' },
         OButton: {
-          template: '<button v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
+          template: '<button v-bind="$attrs" @click="$emit(\'click\', $event)"><slot /></button>',
           emits: ["click"],
         },
         OIcon: { template: "<span />" },
@@ -140,6 +153,7 @@ describe("IncidentList.vue", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetListViewState();
 
     store.state.selectedOrganization = {
       label: "default Organization",
@@ -290,6 +304,59 @@ describe("IncidentList.vue", () => {
       await (wrapper.vm as any).refreshIncidents();
       await flushPromises();
       expect(incidentsService.list).toHaveBeenCalled();
+    });
+  });
+
+  describe("Muted chip", () => {
+    it("shows the chip on a list row that carries muted_by_downtime_id", async () => {
+      (incidentsService.list as any).mockResolvedValue({
+        data: {
+          incidents: [
+            createIncident({ id: "1", muted_by_downtime_id: "dt-1" }),
+            createIncident({ id: "2" }),
+          ],
+          total: 2,
+        },
+      });
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.find('[data-test="row-1"] [data-test="incident-list-muted"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="row-2"] [data-test="incident-list-muted"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("says the downtime was not loaded when the lookup list is capped", async () => {
+      queryClient.clear();
+      const zoConfig = store.state.zoConfig;
+      store.state.zoConfig = { ...zoConfig, downtimes_enabled: true };
+      vi.mocked(downtimesService.list).mockResolvedValue({
+        data: { items: [{ id: "dt-1", name: "Deploy freeze" }], total: 600 },
+      } as any);
+      (incidentsService.list as any).mockResolvedValue({
+        data: {
+          incidents: [
+            createIncident({ id: "1", muted_by_downtime_id: "dt-1" }),
+            createIncident({ id: "2", muted_by_downtime_id: "dt-far" }),
+          ],
+          total: 2,
+        },
+      });
+      try {
+        wrapper = createWrapper();
+        await flushPromises();
+        const chip = (row: string) =>
+          wrapper.find(`[data-test="row-${row}"] [data-test="incident-list-muted"]`);
+        expect(chip("1").text()).toContain("Muted · Deploy freeze");
+        expect(chip("2").text()).toContain("Muted · Downtime not loaded");
+        expect(chip("2").text()).not.toContain("dt-far");
+        expect((wrapper.vm as any).mutedTooltip("dt-far")).toContain("dt-far");
+      } finally {
+        store.state.zoConfig = zoConfig;
+        queryClient.clear();
+      }
     });
   });
 
@@ -670,6 +737,220 @@ describe("IncidentList.vue", () => {
       expect(restorePage).toHaveBeenCalledWith(3);
       store.state.incidents = { incidents: {}, isInitialized: false };
       vi.useRealTimers();
+    });
+  });
+
+  describe("View state restore", () => {
+    it("restores severity, page size and sort", () => {
+      useListViewState("incidents", {
+        severityFilter: "P2",
+        pageSize: 50,
+        sortBy: "title",
+        sortOrder: "desc",
+      });
+      wrapper = createWrapper();
+      expect(wrapper.vm.severityFilter).toBe("P2");
+      expect(wrapper.vm.pageSize).toBe(50);
+      expect(wrapper.vm.sortBy).toBe("title");
+      expect(wrapper.vm.sortOrder).toBe("desc");
+    });
+
+    it("saves changes to the view state", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.severityFilter = "P1";
+      wrapper.vm.pageSize = 100;
+      await flushPromises();
+      const saved: any = useListViewState("incidents", {});
+      expect(saved.severityFilter).toBe("P1");
+      expect(saved.pageSize).toBe(100);
+    });
+  });
+
+  // ── AI analysis column ─────────────────────────────
+
+  describe("AI analysis column", () => {
+    const liveRca = (): Incident["rca"] => ({
+      run_id: "run-1",
+      state: "running",
+      stale: false,
+      started_at: 1700000000000000,
+      updated_at: 1700000000000000,
+      outcome: null,
+      confidence: null,
+      report_format: "v2",
+      summary: {
+        stage: null,
+        stage_index: null,
+        stage_count: 0,
+        steps: 0,
+        tool_calls: 0,
+        steered_by: [],
+        unblocked_by: null,
+        detail: null,
+        deadline_at: null,
+        previous: null,
+      },
+    });
+    const listMock = vi.mocked(incidentsService.list);
+    const triggerRcaMock = vi.mocked(incidentsService.triggerRca);
+    let zoConfig: typeof store.state.zoConfig;
+
+    beforeEach(() => {
+      zoConfig = store.state.zoConfig;
+      store.state.zoConfig = { ...zoConfig, incidents_rca_enabled: true };
+    });
+
+    afterEach(() => {
+      store.state.zoConfig = zoConfig;
+      vi.useRealTimers();
+    });
+
+    it("RR-32: ai_analysis is column 4 (after title, severity, status), hideable, not sortable, persisted", () => {
+      wrapper = createWrapper();
+      const table = wrapper.findComponent({ name: "OTable" });
+      const columns = table.props("columns") as {
+        id: string;
+        hideable?: boolean;
+        sortable?: boolean;
+      }[];
+
+      expect(columns.slice(0, 4).map((c) => c.id)).toEqual([
+        "title",
+        "severity",
+        "status",
+        "ai_analysis",
+      ]);
+      const column = columns[3];
+      expect(column.hideable).toBe(true);
+      expect(column.sortable).toBeFalsy();
+      expect(table.props("persistColumns")).toBe(true);
+      expect(table.props("tableId")).toBe("alerts-incident-list");
+    });
+
+    it("RR-33: Analyze sends one POST with reanalysis=true, skips the row click and refetches", async () => {
+      listMock.mockResolvedValue({
+        data: { incidents: [createIncident({ id: "1" })], total: 1 },
+      });
+      triggerRcaMock.mockResolvedValue({
+        data: { message: "started", run_id: "run-1" },
+      });
+      const pushSpy = vi.spyOn(router, "push");
+      wrapper = createWrapper();
+      await flushPromises();
+      const listCalls = listMock.mock.calls.length;
+
+      await wrapper.find('[data-test="incident-ai-analysis-analyze-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(incidentsService.triggerRca).toHaveBeenCalledTimes(1);
+      expect(incidentsService.triggerRca).toHaveBeenCalledWith(
+        "default",
+        "1",
+        {},
+        { signal: undefined },
+      );
+      expect(pushSpy).not.toHaveBeenCalled();
+      expect(listMock.mock.calls.length).toBe(listCalls + 1);
+    });
+
+    it("opens the incident on the Analysis tab from the cell, not via the row click", async () => {
+      listMock.mockResolvedValue({
+        data: { incidents: [createIncident({ id: "1", rca: liveRca() })], total: 1 },
+      });
+      const pushSpy = vi.spyOn(router, "push");
+      wrapper = createWrapper();
+      await flushPromises();
+
+      await wrapper.find('[data-test="incident-ai-analysis-label"]').trigger("click");
+      await flushPromises();
+
+      expect(pushSpy).toHaveBeenCalledTimes(1);
+      expect(pushSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "incidentDetail",
+          params: { id: "1" },
+          query: expect.objectContaining({ tab: "incidentAnalysis" }),
+        }),
+      );
+      await router.push({ query: {} });
+    });
+
+    it("RR-34: one live row on the current page refetches after 30 s", async () => {
+      vi.useFakeTimers();
+      listMock.mockResolvedValue({
+        data: {
+          incidents: [createIncident({ id: "1", rca: liveRca() }), createIncident({ id: "2" })],
+          total: 2,
+        },
+      });
+      wrapper = createWrapper();
+      await flushPromises();
+      const listCalls = listMock.mock.calls.length;
+
+      await vi.advanceTimersByTimeAsync(30_000);
+      await flushPromises();
+
+      expect(listMock.mock.calls.length).toBe(listCalls + 1);
+    });
+
+    it("RR-34: no live row → no refetch after 30 s", async () => {
+      vi.useFakeTimers();
+      wrapper = createWrapper();
+      await flushPromises();
+      const listCalls = listMock.mock.calls.length;
+
+      await vi.advanceTimersByTimeAsync(30_000);
+      await flushPromises();
+
+      expect(listMock.mock.calls.length).toBe(listCalls);
+    });
+
+    it("RR-34: a poll refetch on page 2 keeps page 2", async () => {
+      vi.useFakeTimers();
+      // 25 rows at page size 20: the live row (index 22) is on page 2.
+      const incidents = Array.from({ length: 25 }, (_, i) =>
+        createIncident({ id: `inc-${i}`, rca: i === 22 ? liveRca() : null }),
+      );
+      listMock.mockResolvedValue({ data: { incidents, total: 25 } });
+      wrapper = createWrapper();
+      await flushPromises();
+      const restorePage = vi.fn();
+      wrapper.vm.qTableRef.restorePage = restorePage;
+      wrapper.vm.onPageChange(2);
+      await flushPromises();
+      const listCalls = listMock.mock.calls.length;
+
+      await vi.advanceTimersByTimeAsync(30_000);
+      await flushPromises();
+
+      expect(listMock.mock.calls.length).toBe(listCalls + 1);
+      expect(wrapper.vm.currentPage).toBe(2);
+      expect(restorePage).not.toHaveBeenCalledWith(1);
+      expect(wrapper.findComponent({ name: "OTable" }).props("keepPageOnDataChange")).toBe(true);
+    });
+
+    it("a filter change starts over on page 1", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.onPageChange(2);
+      await flushPromises();
+
+      wrapper.vm.severityFilter = "P2";
+      await flushPromises();
+
+      expect(wrapper.vm.currentPage).toBe(1);
+    });
+
+    it("a sort change starts over on page 1", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.onPageChange(2);
+      await flushPromises();
+
+      wrapper.vm.sortBy = "last_alert_at";
+      await flushPromises();
+
+      expect(wrapper.vm.currentPage).toBe(1);
     });
   });
 });

@@ -13,6 +13,7 @@ O2 components for loading states, messaging, transient notifications, hierarchic
   - [Toast — OToastProvider + useToast](#toast--otoastprovider--usetoast)
 - Data display
   - [OProgressBar](#oprogressbar)
+  - [OSegmentedBar](#osegmentedbar)
   - [OTimeline / OTimelineItem](#otimeline--otimelineitem)
   - [OTree](#otree)
 - Lists
@@ -55,6 +56,7 @@ Rules of thumb:
 
 `role` is derived automatically: `alert` for `error`/`warning`, otherwise `status`.
 **Slots:** `default` (message body, overrides `content`), `icon` (custom leading icon, overrides `icon` prop), `actions` (buttons/links).
+**Slots are detected once, at setup.** `hasActionsSlot` is a `computed` over `useSlots()`, which is not reactive, so `<template v-if="cond" #actions>` that becomes true later never renders. Always pass the slot and put the `v-if` on its contents.
 **Emits:** none.
 **Example:**
 
@@ -243,6 +245,32 @@ function copyLink(url: string) {
 <OProgressBar :value="usedRatio" variant="warning" size="md">
   {{ Math.round(usedRatio * 100) }}%
 </OProgressBar>
+```
+
+**Family:** standalone.
+
+### OSegmentedBar
+
+**Import:** `@/lib/data/SegmentedBar/OSegmentedBar.vue` (types and `SEGMENT_SWATCH` from `OSegmentedBar.types.ts`)
+**Use when:** One track split into coloured shares (status mix, usage vs capacity), optionally with tick markers such as a request or limit line.
+**Don't use for:** A single 0-1 progress value (use [OProgressBar](#oprogressbar)) or a time series (use a chart).
+**Key props:**
+
+- `segments` (`{ id, pct, variant? }[]`, required) — `pct` is 0-100 and clamped; segments render left to right.
+- `markers` (`{ id, pct, variant? }[]`, default `[]`) — ticks drawn over the track.
+- `variant` per entry (`"default" | "success" | "warning" | "danger" | "info" | "neutral" | "muted" | "contrast"`, default `"default"` = brand accent).
+- `size` (`"sm" | "md"` — default `"sm"`) — track height.
+- `label` (`I18nText`) — accessible name; without it the bar is `aria-hidden` and a legend must sit beside it.
+  **Legend dots:** use the exported `SEGMENT_SWATCH[variant]` background class so dots match the bar; never re-declare the map.
+  **Emits:** none. Test hooks: `o-segmented-bar-segment-<id>`, `o-segmented-bar-marker-<id>`.
+  **Example:**
+
+```vue
+<OSegmentedBar
+  :segments="[{ id: 'usage', pct: 62 }]"
+  :markers="[{ id: 'limit', pct: 90, variant: 'danger' }]"
+  :label="t('usage')"
+/>
 ```
 
 **Family:** standalone.

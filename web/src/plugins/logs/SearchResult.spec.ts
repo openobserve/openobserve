@@ -15,9 +15,11 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+import { nextTick } from "vue";
 import SearchResult from "@/plugins/logs/SearchResult.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import { resetLogsAutoRunForTests } from "@/composables/useLogs/logsAutoRun";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -42,10 +44,23 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
   __esModule: true,
   default: {
     name: "OTable",
-    props: ["columns", "data", "loading", "streaming", "wrap", "rowKey", "virtualScroll"],
+    props: [
+      "columns",
+      "data",
+      "loading",
+      "streaming",
+      "wrap",
+      "rowKey",
+      "virtualScroll",
+      "rowClass",
+      "getRowStatusColor",
+    ],
     template:
       '<div data-test="otable-stub">' +
       '<div v-if="$slots[\'loading-banner\']" data-test="otable-stub-has-loading-banner-slot" />' +
+      '<div v-for="(r, i) in (data || [])" :key="i" data-test="otable-stub-row" :class="rowClass ? rowClass(r) : \'\'" :data-row-status-color="getRowStatusColor ? getRowStatusColor(r) : \'\'">' +
+      '<div v-for="c in (columns || [])" :key="c.id" :data-test="\'otable-stub-cell-\' + c.id"><slot :name="\'cell-\' + c.id" :row="r" :value="r[c.id]" /></div>' +
+      "</div>" +
       "</div>",
   },
 }));
@@ -63,6 +78,7 @@ describe("SearchResult Component", () => {
   let wrapper: any;
 
   beforeEach(async () => {
+    resetLogsAutoRunForTests();
     // jsdom does not implement HTMLElement.scrollTo
     HTMLElement.prototype.scrollTo = vi.fn();
 
@@ -224,6 +240,30 @@ describe("SearchResult Component", () => {
       expect(wrapper.emitted()["expandlog"]).toEqual([[3]]);
     });
 
+    it("filters the (empty) breakdown row by NULL only for a numeric field", () => {
+      wrapper.vm.pinnedTooltip = { ...wrapper.vm.pinnedTooltip, field: "status" };
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+        { name: "status", dataType: "Int64" },
+      ];
+
+      wrapper.vm.applyPinnedFilter("", "include");
+
+      expect(wrapper.vm.searchObj.data.stream.addToFilterMode).toBe("append");
+      expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe("status is null");
+    });
+
+    it("filters the (empty) breakdown row by NULL and '' for a string field", () => {
+      wrapper.vm.pinnedTooltip = { ...wrapper.vm.pinnedTooltip, field: "level" };
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [{ name: "level", dataType: "Utf8" }];
+
+      wrapper.vm.applyPinnedFilter("", "exclude");
+
+      expect(wrapper.vm.searchObj.data.stream.addToFilterMode).toBe("append");
+      expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe(
+        "(level is not null AND level != '')",
+      );
+    });
+
     it("should toggle error details", async () => {
       wrapper.vm.disableMoreErrorDetails = false;
 
@@ -238,6 +278,164 @@ describe("SearchResult Component", () => {
       await wrapper.vm.sendToAiChat(testValue);
 
       expect(wrapper.emitted()["sendToAiChat"]).toEqual([[testValue, true]]); // includes append parameter
+    });
+  });
+
+  describe("pinned breakdown tooltip and theme changes", () => {
+    const ts = 1640995200000;
+    const accents = new Map<Element, string>();
+    let styleSpy: ReturnType<typeof vi.spyOn>;
+    let originalTheme: string;
+    let originalShowHistogram: boolean;
+    let originalHistogram: any;
+    let chartMock: any;
+
+    const pinAt = () =>
+      wrapper.vm.onHistogramAreaClick({
+        currentTarget: { getBoundingClientRect: () => ({ left: 0, top: 0 }) },
+        clientX: 10,
+        clientY: 10,
+      });
+    const emptyRowColor = () =>
+      wrapper.vm.pinnedTooltip.rows.find((r: any) => r.rawValue === "").color;
+
+    beforeEach(async () => {
+      originalTheme = store.state.theme;
+      originalShowHistogram = wrapper.vm.searchObj.meta.showHistogram;
+      originalHistogram = wrapper.vm.searchObj.data.histogram;
+      store.state.theme = "light";
+      await flushPromises();
+      document.documentElement.classList.remove("dark");
+      accents.set(document.documentElement, "rgba(91, 76, 240, 1)");
+      accents.set(document.body, "rgba(139, 141, 240, 1)");
+      styleSpy = vi.spyOn(window, "getComputedStyle").mockImplementation(
+        (el: Element) =>
+          ({
+            getPropertyValue: (prop: string) =>
+              prop === "--color-theme-accent" ? (accents.get(el) ?? "") : "",
+          }) as unknown as CSSStyleDeclaration,
+      );
+      // Hidden chart, so re-renders cannot replace the mocked ECharts instance.
+      wrapper.vm.searchObj.meta.showHistogram = false;
+      wrapper.vm.searchObj.data.histogram = {
+        xData: [ts],
+        yData: [5],
+        breakdownField: "level",
+        breakdownSeries: new Map([
+          ["error", [2]],
+          ["", [3]],
+        ]),
+        chartParams: { title: "", timezone: "UTC" },
+      };
+      wrapper.vm.reDrawChart();
+      await flushPromises();
+      chartMock = {
+        containPixel: vi.fn(() => true),
+        convertFromPixel: vi.fn(() => [ts, 0]),
+        dispatchAction: vi.fn(),
+        setOption: vi.fn(),
+      };
+      wrapper.vm.histogramChart = { chart: chartMock };
+    });
+
+    afterEach(async () => {
+      styleSpy.mockRestore();
+      accents.clear();
+      vi.useRealTimers();
+      localStorage.removeItem("appliedLightThemeName");
+      document.documentElement.classList.remove("dark");
+      wrapper.vm.searchObj.meta.showHistogram = originalShowHistogram;
+      wrapper.vm.searchObj.data.histogram = originalHistogram;
+      store.state.theme = originalTheme;
+      await flushPromises();
+    });
+
+    it("pins the (empty) row with the current accent and keeps populated colors", () => {
+      pinAt();
+
+      expect(wrapper.vm.pinnedTooltip.visible).toBe(true);
+      expect(emptyRowColor()).toBe("rgba(91, 76, 240, 1)");
+      expect(wrapper.vm.pinnedTooltip.rows.find((r: any) => r.rawValue === "error").color).toBe(
+        "#EF5350",
+      );
+    });
+
+    it("closes the pin on a custom accent change and repins with the new accent", async () => {
+      vi.useFakeTimers();
+      localStorage.setItem("appliedLightThemeName", "__custom__");
+      pinAt();
+
+      accents.set(document.documentElement, "rgba(16, 185, 129, 1)");
+      window.dispatchEvent(new CustomEvent("themeColorChanged"));
+      await nextTick();
+
+      expect(wrapper.vm.pinnedTooltip.visible).toBe(false);
+      expect(chartMock.setOption).toHaveBeenCalledWith(
+        { tooltip: { triggerOn: "mousemove|click" } },
+        false,
+      );
+
+      vi.advanceTimersByTime(300);
+      pinAt();
+      expect(emptyRowColor()).toBe("rgba(16, 185, 129, 1)");
+    });
+
+    it("closes the pin on a light/dark mode change and repins with the dark accent", async () => {
+      pinAt();
+
+      store.state.theme = "dark";
+      await flushPromises();
+
+      expect(wrapper.vm.pinnedTooltip.visible).toBe(false);
+      pinAt();
+      expect(emptyRowColor()).toBe("rgba(139, 141, 240, 1)");
+    });
+
+    it("closes a pin opened during the accent debounce once the redraw runs", async () => {
+      vi.useFakeTimers();
+      localStorage.setItem("appliedLightThemeName", "__custom__");
+      pinAt();
+
+      accents.set(document.documentElement, "rgba(16, 185, 129, 1)");
+      window.dispatchEvent(new CustomEvent("themeColorChanged"));
+      await nextTick();
+      pinAt();
+      expect(wrapper.vm.pinnedTooltip.visible).toBe(true);
+
+      vi.advanceTimersByTime(300);
+      expect(wrapper.vm.pinnedTooltip.visible).toBe(false);
+      pinAt();
+      expect(emptyRowColor()).toBe("rgba(16, 185, 129, 1)");
+    });
+
+    it("gives the empty group and a literal (empty) value their own series colors", async () => {
+      wrapper.vm.searchObj.data.histogram = {
+        ...wrapper.vm.searchObj.data.histogram,
+        breakdownSeries: new Map([
+          ["", [3]],
+          ["(empty)", [1]],
+          ["error", [2]],
+        ]),
+      };
+      wrapper.vm.reDrawChart();
+      await flushPromises();
+      const seriesColors = wrapper.vm.plotChart.options.series.map((s: any) => s.itemStyle.color);
+
+      pinAt();
+      const rowColors = wrapper.vm.pinnedTooltip.rows.map((r: any) => r.color);
+
+      expect(seriesColors[0]).toBe("rgba(91, 76, 240, 1)");
+      expect(seriesColors[1]).not.toBe(seriesColors[0]);
+      expect(rowColors).toEqual(seriesColors);
+    });
+
+    it("keeps the pin open across a streaming redraw", async () => {
+      pinAt();
+
+      wrapper.vm.reDrawChart();
+      await flushPromises();
+
+      expect(wrapper.vm.pinnedTooltip.visible).toBe(true);
     });
   });
 
@@ -484,6 +682,71 @@ describe("SearchResult Component", () => {
       // and is marked as a system pick so it is never persisted.
       expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual(["message"]);
       expect(wrapper.vm.searchObj.meta.isFtsDefaultColumn).toBe(true);
+    });
+
+    it("resolves the FTS default once the fields land after the search finished", async () => {
+      // A search finishing inside the window where extractFields() has emptied the list leaves the table on _source for good.
+      wrapper.vm.searchObj.data.stream.selectedFields = [];
+      wrapper.vm.searchObj.meta.isFtsDefaultColumn = false;
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [];
+      wrapper.vm.searchObj.data.queryResults = {
+        hits: [{ message: "hello", kubernetes_pod_id: "pod-1" }],
+      };
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.meta.searchApplied = true;
+
+      wrapper.vm.searchObj.loading = true;
+      await wrapper.vm.$nextTick();
+      wrapper.vm.searchObj.loading = false;
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([]);
+      expect(wrapper.vm.searchObj.meta.isFtsDefaultColumn).toBe(false);
+
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+        { name: "message", ftsKey: true },
+        { name: "kubernetes_pod_id", ftsKey: false },
+      ];
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual(["message"]);
+      expect(wrapper.vm.searchObj.meta.isFtsDefaultColumn).toBe(true);
+    });
+
+    it("does not resolve on late fields when the user chose the columns", async () => {
+      wrapper.vm.searchObj.data.stream.selectedFields = ["kubernetes_pod_id"];
+      wrapper.vm.searchObj.meta.isFtsDefaultColumn = false;
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [];
+      wrapper.vm.searchObj.data.queryResults = { hits: [{ message: "hello" }] };
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.meta.searchApplied = true;
+      wrapper.vm.searchObj.loading = false;
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+        { name: "message", ftsKey: true },
+        { name: "kubernetes_pod_id", ftsKey: false },
+      ];
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual(["kubernetes_pod_id"]);
+      expect(wrapper.vm.searchObj.meta.isFtsDefaultColumn).toBe(false);
+    });
+
+    it("does not resolve on late fields in SQL mode", async () => {
+      wrapper.vm.searchObj.data.stream.selectedFields = [];
+      wrapper.vm.searchObj.meta.isFtsDefaultColumn = false;
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [];
+      wrapper.vm.searchObj.data.queryResults = { hits: [{ message: "hello" }] };
+      wrapper.vm.searchObj.meta.sqlMode = true;
+      wrapper.vm.searchObj.meta.searchApplied = true;
+      wrapper.vm.searchObj.loading = false;
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [{ name: "message", ftsKey: true }];
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([]);
     });
 
     it("loading watcher leaves columns alone in SQL mode (custom queries are authoritative)", async () => {
@@ -1005,6 +1268,72 @@ describe("SearchResult Component", () => {
       expect(wrapper.find('[data-test="otable-stub-has-loading-banner-slot"]').exists()).toBe(true);
     });
   });
+  describe("severity spine, row class and timestamp sr text (A7)", () => {
+    const render = async (rows: any[]) => {
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.meta.quickMode = false;
+      wrapper.vm.searchObj.data.resultGrid.columns = [
+        { id: "_timestamp", header: "_timestamp" },
+        { id: "message", header: "message" },
+      ];
+      wrapper.vm.searchObj.data.queryResults = { hits: rows };
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+      return wrapper.findAll('[data-test="otable-stub-row"]');
+    };
+
+    it("AC-A1.1: an inferred row gets the message classes, the solid field spine and inferred sr text", async () => {
+      const [row] = await render([
+        { _timestamp: "2026-10-06 12:00:01", message: "2026-10-06 12:00:01 ERROR payment failed" },
+      ]);
+      expect(row.classes()).toEqual(
+        expect.arrayContaining(["o2-log-level-error", "o2-log-level-src-message"]),
+      );
+      expect(row.attributes("data-row-status-color")).toBe(
+        "var(--color-log-severity-error-indicator)",
+      );
+      const cell = row.find('[data-test="otable-stub-cell-_timestamp"]');
+      expect(cell.find('[data-test="log-row-timestamp-value"]').text()).toBe("2026-10-06 12:00:01");
+      const sr = cell.find('[data-test="log-row-severity-sr"]');
+      expect(sr.text()).toBe("Severity error, inferred");
+      expect(sr.classes()).toEqual(expect.arrayContaining(["sr-only", "select-none"]));
+    });
+
+    it("AC-A1.2: a row with no evidence is unknown with a transparent spine", async () => {
+      const [row] = await render([{ _timestamp: "t", message: "user logged in" }]);
+      expect(row.classes()).toEqual(
+        expect.arrayContaining(["o2-log-level-unknown", "o2-log-level-src-none"]),
+      );
+      expect(row.attributes("data-row-status-color")).toBe("transparent");
+      expect(row.find('[data-test="log-row-severity-sr"]').text()).toBe("Severity unknown");
+    });
+
+    it("J-A2: HTTP rows resolve from status with a solid token spine", async () => {
+      const rows = await render([
+        { _timestamp: "a", status: 503 },
+        { _timestamp: "b", status: 404 },
+        { _timestamp: "c", status: 200 },
+      ]);
+      const levels = rows.map((r: any) =>
+        r.classes().find((c: string) => /^o2-log-level-(?!src)/.test(c)),
+      );
+      expect(levels).toEqual(["o2-log-level-error", "o2-log-level-warning", "o2-log-level-ok"]);
+      rows.forEach((r: any) => expect(r.classes()).toContain("o2-log-level-src-http"));
+      expect(rows[0].attributes("data-row-status-color")).toBe(
+        "var(--color-log-severity-error-indicator)",
+      );
+      expect(rows[0].find('[data-test="log-row-severity-sr"]').text()).toBe("Severity error");
+    });
+
+    it("renders the sr text in the timestamp column only", async () => {
+      const [row] = await render([{ _timestamp: "t", message: "[WARN] x" }]);
+      expect(row.findAll('[data-test="log-row-severity-sr"]')).toHaveLength(1);
+      const message = row.find('[data-test="otable-stub-cell-message"]');
+      expect(message.find('[data-test="log-row-severity-sr"]').exists()).toBe(false);
+      expect(message.find('[data-test="log-row-timestamp-value"]').exists()).toBe(false);
+    });
+  });
+
   describe("results progress bar (#14303)", () => {
     const progressBars = () => wrapper.findAllComponents({ name: "LoadingProgress" });
     const barsLoading = () => progressBars().filter((bar: any) => bar.props("loading") === true);

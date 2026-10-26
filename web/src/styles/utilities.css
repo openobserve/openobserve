@@ -80,3 +80,34 @@
   opacity: 0.5 !important;
   box-shadow: var(--shadow-lg) !important;
 }
+
+/* Announcement message markup comes from v-html, so links and code inherit the operator-chosen banner colour. */
+@utility announcement-message {
+  overflow-wrap: anywhere;
+  & a,
+  & a:hover {
+    color: inherit;
+    font-weight: var(--font-weight-semibold);
+    text-decoration: underline;
+  }
+  & a:hover {
+    opacity: 0.8;
+  }
+  & code {
+    font-family: var(--font-mono);
+    padding-inline: 0.25rem;
+    border-radius: var(--radius-default);
+    background-color: color-mix(in srgb, currentColor 14%, transparent);
+  }
+}
+
+@utility bg-hatched {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: 1 device pixel */
+  --hatch-line: 1px;
+  background-color: var(--color-surface-subtle);
+  background-image: repeating-linear-gradient(
+    135deg,
+    var(--color-border-strong) 0 var(--hatch-line),
+    transparent var(--hatch-line) 0.3125rem
+  );
+}

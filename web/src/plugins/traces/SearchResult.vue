@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :max="totalPages"
             class="paginator-section float-right mt-0!"
             data-test="traces-search-result-pagination"
-            @update:model-value="changePage"
+            @update:model-value="(page: number) => changePage(page)"
           />
         </template>
       </div>
@@ -168,11 +168,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :streamFields="searchObj.data.stream.selectedStreamFields"
             :show="searchObj.searchApplied && !searchObj.data.errorMsg?.trim()?.length"
             @time-range-selected="onMetricsTimeRangeSelected"
-            @filters-updated="onMetricsFiltersUpdated"
+            @editor-filter-set="onMetricsEditorFilterSet"
+            @editor-filter-run="onMetricsEditorFilterRun"
           />
         </transition>
 
         <TracesSearchResultList
+          ref="searchResultListRef"
           :hits="hits"
           :wrap="searchObj.meta.resultGrid.wrapCells"
           :scroll-el="scrollContainerRef"
@@ -197,7 +199,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :stream-doc-time-range="streamDocTimeRange"
           :query-window-us="queryWindowUs"
           @row-click="expandRowDetail"
-          @page-change="changePage"
+          @page-change="(page: number) => changePage(page)"
+          @cross-page="(page: number) => changePage(page, { fromCrossing: true })"
           @rows-per-page-change="changeRowsPerPage"
           @sort-change="changeSortBy"
           @remove-filter="$emit('remove-filter')"
@@ -278,7 +281,8 @@ export default defineComponent({
     "remove:searchTerm",
     "search:timeboxed",
     "get:traceDetails",
-    "metrics:filters-updated",
+    "metrics:editor-filter-set",
+    "metrics:editor-filter-run",
     "run-query",
     "remove-filter",
     "jump-to-stream-data",
@@ -340,6 +344,8 @@ export default defineComponent({
     const expandRowDetail = (props: any) => {
       let from: number;
       let to: number;
+      searchObj.meta.resultGrid.navigation.lastOpenedId =
+        searchObj.meta.searchMode === "spans" ? props.span_id : props.trace_id;
 
       if (searchObj.meta.searchMode === "spans") {
         // start_time / end_time are nanoseconds in raw span rows — convert to µs
@@ -374,8 +380,12 @@ export default defineComponent({
       });
     };
 
-    const onMetricsFiltersUpdated = (filters: string[]) => {
-      emit("metrics:filters-updated", filters);
+    const onMetricsEditorFilterSet = (text: string) => {
+      emit("metrics:editor-filter-set", text);
+    };
+
+    const onMetricsEditorFilterRun = (text: string) => {
+      emit("metrics:editor-filter-run", text);
     };
 
     const getDashboardData = () => {
@@ -402,14 +412,23 @@ export default defineComponent({
         : 1,
     );
 
-    function changePage(page: number) {
+    const resetRowSelection = () => {
+      const navigation = searchObj.meta.resultGrid.navigation;
+      navigation.selectionActive = false;
+      navigation.currentRowIndex = null;
+      navigation.pendingPageSelection = null;
+    };
+
+    function changePage(page: number, options: { fromCrossing?: boolean } = {}) {
       if (searchObj.loading) return;
+      if (!options.fromCrossing) resetRowSelection();
       searchObj.data.resultGrid.currentPage = page - 1;
       emit("update:scroll");
     }
 
     function changeRowsPerPage(val: SelectModelValue) {
       if (searchObj.loading) return;
+      resetRowSelection();
       // rowsPerPageOptions are all numbers, so val is always a number here
       searchObj.meta.resultGrid.rowsPerPage = val as number;
       searchObj.data.resultGrid.currentPage = 0;
@@ -418,6 +437,7 @@ export default defineComponent({
 
     function changeSortBy(sortBy: string, sortOrder: "asc" | "desc") {
       if (searchObj.loading) return;
+      resetRowSelection();
       searchObj.meta.resultGrid.sortBy = sortBy;
       searchObj.meta.resultGrid.sortOrder = sortOrder;
       searchObj.data.resultGrid.currentPage = 0;
@@ -431,15 +451,17 @@ export default defineComponent({
       useLocalWrapTracesContent(searchObj.meta.resultGrid.wrapCells ? "true" : "false");
     }
 
-    function openUnifiedAnalysisDashboard() {
-      if (metricsDashboardRef.value) {
-        metricsDashboardRef.value.openUnifiedAnalysisDashboard();
-      }
+    function openComparison() {
+      metricsDashboardRef.value?.openComparison();
     }
 
     const toggleFieldList = () => {
       searchObj.meta.showFields = !searchObj.meta.showFields;
     };
+
+    const searchResultListRef = ref<InstanceType<typeof TracesSearchResultList> | null>(null);
+    const stepTraceRow = (direction: 1 | -1, isRepeat = false) =>
+      searchResultListRef.value?.stepTraceRow(direction, isRepeat);
 
     return {
       t,
@@ -451,7 +473,8 @@ export default defineComponent({
       scrollContainerRef,
       expandRowDetail,
       onMetricsTimeRangeSelected,
-      onMetricsFiltersUpdated,
+      onMetricsEditorFilterSet,
+      onMetricsEditorFilterRun,
       getDashboardData,
       hits,
       searchPerformed,
@@ -460,10 +483,12 @@ export default defineComponent({
       changeSortBy,
       rowsPerPageOptions,
       totalPages,
-      openUnifiedAnalysisDashboard,
+      openComparison,
       toggleWrapCells,
       toggleFieldList,
       formatLargeNumber,
+      searchResultListRef,
+      stepTraceRow,
     };
   },
 });

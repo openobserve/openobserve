@@ -15,9 +15,12 @@
 
 // Default builder fields shared by the Add Panel and Metrics pages.
 
+// The builder's last_value has no ORDER BY, so it is not the latest sample; max reads any column type.
+export const STATE_TIMELINE_Y_FUNCTION = "max";
+
 /** Default x-axis: histogram(_timestamp). */
 export const DEFAULT_SQL_X_FIELD = () => ({
-  label: "_timestamp",
+  label: "",
   alias: "x_axis_1",
   column: "_timestamp",
   color: null,
@@ -34,7 +37,7 @@ export const DEFAULT_SQL_X_FIELD = () => ({
 
 /** Default y-axis for logs/traces (and metrics without a "value" column): count(_timestamp). */
 export const DEFAULT_SQL_Y_FIELD_COUNT = () => ({
-  label: "_timestamp",
+  label: "",
   alias: "y_axis_1",
   column: "_timestamp",
   color: "#5960b2",
@@ -48,7 +51,7 @@ export const DEFAULT_SQL_Y_FIELD_COUNT = () => ({
 
 /** Metrics-only y-axis when the stream has a "value" column: avg(value). */
 export const DEFAULT_SQL_Y_FIELD_VALUE = () => ({
-  label: "value",
+  label: "",
   alias: "y_axis_1",
   column: "value",
   color: "#5960b2",
@@ -116,5 +119,7 @@ export const buildDefaultBuilderFields = (
   const { x, y } = buildDefaultSqlFields(streamType, groupedFields, streamName);
   // metric has no x-axis — it renders a single measure.
   if (chartType === "metric") return { x: [], y };
+  // A count is not a state; the user picks the state column.
+  if (chartType === "state-timeline") return { x, y: [] };
   return { x, y };
 };

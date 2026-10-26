@@ -15,19 +15,16 @@
 
 //! A team's escalation policy, stored as JSON.
 
-use std::{
-    sync::LazyLock,
-    time::{Duration, Instant},
-};
+use std::time::Duration;
 
 use config::{
-    RwHashMap, ider,
+    ider,
     meta::oncall::{EscalationPolicy, PriorityRung},
     utils::time::now_micros,
 };
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 
-use super::entity::oncall_policies;
+use super::{entity::oncall_policies, ttl_cache::TtlCache};
 use crate::{db::get_orm_client_rw, errors};
 
 /// The team's escalation policy, for the paging path (`06` §3).
@@ -43,8 +40,7 @@ use crate::{db::get_orm_client_rw, errors};
 ///
 /// Backs [`get_or_create_cached`] only. The policy screen reads
 /// [`get_or_create`].
-static POLICY_CACHE: LazyLock<RwHashMap<String, (EscalationPolicy, Instant)>> =
-    LazyLock::new(Default::default);
+static POLICY_CACHE: TtlCache<EscalationPolicy> = TtlCache::new(POLICY_CACHE_TTL);
 
 const POLICY_CACHE_TTL: Duration = Duration::from_secs(60);
 
@@ -56,6 +52,12 @@ fn policy_cache_key(org_id: &str, team_id: &str) -> String {
 /// paths.
 pub fn invalidate_cache(org_id: &str, team_id: &str) {
     POLICY_CACHE.remove(&policy_cache_key(org_id, team_id));
+}
+
+/// Drops every policy an org holds, for when the org itself is deleted.
+pub fn invalidate_org(org_id: &str) {
+    let prefix = format!("{org_id}/");
+    POLICY_CACHE.retain(|key| !key.starts_with(&prefix));
 }
 
 pub(super) async fn invalidate_and_publish(org_id: &str, team_id: &str) {
@@ -170,13 +172,11 @@ pub async fn get_or_create_cached(
     team_id: &str,
 ) -> Result<EscalationPolicy, errors::Error> {
     let key = policy_cache_key(org_id, team_id);
-    if let Some(entry) = POLICY_CACHE.get(&key)
-        && entry.1.elapsed() < POLICY_CACHE_TTL
-    {
-        return Ok(entry.0.clone());
+    if let Some(cached) = POLICY_CACHE.get(&key) {
+        return Ok(cached);
     }
     let policy = get_or_create(org_id, team_id).await?;
-    POLICY_CACHE.insert(key, (policy.clone(), Instant::now()));
+    POLICY_CACHE.insert(key, policy.clone());
     Ok(policy)
 }
 
@@ -414,5 +414,27 @@ mod tests {
             "the team's edit stands"
         );
         assert!(back.pages_anyone(AlertPriority::P1));
+    }
+
+    #[test]
+    fn test_invalidate_org_drops_only_that_orgs_policies() {
+        let policy = |org: &str| {
+            EscalationPolicy::default_for_team("pol_1", org, "team_1", "rot_primary", None)
+        };
+        for org in ["inv_pol_a", "inv_pol_ab"] {
+            POLICY_CACHE.insert(policy_cache_key(org, "team_1"), policy(org));
+        }
+        invalidate_org("inv_pol_a");
+        assert!(
+            POLICY_CACHE
+                .get(&policy_cache_key("inv_pol_a", "team_1"))
+                .is_none()
+        );
+        assert!(
+            POLICY_CACHE
+                .get(&policy_cache_key("inv_pol_ab", "team_1"))
+                .is_some()
+        );
+        invalidate_org("inv_pol_ab");
     }
 }

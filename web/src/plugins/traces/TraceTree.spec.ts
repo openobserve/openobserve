@@ -1168,6 +1168,23 @@ describe("TraceTree", () => {
       expect(row.exists()).toBe(true);
       expect(row.classes()).not.toContain("span-row-selected");
     });
+
+    it("marks only the selected span row with aria-current", async () => {
+      await wrapper.setProps({ selectedSpanId: "d9603ec7f76eb499" });
+      await flushPromises();
+
+      const current = wrapper.findAll('[data-test^="trace-tree-span-container-"][aria-current]');
+      expect(current).toHaveLength(1);
+      expect(current[0].attributes("data-test")).toBe("trace-tree-span-container-d9603ec7f76eb499");
+      expect(current[0].attributes("aria-current")).toBe("true");
+    });
+
+    it("does not mark a merely hovered span row with aria-current", async () => {
+      await wrapper.setProps({ selectedSpanId: "", hoveredSpanId: "d9603ec7f76eb499" });
+      await flushPromises();
+
+      expect(wrapper.findAll("[aria-current]")).toHaveLength(0);
+    });
   });
 
   describe("LLM trace functionality", () => {
@@ -1447,18 +1464,22 @@ describe("TraceTree", () => {
   describe("span name tooltips", () => {
     // Both names sit in one row; a title on their shared ancestor made the
     // service name report the operation name on hover.
-    it("titles the service name with the service name", () => {
+    it("cuts the service name on its own element", () => {
       const serviceName = wrapper.find(
         '[data-test="trace-tree-span-service-name-d9603ec7f76eb499"]',
       );
-      expect(serviceName.attributes("title")).toBe("scheduler");
+      expect(serviceName.classes()).toContain("truncate");
+      expect(serviceName.text()).toBe("scheduler");
+      expect(serviceName.attributes("title")).toBeUndefined();
     });
 
-    it("titles the operation name with the operation name", () => {
+    it("cuts the operation name on its own element", () => {
       const operationName = wrapper.find(
         '[data-test="trace-tree-span-operation-name-d9603ec7f76eb499"]',
       );
-      expect(operationName.attributes("title")).toBe("service:alerts:evaluate_scheduled");
+      expect(operationName.classes()).toContain("truncate");
+      expect(operationName.text()).toBe("service:alerts:evaluate_scheduled");
+      expect(operationName.attributes("title")).toBeUndefined();
     });
   });
 

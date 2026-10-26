@@ -138,15 +138,6 @@ impl UserRole {
             UserRole::SreAgent => "SRE Agent".to_string(),
         }
     }
-
-    /// Check if a string is a valid standard role name
-    /// Returns true if the string matches one of the UserRole enum variants
-    pub fn is_valid_role(role: &str) -> bool {
-        matches!(
-            role,
-            "admin" | "root" | "viewer" | "editor" | "user" | "service_account" | "sre_agent"
-        )
-    }
 }
 
 // Implementing FromStr for UserRole
@@ -446,20 +437,6 @@ mod tests {
         assert_eq!(UserRole::User.get_label(), "User");
         assert_eq!(UserRole::ServiceAccount.get_label(), "Service Account");
         assert_eq!(UserRole::SreAgent.get_label(), "SRE Agent");
-    }
-
-    #[test]
-    fn test_user_role_is_valid_role() {
-        assert!(UserRole::is_valid_role("admin"));
-        assert!(UserRole::is_valid_role("root"));
-        assert!(UserRole::is_valid_role("viewer"));
-        assert!(UserRole::is_valid_role("editor"));
-        assert!(UserRole::is_valid_role("user"));
-        assert!(UserRole::is_valid_role("service_account"));
-        assert!(UserRole::is_valid_role("sre_agent"));
-        assert!(!UserRole::is_valid_role("Admin")); // case sensitive
-        assert!(!UserRole::is_valid_role("superadmin"));
-        assert!(!UserRole::is_valid_role(""));
     }
 
     #[test]

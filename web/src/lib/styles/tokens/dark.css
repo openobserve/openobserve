@@ -248,6 +248,7 @@
   --color-tabs-active-text: var(--color-white);
   --color-tabs-hover-bg: var(--color-primary-900);
   --color-tabs-bar-border: var(--color-grey-700);
+  --color-nav-label-accent: var(--color-accent);
 
   /* Collapsible */
   --color-collapsible-trigger-hover-bg: var(--color-primary-900);
@@ -375,6 +376,16 @@
   --color-button-ghost-warning-text: var(--color-warning-400);
   --color-button-outline-warning-text: var(--color-warning-400);
   --color-button-outline-warning-border: var(--color-warning-500);
+
+  /* Button — pending (dark keeps the deeper amber-500 fill) */
+  --color-button-pending-bg: var(--color-amber-500);
+  --color-button-pending-hover-bg: var(--color-amber-600);
+  /* Halfway to amber-700: on amber-700 itself the label drops to 3.94:1 */
+  --color-button-pending-active-bg: color-mix(
+    in srgb,
+    var(--color-amber-600) 50%,
+    var(--color-amber-700)
+  );
 
   /* RefreshButton — staleness dot (slightly muted in dark mode) */
   --color-refresh-dot-stale: var(--color-warning-500);
@@ -544,10 +555,13 @@
   --color-progress-bar-success: var(--color-success-500);
   --color-progress-bar-warning: var(--color-warning-400);
   --color-progress-bar-danger: var(--color-error-500);
+  --color-progress-bar-neutral: var(--color-grey-500);
   --color-progress-bar-track: var(--color-grey-700);
 
   /* Banner (OBanner) */
   --color-banner-default-bg: var(--color-grey-800);
+  --color-banner-preview-page-bg: var(--color-grey-950);
+  --color-banner-preview-page-line: var(--color-grey-800);
   --color-banner-default-text: var(--color-grey-200);
   --color-banner-info-bg: color-mix(in srgb, var(--color-blue-800) 20%, transparent);
   --color-banner-info-border: var(--color-blue-700);
@@ -615,6 +629,13 @@
   --color-chart-series-11: #f5d0fe;
   --color-chart-series-12: #fef08a;
 
+  --color-map-seq-1: #03a92e;
+  --color-map-seq-2: #9db303;
+  --color-map-seq-3: #eeb400;
+  --color-map-seq-4: #fe933f;
+  --color-map-seq-5: #ff664b;
+  --color-map-card-header: var(--d-well);
+
   --color-chart-markline-shadow: rgba(0, 0, 0, 0.7);
 
   /* Dashboard table row-highlight palette — dark overrides */
@@ -679,6 +700,7 @@
   --chart-area-fill-top-opacity: 1;
   --chart-area-fill-bottom-opacity: 1;
   --chart-metric-contrast-threshold: 0.8;
+  --chart-threshold-band-opacity: 0.5;
 }
 
 /* ── Theme-driven runtime tokens, dark mode (utils/theme.ts) ──
@@ -842,6 +864,16 @@
   --color-json-object: #d1d5db;
   --color-json-string: #6ee7b7;
   --color-latency-p95: #5586f7;
+  --color-log-severity-emergency-indicator: #e07070;
+  --color-log-severity-alert-indicator: #ea580c;
+  --color-log-severity-critical-indicator: #dc6030;
+  --color-log-severity-error-indicator: #d95c5c;
+  --color-log-severity-warning-indicator: #d4944a;
+  --color-log-severity-notice-indicator: #16a34a;
+  --color-log-severity-info-indicator: #4d8fd4;
+  --color-log-severity-debug-indicator: #3daab8;
+  --color-log-severity-trace-indicator: #7a9baa;
+  --color-log-severity-ok-indicator: #4dad55;
   --color-log-table-header-bg: var(--color-table-header-bg);
   --color-log-table-row-bg: #21242c;
   --color-log-table-row-border: rgba(255, 255, 255, 0.14);

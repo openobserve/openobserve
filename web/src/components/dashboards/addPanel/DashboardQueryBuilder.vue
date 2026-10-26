@@ -90,6 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @dragenter="onDragEnter($event, 'x', index)"
               >
                 <OButton
+                  :aria-label="t('common.dragToReorder')"
                   variant="ghost"
                   size="icon-chip"
                   class="!w-4 !cursor-grab"
@@ -140,6 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </ODropdown>
                 <OButton
+                  :aria-label="t('common.remove')"
                   variant="ghost"
                   size="icon-chip"
                   class="!w-4"
@@ -174,7 +176,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type == 'h-stacked' ||
           dashboardPanelData.data.type == 'scatter' ||
           dashboardPanelData.data.type == 'area-stacked' ||
-          dashboardPanelData.data.type == 'stacked'
+          dashboardPanelData.data.type == 'stacked' ||
+          dashboardPanelData.data.type == 'state-timeline'
         "
       >
         <div
@@ -204,6 +207,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   >{{ t("panel.breakdownTooltipHBar") }}</span
                 >
+                <span v-else-if="dashboardPanelData.data.type == 'state-timeline'">{{
+                  t("panel.breakdownTooltipStateTimeline")
+                }}</span>
                 <span v-else>{{ t("panel.breakdownTooltipDefault") }}</span>
               </template>
             </OTooltip>
@@ -258,6 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @dragenter="onDragEnter($event, 'breakdown', index)"
               >
                 <OButton
+                  :aria-label="t('common.dragToReorder')"
                   variant="ghost"
                   size="icon-chip"
                   class="!w-4 !cursor-grab"
@@ -308,6 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </ODropdown>
                 <OButton
+                  :aria-label="t('common.remove')"
                   variant="ghost"
                   size="icon-chip"
                   class="!w-4"
@@ -393,6 +401,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @dragenter="onDragEnter($event, 'y', index)"
           >
             <OButton
+              :aria-label="t('common.dragToReorder')"
               variant="ghost"
               size="icon-chip"
               class="!w-4 cursor-grab"
@@ -443,6 +452,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </ODropdown>
             <OButton
+              :aria-label="t('common.remove')"
               variant="ghost"
               size="icon-chip"
               class="!w-4"
@@ -527,6 +537,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @dragenter="onDragEnter($event, 'z', index)"
             >
               <OButton
+                :aria-label="t('common.dragToReorder')"
                 variant="ghost"
                 size="icon-chip"
                 class="!w-4 cursor-grab"
@@ -577,6 +588,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </ODropdown>
               <OButton
+                :aria-label="t('common.remove')"
                 variant="ghost"
                 size="icon-chip"
                 class="!w-4"
@@ -651,7 +663,7 @@ import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFuncti
 import AxisFieldChipLabel from "@/components/dashboards/addPanel/AxisFieldChipLabel.vue";
 import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import { useStore } from "vuex";
-import { MAX_FIELD_LABEL_CHARS, FIELD_FUNCTION_MENU_WIDTH } from "@/utils/dashboard/constants";
+import { FIELD_FUNCTION_MENU_WIDTH } from "@/utils/dashboard/constants";
 import LabelFilterEditor from "@/components/promql/components/LabelFilterEditor.vue";
 import OperationsList from "@/components/promql/components/OperationsList.vue";
 import PromQLBuilderOptions from "@/components/promql/components/PromQLBuilderOptions.vue";
@@ -1136,6 +1148,7 @@ export default defineComponent({
         case "scatter":
           return t("dashboard.twoFieldsMessage");
         case "heatmap":
+        case "state-timeline":
           return t("dashboard.oneFieldMessage");
         case "gauge":
           return t("dashboard.dashboardQueryBuilder.addZeroOrOneLabelField");
@@ -1164,6 +1177,7 @@ export default defineComponent({
         case "metric":
           return t("dashboard.oneValueFieldMessage");
         case "heatmap":
+        case "state-timeline":
           return t("dashboard.oneFieldMessage");
         default:
           return t("dashboard.oneOrMoreFieldsMessage");
@@ -1191,9 +1205,7 @@ export default defineComponent({
               ?.stream
           : "",
       );
-      return label?.length > MAX_FIELD_LABEL_CHARS
-        ? label.substring(0, MAX_FIELD_LABEL_CHARS) + "..."
-        : label;
+      return label;
     };
 
     const xLabel = computed(() => {
@@ -1233,6 +1245,9 @@ export default defineComponent({
       labels: [],
       operations: [],
     });
+
+    // Per query, the builder state as loaded from the panel; that query's text is the user's until it changes.
+    const loadedStates = new WeakMap<object, string>();
 
     /**
      * Reads a panel's saved operations, upgrading any step ids it was stored
@@ -1352,6 +1367,7 @@ export default defineComponent({
           // panel was saved under.
           promqlBuilderQuery.labels = currentQuery?.fields?.promql_labels || [];
           promqlBuilderQuery.operations = loadSavedSteps(currentQuery);
+          if (currentQuery) loadedStates.set(currentQuery, JSON.stringify(promqlBuilderQuery));
         }
       },
       { immediate: true },
@@ -1411,6 +1427,7 @@ export default defineComponent({
           // Load saved builder state, migrating any legacy step ids (see above).
           promqlBuilderQuery.labels = currentQuery?.fields?.promql_labels || [];
           promqlBuilderQuery.operations = loadSavedSteps(currentQuery);
+          if (currentQuery) loadedStates.set(currentQuery, JSON.stringify(promqlBuilderQuery));
         }
       },
     );
@@ -1425,6 +1442,8 @@ export default defineComponent({
 
         const currentQuery =
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
+        if (loadedStates.get(currentQuery) === JSON.stringify(promqlBuilderQuery)) return;
+        loadedStates.delete(currentQuery);
 
         // Save labels and operations to schema
         currentQuery.fields.promql_labels = promqlBuilderQuery.labels;

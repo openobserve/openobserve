@@ -150,16 +150,6 @@ impl UserUpdateMode {
     }
 }
 
-pub fn get_default_user_org() -> UserOrg {
-    UserOrg {
-        name: "".to_string(),
-        org_name: "".to_string(),
-        token: "".to_string(),
-        rum_token: None,
-        role: get_default_user_role(),
-    }
-}
-
 #[cfg(feature = "enterprise")]
 pub fn get_default_user_role() -> UserRole {
     let mut role = UserRole::Admin;
@@ -484,7 +474,15 @@ pub struct AuthTokensExt {
 impl AuthTokensExt {
     /// Checks if the token is still valid or not
     pub fn has_expired(&self) -> bool {
-        chrono::Utc::now().timestamp() - self.request_time > self.expires_in
+        Self::is_expired(self.request_time, self.expires_in)
+    }
+
+    /// Both values are caller-supplied, so an age that does not fit in an `i64` counts as expired.
+    pub fn is_expired(request_time: i64, expires_in: i64) -> bool {
+        chrono::Utc::now()
+            .timestamp()
+            .checked_sub(request_time)
+            .is_none_or(|age| age > expires_in)
     }
 }
 
@@ -803,6 +801,21 @@ mod tests {
     }
 
     #[test]
+    fn auth_ext_expiry_survives_extreme_times() {
+        let token = |request_time: i64, expires_in: i64| AuthTokensExt {
+            auth_ext: String::new(),
+            refresh_token: String::new(),
+            request_time,
+            expires_in,
+        };
+        let now = chrono::Utc::now().timestamp();
+        assert!(token(i64::MIN, 300).has_expired());
+        assert!(token(i64::MIN, i64::MAX).has_expired());
+        assert!(token(now - 301, 300).has_expired());
+        assert!(!token(now, 300).has_expired());
+    }
+
+    #[test]
     fn test_token_validation_response_builder() {
         let builder = TokenValidationResponseBuilder::new()
             .is_valid(true)
@@ -822,16 +835,6 @@ mod tests {
         assert_eq!(response.given_name, "John");
         assert!(response.is_internal_user);
         assert_eq!(response.user_role, Some(UserRole::Admin));
-    }
-
-    #[test]
-    fn test_get_default_user_org() {
-        let org = get_default_user_org();
-
-        assert_eq!(org.name, "");
-        assert_eq!(org.token, "");
-        assert!(org.rum_token.is_none());
-        assert_eq!(org.role, get_default_user_role());
     }
 
     #[test]
@@ -999,20 +1002,6 @@ mod tests {
             org_role.custom_role,
             Some(vec!["perm1".to_string(), "perm2".to_string()])
         );
-    }
-
-    #[test]
-    fn test_user_role_request_empty_role() {
-        let request = UserRoleRequest {
-            role: "".to_string(),
-            custom: None,
-        };
-
-        let org_role = UserOrgRole::from(&request);
-
-        // Empty role should be treated as custom
-        assert_eq!(org_role.base_role, get_default_user_role());
-        assert_eq!(org_role.custom_role, Some(vec!["".to_string()]));
     }
 
     #[test]

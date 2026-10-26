@@ -6,6 +6,7 @@ const testLogger = require('./test-logger.js');
 const metricsIngestion = require('./metrics-ingestion.js');
 const { ingestTraces } = require('./trace-ingestion.js');
 const { ingestRumErrors } = require('./rum-error-ingestion.js');
+const { ingestBase } = require('./ingest-url.js');
 
 /**
  * Global setup for all tests - handles authentication and test data ingestion
@@ -128,6 +129,11 @@ async function globalSetup() {
       testLogger.info('Starting RUM error data ingestion');
       await ingestRumErrors(page, 3); // Ingest 3 different error types
       testLogger.info('RUM error data ingestion completed');
+
+      // Saved again as a browser that has seen the org with data holds it, so the one-time first-data banner never lands mid-test.
+      await recordFirstDataSeen(page);
+      await context.storageState({ path: authFile });
+      testLogger.info('Storage state saved after the first visit with data', { authFile });
     }
     
   } catch (error) {
@@ -140,6 +146,26 @@ async function globalSetup() {
   }
   
   testLogger.info('Global setup completed successfully - ready for test execution');
+}
+
+/**
+ * Reloads the app until the first-data notice records that the org has data.
+ * @param {import('@playwright/test').Page} page
+ */
+async function recordFirstDataSeen(page) {
+  const key = `o2.onboarding.firstData.${process.env["ORGNAME"]}`;
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    const recorded = await page
+      .waitForFunction((k) => JSON.parse(localStorage.getItem(k) || 'null')?.hadData === true, key, { timeout: 15000 })
+      .then(() => true)
+      .catch(() => false);
+    if (recorded) {
+      testLogger.info('First-data visit recorded', { attempt });
+      return;
+    }
+  }
+  testLogger.warn('First-data visit not recorded; tests may still see the first-data banner', { key });
 }
 
 /**
@@ -161,7 +187,7 @@ async function performGlobalIngestion(page) {
   const baseUrl = (process.env.INGESTION_URL || process.env.ZO_BASE_URL || 'http://localhost:5080').replace(/\/+$/, '');
   let response;
   try {
-    response = await page.request.post(`${baseUrl}/api/${orgId}/${streamName}/_json`, {
+    response = await page.request.post(`${ingestBase(baseUrl)}/api/${orgId}/${streamName}/_json`, {
       headers: headers,
       data: logsdata
     });
@@ -195,7 +221,7 @@ async function performGlobalIngestion(page) {
     testLogger.error('Data ingestion failed', {
       status: responseStatus,
       response: responseData,
-      url: `${baseUrl}/api/${orgId}/${streamName}/_json`,
+      url: `${ingestBase(baseUrl)}/api/${orgId}/${streamName}/_json`,
       orgId,
       streamName
     });

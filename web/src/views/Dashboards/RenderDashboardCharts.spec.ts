@@ -14,12 +14,18 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { shallowMount } from "@vue/test-utils";
+import { flushPromises, shallowMount } from "@vue/test-utils";
+import { installFakeIntersectionObserver } from "@/test/unit/helpers/intersectionObserverFake";
 import { nextTick, ref } from "vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
+import DateTime from "@/components/DateTime.vue";
+import { GridStack } from "gridstack";
+import { updateDashboard } from "../../utils/commons";
+import { LIVE_COMMIT_DEBOUNCE_MS } from "@/composables/dashboard/useVariablesManager";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import searchService from "@/services/search";
 
 // Stub ODialog so tests are deterministic (no Portal/Teleport) and so we
 // can drive open/close + button click emits without touching the real
@@ -71,10 +77,16 @@ const mockGridStackInstance = {
   destroy: vi.fn(),
   removeAll: vi.fn(),
   makeWidget: vi.fn(),
+  batchUpdate: vi.fn(),
   getGridItems: vi.fn().mockReturnValue([]),
   float: vi.fn(),
   setAnimation: vi.fn(),
   setStatic: vi.fn(),
+  load: vi.fn(),
+  getRow: vi.fn().mockReturnValue(60),
+  getCellHeight: vi.fn().mockReturnValue(17),
+  cellHeight: vi.fn(),
+  engine: { nodes: [] as any[] },
 };
 
 vi.mock("gridstack", () => ({
@@ -86,8 +98,26 @@ vi.mock("gridstack", () => ({
 vi.mock("gridstack/dist/gridstack.min.css", () => ({}));
 
 // Mock composables
-const mockNotifications = { showPositiveNotification: vi.fn(), showErrorNotification: vi.fn() };
-const mockLoading = { isLoading: ref(false) };
+const mockNotifications = {
+  showPositiveNotification: vi.fn(),
+  showErrorNotification: vi.fn(),
+};
+const mockOpenConflict = vi.fn();
+vi.mock("@/composables/dashboard/useDashboardSaveConflict", () => ({
+  useDashboardSaveConflict: () => ({
+    isConflict: (error: any) => error?.response?.status === 409,
+    openConflict: mockOpenConflict,
+  }),
+}));
+// `run` is the real save body handed to useLoading, so the save path can be driven directly.
+const mockLoading: {
+  isLoading: any;
+  execute: any;
+  run?: (change?: string) => Promise<boolean>;
+} = {
+  isLoading: ref(false),
+  execute: vi.fn(),
+};
 const mockDebouncer = { setImmediateValue: vi.fn(), setDebounceValue: vi.fn() };
 
 vi.mock("@/composables/useNotifications", () => ({
@@ -95,7 +125,10 @@ vi.mock("@/composables/useNotifications", () => ({
 }));
 
 vi.mock("@/composables/useLoading", () => ({
-  useLoading: () => mockLoading,
+  useLoading: (fn: () => Promise<boolean>) => {
+    mockLoading.run = fn;
+    return mockLoading;
+  },
 }));
 
 vi.mock("../../utils/dashboard/useCustomDebouncer", () => ({
@@ -103,6 +136,10 @@ vi.mock("../../utils/dashboard/useCustomDebouncer", () => ({
 }));
 
 // Mock utils
+vi.mock("@/services/search", () => ({
+  default: { search: vi.fn() },
+}));
+
 vi.mock("../../utils/commons", () => ({
   checkIfVariablesAreLoaded: vi.fn().mockReturnValue(false),
   updateDashboard: vi.fn().mockResolvedValue(true),
@@ -236,22 +273,145 @@ describe("RenderDashboardCharts", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should handle GridStack change events for drag/drop", async () => {
-      wrapper = createWrapper();
-      await nextTick();
-      expect(wrapper.exists()).toBe(true);
-    });
+    describe("layout modes", () => {
+      const dashboardWithPanel = () => ({
+        ...defaultProps.dashboardData,
+        tabs: [
+          {
+            tabId: "default",
+            name: "Default Tab",
+            panels: [
+              {
+                id: "panel-1",
+                title: "Panel 1",
+                type: "line",
+                layout: { x: 0, y: 0, w: 96, h: 18, i: "panel-1" },
+                queries: [],
+              },
+            ],
+          },
+        ],
+      });
 
-    it("should handle GridStack resize events", async () => {
-      wrapper = createWrapper();
-      await nextTick();
-      expect(wrapper.exists()).toBe(true);
-    });
+      const lastChangeHandler = () => {
+        const calls = mockGridStackInstance.on.mock.calls.filter((c: any[]) => c[0] === "change");
+        return calls[calls.length - 1][1];
+      };
 
-    it("should update panel layouts when grid items change", async () => {
-      wrapper = createWrapper();
-      await nextTick();
-      expect(wrapper.exists()).toBe(true);
+      const mountWithPanel = async (props: Record<string, unknown> = {}) => {
+        wrapper = createWrapper({ dashboardData: dashboardWithPanel(), ...props });
+        await flushPromises();
+      };
+
+      const panelLayout = () => wrapper.props("dashboardData").tabs[0].panels[0].layout;
+
+      beforeEach(() => {
+        mockLoading.isLoading.value = false;
+        mockGridStackInstance.engine.nodes = [];
+      });
+
+      it("saves a drag at once in live mode", async () => {
+        await mountWithPanel();
+        lastChangeHandler()({}, [{ id: "panel-1", x: 10, y: 2, w: 50, h: 20 }]);
+
+        expect(panelLayout()).toMatchObject({ x: 10, y: 2, w: 50, h: 20 });
+        expect(mockLoading.execute).toHaveBeenCalledTimes(1);
+        expect(wrapper.emitted("layoutChange")).toBeUndefined();
+      });
+
+      it("neither saves nor emits a draft step in view mode", async () => {
+        await mountWithPanel({ layoutMode: "view" });
+        lastChangeHandler()({}, [{ id: "panel-1", x: 10, y: 2, w: 50, h: 20 }]);
+
+        expect(mockLoading.execute).not.toHaveBeenCalled();
+        expect(wrapper.emitted("layoutChange")).toBeUndefined();
+      });
+
+      it("writes a resize to the draft and emits layoutChange without saving in edit mode", async () => {
+        await mountWithPanel({ layoutMode: "edit" });
+        lastChangeHandler()({}, [{ id: "panel-1", x: 0, y: 0, w: 120, h: 30 }]);
+
+        expect(panelLayout()).toMatchObject({ w: 120, h: 30 });
+        expect(wrapper.emitted("layoutChange")).toHaveLength(1);
+        expect(mockLoading.execute).not.toHaveBeenCalled();
+      });
+
+      it("locks and unlocks the grid with setStatic only, never rebuilding it", async () => {
+        await mountWithPanel({ layoutMode: "view" });
+        expect(vi.mocked(GridStack.init).mock.calls.at(-1)?.[0]).toMatchObject({
+          staticGrid: true,
+        });
+        const initCount = vi.mocked(GridStack.init).mock.calls.length;
+        mockGridStackInstance.destroy.mockClear();
+
+        await wrapper.setProps({ layoutMode: "edit" });
+        await flushPromises();
+        expect(mockGridStackInstance.setStatic).toHaveBeenLastCalledWith(false);
+
+        await wrapper.setProps({ layoutMode: "view" });
+        await flushPromises();
+        expect(mockGridStackInstance.setStatic).toHaveBeenLastCalledWith(true);
+
+        expect(vi.mocked(GridStack.init).mock.calls.length).toBe(initCount);
+        expect(mockGridStackInstance.destroy).not.toHaveBeenCalled();
+      });
+
+      it.each(["view", "edit"] as const)(
+        "builds the %s-mode grid on mount through makeWidget, as the rebuild after a delete does",
+        async (layoutMode) => {
+          mockGridStackInstance.makeWidget.mockClear();
+          await mountWithPanel({ layoutMode });
+
+          expect(mockGridStackInstance.makeWidget).toHaveBeenCalledWith(
+            wrapper.find('[gs-id="panel-1"]').element,
+            expect.objectContaining({ id: "panel-1", x: 0, y: 0, w: 96, h: 18 }),
+          );
+        },
+      );
+
+      it("marks the grid for always-on resize handles only in edit mode", async () => {
+        await mountWithPanel({ layoutMode: "view" });
+        expect(wrapper.find(".grid-stack").classes()).not.toContain("layout-editing");
+
+        await wrapper.setProps({ layoutMode: "edit" });
+        expect(wrapper.find(".grid-stack").classes()).toContain("layout-editing");
+      });
+
+      it("does not rebuild a draft-mode grid when a save finishes", async () => {
+        await mountWithPanel({ layoutMode: "edit" });
+        mockGridStackInstance.destroy.mockClear();
+
+        mockLoading.isLoading.value = true;
+        await flushPromises();
+        mockLoading.isLoading.value = false;
+        await flushPromises();
+
+        expect(mockGridStackInstance.destroy).not.toHaveBeenCalled();
+      });
+
+      it("moves the widgets to the panel data and reads collisions back on syncGridToLayout", async () => {
+        await mountWithPanel({ layoutMode: "edit" });
+        mockGridStackInstance.engine.nodes = [{ id: "panel-1", x: 0, y: 6, w: 96, h: 18 }];
+
+        wrapper.vm.syncGridToLayout();
+
+        expect(mockGridStackInstance.load).toHaveBeenCalledWith(
+          [{ id: "panel-1", x: 0, y: 0, w: 96, h: 18 }],
+          false,
+        );
+        expect(panelLayout()).toMatchObject({ y: 6 });
+        expect(wrapper.emitted("layoutChange")).toBeUndefined();
+      });
+
+      it("passes the mode to the tab list and re-emits its reorder as a layout change", async () => {
+        await mountWithPanel({ layoutMode: "edit", showTabs: true });
+        const tabList = wrapper.findComponent({ name: "TabList" });
+
+        expect(tabList.props("layoutMode")).toBe("edit");
+        tabList.vm.$emit("layoutChange");
+
+        expect(wrapper.emitted("layoutChange")).toHaveLength(1);
+      });
     });
 
     it("should disable/enable grid based on viewOnly prop", async () => {
@@ -331,6 +491,36 @@ describe("RenderDashboardCharts", () => {
       };
       wrapper = createWrapper({ dashboardData: dashboardWithNoPanels });
       expect(wrapper.exists()).toBe(true);
+    });
+
+    it("registers and mounts a panel that joins an already-built tab", async () => {
+      const io = installFakeIntersectionObserver({ autoVisible: true });
+      try {
+        const panel = (id: string) => ({
+          id,
+          title: id,
+          type: "line",
+          layout: { x: 0, y: 0, w: 6, h: 4, i: id },
+          queries: [],
+        });
+        const dashboard = (ids: string[]) => ({
+          ...defaultProps.dashboardData,
+          tabs: [{ tabId: "default", name: "Default Tab", panels: ids.map(panel) }],
+        });
+        wrapper = createWrapper({ dashboardData: dashboard(["panel-a"]) });
+        await flushPromises();
+        await wrapper.setProps({ dashboardData: dashboard(["panel-a", "panel-b"]) });
+        await flushPromises();
+        await vi.waitFor(() => expect(wrapper.vm.shouldMountPanel("panel-b")).toBe(true));
+        // Unregistered, the item has no grid size and collapses at tablet and desktop widths.
+        const added = wrapper.find('[gs-id="panel-b"]').element;
+        expect(mockGridStackInstance.makeWidget).toHaveBeenCalledWith(
+          added,
+          expect.objectContaining({ id: "panel-b" }),
+        );
+      } finally {
+        io.restore();
+      }
     });
 
     it("should pass correct props to PanelContainer components", () => {
@@ -457,6 +647,482 @@ describe("RenderDashboardCharts", () => {
     });
   });
 
+  describe("variable commits", () => {
+    const chainDashboard = () => ({
+      ...defaultProps.dashboardData,
+      variables: {
+        showDynamicFilters: false,
+        list: [
+          { name: "env", type: "custom", scope: "global", value: "prod", options: [] },
+          {
+            name: "service",
+            type: "query_values",
+            scope: "global",
+            query_data: { field: "service", filter: [{ filter: "env=$env" }] },
+          },
+          {
+            name: "pod",
+            type: "query_values",
+            scope: "global",
+            query_data: { field: "pod", filter: [{ filter: "service=$service" }] },
+          },
+        ],
+      },
+    });
+
+    const mountWith = (provide: Record<string, any> = {}) =>
+      shallowMount(RenderDashboardCharts, {
+        props: { ...defaultProps, dashboardData: chainDashboard() },
+        global: {
+          plugins: [i18n, store, router],
+          provide,
+          mocks: {
+            $t: (key) => key,
+            $route: { params: {}, query: {} },
+            $router: { push: vi.fn(), replace: vi.fn() },
+          },
+          stubs: { ODialog: ODialogStub },
+        },
+      });
+
+    const loaded = (v: any, value: any) => {
+      v.value = value;
+      v.isLoading = false;
+      v.isVariableLoadingPending = false;
+      v.isVariablePartialLoaded = true;
+    };
+
+    it("first load commits once, after the whole variable chain has loaded", async () => {
+      wrapper = mountWith();
+      await flushPromises();
+      const manager = wrapper.vm.getVariablesManager();
+      const commits = vi.fn();
+      manager.onAutoCommit(commits);
+      const [env, service, pod] = manager.variablesData.global;
+
+      loaded(env, "prod");
+      loaded(service, "api");
+      pod.isVariableLoadingPending = true;
+      await flushPromises();
+      expect(commits).not.toHaveBeenCalled();
+      expect(manager.committedVariablesData.global[1].value).not.toBe("api");
+
+      loaded(pod, "api-1");
+      await flushPromises();
+      expect(commits).toHaveBeenCalledTimes(1);
+      expect(manager.committedVariablesData.global.map((v: any) => v.value)).toEqual([
+        "prod",
+        "api",
+        "api-1",
+      ]);
+    });
+
+    it("follows the dashboard's Auto Run state", async () => {
+      const autoRun = ref(true);
+      wrapper = mountWith({ dashboardAutoRun: autoRun });
+      const manager = wrapper.vm.getVariablesManager();
+      expect(manager.isLiveMode.value).toBe(true);
+
+      autoRun.value = false;
+      await flushPromises();
+      expect(manager.isLiveMode.value).toBe(false);
+    });
+
+    it("an Auto Run apply drops a panel's own refresh snapshot", async () => {
+      wrapper = mountWith({ dashboardAutoRun: ref(true) });
+      await flushPromises();
+      const manager = wrapper.vm.getVariablesManager();
+      const [env, service, pod] = manager.variablesData.global;
+      loaded(env, "prod");
+      loaded(service, "api");
+      loaded(pod, "api-1");
+      await flushPromises();
+      const podFor = (panelId: string) =>
+        wrapper.vm.getMergedVariablesForPanel(panelId).values.find((v: any) => v.name === "pod")
+          ?.value;
+
+      await wrapper.vm.refreshPanelRequest("panel-1");
+      expect(podFor("panel-1")).toBe("api-1");
+
+      manager.updateVariableValue("pod", "global", undefined, undefined, "api-2");
+      await new Promise((r) => setTimeout(r, LIVE_COMMIT_DEBOUNCE_MS + 20));
+      await flushPromises();
+
+      expect(podFor("panel-1")).toBe("api-2");
+    });
+
+    it("stays in Refresh-to-apply mode when no Auto Run state is provided", () => {
+      wrapper = mountWith();
+      expect(wrapper.vm.getVariablesManager().isLiveMode.value).toBe(false);
+    });
+  });
+
+  describe("panel time pickers", () => {
+    let io: ReturnType<typeof installFakeIntersectionObserver>;
+    let autoRun: ReturnType<typeof ref<boolean>>;
+    let replaceSpy: any;
+
+    const PanelContainerStub = {
+      name: "PanelContainer",
+      props: ["data", "isTimeRangeWaiting"],
+      emits: ["refreshPanelRequest"],
+      template: '<div data-test="panel-container-stub"><slot name="panel-variables" /></div>',
+    };
+
+    const RELATIVE_HOUR = { type: "relative", relativeTimePeriod: "1h" };
+    const timedDashboard = (panelTimeRange: any = RELATIVE_HOUR) => ({
+      ...defaultProps.dashboardData,
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default Tab",
+          panels: [
+            {
+              id: "P1",
+              title: "P1",
+              type: "line",
+              layout: { x: 0, y: 0, w: 6, h: 4, i: "P1" },
+              queries: [],
+              config: {
+                panel_time_enabled: true,
+                panel_time_range: panelTimeRange,
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    const mountWithPanelPicker = async (panelTimeRange?: any) => {
+      wrapper = shallowMount(RenderDashboardCharts, {
+        props: { ...defaultProps, dashboardData: timedDashboard(panelTimeRange) },
+        global: {
+          plugins: [i18n, store, router],
+          provide: { dashboardAutoRun: autoRun },
+          stubs: {
+            ODialog: ODialogStub,
+            PanelContainer: PanelContainerStub,
+            DateTimePickerDashboard: false,
+            DateTime: false,
+          },
+        },
+      });
+      await flushPromises();
+      await vi.waitFor(() => expect(wrapper.vm.shouldMountPanel("P1")).toBe(true));
+      await flushPromises();
+    };
+
+    const panel = () => wrapper.findComponent({ name: "PanelContainer" });
+    const dateTime = () => wrapper.findComponent({ name: "DateTimePickerDashboard" });
+    const pickPreset = async (unit: string, value: number) => {
+      dateTime().findComponent(DateTime).vm.setRelativeDate(unit, value);
+      await flushPromises();
+    };
+    const panelRefreshRequests = () =>
+      (wrapper.emitted("refreshPanelRequest") ?? []).filter((args: any[]) => args[0] === "P1");
+
+    beforeEach(() => {
+      io = installFakeIntersectionObserver({ autoVisible: true });
+      autoRun = ref(false);
+      store.state.timezone = "UTC";
+      replaceSpy = vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
+    });
+
+    afterEach(() => {
+      replaceSpy.mockRestore();
+      io.restore();
+    });
+
+    it("renders the panel's own picker without an Apply button", async () => {
+      await mountWithPanelPicker();
+
+      expect(dateTime().props("autoApplyDashboard")).toBe(true);
+      expect(wrapper.vm.getPanelTimeGate("P1").applied.value.relativeTimePeriod).toBe("1h");
+    });
+
+    it("keeps a picked range waiting with Auto Run off and marks only that panel", async () => {
+      await mountWithPanelPicker();
+
+      await pickPreset("h", 6);
+
+      expect(wrapper.vm.getPanelTimeGate("P1").picked.value.relativeTimePeriod).toBe("6h");
+      expect(wrapper.vm.panelTimeValues.P1.relativeTimePeriod).toBe("1h");
+      expect(panel().props("isTimeRangeWaiting")).toBe(true);
+      expect(panelRefreshRequests()).toHaveLength(0);
+      expect(replaceSpy).not.toHaveBeenCalled();
+    });
+
+    it("applies the waiting range when the panel's own refresh is clicked", async () => {
+      await mountWithPanelPicker();
+      await pickPreset("h", 6);
+
+      panel().vm.$emit("refreshPanelRequest", "P1", false);
+      await flushPromises();
+
+      expect(wrapper.vm.panelTimeValues.P1.relativeTimePeriod).toBe("6h");
+      expect(replaceSpy).toHaveBeenCalledWith({
+        query: expect.objectContaining({ "pt-period.P1": "6h" }),
+      });
+      expect(panelRefreshRequests()).toEqual([["P1", false]]);
+      expect(panel().props("isTimeRangeWaiting")).toBe(false);
+    });
+
+    it("applies the waiting range on the dashboard Refresh", async () => {
+      await mountWithPanelPicker();
+      await pickPreset("h", 6);
+
+      await wrapper.vm.syncAllPanelDateTimePickers();
+      await flushPromises();
+
+      expect(wrapper.vm.panelTimeValues.P1.relativeTimePeriod).toBe("6h");
+      expect(panel().props("isTimeRangeWaiting")).toBe(false);
+    });
+
+    it("clears the marker without a reload when the applied range is picked again", async () => {
+      await mountWithPanelPicker();
+      await pickPreset("h", 6);
+
+      await pickPreset("h", 1);
+
+      expect(panel().props("isTimeRangeWaiting")).toBe(false);
+      expect(panelRefreshRequests()).toHaveLength(0);
+      expect(replaceSpy).not.toHaveBeenCalled();
+    });
+
+    it("applies a preset at once and refreshes only that panel when Auto Run is on", async () => {
+      autoRun.value = true;
+      await mountWithPanelPicker();
+
+      await pickPreset("h", 6);
+
+      expect(wrapper.vm.panelTimeValues.P1.relativeTimePeriod).toBe("6h");
+      expect(panelRefreshRequests()).toEqual([["P1", false]]);
+      expect(panel().props("isTimeRangeWaiting")).toBe(false);
+    });
+
+    it("applies a waiting range when Auto Run is turned on", async () => {
+      await mountWithPanelPicker();
+      await pickPreset("h", 6);
+
+      autoRun.value = true;
+      await flushPromises();
+
+      expect(wrapper.vm.panelTimeValues.P1.relativeTimePeriod).toBe("6h");
+      expect(panelRefreshRequests()).toEqual([["P1", false]]);
+    });
+
+    it.each([
+      ["off", false],
+      ["on", true],
+    ])(
+      "puts the panel picker back on the applied range when it closes on a broken range (Auto Run %s)",
+      async (_label, isOn) => {
+        autoRun.value = isOn;
+        await mountWithPanelPicker();
+        const realPicker = dateTime().findComponent(DateTime);
+
+        realPicker.vm.onMenuOpenChange(true);
+        realPicker.vm.selectedType = "absolute";
+        realPicker.vm.selectedDate = { from: "2026/10/13", to: "2026/10/13" };
+        realPicker.vm.selectedTime = { startTime: "18:50:30", endTime: "18:25:22" };
+        await flushPromises();
+        expect(realPicker.vm.getDisplayValue).toBe("2026/10/13 18:50:30 - 2026/10/13 18:25:22");
+
+        realPicker.vm.onMenuOpenChange(false);
+        await flushPromises();
+
+        expect(realPicker.vm.getDisplayValue).toBe("Past 1 Hour");
+        expect(wrapper.vm.getPanelTimeGate("P1").picked.value.relativeTimePeriod).toBe("1h");
+        expect(panel().props("isTimeRangeWaiting")).toBe(false);
+        expect(panelRefreshRequests()).toHaveLength(0);
+        expect(replaceSpy).not.toHaveBeenCalled();
+      },
+    );
+
+    it("puts an absolute panel range back in the picker when it closes on a broken one", async () => {
+      const start = Date.UTC(2026, 9, 13, 10, 0, 0) * 1000;
+      await mountWithPanelPicker({
+        type: "absolute",
+        startTime: start,
+        endTime: start + 30 * 60e6,
+      });
+      const realPicker = dateTime().findComponent(DateTime);
+      const appliedLabel = "2026/10/13 10:00:00 - 2026/10/13 10:30:00";
+      expect(realPicker.vm.getDisplayValue).toBe(appliedLabel);
+
+      realPicker.vm.onMenuOpenChange(true);
+      realPicker.vm.selectedTime = { startTime: "18:50:30", endTime: "18:25:22" };
+      await flushPromises();
+      expect(realPicker.vm.getDisplayValue).toBe("2026/10/13 18:50:30 - 2026/10/13 18:25:22");
+
+      realPicker.vm.onMenuOpenChange(false);
+      await flushPromises();
+
+      expect(realPicker.vm.getDisplayValue).toBe(appliedLabel);
+      expect(panel().props("isTimeRangeWaiting")).toBe(false);
+      expect(panelRefreshRequests()).toHaveLength(0);
+      expect(replaceSpy).not.toHaveBeenCalled();
+    });
+
+    it("does not reload the panel when its picker reports its starting range", async () => {
+      autoRun.value = true;
+      await mountWithPanelPicker();
+
+      expect(panelRefreshRequests()).toHaveLength(0);
+      expect(replaceSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Kiosk", () => {
+    const kioskDashboard = () => ({
+      ...defaultProps.dashboardData,
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default Tab",
+          panels: [
+            {
+              id: "panel-1",
+              title: "Panel 1",
+              type: "line",
+              layout: { x: 0, y: 0, w: 96, h: 60, i: "panel-1" },
+              queries: [],
+            },
+          ],
+        },
+      ],
+    });
+
+    let clientHeight: PropertyDescriptor | undefined;
+    beforeEach(() => {
+      clientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientHeight");
+      Object.defineProperty(HTMLElement.prototype, "clientHeight", {
+        configurable: true,
+        get: () => 908,
+      });
+      mockGridStackInstance.cellHeight.mockClear();
+    });
+    afterEach(() => {
+      if (clientHeight) Object.defineProperty(HTMLElement.prototype, "clientHeight", clientHeight);
+    });
+
+    const twoTabs = () => ({
+      ...kioskDashboard(),
+      tabs: [...kioskDashboard().tabs, { tabId: "beta", name: "Beta", panels: [] }],
+    });
+    const controls = () => wrapper.find('[data-test="dashboard-kiosk-controls"]');
+
+    it("puts the tab bar and the variables in one compact row on a wall screen", async () => {
+      wrapper = createWrapper({
+        showTabs: true,
+        kiosk: true,
+        viewOnly: true,
+        dashboardData: {
+          ...twoTabs(),
+          variables: { list: [{ name: "region", type: "constant", value: "eu" }] },
+        },
+      });
+      await flushPromises();
+      expect(controls().classes()).toEqual(
+        expect.arrayContaining(["flex", "min-h-9", "items-center", "py-1"]),
+      );
+      expect(wrapper.find(".render-dashboard-charts-container").classes()).toContain("pt-0");
+
+      const tabs = wrapper.findComponent({ name: "TabList" });
+      expect(tabs.classes()).toEqual(expect.arrayContaining(["order-first", "flex-1"]));
+      expect(tabs.classes()).not.toContain("mt-2");
+      expect(tabs.props("viewOnly")).toBe(true);
+
+      const selector = wrapper.find('[data-test="global-variables-selector"]');
+      expect(selector.element.parentElement).toBe(controls().element);
+      expect(selector.classes()).toContain("mt-0!");
+    });
+
+    it("drops a lone tab from the row but keeps the variables", async () => {
+      wrapper = createWrapper({
+        showTabs: true,
+        kiosk: true,
+        dashboardData: {
+          ...kioskDashboard(),
+          variables: { list: [{ name: "region", type: "constant", value: "eu" }] },
+        },
+      });
+      await flushPromises();
+      expect(controls().classes()).toContain("flex");
+      expect(wrapper.findComponent({ name: "TabList" }).classes()).toContain("hidden");
+    });
+
+    it("hides the row for a single-tab dashboard with no visible variables", async () => {
+      wrapper = createWrapper({
+        showTabs: true,
+        kiosk: true,
+        dashboardData: {
+          ...kioskDashboard(),
+          variables: {
+            list: [{ name: "hidden", type: "constant", value: "x", hideOnDashboard: true }],
+          },
+        },
+      });
+      await flushPromises();
+      expect(controls().classes()).toEqual(["hidden"]);
+    });
+
+    it("leaves the normal layout as it was: a contents wrapper, spaced tab bar", async () => {
+      wrapper = createWrapper({ showTabs: true, dashboardData: twoTabs() });
+      await flushPromises();
+      expect(controls().classes()).toEqual(["contents"]);
+      expect(wrapper.findComponent({ name: "TabList" }).classes()).toContain("mt-2");
+      expect(wrapper.find(".render-dashboard-charts-container").classes()).toContain("pt-2");
+    });
+
+    it("shows the one-row bar with its values in a playlist slide, but out of interaction", async () => {
+      wrapper = createWrapper({
+        showTabs: true,
+        kiosk: true,
+        viewOnly: true,
+        readOnlySelectors: true,
+        dashboardData: {
+          ...kioskDashboard(),
+          variables: { list: [{ name: "region", type: "constant", value: "eu" }] },
+        },
+      });
+      await flushPromises();
+      const row = wrapper.find('[data-test="dashboard-kiosk-controls"]');
+      expect(row.classes()).not.toContain("hidden");
+      expect(row.attributes("inert")).toBeDefined();
+      expect(row.attributes("data-read-only")).toBe("true");
+      expect(row.find('[data-test="global-variables-selector"]').exists()).toBe(true);
+    });
+
+    it("keeps the plain TV mode bar interactive", async () => {
+      wrapper = createWrapper({
+        kiosk: true,
+        dashboardData: {
+          ...kioskDashboard(),
+          variables: { list: [{ name: "region", type: "constant", value: "eu" }] },
+        },
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="dashboard-kiosk-controls"]').attributes("inert")).toBe(
+        undefined,
+      );
+    });
+
+    it("scales the cell height so every row fits when fit is on", async () => {
+      wrapper = createWrapper({ dashboardData: kioskDashboard(), kiosk: true, fitToScreen: true });
+      await flushPromises();
+      expect(mockGridStackInstance.cellHeight).toHaveBeenCalledWith(15);
+      expect(wrapper.classes()).toContain("overflow-hidden");
+    });
+
+    it("never resizes cells on a normal dashboard", async () => {
+      wrapper = createWrapper({ dashboardData: kioskDashboard() });
+      await flushPromises();
+      expect(mockGridStackInstance.cellHeight).not.toHaveBeenCalled();
+      expect(wrapper.classes()).toContain("overflow-y-auto");
+    });
+  });
+
   describe("Tab Management", () => {
     it("should render TabList when showTabs is true", () => {
       wrapper = createWrapper({ showTabs: true });
@@ -495,9 +1161,8 @@ describe("RenderDashboardCharts", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    // Variables scope the ACTIVE tab, so rendering them above the strip made them
-    // read as page chrome and moved the tab bar whenever their height changed.
-    it("renders the global variables strip BELOW the tab list, not above it", () => {
+    // Global variables apply dashboard-wide, so the strip sits above the tab bar.
+    it("renders the global variables strip ABOVE the tab list, not below it", () => {
       wrapper = createWrapper({
         showTabs: true,
         dashboardData: {
@@ -515,7 +1180,7 @@ describe("RenderDashboardCharts", () => {
 
       expect(tabsAt).toBeGreaterThan(-1);
       expect(varsAt).toBeGreaterThan(-1);
-      expect(tabsAt).toBeLessThan(varsAt);
+      expect(varsAt).toBeLessThan(tabsAt);
     });
   });
 
@@ -678,6 +1343,71 @@ describe("RenderDashboardCharts", () => {
     });
   });
 
+  describe("saveDashboardData", () => {
+    it("returns true and confirms the save", async () => {
+      wrapper = createWrapper();
+      vi.mocked(updateDashboard).mockResolvedValueOnce(true);
+
+      await expect(mockLoading.run!()).resolves.toBe(true);
+      expect(mockNotifications.showPositiveNotification).toHaveBeenCalled();
+      expect(wrapper.emitted("refresh")).toBeUndefined();
+    });
+
+    it("returns false and opens the save-conflict dialog with my layout on a 409, without reloading", async () => {
+      mockOpenConflict.mockClear();
+      wrapper = createWrapper();
+      vi.mocked(updateDashboard).mockRejectedValueOnce({
+        response: { status: 409, data: { message: "Dashboard was changed elsewhere" } },
+      });
+
+      await expect(mockLoading.run!()).resolves.toBe(false);
+      expect(mockOpenConflict).toHaveBeenCalledWith(
+        expect.objectContaining({
+          dashboardId: wrapper.props("dashboardData").dashboardId,
+          mine: wrapper.props("dashboardData"),
+          change: "Moved or resized panels",
+        }),
+      );
+      expect(mockNotifications.showErrorNotification).not.toHaveBeenCalled();
+      expect(wrapper.emitted("refresh")).toBeUndefined();
+    });
+
+    it("names the caller's change in the conflict dialog when one is passed", async () => {
+      mockOpenConflict.mockClear();
+      wrapper = createWrapper({ layoutMode: "edit" });
+      vi.mocked(updateDashboard).mockRejectedValueOnce({ response: { status: 409 } });
+
+      await expect(mockLoading.run!("Edited the dashboard JSON")).resolves.toBe(false);
+      expect(mockOpenConflict).toHaveBeenCalledWith(
+        expect.objectContaining({ change: "Edited the dashboard JSON" }),
+      );
+    });
+
+    it("returns false and shows an error on a network failure", async () => {
+      wrapper = createWrapper();
+      vi.mocked(updateDashboard).mockRejectedValueOnce(new Error("Network Error"));
+
+      await expect(mockLoading.run!()).resolves.toBe(false);
+      expect(mockNotifications.showErrorNotification).toHaveBeenCalledWith("Network Error", {
+        timeout: 2000,
+      });
+    });
+
+    it.each([
+      [
+        "a 409",
+        { response: { status: 409, data: { message: "Dashboard was changed elsewhere" } } },
+      ],
+      ["a network failure", new Error("Network Error")],
+    ])("keeps the layout draft without reloading on %s in edit mode", async (_label, error) => {
+      wrapper = createWrapper({ layoutMode: "edit" });
+      vi.mocked(updateDashboard).mockRejectedValueOnce(error);
+
+      await expect(mockLoading.run!()).resolves.toBe(false);
+      expect(wrapper.emitted("refresh")).toBeUndefined();
+    });
+  });
+
   describe("Dashboard Operations", () => {
     it("should handle dashboard saving with success", () => {
       wrapper = createWrapper();
@@ -828,6 +1558,52 @@ describe("RenderDashboardCharts", () => {
       wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
       wrapper.unmount();
+    });
+  });
+
+  describe("annotation sources", () => {
+    const withSource = {
+      ...defaultProps,
+      dashboardData: {
+        ...defaultProps.dashboardData,
+        annotationSources: [
+          {
+            id: "deploys",
+            name: "Deploys",
+            enabled: true,
+            mode: "sql",
+            streamType: "logs",
+            stream: "",
+            filters: [],
+            query: "SELECT _timestamp FROM deploys",
+            title: "deploy",
+          },
+        ],
+      },
+      currentTimeObj: {
+        __global: {
+          start_time: new Date(1_700_000_000_000_000),
+          end_time: new Date(1_700_003_600_000_000),
+        },
+      },
+    };
+
+    it("holds the all-loaded flag (and so report capture) until the sources settle", async () => {
+      let release: () => void = () => undefined;
+      vi.mocked(searchService.search).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            release = () => resolve({ data: { hits: [] } } as never);
+          }) as never,
+      );
+      wrapper = createWrapper(withSource);
+      await flushPromises();
+      expect(searchService.search).toHaveBeenCalledTimes(1);
+      expect(wrapper.emitted("panelsValues")?.at(-1)).not.toEqual([true]);
+
+      release();
+      await flushPromises();
+      expect(wrapper.emitted("panelsValues")?.at(-1)).toEqual([true]);
     });
   });
 });

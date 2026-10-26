@@ -169,6 +169,14 @@ export default class ChartTypeSelector {
       '[data-test="index-dropdown-stream"]'
     );
 
+    // An already-selected stream can be missing from the open option list (seen on alpha1), so there is nothing to click.
+    const trigger = this.page.locator('[data-test="index-dropdown-stream-trigger"]').first();
+    await streamInput.waitFor({ state: "visible", timeout: 10000 });
+    if ((await trigger.getAttribute("data-test-selected-value", { timeout: 5000 })) === streamName) {
+      testLogger.info(`selectStream: "${streamName}" is already the selected stream`);
+      return;
+    }
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         // Close any open dropdown first — click outside (ODropdown closes on outside click)
@@ -189,8 +197,9 @@ export default class ChartTypeSelector {
           .allTextContents();
         testLogger.debug(`Attempt ${attempt}: Looking for "${streamName}". Available options (${allOptions.length}): ${allOptions.slice(0, 10).join(', ')}`);
 
+        // Exact value match: hasText is a substring match, so "e2e_automate" also hit "e2e_automate1_w0".
         const streamOption = this.page
-          .locator('[data-test="index-dropdown-stream-option"]', { hasText: streamName })
+          .locator(`[data-test="index-dropdown-stream-option"][data-test-value="${streamName}"]`)
           .first();
 
         await streamOption.waitFor({ state: "visible", timeout: 15000 });
@@ -697,15 +706,34 @@ export default class ChartTypeSelector {
   async enterCustomSQL(query) {
     await this.queryEditor.waitFor({ state: "visible", timeout: 10000 });
     await this.queryEditor.click();
-    await this.page.keyboard.press("Escape"); // dismiss any open Monaco suggestion
+    await this.dismissSuggestionsIfOpen();
     await this.page.keyboard.press("Control+a");
     await this.page.keyboard.press("Delete");
     // Use insertText (single input event) instead of type (per-character keydown events)
     // to prevent Monaco's autocomplete from accepting suggestions mid-input and
     // mangling the SQL (e.g. replacing table names with function calls).
     await this.page.keyboard.insertText(query);
-    await this.page.keyboard.press("Escape"); // dismiss any suggestion triggered at end
+    await this.dismissSuggestionsIfOpen();
     testLogger.debug('Entered custom SQL query', { query });
+  }
+
+  // Escape with no suggest widget open moves focus out of the editor, so only press it when needed.
+  async dismissSuggestionsIfOpen() {
+    const open = await this.page.evaluate(() => {
+      const widget = document.querySelector(".monaco-editor .suggest-widget");
+      return !!widget && (widget.classList.contains("visible") || widget.classList.contains("focused"));
+    });
+    if (open) await this.page.keyboard.press("Escape");
+  }
+
+  /**
+   * Wait until the custom SQL has been parsed into these axis fields; Apply validates the panel state, which lags the editor.
+   * @param {string} xAlias
+   * @param {string} yAlias
+   */
+  async waitForCustomQueryAxes(xAlias, yAlias) {
+    await this.page.locator(`[data-test="dashboard-x-item-${xAlias}"]`).first().waitFor({ state: "attached", timeout: 15000 });
+    await this.page.locator(`[data-test="dashboard-y-item-${yAlias}"]`).first().waitFor({ state: "attached", timeout: 15000 });
   }
 
   /**

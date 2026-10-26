@@ -230,9 +230,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             />
                           </div>
                           <div class="flex min-w-0 flex-1 flex-col">
-                            <span class="text-text-secondary! cursor-pointer truncate text-sm">{{
+                            <OTruncatedText class="text-text-secondary! cursor-pointer text-sm">{{
                               stream.stream_name
-                            }}</span>
+                            }}</OTruncatedText>
                           </div>
                         </div>
                       </template>
@@ -285,11 +285,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <component v-else :is="outerGroup.icon" />
                         <span class="whitespace-nowrap">{{ t(outerGroup.labelKey) }}</span>
                       </div>
-                      <span
+                      <OTruncatedText
                         v-if="outerTabResourceName[outerGroup.id]"
-                        class="max-w-40 truncate text-xs leading-tight opacity-75"
-                        :title="outerTabResourceName[outerGroup.id]"
-                        >{{ outerTabResourceName[outerGroup.id] }}</span
+                        class="max-w-40 text-xs leading-tight opacity-75"
+                        >{{ outerTabResourceName[outerGroup.id] }}</OTruncatedText
                       >
                     </div>
                   </OTab>
@@ -424,6 +423,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <TraceDetails
               mode="embedded"
+              :shortcuts-active="shortcutsActive"
               :trace-id-prop="extractedTraceId || ''"
               :stream-name-prop="sortedTraceStreams[0] ? sortedTraceStreams[0].stream_name : ''"
               :span-list-prop="traceSpanList"
@@ -687,9 +687,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           />
                         </div>
                         <div class="flex min-w-0 flex-1 flex-col">
-                          <span class="text-text-secondary! cursor-pointer truncate text-sm">{{
+                          <OTruncatedText class="text-text-secondary! cursor-pointer text-sm">{{
                             stream.stream_name
-                          }}</span>
+                          }}</OTruncatedText>
                         </div>
                       </div>
                     </template>
@@ -742,11 +742,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <component v-else :is="outerGroup.icon" />
                       <span class="text-xs whitespace-nowrap">{{ t(outerGroup.labelKey) }}</span>
                     </div>
-                    <span
+                    <OTruncatedText
                       v-if="outerTabResourceName[outerGroup.id]"
-                      class="max-w-40 truncate text-xs leading-tight opacity-75"
-                      :title="outerTabResourceName[outerGroup.id]"
-                      >{{ outerTabResourceName[outerGroup.id] }}</span
+                      class="max-w-40 text-xs leading-tight opacity-75"
+                      >{{ outerTabResourceName[outerGroup.id] }}</OTruncatedText
                     >
                   </div>
                 </OTab>
@@ -866,6 +865,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <TraceDetails
             mode="embedded"
+            :shortcuts-active="shortcutsActive"
             :trace-id-prop="extractedTraceId || ''"
             :stream-name-prop="sortedTraceStreams[0] ? sortedTraceStreams[0].stream_name : ''"
             :span-list-prop="traceSpanList"
@@ -1109,6 +1109,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -1146,11 +1147,13 @@ export interface TelemetryCorrelationDashboardProps {
   panelHeight?: number; // Override default panel height (grid units) for metric panels
   logsPanelWidth?: number; // Override default panel width (grid units) for logs panel
   logsPanelHeight?: number; // Override default panel height (grid units) for logs panel
+  shortcutsActive?: boolean;
 }
 
 const props = withDefaults(defineProps<TelemetryCorrelationDashboardProps>(), {
   mode: "dialog",
   externalActiveTab: "logs",
+  shortcutsActive: true,
 });
 
 const emit = defineEmits<{

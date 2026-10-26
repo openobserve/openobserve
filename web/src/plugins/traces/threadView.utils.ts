@@ -402,6 +402,29 @@ export function looksLikeAgentInjection(text: string): boolean {
 // Turn / trace-group construction
 // ---------------------------------------------------------------------------
 
+/** Earliest start and latest end in ns, skipping missing or negative times; null without both. */
+export function spanTimeBounds(
+  spans: ReadonlyArray<{ start_time?: unknown; end_time?: unknown }>,
+): { startNs: number; endNs: number } | null {
+  let startNs = Infinity;
+  let endNs = -Infinity;
+  // A loop, not Math.min(...spans): spreading a large trace overflows the argument limit.
+  for (const span of spans) {
+    const start = Number(span.start_time);
+    const end = Number(span.end_time);
+    if (Number.isFinite(start) && start >= 0 && start < startNs) startNs = start;
+    if (Number.isFinite(end) && end >= 0 && end > endNs) endNs = end;
+  }
+  return Number.isFinite(startNs) && Number.isFinite(endNs) ? { startNs, endNs } : null;
+}
+
+/** Math.max over any number of values; spreading a large array overflows the argument limit. */
+export function maxOf(values: ReadonlyArray<number>, initial = -Infinity): number {
+  let max = initial;
+  for (const value of values) max = Math.max(max, value);
+  return max;
+}
+
 export interface Turn {
   span: any;
   toolCalls: any[];
@@ -519,9 +542,8 @@ export function buildTraceGroup(spans: any[]): TraceGroup | null {
   });
 
   const totalCost = turns.reduce((s, t) => s + getCost(t.span), 0);
-  const startNs = Math.min(...spans.map((s) => Number(s.start_time)).filter(Number.isFinite));
-  const endNs = Math.max(...spans.map((s) => Number(s.end_time)).filter(Number.isFinite));
-  const totalDurationNs = isFinite(endNs - startNs) ? endNs - startNs : 0;
+  const bounds = spanTimeBounds(spans);
+  const totalDurationNs = bounds ? bounds.endNs - bounds.startNs : 0;
   const errorCount = spans.filter((s) => s.span_status === "ERROR").length;
 
   const userId = String(

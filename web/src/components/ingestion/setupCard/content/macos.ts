@@ -18,9 +18,8 @@
 // detection, troubleshooting rows).
 //
 // Two things differ from the Linux/Windows cards:
-//   - No environment toggle. The agents repo ships no mac/ec2 variant, so this is
-//     a single command rather than a generic/EC2 pair, and the EC2 troubleshooting
-//     row is dropped.
+//   - No EC2 support. The agents repo ships no mac/ec2 variant, so the EC2
+//     troubleshooting row is dropped.
 //   - The macOS unified log is not a file any collector can tail, so the installer
 //     also registers a second launchd daemon that streams `log stream --style
 //     ndjson` into the agent's TCP receiver. That daemon is the thing to check

@@ -502,30 +502,9 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
     await pageManager.pipelinesPage.selectStreamOptionByName(TRACES_STREAM);
     await pageManager.pipelinesPage.saveInputNodeStream();
 
-    // Store current URL before navigation attempt
-    const beforeUrl = page.url();
-
-    // Try to navigate to dashboards — onBeforeRouteLeave fires and shows a Vue
-    // ConfirmDialog (data-test="confirm-dialog") instead of window.confirm.
+    // onBeforeRouteLeave must hold the navigation behind the confirm dialog; accepting it completes the navigation.
     await pageManager.pipelinesPage.clickDashboardsMenu();
-
-    // Check if the Vue confirm dialog appeared (unsaved changes prompt).
-    const dialogVisible = await pageManager.pipelinesPage.discardChangesOkBtn
-      .isVisible({ timeout: 5000 }).catch(() => false);
-
-    if (dialogVisible) {
-      testLogger.debug('Vue confirm dialog appeared — accepting to proceed');
-      await pageManager.pipelinesPage.discardChangesOkBtn.click();
-    }
-
-    // Wait to see if navigation happens after accepting (or if it happened directly)
-    await page.waitForURL(/dashboards/, { timeout: 5000 }).catch(() => {
-      testLogger.info('Navigation blocked or no dialog appeared');
-    });
-
-    // Either the Vue confirm dialog appeared or navigation went straight through
-    const urlChanged = page.url() !== beforeUrl;
-    expect(dialogVisible || urlChanged).toBe(true);
+    await pageManager.pipelinesPage.acceptUnsavedChangesPromptAndExpectDashboards();
 
     testLogger.info('Test completed: Unsaved changes behavior verified');
   });

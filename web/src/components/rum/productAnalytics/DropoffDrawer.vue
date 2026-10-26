@@ -238,8 +238,9 @@ const props = withDefaults(
     sampled: SampleRatio;
     expectedDropped?: number | null;
     events?: NamedEvent[];
+    deletedNames?: Readonly<Record<string, string>>;
   }>(),
-  { expectedDropped: null, events: () => [] },
+  { expectedDropped: null, events: () => [], deletedNames: () => ({}) },
 );
 const emit = defineEmits<{ "update:open": [boolean]; paths: [FunnelCohort] }>();
 const { t } = useI18nTyped();
@@ -274,10 +275,12 @@ const unitNoun = computed(() =>
   users.value ? pa.usersUnit.value.noun : t("rum.analytics.funnel.sessionNoun"),
 );
 const step = computed(() => props.cohort.funnel.steps[props.cohort.stepIndex - 1]);
-const stepKey = computed(() => (step.value ? stepLabel(step.value, props.events) : ""));
+const stepKey = computed(() =>
+  step.value ? stepLabel(step.value, props.events, props.deletedNames) : "",
+);
 const nextKey = computed(() => {
   const s = props.cohort.funnel.steps[props.cohort.stepIndex];
-  return s ? stepLabel(s, props.events) : "";
+  return s ? stepLabel(s, props.events, props.deletedNames) : "";
 });
 
 const dropped = computed(() => healthPanel.value.rows.find((r) => r.side === "dropped"));
@@ -425,7 +428,8 @@ async function load(force = false, resetRetry = true) {
   pageRuns.clear();
   const scope = pa.scope.value;
   const id = pa.identitySql.value;
-  const spec = (sql: string, limit: number) => ({ sql, ...cur, limit, sampled: ratio.value });
+  const range = pa.newUsersRange(cur, props.cohort.funnel.unit === "users" && !!id);
+  const spec = (sql: string, limit: number) => ({ sql, ...range, limit, sampled: ratio.value });
   await Promise.all([
     runner.run("next", spec(dropoffNextSql(scope, id, props.cohort, opts()), 6), key),
     runner.run(
@@ -455,7 +459,7 @@ const loadMore = async () => {
       `sessions-${page}`,
       {
         sql: cohortSessionsSql(pa.scope.value, pa.identitySql.value, props.cohort, page, opts()),
-        ...cur,
+        ...pa.newUsersRange(cur, props.cohort.funnel.unit === "users" && !!pa.identitySql.value),
         limit: PAGE_LIMIT,
         sampled: ratio.value,
       },

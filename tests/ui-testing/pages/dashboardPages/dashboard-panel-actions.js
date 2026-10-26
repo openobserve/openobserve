@@ -2,6 +2,7 @@
 // Methods : AddPanelName, SavePanel, ApplyDashboardBtn, AddNextPanel, GetTableRowCount, VerifyChartRenders
 
 import { SELECTORS, visibleOnly } from "./dashboard-selectors.js";
+import { settlePanelLeave } from "./panel-leave-dialog.js";
 
 export default class DashboardactionPage {
   constructor(page) {
@@ -16,6 +17,35 @@ export default class DashboardactionPage {
     this.panelSaveBtn = page.locator('[data-test="dashboard-panel-save"]');
     this.applyDashboard = page.locator('[data-test="dashboard-apply"]');
     this.addPanelBtn = page.locator('[data-test="dashboard-panel-add"]');
+    this.layoutEditBtn = page.locator('[data-test="dashboard-edit-btn"]');
+    this.layoutEditSaveBtn = page.locator('[data-test="dashboard-edit-save-btn"]');
+    this.layoutEditDiscardBtn = page.locator('[data-test="dashboard-edit-discard-btn"]');
+    this.layoutEditUndoBtn = page.locator('[data-test="dashboard-edit-undo-btn"]');
+    this.layoutEditRedoBtn = page.locator('[data-test="dashboard-edit-redo-btn"]');
+    this.layoutEditChangesCount = page.locator('[data-test="dashboard-edit-changes-count"]');
+    this.layoutEditBadge = page.locator('[data-test="dashboard-edit-badge"]');
+    this.layoutDiscardDialog = page.locator('[data-test="dashboard-edit-discard-dialog"]');
+    this.layoutDiscardConfirmBtn = page.locator(
+      '[data-test="dashboard-edit-discard-dialog"] [data-test="o-dialog-primary-btn"]'
+    );
+    this.layoutDiscardCancelBtn = page.locator(
+      '[data-test="dashboard-edit-discard-dialog"] [data-test="o-dialog-secondary-btn"]'
+    );
+    this.layoutSettingsHeightInput = page.locator('[data-test="panel-layout-settings-height-input-field"]');
+    this.layoutSettingsApplyBtn = page.locator(
+      '[data-test="panel-layout-settings-drawer"] [data-test="o-dialog-primary-btn"]'
+    );
+    this.panelDragGrip = page.locator('[data-test="dashboard-panel-drag"]');
+    this.lockedGrid = page.locator(".grid-stack.grid-stack-static");
+    this.editingGrid = page.locator(".grid-stack.layout-editing");
+    this.panelMenuEditPanel = page.locator('[data-test="dashboard-edit-panel"]');
+    this.panelMenuEditLayout = page.locator('[data-test="dashboard-edit-layout"]');
+    this.panelMenuDuplicate = page.locator('[data-test="dashboard-duplicate-panel"]');
+    this.panelMenuDelete = page.locator('[data-test="dashboard-delete-panel"]');
+    this.shareBtn = page.locator('[data-test="dashboard-share-btn"]');
+    this.settingsBtn = page.locator('[data-test="dashboard-setting-btn"]');
+    this.addTabBtn = page.locator('[data-test="dashboard-tab-add-btn"]');
+    this.dashboardBackBtn = page.locator('[data-test="dashboard-back-btn"]');
     this.dashboardTable = page.locator('[data-test="dashboard-panel-table"]');
     this.chartRenderer = page.locator('[data-test="dashboard-panel-table"], [data-test="chart-renderer"]');
     this.chartRendererCanvas = page.locator('[data-test="chart-renderer"]');
@@ -183,8 +213,8 @@ export default class DashboardactionPage {
     return this.panelSaveBtn;
   }
 
-  // Raw discard-button locator for callers that must own the confirm dialog
-  // themselves (discardPanel() installs its own auto-accepting handler).
+  // Raw discard-button locator for callers that answer the in-app leave dialog
+  // themselves (discardPanel() answers it with Discard).
   getPanelDiscardBtn() {
     return this.discardPanelBtn;
   }
@@ -219,6 +249,22 @@ export default class DashboardactionPage {
     ]).catch(() => {});
   }
 
+  /**
+   * Save from the Save split button's menu and stay in the editor. A new panel's
+   * URL switches to its panelId; the "Panel saved" toast confirms the save.
+   */
+  async saveAndKeepEditing() {
+    await this.page.locator('[data-test="dashboard-panel-save-options-btn"]').click();
+    await this.page.locator('[data-test="dashboard-panel-save-and-stay"]').click();
+    await this.page.waitForURL((url) => url.searchParams.has("panelId"), { timeout: 20000 });
+  }
+
+  /** Ctrl/Cmd+S in the panel editor is Save and keep editing. */
+  async saveAndKeepEditingWithShortcut() {
+    await this.page.keyboard.press("ControlOrMeta+s");
+    await this.page.waitForURL((url) => url.searchParams.has("panelId"), { timeout: 20000 });
+  }
+
   async getErrorToastText() {
     await this.errorToast.first().waitFor({ state: "visible", timeout: 20000 });
     return (await this.errorToast.first().innerText()).replace(/\s+/g, " ").trim();
@@ -228,10 +274,9 @@ export default class DashboardactionPage {
    * Discard the current panel and return to the dashboard view page.
    * Use this for teardown when the panel intentionally holds an
    * incomplete/invalid config (which cannot pass save validation) or when the
-   * test does not need to persist the panel. Discarding an edited panel fires
-   * a native window.confirm — Playwright auto-dismisses dialogs by default,
-   * which would cancel the navigation and leave the page on add_panel — so
-   * accept it for the duration of the discard.
+   * test does not need to persist the panel. Discarding a panel with edits
+   * opens the in-app "Leave with unsaved changes?" dialog, answered with
+   * Discard so no browser draft lingers.
    * (Same handling as dashboard-multi-sql.js discardPanel; this is the
    * generic home for it since discard is not a multi-SQL-specific action.)
    */
@@ -242,10 +287,7 @@ export default class DashboardactionPage {
     try {
       await discardBtn.waitFor({ state: "visible", timeout: 15000 });
       await discardBtn.click();
-      // Discard navigates to the dashboard view page (/dashboards/view).
-      await this.page.waitForURL((url) => !url.pathname.includes("add_panel"), {
-        timeout: 30000,
-      });
+      return await settlePanelLeave(this.page);
     } finally {
       this.page.off("dialog", dialogHandler);
     }
@@ -302,6 +344,21 @@ export default class DashboardactionPage {
     }, { timeout: 30000 });
   }
 
+  // The apply button stays enabled for ~100ms after the click, so waitForChartToRender alone can pass before the query starts and the table later resets to empty.
+  async applyAndWaitForPromQLQuery() {
+    const promqlResponse = this.page.waitForResponse(
+      (res) => res.url().includes("/prometheus/api/v1/query_range"),
+      { timeout: 30000 }
+    );
+    await this.applyDashboardBtn();
+    const response = await promqlResponse;
+    // A streamed (text/event-stream) response never reports finished; waitForChartToRender covers completion.
+    if (!(await response.headerValue("content-type"))?.includes("text/event-stream")) {
+      await response.finished();
+    }
+    await this.waitForChartToRender();
+  }
+
   //Dashboard panel actions(Edit, Layout, Duplicate, Inspector, Move, Delete)
 
   // Returns the per-panel edit dropdown locator (data-test keyed by panel name)
@@ -324,10 +381,91 @@ export default class DashboardactionPage {
     const actionTestId = actionDataTestIds[action];
     if (!actionTestId) throw new Error(`Unknown action: ${action}`);
 
+    // The panel menu offers "Edit layout" only in layout edit mode, and only that item there.
+    if (action === "Layout") await this.enterLayoutEdit();
+
     await this.page
       .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
       .click();
     await this.page.locator(`[data-test="${actionTestId}"]`).click();
+  }
+
+  async enterLayoutEdit() {
+    await this.layoutEditBtn.waitFor({ state: "visible" });
+    await this.layoutEditBtn.click();
+    await this.layoutEditSaveBtn.waitFor({ state: "visible" });
+  }
+
+  async saveLayoutEdit() {
+    await this.layoutEditSaveBtn.click();
+    await this.layoutEditSaveBtn.waitFor({ state: "hidden" });
+  }
+
+  async discardLayoutEdit() {
+    await this.layoutEditDiscardBtn.click();
+    const confirm = this.page.locator(
+      '[data-test="dashboard-edit-discard-dialog"] [data-test="o-dialog-primary-btn"]'
+    );
+    await Promise.race([
+      confirm.waitFor({ state: "visible" }),
+      this.layoutEditSaveBtn.waitFor({ state: "hidden" }),
+    ]).catch(() => {});
+    if (await confirm.isVisible()) await confirm.click();
+    await this.layoutEditSaveBtn.waitFor({ state: "hidden" });
+  }
+
+  getTabRenameBtn(tabId) {
+    return this.page.locator(`[data-test="dashboard-tab-${tabId}-rename-btn"]`);
+  }
+
+  async openPanelMenu(panelName) {
+    const dropdown = this.getEditPanelDropdown(panelName);
+    await dropdown.waitFor({ state: "visible", timeout: 30000 });
+    await dropdown.click();
+  }
+
+  async closePanelMenu() {
+    await this.page.keyboard.press("Escape");
+  }
+
+  // Already in layout edit mode: the dialog's Apply only adds a draft step, it never saves.
+  async applyPanelHeight(panelName, height) {
+    await this.openPanelMenu(panelName);
+    await this.panelMenuEditLayout.click();
+    await this.layoutSettingsHeightInput.waitFor({ state: "visible" });
+    await this.layoutSettingsHeightInput.fill(String(height));
+    await this.layoutSettingsApplyBtn.click();
+    await this.layoutSettingsHeightInput.waitFor({ state: "hidden" });
+  }
+
+  async undoLayoutEdit() {
+    await this.layoutEditUndoBtn.click();
+  }
+
+  async redoLayoutEdit() {
+    await this.layoutEditRedoBtn.click();
+  }
+
+  async requestLayoutDiscard() {
+    await this.layoutEditDiscardBtn.click();
+  }
+
+  async confirmLayoutDiscard() {
+    await this.layoutDiscardConfirmBtn.click();
+    await this.layoutDiscardDialog.waitFor({ state: "hidden" });
+  }
+
+  async cancelLayoutDiscard() {
+    await this.layoutDiscardCancelBtn.click();
+    await this.layoutDiscardDialog.waitFor({ state: "hidden" });
+  }
+
+  async clickDashboardBack() {
+    await this.dashboardBackBtn.click();
+  }
+
+  async pressLayoutShortcut(combo) {
+    await this.page.keyboard.press(combo);
   }
 
   /**

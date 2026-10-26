@@ -55,6 +55,26 @@ async function waitForRunWindows(capture) {
   return Object.fromEntries(['results', ...RED_PANELS].map((p) => [p, last(p)]));
 }
 
+// Lets the reload's own first run send every request, so none of them can stand in for the run under test.
+async function reloadAndSettle(page, tracesPage) {
+  await test.step('reload and let its own first run send every request', async () => {
+    const initial = tracesPage.captureSearchRequests();
+    try {
+      await page.reload();
+      await waitForRunWindows(initial);
+    } finally {
+      initial.stop();
+    }
+  });
+}
+
+// Only the view's filter follows the stream name in the Rate and heatmap SQL; Errors and the count query always carry one.
+function expectSavedViewRun(windows, stream) {
+  for (const panel of ['Rate', 'Duration']) {
+    expect(windows[panel].sql, `${panel} must come from the saved view's run, not the reload's`).toContain(`FROM "${stream}" WHERE ${ERROR_FILTER}`);
+  }
+}
+
 test.describe('Traces search window and error state (#15130, ENT#2805, ENT#2806)', () => {
   test.describe.configure({ mode: 'parallel' });
   let pm;
@@ -80,12 +100,13 @@ test.describe('Traces search window and error state (#15130, ENT#2805, ENT#2806)
       type: 'relative', relativeTimePeriod: '15m', startTime: threeDaysAgo - 15 * MINUTE_US, endTime: threeDaysAgo,
     });
     try {
-      await page.reload();
+      await reloadAndSettle(page, pm.tracesPage);
       const capture = pm.tracesPage.captureSearchRequests();
       const appliedAt = nowUs();
       await pm.tracesPage.applySavedView(`e2e-rel-${stream}`);
       const windows = await waitForRunWindows(capture);
       capture.stop();
+      expectSavedViewRun(windows, stream);
 
       expect(Math.abs(windows.results.endTime - appliedAt), 'results must end at "now"').toBeLessThan(MINUTE_US);
       for (const panel of RED_PANELS) {
@@ -104,11 +125,12 @@ test.describe('Traces search window and error state (#15130, ENT#2805, ENT#2806)
     const startTime = endTime - 30 * MINUTE_US;
     const viewId = await createTracesView(page, `e2e-abs-${stream}`, stream, { type: 'absolute', startTime, endTime });
     try {
-      await page.reload();
+      await reloadAndSettle(page, pm.tracesPage);
       const capture = pm.tracesPage.captureSearchRequests();
       await pm.tracesPage.applySavedView(`e2e-abs-${stream}`);
       const windows = await waitForRunWindows(capture);
       capture.stop();
+      expectSavedViewRun(windows, stream);
 
       for (const panel of ['results', ...RED_PANELS]) {
         expect(Math.abs(windows[panel].startTime - startTime), `${panel} must start at the stored start`).toBeLessThan(SAME_WINDOW_US);

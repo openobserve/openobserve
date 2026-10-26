@@ -27,6 +27,7 @@
 //!   width (~6% at schema 0, less at finer schemas, more after downscaling). This is an approximate
 //!   fallback, not a native-fidelity one.
 
+use config::meta::promql::is_stale_marker;
 use proto::prometheus_rpc;
 
 /// The classic streams a native histogram degrades into.
@@ -48,9 +49,6 @@ const MIN_DOWNSCALE_SCHEMA: i32 = -10;
 
 /// The `__name__` suffix, the `le` label (`None` for `_count`/`_sum`), and the value.
 pub type ClassicHistogramRecord = (&'static str, Option<String>, f64);
-
-/// Prometheus's stale-marker bit pattern in `sum`; an ordinary NaN is NOT stale.
-const STALE_NAN_BITS: u64 = 0x7ff0_0000_0000_0002;
 
 /// Emitted schema is `min(producer schema, target_schema)`; `max_buckets` is only a safety valve.
 #[derive(Clone, Copy, Debug)]
@@ -183,7 +181,7 @@ pub fn expand_native_histogram(
 
     // a stale marker terminates the series; expanding it would write a spurious
     // `_count = 0` that reads as a counter reset
-    if hp.sum.to_bits() == STALE_NAN_BITS {
+    if is_stale_marker(hp.sum) {
         return vec![];
     }
 

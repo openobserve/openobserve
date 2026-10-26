@@ -23,7 +23,7 @@
             :data-test="`dashboard-add-condition-label-${conditionIndex}-${computedLabel(condition)}`"
             icon-right="arrow-drop-down"
           >
-            <span class="leading-normal font-normal whitespace-nowrap"
+            <OTruncatedText class="max-w-80 leading-normal font-normal"
               ><span class="text-text-body">{{ labelParts(condition).prefix }}</span
               ><span class="text-text-body">{{ labelParts(condition).field }}</span
               ><span v-if="labelParts(condition).op" class="text-text-secondary">{{
@@ -41,7 +41,7 @@
                 ><span class="text-badge-blue-ol-text">{{
                   labelParts(condition).valueClose
                 }}</span></template
-              ></span
+              ></OTruncatedText
             >
           </OButton>
         </template>
@@ -59,6 +59,7 @@
                   :data-test="`dashboard-add-condition-column-${conditionIndex}`"
                 />
                 <OButton
+                  :aria-label="t('common.remove')"
                   variant="outline"
                   size="icon"
                   class="shrink-0"
@@ -145,6 +146,7 @@
         </div>
       </ODropdown>
       <OButton
+        :aria-label="t('common.remove')"
         variant="ghost"
         size="icon-chip"
         class="!w-4 shrink-0"
@@ -175,7 +177,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import StreamFieldSelect from "@/components/dashboards/addPanel/StreamFieldSelect.vue";
-import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { buildCondition } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 
 export default defineComponent({
@@ -193,6 +195,7 @@ export default defineComponent({
     OCombobox,
     StreamFieldSelect,
     OSelect,
+    OTruncatedText,
   },
   props: [
     "condition",
@@ -268,11 +271,7 @@ export default defineComponent({
     const computedLabel = (condition: any) => {
       const builtCondition = buildCondition(condition, dashboardPanelData);
 
-      return builtCondition === ""
-        ? condition.column.field
-        : builtCondition?.length > MAX_FIELD_LABEL_CHARS
-          ? builtCondition.substring(0, MAX_FIELD_LABEL_CHARS) + "..."
-          : builtCondition;
+      return builtCondition === "" ? condition.column.field : builtCondition;
     };
 
     /**

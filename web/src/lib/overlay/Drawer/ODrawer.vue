@@ -24,7 +24,7 @@ import {
   onDeactivated,
 } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
 import { FORM_SUBMIT_STATE_KEY } from "@/lib/forms/Form/OForm.types";
 import { useI18nTyped } from "@/types/i18n";
@@ -48,6 +48,7 @@ const props = withDefaults(defineProps<DrawerProps>(), {
   showClose: true,
   width: undefined,
   seamless: false,
+  primaryButtonDataTest: "o-drawer-primary-btn",
   primaryButtonVariant: "primary",
   secondaryButtonVariant: "outline",
   neutralButtonVariant: "ghost",
@@ -61,6 +62,7 @@ const props = withDefaults(defineProps<DrawerProps>(), {
   portalTarget: undefined,
   anchor: undefined,
   anchorEdge: "top",
+  modal: true,
 });
 
 const emit = defineEmits<DrawerEmits>();
@@ -68,6 +70,9 @@ const emit = defineEmits<DrawerEmits>();
 defineSlots<DrawerSlots>();
 
 const slots = useSlots();
+
+const ESCAPE_KEEPS_OPEN =
+  "input, textarea, select, [contenteditable], [data-reka-popper-content-wrapper]";
 
 // Mirrors the same controlled/uncontrolled pattern as ODialog — Vue
 // boolean-casts an absent `open` prop to `false`, locking reka-ui into
@@ -106,9 +111,17 @@ onActivated(() => (hostAway.value = false));
 
 function handleCloseAutoFocus(event: Event) {
   if (hostAway.value || awaySinceOpen) event.preventDefault();
-  if (hostAway.value || !awaySinceOpen) return;
-  awaySinceOpen = false;
-  if (openedFrom?.isConnected) openedFrom.focus();
+  const target = hostAway.value ? null : props.returnFocusTo?.();
+  if (target?.isConnected) {
+    event.preventDefault();
+    awaySinceOpen = false;
+    target.scrollIntoView({ block: "nearest" });
+    target.focus({ preventScroll: true });
+  } else if (!hostAway.value && awaySinceOpen) {
+    awaySinceOpen = false;
+    if (openedFrom?.isConnected) openedFrom.focus();
+  }
+  emit("after-close");
 }
 
 function handleOpenChange(v: boolean) {
@@ -117,7 +130,9 @@ function handleOpenChange(v: boolean) {
 }
 
 function handleEscapeKeyDown(e: KeyboardEvent) {
-  if (props.persistent) {
+  const target = e.target instanceof Element ? e.target : null;
+  // A non-modal drawer sits beside live controls, so Escape there belongs to the field or open listbox.
+  if (props.persistent || (!props.modal && target?.closest(ESCAPE_KEEPS_OPEN))) {
     e.preventDefault();
     return;
   }
@@ -125,7 +140,7 @@ function handleEscapeKeyDown(e: KeyboardEvent) {
 }
 
 function handleInteractOutside(e: Event) {
-  if (props.persistent) {
+  if (props.persistent || !props.modal) {
     e.preventDefault();
     return;
   }
@@ -299,24 +314,25 @@ function findAutoFocusTarget(root: Element): HTMLElement | null {
 
 function handleOpenAutoFocus(event: Event) {
   event.preventDefault();
+  // The panel is still translated off-screen by the slide-in, so a scrolling focus would drag a contained portal target sideways.
   nextTick(() => {
     const body = bodyRef.value;
     const field = body ? findAutoFocusTarget(body) : null;
     if (field) {
-      field.focus();
+      field.focus({ preventScroll: true });
       return;
     }
     const autofocus = body?.querySelector<HTMLElement>("[autofocus]");
     if (autofocus) {
-      autofocus.focus();
+      autofocus.focus({ preventScroll: true });
       return;
     }
     const btnEl = (primaryBtnRef.value as any)?.$el as HTMLElement | undefined;
     if (btnEl) {
-      btnEl.focus();
+      btnEl.focus({ preventScroll: true });
       return;
     }
-    body?.closest<HTMLElement>("[data-o2-drawer]")?.focus();
+    body?.closest<HTMLElement>("[data-o2-drawer]")?.focus({ preventScroll: true });
   });
 }
 
@@ -388,7 +404,7 @@ watch(shown, (open) => {
 </script>
 
 <template>
-  <DialogRoot :open="shown" @update:open="handleOpenChange">
+  <DialogRoot :open="shown" :modal="modal" @update:open="handleOpenChange">
     <!-- Trigger slot — omit when controlling via v-model:open -->
     <DialogTrigger v-if="hasTrigger" as-child>
       <slot name="trigger" />
@@ -482,21 +498,19 @@ watch(shown, (open) => {
           <template v-else>
             <!-- Below lg a subtitle longer than the panel must truncate, or it pushes the close button off screen. -->
             <div v-if="title || subTitle" class="min-w-0 shrink-0 max-lg:shrink">
-              <span
+              <OTruncatedText
                 v-if="title"
-                class="text-dialog-header-text block truncate text-base font-semibold"
+                class="text-dialog-header-text block text-base font-semibold"
                 :data-test="titleDataTest"
               >
                 {{ title }}
-                <!-- Full title on hover (styled), so a truncated title is never lost. -->
-                <OTooltip :content="title" />
-              </span>
-              <span
+              </OTruncatedText>
+              <OTruncatedText
                 v-if="subTitle"
-                class="text-dialog-content-text mt-0.5 block truncate text-xs opacity-70"
+                class="text-dialog-content-text mt-0.5 block text-xs opacity-70"
               >
                 {{ subTitle }}
-              </span>
+              </OTruncatedText>
             </div>
 
             <!-- #header-left sub-slot — grows to fill space if present -->
@@ -616,7 +630,7 @@ watch(shown, (open) => {
               <OButton
                 v-if="primaryButtonLabel"
                 ref="primaryBtnRef"
-                data-test="o-drawer-primary-btn"
+                :data-test="primaryButtonDataTest"
                 :variant="primaryButtonVariant"
                 size="sm-action"
                 :type="formId ? 'submit' : 'button'"

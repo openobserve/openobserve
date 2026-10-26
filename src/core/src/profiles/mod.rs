@@ -13,7 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::BufReader, sync::Arc};
+mod attributes;
+mod dictionary_compat;
+mod otlp_json_compat;
+pub mod query;
+mod validation;
+
+use std::{
+    collections::{HashMap, HashSet},
+    io::BufReader,
+    sync::Arc,
+};
 
 use axum::{http, response::Response as HttpResponse};
 use bytes::Bytes;
@@ -42,6 +52,7 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use schema::check_for_schema;
 
+use self::attributes::resolve_any_value_string;
 use crate::{
     common::meta::{
         authz::Authz,
@@ -54,13 +65,10 @@ use crate::{
     },
 };
 
-mod otlp_json_compat;
-pub mod query;
-
-/// Transport-neutral failure from profile ingestion. HTTP and gRPC map this
-/// separately so a gate/circuit-breaker reject is not acknowledged as success.
+/// Ingestion failures retain their meaning across HTTP and gRPC.
 #[derive(Debug)]
 pub enum ProfilesExportError {
+    InvalidArgument(String),
     TrialPeriodExpired(String),
     Unavailable(String),
     Internal(anyhow::Error),
@@ -69,7 +77,9 @@ pub enum ProfilesExportError {
 impl std::fmt::Display for ProfilesExportError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::TrialPeriodExpired(msg) | Self::Unavailable(msg) => write!(f, "{msg}"),
+            Self::InvalidArgument(msg) | Self::TrialPeriodExpired(msg) | Self::Unavailable(msg) => {
+                write!(f, "{msg}")
+            }
             Self::Internal(err) => write!(f, "{err}"),
         }
     }
@@ -122,10 +132,17 @@ fn map_otlp_handler_error(
         OtlpRequestType::HttpProtobuf => "protobuf",
         OtlpRequestType::Grpc => "grpc",
     };
-    log::error!(
+    let level = if matches!(&err, ProfilesExportError::InvalidArgument(_)) {
+        log::Level::Warn
+    } else {
+        log::Level::Error
+    };
+    log::log!(
+        level,
         "[PROFILES:OTLP] Error while handling {kind} request: org_id: {org_id}, error: {err}"
     );
     let (status, rpc_code, msg) = match err {
+        ProfilesExportError::InvalidArgument(msg) => (http::StatusCode::BAD_REQUEST, 3, msg),
         ProfilesExportError::TrialPeriodExpired(msg) => {
             (http::StatusCode::TOO_MANY_REQUESTS, 8, msg) // RESOURCE_EXHAUSTED
         }
@@ -146,6 +163,8 @@ fn map_otlp_handler_error(
 }
 
 const EXTRACTOR_VERSION: &str = "v1";
+/// OTel semconv default `service.name`, suffixed with `:<process.executable.name>` when known.
+const UNKNOWN_SERVICE: &str = "unknown_service";
 /// Resource attributes promoted to fixed columns (hot query dimensions).
 const HOT_RESOURCE_ATTRS: &[(&str, &str)] = &[
     ("service.name", "service_name"),
@@ -236,7 +255,7 @@ pub async fn otlp_json(
         }
     };
     otlp_json_compat::normalize(&mut body_json);
-    let request = match serde_json::from_value::<ExportProfilesServiceRequest>(body_json) {
+    let request = match otlp_json_compat::deserialize(body_json) {
         Ok(req) => req,
         Err(e) => {
             log::error!("[PROFILES:OTLP] Invalid json: org_id: {org_id}, error: {e}");
@@ -265,7 +284,7 @@ pub async fn otlp_json(
 
 pub async fn handle_otlp_request(
     org_id: &str,
-    request: ExportProfilesServiceRequest,
+    mut request: ExportProfilesServiceRequest,
     req_type: OtlpRequestType,
     in_stream_name: Option<&str>,
     user: IngestUser,
@@ -279,6 +298,9 @@ pub async fn handle_otlp_request(
         }
         return Err(ingestion_gate_error(e));
     }
+
+    dictionary_compat::normalize(&mut request).map_err(ProfilesExportError::InvalidArgument)?;
+    validation::validate(&request).map_err(ProfilesExportError::InvalidArgument)?;
 
     let start = std::time::Instant::now();
     let started_at = now_micros();
@@ -301,8 +323,6 @@ pub async fn handle_otlp_request(
         for scope_profile in &resource_profile.scope_profiles {
             for profile in &scope_profile.profiles {
                 let (records, rejected_samples) = build_sample_records(
-                    org_id,
-                    &stream_name,
                     resource_profile,
                     scope_profile,
                     profile,
@@ -543,10 +563,7 @@ fn export_service_response(
 ///
 /// Observations whose `_timestamp` falls outside `[min_ts, max_ts]` (microseconds)
 /// are skipped; the returned `rejected` count mirrors traces' retention filter.
-#[allow(clippy::too_many_arguments)]
 fn build_sample_records(
-    org_id: &str,
-    stream_name: &str,
     resource_profile: &ResourceProfiles,
     scope_profile: &ScopeProfiles,
     profile: &Profile,
@@ -653,6 +670,17 @@ fn build_sample_records(
             }
         }
     }
+    // A NULL service_name is never listed by meta, so the UI cannot select those rows.
+    if !base.contains_key("service_name") {
+        let service_name = match base.get("process_executable_name").and_then(|v| v.as_str()) {
+            Some(exe) => format!("{UNKNOWN_SERVICE}:{exe}"),
+            None => UNKNOWN_SERVICE.to_string(),
+        };
+        base.insert(
+            "service_name".to_string(),
+            json::Value::String(service_name),
+        );
+    }
 
     base.insert(
         "extractor_version".to_string(),
@@ -661,7 +689,8 @@ fn build_sample_records(
 
     let mut records = Vec::with_capacity(profile.samples.len());
     let mut rejected = 0_i64;
-    for (sample_idx, sample) in profile.samples.iter().enumerate() {
+    let mut timed_instances = HashSet::new();
+    for sample in &profile.samples {
         let (stack, frame_count) = resolve_stack(sample.stack_index, dictionary);
         let (trace_id, span_id) = resolve_link(sample.link_index, dictionary);
         let (thread_id, thread_name, cpu_logical_number, sample_tags) =
@@ -677,7 +706,7 @@ fn build_sample_records(
             continue;
         };
 
-        for (obs_idx, (timestamp, value)) in observations.into_iter().enumerate() {
+        for (timestamp, value) in observations {
             if timestamp < min_ts {
                 log::error!(
                     "[PROFILES:OTLP] skipping observation with timestamp older than allowed retention period, profile_id: {profile_id}"
@@ -739,19 +768,31 @@ fn build_sample_records(
                 record.insert(key.clone(), value.clone());
             }
 
-            // `stack` is excluded: redaction runs later, so its digest would outlive the text.
-            let event_id = format!(
-                "{:x}",
-                md5::compute(format!(
-                    "{org_id}/{stream_name}/{timestamp}/{profile_id}/{sample_idx}/{obs_idx}/{value}"
-                ))
-            );
-            record.insert("event_id".to_string(), json::Value::String(event_id));
+            // One row per process carries the profiled time so per-instance rates count it once.
+            if profile.duration_nano > 0 && timed_instances.insert(instance_identity(&record)) {
+                record.insert(
+                    query::PROFILE_DURATION_COLUMN.to_string(),
+                    json::Value::Number((profile.duration_nano as i64).into()),
+                );
+            }
 
             records.push(record);
         }
     }
     (records, rejected)
+}
+
+fn instance_identity(record: &json::Map<String, json::Value>) -> Vec<String> {
+    query::INSTANCE_KEY_COLUMNS
+        .iter()
+        .map(|col| {
+            record
+                .get(*col)
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string()
+        })
+        .collect()
 }
 
 /// Expand one OTLP Sample into `(timestamp_micros, value)` observations.
@@ -872,7 +913,7 @@ fn format_location_frames(location_index: i32, dictionary: &ProfilesDictionary) 
     }
 }
 
-/// Format an unsymbolized location as `{mapping_id}+0x{rel}` (+ optional `/{frame_type}`).
+/// Format an unsymbolized location as `[{file}@]{id}+0x{rel}` (+ optional `/{frame_type}`).
 ///
 /// eBPF native frames omit Line/Function and expect backends to retain mapping metadata
 /// for later symbolization. Bare `0x{va}` collapses frames across different binaries.
@@ -880,18 +921,21 @@ fn format_unsymbolized_frame(
     location: &opentelemetry_proto::tonic::profiles::v1development::Location,
     dictionary: &ProfilesDictionary,
 ) -> Option<String> {
-    let mapping_id = resolve_mapping_identity(location.mapping_index, dictionary);
-    let rel = relative_file_offset(location, dictionary);
-    let frame = match (mapping_id.as_deref(), rel, location.address) {
-        (Some(id), Some(off), _) => format!("{id}+0x{off:x}"),
-        (Some(id), None, addr) if addr != 0 => format!("{id}+0x{addr:x}"),
-        (None, _, addr) if addr != 0 => format!("0x{addr:x}"),
+    let mapping = mapping_at(location.mapping_index, dictionary);
+    let file = mapping.and_then(|m| mapping_file_name(m, dictionary));
+    let build_id = mapping.and_then(|m| mapping_build_id(m, dictionary));
+    let offset = match relative_file_offset(location, dictionary) {
+        Some(rel) if file.is_some() || build_id.is_some() => rel,
+        _ if location.address != 0 => location.address,
         _ => return None,
     };
-    match location_frame_type(location, dictionary) {
-        Some(ft) if !ft.is_empty() => Some(format!("{frame}/{ft}")),
-        _ => Some(frame),
-    }
+    let frame_type = location_frame_type(location, dictionary).unwrap_or_default();
+    let sep = if frame_type.is_empty() { "" } else { "/" };
+    Some(match (file, build_id.as_deref()) {
+        (Some(file), Some(id)) => format!("{file}@{id}+0x{offset:x}{sep}{frame_type}"),
+        (Some(id), None) | (None, Some(id)) => format!("{id}+0x{offset:x}{sep}{frame_type}"),
+        (None, None) => format!("0x{offset:x}{sep}{frame_type}"),
+    })
 }
 
 fn relative_file_offset(
@@ -908,8 +952,23 @@ fn relative_file_offset(
     Some(location.address - mapping.memory_start + mapping.file_offset)
 }
 
-fn resolve_mapping_identity(mapping_index: i32, dictionary: &ProfilesDictionary) -> Option<String> {
-    let mapping = mapping_at(mapping_index, dictionary)?;
+fn mapping_file_name<'a>(
+    mapping: &opentelemetry_proto::tonic::profiles::v1development::Mapping,
+    dictionary: &'a ProfilesDictionary,
+) -> Option<&'a str> {
+    let path = string_at(&dictionary.string_table, mapping.filename_strindex)?;
+    Some(
+        std::path::Path::new(path)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or(path),
+    )
+}
+
+fn mapping_build_id(
+    mapping: &opentelemetry_proto::tonic::profiles::v1development::Mapping,
+    dictionary: &ProfilesDictionary,
+) -> Option<String> {
     for &attr_index in &mapping.attribute_indices {
         if attr_index <= 0 {
             continue;
@@ -917,10 +976,10 @@ fn resolve_mapping_identity(mapping_index: i32, dictionary: &ProfilesDictionary)
         let Some(attr) = dictionary.attribute_table.get(attr_index as usize) else {
             continue;
         };
-        let Some(key) = lookup_string(&dictionary.string_table, attr.key_strindex) else {
+        let Some(key) = string_at(&dictionary.string_table, attr.key_strindex) else {
             continue;
         };
-        if !MAPPING_ID_ATTR_KEYS.contains(&key.as_str()) {
+        if !MAPPING_ID_ATTR_KEYS.contains(&key) {
             continue;
         }
         if let Some(value) = resolve_any_value_string(attr.value.as_ref(), Some(dictionary))
@@ -929,13 +988,7 @@ fn resolve_mapping_identity(mapping_index: i32, dictionary: &ProfilesDictionary)
             return Some(value);
         }
     }
-    lookup_string(&dictionary.string_table, mapping.filename_strindex).map(|path| {
-        std::path::Path::new(&path)
-            .file_name()
-            .and_then(|name| name.to_str())
-            .map(|name| name.to_string())
-            .unwrap_or(path)
-    })
+    None
 }
 
 fn location_frame_type(
@@ -949,7 +1002,7 @@ fn location_frame_type(
         let Some(attr) = dictionary.attribute_table.get(attr_index as usize) else {
             continue;
         };
-        let Some(key) = lookup_string(&dictionary.string_table, attr.key_strindex) else {
+        let Some(key) = string_at(&dictionary.string_table, attr.key_strindex) else {
             continue;
         };
         if key != PROFILE_FRAME_TYPE_ATTR {
@@ -1074,30 +1127,6 @@ fn resolve_key_value_string(
     resolve_any_value_string(attr.value.as_ref(), dictionary)
 }
 
-fn resolve_any_value_string(
-    value: Option<&opentelemetry_proto::tonic::common::v1::AnyValue>,
-    dictionary: Option<&ProfilesDictionary>,
-) -> Option<String> {
-    let value = value?;
-    match value.value.as_ref() {
-        Some(opentelemetry_proto::tonic::common::v1::any_value::Value::StringValueStrindex(
-            index,
-        )) => lookup_string(
-            dictionary.map(|d| d.string_table.as_slice()).unwrap_or(&[]),
-            *index,
-        ),
-        _ => {
-            let normalized = crate::ingestion::grpc::get_val_with_type_retained(&Some(value));
-            let string_value = config::utils::json::get_string_value(&normalized);
-            if string_value.is_empty() {
-                None
-            } else {
-                Some(string_value)
-            }
-        }
-    }
-}
-
 fn resource_attr_tag_key(otel_key: &str) -> String {
     if let Some((_, alias)) = TAG_RESOURCE_ATTR_ALIASES
         .iter()
@@ -1125,12 +1154,16 @@ fn get_profile_type_unit(
 }
 
 fn lookup_string(values: &[String], index: i32) -> Option<String> {
+    string_at(values, index).map(str::to_string)
+}
+
+fn string_at(values: &[String], index: i32) -> Option<&str> {
     if index <= 0 {
         return None;
     }
     values
         .get(index as usize)
-        .cloned()
+        .map(String::as_str)
         .filter(|v| !v.is_empty())
 }
 
@@ -1261,6 +1294,7 @@ mod tests {
                 unit_strindex: 2,
             }),
             time_unix_nano: ok_ts_nano,
+            duration_nano: 5_000_000_000,
             samples: vec![Sample {
                 stack_index: 1,
                 // First observation is out of window; later ones must still be kept.
@@ -1273,8 +1307,6 @@ mod tests {
         let min_ts = now - 5 * 3600 * 1_000_000;
         let max_ts = now + 24 * 3600 * 1_000_000;
         let (records, rejected) = build_sample_records(
-            "default",
-            "default",
             &ResourceProfiles::default(),
             &ScopeProfiles::default(),
             &profile,
@@ -1289,6 +1321,89 @@ mod tests {
         assert_eq!(
             records[0].get(TIMESTAMP_COL_NAME).and_then(|v| v.as_i64()),
             Some((ok_ts_nano / 1000) as i64)
+        );
+        // The rejected observation must not swallow the profiled-time marker.
+        assert_eq!(
+            records[0]
+                .get(query::PROFILE_DURATION_COLUMN)
+                .and_then(|v| v.as_i64()),
+            Some(5_000_000_000)
+        );
+        assert!(!records[1].contains_key(query::PROFILE_DURATION_COLUMN));
+    }
+
+    #[test]
+    fn build_sample_records_marks_profiled_time_once_per_process() {
+        let pid_attr = |value_strindex: i32| KeyValueAndUnit {
+            key_strindex: 3,
+            value: Some(AnyValue {
+                value: Some(any_value::Value::StringValueStrindex(value_strindex)),
+            }),
+            ..Default::default()
+        };
+        let dictionary = ProfilesDictionary {
+            string_table: ["", "cpu", "nanoseconds", "process.pid", "11", "22"]
+                .map(String::from)
+                .to_vec(),
+            attribute_table: vec![KeyValueAndUnit::default(), pid_attr(4), pid_attr(5)],
+            ..Default::default()
+        };
+        let sample = |attr: i32, value: i64| Sample {
+            values: vec![value],
+            attribute_indices: vec![attr],
+            ..Default::default()
+        };
+        let now = now_micros();
+        let profile = Profile {
+            sample_type: Some(ValueType {
+                type_strindex: 1,
+                unit_strindex: 2,
+            }),
+            time_unix_nano: (now as u64).saturating_mul(1000),
+            duration_nano: 5_000_000_000,
+            samples: vec![sample(1, 10), sample(1, 20), sample(2, 30)],
+            ..Default::default()
+        };
+        let build = |profile: &Profile| {
+            build_sample_records(
+                &ResourceProfiles::default(),
+                &ScopeProfiles::default(),
+                profile,
+                Some(&dictionary),
+                now - 3_600_000_000,
+                now + 3_600_000_000,
+            )
+            .0
+        };
+
+        let records = build(&profile);
+        let timed: Vec<(Option<&str>, Option<i64>)> = records
+            .iter()
+            .map(|r| {
+                (
+                    r.get("process_pid").and_then(|v| v.as_str()),
+                    r.get(query::PROFILE_DURATION_COLUMN)
+                        .and_then(|v| v.as_i64()),
+                )
+            })
+            .collect();
+        assert_eq!(
+            timed,
+            vec![
+                (Some("11"), Some(5_000_000_000)),
+                (Some("11"), None),
+                (Some("22"), Some(5_000_000_000)),
+            ]
+        );
+
+        let untimed = Profile {
+            duration_nano: 0,
+            ..profile
+        };
+        assert!(
+            build(&untimed)
+                .iter()
+                .all(|r| !r.contains_key(query::PROFILE_DURATION_COLUMN))
         );
     }
 
@@ -1450,7 +1565,7 @@ mod tests {
 
         // rel = address - memory_start + file_offset = 0x1000 - 0x1000 + 0x100
         let (stack, frame_count) = resolve_stack(1, Some(&dictionary));
-        assert_eq!(stack, "deadbeefcafebabe+0x100/native");
+        assert_eq!(stack, "libexample.so@deadbeefcafebabe+0x100/native");
         assert_eq!(frame_count, 1);
 
         let (other, _) = resolve_stack(2, Some(&dictionary));
@@ -1458,7 +1573,10 @@ mod tests {
         assert_ne!(stack, other);
 
         let (combined, combined_count) = resolve_stack(3, Some(&dictionary));
-        assert_eq!(combined, "deadbeefcafebabe+0x100/native;libc.so.6+0x100");
+        assert_eq!(
+            combined,
+            "libexample.so@deadbeefcafebabe+0x100/native;libc.so.6+0x100"
+        );
         assert_eq!(combined_count, 2);
     }
 
@@ -1572,7 +1690,7 @@ mod tests {
         };
 
         let (stack, frame_count) = resolve_stack(1, Some(&dictionary));
-        assert_eq!(stack, "deadbeefcafebabe+0x100");
+        assert_eq!(stack, "libexample.so@deadbeefcafebabe+0x100");
         assert_eq!(frame_count, 1);
     }
 
@@ -1798,8 +1916,6 @@ mod tests {
         };
         let scope = ScopeProfiles::default();
         let (records, rejected) = build_sample_records(
-            "default",
-            "default",
             &resource,
             &scope,
             &profile,
@@ -1887,6 +2003,123 @@ mod tests {
         );
         assert!(row.get("sample_tags").is_none());
         assert!(row.get("profile_blob").is_none());
+    }
+
+    #[test]
+    fn collector_empty_attribute_wire_sentinel_survives_record_extraction() {
+        let mut dictionary = ProfilesDictionary::decode(&[0x32, 0x02, 0x12, 0x00][..]).unwrap();
+        dictionary.string_table = vec!["".into(), "context".into(), "worker-1".into()];
+        dictionary.attribute_table.push(KeyValueAndUnit {
+            key_strindex: 1,
+            value: Some(AnyValue {
+                value: Some(any_value::Value::StringValueStrindex(2)),
+            }),
+            ..Default::default()
+        });
+        let request = ExportProfilesServiceRequest {
+            dictionary: Some(dictionary),
+            resource_profiles: vec![ResourceProfiles {
+                scope_profiles: vec![ScopeProfiles {
+                    profiles: vec![Profile {
+                        samples: vec![Sample {
+                            attribute_indices: vec![1],
+                            values: vec![7],
+                            ..Default::default()
+                        }],
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        let request =
+            ExportProfilesServiceRequest::decode(request.encode_to_vec().as_slice()).unwrap();
+        validation::validate(&request).unwrap();
+        let resource = &request.resource_profiles[0];
+        let scope = &resource.scope_profiles[0];
+        let (records, rejected) = build_sample_records(
+            resource,
+            scope,
+            &scope.profiles[0],
+            request.dictionary.as_ref(),
+            i64::MIN,
+            i64::MAX,
+        );
+        assert_eq!(rejected, 0);
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0]["context"], "worker-1");
+        assert_eq!(records[0]["value"], 7);
+    }
+
+    #[test]
+    fn omitted_empty_collection_values_survive_record_extraction() {
+        let mut payload = json::json!({
+            "dictionary": {
+                "stringTable": ["", "empty.array", "empty.kv", "nested"],
+                "attributeTable": [{"value": {}},
+                    {"keyStrindex": 1, "value": {"arrayValue": {}}},
+                    {"keyStrindex": 2, "value": {"kvlistValue": {}}},
+                    {"keyStrindex": 3, "value": {"arrayValue": {"values": [{"arrayValue": {}}, {"kvlistValue": {}}]}}}
+                ]
+            },
+            "resourceProfiles": [{"scopeProfiles": [{"profiles": [{"samples": [{"attributeIndices": [1, 2, 3], "values": [7]}]}]}]}]
+        });
+        otlp_json_compat::normalize(&mut payload);
+        let request = otlp_json_compat::deserialize(payload).unwrap();
+        validation::validate(&request).unwrap();
+        let resource = &request.resource_profiles[0];
+        let scope = &resource.scope_profiles[0];
+        let (records, rejected) = build_sample_records(
+            resource,
+            scope,
+            &scope.profiles[0],
+            request.dictionary.as_ref(),
+            i64::MIN,
+            i64::MAX,
+        );
+        assert_eq!(rejected, 0);
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0]["empty_array"], "[]");
+        assert_eq!(records[0]["empty_kv"], "{}");
+        assert_eq!(records[0]["nested"], "[[],{}]");
+        assert_eq!(records[0]["value"], 7);
+    }
+
+    #[test]
+    fn nested_json_string_references_survive_record_extraction() {
+        let mut payload = json::json!({
+            "dictionary": {
+                "stringTable": ["", "sample.array", "sample.kv", "worker-1", "label"],
+                "attributeTable": [{"value": {}},
+                    {"keyStrindex": 1, "value": {"arrayValue": {"values": [{"stringValueStrindex": 3}]}}},
+                    {"keyStrindex": 2, "value": {"kvlistValue": {"values": [{"keyStrindex": 4, "value": {"stringValueStrindex": 3}}]}}}
+                ]
+            },
+            "resourceProfiles": [{
+                "resource": {"attributes": [{"key": "context.array", "value": {"arrayValue": {"values": [{"stringValueStrindex": 3}]}}}]},
+                "scopeProfiles": [{"profiles": [{"samples": [{"attributeIndices": [1, 2], "values": [7]}]}]}]
+            }]
+        });
+        otlp_json_compat::normalize(&mut payload);
+        let request = otlp_json_compat::deserialize(payload).unwrap();
+        validation::validate(&request).unwrap();
+        let resource = &request.resource_profiles[0];
+        let scope = &resource.scope_profiles[0];
+        let (records, rejected) = build_sample_records(
+            resource,
+            scope,
+            &scope.profiles[0],
+            request.dictionary.as_ref(),
+            i64::MIN,
+            i64::MAX,
+        );
+        assert_eq!(rejected, 0);
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0]["sample_array"], r#"["worker-1"]"#);
+        assert_eq!(records[0]["sample_kv"], r#"{"label":"worker-1"}"#);
+        assert_eq!(records[0]["context_array"], r#"["worker-1"]"#);
+        assert_eq!(records[0]["value"], 7);
     }
 
     #[test]
@@ -1992,8 +2225,6 @@ mod tests {
         };
 
         let (records, rejected) = build_sample_records(
-            "default",
-            "default",
             &resource,
             &scope,
             &profile,
@@ -2093,8 +2324,6 @@ mod tests {
         };
 
         let (records, rejected) = build_sample_records(
-            "default",
-            "default",
             &resource,
             &ScopeProfiles::default(),
             &profile,
@@ -2192,8 +2421,6 @@ mod tests {
         let min_ts = now - 5 * 3600 * 1_000_000;
         let max_ts = now + 24 * 3600 * 1_000_000;
         let (records, rejected) = build_sample_records(
-            "default",
-            "default",
             &ResourceProfiles::default(),
             &ScopeProfiles::default(),
             &profile,
@@ -2206,6 +2433,82 @@ mod tests {
         assert_eq!(
             records[0].get(TIMESTAMP_COL_NAME).and_then(|v| v.as_i64()),
             Some((ok_ts_nano / 1000) as i64)
+        );
+    }
+
+    fn service_name_for(resource_attrs: &[(&str, &str)]) -> Option<String> {
+        let resource = ResourceProfiles {
+            resource: Some(opentelemetry_proto::tonic::resource::v1::Resource {
+                attributes: resource_attrs
+                    .iter()
+                    .map(
+                        |(key, value)| opentelemetry_proto::tonic::common::v1::KeyValue {
+                            key: key.to_string(),
+                            value: Some(AnyValue {
+                                value: Some(any_value::Value::StringValue(value.to_string())),
+                            }),
+                            ..Default::default()
+                        },
+                    )
+                    .collect(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let now = now_micros();
+        let profile = Profile {
+            time_unix_nano: (now as u64).saturating_mul(1000),
+            samples: vec![Sample {
+                values: vec![1],
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let (records, _) = build_sample_records(
+            &resource,
+            &ScopeProfiles::default(),
+            &profile,
+            Some(&ProfilesDictionary::default()),
+            now - 3600 * 1_000_000,
+            now + 3600 * 1_000_000,
+        );
+        assert_eq!(records.len(), 1);
+        records[0]
+            .get("service_name")
+            .and_then(|v| v.as_str())
+            .map(str::to_string)
+    }
+
+    #[test]
+    fn build_sample_records_keeps_the_sent_service_name() {
+        assert_eq!(
+            service_name_for(&[
+                ("service.name", "checkout"),
+                ("process.executable.name", "checkout-bin"),
+            ])
+            .as_deref(),
+            Some("checkout")
+        );
+    }
+
+    #[test]
+    fn build_sample_records_names_a_process_without_service_name_by_its_executable() {
+        assert_eq!(
+            service_name_for(&[("process.executable.name", "dockerd")]).as_deref(),
+            Some("unknown_service:dockerd")
+        );
+        assert_eq!(
+            service_name_for(&[("service.name", ""), ("process.executable.name", "dockerd")])
+                .as_deref(),
+            Some("unknown_service:dockerd")
+        );
+    }
+
+    #[test]
+    fn build_sample_records_falls_back_to_unknown_service_without_executable_name() {
+        assert_eq!(
+            service_name_for(&[("process.pid", "42")]).as_deref(),
+            Some("unknown_service")
         );
     }
 
@@ -2286,6 +2589,56 @@ mod tests {
         let resource =
             ingestion_gate_error(infra::errors::Error::ResourceError("disk full".into()));
         assert!(matches!(resource, ProfilesExportError::Unavailable(_)));
+    }
+
+    #[tokio::test]
+    async fn malformed_dictionary_returns_http_400_with_otlp_status() {
+        use crate::common::meta::otlp::GoogleRpcStatus;
+
+        for index in [-1, 99] {
+            let mut payload = json::json!({
+                "dictionary": {
+                    "stringTable": ["", "thread.name"],
+                    "attributeTable": [{}, {"keyStrindex": 1, "value": {"stringValueStrindex": index}}]
+                },
+                "resourceProfiles": [{"scopeProfiles": [{"profiles": [{"samples": [{"attributeIndices": [1], "values": [1]}]}]}]}]
+            });
+            otlp_json_compat::normalize(&mut payload);
+            let request = otlp_json_compat::deserialize(payload).unwrap();
+            let message = validation::validate(&request).unwrap_err();
+            assert!(message.contains(&format!(
+                "dictionary.attribute_table[1].value.string_value_strindex: index {index}"
+            )));
+            for req_type in [OtlpRequestType::HttpJson, OtlpRequestType::HttpProtobuf] {
+                let response = map_otlp_handler_error(
+                    "default",
+                    req_type,
+                    ProfilesExportError::InvalidArgument(message.clone()),
+                );
+                assert_eq!(response.status(), http::StatusCode::BAD_REQUEST);
+                let expected_type = if req_type == OtlpRequestType::HttpJson {
+                    CONTENT_TYPE_JSON
+                } else {
+                    CONTENT_TYPE_PROTO
+                };
+                assert_eq!(
+                    response.headers().get(http::header::CONTENT_TYPE).unwrap(),
+                    expected_type
+                );
+                let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                    .await
+                    .unwrap();
+                if req_type == OtlpRequestType::HttpJson {
+                    let status: json::Value = json::from_slice(&body).unwrap();
+                    assert_eq!(status["code"], 3);
+                    assert_eq!(status["message"], message);
+                } else {
+                    let status = GoogleRpcStatus::decode(body).unwrap();
+                    assert_eq!(status.code, 3);
+                    assert_eq!(status.message, message);
+                }
+            }
+        }
     }
 
     #[test]

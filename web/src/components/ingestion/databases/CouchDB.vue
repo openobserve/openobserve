@@ -14,8 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <script setup lang="ts">
-import { raw } from "@/types/i18n";
-import CopyContent from "@/components/CopyContent.vue";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
 import useIngestion from "@/composables/useIngestion";
@@ -26,8 +25,8 @@ const docURL = databaseDocURLs[name];
 </script>
 
 <template>
-  <IngestionContent>
-    <CopyContent :content="raw(content)" />
+  <IngestionContent snippet-kind="config" config-tool="OpenTelemetry Collector">
+    <CredentialCodeBlock slug="couchdb" :content="content" />
     <IngestionDocLink :href="docURL" />
   </IngestionContent>
 </template>

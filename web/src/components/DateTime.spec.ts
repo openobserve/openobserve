@@ -781,6 +781,23 @@ describe("DateTime Component", () => {
     });
   });
 
+  describe("disablePrevShift", () => {
+    const prev = (w: any) =>
+      w
+        .findAllComponents({ name: "OButton" })
+        .find((b: any) => b.attributes("data-test") === "date-time-prev-btn");
+
+    it("leaves ‹ on by default, as every existing picker has it", () => {
+      wrapper = createWrapper();
+      expect(prev(wrapper).props("disabled")).toBeFalsy();
+    });
+
+    it("turns ‹ off when the parent asks", () => {
+      wrapper = createWrapper({ disablePrevShift: true });
+      expect(prev(wrapper).props("disabled")).toBe(true);
+    });
+  });
+
   describe("Relative preset search", () => {
     it("shows every period with no search term", () => {
       wrapper = createWrapper();

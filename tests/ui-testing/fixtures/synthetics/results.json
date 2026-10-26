@@ -1,0 +1,520 @@
+{
+  "browser_passed": {
+    "schema_version": 2,
+    "type": "browser",
+    "target": "https://example.com",
+    "location": "e2e-us-east-1",
+    "location_label": "E2E Public",
+    "region": "us-east-1",
+    "device": "desktop",
+    "engine": "chromium",
+    "runtime": "lambda",
+    "probe_id": "e2e-probe",
+    "probe_name": "e2e",
+    "trigger_type": "schedule",
+    "tags": "",
+    "artifacts_withheld": false,
+    "scheduled_ts": 1,
+    "started_ts": 1,
+    "completed_ts": 1,
+    "init_ms": 180,
+    "total_attempt_ms": 480,
+    "attempts": 1,
+    "retry_history": [],
+    "status_reason": "",
+    "error_source": "",
+    "error": "",
+    "failed_step": "",
+    "evidence_key": "",
+    "evidence_by_step": [],
+    "evidence_truncated": false,
+    "trace_key": "",
+    "recorded_steps": [
+      {
+        "id": "step-navigate",
+        "action": "navigate",
+        "name": "Open example.com",
+        "url": "https://example.com"
+      },
+      {
+        "id": "step-title",
+        "action": "assert",
+        "name": "Title is Example Domain",
+        "selector": "page_title"
+      },
+      {
+        "id": "step-url",
+        "action": "assert",
+        "name": "URL matches example.com",
+        "selector": "url_matches"
+      }
+    ],
+    "run_id": "x",
+    "execution_id": "x",
+    "job_id": "x",
+    "status": "passed",
+    "response_time_ms": 467,
+    "last_attempt_steps": [
+      {
+        "step_id": "step-navigate",
+        "status": "passed",
+        "duration_ms": 420,
+        "error": "",
+        "screenshot_key": ""
+      },
+      {
+        "step_id": "step-title",
+        "status": "passed",
+        "duration_ms": 35,
+        "error": "",
+        "screenshot_key": ""
+      },
+      {
+        "step_id": "step-url",
+        "status": "passed",
+        "duration_ms": 12,
+        "error": "",
+        "screenshot_key": ""
+      }
+    ],
+    "step_template": "browser_passed"
+  },
+  "browser_failed": {
+    "schema_version": 2,
+    "type": "browser",
+    "target": "https://example.com",
+    "location": "e2e-us-east-1",
+    "location_label": "E2E Public",
+    "region": "us-east-1",
+    "device": "desktop",
+    "engine": "chromium",
+    "runtime": "lambda",
+    "probe_id": "e2e-probe",
+    "probe_name": "e2e",
+    "trigger_type": "schedule",
+    "tags": "",
+    "artifacts_withheld": false,
+    "scheduled_ts": 1,
+    "started_ts": 1,
+    "completed_ts": 1,
+    "init_ms": 180,
+    "total_attempt_ms": 10465,
+    "attempts": 1,
+    "retry_history": [],
+    "status_reason": "",
+    "error_source": "",
+    "error": "assert: Timeout 10000ms exceeded while waiting for locator('#missing-title') to be visible. Tried 3 candidates: css=#missing-title, text=Example Domain, role=heading[name=Example Domain]. The page stayed on https://example.com/ and no navigation was observed during the settle window.",
+    "failed_step": "step-url",
+    "evidence_key": "",
+    "evidence_by_step": [],
+    "evidence_truncated": false,
+    "trace_key": "",
+    "recorded_steps": [
+      {
+        "id": "step-navigate",
+        "action": "navigate",
+        "name": "Open example.com",
+        "url": "https://example.com"
+      },
+      {
+        "id": "step-title",
+        "action": "assert",
+        "name": "Title is Example Domain",
+        "selector": "page_title"
+      },
+      {
+        "id": "step-url",
+        "action": "assert",
+        "name": "URL matches example.com",
+        "selector": "url_matches"
+      }
+    ],
+    "run_id": "x",
+    "execution_id": "x",
+    "job_id": "x",
+    "status": "failed",
+    "response_time_ms": 10465,
+    "failure_detail": {
+      "step_id": "step-url",
+      "step_name": "URL matches example.com",
+      "step_index": 2,
+      "error": "Timeout 10000ms exceeded while waiting for locator('#missing-title') to be visible. Tried 3 candidates: css=#missing-title, text=Example Domain, role=heading[name=Example Domain]. The page stayed on https://example.com/ and no navigation was observed during the settle window.",
+      "candidates_tried": [],
+      "settle_signals": [],
+      "settle_ms": 0,
+      "observed_duration_ms": 10010,
+      "screenshot_key": "synthetics/e2e/failed-step-url.png"
+    },
+    "last_attempt_steps": [
+      {
+        "step_id": "step-navigate",
+        "status": "passed",
+        "duration_ms": 420,
+        "error": "",
+        "screenshot_key": ""
+      },
+      {
+        "step_id": "step-title",
+        "status": "passed",
+        "duration_ms": 35,
+        "error": "",
+        "screenshot_key": ""
+      },
+      {
+        "step_id": "step-url",
+        "status": "failed",
+        "duration_ms": 10010,
+        "error": "Timeout 10000ms exceeded while waiting for locator('#missing-title') to be visible. Tried 3 candidates: css=#missing-title, text=Example Domain, role=heading[name=Example Domain]. The page stayed on https://example.com/ and no navigation was observed during the settle window.",
+        "screenshot_key": "synthetics/e2e/failed-step-url.png"
+      }
+    ],
+    "step_template": "browser_failed"
+  },
+  "browser_retried": {
+    "schema_version": 2,
+    "type": "browser",
+    "target": "https://example.com",
+    "location": "e2e-us-east-1",
+    "location_label": "E2E Public",
+    "region": "us-east-1",
+    "device": "desktop",
+    "engine": "chromium",
+    "runtime": "lambda",
+    "probe_id": "e2e-probe",
+    "probe_name": "e2e",
+    "trigger_type": "schedule",
+    "tags": "",
+    "artifacts_withheld": false,
+    "scheduled_ts": 1,
+    "started_ts": 1,
+    "completed_ts": 1,
+    "init_ms": 180,
+    "total_attempt_ms": 10935,
+    "attempts": 2,
+    "retry_history": [
+      {
+        "attempt": 0,
+        "status": "failed",
+        "response_time_ms": 10465,
+        "steps": [
+          {
+            "step_id": "step-navigate",
+            "status": "passed",
+            "duration_ms": 420,
+            "error": "",
+            "screenshot_key": ""
+          },
+          {
+            "step_id": "step-title",
+            "status": "passed",
+            "duration_ms": 35,
+            "error": "",
+            "screenshot_key": ""
+          },
+          {
+            "step_id": "step-url",
+            "status": "failed",
+            "duration_ms": 10010,
+            "error": "Timeout 10000ms exceeded while waiting for locator('#missing-title') to be visible. Tried 3 candidates: css=#missing-title, text=Example Domain, role=heading[name=Example Domain]. The page stayed on https://example.com/ and no navigation was observed during the settle window.",
+            "screenshot_key": "synthetics/e2e/failed-step-url.png"
+          }
+        ],
+        "failure_detail": {
+          "step_id": "step-url",
+          "step_name": "URL matches example.com",
+          "step_index": 2,
+          "error": "Timeout 10000ms exceeded while waiting for locator('#missing-title') to be visible. Tried 3 candidates: css=#missing-title, text=Example Domain, role=heading[name=Example Domain]. The page stayed on https://example.com/ and no navigation was observed during the settle window."
+        }
+      },
+      {
+        "attempt": 1,
+        "status": "passed",
+        "response_time_ms": 470,
+        "steps": [
+          {
+            "step_id": "step-navigate",
+            "status": "passed",
+            "duration_ms": 420,
+            "error": "",
+            "screenshot_key": ""
+          },
+          {
+            "step_id": "step-title",
+            "status": "passed",
+            "duration_ms": 35,
+            "error": "",
+            "screenshot_key": ""
+          },
+          {
+            "step_id": "step-url",
+            "status": "passed",
+            "duration_ms": 12,
+            "error": "",
+            "screenshot_key": ""
+          }
+        ]
+      }
+    ],
+    "status_reason": "flaky",
+    "error_source": "",
+    "error": "",
+    "failed_step": "",
+    "evidence_key": "",
+    "evidence_by_step": [],
+    "evidence_truncated": false,
+    "trace_key": "",
+    "recorded_steps": [
+      {
+        "id": "step-navigate",
+        "action": "navigate",
+        "name": "Open example.com",
+        "url": "https://example.com"
+      },
+      {
+        "id": "step-title",
+        "action": "assert",
+        "name": "Title is Example Domain",
+        "selector": "page_title"
+      },
+      {
+        "id": "step-url",
+        "action": "assert",
+        "name": "URL matches example.com",
+        "selector": "url_matches"
+      }
+    ],
+    "run_id": "x",
+    "execution_id": "x",
+    "job_id": "x",
+    "status": "warning",
+    "response_time_ms": 470,
+    "last_attempt_steps": [
+      {
+        "step_id": "step-navigate",
+        "status": "passed",
+        "duration_ms": 420,
+        "error": "",
+        "screenshot_key": ""
+      },
+      {
+        "step_id": "step-title",
+        "status": "passed",
+        "duration_ms": 35,
+        "error": "",
+        "screenshot_key": ""
+      },
+      {
+        "step_id": "step-url",
+        "status": "passed",
+        "duration_ms": 12,
+        "error": "",
+        "screenshot_key": ""
+      }
+    ],
+    "step_template": "browser_retried"
+  },
+  "error_dispatch": {
+    "schema_version": 2,
+    "type": "browser",
+    "target": "https://example.com",
+    "location": "e2e-us-east-1",
+    "location_label": "E2E Public",
+    "region": "us-east-1",
+    "device": "desktop",
+    "engine": "chromium",
+    "runtime": "lambda",
+    "probe_id": "e2e-probe",
+    "probe_name": "e2e",
+    "trigger_type": "schedule",
+    "tags": "",
+    "artifacts_withheld": false,
+    "scheduled_ts": 1,
+    "started_ts": 0,
+    "completed_ts": 0,
+    "init_ms": 0,
+    "total_attempt_ms": 0,
+    "attempts": 0,
+    "retry_history": [],
+    "status_reason": "",
+    "error_source": "dispatch",
+    "error": "dispatch: Lambda invoke failed after 3 attempts: ResourceNotFoundException",
+    "failed_step": "",
+    "evidence_key": "",
+    "evidence_by_step": [],
+    "evidence_truncated": false,
+    "trace_key": "",
+    "recorded_steps": [],
+    "run_id": "x",
+    "execution_id": "x",
+    "job_id": "x",
+    "status": "error",
+    "response_time_ms": 0,
+    "last_attempt_steps": [],
+    "step_template": ""
+  },
+  "error_quota": {
+    "schema_version": 2,
+    "type": "browser",
+    "target": "https://example.com",
+    "location": "e2e-us-east-1",
+    "location_label": "E2E Public",
+    "region": "us-east-1",
+    "device": "desktop",
+    "engine": "chromium",
+    "runtime": "lambda",
+    "probe_id": "e2e-probe",
+    "probe_name": "e2e",
+    "trigger_type": "schedule",
+    "tags": "",
+    "artifacts_withheld": false,
+    "scheduled_ts": 0,
+    "started_ts": 0,
+    "completed_ts": 0,
+    "init_ms": 0,
+    "total_attempt_ms": 0,
+    "attempts": 0,
+    "retry_history": [],
+    "status_reason": "",
+    "error_source": "quota",
+    "error": "quota: org step budget exhausted for this period",
+    "failed_step": "",
+    "evidence_key": "",
+    "evidence_by_step": [],
+    "evidence_truncated": false,
+    "trace_key": "",
+    "recorded_steps": [],
+    "run_id": "",
+    "execution_id": "",
+    "job_id": "",
+    "status": "error",
+    "response_time_ms": 0,
+    "last_attempt_steps": [],
+    "step_template": ""
+  },
+  "http_passed": {
+    "schema_version": 2,
+    "type": "http",
+    "target": "https://example.com",
+    "location": "e2e-us-east-1",
+    "location_label": "E2E Public",
+    "region": "us-east-1",
+    "device": "",
+    "engine": "",
+    "runtime": "lambda",
+    "probe_id": "e2e-probe",
+    "probe_name": "e2e",
+    "trigger_type": "schedule",
+    "tags": "",
+    "artifacts_withheld": false,
+    "scheduled_ts": 1,
+    "started_ts": 1,
+    "completed_ts": 1,
+    "init_ms": 0,
+    "total_attempt_ms": 312,
+    "attempts": 1,
+    "retry_history": [],
+    "status_reason": "",
+    "error_source": "",
+    "error": "",
+    "failed_step": "",
+    "evidence_key": "",
+    "evidence_by_step": [],
+    "evidence_truncated": false,
+    "trace_key": "",
+    "recorded_steps": [],
+    "run_id": "x",
+    "execution_id": "x",
+    "job_id": "x",
+    "last_attempt_steps": [],
+    "status_code": 200,
+    "assertions_passed": true,
+    "assertions": [
+      {
+        "field": "status_code",
+        "operator": "eq",
+        "value": 200,
+        "passed": true,
+        "detail": "200 == 200"
+      },
+      {
+        "field": "response_time_ms",
+        "operator": "lt",
+        "value": 5000,
+        "passed": true,
+        "detail": "312 < 5000"
+      }
+    ],
+    "timings_ms_dns": 12,
+    "timings_ms_connect": 40,
+    "timings_ms_tls": 80,
+    "timings_ms_ttfb": 180,
+    "timings_ms_total": 312,
+    "response_bytes": 1256,
+    "step_template": "",
+    "status": "passed",
+    "response_time_ms": 312
+  },
+  "http_failed": {
+    "schema_version": 2,
+    "type": "http",
+    "target": "https://example.com",
+    "location": "e2e-us-east-1",
+    "location_label": "E2E Public",
+    "region": "us-east-1",
+    "device": "",
+    "engine": "",
+    "runtime": "lambda",
+    "probe_id": "e2e-probe",
+    "probe_name": "e2e",
+    "trigger_type": "schedule",
+    "tags": "",
+    "artifacts_withheld": false,
+    "scheduled_ts": 1,
+    "started_ts": 1,
+    "completed_ts": 1,
+    "init_ms": 0,
+    "total_attempt_ms": 312,
+    "attempts": 1,
+    "retry_history": [],
+    "status_reason": "",
+    "error_source": "",
+    "error": "assertion failed: status_code eq 200 (got 503)",
+    "failed_step": "",
+    "evidence_key": "",
+    "evidence_by_step": [],
+    "evidence_truncated": false,
+    "trace_key": "",
+    "recorded_steps": [],
+    "run_id": "x",
+    "execution_id": "x",
+    "job_id": "x",
+    "last_attempt_steps": [],
+    "status_code": 503,
+    "assertions_passed": false,
+    "assertions": [
+      {
+        "field": "status_code",
+        "operator": "eq",
+        "value": 200,
+        "passed": false,
+        "detail": "503 != 200"
+      },
+      {
+        "field": "response_time_ms",
+        "operator": "lt",
+        "value": 5000,
+        "passed": false,
+        "detail": "6210 >= 5000"
+      }
+    ],
+    "timings_ms_dns": 12,
+    "timings_ms_connect": 40,
+    "timings_ms_tls": 80,
+    "timings_ms_ttfb": 6000,
+    "timings_ms_total": 6210,
+    "response_bytes": 1256,
+    "step_template": "",
+    "status": "failed",
+    "response_time_ms": 6210
+  }
+}

@@ -282,6 +282,7 @@ function rowTitle(e: EvidenceEvent): string {
     :show-global-filter="false"
     :dense="true"
     :wrap="wrap"
+    :cell-overflow-tooltip="false"
     :bordered="true"
     :default-columns="false"
     :fill-height="false"
@@ -356,8 +357,7 @@ function rowTitle(e: EvidenceEvent): string {
     <template v-if="isPanel" #cell-step="{ row }">
       <span
         class="text-text-secondary text-xs"
-        :class="wrap ? 'break-all whitespace-normal' : 'truncate'"
-        :title="row.stepName ?? ''"
+        :class="{ 'break-all whitespace-normal': wrap }"
         data-test="synthetics-evidence-events-step"
       >
         {{ row.stepName ?? t("synthetics.evidence.unattributed") }}

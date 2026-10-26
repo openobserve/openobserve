@@ -288,12 +288,20 @@ fn generate_result_path(
     )
 }
 
-/// Delete every S3 result file backing an org's search jobs. Used by org cleanup:
-/// the DB rows are removed by `search_jobs::delete_by_org`, but the result objects
-/// in storage (keyed by created_at/trace_id, not org) would otherwise be orphaned.
-/// Best-effort per job; a storage error on one job does not abort the rest.
+/// Only search-job result files under `result/` may be read back from object storage.
+pub fn is_search_job_result_path(path: &str) -> bool {
+    use std::path::{Component, Path};
+    path.starts_with("result/")
+        && path.ends_with(".result.json")
+        && Path::new(path)
+            .components()
+            .all(|c| matches!(c, Component::Normal(_)))
+}
+
+/// Tries every job of the org and returns the first storage error.
 pub async fn delete_org_result_files(org_id: &str) -> Result<(), anyhow::Error> {
     let jobs = list_status_by_org_id(org_id).await?;
+    let mut first_err = None;
     for job in jobs.iter() {
         let mut deleted_files = Vec::new();
         if let Some(partition_num) = job.partition_num {
@@ -328,9 +336,10 @@ pub async fn delete_org_result_files(org_id: &str) -> Result<(), anyhow::Error> 
                 "[SEARCH JOB] delete_org_result_files org={org_id} job={} error: {e}",
                 job.id
             );
+            first_err.get_or_insert(anyhow::anyhow!("job {}: {e}", job.id));
         }
     }
-    Ok(())
+    first_err.map_or(Ok(()), Err)
 }
 
 pub async fn delete_jobs() -> Result<(), anyhow::Error> {
@@ -555,4 +564,25 @@ pub async fn delete_result(paths: Vec<String>) -> Result<(), anyhow::Error> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_search_job_result_path() {
+        assert!(is_search_job_result_path(
+            "result/2026/09/29/abc123/final.result.json"
+        ));
+        assert!(is_search_job_result_path(
+            "result/2026/09/29/abc123/0.result.json"
+        ));
+        assert!(!is_search_job_result_path("files/otherorg/logs/x.parquet"));
+        assert!(!is_search_job_result_path(
+            "result/../files/otherorg/secret.result.json"
+        ));
+        assert!(!is_search_job_result_path("/result/x.result.json"));
+        assert!(!is_search_job_result_path("result/x.parquet"));
+    }
 }

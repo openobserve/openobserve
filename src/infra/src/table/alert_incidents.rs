@@ -17,10 +17,11 @@
 //!
 //! Provides CRUD operations for incidents and incident-alert associations.
 
+use config::meta::alerts::rca_runs::{V1_PREVIOUS_REPORTS_KEY, V1_REPORT_KEY};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Set, TransactionTrait,
-    sea_query::{Expr, LockType},
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect, RelationTrait, Set, TransactionTrait,
+    sea_query::{Expr, JoinType, LockType},
 };
 use svix_ksuid::KsuidLike;
 
@@ -29,6 +30,14 @@ use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
 };
+
+/// One incident [auto_resolve_stale] resolved, with the downtime that muted it until then.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AutoResolved {
+    pub org_id: String,
+    pub incident_id: String,
+    pub muted_by_downtime_id: Option<String>,
+}
 
 /// The row a new incident starts as. One construction site, so the plain create
 /// and the on-call promotion's transaction cannot drift as columns are added.
@@ -39,6 +48,7 @@ fn new_incident(
     key_type: &str,
     first_alert_at: i64,
     title: Option<String>,
+    muted_by_downtime_id: Option<String>,
 ) -> alert_incidents::ActiveModel {
     let now = chrono::Utc::now().timestamp_micros();
 
@@ -60,12 +70,35 @@ fn new_incident(
         acknowledged_at: Set(None),
         created_at: Set(now),
         updated_at: Set(now),
+        muted_by_downtime_id: Set(muted_by_downtime_id),
+        rca_run_id: Set(None),
+        rca_state: Set(None),
+        rca_started_at: Set(None),
+        rca_updated_at: Set(None),
+        rca_outcome: Set(None),
+        rca_confidence: Set(None),
+        rca_summary: Set(None),
+        rca_off_reason: Set(None),
     }
 }
 
 /// Get incident by ID
 pub async fn get(org_id: &str, id: &str) -> Result<Option<alert_incidents::Model>, errors::Error> {
     let client = get_orm_client_ro().await;
+
+    alert_incidents::Entity::find_by_id(id)
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// [get] on the primary, for a write that must not act on a lagging replica.
+pub async fn get_rw(
+    org_id: &str,
+    id: &str,
+) -> Result<Option<alert_incidents::Model>, errors::Error> {
+    let client = get_orm_client_rw().await;
 
     alert_incidents::Entity::find_by_id(id)
         .filter(alert_incidents::Column::OrgId.eq(org_id))
@@ -83,6 +116,28 @@ pub async fn create(
     first_alert_at: i64,
     title: Option<String>,
 ) -> Result<alert_incidents::Model, errors::Error> {
+    create_with_mute(
+        org_id,
+        severity,
+        group_values,
+        key_type,
+        first_alert_at,
+        title,
+        None,
+    )
+    .await
+}
+
+/// [`create`] for an incident opened by a firing that a downtime suppressed (D3).
+pub async fn create_with_mute(
+    org_id: &str,
+    severity: &str,
+    group_values: serde_json::Value,
+    key_type: &str,
+    first_alert_at: i64,
+    title: Option<String>,
+    muted_by_downtime_id: Option<String>,
+) -> Result<alert_incidents::Model, errors::Error> {
     let client = get_orm_client_rw().await;
 
     new_incident(
@@ -92,6 +147,7 @@ pub async fn create(
         key_type,
         first_alert_at,
         title,
+        muted_by_downtime_id,
     )
     .insert(client)
     .await
@@ -132,6 +188,7 @@ pub async fn create_and_attach_to_oncall_response(
         key_type,
         first_alert_at,
         title,
+        None,
     )
     .insert(&txn)
     .await
@@ -253,11 +310,23 @@ pub async fn update_status(
     id: &str,
     status: &str,
 ) -> Result<alert_incidents::Model, errors::Error> {
-    let client = get_orm_client_rw().await;
+    update_status_with(get_orm_client_rw().await, org_id, id, status).await
+}
+
+/// [`update_status`] on a given connection; a resolve ends the downtime mute.
+pub async fn update_status_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    id: &str,
+    status: &str,
+) -> Result<alert_incidents::Model, errors::Error> {
     let now = chrono::Utc::now().timestamp_micros();
 
-    let incident = get(org_id, id)
-        .await?
+    let incident = alert_incidents::Entity::find_by_id(id)
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .one(conn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
         .ok_or_else(|| Error::DbError(DbError::SeaORMError("Incident not found".to_string())))?;
 
     let mut active: alert_incidents::ActiveModel = incident.into();
@@ -266,10 +335,12 @@ pub async fn update_status(
 
     if status == "resolved" {
         active.resolved_at = Set(Some(now));
+        // A manual reopen must run as a live incident, not stay muted forever.
+        active.muted_by_downtime_id = Set(None);
     }
 
     active
-        .update(client)
+        .update(conn)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
@@ -303,6 +374,86 @@ pub async fn acknowledge(
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
     get(org_id, id).await
+}
+
+/// Clears the mute only while it names `downtime_id`, so one of two concurrent firings sees `true`.
+pub async fn clear_muted_by_downtime_id(
+    org_id: &str,
+    id: &str,
+    downtime_id: &str,
+) -> Result<bool, errors::Error> {
+    clear_muted_by_downtime_id_with(get_orm_client_rw().await, org_id, id, downtime_id).await
+}
+
+/// [`clear_muted_by_downtime_id`] on a given connection.
+pub async fn clear_muted_by_downtime_id_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    id: &str,
+    downtime_id: &str,
+) -> Result<bool, errors::Error> {
+    replace_muted_by_downtime_id_with(conn, org_id, id, downtime_id, None).await
+}
+
+/// Names the downtime that mutes the incident now, only while it still names `downtime_id`.
+pub async fn retarget_muted_by_downtime_id(
+    org_id: &str,
+    id: &str,
+    downtime_id: &str,
+    current: &str,
+) -> Result<bool, errors::Error> {
+    replace_muted_by_downtime_id_with(
+        get_orm_client_rw().await,
+        org_id,
+        id,
+        downtime_id,
+        Some(current),
+    )
+    .await
+}
+
+/// Compare-and-set of the mute from `downtime_id` to `next`; `true` when this call changed it.
+pub async fn replace_muted_by_downtime_id_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    id: &str,
+    downtime_id: &str,
+    next: Option<&str>,
+) -> Result<bool, errors::Error> {
+    let res = alert_incidents::Entity::update_many()
+        .col_expr(
+            alert_incidents::Column::MutedByDowntimeId,
+            Expr::value(next.map(str::to_string)),
+        )
+        .col_expr(
+            alert_incidents::Column::UpdatedAt,
+            Expr::value(chrono::Utc::now().timestamp_micros()),
+        )
+        .filter(alert_incidents::Column::Id.eq(id))
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::MutedByDowntimeId.eq(downtime_id))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected == 1)
+}
+
+/// Records why automatic runs never start; leaves `updated_at` alone so the list order holds.
+pub async fn set_rca_off_reason(
+    org_id: &str,
+    id: &str,
+    reason: Option<&str>,
+) -> Result<(), errors::Error> {
+    alert_incidents::Entity::update_many()
+        .col_expr(
+            alert_incidents::Column::RcaOffReason,
+            Expr::value(reason.map(str::to_string)),
+        )
+        .filter(alert_incidents::Column::Id.eq(id))
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .exec(get_orm_client_rw().await)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(())
 }
 
 /// Update incident title
@@ -358,11 +509,20 @@ pub async fn list(
     limit: u64,
     offset: u64,
 ) -> Result<Vec<alert_incidents::Model>, errors::Error> {
-    let client = get_orm_client_ro().await;
+    list_with(get_orm_client_ro().await, org_id, status, limit, offset).await
+}
 
+/// [`list`] on a given connection.
+pub async fn list_with<C: ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+    status: Option<&str>,
+    limit: u64,
+    offset: u64,
+) -> Result<Vec<alert_incidents::Model>, errors::Error> {
     let mut query = alert_incidents::Entity::find()
         .select_only()
-        // Select all columns EXCEPT topology_context for performance
+        // Skip topology_context for performance; the run summary columns feed the list's AI cell.
         .column(alert_incidents::Column::Id)
         .column(alert_incidents::Column::OrgId)
         .column(alert_incidents::Column::Status)
@@ -377,6 +537,15 @@ pub async fn list(
         .column(alert_incidents::Column::AssignedTo)
         .column(alert_incidents::Column::CreatedAt)
         .column(alert_incidents::Column::UpdatedAt)
+        .column(alert_incidents::Column::MutedByDowntimeId)
+        .column(alert_incidents::Column::RcaRunId)
+        .column(alert_incidents::Column::RcaState)
+        .column(alert_incidents::Column::RcaStartedAt)
+        .column(alert_incidents::Column::RcaUpdatedAt)
+        .column(alert_incidents::Column::RcaOutcome)
+        .column(alert_incidents::Column::RcaConfidence)
+        .column(alert_incidents::Column::RcaSummary)
+        .column(alert_incidents::Column::RcaOffReason)
         .filter(alert_incidents::Column::OrgId.eq(org_id))
         .order_by_desc(alert_incidents::Column::LastAlertAt);
 
@@ -498,6 +667,54 @@ pub async fn find_open_incident_containing_alert(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
+/// The resolved incidents among the alert's `limit` latest firings, newest first.
+pub async fn resolved_incidents_for_alert(
+    org_id: &str,
+    alert_id: &str,
+    limit: u64,
+) -> Result<Vec<String>, errors::Error> {
+    resolved_incidents_for_alert_with(get_orm_client_ro().await, org_id, alert_id, limit).await
+}
+
+/// [`resolved_incidents_for_alert`] against a caller-supplied connection.
+pub async fn resolved_incidents_for_alert_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: &str,
+    limit: u64,
+) -> Result<Vec<String>, errors::Error> {
+    let links: Vec<String> = alert_incident_alerts::Entity::find()
+        .select_only()
+        .column(alert_incident_alerts::Column::IncidentId)
+        .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
+        .order_by_desc(alert_incident_alerts::Column::AlertFiredAt)
+        .limit(limit)
+        .into_tuple()
+        .all(conn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    let mut ids: Vec<String> = Vec::with_capacity(links.len());
+    for id in links {
+        if !ids.contains(&id) {
+            ids.push(id);
+        }
+    }
+    if ids.is_empty() {
+        return Ok(ids);
+    }
+    let resolved: Vec<String> = alert_incidents::Entity::find()
+        .select_only()
+        .column(alert_incidents::Column::Id)
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::Status.eq("resolved"))
+        .filter(alert_incidents::Column::Id.is_in(ids.clone()))
+        .into_tuple()
+        .all(conn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(ids.into_iter().filter(|id| resolved.contains(id)).collect())
+}
+
 /// Get actual alert counts for multiple incidents (source of truth)
 ///
 /// Returns a HashMap of incident_id -> actual_count from junction table.
@@ -536,6 +753,44 @@ pub async fn get_alert_counts(
     Ok(results
         .into_iter()
         .map(|r| (r.incident_id, r.count as i32))
+        .collect())
+}
+
+/// Built apart from the call so its shape is testable without a database.
+fn linked_firings_query(
+    org_id: &str,
+    start_micros: i64,
+    end_micros: i64,
+) -> sea_orm::Select<alert_incident_alerts::Entity> {
+    // The junction carries no org, so scoping has to come through the incident row.
+    alert_incident_alerts::Entity::find()
+        .join(
+            JoinType::InnerJoin,
+            alert_incident_alerts::Relation::Incident.def(),
+        )
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incident_alerts::Column::AlertFiredAt.gte(start_micros))
+        .filter(alert_incident_alerts::Column::AlertFiredAt.lt(end_micros))
+        .select_only()
+        .column(alert_incident_alerts::Column::AlertId)
+        .column_as(alert_incident_alerts::Column::AlertId.count(), "count")
+        .group_by(alert_incident_alerts::Column::AlertId)
+}
+
+/// Firings that joined an incident, per alert, over a half-open window.
+pub async fn count_linked_firings_by_alert(
+    org_id: &str,
+    start_micros: i64,
+    end_micros: i64,
+) -> Result<std::collections::HashMap<String, u64>, errors::Error> {
+    let counts = linked_firings_query(org_id, start_micros, end_micros)
+        .into_tuple::<(String, i64)>()
+        .all(get_orm_client_ro().await)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(counts
+        .into_iter()
+        .map(|(alert_id, count)| (alert_id, count as u64))
         .collect())
 }
 
@@ -614,17 +869,27 @@ pub async fn update_topology(
     let client = get_orm_client_rw().await;
     let now = chrono::Utc::now().timestamp_micros();
 
-    let incident = get(org_id, id)
+    let mut incident = get(org_id, id)
         .await?
         .ok_or_else(|| Error::DbError(DbError::SeaORMError("Incident not found".to_string())))?;
 
     // Serialize topology to JSON - ONLY place this happens
-    let topology_json = serde_json::to_value(topology).map_err(|e| {
+    let mut topology_json = serde_json::to_value(topology).map_err(|e| {
         Error::DbError(DbError::SeaORMError(format!(
             "Failed to serialize topology: {}",
             e
         )))
     })?;
+    // The pre-run reports are not part of the struct but are still read as v1 reports.
+    if let (serde_json::Value::Object(new), Some(serde_json::Value::Object(mut old))) =
+        (&mut topology_json, incident.topology_context.take())
+    {
+        for key in [V1_REPORT_KEY, V1_PREVIOUS_REPORTS_KEY] {
+            if let Some(value) = old.remove(key) {
+                new.insert(key.to_string(), value);
+            }
+        }
+    }
 
     let mut active: alert_incidents::ActiveModel = incident.into();
     active.topology_context = Set(Some(topology_json));
@@ -779,18 +1044,21 @@ pub async fn upgrade_incident_group_values(
     Ok(())
 }
 
-/// Auto-resolve stale incidents that haven't received new alerts
-///
-/// Returns the number of incidents resolved
-/// Returns (count, Vec<(org_id, incident_id)>) of resolved incidents
+/// Resolves the incidents with no alert within the threshold; their count and the incidents.
 pub async fn auto_resolve_stale(
     stale_threshold_micros: i64,
-) -> Result<(u64, Vec<(String, String)>), errors::Error> {
-    const PAGE_SIZE: u64 = 500;
-
-    let client = get_orm_client_rw().await;
+) -> Result<(u64, Vec<AutoResolved>), errors::Error> {
     let now = chrono::Utc::now().timestamp_micros();
-    let cutoff = now - stale_threshold_micros;
+    auto_resolve_stale_with(get_orm_client_rw().await, now - stale_threshold_micros, now).await
+}
+
+/// [auto_resolve_stale] on a given connection, for incidents with no alert since `cutoff`.
+pub async fn auto_resolve_stale_with<C: ConnectionTrait>(
+    client: &C,
+    cutoff: i64,
+    now: i64,
+) -> Result<(u64, Vec<AutoResolved>), errors::Error> {
+    const PAGE_SIZE: u64 = 500;
 
     let mut resolved_ids = Vec::new();
     loop {
@@ -812,17 +1080,22 @@ pub async fn auto_resolve_stale(
             .col_expr(alert_incidents::Column::Status, Expr::value("resolved"))
             .col_expr(alert_incidents::Column::ResolvedAt, Expr::value(Some(now)))
             .col_expr(alert_incidents::Column::UpdatedAt, Expr::value(now))
+            // A resolved incident is muted by nothing, even if recording its events fails later.
+            .col_expr(
+                alert_incidents::Column::MutedByDowntimeId,
+                Expr::value(Option::<String>::None),
+            )
             .filter(alert_incidents::Column::Id.is_in(page_ids))
             .filter(alert_incidents::Column::Status.ne("resolved"))
             .exec(client)
             .await
             .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
-        resolved_ids.extend(
-            stale_incidents
-                .into_iter()
-                .map(|incident| (incident.org_id, incident.id)),
-        );
+        resolved_ids.extend(stale_incidents.into_iter().map(|incident| AutoResolved {
+            org_id: incident.org_id,
+            incident_id: incident.id,
+            muted_by_downtime_id: incident.muted_by_downtime_id,
+        }));
         if !page_full {
             break;
         }
@@ -844,7 +1117,258 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
 
 #[cfg(test)]
 mod tests {
+    use sea_orm::{Database, DatabaseConnection, Schema};
+
     use super::*;
+
+    // The join, the org scope and the half-open bounds are the whole correctness of this query.
+    #[test]
+    fn linked_firings_query_scopes_by_org_through_the_incident_join() {
+        use sea_orm::{DbBackend, QueryTrait};
+
+        let sql = linked_firings_query("acme", 100, 200)
+            .build(DbBackend::Postgres)
+            .to_string();
+
+        assert!(sql.contains("INNER JOIN \"alert_incidents\""), "{sql}");
+        assert!(
+            sql.contains("\"alert_incidents\".\"org_id\" = 'acme'"),
+            "{sql}"
+        );
+        assert!(
+            sql.contains("\"alert_fired_at\" >= 100") && sql.contains("\"alert_fired_at\" < 200"),
+            "window must be half-open, or a firing on a boundary is counted twice: {sql}"
+        );
+        assert!(
+            sql.contains("GROUP BY \"alert_incident_alerts\".\"alert_id\""),
+            "{sql}"
+        );
+    }
+
+    async fn incidents_db() -> DatabaseConnection {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(alert_incidents::Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        db
+    }
+
+    /// An incident in `status` that alert `a1` fired into at `fired_at`.
+    async fn fired_into(db: &DatabaseConnection, status: &str, fired_at: i64) -> String {
+        let mut incident = new_incident(
+            "acme",
+            "P2",
+            serde_json::json!({"service": "payments"}),
+            "service",
+            fired_at,
+            None,
+            None,
+        );
+        incident.status = Set(status.to_string());
+        let incident = incident.insert(db).await.unwrap();
+        alert_incident_alerts::ActiveModel {
+            incident_id: Set(incident.id.clone()),
+            alert_id: Set("a1".to_string()),
+            alert_fired_at: Set(fired_at),
+            alert_name: Set("a1".to_string()),
+            alert_kind: Set("alert".to_string()),
+            correlation_reason: Set(None),
+            created_at: Set(fired_at),
+            resolved_at: Set(None),
+        }
+        .insert(db)
+        .await
+        .unwrap();
+        incident.id
+    }
+
+    #[tokio::test]
+    async fn a_firing_after_the_window_finds_the_resolved_incidents_but_not_the_open_one() {
+        let db = incidents_db().await;
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(alert_incident_alerts::Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        let oldest = fired_into(&db, "resolved", 1).await;
+        let quiet = fired_into(&db, "resolved", 2).await;
+        let open = fired_into(&db, "open", 3).await;
+
+        let found = resolved_incidents_for_alert_with(&db, "acme", "a1", 10)
+            .await
+            .unwrap();
+        assert_eq!(found, [quiet.clone(), oldest]);
+        assert!(!found.contains(&open));
+        let latest_two = resolved_incidents_for_alert_with(&db, "acme", "a1", 2)
+            .await
+            .unwrap();
+        assert_eq!(latest_two, [quiet]);
+        assert!(
+            resolved_incidents_for_alert_with(&db, "other", "a1", 10)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    async fn muted_incident(db: &DatabaseConnection, downtime_id: &str) -> alert_incidents::Model {
+        new_incident(
+            "acme",
+            "P2",
+            serde_json::json!({"service": "payments"}),
+            "service",
+            1,
+            None,
+            Some(downtime_id.to_string()),
+        )
+        .insert(db)
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn two_concurrent_unmutes_clear_the_incident_once() {
+        let db = incidents_db().await;
+        let incident = muted_incident(&db, "dt-1").await;
+        let (a, b) = tokio::join!(
+            clear_muted_by_downtime_id_with(&db, "acme", &incident.id, "dt-1"),
+            clear_muted_by_downtime_id_with(&db, "acme", &incident.id, "dt-1"),
+        );
+        let winners = [a.unwrap(), b.unwrap()].iter().filter(|won| **won).count();
+        assert_eq!(
+            winners, 1,
+            "exactly one firing sends the opened notification"
+        );
+        let row = alert_incidents::Entity::find_by_id(incident.id.clone())
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.muted_by_downtime_id, None);
+    }
+
+    #[tokio::test]
+    async fn a_second_downtime_takes_over_the_mute_of_the_first() {
+        let db = incidents_db().await;
+        let incident = muted_incident(&db, "dt-1").await;
+        assert!(
+            replace_muted_by_downtime_id_with(&db, "acme", &incident.id, "dt-1", Some("dt-2"))
+                .await
+                .unwrap()
+        );
+        assert!(
+            !replace_muted_by_downtime_id_with(&db, "acme", &incident.id, "dt-1", Some("dt-3"))
+                .await
+                .unwrap()
+        );
+        let row = alert_incidents::Entity::find_by_id(incident.id.clone())
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.muted_by_downtime_id.as_deref(), Some("dt-2"));
+    }
+
+    #[tokio::test]
+    async fn an_unmute_for_another_downtime_or_org_changes_nothing() {
+        let db = incidents_db().await;
+        let incident = muted_incident(&db, "dt-1").await;
+        assert!(
+            !clear_muted_by_downtime_id_with(&db, "acme", &incident.id, "dt-2")
+                .await
+                .unwrap()
+        );
+        assert!(
+            !clear_muted_by_downtime_id_with(&db, "other", &incident.id, "dt-1")
+                .await
+                .unwrap()
+        );
+        let row = alert_incidents::Entity::find_by_id(incident.id.clone())
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.muted_by_downtime_id.as_deref(), Some("dt-1"));
+    }
+
+    #[tokio::test]
+    async fn a_resolve_clears_the_mute_so_a_manual_reopen_is_live() {
+        let db = incidents_db().await;
+        let incident = muted_incident(&db, "dt-1").await;
+        let ack = update_status_with(&db, "acme", &incident.id, "acknowledged")
+            .await
+            .unwrap();
+        assert_eq!(ack.muted_by_downtime_id.as_deref(), Some("dt-1"));
+        let resolved = update_status_with(&db, "acme", &incident.id, "resolved")
+            .await
+            .unwrap();
+        assert_eq!(resolved.muted_by_downtime_id, None);
+        assert!(resolved.resolved_at.is_some());
+        let reopened = update_status_with(&db, "acme", &incident.id, "open")
+            .await
+            .unwrap();
+        assert_eq!(reopened.status, "open");
+        assert_eq!(reopened.muted_by_downtime_id, None);
+        assert!(
+            update_status_with(&db, "other", &incident.id, "resolved")
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn the_list_carries_the_muting_downtime_for_the_muted_chip() {
+        let db = incidents_db().await;
+        let muted = muted_incident(&db, "dt-1").await;
+        let rows = list_with(&db, "acme", None, 50, 0).await.unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].id, muted.id);
+        assert_eq!(rows[0].muted_by_downtime_id.as_deref(), Some("dt-1"));
+    }
+
+    /// The list selects the run summary columns (no join, no `topology_context`).
+    #[tokio::test]
+    async fn the_list_carries_the_run_summary_columns() {
+        let db = incidents_db().await;
+        let incident = muted_incident(&db, "dt-1").await;
+        alert_incidents::Entity::update_many()
+            .col_expr(alert_incidents::Column::RcaRunId, Expr::value("run-1"))
+            .col_expr(alert_incidents::Column::RcaState, Expr::value("completed"))
+            .col_expr(alert_incidents::Column::RcaStartedAt, Expr::value(10_i64))
+            .col_expr(alert_incidents::Column::RcaUpdatedAt, Expr::value(20_i64))
+            .col_expr(
+                alert_incidents::Column::RcaOutcome,
+                Expr::value("root_cause"),
+            )
+            .col_expr(alert_incidents::Column::RcaConfidence, Expr::value("high"))
+            .col_expr(
+                alert_incidents::Column::RcaSummary,
+                Expr::value(r#"{"steps":3}"#),
+            )
+            .col_expr(alert_incidents::Column::RcaOffReason, Expr::value("l0_off"))
+            .col_expr(
+                alert_incidents::Column::TopologyContext,
+                Expr::value(serde_json::json!({"nodes": []})),
+            )
+            .filter(alert_incidents::Column::Id.eq(incident.id.as_str()))
+            .exec(&db)
+            .await
+            .unwrap();
+        let rows = list_with(&db, "acme", None, 50, 0).await.unwrap();
+        let row = &rows[0];
+        assert_eq!(row.rca_run_id.as_deref(), Some("run-1"));
+        assert_eq!(row.rca_state.as_deref(), Some("completed"));
+        assert_eq!(
+            (row.rca_started_at, row.rca_updated_at),
+            (Some(10), Some(20))
+        );
+        assert_eq!(row.rca_outcome.as_deref(), Some("root_cause"));
+        assert_eq!(row.rca_confidence.as_deref(), Some("high"));
+        assert_eq!(row.rca_summary.as_deref(), Some(r#"{"steps":3}"#));
+        assert_eq!(row.rca_off_reason.as_deref(), Some("l0_off"));
+        assert_eq!(
+            row.topology_context, None,
+            "the list skips topology_context"
+        );
+    }
 
     #[test]
     fn test_ksuid_generation() {
@@ -885,8 +1409,6 @@ mod tests {
             nodes: vec![node1, node2],
             edges: vec![edge],
             related_incident_ids: vec![],
-            suggested_root_cause: Some("# RCA Analysis\n\nTest markdown".to_string()),
-            previous_analyses: vec![],
         };
 
         // Serialize to JSON
@@ -897,12 +1419,6 @@ mod tests {
         assert_eq!(json["nodes"][1]["service_name"], "database");
         assert_eq!(json["edges"][0]["from_node_index"], 0);
         assert_eq!(json["edges"][0]["edge_type"], "service_dependency");
-        assert!(
-            json["suggested_root_cause"]
-                .as_str()
-                .unwrap()
-                .contains("RCA Analysis")
-        );
     }
 
     #[tokio::test]
@@ -927,7 +1443,7 @@ mod tests {
                 }
             ],
             "related_incident_ids": [],
-            "suggested_root_cause": "# Root Cause\n\nDatabase connection pool exhausted"
+            "suggested_root_cause": "# Root Cause\n\na pre-run report the struct does not own"
         });
 
         // Deserialize
@@ -938,12 +1454,6 @@ mod tests {
         assert_eq!(topology.edges.len(), 1);
         assert_eq!(topology.nodes[0].alert_id, "alert_1");
         assert_eq!(topology.nodes[0].alert_count, 2);
-        assert!(
-            topology
-                .suggested_root_cause
-                .unwrap()
-                .contains("Database connection")
-        );
     }
 
     #[tokio::test]
@@ -960,7 +1470,6 @@ mod tests {
 
         assert!(topology.nodes.is_empty());
         assert!(topology.edges.is_empty());
-        assert_eq!(topology.suggested_root_cause, None);
     }
 
     #[tokio::test]
@@ -975,5 +1484,30 @@ mod tests {
             serde_json::from_value(json);
 
         assert!(result.is_err(), "Should reject malformed JSON");
+    }
+
+    #[tokio::test]
+    async fn the_bulk_auto_resolve_clears_the_mute_and_reports_it() {
+        let db = incidents_db().await;
+        let incident = muted_incident(&db, "dt-1").await;
+        let now = incident.last_alert_at + 1_000;
+
+        let (count, resolved) = auto_resolve_stale_with(&db, now, now).await.unwrap();
+        assert_eq!(count, 1);
+        assert_eq!(
+            resolved,
+            [AutoResolved {
+                org_id: "acme".to_string(),
+                incident_id: incident.id.clone(),
+                muted_by_downtime_id: Some("dt-1".to_string()),
+            }]
+        );
+        let row = alert_incidents::Entity::find_by_id(incident.id)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.status, "resolved");
+        assert_eq!(row.muted_by_downtime_id, None);
     }
 }

@@ -25,7 +25,9 @@ use std::{
     time::{Duration, Instant},
 };
 
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set, sea_query::Expr};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set, sea_query::Expr,
+};
 use tokio::sync::RwLock;
 
 use super::entity::synthetics_locations::{ActiveModel, Column, Entity, Model};
@@ -259,6 +261,17 @@ pub async fn remove(id: &str) -> Result<(), errors::Error> {
     Ok(())
 }
 
+/// Deletes an org's private locations; public locations carry no org and stay.
+pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(get_orm_client_rw().await)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    invalidate_and_publish().await;
+    Ok(())
+}
+
 /// Claims the right to send this location's "location down" notification,
 /// returning whether THIS caller won it.
 ///
@@ -276,14 +289,7 @@ pub async fn remove(id: &str) -> Result<(), errors::Error> {
 /// stale `down_notified_at` would reintroduce exactly the duplicate this fixes.
 pub async fn try_claim_down_notification(id: &str, now_us: i64) -> Result<bool, errors::Error> {
     let client = get_orm_client_rw().await;
-    let res = Entity::update_many()
-        .col_expr(Column::DownNotifiedAt, Expr::value(now_us))
-        .filter(Column::Id.eq(id))
-        .filter(Column::DownNotifiedAt.eq(0i64))
-        .exec(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-    Ok(res.rows_affected > 0)
+    try_claim_down_notification_with(client, id, now_us).await
 }
 
 /// Clears the down flag so a future outage notifies again.
@@ -301,6 +307,21 @@ pub async fn clear_down_notification(id: &str) -> Result<(), errors::Error> {
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
     Ok(())
+}
+
+pub async fn try_claim_down_notification_with<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    now_us: i64,
+) -> Result<bool, errors::Error> {
+    let res = Entity::update_many()
+        .col_expr(Column::DownNotifiedAt, Expr::value(now_us))
+        .filter(Column::Id.eq(id))
+        .filter(Column::DownNotifiedAt.eq(0i64))
+        .exec(conn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(res.rows_affected > 0)
 }
 
 #[cfg(test)]

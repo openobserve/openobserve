@@ -127,11 +127,24 @@ vi.mock("@/services/common", async (importOriginal) => {
     },
   });
 });
+vi.mock("@/services/fleet", () => ({
+  default: {
+    listFleets: vi.fn(async () => ({ data: { items: [{ id: "f9", name: "F9" }] } })),
+  },
+}));
 vi.mock("@/services/synthetics", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock((await importOriginal()) as any, {
     default: {
       listByFolderId: vi.fn(async () => ({ data: { checks: [{ id: "s1", name: "S1" }] } })),
+    },
+  });
+});
+vi.mock("@/services/downtimes", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock((await importOriginal()) as any, {
+    default: {
+      list: vi.fn(async () => ({ data: { items: [{ id: "d1", name: "D1" }] } })),
     },
   });
 });
@@ -171,6 +184,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import alertService from "@/services/alerts";
 import cipherKeysService from "@/services/cipher_keys";
 import commonService from "@/services/common";
+import fleetService from "@/services/fleet";
 import dashboardService from "@/services/dashboards";
 import destinationService from "@/services/alert_destination";
 import jsTransformService from "@/services/jstransform";
@@ -185,6 +199,7 @@ import reportService from "@/services/reports";
 import savedviewsService from "@/services/saved_views";
 import serviceAccountService from "@/services/service_accounts";
 import syntheticsService from "@/services/synthetics";
+import downtimesService from "@/services/downtimes";
 import templateService from "@/services/alert_templates";
 import workflowService from "@/services/workflows";
 
@@ -486,6 +501,28 @@ describe("useRoleEntityLoaders - folder loaders", () => {
   });
 });
 
+describe("useRoleEntityLoaders - fleets", () => {
+  it("loads fleets entities from the fleet list, with default added and no children", async () => {
+    const { getResourceEntities, updateResourceEntities } = setup();
+    const resource = row({ resourceName: "fleets" });
+
+    await getResourceEntities(resource as any);
+
+    expect(fleetService.listFleets).toHaveBeenCalledWith(ORG);
+    expect(commonService.list_Folders).not.toHaveBeenCalledWith(ORG, "fleets");
+    expect(updateResourceEntities).toHaveBeenCalledWith(
+      "fleets",
+      ["id"],
+      [
+        { id: "default", name: "default" },
+        { id: "f9", name: "F9" },
+      ],
+      false,
+      "name",
+    );
+  });
+});
+
 describe("useRoleEntityLoaders - folder children", () => {
   // BUG pinned, not fixed: getDashboards flattens each dashboard to its first
   // truthy value before building rows, so the rows are plain strings — the
@@ -572,6 +609,41 @@ describe("useRoleEntityLoaders - folder children", () => {
       folder,
       ["id"],
       [{ id: "s1", name: "S1" }],
+      false,
+      "name",
+    );
+  });
+
+  it("getDowntimeFolders lists folder type downtimes with downtime as the child", async () => {
+    const { getDowntimeFolders, updateResourceEntities } = setup();
+
+    await getDowntimeFolders();
+
+    expect(commonService.list_Folders).toHaveBeenCalledWith(ORG, "downtimes");
+    expect(updateResourceEntities).toHaveBeenCalledWith(
+      "downtime_folder",
+      ["folderId"],
+      [
+        { folderId: "default", name: "default" },
+        { folderId: "f9", name: "F9" },
+      ],
+      true,
+      "name",
+      "downtime",
+    );
+  });
+
+  it("getDowntimes names rows by plain downtime id from the folder's list", async () => {
+    const { getDowntimes, updateEntityEntities } = setup();
+    const folder = row({ name: "f9", childName: "downtime" });
+
+    await getDowntimes(folder as any);
+
+    expect(downtimesService.list).toHaveBeenCalledWith(ORG, { folder_id: "f9", page_size: 500 });
+    expect(updateEntityEntities).toHaveBeenCalledWith(
+      folder,
+      ["id"],
+      [{ id: "d1", name: "D1" }],
       false,
       "name",
     );

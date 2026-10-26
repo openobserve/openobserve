@@ -7,6 +7,7 @@ import { openNavFlyoutChild, clickNavUntilRoute, selectLogsViewMode } from '../c
 import { openOSelectDropdown } from '../alertsPages/oselectHelpers.js';
 import * as fs from 'fs';
 import * as path from 'path';
+import { ingestBase } from '../../playwright-tests/utils/ingest-url.js';
 
 // Import testLogger for proper logging
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
@@ -122,7 +123,7 @@ export class LogsPage {
         this.savedViewDialog = '[data-test="search-bar-store-state-saved-view-dialog"]';
         this.savedViewArrow = '[data-test="logs-search-bar-utilities-menu-btn"]';
         // OInput convention §4: drive the auto-derived `-field` inner native input for fill().
-        this.savedViewSearchInput = '[data-test="log-search-saved-view-field-search-input-field"]';
+        this.savedViewSearchInput = '[data-test="logs-saved-views-dialog-search-field"]';
         // Matches both ConfirmDialog.vue (data-test="confirm-dialog") and SearchBar's inline
         // ODialog (data-test="search-bar-confirm-dialog") via substring selector.
         this.confirmButton = '[data-test*="confirm-dialog"] [data-test="o-dialog-primary-btn"]';
@@ -133,7 +134,7 @@ export class LogsPage {
         this.menuTransformEditorToggleBtn = '[data-test="logs-search-bar-menu-transform-editor-toggle-btn"]';
         this.menuListSavedViewsBtn = '[data-test="logs-search-bar-menu-list-saved-views-btn"]';
         this.menuCreateSavedViewBtn = '[data-test="logs-search-bar-menu-create-saved-view-btn"]';
-        this.savedViewsListDialogEl = '[data-test="saved-views-list-dialog"]';
+        this.savedViewsListDialogEl = '[data-test="logs-saved-views-dialog"]';
         this.menuHistogramBtn = '[data-test="logs-search-bar-menu-histogram-btn"]';
         this.menuSqlModeBtn = '[data-test="logs-search-bar-menu-sql-mode-btn"]';
         this.menuSqlModeBtnState = '[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]';
@@ -384,6 +385,12 @@ export class LogsPage {
         this.logDetailCloseButton = '[data-test="logs-search-result-detail-dialog"] [data-test="o-drawer-close-btn"]';
         this.logDetailPreviousBtn = '[data-test="log-detail-previous-detail-btn"]';
         this.logDetailNextBtn = '[data-test="log-detail-next-detail-btn"]';
+        this.logDetailPreviousKbd = '[data-test="log-detail-previous-detail-btn-kbd"]';
+        this.logDetailNextKbd = '[data-test="log-detail-next-detail-btn-kbd"]';
+        this.logDetailPageLoading = '[data-test="log-detail-page-loading"]';
+        this.logsDetailNavLive = '[data-test="logs-detail-nav-live"]';
+        this.logsRowNavLive = '[data-test="logs-row-nav-live"]';
+        this.logDetailDialog = '[data-test="logs-search-result-detail-dialog"]';
         this.logDetailWrapToggle = '[data-test="log-detail-wrap-values-toggle-btn"]';
 
         // ===== VIEW RELATED / CORRELATION SELECTORS (Enterprise Feature) =====
@@ -504,6 +511,8 @@ export class LogsPage {
         this.resultsSkeleton = '[data-test="logs-search-result-logs-table"] [data-test="o2-table-skeleton-body"]';
         this.resultsLoadingBanner = '[data-test="logs-search-result-logs-table"] [data-test="o2-table-loading-banner"]';
         this.noResultsFoundText = '[data-test="logs-search-no-events-found-text"]';
+        // States that only render once a search has run (or the auto-run guard held it); the pre-search "apply search" hero is excluded on purpose.
+        this.searchSettledStates = `${this.logsSearchResultTableRows}, ${this.noResultsFoundText}, [data-test="logs-search-error-state"], [data-test="logs-search-filter-error-message"], [data-test="logs-search-cancelled-state"], [data-test="logs-auto-run-guard"]`;
         this.resultsProgressBar = '[data-test="logs-results-progress"]';
         this.queryPlanDialog = '[data-test="query-plan-dialog"]';
         this.queryEditorSplitter = '[role="separator"][aria-orientation="horizontal"]';
@@ -1091,6 +1100,116 @@ export class LogsPage {
         throw new Error(`selectStream: Failed to find stream "${stream}" after ${maxRetries} attempts`);
     }
 
+    /** Wait until the Logs search bar's completion lists (what it feeds the query editor) know the stream's fields and optionally a server function. */
+    async waitForStreamFieldsLoaded(fieldName = 'level', functionName = null, timeout = 30000) {
+        testLogger.info(`waitForStreamFieldsLoaded: waiting for field "${fieldName}"${functionName ? ` and function "${functionName}"` : ''} in the query editor`);
+        // Each check walks the whole vnode tree, so poll on an interval rather than every animation frame.
+        await this.page.waitForFunction(({ field, fn }) => {
+            const app = document.querySelector('#app');
+            if (!app?._vnode) return false;
+            const visited = new Set();
+            let searchBar = null;
+            const walk = (node, depth) => {
+                if (!node || depth > 80 || visited.has(node) || searchBar) return;
+                visited.add(node);
+                // The editor's own component props read back empty in prod builds; SearchBar's setupState holds the same lists.
+                if (node.component?.setupState && 'effectiveKeywords' in node.component.setupState) {
+                    searchBar = node.component.setupState;
+                    return;
+                }
+                if (node.component?.subTree) walk(node.component.subTree, depth + 1);
+                if (Array.isArray(node.children)) {
+                    for (const c of node.children) {
+                        if (c && typeof c === 'object') walk(c, depth + 1);
+                        if (searchBar) return;
+                    }
+                }
+            };
+            walk(app._vnode, 0);
+            if (!searchBar) return false;
+            const keywords = Array.isArray(searchBar.effectiveKeywords) ? searchBar.effectiveKeywords : [];
+            const hasField = keywords.some((k) => k?.kind === 'Field' && k?.name === field);
+            if (!fn) return hasField;
+            const suggestions = Array.isArray(searchBar.effectiveSuggestions) ? searchBar.effectiveSuggestions : [];
+            return hasField && suggestions.some((s) => (s?.name ?? s?.label) === fn);
+        }, { field: fieldName, fn: functionName }, { timeout, polling: 250 });
+    }
+
+    /** Field names the Logs search bar feeds the query editor's completions. */
+    async getQueryEditorFieldNames() {
+        return await this.page.evaluate(() => {
+            const app = document.querySelector('#app');
+            if (!app?._vnode) return [];
+            const visited = new Set();
+            let searchBar = null;
+            const walk = (node, depth) => {
+                if (!node || depth > 80 || visited.has(node) || searchBar) return;
+                visited.add(node);
+                if (node.component?.setupState && 'effectiveKeywords' in node.component.setupState) {
+                    searchBar = node.component.setupState;
+                    return;
+                }
+                if (node.component?.subTree) walk(node.component.subTree, depth + 1);
+                if (Array.isArray(node.children)) {
+                    for (const c of node.children) {
+                        if (c && typeof c === 'object') walk(c, depth + 1);
+                        if (searchBar) return;
+                    }
+                }
+            };
+            walk(app._vnode, 0);
+            const keywords = Array.isArray(searchBar?.effectiveKeywords) ? searchBar.effectiveKeywords : [];
+            return keywords.filter((k) => k?.kind === 'Field' && typeof k?.name === 'string').map((k) => k.name);
+        });
+    }
+
+    /** Read one o2FieldValues record by its "org|streamType|streamName|fieldName" key; null until the app has written it. */
+    async readFieldValueRecord(key) {
+        return await this.page.evaluate((searchKey) => new Promise((resolve, reject) => {
+            const req = indexedDB.open('o2FieldValues', 1);
+            let aborted = false;
+            // A reader that creates the DB leaves it without the app's store, and the app never writes again.
+            req.onupgradeneeded = () => { aborted = true; req.transaction.abort(); resolve(null); };
+            req.onerror = () => (aborted ? resolve(null) : reject(req.error));
+            req.onsuccess = () => {
+                const db = req.result;
+                if (!db.objectStoreNames.contains('fieldValues')) { db.close(); resolve(null); return; }
+                const getReq = db.transaction('fieldValues', 'readonly').objectStore('fieldValues').get(searchKey);
+                getReq.onsuccess = () => { db.close(); resolve(getReq.result || null); };
+                getReq.onerror = () => { db.close(); reject(getReq.error); };
+            };
+        }), key);
+    }
+
+    /** Read every o2FieldValues record; [] until the app has created the DB. */
+    async readAllFieldValueRecords() {
+        return await this.page.evaluate(() => new Promise((resolve, reject) => {
+            const req = indexedDB.open('o2FieldValues', 1);
+            let aborted = false;
+            // A reader that creates the DB leaves it without the app's store, and the app never writes again.
+            req.onupgradeneeded = () => { aborted = true; req.transaction.abort(); resolve([]); };
+            req.onerror = () => (aborted ? resolve([]) : reject(req.error));
+            req.onsuccess = () => {
+                const db = req.result;
+                if (!db.objectStoreNames.contains('fieldValues')) { db.close(); resolve([]); return; }
+                const getAllReq = db.transaction('fieldValues', 'readonly').objectStore('fieldValues').getAll();
+                getAllReq.onsuccess = () => { db.close(); resolve(getAllReq.result || []); };
+                getAllReq.onerror = () => { db.close(); reject(getAllReq.error); };
+            };
+        }));
+    }
+
+    /** Delete the o2FieldValues DB and resolve once the delete has completed. */
+    async clearFieldValueDB() {
+        await this.page.evaluate(() => new Promise((resolve, reject) => {
+            const req = indexedDB.deleteDatabase('o2FieldValues');
+            // onblocked is not completion: the app closes its connection on versionchange, then onsuccess fires.
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        }));
+        testLogger.info('Cleared IndexedDB o2FieldValues database');
+    }
+
     async deselectStream(streamName) {
         testLogger.info(`Deselecting stream: ${streamName}`);
         // Legacy select used `log-search-index-list-stream-toggle-<name> div`;
@@ -1264,7 +1383,7 @@ export class LogsPage {
             // Wait for button to leave Cancel/loading state before clicking —
             // otherwise a click on "Cancel" aborts the in-flight query instead
             // of starting a fresh one.
-            await this.page.waitForFunction(
+            const settled = await this.page.waitForFunction(
                 (sel) => {
                     const b = document.querySelector(sel);
                     if (!b) return false;
@@ -1274,8 +1393,13 @@ export class LogsPage {
                 },
                 this.queryButton,
                 { timeout: 30000 },
-            ).catch(() => {});
-            await queryBtn.click();
+            ).then(() => true).catch(() => false);
+            // A retry on a still-busy button would cancel and restart the same search; keep waiting on it instead.
+            if (settled || attempt === 1) {
+                await queryBtn.click();
+            } else {
+                testLogger.debug(`selectRunQuery: search still running on attempt ${attempt} — waiting instead of re-clicking`);
+            }
 
             try {
                 await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', {
@@ -1676,6 +1800,11 @@ export class LogsPage {
     // when the query contains SELECT...FROM. Delegate to the canonical enableSqlModeIfNeeded.
     async enableSQLMode() {
         await this.enableSqlModeIfNeeded();
+    }
+
+    async expectSqlModeActive() {
+        // Filter mode rejects LIMIT client-side, so a run before this flips sends no request at all.
+        await expect.poll(() => this._isSqlModeEnabledViaVue(), { timeout: 10000 }).toBe(true);
     }
 
     // Quick Mode methods (now inside the utilities hamburger menu)
@@ -2247,7 +2376,10 @@ export class LogsPage {
     }
 
     async displayTwoStreams() {
-        await this.clearAndFillQueryEditor("SELECT * FROM 'e2e_automate' UNION ALL SELECT * FROM 'e2e_automate'");
+        const unionQuery = "SELECT * FROM 'e2e_automate' UNION ALL SELECT * FROM 'e2e_automate'";
+        await this.clearAndFillQueryEditor(unionQuery);
+        // Typed while the stream picks still load, the edit never reaches searchObj, so Run sends it as a non-SQL filter.
+        await this.waitForSearchQueryCommitted(unionQuery);
 
         // Ensure query editor is ready
         await this.ensureQueryEditorReady();
@@ -2722,7 +2854,7 @@ export class LogsPage {
             : process.env.INGESTION_URL;
 
         try {
-            const response = await this.page.request.post(`${baseUrl}/api/${orgId}/${streamName}/_json`, {
+            const response = await this.page.request.post(`${ingestBase(baseUrl)}/api/${orgId}/${streamName}/_json`, {
                 headers: headers,
                 data: logData
             });
@@ -2972,21 +3104,8 @@ export class LogsPage {
         await this.page.waitForTimeout(200);
     }
 
-    /**
-     * Click Run query and wait for query execution to complete.
-     * Uses button UI state (loading/disabled → ready) instead of response matching
-     * to avoid capturing stale responses from auto-searches.
-     * @param {number} timeout - Max wait time in ms (default 60000)
-     */
-    async runQueryAndWaitForResults(timeout = 60000) {
-        const btn = this.page.locator(this.queryButton);
-
-        // If a prior auto-search (e.g. from toggling SQL mode) is still running, the button
-        // renders as "Cancel query" via a v-if/v-else swap — wait for the run-mode variant
-        // to appear (not in Cancel state) before clicking, so we don't accidentally cancel it.
-        // Use the full timeout here (not a hard-coded 15 s) so a slow CI auto-search never
-        // causes us to force-click the Cancel button instead of the Run button.
-        let buttonWasInCancelState = false;
+    async waitForRunQueryButton(timeout = 60000) {
+        // An automatic search shares this button, so a premature click would cancel it.
         await this.page.waitForFunction(
             (selector) => {
                 const el = document.querySelector(selector);
@@ -2997,7 +3116,14 @@ export class LogsPage {
             },
             this.queryButton,
             { timeout }
-        ).catch(() => {
+        );
+    }
+
+    async runQueryAndWaitForResults(timeout = 60000) {
+        const btn = this.page.locator(this.queryButton);
+
+        let buttonWasInCancelState = false;
+        await this.waitForRunQueryButton(timeout).catch(() => {
             buttonWasInCancelState = true;
             testLogger.warn('runQueryAndWaitForResults: refresh button never exited Cancel state, force-clicking to cancel in-flight search');
         });
@@ -3139,7 +3265,7 @@ export class LogsPage {
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                const response = await this.page.request.post(`${baseUrl}/api/${orgId}/${streamName}/_json`, {
+                const response = await this.page.request.post(`${ingestBase(baseUrl)}/api/${orgId}/${streamName}/_json`, {
                     headers: headers,
                     data: logData
                 });
@@ -3183,10 +3309,7 @@ export class LogsPage {
     }
 
     async clickSearchBarRefreshButton() {
-        // Use .first() to avoid strict-mode violations when multiple data-test matches exist.
-        // waitForSearchBarRefreshButton() must be called first to ensure the button is enabled;
-        // OButton.handleClick() guards on props.loading/disabled and will not emit when loading,
-        // making force-click on a loading button a silent no-op.
+        await this.waitForRunQueryButton();
         return await this.page.locator(this.searchBarRefreshButton).first().click({ force: true });
     }
 
@@ -3349,7 +3472,7 @@ export class LogsPage {
     async clickSaveViewButton() {
         // Post-menu-migration: "Create saved view" moved into utilities ("More") menu.
         // Close any open menus/dialogs first, then open the menu and click the item.
-        const listDialog = this.page.locator('[data-test="saved-views-list-dialog"]');
+        const listDialog = this.page.locator(this.savedViewsListDialogEl);
         const isListOpen = await listDialog.isVisible({ timeout: 500 }).catch(() => false);
         if (isListOpen) {
             await listDialog.locator('[data-test="o-dialog-close-btn"]').click();
@@ -3460,17 +3583,23 @@ export class LogsPage {
         return await searchInput.fill(text);
     }
 
+    // The `-apply-` prefix keeps the favourites pane (`-favorites-apply-`) out of the match.
+    savedViewApplyLocator(name) {
+        if (typeof name !== 'string') {
+            throw new TypeError(`savedViewApplyLocator expects the exact view name, got ${name}`);
+        }
+        return this.page.locator(`[data-test^="logs-saved-views-dialog-apply-"][data-test-view-name="${LogsPage.escapeCssAttrValue(name)}"]`);
+    }
+
     async clickSavedViewByTitle(title) {
-        const element = this.page.locator(`[data-test="logs-search-bar-apply-${title}-saved-view-btn"]`).first();
+        const element = this.savedViewApplyLocator(title).first();
         await element.waitFor({ state: 'visible', timeout: 10000 });
         // force: true — ODropdown portal transiently detaches items during initial render
         return await element.click({ force: true });
     }
 
     async clickDeleteButton() {
-        // Delete buttons in saved views carry data-test="logs-search-bar-delete-{view_id}-saved-view-btn"
-        // Click the first visible delete button in the saved views area
-        const deleteBtn = this.page.locator('[data-test*="logs-search-bar-delete-"][data-test*="-saved-view-btn"]').first();
+        const deleteBtn = this.page.locator('[data-test="logs-saved-views-dialog-table"] [data-test^="logs-saved-views-dialog-delete-"]:not([data-test$="-menu"])').first();
         await deleteBtn.waitFor({ state: 'visible', timeout: 5000 });
         return await deleteBtn.click();
     }
@@ -3523,13 +3652,13 @@ export class LogsPage {
     }
 
     async clickSavedViewByText(text) {
-        const element = this.page.locator(`[data-test="logs-search-bar-apply-${text}-saved-view-btn"]`).first();
+        const element = this.savedViewApplyLocator(text).first();
         await element.waitFor({ state: 'visible', timeout: 10000 });
         return await element.click();
     }
 
     async waitForSavedViewText(text) {
-        return await this.page.locator(`[data-test="logs-search-bar-apply-${text}-saved-view-btn"]`).first().waitFor({ state: 'visible', timeout: 10000 });
+        return await this.savedViewApplyLocator(text).first().waitFor({ state: 'visible', timeout: 10000 });
     }
 
     /**
@@ -3552,7 +3681,7 @@ export class LogsPage {
     async clickDeleteSavedViewButton(savedViewName) {
         // The caller (clickSavedViewByTitle) closes the dialog. Wait passively for it to
         // reach hidden state so the re-open sequence doesn't race the close animation.
-        await this.page.locator('[data-test="saved-views-list-dialog"]')
+        await this.page.locator(this.savedViewsListDialogEl)
             .waitFor({ state: 'hidden', timeout: 5000 })
             .catch(() => {});
 
@@ -3574,8 +3703,8 @@ export class LogsPage {
         // The delete button data-test uses view_id (a UUID), not the view name, so we
         // can't build the exact selector. Instead scope to the main saved-views table
         // (not favorites) — after filtering by name there is exactly one visible row.
-        const mainTable = this.page.locator('[data-test="log-search-saved-view-list-fields-table"]');
-        const deleteBtn = mainTable.locator('[data-test*="logs-search-bar-delete-"]').first();
+        const mainTable = this.page.locator('[data-test="logs-saved-views-dialog-table"]');
+        const deleteBtn = mainTable.locator('[data-test^="logs-saved-views-dialog-delete-"]:not([data-test$="-menu"])').first();
         await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
         await deleteBtn.scrollIntoViewIfNeeded();
         await deleteBtn.click();
@@ -3912,6 +4041,19 @@ export class LogsPage {
         testLogger.info('✓ Previous and Next navigation buttons are visible');
     }
 
+    logResultsRow(n) {
+        return this.page.locator(`[data-test="logs-search-result-logs-table"] [data-test="o2-table-row-${n}"]`);
+    }
+
+    async pressLogRowKey(key, options = {}) {
+        await this.page.keyboard.press(key, options);
+    }
+
+    async expectActiveLogRow(n) {
+        await expect(this.logResultsRow(n)).toHaveAttribute('aria-current', 'true');
+        await expect(this.page.locator('[data-test="logs-search-result-logs-table"] [data-active-row="true"]')).toHaveCount(1);
+    }
+
     // ===== VIEW RELATED / CORRELATION METHODS (Enterprise Feature) =====
 
     /**
@@ -4082,7 +4224,7 @@ export class LogsPage {
     }
 
     async clickSavedViewByLabel(label) {
-        const element = this.page.locator(`[data-test="logs-search-bar-apply-${label}-saved-view-btn"]`).first();
+        const element = this.savedViewApplyLocator(label).first();
         await element.waitFor({ state: 'visible', timeout: 10000 });
         return await element.click({ force: true });
     }
@@ -7054,7 +7196,7 @@ export class LogsPage {
         const httpsAgent = new https.Agent({ keepAlive: false });
         const agent = (parsedURL) => (parsedURL.protocol === 'https:' ? httpsAgent : httpAgent);
 
-        const ingestUrl = `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
+        const ingestUrl = `${ingestBase(process.env.INGESTION_URL)}/api/${orgId}/${streamName}/_json`;
         const maxAttempts = 3;
 
         let successCount = 0;
@@ -7139,26 +7281,19 @@ export class LogsPage {
 
             for (const row of rows) {
                 const text = row.textContent;
-                // OTable draws the spine as a ::before on the row's first cell, fed by
-                // the --row-status-color custom property set inline on the <tr>, and
-                // marks the row with data-status-bar. The level rides along on the row
-                // class (o2-log-level-<level>) so it stays machine-readable whichever
-                // column is shown.
-                const raw = row.style.getPropertyValue('--row-status-color').trim();
-                if (!raw || raw === 'rgba(0, 0, 0, 0)' || raw === 'transparent') continue;
-                // The token resolves to a hex; callers normalise through rgbToHex,
-                // so hand back the rgb() form a computed style would have given.
-                let bgColor = raw;
-                const hex = raw.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
-                if (hex) {
-                    let h = hex[1];
-                    if (h.length === 3) h = h.split('').map((c) => c + c).join('');
-                    const n = parseInt(h, 16);
-                    bgColor = `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
-                }
+                const firstCell = row.querySelector('td');
+                if (!firstCell) continue;
+                const spine = getComputedStyle(firstCell, '::before');
+                const backgroundImage = spine.backgroundImage;
+                const bgColor = spine.backgroundColor;
+                if (!bgColor || bgColor === 'rgba(0, 0, 0, 0)' || bgColor === 'transparent') continue;
 
-                const levelClass = Array.from(row.classList).find((c) => c.startsWith('o2-log-level-'));
+                const levelClass = Array.from(row.classList).find(
+                    (c) => c.startsWith('o2-log-level-') && !c.startsWith('o2-log-level-src-'),
+                );
                 const level = levelClass ? levelClass.replace('o2-log-level-', '') : null;
+                const sourceClass = Array.from(row.classList).find((c) => c.startsWith('o2-log-level-src-'));
+                const source = sourceClass ? sourceClass.replace('o2-log-level-src-', '') : null;
 
                 // Best-effort: also recover the raw severity number when the JSON
                 // source column is visible (kept for backward compatibility).
@@ -7178,7 +7313,7 @@ export class LogsPage {
                 }
 
                 if (level === null && severity === null) continue;
-                findings.push({ severity, level, color: bgColor });
+                findings.push({ severity, level, source, backgroundImage, color: bgColor });
             }
 
             return findings;
@@ -7251,7 +7386,7 @@ export class LogsPage {
         const orgId = getOrgIdentifier();
         const headers = getAuthHeaders();
 
-        const url = `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
+        const url = `${ingestBase(process.env.INGESTION_URL)}/api/${orgId}/${streamName}/_json`;
 
         try {
             const response = await this.page.request.post(url, {
@@ -7558,12 +7693,11 @@ export class LogsPage {
     async clickShareLinkButton() {
         const btn = this.page.locator(this.shareLinkButton);
         await btn.waitFor({ state: 'visible', timeout: 10000 });
-        // ShareButton stays disabled until the authenticated /api/<org>/config supplies web_url; the public /config lacks it.
         const enabled = await expect(btn).toBeEnabled({ timeout: 30000 }).then(() => true).catch(() => false);
         if (!enabled) {
-            testLogger.warn('Share link button still disabled after 30s (org config not loaded); reloading once', { url: this.page.url() });
+            testLogger.warn('Share link button still disabled after 30s; reloading once', { url: this.page.url() });
             await this.page.reload({ waitUntil: 'domcontentloaded' });
-            await expect(btn, 'share link button never enabled: org config (web_url) did not load').toBeEnabled({ timeout: 30000 });
+            await expect(btn, 'share link button never enabled: the query has not run yet (G1), or web_url is missing from the org config').toBeEnabled({ timeout: 30000 });
         }
         await btn.click();
         testLogger.info('Clicked share link button');
@@ -8559,13 +8693,26 @@ export class LogsPage {
      */
     async clickRelative1HourOrFallback() {
         const oneHourButton = this.page.locator('[data-test="date-time-relative-1-h-btn"]');
+        let picked;
         if (await oneHourButton.isVisible({ timeout: 2000 }).catch(() => false)) {
             await oneHourButton.click();
-            return 'Last 1 hour';
+            picked = 'Last 1 hour';
         } else {
             await this.clickRelative15MinButton();
-            return 'Last 15 minutes';
+            picked = 'Last 15 minutes';
         }
+        await this.closeDateTimePickerIfOpen();
+        return picked;
+    }
+
+    /** The auto-apply picker stays open after a pick, and force-clicks behind it land on the panel. */
+    async closeDateTimePickerIfOpen() {
+        const panel = this.page.locator('#date-time-menu');
+        if (!(await panel.isVisible().catch(() => false))) return;
+        await this.page.keyboard.press('Escape');
+        const closed = await panel.waitFor({ state: 'hidden', timeout: 2000 }).then(() => true).catch(() => false);
+        if (!closed) await this.page.locator(this.dateTimeButton).click();
+        await expect(panel).toBeHidden({ timeout: 5000 });
     }
 
     /**
@@ -8878,9 +9025,7 @@ export class LogsPage {
      * @param {string} name - Saved view name
      */
     async clickSavedViewByName(name) {
-        // SearchBar.vue uses data-test="logs-search-bar-apply-${value}-saved-view-btn" for the apply button.
-        // The previously used `logs-search-saved-view-item-${name}` does not exist in the DOM.
-        const savedView = this.page.locator(`[data-test="logs-search-bar-apply-${name}-saved-view-btn"]`).first();
+        const savedView = this.savedViewApplyLocator(name).first();
         await savedView.waitFor({ state: 'visible', timeout: 10000 });
         // force: true — ODropdown portal transiently detaches items during initial render
         await savedView.click({ force: true });
@@ -8954,8 +9099,8 @@ export class LogsPage {
      */
     async clickDeleteSavedViewByName(name) {
         // data-test uses view_id (UUID), not name — scope to main table after filtering.
-        const mainTable = this.page.locator('[data-test="log-search-saved-view-list-fields-table"]');
-        const deleteBtn = mainTable.locator('[data-test*="logs-search-bar-delete-"]').first();
+        const mainTable = this.page.locator('[data-test="logs-saved-views-dialog-table"]');
+        const deleteBtn = mainTable.locator('[data-test^="logs-saved-views-dialog-delete-"]:not([data-test$="-menu"])').first();
         await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
         await deleteBtn.click();
         testLogger.info(`Clicked delete for saved view: ${name}`);
@@ -10989,24 +11134,54 @@ export class LogsPage {
      * has finished (it depends on the updateGroupedFields API call, which can be slow in CI).
      * Fails the test if the editor stays empty beyond the timeout.
      */
-    async expectQueryEditorPopulated(timeout = 30000) {
-        await this.page.waitForFunction(
-            (selector) => {
-                const host = document.querySelector(selector);
-                if (!host) return false;
-                const editors = window.monaco?.editor?.getEditors?.() ?? [];
-                for (const ed of editors) {
-                    const domNode = ed.getDomNode?.();
-                    if (domNode && host.contains(domNode)) {
-                        const val = ed.getValue();
-                        return val && val.trim().length > 0;
+    async expectQueryEditorPopulated(timeout = 60000) {
+        // 60s, not 30s: the editor fills only after the Build-tab init awaits
+        // updateGroupedFields() -> loadStreamFields() -> GET /{org}/streams/{name}/schema
+        // and THEN calls makeAutoSQLQuery() (useDefaultPanelFields.ts:66 and :92 —
+        // makeAutoSQLQuery does not await the schema load itself). Under CI load that
+        // sequence regularly passed 30s, which made this the flakiest wait in the Logs
+        // suite (two tests passing only on retry, a third exhausting them). Waiting on
+        // the schema response instead is not an option: useStreams caches it, so on a
+        // warm cache no request fires and the wait would hang.
+        try {
+            await this.page.waitForFunction(
+                (selector) => {
+                    const host = document.querySelector(selector);
+                    if (!host) return false;
+                    const editors = window.monaco?.editor?.getEditors?.() ?? [];
+                    for (const ed of editors) {
+                        const domNode = ed.getDomNode?.();
+                        if (domNode && host.contains(domNode)) {
+                            const val = ed.getValue();
+                            return val && val.trim().length > 0;
+                        }
                     }
-                }
-                return false;
-            },
-            '[data-test="logs-search-bar-query-editor"]',
-            { timeout, polling: 500 }
-        );
+                    return false;
+                },
+                '[data-test="logs-search-bar-query-editor"]',
+                { timeout, polling: 250 }
+            );
+        } catch (e) {
+            // Say WHICH link of the chain broke. "Timeout exceeded" alone sent a
+            // reader to the test; these three facts point at the page instead.
+            const diag = await this.page.evaluate((selector) => {
+                const host = document.querySelector(selector);
+                const editors = window.monaco?.editor?.getEditors?.() ?? [];
+                return {
+                    hostPresent: !!host,
+                    monacoLoaded: !!window.monaco,
+                    editorsInHost: host ? editors.filter((ed) => {
+                        const n = ed.getDomNode?.();
+                        return n && host.contains(n);
+                    }).length : 0,
+                };
+            }, '[data-test="logs-search-bar-query-editor"]').catch(() => null);
+            throw new Error(
+                `Query editor stayed empty after ${timeout}ms (host=${diag?.hostPresent} ` +
+                `monaco=${diag?.monacoLoaded} editors=${diag?.editorsInHost}). ` +
+                `the Build-tab schema load or makeAutoSQLQuery() never resolved.`
+            );
+        }
         testLogger.info('Query editor populated');
     }
 
@@ -11360,10 +11535,12 @@ export class LogsPage {
         const count = Math.min(await cells.count(), limit);
         const values = [];
         for (let i = 0; i < count; i++) {
-            let text = await cells.nth(i).textContent();
+            const valueSpan = cells.nth(i).locator('[data-test="log-row-timestamp-value"]');
+            let text = (await valueSpan.count()) > 0
+                ? await valueSpan.first().textContent()
+                : await cells.nth(i).textContent();
             text = text?.trim() || '';
             // Strip expand button icon text that appears before the timestamp
-            // The cell contains both the expand icon ("chevron_right" or "expand_more") and the timestamp
             text = text.replace(/^(chevron_right|expand_more|chevron_left|expand_less)/, '').trim();
             values.push(text);
         }
@@ -11475,9 +11652,18 @@ export class LogsPage {
      * is positioned at a location where suggestions can be provided.
      */
     async triggerEditorSuggestions() {
-        // Focus the editor's input area (click auto-waits for actionability)
-        const inputArea = this.page.locator('[data-test="logs-search-bar-query-editor"] .inputarea');
-        await inputArea.click({ force: true });
+        // A click lands wherever the textarea sits and can move the caret into a word; pin it to the end instead.
+        const placed = await this.page.evaluate((selector) => {
+            const host = document.querySelector(selector);
+            const ed = window.monaco?.editor?.getEditors?.().find((e) => host?.contains(e.getDomNode()));
+            if (!ed) return false;
+            const model = ed.getModel();
+            const lastLine = model.getLineCount();
+            ed.focus();
+            ed.setPosition({ lineNumber: lastLine, column: model.getLineMaxColumn(lastLine) });
+            return true;
+        }, this.queryEditor);
+        if (!placed) throw new Error('Monaco query editor not found to place the caret');
         // Trigger suggestion widget and wait for it to appear
         await this.page.keyboard.press('Control+Space');
         await this.waitForSuggestionWidgetVisible();
@@ -13184,7 +13370,26 @@ export class LogsPage {
 
     /** Refreshes and waits for the results table to render. */
     async runSearchAndWaitForResults(timeout = 30000) {
-        await this.page.locator(this.searchBarRefreshButton).click();
+        // The button reads Run before the load-time search starts, so first wait for that search to have produced a state.
+        await expect(this.page.locator(this.searchSettledStates).first()).toBeVisible({ timeout });
+        // A click while the load-time search is in flight hits the Cancel variant of this button.
+        await this.waitForRunQueryButton(timeout);
+        // The table is already visible from the load-time search, so gate on this click's own hits response.
+        const [response] = await Promise.all([
+            this.page.waitForResponse(
+                (r) =>
+                    r.request().method() === 'POST' &&
+                    /\/_search(_stream)?\?/.test(r.url()) &&
+                    !r.url().includes('is_ui_histogram'),
+                { timeout }
+            ),
+            this.page.locator(this.searchBarRefreshButton).click(),
+        ]);
+        // A streamed (text/event-stream) response never reports finished; the Run button wait covers completion.
+        if (!(await response.headerValue('content-type'))?.includes('text/event-stream')) {
+            await response.finished();
+        }
+        await this.waitForRunQueryButton(timeout);
         await expect(this.resultsTable()).toBeVisible({ timeout });
     }
 
@@ -13263,6 +13468,8 @@ export class LogsPage {
     /** Opens the first row's detail and returns the stream name that row came from. */
     async openFirstHitDetail(timeout = 20000) {
         const streamCell = this.streamNameCells().first();
+        // The grid is rebuilt per streamed chunk; a one-shot read can land on a cell not yet filled.
+        await expect(streamCell).toHaveText(/\S/, { timeout });
         const hitStream = (await streamCell.innerText()).trim();
         await streamCell.click();
         await expect(this.page.locator(this.logDetailDialog)).toBeVisible({ timeout });
@@ -13295,6 +13502,204 @@ export class LogsPage {
             this.searchAroundButton().click(),
         ]);
         return request;
+    }
+
+    /** The sidebar row for `field` must be listed. */
+    async expectFieldListItemVisible(field) {
+        await expect(
+            this.page.locator(this.fieldListItem(field)).first(),
+            `Field "${field}" must be listed in the sidebar`
+        ).toBeVisible({ timeout: 15000 });
+    }
+
+    /**
+     * How many interesting-field (ⓘ) toggles the sidebar renders for `field`.
+     * FieldRow renders one in the row itself and one in the hover-actions tray, both
+     * carrying the same data-test, so an eligible field counts more than one.
+     */
+    async countInterestingFieldButtons(field) {
+        await this.expectFieldListItemVisible(field);
+        return await this.page.locator(this.interestingFieldBtn(field)).count();
+    }
+
+    /**
+     * Push `field` straight into searchObj.data.stream.interestingFieldList, which is
+     * how a list persisted by a build that still starred the field comes back. Throws
+     * if Vue state could not be reached, so a test can't pass on a silent no-op.
+     */
+    async forceInterestingFieldInState(field) {
+        const list = await this._mutateSearchObj((searchObj, name) => {
+            const fields = searchObj.data?.stream?.interestingFieldList;
+            if (!Array.isArray(fields)) return null;
+            if (!fields.includes(name)) fields.push(name);
+            return [...fields];
+        }, field);
+        if (!list?.includes(field)) {
+            throw new Error(`forceInterestingFieldInState: could not add "${field}" to interestingFieldList`);
+        }
+        testLogger.info(`interestingFieldList forced to: ${list.join(',')}`);
+        return list;
+    }
+
+    /** Reads searchObj.data.stream.interestingFieldList. */
+    async getInterestingFieldList() {
+        return await this._mutateSearchObj((searchObj) => [
+            ...(searchObj.data?.stream?.interestingFieldList || []),
+        ]);
+    }
+
+    /** The search must not have failed — asserts the error state is absent. */
+    async expectNoSearchError() {
+        const error = this.page.locator(this.errorMessage);
+        try {
+            await expect(error).toBeHidden();
+        } catch {
+            // Read the text only once the wait has settled on "visible", otherwise it
+            // is empty precisely when the error is the thing worth reporting.
+            const text = (await error.first().textContent().catch(() => '')) || '';
+            throw new Error(`Search must not error, but the error state shows: "${text.trim()}"`);
+        }
+    }
+
+    // =========================================================================
+    // QUERY EDITOR KEYBOARD ACCESSIBILITY — Escape / focus helpers
+    // =========================================================================
+
+    /**
+     * Focus the Monaco query editor through its public API, without the Escape
+     * press that clickQueryEditor() uses to dismiss a lingering popper. Required
+     * for the fullscreen case, where that leading Escape would collapse the
+     * expanded wrapper before the test's own Escape runs.
+     * @returns {Promise<boolean>} whether the Monaco editor could be focused
+     */
+    async focusQueryEditorMonaco() {
+        return await this.page.evaluate((selector) => {
+            const host = document.querySelector(selector);
+            if (!host || !window.monaco?.editor?.getEditors) return false;
+            const ed = window.monaco.editor.getEditors().find((e) => host.contains(e.getDomNode()));
+            if (!ed) return false;
+            ed.focus();
+            return true;
+        }, this.queryEditor).catch(() => false);
+    }
+
+    /**
+     * Whether document.activeElement sits inside the Monaco editor host or its
+     * outer wrapper — i.e. focus has NOT yet left the editor.
+     * @returns {Promise<boolean>}
+     */
+    async hasEditorFocus() {
+        return await this.page.evaluate(() => {
+            const active = document.activeElement;
+            if (!(active instanceof HTMLElement)) return false;
+            return !!active.closest('[data-test="query-editor"], [data-test="logs-search-bar-query-editor"]');
+        });
+    }
+
+    /** Assert focus is still inside the editor (e.g. after widget-close or fullscreen collapse). */
+    async expectFocusInsideEditor() {
+        await expect
+            .poll(() => this.hasEditorFocus(), { timeout: 10000, intervals: [100, 250, 500] })
+            .toBe(true);
+    }
+
+    /**
+     * Whether document.activeElement is a visible tabbable control that follows the
+     * editor host in document order — the exact target focusControlAfter() focuses.
+     * @returns {Promise<boolean>}
+     */
+    async hasFocusOnFollowingControl() {
+        return await this.page.evaluate(() => {
+            const container = document.querySelector('[data-test="query-editor"]');
+            const active = document.activeElement;
+            if (!container || !(active instanceof HTMLElement)) return false;
+            const TABBABLE =
+                'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]';
+            return (
+                !container.contains(active) &&
+                active.matches(TABBABLE) &&
+                active.getAttribute('tabindex') !== '-1' &&
+                active.getClientRects().length > 0 &&
+                Boolean(container.compareDocumentPosition(active) & Node.DOCUMENT_POSITION_FOLLOWING)
+            );
+        }).catch(() => false);
+    }
+
+    /** Assert Escape moved focus to a visible tabbable control that follows the editor. */
+    async expectFocusOnFollowingControl() {
+        await expect
+            .poll(() => this.hasFocusOnFollowingControl(), { timeout: 10000, intervals: [100, 250, 500] })
+            .toBe(true);
+    }
+
+    /**
+     * Whether the Monaco editor currently holds a non-empty text selection.
+     * @returns {Promise<boolean>}
+     */
+    async hasEditorSelection() {
+        return await this.page.evaluate((selector) => {
+            const host = document.querySelector(selector);
+            if (!host || !window.monaco?.editor?.getEditors) return false;
+            const ed = window.monaco.editor.getEditors().find((e) => host.contains(e.getDomNode()));
+            if (!ed) return false;
+            return !(ed.getSelection()?.isEmpty?.() ?? true);
+        }, this.queryEditor).catch(() => false);
+    }
+
+    /** Assert the editor holds a non-empty text selection (guard before the first Escape). */
+    async expectEditorSelectionActive() {
+        await expect
+            .poll(() => this.hasEditorSelection(), { timeout: 10000, intervals: [100, 250, 500] })
+            .toBe(true);
+    }
+
+    /** Assert the editor selection is collapsed/empty (after the first Escape). */
+    async expectEditorSelectionCollapsed() {
+        await expect
+            .poll(() => this.hasEditorSelection(), { timeout: 10000, intervals: [100, 250, 500] })
+            .toBe(false);
+    }
+
+    /** Assert the query editor fullscreen wrapper is expanded (data-fullscreen="true"). */
+    async expectQueryEditorExpanded() {
+        await expect
+            .poll(() => this.isQueryEditorExpanded(), { timeout: 10000, intervals: [100, 250, 500] })
+            .toBe(true);
+    }
+
+    /** Assert the query editor fullscreen wrapper is collapsed (data-fullscreen="false"). */
+    async expectQueryEditorCollapsed() {
+        await expect
+            .poll(() => this.isQueryEditorExpanded(), { timeout: 10000, intervals: [100, 250, 500] })
+            .toBe(false);
+    }
+
+    /** Assert the Monaco suggest widget is visible. */
+    async expectSuggestWidgetVisible() {
+        await expect
+            .poll(() => this.isSuggestionsWidgetVisible(), { timeout: 10000, intervals: [100, 250, 500] })
+            .toBe(true);
+    }
+
+    /** Assert the Monaco suggest widget is hidden/closed. */
+    async expectSuggestWidgetHidden() {
+        await expect
+            .poll(() => this.isSuggestionsWidgetVisible(), { timeout: 10000, intervals: [100, 250, 500] })
+            .toBe(false);
+    }
+
+    /**
+     * Open the suggest widget in the focused editor: type a value-quote trigger,
+     * then fall back to the deterministic Ctrl+Space manual trigger when the
+     * trigger character alone does not surface a menu (e.g. no field context).
+     */
+    async openSuggestWidget() {
+        await this.focusQueryEditorMonaco();
+        await this.page.keyboard.type("'");
+        if (!(await this.isSuggestionsWidgetVisible())) {
+            await this.getMonacoEditorHelper().triggerSuggestions();
+        }
+        await this.expectSuggestWidgetVisible();
     }
 
 }

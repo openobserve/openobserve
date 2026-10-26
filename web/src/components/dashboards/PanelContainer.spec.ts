@@ -15,11 +15,22 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+import { ref } from "vue";
 import PanelContainer from "@/components/dashboards/PanelContainer.vue";
+import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import config from "@/aws-exports";
+import { needsConfirmation, normalizePrefill } from "@/utils/alerts/alertPrefill";
+import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
+import {
+  deletePanelDraft,
+  panelDraftKey,
+  panelDraftRevision,
+  writePanelDraft,
+} from "@/composables/dashboard/usePanelDraft";
+import { KIOSK_PANEL_HEALTH_KEY } from "@/composables/dashboard/useKioskRefresh";
 
 // Mock shortURL service
 vi.mock("@/services/short_url", () => ({
@@ -194,7 +205,7 @@ describe("PanelContainer", () => {
     }
   });
 
-  const createWrapper = (props = {}, extraStubs = {}) => {
+  const createWrapper = (props = {}, extraStubs = {}, provide = {}) => {
     return mount(PanelContainer, {
       props: {
         ...defaultProps,
@@ -202,6 +213,7 @@ describe("PanelContainer", () => {
       },
       global: {
         plugins: [i18n, store, router],
+        provide,
         stubs: {
           ODialog: ODialogStub,
           ChartRenderer: { template: '<div data-test="chart-renderer"></div>' },
@@ -337,7 +349,14 @@ describe("PanelContainer", () => {
 
       const header = wrapper.find('[data-test="dashboard-panel-header"]');
       expect(header.text()).toBe("Test Panel");
-      expect(header.attributes("title")).toBe("Test Panel");
+    });
+
+    it("should give the panel title an overflow-only tooltip instead of a native title", () => {
+      wrapper = createWrapper();
+
+      const header = wrapper.find('[data-test="dashboard-panel-header"]');
+      expect(header.attributes("title")).toBeUndefined();
+      expect(header.findComponent({ name: "OTooltip" }).props("overflowOnly")).toBe(true);
     });
 
     it("should show description tooltip on hover when description exists", async () => {
@@ -437,6 +456,144 @@ describe("PanelContainer", () => {
         // Check if error message is in errorData ref
         expect(wrapper.vm.errorData).toBe(errorMessage);
       }
+    });
+  });
+
+  describe("Kiosk mode", () => {
+    const emitRendererError = async (error: unknown) => {
+      wrapper.findComponent({ name: "PanelSchemaRenderer" }).vm.$emit("error", error);
+      await wrapper.vm.$nextTick();
+    };
+
+    it("shows a failed panel loudly, with the error text inside the panel", async () => {
+      wrapper = createWrapper({ kiosk: true });
+      await emitRendererError({ message: "stream k8s_events not found", code: 404 });
+
+      const overlay = wrapper.find('[data-test="dashboard-panel-kiosk-error"]');
+      expect(overlay.exists()).toBe(true);
+      expect(overlay.text()).toContain("Panel failed to load");
+      expect(overlay.text()).toContain("stream k8s_events not found");
+      expect(wrapper.attributes("data-kiosk-failed")).toBe("true");
+    });
+
+    it("reduces a raw SQL parser error to one readable line", async () => {
+      wrapper = createWrapper({ kiosk: true });
+      await emitRendererError(
+        'Error# SQL error: ParserError("Expected: an SQL statement, found: SELEKT at Line: 1, Column: 1")\nstack line',
+      );
+
+      const summary = wrapper.find('[data-test="dashboard-panel-kiosk-error-summary"]');
+      expect(summary.text()).toBe(
+        "Query error: Expected: an SQL statement, found: SELEKT at Line: 1, Column: 1",
+      );
+      expect(summary.text()).not.toContain("ParserError");
+      expect(summary.text()).not.toContain("stack line");
+      // Wraps up to three lines in a narrow panel instead of cutting one line mid-word.
+      expect(summary.find(".line-clamp-3").exists()).toBe(true);
+      expect(summary.classes()).toContain("break-words");
+    });
+
+    it("keeps today's tooltip-only error outside kiosk", async () => {
+      wrapper = createWrapper();
+      await emitRendererError({ message: "stream k8s_events not found", code: 404 });
+
+      expect(wrapper.find('[data-test="dashboard-panel-kiosk-error"]').exists()).toBe(false);
+      expect(wrapper.attributes("data-kiosk-failed")).toBeUndefined();
+    });
+
+    it("reports its error and its recovery to the dashboard's health registry", async () => {
+      const registry = {
+        register: vi.fn(),
+        unregister: vi.fn(),
+        report: vi.fn(),
+        outage: ref(false),
+      };
+      wrapper = createWrapper(
+        { kiosk: true },
+        {},
+        { [KIOSK_PANEL_HEALTH_KEY as symbol]: registry },
+      );
+      const id = defaultProps.data.id;
+      expect(registry.register).toHaveBeenCalledWith(id);
+
+      await emitRendererError({ message: "502 Bad Gateway", code: 502 });
+      expect(registry.report).toHaveBeenLastCalledWith(id, {
+        message: "502 Bad Gateway",
+        code: 502,
+      });
+
+      await emitRendererError({ message: "", code: "" });
+      expect(registry.report).toHaveBeenLastCalledWith(id, { message: "", code: "" });
+      expect(wrapper.find('[data-test="dashboard-panel-kiosk-error"]').exists()).toBe(false);
+
+      wrapper.unmount();
+      expect(registry.unregister).toHaveBeenCalledWith(id);
+      wrapper = null;
+    });
+
+    it("hides the routine warning icons so only a failure draws the eye", async () => {
+      wrapper = createWrapper({ kiosk: true });
+      await emitRendererError({ message: "boom", code: 500 });
+      expect(wrapper.find('[data-test="panel-error-data"]').exists()).toBe(false);
+    });
+
+    it("dims the last render and marks it stale while the backend is unreachable", async () => {
+      const registry = {
+        register: vi.fn(),
+        unregister: vi.fn(),
+        report: vi.fn(),
+        outage: ref(false),
+      };
+      wrapper = createWrapper(
+        { kiosk: true },
+        {},
+        { [KIOSK_PANEL_HEALTH_KEY as symbol]: registry },
+      );
+      const body = () => wrapper.find('[data-test="dashboard-panel-body"]');
+      expect(wrapper.find('[data-test="dashboard-panel-kiosk-stale"]').exists()).toBe(false);
+      expect(body().classes()).not.toContain("opacity-60");
+
+      registry.outage.value = true;
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="dashboard-panel-kiosk-stale"]').text()).toBe("Stale");
+      expect(body().classes()).toContain("opacity-60");
+      expect(wrapper.find('[data-test="panel-schema-renderer"]').exists()).toBe(true);
+    });
+
+    it("shows a loading skeleton instead of an empty body until the first result or error", async () => {
+      wrapper = createWrapper({ kiosk: true });
+      wrapper.findComponent({ name: "PanelSchemaRenderer" }).vm.setNoData("No Data");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="dashboard-panel-kiosk-loading"]').exists()).toBe(true);
+
+      await emitRendererError({ message: "bad query", code: 400 });
+      expect(wrapper.find('[data-test="dashboard-panel-kiosk-loading"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-panel-kiosk-error"]').exists()).toBe(true);
+    });
+
+    it("keeps the skeleton through the first load only, never on later refreshes", async () => {
+      wrapper = createWrapper({ kiosk: true });
+      wrapper.findComponent({ name: "PanelSchemaRenderer" }).vm.setNoData("No Data");
+      const skeleton = () => wrapper.find('[data-test="dashboard-panel-kiosk-loading"]').exists();
+
+      wrapper.vm.handleLoadingStateChange(true);
+      await wrapper.vm.$nextTick();
+      expect(skeleton()).toBe(true);
+
+      wrapper.vm.handleLoadingStateChange(false);
+      await wrapper.vm.$nextTick();
+      expect(skeleton()).toBe(false);
+
+      wrapper.vm.handleLoadingStateChange(true);
+      await wrapper.vm.$nextTick();
+      expect(skeleton()).toBe(false);
+    });
+
+    it("never shows the skeleton outside kiosk", async () => {
+      wrapper = createWrapper();
+      wrapper.findComponent({ name: "PanelSchemaRenderer" }).vm.setNoData("No Data");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="dashboard-panel-kiosk-loading"]').exists()).toBe(false);
     });
   });
 
@@ -733,6 +890,51 @@ describe("PanelContainer", () => {
 
       expect(wrapper.vm.variablesDataUpdated).toBe(true);
     });
+
+    describe("a time range waiting in the panel's own picker", () => {
+      const refreshButton = () => wrapper.find('[data-test="dashboard-panel-refresh-panel-btn"]');
+      const refreshTooltip = () =>
+        refreshButton().findComponent({ name: "OTooltip" }).props("content");
+
+      it("marks the refresh icon with the variables warning look and says why", () => {
+        wrapper = createWrapper({ isTimeRangeWaiting: true });
+
+        expect(refreshButton().attributes("data-o2-variant")).toBe("ghost-warning");
+        expect(refreshTooltip()).toBe("Refresh to apply the time range");
+      });
+
+      it("names both when variables are waiting too", async () => {
+        wrapper = createWrapper({
+          isTimeRangeWaiting: true,
+          data: {
+            ...mockPanelData,
+            queries: [{ query: "SELECT * FROM test WHERE field = ${testVar}" }],
+          },
+          variablesData: { values: [{ name: "testVar", value: "a" }], isLoading: false },
+          currentVariablesData: { values: [{ name: "testVar", value: "b" }], isLoading: false },
+        });
+        await wrapper.vm.$nextTick();
+
+        expect(refreshButton().attributes("data-o2-variant")).toBe("ghost-warning");
+        expect(refreshTooltip()).toBe("Refresh to apply the time range and variable changes");
+      });
+
+      it("keeps the marker outside layout edit mode, where the refresh icon is hidden", () => {
+        wrapper = createWrapper({ isTimeRangeWaiting: true, layoutMode: "view" });
+        expect(refreshButton().attributes("data-o2-variant")).toBe("ghost-warning");
+        wrapper.unmount();
+
+        wrapper = createWrapper({ isTimeRangeWaiting: true, layoutMode: "edit" });
+        expect(refreshButton().exists()).toBe(false);
+      });
+
+      it("keeps the plain refresh icon when nothing waits", () => {
+        wrapper = createWrapper({ isTimeRangeWaiting: false });
+
+        expect(refreshButton().attributes("data-o2-variant")).toBe("ghost");
+        expect(refreshTooltip()).toBe("Refresh");
+      });
+    });
   });
 
   describe("Delete Panel", () => {
@@ -855,6 +1057,148 @@ describe("PanelContainer", () => {
       expect(prefill.name).toBe("Alert_from_My_Panel");
     });
 
+    it("uses the executed query, and lets the user pick between two queries", async () => {
+      const twoQueries = {
+        ...mockPanelData,
+        queryType: "promql",
+        queries: [
+          {
+            query: 'avg(disk_used{host=~"$host"})',
+            fields: { stream: "disk_used", stream_type: "metrics" },
+          },
+          {
+            query: "sum(rate(io_ops[$__rate_interval]))",
+            tabName: "IO",
+            fields: { stream: "io_ops", stream_type: "metrics" },
+          },
+        ],
+      };
+      const metaData = {
+        queries: [
+          { query: 'avg(disk_used{host=~"a"})', panelQueryIndex: 0 },
+          { query: "sum(rate(io_ops[1m]))", panelQueryIndex: 1 },
+        ],
+      };
+      wrapper = createWrapper({ data: twoQueries });
+      await wrapper.vm.metaDataValue(metaData);
+
+      const first = wrapper.vm.buildPanelAlertPrefill();
+      expect(first.promql).toBe('avg(disk_used{host=~"a"})');
+      expect(first.queryChoices.map((c: any) => c.query)).toEqual([
+        'avg(disk_used{host=~"a"})',
+        "sum(rate(io_ops[1m]))",
+      ]);
+      // The panel menu always opens the query-only dialog for a multi-query panel.
+      expect(needsConfirmation(normalizePrefill(first))).toBe(true);
+      expect(getAlertSource(first.source).pickQueryOnly).toBe(true);
+
+      const second = wrapper.vm.buildPanelAlertPrefill({ queryIndex: 1 });
+      expect(second.promql).toBe("sum(rate(io_ops[1m]))");
+      expect(second.streamName).toBe("io_ops");
+      expect(second.queryIndex).toBe(1);
+    });
+
+    it("offers no empty query slot as an alert target", async () => {
+      const query = (text: string) => ({
+        query: text,
+        fields: { stream: "io_ops", stream_type: "metrics" },
+      });
+      wrapper = createWrapper({
+        data: { ...mockPanelData, queryType: "promql", queries: [query("up"), query(" ")] },
+      });
+      await wrapper.vm.metaDataValue({ queries: [{ query: "up", panelQueryIndex: 0 }] });
+      expect(wrapper.vm.buildPanelAlertPrefill().queryChoices).toBeUndefined();
+
+      wrapper = createWrapper({
+        data: {
+          ...mockPanelData,
+          queryType: "promql",
+          queries: [query("up"), query(""), query("rate(io_ops[1m])")],
+        },
+      });
+      await wrapper.vm.metaDataValue({ queries: [] });
+      expect(
+        wrapper.vm.buildPanelAlertPrefill().queryChoices.map((c: { index: number }) => c.index),
+      ).toEqual([0, 2]);
+    });
+
+    describe("with a formula and hidden inputs", () => {
+      const combined = "(sum(rate(errors[1m]))) / (sum(rate(requests[1m]))) * 100";
+      const formulaPanel = (hideA: boolean) => ({
+        ...mockPanelData,
+        queryType: "promql",
+        queries: [
+          {
+            query: "sum(rate(errors[$__rate_interval]))",
+            fields: { stream: "errors", stream_type: "metrics" },
+            config: { ref: "A", hide: hideA },
+          },
+          {
+            query: "sum(rate(requests[$__rate_interval]))",
+            fields: { stream: "requests", stream_type: "metrics" },
+            config: { ref: "B", hide: true },
+          },
+          {
+            query: "",
+            tabName: "Ratio",
+            fields: { stream_type: "metrics" },
+            config: { formula: "A / B * 100" },
+          },
+        ],
+      });
+      const metaData = {
+        queries: [
+          { query: "sum(rate(errors[1m]))", panelQueryIndex: 0 },
+          { query: "sum(rate(requests[1m]))", panelQueryIndex: 1, notSent: true },
+          { query: combined, panelQueryIndex: 2 },
+        ],
+      };
+
+      it("alerts on the formula, its only visible query, with its inputs' metrics", async () => {
+        wrapper = createWrapper({ data: formulaPanel(true) });
+        await wrapper.vm.metaDataValue(metaData);
+
+        const prefill = wrapper.vm.buildPanelAlertPrefill();
+        expect(prefill.promql).toBe(combined);
+        expect(prefill.queryChoices).toBeUndefined();
+        expect(prefill.streamCandidates.map((c: any) => c.name)).toEqual(["errors", "requests"]);
+      });
+
+      it("keeps the action for a formula whose inputs carry no stream pick", () => {
+        const panel = formulaPanel(true);
+        panel.queries.forEach((query: any) => (query.fields.stream = ""));
+        wrapper = createWrapper({ data: panel });
+        expect(wrapper.vm.alertDisabledReason).toBeNull();
+      });
+
+      it("disables the action when every query is hidden", () => {
+        const panel = formulaPanel(true);
+        panel.queries[2].config.hide = true;
+        wrapper = createWrapper({ data: panel });
+        expect(wrapper.vm.alertDisabledReason).toBeTruthy();
+      });
+
+      it("offers only the visible queries in the picker", async () => {
+        wrapper = createWrapper({ data: formulaPanel(false) });
+        await wrapper.vm.metaDataValue(metaData);
+
+        const prefill = wrapper.vm.buildPanelAlertPrefill();
+        expect(prefill.queryChoices.map((c: any) => c.index)).toEqual([0, 2]);
+        expect(prefill.promql).toBe("sum(rate(errors[1m]))");
+        expect(wrapper.vm.buildPanelAlertPrefill({ queryIndex: 2 }).promql).toBe(combined);
+      });
+    });
+
+    it("offers no query choice for a single-query panel", async () => {
+      wrapper = createWrapper({
+        data: {
+          ...mockPanelData,
+          queries: [{ query: "SELECT * FROM test", fields: { stream: "test-stream" } }],
+        },
+      });
+      expect(wrapper.vm.buildPanelAlertPrefill().queryChoices).toBeUndefined();
+    });
+
     it("disables the action when the panel has no queries", async () => {
       wrapper = createWrapper({ data: { ...mockPanelData, queries: [] } });
       expect(wrapper.vm.alertDisabledReason).toBeTruthy();
@@ -867,6 +1211,19 @@ describe("PanelContainer", () => {
       };
       wrapper = createWrapper({ data: panelWithoutStream });
       expect(wrapper.vm.alertDisabledReason).toBeTruthy();
+    });
+
+    it("enables the action when only a later query has a stream", async () => {
+      wrapper = createWrapper({
+        data: {
+          ...mockPanelData,
+          queries: [
+            { query: "SELECT 1", fields: {} },
+            { query: "SELECT * FROM test", fields: { stream: "test-stream" } },
+          ],
+        },
+      });
+      expect(wrapper.vm.alertDisabledReason).toBeNull();
     });
 
     it("enables the action for a panel with a query and a stream", async () => {
@@ -1099,6 +1456,108 @@ describe("PanelContainer", () => {
       // Check the method exists
       expect(wrapper.vm.onPanelModifyClick).toBeDefined();
     });
+
+    describe("layout modes", () => {
+      const menuStubs = {
+        ODropdown: {
+          name: "ODropdown",
+          template: '<div class="o-dropdown-stub"><slot name="trigger" /><slot /></div>',
+        },
+        ODropdownItem: {
+          name: "ODropdownItem",
+          template: '<div class="o-dropdown-item-stub" v-bind="$attrs"><slot /></div>',
+        },
+      };
+      const menuIds = () =>
+        wrapper
+          .findAllComponents({ name: "ODropdownItem" })
+          .map((item: any) => item.attributes("data-test"));
+
+      it("keeps every action except Edit layout in view mode", () => {
+        wrapper = createWrapper({ layoutMode: "view" }, menuStubs);
+
+        expect(menuIds()).not.toContain("dashboard-edit-layout");
+        expect(menuIds()).toEqual(
+          expect.arrayContaining([
+            "dashboard-edit-panel",
+            "dashboard-duplicate-panel",
+            "dashboard-delete-panel",
+            "dashboard-move-to-another-panel",
+          ]),
+        );
+        expect(wrapper.find('[data-test="dashboard-panel-drag"]').exists()).toBe(false);
+      });
+
+      it("offers only Edit layout in edit mode", () => {
+        wrapper = createWrapper({ layoutMode: "edit" }, menuStubs);
+
+        expect(menuIds()).toEqual(["dashboard-edit-layout"]);
+        expect(wrapper.find('[data-test="dashboard-panel-drag"]').exists()).toBe(true);
+      });
+
+      it("drops the hover controls and refresh from the bar in edit mode so the title keeps the room", async () => {
+        wrapper = createWrapper({ layoutMode: "edit" });
+        wrapper.vm.isCurrentlyHoveredPanel = true;
+        await wrapper.vm.$nextTick();
+
+        const fullscreen = wrapper.find('[data-test="dashboard-panel-fullscreen-btn"]');
+        expect(fullscreen.classes()).toContain("hidden");
+        expect(wrapper.find('[data-test="dashboard-panel-refresh-panel-btn"]').exists()).toBe(
+          false,
+        );
+        expect(wrapper.find('[data-test="dashboard-panel-drag"]').classes()).toContain("shrink-0");
+      });
+
+      it("keeps the hover controls and refresh in view mode", async () => {
+        wrapper = createWrapper({ layoutMode: "view" });
+        wrapper.vm.isCurrentlyHoveredPanel = true;
+        await wrapper.vm.$nextTick();
+
+        const fullscreen = wrapper.find('[data-test="dashboard-panel-fullscreen-btn"]');
+        expect(fullscreen.exists()).toBe(true);
+        expect(fullscreen.classes()).not.toContain("hidden");
+        expect(wrapper.find('[data-test="dashboard-panel-refresh-panel-btn"]').exists()).toBe(true);
+      });
+
+      it("keeps the full menu when no layout mode is given", () => {
+        wrapper = createWrapper({}, menuStubs);
+
+        expect(menuIds()).toEqual(
+          expect.arrayContaining(["dashboard-edit-panel", "dashboard-edit-layout"]),
+        );
+      });
+
+      it.each([
+        ["view", true],
+        ["edit", false],
+      ])("the hover Delete key opens the delete confirm in %s mode: %s", async (mode, opens) => {
+        wrapper = createWrapper({ layoutMode: mode });
+        wrapper.vm.isCurrentlyHoveredPanel = true;
+
+        window.dispatchEvent(new KeyboardEvent("keydown", { key: "Delete" }));
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.vm.confirmDeletePanelDialog).toBe(opens);
+      });
+
+      it.each([["kiosk"], ["viewOnly"]])("ignores every hover shortcut in %s", async (prop) => {
+        const routerPushSpy = vi.spyOn(router, "push");
+        wrapper = createWrapper({ [prop]: true });
+        wrapper.vm.isCurrentlyHoveredPanel = true;
+
+        for (const key of ["Delete", "Backspace", "d", "e", "v", "i"]) {
+          window.dispatchEvent(new KeyboardEvent("keydown", { key }));
+        }
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.vm.confirmDeletePanelDialog).toBe(false);
+        expect(wrapper.vm.showViewPanel).toBe(false);
+        expect(wrapper.emitted("onViewPanel")).toBeUndefined();
+        expect(toastMock).not.toHaveBeenCalled();
+        expect(routerPushSpy).not.toHaveBeenCalled();
+        routerPushSpy.mockRestore();
+      });
+    });
   });
 
   describe("Variables Data Management", () => {
@@ -1215,6 +1674,28 @@ describe("PanelContainer", () => {
       await panelRenderer.vm.$emit("loading-state-change", true);
 
       expect(wrapper.vm.isPanelLoading).toBe(true);
+    });
+
+    it("keeps the previous last-refreshed age in the header while a restored panel refreshes", async () => {
+      wrapper = createWrapper({}, { PanelErrorButtons });
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      const shownAge = () => {
+        expect(wrapper.find('[data-test="panel-last-refreshed-at"]').exists()).toBe(true);
+        return wrapper.findComponent(PanelErrorButtons).props("lastTriggeredAt");
+      };
+      const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+
+      await renderer.vm.$emit("last-triggered-at-update", tenMinutesAgo);
+      await renderer.vm.$emit("loading-state-change", true);
+      await flushPromises();
+      expect(wrapper.vm.isPanelLoading).toBe(true);
+      expect(shownAge()).toBe(tenMinutesAgo);
+
+      const freshAt = Date.now();
+      await renderer.vm.$emit("last-triggered-at-update", freshAt);
+      await renderer.vm.$emit("loading-state-change", false);
+      await flushPromises();
+      expect(shownAge()).toBe(freshAt);
     });
   });
 
@@ -1354,6 +1835,175 @@ describe("PanelContainer", () => {
       expect(wrapper.find('[data-test="panel-limit-number-of-series-warning"]').exists()).toBe(
         false,
       );
+    });
+  });
+
+  describe("notice chips with the real PanelErrorButtons", () => {
+    const VRL_ERROR = "function error: parse_json failed";
+    const RANGE_CLAMP = "Query duration is modified due to query range restriction of 24 hours";
+
+    const mountWithChips = (props = {}) =>
+      mount(PanelContainer, {
+        props: { ...defaultProps, ...props },
+        attachTo: document.body,
+        global: {
+          plugins: [i18n, store, router],
+          stubs: {
+            PanelSchemaRenderer: {
+              name: "PanelSchemaRenderer",
+              template: '<div data-test="panel-schema-renderer"></div>',
+            },
+            QueryInspector: {
+              name: "QueryInspector",
+              inheritAttrs: false,
+              props: ["open", "metaData", "data", "diagnostics", "seriesLimit"],
+              template: '<div data-test="query-inspector" :data-open="String(open)"></div>',
+            },
+            ShowLegendsPopup: { template: "<div></div>" },
+            SinglePanelMove: { template: "<div></div>" },
+            PanelErrorButtons,
+          },
+        },
+      });
+
+    const diagnosticsWith = (overrides = {}) => ({
+      queries: [],
+      serverPartial: false,
+      partialReasons: [],
+      functionErrors: [],
+      ...overrides,
+    });
+
+    it("renders the series count chip from the renderer's series-limit event", async () => {
+      wrapper = mountWithChips();
+      wrapper.vm.handleSeriesLimitUpdate({ shown: 100, total: 342, cap: 100 });
+      wrapper.vm.handleLimitNumberOfSeriesWarningMessageUpdate("Showing 100 of 342 series");
+      await flushPromises();
+      expect(wrapper.find('[data-test="panel-notice-chip-series-cap"]').text()).toBe(
+        "100/342 series",
+      );
+    });
+
+    it("opens the Query Inspector when a chip is clicked", async () => {
+      wrapper = mountWithChips();
+      wrapper.vm.metaDataValue({ queries: [{ query: "SELECT 1", variables: [] }] });
+      wrapper.vm.handlePanelDiagnosticsUpdate(diagnosticsWith({ serverPartial: true }));
+      await flushPromises();
+      await wrapper.find('[data-test="panel-notice-chip-partial"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="query-inspector"]').attributes("data-open")).toBe("true");
+    });
+
+    it("moves a function error out of the range warning into its own chip", async () => {
+      wrapper = mountWithChips();
+      wrapper.vm.handleResultMetadataUpdate([[{ function_error: [VRL_ERROR] }]]);
+      wrapper.vm.handlePanelDiagnosticsUpdate(diagnosticsWith({ functionErrors: [VRL_ERROR] }));
+      await flushPromises();
+      expect(wrapper.find('[data-test="panel-notice-chip-function-error"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-max-duration-warning"]').exists()).toBe(false);
+    });
+
+    it("keeps a range clamp on the existing range warning", async () => {
+      wrapper = mountWithChips();
+      wrapper.vm.handleResultMetadataUpdate([[{ function_error: [VRL_ERROR, RANGE_CLAMP] }]]);
+      wrapper.vm.handlePanelDiagnosticsUpdate(diagnosticsWith({ functionErrors: [VRL_ERROR] }));
+      await flushPromises();
+      expect(wrapper.vm.maxQueryRangeWarning).toBe(RANGE_CLAMP);
+    });
+
+    it("grants editor actions only outside view-only mode", async () => {
+      wrapper = mountWithChips();
+      expect(wrapper.vm.canEditFromNotice).toBe(true);
+      wrapper.unmount();
+      wrapper = mountWithChips({ viewOnly: true });
+      expect(wrapper.vm.canEditFromNotice).toBe(false);
+      expect(wrapper.vm.canRefreshFromNotice).toBe(true);
+    });
+
+    it("keeps the title on one line and lets the notice area shrink before the panel controls", async () => {
+      wrapper = mountWithChips();
+      const title = wrapper.find('[data-test="dashboard-panel-header"]');
+      expect(title.classes()).not.toContain("max-lg:line-clamp-2");
+      expect(title.classes()).toContain("truncate");
+      wrapper.vm.handlePanelDiagnosticsUpdate(diagnosticsWith({ serverPartial: true }));
+      await flushPromises();
+      const notices = wrapper.find('[data-test="panel-notice-chips"]').element.parentElement!;
+      expect(notices.className).toContain("min-w-0");
+      expect(notices.className).toContain("overflow-x-clip");
+    });
+
+    it("keeps notice chips ahead of the hover-only controls on a narrow bar, at rest and on hover", async () => {
+      wrapper = mountWithChips();
+      const title = () => wrapper.find('[data-test="dashboard-panel-header"]');
+      const fullscreen = () => wrapper.find('[data-test="dashboard-panel-fullscreen-btn"]');
+      wrapper.vm.handlePanelDiagnosticsUpdate(diagnosticsWith({ serverPartial: true }));
+      await flushPromises();
+
+      expect(title().classes()).toContain("min-w-[min(10rem,40%)]!");
+      expect(fullscreen().classes()).toContain("@max-[28rem]/panelbar:hidden");
+      expect(fullscreen().classes()).toContain("invisible");
+
+      await wrapper.trigger("mouseover");
+      expect(fullscreen().classes()).toContain("@max-[28rem]/panelbar:hidden");
+      expect(fullscreen().classes()).not.toContain("invisible");
+      expect(title().classes()).toContain("min-w-[min(10rem,40%)]!");
+    });
+
+    it("leaves a panel without notices on the original hover and title rules", async () => {
+      wrapper = mountWithChips();
+      const title = wrapper.find('[data-test="dashboard-panel-header"]');
+      expect(title.classes()).not.toContain("min-w-[min(10rem,40%)]!");
+      expect(wrapper.vm.hoverRevealClass).toBe("invisible pointer-events-none");
+      await wrapper.trigger("mouseover");
+      expect(wrapper.vm.hoverRevealClass).toBe("");
+    });
+
+    it("keeps Refresh but not editor actions while the layout is being edited", async () => {
+      wrapper = mountWithChips({ layoutMode: "edit" });
+      expect(wrapper.vm.canEditFromNotice).toBe(false);
+      expect(wrapper.vm.canRefreshFromNotice).toBe(true);
+    });
+
+    it("passes the row cap through so the series chip reads as a lower bound", async () => {
+      wrapper = mountWithChips();
+      wrapper.vm.handleSeriesLimitUpdate({ shown: 100, total: 1000, cap: 100 });
+      wrapper.vm.handlePanelDiagnosticsUpdate(
+        diagnosticsWith({ serverPartial: true, rowsCapped: true }),
+      );
+      await flushPromises();
+      expect(wrapper.find('[data-test="panel-notice-chip-series-cap"]').text()).toBe(
+        "100/1,000+ series",
+      );
+    });
+
+    it("navigates to the panel editor from Use Top N", async () => {
+      const routerPushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      wrapper = mountWithChips();
+      wrapper.vm.handleSeriesLimitUpdate({ shown: 100, total: 342, cap: 100 });
+      await flushPromises();
+      wrapper.findComponent(PanelErrorButtons).vm.$emit("edit-panel", "use-top-n");
+      await flushPromises();
+      expect(routerPushSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: "/dashboards/add_panel",
+          query: expect.objectContaining({ focus: "top-n" }),
+        }),
+      );
+      routerPushSpy.mockRestore();
+    });
+
+    it("deep-links Edit function to the VRL editor, and the menu's Edit panel to no focus", async () => {
+      const routerPushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      wrapper = mountWithChips();
+      wrapper.findComponent(PanelErrorButtons).vm.$emit("edit-panel", "edit-function");
+      await flushPromises();
+      expect(routerPushSpy).toHaveBeenLastCalledWith(
+        expect.objectContaining({ query: expect.objectContaining({ focus: "vrl" }) }),
+      );
+      wrapper.vm.onEditPanel(wrapper.props("data"));
+      await flushPromises();
+      expect(routerPushSpy.mock.lastCall?.[0]).not.toHaveProperty("query.focus");
+      routerPushSpy.mockRestore();
     });
   });
 
@@ -1813,7 +2463,9 @@ describe("PanelContainer", () => {
       // attribute nothing in web/src consumed, so the caveat reached no user.
       const tooltip = wrapper.findComponent({ name: "OTag" }).findComponent({ name: "OTooltip" });
       expect(tooltip.exists()).toBe(true);
-      expect(tooltip.props("content")).toBe("As of the last stream-list refresh.");
+      expect(tooltip.props("content")).toContain("As of the last stream-list refresh.");
+      // The label rides the tooltip too, since a narrow panel bar shows only the icon.
+      expect(tooltip.props("content")).toContain("3 days");
     });
 
     it("dims the panel BODY wrapper when badged — a full-contrast number reads as current", () => {
@@ -2043,6 +2695,24 @@ describe("PanelContainer", () => {
       expect(wrapper.find('[data-test="dashboard-panel-curated-subtitle"]').exists()).toBe(false);
     });
 
+    it("a curated TILE wraps its title and keeps two lines; a plain tile stays one line", () => {
+      wrapper = createWrapper({
+        data: { ...eligible(), type: "metric", title: "Deployments not ready" },
+        viewOnly: true,
+      });
+      const curated = wrapper.find('[data-test="dashboard-panel-header"]').classes();
+      expect(curated).toEqual(expect.arrayContaining(["line-clamp-2", "min-h-[2lh]"]));
+      wrapper.unmount();
+
+      wrapper = createWrapper({
+        data: { ...mockPanelData, type: "metric", title: "Deployments not ready", config: {} },
+        viewOnly: true,
+      });
+      const plain = wrapper.find('[data-test="dashboard-panel-header"]').classes();
+      expect(plain).not.toContain("line-clamp-2");
+      expect(plain).toContain("truncate");
+    });
+
     it("gives the title the full bar — nothing between it and the flex spacer", () => {
       // The truncation was structural, not cosmetic: a sibling in the same
       // one-line flex row takes width the title then has to ellipsise into.
@@ -2156,6 +2826,242 @@ describe("PanelContainer", () => {
       );
       await flushPromises();
       expect(wrapper.find('[data-test="errors-stub"]').text()).toBe("scan failed");
+    });
+  });
+
+  describe("annotation source failures", () => {
+    const rendererWithFailures = (failed: string[]) => ({
+      PanelSchemaRenderer: {
+        name: "PanelSchemaRenderer",
+        template: '<div data-test="panel-schema-renderer"></div>',
+        props: ["panelSchema", "selectedTimeObj", "width", "height"],
+        data: () => ({ noData: "", failedAnnotationSources: failed }),
+      },
+    });
+
+    it("shows a quiet indicator naming the failed source while the panel still renders", async () => {
+      wrapper = createWrapper({}, rendererWithFailures(["Incidents"]));
+      await flushPromises();
+      const indicator = wrapper.find('[data-test="dashboard-panel-annotation-source-error"]');
+      expect(indicator.exists()).toBe(true);
+      expect(indicator.attributes("aria-label")).toBe(
+        "Annotation source Incidents failed to load. Panel data is unaffected.",
+      );
+      expect(indicator.attributes("role")).toBe("img");
+      expect(indicator.attributes("aria-hidden")).toBeUndefined();
+      expect(wrapper.find('[data-test="panel-schema-renderer"]').exists()).toBe(true);
+    });
+
+    it("shows nothing when every source loaded", () => {
+      wrapper = createWrapper({}, rendererWithFailures([]));
+      expect(wrapper.find('[data-test="dashboard-panel-annotation-source-error"]').exists()).toBe(
+        false,
+      );
+    });
+  });
+
+  describe("annotation source truncation", () => {
+    const rendererWithTruncation = (truncated: string[]) => ({
+      PanelSchemaRenderer: {
+        name: "PanelSchemaRenderer",
+        template: '<div data-test="panel-schema-renderer"></div>',
+        props: ["panelSchema", "selectedTimeObj", "width", "height"],
+        data: () => ({ noData: "", truncatedAnnotationSources: truncated }),
+      },
+    });
+
+    it("shows a quiet indicator naming a source showing only its latest 500 markers", async () => {
+      wrapper = createWrapper({}, rendererWithTruncation(["Incidents"]));
+      await flushPromises();
+      const indicator = wrapper.find('[data-test="dashboard-panel-annotation-source-truncated"]');
+      expect(indicator.exists()).toBe(true);
+      expect(indicator.attributes("aria-label")).toBe(
+        "Annotation source Incidents is showing only the latest 500 markers in this range.",
+      );
+      expect(indicator.attributes("role")).toBe("img");
+      expect(indicator.attributes("aria-hidden")).toBeUndefined();
+      expect(wrapper.find('[data-test="panel-schema-renderer"]').exists()).toBe(true);
+    });
+
+    it("shows nothing when no source was truncated", () => {
+      wrapper = createWrapper({}, rendererWithTruncation([]));
+      expect(
+        wrapper.find('[data-test="dashboard-panel-annotation-source-truncated"]').exists(),
+      ).toBe(false);
+    });
+  });
+
+  describe("Unsaved draft dot", () => {
+    const draftScope = {
+      userEmail: "me@x.io",
+      org: "test-org",
+      dashboardId: "test-dashboard-id",
+      panelId: "panel-1",
+    };
+    const seed = () =>
+      writePanelDraft(draftScope, {
+        tabId: "default-tab",
+        data: { ...mockPanelData, title: "Draft" },
+        layout: { currentQueryIndex: 0, vrlFunctionToggle: false },
+        sessionVariables: [],
+        variablesWithCurrentPanel: [],
+      });
+    // The menu renders open so the Edit Panel item and its dot are in the DOM.
+    const menuStubs = {
+      ODropdown: {
+        name: "ODropdown",
+        template: '<div class="o-dropdown-stub"><slot name="trigger" /><slot /></div>',
+      },
+      ODropdownItem: {
+        name: "ODropdownItem",
+        template:
+          '<div role="menuitem" v-bind="$attrs" @click="$emit(\'select\')"><slot name="icon-left" /><slot /><slot name="icon-right" /></div>',
+        emits: ["select"],
+      },
+      OTooltip: { template: "<slot />" },
+    };
+    const mountPanel = (props = {}) => createWrapper({ layoutMode: "view", ...props }, menuStubs);
+    const trigger = () => wrapper.find('[data-test="dashboard-edit-panel-Test Panel-dropdown"]');
+    const triggerDot = () => wrapper.find('[data-test="dashboard-panel-draft-dot"]');
+    const itemDot = () => wrapper.find('[data-test="dashboard-panel-edit-draft-dot"]');
+    const editItem = () => wrapper.find('[data-test="dashboard-edit-panel"]');
+
+    beforeEach(() => {
+      localStorage.clear();
+      (store.state as any).userInfo = { email: "me@x.io" };
+      store.state.printMode = false;
+    });
+
+    afterEach(() => {
+      store.state.printMode = false;
+    });
+
+    it("badges the panel menu trigger and names the draft in its accessible name", async () => {
+      seed();
+      wrapper = mountPanel();
+      await flushPromises();
+
+      expect(triggerDot().exists()).toBe(true);
+      expect(trigger().element.contains(triggerDot().element)).toBe(true);
+      expect(triggerDot().attributes("aria-hidden")).toBe("true");
+      expect(trigger().element.tagName).toBe("BUTTON");
+      expect(trigger().attributes("aria-label")).toBe("Panel actions · unsaved draft");
+    });
+
+    it("keeps the plain trigger name and no dots without a draft", async () => {
+      wrapper = mountPanel();
+      await flushPromises();
+
+      expect(triggerDot().exists()).toBe(false);
+      expect(itemDot().exists()).toBe(false);
+      expect(trigger().attributes("aria-label")).toBe("More actions");
+    });
+
+    it("marks Edit Panel with a labelled dot after its label", async () => {
+      seed();
+      wrapper = mountPanel();
+      await flushPromises();
+
+      expect(itemDot().exists()).toBe(true);
+      expect(itemDot().attributes("role")).toBe("img");
+      expect(itemDot().attributes("aria-label")).toBe("Unsaved changes in this browser");
+      const item = editItem().element;
+      expect(item.contains(itemDot().element)).toBe(true);
+      expect(item.textContent?.trim().startsWith("Edit Panel")).toBe(true);
+      expect(item.lastElementChild).toBe(itemDot().element);
+    });
+
+    it("Edit Panel keeps its normal behaviour and does not skip the restore dialog", async () => {
+      const routerPushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      seed();
+      wrapper = mountPanel();
+      await flushPromises();
+
+      await editItem().trigger("click");
+      await flushPromises();
+
+      expect(routerPushSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: "/dashboards/add_panel",
+          query: expect.objectContaining({ panelId: "panel-1" }),
+        }),
+      );
+      expect(routerPushSpy.mock.lastCall?.[0]).not.toHaveProperty("query.draft");
+      routerPushSpy.mockRestore();
+    });
+
+    it("follows drafts as they are written and deleted, including from another tab", async () => {
+      wrapper = mountPanel();
+      await flushPromises();
+      expect(triggerDot().exists()).toBe(false);
+
+      seed();
+      await flushPromises();
+      expect(triggerDot().exists()).toBe(true);
+      expect(itemDot().exists()).toBe(true);
+
+      deletePanelDraft(draftScope);
+      await flushPromises();
+      expect(triggerDot().exists()).toBe(false);
+      expect(itemDot().exists()).toBe(false);
+
+      // Another tab writes straight to storage; only its storage event reaches this one.
+      localStorage.setItem(
+        panelDraftKey(draftScope),
+        JSON.stringify({ v: 1, savedAt: Date.now(), data: {} }),
+      );
+      const before = panelDraftRevision.value;
+      window.dispatchEvent(new StorageEvent("storage", { key: panelDraftKey(draftScope) }));
+      expect(panelDraftRevision.value).toBe(before + 1);
+      await flushPromises();
+      expect(triggerDot().exists()).toBe(true);
+    });
+
+    it.each([
+      ["view only", { viewOnly: true }],
+      ["simplified panel view", { simplifiedPanelView: true }],
+      ["layout editing", { layoutMode: "edit" }],
+    ])("is hidden in %s", async (_label, props) => {
+      seed();
+      wrapper = mountPanel(props);
+      await flushPromises();
+
+      expect(triggerDot().exists()).toBe(false);
+      expect(itemDot().exists()).toBe(false);
+    });
+
+    it("is hidden in print mode", async () => {
+      seed();
+      store.state.printMode = true;
+      wrapper = mountPanel();
+      await flushPromises();
+
+      expect(triggerDot().exists()).toBe(false);
+      expect(trigger().attributes("aria-label")).toBe("More actions");
+    });
+
+    it("hides the trigger badge in full screen", async () => {
+      seed();
+      wrapper = mountPanel();
+      await flushPromises();
+
+      expect(triggerDot().classes()).toContain("in-[.fullscreen]:hidden");
+    });
+
+    it("paints both dots with the Refresh pending token and a soft halo of the same colour", async () => {
+      seed();
+      wrapper = mountPanel();
+      await flushPromises();
+
+      expect(triggerDot().classes()).toEqual(
+        expect.arrayContaining(["bg-button-pending-bg", "ring-3", "ring-button-pending-bg/30"]),
+      );
+      expect(itemDot().classes()).toEqual(
+        expect.arrayContaining(["bg-button-pending-bg", "ring-2", "ring-button-pending-bg/30"]),
+      );
+      for (const dot of [triggerDot(), itemDot()]) {
+        expect(dot.classes()).not.toContain("ring-badge-amber-ol-text");
+      }
     });
   });
 });

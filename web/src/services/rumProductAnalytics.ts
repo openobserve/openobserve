@@ -16,16 +16,22 @@
 import type { AxiosResponse } from "axios";
 import http from "./http";
 import type {
-  NamedActionRule,
-  NamedEventRule,
+  AppSettings,
+  NamedRule,
+  PutAppSettingsBody,
   SavedFunnelBody,
 } from "@/utils/rum/productAnalyticsModel";
 
 export interface NamedEventBody {
   name: string;
-  rules: (NamedEventRule | NamedActionRule)[];
+  rules: NamedRule[];
 }
 export interface FunnelRef {
+  id: string;
+  name: string;
+}
+/** A deleted named event's id and the name it had when it was deleted. */
+export interface NamedEventRef {
   id: string;
   name: string;
 }
@@ -60,6 +66,11 @@ const rumProductAnalytics = {
     id: string,
   ): Promise<AxiosResponse<{ list: FunnelRef[] }>> =>
     http().get(`${events(org, id)}/funnels`, inApp(app)),
+  deletedEventNames: (
+    org: string,
+    ids: readonly string[],
+  ): Promise<AxiosResponse<{ list: NamedEventRef[] }>> =>
+    http().get(`${events(org)}/deleted_names`, { params: { ids: ids.join(",") } }),
   listFunnels: (org: string, app: string): Promise<Rows> => http().get(funnels(org), inApp(app)),
   getFunnel: (org: string, app: string, id: string): Promise<AxiosResponse<unknown>> =>
     http().get(funnels(org, id), inApp(app)),
@@ -76,6 +87,13 @@ const rumProductAnalytics = {
   ): Promise<AxiosResponse<unknown>> => http().put(funnels(org, id), body, inApp(app)),
   deleteFunnel: (org: string, app: string, id: string): Promise<AxiosResponse> =>
     http().delete(funnels(org, id), inApp(app)),
+  getAppSettings: (org: string, app: string): Promise<AxiosResponse<AppSettings>> =>
+    http().get(`${base(org)}/settings`, inApp(app)),
+  putAppSettings: (
+    org: string,
+    app: string,
+    body: PutAppSettingsBody,
+  ): Promise<AxiosResponse<AppSettings>> => http().put(`${base(org)}/settings`, body, inApp(app)),
 };
 
 export default rumProductAnalytics;

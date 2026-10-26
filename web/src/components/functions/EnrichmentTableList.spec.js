@@ -5,6 +5,10 @@ import streamService from "@/services/stream";
 import analytics from "@/services/product_analytics";
 import i18n from "@/locales";
 
+vi.mock("@/stores", () => ({
+  default: { state: { selectedOrganization: { identifier: "test-org" } } },
+}));
+
 // Mock zincutils
 vi.mock("@/utils/zincutils", () => ({
   formatSizeFromMB: vi.fn((size) => `${size} MB`),
@@ -290,7 +294,6 @@ describe("EnrichmentTableList Component", () => {
       expect(analytics.track).toHaveBeenCalledWith("Button Click", {
         button: "Delete Enrichment Table",
         user_org: "test-org",
-        user_id: "test@example.com",
         function_name: "test-table",
         is_ingest_func: undefined,
         page: "Functions",

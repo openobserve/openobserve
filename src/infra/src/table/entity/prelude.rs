@@ -2,6 +2,7 @@
 #[cfg(feature = "cloud")]
 pub use super::trial_quota_usage::Entity as TrialQuotaUsage;
 pub use super::{
+    alert_calibration_configs::Entity as AlertCalibrationConfigs,
     alert_composite_children::Entity as AlertCompositeChildren,
     alert_composites::Entity as AlertComposites,
     alert_incident_alerts::Entity as AlertIncidentAlerts,
@@ -9,9 +10,8 @@ pub use super::{
     anomaly_detection_config::Entity as AnomalyDetectionConfig,
     anomaly_detection_models::Entity as AnomalyDetectionModels, cipher_keys::Entity as CipherKeys,
     compactor_manual_jobs::Entity as CompactorManualJobs, dashboards::Entity as Dashboards,
-    destinations::Entity as Destinations, distinct_value_fields::Entity as DistinctValueFields,
-    enrichment_tables::Entity as EnrichmentTables, folders::Entity as Folders,
-    kv_store::Entity as KvStore,
+    destinations::Entity as Destinations, enrichment_tables::Entity as EnrichmentTables,
+    folders::Entity as Folders, kv_store::Entity as KvStore,
     llm_annotation_queue_bindings::Entity as LlmAnnotationQueueBindings,
     llm_annotation_queue_items::Entity as LlmAnnotationQueueItems,
     llm_annotation_queues::Entity as LlmAnnotationQueues,

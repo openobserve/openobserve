@@ -121,6 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OToggleGroup
           :model-value="baseline"
           class="shrink-0"
+          mobile-dropdown
           data-test="dbm-queries-baseline"
           @update:model-value="onBaselineChange"
         >
@@ -222,6 +223,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:sort-by="onSortChange"
         @row-click="onRowClick"
       >
+        <template #error="{ message }">
+          <OEmptyState
+            preset="load-error"
+            :description="raw(message)"
+            data-test="dbm-queries-error"
+            @action="onRefresh()"
+          />
+        </template>
         <!-- ONE toolbar row: search, the filter popover, its chips, the
              statement toggle, then the time range pinned right. -->
         <!-- Coverage, then the cross-row framing. Both inside the table frame
@@ -268,13 +277,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-body text-xs font-medium">
               {{ t("dbm.queries.foldRowText", { count: row.foldCount ?? 0 }) }}
             </span>
-            <span class="text-text-secondary text-3xs truncate">
+            <OTruncatedText class="text-text-secondary text-3xs">
               {{
                 tailExpanded
                   ? t("dbm.queries.foldRowDetailOpen", { share: formatPercent(row.share, 0) })
                   : t("dbm.queries.foldRowDetail", { share: formatPercent(row.share, 0) })
               }}
-            </span>
+            </OTruncatedText>
           </div>
           <div v-else class="flex min-w-0 flex-col gap-px">
             <span
@@ -289,16 +298,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <div
               v-if="!row.isOther"
-              class="text-text-secondary text-3xs flex min-w-0 items-center gap-1 truncate"
+              class="text-text-secondary text-3xs flex min-w-0 items-center gap-1"
               :class="row.isTail ? 'ps-4' : ''"
             >
               <OTag type="dbSystem" :value="row.db_system" size="xs" />
               <span class="opacity-45">·</span>
-              <span class="text-text-secondary font-medium">{{ row.serviceLabel }}</span>
-              <template v-if="row.db_instance">
-                <span class="opacity-45">·</span>
-                <span>{{ row.db_instance }}</span>
-              </template>
+              <OTruncatedText
+                :tooltip="raw([row.serviceLabel, row.db_instance].filter(Boolean).join(' · '))"
+              >
+                <span class="text-text-secondary font-medium">{{ row.serviceLabel }}</span>
+                <template v-if="row.db_instance">
+                  <span class="px-1 opacity-45">·</span>
+                  <span>{{ row.db_instance }}</span>
+                </template>
+              </OTruncatedText>
               <DbmRowChips :chips="chipsByFingerprint.get(row.fingerprint) ?? []" />
             </div>
             <!-- Every remainder states its own call count; only the first
@@ -518,7 +531,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-query="{ row }">
             <DbmQueryCell
               :text="raw(row.query ?? '')"
-              :title-attr="row.query ?? undefined"
               :db-system="row.db_system"
               :meta-items="[
                 { key: 'instance', label: raw(row.db_instance ?? '') },
@@ -595,7 +607,9 @@ import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";
 import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import { copyToClipboard } from "@/utils/clipboard";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -728,9 +742,7 @@ const {
             ? countClaim(rows.value.length, false, "client")
             : countClaim(serverRows.value.length, serverTruncated.value, "server"),
     },
-    // 0 here means "no client traffic", not "no databases" — the shared
-    // snapshot's fleet fallback is the better number then.
-    { key: "databaseCount", value: () => databaseCount.value || undefined },
+    // Only this tab's own badge: distinct instances in the top queries is not the Overview's database count.
   ],
 });
 // The list→detail hop: the seed hand-off plus the push, in one place. See
@@ -934,24 +946,8 @@ const { traceCount, probeTracePresence } = useDbmTracePresence(getStreams);
  * rather than on a page state that merely looks quiet.
  */
 const completionBias = ref<{ dropPercent: number } | null>(null);
-/**
- * The distinct instances in THIS page's result, which is not the shared
- * fan-out's database count and must not be replaced by it: this page's rows are
- * narrowed by up to five filters, so the number beside the Overview tab has
- * always described what the reader is looking at here. `null` until the first
- * load answers, so the badge stays bare rather than claiming zero.
- */
-const databaseCount = ref<number | null>(null);
 
-/**
- * Every badge, from the shell's shared snapshot.
- *
- * The TWO this page counts better than the fan-out can are in there too —
- * `ownCounts` above publishes them. `queryCount` is `rows.length` (what the
- * table is showing after this page's filters) and `databaseCount` the distinct
- * instances within it; both differ from the unfiltered shared read by design,
- * and both must read the same from every tab rather than only from this one.
- */
+// Every badge comes from the shell's shared snapshot; this page publishes only its own queryCount into it.
 const tabCounts = computed(() => tabCountProps(tabCountsContext.counts.value));
 
 /**
@@ -1494,7 +1490,6 @@ const loadQueries = async (token: number) => {
   freshness.value = data.freshness;
   topNSubset.value = data.top_n_subset;
   neverAggregated.value = data.freshness?.data_through === 0;
-  databaseCount.value = new Set(hits.map((r) => r.db_instance)).size;
 
   // Shares are measured against the WHOLE scope (shown + remainder), not just
   // what is on screen — otherwise every row's share inflates as the ranking

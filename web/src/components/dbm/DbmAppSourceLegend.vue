@@ -21,8 +21,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <span class="text-text-secondary text-2xs flex min-w-0 items-center gap-1" :data-test="dataTest">
     <OIcon name="account-tree" size="xs" class="shrink-0" aria-hidden="true" />
-    <span v-if="!compact" class="min-w-0 truncate" :data-test="`${dataTest}-text`">{{ text }}</span>
-    <OTooltip :content="hint" />
+    <!-- Without a label the hint tooltip below anchors to this text, so it must not open a second one. -->
+    <OTruncatedText
+      v-if="!compact"
+      :tooltip="label ? undefined : false"
+      :data-test="`${dataTest}-text`"
+    >
+      {{ text }}
+    </OTruncatedText>
+    <OTooltip v-if="compact || !label" :content="hint" />
   </span>
 </template>
 
@@ -30,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 

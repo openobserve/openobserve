@@ -23,7 +23,7 @@ import { createStore } from "vuex";
 import ExperimentForm from "./ExperimentForm.vue";
 import { MAX_TRIAL_COUNT } from "./ExperimentForm.schema";
 import llmExperimentsService from "@/services/llm-experiments.service";
-import llmDatasetsService from "@/services/llm-datasets.service";
+import llmDatasetsService, { type LlmDatasetItem } from "@/services/llm-datasets.service";
 import llmPromptsService from "@/services/llm-prompts.service";
 import remoteTasksService from "@/services/remote-tasks.service";
 import onlineEvalsService from "@/services/online-evals.service";
@@ -42,7 +42,13 @@ vi.mock("vue-router", () => ({
 vi.mock("@/services/llm-experiments.service", () => ({
   default: { create: vi.fn(), preview: vi.fn(), get: vi.fn(), clone: vi.fn() },
 }));
-vi.mock("@/services/llm-datasets.service", () => ({ default: { list: vi.fn() } }));
+vi.mock("@/services/llm-datasets.service", async () => ({
+  // The real helpers (commonInputFields, page-size ceiling) stay; only I/O is stubbed.
+  ...(await vi.importActual<typeof import("@/services/llm-datasets.service")>(
+    "@/services/llm-datasets.service",
+  )),
+  default: { list: vi.fn(), listItems: vi.fn() },
+}));
 vi.mock("@/services/online-evals.service", () => ({
   default: { scorers: { list: vi.fn() }, providers: { list: vi.fn() } },
 }));
@@ -103,6 +109,8 @@ const previewResult = {
   sampleSlots: [],
 };
 
+const emptyItemPage = { items: [], total: 0, from: 0, size: 0, hasMore: false };
+
 function oform(w: any) {
   return w.findComponent({ name: "OForm" }).vm as any;
 }
@@ -136,6 +144,7 @@ describe("ExperimentForm", () => {
     vi.clearAllMocks();
     for (const key of Object.keys(routeQuery)) delete routeQuery[key];
     (llmDatasetsService.list as any).mockResolvedValue([dataset]);
+    vi.mocked(llmDatasetsService.listItems).mockResolvedValue(emptyItemPage);
     (onlineEvalsService.scorers.list as any).mockResolvedValue([scorer]);
     (onlineEvalsService.providers.list as any).mockResolvedValue([provider]);
     (llmExperimentsService.preview as any).mockResolvedValue(previewResult);
@@ -376,6 +385,301 @@ describe("ExperimentForm", () => {
       "Finish the task section",
     );
   });
+
+  describe("cost confirmation", () => {
+    const costEstimate = {
+      estimatedCost: 42.5,
+      taskCostEstimated: true,
+      incomplete: false,
+      warningThreshold: 10,
+      confirmationRequired: true,
+    };
+    const overThreshold = {
+      response: {
+        status: 412,
+        data: {
+          code: 412,
+          message:
+            "the estimated scoring cost of 42.50 USD is above the 10.00 USD warning threshold",
+        },
+      },
+    };
+
+    function costDialog(w: any) {
+      return w
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((d: any) => d.props("title") === "Run this costly experiment?");
+    }
+
+    // The server prices the task from every message (characters / 4) times the
+    // task model's price, so these edits must refresh the estimate.
+    it.each([
+      ["userPrompt", "Summarise this much longer prompt: {{ input }}"],
+      ["systemPrompt", "Answer from context only."],
+      ["model", "gpt-4o-mini"],
+    ])("re-requests the preview when %s changes", async (field, value) => {
+      const settle = () => new Promise((resolve) => setTimeout(resolve, 600)); // past the typing debounce
+      wrapper = await createWrapper();
+      fillValid(wrapper);
+      await settle();
+      await flushPromises();
+      expect(llmExperimentsService.preview).toHaveBeenCalled();
+      (llmExperimentsService.preview as any).mockClear();
+
+      setField(wrapper, field, value);
+      await settle();
+      await flushPromises();
+      expect(llmExperimentsService.preview).toHaveBeenCalled();
+    });
+
+    it("shows the estimate in the preview panel", async () => {
+      (llmExperimentsService.preview as any).mockResolvedValue({
+        ...previewResult,
+        costEstimate: { ...costEstimate, incomplete: true, taskCostEstimated: false },
+      });
+      wrapper = await createWrapper();
+      fillValid(wrapper);
+      await flushPromises();
+      const text = wrapper.find('[data-test="ai-experiment-form-cost-estimate"]').text();
+      expect(text).toContain("$42.50");
+      expect(text).toContain("order of magnitude");
+      // A Remote/SDK task is incomplete by design; that is "scoring cost only",
+      // not a missing price.
+      expect(text).not.toContain("lower bound");
+      expect(text).toContain("scoring cost only");
+    });
+
+    it("calls the estimate a lower bound only when a model has no price", async () => {
+      (llmExperimentsService.preview as any).mockResolvedValue({
+        ...previewResult,
+        costEstimate: { ...costEstimate, incomplete: true, hasUnpricedModel: true },
+      });
+      wrapper = await createWrapper();
+      fillValid(wrapper);
+      await flushPromises();
+      const text = wrapper.find('[data-test="ai-experiment-form-cost-estimate"]').text();
+      expect(text).toContain("lower bound, some models have no price");
+    });
+
+    it("says when the cost could not be estimated", async () => {
+      (llmExperimentsService.preview as any).mockResolvedValue({
+        ...previewResult,
+        costEstimate: { ...costEstimate, estimatedCost: null, confirmationRequired: false },
+      });
+      wrapper = await createWrapper();
+      fillValid(wrapper);
+      await flushPromises();
+      expect(wrapper.find('[data-test="ai-experiment-form-cost-estimate"]').text()).toContain(
+        "could not be estimated",
+      );
+    });
+
+    it("does not qualify a missing cost as scoring cost only", async () => {
+      (llmExperimentsService.preview as any).mockResolvedValue({
+        ...previewResult,
+        costEstimate: { ...costEstimate, estimatedCost: null, taskCostEstimated: false },
+      });
+      wrapper = await createWrapper();
+      fillValid(wrapper);
+      await flushPromises();
+      const text = wrapper.find('[data-test="ai-experiment-form-cost-estimate"]').text();
+      expect(text).toContain("Cost could not be estimated");
+      expect(text).not.toContain("scoring cost only");
+    });
+
+    it("asks before creating when the preview requires confirmation", async () => {
+      (llmExperimentsService.preview as any).mockResolvedValue({ ...previewResult, costEstimate });
+      wrapper = await createWrapper();
+      fillValid(wrapper);
+      await flushPromises();
+      await submit(wrapper);
+      expect(llmExperimentsService.create).not.toHaveBeenCalled();
+      expect(costDialog(wrapper).props("modelValue")).toBe(true);
+      expect(costDialog(wrapper).props("message")).toContain("$42.50");
+      expect(costDialog(wrapper).props("message")).toContain("$10.00");
+    });
+
+    it("opens the dialog on a 412 and resends the same payload with confirmCostEstimate on confirm", async () => {
+      (llmExperimentsService.create as any).mockRejectedValueOnce(overThreshold);
+      wrapper = await createWrapper();
+      fillValid(wrapper);
+      await submit(wrapper);
+
+      expect(llmExperimentsService.create).toHaveBeenCalledTimes(1);
+      const dialog = costDialog(wrapper);
+      expect(dialog.props("modelValue")).toBe(true);
+      // No estimate on the preview: the app's own words, never the API text.
+      expect(dialog.props("message")).toBe(
+        "This experiment is estimated to cost more than the warning threshold. Create and run it anyway?",
+      );
+
+      dialog.vm.$emit("update:ok");
+      await flushPromises();
+
+      expect(llmExperimentsService.create).toHaveBeenCalledTimes(2);
+      const [first, retry] = (llmExperimentsService.create as any).mock.calls.map((c: any) => c[1]);
+      expect(retry).toEqual({ ...first, confirmCostEstimate: true });
+      expect(push).toHaveBeenCalled();
+    });
+
+    it("refreshes the preview on a 412, so the dialog shows the server's cost", async () => {
+      (llmExperimentsService.preview as any).mockResolvedValue({
+        ...previewResult,
+        costEstimate: { ...costEstimate, estimatedCost: 0.22, confirmationRequired: false },
+      });
+      (llmExperimentsService.create as any).mockRejectedValueOnce(overThreshold);
+      wrapper = await createWrapper();
+      fillValid(wrapper);
+      await flushPromises();
+      // The server now prices the run above the threshold.
+      (llmExperimentsService.preview as any).mockResolvedValue({ ...previewResult, costEstimate });
+      await submit(wrapper);
+
+      const message = String(costDialog(wrapper).props("message"));
+      expect(message).toContain("$42.50");
+      expect(message).not.toContain("$0.22");
+    });
+
+    it("does not send a judge removed while the next preview is loading", async () => {
+      const pinned = (ids: string[]) => ids.map((id) => ({ id, version: 1 }));
+      (llmExperimentsService.preview as any).mockResolvedValue({
+        ...previewResult,
+        pinnedScorers: pinned(["sc-1", "sc-2"]),
+        costEstimate,
+      });
+      wrapper = await createWrapper();
+      fillValid(wrapper);
+      setField(wrapper, "scorerIds", ["sc-1", "sc-2"]);
+      await flushPromises();
+
+      // The preview for the edit below never lands; a fresh one does.
+      (llmExperimentsService.preview as any)
+        .mockReturnValueOnce(new Promise(() => {}))
+        .mockResolvedValue({ ...previewResult, pinnedScorers: pinned(["sc-1"]), costEstimate });
+      setField(wrapper, "scorerIds", ["sc-1"]);
+      await submit(wrapper);
+      costDialog(wrapper).vm.$emit("update:ok");
+      await flushPromises();
+
+      const sent = (llmExperimentsService.create as any).mock.calls[0][1];
+      expect(sent.scorers.map((s: any) => s.id)).toEqual(["sc-1"]);
+    });
+
+    it("explains the cost even when the 412 has no message", async () => {
+      (llmExperimentsService.create as any).mockRejectedValueOnce({
+        response: { status: 412, data: {} },
+      });
+      wrapper = await createWrapper();
+      fillValid(wrapper);
+      await submit(wrapper);
+
+      const message = String(costDialog(wrapper).props("message"));
+      expect(message).toContain("warning threshold");
+      expect(message).not.toContain("confirmCostEstimate");
+    });
+
+    it("stays busy until the confirmed create ends, and sends it once", async () => {
+      (llmExperimentsService.preview as any).mockResolvedValue({ ...previewResult, costEstimate });
+      (llmExperimentsService.create as any).mockReturnValue(new Promise(() => {}));
+      wrapper = await createWrapper();
+      fillValid(wrapper);
+      await flushPromises();
+      await submit(wrapper);
+      costDialog(wrapper).vm.$emit("update:ok");
+      await flushPromises();
+
+      const submitBtn = wrapper
+        .findAllComponents({ name: "OButton" })
+        .find((b: any) => b.attributes("data-test") === "ai-experiment-form-submit-btn");
+      expect(submitBtn.props("loading")).toBe(true);
+
+      await submit(wrapper); // a second click while the first create is pending
+      if (costDialog(wrapper).props("modelValue")) costDialog(wrapper).vm.$emit("update:ok");
+      await flushPromises();
+      expect(llmExperimentsService.create).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not resend on cancel and keeps the form", async () => {
+      (llmExperimentsService.create as any).mockRejectedValueOnce(overThreshold);
+      wrapper = await createWrapper();
+      fillValid(wrapper);
+      await submit(wrapper);
+
+      const dialog = costDialog(wrapper);
+      dialog.vm.$emit("update:modelValue", false);
+      dialog.vm.$emit("update:cancel");
+      await flushPromises();
+
+      expect(dialog.props("modelValue")).toBe(false);
+      expect(llmExperimentsService.create).toHaveBeenCalledTimes(1);
+      expect(push).not.toHaveBeenCalled();
+      expect(oform(wrapper).form.state.values.name).toBe("prompt v4 probe");
+    });
+  });
+
+  // The backend rejects a variable any row lacks, so only shared fields are chips.
+  it("offers the dataset's shared input fields as chips, but never expected_output", async () => {
+    vi.mocked(llmDatasetsService.listItems).mockResolvedValue({
+      ...emptyItemPage,
+      items: [
+        { rawInput: { question: "a", context: "b" }, source: "manual" },
+        { rawInput: { question: "c" }, source: "manual" },
+      ] as unknown as LlmDatasetItem[],
+    });
+    wrapper = await createWrapper();
+    setField(wrapper, "datasetId", "ds-1");
+    await flushPromises();
+
+    expect(llmDatasetsService.listItems).toHaveBeenCalledWith("test-org", "ds-1", { size: 100 });
+    expect(wrapper.find('[data-test="ai-experiment-form-variable-context"]').exists()).toBe(false);
+    setField(wrapper, "userPrompt", "Q:");
+    await wrapper.get('[data-test="ai-experiment-form-variable-question"]').trigger("click");
+    expect(oform(wrapper).form.state.values.userPrompt).toBe("Q:\n{{ question }}");
+
+    const expectedOutput = wrapper.get('[data-test="ai-experiment-form-variable-expected_output"]');
+    expect(expectedOutput.element.tagName).toBe("SPAN");
+    await expectedOutput.trigger("click");
+    expect(oform(wrapper).form.state.values.userPrompt).toBe("Q:\n{{ question }}");
+    expect(wrapper.find('[data-test="ai-experiment-form-expected-leak-warning"]').exists()).toBe(
+      false,
+    );
+  });
+
+  it("derives chips from the rows of the selected sources only", async () => {
+    vi.mocked(llmDatasetsService.listItems).mockResolvedValue({
+      ...emptyItemPage,
+      items: [
+        { rawInput: { question: "a", context: "b" }, source: "trace" },
+        { rawInput: { question: "c" }, source: "manual" },
+      ] as unknown as LlmDatasetItem[],
+    });
+    wrapper = await createWrapper();
+    setField(wrapper, "datasetId", "ds-1");
+    await flushPromises();
+    expect(wrapper.find('[data-test="ai-experiment-form-variable-context"]').exists()).toBe(false);
+
+    setField(wrapper, "sources", ["trace"]);
+    await flushPromises();
+    expect(wrapper.find('[data-test="ai-experiment-form-variable-context"]').exists()).toBe(true);
+  });
+
+  it("warns when the user prompt references expected_output", async () => {
+    wrapper = await createWrapper();
+    setField(wrapper, "userPrompt", "Compare to {{ expected_output }}");
+    await flushPromises();
+    expect(wrapper.find('[data-test="ai-experiment-form-expected-leak-warning"]').exists()).toBe(
+      true,
+    );
+  });
+
+  it("warns when the system prompt references expected_output", async () => {
+    wrapper = await createWrapper();
+    setField(wrapper, "systemPrompt", "Grade against {{ expected_output }}");
+    await flushPromises();
+    expect(wrapper.find('[data-test="ai-experiment-form-expected-leak-warning"]').exists()).toBe(
+      true,
+    );
+  });
 });
 
 // Cloning opens this same form seeded from the source run, so a copy can be
@@ -407,6 +711,7 @@ describe("ExperimentForm — clone", () => {
     vi.clearAllMocks();
     routeQuery.clone_of = "exp-source";
     (llmDatasetsService.list as any).mockResolvedValue([dataset]);
+    vi.mocked(llmDatasetsService.listItems).mockResolvedValue(emptyItemPage);
     (onlineEvalsService.scorers.list as any).mockResolvedValue([scorer]);
     (onlineEvalsService.providers.list as any).mockResolvedValue([provider]);
     (llmExperimentsService.preview as any).mockResolvedValue(previewResult);

@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-button-outline-border h-auto! rounded-e-none! border-e!"
         icon-left="chevron-left"
         :aria-label="t('common.previous')"
-        :disabled="disable"
+        :disabled="disable || disablePrevShift"
         @click.prevent.stop="shiftTimeRange('prev')"
       />
     </OTooltip>
@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       side="bottom"
       :align="menuAlign"
       :z-index="10001"
+      :aria-label="t('common.selectDateRange')"
       content-class="p-1"
       @update:open="onMenuOpenChange"
     >
@@ -61,10 +62,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="disable"
           icon-left="schedule"
         >
-          <span
-            class="date-time-label flex-1 text-left font-semibold max-md:min-w-0 max-md:truncate"
-            >{{ triggerLabel }}</span
-          >
+          <OTruncatedText class="date-time-label flex-1 text-left font-semibold">{{
+            triggerLabel
+          }}</OTruncatedText>
           <template #icon-right
             ><OIcon
               name="arrow-drop-down"
@@ -197,6 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="flex w-20 flex-col">
                       <OInput
                         v-model.number="relativeValue"
+                        :aria-label="t('common.timeAmount')"
                         type="number"
                         :min="1"
                         :step="1"
@@ -213,6 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="flex min-w-0 flex-1 flex-col">
                       <OSelect
                         v-model="relativePeriod"
+                        :aria-label="t('common.timeUnit')"
                         :options="relativePeriodsSelect"
                         @update:model-value="onCustomPeriodSelect"
                       >
@@ -341,6 +343,7 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -398,6 +401,7 @@ export default defineComponent({
     OButton,
     OIcon,
     OTooltip,
+    OTruncatedText,
     OInput,
     OSearchInput,
     OSelect,
@@ -456,6 +460,11 @@ export default defineComponent({
       default: false,
     },
     hideRangeShift: {
+      type: Boolean,
+      default: false,
+    },
+    /** Turns off the ‹ shift, for a parent that knows there is nothing earlier to show. */
+    disablePrevShift: {
       type: Boolean,
       default: false,
     },

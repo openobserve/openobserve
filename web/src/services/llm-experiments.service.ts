@@ -78,6 +78,8 @@ export interface ExperimentCreatePayload {
   trialCount: number;
   metadata?: Record<string, unknown> | null;
   idempotencyKey?: string | null;
+  /** Required once the preview's cost estimate is over the warning threshold. */
+  confirmCostEstimate?: boolean;
 }
 
 /**
@@ -118,7 +120,24 @@ export interface ExperimentPreview {
   slotCount: number;
   pinnedScorers: PinnedExperimentScorer[];
   applicability?: ExperimentApplicability;
+  costEstimate?: ExperimentCostEstimate | null;
   sampleSlots: ExperimentSlot[];
+}
+
+/** An order-of-magnitude estimate of what the platform pays to run the experiment. */
+export interface ExperimentCostEstimate {
+  /** null when nothing could be priced. */
+  estimatedCost: number | null;
+  /** false for Remote/SDK tasks: the total is scoring cost only. */
+  taskCostEstimated: boolean;
+  /** Some dimension had no price, or the task side was left out (Remote/SDK). */
+  incomplete: boolean;
+  /** Some model in the run has no price, so the total is a lower bound. */
+  hasUnpricedModel: boolean;
+  /** USD amount above which a create needs confirmation; 0 switches it off. */
+  warningThreshold: number;
+  /** The estimate is above the threshold, so the create must send `confirmCostEstimate`. */
+  confirmationRequired: boolean;
 }
 
 export interface ExperimentScorerApplicability {
@@ -224,6 +243,8 @@ export interface ExperimentRowDetail {
   expectedOutput: unknown | null;
   trials: ExperimentResultSlot[];
   scoreSummaries: ExperimentScoreSummary[];
+  /** Per-case aggregates of the Scores the customer's own code reported. */
+  clientScoreSummaries?: ExperimentClientScoreSummary[];
 }
 
 export type ExperimentResultRowSort = "dataset" | "dispersion_desc";
@@ -307,6 +328,9 @@ export interface ExperimentResultSlot extends ExperimentSlot {
   taskStatus: "pending" | "queued" | "in_progress" | "ok" | "skipped" | "error";
   execution: ExperimentExecution | null;
   scores: ExperimentResultScore[];
+  /** Score records the customer's own code reported for this Slot. They are
+   *  not tied to a pinned Scorer, so they never appear in `scores`. */
+  clientScores?: Record<string, unknown>[];
 }
 
 export interface ExperimentResultPagination {
@@ -373,6 +397,16 @@ export interface ExperimentScoreSummary {
   noReferenceCount: number;
   noTraceCount: number;
   skippedCount: number;
+  value: Record<string, unknown> | null;
+}
+
+/** Aggregate of one client-reported dimension (a client scorer key under one
+ *  Score Config). Not comparable with a platform Scorer's summary. */
+export interface ExperimentClientScoreSummary {
+  scoreConfigId: string;
+  scoreConfigName: string;
+  clientScorerKey: string;
+  sampleCount: number;
   value: Record<string, unknown> | null;
 }
 
@@ -521,6 +555,28 @@ function value<T>(input: any, camel: string, snake: string, fallback: T): T {
   return (input?.[camel] ?? input?.[snake] ?? fallback) as T;
 }
 
+function normalizeCostEstimate(input: any): ExperimentCostEstimate | null {
+  if (!input) return null;
+  const cost = value<number | null>(input, "estimatedCost", "estimated_cost", null);
+  const taskCostEstimated = Boolean(
+    value(input, "taskCostEstimated", "task_cost_estimated", false),
+  );
+  // One entry per priced call site; a null cost means that model has no price.
+  const dimensions = value<any[] | null>(input, "dimensions", "dimensions", null);
+  return {
+    estimatedCost: cost === null ? null : Number(cost),
+    taskCostEstimated,
+    incomplete: Boolean(input.incomplete),
+    hasUnpricedModel: Array.isArray(dimensions)
+      ? dimensions.some((d) => value(d, "estimatedCost", "estimated_cost", null) === null)
+      : Boolean(input.incomplete) && taskCostEstimated,
+    warningThreshold: Number(value(input, "warningThreshold", "warning_threshold", 0)),
+    confirmationRequired: Boolean(
+      value(input, "confirmationRequired", "confirmation_required", false),
+    ),
+  };
+}
+
 function normalizePreview(input: any): ExperimentPreview {
   const applicability = value<any>(input, "applicability", "applicability", {});
   return {
@@ -575,6 +631,7 @@ function normalizePreview(input: any): ExperimentPreview {
         ),
       })),
     },
+    costEstimate: normalizeCostEstimate(value(input, "costEstimate", "cost_estimate", null)),
     sampleSlots: value<any[]>(input, "sampleSlots", "sample_slots", []).map((slot) => ({
       rowId: value(slot, "rowId", "row_id", ""),
       logicalId: value(slot, "logicalId", "logical_id", ""),
@@ -828,6 +885,7 @@ function normalizeResultSlot(slot: any): ExperimentResultSlot {
     taskStatus,
     execution: slot.execution ? normalizeExecution(slot.execution) : null,
     scores,
+    clientScores: value<Record<string, unknown>[]>(slot, "clientScores", "client_scores", []),
   };
 }
 
@@ -848,6 +906,16 @@ function normalizeScoreSummary(summary: any): ExperimentScoreSummary {
     noTraceCount: Number(value(summary, "noTraceCount", "no_trace_count", 0)),
     skippedCount: Number(value(summary, "skippedCount", "skipped_count", 0)),
     value: summary.value ?? null,
+  };
+}
+
+function normalizeClientScoreSummary(summary: unknown): ExperimentClientScoreSummary {
+  return {
+    scoreConfigId: String(value(summary, "scoreConfigId", "score_config_id", "")),
+    scoreConfigName: String(value(summary, "scoreConfigName", "score_config_name", "")),
+    clientScorerKey: String(value(summary, "clientScorerKey", "client_scorer_key", "")),
+    sampleCount: Number(value(summary, "sampleCount", "sample_count", 0)),
+    value: value<Record<string, unknown> | null>(summary, "value", "value", null),
   };
 }
 
@@ -917,6 +985,12 @@ export function normalizeExperimentRowDetail(input: any): ExperimentRowDetail {
     scoreSummaries: value<any[]>(input, "scoreSummaries", "score_summaries", []).map(
       normalizeScoreSummary,
     ),
+    clientScoreSummaries: value<unknown[]>(
+      input,
+      "clientScoreSummaries",
+      "client_score_summaries",
+      [],
+    ).map(normalizeClientScoreSummary),
   };
 }
 

@@ -473,6 +473,72 @@ describe("normalizeExperimentRowDetail()", () => {
       pendingCount: 1,
     });
   });
+
+  it("keeps the structured output and the client-reported scores", () => {
+    const clientScore = {
+      client_scorer_key: "six-axis/service",
+      score_config_id: "config-1",
+      status: "success",
+      value_numeric: 1,
+    };
+    const normalized = normalizeExperimentRowDetail({
+      trials: [
+        {
+          rowId: "row-1",
+          trialIndex: 0,
+          taskStatus: "ok",
+          execution: { row_id: "row-1", status: "ok", output: { run_id: "run-1" } },
+          scores: [],
+          clientScores: [clientScore],
+        },
+      ],
+      scoreSummaries: [],
+      clientScoreSummaries: [
+        {
+          scoreConfigId: "config-1",
+          scoreConfigName: "orca_service",
+          clientScorerKey: "six-axis/service",
+          sampleCount: 1,
+          value: { kind: "numeric", mean: 1 },
+        },
+      ],
+    });
+
+    expect(normalized.trials[0].execution?.output).toEqual({ run_id: "run-1" });
+    expect(normalized.trials[0].clientScores).toEqual([clientScore]);
+    expect(normalized.clientScoreSummaries).toEqual([
+      {
+        scoreConfigId: "config-1",
+        scoreConfigName: "orca_service",
+        clientScorerKey: "six-axis/service",
+        sampleCount: 1,
+        value: { kind: "numeric", mean: 1 },
+      },
+    ]);
+  });
+});
+
+describe("preview() cost estimate", () => {
+  const estimate = (dimensions: unknown[]) => ({
+    estimatedCost: 5,
+    taskCostEstimated: false,
+    incomplete: true,
+    warningThreshold: 10,
+    confirmationRequired: false,
+    dimensions,
+  });
+
+  it("flags an unpriced model from the dimensions, not from incomplete", async () => {
+    mockClient.post.mockResolvedValue({ data: { costEstimate: estimate([{ estimatedCost: 5 }]) } });
+    let preview = await llmExperimentsService.preview("acme", {} as any);
+    expect(preview.costEstimate?.hasUnpricedModel).toBe(false);
+
+    mockClient.post.mockResolvedValue({
+      data: { costEstimate: estimate([{ estimatedCost: 5 }, { estimatedCost: null }]) },
+    });
+    preview = await llmExperimentsService.preview("acme", {} as any);
+    expect(preview.costEstimate?.hasUnpricedModel).toBe(true);
+  });
 });
 
 describe("create() analytics", () => {

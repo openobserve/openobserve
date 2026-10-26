@@ -21,6 +21,7 @@ import { convertPivotTableData } from "@/utils/dashboard/convertPivotTableData";
 import { convertGeoMapData } from "@/utils/dashboard/convertGeoMapData";
 import { convertMapsData } from "@/utils/dashboard/convertMapsData";
 import { convertSankeyData } from "./convertSankeyData";
+import { convertStateTimelineData } from "./convertStateTimelineData";
 import { runJavaScriptCode, validateUserCode } from "./convertCustomChartData";
 /**
  * Converts panel data based on the panel schema and data.
@@ -222,6 +223,21 @@ export const convertPanelData = async (
         ...convertSankeyData(panelSchema, data),
       };
     }
+    case "state-timeline": {
+      return {
+        chartType: panelSchema.type,
+        ...convertStateTimelineData(
+          panelSchema,
+          data,
+          store,
+          chartPanelRef,
+          resultMetaData?.value ?? resultMetaData,
+          metadata,
+          hoveredSeriesState,
+          annotations,
+        ),
+      };
+    }
     case "custom_chart": {
       const validationError = validateUserCode(panelSchema.customChartContent ?? "");
       if (validationError) {
@@ -240,9 +256,6 @@ export const convertPanelData = async (
           chartType: panelSchema.type,
           ...safeResult,
         };
-      } else {
-        if (panelSchema?.queries?.[0]?.query?.trim() == "")
-          throw new Error(gt("dashboard.utils.noDataFound"));
       }
     }
     // falls through — custom chart without data resolves to the default empty result

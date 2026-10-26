@@ -2,7 +2,18 @@ import { queryFunctionsQuery } from "@/services/query_functions.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { ref, computed } from "vue";
 import { useStore } from "vuex";
-import { getFieldValuesForSuggestion, requestFieldValues } from "@/composables/fieldValueStore";
+import {
+  fieldValuesTruncated,
+  fieldValuesUnavailable,
+  getFieldValuesForSuggestion,
+  noValueLookup,
+  pendingFieldValues,
+  requestFieldValues,
+  requestFieldValuesMatching,
+  type FieldValuesTimeRange,
+  type StreamContext,
+  type ValueLookupOptions,
+} from "@/composables/fieldValueStore";
 import {
   SQL_KEYWORDS,
   SQL_CLAUSE_KEYWORDS,
@@ -11,6 +22,11 @@ import {
 } from "@/utils/query/sqlCompletion";
 import { mergeServerFunctions } from "@/utils/query/serverFunctions";
 import { type ServerQueryFunction } from "@/services/query_functions";
+import { MAX_VALUE_LENGTH } from "@/utils/fieldValueUtils";
+
+// Under the editor's 1 s value budget, so local values still beat the still-loading row.
+const LOCAL_VALUES_SERVER_WAIT_MS = 800;
+const PREFIX_ENOUGH_MATCHES = 3;
 
 const useSqlSuggestions = () => {
   // Both lists come from the shared catalog (web/src/utils/query/sqlCompletion.ts).
@@ -138,47 +154,115 @@ const useSqlSuggestions = () => {
     contextKeywords.value.length ? [] : autoCompleteSuggestions.value,
   );
 
-  /**
-   * Field values for one column, for the completion provider to await directly.
-   *
-   * The same merge getSuggestions does — in-session values first, then what
-   * IndexedDB has kept — but callable, so the provider can resolve values
-   * inline instead of the parent debouncing, fetching, pushing the result down
-   * as a prop and force-reopening the widget.
-   */
-  const resolveFieldValues = async (fieldName: string): Promise<string[]> => {
-    if (!fieldName) return [];
-    const inSession = Array.from(
-      autoCompleteData.value.fieldValues[fieldName] || new Set(),
-    ) as string[];
-
+  const readStreamContext = (): StreamContext | null => {
     const { org, streamType, streamName } = autoCompleteData.value;
+    return org && streamType && streamName ? { org, streamType, streamName } : null;
+  };
+
+  const sameStreamContext = (a: StreamContext, b: StreamContext | null): boolean =>
+    !!b && a.org === b.org && a.streamType === b.streamType && a.streamName === b.streamName;
+
+  // Null means the default fifteen-minute lookback; a dashboard panel sets its own range.
+  let valuesTimeRange: FieldValuesTimeRange | null = null;
+
+  const setValuesTimeRange = (range: { startTime: number; endTime: number } | null): void => {
+    const valid =
+      !!range &&
+      Number.isFinite(range.startTime) &&
+      Number.isFinite(range.endTime) &&
+      range.startTime < range.endTime;
+    valuesTimeRange = valid ? { startTime: range.startTime, endTime: range.endTime } : null;
+  };
+
+  const lookupUnchanged = (ctx: StreamContext, range: FieldValuesTimeRange | null): boolean =>
+    sameStreamContext(ctx, readStreamContext()) &&
+    range?.startTime === valuesTimeRange?.startTime &&
+    range?.endTime === valuesTimeRange?.endTime;
+
+  // Resolves to null when the server misses the wait, so local values are not held back by it.
+  const withinServerWait = (lookup: Promise<string[]>, ms: number): Promise<string[] | null> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const wait = new Promise<null>((resolve) => {
+      timer = setTimeout(() => resolve(null), Math.max(0, ms));
+    });
+    return Promise.race([lookup, wait]).finally(() => clearTimeout(timer));
+  };
+
+  // Only a truncated top list can be hiding matches, and a few matches already make a useful menu.
+  const needsPrefixLookup = (prefix: string, truncated: boolean, merged: string[]) => {
+    if (!truncated) return false;
+    const lower = prefix.toLowerCase();
+    const matches = merged.filter((v) => v.toLowerCase().startsWith(lower)).length;
+    return matches < PREFIX_ENOUGH_MATCHES;
+  };
+
+  /** Field values for one column: in-session first, then stored, then the server's, deduplicated. */
+  const resolveFieldValues = async (
+    fieldName: string,
+    options: ValueLookupOptions = {},
+  ): Promise<string[]> => {
+    // Search hits put raw values here, null and numbers included, and the menu works on text.
+    const inSession = (
+      Array.from(autoCompleteData.value.fieldValues?.[fieldName] || new Set()) as unknown[]
+    )
+      .filter((v) => typeof v === "string" || typeof v === "number" || typeof v === "boolean")
+      .map(String)
+      // Dropped, not cut short: a truncated value would insert a filter that matches nothing.
+      .filter((v) => v.length <= MAX_VALUE_LENGTH);
+    const ctx = readStreamContext();
+    if (!ctx) {
+      if (inSession.length) return inSession;
+      throw noValueLookup();
+    }
+    const range = valuesTimeRange;
+
     let stored: string[] = [];
-    // Without the composite key there is nothing to look up; the in-session
-    // values are still perfectly good on their own.
-    if (org && streamType && streamName) {
+    // Persisted values come from any window, so a caller with its own range does not get them.
+    if (!range) {
       try {
-        stored = await getFieldValuesForSuggestion({ org, streamType, streamName }, fieldName);
+        stored = await getFieldValuesForSuggestion(ctx, fieldName);
       } catch {
         // A failed lookup must not take completion down with it.
         stored = [];
       }
     }
 
-    const merged = [...new Set([...inSession, ...stored])];
+    // The stream can change while a lookup is awaited, and the menu must show the current stream's values.
+    if (!lookupUnchanged(ctx, range)) return resolveFieldValues(fieldName, options);
+    const local = [...new Set([...inSession, ...stored])];
 
-    // Nothing cached: ask the server, and do NOT wait for the answer. The
-    // completion provider awaits this function, so awaiting here would put a
-    // network round trip between the user and their dropdown on every value
-    // position. The fetch writes to the cache; the provider is invoked again on
-    // the next keystroke (its results are marked incomplete for exactly this
-    // reason), and that call reads the values locally.
-    if (!merged.length && org && streamType && streamName) {
-      void Promise.resolve(requestFieldValues({ org, streamType, streamName }, fieldName)).catch(
-        () => {},
-      );
+    const { prefix: typed = "", ...lookupOptions } = options;
+    const serverOptions = { ...lookupOptions, ...(range ? { timeRange: range } : {}) };
+    const deadline = Date.now() + LOCAL_VALUES_SERVER_WAIT_MS;
+    const awaitServer = (lookup: Promise<string[]>) =>
+      local.length ? withinServerWait(lookup, deadline - Date.now()) : lookup;
+
+    // Recent values on screen are a thin sample, so the server is asked even when there are some.
+    let fetched = await awaitServer(requestFieldValues(ctx, fieldName, serverOptions));
+    const slow =
+      !local.length && !fetched?.length && pendingFieldValues(ctx, fieldName, serverOptions);
+    // Still answering is not "no values": staying pending lets the editor show its loading row.
+    if (slow) fetched = await slow;
+    if (!lookupUnchanged(ctx, range)) return resolveFieldValues(fieldName, options);
+    let merged = [...new Set([...local, ...(fetched ?? [])])];
+
+    const prefix = typed.trim();
+    if (
+      prefix &&
+      needsPrefixLookup(
+        prefix,
+        !!fetched && fieldValuesTruncated(ctx, fieldName, serverOptions),
+        merged,
+      )
+    ) {
+      const matching = requestFieldValuesMatching(ctx, fieldName, prefix, serverOptions);
+      const matched = await awaitServer(matching);
+      if (!lookupUnchanged(ctx, range)) return resolveFieldValues(fieldName, options);
+      merged = [...new Set([...merged, ...(matched ?? [])])];
     }
-
+    if (!merged.length && fieldValuesUnavailable(ctx, fieldName, range)) {
+      throw new Error("field values unavailable");
+    }
     return merged;
   };
 
@@ -285,11 +369,19 @@ const useSqlSuggestions = () => {
     // Guarded by fetchedOrg, so this is a no-op after the first call.
     void ensureServerFunctions();
 
+    // The server knows which functions aggregate, including the local catalog's own count or avg.
+    const aggregates = new Set(
+      (serverFunctions.value as any[])
+        .filter((f: any) => f?.kind === "aggregate" || f?.kind === "window")
+        .map((f: any) => String(f.name).toLowerCase()),
+    );
     autoCompleteSuggestions.value = mergeServerFunctions(
       defaultSuggestions,
       (serverFunctions.value as any[]).filter(
         (f: any) => !alreadyOffered.has(String(f?.name).toLowerCase()),
       ),
+    ).map((entry) =>
+      aggregates.has(entry.name.toLowerCase()) ? { ...entry, aggregate: true } : entry,
     );
   };
 
@@ -359,6 +451,7 @@ const useSqlSuggestions = () => {
     updateStreamKeywords,
     setServerFunctions,
     resolveFieldValues,
+    setValuesTimeRange,
     defaultSuggestions, // Export for use in natural language detection
   };
 };

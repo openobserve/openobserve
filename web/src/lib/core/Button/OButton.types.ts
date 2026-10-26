@@ -40,6 +40,8 @@ export type ButtonVariant =
   | "on-dark-ghost"
   // Solid warning (yellow) background — use to draw attention to a required action
   | "warning"
+  // Solid amber for a Run/Apply button whose result is behind unapplied edits; never the theme accent (light amber-400, dark amber-500)
+  | "pending"
   // Destination preview buttons — brand-colored CTAs inside alert destination preview cards
   | "preview-slack"
   | "preview-teams"
@@ -57,7 +59,12 @@ export type ButtonVariant =
   | "outline-primary"
   // Dashed outline "add tile" — transparent bg, dashed muted border + muted icon.
   // For the small "+" add-affordance buttons in the query builder (add join / filter / condition).
-  | "dashed";
+  | "dashed"
+  // Soft categorical badge fill (bg + text) for colour-coded identity tiles, e.g. a cluster code in a hot bar
+  | "tint-teal"
+  | "tint-purple"
+  | "tint-blue"
+  | "tint-orange";
 
 /** Size controls height, padding, font-size, and border-radius */
 export type ButtonSize =
@@ -85,6 +92,7 @@ export type ButtonSize =
   | "sidebar-button"
   // 30px labeled button — matches toolbar icon height for labeled outline toolbar buttons
   | "sm-toolbar"
+  | "xs-grouped"
   // Chip with fixed 12px font — for dashboard query builder axis field chips
   | "chip-12";
 
@@ -95,6 +103,10 @@ export interface ButtonProps extends PrimitiveProps {
   size?: ButtonSize;
   /** Disables the button and all interaction */
   disabled?: boolean;
+  /** Keeps an unavailable button focusable so its reason can be reached. */
+  focusableUnavailable?: boolean;
+  /** Associates the unavailable button with its reason. */
+  descriptionId?: string;
   /** Shows loading state and disables interaction */
   loading?: boolean;
   /** Applies active/selected state styling (overrides variant to primary appearance) */
@@ -121,6 +133,8 @@ export interface ButtonEmits {
 export interface ButtonSlots {
   /** Main label / content */
   default?: () => unknown;
+  /** Explains why the focusable button cannot perform its action. */
+  "unavailable-reason"?: () => unknown;
   /** Icon placed before the label */
   "icon-left"?: () => unknown;
   /** Icon placed after the label */

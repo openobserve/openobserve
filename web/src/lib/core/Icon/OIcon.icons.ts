@@ -151,6 +151,7 @@ import Description from "~icons/material-symbols/description-outline";
 import Dns from "~icons/material-symbols/dns-outline";
 import ForkRight from "~icons/material-symbols/fork-right";
 import FullscreenExit from "~icons/material-symbols/fullscreen-exit";
+import FitScreen from "~icons/material-symbols/fit-screen";
 import Group from "~icons/material-symbols/group-outline";
 import HourglassEmpty from "~icons/material-symbols/hourglass-empty";
 import Label from "~icons/material-symbols/label-outline";
@@ -177,6 +178,8 @@ import Title from "~icons/material-symbols/title";
 import TrendingUp from "~icons/material-symbols/trending-up";
 import Undo from "~icons/material-symbols/undo";
 import UnfoldMore from "~icons/material-symbols/unfold-more";
+import ZoomIn from "~icons/material-symbols/zoom-in";
+import ZoomOut from "~icons/material-symbols/zoom-out";
 import Upload from "~icons/material-symbols/upload";
 import VerifiedUser from "~icons/material-symbols/verified-user-outline";
 import Webhook from "~icons/material-symbols/webhook";
@@ -275,6 +278,8 @@ import SaveIcon from "~icons/material-symbols/save-outline";
 import SavedSearchIcon from "~icons/material-symbols/saved-search";
 import SearchOffIcon from "~icons/material-symbols/search-off";
 import SensorsOff from "~icons/material-symbols/sensors-off-outline";
+import NotificationsPaused from "~icons/material-symbols/notifications-paused-outline";
+import RepeatIcon from "~icons/material-symbols/repeat";
 import SecurityIcon from "~icons/material-symbols/shield-outline";
 import SentimentVeryDissatisfiedIcon from "~icons/material-symbols/mood-bad-outline";
 import AddReactionIcon from "~icons/material-symbols/add-reaction-outline";
@@ -296,6 +301,7 @@ import TrendingDownIcon from "~icons/material-symbols/trending-down";
 import TrendingFlatIcon from "~icons/material-symbols/trending-flat";
 import TroubleshootIcon from "~icons/material-symbols/troubleshoot";
 import UpdateIcon from "~icons/material-symbols/update";
+import TvIcon from "~icons/material-symbols/tv-outline";
 import VerifiedIcon from "~icons/material-symbols/verified-outline";
 import ViewColumnIcon from "~icons/material-symbols/view-column-outline";
 import VolumeOffIcon from "~icons/material-symbols/volume-off-outline";
@@ -353,6 +359,7 @@ import Web from "~icons/material-symbols/web";
 import SmartDisplay from "~icons/material-symbols/smart-display-outline";
 import AndroidIcon from "~icons/material-symbols/android";
 import PhoneIphoneIcon from "~icons/material-symbols/phone-iphone-outline";
+import CallIcon from "~icons/material-symbols/call-outline";
 
 // Brand mark (not a Material Symbol) — a local inline SVG component. See McpLogo.vue.
 import McpLogo from "./McpLogo.vue";
@@ -532,6 +539,7 @@ export const iconRegistry = {
   "navigate-before": ChevronLeft,
   "navigate-next": ChevronRight,
   "fullscreen-exit": FullscreenExit,
+  "fit-screen": FitScreen,
   group: Group,
   "hourglass-empty": HourglassEmpty,
   label: Label,
@@ -558,6 +566,8 @@ export const iconRegistry = {
   "trending-up": TrendingUp,
   undo: Undo,
   "unfold-more": UnfoldMore,
+  "zoom-in": ZoomIn,
+  "zoom-out": ZoomOut,
   upload: Upload,
   "verified-user": VerifiedUser,
   webhook: Webhook,
@@ -674,6 +684,7 @@ export const iconRegistry = {
   "trending-flat": TrendingFlatIcon,
   troubleshoot: TroubleshootIcon,
   update: UpdateIcon,
+  tv: TvIcon,
   verified: VerifiedIcon,
   "view-column": ViewColumnIcon,
   "volume-off": VolumeOffIcon,
@@ -702,6 +713,7 @@ export const iconRegistry = {
   web: Web,
   android: AndroidIcon,
   "phone-iphone": PhoneIphoneIcon,
+  call: CallIcon,
 
   // Batch 3: Synthetics / browser-check icons (2026-06-22)
   // (duplicate "person-pin-circle" from batch 2 removed — keep the first entry at line 624)
@@ -715,6 +727,10 @@ export const iconRegistry = {
   // Batch 4: Alert Library (2026-08-20)
   // "no signal arriving" — the alert library's not-ingesting-this-stream state.
   "sensors-off": SensorsOff,
+
+  // Batch 5: Downtimes (2026-09-24)
+  "notifications-paused": NotificationsPaused,
+  repeat: RepeatIcon,
 } as const satisfies Record<string, Component>;
 
 export type IconName = keyof typeof iconRegistry;

@@ -104,6 +104,8 @@ export interface ScheduleTimelineProps {
    * pages forward through a calendar.
    */
   nowOffset?: number | null;
+  /** In gutter mode, the key of the only track that draws the now marker; omitted, every track draws it. */
+  nowTrackKey?: string;
   /**
    * The now marker's label. Drawn as a pill on the axis in lane mode, and used
    * as the marker's accessible name in both modes.
@@ -142,6 +144,8 @@ export interface ScheduleTimelineEmits {
 
 export interface ScheduleBandProps {
   band: ScheduleBand;
+  /** Hover text when the label is cut (defaults to the label); `false` when the caller wraps the band in its own tooltip. */
+  tooltip?: I18nText | false;
 }
 
 export interface ScheduleTimelineSlots {

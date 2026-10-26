@@ -40,6 +40,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="default-soft"
             size="xs"
           />
+          <OTag
+            v-if="row.builtinOnly"
+            :label="t('rum.analytics.funnel.builtinOnly')"
+            variant="default-outline"
+            size="xs"
+          />
         </span>
       </template>
       <template v-for="(_, i) in steps" :key="i" #[`cell-s${i}`]="{ row }">
@@ -75,6 +81,7 @@ interface TableRow {
   conversion: number;
   atLeast: boolean;
   total: boolean;
+  builtinOnly: boolean;
 }
 
 const props = withDefaults(
@@ -85,8 +92,10 @@ const props = withDefaults(
     dimLabel: I18nText;
     events: NamedEvent[];
     sampled?: SampleRatio;
+    deletedNames?: Readonly<Record<string, string>>;
+    builtinOnly?: string[];
   }>(),
-  { sampled: 1 },
+  { sampled: 1, deletedNames: () => ({}), builtinOnly: () => [] },
 );
 const { t } = useI18nTyped();
 
@@ -104,6 +113,7 @@ const tableRows = computed<TableRow[]>(() => [
     conversion: r.conversion,
     atLeast: r.atLeast,
     total: false,
+    builtinOnly: !r.notSet && !r.other && props.builtinOnly.includes(r.label),
   })),
   {
     id: "total",
@@ -112,6 +122,7 @@ const tableRows = computed<TableRow[]>(() => [
     conversion: props.total[0] > 0 ? props.total[props.total.length - 1] / props.total[0] : 0,
     atLeast: false,
     total: true,
+    builtinOnly: false,
   },
 ]);
 
@@ -125,7 +136,7 @@ const columns = computed<OTableColumnDef<TableRow>[]>(() => [
   },
   ...props.steps.map((s, i) => ({
     id: `s${i}`,
-    header: raw(`${i + 1}. ${stepLabel(s, props.events)}`),
+    header: raw(`${i + 1}. ${stepLabel(s, props.events, props.deletedNames)}`),
     accessorFn: (r: TableRow) => r.counts[i],
     size: 130,
     meta: { align: "right" as const },

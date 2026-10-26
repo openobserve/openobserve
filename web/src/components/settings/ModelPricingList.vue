@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="refreshBuiltIn"
           data-test="model-pricing-refresh-btn"
         >
-          {{ t("modelPricing.refresh") }}
+          {{ t("modelPricing.syncBuiltInPrices") }}
         </OButton>
         <OButton
           variant="outline"
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="showTestMatchDialog = true"
           data-test="model-pricing-test-match-btn"
         >
-          {{ t("modelPricing.testBtn") }}
+          {{ t("modelPricing.testMatch") }}
         </OButton>
         <OButton
           variant="outline"
@@ -94,8 +94,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :selected-ids="selectedIds"
           selection="multiple"
           pagination="client"
-          :page-size="20"
+          :page-size="pageSize"
           :page-size-options="[20, 50, 100, 250, 500]"
+          :current-page="currentPage"
+          :sort-by="sortBy"
+          :sort-order="sortOrder"
           sorting="client"
           filter-mode="client"
           :default-columns="false"
@@ -108,7 +111,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :get-row-warning="
             (row: any) => !!(row.children?.length && shadowingParentNames.has(row.name))
           "
+          :row-tone="(row: any) => (isDisabled(row) ? 'muted' : null)"
+          @row-click="openPricingDialog"
           @update:selected-ids="handleSelectedIdsUpdate"
+          @update:page-size="pageSize = $event"
+          @update:current-page="currentPage = $event"
+          @update:sort-by="sortBy = $event"
+          @update:sort-order="sortOrder = $event"
         >
           <!-- Toolbar: Built-in/Custom tabs + search -->
           <template #toolbar>
@@ -175,7 +184,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="person" size="sm" class="text-text-secondary" />
                 <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
               </span>
-              <div class="block w-full truncate">{{ row.name }}</div>
+              <OTruncatedText as="div">{{ row.name }}</OTruncatedText>
+              <OTag
+                v-if="isDisabled(row)"
+                type="booleanState"
+                value="disabled"
+                size="sm"
+                class="ms-2 shrink-0"
+                data-test="model-pricing-disabled-tag"
+              />
             </div>
           </template>
           <template #cell-match_pattern="{ row }">
@@ -294,9 +311,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             {{ t("modelPricing.localTimeHint", { range: tierWindowsLocal(tier) }) }}
                           </div>
                           <div
-                            v-if="!tier.condition && !tier.utc_windows?.length"
-                            class="text-2xs opacity-70"
+                            v-for="(rule, rIdx) in tier.rules ?? []"
+                            :key="rIdx"
+                            class="text-2xs font-mono opacity-70"
                           >
+                            {{ formatTierRule(rule, t) }}
+                          </div>
+                          <div v-if="isUnrestrictedTier(tier)" class="text-2xs opacity-70">
                             {{ t("modelPricing.tierAlwaysActive") }}
                           </div>
                           <table class="mt-0.5 w-full border-collapse">
@@ -346,33 +367,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-row-action="edit"
                   icon-left="edit"
                 />
-                <OButton
-                  variant="ghost-destructive"
-                  size="icon-sm"
-                  class="max-md:hidden"
-                  :title="t('modelPricing.actionDelete')"
-                  @click.stop="confirmDelete(row)"
-                  data-test="model-pricing-delete-btn"
-                  data-row-action="delete"
-                  icon-left="delete"
-                />
-                <OButton
-                  variant="ghost"
-                  size="icon-sm"
-                  class="max-md:hidden"
-                  :title="t('modelPricing.actionDuplicate')"
-                  @click.stop="duplicateModel(row)"
-                  data-test="model-pricing-duplicate-btn"
+                <!-- The menu teleports out of the row, so row shortcuts need in-row proxies. -->
+                <button
+                  type="button"
                   data-row-action="duplicate"
-                  icon-left="content-copy"
+                  class="hidden"
+                  tabindex="-1"
+                  aria-hidden="true"
+                  @click.stop="duplicateModel(row)"
+                />
+                <button
+                  type="button"
+                  data-row-action="delete"
+                  class="hidden"
+                  tabindex="-1"
+                  aria-hidden="true"
+                  @click.stop="confirmDelete(row)"
                 />
                 <ODropdown side="bottom" align="end">
                   <template #trigger>
                     <OButton
                       icon-left="more-vert"
                       variant="ghost"
-                      size="icon-xs-sq"
-                      class="md:hidden"
+                      size="icon-sm"
+                      :aria-label="t('modelPricing.moreActions')"
                       data-test="model-pricing-row-more-actions"
                       @click.stop
                     />
@@ -397,21 +415,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span>{{ t("modelPricing.actionEdit") }}</span>
                   </ODropdownItem>
                   <ODropdownItem
-                    icon-left="delete"
-                    variant="destructive"
-                    class="md:hidden"
-                    data-test="model-pricing-delete-btn-menu"
-                    @select="confirmDelete(row)"
-                  >
-                    <span>{{ t("modelPricing.actionDelete") }}</span>
-                  </ODropdownItem>
-                  <ODropdownItem
                     icon-left="content-copy"
-                    class="md:hidden"
                     data-test="model-pricing-duplicate-btn-menu"
                     @select="duplicateModel(row)"
                   >
                     <span>{{ t("modelPricing.actionDuplicate") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="delete"
+                    variant="destructive"
+                    data-test="model-pricing-delete-btn-menu"
+                    @select="confirmDelete(row)"
+                  >
+                    <span>{{ t("modelPricing.actionDelete") }}</span>
                   </ODropdownItem>
                 </ODropdown>
               </template>
@@ -471,9 +487,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="model-pricing-list-pricing-drawer"
       v-model:open="showPricingDialog"
       :width="30"
-      :title="pricingDialogRow?.match_pattern"
+      :title="pricingDialogRow?.name"
       :title-data-test="'model-pricing-drawer-title'"
       :sub-title="t('modelPricing.modelDetails')"
+      :primary-button-label="drawerReadOnly ? undefined : t('modelPricing.actionEdit')"
+      primary-button-data-test="model-pricing-drawer-edit-btn"
+      :secondary-button-label="
+        drawerReadOnly ? t('modelPricing.actionClone') : t('modelPricing.actionDuplicate')
+      "
+      secondary-button-variant="outline"
+      @click:primary="editFromDrawer"
+      @click:secondary="duplicateFromDrawer"
     >
       <!-- Source (built-in / inherited / custom) indicator trails on the right. -->
       <template #header-right>
@@ -559,9 +583,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <UtcHoursBar :windows="tier.utc_windows" />
                   </div>
                   <div
-                    v-if="!tier.condition && !tier.utc_windows?.length"
-                    class="text-2xs mt-0.5 opacity-55"
+                    v-for="(rule, rIdx) in tier.rules ?? []"
+                    :key="rIdx"
+                    class="mt-0.5"
+                    data-test="model-pricing-drawer-tier-rule"
                   >
+                    <OCode>{{ formatTierRule(rule, t) }}</OCode>
+                  </div>
+                  <div v-if="isUnrestrictedTier(tier)" class="text-2xs mt-0.5 opacity-55">
                     {{ t("modelPricing.tierAlwaysActive") }}
                   </div>
                 </div>
@@ -579,7 +608,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <th
                         class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b px-3.5 py-1.5 text-right font-semibold"
                       >
-                        {{ t("modelPricing.colPricing") }}
+                        {{ t("modelPricing.colPrice") }}
                       </th>
                     </tr>
                   </thead>
@@ -653,10 +682,17 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import UtcHoursBar from "@/components/settings/UtcHoursBar.vue";
 import OCode from "@/lib/core/Code/OCode.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import { operatorSymbol, formatUtcWindows, formatUtcWindowsInTz } from "@/utils/formatters";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import {
+  operatorSymbol,
+  formatTierRule,
+  formatUtcWindows,
+  formatUtcWindowsInTz,
+} from "@/utils/formatters";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { useListViewState } from "@/composables/useListViewState";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -674,6 +710,15 @@ const modelsQuery = useQuery(() =>
 // repaints these rows with no wiring here.
 const models = computed(() => modelsQuery.data.value ?? []);
 const loading = modelsQuery.isPending;
+// setTimeout(0) runs after TanStack's deferred auto-reset-on-data-change, so the restored page wins.
+watch(
+  loading,
+  (isLoading) => {
+    if (isLoading) return;
+    setTimeout(() => qTableRef.value?.restorePage?.(currentPage.value), 0);
+  },
+  { once: true, immediate: true },
+);
 // Request in flight, with rows still on screen — the refresh button's
 // spinner. `loading` stays for the skeleton, which only a cold read wants.
 const fetching = modelsQuery.isFetching;
@@ -694,6 +739,17 @@ function openPricingDialog(row: any) {
   showPricingDialog.value = true;
 }
 
+// The list route is keepAlive and ODrawer re-shows on re-activation, so close it before leaving.
+function editFromDrawer() {
+  showPricingDialog.value = false;
+  openEditor(pricingDialogRow.value);
+}
+
+function duplicateFromDrawer() {
+  showPricingDialog.value = false;
+  duplicateModel(pricingDialogRow.value);
+}
+
 const confirmDialogMeta = ref({
   show: false,
   // raw("") is only the empty placeholder — the real values are assigned from t().
@@ -705,12 +761,35 @@ const confirmDialogMeta = ref({
 const resetConfirmDialog = () => {
   confirmDialogMeta.value.show = false;
 };
-const filterQuery = ref("");
+const viewState = useListViewState("model-pricing", {
+  filterQuery: "",
+  selectedTab: "all",
+  pageSize: 20,
+  currentPage: 1,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+});
+const filterQuery = ref(viewState.filterQuery);
+const pageSize = ref(viewState.pageSize);
+const currentPage = ref(viewState.currentPage);
+const sortBy = ref(viewState.sortBy);
+const sortOrder = ref(viewState.sortOrder);
 const showImportModelPricingPage = ref(false);
 const showTestMatchDialog = ref(false);
 const selectedIds = ref<string[]>([]);
 const bulkDeleteLoading = ref(false);
-const selectedTab = ref("all");
+const selectedTab = ref(viewState.selectedTab);
+
+watch([filterQuery, selectedTab, pageSize, currentPage, sortBy, sortOrder], () => {
+  Object.assign(viewState, {
+    filterQuery: filterQuery.value,
+    selectedTab: selectedTab.value,
+    pageSize: pageSize.value,
+    currentPage: currentPage.value,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+  });
+});
 
 const tabOptions = computed(() => [
   { label: t("modelPricing.tabAll"), value: "all", icon: "format-list-bulleted" },
@@ -786,9 +865,9 @@ const columns: OTableColumnDef[] = [
     header: t("modelPricing.colActions"),
     isAction: true,
     pinned: "right",
-    size: 168,
+    size: 128,
     minSize: 44,
-    meta: { align: "center", actionCount: 4 },
+    meta: { align: "center", actionCount: 3 },
   },
 ];
 
@@ -812,6 +891,10 @@ function getSource(model: any): string {
 /** True when a model entry is read-only (built-in or from another org). */
 function isReadOnly(model: any): boolean {
   return model.source === "built_in" || model.org_id !== orgIdentifier.value;
+}
+
+function isDisabled(model: any): boolean {
+  return !model.enabled;
 }
 
 // True when the search box or a non-"all" tab is narrowing the list. Drives
@@ -871,10 +954,13 @@ function formatPerMillion(pricePerToken: number | undefined | null): string {
   return `$${perMillion.toFixed(2)}`;
 }
 
-// Mirrors the backend fallback rule: the default tier is the one restricted by
-// neither a usage condition nor a UTC time window (peak / off-peak pricing).
+/** Mirrors the backend: a tier with no usage condition, UTC window or attribute rule. */
+function isUnrestrictedTier(tier: any): boolean {
+  return !tier?.condition && !tier?.utc_windows?.length && !tier?.rules?.length;
+}
+
 function getDefaultTier(model: any) {
-  const fallback = model.tiers?.find((t: any) => !t.condition && !t.utc_windows?.length);
+  const fallback = model.tiers?.find(isUnrestrictedTier);
   return fallback || model.tiers?.[0];
 }
 
@@ -885,6 +971,10 @@ function hasTimeBasedTiers(model: any): boolean {
 
 /** All of the drawer row's tiers, in stored order (default tier included). */
 const drawerTiers = computed<any[]>(() => pricingDialogRow.value?.tiers ?? []);
+
+const drawerReadOnly = computed(
+  () => !!pricingDialogRow.value && isReadOnly(pricingDialogRow.value),
+);
 
 /** A tier's windows in the user's timezone, or "" when that adds nothing (UTC). */
 function tierWindowsLocal(tier: any): string {
@@ -1036,11 +1126,11 @@ async function refreshBuiltIn() {
     await modelPricingService.refreshBuiltIn(orgIdentifier.value);
     toast({
       variant: "success",
-      message: t("modelPricing.builtInRefreshed"),
+      message: t("modelPricing.builtInPricesSynced"),
     });
     await fetchModels(true);
   } catch (e: any) {
-    notifyError(t("modelPricing.errRefresh"), e);
+    notifyError(t("modelPricing.errSync"), e);
   } finally {
     refreshing.value = false;
   }

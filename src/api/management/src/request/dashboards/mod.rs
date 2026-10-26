@@ -37,6 +37,7 @@ use crate::{
 };
 
 pub mod reports;
+pub mod reports_history;
 pub mod timed_annotations;
 
 async fn ensure_dashboard_in_org(org_id: &str, dashboard_id: &str) -> bool {
@@ -145,6 +146,19 @@ pub async fn update_dashboard(
     let mut dashboard: Dashboard = req_body.into();
 
     set_dashboard_owner_if_empty(&mut dashboard, &user_email.user_id);
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = openobserve_core::background_access::guard_dashboard_update(
+        &org_id,
+        &user_email.user_id,
+        &folder,
+        &dashboard_id,
+        &dashboard,
+        hash,
+    )
+    .await
+    {
+        return resp;
+    }
 
     let saved = match dashboards::update_dashboard(&org_id, &dashboard_id, &folder, dashboard, hash)
         .await
@@ -512,6 +526,7 @@ pub async fn move_dashboards(
 pub async fn add_panel(
     Path((org_id, dashboard_id)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     axum::Json(req_body): axum::Json<PanelRequestBody>,
 ) -> Response {
     if !ensure_dashboard_in_org(&org_id, &dashboard_id).await {
@@ -524,6 +539,20 @@ pub async fn add_panel(
             return MetaHttpResponse::bad_request("hash query parameter is required");
         }
     };
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = openobserve_core::background_access::guard_panel_add(
+        &org_id,
+        &user_email.user_id,
+        &folder,
+        &dashboard_id,
+        hash,
+        req_body.tab_id.as_deref(),
+        &req_body.panel,
+    )
+    .await
+    {
+        return resp;
+    }
 
     match dashboards::add_panel_to_dashboard(
         &org_id,
@@ -578,6 +607,7 @@ pub async fn add_panel(
 pub async fn update_panel(
     Path((org_id, dashboard_id, panel_id)): Path<(String, String, String)>,
     Query(query): Query<HashMap<String, String>>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     axum::Json(req_body): axum::Json<PanelRequestBody>,
 ) -> Response {
     if !ensure_dashboard_in_org(&org_id, &dashboard_id).await {
@@ -590,6 +620,21 @@ pub async fn update_panel(
             return MetaHttpResponse::bad_request("hash query parameter is required");
         }
     };
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = openobserve_core::background_access::guard_panel_update(
+        &org_id,
+        &user_email.user_id,
+        &folder,
+        &dashboard_id,
+        &panel_id,
+        hash,
+        req_body.tab_id.as_deref(),
+        &req_body.panel,
+    )
+    .await
+    {
+        return resp;
+    }
 
     match dashboards::update_panel_in_dashboard(
         &org_id,
@@ -818,6 +863,22 @@ mod tests {
     fn test_panel_unsupported_version_is_bad_request() {
         assert_eq!(
             status(DashboardError::PanelUnsupportedVersion),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_too_many_annotation_sources_is_bad_request() {
+        assert_eq!(
+            status(DashboardError::TooManyAnnotationSources(10)),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_invalid_annotation_source_is_bad_request() {
+        assert_eq!(
+            status(DashboardError::InvalidAnnotationSource("bad".to_string())),
             StatusCode::BAD_REQUEST
         );
     }

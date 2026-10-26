@@ -4,6 +4,7 @@ import { test } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { getAuthHeaders, getOrgIdentifier } from '../playwright-tests/utils/cloud-auth.js';
 import testLogger from '../playwright-tests/utils/test-logger.js';
+import { ingestBase } from '../playwright-tests/utils/ingest-url.js';
 
 // Left-nav group flyouts.
 // Several former top-level menu items (pipeline, functions, enrichment tables,
@@ -21,6 +22,7 @@ export const NAV_GROUP_TILE = {
     // The group root, not its inner tile: hover is handled on the root, and this
     // selector does not move if the group's parentLink ever changes.
     reliability: '[data-test="nav-group-reliability"]',
+    experience: '[data-test="nav-group-experience"]',
 };
 
 // route `name` of each child within its group (matches navGroups.ts).
@@ -36,6 +38,8 @@ export const NAV_FLYOUT_CHILD = {
     // the way you reach them is.
     destinations: { group: 'reliability', name: 'alertDestinations' },
     templates: { group: 'reliability', name: 'alertTemplates' },
+    // Synthetics is feature-gated, so the Experience tile itself lands on RUM.
+    synthetics: { group: 'experience', name: 'synthetics' },
 };
 
 /**
@@ -304,7 +308,7 @@ export class CommonActions {
         const baseUrl = process.env["ZO_BASE_URL"];
         const orgName = getOrgIdentifier();
         const data = [{"level":"info","job":"test","log":"test message for openobserve. this data ingestion has been done using a playwright automation script."}];
-        const ingestUrl = `${baseUrl}/api/${orgName}/${streamName}/_json`;
+        const ingestUrl = `${ingestBase(baseUrl)}/api/${orgName}/${streamName}/_json`;
         const listUrl = `${baseUrl}/api/${orgName}/streams?type=logs`;
 
         // Ingest with a retry loop around the "stream is being deleted" race.
@@ -397,7 +401,7 @@ export class CommonActions {
 
         testLogger.debug(`Ingesting test data with unique ID: ${uniqueId}`, { streamName, triggerField, triggerValue });
 
-        const response = await this.page.request.post(`${baseUrl}/api/${orgName}/${streamName}/_json`, {
+        const response = await this.page.request.post(`${ingestBase(baseUrl)}/api/${orgName}/${streamName}/_json`, {
             headers,
             data: [testData]
         });
@@ -432,7 +436,7 @@ export class CommonActions {
 
         testLogger.info(`Initializing alert test stream: ${streamName}`);
 
-        const response = await this.page.request.post(`${baseUrl}/api/${orgName}/${streamName}/_json`, {
+        const response = await this.page.request.post(`${ingestBase(baseUrl)}/api/${orgName}/${streamName}/_json`, {
             headers,
             data: initialData
         });
@@ -492,7 +496,7 @@ export class CommonActions {
         const dataPath = path.resolve(__dirname, '..', 'utils', 'td150.json');
         const data = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
 
-        const response = await this.page.request.post(`${baseUrl}/api/${orgName}/${streamName}/_json`, {
+        const response = await this.page.request.post(`${ingestBase(baseUrl)}/api/${orgName}/${streamName}/_json`, {
             headers,
             data
         });

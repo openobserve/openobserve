@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { I18nText } from "@/types/i18n";
+import type { AnnotationSource } from "@/ts/interfaces/dashboard";
 
 import type { Ref } from "vue";
 
@@ -140,6 +141,9 @@ export interface PanelEditorChartData {
       min?: number;
       max?: number;
       time_shift?: any[];
+      formula?: string;
+      ref?: string;
+      hide?: boolean;
     };
   }>;
   [key: string]: any;
@@ -167,6 +171,7 @@ export interface PanelEditorDashboardData {
     endTime?: string;
     relativeTimePeriod?: string;
   };
+  annotationSources?: AnnotationSource[];
   [key: string]: any;
 }
 
@@ -224,6 +229,14 @@ export interface PanelEditorProps {
    * @default false (dashboard), true (metrics, logs)
    */
   showAddToDashboardButton?: boolean;
+
+  addToDashboardDisabledReason?: I18nText | null;
+
+  /**
+   * While true, chart-type and config re-renders keep the queries the chart last ran.
+   * @default false
+   */
+  holdQueries?: boolean;
 
   // ---- Chart Configuration ----
   /**
@@ -381,6 +394,17 @@ export interface PanelEditorEmits {
    * Parent can use these to initialize variables from URL.
    */
   (e: "initialVariableValuesUpdated", values: Record<string, any>): void;
+
+  /**
+   * Emitted by the preview's Refresh notice action. A host that listens re-runs it the way its
+   * Apply does; without a listener the editor re-runs its own preview.
+   */
+  (e: "applyRequested"): void;
+
+  /**
+   * Emitted by a preview notice's "Open inspector". The action is offered only when the host listens.
+   */
+  (e: "openQueryInspector"): void;
 }
 
 // ============================================================================
@@ -513,7 +537,8 @@ export const DASHBOARD_PRESET: PanelEditorConfig = {
   showQueryBuilder: true,
   showVariablesSelector: true,
   showLastRefreshedTime: true,
-  showOutdatedWarning: true,
+  // Live preview runs builder edits itself; pending changes show on the Apply button.
+  showOutdatedWarning: false,
   showAddToDashboardButton: false, // Dashboard has Save button instead
   showQueryTypeSelector: false,
   showGeneratedQueryDisplay: false,
@@ -632,6 +657,7 @@ export const ALL_CHART_TYPES = [
   "gauge",
   "table",
   "heatmap",
+  "state-timeline",
   "geomap",
   "sankey",
   "html",
@@ -664,6 +690,7 @@ export const AGGREGATION_REQUIRED_CHART_TYPES: ChartType[] = [
   "metric",
   "gauge",
   "heatmap",
+  "state-timeline",
   "geomap",
   "sankey",
 ];

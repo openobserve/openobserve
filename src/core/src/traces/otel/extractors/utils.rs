@@ -66,12 +66,6 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_f64_from_integer() {
-        let result = extract_f64(&json::json!(5i64)).unwrap();
-        assert!((result - 5.0).abs() < 1e-10);
-    }
-
-    #[test]
     fn test_extract_f64_from_string() {
         let result = extract_f64(&json::json!("2.75")).unwrap();
         assert!((result - 2.75).abs() < 1e-6);

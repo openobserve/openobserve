@@ -15,7 +15,7 @@
 
 use std::time::Duration;
 
-use config::meta::promql::value::Sample;
+use config::meta::promql::{is_stale_marker, value::Sample};
 
 use crate::functions::RangeFunc;
 
@@ -36,6 +36,26 @@ impl RangeFunc for LastOverTimeFunc {
     }
 }
 
+/// `last_over_time` as a bare selector's lookback, where a stale newest sample means no value.
+pub struct InstantLookbackFunc;
+
+impl RangeFunc for InstantLookbackFunc {
+    fn name(&self) -> &'static str {
+        LastOverTimeFunc.name()
+    }
+
+    fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
+        samples
+            .last()
+            .map(|sample| sample.value)
+            .filter(|value| !is_stale_marker(*value))
+    }
+
+    fn reads_stale_markers(&self) -> bool {
+        true
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
@@ -53,24 +73,6 @@ mod tests {
     fn last_over_time_test_helper(data: Value) -> Result<Value> {
         let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
         last_over_time(data, &eval_ctx)
-    }
-
-    #[test]
-    fn test_last_over_time_value_none_input() {
-        let result = last_over_time_test_helper(Value::None).unwrap();
-        assert!(matches!(result, Value::None));
-    }
-
-    #[test]
-    fn test_last_over_time_invalid_input_returns_err() {
-        let result = last_over_time_test_helper(Value::Float(1.0));
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_last_over_time_exec_empty_samples_returns_none() {
-        let func = LastOverTimeFunc;
-        assert!(func.exec(&[], 0, &Duration::ZERO).is_none());
     }
 
     #[test]

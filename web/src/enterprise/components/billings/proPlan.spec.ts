@@ -18,6 +18,9 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import proPlan from "@/enterprise/components/billings/proPlan.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 const mockProFeatures = [
   {
@@ -373,5 +376,123 @@ describe("proPlan.vue", () => {
     it("should expose onSubscribe as a function", () => {
       expect(typeof wrapper.vm.onSubscribe).toBe("function");
     });
+  });
+
+  describe("billing instrumentation guard", () => {
+    it("renders the subscribe id once and fires billing_subscribe_clicked once with the plan", async () => {
+      expect(wrapper.findAll('[data-test="billing-plans-pro-subscribe-btn"]')).toHaveLength(1);
+      await wrapper.find('[data-test="billing-plans-pro-subscribe-btn"]').trigger("click");
+      expect(vi.mocked(analytics.track).mock.calls).toEqual([
+        ["billing_subscribe_clicked", { plan: "pay-as-you-go" }],
+      ]);
+    });
+
+    it("renders the manage id once and fires billing_manage_subscription_clicked once with the plan", async () => {
+      wrapper.unmount();
+      wrapper = createWrapper({ planType: "pay-as-you-go" });
+      expect(wrapper.findAll('[data-test="billing-plans-pro-cancel-btn"]')).toHaveLength(1);
+      await wrapper.find('[data-test="billing-plans-pro-cancel-btn"]').trigger("click");
+      expect(vi.mocked(analytics.track).mock.calls).toEqual([
+        ["billing_manage_subscription_clicked", { plan: "pay-as-you-go" }],
+      ]);
+    });
+  });
+});
+
+describe("pa gap fixes: plan button test ids (P8)", () => {
+  const mountPlan = (planType: string) =>
+    mount(proPlan, {
+      props: { planType, billingProvider: "stripe", features: mockProFeatures },
+      global: { plugins: [i18n], provide: { store }, stubs: { OIcon: true } },
+    });
+
+  it("P8-R3: Subscribe and Cancel each carry their own data-test", () => {
+    const subscribe = mountPlan("free").find("button");
+    const cancel = mountPlan("pay-as-you-go").find("button");
+    expect(subscribe.attributes("data-test")).toBeTruthy();
+    expect(cancel.attributes("data-test")).toBeTruthy();
+    expect(subscribe.attributes("data-test")).not.toBe(cancel.attributes("data-test"));
+  });
+});
+
+describe("proPlan.vue price block", () => {
+  const pricingOptions = [
+    {
+      label: "Pay as you go",
+      price: "$0.70",
+      period: "/GB ingested",
+      note: "No commitment, billed monthly",
+      badge: "",
+    },
+    {
+      label: "Annual contract",
+      price: "$0.50",
+      period: "/GB ingested",
+      note: "12-month commitment",
+      badge: "Save 28%",
+    },
+  ];
+  const mountPlan = (props = {}) =>
+    mount(proPlan, {
+      props: { planType: "free", billingProvider: "stripe", features: mockProFeatures, ...props },
+      global: { plugins: [i18n], provide: { store }, stubs: { OIcon: true } },
+    });
+
+  it("renders one tile per option with its price, period, note and badge", () => {
+    const w = mountPlan({ pricingOptions });
+    const payg = w.get('[data-test="billing-plans-pro-price-option-0"]').text();
+    const annual = w.get('[data-test="billing-plans-pro-price-option-1"]').text();
+    expect(payg).toContain("Pay as you go");
+    expect(payg).toContain("$0.70");
+    expect(payg).toContain("/GB ingested");
+    expect(payg).toContain("No commitment, billed monthly");
+    expect(annual).toContain("$0.50");
+    expect(annual).toContain("12-month commitment");
+    expect(w.findAll('[data-test="billing-plans-pro-price-option-badge"]')).toHaveLength(1);
+    expect(w.get('[data-test="billing-plans-pro-price-option-badge"]').text()).toBe("Save 28%");
+  });
+
+  it("offers contact sales on the annual tile only, and emits it upward", async () => {
+    const w = mountPlan({ pricingOptions });
+    const buttons = w.findAll('[data-test="billing-plans-pro-contact-sales-btn"]');
+    expect(buttons).toHaveLength(1);
+    expect(w.get('[data-test="billing-plans-pro-price-option-1"]').find("button").exists()).toBe(
+      true,
+    );
+    await buttons[0].trigger("click");
+    expect(w.emitted("contact-sales")).toHaveLength(1);
+  });
+
+  it("keeps the seven subgrid rows as the card's direct children, priced or not", () => {
+    expect(mountPlan().classes()).toContain("grid-rows-subgrid");
+    expect(mountPlan({ pricingOptions }).element.children).toHaveLength(7);
+    expect(mountPlan().element.children).toHaveLength(7);
+  });
+
+  it("renders no price block without pricing options", () => {
+    const w = mountPlan();
+    expect(w.find('[data-test="billing-plans-pro-price-options"]').exists()).toBe(false);
+    expect(w.find('[data-test="billing-plans-pro-contact-sales-btn"]').exists()).toBe(false);
+  });
+});
+
+describe("proPlan.vue additional info", () => {
+  const mountPlan = (props = {}) =>
+    mount(proPlan, {
+      props: { planType: "free", billingProvider: "stripe", features: mockProFeatures, ...props },
+      global: { plugins: [i18n], provide: { store }, stubs: { OIcon: true } },
+    });
+
+  it("renders the footnote when present", () => {
+    const w = mountPlan({ additionalInfo: "*Includes 30% discount for annual commitment" });
+    expect(w.get('[data-test="billing-plans-pro-additional-info"]').text()).toBe(
+      "*Includes 30% discount for annual commitment",
+    );
+  });
+
+  it("renders nothing when absent", () => {
+    expect(mountPlan().find('[data-test="billing-plans-pro-additional-info"]').exists()).toBe(
+      false,
+    );
   });
 });

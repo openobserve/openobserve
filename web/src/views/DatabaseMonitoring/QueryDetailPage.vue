@@ -655,8 +655,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="xs"
                     class="text-text-secondary shrink-0"
                   />
-                  <span
-                    class="min-w-0 truncate"
+                  <OTruncatedText
                     :class="[
                       whereRow.isChild
                         ? 'text-text-secondary text-xs'
@@ -671,7 +670,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ? t("dbm.breakdown.noSchema")
                           : t("dbm.detail.whereItRuns.noInstance")
                     }}
-                  </span>
+                  </OTruncatedText>
                   <!-- Tooltip is a SIBLING of the tag: OTag's default slot overrides the `label` prop, so a tooltip inside would blank the "focused" text. -->
                   <span
                     v-if="isWhereRowActive(whereRow, whereScope)"
@@ -757,13 +756,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex items-center gap-3"
                 :data-test="`dbm-detail-error-code-${entry.status_code}`"
               >
-                <span class="text-text-heading w-28 shrink-0 truncate font-mono text-xs">
+                <OTruncatedText class="text-text-heading w-28 shrink-0 font-mono text-xs">
                   {{
                     entry.status_code === "unknown"
                       ? t("dbm.detail.errorsByCode.noCode")
                       : entry.status_code
                   }}
-                </span>
+                </OTruncatedText>
                 <DbmShareBar
                   :share="errorCodeBarShare(entry)"
                   track-class="h-1.5 w-40 shrink-0"
@@ -1027,12 +1026,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #cell-caller="{ row: endpoint }">
                 <div class="flex min-w-0 flex-col">
-                  <span class="text-text-heading truncate text-sm">{{
+                  <OTruncatedText class="text-text-heading text-sm">{{
                     endpoint.serviceLabel
-                  }}</span>
-                  <span v-if="endpoint.endpoint" class="text-text-secondary truncate text-xs">
+                  }}</OTruncatedText>
+                  <OTruncatedText v-if="endpoint.endpoint" class="text-text-secondary text-xs">
                     {{ endpoint.endpoint }}
-                  </span>
+                  </OTruncatedText>
                 </div>
               </template>
               <template #cell-calls="{ row: endpoint }">
@@ -1201,6 +1200,7 @@ import DbmSuggestFixButton from "@/components/dbm/DbmSuggestFixButton.vue";
 import DateTime from "@/components/DateTime.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";

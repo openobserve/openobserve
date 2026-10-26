@@ -14,8 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #[cfg(feature = "enterprise")]
+mod partitioned_search;
+
+#[cfg(feature = "enterprise")]
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{LazyLock, RwLock},
     time::{Duration, Instant},
 };
@@ -74,11 +77,11 @@ const TIMESTAMP_COLUMNS: [&str; 5] = [
 
 /// Bounds staleness after an edit on nodes the update-path invalidation cannot reach.
 #[cfg(feature = "enterprise")]
-const VALUE_COLUMN_TTL: Duration = Duration::from_secs(60);
+const QUERY_METADATA_TTL: Duration = Duration::from_secs(60);
 
 /// Keyed `(org_id, anomaly_id)` so per-tick detection stops PK-reading the meta primary.
 #[cfg(feature = "enterprise")]
-static VALUE_COLUMN_CACHE: LazyLock<RwLock<ValueColumnCache>> =
+static QUERY_METADATA_CACHE: LazyLock<RwLock<QueryMetadataCache>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
 /// Lowercased aggregations the trainer's `DetectionFunction` can deserialize. A name
@@ -124,6 +127,7 @@ const SUPPORTED_FILTER_OPERATORS: [&str; 30] = [
 
 /// The trainer fetches at least 21 days; 28 adds a spare week.
 const DEFAULT_TRAINING_WINDOW_DAYS: i32 = 28;
+const RECOVERY_RETRY_DELAY: Duration = Duration::from_secs(60);
 
 /// Stored only because the `rcf_*` columns are NOT NULL; nothing reads them since the band model.
 const LEGACY_RCF_NUM_TREES: i32 = 100;
@@ -144,12 +148,14 @@ const MAX_ALERT_WINDOW_SECONDS: i64 = 86_400;
 const REJECTION_BODY_MAX_CHARS: usize = 512;
 
 #[cfg(feature = "enterprise")]
-type ValueColumnCache = HashMap<(String, String), (Option<String>, Instant)>;
+type QueryMetadataCache = HashMap<(String, String), (partitioned_search::QueryMetadata, Instant)>;
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateAnomalyConfigRequest {
     pub name: String,
     pub description: Option<String>,
+    /// The stream the detector reads. Required in filters mode. In custom_sql mode it can be
+    /// left blank when the SQL reads exactly one stream, which then names it.
     pub stream_name: String,
     pub stream_type: String,
     pub query_mode: String,
@@ -231,7 +237,7 @@ where
     serde::Deserialize::deserialize(deserializer).map(Some)
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct UpdateAnomalyConfigRequest {
     pub name: Option<String>,
     pub description: Option<String>,
@@ -636,14 +642,7 @@ pub async fn create_config(
     org_id: &str,
     mut req: CreateAnomalyConfigRequest,
 ) -> Result<serde_json::Value> {
-    req.filters = normalize_request_filters(req.filters).map_err(validation_error)?;
-    validate_config_request(&req).map_err(validation_error)?;
-
-    // Feature 2 (PT-7): same normalization the alerts path uses, so a tag
-    // means the same thing on both. Kept typed, not stringified, so the API
-    // layer can downcast it to a 400.
-    let normalized_tags =
-        config::meta::alerts::tags::normalize_tags(&req.tags).map_err(anyhow::Error::new)?;
+    let normalized_tags = checked_create_body(&mut req)?;
 
     let db = get_orm_client_rw().await;
 
@@ -651,14 +650,8 @@ pub async fn create_config(
     let now_us = Utc::now().timestamp_micros();
 
     // Resolve the folder name to the FK (folders.id PK), consistent with the alerts table.
-    let folder_name = req
-        .folder_id
-        .as_deref()
-        .filter(|s| !s.is_empty())
-        .unwrap_or("default");
-    let folder_pk = resolve_folder_pk(org_id, folder_name)
-        .await
-        .ok_or_else(|| anyhow::anyhow!("Folder '{}' not found", folder_name))?;
+    let folder_name = create_folder_name(&req);
+    let folder_pk = folder_pk(org_id, folder_name).await?;
 
     let resolved_threshold = clamped_threshold(req.percentile.unwrap_or(DEFAULT_PERCENTILE));
 
@@ -823,6 +816,33 @@ pub async fn create_config(
     Ok(val)
 }
 
+/// Runs [`create_config`]'s checks on a copy without writing, so a caller can answer them first.
+pub async fn check_create_config(org_id: &str, req: &CreateAnomalyConfigRequest) -> Result<()> {
+    let mut req = req.clone();
+    checked_create_body(&mut req)?;
+    folder_pk(org_id, create_folder_name(&req))
+        .await
+        .map(|_| ())
+}
+
+/// Runs [`update_config`]'s checks on a copy without writing, so a caller can answer them first.
+pub async fn check_update_config(
+    org_id: &str,
+    anomaly_id: &str,
+    req: &UpdateAnomalyConfigRequest,
+) -> Result<()> {
+    let existing = config_to_update(get_orm_client_rw().await, org_id, anomaly_id).await?;
+    let mut req = req.clone();
+    checked_update_body(&mut req, &existing)?;
+    if let Some(folder) = req.folder_id.as_deref() {
+        folder_pk(org_id, folder).await?;
+    }
+    if let Some(tags) = req.tags.as_deref() {
+        config::meta::alerts::tags::normalize_tags(tags).map_err(anyhow::Error::new)?;
+    }
+    Ok(())
+}
+
 /// Update an existing anomaly detection configuration
 pub async fn update_config(
     org_id: &str,
@@ -833,38 +853,13 @@ pub async fn update_config(
 
     // Fetch existing config — into_active_model() on a DB-fetched model sets the PK as
     // Unchanged, which is required for SeaORM to generate UPDATE … WHERE anomaly_id = ?
-    let existing = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
-        .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?
-        .ok_or_else(|| anyhow::anyhow!("Config not found"))?;
-
-    // Normalized before the gates, as create does: `{}` and `null` persist as `[]`, so a gate
-    // comparing the raw value would read them as a change and re-litigate a grandfathered row
-    // over an edit that leaves the stored filters exactly as they were. Kept after the fetch
-    // so a request against a missing config still answers 404 rather than 400.
-    req.filters = normalize_request_filters(req.filters).map_err(validation_error)?;
+    let existing = config_to_update(db, org_id, anomaly_id).await?;
+    checked_update_body(&mut req, &existing)?;
 
     let previous = existing.clone();
     // Only a field that could plausibly fix a failure clears the backoff, so that a bulk
     // folder move or tag edit cannot reset the counter on dozens of configs at once.
     let mut retryable_change = false;
-
-    validated_intervals(&req, &existing).map_err(validation_error)?;
-    validated_detection_window(&req, &existing).map_err(validation_error)?;
-    validated_detection_function(&req, &existing).map_err(validation_error)?;
-    validated_custom_sql(&req, &existing).map_err(validation_error)?;
-    validated_denominator(&req, &existing).map_err(validation_error)?;
-    validated_budget_update(
-        req.percentile,
-        req.alert_budget_per_day,
-        existing.alert_budget_per_day,
-        existing.threshold,
-    )
-    .map_err(validation_error)?;
-    if let Some(days) = req.retrain_interval_days {
-        validate_retrain_interval_days(days).map_err(validation_error)?;
-    }
-    validated_band_settings(&req, &existing).map_err(validation_error)?;
 
     let mut active_model = existing.into_active_model();
 
@@ -920,6 +915,16 @@ pub async fn update_config(
         };
         retryable_change |= rows(previous.filters.as_ref()) != rows(Some(&filters));
         active_model.filters = Set(Some(filters));
+    }
+    // A row saved before the create gate existed carries no stream. The next edit repairs it
+    // from the SQL it will run, so the row stops reaching the UI with a blank stream.
+    if let Some(stream_name) = repaired_stream_name(
+        &previous.stream_name,
+        &previous.stream_type,
+        previous.custom_sql.as_deref(),
+        req.custom_sql.as_deref(),
+    ) {
+        active_model.stream_name = Set(stream_name);
     }
     if let Some(custom_sql) = req.custom_sql {
         retryable_change |= previous.custom_sql.as_deref() != Some(custom_sql.as_str());
@@ -1000,10 +1005,7 @@ pub async fn update_config(
         ));
     }
     if let Some(folder_id_str) = req.folder_id {
-        let pk = resolve_folder_pk(org_id, &folder_id_str)
-            .await
-            .ok_or_else(|| anyhow::anyhow!("Folder '{}' not found", folder_id_str))?;
-        active_model.folder_id = Set(pk);
+        active_model.folder_id = Set(folder_pk(org_id, &folder_id_str).await?);
     }
     if let Some(owner) = req.owner {
         active_model.owner = Set(Some(owner));
@@ -1042,7 +1044,7 @@ pub async fn update_config(
     o2_enterprise::enterprise::anomaly_detection::cache::invalidate_config(&updated.anomaly_id)
         .await;
     #[cfg(feature = "enterprise")]
-    invalidate_value_column_cache(org_id, anomaly_id);
+    invalidate_query_metadata_cache(org_id, anomaly_id);
 
     // Broadcast config update to all super cluster regions.
     #[cfg(feature = "enterprise")]
@@ -1431,6 +1433,7 @@ pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_js
                     error: Some(e.to_string()),
                     success_response: None,
                     gate_passed: false,
+                    downtime_id: None,
                     start_us,
                     end_us,
                 };
@@ -1447,6 +1450,7 @@ pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_js
                     serde_json::json!({ "anomalies_found": outcome.anomaly_count }).to_string(),
                 ),
                 gate_passed: outcome.gate_passed,
+                downtime_id: outcome.suppressed_by.clone(),
                 start_us,
                 end_us,
             };
@@ -1563,13 +1567,64 @@ pub async fn recover_detection_triggers_on_startup() {
             return;
         }
     };
+    // A re-created trigger would bring detection back for a pending or deleting org.
+    let (configs, unresolved) = configs_of_active_orgs(configs, |org_id| async move {
+        db::org_status::read_active(&org_id).await
+    })
+    .await;
 
     log::info!(
         "[anomaly_detection] Startup trigger recovery: checking {} enabled config(s)",
         configs.len()
     );
+    recreate_missing_triggers(&configs).await;
+    if !unresolved.is_empty() {
+        tokio::spawn(retry_unresolved_recovery(unresolved));
+    }
+}
 
-    for config in &configs {
+/// Re-checks configs whose org status could not be read, until every one has a verdict.
+async fn retry_unresolved_recovery(
+    mut pending: Vec<infra::table::entity::anomaly_detection_config::Model>,
+) {
+    while !pending.is_empty() {
+        tokio::time::sleep(RECOVERY_RETRY_DELAY).await;
+        let enabled = match anomaly_config_table::list_all_enabled(get_orm_client_ro().await).await
+        {
+            Ok(enabled) => enabled,
+            Err(e) => {
+                log::warn!("[anomaly_detection] Trigger recovery retry cannot list configs: {e}");
+                continue;
+            }
+        };
+        // A config deleted or disabled since startup must not get its trigger back.
+        pending = still_enabled(&pending, enabled);
+        let (active, unresolved) = configs_of_active_orgs(pending, |org_id| async move {
+            db::org_status::read_active(&org_id).await
+        })
+        .await;
+        recreate_missing_triggers(&active).await;
+        pending = unresolved;
+    }
+}
+
+/// The current rows of the `pending` configs, among the configs enabled now.
+fn still_enabled(
+    pending: &[infra::table::entity::anomaly_detection_config::Model],
+    enabled: Vec<infra::table::entity::anomaly_detection_config::Model>,
+) -> Vec<infra::table::entity::anomaly_detection_config::Model> {
+    let ids: std::collections::HashSet<&str> =
+        pending.iter().map(|c| c.anomaly_id.as_str()).collect();
+    enabled
+        .into_iter()
+        .filter(|c| ids.contains(c.anomaly_id.as_str()))
+        .collect()
+}
+
+async fn recreate_missing_triggers(
+    configs: &[infra::table::entity::anomaly_detection_config::Model],
+) {
+    for config in configs {
         let org = &config.org_id;
         let key = &config.anomaly_id;
 
@@ -1596,6 +1651,53 @@ pub async fn recover_detection_triggers_on_startup() {
             }
         }
     }
+}
+
+/// Splits configs into those of active orgs and those whose org status could not be read.
+async fn configs_of_active_orgs<F, Fut, E>(
+    configs: Vec<infra::table::entity::anomaly_detection_config::Model>,
+    read_active: F,
+) -> (
+    Vec<infra::table::entity::anomaly_detection_config::Model>,
+    Vec<infra::table::entity::anomaly_detection_config::Model>,
+)
+where
+    F: Fn(String) -> Fut,
+    Fut: std::future::Future<Output = Result<bool, E>>,
+    E: std::fmt::Display,
+{
+    let mut verdicts: HashMap<String, Option<bool>> = HashMap::new();
+    let (mut kept, mut unresolved) = (Vec::with_capacity(configs.len()), Vec::new());
+    for config in configs {
+        let verdict = match verdicts.get(&config.org_id) {
+            Some(verdict) => *verdict,
+            None => {
+                let verdict = match read_active(config.org_id.clone()).await {
+                    Ok(active) => Some(active),
+                    Err(e) => {
+                        log::warn!(
+                            "[anomaly_detection] Cannot read the status of org {}, retrying \
+                             its trigger recovery later: {e}",
+                            config.org_id
+                        );
+                        None
+                    }
+                };
+                verdicts.insert(config.org_id.clone(), verdict);
+                verdict
+            }
+        };
+        match verdict {
+            Some(true) => kept.push(config),
+            Some(false) => log::info!(
+                "[anomaly_detection] Skipping trigger recovery for {}: org {} is not active",
+                config.anomaly_id,
+                config.org_id
+            ),
+            None => unresolved.push(config),
+        }
+    }
+    (kept, unresolved)
 }
 
 /// History row only: `scheduled_jobs` belongs to the scheduler, and a write here races its pull.
@@ -1909,6 +2011,152 @@ fn validation_error(e: anyhow::Error) -> anyhow::Error {
         return e;
     }
     anyhow::anyhow!("validation error: {e}")
+}
+
+/// Normalizes and validates a create body; returns its normalized tags.
+fn checked_create_body(req: &mut CreateAnomalyConfigRequest) -> Result<Vec<String>> {
+    req.filters = normalize_request_filters(req.filters.take()).map_err(validation_error)?;
+    // Before the rules: the denominator rule reads the stream name, so it must see the real one.
+    req.stream_name = resolved_stream_name(req).map_err(validation_error)?;
+    validate_config_request(req).map_err(validation_error)?;
+
+    // Feature 2 (PT-7): normalized as the alerts path does, kept typed so the API answers 400.
+    config::meta::alerts::tags::normalize_tags(&req.tags).map_err(anyhow::Error::new)
+}
+
+/// The stream a create body is about: the named one, or in custom_sql mode the one its SQL
+/// reads when the body left the name blank.
+///
+/// A client that builds the body from a query (the AI assistant does) can send an empty
+/// `stream_name`. The row then saved with a 200 and reached the UI with no stream, so the
+/// preview, the edit form and the stream-scoped access check all read a blank name.
+fn resolved_stream_name(req: &CreateAnomalyConfigRequest) -> Result<String> {
+    let named = req.stream_name.trim();
+    if !named.is_empty() {
+        return Ok(req.stream_name.clone());
+    }
+    if req.query_mode != "custom_sql" {
+        anyhow::bail!("stream_name is required");
+    }
+    let Some(sql) = req.custom_sql.as_deref().filter(|s| !s.trim().is_empty()) else {
+        anyhow::bail!("stream_name is required");
+    };
+    stream_name_from_sql(sql, &req.stream_type)
+        .map_err(|e| anyhow::anyhow!("stream_name is required: {e}"))
+}
+
+/// The one stream a custom query reads, which must be of the config's own stream type.
+///
+/// Streams are told apart by type AND name: `logs.prod` and `metrics.prod` are two streams,
+/// not one. A stream of another type is refused rather than adopted, because the row would
+/// then name a `{stream_type}/{name}` stream the SQL never reads, and every later access
+/// check would ask for it. A query over several streams has no single stream to name, so
+/// the caller must say which one the config belongs to.
+fn stream_name_from_sql(sql: &str, stream_type: &str) -> Result<String> {
+    use config::meta::sql::TableReferenceExt;
+
+    let own_type = StreamType::from(stream_type);
+    let mut streams: Vec<(String, String)> = config::meta::sql::resolve_stream_names_with_type(sql)
+        .map_err(|e| anyhow::anyhow!("custom_sql could not be parsed: {e}"))?
+        .into_iter()
+        .map(|table| {
+            (
+                table.get_stream_type(own_type).to_string(),
+                table.stream_name(),
+            )
+        })
+        .collect();
+    streams.sort();
+    streams.dedup();
+    match streams.as_slice() {
+        [(read_type, name)] => {
+            // `FROM ""` parses: the quoted identifier is legal SQL and names nothing.
+            if name.trim().is_empty() {
+                anyhow::bail!("custom_sql names no stream");
+            }
+            if *read_type != own_type.to_string() {
+                anyhow::bail!(
+                    "custom_sql reads {read_type}/{name}, not a {own_type} stream; set \
+                     stream_type to {read_type} or name the stream"
+                );
+            }
+            Ok(name.clone())
+        }
+        [] => anyhow::bail!("custom_sql reads no stream"),
+        many => anyhow::bail!(
+            "custom_sql reads several streams ({}), so name the one the config is for",
+            many.iter()
+                .map(|(t, n)| format!("{t}/{n}"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+    }
+}
+
+/// The stream an update writes onto a row that has none, read from the SQL the row will
+/// run after the update: the submitted one, else the stored one. `None` leaves the row as
+/// it is, so a legacy row never blocks an unrelated edit.
+fn repaired_stream_name(
+    stored_name: &str,
+    stored_type: &str,
+    stored_sql: Option<&str>,
+    submitted_sql: Option<&str>,
+) -> Option<String> {
+    if !stored_name.trim().is_empty() {
+        return None;
+    }
+    let sql = submitted_sql.or(stored_sql)?;
+    stream_name_from_sql(sql, stored_type).ok()
+}
+
+fn create_folder_name(req: &CreateAnomalyConfigRequest) -> &str {
+    req.folder_id
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .unwrap_or("default")
+}
+
+async fn folder_pk(org_id: &str, folder_name: &str) -> Result<String> {
+    resolve_folder_pk(org_id, folder_name)
+        .await
+        .ok_or_else(|| anyhow::anyhow!("Folder '{}' not found", folder_name))
+}
+
+async fn config_to_update(
+    db: &sea_orm::DatabaseConnection,
+    org_id: &str,
+    anomaly_id: &str,
+) -> Result<infra::table::entity::anomaly_detection_config::Model> {
+    anomaly_config_table::get_by_id(db, org_id, anomaly_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .ok_or_else(|| anyhow::anyhow!("Config not found"))
+}
+
+/// The update's gates, run against the stored config before anything is written.
+fn checked_update_body(
+    req: &mut UpdateAnomalyConfigRequest,
+    existing: &infra::table::entity::anomaly_detection_config::Model,
+) -> Result<()> {
+    // Before the gates so `{}` and `null` read as the stored `[]`; after the fetch so 404 wins.
+    req.filters = normalize_request_filters(req.filters.take()).map_err(validation_error)?;
+
+    validated_intervals(req, existing).map_err(validation_error)?;
+    validated_detection_window(req, existing).map_err(validation_error)?;
+    validated_detection_function(req, existing).map_err(validation_error)?;
+    validated_custom_sql(req, existing).map_err(validation_error)?;
+    validated_denominator(req, existing).map_err(validation_error)?;
+    validated_budget_update(
+        req.percentile,
+        req.alert_budget_per_day,
+        existing.alert_budget_per_day,
+        existing.threshold,
+    )
+    .map_err(validation_error)?;
+    if let Some(days) = req.retrain_interval_days {
+        validate_retrain_interval_days(days).map_err(validation_error)?;
+    }
+    validated_band_settings(req, existing).map_err(validation_error)
 }
 
 /// Only `enabled` gates training: `alert_enabled` gates dispatch and `status` gates nothing.
@@ -2650,11 +2898,71 @@ pub async fn execute_anomaly_query(
         end_time
     );
 
-    let search_req = config::meta::search::Request {
+    // Resolved here rather than threaded through the enterprise query-executor boundary,
+    // whose registered Fn signature is fixed and shared by every anomaly query path.
+    let metadata = resolve_query_metadata(org_id, anomaly_id).await;
+    let stream_fields = match &metadata {
+        Some(m) => stream_field_names(org_id, anomaly_id, &m.stream_name, stream_type).await,
+        None => None,
+    };
+    let trace_id = config::ider::generate_trace_id();
+    let window = (start_time, end_time);
+    match partitioned_search::supported_query(
+        metadata.as_ref(),
+        query_sql,
+        stream_type,
+        window,
+        stream_fields.as_ref(),
+    ) {
+        Ok(query) => {
+            partitioned_search::execute_supported(
+                org_id,
+                query_sql,
+                window,
+                anomaly_id,
+                stream_type,
+                &trace_id,
+                query,
+            )
+            .await
+        }
+        Err(reason) => {
+            partitioned_search::log_fallback(org_id, anomaly_id, &reason);
+            let value_column = metadata.and_then(|m| m.value_column);
+            let search_req = anomaly_search_request(query_sql, start_time, end_time, 10000);
+            let parsed_stream_type = StreamType::from(stream_type);
+            let search_result =
+                search::search(&trace_id, org_id, parsed_stream_type, None, &search_req)
+                    .await
+                    .map_err(|e| {
+                        anyhow::anyhow!("[anomaly_detection {}] search failed: {}", anomaly_id, e)
+                    })?;
+
+            log::info!(
+                "[anomaly_detection {}] search returned {} hits (total={})",
+                anomaly_id,
+                search_result.hits.len(),
+                search_result.total
+            );
+
+            parse_search_results_to_timeseries(&search_result, anomaly_id, value_column.as_deref())
+        }
+    }
+}
+
+/// The direct anomaly search request every path shares; only the window and size vary.
+#[cfg(feature = "enterprise")]
+fn anomaly_search_request(
+    query_sql: &str,
+    start_time: i64,
+    end_time: i64,
+    size: i64,
+) -> config::meta::search::Request {
+    config::meta::search::Request {
         query: config::meta::search::Query {
             sql: query_sql.to_string(),
             from: 0,
-            size: 10000,
+            size,
             start_time,
             end_time,
             track_total_hits: false,
@@ -2673,40 +2981,21 @@ pub async fn execute_anomaly_query(
         clear_cache: false,
         local_mode: None,
         agent_options: None,
-    };
-
-    let parsed_stream_type = StreamType::from(stream_type);
-    let trace_id = config::ider::generate_trace_id();
-    let search_result = search::search(&trace_id, org_id, parsed_stream_type, None, &search_req)
-        .await
-        .map_err(|e| anyhow::anyhow!("[anomaly_detection {}] search failed: {}", anomaly_id, e))?;
-
-    log::info!(
-        "[anomaly_detection {}] search returned {} hits (total={})",
-        anomaly_id,
-        search_result.hits.len(),
-        search_result.total
-    );
-
-    // Resolved here rather than threaded through the enterprise query-executor boundary,
-    // whose registered Fn signature is fixed and shared by every anomaly query path.
-    let value_column = resolve_value_column(org_id, anomaly_id).await;
-
-    let data_points =
-        parse_search_results_to_timeseries(&search_result, anomaly_id, value_column.as_deref())?;
-
-    Ok(data_points)
+    }
 }
 
-/// The config-declared value column; degrades to `None` (legacy fallback) on lookup failure.
+/// The config snapshot one run reads; `None` on lookup failure keeps the legacy fallback.
 #[cfg(feature = "enterprise")]
-async fn resolve_value_column(org_id: &str, anomaly_id: &str) -> Option<String> {
+async fn resolve_query_metadata(
+    org_id: &str,
+    anomaly_id: &str,
+) -> Option<partitioned_search::QueryMetadata> {
     let key = (org_id.to_string(), anomaly_id.to_string());
-    if let Ok(cache) = VALUE_COLUMN_CACHE.read()
-        && let Some((column, cached_at)) = cache.get(&key)
-        && cached_at.elapsed() < VALUE_COLUMN_TTL
+    if let Ok(cache) = QUERY_METADATA_CACHE.read()
+        && let Some((metadata, cached_at)) = cache.get(&key)
+        && cached_at.elapsed() < QUERY_METADATA_TTL
     {
-        return column.clone();
+        return Some(metadata.clone());
     }
 
     let db = get_orm_client_ro().await;
@@ -2715,22 +3004,41 @@ async fn resolve_value_column(org_id: &str, anomaly_id: &str) -> Option<String> 
         .await
         .inspect_err(|e| {
             log::warn!(
-                "[anomaly_detection {anomaly_id}] could not load config for value column: {e}"
+                "[anomaly_detection {anomaly_id}] could not load config for query metadata: {e}"
             )
         })
         .ok()??;
 
-    let column = declared_value_column(&model.query_mode, &model.detection_function);
-    if let Ok(mut cache) = VALUE_COLUMN_CACHE.write() {
-        cache.insert(key, (column.clone(), Instant::now()));
+    let metadata = partitioned_search::QueryMetadata::from_model(&model);
+    if let Ok(mut cache) = QUERY_METADATA_CACHE.write() {
+        cache.insert(key, (metadata.clone(), Instant::now()));
     }
-    column
+    Some(metadata)
+}
+
+/// The stream's field names, or `None` when the schema cannot be read, which keeps the single call.
+#[cfg(feature = "enterprise")]
+async fn stream_field_names(
+    org_id: &str,
+    anomaly_id: &str,
+    stream_name: &str,
+    stream_type: &str,
+) -> Option<HashSet<String>> {
+    match infra::schema::get_cache(org_id, stream_name, StreamType::from(stream_type)).await {
+        Ok(cache) => Some(cache.fields_map().keys().cloned().collect()),
+        Err(e) => {
+            log::warn!(
+                "[anomaly_detection {anomaly_id}] could not read the schema of '{stream_name}': {e}"
+            );
+            None
+        }
+    }
 }
 
 /// Update-path hook; only bounds staleness on the serving node, the TTL covers the rest.
 #[cfg(feature = "enterprise")]
-fn invalidate_value_column_cache(org_id: &str, anomaly_id: &str) {
-    if let Ok(mut cache) = VALUE_COLUMN_CACHE.write() {
+fn invalidate_query_metadata_cache(org_id: &str, anomaly_id: &str) {
+    if let Ok(mut cache) = QUERY_METADATA_CACHE.write() {
         cache.remove(&(org_id.to_string(), anomaly_id.to_string()));
     }
 }
@@ -2870,41 +3178,40 @@ fn parse_search_results_to_timeseries(
 #[cfg(feature = "enterprise")]
 fn extract_timestamp_from_hit(hit: &serde_json::Value) -> Result<i64> {
     // Try different timestamp field names
-    for field_name in &TIMESTAMP_COLUMNS {
-        if let Some(ts_value) = hit.get(field_name) {
-            // Numeric microseconds
-            if let Some(ts_num) = ts_value.as_i64() {
-                return Ok(ts_num);
-            }
-            if let Some(ts_str) = ts_value.as_str() {
-                // RFC3339 with timezone: "2026-02-20T13:15:00Z" or "2026-02-20T13:15:00+00:00"
-                if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(ts_str) {
-                    return Ok(dt.timestamp_micros());
-                }
-                // Naive datetime without timezone (OpenObserve histogram output):
-                // "2026-02-20T13:15:00" — treat as UTC.
-                //
-                // TODO(timezone): OpenObserve histogram() always outputs UTC (origin
-                // hardcoded to "2001-01-01T00:00:00", no timezone field in SearchQuery
-                // proto). Arrow JSON serializer emits Timestamp(Microsecond, None) as
-                // ISO 8601 strings without a "Z" or "+00:00" suffix, so we parse as
-                // NaiveDateTime and attach UTC. If OpenObserve ever adds per-query
-                // timezone support, update this to use the configured timezone.
-                if let Ok(ndt) = chrono::NaiveDateTime::parse_from_str(ts_str, "%Y-%m-%dT%H:%M:%S")
-                {
-                    return Ok(ndt.and_utc().timestamp_micros());
-                }
-                // With fractional seconds: "2026-02-20T13:15:00.000"
-                if let Ok(ndt) =
-                    chrono::NaiveDateTime::parse_from_str(ts_str, "%Y-%m-%dT%H:%M:%S%.f")
-                {
-                    return Ok(ndt.and_utc().timestamp_micros());
-                }
-            }
-        }
-    }
+    TIMESTAMP_COLUMNS
+        .iter()
+        .find_map(|field_name| hit.get(field_name).and_then(timestamp_from_value))
+        .ok_or_else(|| anyhow::anyhow!("No timestamp field found in search result"))
+}
 
-    anyhow::bail!("No timestamp field found in search result")
+/// One timestamp cell as microseconds, or `None` when it is not a recognised format.
+#[cfg(feature = "enterprise")]
+fn timestamp_from_value(ts_value: &serde_json::Value) -> Option<i64> {
+    // Numeric microseconds
+    if let Some(ts_num) = ts_value.as_i64() {
+        return Some(ts_num);
+    }
+    let ts_str = ts_value.as_str()?;
+    // RFC3339 with timezone: "2026-02-20T13:15:00Z" or "2026-02-20T13:15:00+00:00"
+    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(ts_str) {
+        return Some(dt.timestamp_micros());
+    }
+    // Naive datetime without timezone (OpenObserve histogram output):
+    // "2026-02-20T13:15:00" — treat as UTC.
+    //
+    // TODO(timezone): OpenObserve histogram() always outputs UTC (origin
+    // hardcoded to "2001-01-01T00:00:00", no timezone field in SearchQuery
+    // proto). Arrow JSON serializer emits Timestamp(Microsecond, None) as
+    // ISO 8601 strings without a "Z" or "+00:00" suffix, so we parse as
+    // NaiveDateTime and attach UTC. If OpenObserve ever adds per-query
+    // timezone support, update this to use the configured timezone.
+    if let Ok(ndt) = chrono::NaiveDateTime::parse_from_str(ts_str, "%Y-%m-%dT%H:%M:%S") {
+        return Some(ndt.and_utc().timestamp_micros());
+    }
+    // With fractional seconds: "2026-02-20T13:15:00.000"
+    chrono::NaiveDateTime::parse_from_str(ts_str, "%Y-%m-%dT%H:%M:%S%.f")
+        .ok()
+        .map(|ndt| ndt.and_utc().timestamp_micros())
 }
 
 /// A declared `value_column` is authoritative: a missing one errors, never legacy-falls-back.
@@ -3122,6 +3429,51 @@ fn anomaly_alert_payload(
 
 /// Send an anomaly alert (or recovery message) to the configured destination.
 ///
+/// The downtime check the anomaly scheduler asks before it sends, registered next to the sender.
+#[cfg(feature = "enterprise")]
+pub fn downtime_is_muted(
+    org_id: &str,
+    anomaly_id: &str,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = Option<String>> + Send>> {
+    let (org_id, anomaly_id) = (org_id.to_string(), anomaly_id.to_string());
+    Box::pin(async move { muted_by_downtime(&org_id, &anomaly_id).await })
+}
+
+/// `custom_sql` equalities, then plain `=` filters, then `key:value` tags, on the Anomaly target.
+#[cfg(feature = "enterprise")]
+async fn muted_by_downtime(org_id: &str, anomaly_id: &str) -> Option<String> {
+    if !crate::alerts::downtimes::any_for(
+        org_id,
+        config::meta::downtimes::TargetModule::AnomalyDetections,
+    ) {
+        return None;
+    }
+    let row = anomaly_config_table::get_by_id(get_orm_client_rw().await, org_id, anomaly_id)
+        .await
+        .ok()
+        .flatten()?;
+    let folder_id = pk_to_name(Some(&row.folder_id)).await;
+    let tags: Vec<String> = row
+        .tags
+        .and_then(|tags| serde_json::from_value(tags).ok())
+        .unwrap_or_default();
+    let semantic_groups = crate::db::system_settings::get_semantic_field_groups(org_id).await;
+    let dims = o2_enterprise::enterprise::downtimes::scope::anomaly_dimensions(
+        crate::alerts::downtimes::anomaly_sql(&row.query_mode, row.custom_sql.as_deref()),
+        crate::alerts::downtimes::anomaly_filters(&row.query_mode, row.filters.as_ref()),
+        &tags,
+        &semantic_groups,
+    );
+    crate::alerts::downtimes::active_for_anomaly(
+        org_id,
+        anomaly_id,
+        &folder_id,
+        &dims,
+        config::utils::time::now_micros(),
+    )
+    .map(|downtime| downtime.id)
+}
+
 /// Called by the enterprise scheduler when anomalies are detected and alert_enabled=true.
 /// Looks up the destination by name and POSTs a JSON payload to its webhook URL.
 /// Non-HTTP destinations (email, SNS) are skipped with a warning — a known, parked gap
@@ -3169,10 +3521,13 @@ pub async fn send_anomaly_alert(
     let payload = anomaly_alert_payload(&ctx, &message, &link);
 
     // SSRF protection: validate the URL (incl. DNS) before sending and build the
-    // client through `build_safe_client` so redirects + connect-time resolution
+    // client through `build_safe_destination_client` so redirects + connect-time resolution
     // are re-validated.
     if let Err(e) =
-        common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(&endpoint.url).await
+        common::utils::ssrf_guard::SsrfGuard::validate_destination_url_with_config_async(
+            &endpoint.url,
+        )
+        .await
     {
         return Err(anyhow::anyhow!("Webhook URL blocked by SSRF guard: {e}"));
     }
@@ -3181,7 +3536,7 @@ pub async fn send_anomaly_alert(
     } else {
         reqwest::Client::builder()
     };
-    let client = common::utils::ssrf_guard::build_safe_client(builder)?;
+    let client = common::utils::ssrf_guard::build_safe_destination_client(builder)?;
 
     let mut req = client.post(&endpoint.url);
 
@@ -3590,6 +3945,177 @@ mod tests {
         assert!(validate_config_request(&req).is_err());
     }
 
+    mod stream_name_gate {
+        use super::*;
+
+        fn custom_sql_req(sql: &str) -> CreateAnomalyConfigRequest {
+            let mut req = make_valid_filters_req();
+            req.query_mode = "custom_sql".to_string();
+            req.filters = None;
+            req.custom_sql = Some(sql.to_string());
+            req.stream_name = String::new();
+            req
+        }
+
+        /// The body the AI assistant sent: a complete query and a blank stream_name.
+        #[test]
+        fn a_blank_stream_name_is_filled_from_the_custom_sql() {
+            let mut req = custom_sql_req(
+                "SELECT histogram(_timestamp, '5 minute') AS time_bucket, count(*) AS value \
+                 FROM prod WHERE service_name = 'payments' GROUP BY time_bucket \
+                 ORDER BY time_bucket",
+            );
+            checked_create_body(&mut req).expect("the stream is readable from the SQL");
+            assert_eq!(req.stream_name, "prod");
+        }
+
+        #[test]
+        fn a_quoted_stream_in_the_sql_is_read_unquoted() {
+            let mut req = custom_sql_req(
+                "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value \
+                 FROM \"k8s_logs\" GROUP BY time_bucket",
+            );
+            checked_create_body(&mut req).unwrap();
+            assert_eq!(req.stream_name, "k8s_logs");
+        }
+
+        #[test]
+        fn whitespace_counts_as_blank() {
+            let mut req = custom_sql_req("SELECT count(*) FROM prod");
+            req.stream_name = "   ".to_string();
+            checked_create_body(&mut req).unwrap();
+            assert_eq!(req.stream_name, "prod");
+        }
+
+        /// A named stream is the caller's choice; the SQL does not override it.
+        #[test]
+        fn a_named_stream_is_kept() {
+            let mut req = custom_sql_req("SELECT count(*) FROM prod");
+            req.stream_name = "other".to_string();
+            checked_create_body(&mut req).unwrap();
+            assert_eq!(req.stream_name, "other");
+        }
+
+        #[test]
+        fn filters_mode_cannot_leave_the_stream_blank() {
+            let mut req = make_valid_filters_req();
+            req.stream_name = String::new();
+            let err = checked_create_body(&mut req).unwrap_err().to_string();
+            assert!(err.contains("validation error"), "got: {err}");
+            assert!(err.contains("stream_name is required"), "got: {err}");
+        }
+
+        #[test]
+        fn a_query_over_several_streams_needs_the_name() {
+            let mut req = custom_sql_req("SELECT count(*) FROM a JOIN b ON a.id = b.id");
+            let err = checked_create_body(&mut req).unwrap_err().to_string();
+            assert!(err.contains("stream_name is required"), "got: {err}");
+            assert!(err.contains("several streams"), "got: {err}");
+        }
+
+        #[test]
+        fn an_unparsable_query_names_the_stream_as_the_missing_piece() {
+            let mut req = custom_sql_req("SELECT count(*) FROM");
+            let err = checked_create_body(&mut req).unwrap_err().to_string();
+            assert!(err.contains("stream_name is required"), "got: {err}");
+        }
+
+        /// `logs.prod` and `metrics.prod` share a name and are still two streams.
+        #[test]
+        fn two_streams_of_different_types_with_one_name_are_several() {
+            let mut req = custom_sql_req(
+                "SELECT count(*) FROM logs.prod a JOIN metrics.prod b ON a.id = b.id",
+            );
+            let err = checked_create_body(&mut req).unwrap_err().to_string();
+            assert!(err.contains("several streams"), "got: {err}");
+            assert!(err.contains("logs/prod"), "got: {err}");
+            assert!(err.contains("metrics/prod"), "got: {err}");
+        }
+
+        /// A `logs` config over a metrics stream would name `logs/cpu`, a stream the SQL
+        /// never reads, and every later access check would ask for it.
+        #[test]
+        fn a_stream_of_another_type_is_refused_not_adopted() {
+            let mut req = custom_sql_req("SELECT count(*) FROM metrics.cpu");
+            let err = checked_create_body(&mut req).unwrap_err().to_string();
+            assert!(err.contains("stream_name is required"), "got: {err}");
+            assert!(err.contains("metrics/cpu"), "got: {err}");
+            assert!(err.contains("not a logs stream"), "got: {err}");
+        }
+
+        #[test]
+        fn a_qualifier_of_the_configs_own_type_is_accepted() {
+            let mut req = custom_sql_req("SELECT count(*) FROM logs.prod");
+            checked_create_body(&mut req).unwrap();
+            assert_eq!(req.stream_name, "prod");
+            let mut req = custom_sql_req("SELECT count(*) FROM metrics.cpu");
+            req.stream_type = "metrics".to_string();
+            checked_create_body(&mut req).unwrap();
+            assert_eq!(req.stream_name, "cpu");
+        }
+
+        /// `FROM ""` is legal SQL: the parser accepts the empty quoted identifier, so the
+        /// gate must refuse it itself or the blank row comes back.
+        #[test]
+        fn an_empty_quoted_identifier_does_not_pass_as_a_stream() {
+            for sql in [
+                "SELECT count(*) FROM \"\"",
+                "SELECT count(*) FROM \"   \"",
+                "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value \
+                 FROM \"\" GROUP BY time_bucket",
+            ] {
+                let mut req = custom_sql_req(sql);
+                let err = checked_create_body(&mut req).expect_err(sql).to_string();
+                assert!(err.contains("stream_name is required"), "{sql}: {err}");
+                assert!(req.stream_name.trim().is_empty(), "{sql} wrote a name");
+            }
+        }
+
+        /// The repair the update path runs on a row saved before this gate existed.
+        #[test]
+        fn a_blank_legacy_row_is_repaired_from_the_sql_it_will_run() {
+            let stored = Some("SELECT count(*) FROM prod WHERE x = 1");
+            assert_eq!(
+                repaired_stream_name("", "logs", stored, None).as_deref(),
+                Some("prod")
+            );
+            // The submitted SQL is what the row will run, so it wins over the stored one.
+            assert_eq!(
+                repaired_stream_name("", "logs", stored, Some("SELECT count(*) FROM other"))
+                    .as_deref(),
+                Some("other")
+            );
+        }
+
+        #[test]
+        fn the_update_repair_leaves_every_other_row_alone() {
+            let stored = Some("SELECT count(*) FROM prod");
+            // A named row is never renamed by its SQL.
+            assert_eq!(repaired_stream_name("app", "logs", stored, None), None);
+            // Nothing to read from.
+            assert_eq!(repaired_stream_name("", "logs", None, None), None);
+            // A blank legacy row whose SQL does not name one stream of its own type stays
+            // blank rather than failing the edit.
+            assert_eq!(
+                repaired_stream_name("", "logs", Some("SELECT count(*) FROM metrics.cpu"), None),
+                None
+            );
+            assert_eq!(
+                repaired_stream_name("", "logs", Some("SELECT count(*) FROM \"\""), None),
+                None
+            );
+            assert_eq!(
+                repaired_stream_name(
+                    "",
+                    "logs",
+                    Some("SELECT count(*) FROM a JOIN b ON true"),
+                    None
+                ),
+                None
+            );
+        }
+    }
+
     #[test]
     fn test_validate_invalid_histogram_interval() {
         let mut req = make_valid_filters_req();
@@ -3799,13 +4325,6 @@ mod tests {
     fn test_extract_value_from_hit_value_field_f64() {
         let hit = serde_json::json!({"value": 3.25});
         assert!((extract_value_from_hit(&hit, None).unwrap() - 3.25).abs() < f64::EPSILON);
-    }
-
-    #[cfg(feature = "enterprise")]
-    #[test]
-    fn test_extract_value_from_hit_count_field_integer() {
-        let hit = serde_json::json!({"count": 42});
-        assert!((extract_value_from_hit(&hit, None).unwrap() - 42.0).abs() < f64::EPSILON);
     }
 
     #[cfg(feature = "enterprise")]
@@ -4041,6 +4560,95 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+    }
+
+    #[tokio::test]
+    async fn test_recovery_skips_inactive_orgs() {
+        let of_org = |anomaly_id: &str, org_id: &str| {
+            infra::table::entity::anomaly_detection_config::Model {
+                anomaly_id: anomaly_id.to_string(),
+                org_id: org_id.to_string(),
+                ..update_interval_validation::stored_config()
+            }
+        };
+        let configs = vec![
+            of_org("a1", "acme"),
+            of_org("g1", "gone"),
+            of_org("a2", "acme"),
+            of_org("g2", "gone"),
+        ];
+        let lookups = std::sync::Mutex::new(Vec::new());
+        let (kept, unresolved) = configs_of_active_orgs(configs, |org_id| {
+            lookups.lock().unwrap().push(org_id.clone());
+            async move { Ok::<_, String>(org_id != "gone") }
+        })
+        .await;
+        let ids: Vec<&str> = kept.iter().map(|c| c.anomaly_id.as_str()).collect();
+        assert_eq!(
+            ids,
+            ["a1", "a2"],
+            "an inactive org's trigger must not be re-created"
+        );
+        assert!(unresolved.is_empty());
+        assert_eq!(
+            *lookups.lock().unwrap(),
+            ["acme", "gone"],
+            "one lookup per org"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_recovery_keeps_configs_of_an_unreadable_org_for_a_retry() {
+        let of_org = |anomaly_id: &str, org_id: &str| {
+            infra::table::entity::anomaly_detection_config::Model {
+                anomaly_id: anomaly_id.to_string(),
+                org_id: org_id.to_string(),
+                ..update_interval_validation::stored_config()
+            }
+        };
+        let configs = vec![
+            of_org("a1", "acme"),
+            of_org("u1", "unreadable"),
+            of_org("u2", "unreadable"),
+        ];
+        let (kept, unresolved) = configs_of_active_orgs(configs, |org_id| async move {
+            if org_id == "unreadable" {
+                Err("db down".to_string())
+            } else {
+                Ok(true)
+            }
+        })
+        .await;
+        let ids = |c: &[infra::table::entity::anomaly_detection_config::Model]| {
+            c.iter().map(|c| c.anomaly_id.clone()).collect::<Vec<_>>()
+        };
+        assert_eq!(ids(&kept), ["a1"]);
+        assert_eq!(
+            ids(&unresolved),
+            ["u1", "u2"],
+            "a failed status read must neither drop nor recover the trigger"
+        );
+    }
+
+    #[test]
+    fn test_recovery_retry_drops_configs_deleted_or_disabled_since_startup() {
+        let config = |anomaly_id: &str, org_id: &str| {
+            infra::table::entity::anomaly_detection_config::Model {
+                anomaly_id: anomaly_id.to_string(),
+                org_id: org_id.to_string(),
+                ..update_interval_validation::stored_config()
+            }
+        };
+        let pending = vec![config("kept", "acme"), config("gone", "acme")];
+        let enabled_now = vec![config("kept", "acme-renamed"), config("other", "acme")];
+
+        let retried = still_enabled(&pending, enabled_now);
+
+        let rows: Vec<(String, String)> = retried
+            .into_iter()
+            .map(|c| (c.anomaly_id, c.org_id))
+            .collect();
+        assert_eq!(rows, [("kept".to_string(), "acme-renamed".to_string())]);
     }
 
     /// The key names here are a cross-crate contract:

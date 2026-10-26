@@ -1,6 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
+import { h, nextTick } from "vue";
 import OButton from "./OButton.vue";
+import type { ButtonVariant } from "./OButton.types";
 
 describe("OButton", () => {
   // --- Slots ---
@@ -132,6 +134,33 @@ describe("OButton", () => {
     expect(wrapper.classes().join(" ")).toContain("text-button-ghost-destructive-text");
   });
 
+  it("paints pending as a solid amber fill bordered in its own colour, never warning or the accent", () => {
+    const wrapper = mount(OButton, { props: { variant: "pending" } });
+    const classes = wrapper.classes();
+    expect(classes).toEqual(
+      expect.arrayContaining([
+        "bg-button-pending-bg",
+        "text-button-pending-text",
+        "border",
+        "border-button-pending-bg",
+        "enabled:hover:bg-button-pending-hover-bg",
+        "enabled:hover:border-button-pending-hover-bg",
+        "enabled:active:bg-button-pending-active-bg",
+        "enabled:active:border-button-pending-active-bg",
+        "focus-visible:ring-button-pending-focus-ring",
+        "rounded-default",
+      ]),
+    );
+    const paint = classes.filter((value) => /^(enabled:\w+:)?(bg|text|border)-/.test(value));
+    expect(paint.filter((value) => /warning|accent|primary/.test(value))).toEqual([]);
+  });
+
+  it("dims a disabled pending button like warning", () => {
+    const wrapper = mount(OButton, { props: { variant: "pending", disabled: true } });
+    expect(wrapper.classes()).toContain("disabled:opacity-60");
+    expect(wrapper.attributes("data-o2-variant")).toBe("pending");
+  });
+
   // Destination previews are fixed-light brand replicas: the label must use the
   // fixed brand foreground, not text-text-inverse, which turns near-black in dark mode.
   it.each([
@@ -194,6 +223,19 @@ describe("OButton", () => {
     const classes = wrapper.classes().join(" ");
     expect(classes).toContain("h-12");
     expect(classes).toContain("w-12");
+  });
+
+  it("sizes xs-grouped one border-pair (0.125rem) shorter than xs", () => {
+    expect(mount(OButton, { props: { size: "xs" } }).classes()).toContain("h-7");
+    const classes = mount(OButton, { props: { size: "xs-grouped" } }).classes();
+    expect(classes).toContain("h-6.5");
+    expect(classes).not.toContain("h-7");
+  });
+
+  it("sizes icon-panel as a 1.625rem square, the icon partner of xs-grouped", () => {
+    const classes = mount(OButton, { props: { size: "icon-panel" } }).classes();
+    expect(classes).toContain("size-6.5");
+    expect(classes).toContain("p-0");
   });
 
   // --- Keyboard ---
@@ -318,7 +360,9 @@ describe("OButton", () => {
     const wrapper = mount(OButton, { props: { loading: true }, slots: { default: "Save" } });
     const content = wrapper.find("span.contents");
     expect(content.exists()).toBe(true);
-    expect(content.classes()).toContain("invisible");
+    expect(content.classes()).toContain("text-transparent");
+    expect(content.classes()).toContain("[&>*]:opacity-0");
+    expect(content.classes()).not.toContain("invisible");
     expect(content.classes()).not.toContain("inline-flex");
     expect(content.attributes("style")).toBeUndefined();
   });
@@ -345,5 +389,237 @@ describe("OButton", () => {
   it("defaults data-o2-variant to primary", () => {
     const wrapper = mount(OButton);
     expect(wrapper.attributes("data-o2-variant")).toBe("primary");
+  });
+  it.each([
+    "primary",
+    "secondary",
+    "outline",
+    "ghost",
+    "ghost-primary",
+    "ghost-muted",
+    "ghost-subtle",
+    "ghost-destructive",
+    "ghost-success",
+    "destructive",
+    "filter-exclude",
+    "ghost-warning",
+    "warning",
+    "pending",
+    "ghost-neutral",
+    "outline-destructive",
+    "cancel-query",
+    "panel-collapse",
+    "sidebar-button",
+    "sidebar-toggle",
+    "ai-gradient",
+    "on-dark-primary",
+    "on-dark-ghost",
+    "preview-slack",
+    "preview-teams",
+    "preview-email",
+    "preview-opsgenie",
+    "preview-action",
+    "webinar-dismiss",
+    "banner-dismiss",
+    "outline-primary",
+    "dashed",
+    "pricing-chip",
+    "tint-teal",
+    "tint-purple",
+    "tint-blue",
+    "tint-orange",
+  ] satisfies ButtonVariant[])(
+    "preserves native disabled styling for %s when unavailable",
+    (variant) => {
+      const disabled = mount(OButton, { props: { variant, disabled: true } });
+      const unavailable = mount(OButton, {
+        props: { variant, disabled: true, focusableUnavailable: true },
+      });
+      const disabledClasses = disabled
+        .classes()
+        .filter((value) => value.startsWith("disabled:") && value !== "disabled:cursor-not-allowed")
+        .map((value) => value.slice("disabled:".length));
+      expect(disabledClasses.length).toBeGreaterThan(0);
+      for (const value of disabledClasses) expect(unavailable.classes()).toContain(value);
+      const groups = disabledClasses.map((value) => value.split("-")[0]);
+      expect(
+        unavailable
+          .classes()
+          .filter(
+            (value) =>
+              groups.includes(value.split("-")[0]) &&
+              !/^text-(xs|sm|base|lg|compact|inherit)$/.test(value),
+          )
+          .sort(),
+      ).toEqual(disabledClasses.sort());
+      expect(unavailable.classes().some((value) => value.startsWith("enabled:"))).toBe(false);
+      expect(unavailable.attributes("disabled")).toBeUndefined();
+      disabled.unmount();
+      unavailable.unmount();
+    },
+  );
+
+  it("keeps an unavailable action focusable and connects its reason", async () => {
+    const wrapper = mount(OButton, {
+      props: { disabled: true, focusableUnavailable: true },
+      slots: { default: "Configure", "unavailable-reason": "Permission required" },
+    });
+    expect(wrapper.attributes("disabled")).toBeUndefined();
+    expect(wrapper.attributes("aria-disabled")).toBe("true");
+    const reason = wrapper.get(".sr-only");
+    expect(wrapper.attributes("aria-describedby")).toBe(reason.attributes("id"));
+    expect(reason.text()).toBe("Permission required");
+    const click = new MouseEvent("click", { cancelable: true });
+    wrapper.element.dispatchEvent(click);
+    expect(click.defaultPrevented).toBe(true);
+    await wrapper.trigger("click");
+    expect(wrapper.emitted("click")).toBeUndefined();
+  });
+
+  it.each(["Enter", " "])("stops unavailable %s before parent or caller activation", (key) => {
+    const parentKeydown = vi.fn();
+    const callerKeydown = vi.fn();
+    const wrapper = mount(OButton, {
+      props: { disabled: true, focusableUnavailable: true },
+      attrs: { onKeydown: callerKeydown },
+    });
+    const parent = document.createElement("div");
+    parent.addEventListener("keydown", parentKeydown);
+    parent.appendChild(wrapper.element);
+    const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+    wrapper.element.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(parentKeydown).not.toHaveBeenCalled();
+    expect(callerKeydown).not.toHaveBeenCalled();
+    expect(wrapper.emitted("click")).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it.each([false, true])("preserves the accessible label when icon-only is %s", (iconOnly) => {
+    const wrapper = mount(OButton, {
+      props: { disabled: true, focusableUnavailable: true },
+      attrs: iconOnly ? { "aria-label": "Share" } : {},
+      slots: { default: iconOnly ? "" : "Configure", "unavailable-reason": "Run first" },
+    });
+    const reason = wrapper.get(".sr-only");
+    expect(reason.attributes("aria-hidden")).toBe("true");
+    expect(wrapper.attributes("aria-describedby")).toBe(reason.attributes("id"));
+    expect(reason.text()).toBe("Run first");
+    const nameContent = wrapper.element.cloneNode(true) as HTMLElement;
+    nameContent.querySelectorAll('[aria-hidden="true"]').forEach((node) => node.remove());
+    expect(nameContent.getAttribute("aria-label") ?? nameContent.textContent).toBe(
+      iconOnly ? "Share" : "Configure",
+    );
+    wrapper.unmount();
+  });
+
+  it.each([false, true])(
+    "keeps a single loading label when focusable unavailable is %s",
+    (focusableUnavailable) => {
+      const wrapper = mount(OButton, {
+        props: { loading: true, disabled: focusableUnavailable, focusableUnavailable },
+        slots: { default: "Next", "unavailable-reason": "Loading page 2…" },
+      });
+      const nameContent = wrapper.element.cloneNode(true) as HTMLElement;
+      nameContent.querySelectorAll('[aria-hidden="true"]').forEach((node) => node.remove());
+      expect(nameContent.textContent).toBe("Next");
+      expect(wrapper.find(".invisible").exists()).toBe(false);
+      expect(wrapper.attributes("aria-label")).toBeUndefined();
+      if (focusableUnavailable) {
+        expect(wrapper.attributes("disabled")).toBeUndefined();
+        const reason = wrapper.get(".sr-only");
+        expect(wrapper.attributes("aria-describedby")).toBe(reason.attributes("id"));
+        expect(reason.text()).toBe("Loading page 2…");
+      }
+      wrapper.unmount();
+    },
+  );
+
+  it("keeps descriptions distinct when instances share a test marker", () => {
+    const wrapper = mount({
+      render: () =>
+        h(
+          "div",
+          ["First reason", "Second reason"].map((reason) =>
+            h(
+              OButton,
+              { disabled: true, focusableUnavailable: true, "data-test": "shared-action" },
+              { "unavailable-reason": () => reason },
+            ),
+          ),
+        ),
+    });
+    const buttons = wrapper.findAllComponents(OButton);
+    const ids = buttons.map((button) => button.attributes("aria-describedby"));
+    expect(new Set(ids).size).toBe(2);
+    expect(ids.map((id) => wrapper.find(`[id="${id}"]`).text())).toEqual([
+      "First reason",
+      "Second reason",
+    ]);
+    wrapper.unmount();
+  });
+
+  it("uses an external reason and preserves unavailable focus during loading", () => {
+    const wrapper = mount(OButton, {
+      props: {
+        disabled: true,
+        focusableUnavailable: true,
+        descriptionId: "permission",
+        loading: true,
+      },
+    });
+    expect(wrapper.attributes("disabled")).toBeUndefined();
+    expect(wrapper.attributes("aria-describedby")).toBe("permission");
+    expect(wrapper.find(".sr-only").exists()).toBe(false);
+  });
+
+  describe("unnamed icon-only dev warning", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.unstubAllEnvs();
+      vi.restoreAllMocks();
+    });
+
+    const mountIconOnly = (attrs: Record<string, string> = {}) =>
+      mount(OButton, { props: { size: "icon" }, attrs, slots: { default: () => h("svg") } });
+
+    it("schedules nothing under test", () => {
+      vi.useFakeTimers();
+      const wrapper = mountIconOnly();
+      expect(vi.getTimerCount()).toBe(0);
+      wrapper.unmount();
+    });
+
+    it("warns after the delay for a button nothing names", () => {
+      vi.stubEnv("MODE", "development");
+      vi.useFakeTimers();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const wrapper = mountIconOnly();
+      expect(warn).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1000);
+      expect(warn).toHaveBeenCalledTimes(1);
+      wrapper.unmount();
+    });
+
+    it("stays quiet for a title, or a name that arrives before the check", async () => {
+      vi.stubEnv("MODE", "development");
+      vi.useFakeTimers();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      mountIconOnly({ title: "Delete" });
+      const late = mountIconOnly();
+      late.element.setAttribute("aria-label", "Loaded later");
+      await nextTick();
+      vi.advanceTimersByTime(1000);
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it("does not warn for a button unmounted before the check", () => {
+      vi.stubEnv("MODE", "development");
+      vi.useFakeTimers();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      mountIconOnly().unmount();
+      vi.advanceTimersByTime(1000);
+      expect(warn).not.toHaveBeenCalled();
+    });
   });
 });

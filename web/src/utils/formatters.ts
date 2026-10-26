@@ -113,12 +113,17 @@ export const truncateText = (text: string, maxLength: number): string => {
   return `${text.slice(0, Math.max(maxLength - 1, 0))}…`;
 };
 
+// True when `num / divisor` would print as 1000.0 or more at one decimal, so the
+// value belongs in the next unit up (999 950 is "1.0M", not "1000.0K").
+const roundsToNextUnit = (num: number, divisor: number) =>
+  Number((num / divisor).toFixed(1)) >= 1000;
+
 export const formatLargeNumber = (number: number) => {
   if (number === undefined || number === null) return "";
 
-  if (number >= 1000000000) {
+  if (number >= 1000000000 || roundsToNextUnit(number, 1000000)) {
     return (number / 1000000000).toFixed(1) + "B";
-  } else if (number >= 1000000) {
+  } else if (number >= 1000000 || roundsToNextUnit(number, 1000)) {
     return (number / 1000000).toFixed(1) + "M";
   } else if (number >= 1000) {
     return (number / 1000).toFixed(1) + "K";
@@ -140,6 +145,7 @@ export const formatEventCount = (num: number): string => {
   const units = ["", "K", "M", "B", "T"];
   let tier = Math.floor(Math.log10(num) / 3);
 
+  if (tier < units.length - 1 && roundsToNextUnit(num, Math.pow(10, tier * 3))) tier++;
   if (tier >= units.length) tier = units.length - 1;
 
   const scaled = num / Math.pow(10, tier * 3);
@@ -263,6 +269,27 @@ export function operatorSymbol(op: string): string {
     neq: "≠",
   };
   return map[op] || op;
+}
+
+/** Attribute rule → `openai.response.service_tier +1 is one of flex, priority`, labelled through `t`. */
+export function formatTierRule(
+  rule: { keys?: string[]; op?: string; values?: string[]; value?: number | null },
+  t: (_key: string) => string,
+): string {
+  const keys = (rule?.keys ?? []).map((k) => String(k ?? "").trim()).filter(Boolean);
+  const key = keys.length > 1 ? `${keys[0]} +${keys.length - 1}` : (keys[0] ?? "");
+  const op = rule?.op ?? "in";
+  const labels: Record<string, string> = {
+    in: "modelPricing.ruleOpIn",
+    not_in: "modelPricing.ruleOpNotIn",
+    exists: "modelPricing.ruleOpExists",
+    not_exists: "modelPricing.ruleOpNotExists",
+  };
+  if (op === "exists" || op === "not_exists") return `${key} ${t(labels[op])}`;
+  if (op === "in" || op === "not_in") {
+    return `${key} ${t(labels[op])} ${(rule?.values ?? []).join(", ")}`;
+  }
+  return `${key} ${operatorSymbol(op)} ${rule?.value ?? ""}`;
 }
 
 /**

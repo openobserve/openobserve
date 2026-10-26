@@ -91,6 +91,8 @@ pub enum Error {
     ResourceError(String),
     #[error("Error# {0}")]
     IngestionError(String),
+    #[error("PayloadTooLarge# {0}")]
+    PayloadTooLarge(String),
     /// Carried inside an `anyhow::Error`, whose `OtherError` wrapper adds the `Error# ` prefix.
     #[error("{0}")]
     ColumnsLimitExceeded(String),
@@ -102,6 +104,8 @@ pub enum Error {
     TrialPeriodExpired,
     #[error("QueueError# {0}")]
     QueueError(#[from] QueueError),
+    #[error("{0}")]
+    Ingestion(#[from] IngestionError),
 }
 
 unsafe impl Send for Error {}
@@ -131,6 +135,13 @@ pub enum QueueError {
     },
     #[error("queue is closed")]
     QueueClosed,
+}
+
+/// Admission refusals that callers map to a status of their own instead of a generic 4xx/5xx.
+#[derive(ThisError, Debug)]
+pub enum IngestionError {
+    #[error("Organization [{0}] is deleted")]
+    OrgBlocked(String),
 }
 
 #[derive(ThisError, Debug)]
@@ -246,6 +257,9 @@ pub enum ErrorCodes {
     /// The o2-ai replica holding a conversation is unreachable; carries the
     /// session id. Recoverable — the UI restores it into a fresh session.
     AiSessionOwnerUnavailable(String),
+    /// Another turn is already running in this AI chat session; carries the
+    /// session id. Retry once it finishes.
+    AiChatSessionBusy(String),
 }
 
 impl From<sea_orm::DbErr> for Error {
@@ -302,6 +316,7 @@ impl Error {
         match self {
             Error::ErrorCode(code) => code.http_status(),
             Error::ResourceError(_) => 503,
+            Error::Ingestion(IngestionError::OrgBlocked(_)) => 403,
             // A JSON deserialization failure means the client sent a malformed
             // request body, so surface it as 400 rather than a 500 server error.
             _ => 400,
@@ -315,7 +330,7 @@ impl ErrorCodes {
         match self {
             ErrorCodes::SearchCancelQuery(_) | ErrorCodes::RatelimitExceeded(_) => 429,
             ErrorCodes::SearchTimeout(_) => 408,
-            ErrorCodes::AiSessionOwnerUnavailable(_) => 409,
+            ErrorCodes::AiSessionOwnerUnavailable(_) | ErrorCodes::AiChatSessionBusy(_) => 409,
             ErrorCodes::ServerInternalError(_) | ErrorCodes::SearchParquetFileNotFound => 500,
             ErrorCodes::InvalidParams(_)
             | ErrorCodes::SearchSQLExecuteError(_)
@@ -346,6 +361,7 @@ impl ErrorCodes {
             ErrorCodes::RatelimitExceeded(_) => 20012,
             ErrorCodes::SearchHistogramNotAvailable(_) => 20013,
             ErrorCodes::AiSessionOwnerUnavailable(_) => 30001,
+            ErrorCodes::AiChatSessionBusy(_) => 30002,
         }
     }
 
@@ -378,6 +394,9 @@ impl ErrorCodes {
             ErrorCodes::AiSessionOwnerUnavailable(_) => {
                 "The replica serving this conversation is unavailable".to_string()
             }
+            ErrorCodes::AiChatSessionBusy(_) => {
+                "Another turn is already running in this conversation".to_string()
+            }
         }
     }
 
@@ -398,6 +417,7 @@ impl ErrorCodes {
             ErrorCodes::RatelimitExceeded(msg) => msg.to_owned(),
             ErrorCodes::SearchHistogramNotAvailable(msg) => msg.to_owned(),
             ErrorCodes::AiSessionOwnerUnavailable(session_id) => session_id.to_owned(),
+            ErrorCodes::AiChatSessionBusy(session_id) => session_id.to_owned(),
         }
     }
 
@@ -418,6 +438,7 @@ impl ErrorCodes {
             ErrorCodes::RatelimitExceeded(msg) => msg.to_owned(),
             ErrorCodes::SearchHistogramNotAvailable(msg) => msg.to_owned(),
             ErrorCodes::AiSessionOwnerUnavailable(session_id) => session_id.to_owned(),
+            ErrorCodes::AiChatSessionBusy(session_id) => session_id.to_owned(),
         }
     }
 
@@ -471,6 +492,7 @@ impl ErrorCodes {
             20012 => Ok(ErrorCodes::RatelimitExceeded(message)),
             20013 => Ok(ErrorCodes::SearchHistogramNotAvailable(message)),
             30001 => Ok(ErrorCodes::AiSessionOwnerUnavailable(message)),
+            30002 => Ok(ErrorCodes::AiChatSessionBusy(message)),
             _ => Ok(ErrorCodes::ServerInternalError(json.to_string())),
         }
     }
@@ -716,5 +738,12 @@ mod tests {
             ErrorCodes::SearchHistogramNotAvailable("msg".into()).get_message(),
             "Search histogram not available"
         );
+    }
+
+    #[test]
+    fn test_org_blocked_is_forbidden() {
+        let e = Error::from(IngestionError::OrgBlocked("t1".into()));
+        assert_eq!(e.http_status(), 403);
+        assert_eq!(e.to_string(), "Organization [t1] is deleted");
     }
 }

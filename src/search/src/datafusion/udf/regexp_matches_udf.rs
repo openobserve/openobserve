@@ -196,23 +196,24 @@ pub fn regexp_matches<T: OffsetSizeTrait>(args: &[ArrayRef]) -> Result<ArrayRef>
             // Group 3: hello              (innermost capture - what we want!)
 
             // Try innermost capture group first, then work outwards
-            let matched_value = (2..=cap.len())  // Start from 2 because: Group 0 is full match, Group 1 is first explicit group
-                .rev()  // Reverse the range to start from last group (innermost) to first group
-                .find_map(|i| cap.get(i))  // Try to get each group, returns None if group didn't match
-                .or_else(|| cap.get(1))    // If no inner groups matched, try the first explicit group
-                .or_else(|| cap.get(0))    // If no groups matched at all, use the entire match
+            let matched_value = (2..=cap.len()) // Start from 2 because: Group 0 is full match, Group 1 is first explicit group
+                .rev() // Reverse the range to start from last group (innermost) to first group
+                .find_map(|i| cap.get(i)) // Try to get each group, returns None if group didn't match
+                .or_else(|| cap.get(1)) // If no inner groups matched, try the first explicit group
+                .or_else(|| cap.get(0)) // If no groups matched at all, use the entire match
                 .map(|m| m.as_str()); // Convert the match to a string slice
 
             if let Some(matched) = matched_value {
                 // Clean up the matched value:
                 // If the value is wrapped in quotes (like "hello"), remove them
                 // If it's not (like 123), keep as is
-                let cleaned = if matched.starts_with('"') && matched.ends_with('"') {
-                    // Remove the surrounding quotes
-                    &matched[1..matched.len() - 1]
-                } else {
-                    matched
-                };
+                let cleaned =
+                    if matched.len() >= 2 && matched.starts_with('"') && matched.ends_with('"') {
+                        // Remove the surrounding quotes
+                        &matched[1..matched.len() - 1]
+                    } else {
+                        matched
+                    };
                 list_builder.values().append_value(cleaned);
                 has_match = true;
             }
@@ -247,6 +248,17 @@ mod tests {
     fn test_regexp_matches_direct_finds_matches() {
         let values = StringArray::from(vec!["abc123def456"]);
         let pattern = StringArray::from(vec!["(\\d+)"]);
+        let args: Vec<ArrayRef> = vec![Arc::new(values), Arc::new(pattern)];
+        let result = regexp_matches::<i32>(&args).unwrap();
+        use arrow::array::{Array, ListArray};
+        let list = result.as_any().downcast_ref::<ListArray>().unwrap();
+        assert!(!list.is_null(0));
+    }
+
+    #[test]
+    fn test_regexp_matches_lone_quote_does_not_panic() {
+        let values = StringArray::from(vec![r#"""#]);
+        let pattern = StringArray::from(vec![r#"(")"#]);
         let args: Vec<ArrayRef> = vec![Arc::new(values), Arc::new(pattern)];
         let result = regexp_matches::<i32>(&args).unwrap();
         use arrow::array::{Array, ListArray};

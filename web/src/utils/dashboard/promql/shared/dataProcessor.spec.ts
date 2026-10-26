@@ -103,6 +103,39 @@ describe("dataProcessor", () => {
       expect(result[0].series.map((entry: any) => entry.name)).toEqual(["api-1", "api-2"]);
     });
 
+    it("names a formula's label-less series after the formula, not {}", async () => {
+      const searchQueryData = [
+        { status: "success", resultType: "matrix", result: [{ metric: {}, values: [[1, "1"]] }] },
+      ] as any;
+      const formula = { ...mockPanelSchema, queries: [{ config: { formula: "B / A * 100" } }] };
+
+      const result = await processPromQLData(searchQueryData, formula, mockStore);
+
+      expect(result[0].series[0].name).toBe("B / A * 100");
+    });
+
+    it("names an input's label-less series after its letter in a panel with a formula", async () => {
+      const unlabelled = () => ({
+        status: "success",
+        resultType: "matrix",
+        result: [{ metric: {}, values: [[1, "1"]] }],
+      });
+      const searchQueryData = [unlabelled(), unlabelled(), unlabelled()] as any;
+      const queries = [
+        { config: { ref: "A" } },
+        { config: { ref: "B" } },
+        { config: { formula: "B / A" } },
+      ];
+
+      const result = await processPromQLData(
+        searchQueryData,
+        { ...mockPanelSchema, queries },
+        mockStore,
+      );
+
+      expect(result.map((query: any) => query.series[0].name)).toEqual(["A", "B", "B / A"]);
+    });
+
     it("should process OpenObserve format (direct result)", async () => {
       const searchQueryData: PromQLResponse[] = [
         {
@@ -228,6 +261,41 @@ describe("dataProcessor", () => {
 
       expect(processed[0].series.map((s: any) => s.metric.job)).toEqual(["a", "b", "c", "d", "e"]);
       expect(processed[1].series.map((s: any) => s.metric.job)).toEqual(["e", "d", "c", "b"]);
+      expect(processed.map((q: any) => q.nameSuffix)).toEqual([undefined, "1 day ago"]);
+    });
+
+    it("keeps whole histograms under the series limit in histogram mode and reports the ones dropped", async () => {
+      const buckets = ["1", "2", "+Inf"];
+      // Interleaved, as Prometheus returns them, so a plain slice would cut every histogram short.
+      const result = buckets.flatMap((le) =>
+        ["a", "b", "c"].map((pod) => ({ metric: { le, pod }, values: [[1000, "1"]] })),
+      );
+      const processed = await processPromQLData(
+        [{ result }] as any,
+        {
+          ...mockPanelSchema,
+          type: "heatmap",
+          config: { promql_series_limit: 7, heatmap_mode: "prometheus_histogram" },
+        },
+        mockStore,
+      );
+
+      const kept = processed[0].series.map((s: any) => `${s.metric.pod}${s.metric.le}`);
+      expect(kept.sort()).toEqual(["a+Inf", "a1", "a2", "b+Inf", "b1", "b2"]);
+      expect(processed[0].histogramsLimited).toEqual({ shown: 2, total: 3 });
+    });
+
+    it("slices plain heatmaps by series, as before", async () => {
+      const result = ["1", "2"].flatMap((le) =>
+        ["a", "b"].map((pod) => ({ metric: { le, pod }, values: [[1000, "1"]] })),
+      );
+      const processed = await processPromQLData(
+        [{ result }] as any,
+        { ...mockPanelSchema, type: "heatmap", config: { promql_series_limit: 3 } },
+        mockStore,
+      );
+      expect(processed[0].series).toHaveLength(3);
+      expect(processed[0].histogramsLimited).toBeUndefined();
     });
 
     it("should use default series limit when not specified", async () => {

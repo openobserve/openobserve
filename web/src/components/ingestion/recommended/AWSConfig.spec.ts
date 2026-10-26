@@ -54,10 +54,10 @@ vi.mock("vue-router", () => ({
   })),
 }));
 
-// Mock CopyContent component to avoid its dependencies
-vi.mock("@/components/CopyContent.vue", () => ({
+// Mock CredentialCodeBlock component to avoid its dependencies
+vi.mock("@/components/ingestion/CredentialCodeBlock.vue", () => ({
   default: {
-    name: "CopyContent",
+    name: "CredentialCodeBlock",
     props: ["content"],
     template: '<div class="copy-content-mock">{{ content }}</div>',
   },
@@ -283,15 +283,15 @@ describe("AWSConfig", () => {
     expect(wrapper.find(".mb-4").exists()).toBe(true);
   });
 
-  // Test 19: CopyContent component integration
-  it("should render CopyContent component", () => {
-    const copyContent = wrapper.findComponent({ name: "CopyContent" });
+  // Test 19: CredentialCodeBlock component integration
+  it("should render CredentialCodeBlock component", () => {
+    const copyContent = wrapper.findComponent({ name: "CredentialCodeBlock" });
     expect(copyContent.exists()).toBe(true);
   });
 
-  // Test 20: CopyContent content prop
-  it("should pass content to CopyContent component", () => {
-    const copyContent = wrapper.findComponent({ name: "CopyContent" });
+  // Test 20: CredentialCodeBlock content prop
+  it("should pass content to CredentialCodeBlock component", () => {
+    const copyContent = wrapper.findComponent({ name: "CredentialCodeBlock" });
     expect(copyContent.props("content")).toBe(wrapper.vm.content);
   });
 
@@ -458,7 +458,7 @@ describe("AWSConfig", () => {
     expect(content).toContain("Access Key: [BASIC_PASSCODE]");
 
     // Verify component rendering
-    const copyComponent = wrapper.findComponent({ name: "CopyContent" });
+    const copyComponent = wrapper.findComponent({ name: "CredentialCodeBlock" });
     expect(copyComponent.exists()).toBe(true);
     expect(copyComponent.props("content")).toBe(content);
 
@@ -469,5 +469,41 @@ describe("AWSConfig", () => {
     // Verify template structure
     expect(wrapper.find(".m-3").exists()).toBe(true);
     expect(wrapper.find('[data-test="aws-config-page-title"]').exists()).toBe(true);
+  });
+});
+
+describe("AWSConfig: first event status", () => {
+  const FirstEventStatusStub = {
+    name: "FirstEventStatus",
+    props: ["org", "signal", "snippetKind"],
+    emits: ["copy-command"],
+    template: '<div data-test="first-event-status" />',
+  };
+
+  it("mounts one status bar for the org, last on the page, whose Copy command re-copies the manual block", async () => {
+    const wrapper = mount(AWSConfig, {
+      props: { currOrgIdentifier: "test_org" },
+      global: {
+        plugins: [mockI18n],
+        provide: { store: mockStore },
+        mocks: { $store: mockStore },
+        stubs: { FirstEventStatus: FirstEventStatusStub },
+      },
+      attachTo: document.body,
+    });
+    const bars = wrapper.findAllComponents({ name: "FirstEventStatus" });
+    expect(bars).toHaveLength(1);
+    expect(bars[0].props("org")).toBe("test_org");
+    expect(bars[0].props("signal")).toBeUndefined();
+    expect(wrapper.element.lastElementChild?.getAttribute("data-test")).toBe("first-event-status");
+
+    const copy = document.createElement("button");
+    copy.setAttribute("data-test", "ingestion-aws-code-block-copy-btn");
+    const click = vi.fn();
+    copy.addEventListener("click", click);
+    wrapper.element.appendChild(copy);
+    bars[0].vm.$emit("copy-command");
+    expect(click).toHaveBeenCalledTimes(1);
+    wrapper.unmount();
   });
 });

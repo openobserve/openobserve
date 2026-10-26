@@ -62,6 +62,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :column-visibility="defaultColumnVisibility"
         data-test="dbm-table-health-table"
       >
+        <template #error="{ message }">
+          <OEmptyState
+            preset="load-error"
+            :description="raw(message)"
+            data-test="dbm-table-health-error"
+            @action="onRefresh()"
+          />
+        </template>
         <!-- Magnitude bars. The bar ACCOMPANIES the formatted number, never
              replaces it: `tableSizeLabel` and the two-decimal percentage are
              the honest measurements, and the bar only makes their relative size

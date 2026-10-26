@@ -330,7 +330,7 @@ test.describe("ConfigPanel — Drilldown Configuration", () => {
 
     await setupTablePanelWithConfig(page, pm, dashboardName);
 
-    await pm.dashboardDrilldown.addDrilldownByURL("URL Same Tab Drilldown", "https://openobserve.ai");
+    await pm.dashboardDrilldown.addDrilldownByURL("URL Same Tab Drilldown", "https://www.google.com/");
 
     await expect(pm.dashboardDrilldown.drilldownItemAt(0)).toContainText("URL Same Tab Drilldown");
 
@@ -343,7 +343,7 @@ test.describe("ConfigPanel — Drilldown Configuration", () => {
     await expect(drilldownMenu).toBeVisible({ timeout: 5000 });
 
     await pm.dashboardDrilldown.drilldownMenuFirstItem.click();
-    await page.waitForURL(/openobserve\.ai/, { timeout: 15000 });
+    await page.waitForURL(/google\.com/, { timeout: 15000 });
     testLogger.info(`Navigated to external URL in same tab: ${page.url()}`);
 
     // Navigate back to the app, then to dashboard list for cleanup

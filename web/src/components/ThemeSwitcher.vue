@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     variant="ghost"
     size="icon-toolbar"
     data-test="navbar-theme-toggle-btn"
+    :aria-label="raw(tooltipText)"
     @click="toggleDarkMode"
   >
     <Transition name="theme-icon" mode="out-in">
@@ -92,7 +93,8 @@ export default defineComponent({
 
     const setTheme = (theme: any) => {
       try {
-        localStorage.setItem("theme", theme);
+        // A kiosk ?theme= is for that screen only and must not become the saved preference.
+        if (!store.state.themeOverride) localStorage.setItem("theme", theme);
       } catch (error) {
         // Handle localStorage not available
         console.warn("localStorage not available for theme storage:", error);

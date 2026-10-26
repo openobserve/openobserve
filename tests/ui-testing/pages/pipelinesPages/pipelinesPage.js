@@ -6,6 +6,7 @@ const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const fetch = require('node-fetch');
 const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 import { openNavFlyoutChild } from '../commonActions.js';
+import { ingestBase } from '../../playwright-tests/utils/ingest-url.js';
 
 const randomNodeName = `remote-node-${Math.floor(Math.random() * 1000)}`;
 
@@ -232,8 +233,8 @@ export class PipelinesPage {
         this.addEnrichmentTableButton = page.locator('[data-test="enrichment-tables-add-btn"]');
         // Enrichment tables list — OInput search field (auto-derived `-field` data-test)
         this.enrichmentSearchField = page.locator('[data-test="enrichment-tables-search-input-field"]');
-        // Add / Update Enrichment Table form root
-        this.addEnrichmentTablePage = page.locator('[data-test="add-enrichment-table-page"]');
+        // Add / Update Enrichment Table form dialog
+        this.addEnrichmentTablePage = page.locator('[data-test="add-enrichment-table-dialog"]');
         // Enrichment table tab locator (data-test prefix; the tab is rendered by
         // OToggleGroup under the Functions section).
         this.enrichmentTableTabLocator = page.locator('[data-test="pipeline-section-tab-enrichmentTables"]');
@@ -1091,8 +1092,8 @@ export class PipelinesPage {
         // click. The OButton in the AppPageHeader #actions slot can detach
         // mid-render while the list hydrates (documented add-btn detach race),
         // so re-resolve the locator and tolerate a transient detach. Short-circuit
-        // if a prior attempt already opened the form (the Add button is v-if'd
-        // out once the form mounts, so re-asserting its visibility would loop).
+        // if a prior attempt already opened the form (the dialog overlay blocks
+        // the Add button once it opens, so re-clicking it would loop).
         await listPage.waitFor({ state: 'visible', timeout: 20000 });
         await expect(async () => {
             if (await this.addEnrichmentTablePage.isVisible().catch(() => false)) return;
@@ -1418,7 +1419,7 @@ export class PipelinesPage {
         const headers = getAuthHeaders();
 
         const baseUrl = (process.env.INGESTION_URL || '').replace(/\/$/, '');
-        const url = `${baseUrl}/api/${orgId}/${streamName}/_json`;
+        const url = `${ingestBase(baseUrl)}/api/${orgId}/${streamName}/_json`;
         const fetchResponse = await fetch(url, {
             method: 'POST',
             headers: headers,
@@ -2261,7 +2262,7 @@ export class PipelinesPage {
         const baseUrl = (process.env.INGESTION_URL || '').replace(/\/$/, '');
 
         for (const streamName of streamNames) {
-            const url = `${baseUrl}/api/${orgId}/${streamName}/_json`;
+            const url = `${ingestBase(baseUrl)}/api/${orgId}/${streamName}/_json`;
             const fetchResponse = await fetchWithRetry(url, {
                 method: 'POST',
                 headers: headers,
@@ -2304,7 +2305,7 @@ export class PipelinesPage {
         }
 
         const baseUrl = (process.env.INGESTION_URL || '').replace(/\/$/, '');
-        const url = `${baseUrl}/api/${orgId}/ingest/metrics/_json`;
+        const url = `${ingestBase(baseUrl)}/api/${orgId}/ingest/metrics/_json`;
         const fetchResponse = await fetchWithRetry(url, {
             method: 'POST',
             headers: headers,
@@ -2421,7 +2422,7 @@ export class PipelinesPage {
         if (streamName) {
             requestHeaders["stream-name"] = streamName;
         }
-        const fetchResponse = await fetchWithRetry(`${baseUrl}/api/${orgId}/v1/traces`, {
+        const fetchResponse = await fetchWithRetry(`${ingestBase(baseUrl)}/api/${orgId}/v1/traces`, {
             method: 'POST',
             headers: requestHeaders,
             body: JSON.stringify(tracesData)
@@ -2852,6 +2853,12 @@ export class PipelinesPage {
      */
     async clickDashboardsMenu() {
         await this.dashboardsMenuLink.click();
+    }
+
+    async acceptUnsavedChangesPromptAndExpectDashboards() {
+        await expect(this.discardChangesOkBtn, 'Leaving an unsaved pipeline must show the confirm dialog').toBeVisible({ timeout: 10000 });
+        await this.discardChangesOkBtn.click();
+        await expect(this.page).toHaveURL(/dashboards/, { timeout: 15000 });
     }
 
     /**

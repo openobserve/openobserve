@@ -57,6 +57,7 @@ vi.mock("@/composables/usePrebuiltDestinations", () => ({
 }));
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import { mount, flushPromises } from "@vue/test-utils";
 import AlertsDestinationList from "./AlertsDestinationList.vue";
 import destinationService from "@/services/alert_destination";
@@ -174,6 +175,7 @@ describe("AlertsDestinationList", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetListViewState();
 
     // Reset router state
     (router as any).currentRoute.value.query = {};
@@ -522,10 +524,11 @@ describe("AlertsDestinationList", () => {
       method: "post",
       emails: ["alerts@example.com", "oncall@example.com"],
     });
+    const lowerPutDest = makeDestination(5, { name: "lower-put", method: "put" });
 
     beforeEach(async () => {
       (destinationService.list as any).mockResolvedValue({
-        data: [makeDestination(1), emailDest],
+        data: [makeDestination(1), emailDest, lowerPutDest],
       });
       wrapper = mountComponent();
       await flushPromises();
@@ -549,6 +552,10 @@ describe("AlertsDestinationList", () => {
         "https://example.com/hook-1",
       );
       expect(wrapper!.find('[data-test="destination-method-destination-1"]').text()).toBe("POST");
+    });
+
+    it("shows a lowercase stored method in uppercase", () => {
+      expect(wrapper!.find('[data-test="destination-method-lower-put"]').text()).toBe("PUT");
     });
 
     it("labels the column URL / Recipients, not URL", () => {
@@ -665,6 +672,59 @@ describe("AlertsDestinationList", () => {
       const pushedQuery = pushSpy.mock.calls[0][0].query;
       expect(pushedQuery.page).toBe("3");
       expect(pushedQuery.action).toBe("import");
+    });
+  });
+
+  describe("view state restore", () => {
+    it("restores search, tab, page size and sort", () => {
+      useListViewState("alertDestinations", {
+        filterQuery: "slack",
+        tab: "custom",
+        pageSize: 50,
+        sortBy: "name",
+        sortOrder: "desc",
+      });
+      wrapper = mountComponent();
+      const vm = wrapper.vm as any;
+      expect(vm.filterQuery).toBe("slack");
+      expect(vm.activeTab).toBe("custom");
+      expect(vm.pageSize).toBe(50);
+      expect(vm.sortBy).toBe("name");
+      expect(vm.sortOrder).toBe("desc");
+    });
+
+    it("saves changes to the view state", async () => {
+      wrapper = mountComponent();
+      const vm = wrapper.vm as any;
+      vm.filterQuery = "abc";
+      vm.activeTab = "prebuilt";
+      vm.pageSize = 100;
+      await vm.$nextTick();
+      const saved: any = useListViewState("alertDestinations", {});
+      expect(saved.filterQuery).toBe("abc");
+      expect(saved.tab).toBe("prebuilt");
+      expect(saved.pageSize).toBe(100);
+    });
+  });
+  describe("templates load denied", () => {
+    it("falls back to no templates without an unhandled rejection on a 403", async () => {
+      const { queryClient } = await import("@/composables/query/queryClient");
+      queryClient.clear();
+      (templateService.list as any).mockRejectedValue({ response: { status: 403 } });
+      (destinationService.list as any).mockResolvedValue({ data: [] });
+      const unhandled = vi.fn();
+      process.on("unhandledRejection", unhandled);
+
+      const w: any = mountComponent();
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      process.off("unhandledRejection", unhandled);
+      expect(unhandled.mock.calls.map(([reason]) => reason)).not.toContainEqual({
+        response: { status: 403 },
+      });
+      expect(w.vm.templates).toEqual([]);
+      w.unmount();
     });
   });
 });

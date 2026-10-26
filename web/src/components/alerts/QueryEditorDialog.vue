@@ -78,6 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :ripple="false"
           @click="toggleAIChat"
           data-test="menu-link-ai-item"
+          :aria-label="t('menu.aiAssistant')"
           variant="ghost"
           size="icon-toolbar"
           class="group hover:shadow-ai-accent/35 transition-[background,box-shadow] duration-300 ease-[ease] [background:var(--color-gradient-ai-subtle)]! hover:shadow-md hover:[background:var(--color-gradient-ai)]!"
@@ -85,6 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @mouseleave="isHovered = false"
         >
           <img
+            alt=""
             :src="getBtnLogo"
             class="transition-transform duration-[600ms] ease-[ease] group-hover:rotate-180"
             style="width: 1.125rem; height: 1.125rem"
@@ -216,10 +218,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="absolute inset-0 flex items-center gap-1.25 overflow-hidden px-2.5">
                       <template v-if="sqlStatusState === 'sql-status-bar--error'">
                         <OIcon name="error-outline" size="xs" class="shrink-0" />
-                        <span
-                          class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
-                          >{{ localSqlQueryErrorMsg || sqlQueryErrorMsg }}</span
-                        >
+                        <OTruncatedText class="flex-1">{{
+                          localSqlQueryErrorMsg || sqlQueryErrorMsg
+                        }}</OTruncatedText>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--loading'">
                         <OSpinner size="xs" class="shrink-0" />
@@ -242,13 +243,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span>{{ t("alerts.queryEditor.eventsFound", sqlResultCount) }}</span>
                       </template>
                     </div>
-                    <OTooltip
-                      v-if="sqlStatusState === 'sql-status-bar--error'"
-                      side="top"
-                      align="center"
-                      :max-width="'32.5rem'"
-                      :content="raw(localSqlQueryErrorMsg || sqlQueryErrorMsg)"
-                    />
                   </div>
                 </div>
 
@@ -550,6 +544,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = defineProps({
@@ -1130,7 +1125,8 @@ watch(
     if (cols?.length) {
       const fields = (cols as any[]).map((c: any) => ({
         name: typeof c === "string" ? c : (c.value ?? c.label ?? c),
-        type: c.type ?? "Utf8",
+        // An untyped column must read as unknown, so operators and quoting fall back to the value itself.
+        type: c.type,
       }));
       updateFieldKeywords(fields);
     }

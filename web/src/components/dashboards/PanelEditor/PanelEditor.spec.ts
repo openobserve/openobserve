@@ -3,6 +3,8 @@ import { shallowMount } from "@vue/test-utils";
 import { ref, reactive, nextTick } from "vue";
 import { createI18n } from "vue-i18n";
 import PanelEditor from "./PanelEditor.vue";
+import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
+import { usePanelEditorFocus } from "@/composables/dashboard/usePanelEditorFocus";
 
 // Mock vuex store
 const mockStore = {
@@ -77,9 +79,14 @@ const mockDashboardPanelData = reactive({
   },
 });
 
+const mockMakeAutoSQLQuery = vi.fn(async () => undefined);
+const mockRegenerateOtherBuilderQueries = vi.fn();
+
 vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: () => ({
     dashboardPanelData: mockDashboardPanelData,
+    makeAutoSQLQuery: mockMakeAutoSQLQuery,
+    regenerateOtherBuilderQueries: mockRegenerateOtherBuilderQueries,
     resetAggregationFunction: vi.fn(),
     resetDashboardPanelData: vi.fn(),
     updateGroupedFields: vi.fn(),
@@ -89,6 +96,8 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
 // Shared refs so tests can toggle composable state to truthy/falsy
 const mockChartData = ref(undefined as any);
 const mockShowLegendsDialog = ref(false);
+const mockNoticeProps = ref<Record<string, unknown>>({});
+const mockRunQuery = vi.fn();
 
 // Mock usePanelEditor composable
 vi.mock("./composables/usePanelEditor", () => ({
@@ -101,6 +110,11 @@ vi.mock("./composables/usePanelEditor", () => ({
     showLegendsDialog: mockShowLegendsDialog,
     shouldRefreshWithoutCache: ref(false),
     maxQueryRangeWarning: ref(""),
+    panelDiagnostics: ref(null),
+    seriesLimit: ref(null),
+    noticeProps: mockNoticeProps,
+    handlePanelDiagnosticsUpdate: vi.fn(),
+    handleSeriesLimitUpdate: vi.fn(),
     limitNumberOfSeriesWarningMessage: ref(""),
     errorMessage: ref(""),
     isPartialData: ref(false),
@@ -113,7 +127,7 @@ vi.mock("./composables/usePanelEditor", () => ({
     isLoading: ref(false),
     currentPanelData: ref({}),
     initChartData: vi.fn(),
-    runQuery: vi.fn(),
+    runQuery: mockRunQuery,
     handleChartApiError: vi.fn(),
     handleLastTriggeredAtUpdate: vi.fn(),
     handleLimitNumberOfSeriesWarningMessage: vi.fn(),
@@ -299,6 +313,85 @@ const mountGlobal = {
 
 describe("PanelEditor.vue", () => {
   let wrapper: any;
+
+  describe("preview notice chips", () => {
+    const mountWithNotices = (listeners: Record<string, unknown> = {}) =>
+      shallowMount(PanelEditor, {
+        props: { pageType: "dashboard", editMode: true, ...listeners },
+        global: {
+          ...mountGlobal,
+          stubs: { ...mountGlobal.stubs, PanelErrorButtons: false, OTooltip: false, OTag: false },
+        },
+      });
+
+    beforeEach(() => {
+      mockChartData.value = { type: "line", queries: [] };
+      mockNoticeProps.value = {
+        functionErrors: ["error[E203]: syntax error"],
+        seriesLimit: { shown: 100, total: 342, cap: 100 },
+        serverPartial: false,
+      };
+      mockDashboardPanelData.layout.isConfigPanelOpen = false;
+      mockDashboardPanelData.layout.showQueryBar = false;
+      (mockDashboardPanelData.layout as any).vrlFunctionToggle = false;
+    });
+
+    afterEach(() => {
+      usePanelEditorFocus().requestFocus(null);
+      mockNoticeProps.value = {};
+    });
+
+    it("renders the real PanelErrorButtons with the notice props and editor actions", () => {
+      wrapper = mountWithNotices();
+      const buttons = wrapper.findComponent(PanelErrorButtons);
+      expect(buttons.exists()).toBe(true);
+      expect(buttons.props("functionErrors")).toEqual(["error[E203]: syntax error"]);
+      expect(buttons.props("seriesLimit")).toEqual({ shown: 100, total: 342, cap: 100 });
+      expect(buttons.props("canEdit")).toBe(true);
+      expect(buttons.props("canRefresh")).toBe(true);
+      expect(buttons.props("canInspect")).toBe(false);
+      // The chips sit inside reka tooltip triggers, which a shallow mount does not render.
+      expect(buttons.vm.notices.map((n: any) => n.id)).toEqual(["function-error", "series-cap"]);
+      expect(buttons.find('[data-test="panel-limit-number-of-series-warning"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("focuses the VRL pane and the Top N input in place", () => {
+      wrapper = mountWithNotices();
+      const buttons = wrapper.findComponent(PanelErrorButtons);
+      const { pendingFocus } = usePanelEditorFocus();
+
+      buttons.vm.$emit("edit-panel", "edit-function");
+      expect(pendingFocus.value).toBe("vrl");
+      expect(mockDashboardPanelData.layout.showQueryBar).toBe(true);
+      expect((mockDashboardPanelData.layout as any).vrlFunctionToggle).toBe(true);
+
+      buttons.vm.$emit("edit-panel", "use-top-n");
+      expect(pendingFocus.value).toBe("top-n");
+      expect(mockDashboardPanelData.layout.isConfigPanelOpen).toBe(true);
+    });
+
+    it("re-runs its own preview on Refresh when the host does not take Apply", () => {
+      wrapper = mountWithNotices();
+      wrapper.findComponent(PanelErrorButtons).vm.$emit("refresh-panel");
+      expect(mockRunQuery).toHaveBeenCalled();
+    });
+
+    it("hands Refresh and Open inspector to a host that listens", () => {
+      const onApplyRequested = vi.fn();
+      const onOpenQueryInspector = vi.fn();
+      wrapper = mountWithNotices({ onApplyRequested, onOpenQueryInspector });
+      const buttons = wrapper.findComponent(PanelErrorButtons);
+      expect(buttons.props("canInspect")).toBe(true);
+
+      buttons.vm.$emit("refresh-panel");
+      buttons.vm.$emit("open-inspector");
+      expect(onApplyRequested).toHaveBeenCalledTimes(1);
+      expect(onOpenQueryInspector).toHaveBeenCalledTimes(1);
+      expect(mockRunQuery).not.toHaveBeenCalled();
+    });
+  });
 
   beforeEach(() => {
     // Reset shared state to a known baseline before each test
@@ -671,6 +764,86 @@ describe("PanelEditor.vue", () => {
     });
   });
 
+  describe("Column / Series Formatting dialog", () => {
+    const OverrideConfigStub = {
+      name: "OverrideConfig",
+      props: ["mode", "panelData", "previewSource"],
+      template: '<div data-test="override-config-stub" :data-mode="mode"></div>',
+    };
+    const PanelSchemaRendererStub = {
+      name: "PanelSchemaRenderer",
+      props: ["searchType", "panelSchema"],
+      emits: ["result-metadata-update"],
+      template: '<div class="panel-renderer-mock"></div>',
+    };
+    const mountEditor = () =>
+      shallowMount(PanelEditor, {
+        props: { pageType: "dashboard" },
+        global: {
+          ...mountGlobal,
+          stubs: {
+            ...mountGlobal.stubs,
+            OverrideConfig: OverrideConfigStub,
+            PanelSchemaRenderer: PanelSchemaRendererStub,
+          },
+        },
+      });
+
+    it.each([
+      ["table", "table"],
+      ["line", "chart"],
+      ["h-stacked", "chart"],
+      ["pie", "chart"],
+      ["metric", "chart"],
+    ])("mounts the dialog for %s in %s mode", async (type, mode) => {
+      mockDashboardPanelData.data.type = type;
+      wrapper = mountEditor();
+      await nextTick();
+      expect(wrapper.findComponent({ name: "OverrideConfig" }).props("mode")).toBe(mode);
+    });
+
+    it.each(["heatmap", "geomap", "sankey"])("does not mount it for %s", async (type) => {
+      mockDashboardPanelData.data.type = type;
+      wrapper = mountEditor();
+      await nextTick();
+      expect(wrapper.findComponent({ name: "OverrideConfig" }).exists()).toBe(false);
+    });
+
+    it("hands chart mode the applied schema and the latest result metadata for the preview", async () => {
+      mockChartData.value = { type: "line", config: { unit: "bytes" } };
+      wrapper = mountEditor();
+      await nextTick();
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      await renderer.vm.$emit("result-metadata-update", [[{ histogram_interval: 60 }]]);
+      await nextTick();
+      const source = wrapper.findComponent({ name: "OverrideConfig" }).props("previewSource");
+      expect(source.panelSchema).toEqual({ type: "line", config: { unit: "bytes" } });
+      expect(source.resultMetaData).toEqual([[{ histogram_interval: 60 }]]);
+      expect(source.hiddenQueries).toEqual([]);
+    });
+
+    it("passes the editor's hidden queries so the preview drops them like the panel", async () => {
+      mockChartData.value = { type: "line", config: {} };
+      (mockDashboardPanelData.layout as any).hiddenQueries = [1];
+      try {
+        wrapper = mountEditor();
+        await nextTick();
+        const source = wrapper.findComponent({ name: "OverrideConfig" }).props("previewSource");
+        expect(source.hiddenQueries).toEqual([1]);
+      } finally {
+        delete (mockDashboardPanelData.layout as any).hiddenQueries;
+      }
+    });
+
+    it("gives table mode no preview source", async () => {
+      mockDashboardPanelData.data.type = "table";
+      mockChartData.value = { type: "table", config: {} };
+      wrapper = mountEditor();
+      await nextTick();
+      expect(wrapper.findComponent({ name: "OverrideConfig" }).props("previewSource")).toBeNull();
+    });
+  });
+
   describe("ODialog migration (legends popup)", () => {
     // ShowLegendsPopup wraps ODialog internally. PanelEditor owns the v-model:open binding.
     // We test at the ShowLegendsPopup level (it is auto-stubbed in shallowMount).
@@ -744,6 +917,48 @@ describe("PanelEditor.vue", () => {
       expect(selectorDialog!.attributes("data-show-close")).toBe("false");
       // Closed by default
       expect(selectorDialog!.attributes("data-open")).toBe("false");
+    });
+  });
+
+  describe("builder SQL regeneration on heatmap y settings", () => {
+    it.each([
+      ["heatmap_y_bucket", { mode: "size", size: 10 }],
+      ["heatmap_y_min", 5],
+      ["heatmap_y_max", 50],
+    ])("rebuilds the query when %s changes", async (key, value) => {
+      const config = mockDashboardPanelData.data.config as Record<string, unknown>;
+      mockDashboardPanelData.data.type = "heatmap";
+      wrapper = shallowMount(PanelEditor, {
+        props: { pageType: "dashboard", editMode: false },
+        global: mountGlobal,
+      });
+      await nextTick();
+      mockMakeAutoSQLQuery.mockClear();
+      mockRegenerateOtherBuilderQueries.mockClear();
+
+      config[key] = value;
+      await nextTick();
+      expect(mockMakeAutoSQLQuery).toHaveBeenCalledTimes(1);
+      expect(mockRegenerateOtherBuilderQueries).toHaveBeenCalledTimes(1);
+      delete config[key];
+      wrapper.unmount();
+    });
+
+    it("rebuilds the query when the bucket size is edited in place", async () => {
+      const config = mockDashboardPanelData.data.config as Record<string, any>;
+      config.heatmap_y_bucket = { mode: "size", size: 10 };
+      wrapper = shallowMount(PanelEditor, {
+        props: { pageType: "dashboard", editMode: false },
+        global: mountGlobal,
+      });
+      await nextTick();
+      mockMakeAutoSQLQuery.mockClear();
+
+      config.heatmap_y_bucket.size = 20;
+      await nextTick();
+      expect(mockMakeAutoSQLQuery).toHaveBeenCalledTimes(1);
+      delete config.heatmap_y_bucket;
+      wrapper.unmount();
     });
   });
 });

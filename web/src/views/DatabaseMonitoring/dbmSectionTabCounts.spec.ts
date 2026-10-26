@@ -451,6 +451,25 @@ describe("the active tab still overrides its own badge", () => {
  *
  * Read off the source, for the reason dbmRequestGuard.spec.ts gives.
  */
+describe("each page publishes only its own tab's badge", () => {
+  // Top queries once published `databaseCount` (distinct instances in its rows), overwriting Overview's database count from every tab.
+  const OWN_KEYS: Record<string, string[]> = {
+    "DatabasesPage.vue": ["databaseCount"],
+    "QueriesPage.vue": ["queryCount"],
+    "SamplesPage.vue": ["sampleCallsCount"],
+    "ActivityPage.vue": ["activityCount"],
+    "DeadlocksPage.vue": ["deadlockCount"],
+    "BlockedQueriesPage.vue": ["blockedCount"],
+    "TableHealthPage.vue": ["tableHealthCount"],
+  };
+
+  it.each(Object.keys(OWN_KEYS))("%s publishes no sibling tab's count", (page) => {
+    const block = read(page).split("ownCounts: [")[1]?.split("\n  ],")[0] ?? "";
+    const keys = [...block.matchAll(/key: "(\w+)"/g)].map((match) => match[1]);
+    expect(keys).toEqual(OWN_KEYS[page]);
+  });
+});
+
 describe("no page re-fetches the badges the shell already owns", () => {
   /** Which endpoint each page is legitimately allowed to read for ITS OWN table. */
   const OWN_READ: Record<string, string[]> = {
