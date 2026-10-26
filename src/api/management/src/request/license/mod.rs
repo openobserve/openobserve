@@ -448,9 +448,20 @@ where
         }
     };
     // a landed write whose acknowledgement was lost also reports a moved revision
-    if !committed && !matches!(key_landed(raw_key, read_back).await, Ok(true)) {
-        // the raise may already back a newer paste's key, so a stale judgment never undoes it
-        return (StatusCode::CONFLICT, Json(key_changed_body(pasted))).into_response();
+    if !committed {
+        match key_landed(raw_key, read_back).await {
+            Ok(true) => {}
+            // the raise may already back a newer paste's key, so a stale judgment never undoes it
+            Ok(false) => {
+                return (StatusCode::CONFLICT, Json(key_changed_body(pasted))).into_response();
+            }
+            Err(e) => {
+                log::error!(
+                    "[LICENSE] cannot read back the license key after a moved revision : {e}"
+                );
+                return MetaHttpResponse::internal_error(STORE_OUTCOME_UNKNOWN_MSG);
+            }
+        }
     }
     match license::update().await {
         Ok(_) => (StatusCode::CREATED, Json("")).into_response(),
@@ -1823,7 +1834,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_moved_revision_stays_409_unless_this_key_is_read_back() {
+    async fn a_moved_revision_stays_409_when_another_key_or_none_is_read_back() {
         let _store = store_setup().await;
         let coordinator = infra::db::get_coordinator().await;
         let _ = coordinator
@@ -1841,18 +1852,6 @@ mod tests {
             (status, body["reason"].as_str()),
             (StatusCode::CONFLICT, Some("key_changed"))
         );
-        let unreadable = store_gated(
-            &lic("lic-1", 9),
-            "key-9",
-            |_| async { Ok(false) },
-            || async { Err(infra::errors::Error::Message("meta store down".to_string())) },
-        )
-        .await;
-        let (status, body) = body_of(unreadable).await;
-        assert_eq!(
-            (status, body["reason"].as_str()),
-            (StatusCode::CONFLICT, Some("key_changed"))
-        );
         let missing = store_gated(
             &lic("lic-1", 9),
             "key-9",
@@ -1861,6 +1860,33 @@ mod tests {
         )
         .await;
         assert_eq!(missing.status(), StatusCode::CONFLICT);
+        assert!(!license_reload_signalled().await);
+    }
+
+    #[tokio::test]
+    async fn a_moved_revision_with_an_unreadable_key_is_an_unknown_outcome() {
+        let _store = store_setup().await;
+        let coordinator = infra::db::get_coordinator().await;
+        let _ = coordinator
+            .delete(db::license::LICENSE_KEY_PREFIX, false, false, None)
+            .await;
+        gate_and_raise(&lic("lic-1", 5)).await.unwrap().unwrap();
+        let resp = store_gated(
+            &lic("lic-1", 9),
+            "key-9",
+            |_| async { Ok(false) },
+            || async { Err(infra::errors::Error::Message("meta store down".to_string())) },
+        )
+        .await;
+        let (status, body) = body_of(resp).await;
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "{body}");
+        assert_eq!(
+            body["message"].as_str(),
+            Some(
+                "The license key may or may not have been saved: storing it failed and it could not be read back. Paste the same key again; that is safe."
+            )
+        );
+        assert_eq!(hwm_rev(&load_rev_hwm().await.unwrap()), Some(9));
         assert!(!license_reload_signalled().await);
     }
 
