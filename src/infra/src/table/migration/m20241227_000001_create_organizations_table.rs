@@ -46,17 +46,29 @@ fn create_organizations_table_statement() -> TableCreateStatement {
                 .not_null()
                 .primary_key(),
         )
-        .col(ColumnDef::new(Organizations::OrgName).string_len(200).not_null())
+        .col(
+            ColumnDef::new(Organizations::OrgName)
+                .string_len(200)
+                .not_null(),
+        )
         // Organizations type where...
         // - 0 is a default organization
         // - 1 is a custom organization
-        .col(ColumnDef::new(Organizations::OrgType).small_integer().not_null())
         .col(
-            ColumnDef::new(Organizations::CreatedAt)
-            .big_integer()
+            ColumnDef::new(Organizations::OrgType)
+                .small_integer()
                 .not_null(),
         )
-        .col(ColumnDef::new(Organizations::UpdatedAt).big_integer().not_null())
+        .col(
+            ColumnDef::new(Organizations::CreatedAt)
+                .big_integer()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(Organizations::UpdatedAt)
+                .big_integer()
+                .not_null(),
+        )
         .to_owned()
 }
 

@@ -707,6 +707,15 @@ describe("DashboardQueryBuilder", () => {
       });
     });
 
+    it("renders the breakdown slot for a state timeline, where it holds the row field", () => {
+      wrapper.unmount();
+      wrapper = createWrapper({ "data.type": "state-timeline" });
+      expect(wrapper.find('[data-test="dashboard-b-layout"]').exists()).toBe(true);
+      wrapper.unmount();
+      wrapper = createWrapper({ "data.type": "pie" });
+      expect(wrapper.find('[data-test="dashboard-b-layout"]').exists()).toBe(false);
+    });
+
     it("should handle unsupported chart types", () => {
       const unsupportedTypes = ["pie", "donut", "metric", "table"];
 

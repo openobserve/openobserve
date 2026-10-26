@@ -78,10 +78,7 @@ impl CacheBuf {
 
     pub(crate) fn check_and_add_partition(&mut self) -> bool {
         self.cached_partition_num += 1;
-        if self.cached_partition_num >= self.total_partition_num {
-            return true;
-        }
-        false
+        self.cached_partition_num >= self.total_partition_num
     }
 
     pub(crate) fn get_final_result(&mut self, stream_id: &str) -> Result<Vec<RecordBatch>> {

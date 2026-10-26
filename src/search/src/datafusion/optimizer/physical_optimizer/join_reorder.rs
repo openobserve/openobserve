@@ -134,9 +134,15 @@ mod tests {
         ]));
 
         let state = SessionStateBuilder::new()
-            .with_config(SessionConfig::new().with_target_partitions(12)
-                // Match production: runtime join filters cannot cross the Flight boundary.
-                .set_bool("datafusion.optimizer.enable_join_dynamic_filter_pushdown", false))
+            .with_config(
+                SessionConfig::new()
+                    .with_target_partitions(12)
+                    // Match production: runtime join filters cannot cross the Flight boundary.
+                    .set_bool(
+                        "datafusion.optimizer.enable_join_dynamic_filter_pushdown",
+                        false,
+                    ),
+            )
             .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
             .with_default_features()
             .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()))
@@ -176,9 +182,15 @@ mod tests {
         ]));
 
         let state = SessionStateBuilder::new()
-            .with_config(SessionConfig::new().with_target_partitions(12)
-                // Match production: runtime join filters cannot cross the Flight boundary.
-                .set_bool("datafusion.optimizer.enable_join_dynamic_filter_pushdown", false))
+            .with_config(
+                SessionConfig::new()
+                    .with_target_partitions(12)
+                    // Match production: runtime join filters cannot cross the Flight boundary.
+                    .set_bool(
+                        "datafusion.optimizer.enable_join_dynamic_filter_pushdown",
+                        false,
+                    ),
+            )
             .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
             .with_default_features()
             .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()))
@@ -216,9 +228,15 @@ mod tests {
         ]));
 
         let state = SessionStateBuilder::new()
-            .with_config(SessionConfig::new().with_target_partitions(12)
-                // Match production: runtime join filters cannot cross the Flight boundary.
-                .set_bool("datafusion.optimizer.enable_join_dynamic_filter_pushdown", false))
+            .with_config(
+                SessionConfig::new()
+                    .with_target_partitions(12)
+                    // Match production: runtime join filters cannot cross the Flight boundary.
+                    .set_bool(
+                        "datafusion.optimizer.enable_join_dynamic_filter_pushdown",
+                        false,
+                    ),
+            )
             .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
             .with_default_features()
             .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()))
@@ -255,9 +273,15 @@ mod tests {
         ]));
 
         let state = SessionStateBuilder::new()
-            .with_config(SessionConfig::new().with_target_partitions(12)
-                // Match production: runtime join filters cannot cross the Flight boundary.
-                .set_bool("datafusion.optimizer.enable_join_dynamic_filter_pushdown", false))
+            .with_config(
+                SessionConfig::new()
+                    .with_target_partitions(12)
+                    // Match production: runtime join filters cannot cross the Flight boundary.
+                    .set_bool(
+                        "datafusion.optimizer.enable_join_dynamic_filter_pushdown",
+                        false,
+                    ),
+            )
             .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
             .with_default_features()
             .with_optimizer_rule(Arc::new(LimitJoinRightSide::new(50_000, StreamType::Logs)))
@@ -302,9 +326,15 @@ mod tests {
         ]));
 
         let state = SessionStateBuilder::new()
-            .with_config(SessionConfig::new().with_target_partitions(12)
-                // Match production: runtime join filters cannot cross the Flight boundary.
-                .set_bool("datafusion.optimizer.enable_join_dynamic_filter_pushdown", false))
+            .with_config(
+                SessionConfig::new()
+                    .with_target_partitions(12)
+                    // Match production: runtime join filters cannot cross the Flight boundary.
+                    .set_bool(
+                        "datafusion.optimizer.enable_join_dynamic_filter_pushdown",
+                        false,
+                    ),
+            )
             .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
             .with_default_features()
             .with_optimizer_rule(Arc::new(LimitJoinRightSide::new(50_000, StreamType::Logs)))
@@ -347,9 +377,15 @@ mod tests {
         ]));
 
         let state = SessionStateBuilder::new()
-            .with_config(SessionConfig::new().with_target_partitions(12)
-                // Match production: runtime join filters cannot cross the Flight boundary.
-                .set_bool("datafusion.optimizer.enable_join_dynamic_filter_pushdown", false))
+            .with_config(
+                SessionConfig::new()
+                    .with_target_partitions(12)
+                    // Match production: runtime join filters cannot cross the Flight boundary.
+                    .set_bool(
+                        "datafusion.optimizer.enable_join_dynamic_filter_pushdown",
+                        false,
+                    ),
+            )
             .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
             .with_default_features()
             .with_optimizer_rule(Arc::new(LimitJoinRightSide::new(50_000, StreamType::Logs)))

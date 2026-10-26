@@ -29,7 +29,10 @@ vi.mock("@/services/online-evals.service", () => ({
   },
 }));
 
-vi.mock("@/services/llm-datasets.service", () => ({
+vi.mock("@/services/llm-datasets.service", async () => ({
+  ...(await vi.importActual<typeof import("@/services/llm-datasets.service")>(
+    "@/services/llm-datasets.service",
+  )),
   default: { list: (...args: unknown[]) => datasetsList(...args) },
 }));
 
@@ -63,7 +66,8 @@ vi.mock("@/types/i18n", async () => {
 });
 
 import PlaygroundPage from "./PlaygroundPage.vue";
-import { SINGLE_ROW_KEY } from "./playgroundDraft";
+import { SINGLE_ROW_KEY, type PlaygroundSample } from "./playgroundDraft";
+import type { LlmDatasetItem } from "@/services/llm-datasets.service";
 
 // Structural stubs: this spec is about the run engine and draft mutations, not
 // about how the shared components paint.
@@ -130,6 +134,8 @@ function vm(wrapper: Awaited<ReturnType<typeof mountPage>>) {
     scoreAll: () => Promise<void>;
     addOutputToMessages: (variantId: string) => void;
     totalCells: number;
+    applySample: (sample: PlaygroundSample, item: LlmDatasetItem, notify?: boolean) => void;
+    clearSample: () => void;
   };
 }
 
@@ -360,6 +366,40 @@ describe("PlaygroundPage", () => {
 
     const request = runPlayground.mock.calls[0][1] as { messages: { content: string }[] };
     expect(request.messages[0].content).toBe("Summarise the refund policy");
+  });
+
+  describe("sampling an object-input row", () => {
+    const sample = { datasetId: "d1", datasetName: "goldens", itemId: "i1", index: 0, total: 2 };
+    const row = (rawInput: Record<string, unknown>) =>
+      ({
+        rawInput,
+        input: JSON.stringify(rawInput),
+        inputPreview: JSON.stringify(rawInput),
+        expectedOutput: null,
+      }) as LlmDatasetItem;
+
+    it("binds each field by name and drops a field the next row lacks", async () => {
+      const page = vm(await mountPage());
+      page.draft.variants[0].messages[1].content = "Q: {{question}} C: {{context}}";
+
+      page.applySample(sample, row({ question: "What is 2+2?", context: "math" }), false);
+      page.applySample({ ...sample, index: 1 }, row({ question: "Capital of France?" }), false);
+      page.onRunAll();
+      await flushPromises();
+
+      const request = runPlayground.mock.calls[0][1] as { messages: { content: string }[] };
+      expect(request.messages[0].content).toBe("Q: Capital of France? C: ");
+    });
+
+    it("unbinds the row's fields when the sample is cleared", async () => {
+      const page = vm(await mountPage());
+      page.draft.vars = { tone: "curt" };
+
+      page.applySample(sample, row({ context: "math" }), false);
+      page.clearSample();
+
+      expect(page.draft.vars).toEqual({ tone: "curt", input: '{"context":"math"}' });
+    });
   });
 
   it("runs every variant on the bench", async () => {

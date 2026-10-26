@@ -655,6 +655,7 @@ export const ALL_CHART_TYPES = [
   "gauge",
   "table",
   "heatmap",
+  "state-timeline",
   "geomap",
   "sankey",
   "html",
@@ -687,6 +688,7 @@ export const AGGREGATION_REQUIRED_CHART_TYPES: ChartType[] = [
   "metric",
   "gauge",
   "heatmap",
+  "state-timeline",
   "geomap",
   "sankey",
 ];

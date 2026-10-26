@@ -66,6 +66,32 @@ describe("usePanelAggregation", () => {
       expect(panelData.data.htmlContent).toBe("some html");
     });
 
+    describe("state-timeline chart type", () => {
+      it("drops a count y and keeps only the first other y, read with max", () => {
+        const panelData = makePanelData("state-timeline");
+        panelData.data.queries[0].fields.y = [
+          { functionName: "count", args: [{ type: "field" }] },
+          { functionName: null, args: [{ type: "field" }, { type: "extra" }] },
+          { functionName: "min", args: [{ type: "field" }] },
+        ];
+        panelData.data.queries[0].config.time_shift = [{ offSet: "1h" }] as any;
+        const { resetAggregationFunction } = makeAggregation(panelData);
+        resetAggregationFunction();
+        const y = panelData.data.queries[0].fields.y;
+        expect(y.map((item: any) => item.functionName)).toEqual(["max"]);
+        expect(y[0].args).toHaveLength(1);
+        expect(panelData.data.queries[0].config.time_shift).toEqual([]);
+      });
+
+      it("clears PromQL time shifts too, though PromQL keeps its fields", () => {
+        const panelData = makePanelData("state-timeline", "promql");
+        panelData.data.queries[0].config.time_shift = [{ offSet: "1h" }] as any;
+        const { resetAggregationFunction } = makeAggregation(panelData);
+        resetAggregationFunction();
+        expect(panelData.data.queries[0].config.time_shift).toEqual([]);
+      });
+    });
+
     // ── heatmap ──────────────────────────────────────────────────────────
 
     describe("heatmap chart type", () => {

@@ -39,6 +39,7 @@ use promql::{
     },
     exec::PromqlContext,
     micros,
+    utils::absent_label_rejects_all,
 };
 use promql_parser::{label::Matchers, parser};
 use proto::cluster_rpc;
@@ -76,6 +77,9 @@ impl TableProvider for StorageProvider {
         filters: &mut [(String, Vec<String>)],
         streaming: bool,
     ) -> datafusion::error::Result<Vec<ScanContext>> {
+        if matches_nothing(org_id, stream_name, &matchers).await? {
+            return Ok(vec![]);
+        }
         let mut ctxs = Vec::new();
         let trace_id = self.trace_id.to_owned() + "-storage-" + stream_name;
         let ctx = storage::create_context(
@@ -423,7 +427,7 @@ pub async fn search_inner(
         need_wal: req.need_wal,
         use_cache: req.use_cache,
         timeout,
-        search_event_type: SearchEventType::try_from(req.search_event_type.as_str()).ok(),
+        search_event_type: req.search_event_type.parse::<SearchEventType>().ok(),
         regions: req.regions.clone(),
         clusters: req.clusters.clone(),
         is_super_cluster: req.is_super_cluster,
@@ -504,6 +508,21 @@ async fn get_max_file_list(
         files: file_list,
         window,
     })
+}
+
+/// A label the stream lacks reads as "", so a matcher rejecting "" leaves nothing to scan.
+async fn matches_nothing(
+    org_id: &str,
+    stream_name: &str,
+    matchers: &Matchers,
+) -> datafusion::error::Result<bool> {
+    let schema = infra::schema::get_cache(org_id, stream_name, StreamType::Metrics)
+        .await
+        .map_err(|err| DataFusionError::Execution(err.to_string()))?;
+    Ok(matchers
+        .matchers
+        .iter()
+        .any(|mat| absent_label_rejects_all(schema.schema(), mat)))
 }
 
 /// The time from which a group must also read the WAL.
@@ -885,5 +904,42 @@ mod tests {
                 .unwrap(),
             vec![(0, 410), (420, 430)]
         );
+    }
+
+    #[tokio::test]
+    async fn test_matches_nothing_on_a_label_the_stream_lacks() {
+        use datafusion::arrow::datatypes::{DataType, Field, Schema};
+
+        let (org_id, stream_name) = ("test_org_absent_label", "absent_label_metric");
+        {
+            let mut w = infra::schema::STREAM_SCHEMAS_LATEST.write().await;
+            infra::schema::insert_latest(
+                &mut w,
+                format!("{org_id}/{}/{stream_name}", StreamType::Metrics),
+                infra::schema::SchemaCache::new(Schema::new(vec![Field::new(
+                    "job",
+                    DataType::Utf8,
+                    true,
+                )])),
+            );
+        }
+        for (query, nothing) in [
+            (r#"absent_label_metric{uuid="x"}"#, true),
+            (r#"absent_label_metric{uuid=~"x.+"}"#, true),
+            (r#"absent_label_metric{uuid!="x"}"#, false),
+            (r#"absent_label_metric{uuid=""}"#, false),
+            (r#"absent_label_metric{job="x"}"#, false),
+        ] {
+            let parser::Expr::VectorSelector(selector) = parser::parse(query).unwrap() else {
+                panic!("expected a vector selector");
+            };
+            assert_eq!(
+                matches_nothing(org_id, stream_name, &selector.matchers)
+                    .await
+                    .unwrap(),
+                nothing,
+                "{query}"
+            );
+        }
     }
 }

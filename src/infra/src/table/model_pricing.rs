@@ -207,6 +207,15 @@ pub async fn delete_by_id(org_id: &str, id: &str) -> Result<bool, Error> {
     }
 }
 
+/// Raw row delete; `db::model_pricing::delete_by_org` also evicts the caches.
+pub async fn delete_by_org(org_id: &str) -> Result<(), Error> {
+    Entity::delete_many()
+        .filter(Column::Org.eq(org_id))
+        .exec(get_orm_client_rw().await)
+        .await?;
+    Ok(())
+}
+
 /// Return all model names belonging to the built-in org.
 /// Used by the sync job to detect models removed from the upstream source.
 pub async fn list_built_in_names() -> Result<Vec<String>, Error> {

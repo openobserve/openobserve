@@ -92,7 +92,7 @@ impl Sql {
         let search_event_type = req
             .search_event_type
             .as_ref()
-            .and_then(|s| SearchEventType::try_from(s.as_str()).ok());
+            .and_then(|s| s.parse::<SearchEventType>().ok());
         Self::resolve(
             query,
             &req.org_id,

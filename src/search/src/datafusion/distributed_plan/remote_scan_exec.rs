@@ -318,7 +318,7 @@ async fn get_remote_batch(
         .super_cluster_info
         .search_event_type
         .as_ref()
-        .and_then(|s| s.as_str().try_into().ok());
+        .and_then(|s| s.parse().ok());
 
     // check timeout
     let mut timeout = remote_scan_node.search_infos.timeout;

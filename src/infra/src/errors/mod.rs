@@ -104,6 +104,8 @@ pub enum Error {
     TrialPeriodExpired,
     #[error("QueueError# {0}")]
     QueueError(#[from] QueueError),
+    #[error("{0}")]
+    Ingestion(#[from] IngestionError),
 }
 
 unsafe impl Send for Error {}
@@ -133,6 +135,13 @@ pub enum QueueError {
     },
     #[error("queue is closed")]
     QueueClosed,
+}
+
+/// Admission refusals that callers map to a status of their own instead of a generic 4xx/5xx.
+#[derive(ThisError, Debug)]
+pub enum IngestionError {
+    #[error("Organization [{0}] is deleted")]
+    OrgBlocked(String),
 }
 
 #[derive(ThisError, Debug)]
@@ -307,6 +316,7 @@ impl Error {
         match self {
             Error::ErrorCode(code) => code.http_status(),
             Error::ResourceError(_) => 503,
+            Error::Ingestion(IngestionError::OrgBlocked(_)) => 403,
             // A JSON deserialization failure means the client sent a malformed
             // request body, so surface it as 400 rather than a 500 server error.
             _ => 400,
@@ -728,5 +738,12 @@ mod tests {
             ErrorCodes::SearchHistogramNotAvailable("msg".into()).get_message(),
             "Search histogram not available"
         );
+    }
+
+    #[test]
+    fn test_org_blocked_is_forbidden() {
+        let e = Error::from(IngestionError::OrgBlocked("t1".into()));
+        assert_eq!(e.http_status(), 403);
+        assert_eq!(e.to_string(), "Organization [t1] is deleted");
     }
 }

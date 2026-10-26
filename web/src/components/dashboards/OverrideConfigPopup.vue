@@ -408,6 +408,7 @@ import {
 
 import SeriesAddMenu from "./SeriesAddMenu.vue";
 import SeriesFormatControls from "./SeriesFormatControls.vue";
+import { valueMappingPatternErrors } from "./addPanel/valueMappingErrors";
 import {
   type SeriesOverrideDraft,
   type SeriesOverridePreviewSource,
@@ -763,7 +764,11 @@ export default defineComponent({
 
     // An invalid pattern can never match, so Save stays on the dialog and shows its error.
     const saveSeriesOverrides = () => {
-      const invalidIdx = seriesDrafts.value.findIndex((d) => seriesPatternError(d) !== null);
+      const invalidIdx = seriesDrafts.value.findIndex(
+        (d) =>
+          seriesPatternError(d) !== null ||
+          Object.keys(valueMappingPatternErrors(d.valueMappings, t)).length > 0,
+      );
       if (invalidIdx !== -1) {
         selectedSeriesIdx.value = invalidIdx;
         return;

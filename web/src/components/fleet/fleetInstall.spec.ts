@@ -67,6 +67,7 @@ describe("installCommand", () => {
     expect(cmd).toContain("AUTH=$(printf 'fleet:%s' 'o2ft_abc123' | base64");
     expect(cmd).toContain("endpoint: ws://host.docker.internal:5080/api/acme/v1/opamp");
     expect(cmd).toContain("insecure: true");
+    expect(cmd).toContain("  config_apply_timeout: 30s");
     expect(cmd).toContain("O2_ENDPOINT: http://host.docker.internal:5080/api/acme");
     expect(cmd).toContain("-v otel-fleet-state:/var/lib/opampsupervisor");
     expect(cmd).toContain("docker rm -f otel-fleet-collector >/dev/null 2>&1 || true");
