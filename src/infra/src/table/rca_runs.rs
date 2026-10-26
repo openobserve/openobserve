@@ -21,7 +21,8 @@ use config::meta::alerts::{
     incidents::IncidentEvent,
     rca_runs::{
         RcaRun, RcaRunItem, RcaSummary, ReportFormat, RunError, RunMode, RunState, RunStats,
-        RunSubjectType, RunSummaryFields, RunTrigger, is_live_blocking, is_stale, next_previous,
+        RunSubjectType, RunSummaryFields, RunTrigger, is_live_blocking, is_stale, is_v1_run_id,
+        next_previous,
     },
     rca_steering::SteerRecord,
 };
@@ -1322,9 +1323,14 @@ pub fn summary_from_incident(
     );
     let started_at = inc.rca_started_at.unwrap_or_default();
     let updated_at = inc.rca_updated_at.unwrap_or(started_at);
+    let report_format = if is_v1_run_id(&run_id) {
+        ReportFormat::V1
+    } else {
+        ReportFormat::V2
+    };
     Some(RcaSummary {
         run_id,
-        report_format: ReportFormat::V2,
+        report_format,
         state,
         stale: is_stale(state, updated_at, now_us, rca_timeout_secs),
         started_at,
@@ -1334,6 +1340,12 @@ pub fn summary_from_incident(
         summary: decode_summary(inc.rca_summary.as_deref()),
         detail: None,
     })
+}
+
+/// Runs the v1 run-pointer backfill migration over the current rows; for tests in any crate.
+#[cfg(any(test, feature = "test-utils"))]
+pub async fn backfill_v1_pointers_for_tests() -> Result<(), DbErr> {
+    super::migration::backfill_v1_rca_pointer(get_orm_client_rw().await).await
 }
 
 #[cfg(test)]

@@ -2079,8 +2079,10 @@ async fn incident_with_alerts(
         );
         incident_data.alert_count = actual_count;
     }
-    let unique_alert_ids: std::collections::HashSet<&str> =
-        incident_alerts.iter().map(|a| a.alert_id.as_str()).collect();
+    let unique_alert_ids: std::collections::HashSet<&str> = incident_alerts
+        .iter()
+        .map(|a| a.alert_id.as_str())
+        .collect();
     incident_data.unique_alert_count = Some(unique_alert_ids.len() as i32);
 
     // Convert incident_alerts to triggers
@@ -4135,18 +4137,36 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn the_list_carries_each_incidents_run_summary() {
-        use config::meta::alerts::rca_runs::{RunState, RunTrigger};
+        use config::meta::alerts::rca_runs::{ReportFormat, RunState, RunTrigger};
 
-        use crate::alerts::rca_runs::tests::{add_incident, db, new_incident, start};
+        use crate::alerts::rca_runs::{
+            rca_detail,
+            tests::{
+                add_incident, completed_at, db, incident_row, new_incident, pre_run_topology, start,
+            },
+        };
 
         let _db = db().await;
         let (org, analyzed) = new_incident(None).await;
         let run_id = start(&org, &analyzed, RunTrigger::AutoNewIncident).await;
         let never = add_incident(&org, None).await;
+        // Reports from before runs existed: dated by the archive, else by the Complete event.
+        let archived = add_incident(&org, Some(pre_run_topology())).await;
+        let single = add_incident(
+            &org,
+            Some(serde_json::json!({"nodes": [], "edges": [], "suggested_root_cause": "r"})),
+        )
+        .await;
+        completed_at(&org, &single, 150).await;
+        let rerun = add_incident(&org, Some(pre_run_topology())).await;
+        let rerun_id = start(&org, &rerun, RunTrigger::Manual).await;
+        infra::table::rca_runs::backfill_v1_pointers_for_tests()
+            .await
+            .unwrap();
 
         let (incidents, total) = list_incidents(&org, None, 50, 0).await.unwrap();
 
-        assert_eq!(total, 2);
+        assert_eq!(total, 5);
         let by_id = |id: &str| incidents.iter().find(|i| i.id == id).unwrap();
         let rca = by_id(&analyzed).rca.as_ref().unwrap();
         assert_eq!(rca.run_id, run_id);
@@ -4154,6 +4174,35 @@ mod tests {
         assert!(!rca.stale);
         assert!(rca.detail.is_none(), "the list adds no join");
         assert!(by_id(&never).rca.is_none());
+        let v1 = |id: &str| {
+            let rca = by_id(id).rca.as_ref().expect("a pre-run report shows");
+            (
+                rca.run_id.as_str(),
+                rca.report_format,
+                rca.state,
+                rca.outcome.as_deref(),
+                rca.updated_at,
+            )
+        };
+        let (format, state) = (ReportFormat::V1, RunState::Completed);
+        assert_eq!(v1(&archived), ("v1-0", format, state, None, 200));
+        assert_eq!(v1(&single), ("v1-0", format, state, None, 150));
+        let rca = by_id(&rerun).rca.as_ref().unwrap();
+        assert_eq!(
+            (rca.run_id.as_str(), rca.report_format),
+            (rerun_id.as_str(), ReportFormat::V2),
+            "a run replaces the pre-run report"
+        );
+        for id in [&archived, &single] {
+            let listed = by_id(id).rca.as_ref().unwrap();
+            let mut detail = rca_detail(&org, &incident_row(&org, id).await)
+                .await
+                .unwrap()
+                .unwrap();
+            let fields = detail.detail.take().unwrap();
+            assert_eq!(&detail, listed, "the detail summary is the list summary");
+            assert_eq!(fields.history[0].started_at, listed.updated_at);
+        }
 
         let json = serde_json::to_value(&incidents).unwrap();
         let json_of = |id: &str| {
@@ -4168,6 +4217,7 @@ mod tests {
         assert!(json_of(&analyzed)["rca"].get("current_run").is_none());
         assert!(json_of(&never)["rca"].is_null());
         assert!(json_of(&never).as_object().unwrap().contains_key("rca"));
+        assert_eq!(json_of(&archived)["rca"]["report_format"], "v1");
     }
 
     /// A turn that could not start fails its run with the turn's code and an actionable reason.

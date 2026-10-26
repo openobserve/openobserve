@@ -118,7 +118,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 118: add the lease columns to org_cleanup_tasks.
 // 119: create public_dashboards, public_dashboard_org_settings and public_dashboard_outbox.
 // 120: add search_type to search_queue.
-pub const DB_SCHEMA_VERSION: u64 = 120;
+// 121: point pre-run incidents' run summary at their newest v1 report.
+pub const DB_SCHEMA_VERSION: u64 = 121;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
