@@ -6118,7 +6118,7 @@
       },
       "installOneClick": "Zu {client} hinzufügen",
       "skillsLabel": "{brand}-Skill hinzufügen (optional)",
-      "skillsHint": "Bringt Ihrem KI-Assistenten bei, wie er in {brand} Abfragen durchführt, Alarme einrichtet und Dashboards erstellt, damit er mehr aus den MCP-Tools herausholt. Führen Sie es in Ihrem Projekt aus und wählen Sie dann die Agenten aus, in denen es installiert werden soll.",
+      "skillsHint": "Bringt Ihrem KI-Assistenten bei, wie er in {brand} Abfragen durchführt, Alarme einrichtet und Dashboards erstellt, damit er mehr aus den MCP-Tools herausholt. Führen Sie es in Ihrem Projekt aus; es installiert die Skills in jedes KI-Tool, das es auf Ihrem Rechner findet.",
       "skillsRepo": "Die Skills auf {host} anzeigen"
     },
     "manageTokensBtnLabel": "Tokens verwalten",

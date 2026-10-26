@@ -6118,7 +6118,7 @@
       },
       "installOneClick": "Aggiungi a {client}",
       "skillsLabel": "Aggiungi la skill {brand} (opzionale)",
-      "skillsHint": "Insegna al tuo Assistente AI come eseguire query, creare avvisi e dashboard in {brand}, così può sfruttare al meglio gli strumenti MCP. Eseguilo nel tuo progetto, poi scegli gli agenti su cui installarlo.",
+      "skillsHint": "Insegna al tuo Assistente AI come eseguire query, creare avvisi e dashboard in {brand}, così può sfruttare al meglio gli strumenti MCP. Eseguilo nel tuo progetto: le installa in ogni strumento AI che trova sul tuo computer.",
       "skillsRepo": "Visualizza le skill su {host}"
     },
     "manageTokensBtnLabel": "Gestisci i token",
