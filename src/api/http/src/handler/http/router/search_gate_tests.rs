@@ -224,10 +224,11 @@ const UNGATED_SIBLINGS: &[(&str, &str)] = &[
 ];
 
 /// Pages an over-limit customer needs to understand and fix their state; none may be gated.
-const OPERATIONAL_READS: [&str; 22] = [
+const OPERATIONAL_READS: [&str; 23] = [
     "/v2/{org_id}/alerts/history",
     "/v2/{org_id}/reports/history",
     "/{org_id}/pipelines/history",
+    "/{org_id}/fleet/audit",
     "/{org_id}/workflows/{id}/history",
     "/v2/{org_id}/alert_calibration/digests",
     "/v2/{org_id}/alert_calibration/digests/alerts",
@@ -270,7 +271,7 @@ const SEARCH_ENTRY: &str = r"(?:search_service|SearchService|crate::search|core_
 
 /// Every production file that calls a search entry point, and how its search is licence-gated.
 #[rustfmt::skip]
-const SEARCH_CALLERS: [(&str, Caller); 39] = [
+const SEARCH_CALLERS: [(&str, Caller); 41] = [
     ("api/management/src/request/alert_calibration/digests.rs", Caller::Operational),
     ("api/management/src/request/alerts/history.rs", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
     ("api/management/src/request/dashboards/reports_history.rs", Caller::Exempt("the org's own report run history; its route stays open")),
@@ -302,6 +303,8 @@ const SEARCH_CALLERS: [(&str, Caller); 39] = [
     ("core/src/anomaly_detection/partitioned_search.rs", Caller::Background("anomaly detection runs")),
     ("core/src/db_monitoring/rollup.rs", Caller::Background("DBM rollup")),
     ("core/src/downtimes/values.rs", Caller::Routed("downtimes::")),
+    ("core/src/fleet.rs", Caller::Helper("fleet pipelines; request/fleet/mod.rs checks the licence")),
+    ("core/src/fleet.rs", Caller::Exempt("fleet audit trail from the meta org audit stream; its route stays open")),
     ("core/src/metrics/prom.rs", Caller::Routed("promql::label_values")),
     ("core/src/self_reporting/search.rs", Caller::Exempt("licence usage from the meta org")),
     ("core/src/slo/job.rs", Caller::Background("SLO job")),

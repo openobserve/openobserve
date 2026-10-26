@@ -1677,6 +1677,10 @@ pub async fn get_pipelines(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        // Fleet routes are outside the gated group, so this PromQL search checks the licence here.
+        if let Err(e) = search_service::check_search_allowed(&org_id, None) {
+            return MetaHttpResponse::too_many_requests(e);
+        }
         let user_id = &user_email.user_id;
         if !allowed_on(FLEET_MANAGEMENT, &org_id, user_id, "GET").await {
             return MetaHttpResponse::forbidden("Forbidden");
@@ -2613,5 +2617,89 @@ mod tests {
         let empty = fleet_item(folder("f2"), &[stored]);
         assert_eq!(empty.state, Some(FleetState::default()));
         assert_eq!(empty.settings, FleetSettings::default());
+    }
+
+    async fn pipelines_as(user_id: &str) -> Response {
+        get_pipelines(
+            Path(ORG.to_string()),
+            Query(FlowQuery { window: None }),
+            Headers(UserEmail {
+                user_id: user_id.to_string(),
+            }),
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn pipelines_answer_the_search_licence_429_while_search_is_blocked() {
+        use o2_enterprise::enterprise::license::close_search_gate_for_tests;
+
+        let custom = "blocked@fleet-fleets-handlers.test";
+        seed_member(custom, config::meta::user::UserRole::User, ORG);
+        openfga_on(&[], None);
+        let gate = close_search_gate_for_tests().await;
+        let res = pipelines_as(custom).await;
+        drop(gate);
+        openfga_off();
+        forget(custom, ORG);
+        assert_eq!(res.status(), StatusCode::TOO_MANY_REQUESTS);
+        let body: serde_json::Value = serde_json::from_str(&body_text(res).await).unwrap();
+        assert_eq!(body["code"], 429);
+        let message = body["message"].as_str().unwrap();
+        assert!(
+            message.contains(
+                "Search is temporarily disabled due to exceeding allotted ingestion limit."
+            ) && message.ends_with("Please contact your administrator."),
+            "{message}"
+        );
+    }
+
+    #[tokio::test]
+    async fn pipelines_reach_the_fleet_check_while_search_is_open() {
+        let _held = o2_enterprise::enterprise::license::TEST_STATICS_LOCK
+            .lock()
+            .await;
+        let custom = "open@fleet-fleets-handlers.test";
+        seed_member(custom, config::meta::user::UserRole::User, ORG);
+        openfga_on(&[], None);
+        let res = pipelines_as(custom).await;
+        openfga_off();
+        forget(custom, ORG);
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn the_audit_trail_is_not_licence_gated_while_search_is_blocked() {
+        use o2_enterprise::enterprise::{
+            common::auditor::AUDIT_STREAM, license::close_search_gate_for_tests,
+        };
+
+        let custom = "audit@fleet-fleets-handlers.test";
+        seed_member(custom, config::meta::user::UserRole::User, ORG);
+        openfga_on(&[], None);
+        let gate = close_search_gate_for_tests().await;
+        let exempt = search_service::check_search_allowed(config::META_ORG_ID, Some(AUDIT_STREAM));
+        let customer = search_service::check_search_allowed(ORG, None);
+        let res = list_audit(
+            Path(ORG.to_string()),
+            Query(AuditQuery {
+                from: None,
+                to: None,
+            }),
+            Headers(UserEmail {
+                user_id: custom.to_string(),
+            }),
+        )
+        .await;
+        drop(gate);
+        openfga_off();
+        forget(custom, ORG);
+        assert!(exempt.is_ok(), "the audit search runs on an exempt stream");
+        assert!(customer.is_err());
+        assert_eq!(
+            res.status(),
+            StatusCode::FORBIDDEN,
+            "the fleet check answers, not the licence"
+        );
     }
 }
