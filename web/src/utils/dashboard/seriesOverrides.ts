@@ -178,16 +178,16 @@ const formatValueLabels = (series: any, lookup: SeriesOverrideLookup) => {
   };
 };
 
-const percentText = (value: unknown, total: number, decimals: number): string => {
+const sharePercent = (value: unknown, total: number): number => {
   const numeric = Number(value);
-  const percent = total > 0 && Number.isFinite(numeric) ? (numeric / total) * 100 : 0;
-  return `${percent.toFixed(decimals)}%`;
+  return total > 0 && Number.isFinite(numeric) ? (numeric / total) * 100 : 0;
 };
 
 const applyPieOverrides = (series: any, lookup: SeriesOverrideLookup, options: any) => {
   if (!Array.isArray(series?.data)) return;
-  // Only the `{d}%` label is unit-free; a custom label already reads the lookup itself.
+  // `{d}%` is replaced outright; a custom label reads the lookup itself and only needs the exact share.
   const percentLabel = series.label?.formatter === "{d}%";
+  const customLabel = typeof series.label?.formatter === "function" ? series.label.formatter : null;
   const items = series.data;
   // Like the legend, the share is of the slices still shown; ChartRenderer keeps legend.selected in step.
   const visibleTotal = () =>
@@ -203,13 +203,16 @@ const applyPieOverrides = (series: any, lookup: SeriesOverrideLookup, options: a
     let next = item;
     if (resolved.color) next = { ...next, itemStyle: { ...next.itemStyle, color: resolved.color } };
     const decimals = resolved.decimals;
-    if (percentLabel && decimals !== undefined) {
+    if ((percentLabel || customLabel) && decimals !== undefined) {
       labelOverridden = true;
+      const share = () => sharePercent(item.value, visibleTotal());
       next = {
         ...next,
         label: {
           ...next.label,
-          formatter: () => percentText(item.value, visibleTotal(), decimals),
+          formatter: customLabel
+            ? (params: any) => customLabel({ ...params, percent: share() })
+            : () => `${share().toFixed(decimals)}%`,
         },
       };
     }

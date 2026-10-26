@@ -136,6 +136,13 @@ export class PieConverter implements PromQLChartConverter {
           formatter: (params: any) => {
             const name = seriesOverrides.displayName(params.name);
             const unit = seriesOverrides.unitArgs(params.name);
+            // A slice with its own decimals gets its exact share from applySeriesOverrides, not ECharts' rounding.
+            const overrideDecimals = seriesOverrides.get(params.name)?.decimals;
+            const percent = params.percent.toFixed(
+              overrideDecimals === undefined
+                ? percentDecimals
+                : pieLegendPercentDecimals(overrideDecimals),
+            );
             // Custom formatter with unit support
             if (config.label_format) {
               // If custom format is provided, use it with unit formatting
@@ -147,11 +154,11 @@ export class PieConverter implements PromQLChartConverter {
                     getUnitValue(params.value, unit.unit, unit.unitCustom, unit.decimals),
                   ),
                 )
-                .replace("{d}", params.percent.toFixed(percentDecimals));
+                .replace("{d}", percent);
             }
             // Default format: name: value (percentage%)
             const unitValue = getUnitValue(params.value, unit.unit, unit.unitCustom, unit.decimals);
-            return `${name}: ${formatUnitValue(unitValue)} (${params.percent.toFixed(percentDecimals)}%)`;
+            return `${name}: ${formatUnitValue(unitValue)} (${percent}%)`;
           },
           fontSize: config.label_font_size || 12,
         },

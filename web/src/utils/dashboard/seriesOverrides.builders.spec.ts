@@ -669,8 +669,15 @@ describe.each(["pie", "donut"])("PromQL %s", (type) => {
     const options = await runPromQL(promPanel(type, promOverrides), two());
     const api = options.series[0].data.find((d: any) => d.name === "api");
     expect(api.itemStyle.color).toBe(OVERRIDE_COLOR);
-    const label = options.series[0].label.formatter({ name: "api", value: 1200, percent: 57.14 });
-    expect(label).toBe(`${DISPLAY}: ${apiValue(1200)} (57%)`);
+    const params = { name: "api", value: 1200, percent: 57 };
+    expect(api.label.formatter(params)).toBe(`${DISPLAY}: ${apiValue(1200)} (57.14%)`);
+    options.legend.selected = { api: true, web: false };
+    expect(api.label.formatter(params)).toBe(`${DISPLAY}: ${apiValue(1200)} (100.00%)`);
+    const web = options.series[0].data.find((d: any) => d.name === "web");
+    expect(web.label).toBeUndefined();
+    expect(options.series[0].label.formatter({ name: "web", value: 900, percent: 43 })).toBe(
+      `web: ${panelValue(900)} (43%)`,
+    );
     const html = options.tooltip.formatter({
       seriesName: "s",
       name: "api",
