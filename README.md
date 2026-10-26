@@ -98,7 +98,7 @@ For other installation methods, see the [quickstart documentation](https://openo
 
 OpenObserve ships with a powerful, unified web UI for every signal — logs, traces, metrics, dashboards, RUM, alerts, incidents, pipelines, and AI observability.
 
-[![Watch the OpenObserve introduction video](./screenshots/o2_intro.webp)](https://www.youtube.com/watch?v=4VwuC1tpRP4)
+[![Watch the OpenObserve introduction video](./screenshots/o2_intro.webp)](https://www.youtube.com/watch?v=9V0YQJKDCA8)
 
 ### 🏠 Unified Overview
 
@@ -338,7 +338,7 @@ All data in OpenObserve is **immutable** — once ingested, it cannot be modifie
 
 ### Is this production-ready?
 
-Yes. OpenObserve runs in production across thousands of deployments worldwide, including environments processing in excess of 2 PB/day. See our [customer stories](https://openobserve.ai/customer-stories/) for real-world examples.
+Yes. OpenObserve runs in production across thousands of deployments worldwide, including environments processing in excess of 5 PB/day. See our [customer stories](https://openobserve.ai/customer-stories/) for real-world examples.
 
 ### How does query performance compare to Elasticsearch?
 

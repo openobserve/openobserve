@@ -96,6 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="max-w-45 min-w-32.5">
                         <OSelect
                           v-model="selectedFunction"
+                          :aria-label="t('alerts.queryConfig.aggregationFunction')"
                           :options="logFunctionOptions"
                           labelKey="label"
                           valueKey="value"
@@ -116,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >{{ t("alerts.conditionOf") }}</span
                         >
                         <OFormSelect
+                          :aria-label="t('alerts.column')"
                           name="query_condition.aggregation.having.column"
                           :options="numericColumns"
                           searchable
@@ -143,6 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >{{ t("alerts.criticalIf") }}</span
                         >
                         <OFormSelect
+                          :aria-label="t('common.operator')"
                           name="trigger_condition.operator"
                           :options="numericOperators"
                           width="xs"
@@ -153,6 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <!-- Message hangs under the threshold field it describes. -->
                         <div class="flex flex-col gap-1">
                           <OFormInput
+                            :aria-label="t('alerts.alertIfNoOfEvents')"
                             name="trigger_condition.threshold"
                             type="number"
                             width="xs"
@@ -186,6 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                         <div class="flex flex-col gap-1">
                           <OFormInput
+                            :aria-label="t('alerts.warningIf')"
                             name="trigger_condition.warning_threshold"
                             type="number"
                             width="xs"
@@ -235,6 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >{{ t("alerts.criticalIf") }}</span
                         >
                         <OFormSelect
+                          :aria-label="t('common.operator')"
                           name="query_condition.aggregation.having.operator"
                           :options="numericOperators"
                           :searchable="false"
@@ -245,6 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <!-- Message hangs under the value field it describes. -->
                         <div class="flex flex-col gap-1">
                           <OFormInput
+                            :aria-label="t('common.value')"
                             name="query_condition.aggregation.having.value"
                             type="number"
                             width="xs"
@@ -276,6 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                         <div class="flex flex-col gap-1">
                           <OFormInput
+                            :aria-label="t('alerts.warningIf')"
                             name="query_condition.aggregation.warning_value"
                             type="number"
                             width="xs"
@@ -339,6 +347,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-for="(group, index) in logGroupByRows" :key="index">
                       <div class="flex items-center gap-1">
                         <OFormSelect
+                          :aria-label="t('alerts.groupBy')"
                           :name="`logGroupBy[${index}]`"
                           :options="columns"
                           searchable
@@ -347,6 +356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @update:model-value="onLogGroupByChange"
                         />
                         <OButton
+                          :aria-label="t('common.remove')"
                           variant="ghost"
                           size="icon-circle-sm"
                           class="text-icon-color hover:text-status-error-text"
@@ -396,6 +406,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                   <div class="flex flex-nowrap items-start gap-2">
                     <OFormSelect
+                      :aria-label="t('common.operator')"
                       name="trigger_condition.operator"
                       :options="numericOperators"
                       :searchable="false"
@@ -405,6 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Message hangs under the threshold field it describes. -->
                     <div class="flex flex-col gap-1">
                       <OFormInput
+                        :aria-label="t('alerts.alertIfNoOfEvents')"
                         name="trigger_condition.threshold"
                         type="number"
                         width="xs"
@@ -444,6 +456,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="max-w-45 min-w-32.5">
                         <OSelect
                           v-model="selectedFunction"
+                          :aria-label="t('alerts.queryConfig.aggregationFunction')"
                           :options="logFunctionOptions"
                           labelKey="label"
                           valueKey="value"
@@ -467,6 +480,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="relative inline-flex">
                           <OFormSelect
                             name="query_condition.aggregation.having.column"
+                            :aria-label="t('alerts.column')"
                             :options="columns"
                             searchable
                             :placeholder="t('alerts.placeholders.selectColumn')"
@@ -513,6 +527,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >{{ t("alerts.criticalIf") }}</span
                         >
                         <OFormSelect
+                          :aria-label="t('common.operator')"
                           name="trigger_condition.operator"
                           :options="numericOperators"
                           :searchable="false"
@@ -522,6 +537,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <!-- Message hangs under the threshold field it describes. -->
                         <div class="flex flex-col gap-1">
                           <OFormInput
+                            :aria-label="t('alerts.alertIfNoOfEvents')"
                             name="trigger_condition.threshold"
                             type="number"
                             width="xs"
@@ -552,6 +568,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                         <div class="flex flex-col gap-1">
                           <OFormInput
+                            :aria-label="t('alerts.warningIf')"
                             name="trigger_condition.warning_threshold"
                             type="number"
                             width="xs"
@@ -601,6 +618,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >{{ t("alerts.criticalIf") }}</span
                         >
                         <OFormSelect
+                          :aria-label="t('common.operator')"
                           name="query_condition.aggregation.having.operator"
                           :options="numericOperators"
                           :searchable="false"
@@ -610,6 +628,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <!-- Message hangs under the value field it describes. -->
                         <div class="flex flex-col gap-1">
                           <OFormInput
+                            :aria-label="t('common.value')"
                             name="query_condition.aggregation.having.value"
                             type="number"
                             width="xs"
@@ -641,6 +660,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                         <div class="flex flex-col gap-1">
                           <OFormInput
+                            :aria-label="t('alerts.warningIf')"
                             name="query_condition.aggregation.warning_value"
                             type="number"
                             width="xs"
@@ -703,6 +723,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-for="(group, index) in metricGroupByRows" :key="index">
                       <div class="flex items-center gap-1">
                         <OFormSelect
+                          :aria-label="t('alerts.groupBy')"
                           :name="`query_condition.aggregation.group_by[${index}]`"
                           :options="columns"
                           searchable
@@ -711,6 +732,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @update:model-value="syncMetricGroupByToProps"
                         />
                         <OButton
+                          :aria-label="t('common.remove')"
                           variant="ghost"
                           size="icon-circle-sm"
                           class="text-icon-color hover:text-status-error-text"
@@ -758,6 +780,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                   <div class="flex flex-nowrap items-start gap-2">
                     <OFormSelect
+                      :aria-label="t('common.operator')"
                       name="trigger_condition.operator"
                       :options="numericOperators"
                       :searchable="false"
@@ -767,6 +790,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Message hangs under the threshold field it describes. -->
                     <div class="flex flex-col gap-1">
                       <OFormInput
+                        :aria-label="t('alerts.alertIfNoOfEvents')"
                         name="trigger_condition.threshold"
                         type="number"
                         width="xs"
@@ -804,6 +828,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Minutes/hours mode: number input -->
                     <template v-if="frequencyMode !== 'cron'">
                       <OFormInput
+                        :aria-label="t('alerts.queryConfig.checkEvery')"
                         name="_ui.checkEvery"
                         type="number"
                         class="max-w-25 min-w-25"
@@ -819,6 +844,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        by `name=`, no v-model mirror). -->
                     <template v-else>
                       <OFormInput
+                        :aria-label="t('alerts.queryConfig.cron')"
                         name="trigger_condition.cron"
                         :placeholder="t('alerts.queryConfig.cronExpressionPlaceholder')"
                         class="max-w-25 min-w-25"
@@ -828,6 +854,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- Unit dropdown: minutes / hours / cron -->
                     <OSelect
+                      :aria-label="t('common.timeUnit')"
                       class="max-w-25 min-w-20"
                       :model-value="frequencyMode"
                       :options="frequencyUnitOptions"
@@ -841,6 +868,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-if="frequencyMode === 'cron'">
                       <span class="inline-block max-w-37.5 min-w-37.5">
                         <OFormSelect
+                          :aria-label="t('alerts.downtimes.scheduleForm.timezone')"
                           name="trigger_condition.timezone"
                           :options="timezoneSelectOptions"
                           searchable
@@ -1041,7 +1069,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       }}</span>
                     </div>
                     <!-- fx toggle shown here only when VRL is not yet enabled -->
-                    <OSwitch v-if="localTab === 'sql' && !showVrl" v-model="showVrl">
+                    <OSwitch
+                      v-if="localTab === 'sql' && !showVrl"
+                      v-model="showVrl"
+                      :aria-label="t('alerts.queryConfig.showVrlEditor')"
+                    >
                       <OTooltip :content="t('alerts.queryConfig.showVrlEditor')" :delay="300" />
                     </OSwitch>
                     <OToggleGroup
@@ -1152,6 +1184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OSelect
                         class="w-32.5!"
                         v-model="selectedSavedFunctionName"
+                        :aria-label="t('alerts.placeholders.savedFunctions')"
                         :options="functionsList"
                         labelKey="name"
                         valueKey="name"
@@ -1168,7 +1201,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span>{{ t("alerts.queryConfig.noFunctions") }}</span>
                         </template>
                       </OSelect>
-                      <OSwitch v-model="showVrl">
+                      <OSwitch
+                        v-model="showVrl"
+                        :aria-label="t('alerts.queryConfig.hideVrlEditor')"
+                      >
                         <OTooltip :content="t('alerts.queryConfig.hideVrlEditor')" :delay="300" />
                       </OSwitch>
                     </div>
@@ -1253,6 +1289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="flex items-center gap-2">
                     <template v-if="frequencyMode !== 'cron'">
                       <OFormInput
+                        :aria-label="t('alerts.queryConfig.checkEvery')"
                         name="_ui.checkEvery"
                         type="number"
                         class="max-w-25 min-w-25"
@@ -1266,6 +1303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                     <template v-else>
                       <OFormInput
+                        :aria-label="t('alerts.queryConfig.cron')"
                         name="trigger_condition.cron"
                         :placeholder="t('alerts.queryConfig.cronExpressionPlaceholder')"
                         class="max-w-25 min-w-25"
@@ -1273,6 +1311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </template>
                     <OSelect
+                      :aria-label="t('common.timeUnit')"
                       class="max-w-25 min-w-20"
                       :model-value="frequencyMode"
                       :options="frequencyUnitOptions"
@@ -1284,6 +1323,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-if="frequencyMode === 'cron'">
                       <span class="inline-block max-w-37.5 min-w-37.5">
                         <OFormSelect
+                          :aria-label="t('alerts.downtimes.scheduleForm.timezone')"
                           name="trigger_condition.timezone"
                           :options="timezoneSelectOptions"
                           searchable
@@ -1350,6 +1390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >{{ t("alerts.criticalIf") }}</span
                     >
                     <OFormSelect
+                      :aria-label="t('common.operator')"
                       name="trigger_condition.operator"
                       :options="numericOperators"
                       :searchable="false"
@@ -1363,6 +1404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        right into empty space instead of widening the row. -->
                     <div class="flex flex-col gap-1">
                       <OFormInput
+                        :aria-label="t('alerts.alertIfNoOfEvents')"
                         name="trigger_condition.threshold"
                         type="number"
                         width="xs"
@@ -1396,6 +1438,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                     <div class="flex flex-col gap-1">
                       <OFormInput
+                        :aria-label="t('alerts.warningIf')"
                         name="trigger_condition.warning_threshold"
                         type="number"
                         width="xs"
@@ -1465,6 +1508,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                          aggregation.having.column via the form) despite its
                          name — reused as-is rather than duplicating it. -->
                     <OFormSelect
+                      :aria-label="t('alerts.column')"
                       name="query_condition.aggregation.having.column"
                       :options="sqlAggColumnOptions"
                       searchable
@@ -1480,6 +1524,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >{{ t("alerts.criticalIf") }}</span
                     >
                     <OFormSelect
+                      :aria-label="t('common.operator')"
                       name="query_condition.aggregation.having.operator"
                       :options="numericOperators"
                       :searchable="false"
@@ -1490,6 +1535,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Message hangs under the value field it describes. -->
                     <div class="flex flex-col gap-1">
                       <OFormInput
+                        :aria-label="t('common.value')"
                         name="query_condition.aggregation.having.value"
                         type="number"
                         width="xs"
@@ -1523,6 +1569,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                     <div class="flex flex-col gap-1">
                       <OFormInput
+                        :aria-label="t('alerts.warningIf')"
                         name="query_condition.aggregation.warning_value"
                         type="number"
                         width="xs"
@@ -1601,6 +1648,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >{{ t("alerts.criticalIf") }}</span
                       >
                       <OFormSelect
+                        :aria-label="t('alerts.alertIfValueIs')"
                         name="query_condition.promql_condition.operator"
                         :options="numericOperators"
                         :searchable="false"
@@ -1611,6 +1659,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Message hangs under the value field it describes. -->
                       <div class="flex flex-col gap-1">
                         <OFormInput
+                          :aria-label="t('alerts.alertIfValueIs')"
                           name="query_condition.promql_condition.value"
                           type="number"
                           width="xs"
@@ -1645,6 +1694,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                       <div class="flex flex-col gap-1">
                         <OFormInput
+                          :aria-label="t('alerts.warningIf')"
                           name="query_condition.promql_warning_value"
                           type="number"
                           width="xs"
@@ -1715,6 +1765,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                   <div class="flex items-start gap-2">
                     <OFormSelect
+                      :aria-label="t('common.operator')"
                       name="trigger_condition.operator"
                       :options="numericOperators"
                       :searchable="false"
@@ -1723,6 +1774,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Message hangs under the threshold field it describes. -->
                     <div class="flex flex-col gap-1">
                       <OFormInput
+                        :aria-label="t('alerts.alertIfNoOfEvents')"
                         name="trigger_condition.threshold"
                         type="number"
                         width="xs"
@@ -2118,7 +2170,8 @@ export default defineComponent({
         if (cols?.length) {
           const fields = (cols as any[]).map((c: any) => ({
             name: typeof c === "string" ? c : (c.value ?? c.label ?? c),
-            type: c.type ?? "Utf8",
+            // An untyped column must read as unknown, so operators and quoting fall back to the value itself.
+            type: c.type,
           }));
           updateFieldKeywords(fields);
         }

@@ -102,6 +102,7 @@ const stream = {
     clusters,
     no_count,
     traceparent,
+    keyword,
   }: any) => {
     const fieldsString = fields.join(",");
     let url = `/api/${org_identifier}/${stream_name}/_values?fields=${fieldsString}&size=${size}&start_time=${start_time}&end_time=${end_time}`;
@@ -111,6 +112,8 @@ const stream = {
     if (type) url += "&type=" + type;
     if (regions) url += "&regions=" + regions;
     if (clusters) url += "&clusters=" + clusters;
+    // Typed by the user, so it may hold & or spaces.
+    if (keyword) url += "&keyword=" + encodeURIComponent(keyword);
 
     let headers = {};
     if (traceparent) {

@@ -19,7 +19,9 @@ use ::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta, Search
 use config::{
     cluster::LOCAL_NODE,
     meta::{
-        search::{SearchEventType, StreamResponses, TimeOffset, ValuesEventContext},
+        search::{
+            Request, ScanStats, SearchEventType, StreamResponses, TimeOffset, ValuesEventContext,
+        },
         self_reporting::usage::{RequestStats, UsageType},
         sql::OrderBy,
         stream::StreamType,
@@ -62,17 +64,17 @@ pub async fn write_results_to_cache(
     let mut cached_responses = Vec::new();
     let mut search_responses = Vec::new();
 
-    for result in accumulated_results {
+    for result in accumulated_results.drain(..) {
         match result {
-            SearchResultType::Cached(resp) => cached_responses.push(resp.clone()),
-            SearchResultType::Search(resp) => search_responses.push(resp.clone()),
+            SearchResultType::Cached(resp) => cached_responses.push(resp),
+            SearchResultType::Search(resp) => search_responses.push(resp),
         }
     }
 
     let merged_response = cache::merge_response(
         &c_resp.trace_id,
-        &mut cached_responses,
-        &mut search_responses,
+        cached_responses,
+        search_responses,
         &c_resp.ts_column,
         c_resp.limit,
         c_resp.is_descending,
@@ -118,6 +120,41 @@ pub async fn write_results_to_cache(
     }
 
     Ok(())
+}
+
+/// Caches the first page and returns its scan summary, taken before the write drains the results.
+pub async fn write_first_page_to_cache(
+    c_resp: MultiCachedQueryResponse,
+    req: &Request,
+    start_time: i64,
+    end_time: i64,
+    accumulated_results: &mut Vec<SearchResultType>,
+    extract_patterns: bool,
+) -> Result<(ScanStats, usize), infra::errors::Error> {
+    let summary = summarize_results(accumulated_results);
+    // Pattern extraction reads the results afterwards, and its time-spread sample is not a page.
+    if req.query.from == 0 && !extract_patterns {
+        write_results_to_cache(
+            c_resp,
+            start_time,
+            end_time,
+            accumulated_results,
+            req.clear_cache,
+        )
+        .await?;
+    }
+    Ok(summary)
+}
+
+pub fn summarize_results(results: &[SearchResultType]) -> (ScanStats, usize) {
+    let mut stats = ScanStats::default();
+    let mut records = 0;
+    for result in results {
+        let (result_stats, hits) = result.stats();
+        stats.add(&result_stats);
+        records += hits;
+    }
+    (stats, records)
 }
 
 /// Handle cache responses and deltas in sorted order
@@ -548,8 +585,13 @@ pub async fn write_partial_results_to_cache(
 
 #[cfg(test)]
 mod tests {
-    use config::meta::search::Response;
-    use search::CachedQueryResponse;
+    use config::{
+        meta::search::{Request, Response},
+        utils::json,
+    };
+    use search::{CachedQueryResponse, MultiCachedQueryResponse, SearchResultType};
+
+    use super::write_first_page_to_cache;
 
     /// Test helper to create a mock CachedQueryResponse
     fn create_mock_cached_response(start_time: i64, end_time: i64) -> CachedQueryResponse {
@@ -733,5 +775,68 @@ mod tests {
         let end = all_timestamps.iter().max().copied().unwrap_or_default();
         assert_eq!(start, 100);
         assert_eq!(end, 600);
+    }
+
+    fn search_result(hits: usize, scan_records: usize) -> SearchResultType {
+        SearchResultType::Search(Response {
+            hits: (0..hits)
+                .map(|i| json::json!({ "_timestamp": i, "log": "line" }))
+                .collect(),
+            scan_records,
+            ..Default::default()
+        })
+    }
+
+    #[tokio::test]
+    async fn test_first_page_cache_write_keeps_results_for_pattern_extraction() {
+        let mut results = vec![search_result(3, 30), search_result(2, 20)];
+        let (_, hits) = write_first_page_to_cache(
+            MultiCachedQueryResponse::default(),
+            &Request::default(),
+            0,
+            1,
+            &mut results,
+            true,
+        )
+        .await
+        .unwrap();
+        assert_eq!(results.len(), 2);
+        assert_eq!(hits, 5);
+    }
+
+    #[tokio::test]
+    async fn test_first_page_cache_write_summarizes_results_it_consumes() {
+        let mut results = vec![search_result(3, 30), search_result(2, 20)];
+        let (stats, hits) = write_first_page_to_cache(
+            MultiCachedQueryResponse::default(),
+            &Request::default(),
+            0,
+            1,
+            &mut results,
+            false,
+        )
+        .await
+        .unwrap();
+        assert_eq!(hits, 5);
+        assert_eq!(stats.records, 50);
+    }
+
+    #[tokio::test]
+    async fn test_later_page_skips_cache_write() {
+        let mut req = Request::default();
+        req.query.from = 50;
+        let mut results = vec![search_result(3, 30)];
+        let (_, hits) = write_first_page_to_cache(
+            MultiCachedQueryResponse::default(),
+            &req,
+            0,
+            1,
+            &mut results,
+            false,
+        )
+        .await
+        .unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(hits, 3);
     }
 }

@@ -31,6 +31,7 @@ const { waitForStreamData } = require("../utils/data-ingestion.js");
 
 // Test data from external file
 const testRecords = require("../../../test-data/dashboard-functions/test_records.json");
+const { ingestBase } = require('../utils/ingest-url.js');
 
 const generateDashboardName = (testId) => `FuncTest_${testId}`;
 const generateStreamName = (testId) => `func_test_${testId}`;
@@ -71,7 +72,7 @@ const ingestTestData = async (page, streamName, data) => {
   // Resolve headers/org per attempt so a refreshed passcode is picked up on retry.
   const post = () =>
     fetch(
-      `${process.env.INGESTION_URL}/api/${getOrgIdentifier()}/${streamName}/_json`,
+      `${ingestBase(process.env.INGESTION_URL)}/api/${getOrgIdentifier()}/${streamName}/_json`,
       {
         method: "POST",
         headers: getAuthHeaders(),

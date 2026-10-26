@@ -89,6 +89,7 @@ use crate::{
         openobserve_api_search::profiles::series::profiles_series,
         openobserve_api_search::profiles::merge::merge_profiles_get,
         openobserve_api_search::profiles::merge::merge_profiles,
+        openobserve_api_search::profiles::diff::diff_profiles,
         metrics::ingest::json,
         openobserve_api_search::promql::remote_write,
         openobserve_api_search::promql::query_get,
@@ -178,7 +179,14 @@ use crate::{
         openobserve_api_management::request::alerts::incidents::get_incident_stats,
         openobserve_api_management::request::alerts::incidents::trigger_incident_rca,
         openobserve_api_management::request::alerts::incidents::cancel_incident_rca,
-        openobserve_api_management::request::alerts::incidents::get_incident_rca_history,
+        openobserve_api_management::request::alerts::incidents::list_incident_rca_runs,
+        openobserve_api_management::request::alerts::incidents::get_incident_rca_run,
+        openobserve_api_management::request::alerts::incidents::get_incident_rca_thread,
+        openobserve_api_management::request::alerts::incidents::steer_incident_rca_run,
+        openobserve_api_management::request::alerts::incidents::get_incident_rca_steering,
+        openobserve_api_management::request::alerts::incidents::resume_incident_rca_run,
+        openobserve_api_management::request::alerts::incidents::get_incident_rca_summary,
+        openobserve_api_management::request::alerts::incidents::get_incident_rca_live_stream,
         openobserve_api_management::request::alerts::templates::list_templates,
         openobserve_api_management::request::alerts::templates::get_template,
         openobserve_api_management::request::alerts::templates::save_template,
@@ -268,6 +276,20 @@ use crate::{
         openobserve_api_search::search::search_stream::values_http2_stream,
         patterns::extract_patterns,
         openobserve_core::traces::service_graph::api::get_current_topology,
+        openobserve_api_management::request::db_monitoring::handler::get_dbm_databases,
+        openobserve_api_management::request::db_monitoring::handler::get_dbm_queries,
+        openobserve_api_management::request::db_monitoring::handler::get_dbm_query_history,
+        openobserve_api_management::request::db_monitoring::handler::get_dbm_query_endpoints,
+        openobserve_api_management::request::db_monitoring::handler::get_dbm_samples,
+        openobserve_api_management::request::db_monitoring::handler::get_dbm_activity,
+        openobserve_api_management::request::db_monitoring::handler::get_dbm_query_insights,
+        openobserve_api_management::request::db_monitoring::handler::get_dbm_query_plans,
+        openobserve_api_management::request::db_monitoring::handler::get_dbm_query_server_metrics,
+        openobserve_api_management::request::db_monitoring::handler::get_dbm_server_queries,
+        openobserve_api_management::request::db_monitoring::handler::get_dbm_server_samples,
+        openobserve_api_management::request::db_monitoring::handler::get_dbm_instances,
+        openobserve_api_management::request::db_monitoring::handler::get_dbm_instance_metrics,
+        openobserve_api_management::request::db_monitoring::handler::get_dbm_badges,
         service_streams::list_services,
         service_streams::get_dimension_analytics,
         service_streams::correlate_streams,
@@ -306,6 +328,77 @@ use crate::{
         openobserve_api_management::request::downtimes::extend_downtime,
         openobserve_api_management::request::downtimes::move_downtimes,
         openobserve_api_management::request::downtimes::delete_downtime,
+        openobserve_api_management::request::fleet::list_collectors,
+        openobserve_api_management::request::fleet::get_collector,
+        openobserve_api_management::request::fleet::rename_collector,
+        openobserve_api_management::request::fleet::delete_collector,
+        openobserve_api_management::request::fleet::restart_collector,
+        openobserve_api_management::request::fleet::redeliver_collector,
+        openobserve_api_management::request::fleet::list_fleets,
+        openobserve_api_management::request::fleet::create_fleet,
+        openobserve_api_management::request::fleet::get_fleet,
+        openobserve_api_management::request::fleet::rename_fleet,
+        openobserve_api_management::request::fleet::delete_fleet,
+        openobserve_api_management::request::fleet::get_fleet_settings,
+        openobserve_api_management::request::fleet::put_fleet_settings,
+        openobserve_api_management::request::fleet::set_desired,
+        openobserve_api_management::request::fleet::preview_desired,
+        openobserve_api_management::request::fleet::move_collectors,
+        openobserve_api_management::request::fleet::list_tokens,
+        openobserve_api_management::request::fleet::create_token,
+        openobserve_api_management::request::fleet::revoke_token,
+        openobserve_api_management::request::fleet::list_configs,
+        openobserve_api_management::request::fleet::create_config,
+        openobserve_api_management::request::fleet::get_config,
+        openobserve_api_management::request::fleet::delete_config,
+        openobserve_api_management::request::fleet::save_config_draft,
+        openobserve_api_management::request::fleet::publish_config_version,
+        openobserve_api_management::request::fleet::get_config_version,
+        openobserve_api_management::request::fleet::validate_config,
+        openobserve_api_management::request::fleet::list_rollouts,
+        openobserve_api_management::request::fleet::get_rollout,
+        openobserve_api_management::request::fleet::resume_rollout,
+        openobserve_api_management::request::fleet::skip_rollout,
+        openobserve_api_management::request::fleet::rollback_rollout,
+        openobserve_api_management::request::fleet::summary,
+        openobserve_api_management::request::fleet::get_pipelines,
+        openobserve_api_management::request::fleet::list_audit,
+        openobserve_api_management::request::fleet::get_settings,
+        openobserve_api_management::request::fleet::update_settings,
+        openobserve_api_management::request::slack::installations::install_start,
+        openobserve_api_management::request::slack::installations::install_exchange,
+        openobserve_api_management::request::slack::installations::prerequisites,
+        openobserve_api_management::request::slack::installations::connectivity,
+        openobserve_api_management::request::slack::installations::manifest,
+        openobserve_api_management::request::slack::installations::create_installation,
+        openobserve_api_management::request::slack::installations::install_url,
+        openobserve_api_management::request::slack::installations::update_credentials,
+        openobserve_api_management::request::slack::installations::list_installations,
+        openobserve_api_management::request::slack::installations::test_installation,
+        openobserve_api_management::request::slack::installations::connection_start,
+        openobserve_api_management::request::slack::installations::connection_confirm,
+        openobserve_api_management::request::slack::installations::connect,
+        openobserve_api_management::request::slack::installations::disconnect,
+        openobserve_api_management::request::slack::installations::uninstall,
+        openobserve_api_management::request::slack::installations::get_org_access,
+        openobserve_api_management::request::slack::installations::put_org_access,
+        openobserve_api_management::request::slack::settings::get_linking,
+        openobserve_api_management::request::slack::settings::put_linking,
+        openobserve_api_management::request::slack::settings::link_matches,
+        openobserve_api_management::request::slack::settings::link_all,
+        openobserve_api_management::request::slack::settings::channels,
+        openobserve_api_management::request::slack::settings::channel_defaults,
+        openobserve_api_management::request::slack::settings::get_channel_default,
+        openobserve_api_management::request::slack::settings::put_channel_default,
+        openobserve_api_management::request::slack::settings::delete_channel_default,
+        openobserve_api_management::request::slack::settings::get_help_contact,
+        openobserve_api_management::request::slack::settings::put_help_contact,
+        openobserve_api_management::request::slack::links::start,
+        openobserve_api_management::request::slack::links::confirm,
+        openobserve_api_management::request::slack::links::resend,
+        openobserve_api_management::request::slack::links::links_me,
+        openobserve_api_management::request::slack::links::delete_link,
+        openobserve_api_management::request::slack::links::list_links,
         synthetics::list_synthetics,
         synthetics::create_synthetic,
         synthetics::get_synthetic,
@@ -351,6 +444,8 @@ use crate::{
         rum_analytics::get_funnel,
         rum_analytics::update_funnel,
         rum_analytics::delete_funnel,
+        rum_analytics::get_app_settings,
+        rum_analytics::put_app_settings,
     ),
     components(
         schemas(
@@ -440,6 +535,41 @@ use crate::{
             openobserve_api_management::request::alerts::incidents::IncidentSeverity,
             openobserve_api_management::request::alerts::incidents::IncidentStatus,
             config::meta::alerts::incidents::Incident,
+            openobserve_api_management::request::alerts::incidents::RcaStartedResponse,
+            openobserve_api_management::request::alerts::incidents::CancelRcaResponse,
+            openobserve_api_management::request::alerts::incidents::ListRcaRunsQuery,
+            openobserve_api_management::request::alerts::incidents::RcaThreadQuery,
+            openobserve_api_management::request::alerts::incidents::TriggerRcaBody,
+            openobserve_api_management::request::alerts::incidents::SteerRequestBody,
+            config::meta::alerts::rca_steering::SteerRecord,
+            config::meta::alerts::rca_steering::SteerKind,
+            config::meta::alerts::rca_steering::SteerStatus,
+            config::meta::alerts::rca_steering::SteerAction,
+            config::meta::alerts::rca_steering::SteerStatusReason,
+            config::meta::alerts::rca_runs::RcaSummary,
+            config::meta::alerts::rca_runs::RcaDetailFields,
+            config::meta::alerts::rca_runs::RunSummaryFields,
+            config::meta::alerts::rca_runs::PreviousResult,
+            config::meta::alerts::rca_runs::RcaRun,
+            config::meta::alerts::rca_runs::RcaRunItem,
+            config::meta::alerts::rca_runs::ListRcaRunsResponse,
+            config::meta::alerts::rca_runs::RunError,
+            config::meta::alerts::rca_runs::RunStats,
+            config::meta::alerts::rca_runs::RunState,
+            config::meta::oncall::rca_run::RcaRunSummary,
+            config::meta::oncall::rca_run::SummaryCard,
+            config::meta::oncall::rca_run::SummaryCause,
+            config::meta::oncall::rca_run::SummaryTimelineEntry,
+            config::meta::oncall::rca_run::SummaryHypothesis,
+            config::meta::oncall::rca_run::EvidenceEntry,
+            config::meta::oncall::rca_run::Citation,
+            config::meta::oncall::rca_run::EvidenceTarget,
+            config::meta::oncall::rca_run::LeadingEntry,
+            config::meta::oncall::rca_run::BlindSpot,
+            config::meta::oncall::confidence::UnverifiedCitation,
+            config::meta::alerts::rca_runs::RunTrigger,
+            config::meta::alerts::rca_runs::RunMode,
+            config::meta::alerts::rca_runs::RunSubjectType,
             config::meta::downtimes::Downtime,
             config::meta::downtimes::DowntimeRequest,
             config::meta::downtimes::DowntimeListItem,
@@ -594,6 +724,86 @@ use crate::{
             config::meta::synthetics::SyntheticFrequency,
             config::meta::synthetics::SyntheticFrequencyType,
             config::meta::synthetics::SyntheticAuth,
+            config::meta::fleet::Collector,
+            config::meta::fleet::CollectorList,
+            config::meta::fleet::CollectorDetail,
+            config::meta::fleet::CollectorStatus,
+            config::meta::fleet::CollectorAssignment,
+            config::meta::fleet::DeliveryEvidence,
+            config::meta::fleet::CollectorEvent,
+            config::meta::fleet::RenameCollectorRequest,
+            config::meta::fleet::RestartQueued,
+            config::meta::fleet::Redelivered,
+            config::meta::fleet::CollectorHealth,
+            config::meta::fleet::ComponentHealth,
+            config::meta::fleet::FleetSummary,
+            config::meta::fleet::StatusCounts,
+            config::meta::fleet::VersionCount,
+            config::meta::fleet::EnrollmentToken,
+            config::meta::fleet::TokenList,
+            config::meta::fleet::CreateTokenRequest,
+            config::meta::fleet::CreatedToken,
+            config::meta::fleet::CollectorFleet,
+            config::meta::fleet::Fleet,
+            config::meta::fleet::FleetList,
+            config::meta::fleet::FleetState,
+            config::meta::fleet::FleetVersion,
+            config::meta::fleet::FleetRollout,
+            config::meta::fleet::FleetSettings,
+            config::meta::fleet::GateSettings,
+            config::meta::fleet::Settings,
+            config::meta::fleet::CreateFleetRequest,
+            config::meta::fleet::RenameFleetRequest,
+            config::meta::fleet::MoveCollectorsRequest,
+            config::meta::fleet::MoveCollectorsResponse,
+            config::meta::fleet::References,
+            config::meta::fleet::FleetConfig,
+            config::meta::fleet::FleetConfigList,
+            config::meta::fleet::ConfigDraft,
+            config::meta::fleet::VersionState,
+            config::meta::fleet::ConfigVersionSummary,
+            config::meta::fleet::FleetConfigDetail,
+            config::meta::fleet::CreateConfigRequest,
+            config::meta::fleet::SaveDraftRequest,
+            config::meta::fleet::DraftSaved,
+            config::meta::fleet::PublishRequest,
+            config::meta::fleet::Published,
+            config::meta::fleet::ConfigVersion,
+            config::meta::fleet::ValidateRequest,
+            config::meta::fleet::ValidationResult,
+            config::meta::fleet::IssueSeverity,
+            config::meta::fleet::ConfigIssue,
+            config::meta::fleet::ValidationFailed,
+            config::meta::fleet::AuditEvent,
+            config::meta::fleet::AuditList,
+            config::meta::fleet::DeliveryState,
+            config::meta::fleet::RolloutStart,
+            config::meta::fleet::Batching,
+            config::meta::fleet::SetDesiredRequest,
+            config::meta::fleet::PlanPreview,
+            config::meta::fleet::RolloutStatus,
+            config::meta::fleet::HaltClass,
+            config::meta::fleet::HaltExit,
+            config::meta::fleet::RolloutHalt,
+            config::meta::fleet::PhaseStatus,
+            config::meta::fleet::GateResult,
+            config::meta::fleet::RolloutPhase,
+            config::meta::fleet::MemberState,
+            config::meta::fleet::RolloutMember,
+            config::meta::fleet::RolloutEvent,
+            config::meta::fleet::Rollout,
+            config::meta::fleet::RolloutList,
+            config::meta::fleet::SkipRequest,
+            config::meta::fleet::FlowWindow,
+            config::meta::fleet::FlowSignal,
+            config::meta::fleet::FlowIssueKind,
+            config::meta::fleet::FlowIssue,
+            config::meta::fleet::FlowDestination,
+            config::meta::fleet::PipelineReceiver,
+            config::meta::fleet::PipelineExporter,
+            config::meta::fleet::Pipeline,
+            config::meta::fleet::PipelineFleet,
+            config::meta::fleet::PipelinesResponse,
             config::meta::synthetics::SyntheticVariable,
             config::meta::synthetics::SyntheticListItem,
             config::meta::synthetics::SyntheticListResponse,
@@ -615,6 +825,16 @@ use crate::{
             openobserve_core::rum_pa::NamedEventRefList,
             openobserve_core::rum_pa::Current,
             openobserve_core::rum_pa::RumPaErrorBody,
+            openobserve_core::rum_pa::MatchOp,
+            openobserve_core::rum_pa::SessionField,
+            openobserve_core::rum_pa::SessionRule,
+            openobserve_core::rum_pa::FunnelFilter,
+            openobserve_core::rum_pa::FilterField,
+            openobserve_core::rum_pa::PageOp,
+            openobserve_core::rum_pa::PageRule,
+            openobserve_core::rum_pa::PutAppSettings,
+            openobserve_core::rum_pa::BuiltinBots,
+            openobserve_core::rum_pa::AppSettings,
          ),
     ),
     modifiers(&SecurityAddon),
@@ -644,9 +864,13 @@ use crate::{
         (name = "Patterns", description = "Log pattern extraction operations (enterprise)"),
         (name = "Service Streams", description = "Multi-signal correlation across logs, traces, and metrics (enterprise)"),
         (name = "Synthetics", description = "Synthetic monitoring — uptime and browser checks (enterprise)"),
+        (name = "Slack", description = "Slack app install, workspace connections and settings (enterprise)"),
         (name = "Downtimes", description = "Scheduled windows that keep evaluating alerts, anomaly detections, synthetics checks and SLOs but notify nobody (enterprise)"),
+        (name = "Fleet", description = "Fleet Manager: OpAMP collector inventory (enterprise)"),
         (name = "Announcements", description = "Operator-authored announcement banners shown across organizations (enterprise)"),
         (name = "Alert Calibration", description = "Per-org alert calibration settings and on-demand runs (enterprise)"),
+        (name = "Anomaly Detection", description = "Anomaly detection configs, model training and detection history (enterprise)"),
+        (name = "Workflows", description = "Workflow authoring, drafts, runs and run history (enterprise)"),
     ),
     info(
         description = "OpenObserve API documents [https://openobserve.ai/docs/](https://openobserve.ai/docs/)",
@@ -726,11 +950,38 @@ pub struct ApiDoc;
     openobserve_api_management::request::alert_calibration::digests::list_runs_for_alert,
     openobserve_api_management::request::alert_calibration::digests::get_run_records,
     openobserve_api_management::request::alert_calibration::digests::count_findings_by_rule,
+    openobserve_api_management::request::db_monitoring::handler::get_dbm_deadlocks,
+    openobserve_api_management::request::db_monitoring::handler::get_dbm_blocking,
+    openobserve_api_management::request::db_monitoring::handler::get_dbm_table_health,
+    openobserve_api_management::request::anomaly_detection::list_configs,
+    openobserve_api_management::request::anomaly_detection::get_config,
+    openobserve_api_management::request::anomaly_detection::create_config,
+    openobserve_api_management::request::anomaly_detection::update_config,
+    openobserve_api_management::request::anomaly_detection::delete_config,
+    openobserve_api_management::request::anomaly_detection::train_model,
+    openobserve_api_management::request::anomaly_detection::cancel_training,
+    openobserve_api_management::request::anomaly_detection::detect_anomalies,
+    openobserve_api_management::request::anomaly_detection::get_detection_history,
+    openobserve_api_management::request::alerts::history::get_all_anomaly_history,
+    openobserve_api_management::request::workflows::save_workflow,
+    openobserve_api_management::request::workflows::list_workflows,
+    openobserve_api_management::request::workflows::move_workflows,
+    openobserve_api_management::request::workflows::delete_workflows,
+    openobserve_api_management::request::workflows::update_workflows,
+    openobserve_api_management::request::workflows::test_workflow,
+    openobserve_api_management::request::workflows::trigger_workflow,
+    openobserve_api_management::request::workflows::get_workflow_errors,
+    openobserve_api_management::request::workflows::retry_workflow,
+    openobserve_api_management::request::workflows::enable_workflow,
+    openobserve_api_management::request::workflows::get_workflow_history,
+    openobserve_api_management::request::workflows::promote_draft,
 ))]
 #[openapi(components(schemas(
     openobserve_api_management::models::experiments::ExperimentResultRowSortBody,
     o2_enterprise::enterprise::password_policy::lockout::LockoutState,
     openobserve_api_management::request::users::UserDetailsResponse,
+    openobserve_api_management::request::alerts::incidents::RcaResumedResponse,
+    openobserve_core::alerts::rca_resume::ResumeStep,
 )))]
 struct EnterpriseExperimentApiDoc;
 
@@ -860,6 +1111,42 @@ mod experiment_tests {
     use super::*;
 
     #[test]
+    fn anomaly_and_gated_dbm_paths_are_mcp_tools() {
+        let spec = serde_json::to_value(EnterpriseExperimentApiDoc::openapi()).unwrap();
+        let paths = &spec["paths"];
+        let anomaly = "/api/{org_id}/anomaly_detection";
+        let anomaly_cases = [
+            (anomaly.to_string(), "get"),
+            (anomaly.to_string(), "post"),
+            (format!("{anomaly}/{{anomaly_id}}"), "delete"),
+            (format!("{anomaly}/{{anomaly_id}}/train"), "post"),
+            (format!("{anomaly}/{{anomaly_id}}/detect"), "post"),
+            (format!("{anomaly}/history"), "get"),
+        ];
+        for (path, method) in &anomaly_cases {
+            let ext = &paths[path.as_str()][method]["x-o2-mcp"];
+            assert_eq!(ext["category"], "anomaly_detection", "{method} {path}");
+        }
+        for route in ["deadlocks", "blocking", "table_health"] {
+            let path = format!("/api/{{org_id}}/db_monitoring/{route}");
+            let ext = &paths[path.as_str()]["get"]["x-o2-mcp"];
+            assert_eq!(ext["category"], "db_monitoring", "{path}");
+        }
+        let delete = &paths[format!("{anomaly}/{{anomaly_id}}").as_str()]["delete"];
+        assert_eq!(delete["x-o2-mcp"]["requires_confirmation"], true);
+        let history = &paths[format!("{anomaly}/{{anomaly_id}}/history").as_str()]["get"];
+        assert_eq!(history["x-o2-mcp"]["enabled"], false);
+        for path in [
+            anomaly.to_string(),
+            format!("{anomaly}/{{anomaly_id}}/history"),
+        ] {
+            let body =
+                &paths[path.as_str()]["get"]["responses"]["200"]["content"]["application/json"];
+            assert_eq!(body["schema"]["type"], "array", "{path}");
+        }
+    }
+
+    #[test]
     fn coordinate_retry_is_registered_in_openapi() {
         let api = EnterpriseExperimentApiDoc::openapi();
         let path = api
@@ -912,14 +1199,351 @@ mod experiment_tests {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "enterprise")]
+    use std::collections::BTreeSet;
+
     use utoipa::OpenApi;
 
     use super::ApiDoc;
 
-    // Handlers that gained a folder-destination authorization check must
-    // advertise the 403 it returns, or clients cannot distinguish it from a bug.
-    // The /{org}/anomaly_detection pair is annotated but enterprise-gated, so it
-    // is absent from this ApiDoc and cannot be asserted from an OSS build.
+    #[cfg(feature = "enterprise")]
+    const ROUTER_SOURCE: &str = include_str!("mod.rs");
+
+    #[cfg(feature = "enterprise")]
+    const SERVICE_ROUTES_SIGNATURE: &str = "pub fn service_routes(";
+
+    #[cfg(feature = "enterprise")]
+    const HTTP_METHODS: &[&str] = &[
+        "get", "post", "put", "delete", "patch", "head", "options", "trace",
+    ];
+
+    #[cfg(feature = "enterprise")]
+    const GATED_MODULE_PREFIXES: &[&str] = &[
+        "/{org_id}/anomaly_detection",
+        "/{org_id}/workflows",
+        "/v2/{org_id}/workflows",
+    ];
+
+    /// Spelled as the merged spec does; the router's own placeholder names differ.
+    #[cfg(feature = "enterprise")]
+    const GATED_MODULE_ROUTES: &[(&str, &str)] = &[
+        ("/api/{org_id}/anomaly_detection", "get"),
+        ("/api/{org_id}/anomaly_detection", "post"),
+        ("/api/{org_id}/anomaly_detection/history", "get"),
+        ("/api/{org_id}/anomaly_detection/{anomaly_id}", "get"),
+        ("/api/{org_id}/anomaly_detection/{anomaly_id}", "put"),
+        ("/api/{org_id}/anomaly_detection/{anomaly_id}", "delete"),
+        ("/api/{org_id}/anomaly_detection/{anomaly_id}/train", "post"),
+        (
+            "/api/{org_id}/anomaly_detection/{anomaly_id}/train",
+            "delete",
+        ),
+        (
+            "/api/{org_id}/anomaly_detection/{anomaly_id}/detect",
+            "post",
+        ),
+        (
+            "/api/{org_id}/anomaly_detection/{anomaly_id}/history",
+            "get",
+        ),
+        ("/api/{org_id}/workflows", "get"),
+        ("/api/{org_id}/workflows", "post"),
+        ("/api/v2/{org_id}/workflows/move", "patch"),
+        ("/api/{org_id}/workflows/test", "post"),
+        ("/api/{org_id}/workflows/{id}", "put"),
+        ("/api/{org_id}/workflows/{id}", "delete"),
+        ("/api/{org_id}/workflows/{id}/trigger", "post"),
+        ("/api/{org_id}/workflows/{id}/errors/{run_id}", "get"),
+        ("/api/{org_id}/workflows/{id}/retry", "post"),
+        ("/api/{org_id}/workflows/{id}/enable", "put"),
+        ("/api/{org_id}/workflows/{id}/history", "get"),
+        ("/api/{org_id}/workflows/promote/{id}", "post"),
+    ];
+
+    /// Canonical `ApiGroupOperation` values; anything else is an alias or drops the route.
+    #[cfg(feature = "enterprise")]
+    const RATELIMIT_OPERATIONS: &[&str] = &["list", "get", "create", "update", "delete"];
+
+    /// Runs stay `create` so a flood of triggers cannot throttle ordinary edits in `update`.
+    #[cfg(feature = "enterprise")]
+    const WORKFLOWS_RATELIMIT: &[(&str, &str, &str)] = &[
+        ("/api/{org_id}/workflows", "post", "create"),
+        ("/api/{org_id}/workflows", "get", "list"),
+        ("/api/v2/{org_id}/workflows/move", "patch", "update"),
+        ("/api/{org_id}/workflows/{id}", "delete", "delete"),
+        ("/api/{org_id}/workflows/{id}", "put", "update"),
+        ("/api/{org_id}/workflows/test", "post", "create"),
+        ("/api/{org_id}/workflows/{id}/trigger", "post", "create"),
+        ("/api/{org_id}/workflows/{id}/errors/{run_id}", "get", "get"),
+        ("/api/{org_id}/workflows/{id}/retry", "post", "create"),
+        ("/api/{org_id}/workflows/{id}/enable", "put", "update"),
+        ("/api/{org_id}/workflows/{id}/history", "get", "get"),
+        ("/api/{org_id}/workflows/promote/{id}", "post", "update"),
+    ];
+
+    const SLACK_OPERATIONS: &[(&str, &str)] = &[
+        ("post", "/api/{org_id}/slack/install/start"),
+        ("post", "/api/{org_id}/slack/install/exchange"),
+        ("get", "/api/{org_id}/slack/prerequisites"),
+        ("post", "/api/{org_id}/slack/connectivity"),
+        ("get", "/api/{org_id}/slack/manifest"),
+        ("get", "/api/{org_id}/slack/installations"),
+        ("post", "/api/{org_id}/slack/installations"),
+        (
+            "post",
+            "/api/{org_id}/slack/installations/{installation_id}/install-url",
+        ),
+        (
+            "put",
+            "/api/{org_id}/slack/installations/{installation_id}/credentials",
+        ),
+        (
+            "post",
+            "/api/{org_id}/slack/installations/{installation_id}/test",
+        ),
+        (
+            "get",
+            "/api/{org_id}/slack/installations/{installation_id}/linking",
+        ),
+        (
+            "put",
+            "/api/{org_id}/slack/installations/{installation_id}/linking",
+        ),
+        (
+            "get",
+            "/api/{org_id}/slack/installations/{installation_id}/links/matches",
+        ),
+        (
+            "post",
+            "/api/{org_id}/slack/installations/{installation_id}/link-all",
+        ),
+        (
+            "post",
+            "/api/{org_id}/slack/installations/{installation_id}/connection/start",
+        ),
+        ("post", "/api/{org_id}/slack/connection/confirm"),
+        (
+            "post",
+            "/api/{org_id}/slack/installations/{installation_id}/connection",
+        ),
+        (
+            "delete",
+            "/api/{org_id}/slack/installations/{installation_id}/connection",
+        ),
+        (
+            "delete",
+            "/api/{org_id}/slack/installations/{installation_id}",
+        ),
+        (
+            "get",
+            "/api/{org_id}/slack/installations/{installation_id}/channels",
+        ),
+        (
+            "get",
+            "/api/{org_id}/slack/installations/{installation_id}/channel-defaults",
+        ),
+        (
+            "get",
+            "/api/{org_id}/slack/installations/{installation_id}/channel-defaults/{channel_id}",
+        ),
+        (
+            "put",
+            "/api/{org_id}/slack/installations/{installation_id}/channel-defaults/{channel_id}",
+        ),
+        (
+            "delete",
+            "/api/{org_id}/slack/installations/{installation_id}/channel-defaults/{channel_id}",
+        ),
+        (
+            "get",
+            "/api/{org_id}/slack/installations/{installation_id}/help-contact",
+        ),
+        (
+            "put",
+            "/api/{org_id}/slack/installations/{installation_id}/help-contact",
+        ),
+        (
+            "get",
+            "/api/{org_id}/slack/installations/{installation_id}/org-access",
+        ),
+        (
+            "put",
+            "/api/{org_id}/slack/installations/{installation_id}/org-access",
+        ),
+        (
+            "post",
+            "/api/{org_id}/slack/link-requests/{request_id}/start",
+        ),
+        ("post", "/api/{org_id}/slack/link-requests/confirm"),
+        (
+            "post",
+            "/api/{org_id}/slack/link-requests/{request_id}/resend",
+        ),
+        ("get", "/api/{org_id}/slack/links/me"),
+        ("delete", "/api/{org_id}/slack/links/{link_id}"),
+        ("get", "/api/{org_id}/slack/links"),
+    ];
+
+    // Ends at the column-0 close brace, so an item after the body is never scraped into it.
+    #[cfg(feature = "enterprise")]
+    fn service_routes_body() -> &'static str {
+        let start = ROUTER_SOURCE
+            .find(SERVICE_ROUTES_SIGNATURE)
+            .expect("the router must define service_routes()");
+        let after_signature = &ROUTER_SOURCE[start + SERVICE_ROUTES_SIGNATURE.len()..];
+        let end = after_signature
+            .find("\n}\n")
+            .expect("service_routes() must end at a column-0 close brace");
+        &after_signature[..end]
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn strip_comments(source: &str) -> String {
+        let mut without_blocks = String::with_capacity(source.len());
+        let mut rest = source;
+        while let Some(open) = rest.find("/*") {
+            without_blocks.push_str(&rest[..open]);
+            let after_open = &rest[open + 2..];
+            rest = match after_open.find("*/") {
+                Some(close) => &after_open[close + 2..],
+                None => "",
+            };
+        }
+        without_blocks.push_str(rest);
+        without_blocks
+            .lines()
+            .map(|line| line.split_once("//").map_or(line, |(code, _)| code))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn normalize(source: &str) -> String {
+        source.chars().filter(|c| !c.is_whitespace()).collect()
+    }
+
+    /// Placeholder names never reach the wire, so only their positions can be compared.
+    #[cfg(feature = "enterprise")]
+    fn erase_placeholders(path: &str) -> String {
+        let mut erased = String::with_capacity(path.len());
+        let mut rest = path;
+        while let Some(open) = rest.find('{') {
+            erased.push_str(&rest[..open]);
+            erased.push_str("{}");
+            rest = match rest[open..].find('}') {
+                Some(close) => &rest[open + close + 1..],
+                None => "",
+            };
+        }
+        erased.push_str(rest);
+        erased
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn placeholders(path: &str) -> BTreeSet<&str> {
+        path.split('{')
+            .skip(1)
+            .filter_map(|rest| rest.split('}').next())
+            .collect()
+    }
+
+    /// Stops at the `.route(` call's own closing paren, so a chained call is not part of it.
+    #[cfg(feature = "enterprise")]
+    fn balanced_arguments(call: &str) -> Option<&str> {
+        let mut depth = 1usize;
+        for (index, character) in call.char_indices() {
+            match character {
+                '(' => depth += 1,
+                ')' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return Some(&call[..index]);
+                    }
+                }
+                _ => {}
+            }
+        }
+        None
+    }
+
+    /// `get(` inside a handler path such as `workflows::get_workflow_errors` is not a verb binding.
+    #[cfg(feature = "enterprise")]
+    fn binds_method(bindings: &str, method: &str) -> bool {
+        let needle = format!("{method}(");
+        let mut searched = 0;
+        while let Some(at) = bindings[searched..].find(&needle) {
+            let start = searched + at;
+            let preceding = bindings[..start].chars().next_back();
+            if !preceding.is_some_and(|c| c.is_alphanumeric() || c == '_' || c == ':') {
+                return true;
+            }
+            searched = start + needle.len();
+        }
+        false
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn under_gated_prefix(path: &str) -> bool {
+        GATED_MODULE_PREFIXES.iter().any(|prefix| {
+            path.strip_prefix(prefix)
+                .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+        })
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn registered_gated_routes() -> BTreeSet<(String, String)> {
+        let live = normalize(&strip_comments(service_routes_body()));
+        let mut routes = BTreeSet::new();
+        for call in live.split(".route(").skip(1) {
+            let Some(arguments) = balanced_arguments(call) else {
+                continue;
+            };
+            let Some(path) = arguments
+                .strip_prefix('"')
+                .and_then(|rest| rest.split('"').next())
+            else {
+                continue;
+            };
+            if !under_gated_prefix(path) {
+                continue;
+            }
+            let bindings = &arguments[path.len() + 2..];
+            for method in HTTP_METHODS {
+                if binds_method(bindings, method) {
+                    let served = erase_placeholders(&format!("/api{path}"));
+                    routes.insert((served, (*method).to_string()));
+                }
+            }
+        }
+        routes
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn assert_documented_statuses(expected: &[(&str, &str, &[&str])]) {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec.get("paths").unwrap().as_object().unwrap();
+        let mut wrong = Vec::new();
+        for (path, method, statuses) in expected {
+            let Some(operation) = paths.get(*path).and_then(|item| item.get(*method)) else {
+                wrong.push(format!("{method} {path}: absent from the spec"));
+                continue;
+            };
+            let documented: BTreeSet<&str> = operation
+                .get("responses")
+                .and_then(|r| r.as_object())
+                .map(|r| r.keys().map(String::as_str).collect())
+                .unwrap_or_default();
+            let returned: BTreeSet<&str> = statuses.iter().copied().collect();
+            if documented != returned {
+                wrong.push(format!(
+                    "{method} {path}: documents {documented:?}, handler returns {returned:?}"
+                ));
+            }
+        }
+        assert!(wrong.is_empty(), "{wrong:#?}");
+    }
+
+    // Folder-destination checks must advertise their 403, or clients cannot tell it from a bug.
     #[test]
     fn folder_scoped_writes_document_forbidden() {
         let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
@@ -974,6 +1598,80 @@ mod tests {
     }
 
     #[test]
+    fn slack_paths_are_rate_limited_and_hidden_from_mcp() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec["paths"].as_object().unwrap();
+        let mut documented = Vec::new();
+        for (path, item) in paths.iter().filter(|(p, _)| p.contains("/slack/")) {
+            for (method, op) in item.as_object().unwrap() {
+                documented.push((method.clone(), path.clone()));
+                assert_eq!(op["x-o2-ratelimit"]["module"], "Slack", "{method} {path}");
+                let want = match method.as_str() {
+                    "get" => &["list", "get"][..],
+                    "post" => &["create"][..],
+                    "put" => &["update"][..],
+                    _ => &["delete"][..],
+                };
+                let operation = op["x-o2-ratelimit"]["operation"].as_str().unwrap_or("");
+                assert!(want.contains(&operation), "{method} {path}: {operation}");
+                assert_eq!(op["x-o2-mcp"]["enabled"], false, "{method} {path}");
+                assert_eq!(op["tags"], serde_json::json!(["Slack"]), "{method} {path}");
+            }
+        }
+        documented.sort();
+        let mut want: Vec<(String, String)> = SLACK_OPERATIONS
+            .iter()
+            .map(|(m, p)| (m.to_string(), p.to_string()))
+            .collect();
+        want.sort();
+        assert_eq!(documented, want);
+    }
+
+    #[test]
+    fn slack_status_codes_are_documented() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = &spec["paths"];
+        for (method, path) in SLACK_OPERATIONS {
+            let responses = &paths[*path][*method]["responses"];
+            for status in ["403", "404"] {
+                assert!(responses.get(status).is_some(), "{method} {path} {status}");
+            }
+        }
+        assert!(
+            paths["/api/{org_id}/slack/installations"]["post"]["responses"]
+                .get("201")
+                .is_some()
+        );
+        assert!(
+            paths["/api/{org_id}/slack/installations/{installation_id}/channel-defaults/{channel_id}"]
+                ["delete"]["responses"]
+                .get("204")
+                .is_some()
+        );
+        assert!(
+            paths["/api/{org_id}/slack/links/{link_id}"]["delete"]["responses"]
+                .get("204")
+                .is_some()
+        );
+        assert!(
+            paths["/api/{org_id}/slack/link-requests/{request_id}/resend"]["post"]["responses"]
+                .get("202")
+                .is_some()
+        );
+        for path in [
+            "/api/{org_id}/slack/link-requests/{request_id}/start",
+            "/api/{org_id}/slack/link-requests/confirm",
+        ] {
+            for status in ["400", "410", "429"] {
+                assert!(
+                    paths[path]["post"]["responses"].get(status).is_some(),
+                    "{path} {status}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn recent_rejections_path_and_schemas_are_registered() {
         let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
         let op = &spec["paths"]["/api/{org_id}/ingest/recent_rejections"]["get"];
@@ -985,6 +1683,145 @@ mod tests {
         let schemas = spec["components"]["schemas"].as_object().unwrap();
         for name in ["RecentRejections", "IngestRejection", "RejectionReason"] {
             assert!(schemas.contains_key(name), "schema {name} missing");
+        }
+    }
+
+    #[test]
+    fn fleet_reads_are_documented_with_their_403() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for path in [
+            "/api/{org_id}/fleet/collectors",
+            "/api/{org_id}/fleet/collectors/{id}",
+            "/api/{org_id}/fleet/summary",
+            "/api/{org_id}/fleet/settings",
+        ] {
+            let get = &spec["paths"][path]["get"];
+            assert!(get["responses"]["403"].is_object(), "{path}");
+        }
+        assert!(
+            spec["paths"]["/api/{org_id}/fleet/collectors/{id}"]["get"]["responses"]["404"]
+                .is_object()
+        );
+    }
+
+    #[test]
+    fn fleet_endpoints_are_documented_and_the_removed_ones_are_not() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for (path, method, codes) in [
+            ("/api/{org_id}/fleet/tokens", "get", &["200", "403"][..]),
+            (
+                "/api/{org_id}/fleet/tokens",
+                "post",
+                &["201", "400", "403", "404", "409"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/tokens/{id}/revoke",
+                "post",
+                &["200", "403", "404"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/collectors/{id}",
+                "delete",
+                &["204", "403", "404"][..],
+            ),
+            ("/api/{org_id}/fleet/fleets", "get", &["200", "403"][..]),
+            (
+                "/api/{org_id}/fleet/fleets/{fleet_id}/desired",
+                "put",
+                &["200", "400", "403", "404", "409"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/fleets/move",
+                "post",
+                &["200", "400", "403", "404", "409"][..],
+            ),
+            ("/api/{org_id}/fleet/configs", "get", &["200", "403"][..]),
+            (
+                "/api/{org_id}/fleet/configs",
+                "post",
+                &["201", "400", "403", "409"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/configs/{id}",
+                "get",
+                &["200", "403", "404"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/configs/{id}",
+                "delete",
+                &["204", "403", "404", "409"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/configs/{id}/draft",
+                "put",
+                &["200", "403", "404"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/configs/{id}/versions",
+                "post",
+                &["201", "400", "403", "404", "409", "422"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/configs/{id}/versions/{version}",
+                "get",
+                &["200", "400", "403", "404"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/configs/validate",
+                "post",
+                &["200", "403"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/audit",
+                "get",
+                &["200", "400", "403"][..],
+            ),
+            (
+                "/api/{org_id}/fleet/settings",
+                "put",
+                &["200", "400", "403"][..],
+            ),
+            ("/api/{org_id}/fleet/rollouts", "get", &["200", "403"][..]),
+            (
+                "/api/{org_id}/fleet/rollouts/{id}",
+                "get",
+                &["200", "403", "404"][..],
+            ),
+        ] {
+            for code in codes {
+                assert!(
+                    spec["paths"][path][method]["responses"][*code].is_object(),
+                    "{method} {path} {code}"
+                );
+            }
+        }
+        for (path, method) in [
+            ("/api/{org_id}/fleet/rollouts", "post"),
+            ("/api/{org_id}/fleet/rollouts/{id}", "patch"),
+            ("/api/{org_id}/fleet/rollouts/{id}/revert", "post"),
+            ("/api/{org_id}/fleet/rollouts/{id}/pause", "post"),
+            ("/api/{org_id}/fleet/rollouts/{id}/stop", "post"),
+            ("/api/{org_id}/fleet/flow", "get"),
+        ] {
+            assert!(spec["paths"][path][method].is_null(), "{method} {path}");
+        }
+        for schema in [
+            "SetDesiredRequest",
+            "FleetList",
+            "MoveCollectorsRequest",
+            "CollectorFleet",
+        ] {
+            assert!(
+                spec["components"]["schemas"][schema].is_object(),
+                "{schema}"
+            );
+        }
+        for gone in [
+            "CreateRolloutRequest",
+            "UpdateRolloutRequest",
+            "UpdateCollectorRequest",
+        ] {
+            assert!(spec["components"]["schemas"][gone].is_null(), "{gone}");
         }
     }
 
@@ -1067,6 +1904,27 @@ mod tests {
     }
 
     #[test]
+    fn rca_resume_path_is_documented() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec["paths"].as_object().unwrap();
+        let resume = "/api/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/resume";
+        let op = &paths[resume]["post"];
+        assert!(op.is_object(), "post {resume} missing");
+        assert_eq!(op["operationId"], "ResumeIncidentRcaRun");
+        assert_eq!(op["tags"], serde_json::json!(["Incidents"]));
+        assert_eq!(op["x-o2-ratelimit"]["module"], "Alerts");
+        assert_eq!(op["x-o2-ratelimit"]["operation"], "update");
+        #[cfg(feature = "enterprise")]
+        for status in ["202", "404", "409", "410", "503"] {
+            assert!(
+                op["responses"].get(status).is_some(),
+                "post {resume} {status}"
+            );
+        }
+        assert!(paths[resume].get("get").is_none());
+    }
+
+    #[test]
     fn every_schema_ref_resolves() {
         fn collect_refs<'a>(value: &'a serde_json::Value, refs: &mut Vec<&'a str>) {
             match value {
@@ -1095,5 +1953,325 @@ mod tests {
         unresolved.sort_unstable();
         unresolved.dedup();
         assert!(unresolved.is_empty(), "unresolved refs: {unresolved:?}");
+    }
+
+    /// Only `SecurityAddon` merges these modules in, so the merged doc is the real surface.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn gated_module_routes_are_published_in_the_merged_spec() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec.get("paths").unwrap().as_object().unwrap();
+        let missing: Vec<_> = GATED_MODULE_ROUTES
+            .iter()
+            .filter(|(path, method)| paths.get(*path).and_then(|p| p.get(*method)).is_none())
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "absent from the merged spec: {missing:#?}"
+        );
+    }
+
+    /// A handler served over HTTP but absent from the spec is the gap this table closes.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn gated_route_table_matches_what_service_routes_registers() {
+        let registered = registered_gated_routes();
+        assert!(
+            !registered.is_empty(),
+            "the scrape found no gated routes; service_routes() moved or the scrape stopped matching"
+        );
+        let listed: BTreeSet<(String, String)> = GATED_MODULE_ROUTES
+            .iter()
+            .map(|(path, method)| (erase_placeholders(path), (*method).to_string()))
+            .collect();
+        let unlisted: Vec<_> = registered.difference(&listed).collect();
+        let unregistered: Vec<_> = listed.difference(&registered).collect();
+        assert!(
+            unlisted.is_empty() && unregistered.is_empty(),
+            "served but not listed: {unlisted:#?}\nlisted but not served: {unregistered:#?}"
+        );
+    }
+
+    /// A path param with no placeholder makes generated clients demand a phantom value.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn gated_route_path_parameters_match_their_templates() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec.get("paths").unwrap().as_object().unwrap();
+        let mut invalid = Vec::new();
+        for (path, method) in GATED_MODULE_ROUTES {
+            let Some(operation) = paths.get(*path).and_then(|p| p.get(*method)) else {
+                invalid.push(format!("{method} {path}: absent from the spec"));
+                continue;
+            };
+            let declared: BTreeSet<&str> = operation
+                .get("parameters")
+                .and_then(|p| p.as_array())
+                .into_iter()
+                .flatten()
+                .filter(|p| p.get("in").and_then(|i| i.as_str()) == Some("path"))
+                .filter_map(|p| p.get("name").and_then(|n| n.as_str()))
+                .collect();
+            let template = placeholders(path);
+            if declared != template {
+                invalid.push(format!(
+                    "{method} {path}: declares {declared:?}, template has {template:?}"
+                ));
+            }
+        }
+        assert!(invalid.is_empty(), "{invalid:#?}");
+    }
+
+    /// Every handler but the bulk history opens with `disabled_response()`, which answers 403.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn anomaly_detection_documents_the_statuses_its_handlers_return() {
+        let base = "/api/{org_id}/anomaly_detection";
+        let by_id = "/api/{org_id}/anomaly_detection/{anomaly_id}";
+        let train = "/api/{org_id}/anomaly_detection/{anomaly_id}/train";
+        let detect = "/api/{org_id}/anomaly_detection/{anomaly_id}/detect";
+        let history = "/api/{org_id}/anomaly_detection/{anomaly_id}/history";
+        let bulk_history = "/api/{org_id}/anomaly_detection/history";
+        assert_documented_statuses(&[
+            (base, "get", &["200", "403", "500"]),
+            (base, "post", &["200", "400", "403", "500"]),
+            (by_id, "get", &["200", "403", "404", "500"]),
+            (by_id, "put", &["200", "400", "403", "404", "500"]),
+            (by_id, "delete", &["200", "403", "404", "500"]),
+            (train, "post", &["200", "403", "404", "500"]),
+            (train, "delete", &["200", "403", "404", "500"]),
+            (detect, "post", &["200", "403", "404", "500"]),
+            (history, "get", &["200", "403", "500"]),
+            (bulk_history, "get", &["200", "400", "403", "500"]),
+        ]);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn workflows_document_the_statuses_their_handlers_return() {
+        let base = "/api/{org_id}/workflows";
+        let by_id = "/api/{org_id}/workflows/{id}";
+        assert_documented_statuses(&[
+            (base, "post", &["200", "400", "403", "500"]),
+            (base, "get", &["200", "403", "500"]),
+            (
+                "/api/v2/{org_id}/workflows/move",
+                "patch",
+                &["200", "400", "403", "500"],
+            ),
+            (by_id, "delete", &["200", "400", "404", "500"]),
+            (by_id, "put", &["200", "400", "500"]),
+            ("/api/{org_id}/workflows/test", "post", &["200", "400"]),
+            (
+                "/api/{org_id}/workflows/{id}/trigger",
+                "post",
+                &["200", "400"],
+            ),
+            (
+                "/api/{org_id}/workflows/{id}/errors/{run_id}",
+                "get",
+                &["200", "400", "500"],
+            ),
+            (
+                "/api/{org_id}/workflows/{id}/retry",
+                "post",
+                &["200", "400"],
+            ),
+            (
+                "/api/{org_id}/workflows/{id}/enable",
+                "put",
+                &["200", "400"],
+            ),
+            (
+                "/api/{org_id}/workflows/{id}/history",
+                "get",
+                &["200", "400", "500"],
+            ),
+            (
+                "/api/{org_id}/workflows/promote/{id}",
+                "post",
+                &["201", "400", "403", "500"],
+            ),
+        ]);
+    }
+
+    /// An undeclared query param the handler branches on is unreachable from a generated client.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn workflows_declare_the_query_params_their_handlers_read() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec.get("paths").unwrap().as_object().unwrap();
+        let by_id = "/api/{org_id}/workflows/{id}";
+        let expected: &[(&str, &str, &[&str])] = &[
+            ("/api/{org_id}/workflows", "post", &["folder", "draft"]),
+            (
+                "/api/{org_id}/workflows",
+                "get",
+                &["folder", "all_folders", "search_substring"],
+            ),
+            (by_id, "delete", &["draft"]),
+            (by_id, "put", &["draft"]),
+            ("/api/{org_id}/workflows/test", "post", &["draft"]),
+            ("/api/{org_id}/workflows/{id}/enable", "put", &["value"]),
+            (
+                "/api/{org_id}/workflows/{id}/history",
+                "get",
+                &["start_time", "end_time"],
+            ),
+            (
+                "/api/{org_id}/workflows/promote/{id}",
+                "post",
+                &["trigger_type", "folder"],
+            ),
+        ];
+        let mut wrong = Vec::new();
+        for (path, method, names) in expected {
+            let Some(operation) = paths.get(*path).and_then(|p| p.get(*method)) else {
+                wrong.push(format!("{method} {path}: absent from the spec"));
+                continue;
+            };
+            let declared: BTreeSet<&str> = operation
+                .get("parameters")
+                .and_then(|p| p.as_array())
+                .into_iter()
+                .flatten()
+                .filter(|p| p.get("in").and_then(|i| i.as_str()) == Some("query"))
+                .filter_map(|p| p.get("name").and_then(|n| n.as_str()))
+                .collect();
+            let read: BTreeSet<&str> = names.iter().copied().collect();
+            if declared != read {
+                wrong.push(format!(
+                    "{method} {path}: declares {declared:?}, handler reads {read:?}"
+                ));
+            }
+        }
+        let enable = &paths["/api/{org_id}/workflows/{id}/enable"]["put"];
+        if enable.get("requestBody").is_some() {
+            wrong.push("put .../enable: declares a body the handler never reads".to_string());
+        }
+        assert!(wrong.is_empty(), "{wrong:#?}");
+    }
+
+    /// The handler extracts `Json<Vec<Value>>`, so an object body is rejected before it runs.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn workflow_trigger_body_is_documented_as_an_array() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let body = &spec["paths"]["/api/{org_id}/workflows/{id}/trigger"]["post"]["requestBody"];
+        let schema = &body["content"]["application/json"]["schema"];
+        assert_eq!(schema["type"], "array", "{body}");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn workflows_ratelimit_labels_name_their_own_module_and_a_canonical_operation() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec.get("paths").unwrap().as_object().unwrap();
+        let mut wrong = Vec::new();
+        for (path, method, operation) in WORKFLOWS_RATELIMIT {
+            let Some(op) = paths.get(*path).and_then(|p| p.get(*method)) else {
+                wrong.push(format!("{method} {path}: absent from the spec"));
+                continue;
+            };
+            let label = &op["x-o2-ratelimit"];
+            if label["module"] != "Workflows" || label["operation"] != *operation {
+                wrong.push(format!(
+                    "{method} {path}: {label}, expected Workflows/{operation}"
+                ));
+            }
+        }
+        // Other modules already use labels outside the five, so only workflows paths are checked.
+        for (path, item) in paths.iter().filter(|(path, _)| path.contains("/workflows")) {
+            for (method, op) in item.as_object().unwrap() {
+                let Some(operation) = op["x-o2-ratelimit"]["operation"].as_str() else {
+                    continue;
+                };
+                if !RATELIMIT_OPERATIONS.contains(&operation) {
+                    wrong.push(format!(
+                        "{method} {path}: operation {operation:?} is not canonical"
+                    ));
+                }
+            }
+        }
+        assert!(wrong.is_empty(), "{wrong:#?}");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn workflow_list_and_history_document_an_array_of_objects() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for path in [
+            "/api/{org_id}/workflows",
+            "/api/{org_id}/workflows/{id}/history",
+        ] {
+            let ok = &spec["paths"][path]["get"]["responses"]["200"];
+            let schema = &ok["content"]["application/json"]["schema"];
+            assert_eq!(schema["type"], "array", "{path}: {ok}");
+            assert_eq!(schema["items"]["type"], "object", "{path}: {ok}");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn the_scrape_stops_at_the_end_of_service_routes() {
+        let body = service_routes_body();
+        for item in ["\nfn ", "\npub fn ", "\npub(crate) fn ", "\nasync fn "] {
+            assert!(
+                !body.contains(item),
+                "the scrape ran into a following {item:?} item"
+            );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_commented_out_route_is_not_read_as_a_registration() {
+        assert_eq!(strip_comments("a\n// .route(\"/x\", get(h))\nb"), "a\n\nb");
+        assert_eq!(strip_comments("a/* .route(\"/x\") */b"), "ab");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_chained_call_after_a_route_is_not_read_as_one_of_its_verbs() {
+        let call = normalize("\"/{org_id}/workflows\",get(h)).layer(post(x))");
+        let arguments = balanced_arguments(&call).expect("the route call must close");
+        assert!(binds_method(arguments, "get"));
+        assert!(!binds_method(arguments, "post"));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_verb_name_inside_a_handler_path_is_not_read_as_a_verb_binding() {
+        assert!(binds_method("get(routes::post(state))", "get"));
+        assert!(!binds_method("get(routes::post(state))", "post"));
+        assert!(!binds_method(
+            "get(workflows::get_workflow_errors)",
+            "delete"
+        ));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_sibling_module_sharing_a_name_prefix_is_not_gated() {
+        assert!(under_gated_prefix("/{org_id}/workflows"));
+        assert!(under_gated_prefix("/{org_id}/workflows/{id}"));
+        assert!(!under_gated_prefix("/{org_id}/workflows_v3"));
+    }
+
+    #[test]
+    fn p4_r4_rum_analytics_settings_routes_and_schemas_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let settings = &spec["paths"]["/api/{org_id}/rum/analytics/settings"];
+        for (method, statuses) in [("get", &["200"][..]), ("put", &["200", "400", "409"][..])] {
+            let op = &settings[method];
+            assert!(op.is_object(), "{method} settings missing");
+            for status in statuses {
+                assert!(op["responses"].get(*status).is_some(), "{method} {status}");
+            }
+        }
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        for name in ["AppSettings", "PutAppSettings"] {
+            assert!(schemas.contains_key(name), "schema {name} missing");
+        }
     }
 }

@@ -51,8 +51,7 @@ use usage_reporting::report_request_usage_stats;
 #[cfg(feature = "enterprise")]
 use {
     infra::{client::grpc::make_grpc_search_client, cluster::get_cached_online_query_nodes},
-    o2_enterprise::enterprise::{common::config::get_config as get_o2_config, search::TaskStatus},
-    std::collections::HashSet,
+    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
     tracing::info_span,
 };
 
@@ -88,7 +87,10 @@ use ::search::{
     datafusion::{self, distributed_plan::streaming_aggs_exec},
     index, inspector, sql, tantivy, utils,
 };
+#[cfg(feature = "enterprise")]
+pub use searcher::QueryPhase;
 use searcher::Searcher;
+pub use searcher::{LeaderInfo, QueryRegistration, QueryTracker};
 
 /// The result of search in cluster
 /// data, scan_stats, wait_in_queue, is_partial, partial_err
@@ -109,7 +111,6 @@ pub async fn search(
 ) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
     let started_at = now_micros();
-    let cfg = get_config();
 
     #[allow(unused_mut)]
     let mut search_role = "leader".to_string();
@@ -118,16 +119,7 @@ pub async fn search(
         search_role = "super".to_string();
     }
 
-    let trace_id = if trace_id.is_empty() {
-        if cfg.common.should_create_span() {
-            let ctx = tracing::Span::current().context();
-            ctx.span().span_context().trace_id().to_string()
-        } else {
-            ider::generate_trace_id()
-        }
-    } else {
-        trace_id.to_string()
-    };
+    let trace_id = leader_trace_id(trace_id);
 
     log::info!(
         "{}",
@@ -175,38 +167,36 @@ pub async fn search(
     request.mark_chat_history_reader();
     let meta = Sql::new_from_req(&request, &query).await?;
 
-    #[cfg(feature = "enterprise")]
-    {
-        let sql = Some(in_req.query.sql.clone());
-        let start_time = Some(in_req.query.start_time);
-        let end_time = Some(in_req.query.end_time);
-        let s_event_type = in_req
-            .search_type
-            .map(|s_event_type| s_event_type.to_string());
-        // set search task
-        SEARCH_SERVER
-            .insert(
-                trace_id.clone(),
-                TaskStatus::new_leader(
-                    vec![],
-                    true,
-                    user_id.clone(),
-                    Some(org_id.to_string()),
-                    Some(stream_type.to_string()),
-                    sql,
-                    start_time,
-                    end_time,
-                    s_event_type,
-                    in_req.search_event_context.clone(),
-                ),
-            )
-            .await;
-    }
+    // callers may share one trace_id across concurrent requests, e.g. Grafana via traceparent
+    let registration = SEARCH_SERVER.register_leader(
+        org_id,
+        &trace_id,
+        LeaderInfo {
+            user_id: user_id.as_deref(),
+            stream_type: stream_type.as_str(),
+            sql: &in_req.query.sql,
+            start_time: in_req.query.start_time,
+            end_time: in_req.query.end_time,
+            search_type: in_req.search_type.map(|t| t.to_string()),
+            search_event_context: in_req.search_event_context.as_ref(),
+        },
+    );
 
     let span = tracing::span::Span::current();
+    let query_tracker = registration.tracker().clone();
     let handle = tokio::task::spawn(
-        async move { cluster::http::search(request, query, req_regions, req_clusters, true).await }
-            .instrument(span),
+        async move {
+            cluster::http::search(
+                request,
+                &query_tracker,
+                query,
+                req_regions,
+                req_clusters,
+                true,
+            )
+            .await
+        }
+        .instrument(span),
     );
     let res = match handle.await {
         Ok(Ok(res)) => Ok(res),
@@ -228,17 +218,7 @@ pub async fn search(
         )
     );
 
-    // remove task because task if finished
-    let mut _work_group = None;
-    #[cfg(feature = "enterprise")]
-    {
-        if let Some(status) = SEARCH_SERVER.remove(&trace_id, false).await
-            && let Some((_, stat)) = status.first()
-            && let Some(wg) = stat.work_group.as_ref()
-        {
-            _work_group = Some(wg.to_string());
-        };
-    }
+    let _work_group = registration.finish();
 
     match res {
         Ok(mut res) => {
@@ -341,17 +321,7 @@ pub async fn search_multi(
 ) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
-    let cfg = get_config();
-    let trace_id = if trace_id.is_empty() {
-        if cfg.common.should_create_span() {
-            let ctx = tracing::Span::current().context();
-            ctx.span().span_context().trace_id().to_string()
-        } else {
-            ider::generate_trace_id()
-        }
-    } else {
-        trace_id.to_string()
-    };
+    let trace_id = leader_trace_id(trace_id);
 
     let mut per_query_resp = multi_req.per_query_response;
 
@@ -755,13 +725,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
     }
 
     let mut status = vec![];
-    let mut set = HashSet::new();
-    for result in results.into_iter().flat_map(|v| v.status.into_iter()) {
-        if set.contains(&result.trace_id) {
-            continue;
-        } else {
-            set.insert(result.trace_id.clone());
-        }
+    for result in unique_queries(results.into_iter().flat_map(|v| v.status.into_iter())) {
         let query = result.query.as_ref().map(|query| search::QueryInfo {
             sql: query.sql.clone(),
             start_time: query.start_time,
@@ -792,7 +756,8 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
         };
         let work_group = result.work_group.clone().unwrap_or_default();
         let search_type: Option<search::SearchEventType> = result.search_type.map(|s_event_type| {
-            search::SearchEventType::try_from(s_event_type.as_str())
+            s_event_type
+                .parse::<search::SearchEventType>()
                 .unwrap_or(search::SearchEventType::UI)
         });
         status.push(search::QueryStatus {
@@ -814,9 +779,10 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
     Ok(search::QueryStatusResponse { status })
 }
 
+/// Cancels `trace_id` in `org_id` on every querier.
 #[cfg(feature = "enterprise")]
 pub async fn cancel_query(
-    _org_id: &str,
+    org_id: &str,
     trace_id: &str,
 ) -> Result<search::CancelQueryResponse, Error> {
     // get nodes from cluster
@@ -842,10 +808,12 @@ pub async fn cancel_query(
         );
 
         let trace_id = trace_id.to_string();
+        let org_id = org_id.to_string();
         let task = tokio::task::spawn(
             async move {
                 let mut request = tonic::Request::new(proto::cluster_rpc::CancelQueryRequest {
                     trace_id: trace_id.clone(),
+                    org_id,
                 });
                 let node = Arc::new(node) as _;
                 let mut client = make_grpc_search_client(&trace_id, &mut request, &node, 0).await?;
@@ -870,26 +838,19 @@ pub async fn cancel_query(
         tasks.push(task);
     }
 
-    let mut results = Vec::with_capacity(tasks.len());
+    let mut outcomes = Vec::with_capacity(tasks.len());
     for task in tasks {
-        match task.await {
-            Ok(res) => match res {
-                Ok(res) => results.push(res),
-                Err(err) => {
-                    return Err(err);
-                }
-            },
-            Err(e) => {
-                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                    e.to_string(),
-                )));
-            }
-        }
+        outcomes.push(match task.await {
+            Ok(res) => res.map(|res| res.is_success),
+            Err(e) => Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                e.to_string(),
+            ))),
+        });
     }
 
     Ok(search::CancelQueryResponse {
         trace_id: trace_id.to_string(),
-        is_success: true,
+        is_success: merge_cancel_outcomes(outcomes)?,
     })
 }
 
@@ -1071,6 +1032,23 @@ pub fn generate_search_schema_diff(
     diff_fields
 }
 
+/// The id a leader search runs under: the caller's, else the span's, else a fresh one.
+pub fn leader_trace_id(trace_id: &str) -> String {
+    // A span without a parent context reports all zeros, which every org would share.
+    let unset = |id: &str| id.bytes().all(|b| b == b'0');
+    if !unset(trace_id) {
+        return trace_id.to_string();
+    }
+    if get_config().common.should_create_span() {
+        let span_context = tracing::Span::current().context();
+        let span_trace_id = span_context.span().span_context().trace_id().to_string();
+        if !unset(&span_trace_id) {
+            return span_trace_id;
+        }
+    }
+    ider::generate_trace_id()
+}
+
 #[inline]
 pub fn check_search_allowed(_org_id: &str, _stream: Option<&str>) -> Result<(), Error> {
     #[cfg(feature = "enterprise")]
@@ -1080,9 +1058,9 @@ pub fn check_search_allowed(_org_id: &str, _stream: Option<&str>) -> Result<(), 
         }
         // this is installation level limit for all orgs combined
         if !o2_enterprise::enterprise::license::search_allowed() {
-            Err(Error::Message(
-                "Search is temporarily disabled due to exceeding allotted ingestion limit. Please contact your administrator.".to_string(),
-            ))
+            Err(Error::Message(search_blocked_message(
+                o2_enterprise::enterprise::license::current_license_id().as_deref(),
+            )))
         } else {
             Ok(())
         }
@@ -1092,11 +1070,47 @@ pub fn check_search_allowed(_org_id: &str, _stream: Option<&str>) -> Result<(), 
     Ok(())
 }
 
+/// The first row of each query; two orgs may run the same trace id, so a query is its org and id.
+#[cfg(any(feature = "enterprise", test))]
+fn unique_queries(
+    rows: impl Iterator<Item = proto::cluster_rpc::QueryStatus>,
+) -> Vec<proto::cluster_rpc::QueryStatus> {
+    let mut seen = std::collections::HashSet::new();
+    rows.filter(|row| seen.insert((row.org_id.clone(), row.trace_id.clone())))
+        .collect()
+}
+
+/// A cancel succeeded when any node removed a match; a node error is reported only when none did.
+#[cfg(any(feature = "enterprise", test))]
+fn merge_cancel_outcomes(outcomes: Vec<Result<bool, Error>>) -> Result<bool, Error> {
+    let mut first_err = None;
+    for outcome in outcomes {
+        match outcome {
+            Ok(true) => return Ok(true),
+            Ok(false) => {}
+            Err(e) => {
+                first_err.get_or_insert(e);
+            }
+        }
+    }
+    first_err.map_or(Ok(false), Err)
+}
+
 /// The meta org's own usage and audit streams must stay searchable to diagnose the license gate.
 #[cfg(any(feature = "enterprise", test))]
 #[inline]
 fn is_license_exempt_stream(org_id: &str, stream: Option<&str>) -> bool {
     org_id == META_ORG_ID && (stream == Some(USAGE_STREAM) || stream == Some(AUDIT_STREAM))
+}
+
+#[cfg(any(feature = "enterprise", test))]
+fn search_blocked_message(license_id: Option<&str>) -> String {
+    match license_id.filter(|id| !id.is_empty()) {
+        Some(id) => format!(
+            "Search is temporarily disabled due to exceeding allotted ingestion limit. License ID: {id}. Please contact your administrator."
+        ),
+        None => "Search is temporarily disabled due to exceeding allotted ingestion limit. Please contact your administrator.".to_string(),
+    }
 }
 
 fn flatten_vrl_result(value: json::Value) -> Option<json::Value> {
@@ -1226,6 +1240,85 @@ mod tests {
     fn test_check_search_allowed_non_enterprise_always_ok() {
         assert!(check_search_allowed("myorg", None).is_ok());
         assert!(check_search_allowed("myorg", Some("logs")).is_ok());
+    }
+
+    #[test]
+    fn test_search_blocked_message_names_the_license() {
+        assert_eq!(
+            search_blocked_message(Some("2HbQ7f3aZk")),
+            "Search is temporarily disabled due to exceeding allotted ingestion limit. License ID: 2HbQ7f3aZk. Please contact your administrator."
+        );
+    }
+
+    #[test]
+    fn test_search_blocked_message_without_a_license_keeps_the_old_text() {
+        let old = "Search is temporarily disabled due to exceeding allotted ingestion limit. Please contact your administrator.";
+        assert_eq!(search_blocked_message(None), old);
+        assert_eq!(search_blocked_message(Some("")), old);
+    }
+
+    #[test]
+    fn test_an_unset_trace_id_gets_a_fresh_one() {
+        let zeros = "0".repeat(32);
+        for unset in ["", zeros.as_str()] {
+            let trace_id = leader_trace_id(unset);
+            assert!(
+                !trace_id.bytes().all(|b| b == b'0'),
+                "{unset:?} -> {trace_id:?}"
+            );
+        }
+        assert_ne!(leader_trace_id(""), leader_trace_id(""));
+        assert_eq!(leader_trace_id("abc123"), "abc123");
+    }
+
+    #[test]
+    fn test_status_keeps_one_row_per_org_and_trace_id() {
+        let row = |org: Option<&str>, trace_id: &str, user: &str| proto::cluster_rpc::QueryStatus {
+            trace_id: trace_id.to_string(),
+            org_id: org.map(str::to_string),
+            user_id: Some(user.to_string()),
+            ..Default::default()
+        };
+        let rows = vec![
+            row(Some("a"), "t", "first"),
+            row(Some("b"), "t", "first"),
+            row(Some("a"), "t", "second"),
+            row(None, "t", "first"),
+            row(Some("a"), "u", "first"),
+        ];
+        let listed = unique_queries(rows.into_iter())
+            .into_iter()
+            .map(|row| (row.org_id, row.trace_id, row.user_id.unwrap()))
+            .collect::<Vec<_>>();
+        let expect = |org: Option<&str>, trace_id: &str| {
+            (
+                org.map(str::to_string),
+                trace_id.to_string(),
+                "first".to_string(),
+            )
+        };
+        assert_eq!(
+            listed,
+            vec![
+                expect(Some("a"), "t"),
+                expect(Some("b"), "t"),
+                expect(None, "t"),
+                expect(Some("a"), "u"),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_cancel_succeeds_when_any_node_cancelled() {
+        let err = || Err(Error::Message("node unreachable".to_string()));
+        assert!(merge_cancel_outcomes(vec![Ok(false), Ok(true), Ok(false)]).unwrap());
+        assert!(merge_cancel_outcomes(vec![Ok(true)]).unwrap());
+        assert!(merge_cancel_outcomes(vec![err(), Ok(true)]).unwrap());
+        assert!(merge_cancel_outcomes(vec![Ok(true), err()]).unwrap());
+        assert!(!merge_cancel_outcomes(vec![Ok(false), Ok(false)]).unwrap());
+        assert!(!merge_cancel_outcomes(vec![]).unwrap());
+        assert!(merge_cancel_outcomes(vec![Ok(false), err()]).is_err());
+        assert!(merge_cancel_outcomes(vec![err(), err()]).is_err());
     }
 
     #[test]

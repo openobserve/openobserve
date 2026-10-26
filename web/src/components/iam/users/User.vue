@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </template>
 
-          <template #cell-actions="{ row }">
+          <template #cell-actions="{ row, index }">
             <OButton
               v-if="row.enableDelete && row.status != 'pending'"
               :title="t('user.delete')"
@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               class="max-md:hidden"
-              :data-test="`edit-basic-user-${row.email}`"
+              :data-test="`edit-basic-user-${index}`"
               data-row-action="edit"
               @click="addRoutePush(row)"
             >
@@ -219,6 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #trigger>
                 <OButton
+                  :aria-label="t('common.moreActions')"
                   icon-left="more-vert"
                   variant="ghost"
                   size="icon-xs-sq"
@@ -251,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="row.enableEdit && row.status != 'pending'"
                 icon-left="edit"
                 class="md:hidden"
-                :data-test="`edit-basic-user-${row.email}-menu`"
+                :data-test="`edit-basic-user-${index}-menu`"
                 @select="addRoutePush(row)"
               >
                 <span>{{ t("user.update") }}</span>
@@ -1127,8 +1128,6 @@ export default defineComponent({
         analytics.track("Button Click", {
           button: "Actions",
           user_org: store.state.selectedOrganization.identifier,
-          user_id: store.state.userInfo.email,
-          update_user: props.row.email,
           page: "Users",
         });
       } else {
@@ -1354,12 +1353,7 @@ export default defineComponent({
           await getOrgMembers(true);
           updateUserActions();
 
-          analytics.track("Button Click", {
-            button: "Revoke Invite",
-            user_org: store.state.selectedOrganization.identifier,
-            user_id: store.state.userInfo.email,
-            page: "Users",
-          });
+          analytics.track("invite_revoked");
         })
         .catch((err: any) => {
           dismiss();
@@ -1503,8 +1497,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: "Update Role",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
-        update_user: row.email,
         page: "Users",
       });
     };

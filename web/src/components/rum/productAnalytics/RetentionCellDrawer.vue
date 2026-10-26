@@ -249,7 +249,7 @@ const runMode = async (mode: RetentionMode, force: boolean) => {
           sample: ratio.value,
         },
       ),
-      startUs: props.periods.boundariesUs[0],
+      startUs: pa.newUsersRange({ startUs: props.periods.boundariesUs[0], endUs: end }).startUs,
       endUs: end,
       limit: 400,
       sampled: ratio.value,

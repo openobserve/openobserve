@@ -1001,6 +1001,9 @@ pub struct QueryStatusResponse {
 pub struct CancelQueryRequest {
     #[prost(string, tag = "1")]
     pub trace_id: ::prost::alloc::string::String,
+    /// The org whose queries are cancelled; nodes that predate the field ignore it.
+    #[prost(string, tag = "2")]
+    pub org_id: ::prost::alloc::string::String,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct CancelQueryResponse {
@@ -1243,6 +1246,8 @@ pub struct GetLicenseUsageResponse {
     pub last_usage_response: ::prost::alloc::string::String,
     #[prost(message, repeated, tag = "8")]
     pub ingestion_history: ::prost::alloc::vec::Vec<UsageResult>,
+    #[prost(string, tag = "9")]
+    pub license_status_json: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct GetWorkflowInputsRequest {

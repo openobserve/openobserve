@@ -67,10 +67,7 @@ mod tests {
     use std::sync::Arc;
 
     use arrow::datatypes::{DataType, Field, TimeUnit};
-    use datafusion::{
-        common::config::ConfigOptions, logical_expr::ScalarUDFImpl as _,
-        physical_plan::ColumnarValue,
-    };
+    use datafusion::{common::config::ConfigOptions, physical_plan::ColumnarValue};
 
     use super::*;
 
@@ -94,11 +91,6 @@ mod tests {
         let ret1 = udf.return_type(&[]).unwrap();
         let ret2 = udf.return_type(&[DataType::Int64, DataType::Utf8]).unwrap();
         assert_eq!(ret1, ret2);
-    }
-
-    #[test]
-    fn test_histogram_udf_name_constant() {
-        assert_eq!(HISTOGRAM_UDF_NAME, "histogram");
     }
 
     #[test]

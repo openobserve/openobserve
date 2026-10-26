@@ -41,6 +41,7 @@ pub mod downtimes;
 pub mod eval_jobs;
 #[cfg(feature = "enterprise")]
 pub mod experiments;
+pub mod fleet;
 #[allow(deprecated)]
 pub mod folders;
 pub mod gen_ai;
@@ -75,6 +76,7 @@ pub mod scorers;
 pub mod service_accounts;
 pub mod service_streams;
 pub mod short_url;
+pub mod slack;
 pub mod slos;
 pub mod sourcemaps;
 pub mod status;

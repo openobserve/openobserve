@@ -174,6 +174,10 @@ const getEventIcon = (event: any): string => {
       return "error-outline";
     case "ai_analysis_cancelled":
       return "cancel";
+    case "ai_analysis_steered":
+      return "chat";
+    case "ai_analysis_needs_input":
+      return "help-outline";
     default:
       return "circle";
   }
@@ -205,9 +209,12 @@ const getEventBadgeColor = (event: any): string => {
       return "var(--color-cyan-500)";
     case "ai_analysis_begin":
     case "ai_analysis_complete":
+    case "ai_analysis_steered":
       return "var(--color-ai-accent)";
     case "ai_analysis_failed":
       return "var(--color-error-500)";
+    case "ai_analysis_needs_input":
+      return "var(--color-orange-500)";
     case "ai_analysis_cancelled":
       return "var(--color-grey-500)";
     default:
@@ -246,6 +253,10 @@ const getEventBadgeText = (event: any): string => {
       return t("alerts.incidents.timeline.badgeAiFailed");
     case "ai_analysis_cancelled":
       return t("alerts.incidents.timeline.badgeAiCancelled");
+    case "ai_analysis_steered":
+      return t("alerts.incidents.timeline.badgeAiSteered");
+    case "ai_analysis_needs_input":
+      return t("alerts.incidents.timeline.badgeAiNeedsInput");
     default:
       // An event type the UI does not know yet — echo the server token verbatim.
       return raw(event.type);
@@ -257,6 +268,8 @@ const AI_TYPES = [
   "ai_analysis_complete",
   "ai_analysis_failed",
   "ai_analysis_cancelled",
+  "ai_analysis_steered",
+  "ai_analysis_needs_input",
 ];
 const SEVERITY_TYPES = ["SeverityUpgrade", "SeverityOverride"];
 
@@ -391,6 +404,19 @@ const getInlineEventText = (event: any): string => {
       return data.user_id
         ? t("alerts.incidents.timeline.userCancelledAnalysis")
         : t("alerts.incidents.timeline.analysisCancelled");
+
+    // A steered event carries user_id, so the user-event branch prefixes the
+    // username; an answer to a question reads "answered".
+    case "ai_analysis_steered":
+      return data.kind === "answer"
+        ? t("alerts.incidents.timeline.userAnsweredAnalysis")
+        : t("alerts.incidents.timeline.userSteeredAnalysis");
+
+    // The need is agent text: bold() escapes it.
+    case "ai_analysis_needs_input":
+      return data.need
+        ? t("alerts.incidents.timeline.analysisNeedsInput", { need: bold(data.need) })
+        : t("alerts.incidents.timeline.analysisNeedsInputNoNeed");
 
     default:
       return "";

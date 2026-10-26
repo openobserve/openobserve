@@ -24,14 +24,15 @@ import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from "vue-rout
 import config from "@/aws-exports";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import store from "@/stores";
-import Home from "@/views/HomeView.vue";
-import ImportDashboard from "@/views/Dashboards/ImportDashboard.vue";
-import About from "@/views/About.vue";
-import MemberSubscription from "@/views/MemberSubscription.vue";
-import Error404 from "@/views/Error404.vue";
-import ShortUrl from "@/views/ShortUrl.vue";
 import { hasMetricsEditorParams } from "@/utils/metrics/metricsEditorParams";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
+import { forgetLinkRequest } from "@/utils/slackLink";
+import {
+  PLAYLIST_TV_PATH,
+  buildPlaylistQuery,
+  isPlaylistPage,
+  parsePlaylistQuery,
+} from "@/utils/dashboard/playlist";
 
 const Search = () => import("@/plugins/logs/Index.vue");
 const SearchJobInspector = () => import("@/plugins/logs/SearchJobInspector.vue");
@@ -65,11 +66,7 @@ const redirectToTraceTab =
     query: canonicalTraceQuery(to.query, supportedTraceTab(tab)),
   });
 
-// Eager, not lazy: the shell hosts the keep-alive that every DBM tab lives in,
-// so it is on the critical path for the first DBM route either way, and it is a
-// single `<router-view>`.
-import DbmShell from "@/views/DatabaseMonitoring/DbmShell.vue";
-
+const DbmShell = () => import("@/views/DatabaseMonitoring/DbmShell.vue");
 const DbmDatabasesPage = () => import("@/views/DatabaseMonitoring/DatabasesPage.vue");
 const DbmQueriesPage = () => import("@/views/DatabaseMonitoring/QueriesPage.vue");
 const DbmMetricsPage = () => import("@/views/DatabaseMonitoring/MetricsPage.vue");
@@ -163,7 +160,17 @@ const alertCalibrationRouteGuard = (to: any, from: any, next: any) => {
   routeGuard(to, from, next);
 };
 
+// `=== false`, as for Downtimes: a cold load with `/config` still in flight must not bounce.
+const profilesRouteGuard = (to: any, from: any, next: any) => {
+  if (store.state.zoConfig?.profiling_enabled === false) {
+    next({ name: "home", query: { org_identifier: to.query.org_identifier } });
+    return;
+  }
+  routeGuard(to, from, next);
+};
+
 const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
+const TvPlaylist = () => import("@/views/Dashboards/TvPlaylist.vue");
 const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
 const StreamExplorer = () => import("@/views/StreamExplorer.vue");
 const LogStream = () => import("@/views/LogStream.vue");
@@ -212,6 +219,13 @@ import useEnterpriseRoutes from "./useEnterpriseRoutes";
 import useManagementRoutes from "./useManagementRoutes";
 import Login from "@/views/Login.vue";
 
+const Home = () => import("@/views/HomeView.vue");
+const ImportDashboard = () => import("@/views/Dashboards/ImportDashboard.vue");
+const About = () => import("@/views/About.vue");
+const MemberSubscription = () => import("@/views/MemberSubscription.vue");
+const Error404 = () => import("@/views/Error404.vue");
+const ShortUrl = () => import("@/views/ShortUrl.vue");
+
 const useRoutes = () => {
   const parentRoutes: any = [
     {
@@ -240,6 +254,7 @@ const useRoutes = () => {
           invalidateLoginData();
           useLocalCurrentUser("", true);
           useLocalUserInfo("", true);
+          forgetLinkRequest();
         } finally {
           window.location.href = `${getPath()}login`;
         }
@@ -270,6 +285,31 @@ const useRoutes = () => {
       component: () => import("@/views/SlackOAuthCallback.vue"),
       meta: {
         titleKey: "routeTitles.slackOAuthCallback",
+      },
+    },
+    // The three Slack pages below need a session: signed out, the guard saves the URL and returns after login.
+    {
+      path: "/slack/link",
+      name: "slackLink",
+      component: () => import("@/views/SlackLink.vue"),
+      meta: {
+        titleKey: "routeTitles.slackLink",
+      },
+    },
+    {
+      path: "/slack/link/callback",
+      name: "slackLinkCallback",
+      component: () => import("@/views/SlackLinkCallback.vue"),
+      meta: {
+        titleKey: "routeTitles.slackLinkCallback",
+      },
+    },
+    {
+      path: "/slack/connect/callback",
+      name: "slackConnectCallback",
+      component: () => import("@/views/SlackConnectCallback.vue"),
+      meta: {
+        titleKey: "routeTitles.slackConnectCallback",
       },
     },
   ];
@@ -443,9 +483,7 @@ const useRoutes = () => {
         keepAlive: true,
         titleKey: "menu.profiles",
       },
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
+      beforeEnter: profilesRouteGuard,
     },
     {
       path: "traces/service-graph",
@@ -582,15 +620,16 @@ const useRoutes = () => {
     {
       path: "infra/kubernetes",
       name: "infraKubernetes",
-      component: () => import("@/views/Infrastructure/curated/CuratedPageView.vue"),
-      props: { workload: "kubernetes" },
+      component: () => import("@/views/Infrastructure/kubernetes2/KubernetesPage.vue"),
       meta: { titleKey: "menu.kubernetes" },
       beforeEnter: routeGuard,
     },
     {
+      // Not in the nav; the previous curated Kubernetes page stays reachable by URL only.
       path: "infra/kubernetes-2",
       name: "infraKubernetes2",
-      component: () => import("@/views/Infrastructure/kubernetes2/KubernetesPage.vue"),
+      component: () => import("@/views/Infrastructure/curated/CuratedPageView.vue"),
+      props: { workload: "kubernetes" },
       meta: { titleKey: "menu.kubernetes2" },
       beforeEnter: routeGuard,
     },
@@ -673,6 +712,24 @@ const useRoutes = () => {
       props: true,
       meta: {
         titleKey: "routeTitles.viewDashboard",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        // A playlist link to the dashboard view is played by the TV player, except its own page fallback.
+        const query = to.query ?? {};
+        const playlist = isPlaylistPage(query) ? null : parsePlaylistQuery(query);
+        if (playlist) {
+          next({ path: PLAYLIST_TV_PATH, query: buildPlaylistQuery(playlist), replace: true });
+          return;
+        }
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "/dashboards/tv",
+      name: "dashboardTvPlaylist",
+      component: TvPlaylist,
+      meta: {
+        titleKey: "routeTitles.dashboardTvPlaylist",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

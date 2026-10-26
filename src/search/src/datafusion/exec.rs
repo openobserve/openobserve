@@ -286,8 +286,8 @@ impl<'a> DataFusionContextBuilder<'a> {
         if !self.optimizer_rules.is_empty() {
             builder = builder.with_optimizer_rules(self.optimizer_rules)
         }
-        for rule in self.physical_optimizer_rules {
-            builder = builder.with_physical_optimizer_rule(rule);
+        if !self.physical_optimizer_rules.is_empty() {
+            builder = builder.with_physical_optimizer_rules(self.physical_optimizer_rules)
         }
         if cfg.search.feature_join_match_one_enabled || cfg.search.feature_shared_cte_enabled {
             builder = builder.with_query_planner(Arc::new(OpenobserveQueryPlanner::new()));
@@ -328,6 +328,7 @@ pub fn register_builtin_udfs(ctx: &SessionContext) {
     ctx.register_udf(super::udf::spath_udf::SPATH_UDF.clone());
     ctx.register_udf(super::udf::to_arr_string_udf::TO_ARR_STRING.clone());
     ctx.register_udf(super::udf::histogram_udf::HISTOGRAM_UDF.clone());
+    ctx.register_udf(super::udf::fold_native_frames_udf::FOLD_NATIVE_FRAMES_UDF.clone());
     ctx.register_udf(super::udf::match_all_hash_udf::MATCH_ALL_HASH_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::FUZZY_MATCH_ALL_UDF.clone());

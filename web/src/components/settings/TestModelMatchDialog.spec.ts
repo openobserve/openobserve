@@ -110,9 +110,7 @@ const OButtonStub = {
   template: `<button data-test="o-button-stub" @click="$emit('click')"><slot /></button>`,
 };
 
-// Mirrors OInput's real contract for the parts this dialog relies on: a
-// `for`-associated label with the required marker, help text, and the built-in
-// clear button whose data-test OInput derives as `${parentDataTest}-clear`.
+// Mirrors the parts of OInput's real contract this dialog relies on, including the `${parentDataTest}-clear` id.
 const OInputStub = {
   name: "OInput",
   // Attr inheritance off, like the real OInput: otherwise the parent's
@@ -129,7 +127,7 @@ const OInputStub = {
     clearable: { type: Boolean, default: false },
     autofocus: { type: Boolean, default: false },
   },
-  emits: ["update:modelValue", "clear"],
+  emits: ["update:modelValue", "clear", "keydown"],
   template: `
     <div data-test="o-input-stub">
       <label v-if="label">{{ label }}<span v-if="required">*</span></label>
@@ -138,6 +136,7 @@ const OInputStub = {
         :value="modelValue"
         :placeholder="placeholder"
         @input="$emit('update:modelValue', $event.target.value)"
+        @keydown="$emit('keydown', $event)"
       />
       <button
         v-if="clearable && modelValue !== '' && modelValue != null"
@@ -224,7 +223,7 @@ describe("TestModelMatchDialog", () => {
     it("forwards the title and subTitle to ODialog", () => {
       wrapper = mountDialog({ modelValue: true });
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("title")).toBe("Test Model Match");
+      expect(dialog.props("title")).toBe("Test model match");
       expect(dialog.props("subTitle")).toBe(
         "Simulate how a model name from your spans would match against pricing rules.",
       );
@@ -248,7 +247,7 @@ describe("TestModelMatchDialog", () => {
     it("forwards the i18n labels to ODialog buttons", () => {
       wrapper = mountDialog({ modelValue: true });
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonLabel")).toBe("Test Match");
+      expect(dialog.props("primaryButtonLabel")).toBe("Test match");
       expect(dialog.props("secondaryButtonLabel")).toBe("Close");
     });
 
@@ -319,7 +318,7 @@ describe("TestModelMatchDialog", () => {
       (wrapper.vm as any).testModelName = "gpt-4";
       await nextTick();
       expect(wrapper.find('[data-test="test-match-waiting"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain('Click "Test Match" to see results');
+      expect(wrapper.text()).toContain('Click "Test match" to see results');
     });
 
     it("renders no-match state when testResult has no matched", async () => {
@@ -329,7 +328,7 @@ describe("TestModelMatchDialog", () => {
       await nextTick();
 
       expect(wrapper.find('[data-test="test-match-no-result"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain("No Match Found");
+      expect(wrapper.text()).toContain("No match found");
       expect(wrapper.text()).toContain('No rule matched "gpt-4".');
     });
 
@@ -356,7 +355,29 @@ describe("TestModelMatchDialog", () => {
       };
       await nextTick();
       expect(wrapper.find('[data-test="test-match-result"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain("Match Found");
+      expect(wrapper.text()).toContain("Match found");
+      expect(wrapper.find('[data-test="test-match-approximate"]').exists()).toBe(false);
+    });
+
+    it("labels an approximate match and explains it", async () => {
+      wrapper = mountDialog({ modelValue: true });
+      // Script-setup state the template reads; not part of the component's public type.
+      const vm = wrapper.vm as unknown as { testModelName: string; testResult: unknown };
+      vm.testModelName = "gpt-5.4-mini";
+      vm.testResult = {
+        matched: {
+          name: "GPT-5.4",
+          source: "built_in",
+          tiers: [{ name: "Default", prices: { input: 0.0000025 } }],
+        },
+        match_kind: "approximate",
+        tier: "Default",
+      };
+      await nextTick();
+      expect(wrapper.text()).toContain("Approximate match");
+      expect(wrapper.find('[data-test="test-match-approximate"]').text()).toContain(
+        'This rule matches only part of "gpt-5.4-mini"',
+      );
     });
   });
 
@@ -390,7 +411,7 @@ describe("TestModelMatchDialog", () => {
       wrapper = mountDialog({ modelValue: true });
       const label = wrapper.find('[data-test="o-input-stub"] label');
       expect(label.exists()).toBe(true);
-      expect(label.text()).toContain("Model Name");
+      expect(label.text()).toContain("Model name");
       expect(label.text()).toContain("*");
     });
   });
@@ -425,6 +446,182 @@ describe("TestModelMatchDialog", () => {
       });
       const sentTs = mockTest.mock.calls[0][1].timestamp;
       expect(sentTs).toBeCloseTo(Date.now() * 1000, -7);
+    });
+
+    it("sends non-blank span attributes and skips rows without a key", async () => {
+      mockTest.mockResolvedValue({ data: { matched: null } });
+      wrapper = mountDialog({ modelValue: true });
+      (wrapper.vm as any).testModelName = "gpt-6-sol";
+      (wrapper.vm as any).addAttribute();
+      (wrapper.vm as any).addAttribute();
+      (wrapper.vm as any).testAttributes[0].key = " openai.response.service_tier ";
+      (wrapper.vm as any).testAttributes[0].value = "flex ";
+      (wrapper.vm as any).testAttributes[1].value = "orphan";
+      await nextTick();
+
+      await (wrapper.vm as any).runTest();
+      await flushPromises();
+
+      expect(mockTest.mock.calls[0][1].attributes).toEqual({
+        "openai.response.service_tier": "flex",
+      });
+    });
+
+    it("sends no attributes field when every row is blank", async () => {
+      mockTest.mockResolvedValue({ data: { matched: null } });
+      wrapper = mountDialog({ modelValue: true });
+      (wrapper.vm as any).testModelName = "gpt-6-sol";
+      (wrapper.vm as any).addAttribute();
+      await nextTick();
+      await (wrapper.vm as any).runTest();
+      await flushPromises();
+      expect(mockTest.mock.calls[0][1].attributes).toBeUndefined();
+    });
+
+    it("re-runs once, debounced, after rapid attribute edits", async () => {
+      vi.useFakeTimers();
+      try {
+        mockTest.mockResolvedValue({ data: { matched: null } });
+        wrapper = mountDialog({ modelValue: true });
+        (wrapper.vm as any).testModelName = "gpt-6-sol";
+        await nextTick();
+        await (wrapper.vm as any).runTest();
+        await flushPromises();
+        expect(mockTest).toHaveBeenCalledTimes(1);
+
+        (wrapper.vm as any).addAttribute();
+        await nextTick();
+        for (const partial of ["f", "fl", "fle", "flex"]) {
+          (wrapper.vm as any).testAttributes[0].key = "openai.response.service_tier";
+          (wrapper.vm as any).testAttributes[0].value = partial;
+          await nextTick();
+          vi.advanceTimersByTime(100);
+        }
+        expect(mockTest).toHaveBeenCalledTimes(1);
+        vi.advanceTimersByTime(300);
+        await flushPromises();
+        expect(mockTest).toHaveBeenCalledTimes(2);
+        expect(mockTest.mock.calls[1][1].attributes).toEqual({
+          "openai.response.service_tier": "flex",
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("does not re-run for an added row that changes nothing sent", async () => {
+      vi.useFakeTimers();
+      try {
+        mockTest.mockResolvedValue({ data: { matched: null } });
+        wrapper = mountDialog({ modelValue: true });
+        (wrapper.vm as any).testModelName = "gpt-6-sol";
+        await nextTick();
+        await (wrapper.vm as any).runTest();
+        await flushPromises();
+        (wrapper.vm as any).addAttribute();
+        await nextTick();
+        vi.advanceTimersByTime(1000);
+        await flushPromises();
+        expect(mockTest).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("keeps re-running after a failed call", async () => {
+      mockTest.mockRejectedValueOnce(new Error("boom"));
+      mockTest.mockResolvedValue({ data: { matched: null } });
+      wrapper = mountDialog({ modelValue: true });
+      (wrapper.vm as any).testModelName = "gpt-6-sol";
+      await nextTick();
+      await (wrapper.vm as any).runTest();
+      await flushPromises();
+      expect((wrapper.vm as any).testResult).toBeNull();
+
+      (wrapper.vm as any).testAtTime = "02:00";
+      await nextTick();
+      await flushPromises();
+      expect(mockTest).toHaveBeenCalledTimes(2);
+    });
+
+    it("ignores a response that arrives after a newer request", async () => {
+      let resolveFirst: (_v: any) => void = () => {};
+      mockTest.mockImplementationOnce(() => new Promise((resolve) => (resolveFirst = resolve)));
+      mockTest.mockResolvedValueOnce({ data: { matched: { name: "new" }, tier: "Default" } });
+      wrapper = mountDialog({ modelValue: true });
+      (wrapper.vm as any).testModelName = "gpt-6-sol";
+      await nextTick();
+      const first = (wrapper.vm as any).runTest();
+      (wrapper.vm as any).testAtTime = "02:00";
+      await nextTick();
+      await flushPromises();
+      resolveFirst({ data: { matched: { name: "stale" }, tier: "Default" } });
+      await first;
+      await flushPromises();
+      expect((wrapper.vm as any).testResult.matched.name).toBe("new");
+    });
+
+    it("finds the matched tier by tier_index even when names repeat", async () => {
+      mockTest.mockResolvedValue({
+        data: {
+          matched: {
+            name: "Dup",
+            source: "org",
+            tiers: [
+              { name: "Same", prices: { input: 0.000001 } },
+              { name: "Same", prices: { input: 0.000009 } },
+            ],
+          },
+          tier: "Same",
+          tier_index: 1,
+          costs: {},
+          total_cost: 0,
+        },
+      });
+      wrapper = mountDialog({ modelValue: true });
+      (wrapper.vm as any).testModelName = "dup";
+      await nextTick();
+      await (wrapper.vm as any).runTest();
+      await flushPromises();
+      expect((wrapper.vm as any).matchedTierDef.prices.input).toBe(0.000009);
+    });
+
+    it("shows the matched tier's attribute rules", async () => {
+      mockTest.mockResolvedValue({
+        data: {
+          matched: {
+            name: "GPT-6 Sol",
+            source: "built_in",
+            tiers: [
+              { name: "Default", prices: { input: 0.000002 } },
+              {
+                name: "Flex",
+                rules: [
+                  {
+                    keys: ["openai.response.service_tier", "openai.request.service_tier"],
+                    op: "in",
+                    values: ["flex"],
+                  },
+                ],
+                prices: { input: 0.000001 },
+              },
+            ],
+          },
+          tier: "Flex",
+          costs: {},
+          total_cost: 0,
+        },
+      });
+      wrapper = mountDialog({ modelValue: true });
+      (wrapper.vm as any).testModelName = "gpt-6-sol";
+      await nextTick();
+      await (wrapper.vm as any).runTest();
+      await flushPromises();
+
+      const rule = wrapper.find('[data-test="test-match-tier-rule"]');
+      expect(rule.exists()).toBe(true);
+      expect(rule.text()).toBe("openai.response.service_tier +1 is one of flex");
+      expect(wrapper.text()).not.toContain(i18n.global.t("modelPricing.defaultPricingTier"));
     });
 
     it("stores the API response on testResult after success", async () => {
@@ -501,6 +698,57 @@ describe("TestModelMatchDialog", () => {
       wrapper = mountDialog({ modelValue: true });
       const dialog = wrapper.findComponent(ODialogStub);
       await dialog.vm.$emit("click:secondary");
+      await flushPromises();
+      expect(mockTest).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Enter in the model-name field", () => {
+    const MODEL_INPUT = '[data-test="o-input-stub"] input';
+
+    it("runs the test, like the Test match button", async () => {
+      mockTest.mockResolvedValue({ data: { matched: { name: "gpt-4" } } });
+      wrapper = mountDialog({ modelValue: true });
+      (wrapper.vm as any).testModelName = "gpt-4";
+      await nextTick();
+
+      await wrapper.find(MODEL_INPUT).trigger("keydown", { key: "Enter" });
+      await flushPromises();
+
+      expect(mockTest).toHaveBeenCalledTimes(1);
+      expect(mockTest).toHaveBeenCalledWith(
+        "default",
+        expect.objectContaining({ model_name: "gpt-4" }),
+      );
+    });
+
+    it("does nothing while the field is empty, when the button is disabled", async () => {
+      wrapper = mountDialog({ modelValue: true });
+      await wrapper.find(MODEL_INPUT).trigger("keydown", { key: "Enter" });
+      await flushPromises();
+      expect(mockTest).not.toHaveBeenCalled();
+    });
+
+    it("does not start a second test while one is running", async () => {
+      let resolve: (v: any) => void = () => {};
+      mockTest.mockReturnValue(new Promise((r) => (resolve = r)));
+      wrapper = mountDialog({ modelValue: true });
+      (wrapper.vm as any).testModelName = "gpt-4";
+      await nextTick();
+
+      await wrapper.find(MODEL_INPUT).trigger("keydown", { key: "Enter" });
+      await wrapper.find(MODEL_INPUT).trigger("keydown", { key: "Enter" });
+      expect(mockTest).toHaveBeenCalledTimes(1);
+
+      resolve({ data: { matched: null } });
+      await flushPromises();
+    });
+
+    it("ignores other keys", async () => {
+      wrapper = mountDialog({ modelValue: true });
+      (wrapper.vm as any).testModelName = "gpt-4";
+      await nextTick();
+      await wrapper.find(MODEL_INPUT).trigger("keydown", { key: "a" });
       await flushPromises();
       expect(mockTest).not.toHaveBeenCalled();
     });
@@ -729,15 +977,15 @@ describe("TestModelMatchDialog", () => {
   });
 
   describe("sourceLabel", () => {
-    it("returns Your Org for org source", () => {
+    it("returns Your org for org source", () => {
       wrapper = mountDialog({ modelValue: true });
       const vm: any = wrapper.vm;
-      expect(vm.sourceLabel({ source: "org" })).toBe("Your Org");
+      expect(vm.sourceLabel({ source: "org" })).toBe("Your org");
     });
 
-    it("returns Your Org when source is missing", () => {
+    it("returns Your org when source is missing", () => {
       wrapper = mountDialog({ modelValue: true });
-      expect((wrapper.vm as any).sourceLabel({})).toBe("Your Org");
+      expect((wrapper.vm as any).sourceLabel({})).toBe("Your org");
     });
 
     it("returns Global for meta_org source", () => {

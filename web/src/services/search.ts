@@ -460,9 +460,17 @@ const search = {
     const url = `/api/${org_identifier}/query_manager/status`;
     return http().get(url);
   },
-  delete_running_queries: (org_identifier: string, traceIDs: string[]) => {
+  delete_running_queries: (org_identifier: string, traceIDs: string[]) =>
+    search.cancel_running_queries(
+      org_identifier,
+      traceIDs.map((trace_id) => ({ trace_id, org_id: org_identifier })),
+    ),
+  cancel_running_queries: (
+    org_identifier: string,
+    queries: { trace_id: string; org_id: string }[],
+  ) => {
     const url = `/api/${org_identifier}/query_manager/cancel`;
-    return http().put(url, traceIDs);
+    return http().put(url, queries);
   },
   get_regions: () => {
     const url = `/api/clusters`;

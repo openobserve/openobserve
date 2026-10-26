@@ -35,6 +35,8 @@ const fake = {
   scope: ref<"new-data" | "since-watch-start">("new-data"),
   troubleshooting: ref(false),
   sinceUs: ref<number>(),
+  targetExists: ref(true),
+  deciding: ref(false),
   start: vi.fn(),
   stop: vi.fn(),
   probeNow: vi.fn(),
@@ -48,6 +50,8 @@ vi.mock("@/composables/firstEvent/useFirstEventWatch", () => ({
       ...fake,
       scope: computed(() => fake.scope.value),
       sinceUs: computed(() => fake.sinceUs.value),
+      targetExists: computed(() => fake.targetExists.value),
+      deciding: computed(() => fake.deciding.value),
     };
   },
 }));
@@ -56,19 +60,23 @@ const awsConfig = vi.hoisted(() => ({ isEnterprise: "false", isCloud: "false" })
 vi.mock("@/aws-exports", () => ({ default: awsConfig }));
 
 const NOW = Date.UTC(2026, 9, 7, 10, 0, 0);
-const routes = ["logs", "metrics", "traces", "recommended", "curl"].map((name) => ({
+const routes = ["logs", "metrics", "traces", "profiles", "recommended", "curl"].map((name) => ({
   path: `/${name}`,
   name,
   component: { template: "<div />" },
 }));
 
-const makeStore = (zoConfig: Record<string, unknown> = {}) =>
+const makeStore = (
+  zoConfig: Record<string, unknown> = {},
+  org: Record<string, unknown> = {},
+  organizations: unknown[] = [],
+) =>
   createStore({
     state: {
       API_ENDPOINT: "https://api.openobserve.ai",
       zoConfig: { cluster_name: "US1", ...zoConfig },
-      selectedOrganization: { identifier: "acme-prod" },
-      organizations: [],
+      selectedOrganization: { identifier: "acme-prod", ...org },
+      organizations,
       organizationData: {
         organizationPasscode: "secret-token-value",
         orgTokens: [{ name: "default", token: "secret-token-value" }],
@@ -80,13 +88,18 @@ let wrapper: VueWrapper;
 let router: ReturnType<typeof createRouter>;
 const mountBar = (
   props: Record<string, unknown> = {},
-  opts: { askAi?: (q: string) => void; zoConfig?: Record<string, unknown> } = {},
+  opts: {
+    askAi?: (q: string) => void;
+    zoConfig?: Record<string, unknown>;
+    org?: Record<string, unknown>;
+    organizations?: unknown[];
+  } = {},
 ) => {
   router = createRouter({ history: createMemoryHistory(), routes });
   wrapper = mount(FirstEventStatus, {
     props: { org: "acme-prod", guideName: "Kubernetes", ...props },
     global: {
-      plugins: [i18n, makeStore(opts.zoConfig), router],
+      plugins: [i18n, makeStore(opts.zoConfig, opts.org, opts.organizations), router],
       provide: opts.askAi ? { [FIRST_EVENT_ASK_AI as symbol]: opts.askAi } : {},
     },
   });
@@ -112,6 +125,8 @@ beforeEach(() => {
   fake.scope.value = "new-data";
   fake.troubleshooting.value = false;
   fake.sinceUs.value = undefined;
+  fake.targetExists.value = true;
+  fake.deciding.value = false;
   awsConfig.isEnterprise = "false";
 });
 
@@ -187,6 +202,29 @@ describe("FirstEventStatus — waiting", () => {
   });
 });
 
+describe("FirstEventStatus — before the first decision", () => {
+  it.each([{}, { display: "pill" }])(
+    "renders a neutral placeholder and no claim until the watch decides (%o)",
+    async (props) => {
+      fake.deciding.value = true;
+      mountBar({ targetStream: "syslog_ng", signal: "logs", ...props });
+      const root = q("first-event-status");
+      expect(root.attributes("data-state")).toBe("deciding");
+      expect(root.text()).toBe("");
+      expect(root.find('[role="status"]').exists()).toBe(true);
+      expect(q("first-event-status-meta").exists()).toBe(false);
+      expect(q("first-event-status-troubleshoot-btn").exists()).toBe(false);
+      expect(q("first-event-status-check-now-btn").exists()).toBe(false);
+      await vi.advanceTimersByTimeAsync(130_000);
+      expect(q("first-event-status").text()).not.toContain("Waiting");
+      fake.deciding.value = false;
+      await nextTick();
+      expect(q("first-event-status").attributes("data-state")).toBe("waiting");
+      expect(q("first-event-status").text()).toContain("Waiting for logs in syslog_ng");
+    },
+  );
+});
+
 describe("FirstEventStatus — received", () => {
   const result: FirstEventResult = {
     streamName: "default",
@@ -228,6 +266,31 @@ describe("FirstEventStatus — received", () => {
     ).toHaveLength(2);
   });
 
+  it("reports seconds_since_signup from the org's creation time in microseconds", async () => {
+    mountBar({}, { org: { created_at: (NOW - 3_600_000) * 1000 } });
+    fake.result.value = result;
+    fake.state.value = "received";
+    await nextTick();
+    expect(analytics.track).toHaveBeenCalledWith("first_event_detected", {
+      stream_type: "logs",
+      seconds_since_signup: 3600,
+    });
+  });
+
+  it("falls back to the org list for the creation time", async () => {
+    mountBar(
+      {},
+      { organizations: [{ identifier: "acme-prod", created_at: (NOW - 90_000) * 1000 }] },
+    );
+    fake.result.value = result;
+    fake.state.value = "received";
+    await nextTick();
+    expect(analytics.track).toHaveBeenCalledWith("first_event_detected", {
+      stream_type: "logs",
+      seconds_since_signup: 90,
+    });
+  });
+
   it("opens Logs on the stream with the thirty minutes around the first record", async () => {
     mountBar();
     fake.result.value = result;
@@ -256,6 +319,22 @@ describe("FirstEventStatus — received", () => {
     expect(router.currentRoute.value.query).toMatchObject({
       metric: "up",
       from: String(result.rangeStart / 1000),
+    });
+  });
+
+  it("sends a profiles record to the Profiles page, in microseconds", async () => {
+    mountBar();
+    fake.result.value = { ...result, streamType: "profiles", streamName: "default" };
+    fake.state.value = "received";
+    await nextTick();
+    expect(q("first-event-status-open-btn").text()).toBe("Open in Profiles");
+    await q("first-event-status-open-btn").trigger("click");
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("profiles");
+    expect(router.currentRoute.value.query).toMatchObject({
+      stream: "default",
+      from: String(result.rangeStart),
+      to: String(result.rangeEnd),
     });
   });
 
@@ -401,6 +480,22 @@ describe("FirstEventStatus — diagnosis", () => {
     expect(q("first-event-diagnosis-fix").text()).toContain("Fluent Bit");
     await q("first-event-diagnosis-copy-btn").trigger("click");
     expect(wrapper.emitted("copy-command")).toHaveLength(1);
+  });
+
+  it("names the guide's own tool in the config fix", async () => {
+    mountBar({ snippetKind: "config", configTool: "syslog-ng" });
+    fake.diagnosis.value = {
+      form: "rejected",
+      trigger: "troubleshoot",
+      rejections: [rejection("invalid_credentials", 401)],
+    };
+    fake.state.value = "rejected";
+    await nextTick();
+    expect(q("first-event-diagnosis-fix").text()).toContain(
+      "The password in your syslog-ng config",
+    );
+    expect(q("first-event-diagnosis-fix").text()).toContain("restart syslog-ng");
+    expect(q("first-event-diagnosis-fix").text()).not.toContain("Fluent Bit");
   });
 
   it("shows the org id, endpoint and compare sentence when no request reached the org", async () => {
@@ -670,6 +765,28 @@ describe("FirstEventStatus — pill display for empty pages", () => {
     await nextTick();
     expect(q("first-event-status-meta").text()).toContain(text);
   });
+
+  it.each([
+    [{ targetStream: "syslog_ng" }, "Checks start when you copy the command."],
+    [
+      { targetStream: "syslog_ng", snippetKind: "config" },
+      "Checks start when you copy the config.",
+    ],
+    [{ targetStream: "system_", match: "keyword" }, "Checks start when you copy the command."],
+    [{ targetStream: "syslog_ng", display: "pill" }, "Checks start when you copy the command."],
+  ])(
+    "claims no existing data when the idle bar waits on a target that does not exist (%o)",
+    async (props, text) => {
+      mountBar(props);
+      fake.state.value = "idle";
+      fake.targetExists.value = false;
+      await nextTick();
+      expect(q("first-event-status-meta").text()).toBe(text);
+      expect(q("first-event-status").text()).toContain("Not checking yet");
+      await q("first-event-status-check-now-btn").trigger("click");
+      expect(fake.start).toHaveBeenCalledWith("check");
+    },
+  );
 
   it("offers no Check now outside the idle state", () => {
     mountBar({ targetStream: "default" });

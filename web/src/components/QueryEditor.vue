@@ -97,6 +97,8 @@
         :field-value-resolver="fieldValueResolver ?? undefined"
         :debounce-time="debounceTime"
         :free-text-decorations="freeTextDecorations ?? null"
+        :filter-mode="filterMode"
+        :values-time-range="valuesTimeRange ?? null"
         @update:query="handleQueryUpdate"
         @user-edit="emit('user-edit')"
         @run-query="emit('run-query')"
@@ -163,6 +165,11 @@ import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseF
 
 type Language = "sql" | "promql" | "vrl" | "javascript";
 
+interface QueryChangeOrigin {
+  /** false when the editor was written to (setValue), rather than typed in. */
+  fromUser: boolean;
+}
+
 interface Props {
   // Language configuration
   languages?: Language[]; // Available languages (default: ['sql'])
@@ -180,6 +187,8 @@ interface Props {
   fieldValueResolver?: ((field: string) => Promise<string[]>) | null; // Field-value lookup awaited by the completion provider
   debounceTime?: number; // Debounce time for query updates (ms)
   freeTextDecorations?: { ranges: { start: number; end: number }[]; hover: I18nText } | null;
+  filterMode?: boolean; // The query is a bare WHERE fragment (Logs without SQL mode)
+  valuesTimeRange?: { startTime: number; endTime: number } | null; // Range field values are looked up in (microseconds)
 
   // NL Mode (optional external control)
   nlpMode?: boolean; // External NLP mode control (undefined = internal control)
@@ -216,7 +225,7 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  "update:query": [query: string];
+  "update:query": [query: string, origin?: QueryChangeOrigin];
   "user-edit": [];
   "language-change": [language: Language];
   "ask-ai": [naturalLanguage: string, language: Language];
@@ -324,8 +333,8 @@ const rootStyle = computed(() => {
 });
 
 // Handle query update from editor
-const handleQueryUpdate = (newQuery: string) => {
-  emit("update:query", newQuery);
+const handleQueryUpdate = (newQuery: string, _event?: unknown, origin?: QueryChangeOrigin) => {
+  emit("update:query", newQuery, origin);
 };
 
 const handleEditorFocus = () => {
@@ -578,6 +587,7 @@ defineExpose({
   },
 
   // Editor state
+  focus: () => editorRef.value?.editorObj?.focus(),
   getValue: () => {
     return editorRef.value?.getValue();
   },

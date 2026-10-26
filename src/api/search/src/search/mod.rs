@@ -75,6 +75,7 @@ pub mod error_utils;
 pub mod multi_streams;
 pub mod patterns;
 pub mod query_functions;
+#[cfg(feature = "enterprise")]
 pub mod query_manager;
 pub mod saved_view;
 #[cfg(feature = "enterprise")]
@@ -298,6 +299,20 @@ pub async fn search(
             .and_then(|event_type| get_search_event_context_from_request(event_type, &url_query));
     }
 
+    #[cfg(feature = "enterprise")]
+    if let Some(res) = check_sql_stream_permissions(
+        &req.query.sql,
+        &org_id,
+        user_id,
+        stream_type,
+        StreamPermissionResourceType::Search,
+        &trace_id,
+    )
+    .await
+    {
+        return res;
+    }
+
     // get stream settings
     for stream_name in &stream_names {
         if let Some(settings) = infra::schema::get_settings(&org_id, stream_name, stream_type).await
@@ -324,20 +339,6 @@ pub async fn search(
                     .await
         {
             return map_error_to_http_response(&e, Some(trace_id));
-        }
-
-        // Check permissions on stream
-        #[cfg(feature = "enterprise")]
-        if let Some(res) = check_stream_permissions(
-            stream_name,
-            &org_id,
-            user_id,
-            &stream_type,
-            StreamPermissionResourceType::Search,
-        )
-        .await
-        {
-            return res;
         }
     }
 
@@ -1287,13 +1288,14 @@ fn resolve_typed_stream_names(
         .collect())
 }
 
-/// Requires search permission on every stream `sql` reads; `None` means allowed.
+/// Requires permission on every stream `sql` reads, under the type its SQL names; `None` = allowed.
 #[cfg(feature = "enterprise")]
 async fn check_sql_stream_permissions(
     sql: &str,
     org_id: &str,
     user_id: &str,
     stream_type: StreamType,
+    permission_resource_type: StreamPermissionResourceType,
     trace_id: &str,
 ) -> Option<Response> {
     let streams = match resolve_typed_stream_names(sql, stream_type) {
@@ -1306,7 +1308,7 @@ async fn check_sql_stream_permissions(
             org_id,
             user_id,
             &stream_type,
-            StreamPermissionResourceType::Search,
+            permission_resource_type,
         )
         .await
         {
@@ -1429,8 +1431,15 @@ pub async fn search_partition(
                     .into_response();
             }
         }
-        if let Some(res) =
-            check_sql_stream_permissions(&req.sql, &org_id, user_id, stream_type, &trace_id).await
+        if let Some(res) = check_sql_stream_permissions(
+            &req.sql,
+            &org_id,
+            user_id,
+            stream_type,
+            StreamPermissionResourceType::Search,
+            &trace_id,
+        )
+        .await
         {
             return res;
         }
@@ -1778,6 +1787,20 @@ pub async fn result_schema(
         }
     };
 
+    #[cfg(feature = "enterprise")]
+    if let Some(res) = check_sql_stream_permissions(
+        &req.query.sql,
+        &org_id,
+        user_id,
+        stream_type,
+        StreamPermissionResourceType::Search,
+        "",
+    )
+    .await
+    {
+        return res;
+    }
+
     // get stream settings
     for stream_name in stream_names {
         if let Some(settings) =
@@ -1793,20 +1816,6 @@ pub async fn result_schema(
             {
                 req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
             }
-        }
-
-        // Check permissions on stream
-        #[cfg(feature = "enterprise")]
-        if let Some(res) = check_stream_permissions(
-            &stream_name,
-            &org_id,
-            user_id,
-            &stream_type,
-            StreamPermissionResourceType::Search,
-        )
-        .await
-        {
-            return res;
         }
     }
 
@@ -1966,6 +1975,69 @@ mod tests {
             2
         );
         assert!(resolve_typed_stream_names("not sql", StreamType::Logs).is_err());
+    }
+
+    #[test]
+    fn sql_search_handlers_authorize_the_streams_their_sql_resolves_to() {
+        let handlers = [
+            ("mod.rs", include_str!("mod.rs"), "pub async fn search("),
+            (
+                "mod.rs",
+                include_str!("mod.rs"),
+                "pub async fn search_partition(",
+            ),
+            (
+                "mod.rs",
+                include_str!("mod.rs"),
+                "pub async fn result_schema(",
+            ),
+            (
+                "search_stream.rs",
+                include_str!("search_stream.rs"),
+                "pub async fn search_http2_stream(",
+            ),
+            (
+                "search_job.rs",
+                include_str!("search_job.rs"),
+                "pub async fn submit_job(",
+            ),
+            (
+                "search_job.rs",
+                include_str!("search_job.rs"),
+                "async fn check_permissions(",
+            ),
+            (
+                "patterns.rs",
+                include_str!("patterns.rs"),
+                "pub async fn extract_patterns(",
+            ),
+            (
+                "multi_streams.rs",
+                include_str!("multi_streams.rs"),
+                "pub async fn search_multi(",
+            ),
+            (
+                "multi_streams.rs",
+                include_str!("multi_streams.rs"),
+                "pub async fn _search_partition_multi(",
+            ),
+            (
+                "multi_streams.rs",
+                include_str!("multi_streams.rs"),
+                "pub async fn search_multi_stream(",
+            ),
+        ];
+        for (file, text, signature) in handlers {
+            let start = text
+                .find(signature)
+                .unwrap_or_else(|| panic!("{file}: {signature} not found"));
+            let body = &text[start..];
+            let body = &body[..body.find("\n}\n").expect("handler end")];
+            assert!(
+                body.contains("check_sql_stream_permissions("),
+                "{file}: {signature} must authorize each stream under the type its SQL names"
+            );
+        }
     }
 
     fn schema() -> Schema {

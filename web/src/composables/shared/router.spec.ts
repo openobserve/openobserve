@@ -16,6 +16,7 @@
 import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
 import { createMemoryHistory, createRouter } from "vue-router";
 import useRoutes from "./router";
+import Login from "@/views/Login.vue";
 import store from "@/stores";
 import { routeGuard } from "@/utils/zincutils";
 import { isPaywalledDestination, shouldPaywallRoute } from "@/utils/auth";
@@ -162,15 +163,21 @@ vi.mock("@/components/pipelines/BackfillJobsList.vue", () => ({
 // Sub-composable mocks — return empty arrays so counts are deterministic
 // ---------------------------------------------------------------------------
 vi.mock("./useIngestionRoutes", () => ({
-  default: vi.fn(() => [{ path: "ingestion", name: "ingestion", component: {} }]),
+  default: vi.fn(() => [
+    { path: "ingestion", name: "ingestion", component: () => Promise.resolve({}) },
+  ]),
 }));
 
 vi.mock("./useEnterpriseRoutes", () => ({
-  default: vi.fn(() => [{ path: "iam", name: "iam", component: {}, children: [] }]),
+  default: vi.fn(() => [
+    { path: "iam", name: "iam", component: () => Promise.resolve({}), children: [] },
+  ]),
 }));
 
 vi.mock("./useManagementRoutes", () => ({
-  default: vi.fn(() => [{ path: "settings", name: "settings", component: {}, children: [] }]),
+  default: vi.fn(() => [
+    { path: "settings", name: "settings", component: () => Promise.resolve({}), children: [] },
+  ]),
 }));
 
 // ---------------------------------------------------------------------------
@@ -309,6 +316,29 @@ describe("useRoutes (router.ts)", () => {
       });
     });
 
+    it("W-S12 forgets a kept Slack link request in /logout beforeEnter", async () => {
+      const { rememberLinkRequest, recallLinkRequest } = await import("@/utils/slackLink");
+      rememberLinkRequest("req-1.sig", null);
+      const { parentRoutes } = useRoutes();
+      const logoutRoute = parentRoutes.find((r: any) => r.path === "/logout");
+
+      const originalLocation = window.location;
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        writable: true,
+        value: { href: "" },
+      });
+
+      logoutRoute.beforeEnter({}, {}, vi.fn());
+      expect(recallLinkRequest()).toBeNull();
+
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        writable: true,
+        value: originalLocation,
+      });
+    });
+
     it("should call useLocalCurrentUser in /logout beforeEnter", async () => {
       const { useLocalCurrentUser } = await import("@/utils/zincutils");
       const { parentRoutes } = useRoutes();
@@ -429,6 +459,25 @@ describe("useRoutes (router.ts)", () => {
       expect(callbackRoute.name).toBe("slackOAuthCallback");
       expect(callbackRoute.component).toBeDefined();
       expect(enTitle(callbackRoute.meta.titleKey)).toBe("Connecting Slack");
+    });
+  });
+
+  describe("parentRoutes — Slack link pages", () => {
+    it.each([
+      ["/slack/link", "slackLink", "Link Slack account"],
+      ["/slack/link/callback", "slackLinkCallback", "Linking Slack account"],
+      ["/slack/connect/callback", "slackConnectCallback", "Signing in with Slack"],
+    ])("AC-9.6 %s is a titled route that needs a session", async (path, name, title) => {
+      const { parentRoutes } = useRoutes();
+      const route = parentRoutes.find((r: any) => r.path === path);
+
+      expect(route).toBeDefined();
+      expect(route.name).toBe(name);
+      expect(enTitle(route.meta.titleKey)).toBe(title);
+      expect(route.meta.public).toBeUndefined();
+      expect(route.beforeEnter).toBeUndefined();
+      const view = await route.component();
+      expect(view.default).toBeDefined();
     });
   });
 
@@ -1868,13 +1917,6 @@ describe("useRoutes (router.ts)", () => {
       },
     );
 
-    it("passes the workload prop to the kubernetes page", () => {
-      const { homeChildRoutes } = useRoutes();
-      expect(findRoute(homeChildRoutes, "infraKubernetes").props).toEqual({
-        workload: "kubernetes",
-      });
-    });
-
     // A menu entry whose workload has no registered pack can only render a dead
     // end, so the route must not come back while `curatedPacks` lacks an AWS pack.
     it("registers NO aws route, by name or by path", () => {
@@ -1883,29 +1925,21 @@ describe("useRoutes (router.ts)", () => {
       expect(homeChildRoutes.find((r: any) => r.path === "infra/aws")).toBeUndefined();
     });
 
-    it("keeps exactly the curated infra workload routes plus Kubernetes 2", () => {
+    it("serves Kubernetes from the redesigned page and keeps the curated page on the hidden kubernetes-2 route", () => {
       const { homeChildRoutes } = useRoutes();
-      const infraWorkloads = homeChildRoutes
-        .filter((r: any) => typeof r.path === "string" && /^infra\/(?!databases)/.test(r.path))
-        .map((r: any) => r.path)
-        .sort();
-      expect(infraWorkloads).toEqual(["infra/hosts", "infra/kubernetes", "infra/kubernetes-2"]);
-    });
-
-    it("registers Kubernetes 2 right after Kubernetes, lazily loading its own page", () => {
-      const { homeChildRoutes } = useRoutes();
-      const index = homeChildRoutes.findIndex((r: any) => r.name === "infraKubernetes");
-      const route = homeChildRoutes[index + 1] as any;
-      expect(route.name).toBe("infraKubernetes2");
-      expect(route.meta?.titleKey).toBe("menu.kubernetes2");
-      expect(route.props).toBeUndefined();
-      expect(String(route.component)).toMatch(/kubernetes2\/KubernetesPage\.vue/);
+      const current = findRoute(homeChildRoutes, "infraKubernetes") as any;
+      expect(current.meta?.titleKey).toBe("menu.kubernetes");
+      expect(current.props).toBeUndefined();
+      expect(String(current.component)).toMatch(/kubernetes2\/KubernetesPage\.vue/);
+      const hidden = findRoute(homeChildRoutes, "infraKubernetes2") as any;
+      expect(hidden.props).toEqual({ workload: "kubernetes" });
+      expect(String(hidden.component)).toMatch(/curated\/CuratedPageView\.vue/);
     });
 
     // The curated-page migration (design §8.1) swaps only the `component` on these
     // two rows. Which chunk they load is an implementation detail and deliberately
     // NOT asserted; what must survive is the deep-link contract below.
-    it.each(["infraKubernetes"])(
+    it.each(["infraKubernetes", "infraKubernetes2"])(
       "%s keeps its titleKey and a lazily-imported component across the component swap",
       (name) => {
         const { homeChildRoutes } = useRoutes();
@@ -1915,7 +1949,7 @@ describe("useRoutes (router.ts)", () => {
       },
     );
 
-    it.each(["infraKubernetes"])(
+    it.each(["infraKubernetes2"])(
       "%s resolves to the curated view, NOT WorkloadStubPage (§8.1 step 2)",
       (name) => {
         // The chunk NAME stays unasserted; which MODULE the loader targets is what
@@ -2114,6 +2148,48 @@ describe("useRoutes (router.ts)", () => {
       expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
     });
 
+    it("sends a playlist link on the dashboard view to the TV player", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      vi.mocked(routeGuard).mockClear();
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "viewDashboard");
+      const next = vi.fn();
+
+      route.beforeEnter(
+        { query: { org_identifier: "acme", playlist: "d1:f1,d2", interval: "2m", slide: "2" } },
+        {},
+        next,
+      );
+
+      expect(next).toHaveBeenCalledWith({
+        path: "/dashboards/tv",
+        query: { org_identifier: "acme", playlist: "d1:f1,d2:default", interval: "2m", slide: "2" },
+        replace: true,
+      });
+      expect(routeGuard).not.toHaveBeenCalled();
+    });
+
+    it("keeps the TV player's own page fallback on the dashboard view", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "viewDashboard");
+      const to = { query: { dashboard: "d1", playlist: "d1,d2", tvpage: "1", kiosk: "true" } };
+      const next = vi.fn();
+      route.beforeEnter(to, {}, next);
+      expect(routeGuard).toHaveBeenCalledWith(to, {}, next);
+    });
+
+    it("registers the TV playlist route behind the route guard", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "dashboardTvPlaylist");
+      expect(route.path).toBe("/dashboards/tv");
+      expect(route.meta.titleKey).toBe("routeTitles.dashboardTvPlaylist");
+      const next = vi.fn();
+      route.beforeEnter({}, {}, next);
+      expect(routeGuard).toHaveBeenCalledWith({}, {}, next);
+    });
+
     it("should call routeGuard for functionList route beforeEnter", async () => {
       const { routeGuard } = await import("@/utils/zincutils");
       const { homeChildRoutes } = useRoutes();
@@ -2227,9 +2303,9 @@ describe("useRoutes (router.ts)", () => {
   // 23. Edge cases
   // =========================================================================
   describe("Edge Cases", () => {
-    it("should have exactly 6 parentRoutes", () => {
+    it("should have exactly 9 parentRoutes", () => {
       const { parentRoutes } = useRoutes();
-      expect(parentRoutes).toHaveLength(6);
+      expect(parentRoutes).toHaveLength(9);
     });
 
     it("should have unique paths in parentRoutes", () => {
@@ -2366,6 +2442,33 @@ describe("useRoutes (router.ts)", () => {
     });
   });
 
+  describe("profiles route guard", () => {
+    const enter = (zoConfig: Record<string, unknown>) => {
+      const previous = store.state.zoConfig;
+      store.state.zoConfig = zoConfig;
+      try {
+        const route: any = useRoutes().homeChildRoutes.find((r: any) => r.name === "profiles");
+        const next = vi.fn();
+        route.beforeEnter({ query: { org_identifier: "acme" } }, {}, next);
+        return next;
+      } finally {
+        store.state.zoConfig = previous;
+      }
+    };
+
+    it("sends a typed /profiles URL home when profiling is off", () => {
+      expect(enter({ build_type: "enterprise", profiling_enabled: false })).toHaveBeenCalledWith({
+        name: "home",
+        query: { org_identifier: "acme" },
+      });
+    });
+
+    it("opens the page when profiling is on, or while /config is still loading", () => {
+      expect(enter({ profiling_enabled: true })).toHaveBeenCalledWith();
+      expect(enter({})).toHaveBeenCalledWith();
+    });
+  });
+
   // the paywall predicate treats a matched beforeEnter as proof that routeGuard runs there.
   describe("paywall guard proxy (A-27)", () => {
     const EXPIRED_MICROS = (Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000;
@@ -2464,5 +2567,20 @@ describe("useRoutes (router.ts)", () => {
         expect(findRoute(homeChildRoutes, name).meta?.allowOnEmptyData).toBeUndefined();
       },
     );
+  });
+});
+
+describe("useRoutes lazy loading", () => {
+  // An eager route component lands in the entry bundle the login page downloads.
+  it("lazy-loads every route component except Login", () => {
+    const { parentRoutes, homeChildRoutes } = useRoutes();
+    const walk = (routes: any[]): void =>
+      routes.forEach((route) => {
+        if (route.component && route.component !== Login) {
+          expect(typeof route.component, route.path).toBe("function");
+        }
+        if (route.children) walk(route.children);
+      });
+    walk([...parentRoutes, ...homeChildRoutes]);
   });
 });

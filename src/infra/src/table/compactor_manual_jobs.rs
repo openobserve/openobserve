@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait, sea_query::LikeExpr};
 use serde::{Deserialize, Serialize};
 
 use super::migration::Expr;
@@ -188,9 +188,27 @@ pub async fn bulk_update(jobs: Vec<CompactorManualJob>) -> Result<(), errors::Er
 /// The key format is `{org_id}/{stream_type}/{stream_name}/...`.
 pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;
-    let prefix = format!("{org_id}/%");
+    let pattern = format!("{}/%", crate::db::escape_like_prefix(org_id));
+    let prefix = format!("{org_id}/");
+    let rows = match Entity::find()
+        .filter(Expr::col(Column::Key).like(LikeExpr::new(pattern).escape('\\')))
+        .all(client)
+        .await
+    {
+        Ok(rows) => rows,
+        Err(e) => return orm_err!(format!("delete_by_org list error: {e}")),
+    };
+    // SQLite's LIKE ignores case, so the exact prefix is re-checked before deleting.
+    let ids: Vec<String> = rows
+        .into_iter()
+        .filter(|r| r.key.starts_with(&prefix))
+        .map(|r| r.id)
+        .collect();
+    if ids.is_empty() {
+        return Ok(());
+    }
     let res = Entity::delete_many()
-        .filter(Column::Key.like(&prefix))
+        .filter(Column::Id.is_in(ids))
         .exec(client)
         .await;
 

@@ -371,7 +371,6 @@ describe("IngestMetrics Component", () => {
         button: "Copy to Clipboard",
         ingestion: "otelCollector",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         page: "Ingestion",
       });
     });

@@ -18,6 +18,7 @@
 // into labelling the same value two different ways.
 
 import type { LibrarySeverity } from "@/constants/alertLibrary";
+import type { AlertLibraryEntry } from "@/types/alertLibrary";
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 
 /** A rail entry: one facet value plus how many alerts carry it. */
@@ -26,6 +27,11 @@ export interface LibraryFacet {
   label: I18nText;
   count: number;
 }
+
+/** The rail's alert-type facet; the manifest's `scheduled` reads as Threshold. */
+export type LibraryAlertType = "scheduled" | "anomaly";
+
+export const ALERT_TYPE_ORDER: readonly LibraryAlertType[] = ["scheduled", "anomaly"] as const;
 
 /** Rail order for severity — hottest first, matching the card sort. */
 export const SEVERITY_ORDER: readonly LibrarySeverity[] = ["critical", "warning", "info"] as const;
@@ -77,6 +83,7 @@ export const severityLabel = (t: TranslateFn, severity: string): I18nText =>
  * pack without a frontend release.
  */
 const PACK_LABELS: Record<string, string> = {
+  apm: "APM",
   applications: "Applications",
   "ci-cd": "CI/CD",
   "cloud-providers": "Cloud providers",
@@ -94,7 +101,19 @@ const PACK_LABELS: Record<string, string> = {
   storage: "Storage",
 };
 
+const ALERT_TYPE_LABEL_KEY: Record<LibraryAlertType, I18nKey> = {
+  scheduled: "alert_library.alertTypeThreshold",
+  anomaly: "alert_library.alertTypeAnomaly",
+};
+
 const QUERY_TYPE_LABELS: Record<string, string> = { promql: "PromQL", sql: "SQL" };
+
+// Anything but an explicit anomaly is scheduled, which is what pre-1.1 manifests meant.
+export const alertTypeOf = (entry: Pick<AlertLibraryEntry, "alert_type">): LibraryAlertType =>
+  entry?.alert_type === "anomaly_detection" ? "anomaly" : "scheduled";
+
+export const alertTypeLabel = (t: TranslateFn, type: LibraryAlertType): I18nText =>
+  t(ALERT_TYPE_LABEL_KEY[type]);
 
 // Product names, not shouted acronyms — toUpperCase() rendered "PROMQL".
 export const queryTypeLabel = (queryType: string | null | undefined): I18nText => {

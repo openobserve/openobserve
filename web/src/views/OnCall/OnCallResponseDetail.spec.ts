@@ -1100,6 +1100,29 @@ describe("OnCallResponseDetail", () => {
       expect(who.props("handoverTo")).toBe("bo@o2.ai");
     });
 
+    /// D4: a cover running across a roster handover is one holder, so the handover is where it ends.
+    it("hands over where the holder changes, not where the roster under a cover does", async () => {
+      const now = Date.now() * 1000;
+      const cover = { rotation: "weekly", user_email: "cy@o2.ai", override_id: "ov" };
+      service.resolvedSchedule.mockResolvedValue({
+        data: [
+          { ...cover, from: now - 1_000_000, to: now + 1_000_000, scheduled_email: "ana@o2.ai" },
+          { ...cover, from: now + 1_000_000, to: now + 5_000_000, scheduled_email: "bo@o2.ai" },
+          {
+            from: now + 5_000_000,
+            to: now + 9_000_000,
+            rotation: "weekly",
+            user_email: "bo@o2.ai",
+          },
+        ],
+      } as any);
+      const wrapper = await renderWith();
+
+      const who = wrapper.findComponent({ name: "OnCallWhoIsOn" });
+      expect(who.props("handoverAt")).toBe(now + 5_000_000);
+      expect(who.props("handoverTo")).toBe("bo@o2.ai");
+    });
+
     /// A gap after the current shift is a real answer — the pager goes to
     /// nobody — so the row must not skip forward to the next staffed span.
     it("says nobody inherits when the next span is a gap", async () => {

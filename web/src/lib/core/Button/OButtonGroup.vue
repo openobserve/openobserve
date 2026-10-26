@@ -48,6 +48,12 @@ const alignClasses: Record<NonNullable<ButtonGroupProps["align"]>, string> = {
       props.orientation === 'horizontal'
         ? '[&>*:not(:first-child)]:border-s-0'
         : '[&>*:not(:first-child)]:border-t-0',
+      // A pending child's border is its fill, so its divider borrows the one-step-darker hover fill.
+      props.divided
+        ? props.orientation === 'horizontal'
+          ? '[&>[data-o2-variant=pending]:not(:last-child)]:border-e-button-pending-hover-bg'
+          : '[&>[data-o2-variant=pending]:not(:last-child)]:border-b-button-pending-hover-bg'
+        : '',
     ]"
     role="group"
   >

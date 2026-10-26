@@ -22,7 +22,9 @@ async function open(page, streams = NOFTS) {
   const requests = trackSearches(page);
   await page.goto(url(streams));
   await page.locator('[data-test="logs-search-bar-query-editor"]').waitFor();
-  await page.locator(run).click();
+  // The stream URL runs its own search on entry; clicking the shared run/cancel button mid-flight cancels it.
+  await expect(page.locator(panel).or(page.locator('[data-test="logs-missing-stream-banner"]')).first()).toBeVisible();
+  await expect(page.locator(run)).toHaveAttribute('title', 'Run query');
   return requests;
 }
 async function total(request, stream) {
@@ -121,6 +123,8 @@ test.describe('No-FTS recovery C1', () => {
     const banner = page.locator('[data-test="logs-missing-stream-banner"]');
     await expect(banner).toContainText(NOFTS);
     await expect(page.locator('[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]')).toHaveCount(1);
+    // The page-count search follows the hits search, so count only after it has gone out.
+    await expect.poll(() => requests.all().some((entry) => entry.type === 'pageCount')).toBe(true);
     const before = requests.all().length;
     await banner.locator('[data-test="logs-no-fts-search-fields-btn"]').click();
     await expect(banner).toContainText(`Search ${NOFTS} only; ${FTS} will be deselected.`);

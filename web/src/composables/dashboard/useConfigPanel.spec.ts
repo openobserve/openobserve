@@ -40,6 +40,7 @@ vi.mock("@/utils/dashboard/configUtils", () => ({
   shouldShowAreaLineStyleConfig: vi.fn(() => false),
   shouldShowNoValueReplacement: vi.fn(() => false),
   shouldShowAxisConfig: vi.fn(() => false),
+  shouldShowAxisBorderConfig: vi.fn(() => false),
   shouldShowCartesianAxisConfig: vi.fn(() => false),
   shouldShowGridlines: vi.fn(() => false),
   shouldShowAxisLabelConfig: vi.fn(() => false),
@@ -181,6 +182,7 @@ describe("ORDERED_SECTION_IDS", () => {
     "geographic",
     "legend",
     "data",
+    "stateTimeline",
     "axis",
     "labels",
     "lineStyle",
@@ -188,6 +190,7 @@ describe("ORDERED_SECTION_IDS", () => {
     "pivotTable",
     "valueTransformations",
     "fieldOverrides",
+    "seriesOverrides",
     "map",
     "gauge",
     "layout",
@@ -195,12 +198,13 @@ describe("ORDERED_SECTION_IDS", () => {
     "drilldown",
     "comparison",
     "markLines",
+    "thresholds",
     "background",
     "sparkline",
   ];
 
-  it("contains all 21 sections", () => {
-    expect(ORDERED_SECTION_IDS).toHaveLength(21);
+  it("contains all 24 sections", () => {
+    expect(ORDERED_SECTION_IDS).toHaveLength(24);
   });
 
   it("contains every expected section id", () => {
@@ -614,6 +618,25 @@ describe("useConfigPanel – data section", () => {
   });
 });
 
+describe("useConfigPanel – state timeline section", () => {
+  const options = ["merge-gaps", "row-size", "show-state-text", "row-sort", "tooltip-mode"];
+
+  it("shows the state timeline options and hides unit and decimals for that type", () => {
+    const c = makeComposable(makePanelData("state-timeline"));
+    for (const option of options) {
+      expect(c.isConfigOptionVisible("stateTimeline", option)).toBe(true);
+    }
+    expect(c.isConfigOptionVisible("data", "unit")).toBe(false);
+    expect(c.isConfigOptionVisible("data", "decimals")).toBe(false);
+    expect(c.isSectionVisible("thresholds")).toBe(true);
+  });
+
+  it("hides the state timeline options for other types", () => {
+    const c = makeComposable(makePanelData("line"));
+    expect(c.isSectionVisible("stateTimeline")).toBe(false);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // useConfigPanel — axis section
 // ---------------------------------------------------------------------------
@@ -626,12 +649,12 @@ describe("useConfigPanel – axis section", () => {
     expect(c.isConfigOptionVisible("axis", "axis-width")).toBe(true);
   });
 
-  it("axis-border visibility delegates to shouldShowAxisConfig", async () => {
-    const { shouldShowAxisConfig } = await import("@/utils/dashboard/configUtils");
-    vi.mocked(shouldShowAxisConfig).mockReturnValue(true);
+  it("axis-border visibility delegates to shouldShowAxisBorderConfig", async () => {
+    const { shouldShowAxisBorderConfig } = await import("@/utils/dashboard/configUtils");
+    vi.mocked(shouldShowAxisBorderConfig).mockReturnValue(true);
     const c = makeComposable();
     expect(c.isConfigOptionVisible("axis", "axis-border")).toBe(true);
-    vi.mocked(shouldShowAxisConfig).mockReturnValue(false);
+    vi.mocked(shouldShowAxisBorderConfig).mockReturnValue(false);
   });
 
   it("y-axis visibility delegates to shouldShowCartesianAxisConfig", async () => {
@@ -1016,6 +1039,60 @@ describe("useConfigPanel – markLines section", () => {
 });
 
 // ---------------------------------------------------------------------------
+// useConfigPanel — thresholds section
+// ---------------------------------------------------------------------------
+
+describe("useConfigPanel – thresholds section", () => {
+  it.each(["line", "area", "area-stacked", "bar", "h-bar", "scatter", "gauge", "metric"])(
+    "is visible for %s",
+    (type) => {
+      const c = makeComposable(makePanelData(type));
+      expect(c.isSectionVisible("thresholds")).toBe(true);
+    },
+  );
+
+  it.each(["stacked", "h-stacked", "pie", "donut", "heatmap", "table", "geomap"])(
+    "is hidden for %s",
+    (type) => {
+      const c = makeComposable(makePanelData(type));
+      expect(c.isSectionVisible("thresholds")).toBe(false);
+    },
+  );
+});
+
+// ---------------------------------------------------------------------------
+// useConfigPanel — series overrides section
+// ---------------------------------------------------------------------------
+
+describe("useConfigPanel – series overrides section", () => {
+  it.each([
+    "line",
+    "area",
+    "area-stacked",
+    "bar",
+    "h-bar",
+    "stacked",
+    "h-stacked",
+    "scatter",
+    "pie",
+    "donut",
+    "gauge",
+    "metric",
+  ])("is visible for %s", (type) => {
+    const c = makeComposable(makePanelData(type));
+    expect(c.isSectionVisible("seriesOverrides")).toBe(true);
+  });
+
+  it.each(["table", "heatmap", "geomap", "maps", "sankey", "html", "markdown", "custom_chart"])(
+    "is hidden for %s",
+    (type) => {
+      const c = makeComposable(makePanelData(type));
+      expect(c.isSectionVisible("seriesOverrides")).toBe(false);
+    },
+  );
+});
+
+// ---------------------------------------------------------------------------
 // useConfigPanel — background section
 // ---------------------------------------------------------------------------
 
@@ -1098,19 +1175,169 @@ describe("useConfigPanel – show exemplars option", () => {
     return panel;
   };
 
-  it("is found by searching 'exemplars' on an eligible PromQL panel", async () => {
-    const c = makeComposable(promqlPanel("line"), ref(true));
-    c.searchQuery.value = "exemplars";
-    await nextTick();
-    expect(c.isConfigOptionVisible("general", "show-exemplars")).toBe(true);
-  });
+  it.each(["line", "heatmap"])(
+    "is found by searching 'exemplars' on an eligible PromQL %s panel",
+    async (type) => {
+      const c = makeComposable(promqlPanel(type), ref(true));
+      c.searchQuery.value = "exemplars";
+      await nextTick();
+      expect(c.isConfigOptionVisible("general", "show-exemplars")).toBe(true);
+    },
+  );
 
   it.each([
     ["h-bar", "range", true],
     ["line", "instant", true],
+    ["heatmap", "instant", true],
     ["line", "range", false],
+    ["heatmap", "range", false],
   ])("stays hidden for %s/%s with promqlMode=%s", (type, queryType, promql) => {
     const c = makeComposable(promqlPanel(type, queryType), ref(promql));
     expect(c.isConfigOptionVisible("general", "show-exemplars")).toBe(false);
+  });
+});
+
+describe("filterOption – plural queries", () => {
+  it.each([
+    ["limits", "Limit line only"],
+    ["units", "Unit"],
+    ["thresholds", "Thresholds"],
+    ["labels", "Label position"],
+  ])("%j finds %j", (query, label) => {
+    expect(filterOption({ label }, query)).toBe(true);
+  });
+
+  it.each([
+    ["axis", "Max value"],
+    ["units", "Unity"],
+    ["gas", "Ga"],
+  ])("%j does not widen to %j", (query, label) => {
+    expect(filterOption({ label }, query)).toBe(false);
+  });
+});
+
+describe("useConfigPanel – heatmap colour range", () => {
+  it("is visible only for heatmap panels", () => {
+    expect(
+      makeComposable(makePanelData("heatmap")).isConfigOptionVisible("data", "heatmap-color-range"),
+    ).toBe(true);
+    expect(
+      makeComposable(makePanelData("bar")).isConfigOptionVisible("data", "heatmap-color-range"),
+    ).toBe(false);
+  });
+
+  it.each(["heatmap-palette", "heatmap-palette-reverse", "heatmap-color-scale"])(
+    "shows %s for heatmap panels only, SQL and PromQL alike",
+    (option) => {
+      expect(makeComposable(makePanelData("heatmap")).isConfigOptionVisible("data", option)).toBe(
+        true,
+      );
+      expect(
+        makeComposable(makePanelData("heatmap"), ref(true)).isConfigOptionVisible("data", option),
+      ).toBe(true);
+      expect(makeComposable(makePanelData("bar")).isConfigOptionVisible("data", option)).toBe(
+        false,
+      );
+    },
+  );
+
+  it("shows the histogram mode switch for PromQL heatmaps only", () => {
+    const visible = (type: string, promql: boolean) =>
+      makeComposable(makePanelData(type), ref(promql)).isConfigOptionVisible(
+        "data",
+        "heatmap-histogram-mode",
+      );
+    expect(visible("heatmap", true)).toBe(true);
+    expect(visible("heatmap", false)).toBe(false);
+    expect(visible("line", true)).toBe(false);
+  });
+
+  it("shows the bucket unit only in histogram mode, and its custom text only for a custom unit", () => {
+    const visible = (config: Record<string, any>, option: string) =>
+      makeComposable(makePanelData("heatmap", config), ref(true)).isConfigOptionVisible(
+        "data",
+        option,
+      );
+    expect(visible({}, "bucket-unit")).toBe(false);
+    expect(visible({ heatmap_mode: "prometheus_histogram" }, "bucket-unit")).toBe(true);
+    expect(visible({ heatmap_mode: "prometheus_histogram" }, "bucket-unit-custom")).toBe(false);
+    expect(
+      visible(
+        { heatmap_mode: "prometheus_histogram", bucket_unit: "custom" },
+        "bucket-unit-custom",
+      ),
+    ).toBe(true);
+  });
+
+  it("is found by searching either label", () => {
+    const c = makeComposable(makePanelData("heatmap"));
+    // The i18n mock returns keys, so the search matches the key text.
+    c.searchQuery.value = "heatmapcolormax";
+    expect(c.isConfigOptionVisible("data", "heatmap-color-range")).toBe(true);
+    c.searchQuery.value = "legend";
+    expect(c.isConfigOptionVisible("data", "heatmap-color-range")).toBe(false);
+  });
+});
+
+describe("useConfigPanel – heatmap y axis", () => {
+  const numericY = {
+    fields: {
+      y: [{ alias: "y", functionName: null, args: [{ type: "field", value: { field: "age" } }] }],
+    },
+  };
+  const withSchema = (panel: any, type = "Int64") => ({
+    ...panel,
+    meta: {
+      streamFields: { groupedFields: [{ stream_alias: null, schema: [{ name: "age", type }] }] },
+    },
+  });
+  const visible = (panel: any, option: string, promql = false) =>
+    makeComposable(panel, ref(promql)).isConfigOptionVisible("axis", option);
+
+  it("shows the y sort for SQL and generic PromQL heatmaps, not histogram mode or other charts", () => {
+    expect(visible(makePanelData("heatmap"), "heatmap-y-sort")).toBe(true);
+    expect(visible(makePanelData("heatmap", {}, { customQuery: true }), "heatmap-y-sort")).toBe(
+      true,
+    );
+    expect(visible(makePanelData("heatmap"), "heatmap-y-sort", true)).toBe(true);
+    expect(
+      visible(
+        makePanelData("heatmap", { heatmap_mode: "prometheus_histogram" }),
+        "heatmap-y-sort",
+        true,
+      ),
+    ).toBe(false);
+    expect(visible(makePanelData("bar"), "heatmap-y-sort")).toBe(false);
+  });
+
+  it("shows y bucketing only for a builder heatmap whose y is a numeric column", () => {
+    expect(visible(withSchema(makePanelData("heatmap", {}, numericY)), "heatmap-y-bucket")).toBe(
+      true,
+    );
+    expect(
+      visible(withSchema(makePanelData("heatmap", {}, numericY), "Utf8"), "heatmap-y-bucket"),
+    ).toBe(false);
+    expect(
+      visible(
+        withSchema(makePanelData("heatmap", {}, { ...numericY, customQuery: true })),
+        "heatmap-y-bucket",
+      ),
+    ).toBe(false);
+    expect(
+      visible(withSchema(makePanelData("heatmap", {}, numericY)), "heatmap-y-bucket", true),
+    ).toBe(false);
+    expect(visible(withSchema(makePanelData("bar", {}, numericY)), "heatmap-y-bucket")).toBe(false);
+  });
+
+  it("shows the y range only while bucketing is on", () => {
+    expect(visible(withSchema(makePanelData("heatmap", {}, numericY)), "heatmap-y-range")).toBe(
+      false,
+    );
+    expect(
+      visible(
+        withSchema(makePanelData("heatmap", { heatmap_y_bucket: { mode: "log" } }, numericY)),
+        "heatmap-y-range",
+      ),
+    ).toBe(true);
   });
 });

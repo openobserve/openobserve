@@ -17,11 +17,12 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
+import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 import { computeUserOrgKey } from "@/utils/userOrgKey";
 import i18n from "@/locales";
 
-vi.mock("highlight.js", () => ({
+vi.mock("@/lib/core/Code/highlighter", () => ({
   default: {
     highlight: vi.fn(() => ({ value: "" })),
     highlightAuto: vi.fn(() => ({ value: "" })),
@@ -1124,6 +1125,214 @@ describe("O2AIChat session, persistence and lifecycle", () => {
 
       expect(insertedChips[0].preview.length).toBeLessThanOrEqual(13);
       expect(insertedChips[0].charCount).toBe(200);
+    });
+  });
+
+  describe("Ask hand-off payload", () => {
+    const focusSpy = vi.fn();
+    const handoffStubs = {
+      ...chipStubs,
+      RichTextInput: {
+        ...chipStubs.RichTextInput,
+        methods: { ...chipStubs.RichTextInput.methods, focusInput: focusSpy },
+      },
+    };
+    const CHIP = "Analysis · run 3";
+    const QUERY = "Root cause: checkout-db connection pool exhausted";
+    const handoff = (extra: Record<string, unknown> = {}) => ({
+      text: QUERY,
+      chipName: CHIP,
+      newChat: true,
+      autoSend: false,
+      id: 1,
+      context: { currentPage: "incidents", org_id: "default", incident_id: "inc-1", rca_run: "r" },
+      ...extra,
+    });
+
+    /** Delivers a payload and runs the watcher's nextTick + 50 ms defer and the chip insert on fake timers. */
+    const deliver = async (payload: Record<string, unknown>) => {
+      vi.useFakeTimers();
+      await wrapper!.setProps({ aiChatPayload: payload });
+      await vi.advanceTimersByTimeAsync(60);
+      await nextTick();
+      vi.useRealTimers();
+    };
+
+    beforeEach(async () => {
+      focusSpy.mockClear();
+      wrapper?.unmount();
+      wrapper = mountO2AIChat({}, handoffStubs);
+      vm = wrapper.vm;
+      await flushPromises();
+      await wait(150);
+      focusSpy.mockClear();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("starts a new chat and inserts the named chip without sending anything", async () => {
+      await turn(vm, [], "an earlier question");
+      expect(vm.currentChatId).toBe(42);
+      mockFetchAiChat.mockClear();
+
+      await deliver(handoff());
+
+      expect(vm.currentChatId).toBeNull();
+      expect(vm.chatMessages).toHaveLength(0);
+      expect(insertedChips).toHaveLength(1);
+      expect(insertedChips[0]).toMatchObject({
+        filename: CHIP,
+        preview: CHIP,
+        type: "context",
+        fullContent: QUERY,
+        charCount: QUERY.length,
+      });
+      expect(focusSpy).toHaveBeenCalled();
+
+      vi.useFakeTimers();
+      await vi.runAllTimersAsync();
+      vi.useRealTimers();
+      await flushPromises();
+      expect(mockFetchAiChat).not.toHaveBeenCalled();
+      expect(vm.chatMessages).toHaveLength(0);
+    });
+
+    it("never sends even when the payload asks for autoSend", async () => {
+      await deliver(handoff({ autoSend: true }));
+      await wait(120);
+      await flushPromises();
+
+      expect(insertedChips).toHaveLength(1);
+      expect(mockFetchAiChat).not.toHaveBeenCalled();
+      expect(vm.chatMessages).toHaveLength(0);
+    });
+
+    it("a new-chat hand-off drops the old draft and keeps one chip when two arrive together", async () => {
+      // The input's clear() empties it, chips included.
+      wrapper?.unmount();
+      wrapper = mountO2AIChat(
+        {},
+        {
+          ...handoffStubs,
+          RichTextInput: {
+            ...handoffStubs.RichTextInput,
+            methods: {
+              ...handoffStubs.RichTextInput.methods,
+              clear() {
+                insertedChips.length = 0;
+              },
+            },
+          },
+        },
+      );
+      vm = wrapper.vm;
+      await flushPromises();
+      await wait(150);
+      vm.inputMessage = "a half-written question";
+
+      vi.useFakeTimers();
+      await wrapper!.setProps({ aiChatPayload: handoff() });
+      await wrapper!.setProps({ aiChatPayload: handoff({ id: 2 }) });
+      await vi.advanceTimersByTimeAsync(60);
+      await nextTick();
+      vi.useRealTimers();
+
+      expect(vm.inputMessage).toBe("");
+      expect(insertedChips).toHaveLength(1);
+    });
+
+    it("sends the sanitized context with the user's first turn in that chat", async () => {
+      await deliver(handoff());
+
+      await turn(vm, [], "why did the pool run out?");
+
+      expect(lastCall(mockFetchAiChat)[4]).toEqual({ currentPage: "incidents", org_id: "default" });
+    });
+
+    it("keeps the pin for later turns of the same chat", async () => {
+      await deliver(handoff());
+      await turn(vm, [], "first");
+      await turn(vm, [], "second");
+
+      expect(mockFetchAiChat).toHaveBeenCalledTimes(2);
+      expect(lastCall(mockFetchAiChat)[4]).toEqual({ currentPage: "incidents", org_id: "default" });
+    });
+
+    it("pins nothing when the context carries only RCA keys", async () => {
+      await deliver(handoff({ context: { incident_id: "inc-1", subject_id: "s" } }));
+      await turn(vm);
+
+      expect(lastCall(mockFetchAiChat)[4]).toBeUndefined();
+    });
+
+    it("stays in the current chat when newChat is not set", async () => {
+      await turn(vm, [], "an earlier question");
+
+      await deliver(handoff({ newChat: false }));
+
+      expect(vm.currentChatId).toBe(42);
+      expect(vm.chatMessages.length).toBeGreaterThan(0);
+      expect(insertedChips).toHaveLength(1);
+      await turn(vm, [], "follow-up");
+      expect(lastCall(mockFetchAiChat)[4]).toEqual({ currentPage: "incidents", org_id: "default" });
+    });
+
+    it("a new chat started afterwards drops the pin", async () => {
+      await deliver(handoff());
+      await turn(vm, [], "first");
+
+      vm.addNewChat();
+      await flushPromises();
+      await turn(vm, [], "unrelated");
+
+      expect(lastCall(mockFetchAiChat)[4]).toBeUndefined();
+    });
+
+    it("loading a different chat drops the pin, reloading the hand-off chat keeps it", async () => {
+      await deliver(handoff());
+      await turn(vm, [], "first");
+      expect(vm.currentChatId).toBe(42);
+      const saved = (id: number) => ({
+        id,
+        title: `Chat ${id}`,
+        timestamp: "2026-01-01T00:00:00.000Z",
+        messages: [{ role: "user", content: "q" }],
+        sessionId: `s-${id}`,
+      });
+
+      mockLoadChat.mockResolvedValueOnce(saved(42));
+      await vm.loadChat(42);
+      await flushPromises();
+      await turn(vm, [], "same chat");
+      expect(lastCall(mockFetchAiChat)[4]).toEqual({ currentPage: "incidents", org_id: "default" });
+
+      mockLoadChat.mockResolvedValueOnce(saved(7));
+      await vm.loadChat(7);
+      await flushPromises();
+      mockSaveToHistory.mockResolvedValue(7);
+      await turn(vm, [], "other chat");
+      expect(lastCall(mockFetchAiChat)[4]).toBeUndefined();
+    });
+
+    it("a hand-off into a panel that just mounted inserts the chip once it is ready", async () => {
+      wrapper!.unmount();
+      vi.useFakeTimers();
+      wrapper = mountO2AIChat({}, handoffStubs);
+      vm = wrapper.vm;
+      await wrapper.setProps({ aiChatPayload: handoff() });
+      await vi.advanceTimersByTimeAsync(60);
+      await nextTick();
+      expect(insertedChips).toHaveLength(0);
+
+      await vi.advanceTimersByTimeAsync(200);
+      await nextTick();
+      vi.useRealTimers();
+
+      expect(insertedChips).toHaveLength(1);
+      expect(insertedChips[0]).toMatchObject({ filename: CHIP, fullContent: QUERY });
+      expect(mockFetchAiChat).not.toHaveBeenCalled();
     });
   });
 

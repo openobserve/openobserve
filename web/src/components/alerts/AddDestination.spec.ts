@@ -143,7 +143,7 @@ function mountComp(props: Record<string, any> = {}) {
         DestinationPreview: {
           name: "DestinationPreview",
           template: '<div data-test="destination-preview-stub"></div>',
-          props: ["modelValue", "type", "templateContent"],
+          props: ["modelValue", "type", "templateContent", "recipients"],
         },
         AppTabs: {
           template: '<div data-test="app-tabs-stub"></div>',
@@ -180,6 +180,25 @@ describe("AddDestination - rendering", () => {
     expect(wrapper.find('[data-test="add-destination-url-input"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="add-destination-method-select"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="add-destination-cancel-btn"]').exists()).toBe(true);
+  });
+
+  it("labels method and output-format options in uppercase but keeps lowercase values", async () => {
+    wrapper = mountComp({ isAlerts: false });
+    await toCustomHttp(wrapper);
+    const optionsOf = (name: string) =>
+      wrapper
+        .findAllComponents({ name: "OFormSelect" })
+        .find((c: any) => c.props("name") === name)
+        .props("options");
+    expect(optionsOf("method")).toEqual([
+      { label: "GET", value: "get" },
+      { label: "POST", value: "post" },
+      { label: "PUT", value: "put" },
+    ]);
+    expect(optionsOf("output_format")).toEqual([
+      { label: "JSON", value: "json" },
+      { label: "NDJSON", value: "ndjson" },
+    ]);
   });
 
   it("Save button stays enabled (R3 — no :disabled)", async () => {
@@ -1345,6 +1364,73 @@ describe("AddDestination — email recipients are org users", () => {
     expect(usersService.getRoles).toHaveBeenCalled();
     expect(wrapper.findComponent({ name: "AddUser" }).props("roles")).toEqual([
       { label: "Admin", value: "admin" },
+    ]);
+  });
+});
+
+describe("AddDestination — email destinations", () => {
+  const TEMPLATES = [
+    { name: "email_tpl", type: "email", body: "" },
+    { name: "raw_http_tpl", type: "http", kind: "custom", body: "" },
+    { name: "content_tpl", type: "http", kind: "content", body: "" },
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(usersService.orgUsers).mockResolvedValue({ data: { data: [] } } as any);
+    vi.mocked(usersService.getRoles).mockResolvedValue({ data: [] } as any);
+  });
+
+  const toPrebuiltEmail = async (w: any) => {
+    const form = getForm(w);
+    form.setFieldValue("destination_type", "email");
+    form.setFieldValue("type", "email");
+    form.setFieldValue("credentials", { recipients: ["a@acme.io", "b@acme.io"] });
+    await flushPromises();
+    return form;
+  };
+
+  it("offers content templates alongside email templates, on both paths", async () => {
+    wrapper = mountComp({ templates: TEMPLATES });
+    const form = getForm(wrapper);
+    form.setFieldValue("destination_type", "custom");
+    form.setFieldValue("type", "email");
+    await nextTick();
+    expect(wrapper.vm.getFormattedTemplates).toEqual(["email_tpl", "content_tpl"]);
+
+    await toPrebuiltEmail(wrapper);
+    expect(wrapper.vm.prebuiltTemplateOptions.map((o: any) => o.value)).toEqual([
+      "prebuilt_email",
+      "email_tpl",
+      "content_tpl",
+    ]);
+  });
+
+  it("hides Additional Settings for prebuilt email, keeps it for other prebuilt types", async () => {
+    wrapper = mountComp();
+    await toPrebuiltEmail(wrapper);
+    expect(wrapper.find('[data-test="prebuilt-additional-settings"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="add-destination-skip-tls-verify-toggle"]').exists()).toBe(
+      false,
+    );
+
+    const form = getForm(wrapper);
+    form.setFieldValue("destination_type", "teams");
+    form.setFieldValue("type", "http");
+    form.setFieldValue("credentials", {});
+    await flushPromises();
+    expect(wrapper.find('[data-test="prebuilt-additional-settings"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="add-destination-skip-tls-verify-toggle"]').exists()).toBe(
+      true,
+    );
+  });
+
+  it("passes the entered recipients to the preview", async () => {
+    wrapper = mountComp();
+    await toPrebuiltEmail(wrapper);
+    expect(wrapper.findComponent({ name: "DestinationPreview" }).props("recipients")).toEqual([
+      "a@acme.io",
+      "b@acme.io",
     ]);
   });
 });

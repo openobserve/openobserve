@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="md"
     :title="beingUpdated ? t('user.editUser') : t('user.add')"
     :primaryButtonLabel="t('user.save')"
+    primary-button-data-test="add-user-submit-btn"
     :secondaryButtonLabel="t('user.cancel')"
     form-id="add-user-form"
     @click:secondary="$emit('update:open', false)"

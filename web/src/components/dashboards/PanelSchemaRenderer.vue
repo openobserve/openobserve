@@ -43,14 +43,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="tableRendererData"
           :config="panelSchema.config"
           :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
-          @row-click="onChartClick"
+          @row-click="
+            (params: any, ...rest: any[]) => !store.state.kioskMode && onChartClick(params, ...rest)
+          "
         />
         <TableRenderer
           v-else-if="panelSchema.type == 'table'"
           :data="tableRendererData"
           :value-mapping="panelSchema?.config?.mappings ?? []"
-          @row-click="onChartClick"
-          @explore-cell="(params) => exploreCellInLogs(params.columnId, params.value, params.row)"
+          @row-click="
+            (params: any, ...rest: any[]) => !store.state.kioskMode && onChartClick(params, ...rest)
+          "
+          @explore-cell="
+            (params) =>
+              !store.state.kioskMode && exploreCellInLogs(params.columnId, params.value, params.row)
+          "
           @format-column="onFormatColumn"
           ref="tableRendererRef"
           :wrap-cells="panelSchema.config?.wrap_table_cells"
@@ -58,8 +65,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rows-per-page="panelSchema.config?.table_pagination_rows_per_page"
           :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
           :enable-column-format="enableColumnFormat"
-          :drilldown-columns="store.state.printMode ? [] : drilldownColumnAliases"
-          :drilldown-all-columns="!store.state.printMode && drilldownAllColumns"
+          :drilldown-columns="
+            store.state.printMode || store.state.kioskMode ? [] : drilldownColumnAliases
+          "
+          :drilldown-all-columns="
+            !store.state.printMode && !store.state.kioskMode && drilldownAllColumns
+          "
         />
         <div
           v-else-if="panelSchema.type == 'html'"
@@ -97,15 +108,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="chartRendererRef"
           :data="chartRendererData"
           :height="chartPanelHeight"
+          :label="raw(panelSchema?.title)"
           :render-type="panelSchema?.type === 'metric' ? 'svg' : 'canvas'"
-          @updated:data-zoom="onDataZoom"
+          @updated:data-zoom="(event) => !store.state.kioskMode && onDataZoom(event)"
           @error="errorDetail = $event"
-          @click="onChartClick"
-          @contextmenu="onChartContextMenu"
-          @domcontextmenu="onChartDomContextMenu"
+          @click="
+            (params: any, ...rest: any[]) => !store.state.kioskMode && onChartClick(params, ...rest)
+          "
+          @contextmenu="(event) => !store.state.kioskMode && onChartContextMenu(event)"
+          @domcontextmenu="(event) => !store.state.kioskMode && onChartDomContextMenu(event)"
           :find-line-on-context-menu="findsLineOnContextMenu"
-          @mouseover="exemplarInteraction.onMouseOver"
-          @mouseout="exemplarInteraction.onMouseOut"
+          @mouseover="onChartMouseOver"
+          @mouseout="onChartMouseOut"
           @finished="onChartFinished"
         />
         <ExemplarMarkerList
@@ -131,6 +145,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @leave="exemplarInteraction.onCardLeave"
           @open-trace="exemplarInteraction.openTrace"
         />
+        <QueryAnnotationTooltip
+          v-if="hoveredQueryAnnotation"
+          :marker="hoveredQueryAnnotation.marker"
+          :timezone="store.state.timezone"
+          :x="hoveredQueryAnnotation.x"
+          :y="hoveredQueryAnnotation.y"
+        />
       </div>
       <div
         v-if="metricItems.length && !noData && !loading"
@@ -146,6 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @mouseleave="hoveredMetricIdx = null"
         >
           <OButton
+            :aria-label="t('common.copyToClipboard')"
             class="absolute"
             v-show="hoveredMetricIdx === m.idx || metricCopiedIdx === m.idx"
             variant="ghost"
@@ -318,6 +340,9 @@ import { useRoute, useRouter } from "vue-router";
 import useNotifications from "@/composables/useNotifications";
 import { validateSQLPanelFields } from "@/utils/dashboard/panelValidation";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
+import { usePanelAnnotationSources } from "@/composables/dashboard/usePanelAnnotationSources";
+import QueryAnnotationTooltip from "./QueryAnnotationTooltip.vue";
+import type { QueryAnnotationMarker } from "@/ts/interfaces/dashboard";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import {
   forecastPointOf,
@@ -336,6 +361,10 @@ import {
   toChartTimeMs,
 } from "@/utils/dashboard/exemplars/applyExemplarSeries";
 import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
+import {
+  applyHeatmapExemplarSeries,
+  cachedHeatmapExemplarPlacement,
+} from "@/utils/dashboard/exemplars/heatmapExemplars";
 import { buildExemplarTraceRoute } from "@/utils/dashboard/exemplars/exemplarTraceRoute";
 import {
   exemplarBaseUnit,
@@ -406,6 +435,7 @@ export default defineComponent({
   name: "PanelSchemaRenderer",
   components: {
     OSeparator,
+    QueryAnnotationTooltip,
     ChartRenderer,
     AlertContextMenu,
     TableRenderer,
@@ -822,6 +852,20 @@ export default defineComponent({
         !["html", "markdown"].includes(panelSchema.value?.type),
     );
 
+    // Dashboard-level annotation sources are queried once by the dashboard and merged after the panel's own.
+    const {
+      markers: sourceAnnotationMarkers,
+      failedSources: failedAnnotationSources,
+      truncatedSources: truncatedAnnotationSources,
+    } = usePanelAnnotationSources(
+      () => panelSchema.value?.id,
+      () => panelSchema.value?.type,
+    );
+    const panelAnnotations = computed(() => [
+      ...(annotations.value ?? []),
+      ...sourceAnnotationMarkers.value,
+    ]);
+
     const {
       isAddAnnotationMode,
       isAddAnnotationDialogVisible,
@@ -1057,6 +1101,18 @@ export default defineComponent({
       );
     };
 
+    // A heatmap's markers sit on its cells, so they follow the converter's columns and rows.
+    const placeHeatmapCells = cachedHeatmapExemplarPlacement(toExemplarChartX);
+    const heatmapExemplarPlace = computed(() => {
+      const extras = panelData.value?.extras;
+      if (panelSchema.value?.type !== "heatmap" || !extras?.heatmapExemplarLayout) return null;
+      if (!extras.heatmapTimeAxis) return null;
+      return placeHeatmapCells(
+        extras.heatmapExemplarLayout,
+        extras.heatmapTimeAxis,
+        exemplarMarkers.value,
+      );
+    });
     const exemplarInteraction = usePanelExemplarInteraction({
       chartRendererRef,
       markers: exemplarMarkers,
@@ -1066,7 +1122,48 @@ export default defineComponent({
       toChartX: toExemplarChartX,
       navigate: navigateToExemplarTrace,
       placeY: placeExemplarY,
+      gridPlacer: heatmapExemplarPlace,
     });
+    const hoveredQueryAnnotation = ref<{
+      marker: QueryAnnotationMarker;
+      x: number;
+      y: number;
+    } | null>(null);
+
+    type ChartPointerEvent = Parameters<typeof exemplarInteraction.onMouseOver>[0] & {
+      componentType?: string;
+      data?: { annotationDetails?: Partial<QueryAnnotationMarker> };
+      event?: { event?: { clientX?: number; clientY?: number } };
+    };
+
+    // One tooltip at a time: the axis tooltip pauses while a query marker shows its own.
+    const setAxisTooltipPaused = (paused: boolean) => {
+      const chart = chartRendererRef.value?.chart;
+      if (paused) chart?.dispatchAction?.({ type: "hideTip" });
+      chart?.setOption?.({ tooltip: { triggerOn: paused ? "none" : "mousemove|click" } });
+    };
+
+    const onChartMouseOver = (params: ChartPointerEvent) => {
+      exemplarInteraction.onMouseOver(params);
+      const isMarker = params?.componentType === "markLine" || params?.componentType === "markArea";
+      const marker = params?.data?.annotationDetails;
+      if (!isMarker || !marker?.source) return;
+      if (!hoveredQueryAnnotation.value) setAxisTooltipPaused(true);
+      hoveredQueryAnnotation.value = {
+        marker: marker as QueryAnnotationMarker,
+        x: params?.event?.event?.clientX ?? 0,
+        y: params?.event?.event?.clientY ?? 0,
+      };
+    };
+
+    const onChartMouseOut = (params: ChartPointerEvent) => {
+      exemplarInteraction.onMouseOut(params);
+      if (!hoveredQueryAnnotation.value) return;
+      hoveredQueryAnnotation.value = null;
+      // An open exemplar card keeps the axis tooltip paused for itself.
+      if (!exemplarActiveMarker.value) setAxisTooltipPaused(false);
+    };
+
     const {
       points: exemplarPoints,
       activeMarker: exemplarActiveMarker,
@@ -1347,7 +1444,7 @@ export default defineComponent({
             filteredResultMetaData,
             filteredMetadata.value,
             chartPanelStyle.value,
-            annotations,
+            panelAnnotations,
             loading.value,
             filteredSparklineData.value,
           );
@@ -1547,7 +1644,13 @@ export default defineComponent({
     );
 
     watch(
-      [data, () => store?.state?.theme, () => store?.state?.timezone, annotations, sparklineData],
+      [
+        data,
+        () => store?.state?.theme,
+        () => store?.state?.timezone,
+        panelAnnotations,
+        sparklineData,
+      ],
       async () => {
         // emit vrl function field list per query index
         if (data.value?.length) {
@@ -1918,9 +2021,40 @@ export default defineComponent({
     // Determines what data to pass to ChartRenderer.
     // noData check is evaluated first so promql panels with no results
     // also get the transparent background instead of showing a skeleton.
+    // Reused until the data, markers or colours change, since a new object makes the chart redraw every cell.
+    const heatmapExemplarData = computed(
+      (previous?: { source: unknown; place: unknown; colors: string; data: unknown }) => {
+        const source = panelData.value;
+        const place = heatmapExemplarPlace.value;
+        const queryColors = exemplarQueryColors.value;
+        const haloColor = (void isDark.value, chartColor("--color-surface-base"));
+        const edgeColor = (void isDark.value, chartColor("--color-text-heading"));
+        const colors = [...queryColors, haloColor, edgeColor].join("|");
+        if (
+          previous &&
+          previous.source === source &&
+          previous.place === place &&
+          previous.colors === colors
+        ) {
+          return previous;
+        }
+        const data = place
+          ? {
+              ...source,
+              options: applyHeatmapExemplarSeries(source.options, exemplarMarkers.value, place, {
+                queryColors,
+                haloColor,
+                edgeColor,
+              }),
+            }
+          : source;
+        return { source, place, colors, data };
+      },
+    );
     const withExemplars = (value: any) => {
       if (!exemplarMarkers.value.length || !value?.options) return value;
       if (!exemplarsEligible.value && !injectedExemplars.value) return value;
+      if (panelSchema.value?.type === "heatmap") return heatmapExemplarData.value.data;
       return {
         ...value,
         options: applyExemplarSeries(value.options, exemplarMarkers.value, {
@@ -2222,7 +2356,13 @@ export default defineComponent({
     }
 
     return {
+      hoveredQueryAnnotation,
+      onChartMouseOver,
+      onChartMouseOut,
+      failedAnnotationSources,
+      truncatedAnnotationSources,
       t,
+      raw,
       store,
       chartPanelRef,
       chartRendererRef,

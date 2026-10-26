@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="tokenSelectRef"
         v-model="selectedTokenName"
         data-test="ingestion-token-select"
+        :aria-label="t('ingestion.mcp.auth.token')"
         :options="tokenOptions"
         label-key="label"
         value-key="value"
@@ -93,6 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ref="tokenSelectRef"
             v-model="selectedTokenName"
             data-test="ingestion-token-select"
+            :aria-label="t('ingestion.mcp.auth.token')"
             :options="tokenOptions"
             label-key="label"
             value-key="value"
@@ -236,7 +238,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import { searchIngestionItems } from "@/utils/ingestionSearchIndex";
-import { awsIntegrations } from "@/utils/awsIntegrations";
+import { awsIntegrations, type AWSIntegration } from "@/utils/awsIntegrations";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { OPEN_TOKEN_PICKER } from "@/composables/useCredentialSnippet";
 import { useOrgCredential, type PasscodeRead } from "@/composables/useOrgCredential";
@@ -435,7 +437,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: "Update Passcode",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         page: "Ingestion",
       });
 
@@ -473,7 +474,6 @@ export default defineComponent({
             button: "Copy to Clipboard",
             ingestion: router.currentRoute.value.name,
             user_org: store.state.selectedOrganization.identifier,
-            user_id: store.state.userInfo.email,
             page: "Ingestion",
           });
         }
@@ -515,7 +515,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: "Generate RUM Token",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         page: "Ingestion",
       });
 
@@ -549,7 +548,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: "Update RUM Token",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         page: "Ingestion",
       });
 
@@ -610,10 +608,10 @@ export default defineComponent({
 
       // Third, check AWS services
       const matchesAWSService = awsIntegrations.some(
-        (integration: any) =>
+        (integration: AWSIntegration) =>
           integration.displayName.toLowerCase().includes(searchQuery) ||
           integration.name.toLowerCase().includes(searchQuery) ||
-          integration.description.toLowerCase().includes(searchQuery),
+          t(integration.descriptionKey).toLowerCase().includes(searchQuery),
       );
 
       if (matchesAWSService) {

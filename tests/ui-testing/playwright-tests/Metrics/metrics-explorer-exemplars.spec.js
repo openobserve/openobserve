@@ -76,9 +76,9 @@ test.describe('Metrics explorer exemplars', () => {
       await new Promise((r) => setTimeout(r, 5_000));
       await route.continue().catch(() => {});
     });
-    await pm.metricsExplorerPage.gotoExplorer();
+    // Filtered via the URL: typing it lets the 200ms search debounce re-render the grid mid-click and swallow the click.
+    await pm.metricsExplorerPage.gotoExplorer({ search: PREFIX });
     const search = page.locator('[data-test="metrics-explorer-search"] input');
-    await search.fill(PREFIX);
     await pm.metricsExplorerPage.openMetricDetails(CARD);
     await pm.metricsExplorerPage.expectDetailOpen(CARD);
     await page.locator(toggleSel(CARD)).click();
@@ -91,6 +91,12 @@ test.describe('Metrics explorer exemplars', () => {
     await page.unroute('**/prometheus/api/v1/query_exemplars**');
 
     await search.fill(PREFIX);
+    await expect.poll(() => pm.metricsExplorerPage.getQueryParam('search'), { timeout: 15_000 }).toBe(PREFIX);
+    // Back in view the card refetches, and its spinner mounts beside the toggle and shifts it until the fetch lands.
+    await expect.poll(async () => {
+      const points = page.locator(`${cardSel(CARD)} [data-test="dashboard-panel-exemplar-points"]`);
+      return (await points.count()) ? Number(await points.getAttribute('data-count')) : 0;
+    }, { timeout: 30_000 }).toBeGreaterThan(0);
     await page.locator(toggleSel(CARD)).click();
     await expect(page.locator(`[data-test="metrics-explorer-card-rest-info-${CARD}"]`)).toContainText('heatmap');
   });

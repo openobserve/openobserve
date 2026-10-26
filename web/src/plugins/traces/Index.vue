@@ -771,8 +771,9 @@ function fetchTracesCount() {
           searchObj.meta.resultGrid.showPagination = count > 0;
         }
       },
-      error: (_payload: any, _err: any) => {
-        console.error("Failed to fetch traces count");
+      error: (_payload: any, err: any) => {
+        // The count is a best-effort badge; the main search reports its own failures.
+        console.warn("Failed to fetch traces count", err);
         currentCountTraceId = null;
       },
       complete: (_payload: any) => {
@@ -1096,7 +1097,9 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
           delete tracesRequestState[searchTraceId];
           if (isPagination) noteTracesPageLoad(searchTraceId, "done");
           if (!isPagination) {
-            analytics.track("traces_search_completed");
+            analytics.track("traces_search_completed", {
+              hits: searchObj.data.queryResults?.hits?.length ?? 0,
+            });
             fetchTracesCount();
           }
           correlationFilters.save().catch((e) => console.error("[correlation:save] error:", e));
@@ -1435,10 +1438,11 @@ onActivated(async () => {
     await loadPageData();
   }
 
-  // Arriving from Service Graph / Services Catalog: this view is keep-alive, so
-  // a handoff navigation re-activates it without remounting. Apply the incoming
-  // stream/time/filter and run the query.
-  if (typeof params.filter === "string" && params.filter) {
+  // Arriving from Service Graph / Services Catalog / RCA evidence: this view is
+  // keep-alive, so a handoff navigation re-activates it without remounting. Apply
+  // the incoming stream/time/filter and run the query. An empty `filter` is an
+  // unfiltered handoff (stream + range only) and still clears and runs.
+  if (typeof params.filter === "string") {
     restoreUrlQueryParams();
     if (applyHandoffFilter()) {
       await loadPageData();
@@ -1524,7 +1528,13 @@ const restoreFilters = (query: string) => {
 
   const defaultQuery = `SELECT * FROM "${selectedStreamName.value}" WHERE `;
 
-  const parsedQuery = tracesParser.value.astify(defaultQuery + query);
+  let parsedQuery;
+  try {
+    parsedQuery = tracesParser.value.astify(defaultQuery + query);
+  } catch {
+    // A filter the parser rejects just leaves the field-value selections as they are.
+    return;
+  }
 
   restoreFiltersFromQuery(parsedQuery.where);
 };
@@ -1924,28 +1934,20 @@ const searchData = () => {
 
   runQueryFn();
 
-  analytics.track("Button Click", {
-    button: "Search Data",
-    user_org: store.state.selectedOrganization.identifier,
-    user_id: store.state.userInfo.email,
+  analytics.track("traces_search_run", {
     stream_name: searchObj.data.stream.selectedStream.value,
     show_query: searchObj.meta.showQuery,
     show_histogram: searchObj.meta.showHistogram,
-    sqlMode: searchObj.meta.sqlMode,
-    showFields: searchObj.meta.showFields,
-    page: "Search Logs",
+    sql_mode: searchObj.meta.sqlMode,
+    show_fields: searchObj.meta.showFields,
   });
 };
 
 const getMoreData = () => {
   getQueryData(true);
 
-  analytics.track("Button Click", {
-    button: "Get More Data",
-    user_org: store.state.selectedOrganization.identifier,
-    user_id: store.state.userInfo.email,
+  analytics.track("traces_more_rows_loaded", {
     stream_name: searchObj.data.stream.selectedStream.value,
-    page: "Search Logs",
   });
 };
 
@@ -2173,11 +2175,12 @@ const handleServicesCatalogViewTraces = (data: string | Record<string, any>) => 
 
 /**
  * Hydrate a bookmarkable filter handoff. `restoreUrlQueryParams` applies the
- * stream, time range and tab; this restores the prebuilt filter.
+ * stream, time range and tab; this restores the prebuilt filter. A present but
+ * empty `filter` clears the editor, so the handoff shows every span in range.
  */
 const applyHandoffFilter = (): boolean => {
   const filter = router.currentRoute.value.query.filter;
-  if (typeof filter !== "string" || !filter) return false;
+  if (typeof filter !== "string") return false;
 
   searchObj.data.editorValue = filter;
   searchObj.meta.sqlMode = false; // Traces doesn't use SQL mode

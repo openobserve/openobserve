@@ -1,6 +1,7 @@
 const testLogger = require('./test-logger.js');
 const logsdata = require("../../../test-data/logs_data.json");
 const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
+const { ingestBase } = require('./ingest-url.js');
 
 // Rows are stamped at ingest, so a 5-min refresh keeps them inside every 15-min test window.
 const SHARED_STREAM = 'e2e_automate';
@@ -11,9 +12,10 @@ const lastSharedIngest = new Map();
  * Ingest test data into a stream via API using Node.js context (secure)
  * @param {import('@playwright/test').Page} page - Playwright page object
  * @param {string} streamName - Name of the stream to ingest data into (default: "e2e_automate")
+ * @param {{ force?: boolean }} [options] - `force` posts even if the shared stream was refreshed recently (use after a stream settings change)
  * @returns {Promise<object>} - API response, or `{ skipped: true }` when this worker refreshed the shared stream within the last 5 min
  */
-async function ingestTestData(page, streamName = "e2e_automate") {
+async function ingestTestData(page, streamName = "e2e_automate", { force = false } = {}) {
   const orgId = getOrgIdentifier();
   const headers = getHeaders();
   const baseUrl = process.env.INGESTION_URL.endsWith('/')
@@ -22,13 +24,13 @@ async function ingestTestData(page, streamName = "e2e_automate") {
 
   const sharedKey = `${orgId}:${streamName}`;
   const lastIngest = streamName === SHARED_STREAM ? lastSharedIngest.get(sharedKey) : undefined;
-  if (lastIngest && Date.now() - lastIngest < SHARED_STREAM_REFRESH_MS) {
-    testLogger.debug('Test data ingestion skipped — this worker refreshed the shared stream recently', { streamName, ageMs: Date.now() - lastIngest });
+  if (!force && lastIngest && Date.now() - lastIngest < SHARED_STREAM_REFRESH_MS) {
+    testLogger.info('Test data ingestion skipped — this worker refreshed the shared stream recently', { streamName, ageMs: Date.now() - lastIngest });
     return { skipped: true };
   }
 
   try {
-    const response = await page.request.post(`${baseUrl}/api/${orgId}/${streamName}/_json`, {
+    const response = await page.request.post(`${ingestBase(baseUrl)}/api/${orgId}/${streamName}/_json`, {
       headers: headers,
       data: logsdata
     });
@@ -64,7 +66,7 @@ function getHeaders() {
  * // Returns: "http://localhost:5080/api/default/my_stream/_json"
  */
 function getIngestionUrl(orgId, streamName) {
-  return `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
+  return `${ingestBase(process.env.INGESTION_URL)}/api/${orgId}/${streamName}/_json`;
 }
 
 /**
@@ -107,7 +109,7 @@ async function ingestCustomData(page, streamName, data) {
 
   try {
     // Use Playwright's request API to keep credentials in Node.js context
-    const response = await page.request.post(`${baseUrl}/api/${orgId}/${streamName}/_json`, {
+    const response = await page.request.post(`${ingestBase(baseUrl)}/api/${orgId}/${streamName}/_json`, {
       headers: headers,
       data: data
     });

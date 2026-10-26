@@ -196,11 +196,11 @@ pub fn regexp_matches<T: OffsetSizeTrait>(args: &[ArrayRef]) -> Result<ArrayRef>
             // Group 3: hello              (innermost capture - what we want!)
 
             // Try innermost capture group first, then work outwards
-            let matched_value = (2..=cap.len())  // Start from 2 because: Group 0 is full match, Group 1 is first explicit group
-                .rev()  // Reverse the range to start from last group (innermost) to first group
-                .find_map(|i| cap.get(i))  // Try to get each group, returns None if group didn't match
-                .or_else(|| cap.get(1))    // If no inner groups matched, try the first explicit group
-                .or_else(|| cap.get(0))    // If no groups matched at all, use the entire match
+            let matched_value = (2..=cap.len()) // Start from 2 because: Group 0 is full match, Group 1 is first explicit group
+                .rev() // Reverse the range to start from last group (innermost) to first group
+                .find_map(|i| cap.get(i)) // Try to get each group, returns None if group didn't match
+                .or_else(|| cap.get(1)) // If no inner groups matched, try the first explicit group
+                .or_else(|| cap.get(0)) // If no groups matched at all, use the entire match
                 .map(|m| m.as_str()); // Convert the match to a string slice
 
             if let Some(matched) = matched_value {

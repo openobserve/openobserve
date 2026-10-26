@@ -18,7 +18,13 @@ import { buildInventory, type Series } from "./kubernetesModel";
 import type { QueryId, View } from "./kubernetesQueries";
 import { joinObjects, parseObjects } from "./kubernetesObjects";
 import { parseEvents } from "./kubernetesEvents";
-import { HIDDEN_BY_DEFAULT, columnsFor, defaultSort, type K8sColumn } from "./kubernetesColumns";
+import {
+  HIDDEN_BY_DEFAULT,
+  columnsFor,
+  defaultSort,
+  nodeSub,
+  type K8sColumn,
+} from "./kubernetesColumns";
 
 const t = ((key: string, params?: Record<string, unknown>) =>
   params ? `${key}${JSON.stringify(params)}` : key) as any;
@@ -234,6 +240,69 @@ describe("kubernetesColumns", () => {
     const taints = colOf("nodes", "taints");
     expect(taints.meta.text?.(node)).toBe("2");
     expect(taints.meta.tip?.(node)).toBe("a:NoSchedule\nb=v:NoExecute");
+  });
+
+  it("shows a node's internal IP as the name sub-line, and nothing when it is unknown", () => {
+    const [withIp, bare] = buildInventory(
+      results({
+        N1: [
+          ksm({ node: "n1", condition: "Ready", status: "true" }),
+          ksm({ node: "n2", condition: "Ready", status: "true" }),
+        ],
+        N3: [ksm({ node: "n1", internal_ip: "10.0.0.7" })],
+      }),
+    ).nodes;
+    const name = colOf("nodes", "name");
+    expect(name.meta.sub?.(withIp)).toBe("10.0.0.7");
+    expect(name.meta.sub?.(bare)).toBeNull();
+    expect(colOf("pods", "name").meta.sub).toBeUndefined();
+  });
+
+  it("shows pool · zone from the observed node labels, falling back to the IP", () => {
+    const [node] = buildInventory(
+      results({
+        N1: [ksm({ node: "n1", condition: "Ready", status: "true" })],
+        N3: [ksm({ node: "n1", internal_ip: "10.0.0.7" })],
+      }),
+    ).nodes;
+    const labelled = (labels: Record<string, string>) =>
+      ({ ...node, object: { metadata: { labels } } }) as typeof node;
+    const zone = { "topology.kubernetes.io/zone": "us-east-1a" };
+    expect(nodeSub(labelled({ ...zone, "eks.amazonaws.com/nodegroup": "workers" }))).toBe(
+      "workers · us-east-1a",
+    );
+    expect(
+      nodeSub(
+        labelled({
+          ...zone,
+          "node.kubernetes.io/instance-type": "m5.xlarge",
+          "karpenter.sh/nodepool": "spot",
+        }),
+      ),
+    ).toBe("spot · us-east-1a");
+    expect(nodeSub(labelled({ ...zone, "node.kubernetes.io/instance-type": "m5.xlarge" }))).toBe(
+      "m5.xlarge · us-east-1a",
+    );
+    expect(nodeSub(labelled(zone))).toBe("us-east-1a");
+    expect(nodeSub(labelled({ "kubernetes.io/os": "linux" }))).toBe("10.0.0.7");
+    expect(nodeSub(node)).toBe("10.0.0.7");
+  });
+
+  it("renders the pod IP and the cronjob schedule as mono cells with a dash when absent", () => {
+    const pod = buildInventory(
+      results({
+        P1: [ksm({ namespace: "shop", pod: "web", uid: "u", phase: "Running" })],
+        P6: [ksm({ namespace: "shop", pod: "web", uid: "u", node: "n1", pod_ip: "10.0.0.5" })],
+      }),
+    ).pods[0];
+    const ip = colOf("pods", "ip");
+    expect(ip.meta.render).toBe("mono");
+    expect(ip.meta.text?.(pod)).toBe("10.0.0.5");
+    expect(ip.meta.text?.({ ...pod, ip: null })).toBe("—");
+    const schedule = colOf("cronjobs", "schedule");
+    expect(schedule.meta.render).toBe("mono");
+    expect(schedule.meta.text?.({ schedule: "0 2 * * *" })).toBe("0 2 * * *");
+    expect(schedule.meta.text?.({ schedule: null })).toBe("—");
   });
 
   it("shows Deployment Pods as available/replicas and the derived-conditions tooltip", () => {

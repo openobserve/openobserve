@@ -278,6 +278,29 @@ describe("OSelect", () => {
       const input = document.body.querySelector('input[placeholder="Search..."]');
       expect(input).not.toBeNull();
     });
+
+    it("starts a new search from the top of the list, not the offset it opened at", async () => {
+      wrapper = mount(OSelect, {
+        attachTo: document.body,
+        props: {
+          modelValue: 150,
+          options: Array.from({ length: 200 }, (_, i) => ({ label: `Option ${i}`, value: i })),
+        },
+      });
+      await wrapper.find("button").trigger("click");
+      await flushPromises();
+      const scroller = document.body.querySelector<HTMLElement>(".overflow-auto.max-h-72")!;
+      scroller.scrollTop = 600;
+
+      const input = document.body.querySelector<HTMLInputElement>(
+        'input[placeholder="Search..."]',
+      )!;
+      input.value = "Option 1";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      await flushPromises();
+
+      expect(scroller.scrollTop).toBe(0);
+    });
   });
 
   describe("trigger keyboard focus behavior", () => {
@@ -399,6 +422,33 @@ describe("OSelect", () => {
       );
       document.removeEventListener("keydown", docSpy);
       expect(docSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("accessible name", () => {
+    const options = [{ label: "Option A", value: "a" }];
+
+    it("points the popover trigger at the outside label", () => {
+      wrapper = mount(OSelect, { props: { label: "Country", options } });
+      const label = wrapper.find("label");
+      const trigger = wrapper.find('button[role="combobox"]');
+      expect(label.attributes("id")).toBeTruthy();
+      expect(trigger.attributes("aria-labelledby")).toBe(label.attributes("id"));
+    });
+
+    it("lets an explicit aria-label stand instead of the label", () => {
+      wrapper = mount(OSelect, {
+        props: { label: "Country", options },
+        attrs: { "aria-label": "Pick a country" },
+      });
+      const trigger = wrapper.find('button[role="combobox"]');
+      expect(trigger.attributes("aria-label")).toBe("Pick a country");
+      expect(trigger.attributes("aria-labelledby")).toBeUndefined();
+    });
+
+    it("adds no labelledby without an outside label", () => {
+      wrapper = mount(OSelect, { props: { options } });
+      expect(wrapper.find('button[role="combobox"]').attributes("aria-labelledby")).toBeUndefined();
     });
   });
 

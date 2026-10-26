@@ -17,9 +17,11 @@ import {
   convertToTitleCase,
   truncateText,
   formatLargeNumber,
+  formatEventCount,
   formatSizeFromMB,
   addCommasToNumber,
   formatTimeWithSuffix,
+  formatTierRule,
   formatDuration,
   durationFormatter,
   maskText,
@@ -308,6 +310,41 @@ describe("formatLargeNumber", () => {
   it("formats numbers >= 1_000_000_000 with B suffix", () => {
     expect(formatLargeNumber(3_000_000_000)).toBe("3.0B");
   });
+
+  it("moves to the next unit when rounding reaches 1000", () => {
+    expect(formatLargeNumber(999_949)).toBe("999.9K");
+    expect(formatLargeNumber(999_950)).toBe("1.0M");
+    expect(formatLargeNumber(999_999)).toBe("1.0M");
+    expect(formatLargeNumber(999_999_999)).toBe("1.0B");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatEventCount
+// ---------------------------------------------------------------------------
+
+describe("formatEventCount", () => {
+  it("prints counts below 100 000 exactly", () => {
+    expect(formatEventCount(99_999)).toBe("99999");
+  });
+
+  it("formats larger counts with one decimal and drops a trailing .0", () => {
+    expect(formatEventCount(123_456)).toBe("123.5K");
+    expect(formatEventCount(2_000_000)).toBe("2M");
+    expect(formatEventCount(2_900_000_000)).toBe("2.9B");
+  });
+
+  it("moves to the next unit when rounding reaches 1000", () => {
+    expect(formatEventCount(999_949)).toBe("999.9K");
+    expect(formatEventCount(999_950)).toBe("1M");
+    expect(formatEventCount(999_999)).toBe("1M");
+    expect(formatEventCount(999_999_999)).toBe("1B");
+    expect(formatEventCount(999_990_000_000)).toBe("1T");
+  });
+
+  it("stays on T past the largest unit", () => {
+    expect(formatEventCount(1e15)).toBe("1000T");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -561,6 +598,46 @@ describe("minuteOfDayToHhmm", () => {
   it("normalises out-of-range and negative minutes into the day", () => {
     expect(minuteOfDayToHhmm(1500)).toBe("01:00");
     expect(minuteOfDayToHhmm(-60)).toBe("23:00");
+  });
+});
+
+describe("formatTierRule", () => {
+  const labels: Record<string, string> = {
+    "modelPricing.ruleOpIn": "is one of",
+    "modelPricing.ruleOpNotIn": "is not one of",
+    "modelPricing.ruleOpExists": "is set",
+    "modelPricing.ruleOpNotExists": "is not set",
+  };
+  const t = (key: string) => labels[key] ?? key;
+
+  it("labels set rules through t and counts extra keys", () => {
+    expect(
+      formatTierRule(
+        {
+          keys: ["openai.response.service_tier", "openai.request.service_tier"],
+          op: "in",
+          values: ["flex", "priority"],
+        },
+        t,
+      ),
+    ).toBe("openai.response.service_tier +1 is one of flex, priority");
+    expect(formatTierRule({ keys: ["speed"], op: "not_in", values: ["fast"] }, t)).toBe(
+      "speed is not one of fast",
+    );
+  });
+
+  it("renders presence and comparison rules", () => {
+    expect(formatTierRule({ keys: ["speed"], op: "exists" }, t)).toBe("speed is set");
+    expect(formatTierRule({ keys: ["speed"], op: "not_exists" }, t)).toBe("speed is not set");
+    expect(formatTierRule({ keys: ["usage.input"], op: "gte", value: 272000 }, t)).toBe(
+      "usage.input ≥ 272000",
+    );
+  });
+
+  it("skips blank keys and tolerates a missing operator", () => {
+    expect(formatTierRule({ keys: [" ", "service_tier"], values: ["flex"] }, t)).toBe(
+      "service_tier is one of flex",
+    );
   });
 });
 

@@ -177,11 +177,23 @@ pub async fn remove(org_id: &str, user_email: &str) -> Result<(), anyhow::Error>
     Ok(())
 }
 
+/// Evicts one membership from every node's caches and leaves its row in place.
+pub async fn evict_cached(org_id: &str, user_email: &str) -> Result<(), anyhow::Error> {
+    let key = format!("{ORG_USERS_KEY_PREFIX}single/{org_id}/{user_email}");
+    delete_from_db_coordinator(&key, false, true, None).await?;
+    Ok(())
+}
+
 pub async fn remove_by_user(email: &str) -> Result<(), anyhow::Error> {
-    let key = format!("{ORG_USERS_KEY_PREFIX}many/user/{email}");
     org_users::remove_by_user(email)
         .await
         .map_err(|e| anyhow::anyhow!("Failed to remove user from org: {e}"))?;
+    notify_removed_by_user(email).await
+}
+
+/// Emits the many/user delete event; call it only once the rows are gone from the store.
+pub async fn notify_removed_by_user(email: &str) -> Result<(), anyhow::Error> {
+    let key = format!("{ORG_USERS_KEY_PREFIX}many/user/{email}");
     delete_from_db_coordinator(&key, false, true, None)
         .await
         .inspect_err(|e| {

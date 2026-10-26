@@ -63,6 +63,10 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                     folder.folder_id,
                 )
             };
+        }
+        #[cfg(not(feature = "enterprise"))]
+        usage_data.org_id.clear();
+        if usage_data.event == UsageEvent::Search {
             search_events.push(usage_data.clone());
             continue;
         }
@@ -218,7 +222,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
         for usage in &report_data {
             if let Some(org_id) = usage.get("org_id").and_then(|v| v.as_str()) {
                 // Skip meta org (already handled above)
-                if org_id == META_ORG_ID {
+                if org_id.is_empty() || org_id == META_ORG_ID {
                     continue;
                 }
                 per_org_map
@@ -237,7 +241,8 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
             // do not skip self-reporting even if super org reporting fails
 
             // Check if org has usage stream enabled
-            match crate::db::organization::get_org_setting_usage_stream_enabled(&org).await {
+            match crate::db::organization::read_org_setting(&org, |s| s.usage_stream_enabled).await
+            {
                 Ok(true) => {}
                 Ok(false) => continue, // self-report not enabled, so skip
                 Err(e) => {

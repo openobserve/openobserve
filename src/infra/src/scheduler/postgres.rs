@@ -870,6 +870,66 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
         Ok(jobs)
     }
 
+    async fn delete_by_org(&self, org: &str) -> Result<Vec<(TriggerModule, String)>> {
+        let pool = CLIENT_RW.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["delete", "scheduled_jobs"])
+            .inc();
+        let deleted: Vec<(TriggerModule, String)> = sqlx::query_as(
+            r#"DELETE FROM scheduled_jobs WHERE org = $1 RETURNING module, module_key;"#,
+        )
+        .bind(org)
+        .fetch_all(&pool)
+        .await?;
+        let cluster_coordinator = db::get_coordinator().await;
+        for (module, key) in &deleted {
+            if *module == TriggerModule::Alert {
+                let key = format!("{TRIGGERS_KEY}{module}/{org}/{key}");
+                cluster_coordinator.delete(&key, false, true, None).await?;
+            }
+        }
+        Ok(deleted)
+    }
+
+    async fn release_parked(&self, org: &str, deleted_at: i64, park: i64, now: i64) -> Result<u64> {
+        let pool = CLIENT_RW.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["update", "scheduled_jobs"])
+            .inc();
+        let released = sqlx::query(
+            r#"UPDATE scheduled_jobs SET next_run_at = $4
+WHERE org = $1 AND next_run_at > $4 AND next_run_at > $2 AND (next_run_at - $2) % $3 = 0;"#,
+        )
+        .bind(org)
+        .bind(deleted_at)
+        .bind(park)
+        .bind(now)
+        .execute(&pool)
+        .await?;
+        Ok(released.rows_affected())
+    }
+
+    async fn release_if_org_active(&self, parked: &Trigger, now: i64) -> Result<bool> {
+        let pool = CLIENT_RW.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["update", "scheduled_jobs"])
+            .inc();
+        let released = sqlx::query(
+            r#"UPDATE scheduled_jobs SET next_run_at = $5
+WHERE org = $1 AND module = $2 AND module_key = $3 AND next_run_at = $4
+AND EXISTS (SELECT 1 FROM organizations WHERE identifier = $1 AND status = 'active');"#,
+        )
+        .bind(&parked.org)
+        .bind(&parked.module)
+        .bind(&parked.module_key)
+        .bind(parked.next_run_at)
+        .bind(now)
+        .execute(&pool)
+        .await?;
+        let emit = |due: Trigger| async move { super::emit_realtime_trigger_event(&due).await };
+        Ok(super::finish_release(parked, now, released.rows_affected(), emit).await)
+    }
+
     /// Background job that watches for timeout of a job
     /// Steps:
     /// - Select records with status = "Processing" whose `end_time` has passed

@@ -214,4 +214,25 @@ test.describe('Logs toolbar pins', () => {
         ` | first collapse at ${collapsedAt.width}px, dropped: ${dropped.join(', ')}`,
     );
   });
+
+  test('the syntax guide pin is tracked via the menu pin button title', {
+    tag: ['@toolbarPins', '@logs', '@P2', '@all'],
+  }, async () => {
+    const pins = pm.logsToolbarPinsPage;
+    await pins.seedPinStorage();
+    await pins.navigateToLogs(getOrgIdentifier());
+
+    await pins.openMoreMenu();
+    // The pinned syntax guide control never reaches the DOM (its ODropdown root
+    // drops the data-test), so its pin state is assertable only via this title.
+    await pins.expectPinToggleTitle('syntaxGuide', pins.pinTitle.unpinned);
+
+    await pins.clickPinToggle('syntaxGuide');
+    await pins.expectPinToggleTitle('syntaxGuide', pins.pinTitle.pinned);
+    expect(await pins.readPins()).toContain('syntaxGuide');
+
+    await pins.closeMoreMenu();
+
+    testLogger.info('Syntax guide pin state was tracked through the menu pin button title');
+  });
 });

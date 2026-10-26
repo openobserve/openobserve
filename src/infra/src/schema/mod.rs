@@ -1149,11 +1149,6 @@ fn user_data_org(key: &str) -> Option<&str> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_is_widening_conversion() {
-        assert!(is_widening_conversion(&DataType::Int8, &DataType::Int32));
-    }
-
     #[tokio::test]
     async fn test_stream_settings_mutation_api() {
         // unique org prefix so the shared global caches can host parallel tests

@@ -18,7 +18,7 @@ use std::str::FromStr;
 use config::{ider, meta::destinations, utils::json};
 use sea_orm::{
     ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, DatabaseConnection, EntityTrait,
-    ModelTrait, QueryFilter, QueryOrder, Set, TryIntoModel,
+    ModelTrait, QueryFilter, QueryOrder, QuerySelect, Set, TryIntoModel,
 };
 
 use crate::{
@@ -151,22 +151,14 @@ pub async fn list(
     module: Option<&str>,
 ) -> Result<Vec<destinations::Destination>, Error> {
     let client = get_orm_client_ro().await;
-    let destinations = list_models(client, Some(org_id), module)
-        .await?
-        .into_iter()
-        .map(|(model, template)| model.try_into(template))
-        .collect::<Result<_, Error>>()?;
-    Ok(destinations)
+    Ok(decode_models(
+        list_models(client, Some(org_id), module).await?,
+    ))
 }
 
 pub async fn list_all() -> Result<Vec<destinations::Destination>, Error> {
     let client = get_orm_client_ro().await;
-    let destinations = list_models(client, None, None)
-        .await?
-        .into_iter()
-        .map(|(model, template)| model.try_into(template))
-        .collect::<Result<_, Error>>()?;
-    Ok(destinations)
+    Ok(decode_models(list_models(client, None, None).await?))
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), Error> {
@@ -178,6 +170,23 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), Error> {
     }
 
     Ok(())
+}
+
+/// Skips rows this binary cannot decode, so a newer destination type never fails the whole list.
+fn decode_models(rows: Vec<(Model, Option<String>)>) -> Vec<destinations::Destination> {
+    rows.into_iter()
+        .filter_map(|(model, template)| {
+            let (org, name) = (model.org.clone(), model.name.clone());
+            // The decode error can quote row content, so only the key is logged.
+            let decoded = model.try_into(template).ok();
+            if decoded.is_none() {
+                log::warn!(
+                    "[DESTINATIONS] skipping undecodable destination, org: {org}, name: {name}"
+                );
+            }
+            decoded
+        })
+        .collect()
 }
 
 async fn get_model_and_template(
@@ -216,14 +225,24 @@ async fn list_models(
         .collect())
 }
 
-/// Deletes all destinations belonging to the given org.
-pub async fn delete_by_org(org_id: &str) -> Result<(), Error> {
+/// Deletes all destinations of the org and returns their names.
+pub async fn delete_by_org(org_id: &str) -> Result<Vec<String>, Error> {
     let client = get_orm_client_rw().await;
-    Entity::delete_many()
+    let delete = Entity::delete_many().filter(Column::Org.eq(org_id));
+    Ok(super::delete_returning(client, delete, &[Column::Name]).await?)
+}
+
+/// Names of the org's destinations.
+pub async fn list_names_by_org(org_id: &str) -> Result<Vec<String>, Error> {
+    let client = get_orm_client_ro().await;
+    let names = Entity::find()
+        .select_only()
+        .column(Column::Name)
         .filter(Column::Org.eq(org_id))
-        .exec(client)
+        .into_tuple::<String>()
+        .all(client)
         .await?;
-    Ok(())
+    Ok(names)
 }
 
 #[cfg(test)]
@@ -284,16 +303,24 @@ mod tests {
     }
 
     #[test]
-    fn test_try_into_unknown_module_treated_as_pipeline() {
-        let id = svix_ksuid::Ksuid::new(None, None).to_string();
-        let type_json = serde_json::json!({"url": "https://example.com"});
-        let model = make_model(&id, "UNKNOWN_MODULE", type_json);
-        let result = model.try_into(None);
-        assert!(result.is_ok());
-        assert!(matches!(
-            result.unwrap().module,
-            destinations::Module::Pipeline { .. }
-        ));
+    fn decode_models_skips_unknown_destination_type() {
+        let good_id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let bad_id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let good = make_model(
+            &good_id,
+            "alert",
+            serde_json::json!({"type": "http", "url": "https://example.com"}),
+        );
+        let mut bad = make_model(
+            &bad_id,
+            "alert",
+            serde_json::json!({"type": "slack_app", "installation_id": "inst"}),
+        );
+        bad.name = "slack-dest".to_string();
+        assert!(bad.clone().try_into(None).is_err());
+        let decoded = decode_models(vec![(bad, None), (good, None)]);
+        assert_eq!(decoded.len(), 1);
+        assert_eq!(decoded[0].name, "my-dest");
     }
 
     #[test]

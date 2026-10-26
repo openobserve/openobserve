@@ -223,7 +223,6 @@ watch(
             :model-value="draft.composite_condition.warning_counts_as_firing"
             :label="t('alerts.composite.warningCountsAsFiring')"
             data-test="alerts-composite-warning-counts-as-firing"
-            :aria-checked="draft.composite_condition.warning_counts_as_firing"
             @update:model-value="updateCondition({ warning_counts_as_firing: Boolean($event) })"
           />
           <div class="flex flex-col gap-1">

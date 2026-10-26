@@ -904,6 +904,53 @@ describe("usePrebuiltDestinations", () => {
     });
   });
 
+  // The http interceptor already shows "Access Required" on a 403.
+  describe("save on 403", () => {
+    const forbidden = { response: { status: 403, data: { message: "Forbidden" } } };
+
+    it.each([
+      [
+        "createDestination",
+        (inst: any) => inst.createDestination("slack", "s", makeSlackCredentials()),
+      ],
+      [
+        "updateDestination",
+        (inst: any) => inst.updateDestination("slack", "s", "s", makeSlackCredentials()),
+      ],
+      ["convertToPrebuilt", (inst: any) => inst.convertToPrebuilt("s", "slack")],
+    ])("%s rethrows without its own error toast", async (_name, save) => {
+      mockDestCreate.mockRejectedValue(forbidden);
+      mockDestUpdate.mockRejectedValue(forbidden);
+      mockDestGetByName.mockResolvedValue({
+        data: { name: "s", url: "", headers: {}, metadata: {} },
+      });
+
+      await expect(save(usePrebuiltDestinations())).rejects.toBe(forbidden);
+
+      expect(vi.mocked(toast)).not.toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "error" }),
+      );
+    });
+
+    it.each([
+      [
+        "createDestination",
+        (inst: any) => inst.createDestination("slack", "s", makeSlackCredentials()),
+      ],
+      [
+        "updateDestination",
+        (inst: any) => inst.updateDestination("slack", "s", "s", makeSlackCredentials()),
+      ],
+    ])("%s still toasts and rethrows a non-object rejection", async (_name, save) => {
+      mockDestCreate.mockRejectedValue(undefined);
+      mockDestUpdate.mockRejectedValue(undefined);
+
+      await expect(save(usePrebuiltDestinations())).rejects.toBeUndefined();
+
+      expect(vi.mocked(toast)).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    });
+  });
+
   // -------------------------------------------------------------------------
   // generatePreview
   // -------------------------------------------------------------------------

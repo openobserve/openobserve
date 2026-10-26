@@ -11,7 +11,16 @@ import store from "@/test/unit/helpers/store";
 const barStart = vi.fn();
 const FirstEventStatusStub = defineComponent({
   name: "FirstEventStatus",
-  props: ["org", "signal", "targetStream", "kind", "guideName", "docUrl", "snippetKind"],
+  props: [
+    "org",
+    "signal",
+    "targetStream",
+    "kind",
+    "guideName",
+    "docUrl",
+    "snippetKind",
+    "configTool",
+  ],
   emits: ["copy-command"],
   setup: (_props, { expose }) => {
     expose({ start: barStart });
@@ -36,6 +45,12 @@ const makeRouter = () =>
         name: "ingestMetrics",
         component: { template: "<router-view />" },
         children: [{ path: "prometheus", name: "prometheus", component: page }],
+      },
+      {
+        path: "/profiles",
+        name: "ingestProfiles",
+        component: { template: "<router-view />" },
+        children: [{ path: "otel", name: "profilesOtelCollector", component: page }],
       },
       { path: "/servers/nginx", name: "nginx", component: page },
     ],
@@ -147,6 +162,13 @@ describe("IngestionContent.vue", () => {
       });
     });
 
+    it("watches for profiles on the profiles setup page", async () => {
+      wrapper = await mountAt("/profiles/otel", { default: () => [h("div")] });
+      expect(wrapper.findComponent(FirstEventStatusStub).props()).toMatchObject({
+        signal: "profiles",
+      });
+    });
+
     it("passes the page's guide name, signal, target and snippet kind through", async () => {
       wrapper = await mountAt(
         "/servers/nginx",
@@ -192,6 +214,22 @@ describe("IngestionContent.vue", () => {
       wrapper.findComponent(FirstEventStatusStub).vm.$emit("copy-command");
       expect(clicks.config).toHaveBeenCalledTimes(1);
       expect(clicks.install).toHaveBeenCalledTimes(1);
+    });
+
+    it("re-copies the first block of a config guide whose main config comes first", async () => {
+      clicks.config = vi.fn();
+      clicks.env = vi.fn();
+      wrapper = await mountAt(
+        "/servers/nginx",
+        { default: () => [codeBlock("config"), codeBlock("env")] },
+        { snippetKind: "config", copySnippet: "first", configTool: "OpenTelemetry Collector" },
+      );
+      wrapper.findComponent(FirstEventStatusStub).vm.$emit("copy-command");
+      expect(clicks.config).toHaveBeenCalledTimes(1);
+      expect(clicks.env).not.toHaveBeenCalled();
+      expect(wrapper.findComponent(FirstEventStatusStub).props("configTool")).toBe(
+        "OpenTelemetry Collector",
+      );
     });
   });
 });

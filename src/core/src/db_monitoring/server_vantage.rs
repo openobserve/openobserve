@@ -865,9 +865,9 @@ pub(crate) fn may_canonicalize_key(key: &str) -> bool {
 //
 //   * FTS fields are concatenated into ONE shared `_all` column tokenized with `O2_TOKENIZER`, so a
 //     term match there cannot tell you WHICH field produced it;
-//   * each `index_fields` member gets its OWN column, `.set_tokenizer("raw")` and `.set_fast(None)`
-//     — one term per whole cell value, so `o2_dbm_kind = 'activity'` is an exact-match lookup on a
-//     dedicated column.
+//   * each `index_fields` member gets its OWN column, `.set_tokenizer("raw")` and
+//     `.set_fast(RAW_TOKENIZER_NAME)` — one term per whole cell value, so `o2_dbm_kind =
+//     'activity'` is an exact-match lookup on a dedicated column.
 //
 // Adding the field to `full_text_search_keys` would therefore be both wrong
 // (wrong tokenizer, wrong column) and REJECTED: `persist_stream_settings`

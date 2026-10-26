@@ -228,6 +228,7 @@ export default defineComponent({
         const result = queries.value.reduce((acc: { [key: string]: any }, query: any) => {
           const {
             trace_id,
+            org_id,
             user_id,
             search_type,
             search_type_label,
@@ -246,7 +247,7 @@ export default defineComponent({
               queryRange: 0,
               search_type,
               search_type_label: search_type_label,
-              trace_ids: [],
+              queries: [],
               created_at,
               query: { end_time, start_time },
             };
@@ -264,7 +265,7 @@ export default defineComponent({
             acc[key].query.end_time = end_time;
           }
 
-          acc[key].trace_ids.push(trace_id);
+          acc[key].queries.push({ trace_id, org_id });
 
           acc[key].numOfQueries += 1;
 
@@ -622,7 +623,7 @@ export default defineComponent({
     };
 
     const deleteQuery = () => {
-      SearchService.delete_running_queries(store.state.zoConfig.meta_org, deleteDialog.value.data)
+      SearchService.cancel_running_queries(store.state.zoConfig.meta_org, deleteDialog.value.data)
         .then(() => {
           selectedRow.value[selectedQueryTypeTab.value] = [];
 
@@ -646,26 +647,28 @@ export default defineComponent({
     };
 
     const confirmDeleteAction = (row: any) => {
-      deleteDialog.value.data = [row.trace_id];
+      deleteDialog.value.data = [{ trace_id: row.trace_id, org_id: row.org_id }];
       deleteDialog.value.show = true;
     };
 
-    const handleMultiQueryCancel = (traceIds: string[] | null = null) => {
-      if (!traceIds) {
+    const handleMultiQueryCancel = (
+      runningQueries: { trace_id: string; org_id: string }[] | null = null,
+    ) => {
+      if (!runningQueries) {
         deleteDialog.value.data = selectedRow.value[selectedQueryTypeTab.value].reduce(
           (acc: any, row: any) => {
             if (row.trace_id) {
-              acc.push(row.trace_id);
+              acc.push({ trace_id: row.trace_id, org_id: row.org_id });
             } else {
-              // If query tab is "Summary", then add all trace_ids ( we store trace_id of all queries in trace_ids key )
-              acc.push(...row.trace_ids);
+              // a Summary row holds every query of its user in `queries`
+              acc.push(...row.queries);
             }
             return acc;
           },
           [],
         );
       } else {
-        deleteDialog.value.data = traceIds;
+        deleteDialog.value.data = runningQueries;
       }
 
       deleteDialog.value.show = true;
@@ -714,6 +717,7 @@ export default defineComponent({
           work_group: row?.work_group,
           stream_type: row?.stream_type,
           actions: "true",
+          row_key: `${row?.org_id}/${row?.trace_id}`,
           trace_id: row?.trace_id,
           created_at: row?.created_at,
           started_at: row?.started_at,

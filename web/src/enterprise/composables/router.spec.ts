@@ -25,7 +25,9 @@ vi.mock("@/enterprise/components/billings/plans.vue", () => ({ default: { name: 
 vi.mock("@/enterprise/components/billings/invoiceHistory.vue", () => ({
   default: { name: "InvoiceHistory" },
 }));
-vi.mock("@/enterprise/components/billings/usage.vue", () => ({ default: { name: "Usage" } }));
+vi.mock("@/enterprise/components/billings/usage/UsageView.vue", () => ({
+  default: { name: "Usage" },
+}));
 vi.mock("@/enterprise/components/billings/BillingGroup.vue", () => ({
   default: { name: "BillingGroup" },
 }));
@@ -64,5 +66,17 @@ describe("enterprise routes: removed Paid Usage page", () => {
 
     expect(router.currentRoute.value.name).toBe("plans");
     expect(router.currentRoute.value.query).toEqual({ org_identifier: "acme" });
+  });
+});
+
+describe("enterprise routes: lazy loading", () => {
+  it("lazy-loads every route component", () => {
+    const { parentRoutes, homeChildRoutes } = useEnvRoutes();
+    const walk = (routes: any[]): void =>
+      routes.forEach((route) => {
+        if (route.component) expect(typeof route.component, route.path).toBe("function");
+        if (route.children) walk(route.children);
+      });
+    walk([...parentRoutes, ...homeChildRoutes]);
   });
 });

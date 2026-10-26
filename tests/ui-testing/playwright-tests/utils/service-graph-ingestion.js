@@ -26,6 +26,7 @@
 const crypto = require('crypto');
 const testLogger = require('./test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
+const { ingestBase } = require('./ingest-url.js');
 
 // ============================================================================
 // CONSTANTS
@@ -1104,7 +1105,7 @@ async function ingestTrace(page, traceData, orgId) {
   const payload = traceData.payload || traceData;
 
   try {
-    const response = await page.request.post(`${baseUrl}/api/${org}/v1/traces`, {
+    const response = await page.request.post(`${ingestBase(baseUrl)}/api/${org}/v1/traces`, {
       headers,
       data: payload,
     });
@@ -2269,6 +2270,16 @@ async function getTopology(page) {
   }
 }
 
+/**
+ * Number of nodes in the current service graph topology (0 when empty or unreachable).
+ */
+async function countTopologyNodes(page) {
+  const topoResult = await getTopology(page);
+  const topoData = topoResult.data?.nodes ? topoResult.data : topoResult.data?.data;
+  testLogger.info(`Topology available: ${topoData?.nodes?.length || 0} nodes, ${topoData?.edges?.length || 0} edges`);
+  return topoData?.nodes?.length || 0;
+}
+
 // ============================================================================
 // EXPORTS
 // ============================================================================
@@ -2337,4 +2348,5 @@ module.exports = {
   waitForServiceGraphData,
   waitForServiceRegistry,
   getTopology,
+  countTopologyNodes,
 };

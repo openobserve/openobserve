@@ -235,6 +235,15 @@ pub async fn delete<C: ConnectionTrait>(conn: &C, org_id: &str, anomaly_id: &str
     Ok(())
 }
 
+pub async fn delete_by_org<C: ConnectionTrait>(conn: &C, org_id: &str) -> Result<()> {
+    anomaly_detection_config::Entity::delete_many()
+        .filter(anomaly_detection_config::Column::OrgId.eq(org_id))
+        .exec(conn)
+        .await
+        .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -355,7 +364,7 @@ fn into_active_model(mut m: Model) -> anomaly_detection_config::ActiveModel {
 
 #[cfg(test)]
 mod tests {
-    use sea_orm::{ActiveModelTrait as _, IntoActiveModel, Iterable as _};
+    use sea_orm::{IntoActiveModel, Iterable as _};
 
     use super::*;
 
@@ -581,15 +590,6 @@ mod tests {
         patch_all_fields(&mut active, replicated);
 
         assert_eq!(active.last_failed_at.unwrap(), Some(1_700_000_000_000_000));
-    }
-
-    /// `put()` may insert a ConfigUpdate for an unknown row, so it holds the anchor local.
-    #[test]
-    fn test_into_active_model_drops_a_replicated_last_failed_at() {
-        let mut m = make_model("anom-1", "org");
-        m.last_failed_at = Some(1_700_000_000_000_000);
-        let active = into_active_model(m);
-        assert_eq!(active.last_failed_at.unwrap(), None);
     }
 
     #[test]

@@ -224,7 +224,7 @@ describe("AppSessions.vue", () => {
           QueryEditor: {
             template:
               '<div data-test="query-editor" v-bind="$attrs" @update:query="$emit(\'update:query\', $event)"></div>',
-            props: ["query", "editorId", "debounceTime"],
+            props: ["query", "editorId", "debounceTime", "filterMode"],
             emits: ["update:query"],
           },
           SearchFieldList: {
@@ -336,6 +336,26 @@ describe("AppSessions.vue", () => {
 
       wrapper.vm.updateDateChange(newDate);
       expect(wrapper.vm.dateTime.relativeTimePeriod).toBe("30m");
+    });
+  });
+
+  describe("filter editor autocomplete", () => {
+    it("runs the editor in filter mode, since the query is a WHERE fragment", () => {
+      expect(wrapper.findComponent({ ref: "sessionQueryEditorRef" }).props("filterMode")).toBe(
+        true,
+      );
+    });
+
+    it("hands the query to suggestions after 100 ms, as Logs does", () => {
+      expect(wrapper.findComponent({ ref: "sessionQueryEditorRef" }).props("debounceTime")).toBe(
+        100,
+      );
+    });
+
+    it("sets the stream context on mount, before anything is typed", () => {
+      expect(wrapper.vm.autoCompleteData.org).toBe("test-org-123");
+      expect(wrapper.vm.autoCompleteData.streamType).toBe("logs");
+      expect(wrapper.vm.autoCompleteData.streamName).toBe("_rumdata");
     });
   });
 
@@ -708,6 +728,20 @@ describe("AppSessions.vue", () => {
 
       // Restore original mock
       mockStreams.getStream = originalGetStream;
+    });
+  });
+
+  describe("Missing session stream", () => {
+    it("settles without an unhandled rejection when the stream is not found", async () => {
+      const unhandled = vi.fn();
+      process.on("unhandledRejection", unhandled);
+      mockStreams.getStream.mockRejectedValueOnce(new Error("Stream '_rumdata' not found"));
+
+      await expect(wrapper.vm.getStreamFields()).resolves.toBe(true);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      process.off("unhandledRejection", unhandled);
+      expect(unhandled).not.toHaveBeenCalled();
     });
   });
 

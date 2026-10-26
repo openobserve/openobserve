@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::hash::Hasher;
-
 use super::Sum64;
 
 // offset64 FNVa offset basis. See https://en.wikipedia.org/wiki/Fowler–Noll–Vo_hash_function#FNV-1a_hash
@@ -28,10 +26,6 @@ pub struct Fnv64a {}
 
 pub fn new() -> Fnv64a {
     Fnv64a::new()
-}
-
-pub fn new_hasher() -> impl Hasher {
-    ahash::AHasher::default()
 }
 
 impl Fnv64a {
@@ -72,15 +66,6 @@ mod tests {
         assert_eq!(h.sum64("test1"), 2271358237066212092);
         assert_eq!(h.sum64("test2"), 2271361535601096725);
         assert_eq!(h.sum64("test3"), 2271360436089468514);
-    }
-
-    #[test]
-    fn test_fnv64a_new_hasher_produces_hash() {
-        use std::hash::Hasher;
-        let mut hasher = new_hasher();
-        hasher.write(b"hello");
-        let hash = hasher.finish();
-        assert_ne!(hash, 0);
     }
 
     #[test]

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { I18nText } from "@/types/i18n";
+import type { AnnotationSource } from "@/ts/interfaces/dashboard";
 
 import type { Ref } from "vue";
 
@@ -170,6 +171,7 @@ export interface PanelEditorDashboardData {
     endTime?: string;
     relativeTimePeriod?: string;
   };
+  annotationSources?: AnnotationSource[];
   [key: string]: any;
 }
 
@@ -655,6 +657,7 @@ export const ALL_CHART_TYPES = [
   "gauge",
   "table",
   "heatmap",
+  "state-timeline",
   "geomap",
   "sankey",
   "html",
@@ -687,6 +690,7 @@ export const AGGREGATION_REQUIRED_CHART_TYPES: ChartType[] = [
   "metric",
   "gauge",
   "heatmap",
+  "state-timeline",
   "geomap",
   "sankey",
 ];

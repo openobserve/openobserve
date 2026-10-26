@@ -183,6 +183,7 @@ describe("groupNavLinks", () => {
       "functionList",
       "enrichmentTables",
       "ingestion",
+      "fleet",
     ]);
   });
 
@@ -205,6 +206,7 @@ describe("groupNavLinks", () => {
       "functionList",
       "enrichmentTables",
       "ingestion",
+      "fleet",
     ]);
   });
 
@@ -521,6 +523,7 @@ describe("groupNavLinks", () => {
       "pipelines",
       "functionList",
       "enrichmentTables",
+      "fleet",
     ]);
   });
 
@@ -563,7 +566,6 @@ describe("groupNavLinks", () => {
       "infraHosts",
       "dbmDatabases",
       "infraKubernetes",
-      "infraKubernetes2",
     ]);
   });
 
@@ -581,12 +583,8 @@ describe("groupNavLinks", () => {
       icon: "hub",
       name: "infraKubernetes",
     });
-    expect(byName("infraKubernetes2")).toMatchObject({
-      titleKey: "menu.kubernetes2",
-      icon: "hub",
-      name: "infraKubernetes2",
-    });
-    for (const name of ["infraHosts", "infraKubernetes", "infraKubernetes2"]) {
+    expect(byName("infraKubernetes2")).toBeUndefined();
+    for (const name of ["infraHosts", "infraKubernetes"]) {
       expect(byName(name)?.gate, name).toBeUndefined();
     }
   });
@@ -653,7 +651,7 @@ describe("groupNavLinks", () => {
     const infra = NAV_GROUPS.find((g) => g.key === "infra");
     expect(infra?.standalone).toBe(true);
     expect(infra?.absorbs).toEqual([]);
-    expect(infra?.children).toHaveLength(4);
+    expect(infra?.children).toHaveLength(3);
     expect(infraGroup(groupNavLinks([link("home"), link("traces")]))).toBeTruthy();
   });
 
@@ -837,8 +835,16 @@ describe("GATE_PREDICATES", () => {
     onlineEvals: false,
     databaseMonitoring: false,
     downtimesEnabled: false,
+    alertCalibrationEnabled: false,
+    fleetEnabled: false,
     hiddenMenus: new Set<string>(),
     ...over,
+  });
+
+  it("fleet needs enterprise AND the runtime flag", () => {
+    expect(GATE_PREDICATES.fleet(ctx({ isEnterprise: true, fleetEnabled: true }))).toBe(true);
+    expect(GATE_PREDICATES.fleet(ctx({ isEnterprise: true }))).toBe(false);
+    expect(GATE_PREDICATES.fleet(ctx({ fleetEnabled: true }))).toBe(false);
   });
 
   it("databaseMonitoring gates on the runtime flag ALONE — it is an OSS feature", () => {

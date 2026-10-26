@@ -105,7 +105,8 @@ impl From<AlertError> for Response {
             | AlertError::RecoveryWithNotificationGrouping
             | AlertError::RecoveryNeedsJsonPayload { .. }
             | AlertError::RecoveryNeedsRoutingKey { .. }
-            | AlertError::MultiAlertGroupingError(_) => MetaHttpResponse::bad_request(value),
+            | AlertError::MultiAlertGroupingError(_)
+            | AlertError::GroupByColumnNotFound { .. } => MetaHttpResponse::bad_request(value),
             // S-16 PR 4. A conflict, not a bad request: the alert being sent is
             // fine on its own terms — it is the SLOs that already exist and
             // measure from it that the request collides with. Both messages
@@ -216,6 +217,12 @@ impl From<DashboardError> for Response {
             DashboardError::PanelAlreadyExists(panel_id, tab_id) => MetaHttpResponse::conflict(
                 format!("Panel with id {panel_id} already exists in tab {tab_id}"),
             ),
+            DashboardError::TooManyAnnotationSources(max) => MetaHttpResponse::bad_request(
+                format!("A dashboard can have at most {max} annotation sources"),
+            ),
+            DashboardError::InvalidAnnotationSource(reason) => {
+                MetaHttpResponse::bad_request(reason)
+            }
         }
     }
 }

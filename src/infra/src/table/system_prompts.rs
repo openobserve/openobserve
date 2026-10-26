@@ -15,8 +15,7 @@
 
 use config::meta::ai::{AIPrompt, PromptType};
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, EntityTrait, Order, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Schema, Set,
+    ColumnTrait, EntityTrait, Order, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set,
 };
 
 use super::entity::system_prompts::Model;
@@ -36,20 +35,6 @@ impl TryFrom<Model> for AIPrompt {
             updated_at: model.updated_at,
         })
     }
-}
-pub async fn create_table() -> Result<(), errors::Error> {
-    let client = get_orm_client_rw().await;
-    let builder = client.get_database_backend();
-
-    let schema = Schema::new(builder);
-    let create_table_stmt = schema
-        .create_table_from_entity(Entity)
-        .if_not_exists()
-        .take();
-
-    client.execute(builder.build(&create_table_stmt)).await?;
-
-    Ok(())
 }
 
 pub async fn add(prompt: &AIPrompt) -> Result<(), errors::Error> {

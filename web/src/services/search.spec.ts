@@ -880,7 +880,23 @@ describe("Search Service", () => {
 
       await search.delete_running_queries("test-org", traceIDs);
 
-      expect(mockHttp.put).toHaveBeenCalledWith("/api/test-org/query_manager/cancel", traceIDs);
+      expect(mockHttp.put).toHaveBeenCalledWith("/api/test-org/query_manager/cancel", [
+        { trace_id: "trace1", org_id: "test-org" },
+        { trace_id: "trace2", org_id: "test-org" },
+      ]);
+    });
+  });
+
+  describe("cancel_running_queries", () => {
+    it("should send each query with its org", async () => {
+      const queries = [
+        { trace_id: "trace1", org_id: "org-a" },
+        { trace_id: "trace2", org_id: "org-b" },
+      ];
+
+      await search.cancel_running_queries("_meta", queries);
+
+      expect(mockHttp.put).toHaveBeenCalledWith("/api/_meta/query_manager/cancel", queries);
     });
   });
 

@@ -285,7 +285,6 @@ describe("Ingestion", () => {
       expect(analytics.track).toHaveBeenCalledWith("Button Click", {
         button: "Generate RUM Token",
         user_org: "default",
-        user_id: "example@gmail.com",
         page: "Ingestion",
       });
     });
@@ -391,7 +390,6 @@ describe("Ingestion", () => {
       expect(analytics.track).toHaveBeenCalledWith("Button Click", {
         button: "Update RUM Token",
         user_org: "default",
-        user_id: "example@gmail.com",
         page: "Ingestion",
       });
     });
@@ -877,7 +875,6 @@ describe("Ingestion", () => {
       expect(analytics.track).toHaveBeenCalledWith("Button Click", {
         button: "Update Passcode",
         user_org: "default",
-        user_id: "example@gmail.com",
         page: "Ingestion",
       });
     });
@@ -1296,7 +1293,6 @@ describe("Ingestion", () => {
       expect(analytics.track).toHaveBeenCalledWith("Button Click", {
         button: "Generate RUM Token",
         user_org: "test-org",
-        user_id: "test@example.com",
         page: "Ingestion",
       });
     });
@@ -1323,9 +1319,24 @@ describe("Ingestion", () => {
         button: "Copy to Clipboard",
         ingestion: "custom",
         user_org: "default",
-        user_id: "example@gmail.com",
         page: "Ingestion",
       });
+    });
+  });
+  describe("Global search over AWS integrations", () => {
+    it("matches an AWS service by its translated description", async () => {
+      const replace = vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
+
+      wrapper.vm.globalSearchQuery = "account activity";
+      await flushPromises();
+
+      expect(replace).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "AWSConfig",
+          query: expect.objectContaining({ search: "account activity" }),
+        }),
+      );
+      replace.mockRestore();
     });
   });
 });

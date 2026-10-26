@@ -253,7 +253,7 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.closeButton.click();
 
     testLogger.info('Re-ingesting data with updated schema (Store Original Data ON)');
-    await ingestion(page);
+    await ingestion(page, 'e2e_automate', { force: true });
 
     // Deterministic readiness gate: poll the search API until _o2_id is queryable
     // instead of sleeping a fixed interval and hoping indexing has caught up.
@@ -355,7 +355,7 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.closeButton.click();
 
     testLogger.info('Re-ingesting data with updated schema (Store Original Data ON)');
-    await ingestion(page);
+    await ingestion(page, 'e2e_automate', { force: true });
 
     // Deterministic readiness gate: poll the search API until _o2_id is queryable
     // instead of a fixed 15s sleep + UI re-ingestion retry loop. This was the
@@ -460,7 +460,7 @@ test.describe("Unflattened testcases", () => {
 
     await page.waitForTimeout(500);
     testLogger.info('Ingesting data with Store Original Data OFF');
-    await ingestion(page);
+    await ingestion(page, 'e2e_automate', { force: true });
     testLogger.info('Data ingestion completed, waiting 3s for indexing');
     await page.waitForTimeout(3000);
 

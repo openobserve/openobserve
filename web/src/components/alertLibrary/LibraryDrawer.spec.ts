@@ -384,4 +384,83 @@ describe("LibraryDrawer", () => {
       "k8s/go_gc_pause_high · App performance · Kubernetes",
     );
   });
+
+  describe("anomaly alerts", () => {
+    const anomalyEntry: AlertLibraryEntry = {
+      ...sqlEntry,
+      id: "apm/traces_server_error_ratio_anomaly",
+      title: "Server error ratio is unusually high",
+      stream: "default",
+      stream_type: "traces",
+      required_streams: ["default"],
+      alert_type: "anomaly_detection",
+    };
+
+    const anomalyFile = (): AlertLibraryFile => ({
+      name: "traces_server_error_ratio_anomaly",
+      alert_type: "anomaly_detection",
+      stream_type: "traces",
+      stream_name: "default",
+      enabled: true,
+      anomaly_config: {
+        query_mode: "custom_sql",
+        custom_sql: "SELECT histogram(_timestamp, '5m') AS time_bucket FROM \"default\"",
+        detection_function: "avg",
+        detection_function_field: "error_ratio",
+        histogram_interval: "5m",
+        alert_direction: "above",
+      },
+    });
+
+    beforeEach(() => {
+      mocks.loadAlertFile.mockResolvedValue(anomalyFile());
+    });
+
+    it("explains that it trains on the stream's history before it alerts", async () => {
+      const wrapper = await mountDrawer({ entry: anomalyEntry });
+      const note = wrapper.find('[data-test="alert-library-drawer-anomaly-note"]');
+      expect(note.exists()).toBe(true);
+      expect(note.text()).toContain("about a day");
+    });
+
+    it("shows its SQL and detection settings instead of a threshold and a preview", async () => {
+      const wrapper = await mountDrawer({ entry: anomalyEntry });
+      expect(wrapper.findComponent(AlertQueryPreview).props("query")).toContain("histogram");
+      expect(wrapper.find('[data-test="alert-library-drawer-detection"]').text()).toBe(
+        "avg(error_ratio) · 5m · Above only",
+      );
+      expect(wrapper.find('[data-test="alert-library-drawer-threshold"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="preview-alert"]').exists()).toBe(false);
+    });
+
+    it("shows an unknown direction as published", async () => {
+      mocks.loadAlertFile.mockResolvedValue({
+        ...anomalyFile(),
+        anomaly_config: { ...anomalyFile().anomaly_config, alert_direction: "sideways" },
+      });
+      const wrapper = await mountDrawer({ entry: anomalyEntry });
+      expect(wrapper.find('[data-test="alert-library-drawer-detection"]').text()).toBe(
+        "avg(error_ratio) · 5m · sideways",
+      );
+    });
+
+    it("offers no editor prefill, which speaks the scheduled shape only", async () => {
+      const wrapper = await mountDrawer({ entry: anomalyEntry });
+      expect(wrapper.find('[data-test="alert-library-drawer-customize"]').exists()).toBe(false);
+    });
+
+    it("hands the wizard the file untouched, with no trigger_condition", async () => {
+      const wrapper = await mountDrawer({ entry: anomalyEntry });
+      await wrapper.find('[data-test="alert-library-drawer-install"]').trigger("click");
+
+      const payload = wrapper.emitted("install")?.[0]?.[0] as { file: AlertLibraryFile };
+      expect(payload.file).toEqual(anomalyFile());
+      expect(payload.file).not.toHaveProperty("trigger_condition");
+    });
+
+    it("keeps the readiness callout for a stream the org does not have", async () => {
+      const wrapper = await mountDrawer({ entry: anomalyEntry, ready: false });
+      expect(wrapper.find('[data-test="alert-library-drawer-needs-data"]').exists()).toBe(true);
+    });
+  });
 });

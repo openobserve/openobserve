@@ -193,6 +193,20 @@ export const BADGE_GROUPS = {
     },
   },
 
+  licenseWaiverStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      scheduled: {
+        variant: "blue-soft",
+        labelKey: "components.badge.licenseWaiverStatus.scheduled",
+      },
+      active: { variant: "success-soft", labelKey: "components.badge.licenseWaiverStatus.active" },
+      past: { variant: "default-soft", labelKey: "components.badge.licenseWaiverStatus.past" },
+      ended: { variant: "default-soft", labelKey: "components.badge.licenseWaiverStatus.ended" },
+    },
+  },
+
   // Alert PRIORITY (Feature 2, PT-3) — how much humans care about this alert,
   // set at configuration time.
   //
@@ -400,8 +414,19 @@ export const BADGE_GROUPS = {
       active: { variant: "success-soft" },
       draft: { variant: "default-soft" },
       paused: { variant: "warning-soft" },
-      degraded: { variant: "orange-soft" },
       archived: { variant: "default-soft" },
+    },
+  },
+
+  // No labelKeys: EvalJobList always passes the translated `label`.
+  evalJobHealth: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      healthy: { variant: "success-soft" },
+      degraded: { variant: "orange-soft" },
+      waitingforcredentials: { variant: "error-soft" },
+      norecentruns: { variant: "default-soft" },
     },
   },
 
@@ -1925,6 +1950,64 @@ export const BADGE_GROUPS = {
       beta: { variant: "primary-soft", label: raw("BETA") },
       ha: { variant: "primary-soft", label: raw("HA") },
       comingsoon: { variant: "default-soft", labelKey: "components.badge.featureFlag.comingsoon" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // Fleet Manager rollout lifecycle — dot + soft colour, attention states run hot.
+  fleetRolloutStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      scheduled: { variant: "default-soft", labelKey: "fleet.badge.scheduled" },
+      inprogress: { variant: "primary-soft", labelKey: "fleet.badge.inProgress" },
+      completed: { variant: "success-soft", labelKey: "fleet.badge.completed" },
+      halted: { variant: "error-soft", labelKey: "fleet.badge.halted" },
+      superseded: { variant: "default-soft", labelKey: "fleet.badge.superseded" },
+      rolledback: { variant: "warning-soft", labelKey: "fleet.badge.rolledBack" },
+      // A completed rollout of an empty fleet; not a status the server sends.
+      empty: { variant: "default-soft", labelKey: "fleet.rollouts.noneTargeted" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // Fleet rollout batching — a category, so plain with one hue per kind.
+  fleetBatching: {
+    mode: "plain",
+    shape: "pill",
+    values: {
+      one: { variant: "default-soft", labelKey: "fleet.rollouts.oneBatch" },
+      canary: { variant: "amber-soft", labelKey: "fleet.badge.canary" },
+      progressive: { variant: "blue-soft", labelKey: "fleet.badge.progressive" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // Fleet Manager config delivery — the one vocabulary for a collector's config lifecycle.
+  fleetDelivery: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      assigned: { variant: "default-soft", labelKey: "fleet.delivery.assigned" },
+      sent: { variant: "blue-soft", labelKey: "fleet.delivery.sent" },
+      accepted: { variant: "teal-soft", labelKey: "fleet.delivery.accepted" },
+      running: { variant: "success-soft", labelKey: "fleet.delivery.running" },
+      rejected: { variant: "error-soft", labelKey: "fleet.delivery.rejected" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  slackInstallStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      healthy: { variant: "success-soft", labelKey: "components.badge.slackInstallStatus.healthy" },
+      degraded: {
+        variant: "warning-soft",
+        labelKey: "components.badge.slackInstallStatus.degraded",
+      },
+      pending: { variant: "blue-soft", labelKey: "components.badge.slackInstallStatus.pending" },
+      revoked: { variant: "error-soft", labelKey: "components.badge.slackInstallStatus.revoked" },
     },
     fallback: { variant: "default-soft" },
   },

@@ -1,11 +1,13 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { mount, flushPromises, enableAutoUnmount } from "@vue/test-utils";
 import License from "./License.vue";
 import { makeLicenseSchema } from "./License.schema";
 import licenseServer from "@/services/license_server";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 import type { AxiosResponse } from "axios";
+import zo_config from "@/services/config";
+import { LICENSE_REFRESH_SETTLE_MS } from "@/utils/licenseWaivers";
 
 // Helper to create mock Axios responses
 const createAxiosResponse = <T = any>(data: T): AxiosResponse<T> => ({
@@ -78,7 +80,15 @@ vi.mock("@/services/license_server", async (importOriginal) => {
     default: {
       get_license: vi.fn(),
       update_license: vi.fn(),
+      refresh_license_limits: vi.fn(),
     },
+  });
+});
+
+vi.mock("@/services/config", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { get_config_full: vi.fn() },
   });
 });
 
@@ -100,6 +110,8 @@ const mockDialog = vi.fn().mockReturnValue({
   onOk: vi.fn().mockReturnThis(),
   onCancel: vi.fn().mockReturnThis(),
 });
+
+enableAutoUnmount(afterEach);
 
 describe("License.vue", () => {
   let store: any;
@@ -433,8 +445,135 @@ describe("License.vue", () => {
     });
   });
 
-  describe("Update License Functionality", () => {
+  describe("License state reload after apply", () => {
+    const setConfig = vi.fn();
+
     beforeEach(async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      setConfig.mockClear();
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
+      vi.mocked(zo_config.get_config_full).mockResolvedValue(
+        createAxiosResponse({ license_search_allowed: true }),
+      );
+      store = createStore({
+        state: {
+          zoConfig: { license_server_url: "https://license.example.com", license_expiry: null },
+          selectedOrganization: { identifier: "acme" },
+        },
+        actions: { setConfig },
+      });
+      wrapper = mount(License, {
+        global: { plugins: [store, i18n], stubs: { LicensePeriod: true, ODialog: ODialogStub } },
+      });
+      await flushPromises();
+    });
+
+    afterEach(() => vi.useRealTimers());
+
+    it("applying a key reloads license state after the settle delay", async () => {
+      vi.mocked(licenseServer.update_license).mockResolvedValue(
+        createAxiosResponse({ success: true }),
+      );
+      wrapper.vm.licenseKey = "new-license-key";
+      await wrapper.vm.updateLicense();
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(LICENSE_REFRESH_SETTLE_MS - 1);
+      expect(setConfig).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      await flushPromises();
+      expect(setConfig).toHaveBeenCalledTimes(1);
+    });
+
+    it("the page data reloads when the settle delay elapses", async () => {
+      vi.mocked(licenseServer.update_license).mockResolvedValue(
+        createAxiosResponse({ success: true }),
+      );
+      wrapper.vm.licenseKey = "new-license-key";
+      await wrapper.vm.updateLicense();
+      await flushPromises();
+      const before = vi.mocked(licenseServer.get_license).mock.calls.length;
+      await vi.advanceTimersByTimeAsync(LICENSE_REFRESH_SETTLE_MS);
+      await flushPromises();
+      expect(vi.mocked(licenseServer.get_license).mock.calls.length).toBe(before + 1);
+    });
+
+    it("text typed into the update form survives the immediate and scheduled reloads", async () => {
+      vi.mocked(licenseServer.refresh_license_limits).mockResolvedValue(createAxiosResponse({}));
+      wrapper.vm.showUpdateForm = true;
+      await flushPromises();
+      const field = () => wrapper.find('textarea[data-test="update-license-key-input-field"]');
+      await field().setValue("half-typed-key");
+
+      await wrapper.vm.triggerLimitRefresh();
+      await flushPromises();
+      expect(field().element.value).toBe("half-typed-key");
+
+      const before = vi.mocked(licenseServer.get_license).mock.calls.length;
+      await vi.advanceTimersByTimeAsync(LICENSE_REFRESH_SETTLE_MS);
+      await flushPromises();
+      expect(vi.mocked(licenseServer.get_license).mock.calls.length).toBe(before + 1);
+      expect(wrapper.text()).not.toContain("Loading license information");
+      expect(field().element.value).toBe("half-typed-key");
+    });
+
+    it("refresh sends one request per click burst and spins only while it runs", async () => {
+      let resolveRefresh: (v: unknown) => void = () => {};
+      vi.mocked(licenseServer.refresh_license_limits).mockImplementation(
+        () => new Promise((r) => (resolveRefresh = r)) as never,
+      );
+      const first = wrapper.vm.triggerLimitRefresh();
+      const second = wrapper.vm.triggerLimitRefresh();
+      await flushPromises();
+      expect(licenseServer.refresh_license_limits).toHaveBeenCalledTimes(1);
+      expect(wrapper.vm.refreshing).toBe(true);
+
+      resolveRefresh(createAxiosResponse({}));
+      await Promise.all([first, second]);
+      await flushPromises();
+      expect(wrapper.vm.refreshing).toBe(false);
+
+      let resolveReload: (v: unknown) => void = () => {};
+      vi.mocked(licenseServer.get_license).mockImplementation(
+        () => new Promise((r) => (resolveReload = r)) as never,
+      );
+      await vi.advanceTimersByTimeAsync(LICENSE_REFRESH_SETTLE_MS);
+      expect(licenseServer.get_license).toHaveBeenCalled();
+      expect(wrapper.vm.refreshing).toBe(false);
+      resolveReload(createAxiosResponse(mockLicenseData));
+      await flushPromises();
+    });
+
+    it("unmounting before the delay cancels the reload", async () => {
+      vi.mocked(licenseServer.update_license).mockResolvedValue(
+        createAxiosResponse({ success: true }),
+      );
+      wrapper.vm.licenseKey = "new-license-key";
+      await wrapper.vm.updateLicense();
+      await flushPromises();
+      wrapper.unmount();
+      await vi.advanceTimersByTimeAsync(LICENSE_REFRESH_SETTLE_MS * 2);
+      expect(setConfig).not.toHaveBeenCalled();
+    });
+
+    it("a 409 from the env key shows the server message", async () => {
+      vi.mocked(licenseServer.update_license).mockRejectedValue({
+        response: { status: 409, data: { message: "Remove O2_LICENSE_KEY first" } },
+      });
+      wrapper.vm.licenseKey = "new-license-key";
+      await wrapper.vm.updateLicense();
+      await flushPromises();
+      expect(mockToast.mock.calls.at(-1)?.[0].message).toContain("O2_LICENSE_KEY");
+      await vi.advanceTimersByTimeAsync(LICENSE_REFRESH_SETTLE_MS * 2);
+      await flushPromises();
+      expect(setConfig).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Update License Functionality", () => {
+    afterEach(() => vi.useRealTimers());
+
+    beforeEach(async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
       vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
       wrapper = createWrapper();
       await flushPromises();
@@ -737,6 +876,9 @@ describe("License.vue", () => {
   });
 
   describe("URL Auto-fill License Key", () => {
+    beforeEach(() => vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] }));
+    afterEach(() => vi.useRealTimers());
+
     it("should auto-fill license key from URL parameters", async () => {
       window.location.search = "?installation_id=test-installation-123&license_key=auto-filled-key";
 
@@ -977,6 +1119,159 @@ describe("License.vue", () => {
       expect(wrapper.vm.limitBreachAllowedCount - wrapper.vm.licenseData.ingestion_exceeded).toBe(
         1,
       );
+    });
+  });
+
+  describe("Backend search decision", () => {
+    const decision = {
+      search_allowed: true,
+      blocks: [],
+      exceeded_days: 0,
+      allowed_days: 3,
+      limit_today_gb: 50,
+      used_today_gb: 10,
+      waiver_ids_applied: [],
+    };
+    const withDecision = (over: Record<string, unknown>) => ({
+      ...mockLicenseData,
+      license: { ...mockLicenseData.license, version: 2, limit_breach_allowed_count: 3 },
+      ingestion_exceeded: 4,
+      decision: { ...decision, ...over },
+    });
+
+    it("does not claim features are restricted when the backend allows search", async () => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse(withDecision({ search_allowed: true })),
+      );
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.html()).not.toContain("some application features may be temporarily");
+    });
+
+    it("a pause for a report failure under the day limit claims no over-limit days", async () => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({
+          ...withDecision({ search_allowed: false, blocks: ["report_failure"], exceeded_days: 2 }),
+          ingestion_exceeded: 2,
+        }),
+      );
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.html()).toContain("allowance left of 3 max");
+      expect(wrapper.html()).not.toContain("some application features may be temporarily");
+    });
+
+    it("days over the limit with search still on claim no restriction", async () => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse(
+          withDecision({ search_allowed: true, blocks: ["usage_over_limit"], exceeded_days: 4 }),
+        ),
+      );
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.html()).not.toContain("some application features may be temporarily");
+    });
+
+    it("an unevaluated pause states the limit from the counters", async () => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({
+          ...withDecision({ search_allowed: false, blocks: [], exceeded_days: 4 }),
+          evaluated_at: 0,
+        }),
+      );
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.html()).toContain("some application features may be temporarily");
+    });
+
+    it("a pause for days over the limit states the limit", async () => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse(
+          withDecision({ search_allowed: false, blocks: ["usage_over_limit"], exceeded_days: 4 }),
+        ),
+      );
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.html()).toContain("some application features may be temporarily");
+    });
+
+    it("renders the status card when the backend sends a decision", async () => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(withDecision({})));
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.find("[data-test=license-status-card]").exists()).toBe(true);
+    });
+
+    it("uses the licence grace count until the backend has evaluated", async () => {
+      const synthesised = withDecision({ allowed_days: 3 });
+      synthesised.license.limit_breach_allowed_count = 5;
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({ ...synthesised, evaluated_at: 0 }),
+      );
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.vm.limitBreachAllowedCount).toBe(5);
+
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({ ...synthesised, evaluated_at: 1792000000000000 }),
+      );
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.vm.limitBreachAllowedCount).toBe(3);
+    });
+
+    it("keeps Add New License Key enabled while the env key is in use", async () => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({ ...withDecision({}), env_key_active: true, env_key_in_use: true }),
+      );
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const btn = wrapper.find("[data-test=add-license-key-btn]");
+      expect(btn.attributes("aria-disabled")).toBeUndefined();
+      expect(btn.attributes("disabled")).toBeUndefined();
+      await btn.trigger("click");
+      expect(wrapper.vm.showUpdateForm).toBe(true);
+    });
+
+    it("keeps Add New License Key enabled without the env key", async () => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({ ...withDecision({}), env_key_active: false }),
+      );
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const btn = wrapper.find("[data-test=add-license-key-btn]");
+      expect(btn.attributes("aria-disabled")).toBeUndefined();
+      await btn.trigger("click");
+      expect(wrapper.vm.showUpdateForm).toBe(true);
+    });
+
+    it("renders the waivers card only when waivers arrive", async () => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse({
+          ...withDecision({}),
+          waivers: [
+            {
+              id: "wv_1",
+              type: "search_unblock",
+              starts_at: 1,
+              ends_at: 4102444800000000,
+              note: "n",
+            },
+          ],
+        }),
+      );
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.find("[data-test=license-waivers-card]").exists()).toBe(true);
     });
   });
 
