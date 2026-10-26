@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #cell-window="{ row }">
           <span :data-test="`license-waiver-window-${row.id}`">{{
-            waiverWindowLabel(row, locale, t)
+            waiverWindowLabel(row, nowUs, locale, t)
           }}</span>
         </template>
         <template #cell-note="{ row }">

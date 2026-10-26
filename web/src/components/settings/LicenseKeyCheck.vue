@@ -26,7 +26,7 @@
               <OTag type="licenseWaiverStatus" :value="waiverStatus(row, nowUs)" />
             </span>
           </template>
-          <template #cell-window="{ row }">{{ waiverWindowLabel(row, locale, t) }}</template>
+          <template #cell-window="{ row }">{{ waiverWindowLabel(row, nowUs, locale, t) }}</template>
         </OTable>
       </div>
     </template>

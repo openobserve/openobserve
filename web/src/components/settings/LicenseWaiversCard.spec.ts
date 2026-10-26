@@ -42,6 +42,19 @@ describe("LicenseWaiversCard", () => {
     expect(note?.meta).toMatchObject({ autoWidth: true, fillRemaining: true });
   });
 
+  it("a scheduled restore-search waiver shows its start and end", () => {
+    const w = mountCard([waiver({ starts_at: us(2026, 10, 25) })]);
+    expect(w.get("[data-test=license-waiver-window-wv_1]").text()).toBe(
+      "Oct 25, 00:00 → Oct 27, 00:00",
+    );
+    expect(w.text()).toContain("Scheduled");
+  });
+
+  it("an ended restore-search waiver keeps only its end", () => {
+    const w = mountCard([waiver({ starts_at: us(2026, 10, 1), ends_at: us(2026, 10, 10) })]);
+    expect(w.get("[data-test=license-waiver-window-wv_1]").text()).toBe("until Oct 10, 00:00");
+  });
+
   it("renders nothing when only unknown kinds arrive", () => {
     const w = mountCard([waiver({ type: "future_kind" })]);
     expect(w.find("[data-test=license-waivers-card]").exists()).toBe(false);

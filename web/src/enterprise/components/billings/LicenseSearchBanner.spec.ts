@@ -183,6 +183,25 @@ describe("LicenseSearchBanner", () => {
     expect(licenseServer.refresh_license_limits).toHaveBeenCalledTimes(1);
   });
 
+  it("paused usage copy pluralizes the over-limit day count", async () => {
+    for (const [exceeded, phrase] of [
+      [1, "on 1 day this month"],
+      [5, "on 5 days this month"],
+    ] as const) {
+      queryClient.clear();
+      vi.mocked(licenseServer.get_license).mockResolvedValue({
+        data: {
+          ...pausedLicense,
+          decision: { ...pausedLicense.decision, exceeded_days: exceeded },
+        },
+      } as never);
+      const w = await mountBanner(PAUSED);
+      expect(w.find('[data-test="license-search-banner"]').text()).toContain(phrase);
+      w.unmount();
+      wrapper = undefined;
+    }
+  });
+
   it("refresh button reads Refresh now", async () => {
     const w = await mountBanner(PAUSED);
     expect(w.get('[data-test="license-banner-refresh"]').text()).toBe("Refresh now");

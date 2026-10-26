@@ -274,10 +274,15 @@ export function waiverKindLabel(w: LicenseWaiver, t: TranslateFn, locale = "en-U
   return t("about.waiver_kind_ingestion_limit", { limit: w.limit?.value ?? 0 });
 }
 
-export function waiverWindowLabel(w: LicenseWaiver, locale: string, t: TranslateFn): I18nText {
-  if (w.type === "search_unblock")
+export function waiverWindowLabel(
+  w: LicenseWaiver,
+  nowUs: number,
+  locale: string,
+  t: TranslateFn,
+): I18nText {
+  if (w.type === "search_unblock" && waiverStatus(w, nowUs) !== "scheduled")
     return t("about.waiver_window_until", { end: formatUtc(w.ends_at, locale, true) });
-  if (w.type === "report_grace")
+  if (w.type === "search_unblock" || w.type === "report_grace")
     return t("about.waiver_window_time", {
       start: formatUtc(w.starts_at, locale, true),
       end: formatUtc(w.ends_at, locale, true),
