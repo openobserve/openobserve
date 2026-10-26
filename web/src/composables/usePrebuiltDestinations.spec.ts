@@ -824,21 +824,26 @@ describe("usePrebuiltDestinations", () => {
   // detectPrebuiltType
   // -------------------------------------------------------------------------
   describe("detectPrebuiltType", () => {
-    it("returns type from metadata.prebuilt_type when present", () => {
+    it.each([
+      ["slack", { type: "http", destination_type_name: "slack" }],
+      ["pagerduty", { type: "http", destination_type_name: "pagerduty", metadata: {} }],
+      ["email", { type: "email", template: "prebuilt_email", metadata: {} }],
+    ])("returns %s for a destination the server treats as prebuilt", (expected, destination) => {
       const { detectPrebuiltType } = usePrebuiltDestinations();
-      const result = detectPrebuiltType({
-        metadata: { prebuilt_type: "slack" },
-      });
-      expect(result).toBe("slack");
+      expect(detectPrebuiltType(destination)).toBe(expected);
     });
 
     it.each([
       ["no indicators", { name: "custom-destination" }],
-      ["a system-prebuilt- template", { template: "system-prebuilt-discord" }],
-      ["a prebuilt_ template", { template: "prebuilt_msteams" }],
+      ["a system-prebuilt- template", { type: "http", template: "system-prebuilt-discord" }],
+      ["a prebuilt_ template", { type: "http", template: "prebuilt_msteams" }],
+      ["only prebuilt_type metadata", { type: "http", metadata: { prebuilt_type: "slack" } }],
+      ["an unknown destination_type_name", { type: "http", destination_type_name: "custom" }],
+      ["a custom email template", { type: "email", template: "ops_mail" }],
       [
         "a prebuilt service URL",
         {
+          type: "http",
           url: "https://acme.service-now.com/api/now/table/incident",
           metadata: {},
         },

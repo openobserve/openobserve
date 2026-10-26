@@ -870,7 +870,7 @@ export default defineComponent({
       return t("alert_destinations.custom");
     };
 
-    // "prebuilt" means saved from a prebuilt card (`metadata.prebuilt_type`); "custom" is everything else.
+    // "prebuilt" is what the server treats as prebuilt (`detectPrebuiltType`); "custom" is everything else.
     const activeTab = ref<"all" | "prebuilt" | "custom">(viewState.tab);
     watch([filterQuery, activeTab, pageSize, sortBy, sortOrder], () => {
       Object.assign(viewState, {

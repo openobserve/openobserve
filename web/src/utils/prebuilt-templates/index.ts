@@ -36,7 +36,7 @@ import { pagerdutyConfig, pagerdutyDestinationType } from "./pagerduty";
 import { servicenowConfig, servicenowDestinationType } from "./servicenow";
 import { emailConfig, emailDestinationType } from "./email";
 import { opsgenieConfig, opsgenieDestinationType } from "./opsgenie";
-import { PrebuiltConfig, PrebuiltType } from "./types";
+import { PrebuiltConfig, PrebuiltType, PrebuiltTypeId } from "./types";
 
 /**
  * All available prebuilt destination types
@@ -78,6 +78,17 @@ export function getPrebuiltConfig(type: string): PrebuiltConfig | null {
  */
 export function isPrebuiltType(type: string): boolean {
   return type in PREBUILT_CONFIGS;
+}
+
+/**
+ * Prebuilt type the server treats a destination as (`src/core/src/alerts/destinations.rs`), never guessed from its URL.
+ */
+export function detectPrebuiltType(destination: any): PrebuiltTypeId | null {
+  if (destination.type === "email") {
+    return destination.template?.startsWith("prebuilt_") ? "email" : null;
+  }
+  const type = destination.destination_type_name;
+  return type && isPrebuiltType(type) ? (type as PrebuiltTypeId) : null;
 }
 
 /**

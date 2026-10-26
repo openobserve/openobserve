@@ -510,7 +510,7 @@ import {
   usePrebuiltDestinations,
   type SlackSetupMetadata,
 } from "@/composables/usePrebuiltDestinations";
-import { isPrebuiltType } from "@/utils/prebuilt-templates";
+import { detectPrebuiltType } from "@/utils/prebuilt-templates";
 import { isValidSlackWebhookUrl } from "@/utils/prebuilt-templates/slack";
 import { DEFAULT_SLACK_APP_NAME } from "@/utils/slackManifest";
 import PrebuiltDestinationForm from "./PrebuiltDestinationForm.vue";
@@ -894,7 +894,8 @@ const setupDestinationData = () => {
 
     const destHeaders: Record<string, any> = props.destination.headers || {};
 
-    // Set destination_type for prebuilt destinations in edit mode
+    setDestType(detectPrebuiltType(props.destination) ?? "custom");
+
     // Parse metadata if it's a string
     let parsedMetadata: any = null;
     if (props.destination.metadata) {
@@ -907,12 +908,6 @@ const setupDestinationData = () => {
         console.error("Failed to parse destination metadata:", e);
       }
     }
-
-    setDestType(
-      parsedMetadata?.prebuilt_type && isPrebuiltType(parsedMetadata.prebuilt_type)
-        ? parsedMetadata.prebuilt_type
-        : "custom",
-    );
 
     // Edit-prefill: seed via a single form.reset(record), not a per-field
     // setFieldValue loop — reset() also clears field meta, whereas a setFieldValue

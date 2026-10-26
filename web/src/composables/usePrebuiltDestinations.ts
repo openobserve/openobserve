@@ -26,6 +26,7 @@ import {
   PREBUILT_DESTINATION_TYPES,
   getPrebuiltConfig,
   isPrebuiltType,
+  detectPrebuiltType,
   generateDestinationUrl,
   generateDestinationHeaders,
   generatePrebuiltMetadata,
@@ -808,14 +809,6 @@ export function usePrebuiltDestinations() {
     } finally {
       isLoading.value = false;
     }
-  }
-
-  /**
-   * Prebuilt type a destination was saved with; a custom one is never inferred from its URL or template.
-   */
-  function detectPrebuiltType(destination: any): PrebuiltTypeId | null {
-    const type = destination.metadata?.prebuilt_type;
-    return type && isPrebuiltType(type) ? (type as PrebuiltTypeId) : null;
   }
 
   /**
