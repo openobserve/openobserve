@@ -20,10 +20,11 @@ use axum::{
 use config::{meta::user::UserRole, utils::str::mask_license_key};
 use db::license;
 use o2_enterprise::enterprise::license::{
-    BelowHwm, LICENSE_DB_KEY, License, LicenseDecision, LicenseStatus, RefreshBusy, RefreshReport,
-    RefreshStatus, Rollback, RollbackReason, Waiver, check_license, click_refresh, gate_and_raise,
-    get_license, judge_paste, load_rev_hwm, paste_superseded, pasted_key_supersedes_env,
-    refresh_status, rev_hwm_warning, rotate_instance_key, undo_raise,
+    BelowHwm, HwmRaise, KeyCommitFence, LICENSE_DB_KEY, License, LicenseDecision, LicenseStatus,
+    RefreshBusy, RefreshReport, RefreshStatus, Rollback, RollbackReason, Waiver, check_license,
+    click_refresh, get_license, judge_paste, load_rev_hwm, paste_superseded,
+    pasted_key_supersedes_env, prepare_key_commit, refresh_status, rev_hwm_warning,
+    rotate_instance_key, undo_raise,
 };
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::{AuthExtractor, UserEmail};
@@ -33,6 +34,8 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 const ENV_KEY_CONFLICT_MSG: &str = "This instance uses the license key in the O2_LICENSE_KEY environment variable, and that key stays in use. Only a newer key for the same license, such as one carrying new waivers, can be pasted over it. To use any other key, put it in O2_LICENSE_KEY and restart.";
 const ENV_KEY_CONFLICT: &str = "env_key_conflict";
+const KEY_CHANGED_MSG: &str = "Another license key was applied while this one was being checked. Reload the license page and paste the key again.";
+const KEY_CHANGED: &str = "key_changed";
 const KEY_ACCEPTED: &str = "accept";
 const KEY_ACCEPTED_MSG: &str = "This key can be applied.";
 
@@ -307,6 +310,17 @@ fn env_conflict_body(pasted: &License) -> RollbackBody {
     }
 }
 
+fn key_changed_body(pasted: &License) -> RollbackBody {
+    RollbackBody {
+        code: StatusCode::CONFLICT.as_u16(),
+        message: KEY_CHANGED_MSG.to_string(),
+        reason: KEY_CHANGED,
+        license_id: pasted.license_id.clone(),
+        loaded_rev: None,
+        pasted_rev: Some(pasted.rev),
+    }
+}
+
 // a waiver edited in place shows as removed and added, so the preview never hides a change
 fn waiver_diff(loaded: Option<&License>, pasted: &License) -> (Vec<Waiver>, Vec<Waiver>) {
     let Some(loaded) = loaded.filter(|l| l.license_id == pasted.license_id) else {
@@ -365,29 +379,69 @@ fn verdict_outcome(verdict: &Result<(), Rollback>) -> (&'static str, String) {
     }
 }
 
-// the gate raises the hwm before the key lands, so a failed store must lower it again
-async fn store_gated<F, Fut>(pasted: &License, put: F) -> Response
+// a write can commit before its acknowledgement is lost, so only a proven miss undoes the raise
+async fn undo_unless_landed<R, RF>(raise: &HwmRaise, raw_key: &str, read_back: R)
 where
-    F: FnOnce() -> Fut,
-    Fut: std::future::Future<Output = Result<(), infra::errors::Error>>,
+    R: FnOnce() -> RF,
+    RF: std::future::Future<Output = Result<Option<bytes::Bytes>, infra::errors::Error>>,
 {
-    let raise = match gate_and_raise(pasted).await {
-        Ok(Ok(raise)) => raise,
+    match read_back().await {
+        Ok(Some(stored)) if stored.as_ref() == raw_key.as_bytes() => {
+            log::warn!("[LICENSE] the key landed despite its store error; keeping the rev raise");
+        }
+        Ok(_) => {
+            if let Err(undo) = undo_raise(raise).await {
+                log::error!("[LICENSE] could not undo the rev high-water mark raise : {undo}");
+            }
+        }
+        Err(e) => {
+            log::error!("[LICENSE] cannot read back the license key, keeping the rev raise : {e}");
+        }
+    }
+}
+
+// the gate raises the hwm before the key lands, so a failed store must lower it again
+async fn store_gated<C, CF, R, RF>(
+    pasted: &License,
+    raw_key: &str,
+    commit: C,
+    read_back: R,
+) -> Response
+where
+    C: FnOnce(KeyCommitFence) -> CF,
+    CF: std::future::Future<Output = anyhow::Result<bool>>,
+    R: FnOnce() -> RF,
+    RF: std::future::Future<Output = Result<Option<bytes::Bytes>, infra::errors::Error>>,
+{
+    let (raise, fence) = match prepare_key_commit(pasted).await {
+        Ok(Ok(prepared)) => prepared,
         Ok(Err(r)) => return (StatusCode::CONFLICT, Json(rollback_body(&r))).into_response(),
         Err(e) => return MetaHttpResponse::internal_error(e),
     };
-    if let Err(e) = put().await {
-        if let Some(raise) = raise
-            && let Err(undo) = undo_raise(&raise).await
-        {
-            log::error!("[LICENSE] could not undo the rev high-water mark raise : {undo}");
+    match commit(fence).await {
+        Ok(true) => {}
+        // the raise may already back a newer paste's key, so a stale judgment never undoes it
+        Ok(false) => {
+            return (StatusCode::CONFLICT, Json(key_changed_body(pasted))).into_response();
         }
-        return MetaHttpResponse::internal_error(e);
+        Err(e) => {
+            if let Some(raise) = raise {
+                undo_unless_landed(&raise, raw_key, read_back).await;
+            }
+            return MetaHttpResponse::internal_error(e);
+        }
     }
     match license::update().await {
         Ok(_) => (StatusCode::CREATED, Json("")).into_response(),
         Err(e) => MetaHttpResponse::internal_error(e),
     }
+}
+
+async fn stored_license_key() -> Result<Option<bytes::Bytes>, infra::errors::Error> {
+    infra::db::get_db()
+        .await
+        .get_if_exists(LICENSE_DB_KEY)
+        .await
 }
 
 async fn preview_key(pasted: &License, loaded: Option<&License>, is_root: bool) -> Response {
@@ -556,12 +610,13 @@ pub async fn store_license(
     }
 
     let raw_key = req.raw_key;
-    store_gated(&req.key, || async move {
-        infra::db::get_db()
-            .await
-            .put(LICENSE_DB_KEY, raw_key.into(), false, None)
-            .await
-    })
+    let candidate = raw_key.clone();
+    store_gated(
+        &req.key,
+        &raw_key,
+        |fence| async move { fence.commit(&candidate).await },
+        stored_license_key,
+    )
     .await
 }
 
@@ -592,7 +647,7 @@ pub async fn rotate_license_key(Headers(user_email): Headers<UserEmail>) -> Resp
 mod tests {
     use config::utils::{base64, json};
     use o2_enterprise::enterprise::license::{
-        BelowHwm, Block, KeySource, LICENSE_REV_HWM_KEY, TEST_STATICS_LOCK,
+        BelowHwm, Block, KeySource, LICENSE_REV_HWM_KEY, TEST_STATICS_LOCK, gate_and_raise,
         set_rev_hwm_warning_for_tests,
     };
 
@@ -1568,14 +1623,25 @@ mod tests {
         );
     }
 
+    fn store_failure() -> anyhow::Result<bool> {
+        Err(anyhow::anyhow!("disk full"))
+    }
+
+    fn hwm_rev(hwm: &o2_enterprise::enterprise::license::RevHwm) -> Option<i64> {
+        hwm.entry("lic-1").unwrap().map(|e| e.rev)
+    }
+
     #[tokio::test]
     async fn a_failed_key_store_puts_the_hwm_back() {
         let _store = store_setup().await;
         gate_and_raise(&lic("lic-1", 5)).await.unwrap().unwrap();
         let before = stored(LICENSE_REV_HWM_KEY).await;
-        let resp = store_gated(&lic("lic-1", 9), || async {
-            Err(infra::errors::Error::Message("disk full".to_string()))
-        })
+        let resp = store_gated(
+            &lic("lic-1", 9),
+            "key-9",
+            |_| async { store_failure() },
+            stored_license_key,
+        )
         .await;
         assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
         assert_eq!(stored(LICENSE_REV_HWM_KEY).await, before);
@@ -1588,17 +1654,135 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_key_write_that_landed_before_its_error_keeps_the_hwm() {
+        let _store = store_setup().await;
+        gate_and_raise(&lic("lic-1", 5)).await.unwrap().unwrap();
+        let resp = store_gated(
+            &lic("lic-1", 9),
+            "key-9",
+            |fence| async move {
+                assert!(fence.commit("key-9").await.unwrap());
+                Err(anyhow::anyhow!("acknowledgement lost"))
+            },
+            stored_license_key,
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(stored(LICENSE_DB_KEY).await, Some(json::json!("key-9")));
+        assert_eq!(hwm_rev(&load_rev_hwm().await.unwrap()), Some(9));
+        let (status, body) = paste(lic("lic-1", 5), true).await;
+        assert_eq!(
+            (status, body["outcome"].as_str()),
+            (StatusCode::OK, Some("rev_rollback"))
+        );
+    }
+
+    #[tokio::test]
+    async fn an_unreadable_key_after_a_failed_write_keeps_the_hwm() {
+        let _store = store_setup().await;
+        gate_and_raise(&lic("lic-1", 5)).await.unwrap().unwrap();
+        let resp = store_gated(
+            &lic("lic-1", 9),
+            "key-9",
+            |_| async { store_failure() },
+            || async { Err(infra::errors::Error::Message("meta store down".to_string())) },
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(hwm_rev(&load_rev_hwm().await.unwrap()), Some(9));
+    }
+
+    #[tokio::test]
+    async fn another_key_read_back_after_a_failed_write_puts_the_hwm_back() {
+        let _store = store_setup().await;
+        gate_and_raise(&lic("lic-1", 5)).await.unwrap().unwrap();
+        let resp = store_gated(
+            &lic("lic-1", 9),
+            "key-9",
+            |_| async { store_failure() },
+            || async { Ok(Some(bytes::Bytes::from_static(b"key-5"))) },
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(hwm_rev(&load_rev_hwm().await.unwrap()), Some(5));
+    }
+
+    #[tokio::test]
+    async fn a_paste_judged_before_another_paste_landed_is_409_and_stores_nothing() {
+        let _store = store_setup().await;
+        let resp = store_gated(
+            &lic("lic-1", 9),
+            "key-9",
+            |fence| async move {
+                gate_and_raise(&lic("lic-1", 12)).await.unwrap().unwrap();
+                infra::db::get_db()
+                    .await
+                    .put(LICENSE_DB_KEY, "key-12".into(), false, None)
+                    .await
+                    .unwrap();
+                fence.commit("key-9").await
+            },
+            stored_license_key,
+        )
+        .await;
+        let (status, body) = body_of(resp).await;
+        assert_eq!(status, StatusCode::CONFLICT, "{body}");
+        assert_eq!(
+            (
+                body["code"].as_u64(),
+                body["reason"].as_str(),
+                body["license_id"].as_str(),
+                body["pasted_rev"].as_i64()
+            ),
+            (Some(409), Some("key_changed"), Some("lic-1"), Some(9))
+        );
+        assert_eq!(stored(LICENSE_DB_KEY).await, Some(json::json!("key-12")));
+        assert_eq!(hwm_rev(&load_rev_hwm().await.unwrap()), Some(12));
+    }
+
+    #[tokio::test]
+    async fn a_key_stored_after_the_judgment_is_never_overwritten() {
+        let _store = store_setup().await;
+        let resp = store_gated(
+            &lic("lic-1", 9),
+            "key-9",
+            |fence| async move {
+                infra::db::get_db()
+                    .await
+                    .put(LICENSE_DB_KEY, "other-key".into(), false, None)
+                    .await
+                    .unwrap();
+                fence.commit("key-9").await
+            },
+            stored_license_key,
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::CONFLICT);
+        assert_eq!(stored(LICENSE_DB_KEY).await, Some(json::json!("other-key")));
+    }
+
+    #[tokio::test]
     async fn an_identical_paste_that_stored_its_key_keeps_the_hwm() {
         let _store = store_setup().await;
         gate_and_raise(&lic("lic-1", 5)).await.unwrap().unwrap();
-        let first = store_gated(&lic("lic-1", 9), || async {
-            let _ = store_gated(&lic("lic-1", 9), || async { Ok(()) }).await;
-            Err(infra::errors::Error::Message("disk full".to_string()))
-        })
+        let first = store_gated(
+            &lic("lic-1", 9),
+            "key-9",
+            |_| async {
+                let _ = store_gated(
+                    &lic("lic-1", 9),
+                    "key-9",
+                    |fence| async move { fence.commit("key-9").await },
+                    stored_license_key,
+                )
+                .await;
+                store_failure()
+            },
+            || async { Ok(None) },
+        )
         .await;
         assert_eq!(first.status(), StatusCode::INTERNAL_SERVER_ERROR);
-        let hwm = load_rev_hwm().await.unwrap();
-        assert_eq!(hwm.entry("lic-1").unwrap().map(|e| e.rev), Some(9));
+        assert_eq!(hwm_rev(&load_rev_hwm().await.unwrap()), Some(9));
     }
 
     #[tokio::test]
@@ -1643,17 +1827,26 @@ mod tests {
     async fn store_runs_the_gate_before_the_key_is_stored() {
         let _store = store_setup().await;
         let seen = std::sync::Mutex::new(None);
-        let _ = store_gated(&lic("lic-1", 9), || async {
-            let hwm = load_rev_hwm().await.unwrap();
-            *seen.lock().unwrap() = Some(hwm.entry("lic-1").unwrap().map(|e| e.rev));
-            Ok(())
-        })
+        let seen_by_commit = &seen;
+        let _ = store_gated(
+            &lic("lic-1", 9),
+            "key-9",
+            |_| async move {
+                let hwm = load_rev_hwm().await.unwrap();
+                *seen_by_commit.lock().unwrap() = Some(hwm_rev(&hwm));
+                Ok(true)
+            },
+            stored_license_key,
+        )
         .await;
         assert_eq!(seen.into_inner().unwrap(), Some(Some(9)));
         gate_and_raise(&lic("lic-1", 12)).await.unwrap().unwrap();
-        let refused = store_gated(&lic("lic-1", 10), || async {
-            panic!("a refused key is never stored")
-        })
+        let refused = store_gated(
+            &lic("lic-1", 10),
+            "key-10",
+            |_| async { panic!("a refused key is never stored") },
+            stored_license_key,
+        )
         .await;
         assert_eq!(refused.status(), StatusCode::CONFLICT);
     }
