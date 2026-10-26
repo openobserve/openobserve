@@ -575,6 +575,19 @@ describe("TableRenderer", () => {
       expect(rowKey({ ...a })).toBe(rowKey(a));
     });
 
+    it("gives identical rows their own keys, so they expand separately", () => {
+      const row = { ...mockTableData.rows[0] };
+      wrapper = createWrapper({
+        expandableRows: true,
+        data: { ...mockTableData, rows: [row, { ...row }] },
+      });
+      const rowKey = wrapper.findComponent({ name: "OTable" }).props("rowKey") as (
+        r: any,
+      ) => string;
+      const [first, second] = wrapper.props("data").rows;
+      expect(rowKey(first)).not.toBe(rowKey(second));
+    });
+
     it("keeps an expanded row open when the data refreshes with the same row", async () => {
       wrapper = createWrapper({ expandableRows: true });
 

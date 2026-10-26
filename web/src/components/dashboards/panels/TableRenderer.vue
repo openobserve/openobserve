@@ -193,6 +193,20 @@ import { buildValueMappingCache, lookupValueMappingFull } from "@/utils/dashboar
 import { copyToClipboard } from "@/utils/clipboard";
 import { useStore } from "vuex";
 
+// 53-bit string hash (cyrb53): a short key per row instead of keeping every row's JSON alive.
+const contentHash = (text: string): string => {
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+};
+
 export default defineComponent({
   name: "TableRenderer",
   components: {
@@ -302,16 +316,21 @@ export default defineComponent({
     // OTable reads rowKey once at creation, so the expansion toggle re-keys the table too.
     const tableKey = computed(() => `${paginationMode.value}-${rowsExpandable.value}`);
 
-    // Dashboard rows carry no id; a content key keeps a row open across sorts and data refreshes.
-    const expansionRowIds = new WeakMap<object, string>();
-    const expansionRowKey = (row: any): string => {
-      let id = expansionRowIds.get(row);
-      if (id === undefined) {
-        id = JSON.stringify(row);
-        expansionRowIds.set(row, id);
+    // Dashboard rows carry no id; a content key, numbered among identical rows, survives sorts and refreshes.
+    const expansionRowIds = computed(() => {
+      const ids = new WeakMap<object, string>();
+      if (!rowsExpandable.value) return ids;
+      const seen = new Map<string, number>();
+      for (const row of (props.data?.rows as any[]) || []) {
+        const content = contentHash(JSON.stringify(row));
+        const count = seen.get(content) ?? 0;
+        seen.set(content, count + 1);
+        if (row && typeof row === "object") ids.set(row, count ? `${content}#${count}` : content);
       }
-      return id;
-    };
+      return ids;
+    });
+    const expansionRowKey = (row: any): string =>
+      expansionRowIds.value.get(row) ?? contentHash(JSON.stringify(row));
 
     const tableColumns = computed(() => (props.data?.columns as any[]) || []);
 
