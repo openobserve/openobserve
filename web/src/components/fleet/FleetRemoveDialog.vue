@@ -31,13 +31,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div v-if="shown" class="flex flex-col gap-4">
       <OText data-test="fleet-remove-dialog-message">{{ message }}</OText>
-      <FleetUninstallCommand v-if="shown.online" v-model:platform="platform" show-platforms />
+      <FleetUninstallCommand
+        v-if="shown.online"
+        v-model:platform="platform"
+        v-model:role="role"
+        show-platforms
+      />
       <OCollapsible
         v-else
         :label="t('fleet.uninstall.howTo')"
         data-test="fleet-remove-dialog-uninstall"
       >
-        <FleetUninstallCommand v-model:platform="platform" show-platforms />
+        <FleetUninstallCommand v-model:platform="platform" v-model:role="role" show-platforms />
       </OCollapsible>
     </div>
   </ODialog>
@@ -50,19 +55,22 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import FleetUninstallCommand from "./FleetUninstallCommand.vue";
-import { platformForOs, type InstallPlatform } from "./fleetInstall";
+import { platformForOs, type InstallPlatform, type KubernetesRole } from "./fleetInstall";
 import { useRemoveRequest, type RemoveRequest } from "./useCollectorActions";
 
 const { t } = useI18nTyped();
 const { request, answer } = useRemoveRequest();
 
 const platform = ref<InstallPlatform>("linux");
+// A collector does not report whether a chart installed it as an agent or a gateway.
+const role = ref<KubernetesRole>("agent");
 // The answered request stays shown so the closing dialog does not flash an empty title.
 const shown = shallowRef<RemoveRequest | null>(null);
 watch(request, (req) => {
   if (!req) return;
   shown.value = req;
   platform.value = platformForOs(req.targets.map((c) => c.os));
+  role.value = "agent";
 });
 
 const title = computed(() => {

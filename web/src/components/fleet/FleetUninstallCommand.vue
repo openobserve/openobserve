@@ -32,6 +32,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ opt.label }}
       </OToggleGroupItem>
     </OToggleGroup>
+    <OToggleGroup
+      v-if="showPlatforms && platform === 'kubernetes'"
+      :model-value="role"
+      data-test="fleet-uninstall-command-role"
+      @update:model-value="(v) => emit('update:role', v as KubernetesRole)"
+    >
+      <OToggleGroupItem
+        v-for="opt in roleOptions"
+        :key="opt.value"
+        :value="opt.value"
+        size="sm"
+        :data-test="`fleet-uninstall-command-role-${opt.value}`"
+      >
+        {{ opt.label }}
+      </OToggleGroupItem>
+    </OToggleGroup>
     <OCodeBlock
       :code="command"
       :lang="platform === 'windows' ? 'powershell' : 'bash'"
@@ -51,13 +67,21 @@ import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
   INSTALL_PLATFORMS,
+  KUBERNETES_ROLES,
   PLATFORM_LABEL,
   uninstallCommand,
   type InstallPlatform,
+  type KubernetesRole,
 } from "./fleetInstall";
 
-const props = defineProps<{ platform: InstallPlatform; showPlatforms?: boolean }>();
-const emit = defineEmits<{ "update:platform": [value: InstallPlatform] }>();
+const props = withDefaults(
+  defineProps<{ platform: InstallPlatform; role?: KubernetesRole; showPlatforms?: boolean }>(),
+  { role: "agent" },
+);
+const emit = defineEmits<{
+  "update:platform": [value: InstallPlatform];
+  "update:role": [value: KubernetesRole];
+}>();
 
 const { t } = useI18nTyped();
 
@@ -65,6 +89,14 @@ const platformOptions = INSTALL_PLATFORMS.map((value) => ({
   value,
   label: raw(PLATFORM_LABEL[value]),
 }));
+
+const roleOptions = computed(() =>
+  KUBERNETES_ROLES.map((value) => ({
+    value,
+    label:
+      value === "agent" ? t("fleet.install.kubernetesAgent") : t("fleet.install.kubernetesGateway"),
+  })),
+);
 
 // The scripts keep the collector's state (its instance id) and logs, so a reinstall keeps its identity.
 const KEPT: Record<"linux" | "macos", { state: string; logs: string }> = {
@@ -75,7 +107,7 @@ const KEPT: Record<"linux" | "macos", { state: string; logs: string }> = {
   },
 };
 
-const command = computed(() => uninstallCommand(props.platform));
+const command = computed(() => uninstallCommand(props.platform, props.role));
 
 const note = computed(() => {
   const p = props.platform;

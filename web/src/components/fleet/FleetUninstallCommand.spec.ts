@@ -54,4 +54,18 @@ describe("FleetUninstallCommand", () => {
     w.findComponent({ name: "OToggleGroup" }).vm.$emit("update:model-value", "kubernetes");
     expect(w.emitted("update:platform")).toEqual([["kubernetes"]]);
   });
+
+  it("asks agent or gateway on Kubernetes and removes that role's release", async () => {
+    expect(
+      mountCommand({ platform: "linux", showPlatforms: true })
+        .find('[data-test="fleet-uninstall-command-role"]')
+        .exists(),
+    ).toBe(false);
+    const w = mountCommand({ platform: "kubernetes", role: "gateway", showPlatforms: true });
+    expect(w.find('[data-test="fleet-uninstall-command-code"]').text()).toContain(
+      "helm uninstall otel-fleet-collector-gateway",
+    );
+    w.findAllComponents({ name: "OToggleGroup" })[1].vm.$emit("update:model-value", "agent");
+    expect(w.emitted("update:role")).toEqual([["agent"]]);
+  });
 });

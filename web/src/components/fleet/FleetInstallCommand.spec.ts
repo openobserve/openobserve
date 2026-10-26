@@ -133,4 +133,25 @@ describe("FleetInstallCommand", () => {
     expect(code(w)).toContain("o2cr.ai/openobserve/otel-fleet-collector");
     expect(w.find('[data-test="fleet-install-command-http"]').exists()).toBe(false);
   });
+
+  it("offers the agent or gateway role only on Kubernetes, agents by default", async () => {
+    const w = mountCommand();
+    expect(w.find('[data-test="fleet-install-command-role"]').exists()).toBe(false);
+    await choose(w, "kubernetes");
+    const roles = w.findAll('[data-test^="fleet-install-command-role-"]').map((b) => b.text());
+    expect(roles).toEqual(["Agent (DaemonSet)", "Gateway (StatefulSet)"]);
+    expect(code(w)).toContain("helm upgrade --install otel-fleet-collector openobserve/");
+  });
+
+  it("installs a gateway release and names its OTLP Service", async () => {
+    const w = mountCommand();
+    await choose(w, "kubernetes");
+    w.findAllComponents({ name: "OToggleGroup" })[1].vm.$emit("update:model-value", "gateway");
+    await w.vm.$nextTick();
+    expect(code(w)).toContain("helm upgrade --install otel-fleet-collector-gateway");
+    expect(code(w)).toContain("--set gateway.enabled=true");
+    expect(w.find('[data-test="fleet-install-command-note"]').text()).toContain(
+      "otel-fleet-collector-gateway:4317",
+    );
+  });
 });

@@ -301,6 +301,7 @@ import TrendingDownIcon from "~icons/material-symbols/trending-down";
 import TrendingFlatIcon from "~icons/material-symbols/trending-flat";
 import TroubleshootIcon from "~icons/material-symbols/troubleshoot";
 import UpdateIcon from "~icons/material-symbols/update";
+import TvIcon from "~icons/material-symbols/tv-outline";
 import VerifiedIcon from "~icons/material-symbols/verified-outline";
 import ViewColumnIcon from "~icons/material-symbols/view-column-outline";
 import VolumeOffIcon from "~icons/material-symbols/volume-off-outline";
@@ -683,6 +684,7 @@ export const iconRegistry = {
   "trending-flat": TrendingFlatIcon,
   troubleshoot: TroubleshootIcon,
   update: UpdateIcon,
+  tv: TvIcon,
   verified: VerifiedIcon,
   "view-column": ViewColumnIcon,
   "volume-off": VolumeOffIcon,

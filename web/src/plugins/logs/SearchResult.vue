@@ -2535,6 +2535,19 @@ export default defineComponent({
       return searchObj.meta.resetPlotChart;
     });
 
+    const resolveFtsDefaultColumns = () => {
+      const streamFields = searchObj.data.stream.selectedStreamFields;
+      // Mid-rebuild the list is empty, and picking from it would claim _source as the resolved default.
+      if (!streamFields?.length) return;
+      const hits = searchObj.data.queryResults?.hits || [];
+      const globalFtsKeys = store?.state?.zoConfig?.default_fts_keys || [];
+      const ftsDefaults = resolveDefaultColumns(streamFields, globalFtsKeys, hits);
+      // ftsDefaults is [] when no candidate has filled values → falls through to _source
+      searchObj.data.stream.selectedFields = ftsDefaults;
+      // Marked a system pick so it is never persisted, where it would leak back into later searches and SQL mode as a user choice.
+      searchObj.meta.isFtsDefaultColumn = ftsDefaults.length > 0;
+    };
+
     watch(
       () => searchObj.loading,
       (loading, wasLoading) => {
@@ -2559,21 +2572,21 @@ export default defineComponent({
           const currentFields = searchObj.data.stream.selectedFields;
           const canResolveDefault = !currentFields.length || searchObj.meta.isFtsDefaultColumn;
           if (canResolveDefault) {
-            const hits = searchObj.data.queryResults?.hits || [];
-            const globalFtsKeys = store?.state?.zoConfig?.default_fts_keys || [];
-            const ftsDefaults = resolveDefaultColumns(
-              searchObj.data.stream.selectedStreamFields,
-              globalFtsKeys,
-              hits,
-            );
-            // ftsDefaults is [] when no candidate has filled values → falls through to _source
-            searchObj.data.stream.selectedFields = ftsDefaults;
-            // Mark this as a system pick so it is not persisted to logFilterField.
-            // A stale persisted FTS default would otherwise leak back into later
-            // searches (and SQL mode) as if the user had chosen it.
-            searchObj.meta.isFtsDefaultColumn = ftsDefaults.length > 0;
+            resolveFtsDefaultColumns();
           }
         }
+      },
+    );
+
+    // extractFields() can still be rebuilding the emptied field list when the search finishes, and the resolution above then has no candidate to pick.
+    watch(
+      () => searchObj.data.stream.selectedStreamFields?.length ?? 0,
+      (count, before) => {
+        if (!count || before || searchObj.loading || !searchObj.meta.searchApplied) return;
+        if (searchObj.meta.sqlMode || columnsFromUrl.value) return;
+        if (searchObj.data.stream.selectedFields.length && !searchObj.meta.isFtsDefaultColumn)
+          return;
+        resolveFtsDefaultColumns();
       },
     );
 

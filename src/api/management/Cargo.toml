@@ -48,7 +48,7 @@ profiling = ["openobserve-core/profiling"]
 anyhow.workspace = true
 arrow-schema.workspace = true
 async-stream.workspace = true
-audit.workspace = true
+audit = { workspace = true, optional = true }
 axum.workspace = true
 axum-extra.workspace = true
 base64.workspace = true
@@ -76,7 +76,7 @@ openobserve-core.workspace = true
 openobserve-synthetics.workspace = true
 openobserve-api-common.workspace = true
 openobserve-node.workspace = true
-openobserve-org-storage.workspace = true
+openobserve-org-storage = { workspace = true, optional = true }
 openobserve-sourcemaps.workspace = true
 opentelemetry.workspace = true
 promql-service.workspace = true

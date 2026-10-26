@@ -31,6 +31,7 @@ vi.mock("vuex", () => ({
 }));
 
 vi.mock("@/utils/dashboard/variables/variablesUtils", () => ({
+  escapeHtmlValue: vi.fn((value) => value),
   processVariableContent: vi.fn((content, variables) => {
     // Simple mock implementation that replaces {{variable}} patterns
     if (!content || typeof content !== "string") return content;
@@ -173,7 +174,8 @@ describe("HTMLRenderer", () => {
 
   describe("Variable Processing", () => {
     it("should process variables in HTML content", async () => {
-      const { processVariableContent } = await import("@/utils/dashboard/variables/variablesUtils");
+      const { escapeHtmlValue, processVariableContent } =
+        await import("@/utils/dashboard/variables/variablesUtils");
 
       wrapper = createWrapper({
         htmlContent: "<h1>{{title}}</h1><p>Welcome {{userName}}</p>",
@@ -184,6 +186,7 @@ describe("HTMLRenderer", () => {
         "<h1>{{title}}</h1><p>Welcome {{userName}}</p>",
         { title: "Dashboard", userName: "John" },
         { panelId: undefined, tabId: undefined },
+        escapeHtmlValue,
       );
     });
 
