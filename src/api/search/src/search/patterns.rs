@@ -26,9 +26,9 @@ use {
     tokio::sync::mpsc,
 };
 
-use crate::common::{
-    meta::http::HttpResponse as MetaHttpResponse, utils::http::client_search_type,
-};
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+#[cfg(feature = "enterprise")]
+use crate::common::utils::http::client_search_type;
 
 /// Extract patterns from search results
 ///
