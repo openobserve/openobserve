@@ -32,7 +32,7 @@ use config::{
         stream::{StreamParams, StreamPartition, StreamStats, StreamType},
     },
     utils::{
-        flatten::format_label_name_cow,
+        flatten::{format_label_name_cow, format_label_name_owned},
         json,
         schema::format_stream_name,
         sql::{quote_identifier, quote_sql_string},
@@ -847,7 +847,7 @@ pub async fn get_labels(
                 .fields()
                 .iter()
                 .map(|f| f.name())
-                .filter(|&s| s != TIMESTAMP_COL_NAME && s != VALUE_LABEL && s != HASH_LABEL)
+                .filter(|s| !is_metrics_hash_excluded_label(s))
                 .cloned();
             label_names.extend(field_names);
         }
@@ -905,6 +905,7 @@ pub async fn get_label_values(
     end: i64,
 ) -> Result<Vec<String>> {
     let stream_type = StreamType::Metrics;
+    let label_name = format_label_name_owned(label_name);
 
     if label_name == NAME_LABEL {
         let sel = selector.as_ref();
@@ -953,6 +954,7 @@ pub async fn get_label_values(
         // `db::schema::get` never fails, so it's safe to unwrap
         .unwrap();
     if schema.field_with_name(&label_name).is_err()
+        || is_metrics_hash_excluded_label(&label_name)
         || selector_matches_nothing(&schema, selector.as_ref())
     {
         return Ok(vec![]);
@@ -1060,9 +1062,7 @@ fn series_sql(
             .fields()
             .iter()
             .map(|f| f.name().as_str())
-            .filter(|&name| {
-                name != TIMESTAMP_COL_NAME && name != VALUE_LABEL && name != HASH_LABEL
-            }),
+            .filter(|name| !is_metrics_hash_excluded_label(name)),
     );
     (columns.len() > 1).then(|| metadata_sql(metric_name, &columns, schema, selector))
 }
@@ -1608,6 +1608,8 @@ mod tests {
                 "job",
                 "label\"field",
                 "select",
+                "start_time",
+                "flag",
             ]
             .into_iter()
             .map(|name| Field::new(name, DataType::Utf8, true))

@@ -180,7 +180,7 @@ fn rule_results(
 }
 
 fn referenced_streams(expression: &str) -> anyhow::Result<Vec<String>> {
-    let ast = promql_parser::parser::parse(expression).map_err(|e| anyhow::anyhow!(e))?;
+    let ast = ::promql::parse(expression).map_err(|e| anyhow::anyhow!(e))?;
     let mut visitor = ::promql::ast::name_visitor::MetricNameVisitor::new();
     ::promql::ast::visitor::walk_expr(&mut visitor, &ast).map_err(|e| anyhow::anyhow!(e))?;
     let mut names: Vec<_> = visitor.into_names().into_iter().collect();

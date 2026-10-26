@@ -15,8 +15,16 @@
 
 use std::sync::OnceLock;
 
+use config::{
+    meta::promql::NAME_LABEL,
+    utils::{flatten::format_label_name_owned, schema::format_stream_name},
+};
 use promql_parser::{
-    parser::{self, Expr, Function, function::register_extra_functions, value::ValueType},
+    label::{Labels, MatchOp, Matcher},
+    parser::{
+        self, Expr, Function, LabelModifier, VectorMatchCardinality, VectorSelector,
+        function::register_extra_functions, value::ValueType,
+    },
     util::ExprVisitor,
 };
 
@@ -38,7 +46,8 @@ impl ExprVisitor for SupportedModifiers {
     }
 }
 
-/// Preserves the legacy smoothing function and rejects modifiers the evaluator cannot execute.
+/// Preserves the legacy smoothing function, rejects modifiers the evaluator cannot execute, and
+/// rewrites metric and label names to the form ingest stores them in.
 pub fn parse(query: &str) -> Result<Expr, String> {
     LEGACY_FUNCTIONS
         .get_or_init(|| {
@@ -52,9 +61,100 @@ pub fn parse(query: &str) -> Result<Expr, String> {
         })
         .as_ref()
         .map_err(Clone::clone)?;
-    let expr = parser::parse(query)?;
+    let mut expr = parser::parse(query)?;
     crate::ast::visitor::walk_expr(&mut SupportedModifiers, &expr)?;
+    normalize_names(&mut expr);
     Ok(expr)
+}
+
+fn normalize_names(expr: &mut Expr) {
+    match expr {
+        Expr::VectorSelector(vs) => normalize_selector(vs),
+        Expr::MatrixSelector(ms) => normalize_selector(&mut ms.vs),
+        Expr::Aggregate(agg) => {
+            normalize_names(&mut agg.expr);
+            match agg.param.as_deref_mut() {
+                // only count_values takes a string parameter, and it names the output label
+                Some(Expr::StringLiteral(label)) => normalize_label(&mut label.val),
+                Some(param) => normalize_names(param),
+                None => {}
+            }
+            if let Some(modifier) = &mut agg.modifier {
+                normalize_modifier(modifier);
+            }
+        }
+        Expr::Binary(binary) => {
+            normalize_names(&mut binary.lhs);
+            normalize_names(&mut binary.rhs);
+            if let Some(modifier) = &mut binary.modifier {
+                if let Some(matching) = &mut modifier.matching {
+                    normalize_modifier(matching);
+                }
+                if let VectorMatchCardinality::ManyToOne(labels)
+                | VectorMatchCardinality::OneToMany(labels) = &mut modifier.card
+                {
+                    normalize_labels(labels);
+                }
+            }
+        }
+        Expr::Call(call) => {
+            let func = call.func.name;
+            for (index, arg) in call.args.args.iter_mut().enumerate() {
+                match &mut **arg {
+                    Expr::StringLiteral(label) if is_label_arg(func, index) => {
+                        normalize_label(&mut label.val)
+                    }
+                    arg => normalize_names(arg),
+                }
+            }
+        }
+        Expr::Unary(unary) => normalize_names(&mut unary.expr),
+        Expr::Paren(paren) => normalize_names(&mut paren.expr),
+        Expr::Subquery(sq) => normalize_names(&mut sq.expr),
+        Expr::NumberLiteral(_) | Expr::StringLiteral(_) | Expr::Extension(_) => {}
+    }
+}
+
+fn normalize_selector(vs: &mut VectorSelector) {
+    if let Some(name) = vs.name.take() {
+        vs.name = Some(format_stream_name(name));
+    }
+    let or_matchers = vs.matchers.or_matchers.iter_mut().flatten();
+    for matcher in vs.matchers.matchers.iter_mut().chain(or_matchers) {
+        normalize_matcher(matcher);
+    }
+}
+
+fn normalize_matcher(matcher: &mut Matcher) {
+    normalize_label(&mut matcher.name);
+    // a regex cannot be rewritten safely, so only a literal metric name is normalized
+    if matcher.name == NAME_LABEL && matches!(matcher.op, MatchOp::Equal | MatchOp::NotEqual) {
+        matcher.value = format_stream_name(std::mem::take(&mut matcher.value));
+    }
+}
+
+fn normalize_modifier(modifier: &mut LabelModifier) {
+    match modifier {
+        LabelModifier::Include(labels) | LabelModifier::Exclude(labels) => normalize_labels(labels),
+    }
+}
+
+fn normalize_labels(labels: &mut Labels) {
+    labels.labels.iter_mut().for_each(normalize_label);
+}
+
+fn normalize_label(label: &mut String) {
+    *label = format_label_name_owned(std::mem::take(label));
+}
+
+/// Whether argument `index` of `func` is a label name rather than a value.
+fn is_label_arg(func: &str, index: usize) -> bool {
+    match func {
+        "label_replace" => index == 1 || index == 3,
+        "label_join" => index == 1 || index >= 3,
+        "sort_by_label" | "sort_by_label_desc" => index >= 1,
+        _ => false,
+    }
 }
 
 #[cfg(test)]
@@ -97,5 +197,62 @@ mod tests {
             );
         }
         assert!(parse("fill + fill_left + fill_right").is_ok());
+    }
+
+    #[test]
+    fn names_are_normalized_like_ingest() {
+        for (query, expected) in [
+            (
+                r#"DCGM_FI_DEV_GPU_TEMP{UUID="GPU-1", modelName=~"A.*"}"#,
+                r#"dcgm_fi_dev_gpu_temp{uuid="GPU-1", modelname=~"A.*"}"#,
+            ),
+            (
+                r#"m{Job="a" or Instance!="B"}"#,
+                r#"m{job="a" or instance!="B"}"#,
+            ),
+            (
+                r#"{__name__="PortXmitData", Port="1"}"#,
+                r#"{__name__="portxmitdata", port="1"}"#,
+            ),
+            (r#"{__name__=~"DCGM_.*"}"#, r#"{__name__=~"DCGM_.*"}"#),
+            (
+                "rate(PortXmitDataExtended[1m])",
+                "rate(portxmitdataextended[1m])",
+            ),
+            ("count by (UUID) (m)", "count by (uuid) (m)"),
+            (
+                "sum without (UUID, pci_bus_id) (m)",
+                "sum without (uuid, pci_bus_id) (m)",
+            ),
+            (
+                "x * on (UUID) group_left (modelName) y",
+                "x * on (uuid) group_left (modelname) y",
+            ),
+            (
+                "x / ignoring (GPU) group_right y",
+                "x / ignoring (gpu) group_right y",
+            ),
+            (
+                r#"count_values("Version", m)"#,
+                r#"count_values("version", m)"#,
+            ),
+            ("topk(5, M)", "topk(5, m)"),
+            (
+                r#"label_replace(m, "DST", "$1-X", "SRC_Label", "(A.*)")"#,
+                r#"label_replace(m, "dst", "$1-X", "src_label", "(A.*)")"#,
+            ),
+            (
+                r#"label_join(m, "Out", "-", "A", "B")"#,
+                r#"label_join(m, "out", "-", "a", "b")"#,
+            ),
+            (r#"sort_by_label(m, "UUID")"#, r#"sort_by_label(m, "uuid")"#),
+            ("max_over_time(M[5m:1m])", "max_over_time(m[5m:1m])"),
+        ] {
+            assert_eq!(
+                parse(query).unwrap(),
+                parser::parse(expected).unwrap(),
+                "{query}"
+            );
+        }
     }
 }
