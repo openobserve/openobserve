@@ -27241,5 +27241,79 @@
       "title": "移動 {count} 個收集器 | 移動 {count} 個收集器",
       "tooMany": "一次最多移動 {max} 個收集器"
     }
+  },
+  "sampleData": {
+    "title": "使用範例資料探索",
+    "subtitle": "在連接您自己的資料之前，先用擬真的資料體驗整個平台",
+    "load": "載入範例資料",
+    "remove": "移除範例資料",
+    "openOverview": "開啟服務總覽",
+    "hero": {
+      "title": "一個擬真的線上商店，隨時可供探索",
+      "body": "從執行於 Kubernetes、由 10 個服務組成的電商應用程式載入最近 {hours} 小時的日誌、追蹤和指標，並已預先設定好儀表板、警示和函式。結帳流程出了問題：看看您能否找出原因。",
+      "loadedTitle": "範例資料已載入",
+      "loadedBody": "商店的遙測資料和資源都在此組織中。選擇一個起點開始探索，或在完成後全部移除。"
+    },
+    "included": {
+      "title": "將建立的內容",
+      "logs": "日誌",
+      "logsDetail": "{app} 和 {access} 中的應用程式日誌和 Web 存取日誌",
+      "traces": "追蹤",
+      "tracesDetail": "橫跨 10 個服務的分散式追蹤，並與其日誌連結",
+      "metrics": "指標",
+      "metricsDetail": "{count} 個 Prometheus 指標，涵蓋請求、延遲、CPU、記憶體和佇列延滯",
+      "dashboards": "4 個儀表板",
+      "dashboardsDetail": "服務總覽、業務 KPIs、Web 流量和基礎架構",
+      "alerts": "5 個警示",
+      "alertsDetail": "排程的 SQL 警示，其中一個正因進行中的事件而觸發",
+      "functions": "函式和資料擴充",
+      "functionsDetail": "2 個 VRL 函式和一個服務負責人擴充表"
+    },
+    "footnote": "串流和函式以 {prefix} 開頭，儀表板和警示位於「Sample data」資料夾中，資料涵蓋最近 {hours} 小時。可在此頁面一鍵全部移除。",
+    "steps": {
+      "telemetry": "正在產生並傳送日誌、追蹤和指標",
+      "dashboards": "正在建立儀表板",
+      "alerts": "正在建立警示",
+      "functions": "正在建立函式",
+      "enrichment": "正在上傳服務負責人表"
+    },
+    "progress": {
+      "loading": "正在載入範例資料…",
+      "done": "範例資料已載入",
+      "counts": "{logs} 筆日誌記錄 · {spans} 個 span · {metrics} 個指標資料點",
+      "skipped": "已略過"
+    },
+    "explore": {
+      "title": "開始探索",
+      "subtitle": "每張卡片都會在產品的不同區域開啟商店的資料。",
+      "dashboards": "服務總覽儀表板",
+      "dashboardsDesc": "一覽黃金訊號和進行中的事件",
+      "logs": "日誌中的付款錯誤",
+      "logsDesc": "搜尋過去一小時內失敗的扣款",
+      "traces": "追蹤中的失敗請求",
+      "tracesDesc": "跨服務追蹤一次失敗的結帳",
+      "metrics": "指標",
+      "metricsDesc": "使用 PromQL 查看請求速率、延遲和飽和度",
+      "alerts": "警示",
+      "alertsDesc": "「Sample data」資料夾中的 5 個警示",
+      "functions": "函式",
+      "functionsDesc": "可套用至搜尋結果的 VRL 函式"
+    },
+    "removeConfirm": {
+      "title": "移除範例資料？",
+      "message": "這會刪除範例串流、儀表板、警示、函式和擴充表。您自己的資料不會受到影響。"
+    },
+    "toast": {
+      "loaded": "範例資料已載入，祝您探索愉快！",
+      "loadFailed": "無法載入範例資料",
+      "removed": "範例資料已移除",
+      "removeFailed": "無法移除所有範例資料"
+    },
+    "entry": {
+      "homeTitle": "使用範例資料探索",
+      "homeDesc": "還沒有資料？載入一個附有儀表板和警示的示範商店",
+      "ingestionBtn": "試用範例資料",
+      "onboardingSource": "探索範例資料"
+    }
   }
 }

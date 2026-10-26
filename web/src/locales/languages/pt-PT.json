@@ -27246,5 +27246,79 @@
       "title": "Mover {count} coletor | Mover {count} coletores",
       "tooMany": "Mova no máximo {max} coletores de cada vez"
     }
+  },
+  "sampleData": {
+    "title": "Explorar com dados de exemplo",
+    "subtitle": "Experimente toda a plataforma com dados realistas antes de ligar os seus",
+    "load": "Carregar dados de exemplo",
+    "remove": "Remover dados de exemplo",
+    "openOverview": "Abrir visão geral do serviço",
+    "hero": {
+      "title": "Uma loja online realista, pronta a explorar",
+      "body": "Carrega os logs, traces e métricas das últimas {hours} horas de uma aplicação de comércio eletrónico com 10 serviços em Kubernetes, com dashboards, alertas e funções já configurados. Algo está a correr mal no checkout: veja se consegue descobrir porquê.",
+      "loadedTitle": "Os dados de exemplo estão carregados",
+      "loadedBody": "A telemetria e os recursos da loja estão nesta organização. Escolha por onde começar ou remova tudo quando terminar."
+    },
+    "included": {
+      "title": "O que é criado",
+      "logs": "Logs",
+      "logsDetail": "Logs de aplicação e logs de acesso web em {app} e {access}",
+      "traces": "Traces",
+      "tracesDetail": "Traces distribuídos por 10 serviços, ligados aos respetivos logs",
+      "metrics": "Métricas",
+      "metricsDetail": "{count} métricas do Prometheus para pedidos, latência, CPU, memória e atraso das filas",
+      "dashboards": "4 dashboards",
+      "dashboardsDetail": "Visão geral do serviço, KPIs de negócio, tráfego web e infraestrutura",
+      "alerts": "5 alertas",
+      "alertsDetail": "Alertas SQL agendados, um deles a disparar devido ao incidente em curso",
+      "functions": "Funções e enriquecimento",
+      "functionsDetail": "2 funções VRL e uma tabela de enriquecimento com os responsáveis pelos serviços"
+    },
+    "footnote": "Os streams e as funções começam por {prefix}, os dashboards e os alertas estão numa pasta «Sample data» e os dados abrangem as últimas {hours} horas. Remova tudo a partir desta página com um clique.",
+    "steps": {
+      "telemetry": "A gerar e enviar logs, traces e métricas",
+      "dashboards": "A criar dashboards",
+      "alerts": "A criar alertas",
+      "functions": "A criar funções",
+      "enrichment": "A carregar a tabela de responsáveis pelos serviços"
+    },
+    "progress": {
+      "loading": "A carregar dados de exemplo…",
+      "done": "Dados de exemplo carregados",
+      "counts": "{logs} registos de log · {spans} spans · {metrics} pontos de métricas",
+      "skipped": "Ignorado"
+    },
+    "explore": {
+      "title": "Começar a explorar",
+      "subtitle": "Cada cartão abre os dados da loja numa parte diferente do produto.",
+      "dashboards": "Dashboard de visão geral do serviço",
+      "dashboardsDesc": "Os sinais essenciais e o incidente num relance",
+      "logs": "Erros de pagamento em Logs",
+      "logsDesc": "Pesquise as cobranças falhadas da última hora",
+      "traces": "Pedidos falhados em Traces",
+      "tracesDesc": "Siga um checkout falhado através dos serviços",
+      "metrics": "Métricas",
+      "metricsDesc": "Taxas de pedidos, latência e saturação com PromQL",
+      "alerts": "Alertas",
+      "alertsDesc": "Cinco alertas na pasta «Sample data»",
+      "functions": "Funções",
+      "functionsDesc": "Funções VRL que pode aplicar aos resultados de pesquisa"
+    },
+    "removeConfirm": {
+      "title": "Remover os dados de exemplo?",
+      "message": "Isto elimina os streams, dashboards, alertas, funções e a tabela de enriquecimento de exemplo. Os seus próprios dados não são afetados."
+    },
+    "toast": {
+      "loaded": "Dados de exemplo carregados. Boa exploração!",
+      "loadFailed": "Não foi possível carregar os dados de exemplo",
+      "removed": "Dados de exemplo removidos",
+      "removeFailed": "Não foi possível remover todos os dados de exemplo"
+    },
+    "entry": {
+      "homeTitle": "Explorar com dados de exemplo",
+      "homeDesc": "Ainda sem dados? Carregue uma loja de demonstração com dashboards e alertas",
+      "ingestionBtn": "Experimentar dados de exemplo",
+      "onboardingSource": "Explorar dados de exemplo"
+    }
   }
 }

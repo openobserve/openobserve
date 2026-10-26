@@ -27246,5 +27246,79 @@
       "title": "Déplacer {count} collecteur | Déplacer {count} collecteurs",
       "tooMany": "Déplacez {max} collecteurs au maximum à la fois"
     }
+  },
+  "sampleData": {
+    "title": "Explorer avec des données d'exemple",
+    "subtitle": "Essayez toute la plateforme avec des données réalistes avant de connecter les vôtres",
+    "load": "Charger les données d'exemple",
+    "remove": "Supprimer les données d'exemple",
+    "openOverview": "Ouvrir la vue d'ensemble du service",
+    "hero": {
+      "title": "Une boutique en ligne réaliste, prête à être explorée",
+      "body": "Charge les logs, traces et métriques des {hours} dernières heures d'une application e-commerce de 10 services sur Kubernetes, avec des tableaux de bord, des alertes et des fonctions déjà configurés. Quelque chose ne va pas lors du paiement : essayez de trouver pourquoi.",
+      "loadedTitle": "Les données d'exemple sont chargées",
+      "loadedBody": "La télémétrie et les ressources de la boutique se trouvent dans cette organisation. Choisissez par où commencer, ou supprimez tout lorsque vous avez terminé."
+    },
+    "included": {
+      "title": "Ce qui est créé",
+      "logs": "Logs",
+      "logsDetail": "Logs applicatifs et logs d'accès web dans {app} et {access}",
+      "traces": "Traces",
+      "tracesDetail": "Traces distribuées sur 10 services, liées à leurs logs",
+      "metrics": "Métriques",
+      "metricsDetail": "{count} métriques Prometheus pour les requêtes, la latence, le CPU, la mémoire et le retard des files d'attente",
+      "dashboards": "4 tableaux de bord",
+      "dashboardsDetail": "Vue d'ensemble du service, KPIs métier, trafic web et infrastructure",
+      "alerts": "5 alertes",
+      "alertsDetail": "Alertes SQL planifiées, dont une se déclenche sur l'incident en cours",
+      "functions": "Fonctions et enrichissement",
+      "functionsDetail": "2 fonctions VRL et une table d'enrichissement des responsables de service"
+    },
+    "footnote": "Les flux et les fonctions commencent par {prefix}, les tableaux de bord et les alertes se trouvent dans un dossier « Sample data », et les données couvrent les {hours} dernières heures. Supprimez le tout depuis cette page en un clic.",
+    "steps": {
+      "telemetry": "Génération et envoi des logs, traces et métriques",
+      "dashboards": "Création des tableaux de bord",
+      "alerts": "Création des alertes",
+      "functions": "Création des fonctions",
+      "enrichment": "Envoi de la table des responsables de service"
+    },
+    "progress": {
+      "loading": "Chargement des données d'exemple…",
+      "done": "Données d'exemple chargées",
+      "counts": "{logs} enregistrements de log · {spans} spans · {metrics} points de métriques",
+      "skipped": "Ignoré"
+    },
+    "explore": {
+      "title": "Commencer l'exploration",
+      "subtitle": "Chaque carte ouvre les données de la boutique dans une partie différente du produit.",
+      "dashboards": "Tableau de bord de vue d'ensemble du service",
+      "dashboardsDesc": "Les signaux clés et l'incident en un coup d'œil",
+      "logs": "Erreurs de paiement dans Logs",
+      "logsDesc": "Recherchez les paiements échoués de la dernière heure",
+      "traces": "Requêtes en échec dans Traces",
+      "tracesDesc": "Suivez un paiement échoué à travers les services",
+      "metrics": "Métriques",
+      "metricsDesc": "Taux de requêtes, latence et saturation avec PromQL",
+      "alerts": "Alertes",
+      "alertsDesc": "Cinq alertes dans le dossier « Sample data »",
+      "functions": "Fonctions",
+      "functionsDesc": "Fonctions VRL que vous pouvez appliquer aux résultats de recherche"
+    },
+    "removeConfirm": {
+      "title": "Supprimer les données d'exemple ?",
+      "message": "Cela supprime les flux, tableaux de bord, alertes, fonctions et la table d'enrichissement d'exemple. Vos propres données ne sont pas modifiées."
+    },
+    "toast": {
+      "loaded": "Données d'exemple chargées. Bonne exploration !",
+      "loadFailed": "Impossible de charger les données d'exemple",
+      "removed": "Données d'exemple supprimées",
+      "removeFailed": "Impossible de supprimer toutes les données d'exemple"
+    },
+    "entry": {
+      "homeTitle": "Explorer avec des données d'exemple",
+      "homeDesc": "Pas encore de données ? Chargez une boutique de démonstration avec des tableaux de bord et des alertes",
+      "ingestionBtn": "Essayer les données d'exemple",
+      "onboardingSource": "Explorer les données d'exemple"
+    }
   }
 }

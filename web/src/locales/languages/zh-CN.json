@@ -27246,5 +27246,79 @@
       "title": "移动 {count} 个 Collector | 移动 {count} 个 Collector",
       "tooMany": "一次最多移动 {max} 个 Collector"
     }
+  },
+  "sampleData": {
+    "title": "使用示例数据探索",
+    "subtitle": "在接入您自己的数据之前，先用逼真的数据体验整个平台",
+    "load": "加载示例数据",
+    "remove": "移除示例数据",
+    "openOverview": "打开服务概览",
+    "hero": {
+      "title": "一个逼真的在线商店，随时可供探索",
+      "body": "从运行在 Kubernetes 上、由 10 个服务组成的电商应用加载最近 {hours} 小时的日志、追踪和指标，并预先配置好仪表盘、告警和函数。结账环节出了问题：看看您能否找出原因。",
+      "loadedTitle": "示例数据已加载",
+      "loadedBody": "商店的遥测数据和资源都在此组织中。选择一个起点开始探索，或在完成后全部移除。"
+    },
+    "included": {
+      "title": "将创建的内容",
+      "logs": "日志",
+      "logsDetail": "{app} 和 {access} 中的应用日志和 Web 访问日志",
+      "traces": "追踪",
+      "tracesDetail": "跨 10 个服务的分布式追踪，并与其日志关联",
+      "metrics": "指标",
+      "metricsDetail": "{count} 个 Prometheus 指标，涵盖请求、延迟、CPU、内存和队列积压",
+      "dashboards": "4 个仪表盘",
+      "dashboardsDetail": "服务概览、业务 KPIs、Web 流量和基础设施",
+      "alerts": "5 个告警",
+      "alertsDetail": "定时 SQL 告警，其中一个正因当前事件而触发",
+      "functions": "函数和数据增强",
+      "functionsDetail": "2 个 VRL 函数和一个服务负责人增强表"
+    },
+    "footnote": "数据流和函数以 {prefix} 开头，仪表盘和告警位于“Sample data”文件夹中，数据覆盖最近 {hours} 小时。可在此页面一键全部移除。",
+    "steps": {
+      "telemetry": "正在生成并发送日志、追踪和指标",
+      "dashboards": "正在创建仪表盘",
+      "alerts": "正在创建告警",
+      "functions": "正在创建函数",
+      "enrichment": "正在上传服务负责人表"
+    },
+    "progress": {
+      "loading": "正在加载示例数据…",
+      "done": "示例数据已加载",
+      "counts": "{logs} 条日志记录 · {spans} 个 span · {metrics} 个指标数据点",
+      "skipped": "已跳过"
+    },
+    "explore": {
+      "title": "开始探索",
+      "subtitle": "每张卡片都会在产品的不同模块中打开商店的数据。",
+      "dashboards": "服务概览仪表盘",
+      "dashboardsDesc": "一览黄金信号和当前事件",
+      "logs": "日志中的支付错误",
+      "logsDesc": "搜索过去一小时内失败的扣款",
+      "traces": "追踪中的失败请求",
+      "tracesDesc": "跨服务跟踪一次失败的结账",
+      "metrics": "指标",
+      "metricsDesc": "使用 PromQL 查看请求速率、延迟和饱和度",
+      "alerts": "告警",
+      "alertsDesc": "“Sample data”文件夹中的 5 个告警",
+      "functions": "函数",
+      "functionsDesc": "可应用于搜索结果的 VRL 函数"
+    },
+    "removeConfirm": {
+      "title": "移除示例数据？",
+      "message": "这将删除示例数据流、仪表盘、告警、函数和增强表。您自己的数据不会受到影响。"
+    },
+    "toast": {
+      "loaded": "示例数据已加载，祝您探索愉快！",
+      "loadFailed": "无法加载示例数据",
+      "removed": "示例数据已移除",
+      "removeFailed": "无法移除全部示例数据"
+    },
+    "entry": {
+      "homeTitle": "使用示例数据探索",
+      "homeDesc": "还没有数据？加载一个带有仪表盘和告警的演示商店",
+      "ingestionBtn": "试用示例数据",
+      "onboardingSource": "探索示例数据"
+    }
   }
 }

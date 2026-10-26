@@ -174,6 +174,7 @@ const TvPlaylist = () => import("@/views/Dashboards/TvPlaylist.vue");
 const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
 const StreamExplorer = () => import("@/views/StreamExplorer.vue");
 const LogStream = () => import("@/views/LogStream.vue");
+const SampleData = () => import("@/views/SampleData.vue");
 const Dashboards = () => import("@/views/Dashboards/Dashboards.vue");
 const AlertList = () => import("@/components/alerts/AlertList.vue");
 const AlertsDestinationList = () => import("@/components/alerts/AlertsDestinationList.vue");
@@ -678,6 +679,18 @@ const useRoutes = () => {
       component: LogStream,
       meta: {
         titleKey: "menu.index",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "sample-data",
+      name: "sampleData",
+      component: SampleData,
+      meta: {
+        titleKey: "sampleData.title",
+        allowOnEmptyData: true,
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

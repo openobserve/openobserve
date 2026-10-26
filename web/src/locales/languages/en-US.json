@@ -27244,5 +27244,79 @@
       "title": "Move {count} collector | Move {count} collectors",
       "tooMany": "Move at most {max} collectors at a time"
     }
+  },
+  "sampleData": {
+    "title": "Explore with sample data",
+    "subtitle": "Try the whole platform with realistic data before you connect your own",
+    "load": "Load sample data",
+    "remove": "Remove sample data",
+    "openOverview": "Open service overview",
+    "hero": {
+      "title": "A realistic storefront, ready to explore",
+      "body": "Loads the last {hours} hours of logs, traces and metrics from a 10-service e-commerce app on Kubernetes, with dashboards, alerts and functions already set up. Something is going wrong in checkout: see if you can find out why.",
+      "loadedTitle": "Sample data is loaded",
+      "loadedBody": "The storefront's telemetry and assets are in this organization. Pick a place to start, or remove everything when you are done."
+    },
+    "included": {
+      "title": "What gets created",
+      "logs": "Logs",
+      "logsDetail": "Application logs and web access logs in {app} and {access}",
+      "traces": "Traces",
+      "tracesDetail": "Distributed traces across 10 services, linked to their logs",
+      "metrics": "Metrics",
+      "metricsDetail": "{count} Prometheus metrics for requests, latency, CPU, memory and queue lag",
+      "dashboards": "4 dashboards",
+      "dashboardsDetail": "Service overview, business KPIs, web traffic and infrastructure",
+      "alerts": "5 alerts",
+      "alertsDetail": "Scheduled SQL alerts, one of them firing on the ongoing incident",
+      "functions": "Functions and enrichment",
+      "functionsDetail": "2 VRL functions and a service owners enrichment table"
+    },
+    "footnote": "Streams and functions start with {prefix}, dashboards and alerts sit in a Sample data folder, and the data covers the last {hours} hours. Remove all of it from this page in one click.",
+    "steps": {
+      "telemetry": "Generating and sending logs, traces and metrics",
+      "dashboards": "Creating dashboards",
+      "alerts": "Creating alerts",
+      "functions": "Creating functions",
+      "enrichment": "Uploading the service owners table"
+    },
+    "progress": {
+      "loading": "Loading sample data…",
+      "done": "Sample data loaded",
+      "counts": "{logs} log records · {spans} spans · {metrics} metric points",
+      "skipped": "Skipped"
+    },
+    "explore": {
+      "title": "Start exploring",
+      "subtitle": "Each card opens the storefront's data in a different part of the product.",
+      "dashboards": "Service overview dashboard",
+      "dashboardsDesc": "Golden signals and the incident at a glance",
+      "logs": "Payment errors in Logs",
+      "logsDesc": "Search the failing charges from the last hour",
+      "traces": "Failed requests in Traces",
+      "tracesDesc": "Follow a failed checkout across services",
+      "metrics": "Metrics",
+      "metricsDesc": "Request rates, latency and saturation with PromQL",
+      "alerts": "Alerts",
+      "alertsDesc": "Five alerts in the Sample data folder",
+      "functions": "Functions",
+      "functionsDesc": "VRL functions you can apply to search results"
+    },
+    "removeConfirm": {
+      "title": "Remove sample data?",
+      "message": "This deletes the sample streams, dashboards, alerts, functions and enrichment table. Your own data is not touched."
+    },
+    "toast": {
+      "loaded": "Sample data loaded. Happy exploring!",
+      "loadFailed": "Could not load sample data",
+      "removed": "Sample data removed",
+      "removeFailed": "Could not remove all sample data"
+    },
+    "entry": {
+      "homeTitle": "Explore with sample data",
+      "homeDesc": "No data yet? Load a demo storefront with dashboards and alerts",
+      "ingestionBtn": "Try sample data",
+      "onboardingSource": "Explore sample data"
+    }
   }
 }

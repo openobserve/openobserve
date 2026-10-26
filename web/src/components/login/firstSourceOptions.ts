@@ -28,6 +28,7 @@ export type FirstSourceId =
   | "rum"
   | "llm"
   | "agent"
+  | "sample"
   | "unsure";
 
 export interface FirstSourceOption {
@@ -50,7 +51,7 @@ export interface FirstSourcePrefill {
   referrer?: string;
 }
 
-/** The 11 Get started choices in the approved order, each with its guide route. */
+/** The Get started choices in the approved order, each with its guide route. */
 export const FIRST_SOURCE_OPTIONS: readonly FirstSourceOption[] = Object.freeze([
   {
     id: "kubernetes",
@@ -122,6 +123,13 @@ export const FIRST_SOURCE_OPTIONS: readonly FirstSourceOption[] = Object.freeze(
     labelKey: "login.getStarted.sources.agent",
     route: "recommendedMcp",
     icon: "auto-awesome",
+    signals: [],
+  },
+  {
+    id: "sample",
+    labelKey: "sampleData.entry.onboardingSource",
+    route: "sampleData",
+    icon: "science",
     signals: [],
   },
   {

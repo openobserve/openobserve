@@ -27246,5 +27246,79 @@
       "title": "{count} Collector verschieben | {count} Collector verschieben",
       "tooMany": "Höchstens {max} Collector gleichzeitig verschieben"
     }
+  },
+  "sampleData": {
+    "title": "Mit Beispieldaten erkunden",
+    "subtitle": "Testen Sie die gesamte Plattform mit realistischen Daten, bevor Sie Ihre eigenen anbinden",
+    "load": "Beispieldaten laden",
+    "remove": "Beispieldaten entfernen",
+    "openOverview": "Service-Übersicht öffnen",
+    "hero": {
+      "title": "Ein realistischer Onlineshop, bereit zum Erkunden",
+      "body": "Lädt die Logs, Traces und Metriken der letzten {hours} Stunden aus einer E-Commerce-App mit 10 Services auf Kubernetes, inklusive bereits eingerichteter Dashboards, Alarme und Funktionen. Im Checkout läuft etwas schief: Finden Sie heraus, warum.",
+      "loadedTitle": "Beispieldaten sind geladen",
+      "loadedBody": "Die Telemetriedaten und Assets des Onlineshops befinden sich in dieser Organisation. Wählen Sie einen Einstiegspunkt oder entfernen Sie alles, wenn Sie fertig sind."
+    },
+    "included": {
+      "title": "Was erstellt wird",
+      "logs": "Logs",
+      "logsDetail": "Anwendungslogs und Webzugriffslogs in {app} und {access}",
+      "traces": "Traces",
+      "tracesDetail": "Verteilte Traces über 10 Services, verknüpft mit ihren Logs",
+      "metrics": "Metriken",
+      "metricsDetail": "{count} Prometheus-Metriken für Anfragen, Latenz, CPU, Speicher und Queue-Verzögerung",
+      "dashboards": "4 Dashboards",
+      "dashboardsDetail": "Service-Übersicht, Business-KPIs, Webtraffic und Infrastruktur",
+      "alerts": "5 Alarme",
+      "alertsDetail": "Geplante SQL-Alarme, von denen einer beim laufenden Vorfall auslöst",
+      "functions": "Funktionen und Anreicherung",
+      "functionsDetail": "2 VRL-Funktionen und eine Anreicherungstabelle mit Service-Verantwortlichen"
+    },
+    "footnote": "Streams und Funktionen beginnen mit {prefix}, Dashboards und Alarme liegen im Ordner „Sample data“, und die Daten umfassen die letzten {hours} Stunden. Entfernen Sie alles mit einem Klick auf dieser Seite.",
+    "steps": {
+      "telemetry": "Logs, Traces und Metriken werden erzeugt und gesendet",
+      "dashboards": "Dashboards werden erstellt",
+      "alerts": "Alarme werden erstellt",
+      "functions": "Funktionen werden erstellt",
+      "enrichment": "Tabelle der Service-Verantwortlichen wird hochgeladen"
+    },
+    "progress": {
+      "loading": "Beispieldaten werden geladen…",
+      "done": "Beispieldaten geladen",
+      "counts": "{logs} Log-Einträge · {spans} Spans · {metrics} Metrikpunkte",
+      "skipped": "Übersprungen"
+    },
+    "explore": {
+      "title": "Jetzt erkunden",
+      "subtitle": "Jede Karte öffnet die Daten des Onlineshops in einem anderen Bereich des Produkts.",
+      "dashboards": "Dashboard „Service-Übersicht“",
+      "dashboardsDesc": "Golden Signals und der Vorfall auf einen Blick",
+      "logs": "Zahlungsfehler in Logs",
+      "logsDesc": "Durchsuchen Sie die fehlgeschlagenen Zahlungen der letzten Stunde",
+      "traces": "Fehlgeschlagene Anfragen in Traces",
+      "tracesDesc": "Verfolgen Sie einen fehlgeschlagenen Checkout über alle Services",
+      "metrics": "Metriken",
+      "metricsDesc": "Anfrageraten, Latenz und Auslastung mit PromQL",
+      "alerts": "Alarme",
+      "alertsDesc": "Fünf Alarme im Ordner „Sample data“",
+      "functions": "Funktionen",
+      "functionsDesc": "VRL-Funktionen, die Sie auf Suchergebnisse anwenden können"
+    },
+    "removeConfirm": {
+      "title": "Beispieldaten entfernen?",
+      "message": "Dadurch werden die Beispiel-Streams, Dashboards, Alarme, Funktionen und die Anreicherungstabelle gelöscht. Ihre eigenen Daten bleiben unberührt."
+    },
+    "toast": {
+      "loaded": "Beispieldaten geladen. Viel Spaß beim Erkunden!",
+      "loadFailed": "Beispieldaten konnten nicht geladen werden",
+      "removed": "Beispieldaten entfernt",
+      "removeFailed": "Nicht alle Beispieldaten konnten entfernt werden"
+    },
+    "entry": {
+      "homeTitle": "Mit Beispieldaten erkunden",
+      "homeDesc": "Noch keine Daten? Laden Sie einen Demo-Onlineshop mit Dashboards und Alarmen",
+      "ingestionBtn": "Beispieldaten ausprobieren",
+      "onboardingSource": "Beispieldaten erkunden"
+    }
   }
 }

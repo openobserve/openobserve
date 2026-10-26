@@ -27246,5 +27246,79 @@
       "title": "수집기 {count}개 이동 | 수집기 {count}개 이동",
       "tooMany": "한 번에 최대 {max}개의 수집기까지 이동할 수 있습니다"
     }
+  },
+  "sampleData": {
+    "title": "샘플 데이터로 살펴보기",
+    "subtitle": "자체 데이터를 연결하기 전에 실제와 같은 데이터로 플랫폼 전체를 사용해 보세요",
+    "load": "샘플 데이터 불러오기",
+    "remove": "샘플 데이터 제거",
+    "openOverview": "서비스 개요 열기",
+    "hero": {
+      "title": "바로 살펴볼 수 있는 실제와 같은 온라인 스토어",
+      "body": "Kubernetes에서 실행되는 10개 서비스 규모의 전자상거래 앱에서 최근 {hours}시간 동안의 로그, 트레이스, 메트릭을 불러오며, 대시보드, 알림, 함수도 미리 설정되어 있습니다. 결제 과정에서 문제가 발생하고 있습니다. 원인을 찾아보세요.",
+      "loadedTitle": "샘플 데이터를 불러왔습니다",
+      "loadedBody": "스토어의 텔레메트리와 자산이 이 조직에 있습니다. 시작할 곳을 선택하거나, 다 둘러본 후 모두 제거하세요."
+    },
+    "included": {
+      "title": "생성되는 항목",
+      "logs": "로그",
+      "logsDetail": "{app} 및 {access}의 애플리케이션 로그와 웹 액세스 로그",
+      "traces": "트레이스",
+      "tracesDetail": "10개 서비스에 걸친 분산 트레이스, 해당 로그와 연결됨",
+      "metrics": "메트릭",
+      "metricsDetail": "요청, 지연 시간, CPU, 메모리, 큐 지연에 대한 Prometheus 메트릭 {count}개",
+      "dashboards": "대시보드 4개",
+      "dashboardsDetail": "서비스 개요, 비즈니스 KPIs, 웹 트래픽, 인프라",
+      "alerts": "알림 5개",
+      "alertsDetail": "예약된 SQL 알림, 그중 하나는 진행 중인 인시던트로 발생 중",
+      "functions": "함수 및 데이터 보강",
+      "functionsDetail": "VRL 함수 2개와 서비스 담당자 보강 테이블"
+    },
+    "footnote": "스트림과 함수는 {prefix}(으)로 시작하고, 대시보드와 알림은 'Sample data' 폴더에 있으며, 데이터는 최근 {hours}시간을 포함합니다. 이 페이지에서 한 번의 클릭으로 모두 제거할 수 있습니다.",
+    "steps": {
+      "telemetry": "로그, 트레이스, 메트릭 생성 및 전송 중",
+      "dashboards": "대시보드 생성 중",
+      "alerts": "알림 생성 중",
+      "functions": "함수 생성 중",
+      "enrichment": "서비스 담당자 테이블 업로드 중"
+    },
+    "progress": {
+      "loading": "샘플 데이터 불러오는 중…",
+      "done": "샘플 데이터를 불러왔습니다",
+      "counts": "로그 레코드 {logs}개 · 스팬 {spans}개 · 메트릭 포인트 {metrics}개",
+      "skipped": "건너뜀"
+    },
+    "explore": {
+      "title": "살펴보기 시작",
+      "subtitle": "각 카드는 스토어의 데이터를 제품의 다른 영역에서 엽니다.",
+      "dashboards": "서비스 개요 대시보드",
+      "dashboardsDesc": "골든 시그널과 인시던트를 한눈에",
+      "logs": "로그의 결제 오류",
+      "logsDesc": "최근 1시간 동안 실패한 결제 검색",
+      "traces": "트레이스의 실패한 요청",
+      "tracesDesc": "실패한 결제를 서비스 전반에서 추적",
+      "metrics": "메트릭",
+      "metricsDesc": "PromQL로 요청률, 지연 시간, 포화도 확인",
+      "alerts": "알림",
+      "alertsDesc": "'Sample data' 폴더의 알림 5개",
+      "functions": "함수",
+      "functionsDesc": "검색 결과에 적용할 수 있는 VRL 함수"
+    },
+    "removeConfirm": {
+      "title": "샘플 데이터를 제거하시겠습니까?",
+      "message": "샘플 스트림, 대시보드, 알림, 함수 및 보강 테이블이 삭제됩니다. 사용자의 데이터는 영향을 받지 않습니다."
+    },
+    "toast": {
+      "loaded": "샘플 데이터를 불러왔습니다. 즐겁게 살펴보세요!",
+      "loadFailed": "샘플 데이터를 불러올 수 없습니다",
+      "removed": "샘플 데이터가 제거되었습니다",
+      "removeFailed": "일부 샘플 데이터를 제거할 수 없습니다"
+    },
+    "entry": {
+      "homeTitle": "샘플 데이터로 살펴보기",
+      "homeDesc": "아직 데이터가 없나요? 대시보드와 알림이 포함된 데모 스토어를 불러오세요",
+      "ingestionBtn": "샘플 데이터 사용해 보기",
+      "onboardingSource": "샘플 데이터 살펴보기"
+    }
   }
 }

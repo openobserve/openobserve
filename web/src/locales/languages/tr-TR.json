@@ -27246,5 +27246,79 @@
       "title": "{count} toplayıcıyı taşı | {count} toplayıcıyı taşı",
       "tooMany": "Aynı anda en fazla {max} toplayıcı taşıyın"
     }
+  },
+  "sampleData": {
+    "title": "Örnek verilerle keşfedin",
+    "subtitle": "Kendi verilerinizi bağlamadan önce tüm platformu gerçekçi verilerle deneyin",
+    "load": "Örnek verileri yükle",
+    "remove": "Örnek verileri kaldır",
+    "openOverview": "Servis genel bakışını aç",
+    "hero": {
+      "title": "Keşfetmeye hazır, gerçekçi bir çevrimiçi mağaza",
+      "body": "Kubernetes üzerinde çalışan 10 servisli bir e-ticaret uygulamasının son {hours} saatlik günlüklerini, izlerini ve metriklerini; hazır gösterge panoları, uyarılar ve fonksiyonlarla birlikte yükler. Ödeme adımında bir şeyler ters gidiyor: nedenini bulabilecek misiniz?",
+      "loadedTitle": "Örnek veriler yüklendi",
+      "loadedBody": "Mağazanın telemetrisi ve varlıkları bu organizasyonda. Başlamak için bir yer seçin veya işiniz bittiğinde hepsini kaldırın."
+    },
+    "included": {
+      "title": "Neler oluşturulur",
+      "logs": "Günlükler",
+      "logsDetail": "{app} ve {access} içinde uygulama günlükleri ve web erişim günlükleri",
+      "traces": "İzler",
+      "tracesDetail": "10 servis genelinde, günlükleriyle bağlantılı dağıtık izler",
+      "metrics": "Metrikler",
+      "metricsDetail": "İstekler, gecikme, CPU, bellek ve kuyruk gecikmesi için {count} Prometheus metriği",
+      "dashboards": "4 gösterge panosu",
+      "dashboardsDetail": "Servis genel bakışı, iş KPIs, web trafiği ve altyapı",
+      "alerts": "5 uyarı",
+      "alertsDetail": "Biri devam eden olay nedeniyle tetiklenen zamanlanmış SQL uyarıları",
+      "functions": "Fonksiyonlar ve zenginleştirme",
+      "functionsDetail": "2 VRL fonksiyonu ve bir servis sahipleri zenginleştirme tablosu"
+    },
+    "footnote": "Akışlar ve fonksiyonlar {prefix} ile başlar, gösterge panoları ve uyarılar \"Sample data\" klasöründedir ve veriler son {hours} saati kapsar. Hepsini bu sayfadan tek tıklamayla kaldırabilirsiniz.",
+    "steps": {
+      "telemetry": "Günlükler, izler ve metrikler oluşturuluyor ve gönderiliyor",
+      "dashboards": "Gösterge panoları oluşturuluyor",
+      "alerts": "Uyarılar oluşturuluyor",
+      "functions": "Fonksiyonlar oluşturuluyor",
+      "enrichment": "Servis sahipleri tablosu yükleniyor"
+    },
+    "progress": {
+      "loading": "Örnek veriler yükleniyor…",
+      "done": "Örnek veriler yüklendi",
+      "counts": "{logs} günlük kaydı · {spans} span · {metrics} metrik noktası",
+      "skipped": "Atlandı"
+    },
+    "explore": {
+      "title": "Keşfetmeye başlayın",
+      "subtitle": "Her kart, mağazanın verilerini ürünün farklı bir bölümünde açar.",
+      "dashboards": "Servis genel bakış gösterge panosu",
+      "dashboardsDesc": "Temel sinyaller ve olay tek bakışta",
+      "logs": "Günlükler'de ödeme hataları",
+      "logsDesc": "Son bir saatteki başarısız ödemeleri arayın",
+      "traces": "İzler'de başarısız istekler",
+      "tracesDesc": "Başarısız bir ödemeyi servisler boyunca takip edin",
+      "metrics": "Metrikler",
+      "metricsDesc": "PromQL ile istek oranları, gecikme ve doygunluk",
+      "alerts": "Uyarılar",
+      "alertsDesc": "\"Sample data\" klasöründe beş uyarı",
+      "functions": "Fonksiyonlar",
+      "functionsDesc": "Arama sonuçlarına uygulayabileceğiniz VRL fonksiyonları"
+    },
+    "removeConfirm": {
+      "title": "Örnek veriler kaldırılsın mı?",
+      "message": "Bu işlem örnek akışları, gösterge panolarını, uyarıları, fonksiyonları ve zenginleştirme tablosunu siler. Kendi verilerinize dokunulmaz."
+    },
+    "toast": {
+      "loaded": "Örnek veriler yüklendi. Keyifli keşifler!",
+      "loadFailed": "Örnek veriler yüklenemedi",
+      "removed": "Örnek veriler kaldırıldı",
+      "removeFailed": "Örnek verilerin tamamı kaldırılamadı"
+    },
+    "entry": {
+      "homeTitle": "Örnek verilerle keşfedin",
+      "homeDesc": "Henüz veri yok mu? Gösterge panoları ve uyarılarla bir demo mağaza yükleyin",
+      "ingestionBtn": "Örnek verileri deneyin",
+      "onboardingSource": "Örnek verileri keşfedin"
+    }
   }
 }

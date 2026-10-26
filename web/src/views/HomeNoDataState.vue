@@ -92,6 +92,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="home-no-data-metrics-card"
         @click="go('prometheus')"
       />
+
+      <EmptyStateIngestionCard
+        icon="science"
+        :label="t('sampleData.entry.homeTitle')"
+        :sublabel="t('sampleData.entry.homeDesc')"
+        icon-variant="amber"
+        data-test="home-no-data-sample-data-card"
+        @click="go('sampleData')"
+      />
     </template>
 
     <template #extra>

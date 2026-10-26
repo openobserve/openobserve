@@ -27246,5 +27246,79 @@
       "title": "Przenieś kolektor: {count} | Przenieś kolektory: {count}",
       "tooMany": "Przenoś naraz co najwyżej {max} kolektorów"
     }
+  },
+  "sampleData": {
+    "title": "Poznaj platformę na przykładowych danych",
+    "subtitle": "Wypróbuj całą platformę na realistycznych danych, zanim podłączysz własne",
+    "load": "Wczytaj przykładowe dane",
+    "remove": "Usuń przykładowe dane",
+    "openOverview": "Otwórz przegląd usługi",
+    "hero": {
+      "title": "Realistyczny sklep internetowy, gotowy do eksploracji",
+      "body": "Wczytuje logi, trace i metryki z ostatnich {hours} godz. z aplikacji e-commerce złożonej z 10 usług w Kubernetes, z gotowymi pulpitami, alertami i funkcjami. Coś jest nie tak z procesem płatności: sprawdź, czy uda ci się ustalić dlaczego.",
+      "loadedTitle": "Przykładowe dane są wczytane",
+      "loadedBody": "Telemetria i zasoby sklepu znajdują się w tej organizacji. Wybierz, od czego zacząć, lub usuń wszystko, gdy skończysz."
+    },
+    "included": {
+      "title": "Co zostanie utworzone",
+      "logs": "Logi",
+      "logsDetail": "Logi aplikacji i logi dostępu do sieci w {app} i {access}",
+      "traces": "Trace",
+      "tracesDetail": "Rozproszone trace w 10 usługach, powiązane z ich logami",
+      "metrics": "Metryki",
+      "metricsDetail": "{count} metryk Prometheus dla żądań, opóźnień, CPU, pamięci i opóźnienia kolejek",
+      "dashboards": "4 pulpity",
+      "dashboardsDetail": "Przegląd usługi, biznesowe KPIs, ruch w sieci i infrastruktura",
+      "alerts": "5 alertów",
+      "alertsDetail": "Zaplanowane alerty SQL, z których jeden uruchamia się w związku z trwającym incydentem",
+      "functions": "Funkcje i wzbogacanie",
+      "functionsDetail": "2 funkcje VRL i tabela wzbogacania z właścicielami usług"
+    },
+    "footnote": "Strumienie i funkcje zaczynają się od {prefix}, pulpity i alerty znajdują się w folderze „Sample data”, a dane obejmują ostatnie {hours} godz. Usuń je wszystkie z tej strony jednym kliknięciem.",
+    "steps": {
+      "telemetry": "Generowanie i wysyłanie logów, trace i metryk",
+      "dashboards": "Tworzenie pulpitów",
+      "alerts": "Tworzenie alertów",
+      "functions": "Tworzenie funkcji",
+      "enrichment": "Przesyłanie tabeli właścicieli usług"
+    },
+    "progress": {
+      "loading": "Wczytywanie przykładowych danych…",
+      "done": "Przykładowe dane wczytane",
+      "counts": "Rekordy logów: {logs} · spany: {spans} · punkty metryk: {metrics}",
+      "skipped": "Pominięto"
+    },
+    "explore": {
+      "title": "Zacznij eksplorować",
+      "subtitle": "Każda karta otwiera dane sklepu w innej części produktu.",
+      "dashboards": "Pulpit przeglądu usługi",
+      "dashboardsDesc": "Kluczowe sygnały i incydent w jednym miejscu",
+      "logs": "Błędy płatności w Logach",
+      "logsDesc": "Przeszukaj nieudane obciążenia z ostatniej godziny",
+      "traces": "Nieudane żądania w Trace",
+      "tracesDesc": "Prześledź nieudaną płatność przez wszystkie usługi",
+      "metrics": "Metryki",
+      "metricsDesc": "Liczba żądań, opóźnienia i nasycenie z PromQL",
+      "alerts": "Alerty",
+      "alertsDesc": "Pięć alertów w folderze „Sample data”",
+      "functions": "Funkcje",
+      "functionsDesc": "Funkcje VRL, które możesz zastosować do wyników wyszukiwania"
+    },
+    "removeConfirm": {
+      "title": "Usunąć przykładowe dane?",
+      "message": "Spowoduje to usunięcie przykładowych strumieni, pulpitów, alertów, funkcji i tabeli wzbogacania. Twoje własne dane pozostaną nienaruszone."
+    },
+    "toast": {
+      "loaded": "Przykładowe dane wczytane. Miłej eksploracji!",
+      "loadFailed": "Nie udało się wczytać przykładowych danych",
+      "removed": "Przykładowe dane usunięte",
+      "removeFailed": "Nie udało się usunąć wszystkich przykładowych danych"
+    },
+    "entry": {
+      "homeTitle": "Poznaj platformę na przykładowych danych",
+      "homeDesc": "Nie masz jeszcze danych? Wczytaj demonstracyjny sklep z pulpitami i alertami",
+      "ingestionBtn": "Wypróbuj przykładowe dane",
+      "onboardingSource": "Poznaj przykładowe dane"
+    }
   }
 }

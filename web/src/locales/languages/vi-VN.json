@@ -27246,5 +27246,79 @@
       "title": "Chuyển {count} collector | Chuyển {count} collector",
       "tooMany": "Chuyển tối đa {max} collector mỗi lần"
     }
+  },
+  "sampleData": {
+    "title": "Khám phá với dữ liệu mẫu",
+    "subtitle": "Dùng thử toàn bộ nền tảng với dữ liệu thực tế trước khi kết nối dữ liệu của bạn",
+    "load": "Tải dữ liệu mẫu",
+    "remove": "Xóa dữ liệu mẫu",
+    "openOverview": "Mở tổng quan dịch vụ",
+    "hero": {
+      "title": "Một cửa hàng trực tuyến thực tế, sẵn sàng để khám phá",
+      "body": "Tải nhật ký, trace và chỉ số trong {hours} giờ qua từ một ứng dụng thương mại điện tử gồm 10 dịch vụ trên Kubernetes, kèm bảng điều khiển, cảnh báo và hàm đã được thiết lập sẵn. Có sự cố ở bước thanh toán: hãy thử tìm ra nguyên nhân.",
+      "loadedTitle": "Đã tải dữ liệu mẫu",
+      "loadedBody": "Dữ liệu telemetry và tài nguyên của cửa hàng nằm trong tổ chức này. Chọn nơi để bắt đầu hoặc xóa tất cả khi bạn hoàn tất."
+    },
+    "included": {
+      "title": "Những gì được tạo",
+      "logs": "Nhật ký",
+      "logsDetail": "Nhật ký ứng dụng và nhật ký truy cập web trong {app} và {access}",
+      "traces": "Trace",
+      "tracesDetail": "Trace phân tán trên 10 dịch vụ, được liên kết với nhật ký của chúng",
+      "metrics": "Chỉ số",
+      "metricsDetail": "{count} chỉ số Prometheus cho yêu cầu, độ trễ, CPU, bộ nhớ và độ trễ hàng đợi",
+      "dashboards": "4 bảng điều khiển",
+      "dashboardsDetail": "Tổng quan dịch vụ, KPIs kinh doanh, lưu lượng web và hạ tầng",
+      "alerts": "5 cảnh báo",
+      "alertsDetail": "Cảnh báo SQL theo lịch, một trong số đó đang kích hoạt do sự cố đang diễn ra",
+      "functions": "Hàm và làm giàu dữ liệu",
+      "functionsDetail": "2 hàm VRL và một bảng làm giàu dữ liệu về người phụ trách dịch vụ"
+    },
+    "footnote": "Luồng và hàm bắt đầu bằng {prefix}, bảng điều khiển và cảnh báo nằm trong thư mục \"Sample data\", và dữ liệu bao gồm {hours} giờ qua. Xóa tất cả từ trang này chỉ với một cú nhấp.",
+    "steps": {
+      "telemetry": "Đang tạo và gửi nhật ký, trace và chỉ số",
+      "dashboards": "Đang tạo bảng điều khiển",
+      "alerts": "Đang tạo cảnh báo",
+      "functions": "Đang tạo hàm",
+      "enrichment": "Đang tải lên bảng người phụ trách dịch vụ"
+    },
+    "progress": {
+      "loading": "Đang tải dữ liệu mẫu…",
+      "done": "Đã tải dữ liệu mẫu",
+      "counts": "{logs} bản ghi nhật ký · {spans} span · {metrics} điểm chỉ số",
+      "skipped": "Đã bỏ qua"
+    },
+    "explore": {
+      "title": "Bắt đầu khám phá",
+      "subtitle": "Mỗi thẻ mở dữ liệu của cửa hàng ở một phần khác nhau của sản phẩm.",
+      "dashboards": "Bảng điều khiển tổng quan dịch vụ",
+      "dashboardsDesc": "Các tín hiệu vàng và sự cố trong nháy mắt",
+      "logs": "Lỗi thanh toán trong Nhật ký",
+      "logsDesc": "Tìm các giao dịch thanh toán thất bại trong giờ qua",
+      "traces": "Yêu cầu thất bại trong Trace",
+      "tracesDesc": "Theo dõi một lần thanh toán thất bại qua các dịch vụ",
+      "metrics": "Chỉ số",
+      "metricsDesc": "Tốc độ yêu cầu, độ trễ và mức bão hòa với PromQL",
+      "alerts": "Cảnh báo",
+      "alertsDesc": "Năm cảnh báo trong thư mục \"Sample data\"",
+      "functions": "Hàm",
+      "functionsDesc": "Các hàm VRL bạn có thể áp dụng cho kết quả tìm kiếm"
+    },
+    "removeConfirm": {
+      "title": "Xóa dữ liệu mẫu?",
+      "message": "Thao tác này sẽ xóa các luồng, bảng điều khiển, cảnh báo, hàm và bảng làm giàu dữ liệu mẫu. Dữ liệu của riêng bạn không bị ảnh hưởng."
+    },
+    "toast": {
+      "loaded": "Đã tải dữ liệu mẫu. Chúc bạn khám phá vui vẻ!",
+      "loadFailed": "Không thể tải dữ liệu mẫu",
+      "removed": "Đã xóa dữ liệu mẫu",
+      "removeFailed": "Không thể xóa toàn bộ dữ liệu mẫu"
+    },
+    "entry": {
+      "homeTitle": "Khám phá với dữ liệu mẫu",
+      "homeDesc": "Chưa có dữ liệu? Tải một cửa hàng demo với bảng điều khiển và cảnh báo",
+      "ingestionBtn": "Dùng thử dữ liệu mẫu",
+      "onboardingSource": "Khám phá dữ liệu mẫu"
+    }
   }
 }

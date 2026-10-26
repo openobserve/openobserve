@@ -27246,5 +27246,79 @@
       "title": "{count} collector verplaatsen | {count} collectors verplaatsen",
       "tooMany": "Verplaats maximaal {max} collectors tegelijk"
     }
+  },
+  "sampleData": {
+    "title": "Verkennen met voorbeelddata",
+    "subtitle": "Probeer het hele platform uit met realistische data voordat je je eigen data koppelt",
+    "load": "Voorbeelddata laden",
+    "remove": "Voorbeelddata verwijderen",
+    "openOverview": "Serviceoverzicht openen",
+    "hero": {
+      "title": "Een realistische webwinkel, klaar om te verkennen",
+      "body": "Laadt de logs, traces en metrieken van de afgelopen {hours} uur van een e-commerce-app met 10 services op Kubernetes, met dashboards, alarmen en functies die al zijn ingesteld. Er gaat iets mis bij het afrekenen: kijk of je kunt achterhalen waarom.",
+      "loadedTitle": "Voorbeelddata is geladen",
+      "loadedBody": "De telemetrie en assets van de webwinkel staan in deze organisatie. Kies waar je wilt beginnen, of verwijder alles als je klaar bent."
+    },
+    "included": {
+      "title": "Wat er wordt aangemaakt",
+      "logs": "Logs",
+      "logsDetail": "Applicatielogs en webtoegangslogs in {app} en {access}",
+      "traces": "Traces",
+      "tracesDetail": "Gedistribueerde traces over 10 services, gekoppeld aan hun logs",
+      "metrics": "Metrieken",
+      "metricsDetail": "{count} Prometheus-metrieken voor verzoeken, latentie, CPU, geheugen en wachtrijvertraging",
+      "dashboards": "4 dashboards",
+      "dashboardsDetail": "Serviceoverzicht, zakelijke KPIs, webverkeer en infrastructuur",
+      "alerts": "5 alarmen",
+      "alertsDetail": "Geplande SQL-alarmen, waarvan er één afgaat op het lopende incident",
+      "functions": "Functies en verrijking",
+      "functionsDetail": "2 VRL-functies en een verrijkingstabel met service-eigenaren"
+    },
+    "footnote": "Streams en functies beginnen met {prefix}, dashboards en alarmen staan in de map 'Sample data' en de data beslaat de afgelopen {hours} uur. Verwijder alles met één klik vanaf deze pagina.",
+    "steps": {
+      "telemetry": "Logs, traces en metrieken genereren en verzenden",
+      "dashboards": "Dashboards aanmaken",
+      "alerts": "Alarmen aanmaken",
+      "functions": "Functies aanmaken",
+      "enrichment": "Tabel met service-eigenaren uploaden"
+    },
+    "progress": {
+      "loading": "Voorbeelddata laden…",
+      "done": "Voorbeelddata geladen",
+      "counts": "{logs} logrecords · {spans} spans · {metrics} metriekpunten",
+      "skipped": "Overgeslagen"
+    },
+    "explore": {
+      "title": "Begin met verkennen",
+      "subtitle": "Elke kaart opent de data van de webwinkel in een ander deel van het product.",
+      "dashboards": "Dashboard serviceoverzicht",
+      "dashboardsDesc": "De belangrijkste signalen en het incident in één oogopslag",
+      "logs": "Betalingsfouten in Logs",
+      "logsDesc": "Doorzoek de mislukte betalingen van het afgelopen uur",
+      "traces": "Mislukte verzoeken in Traces",
+      "tracesDesc": "Volg een mislukte checkout door alle services",
+      "metrics": "Metrieken",
+      "metricsDesc": "Verzoeksnelheden, latentie en verzadiging met PromQL",
+      "alerts": "Alarmen",
+      "alertsDesc": "Vijf alarmen in de map 'Sample data'",
+      "functions": "Functies",
+      "functionsDesc": "VRL-functies die je op zoekresultaten kunt toepassen"
+    },
+    "removeConfirm": {
+      "title": "Voorbeelddata verwijderen?",
+      "message": "Hiermee worden de voorbeeldstreams, dashboards, alarmen, functies en de verrijkingstabel verwijderd. Je eigen data blijft ongemoeid."
+    },
+    "toast": {
+      "loaded": "Voorbeelddata geladen. Veel plezier met verkennen!",
+      "loadFailed": "Kan voorbeelddata niet laden",
+      "removed": "Voorbeelddata verwijderd",
+      "removeFailed": "Kan niet alle voorbeelddata verwijderen"
+    },
+    "entry": {
+      "homeTitle": "Verkennen met voorbeelddata",
+      "homeDesc": "Nog geen data? Laad een demowebwinkel met dashboards en alarmen",
+      "ingestionBtn": "Voorbeelddata proberen",
+      "onboardingSource": "Voorbeelddata verkennen"
+    }
   }
 }

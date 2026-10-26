@@ -51,6 +51,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <OButton
         v-if="!isRUMPage"
+        variant="outline"
+        size="sm"
+        icon-left="science"
+        :title="isMobile ? t('sampleData.entry.ingestionBtn') : undefined"
+        data-test="ingestion-sample-data-btn"
+        @click="
+          router.push({
+            name: 'sampleData',
+            query: { org_identifier: store.state.selectedOrganization.identifier },
+          })
+        "
+      >
+        <span class="max-md:hidden">{{ t("sampleData.entry.ingestionBtn") }}</span>
+      </OButton>
+      <OButton
+        v-if="!isRUMPage"
         variant="primary"
         size="sm"
         icon-left="key"
