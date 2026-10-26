@@ -22,10 +22,13 @@ test.describe("Dashboard TV playlist testcases", () => {
   let dashboardsA = [];
   let dashboardsB = [];
 
-  const entriesOf = (dashboards, folder) =>
-    dashboards.map((d) => ({ dashboardId: d.dashboardId, folderId: folder.folderId }));
-
   test.beforeEach(async ({ page }, testInfo) => {
+    // Reset first so a failed seed never makes afterEach clean up the previous test's data.
+    pm = null;
+    folderA = null;
+    folderB = null;
+    dashboardsA = [];
+    dashboardsB = [];
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     pm = new PageManager(page);
@@ -39,15 +42,22 @@ test.describe("Dashboard TV playlist testcases", () => {
   });
 
   test.afterEach(async () => {
+    if (!pm) return;
     // A folder delete is rejected while it still holds dashboards.
-    for (const dash of dashboardsA) {
-      await pm.apiCleanup.deleteDashboard(dash.dashboardId, folderA.folderId);
+    for (const [folder, dashboards] of [
+      [folderA, dashboardsA],
+      [folderB, dashboardsB],
+    ]) {
+      if (!folder?.folderId) continue;
+      for (const dash of dashboards) {
+        await pm.apiCleanup
+          .deleteDashboard(dash.dashboardId, folder.folderId)
+          .catch((e) => testLogger.warn("Dashboard cleanup failed", { error: e.message }));
+      }
+      await pm.apiCleanup
+        .deleteDashboardFolder(folder.folderId)
+        .catch((e) => testLogger.warn("Folder cleanup failed", { error: e.message }));
     }
-    for (const dash of dashboardsB) {
-      await pm.apiCleanup.deleteDashboard(dash.dashboardId, folderB.folderId);
-    }
-    await pm.apiCleanup.deleteDashboardFolder(folderA.folderId);
-    await pm.apiCleanup.deleteDashboardFolder(folderB.folderId);
   });
 
   test(
@@ -189,7 +199,7 @@ test.describe("Dashboard TV playlist testcases", () => {
       const [first, second, third] = dashboardsA;
       const tv = pm.dashboardTvPlaylist;
 
-      await tv.gotoPlaylist({ entries: entriesOf(dashboardsA, folderA), interval: "1h" });
+      await tv.gotoPlaylist({ entries: tv.buildEntries(dashboardsA, folderA.folderId), interval: "1h" });
       await tv.expectPlayerReady();
       await tv.expectSlide(first.title, 1, 3);
 
@@ -221,7 +231,7 @@ test.describe("Dashboard TV playlist testcases", () => {
       const [first, second] = dashboardsA;
       const tv = pm.dashboardTvPlaylist;
 
-      await tv.gotoPlaylist({ entries: entriesOf(dashboardsA, folderA), interval: "10s" });
+      await tv.gotoPlaylist({ entries: tv.buildEntries(dashboardsA, folderA.folderId), interval: "10s" });
       await tv.expectPlayerReady();
       await tv.expectSlide(first.title, 1, 3);
 
@@ -257,7 +267,7 @@ test.describe("Dashboard TV playlist testcases", () => {
       const [first, second] = dashboardsA;
       const tv = pm.dashboardTvPlaylist;
 
-      await tv.gotoPlaylist({ entries: entriesOf(dashboardsA, folderA), interval: "10s" });
+      await tv.gotoPlaylist({ entries: tv.buildEntries(dashboardsA, folderA.folderId), interval: "10s" });
       await tv.expectPlayerReady();
       await tv.expectSlide(first.title, 1, 3);
 
@@ -293,7 +303,7 @@ test.describe("Dashboard TV playlist testcases", () => {
       const [first] = dashboardsA;
       const tv = pm.dashboardTvPlaylist;
 
-      await tv.gotoPlaylist({ entries: entriesOf(dashboardsA, folderA), interval: "3s" });
+      await tv.gotoPlaylist({ entries: tv.buildEntries(dashboardsA, folderA.folderId), interval: "3s" });
       await tv.expectIntervalNotice("Interval adjusted to");
       await tv.expectPlayerReady();
       await tv.expectSlide(first.title, 1, 3);
@@ -310,7 +320,7 @@ test.describe("Dashboard TV playlist testcases", () => {
       const missing = { dashboardId: `${seed}_missing`, folderId: folderA.folderId };
 
       await tv.gotoPlaylist({
-        entries: [missing, { dashboardId: first.dashboardId, folderId: folderA.folderId }],
+        entries: [missing, ...tv.buildEntries([first], folderA.folderId)],
         interval: "1h",
       });
       await tv.expectPlayerReady();

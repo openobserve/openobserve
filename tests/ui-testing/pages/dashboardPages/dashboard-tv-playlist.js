@@ -84,6 +84,10 @@ export default class DashboardTvPlaylistPage {
 
   // ── URL builders ───────────────────────────────────────────────────────
 
+  buildEntries(dashboards, folderId) {
+    return dashboards.map((d) => ({ dashboardId: d.dashboardId, folderId }));
+  }
+
   buildTvUrl({ entries, interval, slide, period } = {}) {
     const params = new URLSearchParams({ org_identifier: process.env["ORGNAME"] });
     if (entries) {
@@ -164,7 +168,9 @@ export default class DashboardTvPlaylistPage {
     await this.fitSwitch.click();
   }
 
+  // "Copied" only appears after the clipboard write, so waiting out the previous one makes it a fresh signal.
   async copyLink() {
+    await expect(this.dialogCopyLinkBtn).not.toContainText("Copied");
     await this.dialogCopyLinkBtn.click();
     await expect(this.dialogCopyLinkBtn).toContainText("Copied");
     return this.page.evaluate(() => navigator.clipboard.readText());
