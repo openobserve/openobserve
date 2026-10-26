@@ -16,6 +16,7 @@
 import { describe, expect, it } from "vitest";
 import {
   shouldApplyChartAlign,
+  shouldShowLegendValues,
   shouldShowGridlines,
   shouldShowLegendsToggle,
   shouldShowLegendPosition,
@@ -37,6 +38,19 @@ import {
 } from "./configUtils";
 
 describe("configUtils", () => {
+  describe("shouldShowLegendValues", () => {
+    const panel = (type: string, show_legends: boolean) => ({
+      data: { type, config: { show_legends } },
+    });
+
+    it("is true only for pie and donut with the legend shown", () => {
+      expect(shouldShowLegendValues(panel("pie", true))).toBe(true);
+      expect(shouldShowLegendValues(panel("donut", true))).toBe(true);
+      expect(shouldShowLegendValues(panel("pie", false))).toBe(false);
+      expect(shouldShowLegendValues(panel("bar", true))).toBe(false);
+    });
+  });
+
   describe("shouldApplyChartAlign", () => {
     it("should return true for pie chart with right legend", () => {
       const dashboardPanelData = {

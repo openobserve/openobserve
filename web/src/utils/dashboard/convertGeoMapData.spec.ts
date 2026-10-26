@@ -670,6 +670,7 @@ describe("convertGeoMapData", () => {
       expect(result.options).toBeDefined();
       expect(result.options.tooltip).toBeDefined();
       expect(typeof result.options.tooltip.formatter).toBe("function");
+      expect(result.options.tooltip.enterable).toBe(true);
 
       // Test the formatter function
       const mockParams = {

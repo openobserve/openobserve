@@ -36,6 +36,7 @@ vi.mock("@/utils/dashboard/configUtils", () => ({
   shouldShowLegendWidth: vi.fn(() => false),
   shouldShowLegendHeight: vi.fn(() => false),
   shouldApplyChartAlign: vi.fn(() => false),
+  shouldShowLegendValues: vi.fn(() => false),
   shouldShowTopResultsConfig: vi.fn(() => false),
   shouldShowAreaLineStyleConfig: vi.fn(() => false),
   shouldShowNoValueReplacement: vi.fn(() => false),

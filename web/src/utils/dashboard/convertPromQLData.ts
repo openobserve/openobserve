@@ -59,7 +59,7 @@ import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
 import { getPropsByChartTypeForSeries } from "./promqlChartSeriesProps";
 import { applyMeasuredYAxisLeftInset } from "./chartDimensionUtils";
 import { legendFallbackOf } from "@/utils/dashboard/promql/formula";
-import { stackTotalRows } from "./stackTotals";
+import { fitAxisBoundsToStacks, stackTotalRows } from "./stackTotals";
 
 /** Rows a tooltip will list before it collapses the rest into a "+N more". */
 const TOOLTIP_MAX_SERIES = 10;
@@ -274,6 +274,7 @@ export const convertPromQLData = async (
       });
 
       if (result.options) applySeriesOverrides(result.options, panelSchema, store.state.theme);
+      if (result.options && panelSchema.type === "stacked") fitAxisBoundsToStacks(result.options);
       if (result.options) applyLineAreaThresholds(result.options, panelSchema);
 
       return result;
@@ -1574,6 +1575,7 @@ export const convertPromQLData = async (
   // console.timeEnd("convertPromQLData");
   // Override colours first: a threshold step outranks them and recolours on top.
   applySeriesOverrides(options, panelSchema, store.state.theme);
+  if (panelSchema.type === "area-stacked") fitAxisBoundsToStacks(options);
   applyLineAreaThresholds(options, panelSchema);
   // Reserve measured left space so wide y-axis labels don't clip.
   applyMeasuredYAxisLeftInset(options);

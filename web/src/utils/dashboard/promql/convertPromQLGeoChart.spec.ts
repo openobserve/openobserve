@@ -561,6 +561,7 @@ describe("GeoConverter", () => {
       expect(result.tooltip.textStyle.fontSize).toBe(10);
       expect(result.tooltip.padding).toBe(6);
       expect(result.tooltip.backgroundColor).toBe("rgba(255,255,255,0.8)");
+      expect(result.tooltip.enterable).toBe(true);
     });
 
     it("should format tooltip correctly", () => {
@@ -1124,6 +1125,42 @@ describe("GeoConverter", () => {
       expect(html).toContain("Weight: 1B");
       expect(html).toContain("city: &lt;i&gt;Oslo&lt;/i&gt;");
       expect(result.visualMap.formatter(2048)).toBe("2KB");
+    });
+
+    it("skips series whose coordinates are not numeric so the panel reports no data", () => {
+      const processedData: any[] = [
+        { series: [point("n/a", "2")], timestamps: [], queryIndex: 0, queryConfig: {} },
+      ];
+
+      const result: any = converter.convert(
+        processedData,
+        { type: "geomap", config: {} },
+        mockStore,
+        mockExtras,
+      );
+
+      expect(result.error).toBe(true);
+      expect(result.series).toEqual([]);
+    });
+
+    it("keeps numeric coordinates of zero", () => {
+      const processedData: any[] = [
+        {
+          series: [point("0", "0"), point("n/a", "x")],
+          timestamps: [],
+          queryIndex: 0,
+          queryConfig: {},
+        },
+      ];
+
+      const result: any = converter.convert(
+        processedData,
+        { type: "geomap", config: {} },
+        mockStore,
+        mockExtras,
+      );
+
+      expect(result.series[0].data).toEqual([[0, 0, 1]]);
     });
   });
 });

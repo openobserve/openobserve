@@ -24,6 +24,13 @@ import {
 import { applyAggregation } from "./shared/dataProcessor";
 import { formatGeoWeight, geoMapTooltipFormatter, normalizeGeoWeight } from "../convertGeoMapData";
 
+interface GeoLayerQueryConfig {
+  layer_type?: string;
+  weight_fixed?: number;
+}
+
+type GeoPoint = number[] | { value: number[]; fields: Record<string, string> };
+
 /**
  * Converter for geographic map charts (geomap)
  * Requires metrics with latitude and longitude labels
@@ -42,7 +49,7 @@ export class GeoConverter implements PromQLChartConverter {
     const weightLabel = config.weight_label || "weight";
 
     const geoLabels = new Set([latLabel, lonLabel, weightLabel]);
-    const layers = new Map<number, { queryConfig: any; data: any[] }>();
+    const layers = new Map<number, { queryConfig: GeoLayerQueryConfig; data: GeoPoint[] }>();
     const errors: string[] = [];
     processedData.forEach((queryData) => {
       const queryIndex = queryData.queryIndex ?? 0;
@@ -52,19 +59,19 @@ export class GeoConverter implements PromQLChartConverter {
       }
       const layer = layers.get(queryIndex)!;
       queryData.series.forEach((seriesData) => {
-        const lat = seriesData.metric[latLabel];
-        const lon = seriesData.metric[lonLabel];
+        const lat = parseFloat(seriesData.metric[latLabel]);
+        const lon = parseFloat(seriesData.metric[lonLabel]);
 
-        if (!lat || !lon) {
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
           errors.push(
-            `Series "${seriesData.name}" missing geo coordinates. ` +
+            `Series "${seriesData.name}" missing geo coordinates or they are not numeric. ` +
               `Expected labels: "${latLabel}", "${lonLabel}"`,
           );
           return;
         }
 
         // Weight is optional - use from metric label, aggregate from values, or use fixed value
-        let weight;
+        let weight: number;
         if (seriesData.metric[weightLabel]) {
           weight = parseFloat(seriesData.metric[weightLabel]);
         } else if (seriesData.values && seriesData.values.length > 0) {
@@ -76,7 +83,7 @@ export class GeoConverter implements PromQLChartConverter {
         const fields = Object.fromEntries(
           Object.entries(seriesData.metric).filter(([key]) => !geoLabels.has(key)),
         );
-        const value = [parseFloat(lon), parseFloat(lat), weight];
+        const value = [lon, lat, weight];
         layer.data.push(Object.keys(fields).length ? { value, fields } : value);
       });
     });
@@ -95,7 +102,7 @@ export class GeoConverter implements PromQLChartConverter {
     }
 
     // Calculate min/max values for visualMap and symbolSize
-    const values = geoData.map((item: any) => (Array.isArray(item) ? item : item.value)[2]);
+    const values = geoData.map((item) => (Array.isArray(item) ? item : item.value)[2]);
     const minValue = Math.min(...values);
     const maxValue = Math.max(...values);
 
@@ -119,6 +126,8 @@ export class GeoConverter implements PromQLChartConverter {
         },
         padding: 6,
         backgroundColor: "rgba(255,255,255,0.8)",
+        // Without it the tooltip hides when the pointer leaves the marker, so it can never be scrolled.
+        enterable: true,
         extraCssText: TOOLTIP_SCROLL_STYLE,
         formatter: geoMapTooltipFormatter(panelSchema),
       },
