@@ -6489,6 +6489,8 @@
     "totalLegends": "Gesamt: {count}",
     "noLegendsAvailable": "Keine Legenden verfügbar",
     "tableFiltering": "Filtern von Spalten",
+    "tableExpandableRows": "Erweiterbare Zeilen",
+    "tableExpandableRowsTooltip": "Jede Zeile erhält eine Schaltfläche zum Aufklappen, die alle ihre Felder anzeigt.",
     "columnFormattingTitle": "Formatierung von Spalten",
     "columnFormattingSubtitle": "Fügen Sie die Felder hinzu, die Sie formatieren möchten, und gestalten Sie dann jedes Feld mit einer Live-Vorschau.",
     "columnFormattingPick": "Wählen Sie eine Spalte",

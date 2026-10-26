@@ -444,6 +444,12 @@ export const formatNumericValue = (
 // Metric single-value styling (driven by config.mappings)
 // ---------------------------------------------------------------------------
 
+export interface DisplayedValueMapping {
+  text?: string | null;
+  color?: string | null;
+  textColor?: string | null;
+}
+
 export interface ResolvedMetricStyle {
   /** Display text: mapped string when a mapping matched, else the unit-formatted value. */
   text: string;
@@ -490,9 +496,9 @@ export const resolveMetricValueStyle = (
 /** First mapping for a single displayed value, also trying the value as rounded to `decimals`. */
 export const lookupDisplayedValueMapping = (
   rawValue: unknown,
-  cache: Map<any, any> | null,
+  cache: ReturnType<typeof buildValueMappingCache>,
   decimals: number | null | undefined,
-): any | null => {
+): DisplayedValueMapping | null => {
   let mapping = lookupValueMappingFull(rawValue, cache);
   const numValue =
     rawValue === null || rawValue === undefined || rawValue === "" ? NaN : Number(rawValue);

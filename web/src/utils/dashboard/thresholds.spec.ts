@@ -385,6 +385,18 @@ describe("applyLineAreaThresholds", () => {
     expect(markers(options)).toHaveLength(0);
   });
 
+  it("turns off large mode only on bars it recolours with a visualMap", () => {
+    const limitsOnly = lineOptions({ type: "bar", large: true });
+    applyLineAreaThresholds(limitsOnly, panel("bar", { ...steps, showAs: "line" }));
+    expect(limitsOnly.series[0].large).toBe(true);
+    const stacked = lineOptions({ type: "bar", large: true });
+    applyLineAreaThresholds(stacked, panel("stacked", { ...steps, showAs: "color" }));
+    expect(stacked.series[0].large).toBe(true);
+    const coloured = lineOptions({ type: "bar", large: true });
+    applyLineAreaThresholds(coloured, panel("bar", { ...steps, showAs: "color" }));
+    expect(coloured.series[0].large).toBe(false);
+  });
+
   it("line: limit lines only", () => {
     const options: any = lineOptions();
     applyLineAreaThresholds(options, panel("line", { ...steps, showAs: "line" }));

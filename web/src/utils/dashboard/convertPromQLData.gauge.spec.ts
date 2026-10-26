@@ -88,6 +88,12 @@ describe("convertPromQLData gauge range", () => {
     expect([gauge.min, gauge.max]).toEqual([-10, 0]);
   });
 
+  it("gives a single auto dial a round max above its samples instead of a full dial", async () => {
+    const [gauge] = await gaugesOf([matrix(["1200", "30"])], {}, [{ range_mode: "auto" }]);
+    expect(gauge.data[0].value).toBe(30);
+    expect([gauge.min, gauge.max]).toEqual([0, 2000]);
+  });
+
   it("derives the range from every dial for auto queries only", async () => {
     const gauges = await gaugesOf([matrix(["300"], ["1200"]), matrix(["4500"])], {}, [
       { range_mode: "auto", min: 0, max: 100 },
@@ -126,6 +132,29 @@ describe("convertPromQLData gauge display", () => {
       },
     });
     expect(gauge.data[0].itemStyle.color).toBe("#0000ff");
+  });
+
+  it("shades an instant query's dial from its value, not white", async () => {
+    const instant = (pod: string, value: string) => ({
+      metric: { pod },
+      value: [1_700_000_000, value],
+    });
+    const gauges = await gaugesOf(
+      [{ resultType: "vector", result: [instant("a", "10"), instant("b", "90")] }],
+      {
+        color: { mode: "shades", fixedColor: ["#204080"] },
+      },
+    );
+    const colors = gauges.map((g: any) => g.data[0].itemStyle.color);
+    expect(colors[0]).toBe("#204080");
+    expect(colors[1]).not.toBe("#ffffff");
+    expect(colors[1]).not.toBe(colors[0]);
+  });
+
+  it("gives every dial the same value font", async () => {
+    const gauges = await gaugesOf([matrix(["5"], ["12345.67"])]);
+    const fonts = gauges.map((g: any) => g.detail.fontSize);
+    expect(new Set(fonts).size).toBe(1);
   });
 
   it("colours a reading of 0 like any other value", async () => {

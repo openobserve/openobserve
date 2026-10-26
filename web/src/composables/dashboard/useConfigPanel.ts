@@ -7,6 +7,7 @@ import {
   shouldShowLegendWidth,
   shouldShowLegendHeight,
   shouldApplyChartAlign,
+  shouldShowLegendValues,
   shouldShowTopResultsConfig,
   shouldShowAreaLineStyleConfig,
   shouldShowNoValueReplacement,
@@ -246,6 +247,10 @@ export function useConfigPanel(
         label: t("dashboard.chartAlign"),
         visible: shouldApplyChartAlign(dashboardPanelData),
       },
+      "legend-values": {
+        label: t("dashboard.legendValues"),
+        visible: shouldShowLegendValues(dashboardPanelData),
+      },
       "promql-legend": {
         label: t("dashboard.query"),
         visible:
@@ -388,6 +393,10 @@ export function useConfigPanel(
       filtering: {
         label: t("dashboard.tableFiltering"),
         visible: dashboardPanelData.data.type === "table",
+      },
+      "expandable-rows": {
+        label: t("dashboard.tableExpandableRows"),
+        visible: dashboardPanelData.data.type === "table" && !isPivotMode.value,
       },
       pagination: {
         label: t("dashboard.pagination"),

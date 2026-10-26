@@ -29,14 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="panelSchema.type == 'maps'"
           :data="panelData.chartType == 'maps' ? panelData : { options: {} }"
         ></MapsRenderer>
-        <GeoMapRenderer
-          v-else-if="panelSchema.type == 'geomap'"
-          :data="
-            panelData.chartType == 'geomap'
-              ? panelData
-              : { options: { backgroundColor: 'transparent' } }
-          "
-        />
+        <GeoMapRenderer v-else-if="panelSchema.type == 'geomap'" :data="geoMapRendererData" />
         <PromQLTableChart
           v-else-if="panelSchema.type == 'table' && panelSchema.queryType === 'promql'"
           ref="tableRendererRef"
@@ -57,6 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-pagination="panelSchema.config?.table_pagination && !store.state.printMode"
           :rows-per-page="panelSchema.config?.table_pagination_rows_per_page"
           :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
+          :expandable-rows="!!panelSchema.config?.table_expandable_rows"
+          :row-key-fields="tableRowKeyFields"
           :enable-column-format="enableColumnFormat"
           :drilldown-columns="store.state.printMode ? [] : drilldownColumnAliases"
           :drilldown-all-columns="!store.state.printMode && drilldownAllColumns"
@@ -166,7 +161,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           noData &&
           !isAwaitingFirstLoad &&
           !errorDetail?.message &&
-          panelSchema.type != 'geomap' &&
           panelSchema.type != 'maps' &&
           panelSchema.type != 'table' &&
           !loading &&
@@ -314,6 +308,11 @@ import { chartColor } from "@/utils/chartTheme";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
+import {
+  CustomChartSkippedError,
+  type CustomChartContext,
+} from "@/utils/dashboard/convertCustomChartData";
+import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { getDataValue } from "@/utils/dashboard/aliasUtils";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { useRoute, useRouter } from "vue-router";
@@ -1360,6 +1359,7 @@ export default defineComponent({
             annotations,
             loading.value,
             filteredSparklineData.value,
+            panelSchema.value?.type === "custom_chart" ? buildCustomChartContext() : undefined,
           );
           // Superseded while awaiting: its data is older than what is coming.
           if (superseded()) return;
@@ -1476,7 +1476,7 @@ export default defineComponent({
             code: "",
           };
         } catch (error: any) {
-          if (superseded()) return;
+          if (superseded() || error instanceof CustomChartSkippedError) return;
           errorDetail.value = {
             message: error?.message,
             code: error?.code || "",
@@ -1542,6 +1542,18 @@ export default defineComponent({
         }
       },
       { deep: true },
+    );
+
+    // The loader reloads only for query-referenced variables, but chart code may read any of them.
+    // Keyed on values only: option lists and loading flags change often and chart code cannot see them.
+    watch(
+      () =>
+        panelSchema.value?.type === "custom_chart" ? JSON.stringify(customChartVariables()) : "",
+      () => {
+        if (panelSchema.value?.type === "custom_chart" && data.value?.length && !loading.value) {
+          convertPanelDataCommon();
+        }
+      },
     );
 
     // Watch for hiddenQueries changes to re-render the chart
@@ -1852,6 +1864,11 @@ export default defineComponent({
       }
     };
 
+    const hasGeoPoints = (): boolean =>
+      (panelData.value?.options?.series ?? []).some(
+        (series: { data?: unknown[] } | null) => (series?.data?.length ?? 0) > 0,
+      );
+
     // Compute the value of the 'noData' variable.
     // Instead of re-scanning raw rows, this checks the conversion output
     // (panelData) which the pipeline already computed — O(1) property access.
@@ -1869,6 +1886,10 @@ export default defineComponent({
         const hasResults =
           filteredData.value?.length &&
           filteredData.value.some((item: any) => item?.result?.length);
+        // Series without the lat/lon labels convert to no points.
+        if (hasResults && type === "geomap" && panelData.value?.chartType === "geomap") {
+          return hasGeoPoints() ? "" : "No Data";
+        }
         if (hasResults) return "";
         // During a reload the executor clears state.data before the new results
         // stream in. Keep showing the previously rendered chart while loading
@@ -1901,8 +1922,13 @@ export default defineComponent({
         return panelData.value?.rows?.length > 0 ? "" : "No Data";
       }
 
-      // Maps/geomap handle their own empty state.
-      if (type === "geomap" || type === "maps") {
+      // Rows with null lat/lon are dropped, so raw rows can still mean no points.
+      if (type === "geomap") {
+        return hasGeoPoints() ? "" : "No Data";
+      }
+
+      // Maps handles its own empty state.
+      if (type === "maps") {
         return "";
       }
 
@@ -1945,6 +1971,13 @@ export default defineComponent({
       };
     };
 
+    // An empty layer list would still build a bare map, so it gets the placeholder too.
+    const geoMapRendererData = computed(() =>
+      panelData.value?.chartType === "geomap" && noData.value !== "No Data" && hasGeoPoints()
+        ? panelData.value
+        : { options: { backgroundColor: "transparent" } },
+    );
+
     const chartRendererData = computed(() => {
       if (noData.value === "No Data") {
         return { options: { backgroundColor: "transparent" } };
@@ -1971,6 +2004,16 @@ export default defineComponent({
     const { showErrorNotification, showPositiveNotification } = useNotifications();
 
     const onFormatColumn = (field: string) => emit("format-column", field);
+
+    // A SQL table row is identified by its x and breakdown fields; the y values change on refresh.
+    const tableRowKeyFields = computed(() => {
+      const queries: { fields?: { x?: { alias?: string }[]; breakdown?: { alias?: string }[] } }[] =
+        panelSchema.value?.queries ?? [];
+      const aliases = queries.flatMap((query) =>
+        [...(query.fields?.x ?? []), ...(query.fields?.breakdown ?? [])].map((f) => f.alias ?? ""),
+      );
+      return [...new Set(aliases.filter(Boolean))];
+    });
 
     const {
       drilldownArray,
@@ -2140,6 +2183,33 @@ export default defineComponent({
       return Number.isFinite(n) && n > 0 ? n : 0;
     }
 
+    // Uses the committed variables the query ran with, so context matches the data.
+    function customChartVariables(): Record<string, unknown> {
+      const variables: Record<string, unknown> = {};
+      for (const v of props.variablesData?.values ?? []) {
+        if (!v?.name) continue;
+        const isAll =
+          v.value == null ||
+          v.value === SELECT_ALL_VALUE ||
+          (Array.isArray(v.value) && (!v.value.length || v.value.includes(SELECT_ALL_VALUE)));
+        // Queries run an empty value or the All sentinel as All, so chart code gets null for both.
+        variables[v.name] = isAll ? null : v.value;
+      }
+      return variables;
+    }
+
+    function buildCustomChartContext(): CustomChartContext {
+      return {
+        variables: customChartVariables(),
+        timeRange: {
+          start: toMicros((props.selectedTimeObj as any)?.start_time),
+          end: toMicros((props.selectedTimeObj as any)?.end_time),
+        },
+        timezone: store.state.timezone,
+        theme: isDark.value ? "dark" : "light",
+      };
+    }
+
     function openCellDrawer(params: {
       field: string;
       value: string | number;
@@ -2244,6 +2314,7 @@ export default defineComponent({
       errorDetail,
       panelData,
       noData,
+      geoMapRendererData,
       isAwaitingFirstLoad,
       chartRendererData,
       metadata,
@@ -2253,6 +2324,7 @@ export default defineComponent({
       onFormatColumn,
       onDataZoom,
       drilldownColumnAliases,
+      tableRowKeyFields,
       drilldownAllColumns,
       drilldownArray,
       selectedAnnotationData,

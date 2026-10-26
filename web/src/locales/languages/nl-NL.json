@@ -6489,6 +6489,8 @@
     "totalLegends": "Totaal: {count}",
     "noLegendsAvailable": "Geen legendes beschikbaar",
     "tableFiltering": "Kolomfiltering",
+    "tableExpandableRows": "Uitklapbare rijen",
+    "tableExpandableRowsTooltip": "Elke rij krijgt een uitklapknop die al haar velden toont.",
     "columnFormattingTitle": "Kolomopmaak",
     "columnFormattingSubtitle": "Voeg de velden toe die u wilt opmaken en geef ze elk een stijl met een live voorbeeld.",
     "columnFormattingPick": "Kies een kolom",

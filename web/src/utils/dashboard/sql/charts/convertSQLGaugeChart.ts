@@ -22,6 +22,7 @@ import { gaugeDialRange } from "../../thresholds";
 import { createSeriesOverrideLookup, gaugeOverrideTooltip } from "../../seriesOverrides";
 import { buildValueMappingCache, lookupDisplayedValueMapping } from "../../tableConfigUtils";
 import {
+  alignGaugeValueFonts,
   gaugeAutoRange,
   gaugeEndLabels,
   gaugeValueText,
@@ -102,7 +103,8 @@ export function applyGaugeChart(ctx: SQLContext): void {
   // for each gauge we have separate grid
   options.grid = gridDataForGauge.gridArray;
 
-  const gaugeData = yAxisValue.length > 0 ? yAxisValue : [0];
+  // No rows is no value, drawn as "-" like PromQL, never a real 0.
+  const gaugeData = yAxisValue.length > 0 ? yAxisValue : [null];
   const gaugeNames = xAxisValue.length > 0 ? xAxisValue : [""];
   const queryConfig = panelSchema?.queries[0]?.config;
   const autoRange = isGaugeAutoRange(queryConfig) ? gaugeAutoRange(gaugeData) : null;
@@ -138,7 +140,7 @@ export function applyGaugeChart(ctx: SQLContext): void {
           name,
           value: it,
           detail: {
-            formatter: (value: any) => gaugeValueText(value, mapping, unit),
+            formatter: (value: unknown) => gaugeValueText(value, mapping, unit),
             ...(mapping?.textColor ? { color: mapping.textColor } : {}),
           },
           itemStyle: {
@@ -167,4 +169,5 @@ export function applyGaugeChart(ctx: SQLContext): void {
     sizeGaugeDial(gauge, minDim, gridDataForGauge.gridWidth);
     return gauge;
   });
+  alignGaugeValueFonts(options.series, minDim);
 }

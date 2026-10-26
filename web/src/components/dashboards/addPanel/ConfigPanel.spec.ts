@@ -214,6 +214,19 @@ describe("ConfigPanel", () => {
       expect(hidden('[data-test="dashboard-config-gauge-max"]')).toBe(true);
     });
 
+    it("flags a fixed max that is not above min beside the field", async () => {
+      const maxInput = () =>
+        wrapper
+          .findAllComponents({ name: "OInput" })
+          .find((c: any) => c.attributes("data-test") === "dashboard-config-gauge-max");
+      const data = gaugeData({ min: 20, max: 10 });
+      wrapper = createWrapper({ dashboardPanelData: data });
+      expect(maxInput()?.props("errorMessage")).toBeTruthy();
+      data.data.queries[0].config.max = 50;
+      await wrapper.vm.$nextTick();
+      expect(maxInput()?.props("errorMessage")).toBeUndefined();
+    });
+
     it("offers the end labels switch and value mappings", () => {
       wrapper = createWrapper({ dashboardPanelData: gaugeData() });
       expect(wrapper.find('[data-test="dashboard-config-gauge-end-labels"]').exists()).toBe(true);
@@ -515,6 +528,43 @@ describe("ConfigPanel", () => {
 
     it("is absent in PromQL mode", () => {
       wrapper = createWrapper({ dashboardPanelData: panelOf("line") }, { promqlMode: true });
+      expect(toggleOf()).toBeUndefined();
+    });
+  });
+
+  describe("Legend values", () => {
+    const panelOf = (type: string, config: Record<string, unknown> = {}) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type,
+        config: { ...mockDashboardPanelData.data.config, show_legends: true, ...config },
+      },
+    });
+    const toggleOf = () =>
+      wrapper
+        .findAllComponents({ name: "OToggleGroup" })
+        .find((group: any) => group.text().includes("Legend values"));
+
+    it.each(["pie", "donut"])(
+      "reads unset as none and writes value and percent for %s",
+      async (type) => {
+        const panel: any = panelOf(type);
+        wrapper = createWrapper({ dashboardPanelData: panel });
+        expect(toggleOf()?.props("modelValue")).toEqual([]);
+        expect(toggleOf()?.text()).toContain("ValuePercent");
+        await toggleOf()?.vm.$emit("update:modelValue", ["percent", "value"]);
+        expect(panel.data.config.legend_values).toEqual(["value", "percent"]);
+        await toggleOf()?.vm.$emit("update:modelValue", []);
+        expect(panel.data.config.legend_values).toEqual([]);
+      },
+    );
+
+    it("is absent when the legend is hidden or the chart is not a pie", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("pie", { show_legends: false }) });
+      expect(toggleOf()).toBeUndefined();
+      wrapper.unmount();
+      wrapper = createWrapper({ dashboardPanelData: panelOf("bar") });
       expect(toggleOf()).toBeUndefined();
     });
   });

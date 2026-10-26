@@ -47,12 +47,16 @@ import {
   resolveMetricValueStyle,
 } from "./tableConfigUtils";
 import {
+  alignGaugeValueFonts,
   gaugeAutoRange,
+  gaugeColorDomain,
   gaugeEndLabels,
   gaugeValueText,
   isGaugeAutoRange,
   promqlGaugeValue,
   sizeGaugeDial,
+  type GaugeQueryConfig,
+  type PromQLGaugeSeries,
 } from "./gaugeDial";
 import {
   applyGaugeThresholds,
@@ -70,8 +74,9 @@ import { buildPromqlSeriesNames, getLegendPosition } from "./promql/shared/legen
 import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
 import { getPropsByChartTypeForSeries } from "./promqlChartSeriesProps";
 import { applyMeasuredYAxisLeftInset } from "./chartDimensionUtils";
+import { buildSeriesMarkLine } from "./promql/shared/markLines";
 import { legendFallbackOf } from "@/utils/dashboard/promql/formula";
-import { stackTotalRows } from "./stackTotals";
+import { fitAxisBoundsToStacks, stackTotalRows } from "./stackTotals";
 
 /** Rows a tooltip will list before it collapses the rest into a "+N more". */
 const TOOLTIP_MAX_SERIES = 10;
@@ -87,27 +92,6 @@ const importMoment = async () => {
   }
 
   return moment;
-};
-
-const getMarkLineData = (panelSchema: any) => {
-  return (
-    panelSchema?.config?.mark_line?.map((markLine: any) => {
-      return {
-        name: markLine.name,
-        type: markLine.type,
-        xAxis: markLine.type == "xAxis" ? markLine.value : null,
-        yAxis: markLine.type == "yAxis" ? markLine.value : null,
-        label: {
-          // The alert preview passes show_label:false — its lines are
-          // colour-coded, and a text label clips at the chart top.
-          show: markLine.show_label !== false,
-          formatter: markLine.name ? "{b}:{c}" : "{c}",
-          position: "insideEndTop",
-        },
-        ...(markLine.color ? { lineStyle: { color: markLine.color } } : {}),
-      };
-    }) ?? []
-  );
 };
 
 export type SeriesRole = "primary" | "shifted" | "forecast";
@@ -286,6 +270,7 @@ export const convertPromQLData = async (
       });
 
       if (result.options) applySeriesOverrides(result.options, panelSchema, store.state.theme);
+      if (result.options && panelSchema.type === "stacked") fitAxisBoundsToStacks(result.options);
       if (result.options) applyLineAreaThresholds(result.options, panelSchema);
 
       return result;
@@ -790,6 +775,8 @@ export const convertPromQLData = async (
   let gridDataForGauge: any = {};
   // Dial range shared by every query in auto range mode; null when none uses it.
   let gaugeRange: { min: number; max: number } | null = null;
+  // Each series is reduced once here, for the auto range, the colour domain and its dial.
+  const gaugeValues = new Map<PromQLGaugeSeries, number | null>();
   const gaugeMappingCache =
     panelSchema.type === "gauge" ? buildValueMappingCache(panelSchema.config?.mappings) : null;
 
@@ -831,12 +818,20 @@ export const convertPromQLData = async (
     //assign grid array to gauge chart options
     options.grid = gridDataForGauge.gridArray;
 
-    if (panelSchema.queries?.some((query: any) => isGaugeAutoRange(query?.config))) {
+    for (const it of limitedSearchQueryData) {
+      for (const metric of it?.result ?? []) {
+        gaugeValues.set(metric, promqlGaugeValue(metric, panelSchema.config?.aggregation));
+      }
+    }
+    if (
+      panelSchema.queries?.some((query: { config?: GaugeQueryConfig }) =>
+        isGaugeAutoRange(query?.config),
+      )
+    ) {
       gaugeRange = gaugeAutoRange(
-        limitedSearchQueryData.flatMap((it: any) =>
-          (it?.result ?? []).map((metric: any) =>
-            promqlGaugeValue(metric, panelSchema.config?.aggregation),
-          ),
+        [...gaugeValues.values()],
+        [...gaugeValues.keys()].flatMap((metric) =>
+          (metric?.values ?? []).map((point) => point[1]),
         ),
       );
     }
@@ -849,7 +844,10 @@ export const convertPromQLData = async (
   let chartMax: any = -Infinity;
 
   if (!Object.values(ColorModeWithoutMinMax).includes(panelSchema.config?.color?.mode)) {
-    [chartMin, chartMax] = getMetricMinMaxValue(limitedSearchQueryData);
+    [chartMin, chartMax] =
+      panelSchema.type === "gauge"
+        ? gaugeColorDomain([...gaugeValues.values()])
+        : getMetricMinMaxValue(limitedSearchQueryData);
   }
 
   // Series names come from the label vocabulary itself, so a chart neither waits
@@ -986,18 +984,7 @@ export const convertPromQLData = async (
                   store.state.theme,
                 ),
                 // markLine if exist
-                markLine: {
-                  silent: true,
-                  animation: false,
-                  data: getMarkLineData(panelSchema),
-                  lineStyle: {
-                    color: "#8B5A2B",
-                    type: [8, 4],
-                    width: 2,
-                    shadowColor: chartColor("--color-chart-markline-shadow"),
-                    shadowBlur: 2,
-                  },
-                },
+                markLine: buildSeriesMarkLine(panelSchema),
                 connectNulls: panelSchema.config?.connect_nulls ?? false,
               };
               if (nameSuffixes[index]) shiftedTwins.push([seriesObject, metric.metric]);
@@ -1065,18 +1052,7 @@ export const convertPromQLData = async (
                   seriesName,
                   store.state.theme,
                 ),
-                markLine: {
-                  silent: true,
-                  animation: false,
-                  data: getMarkLineData(panelSchema),
-                  lineStyle: {
-                    color: "#8B5A2B",
-                    type: [8, 4],
-                    width: 2,
-                    shadowColor: chartColor("--color-chart-markline-shadow"),
-                    shadowBlur: 2,
-                  },
-                },
+                markLine: buildSeriesMarkLine(panelSchema),
                 connectNulls: panelSchema.config?.connect_nulls ?? false,
               };
             });
@@ -1090,7 +1066,9 @@ export const convertPromQLData = async (
         isTimeSeriesFlag = false;
         const queryConfig = panelSchema?.queries[parentQueryIndex[index]]?.config;
         const series = it?.result?.map((metric: any) => {
-          const gaugeValue = promqlGaugeValue(metric, panelSchema.config?.aggregation);
+          const gaugeValue = gaugeValues.has(metric)
+            ? (gaugeValues.get(metric) ?? null)
+            : promqlGaugeValue(metric, panelSchema.config?.aggregation);
           gaugeIndex++;
 
           const seriesName = nameOf(seriesNames, metric.metric, index);
@@ -1115,7 +1093,7 @@ export const convertPromQLData = async (
                 // A series without points has no value, which ECharts draws as an empty dial.
                 value: gaugeValue,
                 detail: {
-                  formatter: (value: any) => gaugeValueText(value, mapping, unit),
+                  formatter: (value: unknown) => gaugeValueText(value, mapping, unit),
                   ...(mapping?.textColor ? { color: mapping.textColor } : {}),
                 },
                 itemStyle: {
@@ -1129,7 +1107,7 @@ export const convertPromQLData = async (
                       getSeriesColor(
                         panelSchema?.config?.color,
                         seriesName,
-                        gaugeValue,
+                        [gaugeValue],
                         chartMin,
                         chartMax,
                         store.state.theme,
@@ -1365,6 +1343,12 @@ export const convertPromQLData = async (
   }
 
   options.series = options.series.flat();
+  if (panelSchema.type === "gauge") {
+    alignGaugeValueFonts(
+      options.series,
+      Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight),
+    );
+  }
 
   // Apply series color mappings via reusable helper
   applySeriesColorMappings(
@@ -1582,6 +1566,7 @@ export const convertPromQLData = async (
   // console.timeEnd("convertPromQLData");
   // Override colours first: a threshold step outranks them and recolours on top.
   applySeriesOverrides(options, panelSchema, store.state.theme);
+  if (panelSchema.type === "area-stacked") fitAxisBoundsToStacks(options);
   applyLineAreaThresholds(options, panelSchema);
   // Reserve measured left space so wide y-axis labels don't clip.
   applyMeasuredYAxisLeftInset(options);

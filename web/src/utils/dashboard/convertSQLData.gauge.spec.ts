@@ -110,6 +110,21 @@ describe("SQL gauge range", () => {
   });
 });
 
+describe("SQL gauge no data", () => {
+  it("draws no value, not 0, when the query returns no rows", async () => {
+    const [gauge] = await runSQL(gaugePanel({}, [sqlQuery()]), [[]]);
+    expect(gauge.data[0].value).toBeNull();
+    expect(gauge.data[0].detail.formatter(gauge.data[0].value)).toBe("-");
+  });
+});
+
+describe("SQL gauge single dial", () => {
+  it("gives a single auto dial a round max above its value", async () => {
+    const [gauge] = await runSQL(gaugePanel({}, [sqlQuery({ range_mode: "auto" })]), [[rows[0]]]);
+    expect([gauge.min, gauge.max]).toEqual([0, 1000]);
+  });
+});
+
 describe("SQL gauge display", () => {
   const mappings = [{ type: "value", value: "640", text: "Busy", color: "#ff0000" }];
   const thresholds = {

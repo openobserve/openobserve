@@ -36,6 +36,7 @@ vi.mock("@/utils/dashboard/configUtils", () => ({
   shouldShowLegendWidth: vi.fn(() => false),
   shouldShowLegendHeight: vi.fn(() => false),
   shouldApplyChartAlign: vi.fn(() => false),
+  shouldShowLegendValues: vi.fn(() => false),
   shouldShowTopResultsConfig: vi.fn(() => false),
   shouldShowAreaLineStyleConfig: vi.fn(() => false),
   shouldShowNoValueReplacement: vi.fn(() => false),
@@ -790,6 +791,32 @@ describe("useConfigPanel – table section", () => {
   it("dynamic-columns is hidden in promqlMode", () => {
     const c = makeComposable(makePanelData("table"), ref(true));
     expect(c.isConfigOptionVisible("table", "dynamic-columns")).toBe(false);
+  });
+
+  it("expandable-rows is visible for table type in sql and promql mode", () => {
+    expect(
+      makeComposable(makePanelData("table"), ref(false)).isConfigOptionVisible(
+        "table",
+        "expandable-rows",
+      ),
+    ).toBe(true);
+    expect(
+      makeComposable(makePanelData("table"), ref(true)).isConfigOptionVisible(
+        "table",
+        "expandable-rows",
+      ),
+    ).toBe(true);
+  });
+
+  it("expandable-rows is hidden in pivot mode", () => {
+    const c = makeComposable(
+      makePanelData("table"),
+      ref(false),
+      undefined,
+      undefined,
+      computed(() => true),
+    );
+    expect(c.isConfigOptionVisible("table", "expandable-rows")).toBe(false);
   });
 
   it("pagination is visible for table type", () => {

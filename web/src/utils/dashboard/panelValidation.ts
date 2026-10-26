@@ -2,6 +2,7 @@ import type { TranslateFn } from "@/types/i18n";
 import { CURRENT_DASHBOARD_SCHEMA_VERSION } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import { isFormulaQuery } from "@/utils/dashboard/promql/formula";
+import { isGaugeFixedRangeValid, type GaugeQueryConfig } from "@/utils/dashboard/gaugeDial";
 
 /**
  * Validates a single condition item
@@ -782,6 +783,20 @@ export const validateJoinFields = (t: TranslateFn, joins: any, errors: string[])
   }
 };
 
+const validateGaugeRanges = (t: TranslateFn, panel: any, errors: string[]) => {
+  if (panel?.type !== "gauge") return;
+  const queries = panel?.queries ?? [];
+  queries.forEach((query: { config?: GaugeQueryConfig }, index: number) => {
+    if (isGaugeFixedRangeValid(query?.config)) return;
+    const error = t("dashboard.utils.gaugeMinBelowMax");
+    errors.push(
+      queries.length > 1
+        ? t("dashboard.utils.queryErrorPrefix", { index: index + 1, error })
+        : error,
+    );
+  });
+};
+
 /**
  * Validates panel fields without validating stream field existence
  *
@@ -931,6 +946,8 @@ export const validatePanel = (
       }
     });
   }
+
+  validateGaugeRanges(t, panelData?.data, errors);
 
   if (isPromQLMode) {
     // 1. Chart type: only specific chart types are supported for PromQL
