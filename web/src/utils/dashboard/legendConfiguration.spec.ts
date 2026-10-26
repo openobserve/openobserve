@@ -1460,4 +1460,72 @@ describe("pie and donut legend values", () => {
     );
     expect(valuesRight.legendWidth).toBeGreaterThan(plainRight.legendWidth);
   });
+
+  it("gives a negative slice 0% under an override's decimals or panel decimals past 13", () => {
+    const negatives = [
+      { name: "api", value: 30 },
+      { name: "loss", value: -10 },
+    ];
+    const withOverride: any = pieOptions(negatives);
+    applyLegendConfiguration(
+      pieSchema({
+        legend_values: ["percent"],
+        override_config: [
+          { field: { matchBy: "series", value: "loss" }, config: [{ type: "decimals", value: 2 }] },
+        ],
+      }),
+      chartPanelRef,
+      hovered(),
+      withOverride,
+    );
+    expect(withOverride.legend.formatter("loss")).toBe("{b|loss}  0.00%");
+
+    const highPrecision: any = pieOptions(negatives);
+    applyLegendConfiguration(
+      pieSchema({ legend_values: ["percent"], decimals: 14 }),
+      chartPanelRef,
+      hovered(),
+      highPrecision,
+    );
+    expect(highPrecision.legend.formatter("loss")).toMatch(/(^|\s)0\.0{14}%$/);
+  });
+
+  it("matches ECharts' seats on tied and zero remainders", () => {
+    const cases = [
+      [1, 1, 1, 1, 1, 1, 1],
+      [0, 5, 5, 0, 5, 3],
+      [2, 2, 2, 1e-9],
+    ];
+    for (const values of cases) {
+      const data = values.map((value, i) => ({ name: `s${i}`, value }));
+      const options: any = pieOptions(data);
+      applyLegendConfiguration(
+        pieSchema({ legend_values: ["percent"], decimals: 2 }),
+        chartPanelRef,
+        hovered(),
+        options,
+      );
+      data.forEach((slice, index) => {
+        const expected = echartsNumber.getPercentWithPrecision(values, index, 2).toFixed(2);
+        expect(options.legend.formatter(slice.name)).toBe(`{b|${slice.name}}  ${expected}%`);
+      });
+    }
+  });
+
+  it("shows a dash, not a zero, for a slice with no finite value", () => {
+    const options: any = pieOptions([
+      { name: "api", value: 30 },
+      { name: "gap", value: NaN },
+      { name: "inf", value: Infinity },
+    ]);
+    applyLegendConfiguration(
+      pieSchema({ legend_values: ["value", "percent"], decimals: 0 }),
+      chartPanelRef,
+      hovered(),
+      options,
+    );
+    expect(options.legend.formatter("gap")).toBe("{b|gap}  -  -");
+    expect(options.legend.formatter("inf")).toBe("{b|inf}  -  -");
+    expect(options.legend.formatter("api")).toBe("{b|api}  30  100%");
+  });
 });

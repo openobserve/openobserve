@@ -380,6 +380,25 @@ describe.each(["pie", "donut"])("SQL %s", (type) => {
     expect(apis).toHaveLength(2);
     expect(apis.every((d: any) => d.itemStyle.color === OVERRIDE_COLOR)).toBe(true);
   });
+
+  it("multi-query: sizes a bottom legend from every query's slices", async () => {
+    const legendConfig = {
+      legends_position: "bottom",
+      legends_type: "plain",
+      legend_values: ["value", "percent"],
+    };
+    const moreRows = Array.from({ length: 40 }, (_, i) => ({
+      x_axis_1: `service-${i}`,
+      y_axis_1: 100 + i,
+    }));
+    const merged = await runSQL(piePanel(legendConfig, 2), [rows, moreRows]);
+    const single = await runSQL(piePanel(legendConfig), [[...rows, ...moreRows]]);
+    const firstOnly = await runSQL(piePanel(legendConfig), [rows]);
+    expect(single.legend.height).toBeGreaterThan(firstOnly.legend.height);
+    expect(merged.legend.top).toBe(single.legend.top);
+    expect(merged.legend.height).toBe(single.legend.height);
+    expect(merged.series[0].center).toEqual(single.series[0].center);
+  });
 });
 
 describe("SQL gauge", () => {

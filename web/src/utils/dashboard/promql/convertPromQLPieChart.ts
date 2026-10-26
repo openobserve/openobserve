@@ -52,10 +52,11 @@ export class PieConverter implements PromQLChartConverter {
     }> = [];
 
     processedData.forEach((queryData) => {
-      // An instant query returns one point per series, where count, range and diff would read 1 or 0.
-      const aggregation =
-        queryData.queryConfig?.query_type === "instant" ? "last" : config.aggregation || "last";
+      const instant = queryData.queryConfig?.query_type === "instant";
       queryData.series.forEach((seriesData) => {
+        // A single instant sample would read 1 or 0 under count, range or diff; a range-vector selector still has many.
+        const aggregation =
+          instant && seriesData.values.length <= 1 ? "last" : config.aggregation || "last";
         const value = applyAggregation(seriesData.values, aggregation);
 
         if (value < chartMin) chartMin = value;
