@@ -267,52 +267,76 @@ const BACKGROUND_SEARCH_FNS: [(&str, Option<&str>); 10] = [
     ),
 ];
 
-const SEARCH_ENTRY: &str = r"(?:search_service|SearchService|crate::search|core_promql::search)::(?:cache::)?(?:search|search_multi|search_partition|search_partition_multi)\(|\bgrpc_search(?:_partition)?\(|process_search_stream_request(?:_multi)?\(|eval_jobs::search::execute|execute_training_query\(";
+const SEARCH_ENTRY: &str = r"\b(?:\w+::)*(?:search|search_service|SearchService|core_promql|promql_service)::(?:(?:cache|search)::)?(?:search|search_multi|search_partition|search_partition_multi)\(|\bgrpc_search(?:_partition)?\(|process_search_stream_request(?:_multi)?\(|eval_jobs::search::execute|execute_training_query\(";
 
-/// Every production file that calls a search entry point, and how its search is licence-gated.
+/// A `use` that brings a search entry fn into scope, so calls name it bare.
+const SEARCH_IMPORT: &str = r"\buse [^;]*\b(?:search|search_service|SearchService|promql_service::search)::(search|search_multi|search_partition|search_partition_multi)(?:\s+as\s+(\w+))?\b[^;]*;";
+
+/// Every production fn that calls a search entry point, as (file, fn), and how it is licence-gated.
 #[rustfmt::skip]
-const SEARCH_CALLERS: [(&str, Caller); 41] = [
-    ("api/management/src/request/alert_calibration/digests.rs", Caller::Operational),
-    ("api/management/src/request/alerts/history.rs", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
-    ("api/management/src/request/dashboards/reports_history.rs", Caller::Exempt("the org's own report run history; its route stays open")),
-    ("api/management/src/request/db_monitoring/service/common.rs", Caller::Routed("db_monitoring::handler::")),
-    ("api/management/src/request/db_monitoring/service/instance_metrics.rs", Caller::Routed("db_monitoring::handler::")),
-    ("api/management/src/request/synthetics/last_check.rs", Caller::Exempt("last check on the synthetics list; its route stays open")),
-    ("api/management/src/request/workflows/mod.rs", Caller::Exempt("the org's own workflow run history; its route stays open")),
-    ("api/pipelines/src/request/pipelines/history.rs", Caller::Exempt("the org's own pipeline run history; its route stays open")),
-    ("api/search/src/profiles/mod.rs", Caller::InHandler),
-    ("api/search/src/promql/mod.rs", Caller::InHandler),
-    ("api/search/src/rum/lookup/query.rs", Caller::Helper("called by rum lookup, which checks the licence in rum/lookup/mod.rs")),
-    ("api/search/src/search/around.rs", Caller::Helper("around v1/v2 check in search/mod.rs; around_multi is in the gated group")),
-    ("api/search/src/search/mod.rs", Caller::InHandler),
-    ("api/search/src/search/multi_streams.rs", Caller::Routed("search::multi_streams::")),
-    ("api/search/src/search/patterns.rs", Caller::Routed("patterns::")),
-    ("api/search/src/search/search_inspector.rs", Caller::Exempt("search/profile stays open (D13)")),
-    ("api/search/src/search/search_stream.rs", Caller::InHandler),
-    ("api/search/src/traces/dag.rs", Caller::InHandler),
-    ("api/search/src/traces/details.rs", Caller::Routed("traces::details::")),
-    ("api/search/src/traces/list/query.rs", Caller::Helper("latest traces; traces/mod.rs checks the licence")),
-    ("api/search/src/traces/list/stream.rs", Caller::Helper("latest traces; traces/mod.rs checks the licence")),
-    ("api/search/src/traces/session.rs", Caller::InHandler),
-    ("api/search/src/traces/time_index/mod.rs", Caller::InHandler),
-    ("api/search/src/traces/user.rs", Caller::InHandler),
-    ("core/src/ai_chat.rs", Caller::Operational),
-    ("core/src/alerts/alert_calibration/mod.rs", Caller::Background("calibration runs")),
-    ("core/src/alerts/mod.rs", Caller::Background("alert evaluation")),
-    ("core/src/alerts/notifications/chart/mod.rs", Caller::Background("notification charts")),
-    ("core/src/anomaly_detection/partitioned_search.rs", Caller::Background("anomaly detection runs")),
-    ("core/src/db_monitoring/rollup.rs", Caller::Background("DBM rollup")),
-    ("core/src/downtimes/values.rs", Caller::Routed("downtimes::")),
-    ("core/src/fleet.rs", Caller::Helper("fleet pipelines; request/fleet/mod.rs checks the licence")),
-    ("core/src/fleet.rs", Caller::Exempt("fleet audit trail from the meta org audit stream; its route stays open")),
-    ("core/src/metrics/prom.rs", Caller::Routed("promql::label_values")),
-    ("core/src/self_reporting/search.rs", Caller::Exempt("licence usage from the meta org")),
-    ("core/src/slo/job.rs", Caller::Background("SLO job")),
-    ("core/src/slo/reconcile.rs", Caller::Background("SLO reconcile")),
-    ("core/src/traces/agent_signals/api.rs", Caller::Routed("traces::get_agent_signals")),
-    ("core/src/traces/service_graph/mod.rs", Caller::Routed("traces::get_current_topology")),
-    ("jobs/src/job/mod.rs", Caller::Background("eval-job scoring")),
-    ("jobs/src/job/red_insights.rs", Caller::Background("red_insights")),
+const SEARCH_CALLERS: [(&str, &str, Caller); 62] = [
+    ("api/management/src/request/alert_calibration/digests.rs", "read", Caller::Operational),
+    ("api/management/src/request/alerts/history.rs", "get_alert_history", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
+    ("api/management/src/request/alerts/history.rs", "get_all_anomaly_history", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
+    ("api/management/src/request/dashboards/reports_history.rs", "run_search", Caller::Exempt("the org's own report run history; its route stays open")),
+    ("api/management/src/request/db_monitoring/service/common.rs", "run_events_search", Caller::Routed("db_monitoring::handler::")),
+    ("api/management/src/request/db_monitoring/service/common.rs", "stats_search_once", Caller::Routed("db_monitoring::handler::")),
+    ("api/management/src/request/db_monitoring/service/instance_metrics.rs", "run_metrics_search", Caller::Routed("db_monitoring::handler::")),
+    ("api/management/src/request/synthetics/last_check.rs", "latest_result_per_check", Caller::Exempt("last check on the synthetics list; its route stays open")),
+    ("api/management/src/request/workflows/mod.rs", "get_workflow_history", Caller::Exempt("the org's own workflow run history; its route stays open")),
+    ("api/pipelines/src/request/pipelines/history.rs", "get_pipeline_history", Caller::Exempt("the org's own pipeline run history; its route stays open")),
+    ("api/search/src/profiles/mod.rs", "run_profiles_sql", Caller::InHandler),
+    ("api/search/src/promql/mod.rs", "search", Caller::InHandler),
+    ("api/search/src/promql/mod.rs", "search_streaming", Caller::InHandler),
+    ("api/search/src/rum/lookup/query.rs", "run", Caller::Helper("called by rum lookup, which checks the licence in rum/lookup/mod.rs")),
+    ("api/search/src/search/around.rs", "around", Caller::Helper("around v1/v2 check in search/mod.rs; around_multi is in the gated group")),
+    ("api/search/src/search/mod.rs", "search", Caller::InHandler),
+    ("api/search/src/search/mod.rs", "search_history", Caller::InHandler),
+    ("api/search/src/search/mod.rs", "search_partition", Caller::InHandler),
+    ("api/search/src/search/mod.rs", "values_inner", Caller::InHandler),
+    ("api/search/src/search/multi_streams.rs", "_search_partition_multi", Caller::Routed("search::multi_streams::")),
+    ("api/search/src/search/multi_streams.rs", "search_multi", Caller::Routed("search::multi_streams::")),
+    ("api/search/src/search/multi_streams.rs", "search_multi_stream", Caller::Routed("search::multi_streams::")),
+    ("api/search/src/search/patterns.rs", "extract_patterns", Caller::Routed("patterns::")),
+    ("api/search/src/search/search_inspector.rs", "get_search_profile", Caller::Exempt("search/profile stays open (D13)")),
+    ("api/search/src/search/search_stream.rs", "search_http2_stream", Caller::InHandler),
+    ("api/search/src/search/search_stream.rs", "values_http2_stream", Caller::InHandler),
+    ("api/search/src/traces/dag.rs", "get_trace_dag", Caller::InHandler),
+    ("api/search/src/traces/details.rs", "get_trace_details", Caller::Routed("traces::details::")),
+    ("api/search/src/traces/list/query.rs", "search", Caller::Helper("latest traces; traces/mod.rs checks the licence")),
+    ("api/search/src/traces/list/stream.rs", "run", Caller::Helper("latest traces; traces/mod.rs checks the licence")),
+    ("api/search/src/traces/session.rs", "fetch_session_trace_hits", Caller::InHandler),
+    ("api/search/src/traces/session.rs", "get_latest_sessions", Caller::InHandler),
+    ("api/search/src/traces/session.rs", "get_session_details", Caller::InHandler),
+    ("api/search/src/traces/time_index/mod.rs", "search_index_window", Caller::InHandler),
+    ("api/search/src/traces/user.rs", "get_latest_users", Caller::InHandler),
+    ("core/src/ai_chat.rs", "search_window", Caller::Operational),
+    ("core/src/alerts/alert_calibration/mod.rs", "search", Caller::Background("calibration runs")),
+    ("core/src/alerts/mod.rs", "evaluate_scheduled", Caller::Background("alert evaluation")),
+    ("core/src/alerts/mod.rs", "run_alert_count_query", Caller::Background("alert evaluation")),
+    ("core/src/alerts/notifications/chart/mod.rs", "fetch_series", Caller::Background("notification charts")),
+    ("core/src/alerts/prom_rule.rs", "evaluate", Caller::Background("alert evaluation of PromQL rules")),
+    ("core/src/alerts/scheduler/query_optimization_recommendation.rs", "search", Caller::Background("query recommendation analysis")),
+    ("core/src/anomaly_detection.rs", "execute_anomaly_query", Caller::Background("anomaly detection runs")),
+    ("core/src/anomaly_detection/partitioned_search.rs", "plan", Caller::Background("anomaly detection runs")),
+    ("core/src/anomaly_detection/partitioned_search.rs", "search", Caller::Background("anomaly detection runs")),
+    ("core/src/db_monitoring/rollup.rs", "run_dbm_search", Caller::Background("DBM rollup")),
+    ("core/src/downtimes/values.rs", "run_search", Caller::Routed("downtimes::")),
+    ("core/src/fleet.rs", "instant", Caller::Helper("fleet pipelines; request/fleet/mod.rs checks the licence")),
+    ("core/src/fleet.rs", "search_audit", Caller::Exempt("fleet audit trail from the meta org audit stream; its route stays open")),
+    ("core/src/metrics/prom.rs", "get_label_values", Caller::Routed("promql::label_values")),
+    ("core/src/metrics/prom.rs", "get_series", Caller::Routed("promql::label_values")),
+    ("core/src/self_reporting/search.rs", "get_usage", Caller::Exempt("licence usage from the meta org")),
+    ("core/src/slo/job.rs", "prom_search", Caller::Background("SLO job")),
+    ("core/src/slo/job.rs", "search", Caller::Background("SLO job")),
+    ("core/src/slo/reconcile.rs", "search_slices_page", Caller::Background("SLO reconcile")),
+    ("core/src/traces/agent_signals/api.rs", "fetch_arm_aggregate", Caller::Routed("traces::get_agent_signals")),
+    ("core/src/traces/agent_signals/api.rs", "fetch_arm_failures", Caller::Routed("traces::get_agent_signals")),
+    ("core/src/traces/agent_signals/api.rs", "get_agent_signals", Caller::Routed("traces::get_agent_signals")),
+    ("core/src/traces/service_graph/mod.rs", "run_graph_search", Caller::Routed("traces::get_current_topology")),
+    ("core/src/traces/service_graph/v4/read.rs", "run_query", Caller::Background("incident topology and on-call blast radius on alert firing; the topology routes are gated")),
+    ("jobs/src/job/mod.rs", "init", Caller::Background("eval-job scoring")),
+    ("jobs/src/job/red_insights.rs", "service_volumes", Caller::Background("red_insights")),
 ];
 
 /// How a search call site is licence-gated.
@@ -400,14 +424,39 @@ fn module_of(handler: &str) -> &str {
     handler.rsplit_once("::").map_or("", |(module, _)| module)
 }
 
-fn search_call_files() -> BTreeSet<String> {
+/// The fns of `production` that call a search entry point, by name.
+fn call_sites(production: &str) -> BTreeSet<String> {
+    let entry = regex::Regex::new(SEARCH_ENTRY).unwrap();
+    let import = regex::Regex::new(SEARCH_IMPORT).unwrap();
+    let fn_name = regex::Regex::new(r"\bfn\s+(\w+)").unwrap();
+    let mut calls: Vec<usize> = entry.find_iter(production).map(|m| m.start()).collect();
+    for imported in import.captures_iter(production) {
+        let name = imported.get(2).or(imported.get(1)).unwrap().as_str();
+        let bare = regex::Regex::new(&format!(r"\b{name}\(")).unwrap();
+        calls.extend(bare.find_iter(production).map(|m| m.start()).filter(|&at| {
+            let before = &production[..at];
+            // a path or method call is another fn, and `fn name(` is a declaration
+            !before.ends_with("::") && !before.ends_with('.') && !before.trim_end().ends_with("fn")
+        }));
+    }
+    calls
+        .into_iter()
+        .map(|at| {
+            fn_name
+                .captures_iter(&production[..at])
+                .last()
+                .map_or_else(String::new, |c| c[1].to_string())
+        })
+        .collect()
+}
+
+fn search_call_sites() -> BTreeSet<(String, String)> {
     let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let mut roots: Vec<_> = std::fs::read_dir(src.join("api"))
         .unwrap()
         .map(|e| e.unwrap().path().join("src"))
         .collect();
     roots.extend(["core/src", "mcp/src", "synthetics/src", "jobs/src"].map(|d| src.join(d)));
-    let entry = regex::Regex::new(SEARCH_ENTRY).unwrap();
     let mut hits = BTreeSet::new();
     let mut pending = roots;
     while let Some(path) = pending.pop() {
@@ -426,8 +475,8 @@ fn search_call_files() -> BTreeSet<String> {
         }
         let text = std::fs::read_to_string(&path).unwrap();
         let production = text.split("\n#[cfg(test)]\nmod tests").next().unwrap();
-        if entry.is_match(production) {
-            hits.insert(rel);
+        for name in call_sites(production) {
+            hits.insert((rel.clone(), name));
         }
     }
     hits
@@ -601,9 +650,17 @@ async fn route_layer_does_not_reach_methods_merged_on_the_same_path() {
 
 #[test]
 fn every_search_call_site_is_classified() {
-    let listed: BTreeSet<String> = SEARCH_CALLERS.iter().map(|(f, _)| f.to_string()).collect();
+    let listed: BTreeSet<(String, String)> = SEARCH_CALLERS
+        .iter()
+        .map(|(file, name, _)| (file.to_string(), name.to_string()))
+        .collect();
     assert_eq!(
-        search_call_files(),
+        listed.len(),
+        SEARCH_CALLERS.len(),
+        "SEARCH_CALLERS lists a call site twice"
+    );
+    assert_eq!(
+        search_call_sites(),
         listed,
         "classify every search call site in SEARCH_CALLERS"
     );
@@ -611,7 +668,7 @@ fn every_search_call_site_is_classified() {
         .into_iter()
         .chain(search_service::OPERATIONAL_STREAMS);
     let operational: Vec<&str> = operational.collect();
-    for (file, class) in SEARCH_CALLERS {
+    for (file, _, class) in SEARCH_CALLERS {
         match class {
             Caller::InHandler => {
                 assert!(
@@ -634,6 +691,27 @@ fn every_search_call_site_is_classified() {
             }
         }
     }
+}
+
+#[test]
+fn search_entry_catches_module_path_aliased_and_imported_calls() {
+    let fixture = r#"
+use crate::{db::organization, search::search};
+use search_service::search_partition as partition;
+
+async fn promql() { promql_service::search::search(&t, org, &req, "", 0, false).await; }
+async fn aliased() { search::search(&t, org, st, None, &req).await; }
+async fn crate_path() { crate::search::search(&t, org, st, None, &req).await; }
+async fn imported() { search("", &org, st, None, &req).await; }
+async fn renamed() { partition(&t, org, &req).await; }
+fn search(&self) {}
+async fn not_a_search() { meta_search::Request::default(); self.search(); client.search(q); }
+"#;
+    let expected = ["aliased", "crate_path", "imported", "promql", "renamed"];
+    assert_eq!(
+        call_sites(fixture),
+        BTreeSet::from(expected.map(String::from))
+    );
 }
 
 #[test]
