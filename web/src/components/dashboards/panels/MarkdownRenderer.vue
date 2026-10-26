@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="scroll h-full w-full overflow-auto" data-test="markdown-renderer-scroll-container">
     <div
       :class="['prose prose-sm max-w-none px-2 py-1', isDark && 'prose-invert']"
-      v-html="DOMPurify.sanitize(marked(processedContent))"
+      v-html="renderedHtml"
       data-test="markdown-renderer"
     ></div>
   </div>
@@ -27,9 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { computed, defineComponent } from "vue";
 import { useTheme } from "@/composables/useTheme";
-import { processVariableContent } from "@/utils/dashboard/variables/variablesUtils";
-import DOMPurify from "dompurify";
-import { marked } from "marked";
+import { renderMarkdownPanel } from "@/utils/dashboard/markdownPanel";
 
 export default defineComponent({
   name: "MarkdownRenderer",
@@ -54,19 +52,17 @@ export default defineComponent({
   setup(props): any {
     const { isDark } = useTheme();
 
-    const processedContent = computed(() => {
+    const renderedHtml = computed(() => {
       const context = {
         tabId: props.tabId,
         panelId: props.panelId,
       };
-      return processVariableContent(props.markdownContent, props.variablesData, context);
+      return renderMarkdownPanel(props.markdownContent, props.variablesData, context);
     });
 
     return {
-      DOMPurify,
-      marked,
       isDark,
-      processedContent,
+      renderedHtml,
     };
   },
 });
