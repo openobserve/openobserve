@@ -444,6 +444,17 @@ describe("ConfigPanel", () => {
       expect(roamSwitch().props("modelValue")).toBe(false);
     });
 
+    it("follows the config search", async () => {
+      const hidden = () => (roamSwitch().attributes("style") ?? "").includes("display: none");
+      wrapper = createWrapper({ dashboardPanelData: mapsPanel("sql") });
+      wrapper.vm.searchQuery = "pan and";
+      await wrapper.vm.$nextTick();
+      expect(hidden()).toBe(false);
+      wrapper.vm.searchQuery = "map";
+      await wrapper.vm.$nextTick();
+      expect(hidden()).toBe(true);
+    });
+
     it("is absent for geomap", () => {
       wrapper = createWrapper({
         dashboardPanelData: {

@@ -1519,6 +1519,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <OSwitch
           v-if="dashboardPanelData.data.type == 'maps'"
+          v-show="isConfigOptionVisible('map', 'map-roam')"
           v-model="mapsEnableRoam"
           :label="t('dashboard.mapsEnableRoam')"
           data-test="dashboard-config-map-roam"
