@@ -596,7 +596,7 @@ const buildPieLegendEntries = (
     const valueText = keys
       .map((key) => (key === "value" ? lookup.formatValue(values[index], name) : percentText()))
       .join("  ");
-    // The name gives way to the values; truncation keeps its first letter, so no entry loses its name.
+    // The values win the room, but a slice must stay identifiable, so its name is cut, never dropped.
     const nameWidth = textWidth - calculateWidthText(`  ${valueText}`, LEGEND_TEXT_FONT);
     entries.set(name, {
       name: truncateLegendName(String(lookup.displayName(name)), nameWidth),

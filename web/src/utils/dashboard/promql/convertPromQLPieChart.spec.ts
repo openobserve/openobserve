@@ -593,7 +593,11 @@ describe("PieConverter", () => {
         expect(convertWith({}).label.formatter({ ...params, percent: 33.33 })).toBe(
           "series1: 100.00 (33.33%)",
         );
-        expect(convertWith({ decimals: 20 }).percentPrecision).toBe(13);
+        const capped = convertWith({ decimals: 20 });
+        expect(capped.percentPrecision).toBe(13);
+        expect(capped.label.formatter({ ...params, percent: 33.3333333333333 })).toBe(
+          "series1: 100.00000000000000000000 (33.3333333333333%)",
+        );
       });
     });
 

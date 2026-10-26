@@ -39,7 +39,11 @@ export class PieConverter implements PromQLChartConverter {
     const chartType = panelSchema.type;
     const config = panelSchema.config || {};
     const seriesOverrides = createSeriesOverrideLookup(config);
-    const percentDecimals = pieLegendPercentDecimals(config.decimals);
+    // ECharts computes no digits past its seat precision, so the label prints no more than that.
+    const percentDecimals = Math.min(
+      pieLegendPercentDecimals(config.decimals),
+      MAX_SEATS_PRECISION,
+    );
     const data: any[] = [];
 
     // Calculate min/max for color scaling
@@ -117,7 +121,7 @@ export class PieConverter implements PromQLChartConverter {
 
         data,
 
-        percentPrecision: Math.min(percentDecimals, MAX_SEATS_PRECISION),
+        percentPrecision: percentDecimals,
 
         emphasis: {
           itemStyle: {

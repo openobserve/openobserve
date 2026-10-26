@@ -15,6 +15,7 @@
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { number as echartsNumber } from "echarts/core";
+import * as echarts from "echarts";
 import {
   getChartDimensions,
   getLegendPosition,
@@ -1666,6 +1667,35 @@ describe("pie outside labels beside a right legend", () => {
       after.radii.forEach((r: number, i: number) => expect(r).toBeCloseTo(before.radii[i]));
     },
   );
+
+  it("keeps the rendered outside labels left of a right legend", () => {
+    const options: any = {
+      series: [
+        {
+          ...pieSeries(["40%", "70%"]),
+          data: ["api-gateway", "cdn-service", "stream-platform", "monitoring-service"].map(
+            (name) => ({ name: `${name}: 81.00 (25.00%)`, value: 81 }),
+          ),
+        },
+      ],
+    };
+    applyLegendConfiguration(schema("donut"), panel, hovered, options);
+    // jsdom has no canvas to measure label text with, so give each glyph a typical width.
+    echarts.setPlatformAPI({ measureText: (text: string) => ({ width: text.length * 7 }) });
+    const chart = echarts.init(null, null, { renderer: "svg", ssr: true, width: 600, height: 300 });
+    chart.setOption(options);
+    const rights: number[] = [];
+    (chart as any)._chartsViews[0].group.traverse((node: any) => {
+      const text = node.getTextContent?.();
+      if (!text || text.ignore || !text.style?.text) return;
+      const rect = text.getBoundingRect().clone();
+      rect.applyTransform(text.getComputedTransform());
+      rights.push(rect.x + rect.width);
+    });
+    chart.dispose();
+    expect(rights.length).toBeGreaterThan(0);
+    rights.forEach((right) => expect(right).toBeLessThanOrEqual(options.legend.left));
+  });
 
   it("leaves inside labels, hidden labels and bottom legends alone", () => {
     const cases: [any, any][] = [
