@@ -189,13 +189,20 @@ const applyPieOverrides = (series: any, lookup: SeriesOverrideLookup, options: a
   const percentLabel = series.label?.formatter === "{d}%";
   const customLabel = typeof series.label?.formatter === "function" ? series.label.formatter : null;
   const items = series.data;
-  // Like the legend, the share is of the slices still shown; ChartRenderer keeps legend.selected in step.
-  const visibleTotal = () =>
-    items.reduce((sum: number, item: any) => {
+  // Like the legend, the share is of the slices still shown; ChartRenderer replaces legend.selected on each toggle.
+  let totalFor: { selected: unknown } | null = null;
+  let total = 0;
+  const visibleTotal = () => {
+    const selected = options.legend?.selected;
+    if (totalFor && totalFor.selected === selected) return total;
+    totalFor = { selected };
+    total = items.reduce((sum: number, item: any) => {
       const numeric = Number(item?.value);
-      const shown = options.legend?.selected?.[item?.name] !== false;
+      const shown = selected?.[item?.name] !== false;
       return shown && Number.isFinite(numeric) && numeric > 0 ? sum + numeric : sum;
     }, 0);
+    return total;
+  };
   let labelOverridden = false;
   series.data = items.map((item: any) => {
     const resolved = lookup.get(item?.name);

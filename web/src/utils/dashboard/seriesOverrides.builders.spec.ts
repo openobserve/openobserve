@@ -378,6 +378,7 @@ describe.each(["pie", "donut"])("SQL %s", (type) => {
     const options = await runSQL(piePanel(overrides), [rows]);
     const api = options.series[0].data[0];
     expect(options.legend.selected).toEqual({});
+    expect(api.label.formatter()).toBe("66.7%");
     options.legend.selected = { api: true, web: false };
     expect(api.label.formatter()).toBe("100.0%");
     options.legend.selected = {};
