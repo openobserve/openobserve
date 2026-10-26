@@ -22,6 +22,7 @@ import { convertGeoMapData } from "@/utils/dashboard/convertGeoMapData";
 import { convertMapsData } from "@/utils/dashboard/convertMapsData";
 import { convertSankeyData } from "./convertSankeyData";
 import { convertStateTimelineData } from "./convertStateTimelineData";
+import { convertHostmapData } from "./convertHostmapData";
 import { runJavaScriptCode, validateUserCode } from "./convertCustomChartData";
 /**
  * Converts panel data based on the panel schema and data.
@@ -236,6 +237,12 @@ export const convertPanelData = async (
           hoveredSeriesState,
           annotations,
         ),
+      };
+    }
+    case "hostmap": {
+      return {
+        chartType: panelSchema.type,
+        ...convertHostmapData(panelSchema, data, store, metadata, chartPanelRef),
       };
     }
     case "custom_chart": {
