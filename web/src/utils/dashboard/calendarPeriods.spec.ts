@@ -21,6 +21,7 @@ import {
   formatCalendarTooltip,
   parseCalendarToken,
   resolveCalendarPeriod,
+  setPickerTimezoneSource,
   shiftCalendarToken,
 } from "./calendarPeriods";
 
@@ -409,6 +410,19 @@ describe("calendarPeriods", () => {
       expect(resolveCalendarPeriod("calendar:day:0", "Browser Time (UTC)", NOW)).toEqual(utc);
       expect(resolveCalendarPeriod("calendar:day:0", null, NOW)).toEqual(utc);
       expect(resolveCalendarPeriod("calendar:day:0", undefined, NOW)).toEqual(utc);
+    });
+
+    it("uses the registered picker zone over the stored one when no zone is given", () => {
+      localStorage.setItem("timezone", "America/New_York");
+      setPickerTimezoneSource(() => "Asia/Calcutta");
+      try {
+        expect(resolveCalendarPeriod("calendar:day:0", null, NOW)).toEqual(
+          resolveCalendarPeriod("calendar:day:0", IST, NOW),
+        );
+      } finally {
+        setPickerTimezoneSource(() => localStorage.getItem("timezone"));
+        localStorage.removeItem("timezone");
+      }
     });
 
     it("defaults now to the current clock", () => {

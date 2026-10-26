@@ -438,6 +438,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
               data-test="service-graph-date-time-picker"
+              calendar-presets
               class="h-8!"
               @on:date-change="updateDateTime"
             />
@@ -491,6 +492,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
               data-test="services-catalog-date-time-picker"
+              calendar-presets
               class="me-1.5 h-8!"
               @on:date-change="updateDateTime"
             />

@@ -15,6 +15,8 @@
 
 import { computed } from "vue";
 import { gt, type I18nKey } from "@/types/i18n";
+import { getIntlLocale } from "@/locales";
+import { formatCalendarLabel, resolveCalendarPeriod } from "@/utils/dashboard/calendarPeriods";
 
 /**
  * `gt()` rather than a threaded `t`: this is a module-scope pure helper that
@@ -23,6 +25,8 @@ import { gt, type I18nKey } from "@/types/i18n";
  */
 export function periodToLabel(period: string): string {
   if (!period || period === "absolute") return "";
+  const calendarLabel = formatCalendarLabel(period, null, gt, getIntlLocale());
+  if (calendarLabel) return calendarLabel;
   const value = parseInt(period, 10);
   const unit = period.slice(-1);
   // One pipe-plural message key per unit — each message carries the whole sentence
@@ -50,7 +54,10 @@ export function nextWiderPeriod(period: string): string {
     w: 10080,
     M: 43200,
   };
-  const mins = value * (toMins[unit] ?? 1);
+  const calendar = resolveCalendarPeriod(period);
+  const mins = calendar
+    ? (calendar.endTime - calendar.startTime) / 60_000_000
+    : value * (toMins[unit] ?? 1);
   if (mins <= 60) return "1d";
   if (mins <= 1440) return "7d";
   return "30d";

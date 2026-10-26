@@ -1838,7 +1838,7 @@ describe("usePanelDataLoader", () => {
       });
 
       it.each([
-        ["a calendar period so far, cached earlier from the same start", 0, false],
+        ["a window with the same start but another end, outside a calendar period", 0, true],
         ["a window of another length and start", 30 * 60_000, true],
       ])("flags restored data from %s as different: %s", async (_label, startShift, differs) => {
         const panelSchema = createMockPanelSchema();

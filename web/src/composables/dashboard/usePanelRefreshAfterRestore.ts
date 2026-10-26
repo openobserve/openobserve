@@ -52,6 +52,17 @@ const toMs = (time: unknown) => (time instanceof Date ? time.getTime() : Number(
 const isSameWindow = (a: TimeWindow, b: TimeWindow) =>
   toMs(a?.start_time) === toMs(b?.start_time) && toMs(a?.end_time) === toMs(b?.end_time);
 
+/** Whether restored data covers another range than the one selected; a calendar period so far keeps its start while it grows. */
+export const cachedWindowDiffers = (
+  cachedWindow: TimeWindow,
+  selectedWindow: TimeWindow,
+  isCalendarRange: boolean,
+): boolean => {
+  const span = (w: TimeWindow) => toMs(w?.end_time) - toMs(w?.start_time);
+  if (span(cachedWindow) === span(selectedWindow)) return false;
+  return !(isCalendarRange && toMs(cachedWindow?.start_time) === toMs(selectedWindow?.start_time));
+};
+
 /** Dashboard-view restore policy: an absolute range restores only its own window; a relative one restores, then re-queries. */
 export const usePanelRefreshAfterRestore = <S extends PanelLoaderState>({
   state,
@@ -70,12 +81,14 @@ export const usePanelRefreshAfterRestore = <S extends PanelLoaderState>({
   const heldResult = ref<Pick<S, HeldKey> | null>(null);
 
   // The cache key has no time range, so another absolute window of the same length would pass for this one.
+  const isCalendarRange = () => !!freshOnOpen?.isCalendarRange?.(panelSchema.value);
+
   const acceptsCachedWindow = (cachedWindow: TimeWindow, selectedWindow: TimeWindow) => {
     if (freshOnOpen?.isRelativeRange(panelSchema.value) === false) {
       return isSameWindow(cachedWindow, selectedWindow);
     }
     // A calendar period has fixed bounds, so data from any other window is not that period's data.
-    if (freshOnOpen?.isCalendarRange?.(panelSchema.value)) {
+    if (isCalendarRange()) {
       return toMs(cachedWindow?.start_time) === toMs(selectedWindow?.start_time);
     }
     return true;
@@ -144,6 +157,7 @@ export const usePanelRefreshAfterRestore = <S extends PanelLoaderState>({
 
   return {
     acceptsCachedWindow,
+    isCalendarRange,
     queueRefresh,
     holdIfQueued,
     release,

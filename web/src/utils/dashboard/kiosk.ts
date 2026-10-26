@@ -16,6 +16,7 @@
 import type { LocationQuery, LocationQueryValue } from "vue-router";
 import { generateDurationLabel, parseDuration } from "@/utils/date";
 import { formatCalendarLabel } from "@/utils/dashboard/calendarPeriods";
+import { getIntlLocale } from "@/locales";
 import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
 
 export type KioskTheme = "light" | "dark";
@@ -174,7 +175,7 @@ export const formatAge = (elapsedMs: number, t: TranslateFn): I18nText => {
 
 /** "Past 15 Minutes" for `15m`, "Last month" for a calendar token, or null when it is neither. */
 export const formatRelativePeriod = (period: string | null | undefined, t: TranslateFn) => {
-  const calendarLabel = formatCalendarLabel(period, null, t);
+  const calendarLabel = formatCalendarLabel(period, null, t, getIntlLocale());
   if (calendarLabel) return calendarLabel;
   const match = /^(\d+)([smhdwM])$/.exec(period ?? "");
   if (!match) return null;

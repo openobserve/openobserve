@@ -8306,8 +8306,7 @@ export class LogsPage {
         const relativeBtn = this.page.locator(`[data-test="date-time-relative-${suffix}-btn"]`);
         await relativeBtn.waitFor({ state: 'visible', timeout: 5000 });
         await relativeBtn.click();
-        // Wait for the date-time button to remain visible (popup closed); selection complete
-        await this.page.locator(this.dateTimeButton).waitFor({ state: 'visible' });
+        await this.closeDateTimePickerIfOpen();
         testLogger.info(`Relative time range set: ${suffix}`);
     }
 

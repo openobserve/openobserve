@@ -386,7 +386,16 @@ import ODateRangeCalendar from "@/lib/forms/DateTimeRange/ODateRangeCalendar.vue
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import DateTimeRail from "@/components/DateTimeRail.vue";
-import { ref, defineComponent, computed, onMounted, watch, nextTick, type PropType } from "vue";
+import {
+  ref,
+  defineComponent,
+  computed,
+  onBeforeUnmount,
+  onMounted,
+  watch,
+  nextTick,
+  type PropType,
+} from "vue";
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 import {
   getImageURL,
@@ -563,7 +572,7 @@ export default defineComponent({
     // A selected calendar period overrides relativePeriod/relativeValue while the type is relative.
     const calendarToken = ref<string | null>(null);
     const appliedCalendarToken = ref<string | null>(null);
-    // The relative selection last applied; closing the panel without Apply returns to it so the arrows never act on a pending pick.
+    // Type and relative selection last applied; closing without Apply restores these, not the absolute fields.
     let appliedSelection = {
       selectedType: "relative",
       calendarToken: null as string | null,
@@ -697,6 +706,10 @@ export default defineComponent({
     const refreshTooltipNow = () => {
       tooltipNow.value = Date.now();
     };
+
+    // Calendar labels name a day, so the clock they read must move on its own, not only on hover.
+    const clockTick = setInterval(refreshTooltipNow, 60_000);
+    onBeforeUnmount(() => clearInterval(clockTick));
 
     const calendarTooltip = (token: string | null) =>
       formatCalendarTooltip(token, store.state.timezone, tooltipNow.value) ?? undefined;
@@ -869,7 +882,7 @@ export default defineComponent({
         // above calls `markProgrammaticDateChange()`, and its nextTick reset has
         // not run yet. Consumers must therefore treat `userChangedValue === false`
         // as "do not fetch": the parent's own `onMounted` covers the first load.
-        saveDate(initialType);
+        saveDate(selectedType.value);
       } catch (e) {
         console.log(e);
       }
@@ -953,8 +966,18 @@ export default defineComponent({
     };
 
     const setRelativeTime = (period: string) => {
-      if (props.calendarPresets && resolveCalendarPeriod(period, store.state.timezone)) {
+      const calendarRange = resolveCalendarPeriod(period, store.state.timezone);
+      if (calendarRange && props.calendarPresets) {
         calendarToken.value = period;
+        return;
+      }
+      if (calendarRange) {
+        // A stale token beside an applied absolute range is not the range in force, so it must not replace it.
+        if (selectedType.value !== "relative") return;
+        // A picker without calendar presets keeps a shared calendar range as its dates instead of dropping it.
+        selectedType.value = "absolute";
+        calendarToken.value = null;
+        setAbsoluteTime(calendarRange.startTime, calendarRange.endTime);
         return;
       }
 
@@ -1283,8 +1306,8 @@ export default defineComponent({
       selectedType.value = dateobj.type;
 
       if (dateobj.type === "relative") {
-        setRelativeTime(dateobj.relativeTimePeriod);
         selectedType.value = "relative";
+        setRelativeTime(dateobj.relativeTimePeriod);
       } else {
         if (
           Object.prototype.hasOwnProperty.call(dateobj, "selectedDate") &&
@@ -1341,24 +1364,40 @@ export default defineComponent({
      * back to what's actually applied; see `appliedDisplayValue`.
      * The `||` fallback covers the first paint, before the mount-time apply.
      */
+    const triggerLabel = computed(() => {
+      const showsApplied = !props.autoApply && !menuOpen.value;
+      // A calendar label is re-derived so an older period keeps naming the right day after midnight.
+      const appliedCalendarLabel = showsApplied
+        ? formatCalendarLabel(
+            appliedCalendarToken.value,
+            store.state.timezone,
+            t,
+            intlLocale.value,
+            tooltipNow.value,
+          )
+        : null;
+      const label = showsApplied
+        ? appliedCalendarLabel || appliedDisplayValue.value || getDisplayValue.value
+        : getDisplayValue.value;
+      return isMobile.value ? compactRangeLabel(label) : label;
+    });
+
     // Mirrors triggerLabel: the live selection while it is in force or being edited, else the applied one.
     const triggerTooltip = computed(() => {
       if (!props.autoApply && !menuOpen.value) return calendarTooltip(appliedCalendarToken.value);
       return selectedType.value === "relative" ? calendarTooltip(calendarToken.value) : undefined;
     });
 
-    const triggerLabel = computed(() => {
-      const label =
-        props.autoApply || menuOpen.value
-          ? getDisplayValue.value
-          : appliedDisplayValue.value || getDisplayValue.value;
-      return isMobile.value ? compactRangeLabel(label) : label;
-    });
-
     const getDisplayValue = computed(() => {
       const calendarLabel =
         !props.disableRelative && selectedType.value === "relative"
-          ? formatCalendarLabel(calendarToken.value, store.state.timezone, t, intlLocale.value)
+          ? formatCalendarLabel(
+              calendarToken.value,
+              store.state.timezone,
+              t,
+              intlLocale.value,
+              tooltipNow.value,
+            )
           : null;
       if (calendarLabel) return calendarLabel;
       if (!props.disableRelative && selectedType.value === "relative") {
@@ -1553,6 +1592,14 @@ export default defineComponent({
       if (selectedType.value === "relative" && calendarToken.value !== null) {
         const shifted = shiftCalendarToken(calendarToken.value, direction === "prev" ? -1 : 1);
         if (shifted === null || !resolveCalendarPeriod(shifted, store.state.timezone)) return;
+        refreshTooltipNow();
+        // A partial period can step into a full one longer than the page allows, which the rail would have refused.
+        if (calendarExceedsRestriction(shifted)) {
+          if (props.queryRangeRestrictionMsg) {
+            toast({ variant: "warning", message: raw(props.queryRangeRestrictionMsg) });
+          }
+          return;
+        }
         calendarToken.value = shifted;
         menuOpen.value = false;
         saveDate("relative");

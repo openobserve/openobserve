@@ -31,7 +31,7 @@ import { useStore } from "vuex";
 import config from "@/aws-exports";
 
 import { usePanelCache } from "./usePanelCache";
-import { usePanelRefreshAfterRestore } from "./usePanelRefreshAfterRestore";
+import { cachedWindowDiffers, usePanelRefreshAfterRestore } from "./usePanelRefreshAfterRestore";
 import { isEqual, omit } from "lodash-es";
 
 import { useAnnotations } from "./useAnnotations";
@@ -918,11 +918,12 @@ export const usePanelDataLoader = (
         };
       }
 
-      // A calendar period so far keeps its start while its span grows, so a shared start is the same range.
       if (
-        selectedTimeObj?.value?.end_time - selectedTimeObj?.value?.start_time !==
-          cache?.cacheTimeRange?.end_time - cache?.cacheTimeRange?.start_time &&
-        selectedTimeObj?.value?.start_time?.getTime?.() !== cache?.cacheTimeRange?.start_time
+        cachedWindowDiffers(
+          cache?.cacheTimeRange,
+          selectedTimeObj?.value,
+          refreshAfterRestore.isCalendarRange(),
+        )
       ) {
         state.isCachedDataDifferWithCurrentTimeRange = true;
       }

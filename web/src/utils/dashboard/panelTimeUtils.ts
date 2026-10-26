@@ -292,16 +292,23 @@ export const isEffectivePanelTimeRelative = (
   return (ownTime?.valueType ?? globalTime?.valueType) === "relative";
 };
 
+/** The fields of a panel that decide which time range it loads with. */
+export interface PanelTimeSource {
+  id?: string;
+  config?: { panel_time_enabled?: boolean; panel_time_range?: PanelTimeRange | null };
+}
+
 /** Whether the range a panel loads with is a calendar period, by the same precedence as isEffectivePanelTimeRelative. */
 export const isEffectivePanelTimeCalendar = (
-  panel: any,
+  panel: PanelTimeSource | null | undefined,
   query: LocationQuery | undefined,
   globalTime: { valueType?: string; relativeTimePeriod?: string } | null | undefined,
 ): boolean => {
-  const ownTime = hasPanelTime(panel)
-    ? (getPanelTimeFromURL(panel.id, query) ??
-      convertPanelTimeRangeToPicker(panel.config?.panel_time_range))
-    : null;
+  const ownTime =
+    panel && hasPanelTime(panel)
+      ? (getPanelTimeFromURL(panel.id ?? "", query) ??
+        convertPanelTimeRangeToPicker(panel.config?.panel_time_range))
+      : null;
   const time = ownTime ?? globalTime;
   return time?.valueType === "relative" && parseCalendarToken(time.relativeTimePeriod) !== null;
 };

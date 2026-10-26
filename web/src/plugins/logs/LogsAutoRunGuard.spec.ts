@@ -76,6 +76,16 @@ describe("LogsAutoRunGuard (J5, F5–F9)", () => {
     expect(wrapper.emitted("search-job")).toHaveLength(1);
   });
 
+  it("names a calendar period in the scope line, never as a NaN count", () => {
+    const wrapper = mountGuard({
+      autoRunOn: true,
+      blocked: blocked({ window: { type: "relative", period: "calendar:month:-1" } }),
+    });
+    const scope = wrapper.find('[data-test="logs-auto-run-guard-estimate"]').text();
+    expect(scope).toContain("k8s_logs · Last month");
+    expect(scope).not.toContain("NaN");
+  });
+
   it("says 'Paused' without the Auto Run hint when Auto Run is off (F14)", () => {
     const wrapper = mountGuard({ autoRunOn: false });
     expect(wrapper.find('[data-test="logs-auto-run-guard-estimate"]').text()).toContain(

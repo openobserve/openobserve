@@ -73,7 +73,7 @@ export const shiftCalendarToken = (token: string, step: number): string | null =
   return parseCalendarToken(next) ? next : null;
 };
 
-/** Resolves a calendar token to a microsecond range, in the given zone or else the stored picker zone, then the browser's. */
+/** Resolves a calendar token to a microsecond range, in the given zone or else the picker's zone, then the browser's. */
 export const resolveCalendarPeriod = (
   token: unknown,
   timezone?: string | null,
@@ -138,7 +138,6 @@ export const formatRangeTooltip = (
 
 const browserTimezone = (): string => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-// The store seeds its timezone from this key, so callers without a store still resolve in the picker's zone.
 const storedTimezone = (): string | null => {
   try {
     return window.localStorage.getItem("timezone");
@@ -147,9 +146,17 @@ const storedTimezone = (): string | null => {
   }
 };
 
+// Until the app store registers itself, the stored key it seeds from is the closest stand-in.
+let pickerTimezoneSource: () => string | null | undefined = storedTimezone;
+
+/** Makes zone-less resolves use the picker's zone; the app store registers its timezone here. */
+export const setPickerTimezoneSource = (source: () => string | null | undefined): void => {
+  pickerTimezoneSource = source;
+};
+
 // An unknown zone (or the "Browser Time (…)" option label) would make date-fns-tz throw or return NaN.
 export const safeTimezone = (timezone?: string | null): string => {
-  const zone = timezone || storedTimezone();
+  const zone = timezone || pickerTimezoneSource();
   if (!zone) return browserTimezone();
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: zone });

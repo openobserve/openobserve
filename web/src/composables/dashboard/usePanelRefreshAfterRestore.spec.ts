@@ -16,7 +16,7 @@
 import { describe, expect, it } from "vitest";
 import { defineComponent, h, provide, reactive, ref } from "vue";
 import { mount } from "@vue/test-utils";
-import { usePanelRefreshAfterRestore } from "./usePanelRefreshAfterRestore";
+import { cachedWindowDiffers, usePanelRefreshAfterRestore } from "./usePanelRefreshAfterRestore";
 import { createDashboardFreshOnOpen, DASHBOARD_FRESH_ON_OPEN } from "./dashboardFreshOnOpen";
 
 const restoredState = () =>
@@ -72,6 +72,25 @@ const startRun = (state: any, refresh: any) => {
   state.loading = true;
   state.data = [];
 };
+
+describe("cachedWindowDiffers", () => {
+  const selected = { start_time: new Date(1_000_000), end_time: new Date(1_900_000) };
+
+  it("is false for the same length", () => {
+    expect(
+      cachedWindowDiffers({ start_time: 2_000_000, end_time: 2_900_000 }, selected, false),
+    ).toBe(false);
+  });
+
+  it("exempts a shared start only for a calendar period", () => {
+    const sameStart = { start_time: 1_000_000, end_time: 1_500_000 };
+    expect(cachedWindowDiffers(sameStart, selected, true)).toBe(false);
+    expect(cachedWindowDiffers(sameStart, selected, false)).toBe(true);
+    expect(
+      cachedWindowDiffers({ start_time: 1_200_000, end_time: 1_500_000 }, selected, true),
+    ).toBe(true);
+  });
+});
 
 describe("usePanelRefreshAfterRestore", () => {
   it("never queues outside a dashboard view", () => {

@@ -275,13 +275,78 @@ describe("DateTime rail", () => {
       expect(wrapper!.vm.triggerLabel).toBe("2024");
     });
 
-    it("ignores calendar tokens when the picker has no calendar presets", async () => {
+    it("keeps a calendar token as its absolute dates when the picker has no calendar presets", async () => {
       createWrapper({ calendarPresets: false, defaultRelativeTime: "calendar:month:0" });
       await flushPromises();
 
       expect(wrapper!.vm.calendarToken).toBeNull();
-      expect(lastEmit().relativeTimePeriod).toBe("15m");
-      expect(wrapper!.vm.triggerLabel).toBe("Past 15 Minutes");
+      expect(wrapper!.vm.selectedType).toBe("absolute");
+      expect(lastEmit()).toMatchObject({
+        valueType: "absolute",
+        relativeTimePeriod: null,
+        startTime: micros("2026-09-30T18:30:00Z"),
+        endTime: micros("2026-10-08T03:00:00Z"),
+      });
+      expect(lastEmit().relativeTimePeriod).not.toBe("15m");
+    });
+
+    it("converts a calendar token restored through setSavedDate on a picker without presets", async () => {
+      createWrapper({ calendarPresets: false });
+      await flushPromises();
+
+      wrapper!.vm.setSavedDate({ type: "relative", relativeTimePeriod: "calendar:day:-1" });
+      expect(wrapper!.vm.selectedType).toBe("absolute");
+      expect(wrapper!.vm.getConsumableDateTime()).toMatchObject({
+        startTime: micros("2026-10-06T18:30:00Z"),
+        endTime: micros("2026-10-07T18:29:59Z"),
+      });
+    });
+
+    it("leaves an applied absolute range alone when a stale calendar token rides along", async () => {
+      createWrapper({
+        calendarPresets: false,
+        defaultType: "absolute",
+        defaultAbsoluteTime: {
+          startTime: micros("2026-10-01T00:00:00Z"),
+          endTime: micros("2026-10-01T01:00:00Z"),
+        },
+        defaultRelativeTime: "calendar:month:-1",
+      });
+      await flushPromises();
+
+      expect(lastEmit()).toMatchObject({
+        valueType: "absolute",
+        startTime: micros("2026-10-01T00:00:00Z"),
+        endTime: micros("2026-10-01T01:00:00Z"),
+      });
+    });
+
+    it("refuses a shift into a period longer than the query-range limit", async () => {
+      createWrapper({
+        autoApply: true,
+        defaultRelativeTime: "calendar:day:0",
+        queryRangeRestrictionInHour: 12,
+        queryRangeRestrictionMsg: "Max 12 hours",
+      });
+      await flushPromises();
+      const emitsBefore = (wrapper!.emitted("on:date-change") ?? []).length;
+
+      el("date-time-prev-btn")!.click();
+      await flushPromises();
+
+      expect(wrapper!.vm.calendarToken).toBe("calendar:day:0");
+      expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(emitsBefore);
+    });
+
+    it("moves an older period's label to the right day once the clock passes midnight", async () => {
+      createWrapper({ autoApply: false, defaultRelativeTime: "calendar:day:-2" });
+      await flushPromises();
+      expect(wrapper!.vm.triggerLabel).toBe("Oct 6");
+
+      vi.setSystemTime(new Date("2026-10-09T03:00:00Z"));
+      wrapper!.vm.refreshTooltipNow();
+      await flushPromises();
+      expect(wrapper!.vm.triggerLabel).toBe("Oct 7");
     });
 
     it("steps a calendar period by its own unit with the shift arrows", async () => {
