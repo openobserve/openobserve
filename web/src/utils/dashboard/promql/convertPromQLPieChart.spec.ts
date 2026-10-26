@@ -166,6 +166,37 @@ describe("PieConverter", () => {
       ]);
     });
 
+    it("keeps the saved reducer for an instant range-vector selector with many samples", async () => {
+      const { applyAggregation } = await import("./shared/dataProcessor");
+      vi.mocked(applyAggregation).mockClear();
+      converter.convert(
+        [
+          {
+            series: [
+              { name: "single", values: [[1, "50"]] },
+              {
+                name: "window",
+                values: [
+                  [1, "10"],
+                  [2, "20"],
+                ],
+              },
+            ],
+            timestamps: [1, 2],
+            queryIndex: 0,
+            queryConfig: { query_type: "instant" },
+          } as any,
+        ],
+        { type: "pie", config: { aggregation: "count" } },
+        mockStore,
+        { legends: [] },
+      );
+      expect(vi.mocked(applyAggregation).mock.calls.map((call) => call[1])).toEqual([
+        "last",
+        "count",
+      ]);
+    });
+
     it("should populate extras.legends with series names", () => {
       const processedData: ProcessedPromQLData[] = [
         {

@@ -314,6 +314,11 @@ import { chartColor } from "@/utils/chartTheme";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
+import {
+  CustomChartSkippedError,
+  type CustomChartContext,
+} from "@/utils/dashboard/convertCustomChartData";
+import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { getDataValue } from "@/utils/dashboard/aliasUtils";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { useRoute, useRouter } from "vue-router";
@@ -1360,6 +1365,7 @@ export default defineComponent({
             annotations,
             loading.value,
             filteredSparklineData.value,
+            panelSchema.value?.type === "custom_chart" ? buildCustomChartContext() : undefined,
           );
           // Superseded while awaiting: its data is older than what is coming.
           if (superseded()) return;
@@ -1476,7 +1482,7 @@ export default defineComponent({
             code: "",
           };
         } catch (error: any) {
-          if (superseded()) return;
+          if (superseded() || error instanceof CustomChartSkippedError) return;
           errorDetail.value = {
             message: error?.message,
             code: error?.code || "",
@@ -1542,6 +1548,18 @@ export default defineComponent({
         }
       },
       { deep: true },
+    );
+
+    // The loader reloads only for query-referenced variables, but chart code may read any of them.
+    // Keyed on values only: option lists and loading flags change often and chart code cannot see them.
+    watch(
+      () =>
+        panelSchema.value?.type === "custom_chart" ? JSON.stringify(customChartVariables()) : "",
+      () => {
+        if (panelSchema.value?.type === "custom_chart" && data.value?.length && !loading.value) {
+          convertPanelDataCommon();
+        }
+      },
     );
 
     // Watch for hiddenQueries changes to re-render the chart
@@ -2138,6 +2156,33 @@ export default defineComponent({
       if (v instanceof Date) return v.getTime();
       const n = Number(v);
       return Number.isFinite(n) && n > 0 ? n : 0;
+    }
+
+    // Uses the committed variables the query ran with, so context matches the data.
+    function customChartVariables(): Record<string, unknown> {
+      const variables: Record<string, unknown> = {};
+      for (const v of props.variablesData?.values ?? []) {
+        if (!v?.name) continue;
+        const isAll =
+          v.value == null ||
+          v.value === SELECT_ALL_VALUE ||
+          (Array.isArray(v.value) && (!v.value.length || v.value.includes(SELECT_ALL_VALUE)));
+        // Queries run an empty value or the All sentinel as All, so chart code gets null for both.
+        variables[v.name] = isAll ? null : v.value;
+      }
+      return variables;
+    }
+
+    function buildCustomChartContext(): CustomChartContext {
+      return {
+        variables: customChartVariables(),
+        timeRange: {
+          start: toMicros((props.selectedTimeObj as any)?.start_time),
+          end: toMicros((props.selectedTimeObj as any)?.end_time),
+        },
+        timezone: store.state.timezone,
+        theme: isDark.value ? "dark" : "light",
+      };
     }
 
     function openCellDrawer(params: {

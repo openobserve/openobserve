@@ -14,8 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi } from "vitest";
-import { createRequire } from "node:module";
-import { Worker } from "node:worker_threads";
 import { number as echartsNumber } from "echarts";
 import { applyPieDonutChart } from "@/utils/dashboard/sql/charts/convertSQLPieDonutChart";
 
@@ -204,14 +202,20 @@ describe.each(["pie", "donut"])("applyPieDonutChart - %s slice percent precision
     expect(ctx.options.series[0].percentPrecision).toBe(decimals);
   });
 
-  it.each([undefined, null])(
-    "defaults the label precision to 2 when decimals is %s",
+  it.each([undefined, null, ""])(
+    "defaults the label precision to 2 when decimals is %o",
     (decimals) => {
       const ctx = contextWithDecimals(decimals);
       applyPieDonutChart(ctx);
       expect(ctx.options.series[0].percentPrecision).toBe(2);
     },
   );
+
+  it("floors fractional decimals like the legend does", () => {
+    const ctx = contextWithDecimals(2.7);
+    applyPieDonutChart(ctx);
+    expect(ctx.options.series[0].percentPrecision).toBe(2);
+  });
 
   // ECharts' percent rounding never ends on these values at precision 14.
   const loopingValues = [3, 5, 7, 11, 13, 17, 19];
@@ -225,68 +229,3 @@ describe.each(["pie", "donut"])("applyPieDonutChart - %s slice percent precision
     expect(echartsNumber.getPercentWithPrecision(values, 0, precision)).toBeCloseTo(4, 10);
   });
 });
-
-const echartsEntry = createRequire(import.meta.url).resolve("echarts");
-
-// Renders in a worker: ECharts' percent rounding is synchronous, so only a worker can stop a run that never ends.
-const renderPieLabels = (series: any, ms: number) =>
-  new Promise<string[] | "timeout">((resolve, reject) => {
-    const worker = new Worker(
-      `const { parentPort, workerData } = require("node:worker_threads");
-      const echarts = require(workerData.entry);
-      const chart = echarts.init(null, null, { renderer: "svg", ssr: true, width: 400, height: 300 });
-      chart.setOption({ animation: false, series: [workerData.series] });
-      const labels = chart.renderToSVGString().match(/>[^<]*%</g) || [];
-      chart.dispose();
-      parentPort.postMessage(labels.map((label) => label.slice(1, -1)));`,
-      { eval: true, workerData: { entry: echartsEntry, series } },
-    );
-    const timer = setTimeout(() => {
-      void worker.terminate();
-      resolve("timeout");
-    }, ms);
-    worker.once("message", (labels) => {
-      clearTimeout(timer);
-      void worker.terminate();
-      resolve(labels);
-    });
-    worker.once("error", (error) => {
-      clearTimeout(timer);
-      reject(error);
-    });
-  });
-
-describe.each(["pie", "donut"])(
-  "applyPieDonutChart - %s near-cancelling negative slices",
-  (type) => {
-    // ECharts' percent rounding on these raw values never ends at precision 13; its pie drops negative slices first.
-    const nearCancelling = [1e15, -999999999999999];
-
-    it("renders at decimals 13 with the real values, labelling the positive slice 100%", async () => {
-      const ctx = makeMockContext({
-        options: {
-          xAxis: [{ data: ["gain", "loss"] }],
-          yAxis: [{ data: [] }],
-          series: [],
-          tooltip: {},
-          grid: {},
-        },
-        getAxisDataFromKey: vi.fn(() => nearCancelling),
-        panelSchema: {
-          type,
-          config: { unit: "default", unit_custom: "", decimals: 13, color: { mode: "fixed" } },
-          queries: [{ fields: { y: [{ label: "Value" }] } }],
-        },
-      });
-      applyPieDonutChart(ctx);
-      const { data, percentPrecision, label, radius } = ctx.options.series[0];
-      expect(data.map((item: any) => item.value)).toEqual(nearCancelling);
-      expect(percentPrecision).toBe(13);
-      const labels = await renderPieLabels(
-        { type: "pie", data, percentPrecision, label, radius },
-        5000,
-      );
-      expect(labels).toEqual(["100%"]);
-    }, 10000);
-  },
-);

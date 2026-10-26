@@ -393,7 +393,8 @@ export default defineComponent({
       chart?.dispatchAction({
         type: "restore",
       });
-      syncPieLegendSelection({});
+      // Restore returns to the last full option, which may carry an isolated slice, not to all visible.
+      syncPieLegendSelection({ ...(chart?.getOption()?.legend?.[0]?.selected ?? {}) });
       // we need that toolbox datazoom button initially selected
       chart?.dispatchAction({
         type: "takeGlobalCursor",

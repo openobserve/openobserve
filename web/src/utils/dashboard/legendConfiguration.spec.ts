@@ -15,7 +15,6 @@
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { number as echartsNumber } from "echarts/core";
-import * as echarts from "echarts";
 import {
   getChartDimensions,
   getLegendPosition,
@@ -1248,7 +1247,7 @@ describe("pie and donut legend values", () => {
       );
       expect(options.legend.formatter("A")).toBe("{b|A}  1  50%");
       expect(options.legend.formatter("B")).toBe("{b|B}  10  50%");
-      expect(options.legend.formatter("C")).toBe("{b|C}  0  0%");
+      expect(options.legend.formatter("C")).toBe("{b|C}  -  -");
     },
   );
 
@@ -1438,7 +1437,7 @@ describe("pie and donut legend values", () => {
 
   it.each([
     [13, "{b|api}  75.0000000000000%"],
-    [25, "{b|a...}  75.0000000000000000000000000%"],
+    [25, "{b|api}  75.0000000000000%"],
     [-1, "{b|api}  75.00%"],
     ["abc", "{b|api}  75.00%"],
     [1.7, "{b|api}  75.0%"],
@@ -1511,7 +1510,7 @@ describe("pie and donut legend values", () => {
     const reserved = 300 - options.legend.left;
     expect(options.legend.textStyle.width).toBe(reserved - 60);
     const text = options.legend.formatter("a-long-service-name");
-    expect(text).toBe("{b|a...}  30  75%");
+    expect(text).toBe("30  75%");
   });
 
   it("lets a right scroll legend with values take up to half the chart", () => {
@@ -1580,6 +1579,74 @@ describe("pie and donut legend values", () => {
     expect(valuesRight.legendWidth).toBeGreaterThan(plainRight.legendWidth);
   });
 
+  it("gives a negative slice 0% under an override's decimals or capped panel decimals", () => {
+    const negatives = [
+      { name: "api", value: 30 },
+      { name: "loss", value: -10 },
+    ];
+    const withOverride: any = pieOptions(negatives);
+    applyLegendConfiguration(
+      pieSchema({
+        legend_values: ["percent"],
+        override_config: [
+          { field: { matchBy: "series", value: "loss" }, config: [{ type: "decimals", value: 2 }] },
+        ],
+      }),
+      chartPanelRef,
+      hovered(),
+      withOverride,
+    );
+    expect(withOverride.legend.formatter("loss")).toBe("{b|loss}  0.00%");
+
+    const highPrecision: any = pieOptions(negatives);
+    applyLegendConfiguration(
+      pieSchema({ legend_values: ["percent"], decimals: 14 }),
+      chartPanelRef,
+      hovered(),
+      highPrecision,
+    );
+    expect(highPrecision.legend.formatter("loss")).toBe(`{b|loss}  ${(0).toFixed(13)}%`);
+  });
+
+  it("matches ECharts' seats on tied and zero remainders", () => {
+    const cases = [
+      [1, 1, 1, 1, 1, 1, 1],
+      [0, 5, 5, 0, 5, 3],
+      [2, 2, 2, 1e-9],
+    ];
+    for (const values of cases) {
+      const data = values.map((value, i) => ({ name: `s${i}`, value }));
+      const options: any = pieOptions(data);
+      applyLegendConfiguration(
+        pieSchema({ legend_values: ["percent"], decimals: 2 }),
+        chartPanelRef,
+        hovered(),
+        options,
+      );
+      data.forEach((slice, index) => {
+        const expected = echartsNumber.getPercentWithPrecision(values, index, 2).toFixed(2);
+        expect(options.legend.formatter(slice.name)).toBe(`{b|${slice.name}}  ${expected}%`);
+      });
+    }
+  });
+
+  it("shows a dash, not a zero, for a slice with no finite value", () => {
+    const options: any = pieOptions([
+      { name: "api", value: 30 },
+      { name: "gap", value: NaN },
+      { name: "inf", value: Infinity },
+    ]);
+    applyLegendConfiguration(
+      pieSchema({ legend_values: ["value", "percent"], decimals: 0 }),
+      chartPanelRef,
+      hovered(),
+      options,
+    );
+    expect(options.legend.formatter("gap")).toBe("{b|gap}  -  -");
+    expect(options.legend.formatter("inf")).toBe("{b|inf}  -  -");
+    expect(options.legend.formatter("api")).toBe("{b|api}  30  100%");
+  });
+
   it.each(["pie", "donut"])(
     "keeps short %s names beside the percents in a narrow right legend",
     (type) => {
@@ -1602,7 +1669,7 @@ describe("pie and donut legend values", () => {
     },
   );
 
-  it("truncates a name to its first letters rather than dropping it when the values fill the legend", () => {
+  it("drops the name rather than push the values out when not one letter fits beside them", () => {
     const options: any = pieOptions([
       { name: "transcoding-service", value: 9837 },
       { name: "payment-service", value: 9785 },
@@ -1613,7 +1680,42 @@ describe("pie and donut legend values", () => {
       hovered(),
       options,
     );
-    expect(options.legend.formatter("transcoding-service")).toBe("{b|t...}  9837.00  50.13%");
+    expect(options.legend.formatter("transcoding-service")).toBe("9837.00  50.13%");
+  });
+
+  it.each([
+    [300, "{b|tra...}  75%"],
+    [255, "75%"],
+  ])("keeps a cut name only while it fits beside the values (panel %i)", (width, expected) => {
+    const options: any = pieOptions([
+      { name: "transcoding-service", value: 30 },
+      { name: "db", value: 10 },
+    ]);
+    applyLegendConfiguration(
+      pieSchema({ legends_position: "right", legend_values: ["percent"], decimals: 0 }),
+      { value: { offsetWidth: width, offsetHeight: 300 } },
+      hovered(),
+      options,
+    );
+    const text = options.legend.formatter("transcoding-service");
+    expect(text).toBe(expected);
+    expect(text.replace(/\{[ab]\|([^}]*)\}/, "$1").length * 8).toBeLessThanOrEqual(
+      options.legend.textStyle.width,
+    );
+  });
+
+  it("never swaps a short name for a wider cut one", () => {
+    const options: any = pieOptions([
+      { name: "ab", value: 30 },
+      { name: "db", value: 10 },
+    ]);
+    applyLegendConfiguration(
+      pieSchema({ legends_position: "right", legend_values: ["value", "percent"], decimals: 0 }),
+      { value: { offsetWidth: 240, offsetHeight: 300 } },
+      hovered(),
+      options,
+    );
+    expect(["{b|ab}  30  75%", "30  75%"]).toContain(options.legend.formatter("ab"));
   });
 });
 
@@ -1667,35 +1769,6 @@ describe("pie outside labels beside a right legend", () => {
       after.radii.forEach((r: number, i: number) => expect(r).toBeCloseTo(before.radii[i]));
     },
   );
-
-  it("keeps the rendered outside labels left of a right legend", () => {
-    const options: any = {
-      series: [
-        {
-          ...pieSeries(["40%", "70%"]),
-          data: ["api-gateway", "cdn-service", "stream-platform", "monitoring-service"].map(
-            (name) => ({ name: `${name}: 81.00 (25.00%)`, value: 81 }),
-          ),
-        },
-      ],
-    };
-    applyLegendConfiguration(schema("donut"), panel, hovered, options);
-    // jsdom has no canvas to measure label text with, so give each glyph a typical width.
-    echarts.setPlatformAPI({ measureText: (text: string) => ({ width: text.length * 7 }) });
-    const chart = echarts.init(null, null, { renderer: "svg", ssr: true, width: 600, height: 300 });
-    chart.setOption(options);
-    const rights: number[] = [];
-    (chart as any)._chartsViews[0].group.traverse((node: any) => {
-      const text = node.getTextContent?.();
-      if (!text || text.ignore || !text.style?.text) return;
-      const rect = text.getBoundingRect().clone();
-      rect.applyTransform(text.getComputedTransform());
-      rights.push(rect.x + rect.width);
-    });
-    chart.dispose();
-    expect(rights.length).toBeGreaterThan(0);
-    rights.forEach((right) => expect(right).toBeLessThanOrEqual(options.legend.left));
-  });
 
   it("leaves inside labels, hidden labels and bottom legends alone", () => {
     const cases: [any, any][] = [

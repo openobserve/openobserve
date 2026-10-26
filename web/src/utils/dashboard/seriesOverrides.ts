@@ -183,7 +183,11 @@ const sharePercent = (value: unknown, total: number): number => {
   return total > 0 && Number.isFinite(numeric) ? (numeric / total) * 100 : 0;
 };
 
-const applyPieOverrides = (series: any, lookup: SeriesOverrideLookup, options: any) => {
+const applyPieOverrides = (
+  series: any,
+  lookup: SeriesOverrideLookup,
+  options: { legend?: { selected?: Record<string, boolean> } },
+) => {
   if (!Array.isArray(series?.data)) return;
   // `{d}%` is replaced outright; a custom label reads the lookup itself and only needs the exact share.
   const percentLabel = series.label?.formatter === "{d}%";
@@ -196,9 +200,9 @@ const applyPieOverrides = (series: any, lookup: SeriesOverrideLookup, options: a
     const selected = options.legend?.selected;
     if (totalFor && totalFor.selected === selected) return total;
     totalFor = { selected };
-    total = items.reduce((sum: number, item: any) => {
+    total = items.reduce((sum: number, item: { name?: string; value?: unknown } | null) => {
       const numeric = Number(item?.value);
-      const shown = selected?.[item?.name] !== false;
+      const shown = selected?.[item?.name ?? ""] !== false;
       return shown && Number.isFinite(numeric) && numeric > 0 ? sum + numeric : sum;
     }, 0);
     return total;
@@ -218,7 +222,7 @@ const applyPieOverrides = (series: any, lookup: SeriesOverrideLookup, options: a
         label: {
           ...next.label,
           formatter: customLabel
-            ? (params: any) => customLabel({ ...params, percent: share() })
+            ? (params: Record<string, unknown>) => customLabel({ ...params, percent: share() })
             : () => `${share().toFixed(decimals)}%`,
         },
       };

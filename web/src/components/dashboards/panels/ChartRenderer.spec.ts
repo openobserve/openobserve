@@ -1471,11 +1471,44 @@ describe("ChartRenderer", () => {
       expect(options.legend.selected).not.toBe(selected);
       expect(options.legend.formatter("a")).toBe("{b|a}  100%");
 
+      chart.getOption.mockReturnValue({ legend: [{}] });
       const onDataZoom = chart.on.mock.calls.find(([event]: any[]) => event === "dataZoom")[1];
       onDataZoom({ batch: [{}, {}] });
 
       expect(chart.dispatchAction).toHaveBeenCalledWith({ type: "restore" });
       expect(options.legend.formatter("a")).toBe("{b|a}  50%");
+    });
+
+    it("keeps a pie legend's percents on the slices a restore leaves isolated", async () => {
+      const options: any = {
+        ...mockChartData.options,
+        series: [
+          {
+            type: "pie",
+            data: [
+              { name: "a", value: 10 },
+              { name: "b", value: 10 },
+            ],
+          },
+        ],
+      };
+      applyLegendConfiguration(
+        {
+          type: "pie",
+          config: { show_legends: true, legend_values: ["percent"], decimals: 0 },
+        },
+        { value: { offsetWidth: 800, offsetHeight: 400 } },
+        mockHoveredSeriesState,
+        options,
+      );
+      const { chart } = await isolateFirstSlice(options);
+      chart.getOption.mockReturnValue({ legend: [{ selected: { a: true, b: false } }] });
+
+      const onDataZoom = chart.on.mock.calls.find(([event]: any[]) => event === "dataZoom")[1];
+      onDataZoom({ batch: [{}, {}] });
+
+      expect(chart.dispatchAction).toHaveBeenCalledWith({ type: "restore" });
+      expect(options.legend.formatter("a")).toBe("{b|a}  100%");
     });
 
     it("recomputes a pie slice's override-decimals label over the visible slices", async () => {
