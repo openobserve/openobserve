@@ -10,6 +10,7 @@ import {
 } from "@/utils/dashboard/heatmapYAxis";
 import { addCommasToNumber } from "@/utils/formatters";
 import { validateAnnotationSources } from "@/utils/dashboard/validateAnnotationSources";
+import { HOSTMAP_MAX_GROUP_LEVELS } from "@/utils/dashboard/convertHostmapData";
 
 /**
  * Validates a single condition item
@@ -501,6 +502,26 @@ const validateChartFieldsConfiguration = (
       }
       break;
     }
+    case "hostmap": {
+      if (fields?.y?.length !== 1) {
+        const errorMsg =
+          pageKey === "logs"
+            ? t("dashboard.utils.unableToExtractValueField")
+            : t("dashboard.utils.addOneFieldFor", { label: yAxisLabel });
+        errors.push(errorMsg);
+      }
+      if (fields?.x?.length !== 1) {
+        const errorMsg =
+          pageKey === "logs"
+            ? t("dashboard.utils.unableToExtractGroupingField")
+            : t("dashboard.utils.addOneFieldFor", { label: xAxisLabel });
+        errors.push(errorMsg);
+      }
+      if ((fields?.breakdown?.length ?? 0) > HOSTMAP_MAX_GROUP_LEVELS) {
+        errors.push(t("dashboard.utils.hostmapTooManyGroups", { count: HOSTMAP_MAX_GROUP_LEVELS }));
+      }
+      break;
+    }
     case "stacked":
     case "h-stacked": {
       if (fields?.y?.length === 0) {
@@ -862,6 +883,7 @@ const validatePanelContent = (t: TranslateFn, panel: any): string[] => {
     "h-stacked",
     "heatmap",
     "state-timeline",
+    "hostmap",
     "metric",
     "gauge",
     "geomap",
@@ -986,6 +1008,7 @@ export const validatePanel = (
       "maps",
       "heatmap",
       "state-timeline",
+      "hostmap",
       "geomap",
       "donut",
       "pie",

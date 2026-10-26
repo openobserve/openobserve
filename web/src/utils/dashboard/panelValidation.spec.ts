@@ -337,6 +337,53 @@ describe("panelValidation", () => {
   });
 });
 
+describe("validateSQLPanelFields — host map field rules", () => {
+  const field = (alias: string) => ({
+    alias,
+    column: alias,
+    label: alias,
+    type: "raw",
+    rawQuery: `max(${alias})`,
+  });
+  const errorsFor = (fields: any) => {
+    const errors: string[] = [];
+    validateSQLPanelFields(
+      gt,
+      { type: "hostmap", queryType: "sql", queries: [{ customQuery: false, fields }] },
+      0,
+      "Entity",
+      "Value",
+      errors,
+      true,
+    );
+    return errors;
+  };
+
+  it("accepts one entity, one value and up to two group fields", () => {
+    expect(
+      errorsFor({
+        x: [field("gpu")],
+        y: [field("temp")],
+        breakdown: [field("rack"), field("host")],
+      }),
+    ).toEqual([]);
+  });
+
+  it("needs exactly one entity and one value", () => {
+    expect(errorsFor({ x: [], y: [field("temp")], breakdown: [] })).toHaveLength(1);
+    expect(errorsFor({ x: [field("gpu")], y: [], breakdown: [] })).toHaveLength(1);
+  });
+
+  it("rejects a third group level", () => {
+    const errors = errorsFor({
+      x: [field("gpu")],
+      y: [field("temp")],
+      breakdown: [field("dc"), field("rack"), field("host")],
+    });
+    expect(errors).toEqual(["Host map can group by at most 2 fields"]);
+  });
+});
+
 describe("validatePanel on a PromQL formula", () => {
   const run = (queries: any[]) => {
     const errors: string[] = [];
