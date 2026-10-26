@@ -1650,12 +1650,12 @@
       "fileTypeZip": "Apenas ficheiros ZIP são permitidos"
     },
     "emptyState": {
-      "title": "Monitorize os seus utilizadores com a monitorização de utilizadores reais",
-      "description": "O RUM acompanha as interações reais dos utilizadores — carregamentos de páginas, erros, chamadas de API e repetições de sessões — para que possa ver exatamente como os utilizadores vivenciam a sua aplicação.",
       "webApp": "Instrumentar uma aplicação web",
       "webAppDesc": "Adicione o SDK RUM do OpenObserve a qualquer aplicação {product}",
       "sessionReplay": "Ativar repetição de sessão",
       "sessionReplayDesc": "Grave e reproduza sessões de utilizador para depurar problemas de UX",
+      "title": "Monitorize os seus utilizadores com a monitorização de utilizadores reais",
+      "description": "O RUM acompanha as interações reais dos utilizadores — carregamentos de páginas, erros, chamadas de API e repetições de sessões — para que possa ver exatamente como os utilizadores vivenciam a sua aplicação.",
       "learnMore": "Saiba mais:",
       "quickImpl": "Guia de implementação rápida",
       "blogPost": "Noções básicas sobre monitorização de front-end"
@@ -4950,12 +4950,6 @@
     "joinSlack": "Junte-se ao Slack",
     "maybeLater": "Talvez mais tarde"
   },
-  "connectDataSourcePopup": {
-    "title": "Para começar, vamos ligar a sua primeira fonte de dados.",
-    "description": "Temos muito para lhe mostrar, mas primeiro precisamos de ligar os seus dados. A maioria das equipas vê os primeiros logs em cerca de um minuto.",
-    "connectButton": "Ligar uma fonte de dados",
-    "slackLink": "Junte-se também à nossa comunidade no Slack"
-  },
   "confirmDialog": {
     "continueFromWherePaused": "Continuar a partir de onde parou",
     "startFromNow": "Começar a partir de agora.",
@@ -5407,8 +5401,6 @@
       "anyWindowsHostNote": "Qualquer servidor ou VM Windows.",
       "arrow": "→",
       "askOnSlack": "Pergunte no Slack",
-      "autoInstrumentTracesDesc": "Ambas dão-lhe **traces distribuídos sem tocar no código da aplicação nem reconstruir imagens**. **Bibliotecas de linguagem:** o operador do OpenTelemetry injeta autoinstrumentação nos pods de um namespace anotado. **eBPF:** o coletor rastreia os processos que selecionar, em qualquer linguagem, incluindo Go.",
-      "autoInstrumentTracesTitle": "Rastreie as suas aplicações: bibliotecas de linguagem ou eBPF",
       "cassandraJmxNote": "Ative o acesso remoto JMX no Cassandra para que o recetor se ligue.",
       "cassandraTagline": "Colete métricas do Cassandra por meio do recetor JMX do OpenTelemetry Collector e envie-as para o OpenObserve.",
       "checking": "A verificar…",
@@ -5493,11 +5485,13 @@
       "k8sAnnotatePodNote": "Anote a especificação de um único pod em vez do namespace para instrumentar uma carga de trabalho de cada vez.",
       "k8sFixBody": "O operador do OpenTelemetry não inicia até que o webhook do cert-manager esteja em serviço, e um coletor que nunca inicia não envia nada. Verifique se ambos estão em execução e teste novamente:",
       "k8sFixTitle": "Aguarde o webhook do cert-manager",
+      "k8sEbpfAnyLanguageVariant": "Qualquer linguagem, sem biblioteca (eBPF)",
       "k8sEbpfNote": "Os traces são capturados com eBPF: não são necessárias alterações de código nem SDK. O contexto de rastreio só passa entre serviços por HTTP em texto simples (nas apps Go também por HTTPS, exceto em nós com kernel lockdown). Um processo que corresponda a qualquer uma das portas, ao caminho do executável ou à linha de comando é rastreado; os globs não podem conter `,`, `{'{'}` ou `{'}'}`, e uma porta corresponde a qualquer processo com um socket nela. Requer Helm 3.14+ e o operador do OpenTelemetry v0.142.0+; se o seu for mais antigo, atualize-o primeiro com `kubectl apply -f https://github.com/open-telemetry/opentelemetry-operator/releases/download/v0.161.0/opentelemetry-operator.yaml`. Se o eBPF já estava ativado com um operador mais antigo, execute o comando novamente com `--force` (`--force-replace` no Helm 4). Voltar a executar o comando de instalação acima repõe a release e desativa o eBPF, por isso execute este comando novamente depois. O namespace `openobserve-collector` tem de permitir pods privilegiados, e os nós têm de executar Linux em amd64 ou arm64 com kernel 5.8+ (ou RHEL da família 4.18 com backports de eBPF) e BTF. Não selecione aplicações que já enviam os seus próprios traces, nem pods que usam o sidecar Go `inject-go`.",
-      "k8sEbpfVariant": "eBPF (qualquer linguagem, sem alterar código)",
-      "k8sLibrariesVariant": "Bibliotecas de linguagem (autoinstrumentação)",
       "k8sInstallerNote": "Isto instala cert-manager, o operador do OpenTelemetry e o coletor do OpenObserve automaticamente.",
       "k8sInternalEndpointNote": "Use isto quando o OpenObserve estiver no mesmo cluster — o tráfego nunca o deixa.",
+      "k8sLibraryPerLanguageVariant": "Adicionar uma biblioteca por linguagem (Java, .NET, Node.js, Python)",
+      "k8sOptionalTracesDesc": "Também quer traces dos pedidos dos seus serviços? Escolha como e execute mais um comando. Não é preciso alterar código e pode fazê-lo a qualquer momento.",
+      "k8sOptionalTracesTitle": "Opcional: rastreie as suas aplicações",
       "k8sTroubleAnnotationA": "A injeção ocorre na criação do pod, então os pods existentes não são afetados até serem reiniciados — execute `kubectl rollout restart deployment -n my-namespace`. Confirme se a anotação foi aplicada com `kubectl get ns my-namespace -o yaml` e verifique se o valor corresponde a `openobserve-collector/openobserve-<language>`.",
       "k8sTroubleAnnotationQ": "Anotei um namespace, mas nenhum trace aparece",
       "k8sTroubleEndpointA": "Use o **Endpoint interno** apenas quando o próprio OpenObserve é executado neste cluster; o tráfego permanece então dentro dele e nunca atravessa a rede. O URL é `http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080` — a predefinição assume a release `o2` no namespace `openobserve`, pelo que deve editá-lo se os seus valores forem diferentes. Todos os outros usam o endpoint externo.",
@@ -5750,6 +5744,7 @@
       "androidTroubleScreenNamesQ": "As sessões aparecem, mas os ecrãs têm todos o mesmo nome",
       "androidTroubleScreenNamesA": "O rastreio de visualizações não está configurado. Passe um `useViewTrackingStrategy(...)` — por exemplo, `ActivityViewTrackingStrategy(trackExtras = true)` para Activities, ou `NavigationViewTrackingStrategy(...)` se usa AndroidX Navigation — ao construir a `RumConfiguration`.",
       "setupTime5Min": "~5 min",
+      "showStepInstructions": "Mostrar instruções",
       "snowflakeCollectorVersionNote": "O Snowflake precisa do collector v0.92.0 — versões mais recentes têm um bug conhecido.",
       "snowflakeTagline": "Colete métricas de conta do Snowflake com o OpenTelemetry Collector e envie-as para o OpenObserve.",
       "sqlClientGuiVariant": "Cliente SQL (GUI)",

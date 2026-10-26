@@ -75,7 +75,7 @@ service:
       exporters: [otlp/openobserve]`;
 
 // Env vars for an SDK pointed straight at OpenObserve (no collector in between).
-const SDK_ENV = `export OTEL_EXPORTER_OTLP_ENDPOINT="{url}/api/{org}"
+export const SDK_ENV = `export OTEL_EXPORTER_OTLP_ENDPOINT="{url}/api/{org}"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic {token},stream-name={stream}"
 export OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf"
 export OTEL_SERVICE_NAME="my-service"`;

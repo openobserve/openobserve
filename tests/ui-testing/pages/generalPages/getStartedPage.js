@@ -1,37 +1,53 @@
 // Copyright 2026 OpenObserve Inc.
+// Cloud onboarding (/onboarding): step 1 choices, rows, which-one tiles, a guide or the coding
+// agent page inside onboarding, the guide's step nav, the agent page's listen bar and the first-data panel.
 const { expect } = require('@playwright/test');
 
-const SOURCE_IDS = [
-    'kubernetes', 'linux', 'windows', 'webserver', 'otel', 'http',
-    'cloud', 'rum', 'llm', 'agent', 'unsure',
-];
+const CHOICE_IDS = ['infrastructure', 'backend', 'frontend', 'logs', 'llm'];
 
-class GetStartedPage {
+class OnboardingPage {
     /** @param {import('@playwright/test').Page} page */
     constructor(page) {
         this.page = page;
-        this.dialog = page.locator('[data-test="main-layout-get-started-dialog"]');
-        this.title = page.locator('[data-test="onboarding-get-started-title"]');
-        this.subtitle = page.locator('[data-test="onboarding-get-started-subtitle"]');
-        this.grid = page.locator('[data-test="onboarding-get-started-source-grid"]');
-        this.sources = page.locator('[data-test^="onboarding-get-started-source-"]:not([data-test="onboarding-get-started-source-grid"])');
-        this.hearAboutUs = page.locator('[data-test="onboarding-get-started-hear-about-us-field"]');
-        this.whereDoYouWork = page.locator('[data-test="onboarding-get-started-where-do-you-work-field"]');
-        // The box itself: the wrapper's centre lands on the Privacy policy link in the label.
-        this.agree = page.locator('[data-test="onboarding-get-started-agree-checkbox"]').getByRole('checkbox');
-        this.skipBtn = page.locator('[data-test="onboarding-get-started-skip-btn"]');
-        this.continueBtn = page.locator('[data-test="onboarding-get-started-submit-btn"]');
-        this.connectPopup = page.locator('[data-test="connect-data-source-popup-dialog"]');
-        this.pickGroup = page.locator('[data-test="ingestion-recommended-pick-group"]');
+        this.view = page.locator('[data-test="onboarding-view"]');
+        this.skipBtn = page.locator('[data-test="onboarding-view-skip"]');
+        this.choose = page.locator('[data-test="onboarding-step-choose"]');
+        this.choices = page.locator('[data-test^="onboarding-step-choose-choice-"]');
+        this.others = page.locator('[data-test^="onboarding-step-choose-other-"]');
+        this.terms = page.locator('[data-test="onboarding-step-choose-terms"]');
+        this.termsLink = page.locator('[data-test="onboarding-step-choose-terms-link"]');
+        this.privacyLink = page.locator('[data-test="onboarding-step-choose-privacy-link"]');
+        this.previewTitle = page.locator('[data-test="onboarding-preview-title"]');
+        this.rows = page.locator('[data-test="onboarding-step-rows"]');
+        this.which = page.locator('[data-test="onboarding-step-which"]');
+        this.guide = page.locator('[data-test="onboarding-step-guide"]');
+        this.agentSetup = page.locator('[data-test="onboarding-agent-setup"]');
+        this.listenBar = page.locator('[data-test="onboarding-listen-bar"]');
+        // The guide's data check: the one step in its nav that carries a status.
+        this.guideStatus = page.locator('[data-test="onboarding-guide-rail"] [data-tone]');
+        this.firstData = page.locator('[data-test="onboarding-first-data"]');
+        this.firstDataOpen = page.locator('[data-test="onboarding-first-data-open"]');
         this.attributionBodies = [];
     }
 
-    static get SOURCE_IDS() {
-        return SOURCE_IDS;
+    static get CHOICE_IDS() {
+        return CHOICE_IDS;
     }
 
-    source(id) {
-        return this.page.locator(`[data-test="onboarding-get-started-source-${id}"]`);
+    choice(id) {
+        return this.page.locator(`[data-test="onboarding-step-choose-choice-${id}"]`);
+    }
+
+    other(id) {
+        return this.page.locator(`[data-test="onboarding-step-choose-other-${id}"]`);
+    }
+
+    row(id) {
+        return this.page.locator(`[data-test="onboarding-step-rows-row-${id}"]`);
+    }
+
+    tile(id) {
+        return this.page.locator(`[data-test="onboarding-step-which-guide-${id}"]`);
     }
 
     // Records each attribution body; OSS has no such endpoint, so there it answers 200 itself.
@@ -43,7 +59,7 @@ class GetStartedPage {
         });
     }
 
-    // Puts this browser into the first-login state MainLayout opens the dialog for.
+    // Puts this browser into the first-login state MainLayout sends to /onboarding (cloud, org with no data).
     async openAsFirstLogin(path, { orgId, prefill } = {}) {
         await this.page.goto(path);
         await this.page.evaluate(({ org, pre }) => {
@@ -53,16 +69,26 @@ class GetStartedPage {
             else sessionStorage.removeItem('o2.onboarding.prefill');
         }, { org: orgId, pre: prefill ?? null });
         await this.page.reload();
-        await expect(this.title).toBeVisible({ timeout: 20000 });
     }
 
-    async sourceIds() {
-        return this.sources.evaluateAll((els) =>
-            els.map((el) => el.getAttribute('data-test').replace('onboarding-get-started-source-', '')));
+    async expectStepOne(timeout = 20000) {
+        await this.page.waitForURL(/\/onboarding(\?|$)/, { timeout });
+        await expect(this.choose).toBeVisible({ timeout });
     }
 
-    async expectPicked(id) {
-        await expect(this.source(id)).toHaveAttribute('data-state', 'checked');
+    async choiceIds() {
+        return this.choices.evaluateAll((els) =>
+            els.map((el) => el.getAttribute('data-test').replace('onboarding-step-choose-choice-', '')));
+    }
+
+    async otherIds() {
+        return this.others.evaluateAll((els) =>
+            els.map((el) => el.getAttribute('data-test').replace('onboarding-step-choose-other-', '')));
+    }
+
+    // tone: waiting | ok | attention
+    async expectGuideStatus(tone, timeout = 20000) {
+        await expect(this.guideStatus).toHaveAttribute('data-tone', tone, { timeout });
     }
 
     async storedPick(orgId) {
@@ -78,4 +104,4 @@ class GetStartedPage {
     }
 }
 
-module.exports = { GetStartedPage };
+module.exports = { OnboardingPage };

@@ -1,21 +1,56 @@
-const { execFileSync } = require('child_process');
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
-const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { authedRequest, getAuthHeaders } = require('../utils/cloud-auth.js');
 const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
-const { GetStartedPage } = require('../../pages/generalPages/getStartedPage.js');
-const { FirstEventPage } = require('../../pages/generalPages/firstEventPage.js');
+const { OnboardingPage } = require('../../pages/generalPages/getStartedPage.js');
+const { generateHexId } = require('../utils/trace-ingestion.js');
 
 const apiBase = () => (process.env.INGESTION_URL || process.env.ZO_BASE_URL).replace(/\/$/, '');
 const uiBase = () => process.env.ZO_BASE_URL.replace(/\/$/, '');
 const CLICK_LOG = 'e2e.journey.clicks';
-const FORBIDDEN_CLICK = /(reveal-btn|troubleshoot-btn|test-btn|recheck)/;
+const FORBIDDEN_CLICK = /(reveal-btn|troubleshoot|test-btn|recheck)/;
 
-async function orgPasscode(request, orgId) {
-    const res = await request.get(`${apiBase()}/api/${orgId}/passcode`, { headers: getAuthHeaders() });
-    if (!res.ok()) return '';
+async function createOrg(page) {
+    const res = await authedRequest(page, 'post', `${uiBase()}/api/organizations`, { data: { name: `e2e_journey_${Date.now()}` } });
+    expect(res.ok()).toBeTruthy();
     const body = await res.json();
-    return body?.data?.passcode ?? '';
+    return body.identifier || (body.data && body.data.identifier);
+}
+
+// The token the setup card puts in its commands: base64(email:org passcode).
+async function orgToken(request, orgId) {
+    const res = await request.get(`${apiBase()}/api/${orgId}/passcode`, { headers: getAuthHeaders() });
+    expect(res.ok()).toBeTruthy();
+    const body = await res.json();
+    const { user, passcode } = body?.data ?? {};
+    return Buffer.from(`${user || process.env.ZO_ROOT_USER_EMAIL}:${passcode}`).toString('base64');
+}
+
+// One span over OTLP HTTP, as an app with the OpenTelemetry SDK sends it.
+async function sendTrace(request, orgId, token) {
+    const nowNs = BigInt(Date.now()) * 1000000n;
+    const res = await request.post(`${apiBase()}/api/${orgId}/v1/traces`, {
+        headers: { Authorization: `Basic ${token}`, 'Content-Type': 'application/json', 'stream-name': 'default' },
+        data: {
+            resourceSpans: [{
+                resource: { attributes: [{ key: 'service.name', value: { stringValue: 'e2e-onboarding-journey' } }] },
+                scopeSpans: [{
+                    scope: { name: 'e2e' },
+                    spans: [{
+                        traceId: generateHexId(16),
+                        spanId: generateHexId(8),
+                        name: 'GET /checkout',
+                        kind: 2,
+                        startTimeUnixNano: String(nowNs - 5000000n),
+                        endTimeUnixNano: String(nowNs),
+                        attributes: [],
+                        status: { code: 1 },
+                    }],
+                }],
+            }],
+        },
+    });
+    expect(res.status()).toBe(200);
 }
 
 // Every trusted pointer press and Enter key, logged by the page itself so the count does not trust the test's own tally.
@@ -36,60 +71,50 @@ async function recordInteractions(page) {
     }, CLICK_LOG);
 }
 
-// Get started to the first record in Logs takes at most six interactions, never a Reveal, Test, Recheck or Troubleshoot click.
+// First login to the first trace in Traces, inside onboarding: pick, guide, data, Explore Your Traces.
 test.describe('First data journey', () => {
-    test('Terms, Skip, one block click, the command run outside, Open in Logs', {
-        tag: ['@onboarding', '@journey', '@all', '@P1'],
+    let orgId;
+
+    test.afterEach(async ({ page }) => {
+        if (orgId) await authedRequest(page, 'delete', `${uiBase()}/api/organizations/${orgId}`).catch(() => {});
+    });
+
+    test('Backend, any language with OpenTelemetry, a trace arrives, Explore Your Traces', {
+        tag: ['@onboarding', '@journey', '@cloud', '@P1'],
     }, async ({ page, request }, testInfo) => {
+        test.skip(!isCloudEnvironment(), 'Onboarding is cloud-only');
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
-        // Cloud runs in the signup org; OSS root's passcode only ingests into the default org, so OSS cannot use a fresh org.
-        const orgId = getOrgIdentifier();
-        const gs = new GetStartedPage(page);
-        const fe = new FirstEventPage(page);
-        await gs.captureAttribution({ passThrough: isCloudEnvironment() });
+        // Onboarding serves only an org with no data, so the journey runs in a fresh one.
+        orgId = await createOrg(page);
+        const ob = new OnboardingPage(page);
+        await ob.captureAttribution({ passThrough: true });
         await recordInteractions(page);
-        await gs.openAsFirstLogin(`${uiBase()}/web/?org_identifier=${orgId}`, { orgId, prefill: { utm_content: 'http' } });
+        await ob.openAsFirstLogin(`${uiBase()}/web/?org_identifier=${orgId}`, { orgId });
+        await ob.expectStepOne();
         await page.evaluate((key) => sessionStorage.removeItem(key), CLICK_LOG);
-        await gs.expectPicked('http');
 
         let interactions = 0;
-        await gs.agree.click(); interactions += 1;
-        await gs.skipBtn.click(); interactions += 1;
-        await page.waitForURL(/\/ingestion\/custom\/logs\/curl/, { timeout: 20000 });
-        await fe.expectState('waiting', 20000);
+        await ob.choice('backend').click(); interactions += 1;
+        await ob.row('any-language-with-opentelemetry').click(); interactions += 1;
+        await page.waitForURL(/\/onboarding\/backend\/any-language-with-opentelemetry/, { timeout: 20000 });
+        await expect(ob.guide).toBeVisible();
+        await ob.expectGuideStatus('waiting');
+        await expect.poll(() => ob.attributionBodies.length).toBe(1);
+        expect(ob.attributionBodies[0]).toEqual({ from: '', company: '', first_source: 'otel', skipped: false });
 
-        await page.locator('[data-test="ingestion-curl-code-block-pre"]').click(); interactions += 1;
-        const copied = await gs.readClipboard();
-        expect(copied).toMatch(/^curl -u /);
-        expect(copied).not.toContain('•');
-        expect(copied).not.toContain('[PASSCODE]');
-        const passcode = await orgPasscode(request, orgId);
-        if (passcode) expect(copied).toContain(passcode);
+        await sendTrace(request, orgId, await orgToken(request, orgId));
 
-        const sentUs = Date.now() * 1000;
-        const marker = `journey-${Date.now()}`;
-        const command = copied.replace('test message for openobserve', marker);
-        const out = execFileSync('/bin/sh', ['-c', `${command} -s -o /dev/null -w "%{http_code}"`], { encoding: 'utf8' });
-        expect(out.trim()).toBe('200');
-
-        await fe.expectState('received', 20000);
-        await expect(fe.firstRecord).toContainText(marker);
-        await fe.clickOpen(); interactions += 1;
-        await expect(page).toHaveURL(/\/logs\?/);
+        await expect(ob.firstData).toBeVisible({ timeout: 60000 });
+        await expect(ob.firstDataOpen).toHaveText('Explore Your Traces');
+        await ob.firstDataOpen.click(); interactions += 1;
+        await expect(page).toHaveURL(/\/traces\?/);
         expect(new URL(page.url()).searchParams.get('stream')).toBe('default');
-        await fe.expectLogsRows(1);
-        // Quick mode may project only the stream's interesting fields, so the row is matched by its timestamp, not the message.
-        const first = Number(new URL(page.url()).searchParams.get('from'));
-        const last = Number(new URL(page.url()).searchParams.get('to'));
-        expect(first).toBeLessThanOrEqual(sentUs);
-        expect(last).toBeGreaterThanOrEqual(sentUs);
 
         const logged = await page.evaluate((key) => JSON.parse(sessionStorage.getItem(key) || '[]'), CLICK_LOG);
         expect(logged.filter((e) => e.path.some((id) => FORBIDDEN_CLICK.test(id)))).toEqual([]);
         expect(logged).toHaveLength(interactions);
-        expect(interactions).toBe(4);
-        expect(interactions).toBeLessThanOrEqual(6);
-        testLogger.info('Journey reached the first record', { interactions, logged: logged.map((e) => e.path[0]) });
+        expect(interactions).toBe(3);
+        testLogger.info('Journey reached the first trace', { interactions, logged: logged.map((e) => e.path[0]) });
     });
 });

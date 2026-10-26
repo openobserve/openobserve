@@ -820,6 +820,12 @@
      border below is unchanged while the light one had to move with the fill. */
   --color-panel-bar-bg: #252526;
   --color-panel-bar-border: var(--d-border);
+
+  /* Onboarding brand panel: two steps deeper than light, so it does not glare
+     next to the dark page and white text keeps its contrast. */
+  --color-onboarding-panel-start: var(--color-primary-900);
+  --color-onboarding-panel-end: var(--color-primary-800);
+  --color-onboarding-choice-active-bg: var(--color-primary-800);
 }
 /* Domain data-viz & color tokens (dark) */
 :root.dark,

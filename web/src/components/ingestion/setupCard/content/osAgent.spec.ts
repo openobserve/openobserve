@@ -70,6 +70,26 @@ describe("host agent cards include the dashboard step", () => {
   });
 });
 
+describe("host agent troubleshooting names the installer's service", () => {
+  // linux/install.sh and windows/install.ps1 in the agents repo both create an otel-collector service.
+  it.each([
+    ["linux", linuxCard],
+    ["windows", windowsCard],
+  ])("%s card checks otel-collector", (_name, builder: any) => {
+    const card = builder(SUBS, gt);
+    expect(card.extras.fixSnippet).toContain("otel-collector");
+    expect(card.extras.fixSnippet).not.toContain("openobserve-agent");
+    expect(JSON.stringify(card.extras.troubleshooting)).toContain("otel-collector");
+  });
+
+  it("filters the Windows event log by the collector before it limits the count", () => {
+    const card: any = windowsCard(SUBS, gt);
+    expect(card.extras.fixSnippet).toContain(
+      'Get-WinEvent -FilterHashtable @{ LogName = "Application"; ProviderName = "otel-collector" } -MaxEvents 50',
+    );
+  });
+});
+
 describe("ingestion.setupCard i18n keys (design 4.2 — the 9 new en-US keys)", () => {
   const NEW_KEYS = [
     "ingestion.setupCard.dashboardReadyTitle",

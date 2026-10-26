@@ -1650,12 +1650,12 @@
       "fileTypeZip": "僅允許 ZIP 檔案"
     },
     "emptyState": {
-      "title": "使用真實使用者監控（RUM）監控您的使用者",
-      "description": "RUM 追蹤真實使用者的互動 — 頁面載入、錯誤、API 呼叫與工作階段重播 — 讓您精確掌握使用者體驗您應用程式的方式。",
       "webApp": "檢測網頁應用程式",
       "webAppDesc": "將 OpenObserve RUM SDK 新增至任何 {product} 應用程式",
       "sessionReplay": "啟用工作階段重播",
       "sessionReplayDesc": "錄製並重播使用者工作階段以偵錯 UX 問題",
+      "title": "使用真實使用者監控（RUM）監控您的使用者",
+      "description": "RUM 追蹤真實使用者的互動 — 頁面載入、錯誤、API 呼叫與工作階段重播 — 讓您精確掌握使用者體驗您應用程式的方式。",
       "learnMore": "深入了解：",
       "quickImpl": "快速實作指南",
       "blogPost": "前端監控基礎"
@@ -4950,12 +4950,6 @@
     "joinSlack": "加入 Slack",
     "maybeLater": "稍後再說"
   },
-  "connectDataSourcePopup": {
-    "title": "首先，讓我們連接您的第一個資料來源。",
-    "description": "我們有很多內容想向您展示，但首先需要連接您的資料。大多數團隊大約一分鐘內就能看到第一批日誌。",
-    "connectButton": "連接資料來源",
-    "slackLink": "也加入我們的 Slack 社群"
-  },
   "confirmDialog": {
     "continueFromWherePaused": "從暫停處繼續",
     "startFromNow": "從現在開始。",
@@ -5407,8 +5401,6 @@
       "anyWindowsHostNote": "任何 Windows 伺服器或虛擬機器。",
       "arrow": "→",
       "askOnSlack": "到 Slack 詢問",
-      "autoInstrumentTracesDesc": "兩者都能**無需修改應用程式碼或重新建置映像檔，即可取得分散式追蹤**。**語言函式庫：**OpenTelemetry Operator 會將自動 Instrumentation 注入已加上註解之命名空間中的 Pod。**eBPF：**收集器會追蹤您選取的處理程序，支援任何語言，包括 Go。",
-      "autoInstrumentTracesTitle": "追蹤您的應用程式：語言函式庫或 eBPF",
       "cassandraJmxNote": "在 Cassandra 上啟用 JMX 遠端存取，供接收器連線。",
       "cassandraTagline": "透過 OpenTelemetry Collector 的 JMX receiver 收集 Cassandra 指標，並將它們傳送到 OpenObserve。",
       "checking": "正在檢查…",
@@ -5493,11 +5485,13 @@
       "k8sAnnotatePodNote": "對單一 Pod spec 加上註解（而非命名空間），以便一次檢測一個工作負載。",
       "k8sFixBody": "OpenTelemetry operator 在 cert-manager 的 webhook 開始服務之前無法啟動，而從未啟動的 collector 不會傳送任何資料。請確認兩者都在執行，然後再次測試：",
       "k8sFixTitle": "等待 cert-manager webhook",
+      "k8sEbpfAnyLanguageVariant": "任何語言，無需函式庫（eBPF）",
       "k8sEbpfNote": "追蹤是透過 eBPF 擷取：無需變更程式碼或使用 SDK。追蹤上下文僅透過明文 HTTP 在服務間傳遞（Go 應用程式在未啟用核心 lockdown 的節點上也可透過 HTTPS）。符合任一連接埠、可執行檔路徑或命令列的處理程序都會被追蹤；glob 不能包含 `,`、`{'{'}` 或 `{'}'}`，且連接埠會符合在該連接埠上持有 socket 的任何處理程序。需要 Helm 3.14+ 與 OpenTelemetry Operator v0.142.0+；若您的版本較舊，請先使用 `kubectl apply -f https://github.com/open-telemetry/opentelemetry-operator/releases/download/v0.161.0/opentelemetry-operator.yaml` 升級 Operator。若已在舊版 Operator 上啟用 eBPF，請加上 `--force`（Helm 4 為 `--force-replace`）重新執行命令。重新執行上方的安裝命令會重設該 release 並關閉 eBPF，因此之後請再次執行此命令。`openobserve-collector` 命名空間必須允許特權 Pod，節點必須在 amd64 或 arm64 上執行 Linux，核心 5.8+（或含 eBPF 回溯移植的 RHEL 系列 4.18）並支援 BTF。請勿選取已自行傳送追蹤的應用程式，或使用 Go `inject-go` sidecar 的 Pod。",
-      "k8sEbpfVariant": "eBPF（任何語言，無需修改程式碼）",
-      "k8sLibrariesVariant": "語言函式庫（自動 Instrumentation）",
       "k8sInstallerNote": "這會自動安裝 cert-manager、OpenTelemetry operator 和 OpenObserve collector。",
       "k8sInternalEndpointNote": "當 OpenObserve 在此叢集中執行時，請使用此選項 — 流量永遠不會離開叢集。",
+      "k8sLibraryPerLanguageVariant": "依語言新增函式庫（Java、.NET、Node.js、Python）",
+      "k8sOptionalTracesDesc": "也想取得服務的請求追蹤嗎？選擇方式，然後再執行一個命令即可。無需修改程式碼，隨時都可以設定。",
+      "k8sOptionalTracesTitle": "選用：追蹤您的應用程式",
       "k8sTroubleAnnotationA": "注入發生在 Pod 建立時，因此現有 Pod 在重新啟動前不受影響 — 執行 `kubectl rollout restart deployment -n my-namespace`。使用 `kubectl get ns my-namespace -o yaml` 確認註解已生效，並確認值符合 `openobserve-collector/openobserve-<language>`。",
       "k8sTroubleAnnotationQ": "我為命名空間加上註解，但沒有出現任何追蹤",
       "k8sTroubleEndpointA": "僅當 OpenObserve 本身執行於此叢集時，才使用**內部端點**；如此流量便會留在叢集內，永遠不會跨出網路。URL 為 `http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080` — 預設假設 release 為 `o2`、命名空間為 `openobserve`，若您的設定不同請自行修改。其他所有人則使用外部端點。",
@@ -5750,6 +5744,7 @@
       "androidTroubleScreenNamesQ": "工作階段出現，但所有畫面名稱都相同",
       "androidTroubleScreenNamesA": "檢視追蹤未設定。在建立 `RumConfiguration` 時，傳入 `useViewTrackingStrategy(...)` — 例如 Activity 使用 `ActivityViewTrackingStrategy(trackExtras = true)`，或使用 AndroidX Navigation 時使用 `NavigationViewTrackingStrategy(...)`。",
       "setupTime5Min": "~5 分鐘",
+      "showStepInstructions": "顯示說明",
       "snowflakeCollectorVersionNote": "Snowflake 需要 collector v0.92.0 — 較新的版本有已知錯誤。",
       "snowflakeTagline": "使用 OpenTelemetry Collector 收集 Snowflake 帳戶指標，並將它們傳送到 OpenObserve。",
       "sqlClientGuiVariant": "SQL 用戶端 (GUI)",

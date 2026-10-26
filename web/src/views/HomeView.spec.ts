@@ -73,6 +73,26 @@ vi.mock("@/components/shared/HomeViewSkeleton.vue", () => ({
   default: { name: "HomeViewSkeleton", template: '<div data-test="home-skeleton-stub" />' },
 }));
 
+// whether the org holds any user data; true keeps the saved tab the rest of this file tests.
+// One ref per call: a test flips the ones made since its mount (`orgData.flip`).
+const orgData = vi.hoisted(() => ({
+  initial: true as boolean | undefined,
+  refs: [] as { value: boolean | undefined }[],
+  flip(value: boolean | undefined) {
+    this.refs.forEach((r) => (r.value = value));
+  },
+}));
+vi.mock("@/composables/useOrgHasUserData", async () => {
+  const { ref } = await import("vue");
+  return {
+    useOrgHasUserData: () => {
+      const hasUserData = ref(orgData.initial);
+      orgData.refs.push(hasUserData);
+      return { hasUserData, isFetching: ref(false) };
+    },
+  };
+});
+
 import config from "@/aws-exports";
 import HomeView from "./HomeView.vue";
 
@@ -279,6 +299,71 @@ describe("HomeView", () => {
 
       expect(has("first-data-panel-stub")).toBe(false);
       expect(has("home-first-data-hero")).toBe(false);
+    });
+  });
+
+  describe("an org with no data", () => {
+    beforeEach(() => {
+      setFlag(false);
+      store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: true });
+      openTab("ai");
+      orgData.refs.length = 0;
+    });
+    afterEach(() => {
+      orgData.initial = true;
+    });
+    const savedTab = () => localStorage.getItem("o2_home_active_tab");
+    const activeTab = () => (wrapper.vm as unknown as { activeHomeTab: string }).activeHomeTab;
+
+    it("opens Overview instead of the assistant, without saving that as the user's tab", async () => {
+      orgData.initial = false;
+      wrapper = mountHome();
+      await flushPromises();
+
+      expect(has("overview-tab-stub")).toBe(true);
+      expect(has("ai-chat-stub")).toBe(false);
+      expect(savedTab()).toBe("ai");
+    });
+
+    it("saves the next tab the user picks", async () => {
+      orgData.initial = false;
+      wrapper = mountHome();
+      await flushPromises();
+      (wrapper.vm as unknown as { activeHomeTab: string }).activeHomeTab = "usage";
+      await flushPromises();
+
+      expect(savedTab()).toBe("usage");
+    });
+
+    it("switches once the data check resolves with no data", async () => {
+      orgData.initial = undefined;
+      wrapper = mountHome();
+      await flushPromises();
+      expect(activeTab()).toBe("ai");
+
+      orgData.flip(false);
+      await flushPromises();
+
+      expect(activeTab()).toBe("overview");
+      expect(savedTab()).toBe("ai");
+    });
+
+    it.each([true, undefined])("keeps the assistant when the data check is %s", async (value) => {
+      orgData.initial = value;
+      wrapper = mountHome();
+      await flushPromises();
+
+      expect(has("ai-chat-stub")).toBe(true);
+      expect(savedTab()).toBe("ai");
+    });
+
+    it("leaves a saved Usage tab alone", async () => {
+      orgData.initial = false;
+      openTab("usage");
+      wrapper = mountHome();
+      await flushPromises();
+
+      expect(activeTab()).toBe("usage");
     });
   });
 });

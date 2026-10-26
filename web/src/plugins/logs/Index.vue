@@ -30,7 +30,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="mx-2.5 mt-2.5 shrink-0"
       @dismiss="firstDataArrival = null"
     />
-    <div id="secondLevel" class="h-full max-h-full min-h-0 flex-1 overflow-hidden">
+    <!-- An org with no data gets the product intro, not the query UI; with the
+         restricted-routes flag on, FirstDataPanel still watches for the first record. -->
+    <FirstDataPanel
+      v-if="showIntro"
+      v-slot="{ layout, statusLine }"
+      signal="logs"
+      variant="full"
+      status-in-slot
+      @detected="onFirstDataDetected"
+    >
+      <NoDataIntro signal="logs" :hide-setup="layout === 'panel'">
+        <template v-if="layout === 'status'" #status>
+          <component :is="statusLine" />
+        </template>
+      </NoDataIntro>
+    </FirstDataPanel>
+    <div v-else id="secondLevel" class="h-full max-h-full min-h-0 flex-1 overflow-hidden">
       <OSplitter
         class="h-full max-h-full overflow-hidden"
         v-model="splitterModel"
@@ -704,6 +720,8 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import LogsNoEventsState from "@/plugins/logs/LogsNoEventsState.vue";
 import LogsNoDataState from "@/plugins/logs/LogsNoDataState.vue";
 import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
+import NoDataIntro from "@/components/ingestion/NoDataIntro.vue";
+import { useNoDataIntro } from "@/composables/useNoDataIntro";
 import type { FirstEventResult } from "@/composables/firstEvent/useFirstEventWatch";
 import LogsNoStreamState from "@/plugins/logs/LogsNoStreamState.vue";
 import LogsErrorState from "@/plugins/logs/LogsErrorState.vue";
@@ -793,6 +811,7 @@ export default defineComponent({
     LogsNoEventsState,
     LogsNoDataState,
     FirstDataPanel,
+    NoDataIntro,
     LogsNoStreamState,
     LogsErrorState,
     LogsAutoRunGuard,
@@ -803,7 +822,7 @@ export default defineComponent({
   methods: {
     setHistogramDate(date: any) {
       this.searchBarRef?.markZoom?.(date);
-      this.searchBarRef.dateTimeRef.setCustomDate("absolute", date);
+      this.searchBarRef?.dateTimeRef?.setCustomDate("absolute", date);
     },
     searchData() {
       this.autoRun.engine.requestRun("run");
@@ -1212,14 +1231,16 @@ export default defineComponent({
             router.currentRoute.value.query.from &&
             router.currentRoute.value.query.to
           ) {
-            searchBarRef.value.dateTimeRef.setAbsoluteTime(
+            searchBarRef.value?.dateTimeRef?.setAbsoluteTime(
               router.currentRoute.value.query.from,
               router.currentRoute.value.query.to,
             );
             searchObj.data.datetime.type = "absolute";
           } else {
             // As when redirecting from search history to logs page, date type was getting set as absolute, so forcefully keeping it relative.
-            searchBarRef.value.dateTimeRef.setRelativeTime(router.currentRoute.value.query.period);
+            searchBarRef.value?.dateTimeRef?.setRelativeTime(
+              router.currentRoute.value.query.period,
+            );
             searchObj.data.datetime.type = "relative";
           }
 
@@ -1247,7 +1268,7 @@ export default defineComponent({
           resetSearchObj();
 
           // As when redirecting from search history to logs page, date type was getting set as absolute, so forcefully keeping it relative.
-          searchBarRef.value.dateTimeRef.setAbsoluteTime(
+          searchBarRef.value?.dateTimeRef?.setAbsoluteTime(
             router.currentRoute.value.query.from,
             router.currentRoute.value.query.to,
           );
@@ -2001,9 +2022,12 @@ export default defineComponent({
       onStreamChange("", { origin: "selector" });
     };
 
+    // undefined while the stream lists load keeps the query UI, as before
+    const showIntro = useNoDataIntro(() => store.state.selectedOrganization?.identifier ?? "");
     const firstDataArrival = ref<FirstEventResult | null>(null);
     // query_on_stream_selection leaves the selection empty, so the arrival names the stream and its range itself
     const onFirstDataDetected = async (result: FirstEventResult) => {
+      showIntro.value = false;
       firstDataArrival.value = result;
       await loadLogsData();
       searchObj.data.stream.selectedStream = [result.streamName];
@@ -2228,7 +2252,7 @@ export default defineComponent({
       if (newQuery) {
         searchObj.data.query = newQuery;
         searchObj.data.editorValue = newQuery;
-        searchBarRef.value.updateQuery();
+        searchBarRef.value?.updateQuery();
       }
     };
 
@@ -4060,6 +4084,7 @@ export default defineComponent({
       runQueryFn,
       firstDataArrival,
       onFirstDataDetected,
+      showIntro,
       refreshData,
       setQuery,
       verifyOrganizationStatus,

@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { ref } from "vue";
 import config from "@/aws-exports";
 
 export type SlackInviteStatus = "not_asked" | "pending_day2" | "resolved";
@@ -43,15 +42,9 @@ const legacySeenKey = (email: string): string => `communitySlackInviteSeen:${ema
 
 const storageKey = (email: string): string => `slackCommunityInvite:${email}`;
 
-// Shared with ConnectDataSourcePopup so both read/write the same session key.
+// Set when the onboarding page claims the session (suppressConnectPrompt); CommunitySlackInvite reads it.
 export const connectDataPromptSessionKey = (email: string): string =>
   `connectDataSourcePromptShown:${email}`;
-
-// Flips false while ConnectDataSourcePopup is deciding whether to open this session (that
-// decision crosses an await), so CommunitySlackInvite never opens before it lands — the two
-// popups must never be open at once. Defaults true so a standalone mount (tests, or when
-// ConnectDataSourcePopup itself bails out) is never blocked.
-export const connectDataPopupSettled = ref(true);
 
 const readRecord = (email: string): SlackInviteRecord => {
   try {
@@ -83,7 +76,7 @@ const writeRecord = (email: string, record: SlackInviteRecord): void => {
   }
 };
 
-// Whether ConnectDataSourcePopup should offer its embedded "Join Slack" action.
+// Whether the invite has not been offered yet.
 export const shouldOfferSlackInvite = (email: string): boolean =>
   readRecord(email).status === "not_asked";
 

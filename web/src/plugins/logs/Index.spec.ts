@@ -266,6 +266,26 @@ vi.mock("@/plugins/traces/metrics/TracesAnalysisDashboard.vue", () => ({
   },
 }));
 
+// whether the org holds any user data; true keeps the query UI the rest of this file tests.
+// One ref per call: a test flips the ones made since its mount (`orgData.flip`), never pages earlier tests left mounted
+const orgData = vi.hoisted(() => ({
+  initial: true as boolean | undefined,
+  refs: [] as { value: boolean | undefined }[],
+  flip(value: boolean | undefined) {
+    this.refs.forEach((r) => (r.value = value));
+  },
+}));
+vi.mock("@/composables/useOrgHasUserData", async () => {
+  const { ref } = await import("vue");
+  return {
+    useOrgHasUserData: () => {
+      const hasUserData = ref(orgData.initial);
+      orgData.refs.push(hasUserData);
+      return { hasUserData, isFetching: ref(false) };
+    },
+  };
+});
+
 import config from "@/aws-exports";
 import analytics from "@/services/product_analytics";
 
@@ -1812,6 +1832,88 @@ describe("Logs Index", async () => {
       expect(wrapper.vm.searchObj.meta.logsVisualizeToggle).toBe("drilldown");
       expect(loaderCalls).toEqual(["logs"]);
 
+      await router.replace({ path: router.currentRoute.value.path, query: {} });
+    });
+  });
+
+  describe("product intro for an org with no data", () => {
+    const errorHandler = vi.fn();
+    const remount = async (has: boolean | undefined) => {
+      wrapper.unmount();
+      orgData.initial = has;
+      wrapper = mount(Index, {
+        attachTo: "#app",
+        global: { provide: { store }, plugins: [i18n, router], config: { errorHandler } },
+      });
+      await flushPromises();
+      // unmounting the previous page reports the stubbed patterns API; only what follows counts
+      errorHandler.mockClear();
+    };
+    const has = (testId: string) => wrapper.find(`[data-test="${testId}"]`).exists();
+
+    beforeEach(() => {
+      orgData.refs.length = 0;
+    });
+    afterEach(() => {
+      orgData.initial = true;
+    });
+
+    it("shows the intro and none of the query UI when the org has no data", async () => {
+      await remount(false);
+
+      expect(wrapper.find('[data-test="no-data-intro"]').attributes("data-signal")).toBe("logs");
+      expect(has("logs-search-bar")).toBe(false);
+      expect(has("logs-search-index-list")).toBe(false);
+      expect(wrapper.find("#secondLevel").exists()).toBe(false);
+    });
+
+    it("keeps the query UI while the stream lists load", async () => {
+      await remount(undefined);
+
+      expect(has("no-data-intro")).toBe(false);
+      expect(has("logs-search-bar")).toBe(true);
+    });
+
+    it("keeps the query UI when the org has data", async () => {
+      await remount(true);
+
+      expect(has("no-data-intro")).toBe(false);
+      expect(has("logs-search-bar")).toBe(true);
+    });
+
+    // the watcher refreshes the stream lists before it reports, so the intro must outlast that refresh
+    it("keeps the intro until the first-data watcher reports, then opens the query UI", async () => {
+      await remount(false);
+      orgData.flip(true);
+      await flushPromises();
+
+      expect(has("no-data-intro")).toBe(true);
+      expect(has("logs-search-bar")).toBe(false);
+
+      wrapper.findComponent({ name: "FirstDataPanel" }).vm.$emit("detected", {
+        streamName: "default",
+        streamType: "logs",
+        count: 1,
+        rangeStart: 1_000_000,
+        rangeEnd: 2_000_000,
+      });
+      await flushPromises();
+
+      expect(has("no-data-intro")).toBe(false);
+      expect(has("logs-search-bar")).toBe(true);
+      expect(wrapper.vm.firstDataArrival?.streamName).toBe("default");
+    });
+
+    it("re-applies a search-history link without the search bar mounted", async () => {
+      await remount(false);
+      await router.replace({
+        path: router.currentRoute.value.path,
+        query: { type: "search_history_re_apply", period: "15m" },
+      });
+      await flushPromises();
+
+      expect(has("no-data-intro")).toBe(true);
+      expect(errorHandler).not.toHaveBeenCalled();
       await router.replace({ path: router.currentRoute.value.path, query: {} });
     });
   });

@@ -1650,12 +1650,12 @@
       "fileTypeZip": "Only ZIP files are allowed"
     },
     "emptyState": {
-      "title": "Monitor your users with Real User Monitoring",
-      "description": "RUM tracks real user interactions — page loads, errors, API calls, and session replays — so you can see exactly how users experience your application.",
       "webApp": "Instrument a web app",
       "webAppDesc": "Add the OpenObserve RUM SDK to any {product} app",
       "sessionReplay": "Enable Session Replay",
       "sessionReplayDesc": "Record and replay user sessions to debug UX issues",
+      "title": "Monitor your users with Real User Monitoring",
+      "description": "RUM tracks real user interactions — page loads, errors, API calls, and session replays — so you can see exactly how users experience your application.",
       "learnMore": "Learn more:",
       "quickImpl": "Quick implementation guide",
       "blogPost": "Frontend monitoring basics"
@@ -2943,11 +2943,8 @@
     "getStartedBannerMessage": "Try OpenObserve today for more efficient and performant observability.",
     "getStartedBannerAlt": "Get Started Banner",
     "getStartedHeading": "One last thing before we begin",
-    "hearAboutUsLabel": "How did you hear about us?",
     "hearAboutUsPlaceholder": "Eg. From a friend",
-    "whereDoYouWorkLabel": "Where do you work?",
     "whereDoYouWorkPlaceholder": "Company Name",
-    "agreeToTermsPrefix": "I have read and agree with the",
     "termsOfUse": "Terms of use",
     "and": "and",
     "privacyPolicyStar": "Privacy policy*",
@@ -2960,19 +2957,7 @@
     "emailRequired": "Email is required",
     "emailInvalid": "Please enter a valid email",
     "passwordRequired": "Password is required",
-    "mustAcceptTerms": "You must accept the terms to continue",
     "getStarted": {
-      "title": "Welcome to OpenObserve",
-      "subtitle": "Your 14-day trial has started. Two quick questions, then we'll take you to setup.",
-      "sourceLabel": "What do you want to send first?",
-      "optional": "(optional)",
-      "skip": "Skip questions",
-      "continue": "Continue",
-      "hearAboutUsPlaceholder": "For example, a colleague or a blog post",
-      "whereDoYouWorkPlaceholder": "Company or team",
-      "termsOfService": "Terms of service",
-      "privacyPolicy": "Privacy policy",
-      "agreeHint": "Needed to continue, even if you skip the questions.",
       "sources": {
         "kubernetes": "Kubernetes",
         "linux": "Linux or VM host",
@@ -2986,6 +2971,16 @@
         "agent": "Let an AI agent set it up",
         "unsure": "Not sure yet"
       }
+    },
+    "heardFrom": {
+      "question": "How did you find us?",
+      "quickQuestion": "Quick question: how did you find us?",
+      "skip": "Skip",
+      "searchEngine": "Search engine",
+      "friendOrColleague": "Friend or colleague",
+      "aiAssistant": "AI assistant",
+      "other": "Other",
+      "thanks": "Thanks for telling us!"
     }
   },
   "user": {
@@ -4950,12 +4945,6 @@
     "joinSlack": "Join the Slack",
     "maybeLater": "Maybe later"
   },
-  "connectDataSourcePopup": {
-    "title": "To get started, let's connect your first data source.",
-    "description": "We've got lots to show you, but we'll need to get your data connected first. Most teams see their first logs in about a minute.",
-    "connectButton": "Connect a data source",
-    "slackLink": "Also join our Slack community"
-  },
   "confirmDialog": {
     "continueFromWherePaused": "Continue from where it paused",
     "startFromNow": "Start from now.",
@@ -4963,6 +4952,108 @@
     "cancel": "Cancel",
     "ok": "OK",
     "loading": "Loading..."
+  },
+  "noDataIntro": {
+    "aboutMinutes": "About {count} minute | About {count} minutes",
+    "codingAgent": "Set up with your coding agent",
+    "afterSetup": "After setup you can",
+    "logs": {
+      "title": "Search every log line in seconds, from any source",
+      "description": "Send logs from your apps, servers or log shipper, then search and alert on them in one place.",
+      "setUp": "Set up logs",
+      "features": {
+        "search": {
+          "title": "Search with SQL or full text",
+          "text": "Filter by any field, over any time range."
+        },
+        "patterns": {
+          "title": "Spot patterns",
+          "text": "Group similar lines and find the new ones."
+        },
+        "dashboards": {
+          "title": "Chart your logs",
+          "text": "Turn a search into a chart and pin it to a dashboard."
+        },
+        "alerts": {
+          "title": "Alert on errors",
+          "text": "Get notified when error counts jump."
+        }
+      }
+    },
+    "metrics": {
+      "title": "See how your hosts and services are doing",
+      "description": "Send metrics from your servers, containers or apps, and each one opens as a ready-made chart.",
+      "setUp": "Set up metrics",
+      "features": {
+        "explore": {
+          "title": "Browse every metric",
+          "text": "Each metric opens as a chart, with no query to write."
+        },
+        "dashboards": {
+          "title": "Build dashboards",
+          "text": "Put the charts you watch on one screen."
+        },
+        "alerts": {
+          "title": "Alert on limits",
+          "text": "Get notified when a value crosses a threshold."
+        }
+      }
+    },
+    "traces": {
+      "title": "Follow every request across your services",
+      "description": "Send traces from your services to find slow and failing requests and see where the time goes.",
+      "setUp": "Set up traces",
+      "features": {
+        "spans": {
+          "title": "See each request end to end",
+          "text": "Every step in order, with how long it took."
+        },
+        "latency": {
+          "title": "Find slow and failing endpoints",
+          "text": "Latency and errors for each service and operation."
+        },
+        "logs": {
+          "title": "Jump to the matching logs",
+          "text": "Open the logs of the same request from its trace."
+        }
+      }
+    },
+    "llm": {
+      "title": "See every LLM call, tool use and agent step",
+      "description": "Trace your AI app to see token use, cost, latency and errors for each model and agent.",
+      "setUp": "Set up LLM tracing",
+      "features": {
+        "cost": {
+          "title": "Track cost and tokens",
+          "text": "Spend and token use for each model and agent."
+        },
+        "latency": {
+          "title": "Find slow and failing calls",
+          "text": "Latency and errors for every model call."
+        },
+        "agents": {
+          "title": "Follow agent runs",
+          "text": "Each step and tool call an agent makes, in order."
+        }
+      }
+    },
+    "rum": {
+      "setUp": "Set up frontend monitoring",
+      "features": {
+        "performance": {
+          "title": "Measure page speed",
+          "text": "Load times from the browsers your users actually use."
+        },
+        "errors": {
+          "title": "Catch frontend errors",
+          "text": "Each error with the page and browser it came from."
+        },
+        "replay": {
+          "title": "Replay user sessions",
+          "text": "Watch what a user did before something broke."
+        }
+      }
+    }
   },
   "ingestion": {
     "firstEvent": {
@@ -5407,8 +5498,6 @@
       "anyWindowsHostNote": "Any Windows server or VM.",
       "arrow": "→",
       "askOnSlack": "Ask on Slack",
-      "autoInstrumentTracesDesc": "Both give you **distributed traces without touching application code or rebuilding images**. **Language libraries:** the OpenTelemetry operator injects auto-instrumentation into the pods of an annotated namespace. **eBPF:** the collector traces the processes you select, in any language, Go included.",
-      "autoInstrumentTracesTitle": "Trace your applications: language libraries or eBPF",
       "cassandraJmxNote": "Enable JMX remote access on Cassandra for the receiver to connect.",
       "cassandraTagline": "Collect Cassandra metrics via the OpenTelemetry Collector's JMX receiver and ship them to OpenObserve.",
       "checking": "Checking…",
@@ -5493,11 +5582,17 @@
       "k8sAnnotatePodNote": "Annotate a single pod spec instead of the namespace to instrument one workload at a time.",
       "k8sFixBody": "The OpenTelemetry operator fails to start until cert-manager's webhook is serving, and a collector that never starts sends nothing. Check that both are running, then test again:",
       "k8sFixTitle": "Wait for the cert-manager webhook",
+      "k8sEbpfAnyLanguageVariant": "Any language, no library (eBPF)",
       "k8sEbpfNote": "Traces are captured with eBPF: no code changes or SDK needed. Trace context crosses services only over plain-text HTTP (Go apps also over HTTPS, except on nodes with kernel lockdown). A process matching any of ports, executable path or command line is traced; globs can't contain `,`, `{'{'}` or `{'}'}`, and a port matches any process with a socket on it. Needs Helm 3.14+ and OpenTelemetry operator v0.142.0+; if yours is older, upgrade it first with `kubectl apply -f https://github.com/open-telemetry/opentelemetry-operator/releases/download/v0.161.0/opentelemetry-operator.yaml`. If eBPF was already enabled on an older operator, re-run with `--force` (`--force-replace` on Helm 4). Re-running the install command above resets the release and turns eBPF off, so run this command again afterwards. The `openobserve-collector` namespace must allow privileged pods, and nodes must run Linux on amd64 or arm64 with kernel 5.8+ (or RHEL-family 4.18 with eBPF backports) and BTF. Don't select apps that already send their own traces, or pods using the Go `inject-go` sidecar.",
-      "k8sEbpfVariant": "eBPF (any language, no code changes)",
-      "k8sLibrariesVariant": "Language libraries (auto-instrumentation)",
       "k8sInstallerNote": "This installs cert-manager, the OpenTelemetry operator and the OpenObserve collector automatically.",
       "k8sInternalEndpointNote": "Use this when OpenObserve runs in this same cluster — traffic never leaves it.",
+      "k8sLibraryPerLanguageVariant": "Add a library per language (Java, .NET, Node.js, Python)",
+      "k8sOptionalTracesDesc": "Want request traces from your services too? Pick how, then run one more command. No code changes needed, and you can do this any time.",
+      "k8sOptionalTracesTitle": "Optional: trace your apps",
+      "k8sTraceAppsTitle": "Trace your apps",
+      "k8sTraceEbpfDesc": "Turn on eBPF tracing in the collector, then pick the apps to trace by port, executable path or command line.",
+      "k8sTraceLibraryDesc": "Annotate the namespace of each language, so the operator adds its library to the pods there. Then restart those apps once.",
+      "k8sTraceNamespaceLabel": "{language} Namespace",
       "k8sTroubleAnnotationA": "Injection happens at pod creation, so existing pods are unaffected until they restart — run `kubectl rollout restart deployment -n my-namespace`. Confirm the annotation landed with `kubectl get ns my-namespace -o yaml`, and check that the value matches `openobserve-collector/openobserve-<language>`.",
       "k8sTroubleAnnotationQ": "I annotated a namespace but no traces appear",
       "k8sTroubleEndpointA": "Use the **Internal endpoint** only when OpenObserve itself runs in this cluster; traffic then stays inside it and never crosses the network. The URL is `http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080` — the default assumes release `o2` in namespace `openobserve`, so edit it if yours differ. Everyone else uses the external endpoint.",
@@ -5750,6 +5845,7 @@
       "androidTroubleScreenNamesQ": "Sessions appear but screens are all named the same",
       "androidTroubleScreenNamesA": "View tracking is not wired up. Pass a `useViewTrackingStrategy(...)` — e.g. `ActivityViewTrackingStrategy(trackExtras = true)` for Activities, or `NavigationViewTrackingStrategy(...)` if you use AndroidX Navigation — when building the `RumConfiguration`.",
       "setupTime5Min": "~5 min",
+      "showStepInstructions": "Show instructions",
       "snowflakeCollectorVersionNote": "Snowflake needs collector v0.92.0 — newer builds have a known bug.",
       "snowflakeTagline": "Collect Snowflake account metrics with the OpenTelemetry Collector and ship them to OpenObserve.",
       "sqlClientGuiVariant": "SQL Client (GUI)",
@@ -5790,6 +5886,7 @@
       "verifyCassandraMetricsDesc": "The check below turns green when data arrives, or check Streams for the `cassandra_*` metrics.",
       "verifyDatabricksLogsDesc": "The check below turns green when data arrives, or open Logs and search `source:databricks`.",
       "verifyDataTitle": "Verify data in OpenObserve",
+      "checkYourDataTitle": "Check Your Data",
       "verifyDynamodbLogsDesc": "The check below turns green when data arrives, or open Logs for the `dynamodb` stream once items change.",
       "verifyGcpLogsDesc": "Generate some activity in the project (or wait for the sink to match a log); the check below turns green when data arrives.",
       "verifyK8sDataDesc": "Give the collector a few seconds to start; the check below turns green when data arrives — cluster logs land in the `default` stream.",
@@ -19884,7 +19981,6 @@
     },
     "login": {
       "somethingWentWrong": "Something went wrong",
-      "thankYouForYourFeedback": "Thank you for your feedback",
       "selectedSuggestion": "Selected suggestion \"{suggestion}\"",
       "pleaseFillAllTheFieldsAnd": "Please fill all the fields and try again.",
       "invalidUsernameOrPassword": "Invalid username or password",
@@ -20605,6 +20701,7 @@
     }
   },
   "routeTitles": {
+    "onboarding": "Get started",
     "reportDetail": "Report",
     "sharedChat": "Shared chat",
     "passwordPolicy": "Password Policy",
@@ -25549,6 +25646,398 @@
       "remove": "Remove",
       "saved": "Organizations saved",
       "saveFailed": "The organizations could not be saved."
+    }
+  },
+  "onboarding": {
+    "guideAbout": {
+      "linux": "Logs, metrics and traces from any Linux server.",
+      "windows": "Event logs and metrics from Windows servers.",
+      "macos": "Logs and metrics from Mac machines.",
+      "aws": "Logs and metrics from your AWS services.",
+      "googleCloud": "Logs and metrics from your Google Cloud projects.",
+      "azure": "Logs and metrics from your Azure resources.",
+      "postgresql": "Query, connection and replication metrics.",
+      "mysql": "Query, connection and InnoDB metrics.",
+      "mongodb": "Operation, connection and replication metrics.",
+      "redis": "Memory, command and keyspace metrics.",
+      "sqlServer": "Query, wait and buffer metrics.",
+      "oracle": "Session, tablespace and wait metrics.",
+      "mariadb": "Query, connection and InnoDB metrics.",
+      "elasticsearch": "Cluster, index and node health.",
+      "cassandra": "Read, write and compaction metrics.",
+      "dynamodb": "Capacity, latency and throttling per table.",
+      "snowflake": "Warehouse, query and credit usage.",
+      "databricks": "Cluster, job and workspace metrics.",
+      "couchdb": "Request, database and replication metrics.",
+      "aerospike": "Namespace, latency and node metrics.",
+      "sapHana": "Memory, CPU and service metrics.",
+      "zookeeper": "Latency, connection and node metrics.",
+      "nginx": "Access and error logs, plus request metrics.",
+      "apache": "Access and error logs, plus server status.",
+      "iis": "Request logs and site metrics.",
+      "kafka": "Broker, topic and consumer lag metrics.",
+      "rabbitmq": "Queue depth, message rate and node metrics.",
+      "nats": "Connection, message and stream metrics.",
+      "prometheus": "Send the metrics you already scrape, by remote write.",
+      "telegraf": "Send metrics from an agent you already run.",
+      "opentelemetryCollector": "Point a collector you already run here.",
+      "cloudwatch": "Stream metrics out of your AWS account.",
+      "gpu": "Use, memory and temperature per GPU.",
+      "networkFlows": "Traffic flows between your hosts and networks.",
+      "fluentBit": "Lightweight log forwarder for hosts and Kubernetes.",
+      "fluentd": "Log collector with a large plugin set.",
+      "vector": "Fast pipeline for logs and metrics.",
+      "filebeat": "Ship log files with a light agent.",
+      "logstash": "Send logs from an existing pipeline.",
+      "syslogNg": "Forward syslog from your servers.",
+      "loongcollector": "Logs and metrics agent for hosts and containers.",
+      "splunkHec": "Keep your HTTP Event Collector senders as they are.",
+      "cribl": "Route data from the pipelines you already run.",
+      "kinesisFirehose": "Stream logs from a delivery stream in AWS.",
+      "googleCloudLogs": "Export logs from your projects through a log sink.",
+      "okta": "Sign-in and admin audit events.",
+      "office365": "Mail, file and admin audit logs.",
+      "googleWorkspace": "Login and admin audit logs.",
+      "falco": "Runtime security alerts from containers.",
+      "osquery": "Endpoint state as logs you can query.",
+      "jumpcloud": "Directory and login events.",
+      "openvpn": "VPN connection and session logs.",
+      "githubActions": "Workflow run and job logs.",
+      "jenkins": "Build logs and pipeline events.",
+      "terraform": "Plan and apply logs from your runs.",
+      "ansible": "Playbook run logs and results.",
+      "vercel": "Deployment and function logs.",
+      "heroku": "App and router logs from a log drain.",
+      "airflow": "DAG run logs and task metrics.",
+      "airbyte": "Sync job logs and status.",
+      "languageTile": "Traces with the {otel} SDK and auto-instrumentation.",
+      "aiIntegration": "Traces, tokens and cost from your LLM calls."
+    },
+    "skip": "Skip",
+    "skipToApp": "Skip to app",
+    "chooseTitle": "What do you want to monitor first?",
+    "terms": "By using {product}, you agree to the {terms} and {privacy}.",
+    "termsOfService": "Terms of Service",
+    "privacyPolicy": "Privacy Policy",
+    "back": "Back",
+    "searchGuides": "Search {count} guide | Search {count} guides",
+    "showMore": "Show {count} more | Show {count} more",
+    "noMatch": "No guide matches \"{query}\" here.",
+    "foundElsewhere": "Found in other choices:",
+    "inChoice": "in {choice}",
+    "tryShorter": "Try a shorter name. Any tool can also {link}.",
+    "sendOverHttp": "send logs over HTTP",
+    "clearSearch": "Clear search",
+    "othersTitle": "Other ways to start",
+    "whatYouGet": "What you get",
+    "signals": {
+      "metrics": "Metrics",
+      "logs": "Logs",
+      "traces": "Traces",
+      "events": "Events",
+      "profiles": "Profiles",
+      "sessions": "Sessions",
+      "errors": "Errors",
+      "webVitals": "Web vitals",
+      "replays": "Session replays",
+      "tokens": "Tokens",
+      "cost": "Cost",
+      "latency": "Latency",
+      "auditLogs": "Audit logs",
+      "securityEvents": "Security events",
+      "uptime": "Uptime",
+      "certificates": "Certificates"
+    },
+    "guide": {
+      "agentTitle": "Prefer a coding agent?",
+      "agentSteps": "Run this in your terminal, then give {claudeCode}, {cursor} or {codex} the prompt or the file.",
+      "copyPrompt": "Copy Prompt",
+      "downloadFile": "Download .md",
+      "inviteTitle": "No access?",
+      "inviteText": "Invite a teammate who can run the command.",
+      "inviteAction": "Invite a teammate",
+      "loadFailed": "This guide did not load.",
+      "openInApp": "Open it in Data sources",
+      "languageText": "For {language}, add the {otelSdk} with automatic instrumentation, then point it at {product} with the settings below.",
+      "languageLink": "{otel} {language} guide"
+    },
+    "rail": {
+      "label": "Setup Progress",
+      "check": "Check Your Data",
+      "received": "Data received",
+      "attention": "Needs attention",
+      "waitingShort": "Waiting for data",
+      "title": "Set Up {name}",
+      "run": "Run the Setup Command",
+      "explore": "Explore Your Data"
+    },
+    "firstData": {
+      "title": "Your data is arriving",
+      "count": "{count} record arrived in {stream} | {count} records arrived in {stream}",
+      "exploreLogs": "Explore Your Logs",
+      "exploreMetrics": "Explore Your Metrics",
+      "exploreTraces": "Explore Your Traces",
+      "exploreProfiles": "Explore Your Profiles",
+      "addAnother": "Add Another Source"
+    },
+    "others": {
+      "synthetics": {
+        "name": "Synthetic checks",
+        "description": "Check a website, API, port or certificate. No install.",
+        "gets": "Run checks on a schedule from outside your network."
+      },
+      "invite": {
+        "name": "Invite a teammate to set up",
+        "description": "They get an invite to your organization."
+      },
+      "agent": {
+        "name": "Set up with your coding agent",
+        "description": "Give {claudeCode}, {cursor} or {codex} one prompt.",
+        "gets": "Your coding agent adds the setup and checks that data arrives."
+      }
+    },
+    "agentLink": "Or let your coding agent do it",
+    "stepDone": "(done)",
+    "agent": {
+      "crumb": "Coding agent",
+      "title": "Set up with your coding agent",
+      "lead": "{claudeCode}, {cursor}, {codex} or any coding agent reads your project, adds the setup and checks that data arrived. You approve each change.",
+      "tokenTitle": "Save your token",
+      "tokenText": "Run this in the terminal where you will start your coding agent, before you start it.",
+      "powerShell": "In {powerShell}:",
+      "copyPowerShell": "Copy the {powerShell} command",
+      "promptTitle": "Copy the prompt",
+      "focusLabel": "Set up",
+      "focus": {
+        "auto": "Whatever it finds in the project",
+        "kubernetes": "{k8s} cluster",
+        "host": "{linux}, {macos} or {windows} host",
+        "backend": "Backend service ({otel})",
+        "llm": "LLM app",
+        "frontend": "Web frontend",
+        "logs": "Logs only"
+      },
+      "copyPrompt": "Copy prompt",
+      "promptCopied": "Prompt copied",
+      "download": "Download .md",
+      "preview": "Preview the prompt",
+      "previewLines": "{count} line | {count} lines",
+      "pasteTitle": "Paste it into your coding agent",
+      "other": "Other",
+      "hint": {
+        "claudeCode": "In the same terminal, run {command} in your project folder, then paste the prompt.",
+        "cursor": "Start {product} from the same terminal with {command}, so it can read the token. Then paste the prompt into its chat.",
+        "codex": "In the same terminal, run {command} in your project folder, then paste the prompt.",
+        "other": "Start your coding agent from the same terminal, so it can read the token. Then paste the prompt, or give it {file}."
+      },
+      "mcp": "Connect the {mcp} server so your coding agent can read your data",
+      "aside": {
+        "eyebrow": "What the prompt tells your coding agent",
+        "title": "Small, safe changes",
+        "line1": "Find what the project runs",
+        "line2": "Make the smallest change that works",
+        "line3": "Keep the token in the environment",
+        "line4": "Send one test event to stream {stream}",
+        "line5": "Report which files changed"
+      },
+      "bar": {
+        "idle": "Copy the prompt to start checking",
+        "idleHint": "Stream {stream} already gets data, so checking starts when you copy the token or the prompt.",
+        "waiting": "Waiting for your coding agent's first event",
+        "waitingHint": "Keep this page open. It turns green when your coding agent sends its first event.",
+        "stopped": "Nothing has arrived yet",
+        "stoppedHint": "Checking has stopped. Check again from the status above.",
+        "rejected": "Data from your coding agent is being rejected",
+        "rejectedHint": "The status above shows the cause and the fix.",
+        "noRequests": "No data has reached your organization yet",
+        "noRequestsHint": "The status above lists the values your coding agent must use."
+      },
+      "firstDataTitle": "Your token and endpoint work",
+      "firstDataNext": "Next, run your app. Its logs, metrics and traces show up here as they arrive.",
+      "openTraces": "Open Traces"
+    },
+    "collect": {
+      "continueToSetup": "Continue to Setup",
+      "languages": "Languages",
+      "languagesRequired": "Pick at least one language.",
+      "kubernetesCluster": {
+        "question": "Choose what to collect from your cluster",
+        "off": {
+          "name": "Logs, Metrics and Events",
+          "description": "Cluster health and container logs. One command.",
+          "about": "Container logs, CPU and memory of every node and pod, and {k8s} events, from one install command."
+        },
+        "ebpf": {
+          "name": "Add Traces With eBPF",
+          "description": "No code changes, any language. Needs Linux kernel 5.8+ on your nodes.",
+          "about": "The same install, plus traces. The collector sees requests from the Linux kernel, so your apps do not change. It links a request across services over plain HTTP only."
+        },
+        "library": {
+          "name": "Add Traces With Language Libraries",
+          "description": "More detail per app. Pick your languages, then restart your apps once.",
+          "about": "The same install, plus traces. The {otelOperator} adds the {otelLibrary} for each language to the pods in the namespaces you pick. Your code does not change."
+        }
+      }
+    },
+    "groups": {
+      "webServers": "Web servers",
+      "messageQueues": "Message queues",
+      "metricsFromAgent": "Metrics from an agent you already run",
+      "gpuAndNetwork": "GPU and network flows",
+      "movingFromAnotherTool": "Moving from another tool",
+      "cloudLogs": "Cloud logs",
+      "securityTools": "Security tools",
+      "cicdAndPlatforms": "CI/CD and platforms"
+    },
+    "infrastructure": {
+      "name": "Infrastructure",
+      "description": "Servers, {k8s}, cloud accounts and databases",
+      "gets": "See every host, pod and cloud service in one place.",
+      "question": "How do you want to monitor your infrastructure?",
+      "rows": {
+        "kubernetesCluster": {
+          "name": "{k8s} cluster",
+          "description": "Logs, metrics, events and traces from one install",
+          "about": "Installs the {productCollector} in your cluster with one command. You get container logs, {k8s} events and cluster metrics."
+        },
+        "linuxWindowsOrMacosHost": {
+          "name": "{linux}, {windows} or {macos} host",
+          "description": "Install the {productAgent} as a service",
+          "about": "One agent collects logs and metrics from the host, and traces programs with no code changes.",
+          "question": "Which operating system is your host?"
+        },
+        "cloudAccount": {
+          "name": "Cloud account",
+          "description": "{aws}, {gcp} or {azure}",
+          "about": "Streams metrics and logs from your cloud account. Nothing runs on your servers.",
+          "question": "Which cloud is your account on?"
+        },
+        "databases": {
+          "name": "Databases",
+          "description": "{examples} and {count} more",
+          "about": "Collects database metrics and logs through the {otelCollector}.",
+          "question": "Which database do you want to monitor?"
+        },
+        "somethingElse": {
+          "name": "Something else",
+          "description": "Web servers, message queues, {prometheus}, GPU and network flows",
+          "about": "Web servers, message queues, metrics from an agent you already run, GPU use and network flows.",
+          "question": "What else do you want to monitor?"
+        }
+      }
+    },
+    "backend": {
+      "name": "Backend applications",
+      "description": "Traces and logs from your services",
+      "gets": "See how each request moves through your services.",
+      "question": "How do you want to trace your services?",
+      "rows": {
+        "addALibraryToYourCode": {
+          "name": "Add a library to your code",
+          "description": "{nodejs}, {python}, {java}, {go}, {dotnet}, {rust} or {fastapi}",
+          "about": "Adds the {otelLibrary} for your language. Traces and logs go to {product}.",
+          "question": "Which language is your service written in?"
+        },
+        "kubernetesWorkloadsNoCodeChanges": {
+          "name": "{k8s} workloads, no code changes",
+          "description": "Auto-instrumentation inside your cluster",
+          "about": "The {otelOperator} adds instrumentation to the pods in one namespace. No code or image change."
+        },
+        "anyLanguageWithOpentelemetry": {
+          "name": "Any language with {otel}",
+          "description": "Send OTLP from your own setup",
+          "about": "Point any {otelSdk} or collector at your {product} endpoint."
+        },
+        "continuousProfiling": {
+          "name": "Continuous profiling",
+          "description": "CPU and memory profiles",
+          "about": "Collects CPU and memory profiles through the {otelCollector}."
+        }
+      }
+    },
+    "frontend": {
+      "name": "Frontend and mobile apps",
+      "description": "Real user monitoring for web and mobile",
+      "gets": "See what real users experience in your web and mobile apps.",
+      "question": "Where does your app run?",
+      "rows": {
+        "browser": {
+          "name": "Browser",
+          "description": "Websites and web apps",
+          "about": "Adds the {sdk} to your web app. You get page loads, errors and sessions from real browsers."
+        },
+        "reactNative": {
+          "description": "{ios} and {android} from one codebase",
+          "about": "Adds the {sdk} to your {platform} app."
+        },
+        "android": {
+          "description": "Native {android} apps",
+          "about": "Adds the {sdk} to your {platform} app. You get crashes and slow screens."
+        },
+        "ios": {
+          "description": "Native {ios} apps",
+          "about": "Adds the {sdk} to your {platform} app. You get crashes and slow screens."
+        }
+      }
+    },
+    "logs": {
+      "name": "Logs from any source",
+      "description": "Send logs from any shipper, service or tool",
+      "gets": "Search and filter every log line, whatever sends it.",
+      "question": "How do you want to send your logs?",
+      "rows": {
+        "fromALogShipperYouRun": {
+          "name": "From a log shipper you run",
+          "description": "{examples} and {count} more",
+          "about": "Points the shipper you already run at {product}. No new agent.",
+          "question": "Which log shipper do you run?"
+        },
+        "overHttpWithCurl": {
+          "name": "Over HTTP with {curl}",
+          "description": "One request from any script. No install.",
+          "about": "Send JSON logs from any script or service with one HTTP request."
+        },
+        "fromOpentelemetry": {
+          "name": "From {otel}",
+          "description": "OTLP logs from an SDK or a collector",
+          "about": "Send logs over OTLP from an {otelSdk} or collector."
+        },
+        "somethingElse": {
+          "name": "Something else",
+          "description": "{splunk} or {cribl}, cloud logs, security tools and CI/CD",
+          "about": "Move from {splunk} or {cribl}, or collect logs from your cloud, security tools and CI/CD.",
+          "question": "Where else do your logs come from?"
+        }
+      }
+    },
+    "llm": {
+      "name": "LLM and AI apps",
+      "description": "Trace LLM calls, agents and tools",
+      "gets": "See every LLM call, tool call and agent step.",
+      "question": "What does your AI app use?",
+      "rows": {
+        "openai": {
+          "description": "{openaiSdk}, Agents or {assistantsApi}",
+          "about": "Traces every call made through the {openaiSdk}, with tokens, cost and latency.",
+          "question": "Which {openai} library do you use?"
+        },
+        "anthropic": {
+          "description": "{anthropicSdk} or {claudeAgentSdk}",
+          "about": "Traces every call made through the {anthropicSdk}, with tokens, cost and latency.",
+          "question": "Which {anthropic} library do you use?"
+        },
+        "langchainOrLanggraph": {
+          "description": "Chains, agents and graphs",
+          "about": "Traces each chain, agent step and tool call.",
+          "question": "Which {langchain} library do you use?"
+        },
+        "somethingElse": {
+          "name": "Something else",
+          "description": "Other frameworks, model providers, gateways and tools",
+          "about": "Frameworks, model providers, gateways, no-code tools, analytics and tools.",
+          "question": "What does your AI app use?"
+        }
+      }
     }
   }
 }

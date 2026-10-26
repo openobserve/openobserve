@@ -441,6 +441,27 @@ describe("Header Component", () => {
     });
   });
 
+  describe("Focus-mode route", () => {
+    it("drops the menu and AI buttons and offers a slot for the page's own buttons", async () => {
+      const focusWrapper = createWrapper({
+        mountType: "mount",
+        storeOverrides: { state: { zoConfig: { ai_enabled: true } } },
+        configOverrides: { isEnterprise: "true" },
+        propsOverrides: {
+          router: { ...mockRouter, currentRoute: { value: { meta: { focusMode: true } } } },
+        },
+        stubsOverrides: {},
+      });
+      await focusWrapper.vm.$nextTick();
+
+      expect(focusWrapper.find('[data-test="header-mobile-nav-toggle"]').exists()).toBe(false);
+      expect(focusWrapper.find('[data-test="menu-link-ai-item"]').exists()).toBe(false);
+      expect(focusWrapper.find("#o2-header-actions").exists()).toBe(true);
+
+      focusWrapper.unmount();
+    });
+  });
+
   describe("AI Chat Button", () => {
     it("should display AI chat button in enterprise mode with ai_enabled", async () => {
       const aiWrapper = createWrapper({

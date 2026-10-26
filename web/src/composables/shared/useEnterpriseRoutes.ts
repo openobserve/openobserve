@@ -491,6 +491,17 @@ const useEnterpriseRoutes = () => {
         routeGuard(to, from, next);
       },
     });
+
+    // Menu-free first-run setup; cloud only, self-hosted builds keep today's Home.
+    routes.push({
+      path: "onboarding/:path*",
+      name: "onboarding",
+      component: () => import("@/views/OnboardingView.vue"),
+      meta: { focusMode: true, titleKey: "routeTitles.onboarding", allowOnEmptyData: true },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    });
   }
 
   return routes;

@@ -1650,12 +1650,12 @@
       "fileTypeZip": "仅允许 ZIP 文件"
     },
     "emptyState": {
-      "title": "使用真实用户监控监控您的用户",
-      "description": "RUM 跟踪真实的用户交互——页面加载、错误、API 调用和会话重播——因此您可以确切地了解用户对应用程序的体验。",
       "webApp": "对 Web 应用程序进行检测",
       "webAppDesc": "将 OpenObserve RUM SDK 添加到任何 {product} 应用",
       "sessionReplay": "启用会话重播",
       "sessionReplayDesc": "记录和重播用户会话以调试 UX 问题",
+      "title": "使用真实用户监控监控您的用户",
+      "description": "RUM 跟踪真实的用户交互——页面加载、错误、API 调用和会话重播——因此您可以确切地了解用户对应用程序的体验。",
       "learnMore": "了解更多：",
       "quickImpl": "快速实施指南",
       "blogPost": "前端监控基础知识"
@@ -4950,12 +4950,6 @@
     "joinSlack": "加入 Slack",
     "maybeLater": "也许以后再说"
   },
-  "connectDataSourcePopup": {
-    "title": "首先，让我们连接您的第一个数据源。",
-    "description": "我们有很多内容想向您展示，但首先需要连接您的数据。大多数团队大约一分钟内就能看到第一批日志。",
-    "connectButton": "连接数据源",
-    "slackLink": "也欢迎加入我们的 Slack 社区"
-  },
   "confirmDialog": {
     "continueFromWherePaused": "从暂停处继续",
     "startFromNow": "从现在开始",
@@ -5407,8 +5401,6 @@
       "anyWindowsHostNote": "任何 Windows 服务器或虚拟机。",
       "arrow": "→",
       "askOnSlack": "在 Slack 上提问",
-      "autoInstrumentTracesDesc": "两种方式都能**无需改动应用代码或重新构建镜像即可获得分布式追踪**。**语言库：**OpenTelemetry Operator 会向带注解命名空间中的 Pod 注入自动插桩。**eBPF：**采集器会追踪你选择的进程，支持任意语言，包括 Go。",
-      "autoInstrumentTracesTitle": "追踪你的应用：语言库或 eBPF",
       "cassandraJmxNote": "在 Cassandra 上启用 JMX 远程访问，以便接收器连接。",
       "cassandraTagline": "通过 OpenTelemetry Collector 的 JMX 接收器采集 Cassandra 指标并将其发送到 OpenObserve。",
       "checking": "正在检查…",
@@ -5493,11 +5485,13 @@
       "k8sAnnotatePodNote": "为单个 pod 规范添加注解，而不是命名空间，以一次检测一个工作负载。",
       "k8sFixBody": "OpenTelemetry operator 在 cert-manager 的 webhook 提供服务之前无法启动，而从未启动的收集器不会发送任何内容。检查两者都在运行，然后再次测试：",
       "k8sFixTitle": "等待 cert-manager webhook",
+      "k8sEbpfAnyLanguageVariant": "任意语言，无需库（eBPF）",
       "k8sEbpfNote": "追踪通过 eBPF 采集：无需修改代码，也无需 SDK。追踪上下文仅通过明文 HTTP 在服务间传递（Go 应用在未启用内核 lockdown 的节点上也可通过 HTTPS）。只要进程匹配端口、可执行文件路径或命令行中的任意一项，就会被追踪；glob 中不能包含 `,`、`{'{'}` 或 `{'}'}`，且端口会匹配在该端口上持有套接字的任何进程。需要 Helm 3.14+ 和 OpenTelemetry Operator v0.142.0+；如果你的版本更旧，请先使用 `kubectl apply -f https://github.com/open-telemetry/opentelemetry-operator/releases/download/v0.161.0/opentelemetry-operator.yaml` 升级 Operator。如果已在旧版 Operator 上启用过 eBPF，请使用 `--force`（Helm 4 上为 `--force-replace`）重新运行命令。重新运行上方的安装命令会重置该 release 并关闭 eBPF，因此之后请再次运行此命令。`openobserve-collector` 命名空间必须允许特权 Pod，节点必须运行 amd64 或 arm64 架构的 Linux，内核 5.8+（或带 eBPF 回溯移植的 RHEL 系列 4.18）并支持 BTF。不要选择已自行发送追踪数据的应用，也不要选择使用 Go `inject-go` sidecar 的 Pod。",
-      "k8sEbpfVariant": "eBPF（任意语言，无需改代码）",
-      "k8sLibrariesVariant": "语言库（自动插桩）",
       "k8sInstallerNote": "这会自动安装 cert-manager、OpenTelemetry operator 和 OpenObserve collector。",
       "k8sInternalEndpointNote": "当 OpenObserve 运行在同一集群中使用此项 — 流量永远不会离开它。",
+      "k8sLibraryPerLanguageVariant": "按语言添加库（Java、.NET、Node.js、Python）",
+      "k8sOptionalTracesDesc": "还想获取服务的请求追踪？选择方式，然后再运行一条命令即可。无需改动代码，随时都可以设置。",
+      "k8sOptionalTracesTitle": "可选：追踪您的应用",
       "k8sTroubleAnnotationA": "注入发生在 pod 创建时，因此现有 pod 在重启前不受影响 — 运行 `kubectl rollout restart deployment -n my-namespace`。使用 `kubectl get ns my-namespace -o yaml` 确认注解已生效，并检查值是否与 `openobserve-collector/openobserve-<language>` 匹配。",
       "k8sTroubleAnnotationQ": "我注解了命名空间但没有出现 trace",
       "k8sTroubleEndpointA": "仅当 OpenObserve 本身运行在此集群中时才使用**内部端点**；这样流量会留在集群内部，不会跨越网络。URL 为 `http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080` — 默认假定发布名为 `o2`、命名空间为 `openobserve`，如果你的不同请自行修改。其他所有情况都使用外部端点。",
@@ -5750,6 +5744,7 @@
       "androidTroubleScreenNamesQ": "会话出现，但屏幕名称都相同",
       "androidTroubleScreenNamesA": "视图跟踪未接入。在构建 `RumConfiguration` 时传入 `useViewTrackingStrategy(...)` — 例如 Activity 使用 `ActivityViewTrackingStrategy(trackExtras = true)`，如果使用 AndroidX Navigation 则使用 `NavigationViewTrackingStrategy(...)`。",
       "setupTime5Min": "~5 分钟",
+      "showStepInstructions": "显示说明",
       "snowflakeCollectorVersionNote": "Snowflake 需要 collector v0.92.0 — 较新的构建存在已知错误。",
       "snowflakeTagline": "使用 OpenTelemetry Collector 采集 Snowflake 账户指标并将其发送到 OpenObserve。",
       "sqlClientGuiVariant": "SQL 客户端 (GUI)",

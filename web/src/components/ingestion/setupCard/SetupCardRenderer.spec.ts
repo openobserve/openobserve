@@ -19,16 +19,18 @@
 // data source's copy.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { defineComponent, h } from "vue";
+import { defineComponent, h, ref } from "vue";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 import SetupCardRenderer from "./SetupCardRenderer.vue";
 import { iconRegistry } from "@/lib/core/Icon/OIcon.icons";
-import type { RichCardContent } from "./types";
+import { SETUP_STEPS_HOST } from "./stepsHost";
+import { SETUP_CARD_ONBOARDING, type RichCardContent, type SetupCardPresets } from "./types";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
+import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import linuxCard from "./content/linux";
 import kubernetesCard from "./content/kubernetes";
 import { gt } from "@/types/i18n";
@@ -369,6 +371,25 @@ describe("SetupCardRenderer — first-event bar, detected emit & showOnDetect ac
     });
   });
 
+  it("emits the bar's first-event result as `received`", async () => {
+    wrapper = mountCard(hostContent());
+    const result = { streamName: "system_cpu_time", streamType: "metrics", count: 3 };
+    bar(wrapper).vm.$emit("detected", result);
+    await flushPromises();
+    expect(wrapper.emitted("received")).toEqual([[result]]);
+  });
+
+  it("emits the bar's state as `state` on every change", async () => {
+    wrapper = mountCard();
+    bar(wrapper).vm.$emit("state", "idle");
+    await flushPromises();
+    bar(wrapper).vm.$emit("state", "rejected");
+    await flushPromises();
+    bar(wrapper).vm.$emit("state", "rejected");
+    await flushPromises();
+    expect(wrapper.emitted("state")).toEqual([["idle"], ["rejected"]]);
+  });
+
   it("does not emit `detected` on a fresh mount (no transition happened)", async () => {
     wrapper = mountCard(hostContent());
     await flushPromises();
@@ -515,6 +536,89 @@ describe("SetupCardRenderer — step-note jump links", () => {
   });
 });
 
+describe("SetupCardRenderer — folded optional step", () => {
+  let wrapper: VueWrapper<any>;
+  const original = (Element.prototype as any).scrollIntoView;
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+    (Element.prototype as any).scrollIntoView = original;
+  });
+
+  // install → folded optional step → verify, so the fold sits between two main-path steps.
+  const folded = (): RichCardContent => ({
+    ...CONTENT,
+    steps: [
+      CONTENT.steps[0],
+      {
+        id: "extra",
+        title: "Optional: extra",
+        description: "Only if you want it.",
+        chip: { kind: "editor", label: "Optional" },
+        completeOn: "copy",
+        collapsed: true,
+        code: { lang: "bash", raw: "echo extra" },
+      },
+      CONTENT.steps[1],
+    ],
+  });
+  const fold = () => wrapper.find('[data-test="ai-step-fold-extra"]');
+  const codes = () => wrapper.findAllComponents(OCodeBlock).map((b) => b.props("code"));
+  const activeStep = () => wrapper.findComponent(OStepper).props("modelValue");
+  // OStep's wrapper element is the whole stepper, so name a step by its body.
+  const body = (i: number) => wrapper.findAll(".step-content-pad")[i];
+  const scrolledTo = (spy: ReturnType<typeof vi.fn>) => spy.mock.contexts[0] as Element;
+
+  it("starts folded under its heading and opens from it", async () => {
+    wrapper = mountCard(folded());
+    expect(wrapper.findAllComponents(OStep)[1].props("title")).toBe("Optional: extra");
+    // The description stays visible; everything below it sits in the fold.
+    expect(body(1).find(".step-desc").text()).toBe("Only if you want it.");
+    expect(body(1).find('[data-test="ai-step-fold-extra"]').exists()).toBe(true);
+    expect(codes()).not.toContain("echo extra");
+
+    await fold().find("button").trigger("click");
+    await flushPromises();
+    expect(codes()).toContain("echo extra");
+  });
+
+  it("does not hold up the auto-advance, the active step or the done state", async () => {
+    wrapper = mountCard(folded());
+    const scrollSpy = vi.fn();
+    (Element.prototype as any).scrollIntoView = scrollSpy;
+    expect(activeStep()).toBe(1);
+
+    wrapper.findAllComponents(OCodeBlock)[0].vm.$emit("copy", { partial: false });
+    await flushPromises();
+    // Copying install skips the fold: the verify step is next, and it scrolls there.
+    expect(activeStep()).toBe(3);
+    expect(scrollSpy).toHaveBeenCalledTimes(1);
+    expect(scrolledTo(scrollSpy)).toBe(body(2).element);
+
+    // Data arriving finishes the card although the optional step was never opened.
+    bar(wrapper).vm.$emit("detected", { count: 1 });
+    await flushPromises();
+    expect(activeStep()).toBe(0);
+    expect(wrapper.findAllComponents(OStep)[1].props("done")).toBe(false);
+  });
+
+  it("leaves a card with no collapsed step unchanged", async () => {
+    wrapper = mountCard();
+    const scrollSpy = vi.fn();
+    (Element.prototype as any).scrollIntoView = scrollSpy;
+    expect(wrapper.find('[data-test^="ai-step-fold-"]').exists()).toBe(false);
+    // The code block is still a direct child of the step body, with no wrapper.
+    expect(
+      wrapper.find('.step-content-pad > [data-test="ingestion-setup-code-block"]').exists(),
+    ).toBe(true);
+
+    wrapper.findAllComponents(OCodeBlock)[0].vm.$emit("copy", { partial: false });
+    await flushPromises();
+    expect(activeStep()).toBe(2);
+    expect(scrolledTo(scrollSpy)).toBe(body(1).element);
+  });
+});
+
 describe("SetupCardRenderer — product analytics", () => {
   let wrapper: VueWrapper<any>;
 
@@ -548,7 +652,10 @@ describe("SetupCardRenderer — product analytics", () => {
         userInfo: { email: "t@e.com" },
         organizationData: {
           organizationPasscode: "pc",
-          orgTokens: [{ name: "default", token: "pc" }],
+          orgTokens: [
+            { name: "default", token: "pc" },
+            { name: "ci", token: "other" },
+          ],
         },
         theme: "light",
       },
@@ -733,15 +840,35 @@ helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-colle
     subTabs().findComponent(OToggleGroup).vm.$emit("update:modelValue", id);
     await flushPromises();
   };
-  const mountK8s = () =>
-    mount(SetupCardRenderer, {
+  // Tracing is a folded optional step, so open it the way the user does first.
+  const mountK8s = async () => {
+    const w = mount(SetupCardRenderer, {
       props: { content: kubernetesCard(SUBS, gt), subs: SUBS },
       global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
       attachTo: document.body,
     });
+    await w.find('[data-test="ai-step-fold-instrument"] > button').trigger("click");
+    await flushPromises();
+    return w;
+  };
+
+  it("puts the folded tracing step before the data check", () => {
+    wrapper = mount(SetupCardRenderer, {
+      props: { content: kubernetesCard(SUBS, gt), subs: SUBS },
+      global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
+      attachTo: document.body,
+    });
+    expect(wrapper.findAllComponents(OStep).map((st) => st.props("title"))).toEqual([
+      "Quick install (recommended)",
+      "Optional: trace your apps",
+      "Verify data in OpenObserve",
+    ]);
+    expect(wrapper.find('[data-test="ai-step-fold-instrument"]').exists()).toBe(true);
+    expect(subTabs().exists()).toBe(false);
+  });
 
   it("renders the nested language toggle under language libraries and switches code", async () => {
-    wrapper = mountK8s();
+    wrapper = await mountK8s();
     expect(subTabs().exists()).toBe(true);
     for (const id of ["java", "dotnet", "nodejs", "python"]) {
       expect(subTabs().find(`[data-test="ai-variant-${id}"]`).exists()).toBe(true);
@@ -759,7 +886,7 @@ helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-colle
   });
 
   it("shows the eBPF fields only under eBPF, opening with nothing selected", async () => {
-    wrapper = mountK8s();
+    wrapper = await mountK8s();
     for (const id of ["ebpfPorts", "ebpfExe", "ebpfCmd"]) expect(field(id).exists()).toBe(false);
     await pickTop("ebpf");
     for (const id of ["ebpfPorts", "ebpfExe", "ebpfCmd"]) expect(field(id).exists()).toBe(true);
@@ -775,7 +902,7 @@ helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-colle
   });
 
   it("emits one --set-string per filled field, in order, with comma-split quoted lists", async () => {
-    wrapper = mountK8s();
+    wrapper = await mountK8s();
     await pickTop("ebpf");
     await type("ebpfPorts", " 8080, 9000-9100 ,,");
     await type("ebpfExe", "/app/it's*");
@@ -788,7 +915,7 @@ helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-colle
   });
 
   it("sets blank fields to null so a selector from an earlier run is cleared", async () => {
-    wrapper = mountK8s();
+    wrapper = await mountK8s();
     await pickTop("ebpf");
     await type("ebpfPorts", "  ");
     await type("ebpfCmd", "*reports.py*");
@@ -799,7 +926,7 @@ helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-colle
   });
 
   it("warns and hides the command when every selector is blank", async () => {
-    wrapper = mountK8s();
+    wrapper = await mountK8s();
     await pickTop("ebpf");
     expect(warning().exists()).toBe(true);
     expect(warning().text()).toContain("Fill in at least one");
@@ -807,7 +934,7 @@ helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-colle
   });
 
   it("escapes backslashes and braces so a value cannot close the Helm list", async () => {
-    wrapper = mountK8s();
+    wrapper = await mountK8s();
     await pickTop("ebpf");
     await type(
       "ebpfCmd",
@@ -822,11 +949,186 @@ helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-colle
   });
 
   it("treats a field holding only commas and spaces as blank", async () => {
-    wrapper = mountK8s();
+    wrapper = await mountK8s();
     await pickTop("ebpf");
     await type("ebpfPorts", " ,,, ");
     await type("ebpfExe", ",");
     expect(warning().exists()).toBe(true);
     expect(codes().some((c) => c.includes("upgrade o2c"))).toBe(false);
+  });
+});
+
+describe("SetupCardRenderer — Kubernetes card in onboarding", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  // Onboarding provides the tracing answer from its URL; the card is built from it, as
+  // DataSourceSetupCard does.
+  const mountOnboarding = (presets: SetupCardPresets) => {
+    wrapper = mount(SetupCardRenderer, {
+      props: { content: kubernetesCard(SUBS, gt, presets), subs: SUBS },
+      global: {
+        plugins: [store, router],
+        stubs: { FirstEventStatus: FirstEventStatusStub },
+        provide: { [SETUP_CARD_ONBOARDING as symbol]: ref(presets) },
+      },
+      attachTo: document.body,
+    });
+  };
+  const find = (id: string) => wrapper.find(`[data-test="${id}"]`);
+  const titles = () => wrapper.findAllComponents(OStep).map((st) => st.props("title"));
+  const instrumentCode = () =>
+    find("ai-step-instrument").findComponent(OCodeBlock).exists()
+      ? (find("ai-step-instrument").findComponent(OCodeBlock).props("code") as string)
+      : undefined;
+
+  it("keeps the verify step, with its data check, as Check Your Data", () => {
+    mountOnboarding({ traces: "off", languages: [] });
+    expect(titles()).toContain("Check Your Data");
+    expect(wrapper.text()).not.toContain("Verify data in OpenObserve");
+    expect(find("ai-step-verify").text()).toContain("Give the collector a few seconds to start");
+    expect(find("ai-step-verify").findComponent(FirstEventStatusStub).exists()).toBe(true);
+  });
+
+  it("has no tracing step when traces were skipped", () => {
+    mountOnboarding({ traces: "off", languages: [] });
+    expect(titles()).toEqual(["Quick install (recommended)", "Check Your Data"]);
+    expect(find("ai-step-instrument").exists()).toBe(false);
+  });
+
+  it("shows a numbered eBPF step, open and with no toggle", async () => {
+    mountOnboarding({ traces: "ebpf", languages: [] });
+    expect(titles()).toEqual(["Quick install (recommended)", "Trace your apps", "Check Your Data"]);
+    expect(find("ai-step-fold-instrument").exists()).toBe(false);
+    expect(find("ai-step-instrument").find('[data-test="ai-variant-tabs"]').exists()).toBe(false);
+    for (const id of ["ebpfPorts", "ebpfExe", "ebpfCmd"]) {
+      expect(find(`ai-input-${id}`).exists()).toBe(true);
+    }
+    expect(find("ai-variant-require-instrument").exists()).toBe(true);
+    await find("ai-input-ebpfPorts").find("input").setValue("8080");
+    expect(instrumentCode()).toContain("upgrade o2c");
+    expect(instrumentCode()).toContain("--set-string 'ebpf.trace.ports={8080}'");
+  });
+
+  it("gives one annotate line per language, each with its own namespace input", async () => {
+    mountOnboarding({ traces: "library", languages: ["java", "nodejs"] });
+    expect(titles()).toEqual(["Quick install (recommended)", "Trace your apps", "Check Your Data"]);
+    expect(find("ai-step-instrument").find('[data-test="ai-variant-tabs"]').exists()).toBe(false);
+    for (const id of ["javaNamespace", "nodejsNamespace"]) {
+      expect((find(`ai-input-${id}`).find("input").element as HTMLInputElement).value).toBe(
+        "my-namespace",
+      );
+    }
+    await find("ai-input-javaNamespace").find("input").setValue("shop");
+    await find("ai-input-nodejsNamespace").find("input").setValue("web");
+    expect(instrumentCode()).toBe(
+      [
+        "# Every pod in the namespace is instrumented — no code or image change.",
+        "kubectl annotate namespace shop \\",
+        '  instrumentation.opentelemetry.io/inject-java="openobserve-collector/openobserve-java"',
+        "kubectl annotate namespace web \\",
+        '  instrumentation.opentelemetry.io/inject-nodejs="openobserve-collector/openobserve-nodejs"',
+        "",
+        "# Restart so running pods pick up the injection",
+        "kubectl rollout restart deployment -n shop",
+        "kubectl rollout restart deployment -n web",
+      ].join("\n"),
+    );
+  });
+
+  it.each([
+    ["no answer", { languages: [] }],
+    ["a library with no known language", { traces: "library", languages: ["go"] }],
+  ] as [string, SetupCardPresets][])(
+    "shows the folded optional step for %s, as on the Data sources page",
+    (_, presets) => {
+      mountOnboarding(presets);
+      expect(titles()).toEqual([
+        "Quick install (recommended)",
+        "Optional: trace your apps",
+        "Check Your Data",
+      ]);
+      expect(find("ai-step-fold-instrument").exists()).toBe(true);
+    },
+  );
+
+  it("keeps the verify step and the folded optional step on the Data sources page", () => {
+    wrapper = mount(SetupCardRenderer, {
+      props: { content: kubernetesCard(SUBS, gt), subs: SUBS },
+      global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
+      attachTo: document.body,
+    });
+    expect(titles()).toEqual([
+      "Quick install (recommended)",
+      "Optional: trace your apps",
+      "Verify data in OpenObserve",
+    ]);
+    expect(find("ai-step-fold-instrument").exists()).toBe(true);
+    expect(find("ai-step-verify").findComponent(FirstEventStatusStub).exists()).toBe(true);
+  });
+});
+
+describe("SetupCardRenderer — steps host", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  const mountWithHost = (content: RichCardContent, onboarding?: SetupCardPresets) => {
+    const setSteps = vi.fn();
+    wrapper = mount(SetupCardRenderer, {
+      props: { content, subs: SUBS },
+      global: {
+        plugins: [store, router],
+        stubs: { FirstEventStatus: FirstEventStatusStub },
+        provide: {
+          [SETUP_STEPS_HOST as symbol]: { setSteps },
+          ...(onboarding ? { [SETUP_CARD_ONBOARDING as symbol]: ref(onboarding) } : {}),
+        },
+      },
+      attachTo: document.body,
+    });
+    return setSteps;
+  };
+
+  it("reports the steps in order, then their done and active changes", async () => {
+    const setSteps = mountWithHost(CONTENT);
+    expect(setSteps).toHaveBeenLastCalledWith([
+      { id: "install", title: "Install", done: false, active: true },
+      { id: "verify", title: "Verify", done: false, active: false },
+    ]);
+    wrapper.findComponent(OCodeBlock).vm.$emit("copy", {});
+    await flushPromises();
+    expect(setSteps).toHaveBeenLastCalledWith([
+      { id: "install", title: "Install", done: true, active: false },
+      { id: "verify", title: "Verify", done: false, active: true },
+    ]);
+    bar(wrapper).vm.$emit("detected", { count: 3 });
+    await flushPromises();
+    expect(setSteps).toHaveBeenLastCalledWith([
+      { id: "install", title: "Install", done: true, active: false },
+      { id: "verify", title: "Verify", done: true, active: false },
+    ]);
+  });
+
+  it("gives each step's root an id the page can scroll to", () => {
+    mountWithHost(CONTENT);
+    expect(wrapper.find("#setup-step-install").attributes("data-test")).toBe("ai-step-install");
+    expect(wrapper.find("#setup-step-verify").attributes("data-test")).toBe("ai-step-verify");
+  });
+
+  it("reports the onboarding titles, folded optional step included", () => {
+    const setSteps = mountWithHost(kubernetesCard(SUBS, gt, { languages: [] }), {
+      languages: [],
+    });
+    expect(setSteps.mock.lastCall![0].map((s: { title: string }) => s.title)).toEqual([
+      "Quick install (recommended)",
+      "Optional: trace your apps",
+      "Check Your Data",
+    ]);
   });
 });

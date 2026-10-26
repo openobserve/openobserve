@@ -24,7 +24,7 @@
 
 import type { TranslateFn } from "@/types/i18n";
 
-import type { CardSubstitutions, RichCardContent } from "./types";
+import type { CardSubstitutions, RichCardContent, SetupCardPresets } from "./types";
 import sqlServer from "./content/sqlServer";
 import postgres from "./content/postgres";
 import mysql from "./content/mysql";
@@ -50,8 +50,13 @@ import nvidiaDcgm from "./content/nvidiaDcgm";
  * Given per-org substitutions and the caller's `t`, returns a data source's
  * setup-card content. `t` is threaded from the rendering component rather than
  * resolved globally so card copy stays reactive to the component's locale.
+ * `presets` is onboarding's tracing answer; a builder with no use for it ignores it.
  */
-export type DataSourceCardBuilder = (subs: CardSubstitutions, t: TranslateFn) => RichCardContent;
+export type DataSourceCardBuilder = (
+  subs: CardSubstitutions,
+  t: TranslateFn,
+  presets?: SetupCardPresets,
+) => RichCardContent;
 
 const registry: Record<string, DataSourceCardBuilder> = {
   sqlServer,
@@ -86,7 +91,8 @@ export function getDataSourceCard(
   slug: string | undefined,
   subs: CardSubstitutions,
   t: TranslateFn,
+  presets?: SetupCardPresets,
 ): RichCardContent | undefined {
   if (!slug) return undefined;
-  return registry[slug]?.(subs, t);
+  return registry[slug]?.(subs, t, presets);
 }

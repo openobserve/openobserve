@@ -52,7 +52,6 @@ const mountMainLayout = () =>
         WebinarBanner: StubDiv,
         AnnouncementBanner: StubDiv,
         ShortcutCheatsheet: StubDiv,
-        GetStarted: StubDiv,
         CommunitySlackInvite: StubDiv,
         ThemeSwitcher: StubDiv,
         PredefinedThemes: StubDiv,

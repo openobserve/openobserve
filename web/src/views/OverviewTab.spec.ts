@@ -65,6 +65,14 @@ vi.mock("@/services/service_graph", async (importOriginal) => {
 // Heavy children — stubbed to keep the suite focused on OverviewTab's own
 // render gating. OverviewSkeleton and OEmptyState are deliberately left REAL
 // so the assertions below exercise the actual rendered output.
+// HomeNoDataState's setup buttons read the org's full stream lists, which HomeView has already
+// loaded in the app; mocked so the probe counts below stay OverviewTab's own.
+vi.mock("@/composables/useOrgHasUserData", async () => {
+  const { ref } = await import("vue");
+  return {
+    useOrgHasUserData: () => ({ hasUserData: ref(undefined), isFetching: ref(false) }),
+  };
+});
 vi.mock("@/components/DateTime.vue", () => ({
   default: {
     name: "DateTime",
@@ -1003,12 +1011,13 @@ describe("OverviewTab", () => {
       expect(wrapper.find('[data-test="first-data-panel"]').exists()).toBe(false);
     });
 
-    it("should keep the toolbar with a fresh refresh run beside the hero", async () => {
+    it("should drop the refresh and time row beside the hero, with nothing to refresh or scope", async () => {
       wrapper = mountOverviewTab();
       await flushPromises();
 
-      expect(wrapper.find(REFRESH_BTN).exists()).toBe(true);
-      expect(refreshLastRun()).not.toBeNull();
+      expect(wrapper.find(HERO).exists()).toBe(true);
+      expect(wrapper.find(REFRESH_BTN).exists()).toBe(false);
+      expect(wrapper.find('[data-test="overview-date-time-stub"]').exists()).toBe(false);
     });
 
     it("should ask nothing when the first-data notice already probed every type empty", async () => {
@@ -1046,7 +1055,8 @@ describe("OverviewTab", () => {
       const first = vi.mocked(streamService.nameList).mock.calls.length;
       expect(first).toBeGreaterThan(0);
 
-      wrapper.findComponent({ name: "DateTime" }).vm.$emit("on:date-change", {
+      // the no-data state has no time picker, so call its handler as a date change would
+      (wrapper.vm as unknown as { onDateChange: (v: object) => void }).onDateChange({
         startTime: 1,
         endTime: 2,
         relativeTimePeriod: "1h",
@@ -1071,13 +1081,13 @@ describe("OverviewTab", () => {
       expect(wrapper.find(HERO).exists()).toBe(false);
     });
 
-    it("should re-read the lists on Refresh and show all clear once a user stream arrived", async () => {
+    it("should re-read the lists on a forced load and show all clear once a user stream arrived", async () => {
       wrapper = mountOverviewTab();
       await flushPromises();
       expect(wrapper.find(HERO).exists()).toBe(true);
       givenStreams({ ...internalOnly, traces: [{ name: "default", stream_type: "traces" }] });
 
-      await wrapper.find(REFRESH_BTN).trigger("click");
+      await (wrapper.vm as unknown as { loadAll: (force: boolean) => Promise<void> }).loadAll(true);
       await flushPromises();
 
       expect(wrapper.find(HERO).exists()).toBe(false);
@@ -1172,7 +1182,6 @@ describe("OverviewTab", () => {
       expect(vi.mocked(streamService.nameList).mock.calls.length).toBeGreaterThan(before);
       expect(wrapper.find(LOAD_ERROR).exists()).toBe(false);
       expect(wrapper.find(HERO).exists()).toBe(true);
-      expect(refreshLastRun()).not.toBeNull();
     });
 
     it("should re-run the probes on Retry and show all clear once a user stream is found", async () => {

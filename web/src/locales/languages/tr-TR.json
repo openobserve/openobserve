@@ -1650,12 +1650,12 @@
       "fileTypeZip": "Yalnızca ZIP dosyalarına izin verilir"
     },
     "emptyState": {
-      "title": "Gerçek Kullanıcı İzleme ile kullanıcılarınızı izleyin",
-      "description": "RUM, gerçek kullanıcı etkileşimlerini (sayfa yükleri, hatalar, API çağrıları ve oturum tekrarları) izler, böylece kullanıcıların uygulamanızı tam olarak nasıl deneyimlediğini görebilirsiniz.",
       "webApp": "Bir web uygulaması düzenleyin",
       "webAppDesc": "OpenObserve RUM SDK'sını herhangi bir {product} uygulamasına ekleyin",
       "sessionReplay": "Oturum Tekrarını Etkinleştir",
       "sessionReplayDesc": "UX sorunlarında hata ayıklamak için kullanıcı oturumlarını kaydedin ve tekrarlayın",
+      "title": "Gerçek Kullanıcı İzleme ile kullanıcılarınızı izleyin",
+      "description": "RUM, gerçek kullanıcı etkileşimlerini (sayfa yükleri, hatalar, API çağrıları ve oturum tekrarları) izler, böylece kullanıcıların uygulamanızı tam olarak nasıl deneyimlediğini görebilirsiniz.",
       "learnMore": "Daha fazla bilgi edinin:",
       "quickImpl": "Hızlı uygulama kılavuzu",
       "blogPost": "Ön uç izleme temelleri"
@@ -4950,12 +4950,6 @@
     "joinSlack": "Slack'e Katılın",
     "maybeLater": "Belki daha sonra"
   },
-  "connectDataSourcePopup": {
-    "title": "Başlamak için ilk veri kaynağınızı bağlayalım.",
-    "description": "Size gösterecek çok şeyimiz var, ancak önce verilerinizi bağlamamız gerekiyor. Çoğu ekip ilk günlüklerini yaklaşık bir dakika içinde görür.",
-    "connectButton": "Bir veri kaynağı bağla",
-    "slackLink": "Ayrıca Slack topluluğumuza katılın"
-  },
   "confirmDialog": {
     "continueFromWherePaused": "Kaldığı yerden devam et",
     "startFromNow": "Şu andan itibaren başlat.",
@@ -5407,8 +5401,6 @@
       "anyWindowsHostNote": "Herhangi bir Windows sunucusu veya VM.",
       "arrow": "→",
       "askOnSlack": "Slack'te Sorun",
-      "autoInstrumentTracesDesc": "Her ikisi de **uygulama koduna dokunmadan veya imajları yeniden oluşturmadan dağıtık izler** sağlar. **Dil kütüphaneleri:** OpenTelemetry operatörü, annotation eklenmiş bir ad alanındaki pod'lara otomatik enstrümantasyon enjekte eder. **eBPF:** toplayıcı, seçtiğiniz süreçleri Go dahil her dilde izler.",
-      "autoInstrumentTracesTitle": "Uygulamalarınızı izleyin: dil kütüphaneleri veya eBPF",
       "cassandraJmxNote": "Alıcının bağlanabilmesi için Cassandra'da JMX uzaktan erişimini etkinleştirin.",
       "cassandraTagline": "Cassandra metriklerini OpenTelemetry Collector'ın JMX alıcısı aracılığıyla toplayın ve OpenObserve'e gönderin.",
       "checking": "Kontrol ediliyor…",
@@ -5493,11 +5485,13 @@
       "k8sAnnotatePodNote": "Tek seferde bir iş yükünü enstrümante etmek için ad alanı yerine tek bir pod spesifikasyonunu notlayın.",
       "k8sFixBody": "OpenTelemetry operatörü, cert-manager'ın webhook'u hizmet verene kadar başlatılamaz ve hiç başlamayan bir toplayıcı hiçbir şey göndermez. İkisinin de çalıştığından emin olun, ardından tekrar test edin:",
       "k8sFixTitle": "cert-manager webhook'unu bekleyin",
+      "k8sEbpfAnyLanguageVariant": "Her dil, kütüphane gerekmez (eBPF)",
       "k8sEbpfNote": "İzler eBPF ile yakalanır: kod değişikliği veya SDK gerekmez. İz bağlamı servisler arasında yalnızca düz metin HTTP üzerinden taşınır (Go uygulamalarında, kernel lockdown olan düğümler dışında HTTPS üzerinden de). Bağlantı noktalarından, yürütülebilir dosya yolundan veya komut satırından herhangi biriyle eşleşen bir süreç izlenir; glob'lar `,`, `{'{'}` veya `{'}'}` içeremez ve bir bağlantı noktası, üzerinde soketi olan her süreçle eşleşir. Helm 3.14+ ve OpenTelemetry operatörü v0.142.0+ gerekir; sizinki daha eskiyse önce `kubectl apply -f https://github.com/open-telemetry/opentelemetry-operator/releases/download/v0.161.0/opentelemetry-operator.yaml` ile yükseltin. eBPF daha eski bir operatörle zaten etkinleştirildiyse komutu `--force` ile yeniden çalıştırın (Helm 4'te `--force-replace`). Yukarıdaki kurulum komutunu yeniden çalıştırmak sürümü sıfırlar ve eBPF'yi kapatır; bu yüzden ardından bu komutu tekrar çalıştırın. `openobserve-collector` ad alanı ayrıcalıklı pod'lara izin vermeli ve düğümler amd64 veya arm64 üzerinde, 5.8+ çekirdekli (veya eBPF geri portlarına sahip RHEL ailesi 4.18) ve BTF destekli Linux çalıştırmalıdır. Zaten kendi izlerini gönderen uygulamaları veya Go `inject-go` sidecar'ını kullanan pod'ları seçmeyin.",
-      "k8sEbpfVariant": "eBPF (her dil, kod değişikliği yok)",
-      "k8sLibrariesVariant": "Dil kütüphaneleri (otomatik enstrümantasyon)",
       "k8sInstallerNote": "Bu, cert-manager'ı, OpenTelemetry operatörünü ve OpenObserve toplayıcısını otomatik olarak kurar.",
       "k8sInternalEndpointNote": "Bunu, OpenObserve aynı kümede çalışıyorsa kullanın — trafik asla kümeden dışarı çıkmaz.",
+      "k8sLibraryPerLanguageVariant": "Her dil için bir kütüphane ekleyin (Java, .NET, Node.js, Python)",
+      "k8sOptionalTracesDesc": "Servislerinizden istek izleri de mi istiyorsunuz? Yöntemi seçin, ardından bir komut daha çalıştırın. Kod değişikliği gerekmez ve bunu istediğiniz zaman yapabilirsiniz.",
+      "k8sOptionalTracesTitle": "İsteğe bağlı: uygulamalarınızı izleyin",
       "k8sTroubleAnnotationA": "Enjeksiyon pod oluşturulurken gerçekleşir, bu nedenle mevcut podlar yeniden başlatılana kadar etkilenmez — `kubectl rollout restart deployment -n my-namespace` komutunu çalıştırın. Notun yerleştiğini `kubectl get ns my-namespace -o yaml` ile doğrulayın ve değerin `openobserve-collector/openobserve-<language>` ile eşleştiğini kontrol edin.",
       "k8sTroubleAnnotationQ": "Bir namespace'e annotasyon ekledim ama hiç iz görünmüyor",
       "k8sTroubleEndpointA": "**Dahili uç noktayı** yalnızca OpenObserve'ün kendisi bu kümede çalışıyorsa kullanın; bu durumda trafik kümenin içinde kalır ve ağı hiç geçmez. URL `http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080` şeklindedir — varsayılan, `openobserve` ad alanında `o2` sürümünü varsayar, farklıysa düzenleyin. Diğer herkes harici uç noktayı kullanır.",
@@ -5750,6 +5744,7 @@
       "androidTroubleScreenNamesQ": "Oturumlar görünüyor ancak ekranların tümü aynı adla adlandırılmış",
       "androidTroubleScreenNamesA": "Görünüm izleme bağlanmamış. `RumConfiguration` oluştururken bir `useViewTrackingStrategy(...)` iletin — örn. Etkinlikler için `ActivityViewTrackingStrategy(trackExtras = true)` veya AndroidX Navigation kullanıyorsanız `NavigationViewTrackingStrategy(...)` —.",
       "setupTime5Min": "~5 dakika",
+      "showStepInstructions": "Talimatları göster",
       "snowflakeCollectorVersionNote": "Snowflake, collector v0.92.0 gerektirir — daha yeni sürümlerde bilinen bir hata vardır.",
       "snowflakeTagline": "Snowflake hesap metriklerini OpenTelemetry Collector ile toplayın ve OpenObserve'e gönderin.",
       "sqlClientGuiVariant": "SQL İstemcisi (GUI)",

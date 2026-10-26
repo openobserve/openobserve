@@ -797,6 +797,16 @@
   /* Darker than the fill so the header/body edge stays readable. NOT
      border-default — see above. */
   --color-panel-bar-border: var(--color-grey-300);
+
+  /* ── Onboarding brand panel ────────────────────────────────
+     The panel beside each onboarding step (OnboardingPreview) is the brand
+     colour, darker at the top where its text sits, and the option it describes
+     (OnboardingChoiceButton) is filled with the same colour so the two read as
+     a pair. Built from the primary ramp, so it follows the org's theme. */
+  --color-onboarding-panel-start: var(--color-primary-700);
+  --color-onboarding-panel-end: var(--color-primary-600);
+  --color-onboarding-panel-text: var(--color-white);
+  --color-onboarding-choice-active-bg: var(--color-primary-700);
 }
 
 /* The attribute lets a preview render light banners inside a dark app; see AnnouncementBannerPreviewPanel. */
@@ -1988,6 +1998,12 @@
   /* Chart panel bar */
   --color-panel-bar-bg: var(--color-panel-bar-bg);
   --color-panel-bar-border: var(--color-panel-bar-border);
+
+  /* Onboarding brand panel */
+  --color-onboarding-panel-start: var(--color-onboarding-panel-start);
+  --color-onboarding-panel-end: var(--color-onboarding-panel-end);
+  --color-onboarding-panel-text: var(--color-onboarding-panel-text);
+  --color-onboarding-choice-active-bg: var(--color-onboarding-choice-active-bg);
 
   /* Shared hover + surface accent */
   --color-interactive-hover-bg: var(--color-interactive-hover-bg);

@@ -108,7 +108,7 @@ const indent = (block: string, spaces: number) =>
 
 // ── NPM variant ──────────────────────────────────────────────────────────────
 
-const NPM_INSTALL = "npm i @openobserve/browser-rum @openobserve/browser-logs";
+export const NPM_INSTALL = "npm i @openobserve/browser-rum @openobserve/browser-logs";
 
 const npmInit = (
   subs: RumCardSubs,

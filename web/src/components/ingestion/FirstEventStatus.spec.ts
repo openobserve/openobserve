@@ -25,6 +25,10 @@ import type {
 } from "@/composables/firstEvent/useFirstEventWatch";
 import FirstEventStatus from "./FirstEventStatus.vue";
 import { FIRST_EVENT_ASK_AI } from "./firstEventAskAi";
+import {
+  FIRST_EVENT_REPORTER,
+  type FirstEventReporter,
+} from "@/composables/firstEvent/firstEventReporter";
 import analytics from "@/services/product_analytics";
 
 const fake = {
@@ -80,14 +84,21 @@ let wrapper: VueWrapper;
 let router: ReturnType<typeof createRouter>;
 const mountBar = (
   props: Record<string, unknown> = {},
-  opts: { askAi?: (q: string) => void; zoConfig?: Record<string, unknown> } = {},
+  opts: {
+    askAi?: (q: string) => void;
+    zoConfig?: Record<string, unknown>;
+    reporter?: FirstEventReporter;
+  } = {},
 ) => {
   router = createRouter({ history: createMemoryHistory(), routes });
   wrapper = mount(FirstEventStatus, {
     props: { org: "acme-prod", guideName: "Kubernetes", ...props },
     global: {
       plugins: [i18n, makeStore(opts.zoConfig), router],
-      provide: opts.askAi ? { [FIRST_EVENT_ASK_AI as symbol]: opts.askAi } : {},
+      provide: {
+        ...(opts.askAi ? { [FIRST_EVENT_ASK_AI as symbol]: opts.askAi } : {}),
+        ...(opts.reporter ? { [FIRST_EVENT_REPORTER as symbol]: opts.reporter } : {}),
+      },
     },
   });
   return wrapper;
@@ -723,5 +734,32 @@ describe("FirstEventStatus — pill display for empty pages", () => {
     expect(q("first-event-status").attributes("data-display")).toBeUndefined();
     expect(q("first-event-status-troubleshoot-btn").exists()).toBe(true);
     expect(q("first-event-status").text()).not.toContain("Waiting for your first logs");
+  });
+});
+
+describe("FirstEventStatus — host page reporter", () => {
+  it("attaches on mount, reports its states and first record, and detaches on unmount", async () => {
+    const detach = vi.fn();
+    const reporter = { attach: vi.fn(() => detach), state: vi.fn(), detected: vi.fn() };
+    mountBar({}, { reporter });
+    expect(reporter.attach).toHaveBeenCalledTimes(1);
+    fake.state.value = "rejected";
+    await nextTick();
+    expect(reporter.state).toHaveBeenLastCalledWith("rejected");
+    const result: FirstEventResult = {
+      streamName: "default",
+      streamType: "logs",
+      count: 3,
+      rangeStart: 1,
+      rangeEnd: 2,
+    };
+    fake.result.value = result;
+    fake.state.value = "received";
+    await nextTick();
+    expect(reporter.state).toHaveBeenLastCalledWith("received");
+    expect(reporter.detected).toHaveBeenCalledWith(result);
+    expect(detach).not.toHaveBeenCalled();
+    wrapper.unmount();
+    expect(detach).toHaveBeenCalledTimes(1);
   });
 });

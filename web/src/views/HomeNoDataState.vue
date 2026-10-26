@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         icon-variant="blue"
         data-test="home-no-data-logs-card"
-        @click="go('curl')"
+        @click="setUp('logs', 'curl')"
       />
 
       <!-- Send Traces -->
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         icon-variant="purple"
         data-test="home-no-data-traces-card"
-        @click="go('tracesOTLP')"
+        @click="setUp('backend', 'tracesOTLP')"
       />
 
       <!-- Send Metrics -->
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         icon-variant="teal"
         data-test="home-no-data-metrics-card"
-        @click="go('prometheus')"
+        @click="setUp('infrastructure', 'prometheus')"
       />
     </template>
 
@@ -174,6 +174,8 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
 import { getImageURL } from "@/utils/zincutils";
+import { useSetupTarget } from "@/composables/useNoDataIntro";
+import type { OnboardingChoiceId } from "@/components/onboarding/onboardingChoices";
 import DOMPurify from "dompurify";
 
 const props = defineProps<{
@@ -232,5 +234,10 @@ const description = computed(() => DOMPurify.sanitize(t("home.noDataState.descri
 
 const go = (routeName: string) => {
   router.push({ name: routeName, query: orgQuery.value });
+};
+// the three main cards start onboarding on cloud for an org with no data, as the data pages' intros do
+const { target } = useSetupTarget();
+const setUp = (choice: OnboardingChoiceId, routeName: string) => {
+  void router.push(target(choice, routeName));
 };
 </script>

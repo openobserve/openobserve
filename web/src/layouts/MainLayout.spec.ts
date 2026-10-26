@@ -16,45 +16,19 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { mount } from "@vue/test-utils";
-import { defineComponent, ref, h } from "vue";
+import { flushPromises, mount } from "@vue/test-utils";
+import { defineComponent, h } from "vue";
+import { createMemoryHistory, createRouter } from "vue-router";
+import store from "@/test/unit/helpers/store";
+import i18n from "@/locales";
+import { queryClient } from "@/composables/query/queryClient";
+import { writeFirstDataRecord } from "@/composables/firstEvent/useFirstDataNotice";
+import MainLayout from "./MainLayout.vue";
 import * as cookies from "@/utils/cookies";
 import { shouldPaywallRoute } from "@/utils/auth";
 import config from "@/aws-exports";
 
 const EXPIRED_MICROS = (Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000;
-
-// ODialog stub mirrors the migrated public contract (v-model:open, size, show-close,
-// update:open / click:* emits). Mirrors stubs used in other migrated specs.
-const ODialogStub = defineComponent({
-  name: "ODialog",
-  props: [
-    "open",
-    "size",
-    "title",
-    "subTitle",
-    "persistent",
-    "showClose",
-    "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryVariant",
-    "secondaryVariant",
-    "neutralVariant",
-    "primaryDisabled",
-    "secondaryDisabled",
-    "neutralDisabled",
-    "primaryLoading",
-    "secondaryLoading",
-    "neutralLoading",
-  ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-  setup(_, { slots }) {
-    return () =>
-      h("div", { class: "o-dialog-stub" }, [slots.header?.(), slots.default?.(), slots.footer?.()]);
-  },
-});
 
 // Mock cookies module
 vi.mock("@/utils/cookies", () => ({
@@ -68,6 +42,19 @@ vi.mock("@/utils/cookies", () => ({
   setToken: vi.fn(),
   removeToken: vi.fn(),
 }));
+
+vi.mock("@/services/config", () => ({
+  default: { get_config_full: vi.fn(() => new Promise(() => {})) },
+}));
+vi.mock("@openobserve/browser-rum", () => ({
+  openobserveRum: { setUser: vi.fn(), startView: vi.fn() },
+}));
+vi.mock("@/composables/useHomeDashboard", () => ({
+  useHomeDashboard: () => ({ load: vi.fn(async () => undefined) }),
+}));
+
+// An earlier describe replaces global.window with a stub and never restores it
+const realWindow = global.window;
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -1251,101 +1238,6 @@ describe("MainLayout Methods and Functions", () => {
     });
   });
 
-  // The MainLayout template now uses <ODialog v-model:open="showGetStarted" size="full"
-  // :show-close="false"> to host <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />.
-  // The full layout requires complex DI (skipped above), so we exercise just the migrated
-  // fragment via a small host component plus an ODialogStub. This guards the migration
-  // contract: prop bindings, v-model:open round-trip, and the removeFirstTimeLogin handler.
-  describe("ODialog Migration - GetStarted Dialog", () => {
-    const GetStartedStub = defineComponent({
-      name: "GetStarted",
-      emits: ["removeFirstTimeLogin"],
-      setup(_, { emit }) {
-        return () =>
-          h(
-            "button",
-            {
-              class: "get-started-stub",
-              onClick: () => emit("removeFirstTimeLogin", false),
-            },
-            "submit",
-          );
-      },
-    });
-
-    const Host = defineComponent({
-      name: "MainLayoutDialogHost",
-      components: { ODialog: ODialogStub, GetStarted: GetStartedStub },
-      setup() {
-        const showGetStarted = ref(true);
-        const removeFirstTimeLogin = (val: boolean) => {
-          showGetStarted.value = val;
-          localStorage.removeItem("isFirstTimeLogin");
-        };
-        return { showGetStarted, removeFirstTimeLogin };
-      },
-      template: `
-        <ODialog v-model:open="showGetStarted" size="full" :show-close="false">
-          <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
-        </ODialog>
-      `,
-    });
-
-    beforeEach(() => {
-      localStorage.setItem("isFirstTimeLogin", "true");
-    });
-
-    afterEach(() => {
-      localStorage.removeItem("isFirstTimeLogin");
-    });
-
-    it("renders ODialog with size='full' and showClose=false", () => {
-      const wrapper = mount(Host);
-      const dialog = wrapper.findComponent(ODialogStub);
-
-      expect(dialog.exists()).toBe(true);
-      expect(dialog.props("size")).toBe("full");
-      expect(dialog.props("showClose")).toBe(false);
-    });
-
-    it("binds open prop from showGetStarted (initially true)", () => {
-      const wrapper = mount(Host);
-      const dialog = wrapper.findComponent(ODialogStub);
-
-      expect(dialog.props("open")).toBe(true);
-    });
-
-    it("closes via v-model:open when ODialog emits update:open=false", async () => {
-      const wrapper = mount(Host);
-      const dialog = wrapper.findComponent(ODialogStub);
-
-      await dialog.vm.$emit("update:open", false);
-
-      expect(dialog.props("open")).toBe(false);
-      expect((wrapper.vm as any).showGetStarted).toBe(false);
-    });
-
-    it("closes and clears isFirstTimeLogin when GetStarted emits removeFirstTimeLogin", async () => {
-      const wrapper = mount(Host);
-      const getStarted = wrapper.findComponent(GetStartedStub);
-
-      await getStarted.vm.$emit("removeFirstTimeLogin", false);
-
-      expect((wrapper.vm as any).showGetStarted).toBe(false);
-      expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
-    });
-
-    it("does NOT forward any legacy dialog-specific props (migration removed maximized/full-height)", () => {
-      const wrapper = mount(Host);
-      const dialog = wrapper.findComponent(ODialogStub);
-
-      // ODialog has no `maximized` / `fullHeight` props — verify only the new contract is in use.
-      expect(dialog.props()).not.toHaveProperty("maximized");
-      expect(dialog.props()).not.toHaveProperty("fullHeight");
-      expect(dialog.props("size")).toBe("full");
-    });
-  });
-
   describe("Performance and Optimization", () => {
     it("should handle debounced search", () => {
       let timeout: any;
@@ -2086,5 +1978,174 @@ describe("MainLayout — AI Observability menu visibility (isAiObservabilityMenu
       expect(traces).toBe("account-tree");
       expect(profiles).toBe("memory");
     });
+  });
+});
+
+describe("MainLayout — focus-mode route", () => {
+  const StubDiv = defineComponent({ name: "StubDiv", setup: () => () => h("div") });
+  const NoticeStub = defineComponent({
+    setup: () => () => h("div", { "data-test": "first-data-notice" }),
+  });
+  const mountAt = async (focusMode: boolean) => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/page", name: "page", component: StubDiv, meta: { focusMode } }],
+    });
+    await router.push("/page");
+    const wrapper = mount(MainLayout, {
+      global: {
+        plugins: [store, i18n, router],
+        stubs: {
+          AppHeader: StubDiv,
+          ONavbar: { name: "ONavbar", setup: () => () => h("nav") },
+          O2AIChat: StubDiv,
+          WebinarBanner: { name: "WebinarBanner", setup: () => () => h("div") },
+          AnnouncementBanner: StubDiv,
+          ShortcutCheatsheet: StubDiv,
+          CommunitySlackInvite: StubDiv,
+          ThemeSwitcher: StubDiv,
+          PredefinedThemes: StubDiv,
+          SlackIcon: StubDiv,
+          ManagementIcon: StubDiv,
+          ODialog: StubDiv,
+          FirstDataNotice: NoticeStub,
+        },
+      },
+    });
+    await flushPromises();
+    store.state.selectedOrganization = { identifier: "focus_org", label: "focus_org" };
+    writeFirstDataRecord("focus_org", { lastVisit: 1, hadData: false });
+    store.state.organizationData.isDataIngested = false;
+    (wrapper.vm as unknown as { isLoading: boolean }).isLoading = true;
+    store.state.isAiChatEnabled = true;
+    await flushPromises();
+    return wrapper;
+  };
+
+  beforeEach(() => {
+    global.window = realWindow;
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+    store.state.isAiChatEnabled = false;
+    localStorage.clear();
+  });
+
+  it("keeps the header but hides the side menu, the AI panel and the banners on a focus-mode route", async () => {
+    // The webinar banner shows on cloud builds only.
+    const wasCloud = config.isCloud;
+    (config as any).isCloud = "true";
+    const wrapper = await mountAt(true);
+    (config as any).isCloud = wasCloud;
+    expect(wrapper.find("header.o2-app-header").classes()).not.toContain("hidden");
+    expect(wrapper.findComponent({ name: "WebinarBanner" }).exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "ONavbar" }).exists()).toBe(false);
+    expect(wrapper.find('[data-test="first-data-notice"]').exists()).toBe(false);
+    expect(wrapper.find("aside.o2-sidebar-right").exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("keeps the chrome on a normal route", async () => {
+    const wasCloud = config.isCloud;
+    (config as any).isCloud = "true";
+    const wrapper = await mountAt(false);
+    (config as any).isCloud = wasCloud;
+    expect(wrapper.findComponent({ name: "WebinarBanner" }).exists()).toBe(true);
+    expect(wrapper.find("header.o2-app-header").classes()).not.toContain("hidden");
+    expect(wrapper.findComponent({ name: "ONavbar" }).exists()).toBe(true);
+    wrapper.unmount();
+  });
+});
+
+describe("MainLayout — first-time cloud login", () => {
+  const StubDiv = defineComponent({ name: "StubDiv", setup: () => () => h("div") });
+  const mountAtHome = async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: "/", name: "home", component: StubDiv },
+        { path: "/onboarding", name: "onboarding", component: StubDiv },
+      ],
+    });
+    // The org rides in the URL, as after a real login; without it the layout clears the selection.
+    window.history.replaceState({}, "", "/?org_identifier=org1");
+    await router.push("/?org_identifier=org1");
+    const replace = vi.spyOn(router, "replace");
+    const wrapper = mount(MainLayout, {
+      global: {
+        plugins: [store, i18n, router],
+        stubs: {
+          AppHeader: StubDiv,
+          ONavbar: StubDiv,
+          O2AIChat: StubDiv,
+          WebinarBanner: StubDiv,
+          AnnouncementBanner: StubDiv,
+          ShortcutCheatsheet: StubDiv,
+          CommunitySlackInvite: StubDiv,
+          ThemeSwitcher: StubDiv,
+          PredefinedThemes: StubDiv,
+          SlackIcon: StubDiv,
+          ManagementIcon: StubDiv,
+          ODialog: StubDiv,
+        },
+      },
+    });
+    await flushPromises();
+    return { wrapper, replace };
+  };
+
+  beforeEach(() => {
+    global.window = realWindow;
+    (config as any).isCloud = "true";
+    store.state.organizationData.isDataIngested = false;
+    store.state.selectedOrganization = { ...store.state.selectedOrganization, identifier: "org1" };
+    localStorage.setItem("isFirstTimeLogin", "true");
+  });
+
+  afterEach(() => {
+    window.history.replaceState({}, "", "/");
+    queryClient.clear();
+    localStorage.clear();
+    sessionStorage.clear();
+    (config as any).isCloud = "false";
+  });
+
+  it("sends a first-time cloud user to onboarding and marks the start as pending", async () => {
+    const { wrapper, replace } = await mountAtHome();
+    expect(replace).toHaveBeenCalledWith({
+      name: "onboarding",
+      query: { org_identifier: "org1" },
+    });
+    expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    expect(localStorage.getItem(`o2.onboarding.pendingStart.${store.state.userInfo.email}`)).toBe(
+      "true",
+    );
+    wrapper.unmount();
+  });
+
+  it("keeps a pending redirect: no onboarding, and the flag stays for a later visit", async () => {
+    sessionStorage.setItem("redirectURI", "/logs");
+    const { wrapper, replace } = await mountAtHome();
+    expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
+    expect(localStorage.getItem("isFirstTimeLogin")).toBe("true");
+    wrapper.unmount();
+  });
+
+  it("does not redirect an org that already has data, and clears the flag", async () => {
+    store.state.organizationData.isDataIngested = true;
+    const { wrapper, replace } = await mountAtHome();
+    expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
+    // A flag left behind would mute the day-two Slack invite for good.
+    expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    wrapper.unmount();
+  });
+
+  it("clears the flag off cloud, where there is no onboarding page", async () => {
+    (config as any).isCloud = "false";
+    const { wrapper, replace } = await mountAtHome();
+    expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
+    expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    wrapper.unmount();
   });
 });

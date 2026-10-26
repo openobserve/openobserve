@@ -1,165 +1,141 @@
+// First login on cloud opens /onboarding: five choices, other ways to start, the terms notice,
+// and exits that record the start once. Onboarding exists only on cloud and only for an org
+// with no data, so each test runs in a fresh org.
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
-const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { authedRequest } = require('../utils/cloud-auth.js');
 const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
-const { GetStartedPage } = require('../../pages/generalPages/getStartedPage.js');
+const { OnboardingPage } = require('../../pages/generalPages/getStartedPage.js');
 
 const baseUrl = () => process.env.ZO_BASE_URL.replace(/\/$/, '');
 const homeUrl = (orgId) => `${baseUrl()}/web/?org_identifier=${orgId}`;
 
-async function orgPasscode(request, orgId) {
-    const res = await request.get(`${baseUrl()}/api/${orgId}/passcode`, { headers: getAuthHeaders() });
-    if (!res.ok()) return '';
+async function createOrg(page) {
+    const res = await authedRequest(page, 'post', `${baseUrl()}/api/organizations`, { data: { name: `e2e_onb_${Date.now()}` } });
+    expect(res.ok()).toBeTruthy();
     const body = await res.json();
-    return body?.data?.passcode ?? '';
+    return body.identifier || (body.data && body.data.identifier);
 }
 
-test.describe('Get started dialog', () => {
+test.describe('Onboarding on first login', () => {
     test.describe.configure({ mode: 'serial' });
-    let gs;
+    let ob;
     let orgId;
 
     test.beforeEach(async ({ page }, testInfo) => {
+        test.skip(!isCloudEnvironment(), 'Onboarding is cloud-only');
         testLogger.testStart(testInfo.title, testInfo.file);
-        orgId = getOrgIdentifier();
         await navigateToBase(page);
-        gs = new GetStartedPage(page);
-        await gs.captureAttribution({ passThrough: isCloudEnvironment() });
+        orgId = await createOrg(page);
+        ob = new OnboardingPage(page);
+        await ob.captureAttribution({ passThrough: true });
     });
 
     test.afterEach(async ({ page }) => {
         await page.evaluate(() => localStorage.removeItem('isFirstTimeLogin')).catch(() => {});
+        if (orgId) await authedRequest(page, 'delete', `${baseUrl()}/api/organizations/${orgId}`).catch(() => {});
     });
 
-    test('is persistent, names the trial and offers the 11 sources in order with logos', {
-        tag: ['@onboarding', '@get-started', '@all', '@P1'],
+    test('opens step 1 once, with five choices, the coding agent first and the terms notice', {
+        tag: ['@onboarding', '@get-started', '@cloud', '@P1'],
     }, async ({ page }) => {
-        await gs.openAsFirstLogin(homeUrl(orgId), { orgId });
+        await ob.openAsFirstLogin(homeUrl(orgId), { orgId });
+        await ob.expectStepOne();
 
-        await expect(gs.title).toHaveText('Welcome to OpenObserve');
-        await expect(gs.subtitle).toContainText('Your 14-day trial has started');
-        expect(await gs.sourceIds()).toEqual(GetStartedPage.SOURCE_IDS);
-        await expect(gs.grid.locator('img')).toHaveCount(7);
-        await expect(gs.grid).toContainText('Logs over HTTP');
-        await expect(gs.grid).toContainText('Not sure yet');
+        expect(await ob.choiceIds()).toEqual(OnboardingPage.CHOICE_IDS);
+        expect((await ob.otherIds())[0]).toBe('agent');
+        await expect(ob.terms).toHaveText(
+            'By using OpenObserve Cloud, you agree to the Terms of Service and Privacy Policy.',
+        );
+        await expect(ob.termsLink).toHaveAttribute('href', 'https://openobserve.ai/legal/terms-of-service/');
+        await expect(ob.privacyLink).toHaveAttribute('href', 'https://openobserve.ai/legal/privacy-policy/');
+        expect(await ob.firstLoginFlag()).toBeNull();
+        expect(ob.attributionBodies).toEqual([]);
 
-        await page.keyboard.press('Escape');
-        await expect(gs.title).toBeVisible();
-        await page.mouse.click(8, 8);
-        await expect(gs.title).toBeVisible();
-        await page.reload();
-        await expect(gs.title).toBeVisible({ timeout: 20000 });
-        testLogger.info('Dialog stays open across Escape, backdrop and reload');
+        // The flag is gone, so a reload of Home does not send the user back.
+        await page.goto(homeUrl(orgId));
+        await expect(ob.view).toHaveCount(0);
+        testLogger.info('Step 1 opened once on first login');
     });
 
-    test('reaches a copied command in three interactions from a prefilled pick, popup suppressed', {
-        tag: ['@onboarding', '@get-started', '@all', '@P1'],
-    }, async ({ page, request }) => {
-        await gs.openAsFirstLogin(homeUrl(orgId), { orgId, prefill: { utm_content: 'http' } });
-        await gs.expectPicked('http');
-        await expect(gs.continueBtn).toBeDisabled();
-        await expect(gs.skipBtn).toBeDisabled();
-
-        let interactions = 0;
-        await gs.agree.click(); interactions += 1;
-        await gs.skipBtn.click(); interactions += 1;
-
-        await page.waitForURL(/\/ingestion\/custom\/logs\/curl/, { timeout: 20000 });
-        await expect(gs.title).toHaveCount(0);
-        expect(gs.attributionBodies).toEqual([
-            { from: '', company: '', first_source: 'http', skipped: true },
-        ]);
-        expect(await gs.storedPick(orgId)).toBe('http');
-        expect(await gs.firstLoginFlag()).toBeNull();
-
-        await page.locator('[data-test="ingestion-curl-code-block-pre"]').click(); interactions += 1;
-        expect(interactions).toBeLessThanOrEqual(3);
-        const copied = await gs.readClipboard();
-        expect(copied).toContain(`/api/${orgId}/`);
-        expect(copied).not.toContain('•');
-        const passcode = await orgPasscode(request, orgId);
-        if (passcode) expect(copied).toContain(passcode);
-        await expect(gs.connectPopup).toHaveCount(0);
-        testLogger.info('Copied command after three interactions', { interactions });
+    test('previews the choice a signup link prefilled', {
+        tag: ['@onboarding', '@get-started', '@cloud', '@P2'],
+    }, async () => {
+        await ob.openAsFirstLogin(homeUrl(orgId), { orgId, prefill: { utm_content: 'rum' } });
+        await ob.expectStepOne();
+        await expect(ob.previewTitle).toHaveText('Frontend and mobile apps');
     });
 
-    test('Continue sends the answers and pins a recommended pick above the rail', {
-        tag: ['@onboarding', '@get-started', '@all', '@P1'],
+    test('the Linux tile opens its guide inside onboarding and records linux once', {
+        tag: ['@onboarding', '@get-started', '@cloud', '@P1'],
     }, async ({ page }) => {
-        await gs.openAsFirstLogin(homeUrl(orgId), { orgId });
-        await gs.hearAboutUs.fill('A colleague');
-        await gs.whereDoYouWork.fill('Acme');
-        await gs.source('kubernetes').click();
-        await gs.agree.click();
-        await gs.continueBtn.click();
+        await ob.openAsFirstLogin(homeUrl(orgId), { orgId });
+        await ob.expectStepOne();
+        await ob.choice('infrastructure').click();
+        await ob.row('linux-windows-or-macos-host').click();
+        await ob.tile('linux').click();
 
-        await page.waitForURL(/\/ingestion\/recommended\/kubernetes/, { timeout: 20000 });
-        expect(gs.attributionBodies).toEqual([
-            { from: 'A colleague', company: 'Acme', first_source: 'kubernetes', skipped: false },
-        ]);
-        await expect(gs.pickGroup).toHaveText('Your pick');
-        await expect(page.locator('[data-test="ingestion-recommended-pick-tab-ingestFromKubernetes"]')).toBeVisible();
-        await expect(page.locator('[data-test="ingestion-recommended-tab-ingestFromKubernetes"]')).toHaveCount(0);
+        await page.waitForURL(/\/onboarding\/infrastructure\/linux-windows-or-macos-host\/linux/, { timeout: 20000 });
+        await expect(ob.guide).toBeVisible();
+        await ob.expectGuideStatus('waiting');
+        await expect.poll(() => ob.attributionBodies.length).toBe(1);
+        expect(ob.attributionBodies[0]).toEqual({ from: '', company: '', first_source: 'linux', skipped: false });
+        expect(await ob.storedPick(orgId)).toBe('linux');
     });
 
-    test('Let an AI agent set it up lands on the MCP card', {
-        tag: ['@onboarding', '@get-started', '@all', '@P2'],
+    test('a row and a tile open a guide inside onboarding', {
+        tag: ['@onboarding', '@get-started', '@cloud', '@P2'],
     }, async ({ page }) => {
-        await gs.openAsFirstLogin(homeUrl(orgId), { orgId });
-        await gs.source('agent').click();
-        await gs.agree.click();
-        await gs.skipBtn.click();
-        await page.waitForURL(/\/ingestion\/recommended\/mcp/, { timeout: 20000 });
+        await ob.openAsFirstLogin(homeUrl(orgId), { orgId });
+        await ob.expectStepOne();
+        await ob.choice('backend').click();
+        await expect(ob.rows).toBeVisible();
+        await ob.row('add-a-library-to-your-code').click();
+        await expect(ob.which).toBeVisible();
+        await ob.tile('java').click();
+
+        await page.waitForURL(/\/onboarding\/backend\/add-a-library-to-your-code\/java/, { timeout: 20000 });
+        await expect(ob.guide).toBeVisible();
+        await expect(page.locator('[data-test="onboarding-step-guide-language-docs"]')).toHaveAttribute(
+            'href',
+            'https://opentelemetry.io/docs/languages/java/getting-started/',
+        );
     });
 
-    test('Not sure yet keeps today\'s landing', {
-        tag: ['@onboarding', '@get-started', '@all', '@P2'],
+    test('the coding agent card opens the agent page with the listen bar', {
+        tag: ['@onboarding', '@get-started', '@cloud', '@P2'],
     }, async ({ page }) => {
-        await gs.openAsFirstLogin(homeUrl(orgId), { orgId });
-        await gs.source('unsure').click();
-        await gs.agree.click();
-        await gs.skipBtn.click();
-        await expect(gs.title).toHaveCount(0);
+        await ob.openAsFirstLogin(homeUrl(orgId), { orgId });
+        await ob.expectStepOne();
+        await ob.other('agent').click();
+
+        await page.waitForURL(/\/onboarding\/agent/, { timeout: 20000 });
+        await expect(ob.agentSetup).toBeVisible();
+        await expect(ob.listenBar).toBeVisible();
+        await expect.poll(() => ob.attributionBodies.length).toBe(1);
+        expect(ob.attributionBodies[0]).toMatchObject({ skipped: false });
+    });
+
+    test('Skip to app records a skip and lands on Home', {
+        tag: ['@onboarding', '@get-started', '@cloud', '@P1'],
+    }, async ({ page }) => {
+        await ob.openAsFirstLogin(homeUrl(orgId), { orgId });
+        await ob.expectStepOne();
+        await ob.skipBtn.click();
+
+        await expect(ob.view).toHaveCount(0, { timeout: 20000 });
         expect(new URL(page.url()).pathname).toMatch(/\/web\/?$/);
-        expect(await gs.storedPick(orgId)).toBe('unsure');
+        await expect.poll(() => ob.attributionBodies.length).toBe(1);
+        expect(ob.attributionBodies[0]).toMatchObject({ skipped: true });
     });
 
-    test('a followed redirect wins over the pick', {
-        tag: ['@onboarding', '@get-started', '@all', '@P2'],
+    test('a followed redirect wins over onboarding, and the flag waits for a later visit', {
+        tag: ['@onboarding', '@get-started', '@cloud', '@P2'],
     }, async ({ page }) => {
-        await gs.openAsFirstLogin(`${baseUrl()}/web/logs?org_identifier=${orgId}`, { orgId });
-        await gs.source('kubernetes').click();
-        await gs.agree.click();
-        await gs.skipBtn.click();
-        await expect(gs.title).toHaveCount(0);
+        await ob.openAsFirstLogin(`${baseUrl()}/web/logs?org_identifier=${orgId}`, { orgId });
+        await page.waitForLoadState('domcontentloaded');
+        await expect(ob.view).toHaveCount(0);
         expect(new URL(page.url()).pathname).toMatch(/\/web\/logs/);
-    });
-
-    test('a failed attribution keeps every answer and Continue retries', {
-        tag: ['@onboarding', '@get-started', '@all', '@P2'],
-    }, async ({ page }) => {
-        await page.unrouteAll({ behavior: 'ignoreErrors' });
-        let calls = 0;
-        await page.route(/\/api\/[^/]+\/billings\/new_user_attribution$/, (route) => {
-            calls += 1;
-            return calls === 1
-                ? route.fulfill({ status: 500, json: { code: 500, message: 'boom' } })
-                : route.fulfill({ status: 200, json: { code: 200, message: 'Success' } });
-        });
-        await gs.openAsFirstLogin(homeUrl(orgId), { orgId });
-        await gs.hearAboutUs.fill('Hacker News');
-        await gs.whereDoYouWork.fill('Acme');
-        await gs.source('webserver').click();
-        await gs.agree.click();
-        await gs.continueBtn.click();
-
-        await expect(page.getByText('Something went wrong').first()).toBeVisible();
-        await expect(gs.title).toBeVisible();
-        await expect(gs.hearAboutUs).toHaveValue('Hacker News');
-        await gs.expectPicked('webserver');
-
-        await gs.continueBtn.click();
-        await page.waitForURL(/\/ingestion\/servers\/nginx/, { timeout: 20000 });
-        expect(calls).toBe(2);
+        expect(await ob.firstLoginFlag()).toBe('true');
     });
 });

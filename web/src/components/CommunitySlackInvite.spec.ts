@@ -235,7 +235,7 @@ describe("CommunitySlackInvite", () => {
   });
 
   // ── First-login gate ─────────────────────────────────────────────────────────
-  // Never compete with ConnectDataSourcePopup/GetStarted during the user's
+  // Never compete with ConnectDataSourcePopup/onboarding during the user's
   // first-login session — the day-2 clock only starts once that session ends.
 
   describe("first-login gate", () => {

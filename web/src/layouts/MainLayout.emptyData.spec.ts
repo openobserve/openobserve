@@ -79,7 +79,6 @@ const mountLayout = async (path: string) => {
         WebinarBanner: StubDiv,
         AnnouncementBanner: StubDiv,
         ShortcutCheatsheet: StubDiv,
-        GetStarted: StubDiv,
         CommunitySlackInvite: StubDiv,
         ThemeSwitcher: StubDiv,
         PredefinedThemes: StubDiv,

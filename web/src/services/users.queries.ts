@@ -25,6 +25,14 @@ export const orgUsersQuery = (org: string) =>
     staleTime: NORMAL_STALE_TIME,
   });
 
+/** Cloud only: every invitation sent from the org, each with its `status` ("pending" until accepted). */
+export const orgInvitesQuery = (org: string) =>
+  queryOptions({
+    queryKey: userKeys.invites(org),
+    queryFn: async (): Promise<{ status?: string }[]> => (await users.invitedUsers(org)).data ?? [],
+    staleTime: NORMAL_STALE_TIME,
+  });
+
 /** Org configuration — the same option list for every user form and the list page. */
 export const assignableRolesQuery = (org: string) =>
   queryOptions({

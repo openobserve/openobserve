@@ -31,7 +31,7 @@ import {
   sharedAgentTroubleshooting,
 } from "./osAgent";
 
-const install = `Invoke-WebRequest -Uri ${AGENTS_REPO}/windows/install.ps1 -OutFile install.ps1
+export const install = `Invoke-WebRequest -Uri ${AGENTS_REPO}/windows/install.ps1 -OutFile install.ps1
 .\\install.ps1 -URL {url}/api/{org}/ -AUTH_KEY {token}`;
 
 export default function windowsCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
@@ -82,14 +82,15 @@ export default function windowsCard(subs: CardSubstitutions, t: TranslateFn): Ri
       fixTitle: t("ingestion.setupCard.agentServiceFixTitle"),
       fixBody: t("ingestion.setupCard.windowsAgentFixBody"),
       fixLang: "powershell",
-      fixSnippet: `Get-Service -Name openobserve-agent
-Get-Content -Tail 50 "$env:ProgramData\\openobserve-agent\\agent.log"`,
+      // windows/install.ps1 registers the otel-collector service and writes no log file; it points to Event Viewer.
+      fixSnippet: `Get-Service -Name otel-collector
+Get-WinEvent -FilterHashtable @{ LogName = "Application"; ProviderName = "otel-collector" } -MaxEvents 50`,
       troubleshooting: [
         {
           q: t("ingestion.setupCard.windowsTroubleScriptQ"),
           a: t("ingestion.setupCard.windowsTroubleScriptA"),
         },
-        ...sharedAgentTroubleshooting(t, "`Get-Service -Name openobserve-agent`"),
+        ...sharedAgentTroubleshooting(t, "`Get-Service -Name otel-collector`"),
       ],
       uninstall: agentUninstall("windows"),
     },

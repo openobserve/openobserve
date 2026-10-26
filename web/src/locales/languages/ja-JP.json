@@ -1650,12 +1650,12 @@
       "fileTypeZip": "ZIPファイルのみ許可されています"
     },
     "emptyState": {
-      "title": "リアルユーザーモニタリングでユーザーを監視する",
-      "description": "RUM は実際のユーザーインタラクション (ページの読み込み、エラー、API 呼び出し、セッションリプレイ) を追跡するので、ユーザーがアプリケーションをどのように体験しているかを正確に把握できます。",
       "webApp": "Web アプリをインストゥルメントする",
       "webAppDesc": "OpenObserve RUM SDK を任意の {product} アプリに追加",
       "sessionReplay": "セッションリプレイを有効にする",
       "sessionReplayDesc": "ユーザーセッションを記録および再生して、UX の問題をデバッグする",
+      "title": "リアルユーザーモニタリングでユーザーを監視する",
+      "description": "RUM は実際のユーザーインタラクション (ページの読み込み、エラー、API 呼び出し、セッションリプレイ) を追跡するので、ユーザーがアプリケーションをどのように体験しているかを正確に把握できます。",
       "learnMore": "さらに詳しく:",
       "quickImpl": "クイック実装ガイド",
       "blogPost": "フロントエンド監視の基本"
@@ -4950,12 +4950,6 @@
     "joinSlack": "Slack に参加しよう",
     "maybeLater": "たぶん後で"
   },
-  "connectDataSourcePopup": {
-    "title": "始めるには、まず最初のデータソースを接続しましょう。",
-    "description": "お見せしたいことがたくさんありますが、まずデータを接続する必要があります。ほとんどのチームは約1分で最初のログを確認できます。",
-    "connectButton": "データソースを接続",
-    "slackLink": "Slackコミュニティにもご参加ください"
-  },
   "confirmDialog": {
     "continueFromWherePaused": "一時停止した場所から続行",
     "startFromNow": "今から開始します。",
@@ -5407,8 +5401,6 @@
       "anyWindowsHostNote": "任意の Windows サーバーまたは VM。",
       "arrow": "→",
       "askOnSlack": "Slack で質問する",
-      "autoInstrumentTracesDesc": "どちらも**アプリケーションコードに手を触れず、イメージを再ビルドすることなく分散トレースを取得できます**。**言語ライブラリ：** OpenTelemetry Operator がアノテーションを付けた名前空間の Pod に自動インストルメンテーションを注入します。**eBPF：** コレクターが選択したプロセスを、Go を含むあらゆる言語でトレースします。",
-      "autoInstrumentTracesTitle": "アプリケーションをトレース：言語ライブラリまたは eBPF",
       "cassandraJmxNote": "レシーバーが接続できるように、Cassandra で JMX リモートアクセスを有効にします。",
       "cassandraTagline": "OpenTelemetry Collector の JMX レシーバーを使用して Cassandra メトリクスを収集し、OpenObserve に送信します。",
       "checking": "確認中…",
@@ -5493,11 +5485,13 @@
       "k8sAnnotatePodNote": "名前空間ではなく個々のPod仕様にアノテーションを付けると、一度に1つのワークロードを計装できます。",
       "k8sFixBody": "OpenTelemetryオペレーターはcert-managerのウェブフックが稼働するまで起動に失敗し、起動しないコレクターは何も送信しません。両方が実行されていることを確認してから、再度テストしてください：",
       "k8sFixTitle": "cert-manager の webhook を待つ",
+      "k8sEbpfAnyLanguageVariant": "全言語対応、ライブラリ不要（eBPF）",
       "k8sEbpfNote": "トレースは eBPF で取得されます。コード変更や SDK は不要です。トレースコンテキストがサービス間で引き継がれるのは平文 HTTP のみです（Go アプリは HTTPS でも可。ただしカーネルロックダウンが有効なノードを除く）。ポート、実行ファイルパス、コマンドラインのいずれかに一致するプロセスがトレースされます。glob には `,`、`{'{'}`、`{'}'}` を含めることはできません。また、ポートはそのポートでソケットを持つすべてのプロセスに一致します。Helm 3.14+ と OpenTelemetry Operator v0.142.0+ が必要です。古いバージョンの場合は、まず `kubectl apply -f https://github.com/open-telemetry/opentelemetry-operator/releases/download/v0.161.0/opentelemetry-operator.yaml` で Operator をアップグレードしてください。古い Operator で既に eBPF を有効にしていた場合は、`--force`（Helm 4 では `--force-replace`）を付けてコマンドを再実行してください。上のインストールコマンドを再実行するとリリースがリセットされ eBPF が無効になるため、その後このコマンドを再度実行してください。`openobserve-collector` 名前空間は特権 Pod を許可している必要があり、ノードは amd64 または arm64 上の Linux で、カーネル 5.8+（または eBPF バックポートを含む RHEL 系 4.18）と BTF が必要です。既に独自にトレースを送信しているアプリや、Go の `inject-go` サイドカーを使用している Pod は選択しないでください。",
-      "k8sEbpfVariant": "eBPF（全言語対応、コード変更不要）",
-      "k8sLibrariesVariant": "言語ライブラリ（自動インストルメンテーション）",
       "k8sInstallerNote": "これにより、cert-manager、OpenTelemetryオペレーター、OpenObserveコレクターが自動的にインストールされます。",
       "k8sInternalEndpointNote": "OpenObserveがこの同じクラスター内で実行される場合にこれを使用してください — トラフィックはクラスター外に出ることはありません。",
+      "k8sLibraryPerLanguageVariant": "言語ごとにライブラリを追加（Java、.NET、Node.js、Python）",
+      "k8sOptionalTracesDesc": "サービスのリクエストトレースも取得しますか？方法を選んで、コマンドをもう 1 つ実行するだけです。コードの変更は不要で、いつでも設定できます。",
+      "k8sOptionalTracesTitle": "オプション：アプリをトレース",
       "k8sTroubleAnnotationA": "インジェクションはポッド作成時に行われるため、既存のポッドは再起動するまで影響を受けません — `kubectl rollout restart deployment -n my-namespace`を実行してください。アノテーションが適用されたことを`kubectl get ns my-namespace -o yaml`で確認し、値が`openobserve-collector/openobserve-<language>`と一致することを確認してください。",
       "k8sTroubleAnnotationQ": "ネームスペースに注釈を付けたのにトレースが表示されません",
       "k8sTroubleEndpointA": "OpenObserve 自体がこのクラスタで実行されている場合にのみ **内部エンドポイント** を使用してください。その場合トラフィックはクラスタ内にとどまり、ネットワークを越えることはありません。URL は `http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080` です。デフォルトでは名前空間 `openobserve` のリリース `o2` を想定しているため、異なる場合は編集してください。それ以外の場合は外部エンドポイントを使用します。",
@@ -5750,6 +5744,7 @@
       "androidTroubleScreenNamesQ": "セッションは表示されるが、画面名がすべて同じ",
       "androidTroubleScreenNamesA": "ビュートラッキングが設定されていません。`RumConfiguration` をビルドするときに `useViewTrackingStrategy(...)` を渡してください。例: Activity では `ActivityViewTrackingStrategy(trackExtras = true)`、AndroidX Navigation を使用している場合は `NavigationViewTrackingStrategy(...)`。",
       "setupTime5Min": "約5分",
+      "showStepInstructions": "手順を表示",
       "snowflakeCollectorVersionNote": "Snowflake には collector v0.92.0 が必要です — 新しいビルドには既知のバグがあります。",
       "snowflakeTagline": "OpenTelemetry Collector を使用して Snowflake アカウントメトリクスを収集し、OpenObserve に送信します。",
       "sqlClientGuiVariant": "SQL クライアント（GUI）",

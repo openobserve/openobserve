@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- LEFT SIDE: Logo -->
     <div class="flex shrink-0 items-center justify-start gap-1 ps-3 max-md:ps-1.5">
       <OButton
+        v-if="!focusMode"
         variant="ghost"
         size="icon-toolbar"
         class="md:hidden"
@@ -216,6 +217,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           {{ enterpriseButtonText }}
         </OButton>
+
+        <!-- A focus-mode page (onboarding) puts its own header buttons here with <Teleport defer>. -->
+        <div id="o2-header-actions" class="contents" />
 
         <!-- ORGANIZATION SELECTOR: Dropdown to switch between organizations -->
         <OrganizationSelector
@@ -722,8 +726,12 @@ export default defineComponent({
         rbac: props.store.state.zoConfig?.rbac_enabled !== false,
       }),
     );
+    // A focus-mode route has no side menu and no AI panel, so their buttons go too.
+    const focusMode = computed(() => props.router?.currentRoute?.value?.meta?.focusMode === true);
     const aiButtonVisible = computed(
-      () => !aiAccess.value.allowed || Boolean(props.store.state.zoConfig.ai_enabled),
+      () =>
+        !focusMode.value &&
+        (!aiAccess.value.allowed || Boolean(props.store.state.zoConfig.ai_enabled)),
     );
 
     // The edition gate and the org's runtime switch both have to pass, as for Settings › Slack.
@@ -862,6 +870,7 @@ export default defineComponent({
       toggleAIChat,
       aiAccess,
       aiButtonVisible,
+      focusMode,
       linkedAccountsVisible,
       showLinkedAccounts,
       openSlack,

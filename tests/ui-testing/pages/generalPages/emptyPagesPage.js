@@ -10,8 +10,8 @@ export class EmptyPagesPage {
         this.copyBtn = page.locator('[data-test="first-data-panel-copy-btn"]');
         this.arrived = page.locator('[data-test="first-data-panel-arrived"]');
         this.status = page.locator('[data-test="first-event-status"]');
-        this.logsNoData = page.locator('[data-test="logs-search-no-streams-in-org-text"]');
-        this.logsCurlCard = page.locator('[data-test="logs-no-data-curl-card"]');
+        this.logsIntro = page.locator('[data-test="no-data-intro"][data-signal="logs"]');
+        this.logsSetupBtn = page.locator('[data-test="no-data-intro"][data-signal="logs"] [data-test="no-data-intro-setup-btn"]');
         this.logsResultRows = page.locator('[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]');
         this.redirectionBanner = page.getByText('data ingestion must be initiated within the current organization');
         this.visitedUrls = [];

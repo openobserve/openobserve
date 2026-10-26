@@ -29,4 +29,6 @@ export const userKeys = {
   assignableRoles: (org: string) => orgKey(org, "iam", "users", "assignableRoles"),
   /** email → role list for every user in the org, in one request. */
   allUserRoles: (org: string) => orgKey(org, "iam", "users", "allRoles"),
+  /** Invitations sent from this org (cloud). */
+  invites: (org: string) => orgKey(org, "iam", "users", "invites"),
 };

@@ -4,7 +4,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier, authedRequest } = require('../utils/cloud-auth.js');
 const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
-const { GetStartedPage } = require('../../pages/generalPages/getStartedPage.js');
+const { OnboardingPage } = require('../../pages/generalPages/getStartedPage.js');
 const { FirstEventPage } = require('../../pages/generalPages/firstEventPage.js');
 const { EmptyPagesPage } = require('../../pages/generalPages/emptyPagesPage.js');
 
@@ -71,60 +71,51 @@ async function pinBillingState(page, { expiry, provider, usageDelayMs = 0 }) {
 
 const SCREENS = [
     {
-        id: 'a1-get-started-prefilled',
-        async run({ page }) {
-            const gs = new GetStartedPage(page);
-            await gs.captureAttribution({ passThrough: false });
-            await gs.openAsFirstLogin(`${base()}/web/?org_identifier=${getOrgIdentifier()}`, { orgId: getOrgIdentifier(), prefill: { utm_content: 'kubernetes' } });
-            await gs.agree.click();
-            await gs.expectPicked('kubernetes');
-            await expect(gs.continueBtn).toBeEnabled();
-            await expect(gs.skipBtn).toBeEnabled();
+        id: 'a1-onboarding-step-1',
+        cloud: true,
+        emptyOrg: true,
+        async run({ page, orgId }) {
+            const ob = new OnboardingPage(page);
+            await ob.captureAttribution({ passThrough: false });
+            await ob.openAsFirstLogin(`${base()}/web/?org_identifier=${orgId}`, { orgId, prefill: { utm_content: 'kubernetes' } });
+            await ob.expectStepOne();
+            expect(await ob.choiceIds()).toEqual(OnboardingPage.CHOICE_IDS);
+            await expect(ob.terms).toBeVisible();
         },
         cleanup: async ({ page }) => page.evaluate(() => localStorage.removeItem('isFirstTimeLogin')),
     },
     {
-        id: 'a2-get-started-empty',
-        async run({ page }) {
-            const gs = new GetStartedPage(page);
-            await gs.captureAttribution({ passThrough: false });
-            await gs.openAsFirstLogin(`${base()}/web/?org_identifier=${getOrgIdentifier()}`, { orgId: getOrgIdentifier() });
-            expect(await gs.sourceIds()).toEqual(GetStartedPage.SOURCE_IDS);
-            await expect(gs.continueBtn).toBeDisabled();
-            await expect(gs.skipBtn).toBeDisabled();
+        id: 'a2-onboarding-rows-backend',
+        cloud: true,
+        emptyOrg: true,
+        async run({ page, orgId }) {
+            const ob = new OnboardingPage(page);
+            await openGuide(page, '/onboarding/backend', orgId);
+            await expect(ob.rows).toBeVisible({ timeout: 20000 });
+            await expect(page.locator('[data-test="onboarding-step-rows-agent-add-a-library-to-your-code"]')).toBeVisible();
         },
-        cleanup: async ({ page }) => page.evaluate(() => localStorage.removeItem('isFirstTimeLogin')),
     },
     {
-        id: 'a3-get-started-submitting',
-        async run({ page }) {
-            const gs = new GetStartedPage(page);
-            await page.route(/\/api\/[^/]+\/billings\/new_user_attribution$/, () => new Promise(() => {}));
-            await gs.openAsFirstLogin(`${base()}/web/?org_identifier=${getOrgIdentifier()}`, { orgId: getOrgIdentifier() });
-            await gs.hearAboutUs.fill('A colleague');
-            await gs.whereDoYouWork.fill('Acme');
-            await gs.source('kubernetes').click();
-            await gs.agree.click();
-            await gs.continueBtn.click();
-            await expect(gs.skipBtn).toBeDisabled();
+        id: 'a3-onboarding-guide-java',
+        cloud: true,
+        emptyOrg: true,
+        async run({ page, orgId }) {
+            const ob = new OnboardingPage(page);
+            await openGuide(page, '/onboarding/backend/add-a-library-to-your-code/java', orgId);
+            await expect(ob.guide).toBeVisible({ timeout: 20000 });
+            await ob.expectGuideStatus('waiting');
         },
-        cleanup: async ({ page }) => page.evaluate(() => localStorage.removeItem('isFirstTimeLogin')),
     },
     {
-        id: 'a4-get-started-error',
-        async run({ page }) {
-            const gs = new GetStartedPage(page);
-            await page.route(/\/api\/[^/]+\/billings\/new_user_attribution$/, (route) => route.fulfill({ status: 500, json: { code: 500, message: 'boom' } }));
-            await gs.openAsFirstLogin(`${base()}/web/?org_identifier=${getOrgIdentifier()}`, { orgId: getOrgIdentifier() });
-            await gs.hearAboutUs.fill('A colleague');
-            await gs.whereDoYouWork.fill('Acme');
-            await gs.source('kubernetes').click();
-            await gs.agree.click();
-            await gs.continueBtn.click();
-            await expect(page.getByText('Something went wrong').first()).toBeVisible();
-            await expect(gs.title).toBeVisible();
+        id: 'a4-onboarding-agent',
+        cloud: true,
+        emptyOrg: true,
+        async run({ page, orgId }) {
+            const ob = new OnboardingPage(page);
+            await openGuide(page, '/onboarding/agent', orgId);
+            await expect(ob.agentSetup).toBeVisible({ timeout: 20000 });
+            await expect(ob.listenBar).toBeVisible();
         },
-        cleanup: async ({ page }) => page.evaluate(() => localStorage.removeItem('isFirstTimeLogin')),
     },
     {
         id: 'b1-setup-kubernetes-copied',
@@ -291,7 +282,7 @@ const SCREENS = [
             const ep = new EmptyPagesPage(page);
             await ep.open('logs', orgId);
             await expect(ep.panelFor('logs')).toHaveAttribute('data-pick', 'none', { timeout: 20000 });
-            await expect(ep.logsCurlCard).toBeVisible();
+            await expect(ep.logsSetupBtn).toBeVisible();
         },
     },
     {
@@ -516,7 +507,7 @@ test.describe('Onboarding screens, light and dark', () => {
         for (const screen of SCREENS) {
             if (only.length && !only.some((p) => screen.id.startsWith(p))) continue;
             test(`${screen.id} ${theme}`, { tag: ['@onboarding', '@screenshots', '@P2'] }, async ({ page, request }, testInfo) => {
-                test.skip(Boolean(screen.cloud) && !isCloudEnvironment(), 'Billing screens are Cloud-only');
+                test.skip(Boolean(screen.cloud) && !isCloudEnvironment(), 'Cloud-only screen');
                 test.setTimeout(screen.timeout || 180000);
                 // The mockups are 1440 x 900; the shared fixture opens every page at 1500 x 1024.
                 await page.setViewportSize({ width: 1440, height: 900 });

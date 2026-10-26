@@ -39,7 +39,7 @@ import {
 } from "./osAgent";
 
 // macOS ships curl but not wget, so the one-liner is curl-based.
-const install = `curl -O ${AGENTS_REPO}/mac/install.sh \\
+export const install = `curl -O ${AGENTS_REPO}/mac/install.sh \\
   && chmod +x install.sh \\
   && sudo ./install.sh {url}/api/{org}/ {token}`;
 

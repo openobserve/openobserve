@@ -43,7 +43,7 @@ test.describe('Pages before data', () => {
             await expect(ep.panelFor('logs')).toHaveAttribute('data-pick', 'kubernetes');
             await expect(ep.codeBlock).toBeVisible();
             await expect(ep.status).toHaveAttribute('data-state', 'waiting');
-            await expect(ep.logsCurlCard).toBeVisible();
+            await expect(ep.logsIntro).toBeVisible();
 
             await ep.open('metrics', orgId);
             await ep.expectNoRedirect('metrics');
@@ -160,8 +160,8 @@ test.describe('Pages before data', () => {
             await ep.open('logs', orgId);
             await expect(ep.panelFor('logs')).toHaveAttribute('data-pick', 'none', { timeout: 20000 });
             await expect(ep.codeBlock).toHaveCount(0);
-            await expect(ep.logsNoData).toBeVisible();
-            await expect(ep.logsCurlCard).toBeVisible();
+            await expect(ep.logsIntro).toBeVisible();
+            await expect(ep.logsSetupBtn).toBeVisible();
         } finally {
             await deleteOrg(page, orgId);
         }

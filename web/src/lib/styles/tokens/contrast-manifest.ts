@@ -1425,4 +1425,10 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     category: "text",
     why: "the inverse foreground exists for filled controls, and the primary button is the fill it is sized against",
   },
+  {
+    fg: "--color-onboarding-panel-text",
+    bg: "--color-onboarding-choice-active-bg",
+    category: "text",
+    why: "onboarding text sits on the brand panel top and the brand-filled option; the option fill is as light as or lighter than the panel top in both themes. Panel text stays in the top part; the lighter end stop carries only the example screen",
+  },
 ];

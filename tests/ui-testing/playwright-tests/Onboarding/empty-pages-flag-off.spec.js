@@ -33,7 +33,7 @@ test.describe('Pages before data with the flag off', () => {
             });
 
             await ep.open('logs', orgId);
-            await expect(ep.logsNoData).toBeVisible({ timeout: 20000 });
+            await expect(ep.logsIntro).toBeVisible({ timeout: 20000 });
             await page.waitForTimeout(12000);
             await ep.open('dashboards', orgId);
             await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});

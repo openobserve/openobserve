@@ -35,9 +35,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            The wrapper always renders — an unconditional ref keeps the observer
            attached even when nothing is on screen yet. -->
       <div ref="announcementBarRef">
-        <!-- Webinar announcement bar: shown above toolbar for cloud users -->
+        <!-- Webinar announcement bar: shown above toolbar for cloud users, but not over a focus-mode page -->
         <div
-          v-if="config.isCloud === 'true'"
+          v-if="config.isCloud === 'true' && !focusMode"
           class="bg-button-primary text-button-primary-foreground text-center"
         >
           <WebinarBanner variant="header" />
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="flex min-h-0 flex-1">
       <ONavbar
-        v-if="store.state.printMode !== true"
+        v-if="store.state.printMode !== true && !focusMode"
         class="max-md:hidden"
         :links-list="navLinks"
         :mini-mode="miniMode"
@@ -91,6 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Not seamless: the scrim gives tap-outside-to-close a target. -->
       <ODrawer
+        v-if="!focusMode"
         v-model:open="mobileNavOpen"
         side="left"
         :width="30"
@@ -135,10 +136,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Main Panel -->
         <main
           data-test="main-content"
-          class="bg-surface-chrome-deeper flex min-h-0 flex-col pe-2 pb-2 max-md:pe-0"
+          class="bg-surface-chrome-deeper flex min-h-0 flex-col"
+          :class="focusMode ? 'px-2 pb-2 max-md:px-0' : 'pe-2 pb-2 max-md:pe-0'"
           :style="{
             width:
-              !store.state.isAiChatEnabled || isChatOverlay
+              focusMode || !store.state.isAiChatEnabled || isChatOverlay
                 ? '100%'
                 : store.state.isAiChatExpanded
                   ? '50%'
@@ -152,12 +154,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="isDark ? 'border-border-default' : 'border-transparent'"
           >
             <div
-              v-if="isLoading"
+              v-if="isLoading && !holdForOnboarding"
               :key="store.state.selectedOrganization?.identifier"
               class="o2-content-scroll h-full flex-1 overflow-y-auto"
             >
               <FirstDataNotice
-                v-if="firstDataNotice.visible.value && router.currentRoute.value.name !== 'home'"
+                v-if="
+                  !focusMode &&
+                  firstDataNotice.visible.value &&
+                  router.currentRoute.value.name !== 'home'
+                "
                 class="mx-3 mt-3"
                 :stream="firstDataNotice.stream.value"
                 :arrived-at="firstDataNotice.arrivedAt.value"
@@ -175,6 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
         <aside
+          v-if="!focusMode"
           v-show="store.state.isAiChatEnabled && isLoading"
           class="o2-sidebar o2-sidebar-right bg-surface-chrome-deeper shrink-0 overflow-y-auto"
           :class="[
@@ -214,16 +221,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <ODialog
-      data-test="main-layout-get-started-dialog"
-      v-model:open="showGetStarted"
-      size="lg"
-      persistent
-      :show-close="false"
-    >
-      <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
-    </ODialog>
-    <ConnectDataSourcePopup />
     <CommunitySlackInvite />
     <PredefinedThemes />
     <ShortcutCheatsheet v-model:open="showShortcuts" />
@@ -285,10 +282,8 @@ import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import ThemeSwitcher from "../components/ThemeSwitcher.vue";
 import PredefinedThemes from "../components/PredefinedThemes.vue";
 import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
-import GetStarted from "@/components/login/GetStarted.vue";
+import { markStartPending, redirectPending } from "@/components/onboarding/onboardingFlow";
 import CommunitySlackInvite from "@/components/CommunitySlackInvite.vue";
-import ConnectDataSourcePopup from "@/components/ConnectDataSourcePopup.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -344,10 +339,7 @@ export default defineComponent({
     O2AIChat,
     PaidOverageConsentDialog,
     ShortcutCheatsheet,
-    GetStarted,
     CommunitySlackInvite,
-    ConnectDataSourcePopup,
-    ODialog,
     ODrawer,
     OButton,
     FirstDataNotice,
@@ -428,6 +420,20 @@ export default defineComponent({
     const miniMode = ref(false);
     const { isMobile, lgUp } = useBreakpoint();
     // Below lg no split leaves room for pages with a folder rail, so the chat overlays instead.
+    // Focus-mode routes (e.g. onboarding) keep the header but drop the side menu, the AI panel and the banners.
+    const focusMode = computed(() => router.currentRoute.value.meta?.focusMode === true);
+    // A first cloud login may be sent to onboarding: show no page until that is decided, so the
+    // user never sees Home for a moment before onboarding replaces it.
+    const holdForOnboarding = ref(
+      config.isCloud === "true" &&
+        (() => {
+          try {
+            return localStorage.getItem("isFirstTimeLogin") === "true";
+          } catch {
+            return false;
+          }
+        })(),
+    );
     const isChatOverlay = computed(() => !lgUp.value);
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
@@ -446,7 +452,6 @@ export default defineComponent({
     const { prefetchRoute } = useRoutePrefetch();
 
     const isMonacoEditorLoaded = ref(false);
-    const showGetStarted = ref((localStorage.getItem("isFirstTimeLogin") ?? "false") === "true");
     const isHovered = ref(false);
     const aiChatInputContext = ref("");
     const aiChatAppendMode = ref(true);
@@ -736,6 +741,37 @@ export default defineComponent({
       const barHeightRem = barHeightPx / 16;
       document.documentElement.style.setProperty("--navbar-height", `${2.5 + barHeightRem}rem`);
     };
+
+    // A brand-new cloud user goes to the onboarding page once; the flag is cleared so a reload does not repeat it.
+    const firstLoginRedirect = async () => {
+      if (localStorage.getItem("isFirstTimeLogin") !== "true") return;
+      await router.isReady();
+      // A pending redirect (a marketplace or deep link) keeps the flag, so a later visit still onboards.
+      if (
+        config.isCloud === "true" &&
+        redirectPending(router.currentRoute.value.name as string | undefined)
+      )
+        return;
+      localStorage.removeItem("isFirstTimeLogin");
+      if (
+        config.isCloud !== "true" ||
+        // Defense in depth: OnboardingView reads the stream lists itself, as this flag can be unset.
+        store.state.organizationData.isDataIngested === true
+      )
+        return;
+      markStartPending(store.state.userInfo?.email);
+      await router.replace({
+        name: "onboarding",
+        query: { org_identifier: store.state.selectedOrganization?.identifier },
+      });
+    };
+    onMounted(async () => {
+      try {
+        await firstLoginRedirect();
+      } finally {
+        holdForOnboarding.value = false;
+      }
+    });
 
     onMounted(() => {
       setNavbarHeight(announcementBarRef.value?.offsetHeight ?? 0);
@@ -1579,13 +1615,6 @@ export default defineComponent({
 
       return getImageURL("images/common/ai_icon_gradient.svg");
     });
-    //this will be the function used to cancel the get started dialog and remove the isFirstTimeLogin from local storage
-    //this will be called from the get started component whenever users clicks on the submit button
-    const removeFirstTimeLogin = (val: boolean) => {
-      showGetStarted.value = val;
-      localStorage.removeItem("isFirstTimeLogin");
-    };
-
     const sendToAiChat = (value: any, append: boolean = true, autoSend: boolean = false) => {
       if (!store.state.isAiChatEnabled) {
         store.dispatch("setIsAiChatEnabled", true);
@@ -1677,6 +1706,8 @@ export default defineComponent({
       selectedOrg,
       orgOptions,
       isMobile,
+      focusMode,
+      holdForOnboarding,
       isChatOverlay,
       miniMode,
       mobileNavOpen,
@@ -1700,8 +1731,6 @@ export default defineComponent({
       closeChat,
       getBtnLogo,
       isHovered,
-      showGetStarted,
-      removeFirstTimeLogin,
       sendToAiChat,
       aiChatInputContext,
       aiChatAppendMode,

@@ -28,10 +28,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   setupCard/content/*) — no edits here.
 -->
 <script setup lang="ts">
-import { computed, inject, ref, watch, nextTick } from "vue";
+import { computed, h, inject, ref, watch, nextTick, type FunctionalComponent } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 import analytics from "@/services/product_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -45,20 +45,26 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import type { CodeBlockCopyPayload } from "@/lib/core/Code/OCodeBlock.types";
-import { OPEN_TOKEN_PICKER } from "@/composables/useCredentialSnippet";
-import type { FirstEventState, StreamSignal } from "@/composables/firstEvent/useFirstEventWatch";
+import { OPEN_TOKEN_PICKER, snippetTokenName } from "@/composables/useCredentialSnippet";
+import type {
+  FirstEventResult,
+  FirstEventState,
+  StreamSignal,
+} from "@/composables/firstEvent/useFirstEventWatch";
 import FirstEventStatus from "../FirstEventStatus.vue";
 import { safeHttpUrl } from "./subs";
-import type {
-  CardSubstitutions,
-  RichCardContent,
-  RichCardInput,
-  RichCardStep,
-  RichCardStepVariant,
-  RichCardStepVariantGroup,
-  RichCardStreamInput,
-  StepChipKind,
+import {
+  SETUP_CARD_ONBOARDING,
+  type CardSubstitutions,
+  type RichCardContent,
+  type RichCardInput,
+  type RichCardStep,
+  type RichCardStepVariant,
+  type RichCardStepVariantGroup,
+  type RichCardStreamInput,
+  type StepChipKind,
 } from "./types";
+import { SETUP_STEPS_HOST } from "./stepsHost";
 import { useStreamDetect, prefersReducedMotion } from "./useStreamDetect";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 
@@ -83,15 +89,23 @@ const emit = defineEmits<{
   (e: "step-action", actionId: string): void;
   /** Detection transitioned to connected; carries the detected stream count. */
   (e: "detected", count: number): void;
+  /** The first-event bar's state changed, so a host page can mirror it. */
+  (e: "state", state: FirstEventState): void;
+  /** The bar found the first record; carries its stream, count and time range. */
+  (e: "received", result: FirstEventResult): void;
 }>();
 
-const router = useRouter();
+const route = useRoute();
 const store = useStore();
 const { t } = useI18nTyped();
 const { isDark } = useTheme();
 const openTokenPicker = inject(OPEN_TOKEN_PICKER, null);
 
 const streamKind = computed(() => props.content.detect?.streamType);
+
+// Inside onboarding, the verify step reads "Check Your Data".
+const inOnboarding = !!inject(SETUP_CARD_ONBOARDING, null);
+const isVerifyStep = (s: RichCardStep) => !!s.detectionAnchor && s.completeOn === "detect";
 
 // Logo precedence per theme: manifest override → content (frontmatter) → none.
 // In dark mode the dark variant is preferred, falling back to the light logo.
@@ -144,7 +158,6 @@ const allInputs = computed(() =>
 const inputValues = ref<Record<string, string>>(
   Object.fromEntries(allInputs.value.map((i) => [i.id, i.default])),
 );
-
 // Substitute live values (stream + free-form inputs) into authored code at
 // display/copy time (kept out of build-time subs because they change as the user
 // types). Build-time {url}/{org}/{token} are already resolved.
@@ -217,6 +230,7 @@ const barSourceLabel = computed(() => {
   return undefined;
 });
 const barState = ref<FirstEventState>("waiting");
+watch(barState, (next) => emit("state", next));
 const statusBar = ref<InstanceType<typeof FirstEventStatus> | null>(null);
 // A function ref: inside the steps' v-for a string ref would collect an array.
 const setStatusBar = (el: unknown) => {
@@ -224,11 +238,15 @@ const setStatusBar = (el: unknown) => {
 };
 const cardRoot = ref<HTMLElement | null>(null);
 
-const onBarDetected = (result: { count: number }) => detect.markConnected(result.count);
+const onBarDetected = (result: FirstEventResult) => {
+  detect.markConnected(result.count);
+  emit("received", result);
+};
 
 // Re-copies through the first step's own block, so the clipboard and the toast match a click on it.
+// A folded step's block is not rendered, and the main path never runs through it.
 const copyFirstSnippet = () => {
-  const index = props.content.steps.findIndex((st) => displayCode(st));
+  const index = props.content.steps.findIndex((st) => !st.collapsed && displayCode(st));
   const step = props.content.steps[index];
   if (!step) return;
   // A hidden command can't be copied; show the step and its warning instead.
@@ -237,12 +255,7 @@ const copyFirstSnippet = () => {
   cardRoot.value?.querySelector<HTMLElement>(`[data-test="${prefix}-copy-btn"]`)?.click();
 };
 
-const tokenName = computed<string | undefined>(() => {
-  const passcode = store.state.organizationData?.organizationPasscode;
-  const tokens: Array<{ name: string; token: string }> =
-    store.state.organizationData?.orgTokens ?? [];
-  return passcode ? tokens.find((tk) => tk.token === passcode)?.name : undefined;
-});
+const tokenName = computed(() => snippetTokenName(store.state.organizationData));
 
 // Fires once per false→true transition — a remount starts idle and stays silent.
 watch(detected, (connected, was) => {
@@ -297,8 +310,10 @@ const currentVariantNote = (step: RichCardStep) =>
 
 // Content modules are plain data with no i18n context, so their `*Key` fields
 // are translated here, on render, and win over the resolved-text counterpart.
-const stepTitle = (step: RichCardStep): I18nText =>
-  step.titleKey ? t(step.titleKey) : (step.title ?? raw(""));
+const stepTitle = (step: RichCardStep): I18nText => {
+  if (inOnboarding && isVerifyStep(step)) return t("ingestion.setupCard.checkYourDataTitle");
+  return step.titleKey ? t(step.titleKey) : (step.title ?? raw(""));
+};
 const stepDescription = (step: RichCardStep): I18nText =>
   step.descriptionKey ? t(step.descriptionKey) : (step.description ?? raw(""));
 const variantLabel = (variant: RichCardStepVariant | RichCardStepVariantGroup): I18nText =>
@@ -335,13 +350,32 @@ const isStepDone = (step: RichCardStep) => {
 const onStepAction = (step: RichCardStep, index: number) => {
   if (step.completeOn === "action") actioned.value = { ...actioned.value, [step.id]: true };
   emit("step-action", step.action!.id);
-  scrollToStep(index + 1);
+  scrollToStep(nextStepIndex(index));
 };
 
 // First not-done step is "active"; -1 once everything is done. OStepper's
-// model is 1-based step numbers (0 = none active, i.e. all done).
-const activeIndex = computed(() => props.content.steps.findIndex((s) => !isStepDone(s)));
+// model is 1-based step numbers (0 = none active, i.e. all done). A folded
+// (`collapsed`) step is optional, so it never holds the active marker.
+const activeIndex = computed(() =>
+  props.content.steps.findIndex((s) => !s.collapsed && !isStepDone(s)),
+);
 const activeStepNumber = computed(() => (activeIndex.value >= 0 ? activeIndex.value + 1 : 0));
+
+// A page can mirror the steps (the onboarding step nav); each step's root is `setup-step-<id>`.
+const stepsHost = inject(SETUP_STEPS_HOST, null);
+if (stepsHost) {
+  watch(
+    () =>
+      props.content.steps.map((s, i) => ({
+        id: s.id,
+        title: stepTitle(s),
+        done: isStepDone(s),
+        active: i === activeIndex.value,
+      })),
+    (steps) => stepsHost.setSteps(steps),
+    { immediate: true },
+  );
+}
 
 // ── next-step auto-advance scroll ────────────────────────────────────────────
 // Refs are OStep component instances; we scroll to their root element ($el).
@@ -357,14 +391,33 @@ const scrollToStep = (i: number) => {
       block: "center",
     });
 };
+// The next step the user should do: folded optional steps are passed over (-1 = none).
+const nextStepIndex = (index: number) =>
+  props.content.steps.findIndex((s, j) => j > index && !s.collapsed);
+
+// A folded step's body sits in a closed OCollapsible under its heading; every
+// other step renders its body unwrapped, as before.
+const StepFold: FunctionalComponent<{ step: RichCardStep }> = ({ step }, { slots }) =>
+  step.collapsed
+    ? h(
+        OCollapsible,
+        {
+          label: t("ingestion.setupCard.showStepInstructions"),
+          class: "step-fold",
+          "data-test": `ai-step-fold-${step.id}`,
+        },
+        () => h("div", { class: "step-fold-body" }, slots.default?.()),
+      )
+    : slots.default?.();
+
 const onStepCopy = (step: RichCardStep, index: number, payload?: CodeBlockCopyPayload) => {
   analytics.track("snippet_copied", {
-    route: router.currentRoute.value.name,
+    route: route?.name,
     partial: payload?.partial ?? false,
   });
   statusBar.value?.start("copy");
   if (step.completeOn === "copy") copied.value = { ...copied.value, [step.id]: true };
-  scrollToStep(index + 1);
+  scrollToStep(nextStepIndex(index));
 };
 
 // ── .env download (from the per-org subs) ────────────────────────────────────
@@ -588,6 +641,7 @@ function fireConfetti() {
           :key="step.id"
           :name="i + 1"
           :title="stepTitle(step)"
+          :id="`setup-step-${step.id}`"
           :done="isStepDone(step)"
           :data-test="`ai-step-${step.id}`"
         >
@@ -607,189 +661,196 @@ function fireConfetti() {
           <div class="step-content-pad" :ref="(el) => setStepRef(el, i)">
             <p class="step-desc" v-html="inlineMd(stepDescription(step))"></p>
 
-            <!-- Per-step inputs (e.g. host/port) — fill {id} in this step's code -->
-            <div
-              v-if="step.inputs?.length"
-              class="step-inputs"
-              :data-test="`ai-step-inputs-${step.id}`"
-            >
-              <OInput
-                v-for="inp in step.inputs"
-                :key="inp.id"
-                v-model="inputValues[inp.id]"
-                :label="inputLabel(inp)"
-                :placeholder="raw(inp.placeholder || inp.default)"
-                :help-text="inp.helpKey ? t(inp.helpKey) : undefined"
-                size="sm"
-                :width="inp.width || 'md'"
-                :data-test="`ai-input-${inp.id}`"
-              />
-            </div>
+            <!-- A `collapsed` step folds everything below its description; the
+                 status bar further down always stays outside the fold. -->
+            <StepFold :step="step">
+              <!-- Per-step inputs (e.g. host/port) — fill {id} in this step's code -->
+              <div
+                v-if="step.inputs?.length"
+                class="step-inputs"
+                :data-test="`ai-step-inputs-${step.id}`"
+              >
+                <OInput
+                  v-for="inp in step.inputs"
+                  :key="inp.id"
+                  v-model="inputValues[inp.id]"
+                  :label="inputLabel(inp)"
+                  :placeholder="raw(inp.placeholder || inp.default)"
+                  :help-text="inp.helpKey ? t(inp.helpKey) : undefined"
+                  size="sm"
+                  :width="inp.width || 'md'"
+                  :data-test="`ai-input-${inp.id}`"
+                />
+              </div>
 
-            <!-- Variant selector (e.g. OS/arch) — shared OToggleGroup; swaps the
+              <!-- Variant selector (e.g. OS/arch) — shared OToggleGroup; swaps the
                  code block below. Hidden on follower steps (variantToggle:false),
                  which instead follow their group's selection. -->
-            <div
-              v-if="step.variants?.length && step.variantToggle !== false"
-              class="variant-tabs"
-              data-test="ai-variant-tabs"
-            >
-              <OToggleGroup
-                :model-value="currentVariantId(step)"
-                @update:model-value="(v) => selectVariant(variantKey(step), v)"
+              <div
+                v-if="step.variants?.length && step.variantToggle !== false"
+                class="variant-tabs"
+                data-test="ai-variant-tabs"
               >
-                <OToggleGroupItem
-                  v-for="v in step.variants"
-                  :key="v.id"
-                  :value="v.id"
-                  size="sm"
-                  :data-test="`ai-variant-${v.id}`"
+                <OToggleGroup
+                  :model-value="currentVariantId(step)"
+                  @update:model-value="(v) => selectVariant(variantKey(step), v)"
                 >
-                  <template v-if="v.icon" #icon-left>
-                    <img
-                      :src="v.icon"
-                      alt=""
-                      aria-hidden="true"
-                      class="variant-icon"
-                      :class="{ 'variant-icon-invert': v.iconInvertDark }"
-                    />
-                  </template>
-                  {{ variantLabel(v) }}
-                </OToggleGroupItem>
-              </OToggleGroup>
-            </div>
+                  <OToggleGroupItem
+                    v-for="v in step.variants"
+                    :key="v.id"
+                    :value="v.id"
+                    size="sm"
+                    :data-test="`ai-variant-${v.id}`"
+                  >
+                    <template v-if="v.icon" #icon-left>
+                      <img
+                        :src="v.icon"
+                        alt=""
+                        aria-hidden="true"
+                        class="variant-icon"
+                        :class="{ 'variant-icon-invert': v.iconInvertDark }"
+                      />
+                    </template>
+                    {{ variantLabel(v) }}
+                  </OToggleGroupItem>
+                </OToggleGroup>
+              </div>
 
-            <div
-              v-if="subVariants(step)?.length && step.variantToggle !== false"
-              class="variant-tabs"
-              :data-test="`ai-subvariant-tabs-${step.id}`"
-            >
-              <OToggleGroup
-                :model-value="currentSubVariantId(step)"
-                @update:model-value="(v) => selectVariant(subVariantKey(step), v)"
+              <div
+                v-if="subVariants(step)?.length && step.variantToggle !== false"
+                class="variant-tabs"
+                :data-test="`ai-subvariant-tabs-${step.id}`"
               >
-                <OToggleGroupItem
-                  v-for="v in subVariants(step)"
-                  :key="v.id"
-                  :value="v.id"
-                  size="sm"
-                  :data-test="`ai-variant-${v.id}`"
+                <OToggleGroup
+                  :model-value="currentSubVariantId(step)"
+                  @update:model-value="(v) => selectVariant(subVariantKey(step), v)"
                 >
-                  <template v-if="v.icon" #icon-left>
-                    <img
-                      :src="v.icon"
-                      alt=""
-                      aria-hidden="true"
-                      class="variant-icon"
-                      :class="{ 'variant-icon-invert': v.iconInvertDark }"
-                    />
-                  </template>
-                  {{ variantLabel(v) }}
-                </OToggleGroupItem>
-              </OToggleGroup>
-            </div>
+                  <OToggleGroupItem
+                    v-for="v in subVariants(step)"
+                    :key="v.id"
+                    :value="v.id"
+                    size="sm"
+                    :data-test="`ai-variant-${v.id}`"
+                  >
+                    <template v-if="v.icon" #icon-left>
+                      <img
+                        :src="v.icon"
+                        alt=""
+                        aria-hidden="true"
+                        class="variant-icon"
+                        :class="{ 'variant-icon-invert': v.iconInvertDark }"
+                      />
+                    </template>
+                    {{ variantLabel(v) }}
+                  </OToggleGroupItem>
+                </OToggleGroup>
+              </div>
 
-            <div
-              v-if="activeVariant(step)?.inputs?.length"
-              class="step-inputs"
-              :data-test="`ai-variant-inputs-${step.id}`"
-            >
-              <OInput
-                v-for="inp in activeVariant(step)?.inputs"
-                :key="inp.id"
-                v-model="inputValues[inp.id]"
-                :label="inputLabel(inp)"
-                :placeholder="raw(inp.placeholder || inp.default)"
-                :help-text="inp.helpKey ? t(inp.helpKey) : undefined"
-                size="sm"
-                :width="inp.width || 'md'"
-                :data-test="`ai-input-${inp.id}`"
-              />
-            </div>
-            <p
-              v-if="missingRequired(activeVariant(step))"
-              class="step-note"
-              :data-test="`ai-variant-require-${step.id}`"
-            >
-              <OIcon name="warning-amber" size="sm" />
-              <span>{{ t(activeVariant(step)!.requireOneOf!.messageKey) }}</span>
-            </p>
+              <div
+                v-if="activeVariant(step)?.inputs?.length"
+                class="step-inputs"
+                :data-test="`ai-variant-inputs-${step.id}`"
+              >
+                <OInput
+                  v-for="inp in activeVariant(step)?.inputs"
+                  :key="inp.id"
+                  v-model="inputValues[inp.id]"
+                  :label="inputLabel(inp)"
+                  :placeholder="raw(inp.placeholder || inp.default)"
+                  :help-text="inp.helpKey ? t(inp.helpKey) : undefined"
+                  size="sm"
+                  :width="inp.width || 'md'"
+                  :data-test="`ai-input-${inp.id}`"
+                />
+              </div>
+              <p
+                v-if="missingRequired(activeVariant(step))"
+                class="step-note"
+                :data-test="`ai-variant-require-${step.id}`"
+              >
+                <OIcon name="warning-amber" size="sm" />
+                <span>{{ t(activeVariant(step)!.requireOneOf!.messageKey) }}</span>
+              </p>
 
-            <!-- Page-supplied controls that CHOOSE this step's code (a client
+              <!-- Page-supplied controls that CHOOSE this step's code (a client
                  picker, an install shortcut) — above the block they drive. -->
-            <div
-              v-if="$slots[`step-${step.id}-controls`]"
-              class="step-slot"
-              :data-test="`ai-step-controls-${step.id}`"
-            >
-              <slot :name="`step-${step.id}-controls`" :step="step" />
-            </div>
+              <div
+                v-if="$slots[`step-${step.id}-controls`]"
+                class="step-slot"
+                :data-test="`ai-step-controls-${step.id}`"
+              >
+                <slot :name="`step-${step.id}-controls`" :step="step" />
+              </div>
 
-            <OCodeBlock
-              v-if="displayCode(step) && !missingRequired(activeVariant(step))"
-              :lang="displayCode(step)?.lang"
-              :chrome="codeChrome(step)"
-              :filename="displayCode(step)?.filename"
-              :code="subStream(displayCode(step)?.raw, activeVariant(step)) || ''"
-              :code-masked="subStream(displayCode(step)?.masked, activeVariant(step))"
-              :data-test="displayCode(step)?.dataTest ?? SETUP_CODE_BLOCK"
-              :reveal-tooltip="t('ingestion.setupCard.revealToken')"
-              :hide-tooltip="t('ingestion.setupCard.hideToken')"
-              :token-name="displayCode(step)?.masked ? tokenName : undefined"
-              @copy="(payload: CodeBlockCopyPayload) => onStepCopy(step, i, payload)"
-              @token-click="openTokenPicker?.()"
-            >
-              <template v-if="displayCode(step)?.downloadEnv" #actions>
-                <OButton
-                  data-test="ai-code-env-btn"
-                  variant="ghost"
-                  size="icon-xs-sq"
-                  @click="downloadEnv"
-                >
-                  <OIcon name="download" size="sm" />
-                  <OTooltip :content="t('ingestion.setupCard.downloadEnvTooltip')" side="top" />
-                </OButton>
-              </template>
-            </OCodeBlock>
+              <OCodeBlock
+                v-if="displayCode(step) && !missingRequired(activeVariant(step))"
+                :lang="displayCode(step)?.lang"
+                :chrome="codeChrome(step)"
+                :filename="displayCode(step)?.filename"
+                :code="subStream(displayCode(step)?.raw, activeVariant(step)) || ''"
+                :code-masked="subStream(displayCode(step)?.masked, activeVariant(step))"
+                :data-test="displayCode(step)?.dataTest ?? SETUP_CODE_BLOCK"
+                :reveal-tooltip="t('ingestion.setupCard.revealToken')"
+                :hide-tooltip="t('ingestion.setupCard.hideToken')"
+                :token-name="displayCode(step)?.masked ? tokenName : undefined"
+                @copy="(payload: CodeBlockCopyPayload) => onStepCopy(step, i, payload)"
+                @token-click="openTokenPicker?.()"
+              >
+                <template v-if="displayCode(step)?.downloadEnv" #actions>
+                  <OButton
+                    data-test="ai-code-env-btn"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    @click="downloadEnv"
+                  >
+                    <OIcon name="download" size="sm" />
+                    <OTooltip :content="t('ingestion.setupCard.downloadEnvTooltip')" side="top" />
+                  </OButton>
+                </template>
+              </OCodeBlock>
 
-            <p v-if="currentVariantNote(step)" class="step-note" @click="onNoteClick">
-              <OIcon name="info-outline" size="sm" />
-              <span v-html="noteMd(currentVariantNote(step) || '')"></span>
-            </p>
-            <p v-if="step.note" class="step-note" @click="onNoteClick">
-              <OIcon name="info-outline" size="sm" />
-              <span v-html="noteMd(step.note)"></span>
-            </p>
+              <p v-if="currentVariantNote(step)" class="step-note" @click="onNoteClick">
+                <OIcon name="info-outline" size="sm" />
+                <span v-html="noteMd(currentVariantNote(step) || '')"></span>
+              </p>
+              <p v-if="step.note" class="step-note" @click="onNoteClick">
+                <OIcon name="info-outline" size="sm" />
+                <span v-html="noteMd(step.note)"></span>
+              </p>
 
-            <!-- Page-supplied controls for this step (region pickers, service
+              <!-- Page-supplied controls for this step (region pickers, service
                  checkboxes …). Lets a page own the interaction while inheriting
                  the card's hero, stepper and chrome instead of rebuilding them. -->
-            <div
-              v-if="$slots[`step-${step.id}`]"
-              class="step-slot"
-              :data-test="`ai-step-slot-${step.id}`"
-            >
-              <slot :name="`step-${step.id}`" :step="step" />
-            </div>
-
-            <!-- Action button — for steps performed in a cloud console rather
-                 than by copying a command. -->
-            <div v-if="step.action && (!step.action.showOnDetect || detected)" class="step-action">
-              <OButton
-                :variant="step.action.variant || 'primary'"
-                size="sm-action"
-                :icon-left="step.action.icon"
-                :disabled="step.action.disabled"
-                :data-test="`ai-step-action-${step.action.id}`"
-                @click="onStepAction(step, i)"
+              <div
+                v-if="$slots[`step-${step.id}`]"
+                class="step-slot"
+                :data-test="`ai-step-slot-${step.id}`"
               >
-                {{ step.action.label }}
-              </OButton>
-            </div>
+                <slot :name="`step-${step.id}`" :step="step" />
+              </div>
 
-            <div v-if="step.pills?.length" class="pill-list mt-2">
-              <OTag v-for="p in step.pills" :key="p" type="fieldTag" value="softsm">{{ p }}</OTag>
-            </div>
+              <!-- Action button — for steps performed in a cloud console rather
+                 than by copying a command. -->
+              <div
+                v-if="step.action && (!step.action.showOnDetect || detected)"
+                class="step-action"
+              >
+                <OButton
+                  :variant="step.action.variant || 'primary'"
+                  size="sm-action"
+                  :icon-left="step.action.icon"
+                  :disabled="step.action.disabled"
+                  :data-test="`ai-step-action-${step.action.id}`"
+                  @click="onStepAction(step, i)"
+                >
+                  {{ step.action.label }}
+                </OButton>
+              </div>
+
+              <div v-if="step.pills?.length" class="pill-list mt-2">
+                <OTag v-for="p in step.pills" :key="p" type="fieldTag" value="softsm">{{ p }}</OTag>
+              </div>
+            </StepFold>
 
             <!-- Live status bar + fix box on the detection-anchor step -->
             <template v-if="step.detectionAnchor">
@@ -1216,6 +1277,27 @@ function fireConfetti() {
 
 .step-note :deep(a.note-jump:hover) {
   text-decoration: underline;
+}
+
+/* ---- folded optional step (step.collapsed) — the bottom accordions' bordered
+   panel, so the fold reads as a section rather than stray text. Rendered by
+   StepFold (a render function), hence :deep(). `> button` keeps the roomier
+   padding on the trigger only, not on the toggles and copy buttons inside. ---- */
+.step-content-pad :deep(.step-fold) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.step-content-pad :deep(.step-fold > button) {
+  padding: 0.8125rem 1rem;
+  border-radius: 0;
+}
+
+.step-content-pad :deep(.step-fold-body) {
+  padding: 0.25rem 1rem 1rem;
 }
 
 .step-content-pad :deep(code),

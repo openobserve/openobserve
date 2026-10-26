@@ -1650,12 +1650,12 @@
       "fileTypeZip": "Alleen ZIP-bestanden zijn toegestaan"
     },
     "emptyState": {
-      "title": "Bewaak uw gebruikers met Real User Monitoring",
-      "description": "RUM volgt echte gebruikersinteracties — het laden van pagina's, fouten, API-aanroepen en sessie-replays — zodat u precies ziet hoe gebruikers uw applicatie ervaren.",
       "webApp": "Instrument: een webapp",
       "webAppDesc": "Voeg de OpenObserve RUM SDK toe aan elke {product}-app",
       "sessionReplay": "Sessie opnieuw afspelen inschakelen",
       "sessionReplayDesc": "Gebruikerssessies opnemen en opnieuw afspelen om UX-problemen op te lossen",
+      "title": "Bewaak uw gebruikers met Real User Monitoring",
+      "description": "RUM volgt echte gebruikersinteracties — het laden van pagina's, fouten, API-aanroepen en sessie-replays — zodat u precies ziet hoe gebruikers uw applicatie ervaren.",
       "learnMore": "Meer informatie:",
       "quickImpl": "Beknopte implementatiegids",
       "blogPost": "Basisprincipes van frontend-monitoring"
@@ -4950,12 +4950,6 @@
     "joinSlack": "Sluit je aan bij de Slack",
     "maybeLater": "Misschien later"
   },
-  "connectDataSourcePopup": {
-    "title": "Laten we om te beginnen je eerste gegevensbron verbinden.",
-    "description": "We hebben veel te laten zien, maar eerst moeten we je gegevens verbinden. De meeste teams zien hun eerste logs binnen ongeveer een minuut.",
-    "connectButton": "Een gegevensbron verbinden",
-    "slackLink": "Sluit je ook aan bij onze Slack-community"
-  },
   "confirmDialog": {
     "continueFromWherePaused": "Doorgaan vanaf waar het pauzeerde",
     "startFromNow": "Vanaf nu starten.",
@@ -5407,8 +5401,6 @@
       "anyWindowsHostNote": "Elke Windows-server of VM.",
       "arrow": "→",
       "askOnSlack": "Vraag het op Slack",
-      "autoInstrumentTracesDesc": "Beide geven je **gedistribueerde traces zonder applicatiecode aan te raken of images opnieuw te bouwen**. **Taalbibliotheken:** de OpenTelemetry-operator injecteert automatische instrumentatie in de pods van een geannoteerde namespace. **eBPF:** de collector traceert de processen die je selecteert, in elke taal, Go inbegrepen.",
-      "autoInstrumentTracesTitle": "Traceer je applicaties: taalbibliotheken of eBPF",
       "cassandraJmxNote": "Schakel externe JMX-toegang op Cassandra in zodat de ontvanger verbinding kan maken.",
       "cassandraTagline": "Verzamel Cassandra-metrieken via de JMX-receiver van de OpenTelemetry Collector en stuur ze naar OpenObserve.",
       "checking": "Controleren…",
@@ -5493,11 +5485,13 @@
       "k8sAnnotatePodNote": "Annoteer een enkele pod-spec in plaats van de namespace om één workload tegelijk te instrumenteren.",
       "k8sFixBody": "De OpenTelemetry-operator start pas als de webhook van cert-manager actief is, en een collector die nooit start, verzendt niets. Controleer dat beide draaien en test opnieuw:",
       "k8sFixTitle": "Wacht op de cert-manager-webhook",
+      "k8sEbpfAnyLanguageVariant": "Elke taal, zonder bibliotheek (eBPF)",
       "k8sEbpfNote": "Traces worden vastgelegd met eBPF: er zijn geen codewijzigingen of SDK nodig. Tracecontext gaat alleen via plain-text HTTP tussen services mee (bij Go-apps ook via HTTPS, behalve op nodes met kernel lockdown). Een proces dat overeenkomt met een van de poorten, het pad naar het uitvoerbare bestand of de opdrachtregel wordt getraceerd; globs mogen geen `,`, `{'{'}` of `{'}'}` bevatten, en een poort komt overeen met elk proces dat er een socket op heeft. Vereist Helm 3.14+ en OpenTelemetry-operator v0.142.0+; is die van jou ouder, werk hem dan eerst bij met `kubectl apply -f https://github.com/open-telemetry/opentelemetry-operator/releases/download/v0.161.0/opentelemetry-operator.yaml`. Was eBPF al ingeschakeld met een oudere operator, voer de opdracht dan opnieuw uit met `--force` (`--force-replace` bij Helm 4). Opnieuw uitvoeren van de installatieopdracht hierboven zet de release terug en schakelt eBPF uit, dus voer deze opdracht daarna opnieuw uit. De namespace `openobserve-collector` moet geprivilegieerde pods toestaan, en nodes moeten Linux draaien op amd64 of arm64 met kernel 5.8+ (of RHEL-familie 4.18 met eBPF-backports) en BTF. Selecteer geen apps die al hun eigen traces versturen, en geen pods die de Go-sidecar `inject-go` gebruiken.",
-      "k8sEbpfVariant": "eBPF (elke taal, geen codewijzigingen)",
-      "k8sLibrariesVariant": "Taalbibliotheken (automatische instrumentatie)",
       "k8sInstallerNote": "Dit installeert automatisch cert-manager, de OpenTelemetry-operator en de OpenObserve-collector.",
       "k8sInternalEndpointNote": "Gebruik dit wanneer OpenObserve in hetzelfde cluster draait — verkeer verlaat het dan nooit.",
+      "k8sLibraryPerLanguageVariant": "Een bibliotheek per taal toevoegen (Java, .NET, Node.js, Python)",
+      "k8sOptionalTracesDesc": "Wilt u ook traces van verzoeken uit uw services? Kies hoe en voer daarna nog één opdracht uit. Geen codewijzigingen nodig, en u kunt dit op elk moment doen.",
+      "k8sOptionalTracesTitle": "Optioneel: traceer uw apps",
       "k8sTroubleAnnotationA": "Injectie vindt plaats bij het aanmaken van de pod, dus bestaande pods worden niet beïnvloed tot ze opnieuw opstarten — voer `kubectl rollout restart deployment -n my-namespace` uit. Bevestig dat de annotatie is geplaatst met `kubectl get ns my-namespace -o yaml` en controleer dat de waarde overeenkomt met `openobserve-collector/openobserve-<language>`.",
       "k8sTroubleAnnotationQ": "Ik heb een namespace geannoteerd, maar er verschijnen geen traces",
       "k8sTroubleEndpointA": "Gebruik het **interne eindpunt** alleen wanneer OpenObserve zelf in dit cluster draait; het verkeer blijft dan binnen het cluster en verlaat nooit het netwerk. De URL is `http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080` — de standaardwaarde gaat uit van release `o2` in namespace `openobserve`, dus pas die aan als die van jou afwijken. Alle anderen gebruiken het externe eindpunt.",
@@ -5750,6 +5744,7 @@
       "androidTroubleScreenNamesQ": "Sessies verschijnen, maar schermen hebben allemaal dezelfde naam",
       "androidTroubleScreenNamesA": "Weergavetracking is niet aangesloten. Geef een `useViewTrackingStrategy(...)` door — bijv. `ActivityViewTrackingStrategy(trackExtras = true)` voor Activities, of `NavigationViewTrackingStrategy(...)` als u AndroidX Navigation gebruikt — bij het bouwen van de `RumConfiguration`.",
       "setupTime5Min": "~5 min",
+      "showStepInstructions": "Instructies tonen",
       "snowflakeCollectorVersionNote": "Snowflake heeft collector v0.92.0 nodig — nieuwere builds hebben een bekende bug.",
       "snowflakeTagline": "Verzamel Snowflake-accountmetrieken met de OpenTelemetry Collector en stuur ze naar OpenObserve.",
       "sqlClientGuiVariant": "SQL-client (GUI)",
