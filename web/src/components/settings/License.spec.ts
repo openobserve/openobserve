@@ -1638,14 +1638,99 @@ describe("License.vue", () => {
       expect(licenseServer.get_license).toHaveBeenCalledTimes(3);
     });
 
-    it("drops a pending refetch on unmount", async () => {
-      vi.mocked(licenseServer.get_license).mockResolvedValue(response({}));
+    const deferred = () => {
+      let resolve: (value: AxiosResponse) => void = () => {};
+      const promise = new Promise<AxiosResponse>((r) => (resolve = r));
+      return { promise, resolve };
+    };
+    const errorToasts = () =>
+      mockToast.mock.calls.filter(([options]) => options?.variant === "error").length;
+
+    it("drops a pending refetch on unmount, including one a boundary set during a refetch", async () => {
+      const inFlight = deferred();
+      vi.mocked(licenseServer.get_license)
+        .mockResolvedValueOnce(response({}))
+        .mockReturnValueOnce(inFlight.promise)
+        .mockResolvedValue(response({}));
       wrapper = createWrapper();
       await flushPromises();
-      await vi.advanceTimersByTimeAsync(1500);
+      await vi.advanceTimersByTimeAsync(2500);
+      expect(licenseServer.get_license).toHaveBeenCalledTimes(2);
+      wrapper.vm.refetchAtBoundary(graceEndUs);
+      inFlight.resolve(response({}));
+      await flushPromises();
       wrapper.unmount();
       await vi.advanceTimersByTimeAsync(LICENSE_BOUNDARY_RETRY_MS * 3);
-      expect(licenseServer.get_license).toHaveBeenCalledTimes(1);
+      expect(licenseServer.get_license).toHaveBeenCalledTimes(2);
+    });
+
+    it("schedules nothing when a refetch in flight finishes after unmount", async () => {
+      const inFlight = deferred();
+      vi.mocked(licenseServer.get_license)
+        .mockResolvedValueOnce(response({}))
+        .mockReturnValueOnce(inFlight.promise)
+        .mockResolvedValue(response({}));
+      wrapper = createWrapper();
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(2500);
+      wrapper.unmount();
+      inFlight.resolve(response({}));
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(LICENSE_BOUNDARY_RETRY_MS * 3);
+      expect(licenseServer.get_license).toHaveBeenCalledTimes(2);
+    });
+
+    it("keeps a single retry chain when a boundary arrives during a refetch", async () => {
+      const inFlight = deferred();
+      vi.mocked(licenseServer.get_license)
+        .mockResolvedValueOnce(response({}))
+        .mockReturnValueOnce(inFlight.promise)
+        .mockResolvedValue(response({}));
+      wrapper = createWrapper();
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(2500);
+      expect(licenseServer.get_license).toHaveBeenCalledTimes(2);
+      wrapper.vm.refetchAtBoundary(graceEndUs);
+      inFlight.resolve(response({}));
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(licenseServer.get_license).toHaveBeenCalledTimes(3);
+      for (let minute = 1; minute <= 3; minute++) {
+        await vi.advanceTimersByTimeAsync(LICENSE_BOUNDARY_RETRY_MS);
+        expect(licenseServer.get_license).toHaveBeenCalledTimes(3 + minute);
+      }
+    });
+
+    it("toasts only the first failure of a boundary retry chain", async () => {
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const gets = () => vi.mocked(licenseServer.get_license).mock.calls.length;
+      vi.mocked(licenseServer.get_license)
+        .mockResolvedValueOnce(response({}))
+        .mockRejectedValue({ response: { status: 503 } });
+      wrapper = createWrapper();
+      await flushPromises();
+      mockToast.mockClear();
+
+      await vi.advanceTimersByTimeAsync(2500 + 5000);
+      expect(gets()).toBeGreaterThan(1);
+      expect(errorToasts()).toBe(1);
+
+      const userReload = wrapper.vm.reloadLicenseData();
+      await vi.advanceTimersByTimeAsync(5000);
+      await userReload;
+      expect(errorToasts()).toBe(2);
+
+      const beforeRetries = gets();
+      await vi.advanceTimersByTimeAsync(LICENSE_BOUNDARY_RETRY_MS * 3);
+      expect(gets()).toBeGreaterThan(beforeRetries + 2);
+      expect(errorToasts()).toBe(2);
+
+      wrapper.vm.refetchAtBoundary(graceEndUs + 1);
+      await vi.advanceTimersByTimeAsync(1000 + 5000);
+      expect(errorToasts()).toBe(3);
+      await vi.advanceTimersByTimeAsync(LICENSE_BOUNDARY_RETRY_MS * 2);
+      expect(errorToasts()).toBe(3);
+      consoleErrorSpy.mockRestore();
     });
   });
 

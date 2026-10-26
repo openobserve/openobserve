@@ -694,17 +694,21 @@ export default defineComponent({
     };
 
     // Only the first load may swap the page for the spinner; later reloads would unmount the form.
-    const loadLicenseData = async ({ background = false } = {}) => {
+    const loadLicenseData = async ({ background = false, quiet = false } = {}) => {
       try {
         if (!background) loading.value = true;
         licenseData.value = await queryClient.fetchQuery(licenseQuery());
         if (!background) checkAndAutoFillLicenseFromUrl();
+        return true;
       } catch (error) {
         console.error("Error loading license data:", error);
-        toast({
-          variant: "error",
-          message: t("about.failed_to_load_license_info"),
-        });
+        if (!quiet) {
+          toast({
+            variant: "error",
+            message: t("about.failed_to_load_license_info"),
+          });
+        }
+        return false;
       } finally {
         if (!background) loading.value = false;
       }
@@ -715,26 +719,36 @@ export default defineComponent({
     let boundaryRefetch: ReturnType<typeof setTimeout> | undefined;
     let boundaryUs = 0;
     let boundaryRetries = 0;
+    let boundaryChain = 0;
+    let boundaryErrorShown = false;
     let unmounted = false;
     const clearBoundaryRefetch = () => {
       if (boundaryRefetch !== undefined) clearTimeout(boundaryRefetch);
       boundaryRefetch = undefined;
     };
+    const scheduleBoundaryRefetch = (chain: number, delayMs: number) => {
+      clearBoundaryRefetch();
+      boundaryRefetch = setTimeout(() => refetchAfterBoundary(chain), delayMs);
+    };
     // the server re-evaluates on its own tick, so a decision from before the boundary is fetched again
-    const refetchAfterBoundary = async () => {
+    const refetchAfterBoundary = async (chain: number) => {
       boundaryRefetch = undefined;
-      await reloadLicenseData();
+      const loaded = await loadLicenseData({ background: true, quiet: boundaryErrorShown });
+      if (!loaded && chain === boundaryChain) boundaryErrorShown = true;
+      // a boundary that arrived during the fetch started a newer chain, which owns the timer
+      if (unmounted || chain !== boundaryChain) return;
       const evaluatedAt = Number(licenseData.value?.evaluated_at ?? 0);
-      if (unmounted || !(evaluatedAt > 0 && evaluatedAt < boundaryUs)) return;
+      if (!(evaluatedAt > 0 && evaluatedAt < boundaryUs)) return;
       if (boundaryRetries >= LICENSE_BOUNDARY_RETRIES) return;
       boundaryRetries++;
-      boundaryRefetch = setTimeout(refetchAfterBoundary, LICENSE_BOUNDARY_RETRY_MS);
+      scheduleBoundaryRefetch(chain, LICENSE_BOUNDARY_RETRY_MS);
     };
     const refetchAtBoundary = (atUs: number) => {
       boundaryUs = Math.max(boundaryUs, atUs);
       boundaryRetries = 0;
-      clearBoundaryRefetch();
-      boundaryRefetch = setTimeout(refetchAfterBoundary, LICENSE_BOUNDARY_DEBOUNCE_MS);
+      boundaryChain++;
+      boundaryErrorShown = false;
+      scheduleBoundaryRefetch(boundaryChain, LICENSE_BOUNDARY_DEBOUNCE_MS);
     };
     onBeforeUnmount(() => {
       unmounted = true;
