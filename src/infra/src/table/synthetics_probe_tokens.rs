@@ -19,17 +19,16 @@
 //! (`/synthetics/jobs/resolve`, `/ack`, `/lease`). Separate from
 //! `org_ingestion_tokens` (`o2oi_`) which is write-only ingest.
 
-use std::{
-    sync::LazyLock,
-    time::{Duration, Instant},
-};
+use std::time::Duration;
 
-use config::RwHashMap;
 use sea_orm::{
     ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr, TransactionTrait, sea_query::Expr,
 };
 
-use super::entity::synthetics_probe_tokens::{ActiveModel, Column, Entity, Model};
+use super::{
+    entity::synthetics_probe_tokens::{ActiveModel, Column, Entity, Model},
+    ttl_cache::TtlCache,
+};
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
@@ -53,13 +52,11 @@ pub const SYNTHETICS_PROBE_TOKEN_PREFIX: &str = "o2syn_";
 /// effectively immediate for an operator and long enough to remove ~99 % of the
 /// queries. Writes in this module invalidate eagerly, so the TTL only covers a
 /// disable performed on a *different* node.
-static TOKEN_CACHE: LazyLock<RwHashMap<String, (Option<SyntheticsProbeTokenRecord>, Instant)>> =
-    LazyLock::new(Default::default);
+static TOKEN_CACHE: TtlCache<Option<SyntheticsProbeTokenRecord>> = TtlCache::new(TOKEN_CACHE_TTL);
 
 /// Org → its default enabled token, same TTL rules as [`TOKEN_CACHE`].
-static DEFAULT_TOKEN_CACHE: LazyLock<
-    RwHashMap<String, (Option<SyntheticsProbeTokenRecord>, Instant)>,
-> = LazyLock::new(Default::default);
+static DEFAULT_TOKEN_CACHE: TtlCache<Option<SyntheticsProbeTokenRecord>> =
+    TtlCache::new(TOKEN_CACHE_TTL);
 
 const TOKEN_CACHE_TTL: Duration = Duration::from_secs(10);
 
@@ -167,10 +164,8 @@ pub async fn add(record: &SyntheticsProbeTokenRecord) -> Result<(), errors::Erro
 /// path (the tenant boundary). Matches ANY enabled token, so old + new tokens
 /// coexist during a rotation overlap window.
 pub async fn find_global(token: &str) -> Result<Option<SyntheticsProbeTokenRecord>, errors::Error> {
-    if let Some(entry) = TOKEN_CACHE.get(token)
-        && entry.1.elapsed() < TOKEN_CACHE_TTL
-    {
-        return Ok(entry.0.clone());
+    if let Some(cached) = TOKEN_CACHE.get(token) {
+        return Ok(cached);
     }
 
     let client = get_orm_client_rw().await;
@@ -182,7 +177,7 @@ pub async fn find_global(token: &str) -> Result<Option<SyntheticsProbeTokenRecor
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
         .map(SyntheticsProbeTokenRecord::from);
 
-    TOKEN_CACHE.insert(token.to_string(), (record.clone(), Instant::now()));
+    TOKEN_CACHE.insert(token.to_string(), record.clone());
     Ok(record)
 }
 
@@ -191,10 +186,8 @@ pub async fn find_global(token: &str) -> Result<Option<SyntheticsProbeTokenRecor
 pub async fn find_default(
     org_id: &str,
 ) -> Result<Option<SyntheticsProbeTokenRecord>, errors::Error> {
-    if let Some(entry) = DEFAULT_TOKEN_CACHE.get(org_id)
-        && entry.1.elapsed() < TOKEN_CACHE_TTL
-    {
-        return Ok(entry.0.clone());
+    if let Some(cached) = DEFAULT_TOKEN_CACHE.get(org_id) {
+        return Ok(cached);
     }
 
     let client = get_orm_client_rw().await;
@@ -207,7 +200,7 @@ pub async fn find_default(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
         .map(SyntheticsProbeTokenRecord::from);
 
-    DEFAULT_TOKEN_CACHE.insert(org_id.to_string(), (record.clone(), Instant::now()));
+    DEFAULT_TOKEN_CACHE.insert(org_id.to_string(), record.clone());
     Ok(record)
 }
 

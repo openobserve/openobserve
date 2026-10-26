@@ -59,6 +59,8 @@ jobs:
           # Only reap jobs whose requested runner label starts with this prefix.
           RUNNER_LABEL_PREFIX: "eks-"
         with:
+          # Human PAT so PR comments are authored by a person, not github-actions[bot].
+          github-token: ${{ secrets.ORG_ADMIN_TOKEN }}
           script: |
             const { owner, repo } = context.repo;
             const inputs = context.payload.inputs || {};
