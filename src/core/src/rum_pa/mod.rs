@@ -278,6 +278,7 @@ pub struct FunnelDef {
     pub u: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub w: Option<String>,
+    /// A built-in key dimension, or any stream column but a session-filter field, env or version.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub b: Option<String>,
     /// 1-based step an attribute `b` reads its value at; absent lets the data pick it.
@@ -369,7 +370,7 @@ pub struct Exclusion {
     pub w: Option<i64>,
 }
 
-/// Filter all steps: keeps sessions where `field` matches one of `values`, or never does if `not`.
+/// Matches `field` to `values`, inverted by `not`; `f` filters sessions with it, `pc` step events.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct FunnelFilter {

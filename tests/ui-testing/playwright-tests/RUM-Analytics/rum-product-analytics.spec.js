@@ -1036,7 +1036,7 @@ test.describe('RUM Product Analytics', () => {
     await pa.expectFunnelCounts([usersApp.sessionsAtA, 0]);
     // Sessions are one window by definition, so Sessions mode shows no window control.
     await expect(pa.funnelWindowTrigger).toHaveCount(0);
-    await expect(page.locator('[data-test="rum-analytics-funnel-window-fixed"]')).toHaveCount(0);
+    await expect(pa.funnelWindowFixed).toHaveCount(0);
 
     await pa.selectCountBy('users');
     for (const w of ['session', '1h', '1d']) {

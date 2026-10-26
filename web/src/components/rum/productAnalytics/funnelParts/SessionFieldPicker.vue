@@ -39,10 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #field-row="{ row }">
             <OFieldRow v-if="groups" :data-test="`rum-analytics-funnel-field-picker-${row.rowId}`">
-              <span
-                class="flex min-w-0 flex-1 items-center justify-between gap-2"
-                :aria-disabled="row.reason ? 'true' : undefined"
-              >
+              <span class="flex min-w-0 flex-1 items-center justify-between gap-2">
                 <OTruncatedText
                   as="span"
                   class="min-w-0 font-mono"
@@ -255,6 +252,7 @@ const bandRows = (groups: readonly PickerGroup[]) =>
         rowId: f.id,
         hint: f.hint,
         reason: f.reason,
+        disabled: !!f.reason,
       })),
     ]);
 

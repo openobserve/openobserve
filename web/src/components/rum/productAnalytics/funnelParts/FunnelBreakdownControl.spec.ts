@@ -160,6 +160,14 @@ describe("FunnelBreakdownControl, the rail's Breakdown section", () => {
     expect(w.emitted("update:def")).toBeUndefined();
   });
 
+  it("the focusable row of a field with a reason carries aria-disabled", async () => {
+    const w = mountControl();
+    await openPicker(w);
+    const button = (id: string) => row(w, id).element.closest('[role="button"]');
+    expect(button("field-usr_id")?.getAttribute("aria-disabled")).toBe("true");
+    expect(button(`field-${PAY}`)?.hasAttribute("aria-disabled")).toBe(false);
+  });
+
   it("a set breakdown is one chip; the + is greyed with One breakdown at a time", async () => {
     const w = mountControl({ def: { ...DEF, breakdown: "browser" } });
     expect(w.find(dt(CHIP)).text()).toContain("Browser");
