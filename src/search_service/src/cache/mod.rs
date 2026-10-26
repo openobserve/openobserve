@@ -551,45 +551,6 @@ pub async fn search(
 }
 
 #[tracing::instrument(name = "service:search:cacher:prepare_cache_response", skip_all)]
-/// Awaits every delta; with `drain` the first error, in any order, aborts the rest and waits.
-async fn join_deltas<T, F, Fut>(
-    tasks: Vec<tokio::task::JoinHandle<Result<T, Error>>>,
-    drain: bool,
-    abort: F,
-) -> Result<Vec<T>, Error>
-where
-    F: FnOnce() -> Fut,
-    Fut: std::future::Future<Output = ()>,
-{
-    if !drain {
-        let mut results = Vec::with_capacity(tasks.len());
-        for task in tasks {
-            results.push(task.await.map_err(|e| Error::Message(e.to_string()))??);
-        }
-        return Ok(results);
-    }
-    let mut slots: Vec<Option<T>> = tasks.iter().map(|_| None).collect();
-    let mut pending: futures::stream::FuturesUnordered<_> = tasks
-        .into_iter()
-        .enumerate()
-        .map(|(i, task)| async move { (i, task.await) })
-        .collect();
-    let mut abort = Some(abort);
-    let mut first_err = None;
-    while let Some((i, joined)) = futures::StreamExt::next(&mut pending).await {
-        match joined.map_err(|e| Error::Message(e.to_string())) {
-            Ok(Ok(res)) => slots[i] = Some(res),
-            Ok(Err(e)) | Err(e) => {
-                if let Some(abort) = abort.take() {
-                    abort().await;
-                }
-                first_err.get_or_insert(e);
-            }
-        }
-    }
-    first_err.map_or_else(|| Ok(slots.into_iter().flatten().collect()), Err)
-}
-
 pub async fn prepare_cache_response(
     trace_id: &str,
     org_id: &str,
@@ -746,6 +707,45 @@ pub async fn prepare_cache_response(
         }
     };
     Ok((resp, should_exec_query))
+}
+
+/// Awaits every delta; with `drain` the first error, in any order, aborts the rest and waits.
+async fn join_deltas<T, F, Fut>(
+    tasks: Vec<tokio::task::JoinHandle<Result<T, Error>>>,
+    drain: bool,
+    abort: F,
+) -> Result<Vec<T>, Error>
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = ()>,
+{
+    if !drain {
+        let mut results = Vec::with_capacity(tasks.len());
+        for task in tasks {
+            results.push(task.await.map_err(|e| Error::Message(e.to_string()))??);
+        }
+        return Ok(results);
+    }
+    let mut slots: Vec<Option<T>> = tasks.iter().map(|_| None).collect();
+    let mut pending: futures::stream::FuturesUnordered<_> = tasks
+        .into_iter()
+        .enumerate()
+        .map(|(i, task)| async move { (i, task.await) })
+        .collect();
+    let mut abort = Some(abort);
+    let mut first_err = None;
+    while let Some((i, joined)) = futures::StreamExt::next(&mut pending).await {
+        match joined.map_err(|e| Error::Message(e.to_string())) {
+            Ok(Ok(res)) => slots[i] = Some(res),
+            Ok(Err(e)) | Err(e) => {
+                if let Some(abort) = abort.take() {
+                    abort().await;
+                }
+                first_err.get_or_insert(e);
+            }
+        }
+    }
+    first_err.map_or_else(|| Ok(slots.into_iter().flatten().collect()), Err)
 }
 
 // based on _timestamp of first record in config::meta::search::Response either add it in start

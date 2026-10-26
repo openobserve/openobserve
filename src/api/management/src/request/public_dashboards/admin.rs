@@ -483,7 +483,7 @@ mod tests {
                     folder_id: f.into(),
                     folder_name: "f".into(),
                 });
-                openobserve_core::public_dashboards::view(link, label.as_ref(), false, 1)
+                openobserve_core::public_dashboards::view(link, label.as_ref(), false, true, 1)
             })
             .collect()
     }

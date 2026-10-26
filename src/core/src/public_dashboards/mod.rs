@@ -165,14 +165,11 @@ impl Engine for SearchEngine {
     }
 
     #[cfg_attr(not(feature = "cloud"), allow(unused_variables))]
-    async fn trial_ok(&self, org: &str) -> bool {
+    async fn trial_ok(&self, org: &str) -> Result<bool, anyhow::Error> {
         #[cfg(feature = "cloud")]
-        return matches!(
-            crate::organization::is_org_in_free_trial_period(org).await,
-            Ok(true)
-        );
+        return crate::organization::is_org_in_free_trial_period(org).await;
         #[cfg(not(feature = "cloud"))]
-        true
+        Ok(true)
     }
 }
 
@@ -656,10 +653,12 @@ pub async fn create(
     }
 }
 
+/// Every live link of the org, read from the replica.
 pub async fn list(org: &str) -> Result<Vec<PublicDashboard>, anyhow::Error> {
     Ok(pd_table::list(get_orm_client_ro().await, org).await?)
 }
 
+/// The live links of one dashboard of the org, read from the replica.
 pub async fn list_for_dashboard(
     org: &str,
     dashboard_id: &str,
@@ -672,6 +671,8 @@ pub async fn views(
     org: &str,
     links: Vec<PublicDashboard>,
 ) -> Result<Vec<PublicLinkView>, anyhow::Error> {
+    // One settings read per list: the org switch decides every link's status.
+    let org_enabled = org_settings(org).await?.enabled;
     let ids: Vec<String> = links
         .iter()
         .map(|l| l.dashboard_id.clone())
@@ -680,13 +681,14 @@ pub async fn views(
         .collect();
     let labels = dashboards::labels_by_ids(org, &ids).await?;
     let is_member = |user: String| async move { publisher_is_member(org, &user).await };
-    Ok(views_with(links, &labels, is_member).await)
+    Ok(views_with(links, &labels, org_enabled, is_member).await)
 }
 
 /// The views with one membership lookup per distinct publisher; a failed lookup is not leaving.
 async fn views_with<F, Fut>(
     links: Vec<PublicDashboard>,
     labels: &HashMap<String, DashboardLabel>,
+    org_enabled: bool,
     is_member: F,
 ) -> Vec<PublicLinkView>
 where
@@ -712,7 +714,7 @@ where
                 labels.get(&link.dashboard_id),
                 left.contains(&link.published_by),
             );
-            view(link, label, publisher_left, now)
+            view(link, label, publisher_left, org_enabled, now)
         })
         .collect()
 }
@@ -722,6 +724,7 @@ pub fn view(
     link: PublicDashboard,
     label: Option<&DashboardLabel>,
     publisher_left: bool,
+    org_enabled: bool,
     now: i64,
 ) -> PublicLinkView {
     let status = PublicLinkStatus::derive(
@@ -731,6 +734,7 @@ pub fn view(
             expires_at: link.expires_at,
             access_count: link.access_count,
         },
+        org_enabled,
         now,
     );
     PublicLinkView {
@@ -1343,12 +1347,20 @@ async fn set_paused(
     .await
 }
 
-/// The org's link limit: its settings row's, never above the env limit.
+/// The org's link limit: its settings row's, never above the env limit; Cloud reads no limit
+/// as the free plan's, the env limit elsewhere.
 fn org_link_limit(settings: Option<&OrgSettings>) -> u32 {
     let env = get_config().public_dashboards.max_links_per_org;
+    #[cfg(feature = "cloud")]
+    let unset =
+        u32::try_from(o2_enterprise::enterprise::cloud::billings::PUBLIC_DASHBOARD_FREE_MAX_LINKS)
+            .unwrap_or(0)
+            .min(env);
+    #[cfg(not(feature = "cloud"))]
+    let unset = env;
     settings
         .and_then(|s| s.max_links)
-        .map_or(env, |max| u32::try_from(max).unwrap_or(0).min(env))
+        .map_or(unset, |max| u32::try_from(max).unwrap_or(0).min(env))
 }
 
 /// The org's link limit at create, or the refusal when the org switch is off.
@@ -2403,10 +2415,11 @@ fn promql_step(
             let secs = (window.max(0) as f64 / 1_000_000.0 / HEATMAP_MAX_COLUMNS).ceil();
             secs.max(HEATMAP_MIN_STEP_SECS) as i64 * 1_000_000
         }
-        0 => window / 400,
+        // The query_range handler's default, so points land on the same whole seconds.
+        0 => ::promql::round_step(window / ::promql::MAX_DATA_POINTS),
         step => step,
     };
-    Ok(step.max(1_000_000))
+    Ok(step.max(::promql::micros(::promql::MINIMAL_INTERVAL)))
 }
 
 fn query_text(q: &config::meta::dashboards::v8::Query) -> Option<&str> {
@@ -2918,11 +2931,28 @@ mod tests {
             updated_at: 1,
             updated_by: "a".into(),
         };
-        assert_eq!(org_link_limit(None), 50);
-        assert_eq!(org_link_limit(Some(&row(None))), 50);
         assert_eq!(org_link_limit(Some(&row(Some(3)))), 3);
         assert_eq!(org_link_limit(Some(&row(Some(80)))), 50);
         assert_eq!(org_link_limit(Some(&row(Some(-1)))), 0);
+    }
+
+    /// Outside Cloud, no row or no stored limit reads as the env limit.
+    #[cfg(not(feature = "cloud"))]
+    #[test]
+    fn without_cloud_an_unset_org_limit_is_the_env_limit() {
+        assert_eq!(org_link_limit(None), 50);
+        assert_eq!(org_link_limit(Some(&org_settings_row(true, None))), 50);
+    }
+
+    /// In Cloud, no row or no stored limit reads as the free plan's 3, never the env's 50.
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn in_cloud_an_unset_org_limit_is_the_free_limit() {
+        assert_eq!(get_config().public_dashboards.max_links_per_org, 50);
+        assert_eq!(org_link_limit(None), 3);
+        assert_eq!(org_link_limit(Some(&org_settings_row(true, None))), 3);
+        assert_eq!(org_link_limit(Some(&org_settings_row(true, Some(50)))), 50);
+        assert_eq!(create_gate(None), Ok(3));
     }
 
     #[test]
@@ -3104,14 +3134,14 @@ mod tests {
         let ctx = ctx(&link, &dash, &family);
         let panel = &dash.v8.as_ref().unwrap().tabs[0].panels[0];
         let step = promql_step(panel, &panel.queries[0], 0, 4_000_000_000).unwrap();
-        assert_eq!(step, 10_000_000);
+        assert_eq!(step, 15_000_000);
         let req = promql_request(&ctx, "a", "up", 0, 4_000_000_000, step);
         assert_eq!(req.use_cache, Some(true));
         assert_eq!(
             req.search_type,
             Some(search::SearchEventType::PublicDashboard)
         );
-        assert_eq!(req.step, 10_000_000);
+        assert_eq!(req.step, 15_000_000);
         assert_eq!(
             promql_step(panel, &panel.queries[0], 0, 60_000_000),
             Ok(1_000_000)
@@ -3120,6 +3150,32 @@ mod tests {
             req.search_event_context.unwrap().panel_id.as_deref(),
             Some("a")
         );
+    }
+
+    #[test]
+    fn an_unset_promql_step_is_the_live_panels_whole_second_step() {
+        let (_link, dash, _family) = ctx_parts();
+        let panel = &dash.v8.as_ref().unwrap().tabs[0].panels[0];
+        let sec = 1_000_000;
+        // The live query_range handler's step for the same window.
+        let live = |window: i64| {
+            ::promql::round_step(window / ::promql::MAX_DATA_POINTS)
+                .max(::promql::micros(::promql::MINIMAL_INTERVAL))
+        };
+        let start = 1_761_000_000 * sec;
+        for (window, want) in [
+            (15 * 60 * sec, 3 * sec),
+            (30 * 60 * sec, 7 * sec),
+            (3_600 * sec, 10 * sec),
+            (86_400 * sec, 300 * sec),
+            // An absolute range of uneven length.
+            (5_000 * sec + 123_456, 15 * sec),
+        ] {
+            let step = promql_step(panel, &panel.queries[0], start, start + window).unwrap();
+            assert_eq!(step, want, "{window}");
+            assert_eq!(step, live(window), "{window}");
+            assert_eq!(step % sec, 0, "{window}");
+        }
     }
 
     fn query_with_shifts(shifts: &[&str], instant: bool) -> config::meta::dashboards::v8::Query {
@@ -3290,6 +3346,7 @@ mod tests {
         }
     }
 
+    #[cfg(not(feature = "cloud"))]
     #[test]
     fn gate12_a_missing_settings_row_gives_the_paid_default_and_an_off_switch_refuses_create() {
         let env = get_config().public_dashboards.max_links_per_org;
@@ -3685,7 +3742,7 @@ mod tests {
                 }
             }
         };
-        let views = views_with(links, &HashMap::new(), is_member).await;
+        let views = views_with(links, &HashMap::new(), true, is_member).await;
         let left: Vec<(&str, bool)> = views
             .iter()
             .map(|v| (v.published_by.as_str(), v.publisher_left))
@@ -3709,6 +3766,56 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn views_show_every_link_disabled_while_the_org_switch_is_off() {
+        let label = DashboardLabel {
+            title: "t".into(),
+            folder_id: "f1".into(),
+            folder_name: "f".into(),
+        };
+        let labels: HashMap<String, DashboardLabel> = [("open".into(), label)].into();
+        let link = |id: &str, dash: &str, enabled: bool, expires_at: Option<i64>| PublicDashboard {
+            dashboard_id: dash.to_string(),
+            enabled,
+            expires_at,
+            access_count: 1,
+            ..replication::tests::link(id)
+        };
+        let links = || {
+            vec![
+                link("live", "open", true, None),
+                link("paused", "open", false, None),
+                link("expired", "open", true, Some(1)),
+                link("deleted", "gone", true, None),
+            ]
+        };
+        let statuses = |views: Vec<PublicLinkView>| -> Vec<PublicLinkStatus> {
+            views.into_iter().map(|v| v.status).collect()
+        };
+        let on = views_with(links(), &labels, true, |_| async { Ok(true) }).await;
+        assert_eq!(
+            statuses(on),
+            [
+                PublicLinkStatus::Live,
+                PublicLinkStatus::Paused,
+                PublicLinkStatus::Expired,
+                PublicLinkStatus::DashboardDeleted
+            ]
+        );
+        let off = views_with(links(), &labels, false, |_| async { Ok(true) }).await;
+        let json = serde_json::to_value(&off[0]).unwrap();
+        assert_eq!(json["status"], json!("disabled"));
+        assert_eq!(
+            statuses(off),
+            [
+                PublicLinkStatus::Disabled,
+                PublicLinkStatus::Disabled,
+                PublicLinkStatus::Expired,
+                PublicLinkStatus::DashboardDeleted
+            ]
+        );
+    }
+
+    #[tokio::test]
     async fn a_view_hides_the_slug_only_where_the_caller_cannot_read_the_dashboard() {
         let label = |folder: &str| DashboardLabel {
             title: "t".into(),
@@ -3724,7 +3831,7 @@ mod tests {
                 ..replication::tests::link(id)
             })
             .collect();
-        let mut views = views_with(links, &labels, |_| async { Ok(true) }).await;
+        let mut views = views_with(links, &labels, true, |_| async { Ok(true) }).await;
         assert!(
             views.iter().all(|v| v.slug.is_some()),
             "the builder keeps every slug"
@@ -5464,12 +5571,12 @@ mod tests {
         let (start, end, s) = (1_000_000_000, 5_000_000_000, 1_000_000);
         let none = json!({});
         let cases = [
-            ("line", none.clone(), none.clone(), (start, end, 10 * s)),
+            ("line", none.clone(), none.clone(), (start, end, 15 * s)),
             (
                 "metric",
                 none.clone(),
                 json!({ "query_type": "instant" }),
-                (end, end, 10 * s),
+                (end, end, 15 * s),
             ),
             (
                 "line",
@@ -5506,7 +5613,7 @@ mod tests {
                 "line",
                 none.clone(),
                 json!({ "step_value": "0s" }),
-                (start, end, 10 * s),
+                (start, end, 15 * s),
             ),
             (
                 "heatmap",

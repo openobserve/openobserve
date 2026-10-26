@@ -95,9 +95,30 @@ async fn resolve_on<C: ConnectionTrait>(db: &C, slug: &str) -> Servable {
             return Servable::Error;
         }
     };
-    let (org_enabled, settings_rev) = org_gate(settings.as_ref());
-    let blocked = db::org_status::is_blocked(&pd.org_id) || !trial_ok(&pd.org_id).await;
-    let verdict = servable(pd.clone(), settings_rev, org_enabled, blocked, now_micros());
+    let trial = if db::org_status::is_blocked(&pd.org_id) {
+        Ok(false)
+    } else {
+        trial_ok(&pd.org_id).await
+    };
+    decide(pd, settings.as_ref(), trial, now_micros()).await
+}
+
+/// The verdict for a loaded link; a failed trial check is an error that keeps the link's files.
+async fn decide(
+    pd: Model,
+    settings: Option<&OrgSettings>,
+    trial: Result<bool, anyhow::Error>,
+    now: i64,
+) -> Servable {
+    let trial_ok = match trial {
+        Ok(ok) => ok,
+        Err(e) => {
+            log::error!("public dashboard trial check failed: {e}");
+            return Servable::Error;
+        }
+    };
+    let (org_enabled, settings_rev) = org_gate(settings);
+    let verdict = servable(pd.clone(), settings_rev, org_enabled, !trial_ok, now);
     if !matches!(verdict, Servable::Ok(..)) {
         // This querier owns the slug, so its files go on the first read that finds the link off.
         evict_link(&pd).await;
@@ -112,14 +133,11 @@ fn org_gate(settings: Option<&OrgSettings>) -> (bool, i64) {
 
 /// Cloud: an org past its trial is served nothing, warm results and 304s included.
 #[cfg_attr(not(feature = "cloud"), allow(unused_variables))]
-async fn trial_ok(org: &str) -> bool {
+async fn trial_ok(org: &str) -> Result<bool, anyhow::Error> {
     #[cfg(feature = "cloud")]
-    return matches!(
-        openobserve_core::organization::is_org_in_free_trial_period(org).await,
-        Ok(true)
-    );
+    return openobserve_core::organization::is_org_in_free_trial_period(org).await;
     #[cfg(not(feature = "cloud"))]
-    true
+    Ok(true)
 }
 
 async fn evict_link(pd: &Model) {
@@ -978,6 +996,39 @@ mod tests {
             assert_eq!(resp.status(), expected);
             assert!(resp.headers().get(header::ETAG).is_none());
         }
+    }
+
+    /// A failed trial check answers an error and keeps the files; an expired trial evicts them.
+    #[tokio::test]
+    async fn a_failed_trial_check_keeps_the_cached_file_and_an_expired_trial_evicts_it() {
+        let live = Model {
+            id: config::ider::uuid(),
+            slug: "Tr8Zt2mR7aB3cD4eF5gH6Q".into(),
+            time_ranges: Some(r#"[{"type":"relative","secs":3600}]"#.into()),
+            default_range_key: Some("r3600".into()),
+            ..link()
+        };
+        let key = store::key(&live.org_id, &live.id, "r3600");
+        infra::cache::file_data::disk::public_dashboards_replace(
+            &key,
+            store::next_incarnation(),
+            bytes::Bytes::from_static(b"a cached result"),
+        )
+        .await
+        .unwrap();
+        let cached = || async { infra::cache::file_data::disk::get(&key, None).await };
+        let failed = decide(live.clone(), None, Err(anyhow::anyhow!("db down")), 1).await;
+        assert!(matches!(failed, Servable::Error));
+        assert!(cached().await.is_some());
+        assert!(matches!(
+            decide(live.clone(), None, Ok(true), 1).await,
+            Servable::Ok(..)
+        ));
+        assert!(matches!(
+            decide(live, None, Ok(false), 1).await,
+            Servable::Unavailable
+        ));
+        assert!(cached().await.is_none());
     }
 
     /// Every gate of this plane reads through `gate_db`, never the read-only pool.

@@ -23,7 +23,9 @@ use axum::{
 };
 use common::utils::http::get_search_type_from_request;
 use config::{
-    RouteDispatchStrategy, get_config,
+    RouteDispatchStrategy,
+    axum::middlewares::mask_log_url,
+    get_config,
     meta::{
         cluster::{Node, Role, RoleGroup},
         search::{
@@ -134,8 +136,8 @@ async fn route(req: Request, path: String, public_slug: Option<String>) -> Respo
         Err(error) => {
             log::error!(
                 "dispatch: {}, resolve target error: {}, took: {} ms",
-                path,
-                error,
+                mask_log_url(&path),
+                mask_log_url(&error),
                 start.elapsed().as_millis()
             );
             return no_nodes(&path, error);
@@ -314,11 +316,7 @@ async fn proxy_request(
             Err(e) => {
                 let is_last = i + 1 >= attempts;
                 if is_retryable_send_error(&e) && !is_last {
-                    log::warn!(
-                        "proxy request failed: {} -> {}, error: {e}, retrying on another node",
-                        target.path,
-                        target.node_addr,
-                    );
+                    warn_retry(&target, &e);
                     last_error = Some((target.node_addr, e));
                     continue;
                 }
@@ -331,6 +329,16 @@ async fn proxy_request(
     proxy_error_response(&path, last_error, start)
 }
 
+/// Logs a connect failure the proxy retries on the next candidate node.
+fn warn_retry(target: &ProxyTarget, e: &reqwest::Error) {
+    log::warn!(
+        "proxy request failed: {} -> {}, error: {}, retrying on another node",
+        mask_log_url(&target.path),
+        target.node_addr,
+        mask_log_url(&e.to_string()),
+    );
+}
+
 /// Builds the 502 response after all proxy attempts have failed.
 fn proxy_error_response(
     path: &str,
@@ -340,9 +348,10 @@ fn proxy_error_response(
     match last_error {
         Some((node_addr, e)) => {
             log::error!(
-                "proxy request failed: {} -> {}, error: {e:?}, took: {} ms",
-                path,
+                "proxy request failed: {} -> {}, error: {}, took: {} ms",
+                mask_log_url(path),
                 node_addr,
+                mask_log_url(&format!("{e:?}")),
                 start.elapsed().as_millis()
             );
             if is_splunk_collector_route(path) {
@@ -427,7 +436,7 @@ async fn proxy_by_key(
     else {
         log::error!(
             "dispatch: {} consistent hash error: {:?}, took: {} ms",
-            path,
+            mask_log_url(&path),
             "No online querier nodes",
             start.elapsed().as_millis()
         );
@@ -437,7 +446,7 @@ async fn proxy_by_key(
     let Some(primary) = cluster::get_cached_node_by_name(&node_name).await else {
         log::error!(
             "dispatch: {} get node {} from cache error: {:?}, took: {} ms",
-            path,
+            mask_log_url(&path),
             node_name,
             "No online querier nodes",
             start.elapsed().as_millis()
@@ -471,11 +480,7 @@ async fn proxy_by_key(
             Err(e) => {
                 let is_last = i + 1 >= attempts;
                 if is_retryable_send_error(&e) && !is_last {
-                    log::warn!(
-                        "proxy request failed: {} -> {}, error: {e}, retrying on another node",
-                        target.path,
-                        target.node_addr,
-                    );
+                    warn_retry(&target, &e);
                     last_error = Some((target.node_addr, e));
                     continue;
                 }
@@ -681,7 +686,7 @@ async fn build_response(
     }
 
     if is_streaming {
-        let path_for_log = target.path.clone();
+        let path_for_log = mask_log_url(&target.path);
         let node_for_log = target.node_addr.clone();
         let stream = resp
             .bytes_stream()
@@ -690,9 +695,10 @@ async fn build_response(
                     Ok(bytes) => Ok(bytes),
                     Err(e) => {
                         log::error!(
-                            "proxy streaming error: {} -> {}, error: {e:?}",
+                            "proxy streaming error: {} -> {}, error: {}",
                             path_for_log,
                             node_for_log,
+                            mask_log_url(&format!("{e:?}")),
                         );
                         let error_event = serde_json::json!({
                             "type": "error",
@@ -715,9 +721,10 @@ async fn build_response(
             Ok(b) => b,
             Err(e) => {
                 log::error!(
-                    "proxy response failed: {} -> {}, error: {e:?}, took: {} ms",
-                    target.path,
+                    "proxy response failed: {} -> {}, error: {}, took: {} ms",
+                    mask_log_url(&target.path),
                     target.node_addr,
+                    mask_log_url(&format!("{e:?}")),
                     start.elapsed().as_millis()
                 );
                 return (
@@ -1125,6 +1132,89 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(&body[..], b"paused");
+    }
+
+    static LOG_LINES: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+
+    struct CaptureLogger;
+
+    impl log::Log for CaptureLogger {
+        fn enabled(&self, _: &log::Metadata) -> bool {
+            true
+        }
+
+        fn log(&self, record: &log::Record) {
+            LOG_LINES.lock().unwrap().push(record.args().to_string());
+        }
+
+        fn flush(&self) {}
+    }
+
+    static CAPTURE_LOGGER: CaptureLogger = CaptureLogger;
+
+    async fn refused_node(id: i32) -> Node {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        drop(listener);
+        let mut node = test_node(id);
+        node.name = format!("refused-{port}");
+        node.uuid = format!("refused-{port}");
+        node.http_addr = format!("http://127.0.0.1:{port}");
+        node
+    }
+
+    #[tokio::test]
+    async fn router_logs_never_carry_a_public_dashboard_slug() {
+        let _ring = RING.lock().await;
+        let _ = log::set_logger(&CAPTURE_LOGGER);
+        log::set_max_level(log::LevelFilter::Trace);
+        let slug = "Zq9LmN3pR5sT7uV1wX2yA4";
+        let path = format!("/api/public_dashboards/{slug}/data?range=r3600");
+        let start = std::time::Instant::now();
+
+        let req = Request::builder().uri(&path).body(Body::empty()).unwrap();
+        assert_eq!(
+            dispatch(req).await.status(),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+
+        let headers = HeaderMap::new();
+        let group = Some(RoleGroup::Interactive);
+        let empty = QuerierPayload::Empty;
+        let resp = proxy_by_key(path.clone(), vec![], slug, group, &headers, &empty, start).await;
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+
+        let mut primary = refused_node(9200).await;
+        let fallback = refused_node(9201).await;
+        cluster::add_node_to_cache(primary.clone()).await;
+        cluster::add_node_to_consistent_hash(&primary, &Role::Querier, group).await;
+        let resp = proxy_by_key(
+            path.clone(),
+            vec![fallback],
+            slug,
+            group,
+            &headers,
+            &empty,
+            start,
+        )
+        .await;
+        cluster::remove_node_from_consistent_hash(&primary, &Role::Querier, group).await;
+        primary.status = config::meta::cluster::NodeStatus::Offline;
+        cluster::add_node_to_cache(primary).await;
+        assert_eq!(resp.status(), StatusCode::BAD_GATEWAY);
+
+        let lines = LOG_LINES.lock().unwrap().clone();
+        let masked = |a: &str, b: &str| {
+            lines
+                .iter()
+                .any(|l| l.contains(a) && l.contains(b) && l.contains("public_dashboards/Zq9LmN…"))
+        };
+        assert!(masked("resolve target error", "took:"), "{lines:?}");
+        assert!(masked("consistent hash error", "took:"), "{lines:?}");
+        assert!(masked("proxy request failed", "retrying"), "{lines:?}");
+        assert!(masked("proxy request failed", "took:"), "{lines:?}");
+        let leaked: Vec<_> = lines.iter().filter(|l| l.contains(slug)).collect();
+        assert!(leaked.is_empty(), "slug in router logs: {leaked:?}");
     }
 
     #[tokio::test]

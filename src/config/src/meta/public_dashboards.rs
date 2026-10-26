@@ -113,12 +113,6 @@ pub struct TimeRangePolicy {
     pub default: TimeRange,
 }
 
-impl TimeRangePolicy {
-    pub fn has_relative(&self) -> bool {
-        self.ranges.iter().any(TimeRange::is_relative)
-    }
-}
-
 /// Admin body to create or update a link; variables stay frozen at the author's values.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PublicDashboardConfig {
@@ -152,16 +146,22 @@ pub enum PublicLinkStatus {
     NeedsAttention,
     Expired,
     DashboardDeleted,
+    /// The org's public dashboards switch is off, so no link of the org is served.
+    Disabled,
 }
 
 impl PublicLinkStatus {
-    /// The lifecycle state from the row. Precedence: deleted dashboard, expired, paused, unviewed.
-    pub fn derive(link: &PublicLinkState, now: i64) -> Self {
+    /// The lifecycle state from the row and the org switch. Precedence: deleted dashboard,
+    /// expired, org switch off, paused, unviewed.
+    pub fn derive(link: &PublicLinkState, org_enabled: bool, now: i64) -> Self {
         if !link.dashboard_exists {
             return Self::DashboardDeleted;
         }
         if link.expires_at.is_some_and(|exp| exp <= now) {
             return Self::Expired;
+        }
+        if !org_enabled {
+            return Self::Disabled;
         }
         if !link.enabled {
             return Self::Paused;
@@ -642,7 +642,7 @@ mod tests {
     fn link_status_follows_its_precedence() {
         let now = 1_000_000_000;
         assert_eq!(
-            PublicLinkStatus::derive(&state(), now),
+            PublicLinkStatus::derive(&state(), true, now),
             PublicLinkStatus::Live
         );
         let s = PublicLinkState {
@@ -651,7 +651,7 @@ mod tests {
             ..state()
         };
         assert_eq!(
-            PublicLinkStatus::derive(&s, now),
+            PublicLinkStatus::derive(&s, true, now),
             PublicLinkStatus::DashboardDeleted
         );
         let s = PublicLinkState {
@@ -659,19 +659,25 @@ mod tests {
             enabled: false,
             ..state()
         };
-        assert_eq!(PublicLinkStatus::derive(&s, now), PublicLinkStatus::Expired);
+        assert_eq!(
+            PublicLinkStatus::derive(&s, true, now),
+            PublicLinkStatus::Expired
+        );
         let s = PublicLinkState {
             enabled: false,
             access_count: 0,
             ..state()
         };
-        assert_eq!(PublicLinkStatus::derive(&s, now), PublicLinkStatus::Paused);
+        assert_eq!(
+            PublicLinkStatus::derive(&s, true, now),
+            PublicLinkStatus::Paused
+        );
         let s = PublicLinkState {
             access_count: 0,
             ..state()
         };
         assert_eq!(
-            PublicLinkStatus::derive(&s, now),
+            PublicLinkStatus::derive(&s, true, now),
             PublicLinkStatus::NotViewed
         );
         assert_eq!(
@@ -679,9 +685,41 @@ mod tests {
             "needs_attention"
         );
         assert_eq!(
+            serde_json::to_value(PublicLinkStatus::Disabled).unwrap(),
+            "disabled"
+        );
+        assert_eq!(
             serde_json::to_value(PublicLinkStatus::NotViewed).unwrap(),
             "not_viewed"
         );
+    }
+
+    #[test]
+    fn an_org_switched_off_shows_disabled_below_deleted_and_expired_only() {
+        let now = 1_000_000_000;
+        let derive = |s: &PublicLinkState| PublicLinkStatus::derive(s, false, now);
+        assert_eq!(derive(&state()), PublicLinkStatus::Disabled);
+        let paused = PublicLinkState {
+            enabled: false,
+            ..state()
+        };
+        assert_eq!(derive(&paused), PublicLinkStatus::Disabled);
+        let unviewed = PublicLinkState {
+            access_count: 0,
+            ..state()
+        };
+        assert_eq!(derive(&unviewed), PublicLinkStatus::Disabled);
+        let expired = PublicLinkState {
+            expires_at: Some(now),
+            ..state()
+        };
+        assert_eq!(derive(&expired), PublicLinkStatus::Expired);
+        let deleted = PublicLinkState {
+            dashboard_exists: false,
+            expires_at: Some(now),
+            ..state()
+        };
+        assert_eq!(derive(&deleted), PublicLinkStatus::DashboardDeleted);
     }
 
     #[test]

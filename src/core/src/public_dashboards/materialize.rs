@@ -125,8 +125,8 @@ pub trait Engine: Send + Sync {
         panel: &ManifestPanel,
         probe: &AuthorizerProbe,
     ) -> Result<bool, anyhow::Error>;
-    /// Cloud: false when the org's trial has expired.
-    async fn trial_ok(&self, org: &str) -> bool;
+    /// Cloud: false when the org's trial has expired; an error when the check could not run.
+    async fn trial_ok(&self, org: &str) -> Result<bool, anyhow::Error>;
 }
 
 /// How one panel of a build ended (design 5.7).
@@ -412,7 +412,6 @@ pub fn assemble(
         dashboard_updated_at: live.dashboard_updated_at,
         link_rev: live.link_rev,
         settings_rev: live.settings_rev,
-        refresh_count: prior_header.as_ref().map_or(0, |h| h.refresh_count) + 1,
         fail_streak: prior_header.as_ref().map_or(0, |h| h.fail_streak),
         published_by: live.published_by.clone(),
         ..Default::default()
@@ -499,8 +498,17 @@ pub async fn build(
         }
     };
     let org = cap.link.org_id.clone();
-    if !servable(&cap, &range, now) || !engine.trial_ok(&org).await {
+    if !servable(&cap, &range, now) {
         return not_servable(&key, Some(&org)).await;
+    }
+    match engine.trial_ok(&org).await {
+        Ok(true) => {}
+        Ok(false) => return not_servable(&key, Some(&org)).await,
+        // A failed check proves nothing about the trial, so the file stays and the read is a 503.
+        Err(e) => {
+            log::error!("public dashboard trial check for {key} failed: {e}");
+            return Err(Failure::Unavailable);
+        }
     }
     match engine.is_member(&org, &cap.link.published_by).await {
         Ok(true) => {}
@@ -832,12 +840,11 @@ fn build_error(intent: String) -> PanelResult {
 
 /// The header's per-panel summaries and counts of the body's panels.
 fn summarize(header: &mut Header, panels: &BTreeMap<String, PanelResult>) {
-    let count = |f: fn(&PanelState) -> bool| {
-        u16::try_from(panels.values().filter(|p| f(&p.state)).count()).unwrap_or(u16::MAX)
-    };
-    header.panel_count = u16::try_from(panels.len()).unwrap_or(u16::MAX);
-    header.retained_count = count(|s| matches!(s, PanelState::Ok { retained: true, .. }));
-    header.unavailable_count = count(|s| matches!(s, PanelState::NotAvailable { .. }));
+    let unavailable = panels
+        .values()
+        .filter(|p| matches!(p.state, PanelState::NotAvailable { .. }))
+        .count();
+    header.unavailable_count = u16::try_from(unavailable).unwrap_or(u16::MAX);
     header.panels = panels
         .iter()
         .map(|(id, p)| PanelSummary {
@@ -1003,8 +1010,6 @@ fn refused(mut header: Header, kind: BuildKind, prior: Option<&Header>, eff_secs
     Header {
         built_at: None,
         panels: vec![],
-        panel_count: 0,
-        retained_count: 0,
         unavailable_count: 0,
         size_bytes: 0,
         ..header
@@ -1367,6 +1372,8 @@ pub(super) mod tests {
         pub(in super::super) built_as: Mutex<Vec<String>>,
         /// None: the membership read fails.
         member: Mutex<Option<bool>>,
+        /// None: the trial check fails.
+        trial: Mutex<Option<bool>>,
         authz_down: AtomicBool,
         pub(in super::super) authz_delay_ms: AtomicU64,
         builds: AtomicUsize,
@@ -1503,8 +1510,11 @@ pub(super) mod tests {
                     .any(|(_, t)| denied.contains(t)))
         }
 
-        async fn trial_ok(&self, _org: &str) -> bool {
-            true
+        async fn trial_ok(&self, _org: &str) -> Result<bool, anyhow::Error> {
+            self.trial
+                .lock()
+                .unwrap()
+                .ok_or_else(|| anyhow::anyhow!("the database is down"))
         }
     }
 
@@ -1638,6 +1648,7 @@ pub(super) mod tests {
             denied_to: Mutex::new(BTreeMap::new()),
             built_as: Mutex::new(Vec::new()),
             member: Mutex::new(Some(true)),
+            trial: Mutex::new(Some(true)),
             authz_down: AtomicBool::new(false),
             authz_delay_ms: AtomicU64::new(0),
             builds: AtomicUsize::new(0),
@@ -1645,6 +1656,15 @@ pub(super) mod tests {
             delay_ms: AtomicU64::new(0),
             panic: AtomicBool::new(false),
         }))
+    }
+
+    /// How many panels of the body hold retained data.
+    fn retained_panels(h: &Header) -> u16 {
+        let n = h
+            .panels
+            .iter()
+            .filter(|p| matches!(p.state, PanelState::Ok { retained: true, .. }));
+        u16::try_from(n.count()).unwrap()
     }
 
     pub(in super::super) fn flights(max: u32, per_org: u32) -> &'static Flights {
@@ -1918,6 +1938,31 @@ pub(super) mod tests {
     }
 
     #[tokio::test]
+    async fn a_failed_trial_check_keeps_the_file_and_answers_503_and_an_expired_trial_evicts() {
+        let link = link(json!([{ "type": "relative", "secs": 3600 }]));
+        let dash = dashboard(&[("p1", "s1")]);
+        let engine = fake(&link, &dash);
+        let flights = flights(8, 1);
+        let now = now_micros();
+        data(&read_at(engine, flights, &link, &dash, rel(3600), now).await);
+        let before = header(&link, &rel(3600)).await;
+        *engine.trial.lock().unwrap() = None;
+        // The due rebuild runs behind the stale read and fails on the trial check.
+        data(&read_at(engine, flights, &link, &dash, rel(3600), now + 6 * MIN).await);
+        settle(flights).await;
+        assert_eq!(header(&link, &rel(3600)).await, before);
+        *engine.trial.lock().unwrap() = Some(false);
+        data(&read_at(engine, flights, &link, &dash, rel(3600), now + 6 * MIN).await);
+        settle(flights).await;
+        let key = store::key(&link.org_id, &link.id, "r3600");
+        assert!(store::read_header(&key).await.is_none());
+        // With no file, the read waits on the build, so a failed check answers 503.
+        *engine.trial.lock().unwrap() = None;
+        let served = read_at(engine, flights, &link, &dash, rel(3600), now + 6 * MIN).await;
+        assert!(matches!(served, Served::Unavailable { .. }), "{served:?}");
+    }
+
+    #[tokio::test]
     async fn gate02_reading_one_range_does_not_postpone_another_ranges_deadline() {
         let link = link(json!([
             { "type": "relative", "secs": 3600 },
@@ -2181,7 +2226,7 @@ pub(super) mod tests {
         assert_eq!(build_no(&resp, "p2"), 2);
         assert!(resp.last_error_at.is_some() && resp.next_retry_at.is_some());
         let h = header(&link, &rel(3600)).await;
-        assert_eq!((h.retained_count, h.incomplete_count), (1, 1));
+        assert_eq!((retained_panels(&h), h.incomplete_count), (1, 1));
     }
 
     #[tokio::test]
@@ -2201,7 +2246,7 @@ pub(super) mod tests {
             let h = header(&link, &rel(3600)).await;
             let n = u16::try_from(ids.len()).unwrap();
             assert_eq!(
-                (h.retained_count, h.incomplete_count, h.fail_streak),
+                (retained_panels(&h), h.incomplete_count, h.fail_streak),
                 (n, n, 1)
             );
             assert_eq!(
@@ -2247,7 +2292,7 @@ pub(super) mod tests {
                     "{ids:?}"
                 );
             }
-            assert_eq!(header(&link, &rel(3600)).await.retained_count, 0);
+            assert_eq!(retained_panels(&header(&link, &rel(3600)).await), 0);
         }
     }
 

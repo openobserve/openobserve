@@ -5192,6 +5192,14 @@ fn validate_synthetics_ceilings(cfg: &Synthetics) -> Result<(), String> {
 /// killed mid-run".
 /// Clamps the public dashboard keys into their valid ranges; runs after the query timeout is set.
 fn check_public_dashboards_config(cfg: &mut Config) {
+    // A build writes its files to the disk cache, so without one every link would answer 503.
+    if !cfg.disk_cache.enabled && cfg.public_dashboards.enabled {
+        log::warn!(
+            "ZO_DISK_CACHE_ENABLED is off, so public dashboards are turned off \
+             (ZO_PUBLIC_DASHBOARD_ENABLED=false)"
+        );
+        cfg.public_dashboards.enabled = false;
+    }
     let query_timeout = u32::try_from(cfg.limit.query_timeout).unwrap_or(u32::MAX);
     let pd = &mut cfg.public_dashboards;
     for v in [
@@ -6787,5 +6795,16 @@ mod tests {
         cfg.public_dashboards.query_timeout_secs = 0;
         check_public_dashboards_config(&mut cfg);
         assert_eq!(cfg.public_dashboards.query_timeout_secs, 1);
+    }
+
+    #[test]
+    fn public_dashboards_turn_off_without_the_disk_cache() {
+        let mut cfg = Config::init().expect("config init");
+        check_public_dashboards_config(&mut cfg);
+        assert!(cfg.public_dashboards.enabled);
+
+        cfg.disk_cache.enabled = false;
+        check_public_dashboards_config(&mut cfg);
+        assert!(!cfg.public_dashboards.enabled);
     }
 }

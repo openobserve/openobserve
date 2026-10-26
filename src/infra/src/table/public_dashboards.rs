@@ -403,18 +403,6 @@ pub async fn set_settings_enabled<C: ConnectionTrait>(
     upsert_settings_columns(db, org_id, enabled, None, &columns, updated_by, now).await
 }
 
-/// Writes only the org's link limit, keeping its switch; a new row is on.
-pub async fn set_settings_max_links<C: ConnectionTrait>(
-    db: &C,
-    org_id: &str,
-    max_links: Option<i32>,
-    updated_by: &str,
-    now: i64,
-) -> Result<settings::Model, errors::Error> {
-    let columns = [settings::Column::MaxLinks];
-    upsert_settings_columns(db, org_id, true, max_links, &columns, updated_by, now).await
-}
-
 /// Upserts `columns` with the rev and audit fields; writing `max_links` also records who set it.
 async fn upsert_settings_columns<C: ConnectionTrait>(
     db: &C,
@@ -549,6 +537,19 @@ pub async fn outbox_delete<C: ConnectionTrait>(
         .exec(db)
         .await?;
     Ok(())
+}
+
+/// Writes only the org's link limit, keeping its switch; a new row is on. For tests in any crate.
+#[cfg(any(test, feature = "test-utils"))]
+pub async fn set_settings_max_links<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    max_links: Option<i32>,
+    updated_by: &str,
+    now: i64,
+) -> Result<settings::Model, errors::Error> {
+    let columns = [settings::Column::MaxLinks];
+    upsert_settings_columns(db, org_id, true, max_links, &columns, updated_by, now).await
 }
 
 /// Creates the three tables if absent, for tests in any crate.

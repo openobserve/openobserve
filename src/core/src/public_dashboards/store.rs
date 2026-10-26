@@ -40,8 +40,8 @@ use infra::cache::file_data::disk::{
 use serde::{Deserialize, Serialize};
 
 const MAGIC: &[u8; 4] = b"O2PD";
-/// 4: headers record the publisher, so a file built before a takeover is never served after it.
-pub const FORMAT_VERSION: u16 = 4;
+/// 5: headers drop the unread counters; a file of any other version is a miss and is rebuilt.
+pub const FORMAT_VERSION: u16 = 5;
 /// Magic, version and the header length.
 const PREFIX_LEN: usize = 4 + 2 + 4;
 /// A longer header is a corrupt file, never an allocation of up to 4 GiB.
@@ -79,9 +79,7 @@ pub struct Header {
     pub link_rev: i64,
     pub settings_rev: i64,
     pub size_bytes: u32,
-    pub panel_count: u16,
     pub incomplete_count: u16,
-    pub retained_count: u16,
     pub unavailable_count: u16,
     pub fail_streak: u16,
     pub next_retry_at: Option<i64>,
@@ -89,8 +87,6 @@ pub struct Header {
     pub last_error: Option<String>,
     /// Revisions of the last failed attempt; an edit bypasses backoff only while it differs.
     pub attempted_revs: Option<[i64; 3]>,
-    pub refresh_count: u32,
-    pub last_read_at: i64,
     /// The publisher whose access built the body; a file of any other publisher is a miss.
     #[serde(default)]
     pub published_by: String,
@@ -331,7 +327,6 @@ pub async fn write_raw(
     body_zst: Bytes,
 ) -> Result<u64, anyhow::Error> {
     header.incarnation = next_incarnation();
-    header.last_read_at = now_micros();
     #[cfg(test)]
     anyhow::ensure!(!FAIL_WRITES.contains(key), "injected write failure");
     #[cfg(test)]
@@ -441,9 +436,11 @@ mod tests {
     #[test]
     fn gate16_an_unknown_format_version_or_broken_file_does_not_decode() {
         let bytes = encode(&Header::default(), &Manifest::default(), &[]).unwrap();
-        let mut newer = bytes.to_vec();
-        newer[4..6].copy_from_slice(&(FORMAT_VERSION + 1).to_le_bytes());
-        assert!(decode(&Bytes::from(newer)).is_err());
+        for version in [FORMAT_VERSION - 1, FORMAT_VERSION + 1] {
+            let mut other = bytes.to_vec();
+            other[4..6].copy_from_slice(&version.to_le_bytes());
+            assert!(decode(&Bytes::from(other)).is_err(), "{version}");
+        }
         let mut garbage = bytes.to_vec();
         garbage[0] = b'X';
         assert!(decode(&Bytes::from(garbage)).is_err());
