@@ -62,18 +62,14 @@ impl TraceListPlan {
         }
     }
 
-    /// Re-aggregates the selected traces over all their spans, or `None` when the page was
-    /// unfiltered and its aggregates already cover every span.
+    /// Re-aggregates the selected traces over all their spans in `range`, without the filter.
     pub fn summary_request(
         &self,
         stream_name: &str,
         base_request: &Request,
         trace_ids: &[String],
         range: (i64, i64),
-    ) -> Option<Request> {
-        if self.filter().is_empty() || trace_ids.is_empty() {
-            return None;
-        }
+    ) -> Request {
         let mut request = base_request.clone();
         request.query.sql = format!(
             "{} WHERE trace_id IN ({}) GROUP BY trace_id",
@@ -84,7 +80,16 @@ impl TraceListPlan {
         request.query.size = trace_ids.len() as i64;
         request.query.start_time = range.0;
         request.query.end_time = range.1;
-        Some(request)
+        request
+    }
+
+    pub fn is_filtered(&self) -> bool {
+        !self.filter().is_empty()
+    }
+
+    // Heap rows of the streamed duration sort are per-partition aggregates.
+    pub fn recompute_all(&self) -> bool {
+        self.is_filtered() || (self.mode == TraceListMode::Streaming && self.sort.by_duration)
     }
 
     fn sql(&self, stream_name: &str) -> String {
@@ -313,8 +318,8 @@ impl TraceColumns {
              count(DISTINCT {service_key}) AS service_count, \
              {root_service} AS root_service_name, \
              {root_operation} AS root_operation_name, \
-             first_value(service_name ORDER BY {TIMESTAMP_COL_NAME} ASC) AS first_service_name, \
-             first_value(operation_name ORDER BY {TIMESTAMP_COL_NAME} ASC) AS first_operation_name"
+             first_value(service_name ORDER BY {TIMESTAMP_COL_NAME} ASC, end_time DESC) AS first_service_name, \
+             first_value(operation_name ORDER BY {TIMESTAMP_COL_NAME} ASC, end_time DESC) AS first_operation_name"
         )
     }
 }
@@ -426,27 +431,15 @@ mod tests {
                 llm_schema: None,
                 mode,
             };
-            let base = unfiltered.request("traces");
-            assert!(
-                unfiltered
-                    .summary_request("traces", &base, &ids, (1, 2))
-                    .is_none()
-            );
-
+            assert!(!unfiltered.is_filtered());
             query.insert("filter".to_string(), "service_name = 'api'".to_string());
             let filtered = TraceListPlan {
                 options: TraceListOptions::parse(&query, mode).unwrap(),
                 ..unfiltered
             };
+            assert!(filtered.is_filtered());
             let base = filtered.request("traces");
-            assert!(
-                filtered
-                    .summary_request("traces", &base, &[], (1, 2))
-                    .is_none()
-            );
-            let request = filtered
-                .summary_request("traces", &base, &ids, (1, 2))
-                .unwrap();
+            let request = filtered.summary_request("traces", &base, &ids, (1, 2));
             assert!(!request.query.sql.contains("service_name = 'api'"));
             assert!(request.query.sql.contains("count(*) AS span_count"));
             assert!(
@@ -459,6 +452,38 @@ mod tests {
             assert_eq!((request.query.start_time, request.query.end_time), (1, 2));
             assert_eq!(request.timeout, 17);
             assert_eq!(request.search_type, base.search_type);
+        }
+    }
+
+    #[test]
+    fn only_filtered_pages_and_the_streamed_duration_sort_recompute_every_trace() {
+        for (sort_by, filter, expected) in [
+            ("start_time", "", [false, false]),
+            ("duration", "", [false, true]),
+            ("start_time", "service_name = 'api'", [true, true]),
+        ] {
+            let mut query = query();
+            query.insert("sort_by".to_string(), sort_by.to_string());
+            if !filter.is_empty() {
+                query.insert("filter".to_string(), filter.to_string());
+            }
+            for (mode, expected) in [TraceListMode::Complete, TraceListMode::Streaming]
+                .into_iter()
+                .zip(expected)
+            {
+                let plan = TraceListPlan {
+                    options: TraceListOptions::parse(&query, mode).unwrap(),
+                    sort: TraceSort::parse(&query).unwrap(),
+                    columns: TraceColumns::default(),
+                    llm_schema: None,
+                    mode,
+                };
+                assert_eq!(
+                    plan.recompute_all(),
+                    expected,
+                    "{sort_by} {filter:?} {mode:?}"
+                );
+            }
         }
     }
 

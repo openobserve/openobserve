@@ -215,14 +215,24 @@ pub async fn len() -> usize {
     }
 }
 
-pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
-    let client = get_orm_client_rw().await;
-    Entity::delete_many()
+/// Short ids of the org.
+pub async fn list_ids_by_org(org_id: &str) -> Result<Vec<String>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    let records = Entity::find()
+        .select_only()
+        .column(Column::ShortId)
         .filter(Column::OrgId.eq(org_id))
-        .exec(client)
+        .into_model::<ShortId>()
+        .all(client)
         .await?;
+    Ok(records.into_iter().map(|r| r.short_id).collect())
+}
 
-    Ok(())
+/// Deletes all short URLs of the org and returns their ids.
+pub async fn delete_by_org(org_id: &str) -> Result<Vec<String>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let delete = Entity::delete_many().filter(Column::OrgId.eq(org_id));
+    Ok(super::delete_returning(client, delete, &[Column::ShortId]).await?)
 }
 
 pub async fn clear() -> Result<(), errors::Error> {
@@ -278,5 +288,28 @@ mod tests {
         let rec = ShortUrlRecord::new("", "", "");
         assert!(rec.short_id.is_empty());
         assert!(rec.original_url.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_org_delete_returns_exactly_the_ids_it_removed() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("t_short");
+        let other = format!("{org}_other");
+        let ids = [format!("{org}_1"), format!("{org}_2"), format!("{org}_3")];
+        for (id, owner) in [(&ids[0], &org), (&ids[1], &org), (&ids[2], &other)] {
+            assert!(add(id, "https://example.com", owner).await.unwrap());
+        }
+
+        let mut removed = delete_by_org(&org).await.unwrap();
+        removed.sort();
+        let left = list_ids_by_org(&org).await.unwrap();
+        let kept = list_ids_by_org(&other).await.unwrap();
+        delete_by_org(&other).await.unwrap();
+
+        assert_eq!(removed, [ids[0].clone(), ids[1].clone()]);
+        assert!(left.is_empty());
+        assert_eq!(kept, [ids[2].clone()]);
     }
 }

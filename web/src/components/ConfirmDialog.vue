@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :primary-button-color="okColor"
     :primary-button-variant="okVariant"
     :initial-focus="focusCancel ? 'secondary' : 'primary'"
+    :primary-button-disabled="!typedMatches"
     @click:secondary="onCancel"
     @click:primary="onConfirm"
   >
@@ -33,20 +34,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="warningMessage && warningMessage.length > 0" class="mt-4 text-left">
         <OBanner variant="warning" icon="warning" :content="warningMessage" />
       </div>
+      <div v-if="confirmText" class="mt-4">
+        <OInput
+          v-model="typed"
+          :label="t('confirmDialog.typeToConfirm', { text: raw(confirmText) })"
+          size="sm"
+          autocomplete="off"
+          :placeholder="raw(confirmText)"
+          data-test="confirm-dialog-type-to-confirm"
+          @keyup.enter="onConfirm"
+        />
+      </div>
     </div>
   </ODialog>
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, type PropType } from "vue";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { defineComponent, computed, ref, watch, type PropType } from "vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 export default defineComponent({
   name: "ConfirmDialog",
-  components: { ODialog, OBanner },
+  components: { ODialog, OBanner, OInput },
   emits: ["update:ok", "update:cancel", "update:modelValue"],
   props: {
     title: { type: String as unknown as PropType<I18nText> },
@@ -61,6 +74,7 @@ export default defineComponent({
     okVariant: { type: String as PropType<ButtonVariant>, default: "primary" },
     // A destructive confirm starts on Cancel so Enter cannot delete by accident.
     focusCancel: { type: Boolean, default: false },
+    confirmText: { type: String },
   },
   setup(props, { emit }) {
     const { t } = useI18nTyped();
@@ -76,19 +90,30 @@ export default defineComponent({
 
     const cancelLabelComputed = computed(() => props.cancelLabel || t("confirmDialog.cancel"));
 
+    const typed = ref("");
+    const typedMatches = computed(() => !props.confirmText || typed.value === props.confirmText);
+    watch(
+      () => props.modelValue,
+      () => (typed.value = ""),
+    );
+
     const onCancel = () => {
       open.value = false;
       emit("update:cancel");
     };
 
     const onConfirm = () => {
+      if (!typedMatches.value) return;
       open.value = false;
       emit("update:ok");
     };
 
     return {
       t,
+      raw,
       open,
+      typed,
+      typedMatches,
       okLabelComputed,
       cancelLabelComputed,
       onCancel,

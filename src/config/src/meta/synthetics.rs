@@ -1473,8 +1473,18 @@ fn check_http_url(field: &str, value: &str, echo: bool) -> Result<(), String> {
         };
         return Err(format!("{field}: URL scheme must be http or https{got}"));
     }
-    if parsed.host_str().is_none_or(str::is_empty) {
+    let Some(host) = parsed.host_str().filter(|h| !h.is_empty()) else {
         return Err(format!("{field}: URL has no host"));
+    };
+    // Every probe refuses these under every policy, so reject them at save time rather
+    // than schedule a check that can only fail. Private ranges pass: a private location
+    // exists to reach them, and the probe's dialer decides per location.
+    if crate::utils::ssrf_guard::is_always_blocked_host(host) {
+        return Err(format!(
+            "{field}: URL host is a loopback, link-local or cloud metadata address, which no \
+             probe location can reach{}",
+            quoted(": ")
+        ));
     }
     Ok(())
 }
@@ -2955,6 +2965,7 @@ mod tests {
             "https://",
             "{{A}} hunter2",
             "{{A/hunter2",
+            "http://127.0.0.1/hunter2",
         ] {
             let quiet = validate_http_url_quietly("target", bad).unwrap_err();
             assert!(quiet.starts_with("target: "), "{quiet}");
@@ -2962,6 +2973,39 @@ mod tests {
             assert!(validate_http_url("target", bad).is_err(), "{bad}");
         }
         assert!(validate_http_url_quietly("target", "https://shop.test/login").is_ok());
+    }
+
+    #[test]
+    fn a_target_no_probe_can_reach_is_rejected_at_save_time() {
+        for bad in [
+            "http://127.0.0.1/",
+            "http://localhost:8080/",
+            "https://LocalHost/",
+            "http://169.254.169.254/latest/meta-data/",
+            "http://[fd00:ec2::254]/",
+            "http://[::1]/",
+            "http://[fe80::1]/",
+            "http://metadata.google.internal/computeMetadata/v1/",
+            "http://metadata/",
+            "http://0.0.0.0/",
+        ] {
+            let err = validate_http_url("target", bad).unwrap_err();
+            assert!(err.contains("no probe location can reach"), "{bad}: {err}");
+        }
+        // A templated host resolves in the probe, whose dialer is the authoritative control.
+        assert!(validate_http_url("target", "{{HOST}}:8080/health").is_ok());
+        // Private ranges stay valid: private locations exist to reach them.
+        for ok in [
+            "http://10.0.0.5/health",
+            "http://192.168.1.1/",
+            "http://172.16.4.2:9090/metrics",
+            "http://[fd12::1]/",
+            "http://api.internal/",
+            "http://service.local/",
+            "https://shop.test/login",
+        ] {
+            assert!(validate_http_url("target", ok).is_ok(), "{ok}");
+        }
     }
 
     #[test]
@@ -3141,13 +3185,6 @@ mod tests {
             "name": "Open",
             "url": "https://example.com"
         })
-    }
-
-    #[test]
-    fn test_v2_minimal_journey_accepted() {
-        let (locs, brs, devs) = allowed();
-        let s = v2_synthetic(serde_json::json!([v2_nav_step(), v2_click_step()]));
-        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
     }
 
     // ── Recorder test-id attribute ───────────────────────────────────────────

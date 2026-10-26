@@ -123,3 +123,32 @@ describe("buildFunnelPanel (AC-53)", () => {
     assertJoinFree(p.queries[0].query);
   });
 });
+
+describe("P5 gap fixes: frozen exclusions in the panel SQL", () => {
+  it("P5-R9: the funnel panel query carries the app's current exclusion rules", () => {
+    const ruled = {
+      ...scope,
+      schema: { ...scope.schema, user_agent_user_agent_family: true, geo_info_country: true },
+      exclusions: {
+        bots: true,
+        builtinBots: { version: 1, families: ["HeadlessChrome"], devices: [] },
+        sessions: [{ field: "geo_info_country", op: "eq", values: ["XX"] }],
+        pages: [],
+      },
+    } as AnalyticsScope;
+    const def = {
+      steps: [
+        { kind: "p" as const, key: "/a" },
+        { kind: "p" as const, key: "/b" },
+      ],
+      unit: "sessions" as const,
+      window: "session" as const,
+      breakdown: null,
+    };
+    const p = buildFunnelPanel(ruled, def, [], t) as unknown as Panel;
+    expect(p.queries[0].query).toContain(
+      "(user_agent_user_agent_family IS NULL OR user_agent_user_agent_family NOT IN ('HeadlessChrome'))",
+    );
+    expect(p.queries[0].query).toContain("(geo_info_country IS NULL OR geo_info_country <> 'XX')");
+  });
+});

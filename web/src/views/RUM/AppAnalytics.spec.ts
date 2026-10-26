@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createRouter, createWebHistory, type Router } from "vue-router";
 import { createStore } from "vuex";
@@ -32,13 +32,18 @@ import searchService from "@/services/search";
 import { rumPaApiMock as api } from "@/utils/rum/__fixtures__/namedEventsApiMock";
 import usePerformance from "@/composables/rum/usePerformance";
 import AppAnalytics from "./AppAnalytics.vue";
+import AnalyticsOverview from "@/components/rum/productAnalytics/AnalyticsOverview.vue";
+import AnalyticsPaths from "@/components/rum/productAnalytics/AnalyticsPaths.vue";
+import AnalyticsPanelState from "@/components/rum/productAnalytics/AnalyticsPanelState.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useProductAnalytics, {
   querySignature,
   resetProductAnalytics,
 } from "@/composables/rum/useProductAnalytics";
 import useNamedEvents, { resetNamedEvents } from "@/composables/rum/useNamedEvents";
 import useSavedFunnels, { resetSavedFunnels } from "@/composables/rum/useSavedFunnels";
-import { encodeDef, MAX_EVENTS_PER_APP } from "@/utils/rum/productAnalyticsModel";
+import { encodeDef, MAX_EVENTS_PER_APP, stepRefParam } from "@/utils/rum/productAnalyticsModel";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 
 const Child = { name: "AnalyticsOverview", template: "<div data-test='child-view' />" };
@@ -410,11 +415,19 @@ describe("AppAnalytics shell", () => {
     expect(router.currentRoute.value.query.period).toBe("7d");
   });
 
-  it("states data through, the SDK sampling caveat and excluded synthetic sessions (AC-54)", async () => {
+  it("states data through on the refresh tooltip and the SDK sampling caveat beside the title (AC-54)", async () => {
     await mountAt("/product-analytics/overview?app=web&period=7d");
-    expect(wrapper!.find('[data-test="rum-analytics-data-through"]').text()).toContain("2026");
-    expect(wrapper!.find('[data-test="rum-analytics-sdk-sampling"]').exists()).toBe(true);
-    expect(wrapper!.find('[data-test="rum-analytics-synthetic-excluded"]').text()).toContain("7");
+    expect(wrapper!.find('[data-test="rum-analytics-trust-caption"]').exists()).toBe(false);
+    const tips = wrapper!.findAllComponents(OTooltip).map((c) => String(c.props("content") ?? ""));
+    expect(tips.some((c) => /^Refresh · data through 2026/.test(c))).toBe(true);
+    const sampling = wrapper!.find('[data-test="rum-analytics-sdk-sampling"]');
+    expect(sampling.attributes("aria-label")).toBe("Counts reflect sampled SDK sessions");
+    expect(
+      wrapper!
+        .find('[data-test="rum-analytics-title"]')
+        .find('[data-test="rum-analytics-sdk-sampling"]')
+        .exists(),
+    ).toBe(false);
   });
 
   it("names the excluded identity share, never the value, and Include it sets idall (AC-50)", async () => {
@@ -925,5 +938,654 @@ describe("AppAnalytics shell", () => {
     expect(scopeSearches()).toBe(before);
     expect(replace).not.toHaveBeenCalled();
     expect(pa.funnel.value.steps).toEqual([{ kind: "p", key: "/a" }]);
+  });
+});
+
+// Each test mounts the whole shell, which runs past the 5 s default on a loaded runner.
+describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, () => {
+  let router: Router;
+  let wrapper: VueWrapper | null = null;
+  const settingsApi = api.service as unknown as Record<string, Mock>;
+  const appSettings = (over: Record<string, unknown> = {}) => ({
+    id: "web-settings-id",
+    app: "web",
+    bots: true,
+    builtinBots: {
+      version: 1,
+      families: ["HeadlessChrome", "PhantomJS", "Spider", "BuiltinListedFamily"],
+      devices: ["Spider"],
+    },
+    sessions: [],
+    pages: [],
+    version: 1,
+    rulesHash: "0123456789abcdef",
+    createdBy: "admin@x.com",
+    createdAt: 1,
+    updatedBy: "admin@x.com",
+    updatedAt: 1,
+    ...over,
+  });
+  const NEVER_SAVED = {
+    id: null,
+    version: 0,
+    createdBy: null,
+    createdAt: null,
+    updatedBy: null,
+    updatedAt: null,
+  };
+  const EXCLUDED_SUMMARY = {
+    ...SUMMARY,
+    sessions: 1673,
+    total_sessions: 14008,
+    builtin_kept_sessions: 1752,
+  };
+  const STAFF_RULE = { field: "usr_email", op: "suffix", values: ["@openobserve.ai"] };
+  const UA_RE = /AS dev/;
+  const BOT_UA = [{ ua: "PingdomBot", dev: "Other", sessions: 500 }];
+
+  const withHits = (extra: [RegExp, Record<string, unknown>[]][], summary = EXCLUDED_SUMMARY) =>
+    respond([
+      ...extra,
+      [
+        /AS app, COUNT/,
+        [
+          { app: "web", sessions: 100 },
+          { app: "shop", sessions: 3 },
+        ],
+      ],
+      [/va_rows/, [summary]],
+      [/total_s/, [{ u: "a", s: 10, total_s: 150, n_values: 50 }]],
+    ]);
+
+  const realRouter = () =>
+    createRouter({
+      history: createWebHistory(),
+      routes: [
+        {
+          path: "/product-analytics",
+          name: PA_ROUTES.shell,
+          component: AppAnalytics,
+          children: [
+            { path: "overview", name: PA_ROUTES.overview, component: AnalyticsOverview },
+            { path: "funnels", name: PA_ROUTES.funnels, component: Child },
+            { path: "funnels/build", name: PA_ROUTES.funnelBuilder, component: Child },
+            { path: "paths", name: PA_ROUTES.paths, component: AnalyticsPaths },
+            { path: "retention", name: PA_ROUTES.retention, component: Child },
+            { path: "events", name: PA_ROUTES.events, component: Child },
+          ],
+        },
+        { path: "/product-analytics/events/new", name: PA_ROUTES.eventNew, component: Child },
+        { path: "/setup", name: "frontendMonitoring", component: Child },
+      ],
+    });
+
+  const settle = async () => {
+    await new Promise((r) => setTimeout(r, 30));
+    for (let i = 0; i < 5; i++) await flushPromises();
+  };
+  // Save chains a PUT, a settings read and a summary re-run, so tests wait on the outcome, never on the clock.
+  const until = (check: () => void) => vi.waitFor(check, { timeout: 10000, interval: 20 });
+
+  const mountAt = async (path: string, real = false) => {
+    router = real ? realRouter() : makeRouter();
+    await router.push(path);
+    wrapper = mount(
+      { template: "<router-view />" },
+      {
+        global: {
+          plugins: [router, store],
+          stubs: {
+            DateTimePickerDashboard: { template: "<div />", props: ["modelValue"] },
+            ShareButton: { template: "<button data-test='share-stub' />", props: ["url"] },
+            TrendsPanel: { name: "TrendsPanel", template: "<div />" },
+            PathsFlow: { name: "PathsFlow", template: "<div />" },
+            PathSessionsDrawer: { name: "PathSessionsDrawer", template: "<div />" },
+          },
+        },
+        attachTo: document.body,
+      },
+    );
+    await settle();
+    await until(() =>
+      expect(["idle", "loading"]).not.toContain(useProductAnalytics().scopeStatus.value),
+    );
+  };
+
+  const chip = () =>
+    wrapper!
+      .findAll("*")
+      .filter((e) => /^\s*App filters\b[\s\S]*\d/.test(e.text()))
+      .at(-1);
+  const body = () => document.body.textContent ?? "";
+  const buttonIn = (root: ParentNode, label: string) =>
+    [...root.querySelectorAll<HTMLButtonElement>("button, a, [role='button']")].find(
+      (b) => b.textContent?.trim() === label,
+    );
+  const drawer = () =>
+    [...document.querySelectorAll<HTMLElement>("[role='dialog']")].find((d) =>
+      d.textContent?.includes("Built-in bot rule"),
+    );
+  const openDrawer = async () => {
+    await chip()!.trigger("click");
+    await until(() => expect(drawer()).toBeDefined());
+  };
+  // Settling only after the replies have resolved keeps a negative check from passing before they are read.
+  const answered = async (re: RegExp) => {
+    await until(() => expect(searchCount(re)).toBeGreaterThan(0));
+    const { calls, results } = vi.mocked(searchService.search).mock;
+    await Promise.all(
+      results.filter((_, i) => re.test(calls[i][0].query.query.sql)).map((r) => r.value),
+    );
+    await settle();
+  };
+  const uaAnswered = () => answered(UA_RE);
+  // The drawer closes only after the PUT and the settings reload, so no Save round leaks into the next test.
+  const saveDrawer = async (d: HTMLElement) => {
+    buttonIn(d, "Save")!.click();
+    await until(() => expect(drawer()).toBeUndefined());
+  };
+  const botSwitch = (d: HTMLElement) =>
+    d.querySelector<HTMLElement>('[data-test="rum-analytics-exclusions-builtin-switch-btn"]')!;
+  const isDisabled = (el: Element | undefined) =>
+    !!el &&
+    ((el as HTMLButtonElement).disabled ||
+      el.getAttribute("aria-disabled") === "true" ||
+      el.hasAttribute("data-disabled"));
+  const hasValue = (root: HTMLElement, value: string) =>
+    !!root.textContent?.includes(value) ||
+    [...root.querySelectorAll<HTMLInputElement>("input, textarea")].some((i) =>
+      i.value.includes(value),
+    );
+  const searchCount = (re: RegExp) =>
+    vi.mocked(searchService.search).mock.calls.filter((c) => re.test(c[0].query.query.sql)).length;
+  const previewLine = (d: HTMLElement) =>
+    [...d.querySelectorAll<HTMLElement>("*")]
+      .filter((e) => /\d[\d,]* of 14,008 sessions remain/.test(e.textContent ?? ""))
+      .at(-1)!;
+  // Tone is compared as markup with the numbers masked, so no class name is pinned.
+  const toneOf = (el: HTMLElement) => {
+    const chain = [el, el.parentElement, el.parentElement?.parentElement]
+      .map((e) => (e ? `${e.tagName}.${e.getAttribute("class") ?? ""}` : ""))
+      .join(">");
+    return `${chain}|${el.outerHTML.replace(/\d[\d,]*/g, "#")}`;
+  };
+  const uaSearches = () =>
+    vi.mocked(searchService.search).mock.calls.filter((c) => UA_RE.test(c[0].query.query.sql))
+      .length;
+  const persistPuts = () => {
+    let stored = appSettings();
+    settingsApi.getAppSettings.mockImplementation(async () => ({ data: stored }));
+    settingsApi.putAppSettings.mockImplementation(
+      async (_o: string, _a: string, body: Record<string, unknown>) => {
+        stored = appSettings({
+          ...body,
+          version: Number(body.version) + 1,
+          rulesHash: "fedcba9876543210",
+        });
+        return { data: stored };
+      },
+    );
+  };
+
+  beforeEach(() => {
+    api.reset();
+    resetNamedEvents();
+    resetSavedFunnels();
+    resetProductAnalytics();
+    vi.mocked(searchService.search).mockReset();
+    mockGetStream.mockReset();
+    usePerformance().performanceState.data.streams._rumdata = {
+      name: "_rumdata",
+      schema: {
+        usr_email: { name: "usr_email" },
+        session_type: { name: "session_type" },
+        user_agent_user_agent_family: { name: "user_agent_user_agent_family" },
+        user_agent_device_family: { name: "user_agent_device_family" },
+      },
+    };
+    settingsApi.getAppSettings.mockImplementation(async () => ({ data: appSettings() }));
+    settingsApi.putAppSettings.mockImplementation(async (_o: string, _a: string, body: object) => ({
+      data: appSettings({ ...body, version: 2, rulesHash: "fedcba9876543210" }),
+    }));
+    withHits([]);
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    document.body.innerHTML = "";
+  });
+
+  it("P7-R2: the chip reads Exclusions 1 on day one, for the built-in rule of an app with no row", async () => {
+    settingsApi.getAppSettings.mockImplementation(async () => ({ data: appSettings(NEVER_SAVED) }));
+    await mountAt("/product-analytics/overview?app=web&period=7d");
+    expect(chip()?.text()).toMatch(/^\s*App filters\s*·?\s*1\b/);
+  });
+
+  it("P7-R2: N counts the built-in rule and the session rules, never the ignored pages", async () => {
+    settingsApi.getAppSettings.mockImplementation(async () => ({
+      data: appSettings({
+        sessions: [STAFF_RULE, { field: "geo_info_country", op: "eq", values: ["XX"] }],
+        pages: [
+          { op: "eq", value: "/web/login" },
+          { op: "eq", value: "/web/cb" },
+          { op: "prefix", value: "/web/org/" },
+        ],
+      }),
+    }));
+    await mountAt("/product-analytics/overview?app=web&period=7d");
+    expect(chip()?.text()).toMatch(/^\s*App filters\s*·?\s*3\b/);
+  });
+
+  it("P7-R2: with the built-in rule off, N is the session rules only", async () => {
+    settingsApi.getAppSettings.mockImplementation(async () => ({
+      data: appSettings({ bots: false, sessions: [STAFF_RULE] }),
+    }));
+    await mountAt("/product-analytics/overview?app=web&period=7d");
+    expect(chip()?.text()).toMatch(/^\s*App filters\s*·?\s*1\b/);
+  });
+
+  it("P7-R2: the chip says likely bot found when the Overview banner fires for a user agent", async () => {
+    withHits([[UA_RE, BOT_UA]]);
+    await mountAt("/product-analytics/overview?app=web&period=7d", true);
+    await until(() => expect(chip()?.text()).toContain("likely bot found"));
+  });
+
+  it("P7-R2: the App filters button shows a warning icon when it says likely bot found", async () => {
+    const chipTone = async (rows: Record<string, unknown>[]) => {
+      resetProductAnalytics();
+      withHits([[UA_RE, rows]]);
+      await mountAt("/product-analytics/overview?app=web&period=7d", true);
+      await uaAnswered();
+      const btn = wrapper!.find('[data-test="rum-analytics-exclusions-chip"]');
+      const out = {
+        text: btn.text(),
+        icons: btn.findAllComponents({ name: "OIcon" }).map((i) => i.props("name")),
+      };
+      wrapper!.unmount();
+      wrapper = null;
+      document.body.innerHTML = "";
+      return out;
+    };
+    const normal = await chipTone([{ ua: "Chrome", dev: "Other", sessions: 1500 }]);
+    const warned = await chipTone(BOT_UA);
+    expect(normal.text).toMatch(/^\s*App filters/);
+    expect(warned.text).toContain("likely bot found");
+    expect(normal.icons).toContain("filter-alt");
+    expect(warned.icons).toContain("warning");
+  });
+
+  it("P7-R2: no likely bot found without a banner", async () => {
+    withHits([[UA_RE, [{ ua: "Chrome", dev: "Other", sessions: 1500 }]]]);
+    await mountAt("/product-analytics/overview?app=web&period=7d", true);
+    await uaAnswered();
+    expect(chip()?.text()).not.toContain("likely bot found");
+  });
+
+  it("one click on the chip opens the drawer, which lists the removed counts and the include switch", async () => {
+    withHits([[UA_RE, []]]);
+    await mountAt("/product-analytics/overview?app=web&period=7d");
+    await openDrawer();
+    const view = () =>
+      document.querySelector<HTMLElement>('[data-test="rum-analytics-exclusions-view"]')!;
+    await until(() => expect(view().textContent).toContain("Built-in bot rule 12,256"));
+    expect(view().textContent).toContain("Saved rules 79");
+    expect(view().textContent).toContain("Synthetic tests 7 · always excluded");
+    expect(view().textContent).toContain("Include hidden sessions in this view");
+    document
+      .querySelector<HTMLElement>('[data-test="rum-analytics-app-filters-include-switch-btn"]')!
+      .click();
+    await until(() => expect(router.currentRoute.value.query.xall).toBe("1"));
+    expect(useProductAnalytics().state.includeExcluded).toBe(true);
+  });
+
+  it("while hidden sessions are included every tab shows the banner, and Hide hidden sessions drops xall", async () => {
+    await mountAt("/product-analytics/paths?app=web&period=7d&xall=1");
+    const banner = () =>
+      document.querySelector<HTMLElement>('[data-test="rum-analytics-included-banner"]');
+    expect(banner()?.textContent).toContain("hidden by app filters in this view only");
+    buttonIn(document.body, "Hide hidden sessions")!.click();
+    await until(() => expect(router.currentRoute.value.query.xall).toBeUndefined());
+    expect(useProductAnalytics().state.includeExcluded).toBe(false);
+    expect(banner()).toBeNull();
+  });
+
+  it("P6-R11: an identity suggestion fires the banner but not the chip's warning tone", async () => {
+    withHits([
+      [UA_RE, []],
+      [/total_s/, [{ u: "staff@x.com", s: 40, total_s: 150, n_values: 50 }]],
+    ]);
+    await mountAt("/product-analytics/overview?app=web&period=7d", true);
+    await until(() => expect(buttonIn(document.body, "Review app filters")).toBeDefined());
+    expect(chip()?.text()).not.toContain("likely bot found");
+  });
+
+  it("P7-R3: the chip opens the drawer with the Built-in bot rule row, its switch, the sessions it removes and the listed names", async () => {
+    await mountAt("/product-analytics/overview?app=web&period=7d");
+    expect(drawer()).toBeUndefined();
+    await openDrawer();
+    const d = drawer()!;
+    expect(d).toBeDefined();
+    expect(d.querySelector("[role='switch']")).not.toBeNull();
+    await until(() => expect(d.textContent).toContain("12,256"));
+    expect(d.innerHTML).toContain("BuiltinListedFamily");
+  });
+
+  it("P7-R3: with nothing to suggest the drawer says Nothing stands out in this range", async () => {
+    withHits([[UA_RE, [{ ua: "Chrome", dev: "Other", sessions: 1500 }]]]);
+    await mountAt("/product-analytics/overview?app=web&period=7d");
+    await openDrawer();
+    await uaAnswered();
+    expect(drawer()!.textContent).toContain("Nothing stands out in this range");
+  });
+
+  it("P7-R3: the live preview reads M of <total> sessions remain, with Cancel and Save", async () => {
+    settingsApi.getAppSettings.mockImplementation(async () => ({
+      data: appSettings({ sessions: [STAFF_RULE] }),
+    }));
+    await mountAt("/product-analytics/overview?app=web&period=7d");
+    await openDrawer();
+    const d = drawer()!;
+    await until(() => expect(d.textContent).toMatch(/1,673 of 14,008 sessions remain/));
+    expect(buttonIn(d, "Cancel")).toBeDefined();
+    expect(buttonIn(d, "Save")).toBeDefined();
+  });
+
+  it("P7-R3: rules that exclude everything read 0 of <total> sessions remain, in another tone, and keep Save enabled", async () => {
+    const render = async (sessions: number) => {
+      resetProductAnalytics();
+      withHits([], { ...EXCLUDED_SUMMARY, sessions });
+      await mountAt("/product-analytics/overview?app=web&period=7d");
+      await openDrawer();
+      const d = drawer()!;
+      await until(() => expect(previewLine(d)).toBeDefined());
+      const line = previewLine(d);
+      const out = {
+        text: line.textContent ?? "",
+        tone: toneOf(line),
+        saveDisabled: isDisabled(buttonIn(d, "Save")),
+      };
+      wrapper!.unmount();
+      wrapper = null;
+      document.body.innerHTML = "";
+      return out;
+    };
+    const some = await render(1673);
+    const none = await render(0);
+    expect(some.text).toMatch(/1,673 of 14,008 sessions remain/);
+    expect(none.text).toMatch(/\b0 of 14,008 sessions remain/);
+    expect(none.tone).not.toBe(some.tone);
+    expect(none.saveDisabled).toBe(false);
+  });
+
+  it("P7-R3: Save sends a PUT with the drawer's edit and the version that was read", async () => {
+    settingsApi.getAppSettings.mockImplementation(async () => ({
+      data: appSettings({ version: 7, sessions: [STAFF_RULE] }),
+    }));
+    await mountAt("/product-analytics/overview?app=web&period=7d");
+    await openDrawer();
+    const d = drawer()!;
+    botSwitch(d).click();
+    await settle();
+    await saveDrawer(d);
+    expect(settingsApi.putAppSettings).toHaveBeenCalledTimes(1);
+    const [org, app, body] = settingsApi.putAppSettings.mock.calls[0];
+    expect([org, app]).toEqual(["org1", "web"]);
+    expect(body).toMatchObject({ bots: false, version: 7, sessions: [STAFF_RULE], pages: [] });
+  });
+
+  it("a page picked in the Hidden pages picker is saved as a page rule", async () => {
+    await mountAt("/product-analytics/overview?app=web&period=7d");
+    await openDrawer();
+    const d = drawer()!;
+    d.querySelector<HTMLElement>('[data-test="rum-analytics-exclusions-add-page"]')!.click();
+    const pageInput = () =>
+      document.querySelector<HTMLInputElement>(
+        '[data-test="rum-analytics-app-filter-page-picker-value"] input, input[data-test="rum-analytics-app-filter-page-picker-value"]',
+      );
+    await until(() => expect(pageInput()).not.toBeNull());
+    const input = pageInput()!;
+    input.value = "/health";
+    input.dispatchEvent(new Event("input"));
+    await settle();
+    document
+      .querySelector<HTMLElement>('[data-test="rum-analytics-app-filter-page-picker-apply"]')!
+      .click();
+    await until(() =>
+      expect(
+        d.querySelector('[data-test="rum-analytics-exclusions-page-0"]')?.textContent,
+      ).toContain("Page is /health"),
+    );
+    await saveDrawer(d);
+    expect(settingsApi.putAppSettings).toHaveBeenCalledTimes(1);
+    const body = settingsApi.putAppSettings.mock.calls[0][2];
+    expect(body).toMatchObject({ pages: [{ op: "eq", value: "/health" }] });
+  });
+
+  it("re-applying an unchanged is rule from its chip keeps it an eq rule", async () => {
+    const rule = { field: "geo_info_country", op: "eq", values: ["XX"] };
+    settingsApi.getAppSettings.mockImplementation(async () => ({
+      data: appSettings({ sessions: [rule] }),
+    }));
+    await mountAt("/product-analytics/overview?app=web&period=7d");
+    await openDrawer();
+    const d = drawer()!;
+    d.querySelector<HTMLElement>('[data-test="rum-analytics-exclusions-rule-0-chip"]')!.click();
+    const apply = () =>
+      document.querySelector<HTMLElement>('[data-test="rum-analytics-funnel-field-picker-apply"]');
+    await until(() => expect(apply()).not.toBeNull());
+    apply()!.click();
+    await settle();
+    await saveDrawer(d);
+    expect(settingsApi.putAppSettings).toHaveBeenCalledTimes(1);
+    expect(settingsApi.putAppSettings.mock.calls[0][2]).toMatchObject({ sessions: [rule] });
+  });
+
+  it("P6-R6: a drawer Save reloads the settings into scope.exclusions and re-runs the summary without re-probing apps", async () => {
+    persistPuts();
+    await mountAt("/product-analytics/overview?app=web&period=7d");
+    await until(() => expect(searchCount(/va_rows/)).toBeGreaterThan(0));
+    await openDrawer();
+    const reads = settingsApi.getAppSettings.mock.calls.length;
+    const probes = searchCount(/AS app, COUNT/);
+    const before = searchCount(/va_rows/);
+    const d = drawer()!;
+    botSwitch(d).click();
+    // The drawer's preview runs the summary SQL too, so the baseline is taken after it.
+    await until(() => expect(searchCount(/va_rows/)).toBe(before + 1));
+    const summaries = searchCount(/va_rows/);
+    await saveDrawer(d);
+    await answered(/va_rows/);
+    const scope = useProductAnalytics().scope.value as unknown as { exclusions: unknown };
+    expect(scope.exclusions).toMatchObject({ bots: false, rulesHash: "fedcba9876543210" });
+    expect(searchCount(/va_rows/)).toBeGreaterThan(summaries);
+    expect(settingsApi.getAppSettings.mock.calls.length).toBeGreaterThan(reads);
+    expect(searchCount(/AS app, COUNT/)).toBe(probes);
+  });
+
+  it("P7-R3: the drawer lists a bot-like user-agent suggestion", async () => {
+    withHits([[UA_RE, BOT_UA]]);
+    await mountAt("/product-analytics/overview?app=web&period=7d", true);
+    await openDrawer();
+    await until(() => expect(drawer()!.textContent).toContain("PingdomBot"));
+    expect(drawer()!.textContent).not.toContain("Nothing stands out in this range");
+  });
+
+  it("P7-R4: with no stored row the audit line reads Built-in default · never saved", async () => {
+    settingsApi.getAppSettings.mockImplementation(async () => ({ data: appSettings(NEVER_SAVED) }));
+    await mountAt("/product-analytics/overview?app=web&period=7d");
+    await openDrawer();
+    expect(drawer()!.textContent).toContain("Built-in default · never saved");
+  });
+
+  it("P7-R5: a 409 on Save reloads the rules and says re-apply your change", async () => {
+    settingsApi.putAppSettings.mockImplementation(async () => {
+      throw {
+        response: {
+          status: 409,
+          data: {
+            code: "version_conflict",
+            message: "version_conflict",
+            current: appSettings({
+              version: 5,
+              sessions: [{ field: "usr_email", op: "suffix", values: ["@reloaded-only.example"] }],
+            }),
+          },
+        },
+      };
+    });
+    await mountAt("/product-analytics/overview?app=web&period=7d");
+    await openDrawer();
+    const d = drawer()!;
+    botSwitch(d).click();
+    await settle();
+    buttonIn(d, "Save")!.click();
+    await until(() =>
+      expect(drawer()!.textContent).toContain(
+        "Reloaded with the latest app filters, re-apply your change",
+      ),
+    );
+    expect(settingsApi.putAppSettings).toHaveBeenCalledTimes(1);
+    expect(hasValue(drawer()!, "@reloaded-only.example")).toBe(true);
+  });
+
+  it("P7-R6: a rule on a field the stream lacks is marked field not in this stream", async () => {
+    settingsApi.getAppSettings.mockImplementation(async () => ({
+      data: appSettings({ sessions: [{ field: "geo_info_country", op: "eq", values: ["XX"] }] }),
+    }));
+    await mountAt("/product-analytics/overview?app=web&period=7d");
+    await openDrawer();
+    expect(drawer()!.textContent).toContain("field not in this stream");
+  });
+
+  it("P7-R8: Review app filters on the Overview banner opens the drawer", async () => {
+    withHits([[UA_RE, BOT_UA]]);
+    await mountAt("/product-analytics/overview?app=web&period=7d", true);
+    expect(drawer()).toBeUndefined();
+    await until(() => expect(buttonIn(document.body, "Review app filters")).toBeDefined());
+    buttonIn(document.body, "Review app filters")!.click();
+    await until(() => expect(drawer()).toBeDefined());
+  });
+
+  it("P7-R10: Edit app filters on a deep link to an ignored Paths anchor opens the drawer", async () => {
+    settingsApi.getAppSettings.mockImplementation(async () => ({
+      data: appSettings({ pages: [{ op: "eq", value: "/web/login" }] }),
+    }));
+    const anchor = encodeDef(stepRefParam({ kind: "p", key: "/web/login" }));
+    await mountAt(`/product-analytics/paths?app=web&period=7d&anchor=${anchor}`, true);
+    await until(() => expect(body()).toContain("This page is hidden by the app filters"));
+    buttonIn(document.body, "Edit app filters")!.click();
+    await until(() => expect(drawer()).toBeDefined());
+  });
+
+  it("P7-R10: the Paths footnote naming the ignored pages links to the drawer", async () => {
+    settingsApi.getAppSettings.mockImplementation(async () => ({
+      data: appSettings({
+        pages: [
+          { op: "eq", value: "/web/login" },
+          { op: "eq", value: "/web/cb" },
+        ],
+      }),
+    }));
+    const anchor = encodeDef(stepRefParam({ kind: "p", key: "/" }));
+    await mountAt(`/product-analytics/paths?app=web&period=7d&anchor=${anchor}`, true);
+    const footnote = [...document.querySelectorAll<HTMLElement>("*")]
+      .filter((e) => {
+        const tx = e.textContent ?? "";
+        return (
+          tx.includes("/web/login") &&
+          tx.includes("/web/cb") &&
+          !!e.querySelector("button, a, [role='button']")
+        );
+      })
+      .at(-1);
+    expect(footnote).toBeDefined();
+    expect(drawer()).toBeUndefined();
+    footnote!.querySelector<HTMLElement>("button, a, [role='button']")!.click();
+    await until(() => expect(drawer()).toBeDefined());
+  });
+
+  it("P6-R8: the user-agent query runs once for Overview and the drawer, survives a Save, and reruns after refresh", async () => {
+    persistPuts();
+    withHits([[UA_RE, [{ ua: "Chrome", dev: "Other", sessions: 1500 }]]]);
+    await mountAt("/product-analytics/overview?app=web&period=7d", true);
+    await uaAnswered();
+    expect(uaSearches()).toBe(1);
+    await openDrawer();
+    expect(uaSearches()).toBe(1);
+    const before = searchCount(/va_rows/);
+    const d = drawer()!;
+    botSwitch(d).click();
+    await until(() => expect(searchCount(/va_rows/)).toBe(before + 1));
+    const summaries = searchCount(/va_rows/);
+    await saveDrawer(d);
+    await answered(/va_rows/);
+    expect(searchCount(/va_rows/)).toBeGreaterThan(summaries);
+    expect(settingsApi.putAppSettings).toHaveBeenCalledTimes(1);
+    expect(uaSearches()).toBe(1);
+    await useProductAnalytics().refresh();
+    await until(() => expect(uaSearches()).toBe(2));
+  });
+
+  it("P6-R8: resetProductAnalytics clears the user-agent suggestions, so the query runs again", async () => {
+    withHits([[UA_RE, [{ ua: "Chrome", dev: "Other", sessions: 1500 }]]]);
+    await mountAt("/product-analytics/overview?app=web&period=7d", true);
+    await until(() => expect(uaSearches()).toBe(1));
+    wrapper!.unmount();
+    wrapper = null;
+    resetProductAnalytics();
+    await mountAt("/product-analytics/overview?app=web&period=7d", true);
+    await until(() => expect(uaSearches()).toBe(2));
+  });
+
+  it("P7-R18: a failed settings read shows an error state in place of the views", async () => {
+    settingsApi.getAppSettings.mockImplementation(async () => {
+      throw { response: { status: 403, data: { code: "forbidden", message: "forbidden" } } };
+    });
+    await mountAt("/product-analytics/overview?app=web&period=7d");
+    expect(settingsApi.getAppSettings).toHaveBeenCalled();
+    expect(wrapper!.find('[data-test="child-view"]').exists()).toBe(false);
+    expect(wrapper!.find('[data-test="rum-analytics-no-data"]').exists()).toBe(false);
+    expect(
+      wrapper!.findComponent(OEmptyState).exists() ||
+        wrapper!.findComponent(AnalyticsPanelState).exists(),
+    ).toBe(true);
+  });
+
+  it("P7-R13: New users only is disabled with a tooltip in Sessions mode and enabled in Users mode", async () => {
+    const chipFor = async (unit: string) => {
+      const funnel = encodeDef({
+        s: [
+          ["p", "/a"],
+          ["p", "/b"],
+        ],
+        u: unit,
+        w: "session",
+      });
+      await mountAt(`/product-analytics/funnels/build?app=web&period=7d&funnel=${funnel}`);
+      const el = wrapper!
+        .findAll("button, [role='button'], [role='checkbox'], [role='switch']")
+        .find((e) => e.text().includes("New users only"));
+      expect(el).toBeDefined();
+      const disabled = isDisabled(el!.element);
+      const host = el!.element.parentElement ?? el!.element;
+      const tooltip =
+        el!.element.hasAttribute("title") ||
+        el!.element.hasAttribute("aria-describedby") ||
+        wrapper!.findAllComponents(OTooltip).some((c) => host.contains(c.element));
+      wrapper!.unmount();
+      wrapper = null;
+      return { disabled, tooltip };
+    };
+    expect(await chipFor("sessions")).toEqual({ disabled: true, tooltip: true });
+    resetProductAnalytics();
+    expect((await chipFor("users")).disabled).toBe(false);
+  });
+
+  it("P7-R13: the App select shows the compared apps", async () => {
+    await mountAt("/product-analytics/overview?app=web&apps=shop&period=7d");
+    const select = wrapper!.find('[data-test="rum-analytics-app-select"]');
+    expect(select.text()).toContain("web");
+    expect(select.text()).toContain("shop");
   });
 });

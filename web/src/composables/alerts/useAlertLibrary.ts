@@ -16,6 +16,7 @@
 import { computed, readonly, ref } from "vue";
 import { useStore } from "vuex";
 
+import config from "@/aws-exports";
 import {
   ALERT_LIBRARY_MANIFEST_URL,
   SUPPORTED_MANIFEST_MAJOR,
@@ -42,6 +43,8 @@ import type {
 // Everything the manifest carries is UNTRUSTED. It is a public bucket and its
 // `id` / `stream_type` values end up as object keys, so every lookup here goes
 // through hasOwn rather than a bare index.
+
+export type AnomalyLibraryAccess = "enabled" | "locked" | "hidden";
 
 /**
  * Machine-readable failure kinds, so callers can map to i18n copy.
@@ -204,7 +207,13 @@ function assertManifest(value: unknown): asserts value is AlertLibraryManifest {
   if (!Array.isArray(candidate.alerts)) fail("has no alerts array");
   if (!Array.isArray(candidate.packs)) fail("has no packs array");
 
-  for (const entry of candidate.alerts as AlertLibraryEntry[]) {
+  // Optional, since manifests before 1.1 have none; present but not an array is a damaged upload.
+  if (candidate.anomaly_alerts !== undefined && !Array.isArray(candidate.anomaly_alerts)) {
+    fail("has a non-array anomaly_alerts");
+  }
+
+  const entries = [...(candidate.alerts ?? []), ...(candidate.anomaly_alerts ?? [])];
+  for (const entry of entries as AlertLibraryEntry[]) {
     if (typeof entry !== "object" || entry === null) fail("contains a non-object alert entry");
     // The four fields every consumer dereferences: the cache key, the URL, the
     // readiness check and the type-scoped lookup.
@@ -314,6 +323,18 @@ export function streamDataState(
     state: worst,
     lastIngestedMicros: worst === "stale" || worst === "fresh" ? oldest : null,
   };
+}
+
+/** The UI is the only guard: an OSS backend stores an anomaly body as a broken scheduled alert. */
+export function useAnomalyLibraryAccess() {
+  const store = useStore();
+  return computed<AnomalyLibraryAccess>(() => {
+    // Both halves, as in AlertList: an enterprise UI can be pointed at an OSS backend.
+    const entitled =
+      store.state.zoConfig?.build_type !== "opensource" && config.isEnterprise === "true";
+    if (!entitled) return "locked";
+    return store.state.zoConfig?.anomaly_detection_enabled === true ? "enabled" : "hidden";
+  });
 }
 
 export function useAlertLibrary() {

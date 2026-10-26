@@ -172,6 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ODropdown side="bottom" align="end">
                   <template #trigger>
                     <OButton
+                      :aria-label="t('common.moreActions')"
                       icon-left="more-vert"
                       variant="ghost"
                       size="icon-xs-sq"
@@ -594,7 +595,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: action,
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         page: "Functions",
       });
     };
@@ -667,7 +667,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: "Delete Function",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         function_name: selectedDelete.value.name,
         is_ingest_func: selectedDelete.value.ingest,
         page: "Functions",

@@ -37,7 +37,7 @@ use datafusion::{
 use hashbrown::HashSet;
 pub use metrics_index::{matcher_predicates, matcher_residual_field};
 use promql_parser::{
-    label::{MatchOp, Matchers},
+    label::{MatchOp, Matcher, Matchers},
     parser::{Offset, VectorSelector},
 };
 
@@ -68,6 +68,13 @@ pub fn apply_matchers(df: DataFrame, matchers: &Matchers) -> Result<DataFrame> {
         df = df.filter(predicate)?;
     }
     Ok(df)
+}
+
+/// True when `matcher`'s label is absent from `schema` and "" (a missing label's value) fails it.
+pub fn absent_label_rejects_all(schema: &Schema, matcher: &Matcher) -> bool {
+    ![TIMESTAMP_COL_NAME, VALUE_LABEL, NAME_LABEL].contains(&matcher.name.as_str())
+        && schema.field_with_name(&matcher.name).is_err()
+        && !matcher.is_match("")
 }
 
 pub fn apply_label_selector(
@@ -514,6 +521,42 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_not_equal_empty_keeps_only_rows_carrying_the_label() {
+        let schema = Arc::new(ArrowSchema::new(vec![Field::new(
+            "trace_stream",
+            DataType::Utf8,
+            true,
+        )]));
+        let batch = RecordBatch::try_new(
+            schema,
+            vec![Arc::new(StringArray::from(vec![
+                Some("default"),
+                None,
+                Some(""),
+                Some("traces"),
+                None,
+            ]))],
+        )
+        .unwrap();
+        let df = SessionContext::new().read_batch(batch).unwrap();
+        let rows = apply_matchers(df, &parsed_matchers(r#"m{trace_stream!=""}"#))
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+        let kept: Vec<String> = rows
+            .iter()
+            .flat_map(|b| {
+                let col = b.column(0).as_any().downcast_ref::<StringArray>().unwrap();
+                (0..col.len())
+                    .map(|i| col.value(i).to_string())
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        assert_eq!(kept, ["default", "traces"]);
+    }
+
+    #[tokio::test]
     async fn test_apply_matchers_exact_regex_supports_utf8_view() {
         let (df, _) = make_string_view_df();
         let matchers = parsed_matchers(r#"m{service=~"api"}"#);
@@ -623,5 +666,31 @@ mod tests {
             panic!("expected vector selector");
         };
         selector.matchers
+    }
+
+    #[test]
+    fn test_absent_label_reads_as_empty_string() {
+        let schema = ArrowSchema::new(vec![Field::new("job", DataType::Utf8, true)]);
+        for (query, rejects) in [
+            (r#"m{absent="x"}"#, true),
+            (r#"m{absent=~"foo.+"}"#, true),
+            (r#"m{absent!=""}"#, true),
+            (r#"m{absent=""}"#, false),
+            (r#"m{absent!="x"}"#, false),
+            (r#"m{absent=~".*"}"#, false),
+            (r#"m{absent=~"foo|"}"#, false),
+            (r#"m{absent!~"x"}"#, false),
+            (r#"m{job="x"}"#, false),
+            (r#"{__name__="m"}"#, false),
+        ] {
+            assert_eq!(
+                parsed_matchers(query)
+                    .matchers
+                    .iter()
+                    .any(|mat| absent_label_rejects_all(&schema, mat)),
+                rejects,
+                "{query}"
+            );
+        }
     }
 }

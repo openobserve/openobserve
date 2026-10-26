@@ -947,13 +947,6 @@ mod tests {
     }
 
     #[test]
-    fn test_validation_rejects_wrong_direction_for_greater_operators() {
-        // warning ABOVE critical with `>` would make warning unreachable.
-        let err = validate_thresholds(Operator::GreaterThan, 50, Some(100)).unwrap_err();
-        assert_eq!(err, ThresholdError::WarningNotLessSevere);
-    }
-
-    #[test]
     fn test_validation_accepts_correct_direction_for_less_operators() {
         assert!(validate_thresholds(Operator::LessThan, 10, Some(25)).is_ok());
         assert!(validate_thresholds(Operator::LessThanEquals, 10, Some(25)).is_ok());

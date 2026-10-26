@@ -19,6 +19,7 @@ class EnrichmentPage {
         this.listAddBtn = page.locator('[data-test="enrichment-tables-add-btn"]');
         this.searchInput = page.locator('[data-test="enrichment-tables-search-input"]');
         this.searchInputField = page.locator('[data-test="enrichment-tables-search-input-field"]');
+        this.listRefreshBtn = page.locator('[data-test="enrichment-tables-list-refresh-btn"]');
 
         // ────────────────────────────────────────────────────────────────────
         // Add / Update enrichment table form locators (AddEnrichmentTable.vue)
@@ -76,6 +77,8 @@ class EnrichmentPage {
         // ────────────────────────────────────────────────────────────────────
         this.vrlEditor = '[data-test="logs-vrl-function-editor"]';
         this.refreshButton = '[data-test="logs-search-bar-refresh-btn"]';
+        // While a search runs the same data-test is the Cancel button, so idle is keyed on the Run title.
+        this.idleRunQueryButton = page.locator('[data-test="logs-search-bar-refresh-btn"][title="Run query"]');
         this.showQueryToggleBtn = '[data-test="logs-search-bar-show-query-toggle-btn"]';
         this.functionsBtn = '[data-test="logs-search-functions-btn"]';
 
@@ -532,10 +535,10 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     async applyQuery() {
-        // OButton returns early in handleClick when loading=true, so wait for enabled first.
         const refreshBtn = this.page.locator(this.refreshButton);
         await refreshBtn.waitFor({ state: 'visible', timeout: 15000 });
-        await expect(refreshBtn).toBeEnabled({ timeout: 15000 });
+        // An auto-run search makes this button an enabled Cancel, so "enabled" alone would cancel that search.
+        await expect(this.idleRunQueryButton).toBeEnabled({ timeout: 30000 });
 
         // Click on the run query button and wait for response
         const search = this.page.waitForResponse("**/api/**/_search**");
@@ -562,28 +565,19 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.page.waitForLoadState('domcontentloaded');
     }
 
-    async applyQueryMultipleClicks() {
-        // Click run query button multiple times to ensure it registers (VRL test specific).
-        // NOTE: Do NOT use `{ force: true }` — OButton's @click handler does not
-        // fire on a forced click (Reka Primitive expects a real bubble path).
-        // Key the final click to a _search response so we don't sit in a
-        // 10s networkidle wait for cross-domain background requests.
-        const refreshButton = this.page.locator(this.refreshButton);
-        await refreshButton.waitFor({ state: 'visible' });
-
-        for (let i = 0; i < 4; i++) {
-            if (i === 3) {
-                const searchResp = this.page.waitForResponse(
-                    (resp) => /\/api\/.*\/_search/.test(resp.url()),
-                    { timeout: 30000 }
-                ).catch(() => null);
-                await refreshButton.click();
-                await searchResp;
-            } else {
-                await refreshButton.click();
-                await this.page.waitForLoadState('domcontentloaded');
-            }
-        }
+    async runQueryWhenIdle({ withVrl = false } = {}) {
+        // Do NOT use `{ force: true }`: OButton's @click handler does not fire on a forced click.
+        await expect(this.idleRunQueryButton).toBeVisible({ timeout: 30000 });
+        await expect(this.idleRunQueryButton).toBeEnabled({ timeout: 15000 });
+        // With Auto Run on, a search without the VRL can answer first; only the one carrying it proves enrichment ran.
+        const searchResp = this.page.waitForResponse(
+            (resp) => /\/api\/.*\/_search/.test(resp.url())
+                && (!withVrl || /"query_fn":"[^"]+"/.test(resp.request().postData() || '')),
+            { timeout: 30000 }
+        );
+        await this.idleRunQueryButton.click();
+        await searchResp;
+        await expect(this.idleRunQueryButton).toBeVisible({ timeout: 30000 });
     }
 
     async verifyNoQueryWarning() {
@@ -595,21 +589,8 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     async expandFirstLogRow() {
-        // Additional run query clicks to ensure VRL enrichment is fully processed.
-        // NOTE: Do NOT use `{ force: true }` — see applyQueryMultipleClicks().
-        // Key each click to a _search response so we don't burn 10s networkidle
-        // timeouts per iteration.
-        const refreshButton = this.page.locator(this.refreshButton);
-        if (await refreshButton.isVisible()) {
-            for (let i = 0; i < 3; i++) {
-                const searchResp = this.page.waitForResponse(
-                    (resp) => /\/api\/.*\/_search/.test(resp.url()),
-                    { timeout: 15000 }
-                ).catch(() => null);
-                await refreshButton.click();
-                await searchResp;
-            }
-        }
+        // Re-run once the previous search settles; clicking mid-search hits Cancel and empties the grid.
+        await this.runQueryWhenIdle();
 
         // Wait for timestamp column to be visible and stable
         await this.timestampColumn.first().waitFor({ state: 'visible', timeout: 30000 });
@@ -824,8 +805,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         // Wait for VRL editor to be fully ready for processing
         await this.waitForVRLEditorReady();
 
-        // Apply query with multiple clicks for VRL test reliability
-        await this.applyQueryMultipleClicks();
+        await this.runQueryWhenIdle({ withVrl: true });
 
         // Wait for query results to load — either the timestamp column appears
         // (success) or the error-details button appears (failure).
@@ -842,7 +822,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
             testLogger.warn('Error detected after first VRL query attempt, waiting 5s and retrying');
 
             // Retry the query — the backend may need a moment to index the new table
-            await this.applyQueryMultipleClicks();
+            await this.runQueryWhenIdle({ withVrl: true });
             await Promise.race([
                 timestampCol.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),
                 errorDetailsBtn.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),
@@ -998,9 +978,12 @@ abc, err = get_enrichment_table_record("${fileName}", {
         // appears; for the negative path (callers expecting non-existence)
         // wait only for the input value to flush so the filter has fired.
         if (expectExists) {
+            // The list is fetched once right after save and can predate the new table, so re-fetch it while the row is missing.
             await expect.poll(async () => {
-                return await this.getRowTypeCell(tableName).isVisible({ timeout: 200 }).catch(() => false);
-            }, { timeout: 15000, intervals: [200, 500, 1000, 2000] }).toBe(true);
+                if (await this.getRowTypeCell(tableName).isVisible().catch(() => false)) return true;
+                if (await this.listRefreshBtn.isEnabled().catch(() => false)) await this.listRefreshBtn.click().catch(() => {});
+                return false;
+            }, { timeout: 45000, intervals: [500, 1000, 2000, 3000] }).toBe(true);
         } else {
             // Negative path: wait for the input value to be committed; callers
             // (verifyTableNotCreated) then poll for count==0 on their own.

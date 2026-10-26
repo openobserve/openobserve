@@ -73,7 +73,7 @@ import { burnWindowLabel } from "@/utils/alerts/sloAlertPayload";
 import {
   ANOMALY_BAND_GROUPING_KEYS,
   ANOMALY_DIRECTION_KEYS,
-  anomalyTrainedK,
+  anomalySensitivityModel,
   anomalyWindowShareEffective,
 } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 import { sloDetailRoute } from "@/utils/alerts/sloAlertRouting";
@@ -237,7 +237,8 @@ const anomalyFiltersText = computed(() => {
 const anomalyBandWidth = (a: any): string => {
   const set = isBlank(a?.band_width) ? NaN : Number(a.band_width);
   if (Number.isFinite(set)) return `${Math.round(set * 100) / 100}σ`;
-  const trained = anomalyTrainedK(a);
+  const model = anomalySensitivityModel(a);
+  const trained = model.current ? model.level : null;
   return trained === null
     ? t("alerts.anomaly.sensitivityAuto")
     : t("alerts.anomaly.sensitivityAutoTrained", { k: trained });

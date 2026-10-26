@@ -112,12 +112,7 @@ impl SsrfGuard {
             let lower_host = host.to_lowercase();
             let host_allowed = allowlist.allows_host(host);
 
-            if !allow_loopback
-                && !host_allowed
-                && (lower_host == "localhost"
-                    || lower_host.starts_with("localhost.")
-                    || lower_host == "127.0.0.1")
-            {
+            if !allow_loopback && !host_allowed && is_loopback_name(&lower_host) {
                 return Err("Access to localhost is not allowed for security reasons".to_string());
             }
 
@@ -134,12 +129,7 @@ impl SsrfGuard {
                 ));
             }
 
-            if lower_host == "169.254.169.254"
-                || lower_host == "metadata.google.internal"
-                || lower_host == "metadata"
-                || lower_host.ends_with(".metadata.google.internal")
-                || lower_host.ends_with("metadata.")
-            {
+            if is_metadata_name(&lower_host) {
                 return Err(format!(
                     "Access to cloud metadata endpoint {} is not allowed for security reasons",
                     host
@@ -153,16 +143,6 @@ impl SsrfGuard {
     #[cfg(test)]
     fn is_private_ip(ip: &IpAddr) -> bool {
         Self::is_private_ip_inner(ip, false)
-    }
-
-    /// Validate one IP against the strict SSRF policy.
-    pub fn check_ip_with_config(ip: &IpAddr) -> Result<(), String> {
-        let allow_loopback = crate::get_config().common.ssrf_allow_loopback;
-        let skip_ssrf = crate::get_config().common.skip_ssrf_checks;
-        if skip_ssrf {
-            return Ok(());
-        }
-        Self::check_ip_inner(ip, allow_loopback, false, &NO_ALLOWLIST)
     }
 
     /// `host_allowed` lifts the private-address check except for link-local and metadata IPs.
@@ -520,6 +500,60 @@ pub fn init_allowlist() {
     LazyLock::force(&ALLOWLIST);
 }
 
+/// True when every synthetics probe refuses `host` under every SSRF policy: loopback,
+/// link-local (the cloud metadata endpoint lives there), multicast, unspecified, the
+/// `METADATA_IPS` list and the fixed metadata hostnames.
+///
+/// This is a save-time courtesy for URLs a remote probe will fetch, so it ignores the
+/// operator allowlist and the `ZO_SSRF_*` flags, which describe the server's network,
+/// not the probe's. Private ranges (RFC1918, ULA) are allowed: a private location exists
+/// to reach them. Only literal IPs and fixed names are judged; other names resolve in the
+/// probe, whose dialer is the authoritative control.
+pub fn is_always_blocked_host(host: &str) -> bool {
+    let unbracketed = host
+        .strip_prefix('[')
+        .and_then(|h| h.strip_suffix(']'))
+        .unwrap_or(host);
+    if let Ok(ip) = unbracketed.parse::<IpAddr>() {
+        return is_always_blocked_ip(&ip);
+    }
+    let lower = host.to_ascii_lowercase();
+    is_loopback_name(&lower) || is_metadata_name(&lower)
+}
+
+/// The subset of [`SsrfGuard::is_private_ip_inner`] that no policy relaxes: link-local and
+/// metadata (via [`needs_explicit_cidr`]) plus loopback, unspecified, multicast and `0.0.0.0/8`.
+fn is_always_blocked_ip(ip: &IpAddr) -> bool {
+    if needs_explicit_cidr(ip) {
+        return true;
+    }
+    match unwrap_embedded_ipv4(ip) {
+        IpAddr::V4(v4) => {
+            v4.is_loopback()
+                || v4.is_unspecified()
+                || v4.is_multicast()
+                || v4.is_broadcast()
+                || v4.octets()[0] == 0
+        }
+        IpAddr::V6(v6) => v6.is_loopback() || v6.is_unspecified() || v6.is_multicast(),
+    }
+}
+
+/// `host` (lowercased) names the local machine without going through DNS.
+fn is_loopback_name(host: &str) -> bool {
+    host == "localhost" || host.starts_with("localhost.") || host == "127.0.0.1"
+}
+
+/// `host` (lowercased) is a cloud metadata endpoint by name or by its well-known literal.
+fn is_metadata_name(host: &str) -> bool {
+    host == "169.254.169.254"
+        || host == "metadata"
+        || host == "metadata.google.internal"
+        || host.ends_with(".metadata.google.internal")
+        || host == "metadata.goog"
+        || host.ends_with("metadata.")
+}
+
 /// The guard's refusal in `err`'s source chain; it is permanent, so never worth a retry.
 pub fn find_ssrf_refusal<'a>(
     err: &'a (dyn std::error::Error + 'static),
@@ -697,6 +731,60 @@ fn prefix_eq(a: u128, b: u128, prefix: u8, bits: u32) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn always_blocked_hosts_match_what_every_probe_refuses() {
+        for blocked in [
+            "127.0.0.1",
+            "127.8.8.8",
+            "0.0.0.0",
+            "0.1.2.3",
+            "169.254.169.254",
+            "169.254.170.2",
+            "169.254.1.1",
+            "100.100.100.200",
+            "224.0.0.1",
+            "255.255.255.255",
+            "::1",
+            "[::1]",
+            "::",
+            "fe80::1",
+            "[fe80::1]",
+            "ff02::1",
+            "fd00:ec2::254",
+            "[fd00:ec2::254]",
+            "::ffff:127.0.0.1",
+            "::ffff:169.254.169.254",
+            "64:ff9b::a9fe:a9fe",
+            "2002:7f00:1::",
+            "localhost",
+            "LOCALHOST",
+            "localhost.localdomain",
+            "metadata",
+            "metadata.google.internal",
+            "foo.metadata.google.internal",
+            "metadata.goog",
+        ] {
+            assert!(super::is_always_blocked_host(blocked), "{blocked}");
+        }
+        // Private ranges stay allowed: a private location exists to reach them.
+        for allowed in [
+            "10.0.0.5",
+            "172.16.0.1",
+            "192.168.1.1",
+            "100.64.0.1",
+            "fd12::1",
+            "[fd12::1]",
+            "::ffff:10.0.0.5",
+            "8.8.8.8",
+            "shop.test",
+            "api.internal",
+            "service.local",
+            "metadata.example.com",
+        ] {
+            assert!(!super::is_always_blocked_host(allowed), "{allowed}");
+        }
+    }
+
     use super::*;
 
     fn none() -> SsrfAllowlist {
@@ -923,13 +1011,6 @@ mod tests {
         assert!(SsrfGuard::is_private_ip(&"fc00::1".parse().unwrap()));
         assert!(!SsrfGuard::is_private_ip(&"8.8.8.8".parse().unwrap()));
         assert!(!SsrfGuard::is_private_ip(&"2606:4700::1".parse().unwrap()));
-    }
-
-    #[test]
-    fn test_check_ip_with_config_rejects_private() {
-        assert!(SsrfGuard::check_ip_with_config(&"10.0.0.1".parse().unwrap()).is_err());
-        assert!(SsrfGuard::check_ip_with_config(&"169.254.169.254".parse().unwrap()).is_err());
-        assert!(SsrfGuard::check_ip_with_config(&"8.8.8.8".parse().unwrap()).is_ok());
     }
 
     #[tokio::test]

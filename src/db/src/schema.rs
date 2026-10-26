@@ -667,26 +667,6 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub fn filter_schema_version_id(schemas: &[Schema], _start_dt: i64, end_dt: i64) -> Option<usize> {
-    let versions = schemas.len();
-    for (i, schema) in schemas.iter().enumerate() {
-        let metadata = schema.metadata();
-        let schema_end_dt: i64 = metadata
-            .get("end_dt")
-            .unwrap_or(&"0".to_string())
-            .parse()
-            .unwrap();
-        if end_dt < schema_end_dt {
-            return Some(i);
-        }
-    }
-    if versions > 0 {
-        Some(versions - 1)
-    } else {
-        None
-    }
-}
-
 pub async fn list_organizations_from_cache() -> Vec<String> {
     let mut names = HashSet::new();
     let r = STREAM_SCHEMAS_LATEST.read().await;
@@ -793,21 +773,7 @@ pub async fn list_streams_from_cache(org_id: &str, stream_type: StreamType) -> V
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
-    use arrow_schema::Schema;
-
     use super::*;
-
-    fn schema_with_end_dt(end_dt: i64) -> Schema {
-        let mut meta = HashMap::new();
-        meta.insert("end_dt".to_string(), end_dt.to_string());
-        Schema::new_with_metadata(vec![] as Vec<arrow_schema::Field>, meta)
-    }
-
-    fn schema_without_end_dt() -> Schema {
-        Schema::new_with_metadata(vec![] as Vec<arrow_schema::Field>, HashMap::new())
-    }
 
     #[tokio::test]
     async fn test_list_all_streams_grouped() {
@@ -843,78 +809,6 @@ mod tests {
         for key in &keys {
             w.remove(key);
         }
-    }
-
-    // ── filter_schema_version_id ──────────────────────────────────────────────
-
-    #[test]
-    fn test_filter_schema_version_id_empty_schemas() {
-        assert_eq!(filter_schema_version_id(&[], 0, 1000), None);
-    }
-
-    #[test]
-    fn test_filter_schema_version_id_single_schema_matches() {
-        // end_dt=5000, query end_dt=3000 → 3000 < 5000 → returns index 0
-        let schemas = vec![schema_with_end_dt(5000)];
-        assert_eq!(filter_schema_version_id(&schemas, 0, 3000), Some(0));
-    }
-
-    #[test]
-    fn test_filter_schema_version_id_single_schema_no_match_returns_last() {
-        // end_dt=1000, query end_dt=2000 → 2000 is NOT < 1000 → fallback to last (index 0)
-        let schemas = vec![schema_with_end_dt(1000)];
-        assert_eq!(filter_schema_version_id(&schemas, 0, 2000), Some(0));
-    }
-
-    #[test]
-    fn test_filter_schema_version_id_multiple_schemas_finds_first_match() {
-        // Three versions with end_dt: 1000, 5000, 9000
-        // Query end_dt = 3000 → 3000 < 5000 at index 1 → returns 1
-        let schemas = vec![
-            schema_with_end_dt(1000),
-            schema_with_end_dt(5000),
-            schema_with_end_dt(9000),
-        ];
-        assert_eq!(filter_schema_version_id(&schemas, 0, 3000), Some(1));
-    }
-
-    #[test]
-    fn test_filter_schema_version_id_query_before_all_versions() {
-        // end_dt values: 1000, 2000, 3000; query end_dt = 500 → 500 < 1000 → index 0
-        let schemas = vec![
-            schema_with_end_dt(1000),
-            schema_with_end_dt(2000),
-            schema_with_end_dt(3000),
-        ];
-        assert_eq!(filter_schema_version_id(&schemas, 0, 500), Some(0));
-    }
-
-    #[test]
-    fn test_filter_schema_version_id_query_after_all_versions() {
-        // end_dt values: 1000, 2000, 3000; query end_dt = 5000 → no match → last index (2)
-        let schemas = vec![
-            schema_with_end_dt(1000),
-            schema_with_end_dt(2000),
-            schema_with_end_dt(3000),
-        ];
-        assert_eq!(filter_schema_version_id(&schemas, 0, 5000), Some(2));
-    }
-
-    #[test]
-    fn test_filter_schema_version_id_schema_missing_end_dt_metadata() {
-        // Schema without end_dt → parses as 0 → any end_dt ≥ 0 never satisfies end_dt < 0
-        // so falls through to last-index fallback
-        let schemas = vec![schema_without_end_dt()];
-        // query end_dt = 100 → 100 is NOT < 0 → fallback last index (0)
-        assert_eq!(filter_schema_version_id(&schemas, 0, 100), Some(0));
-    }
-
-    #[test]
-    fn test_filter_schema_version_id_boundary_equal_end_dt() {
-        // Condition is strict <, so end_dt == schema end_dt should NOT match
-        let schemas = vec![schema_with_end_dt(5000), schema_with_end_dt(9000)];
-        // query end_dt = 5000 → 5000 is NOT < 5000 → check next: 5000 < 9000 → returns 1
-        assert_eq!(filter_schema_version_id(&schemas, 0, 5000), Some(1));
     }
 
     #[test]

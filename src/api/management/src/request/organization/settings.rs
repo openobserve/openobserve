@@ -19,14 +19,20 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-#[cfg(feature = "cloud")]
-use config::META_ORG_ID;
 use db::organization::{get_org_setting, set_org_setting};
 use infra::errors::{DbError, Error};
 #[cfg(feature = "enterprise")]
 use {
     axum::extract::{Multipart, Query},
     o2_enterprise::enterprise::common::settings,
+};
+#[cfg(feature = "cloud")]
+use {
+    config::META_ORG_ID,
+    o2_enterprise::enterprise::cloud::{
+        billing_group::list_billing_group_members_of, billings::MeteringProvider, customer_billings,
+    },
+    std::collections::HashSet,
 };
 
 use crate::common::meta::{
@@ -72,8 +78,12 @@ pub async fn create(
     #[cfg(feature = "cloud")]
     let settings = match check_domain_org_mappings(&org_id, settings).await {
         Ok(settings) => settings,
-        Err(msg) => return MetaHttpResponse::bad_request(msg),
+        Err(refusal) => return refusal,
     };
+    #[cfg(feature = "cloud")]
+    if let Err(response) = check_budget_config(&org_id, &settings).await {
+        return response;
+    }
 
     match db::organization::update_org_setting(&org_id, |data| {
         apply_settings_payload(data, settings)
@@ -252,7 +262,7 @@ fn validate_settings_payload(settings: &OrganizationSettingPayload) -> Result<()
 async fn check_domain_org_mappings(
     org_id: &str,
     mut settings: OrganizationSettingPayload,
-) -> Result<OrganizationSettingPayload, String> {
+) -> Result<OrganizationSettingPayload, Response> {
     let Some(mut mappings) = settings.domain_org_mappings.take() else {
         return Ok(settings);
     };
@@ -260,32 +270,39 @@ async fn check_domain_org_mappings(
         return Ok(settings);
     }
     for mapping in &mut mappings {
-        if openobserve_core::organization::get_org(&mapping.org_id)
-            .await
-            .is_none()
-        {
-            return Err(format!("No org with org id {} found", mapping.org_id));
+        // A deleted org keeps its row as a tombstone, so the row alone does not make it a target.
+        match db::org_status::read_active(&mapping.org_id).await {
+            Ok(true) => {}
+            Ok(false) => return Err(inactive_mapping_target(&mapping.org_id).await),
+            Err(e) => {
+                return Err(MetaHttpResponse::internal_error(format!(
+                    "cannot read the status of org {}: {e}",
+                    mapping.org_id
+                )));
+            }
         }
 
         if mapping.domain.is_empty() || mapping.domain.contains(' ') {
-            return Err(format!(
+            return Err(MetaHttpResponse::bad_request(format!(
                 "domain cannot have space or be empty, bad domain '{}'",
                 mapping.domain
-            ));
+            )));
         }
 
         if !matches!(
             mapping.base_role.as_str(),
             "admin" | "editor" | "viewer" | "allowed_user"
         ) {
-            return Err(format!(
+            return Err(MetaHttpResponse::bad_request(format!(
                 "base role {} for org {} is not a valid base role - only admin, editor, viewer, allowed_user are supported",
                 mapping.base_role, mapping.org_id
-            ));
+            )));
         }
         if let Some(claim) = mapping.role_claim_name.as_mut() {
             if claim.trim().is_empty() {
-                return Err("role claim name must not be empty".to_string());
+                return Err(MetaHttpResponse::bad_request(
+                    "role claim name must not be empty",
+                ));
             }
             *claim = claim.trim().to_string();
         }
@@ -294,6 +311,74 @@ async fn check_domain_org_mappings(
     }
     settings.domain_org_mappings = Some(mappings);
     Ok(settings)
+}
+
+/// The refusal for a mapping whose target org is not active: missing, blocked, or unreadable.
+#[cfg(feature = "cloud")]
+async fn inactive_mapping_target(org_id: &str) -> Response {
+    match infra::table::organizations::find(org_id).await {
+        Ok(None) => MetaHttpResponse::bad_request(format!("No org with org id {org_id} found")),
+        Ok(Some(_)) => MetaHttpResponse::bad_request(format!("org {org_id} is not active")),
+        Err(e) => MetaHttpResponse::internal_error(format!("cannot read org {org_id}: {e}")),
+    }
+}
+
+// Budgets are for Stripe-billed orgs only, and only for this org, its group members and the
+// group total; checked before the settings lock, since it reads billing and group tables.
+#[cfg(feature = "cloud")]
+async fn check_budget_config(
+    org_id: &str,
+    settings: &OrganizationSettingPayload,
+) -> Result<(), Response> {
+    let Some(configs) = settings.budget_config.as_ref() else {
+        return Ok(());
+    };
+    let billings = match customer_billings::get_by_org_id(org_id).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("error getting customer billings for org_id {org_id} : {e}");
+            return Err(MetaHttpResponse::internal_error(e));
+        }
+    };
+    if !billings
+        .first()
+        .is_some_and(|v| v.provider == MeteringProvider::Stripe)
+    {
+        return Err(MetaHttpResponse::bad_request(
+            "this org is not configured with stripe billing, so budget cannot be set".to_string(),
+        ));
+    }
+    let child_orgs = match list_billing_group_members_of(org_id).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("error in getting child orgs of {org_id} for budget config update : {e}");
+            return Err(MetaHttpResponse::internal_error(e));
+        }
+    };
+    let mut allowed_orgs: HashSet<_> = child_orgs.into_iter().map(|v| v.member_org_id).collect();
+    allowed_orgs.insert(org_id.to_string());
+    allowed_orgs.insert("total".to_string()); // special indicator for total of super org
+    if let Some(config) = configs.iter().find(|c| !allowed_orgs.contains(&c.org_id)) {
+        return Err(MetaHttpResponse::bad_request(format!(
+            "cannot set budget notification configuration for org {}",
+            config.org_id
+        )));
+    }
+    for config in configs {
+        if config.total_budget_amount <= 0.0 {
+            return Err(MetaHttpResponse::bad_request(format!(
+                "cannot set budget amount less than 0 for org {}",
+                config.org_id
+            )));
+        }
+        if config.warn_at_amount <= 0.0 || config.warn_at_amount > config.total_budget_amount {
+            return Err(MetaHttpResponse::bad_request(format!(
+                "invalid warning amount for org {}",
+                config.org_id
+            )));
+        }
+    }
+    Ok(())
 }
 
 // Runs under the settings lock on a fresh read, so it must not await or fail.
@@ -346,6 +431,10 @@ fn apply_settings_payload(
     if merge_red_insights_enabled(data, settings.red_insights_enabled) {
         field_found = true;
     }
+    if let Some(ai_rca_thread_tool_output) = settings.ai_rca_thread_tool_output {
+        field_found = true;
+        data.ai_rca_thread_tool_output = ai_rca_thread_tool_output;
+    }
     if let Some(cross_links) = settings.cross_links {
         field_found = true;
         data.cross_links = cross_links;
@@ -354,6 +443,11 @@ fn apply_settings_payload(
     if let Some(mappings) = settings.domain_org_mappings {
         field_found = true;
         data.domain_org_mappings = mappings;
+    }
+    #[cfg(feature = "cloud")]
+    if let Some(configs) = settings.budget_config {
+        field_found = true;
+        data.budget_config = configs;
     }
     // this will always be taken from orgs table, never from settings
     data.free_trial_expiry = None;

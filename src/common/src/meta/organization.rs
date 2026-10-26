@@ -30,6 +30,7 @@ pub enum OrgStatus {
     Active,
     PendingDeletion,
     Deleting,
+    Deleted,
 }
 
 use config::meta::{cluster::Node, self_reporting::usage};
@@ -177,6 +178,9 @@ pub struct OrgDetails {
     /// to the local part of `owner_email` when this is empty.
     #[serde(default)]
     pub owner_first_name: String,
+    /// When the organization was created, as a Unix timestamp in microseconds; 0 when unknown.
+    #[serde(default)]
+    pub created_at: i64,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -490,6 +494,14 @@ pub struct DomainOrgMapping {
     pub create_missing_roles: bool,
 }
 
+#[derive(Deserialize, Serialize, Debug, Clone, ToSchema)]
+pub struct BudgetNotificationConfiguration {
+    pub org_id: String,
+    pub total_budget_amount: f64,
+    pub warn_at_amount: f64,
+    pub paused: bool,
+}
+
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
 pub struct OrganizationSettingPayload {
     /// Ideally this should be the same as prometheus-scrape-interval (in
@@ -518,6 +530,8 @@ pub struct OrganizationSettingPayload {
     pub usage_stream_enabled: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub red_insights_enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ai_rca_thread_tool_output: Option<bool>,
     #[cfg(feature = "enterprise")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub claim_parser_function: Option<String>,
@@ -525,6 +539,8 @@ pub struct OrganizationSettingPayload {
     pub cross_links: Option<Vec<config::meta::stream::CrossLink>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub domain_org_mappings: Option<Vec<DomainOrgMapping>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub budget_config: Option<Vec<BudgetNotificationConfiguration>>,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
@@ -559,6 +575,9 @@ pub struct OrganizationSetting {
     pub usage_stream_enabled: bool,
     #[serde(default)]
     pub red_insights_enabled: bool,
+    /// Show raw tool input and output in incident investigation threads.
+    #[serde(default)]
+    pub ai_rca_thread_tool_output: bool,
     #[cfg(feature = "enterprise")]
     #[serde(default = "default_claim_parser_function")]
     pub claim_parser_function: String,
@@ -569,6 +588,9 @@ pub struct OrganizationSetting {
     #[cfg(feature = "cloud")]
     #[serde(default)]
     pub domain_org_mappings: Vec<DomainOrgMapping>,
+    #[cfg(feature = "cloud")]
+    #[serde(default)]
+    pub budget_config: Vec<BudgetNotificationConfiguration>,
 }
 
 impl Default for OrganizationSetting {
@@ -599,12 +621,15 @@ impl Default for OrganizationSetting {
             max_series_per_query: None,
             usage_stream_enabled: default_usage_stream_enabled(),
             red_insights_enabled: false,
+            ai_rca_thread_tool_output: false,
             #[cfg(feature = "enterprise")]
             claim_parser_function: default_claim_parser_function(),
             cross_links: Vec::new(),
             org_storage_enabled: false,
             #[cfg(feature = "cloud")]
             domain_org_mappings: Vec::new(),
+            #[cfg(feature = "cloud")]
+            budget_config: Vec::new(),
         }
     }
 }
@@ -677,13 +702,6 @@ impl NodeListResponse {
 
         cluster_entry.push(node);
     }
-
-    /// Adds multiple nodes to the response structure
-    pub fn add_nodes(&mut self, nodes: Vec<(Node, String, String)>) {
-        for (node, region, cluster) in nodes {
-            self.add_node(node, region, cluster);
-        }
-    }
 }
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug, ToSchema)]
@@ -754,33 +772,6 @@ mod tests {
             .unwrap();
         assert_eq!(nodes.len(), 1);
         assert_eq!(nodes[0].name, "node-1");
-    }
-
-    #[test]
-    fn test_node_list_response_add_nodes() {
-        let node1 = Node {
-            name: "node-1".into(),
-            ..Default::default()
-        };
-        let node2 = Node {
-            name: "node-2".into(),
-            ..Default::default()
-        };
-
-        let mut response = NodeListResponse::new();
-        response.add_nodes(vec![
-            (node1.clone(), "us-west".into(), "cluster-x".into()),
-            (node2.clone(), "us-west".into(), "cluster-x".into()),
-        ]);
-
-        let nodes = &response
-            .regions
-            .get("us-west")
-            .unwrap()
-            .clusters
-            .get("cluster-x")
-            .unwrap();
-        assert_eq!(nodes.len(), 2);
     }
 
     #[test]
@@ -920,6 +911,7 @@ mod tests {
             plan: 0,
             owner_email: "admin1@example.com".to_string(),
             owner_first_name: "Admin".to_string(),
+            created_at: 1_700_000_000_000_000,
         };
 
         let response = OrganizationResponse {
@@ -929,6 +921,8 @@ mod tests {
         assert_eq!(response.data.len(), 1);
         assert_eq!(response.data[0].identifier, "org-1");
         assert_eq!(response.data[0].ingest_threshold, THRESHOLD);
+        let json = serde_json::to_value(&response).unwrap();
+        assert_eq!(json["data"][0]["created_at"], 1_700_000_000_000_000_i64);
     }
 
     #[test]
@@ -1474,10 +1468,12 @@ mod tests {
             max_series_per_query: None,
             usage_stream_enabled: None,
             red_insights_enabled: None,
+            ai_rca_thread_tool_output: None,
             #[cfg(feature = "enterprise")]
             claim_parser_function: None,
             cross_links: None,
             domain_org_mappings: None,
+            budget_config: None,
         };
         let json = serde_json::to_value(&payload).unwrap();
         let obj = json.as_object().unwrap();
@@ -1552,12 +1548,15 @@ mod tests {
             max_series_per_query: None,
             usage_stream_enabled: false,
             red_insights_enabled: false,
+            ai_rca_thread_tool_output: false,
             #[cfg(feature = "enterprise")]
             claim_parser_function: String::new(),
             cross_links: vec![],
             org_storage_enabled: false,
             #[cfg(feature = "cloud")]
             domain_org_mappings: vec![],
+            #[cfg(feature = "cloud")]
+            budget_config: vec![],
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();
@@ -1583,12 +1582,15 @@ mod tests {
             max_series_per_query: Some(1000),
             usage_stream_enabled: false,
             red_insights_enabled: false,
+            ai_rca_thread_tool_output: false,
             #[cfg(feature = "enterprise")]
             claim_parser_function: String::new(),
             cross_links: vec![],
             org_storage_enabled: false,
             #[cfg(feature = "cloud")]
             domain_org_mappings: vec![],
+            #[cfg(feature = "cloud")]
+            budget_config: vec![],
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();

@@ -167,6 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Histogram (pinned by default — see useToolbarPins) -->
           <OButton
             v-if="showPinnedHistogram"
+            as="div"
             data-test="logs-search-bar-histogram-btn"
             size="xs"
             variant="outline"
@@ -175,6 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OSwitch
               v-model="searchObj.meta.showHistogram"
+              :aria-label="t('search.showHistogramLabel')"
               :size="toolbarToggleIconOnly ? 'sm' : 'md'"
               @click.stop
             />
@@ -192,6 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- SQL Mode (pinned) -->
           <OButton
             v-if="showPinnedSqlMode"
+            as="div"
             data-test="logs-search-bar-sql-mode-pinned-btn"
             size="xs"
             variant="outline"
@@ -200,6 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OSwitch
               :model-value="searchObj.meta.sqlMode"
+              :aria-label="t('search.sqlModeLabel')"
               :disabled="isSqlModeDisabled"
               :size="toolbarToggleIconOnly ? 'sm' : 'md'"
               @click.stop="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
@@ -211,6 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Quick Mode (pinned) -->
           <OButton
             v-if="showPinnedQuickMode"
+            as="div"
             data-test="logs-search-bar-quick-mode-pinned-btn"
             size="xs"
             variant="outline"
@@ -219,6 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OSwitch
               :model-value="searchObj.meta.quickMode"
+              :aria-label="t('search.quickModeLabel')"
               :size="toolbarToggleIconOnly ? 'sm' : 'md'"
               @click.stop="handleQuickMode"
             />
@@ -907,6 +913,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Function Editor (pinned) — sits to the left of the date picker -->
         <OButton
           v-if="showPinnedFunctionEditor"
+          as="div"
           data-test="logs-search-bar-function-editor-pinned-btn"
           size="xs"
           variant="outline"
@@ -915,6 +922,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OSwitch
             v-model="searchObj.meta.showTransformEditor"
+            :aria-label="t('search.functionEditorLabel')"
             :size="toolbarToggleIconOnly ? 'sm' : 'md'"
             @click.stop
           />
@@ -1019,6 +1027,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       variant="ghost"
                       size="icon-xs"
+                      :aria-label="t('search.refreshCacheAndRunQuery')"
                       data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                       :class="[
                         config.isEnterprise == 'true' && visualizeSearchRequestTraceIds.length
@@ -1075,6 +1084,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       variant="ghost"
                       size="icon-xs"
+                      :aria-label="t('search.refreshCacheAndRunQuery')"
                       data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                       :class="[
                         config.isEnterprise == 'true' && visualizeSearchRequestTraceIds.length
@@ -1130,15 +1140,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-cy="search-bar-refresh-button"
                 :data-run-pending="showRunQueryPending ? 'true' : undefined"
                 :aria-label="showRunQueryPending ? t('search.runQueryPendingLabel') : undefined"
-                :variant="showRunQueryPending ? 'warning' : 'primary'"
+                :variant="showRunQueryPending ? 'pending' : 'primary'"
                 :title="t('search.runQuery')"
                 size="sm-toolbar"
                 class="element-box-shadow rounded-s-default! relative h-[1.875rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
-                :class="
+                :class="[
                   showRunQueryPending
                     ? ''
-                    : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md'
-                "
+                    : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
+                  showRunQueryPending ? 'border-e-button-pending-hover-bg!' : '',
+                ]"
                 @click="handleRunQueryFn()"
                 :loading="searchObj.loading || searchObj.loadingHistogram"
                 :disabled="
@@ -1164,19 +1175,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 {{ t("search.runQuery") }}
               </OButton>
-              <OSeparator class="h-[1.875rem]! w-px" vertical />
+              <OSeparator
+                v-if="!showRunQueryPending || isRunQueryCancelShown"
+                class="h-[1.875rem]! w-px"
+                vertical
+              />
               <ODropdown align="end" side="bottom">
                 <template #trigger>
                   <OButton
-                    :variant="showRunQueryPending && !isRunQueryCancelShown ? 'warning' : 'ghost'"
+                    :variant="showRunQueryPending && !isRunQueryCancelShown ? 'pending' : 'ghost'"
                     size="icon-xs"
+                    :aria-label="t('search.refreshCacheAndRunQuery')"
                     data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                     :class="[
                       isRunQueryCancelShown
                         ? 'bg-cancel-query-bg! text-button-primary-foreground!'
                         : !showRunQueryPending
                           ? 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md'
-                          : '',
+                          : showRunQueryPending
+                            ? 'border-s-0'
+                            : '',
                       'rounded-e-default! rounded-s-none!',
                     ]"
                   >
@@ -1304,6 +1322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :free-text-decorations="
                   searchObj.meta.sqlMode ? null : searchObj.data.freeTextDecorations
                 "
+                :filter-mode="!searchObj.meta.sqlMode"
                 editor-height="100%"
                 :style="editorWidthToggleFunction"
                 language="sql"
@@ -1759,6 +1778,7 @@ import { appendConjunct, looksLikeSqlStatement } from "@/utils/query/freeTextFil
 import { buildFilterContext, isFilterHeld } from "@/composables/useLogs/freeTextSearch";
 import { useFreeTextPreview } from "@/composables/useLogs/useFreeTextPreview";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
+import { setFieldTypeOf } from "@/utils/query/sqlDiagnostics";
 import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 import { logsUtils, removeFieldFromWhereAST } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
@@ -2193,10 +2213,22 @@ export default defineComponent({
       externalErrors: toRef(searchObj.data, "sqlSyntaxErrorRanges"),
     });
 
+    // A server type error names only types, so the squiggle needs the stream's column types to pick its operand.
+    const releaseFieldTypes = setFieldTypeOf((name) => {
+      // The field loader stores dataType; a raw stream schema written straight in carries type.
+      const field = (searchObj.data.stream.selectedStreamFields ?? []).find(
+        (f: any) => f.name === name,
+      );
+      return field?.dataType || field?.type;
+    });
+    onBeforeUnmount(releaseFieldTypes);
+
     const onQueryEditorFocus = () => {
       searchObj.meta.queryEditorPlaceholderFlag = false;
       _sqlOnFocus();
     };
+
+    const focusEditor = () => queryEditorRef.value?.focus?.();
 
     const handleQueryEditorBlur = async () => {
       searchObj.meta.queryEditorPlaceholderFlag = true;
@@ -2620,15 +2652,30 @@ export default defineComponent({
       return searchObj.data.transformType === "function" ? "Function" : "Transform";
     });
 
+    // Set as soon as the stream is chosen, so a value lookup on the first keystroke is not left without one.
+    const syncSuggestStreamContext = () => {
+      autoCompleteData.value.org = store.state.selectedOrganization?.identifier ?? "";
+      autoCompleteData.value.streamType = searchObj.data.stream.streamType ?? "logs";
+      autoCompleteData.value.streamName = searchObj.data.stream.selectedStream?.[0] ?? "";
+      autoCompleteData.value.fieldValues = props.fieldValues;
+    };
+    watch(
+      () => [
+        store.state.selectedOrganization?.identifier,
+        searchObj.data.stream.streamType,
+        searchObj.data.stream.selectedStream?.[0],
+        props.fieldValues,
+      ],
+      syncSuggestStreamContext,
+      { immediate: true },
+    );
+
     const updateAutoComplete = (value) => {
       autoCompleteData.value.query = value;
       autoCompleteData.value.cursorIndex = queryEditorRef?.value?.getCursorIndex();
       autoCompleteData.value.fieldValues = props.fieldValues;
       autoCompleteData.value.popup.open = queryEditorRef?.value?.triggerAutoComplete;
-      // [NEW] Pass stream context for IndexedDB value lookups
-      autoCompleteData.value.org = store.state.selectedOrganization.identifier;
-      autoCompleteData.value.streamType = searchObj.data.stream.streamType ?? "logs";
-      autoCompleteData.value.streamName = searchObj.data.stream.selectedStream?.[0] ?? "";
+      syncSuggestStreamContext();
       getSuggestions();
     };
 
@@ -2684,7 +2731,7 @@ export default defineComponent({
       },
     };
 
-    const updateQueryValue = (value: string) => {
+    const updateQueryValue = (value: string, origin?: { fromUser?: boolean }) => {
       // During stream changes, the editor's debounced onDidChangeModelContent
       // callback can re-emit a stale value after onStreamChange has cleared the
       // query. Reject these stale re-emissions to prevent the old filter from
@@ -2716,10 +2763,13 @@ export default defineComponent({
 
       _sqlOnQueryChange();
 
-      // Turn off SQL mode when query is completely cleared
       if (value.trim() === "" && searchObj.meta.sqlMode === true) {
-        searchObj.meta.sqlMode = false;
+        // An emptied query names no stream, so its stream-not-found error goes however it was emptied.
         searchObj.data.filterErrMsg = "";
+        // A write the user did not make must not change their mode: the Build tab's panel reset arrives as an empty value, and off SQL mode it syncs the generated SQL back as a WHERE clause an aggregate query does not have.
+        if (origin?.fromUser !== false) {
+          searchObj.meta.sqlMode = false;
+        }
       }
 
       // Turn off SQL mode when the query is no longer a SQL statement (user
@@ -3055,14 +3105,10 @@ export default defineComponent({
       }
 
       if (value.userChangedValue) {
-        analytics.track("Button Click", {
-          button: "Date Change",
-          tab: value.tab,
-          value: value,
-          //user_org: this.store.state.selectedOrganization.identifier,
-          //user_id: this.store.state.userInfo.email,
+        analytics.track("logs_time_range_changed", {
           stream_name: searchObj.data.stream.selectedStream.join(","),
-          page: "Search Logs",
+          value_type: value.valueType,
+          relative_period: value.relativeTimePeriod,
         });
       }
 
@@ -4912,6 +4958,7 @@ export default defineComponent({
       fnEditorRef,
       searchObj,
       queryEditorRef,
+      focusEditor,
       syntaxGuideRef,
       confirmDialogVisible,
       confirmCallback,

@@ -102,8 +102,22 @@ export interface RichCardStepVariant {
    */
   iconInvertDark?: boolean;
   code: RichCardCode;
+  /** Inputs shown only while this variant is selected; ids must be unique card-wide. */
+  inputs?: RichCardInput[];
+  /** While none of these inputs has a value, show the message instead of the code. */
+  requireOneOf?: { ids: string[]; messageKey: I18nKey };
   /** Optional note rendered under the code for this variant only. */
   note?: I18nText;
+}
+
+/** A toggle entry with its own nested toggle (one level only); the chosen sub-variant supplies code, note and inputs. */
+export interface RichCardStepVariantGroup extends Pick<
+  RichCardStepVariant,
+  "id" | "label" | "labelKey" | "icon" | "iconInvertDark"
+> {
+  variants: RichCardStepVariant[];
+  // Declared so `step.variants[i].code` still type-checks across the union.
+  code?: never;
 }
 
 /**
@@ -143,7 +157,7 @@ export interface RichCardStep {
    * Selectable code alternatives (e.g. per OS/arch). When present, the card
    * renders a toggle and shows the chosen variant's code; `code` is ignored.
    */
-  variants?: RichCardStepVariant[];
+  variants?: (RichCardStepVariant | RichCardStepVariantGroup)[];
   /**
    * Shares the variant selection across steps: steps with the same `variantGroup`
    * read/write one selected id (e.g. "os" so the install OS choice drives the
@@ -322,6 +336,10 @@ export interface RichCardInput {
   helpKey?: I18nKey;
   /** Width hint passed to OInput (e.g. "sm" | "md"). Defaults to "md". */
   width?: FieldWidth;
+  /** CLI flag: the value goes into the variant's `{flags}` as `<flag> '<value>'`, omitted when blank. */
+  flag?: string;
+  /** Helm list value: goes into `{flags}` as `--set-string '<key>={a,b}'`, or `--set <key>=null` when blank. */
+  helmSet?: string;
 }
 
 export interface RichCardContent {

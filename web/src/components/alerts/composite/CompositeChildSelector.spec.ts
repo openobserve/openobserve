@@ -33,6 +33,12 @@ const mountSelector = (
     global: { plugins: [i18n] },
   });
 
+const addButton = (wrapper: ReturnType<typeof mountSelector>) =>
+  wrapper.find('[data-test="alerts-composite-child-add"]');
+
+const addReason = (wrapper: ReturnType<typeof mountSelector>) =>
+  wrapper.find(`#${addButton(wrapper).attributes("aria-describedby")}`).text();
+
 describe("CompositeChildSelector", () => {
   it("renders each selected child as a lettered slot in selection order", () => {
     const wrapper = mountSelector(["child-2", "child-1"], [child(1), child(2)]);
@@ -67,14 +73,38 @@ describe("CompositeChildSelector", () => {
     expect(wrapper.emitted("update:modelValue")?.at(-1)?.[0]).toEqual(["child-2", "child-3"]);
   });
 
-  it("caps at ten children and shows the count", () => {
+  it("caps at ten children, shows the count and says why Add is unavailable", async () => {
     const selected = Array.from({ length: 10 }, (_, index) => `child-${index + 1}`);
     const wrapper = mountSelector(selected);
 
     expect(wrapper.find('[data-test="alerts-composite-child-cap"]').text()).toContain("10");
-    expect(
-      wrapper.find('[data-test="alerts-composite-child-add"]').attributes("disabled"),
-    ).toBeDefined();
+    expect(addButton(wrapper).attributes("aria-disabled")).toBe("true");
+    expect(addReason(wrapper)).toBe("You can add up to 10 alerts.");
+
+    await addButton(wrapper).trigger("click");
+    expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+  });
+
+  it("disables Add while the candidate alerts have not loaded, and enables it once they have", async () => {
+    const wrapper = mountSelector([], []);
+
+    expect(addButton(wrapper).attributes("aria-disabled")).toBe("true");
+    expect(addReason(wrapper)).toBe("No more eligible alerts to add.");
+
+    await wrapper.setProps({ options: [child(1), child(2)] });
+    expect(addButton(wrapper).attributes("aria-disabled")).toBeUndefined();
+    await addButton(wrapper).trigger("click");
+    expect(wrapper.emitted("update:modelValue")?.at(-1)?.[0]).toEqual(["child-1"]);
+  });
+
+  it("disables Add and says why when every candidate alert is already selected", async () => {
+    const wrapper = mountSelector(["child-1", "child-2"], [child(1), child(2)]);
+
+    expect(addButton(wrapper).attributes("aria-disabled")).toBe("true");
+    expect(addReason(wrapper)).toBe("No more eligible alerts to add.");
+
+    await addButton(wrapper).trigger("click");
+    expect(wrapper.emitted("update:modelValue")).toBeUndefined();
   });
 
   it("keeps an inaccessible child removable by its ID without revealing a name or level", () => {

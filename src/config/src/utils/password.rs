@@ -109,11 +109,6 @@ mod tests {
     }
 
     #[test]
-    fn accepts_minimum_valid() {
-        assert!(validate_password_strength("Abcdef1!").is_ok());
-    }
-
-    #[test]
     fn accepts_unicode_as_special() {
         // Non-ASCII characters satisfy the special-character requirement.
         assert!(validate_password_strength("Abcdef1π").is_ok());

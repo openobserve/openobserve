@@ -43,14 +43,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="tableRendererData"
           :config="panelSchema.config"
           :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
-          @row-click="onChartClick"
+          @row-click="
+            (params: any, ...rest: any[]) => !store.state.kioskMode && onChartClick(params, ...rest)
+          "
         />
         <TableRenderer
           v-else-if="panelSchema.type == 'table'"
           :data="tableRendererData"
           :value-mapping="panelSchema?.config?.mappings ?? []"
-          @row-click="onChartClick"
-          @explore-cell="(params) => exploreCellInLogs(params.columnId, params.value, params.row)"
+          @row-click="
+            (params: any, ...rest: any[]) => !store.state.kioskMode && onChartClick(params, ...rest)
+          "
+          @explore-cell="
+            (params) =>
+              !store.state.kioskMode && exploreCellInLogs(params.columnId, params.value, params.row)
+          "
           @format-column="onFormatColumn"
           ref="tableRendererRef"
           :wrap-cells="panelSchema.config?.wrap_table_cells"
@@ -58,8 +65,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rows-per-page="panelSchema.config?.table_pagination_rows_per_page"
           :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
           :enable-column-format="enableColumnFormat"
-          :drilldown-columns="store.state.printMode ? [] : drilldownColumnAliases"
-          :drilldown-all-columns="!store.state.printMode && drilldownAllColumns"
+          :drilldown-columns="
+            store.state.printMode || store.state.kioskMode ? [] : drilldownColumnAliases
+          "
+          :drilldown-all-columns="
+            !store.state.printMode && !store.state.kioskMode && drilldownAllColumns
+          "
         />
         <div
           v-else-if="panelSchema.type == 'html'"
@@ -97,12 +108,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="chartRendererRef"
           :data="chartRendererData"
           :height="chartPanelHeight"
+          :label="raw(panelSchema?.title)"
           :render-type="panelSchema?.type === 'metric' ? 'svg' : 'canvas'"
-          @updated:data-zoom="onDataZoom"
+          @updated:data-zoom="(event) => !store.state.kioskMode && onDataZoom(event)"
           @error="errorDetail = $event"
-          @click="onChartClick"
-          @contextmenu="onChartContextMenu"
-          @domcontextmenu="onChartDomContextMenu"
+          @click="
+            (params: any, ...rest: any[]) => !store.state.kioskMode && onChartClick(params, ...rest)
+          "
+          @contextmenu="(event) => !store.state.kioskMode && onChartContextMenu(event)"
+          @domcontextmenu="(event) => !store.state.kioskMode && onChartDomContextMenu(event)"
           :find-line-on-context-menu="findsLineOnContextMenu"
           @mouseover="exemplarInteraction.onMouseOver"
           @mouseout="exemplarInteraction.onMouseOut"
@@ -146,6 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @mouseleave="hoveredMetricIdx = null"
         >
           <OButton
+            :aria-label="t('common.copyToClipboard')"
             class="absolute"
             v-show="hoveredMetricIdx === m.idx || metricCopiedIdx === m.idx"
             variant="ghost"
@@ -2223,6 +2238,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       store,
       chartPanelRef,
       chartRendererRef,

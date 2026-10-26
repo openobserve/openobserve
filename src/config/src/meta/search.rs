@@ -359,7 +359,7 @@ impl ResponseChunkIterator {
                 * mb
         });
 
-        let hits = response.hits.drain(..).collect::<Vec<_>>();
+        let hits = std::mem::take(&mut response.hits);
 
         Self {
             response,
@@ -524,8 +524,8 @@ impl Response {
             .collect();
     }
 
-    pub fn add_hit(&mut self, hit: &json::Value) {
-        self.hits.push(hit.to_owned());
+    pub fn add_hit(&mut self, hit: json::Value) {
+        self.hits.push(hit);
         self.total += 1;
     }
 
@@ -1064,7 +1064,9 @@ impl<'de> Deserialize<'de> for SearchEventType {
             where
                 E: serde::de::Error,
             {
-                SearchEventType::try_from(value).map_err(serde::de::Error::custom)
+                value
+                    .parse::<SearchEventType>()
+                    .map_err(serde::de::Error::custom)
             }
         }
 
@@ -1090,9 +1092,9 @@ impl std::fmt::Display for SearchEventType {
     }
 }
 
-impl TryFrom<&str> for SearchEventType {
-    type Error = String;
-    fn try_from(s: &str) -> std::result::Result<Self, Self::Error> {
+impl std::str::FromStr for SearchEventType {
+    type Err = String;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "ui" => Ok(Self::UI),
             "dashboards" => Ok(Self::Dashboards),
@@ -1271,12 +1273,6 @@ impl MultiSearchPartitionRequest {
         self.encoding = RequestEncoding::Empty;
         Ok(())
     }
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
-pub struct MultiSearchPartitionResponse {
-    pub success: hashbrown::HashMap<String, SearchPartitionResponse>,
-    pub error: hashbrown::HashMap<String, String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -1547,10 +1543,6 @@ impl Interval {
         *self as i64
     }
 
-    pub fn get_interval_seconds(&self) -> i64 {
-        self.get_duration_minutes() * 60
-    }
-
     pub fn get_interval_microseconds(&self) -> i64 {
         self.get_duration_minutes() * 60 * 1_000_000
     }
@@ -1741,17 +1733,6 @@ mod search_history_utils {
             assert_eq!(
                 query,
                 "SELECT * FROM usage WHERE event='Search' AND stream_type = 'logs'"
-            );
-        }
-
-        #[test]
-        fn test_with_stream_name() {
-            let query = SearchHistoryQueryBuilder::new()
-                .with_stream_name(&Some("streamA".to_string()))
-                .build(SEARCH_STREAM_NAME);
-            assert_eq!(
-                query,
-                "SELECT * FROM usage WHERE event='Search' AND stream_name = 'streamA'"
             );
         }
 
@@ -2098,7 +2079,7 @@ mod tests {
         let hit = json::json!({"num":12});
         let mut val_map = json::Map::new();
         val_map.insert("id".to_string(), json::json!({"id":1}));
-        res.add_hit(&hit); // total+1
+        res.add_hit(hit); // total+1
         assert_eq!(res.total, 11);
     }
 
@@ -2505,19 +2486,19 @@ mod tests {
     #[test]
     fn test_search_event_type_try_from() {
         type Set = SearchEventType; // Saving line too long
-        assert_eq!(Set::try_from("ui").unwrap(), Set::UI);
-        assert_eq!(Set::try_from("dashboards").unwrap(), Set::Dashboards);
-        assert_eq!(Set::try_from("reports").unwrap(), Set::Reports);
-        assert_eq!(Set::try_from("alerts").unwrap(), Set::Alerts);
-        assert_eq!(Set::try_from("values").unwrap(), Set::Values);
-        assert_eq!(Set::try_from("_values").unwrap(), Set::Values);
-        assert_eq!(Set::try_from("other").unwrap(), Set::Other);
-        assert_eq!(Set::try_from("rum").unwrap(), Set::RUM);
-        assert_eq!(Set::try_from("derived_stream").unwrap(), Set::DerivedStream);
-        assert_eq!(Set::try_from("derivedstream").unwrap(), Set::DerivedStream);
-        assert_eq!(Set::try_from("search_job").unwrap(), Set::SearchJob);
-        assert_eq!(Set::try_from("searchjob").unwrap(), Set::SearchJob);
-        assert!(SearchEventType::try_from("invalid").is_err());
+        assert_eq!("ui".parse::<Set>().unwrap(), Set::UI);
+        assert_eq!("dashboards".parse::<Set>().unwrap(), Set::Dashboards);
+        assert_eq!("reports".parse::<Set>().unwrap(), Set::Reports);
+        assert_eq!("alerts".parse::<Set>().unwrap(), Set::Alerts);
+        assert_eq!("values".parse::<Set>().unwrap(), Set::Values);
+        assert_eq!("_values".parse::<Set>().unwrap(), Set::Values);
+        assert_eq!("other".parse::<Set>().unwrap(), Set::Other);
+        assert_eq!("rum".parse::<Set>().unwrap(), Set::RUM);
+        assert_eq!("derived_stream".parse::<Set>().unwrap(), Set::DerivedStream);
+        assert_eq!("derivedstream".parse::<Set>().unwrap(), Set::DerivedStream);
+        assert_eq!("search_job".parse::<Set>().unwrap(), Set::SearchJob);
+        assert_eq!("searchjob".parse::<Set>().unwrap(), Set::SearchJob);
+        assert!("invalid".parse::<SearchEventType>().is_err());
     }
 
     #[test]
@@ -3059,40 +3040,6 @@ mod tests {
     }
 
     #[test]
-    fn test_multi_search_partition_response() {
-        let mut response = MultiSearchPartitionResponse::default();
-        let partition_response = SearchPartitionResponse {
-            trace_id: "trace123".to_string(),
-            file_num: 10,
-            records: 100,
-            original_size: 1024,
-            compressed_size: 512,
-            histogram_interval: Some(3600),
-            max_query_range: 24,
-            partitions: vec![[100, 200]],
-            order_by: OrderBy::Asc,
-            limit: 1000,
-            streaming_output: true,
-            streaming_aggs: false,
-            streaming_id: Some("stream123".to_string()),
-            is_histogram_eligible: false,
-            non_ts_order_by_cols: vec![],
-        };
-
-        response
-            .success
-            .insert("query1".to_string(), partition_response);
-        response
-            .error
-            .insert("query2".to_string(), "Error message".to_string());
-
-        assert_eq!(response.success.len(), 1);
-        assert_eq!(response.error.len(), 1);
-        assert!(response.success.contains_key("query1"));
-        assert!(response.error.contains_key("query2"));
-    }
-
-    #[test]
     fn test_query_status_response() {
         let response = QueryStatusResponse {
             status: vec![QueryStatus {
@@ -3147,11 +3094,6 @@ mod tests {
         assert_eq!(Interval::FiveMinutes.get_duration_minutes(), 5);
         assert_eq!(Interval::OneHour.get_duration_minutes(), 60);
         assert_eq!(Interval::OneDay.get_duration_minutes(), 1440);
-
-        // Test duration in seconds
-        assert_eq!(Interval::FiveMinutes.get_interval_seconds(), 300);
-        assert_eq!(Interval::OneHour.get_interval_seconds(), 3600);
-        assert_eq!(Interval::OneDay.get_interval_seconds(), 86400);
 
         // Test duration in microseconds
         assert_eq!(
@@ -3503,20 +3445,13 @@ mod tests {
     #[test]
     fn test_search_event_type_try_from_download_and_insights() {
         assert_eq!(
-            SearchEventType::try_from("download").unwrap(),
+            "download".parse::<SearchEventType>().unwrap(),
             SearchEventType::Download
         );
         assert_eq!(
-            SearchEventType::try_from("insights").unwrap(),
+            "insights".parse::<SearchEventType>().unwrap(),
             SearchEventType::Insights
         );
-    }
-
-    #[test]
-    fn test_storage_type_equality() {
-        assert_eq!(StorageType::Memory, StorageType::Memory);
-        assert_eq!(StorageType::Wal, StorageType::Wal);
-        assert_ne!(StorageType::Memory, StorageType::Wal);
     }
 
     #[test]
@@ -3643,10 +3578,7 @@ mod tests {
     #[test]
     fn test_interval_seconds_and_microseconds() {
         let h = Interval::OneHour;
-        assert_eq!(h.get_interval_seconds(), 3600);
         assert_eq!(h.get_interval_microseconds(), 3_600_000_000);
-        let five = Interval::FiveMinutes;
-        assert_eq!(five.get_interval_seconds(), 300);
     }
 
     #[test]

@@ -414,7 +414,6 @@ test.describe(
 
         // Add a panel with custom SQL query using mustache syntax
         await pm.dashboardCreate.addPanel();
-        await pm.dashboardTimeRefresh.setRelative("30", "m");
 
         // Switch to custom query mode
         await pm.chartTypeSelector.switchToCustomQueryMode();
@@ -423,6 +422,9 @@ test.describe(
         const sqlQuery = `SELECT histogram(_timestamp) as "x_axis_1", count(*) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = '{{variablename}}' GROUP BY x_axis_1 ORDER BY x_axis_1`;
 
         await pm.chartTypeSelector.enterCustomSQL(sqlQuery);
+        await pm.chartTypeSelector.waitForCustomQueryAxes("x_axis_1", "y_axis_1");
+        // setRelative also clicks Apply; on a panel not loaded yet that raised an error toast this test then counted.
+        await pm.dashboardTimeRefresh.setRelative("30", "m");
 
         // Apply the query
         await pm.dashboardPanelActions.applyDashboardBtn();
@@ -835,7 +837,6 @@ test.describe(
 
         // Add a panel with custom SQL query using spaced mustache syntax
         await pm.dashboardCreate.addPanel();
-        await pm.dashboardTimeRefresh.setRelative("30", "m");
 
         // Switch to custom query mode
         await pm.chartTypeSelector.switchToCustomQueryMode();
@@ -844,6 +845,9 @@ test.describe(
         const sqlQuery = `SELECT histogram(_timestamp) as "x_axis_1", count(*) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = '{{ variablename }}' GROUP BY x_axis_1 ORDER BY x_axis_1`;
 
         await pm.chartTypeSelector.enterCustomSQL(sqlQuery);
+        await pm.chartTypeSelector.waitForCustomQueryAxes("x_axis_1", "y_axis_1");
+        // setRelative also clicks Apply; on a panel not loaded yet that raised an error toast this test then counted.
+        await pm.dashboardTimeRefresh.setRelative("30", "m");
 
         // Apply the query
         await pm.dashboardPanelActions.applyDashboardBtn();

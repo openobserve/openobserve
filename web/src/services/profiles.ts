@@ -37,6 +37,16 @@ export interface ProfilesMetaResponse {
 export interface ProfilesSeriesPoint {
   timestamp: number;
   value: number;
+  /** Value per second of profiled time; absent when the profiles carry no covered time (memory, older data). */
+  rate?: number | null;
+}
+
+export interface ProfilesSeriesGroup {
+  value: string;
+  total: number;
+  /** The values past `group_limit`, summed into one line. */
+  others: boolean;
+  series: ProfilesSeriesPoint[];
 }
 
 export interface ProfilesSeriesResponse {
@@ -44,6 +54,8 @@ export interface ProfilesSeriesResponse {
   profile_type: string;
   step_secs: number;
   series: ProfilesSeriesPoint[];
+  /** One line per value of `group_by`, heaviest first. */
+  groups?: ProfilesSeriesGroup[] | null;
   took: number;
 }
 
@@ -66,8 +78,40 @@ export interface ProfilesMergeResponse {
   total: number;
   merged_total: number;
   truncated: boolean;
+  /** The server folded small call paths into "other" to keep the tree under max_nodes. */
+  tree_truncated?: boolean;
   root: ProfilesTreeNode;
   top: ProfilesTopRow[];
+  took: number;
+}
+
+export interface ProfilesDiffNode {
+  name: string;
+  /** Comparison side. */
+  total: number;
+  self: number;
+  before_total: number;
+  before_self: number;
+  children?: ProfilesDiffNode[];
+}
+
+export interface ProfilesDiffTopRow {
+  name: string;
+  before_self: number;
+  before_total: number;
+  after_self: number;
+  after_total: number;
+}
+
+export interface ProfilesDiffResponse {
+  unit: string;
+  profile_type: string;
+  baseline_total: number;
+  comparison_total: number;
+  truncated: boolean;
+  tree_truncated?: boolean;
+  root: ProfilesDiffNode;
+  top: ProfilesDiffTopRow[];
   took: number;
 }
 
@@ -82,6 +126,9 @@ export interface ProfilesQueryBody {
   step?: string;
   max_nodes?: number;
   timeout?: number;
+  /** A label to draw one series per value of. */
+  group_by?: string;
+  group_limit?: number;
 }
 
 const decodeFilterPart = (part: string) => {
@@ -135,7 +182,7 @@ const profiles = {
   meta: (
     orgIdentifier: string,
     streamName: string,
-    payload: Pick<ProfilesQueryBody, "start_time" | "end_time" | "timeout">,
+    payload: Pick<ProfilesQueryBody, "start_time" | "end_time" | "timeout" | "service_name">,
   ) => {
     const query = new URLSearchParams();
     appendProfilesQuery(query, payload);
@@ -165,6 +212,18 @@ const profiles = {
   ) =>
     http().post<ProfilesMergeResponse>(
       `/api/${orgIdentifier}/${encodeURIComponent(streamName)}/profiles/merge`,
+      payload,
+      options,
+    ),
+
+  diff: (
+    orgIdentifier: string,
+    streamName: string,
+    payload: { baseline: ProfilesQueryBody; comparison: ProfilesQueryBody; max_nodes?: number },
+    options: { signal?: AbortSignal } = {},
+  ) =>
+    http().post<ProfilesDiffResponse>(
+      `/api/${orgIdentifier}/${encodeURIComponent(streamName)}/profiles/diff`,
       payload,
       options,
     ),

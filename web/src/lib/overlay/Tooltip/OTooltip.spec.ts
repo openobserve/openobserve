@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import { h, nextTick } from "vue";
+import { h, nextTick, ref } from "vue";
 import { TooltipProvider } from "reka-ui";
 import OTooltip from "./OTooltip.vue";
 
@@ -178,6 +178,52 @@ describe("OTooltip", () => {
       expect(plain.getAttribute("data-o-tooltip-trigger")).toBe("");
       expect(spy.mock.calls.some(([el]) => el === plain)).toBe(false);
       spy.mockRestore();
+    });
+  });
+
+  describe("trigger naming", () => {
+    it("uses the tooltip text as the name of an icon-only trigger", () => {
+      const wrapper = mount({
+        render: () => h("button", { "data-testid": "btn" }, [h(OTooltip, { content: "Refresh" })]),
+      });
+      expect(wrapper.find('[data-testid="btn"]').attributes("aria-label")).toBe("Refresh");
+    });
+
+    it("names the button, not the icon before the tooltip, when an icon precedes it", () => {
+      const wrapper = mount({
+        render: () =>
+          h("button", { "data-testid": "btn" }, [
+            h("span", { "data-testid": "icon", "aria-hidden": "true" }),
+            h(OTooltip, { content: "Refresh" }),
+          ]),
+      });
+      expect(wrapper.find('[data-testid="btn"]').attributes("aria-label")).toBe("Refresh");
+      expect(wrapper.find('[data-testid="icon"]').attributes("aria-label")).toBeUndefined();
+    });
+
+    it("keeps the button name in step with a changing tooltip text", async () => {
+      const text = ref("Expand");
+      const wrapper = mount({
+        render: () => h("button", { "data-testid": "btn" }, [h(OTooltip, { content: text.value })]),
+      });
+      expect(wrapper.find('[data-testid="btn"]').attributes("aria-label")).toBe("Expand");
+      text.value = "Collapse";
+      await nextTick();
+      expect(wrapper.find('[data-testid="btn"]').attributes("aria-label")).toBe("Collapse");
+    });
+
+    it("leaves a trigger that already has text or a name alone", () => {
+      const wrapper = mount({
+        render: () =>
+          h("div", [
+            h("button", { "data-testid": "text" }, ["Save", h(OTooltip, { content: "Hint" })]),
+            h("button", { "data-testid": "named", "aria-label": "Own" }, [
+              h(OTooltip, { content: "Hint" }),
+            ]),
+          ]),
+      });
+      expect(wrapper.find('[data-testid="text"]').attributes("aria-label")).toBeUndefined();
+      expect(wrapper.find('[data-testid="named"]').attributes("aria-label")).toBe("Own");
     });
   });
 

@@ -2,13 +2,14 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const { FirstEventPage } = require('../../pages/generalPages/firstEventPage.js');
 const { getAuthHeaders, getOrgIdentifier, authedRequest, isCloudEnvironment } = require('../utils/cloud-auth.js');
+const { ingestBase } = require('../utils/ingest-url.js');
 
 const ingestionBase = () => (process.env.INGESTION_URL || process.env.ZO_BASE_URL).replace(/\/$/, '');
 const HOUR_US = 3600 * 1000 * 1000;
 const base = () => process.env.ZO_BASE_URL.replace(/\/$/, '');
 
 async function ingest(request, orgId, stream, records) {
-    const res = await request.post(`${ingestionBase()}/api/${orgId}/${stream}/_json`, {
+    const res = await request.post(`${ingestBase(ingestionBase())}/api/${orgId}/${stream}/_json`, {
         headers: getAuthHeaders(),
         data: records,
     });
@@ -104,7 +105,7 @@ test.describe('First event bar', () => {
         await baseline;
 
         const sentUs = Date.now() * 1000;
-        const res = await request.post(`${ingestionBase()}/api/${orgId}/ingest/metrics/_json`, {
+        const res = await request.post(`${ingestBase(ingestionBase())}/api/${orgId}/ingest/metrics/_json`, {
             headers: getAuthHeaders(),
             data: [{ __name__: metric, __type__: 'gauge', _timestamp: sentUs, value: 1, host: 'e2e' }],
         });
@@ -138,7 +139,7 @@ test.describe('First event bar on a keyword card', () => {
         const body = await created.json();
         const orgId = body.identifier || (body.data && body.data.identifier);
         const metric = async (name, tsUs) => {
-            const res = await request.post(`${ingestionBase()}/api/${orgId}/ingest/metrics/_json`, {
+            const res = await request.post(`${ingestBase(ingestionBase())}/api/${orgId}/ingest/metrics/_json`, {
                 headers: getAuthHeaders(),
                 data: [{ __name__: name, __type__: 'gauge', _timestamp: tsUs, value: 1, host: 'e2e-kw' }],
             });

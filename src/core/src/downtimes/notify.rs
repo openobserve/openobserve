@@ -231,7 +231,7 @@ async fn send_one(org: &str, name: &str, vars: &[(&str, String)]) -> Result<(), 
         TemplateType::Email { title } if !title.is_empty() => render(title, vars, Escape::Plain),
         _ => render(DOWNTIME_EMAIL_TITLE, vars, Escape::Plain),
     };
-    crate::alerts::alert::dispatch_notification(&destination_type, &subject, body)
+    crate::alerts::alert::dispatch_notification(org, &destination_type, &subject, body)
         .await
         .map(|_| ())
         .map_err(|e| e.to_string())

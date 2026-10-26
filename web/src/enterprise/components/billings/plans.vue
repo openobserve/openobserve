@@ -15,80 +15,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-default overflow-auto px-4 pt-3" style="min-height: inherit">
+  <div class="rounded-default min-h-[inherit] overflow-auto px-4 pt-3">
     <!-- Page title is supplied by the parent Billing.vue OPageHeader; no local title here. -->
     <TrialPeriod v-if="!isChildOrg" class="mb-3" currentPage="billing"></TrialPeriod>
     <!-- AI Credits card: shown to child orgs too, whose AI use draws on the same credits -->
-    <div v-if="aiUsage" class="mb-4 grid w-full grid-cols-1 gap-4">
-      <div
-        class="bg-card-glass-bg border-card-glass-border rounded-default dark:bg-surface-base dark:border-border-default border p-4 shadow-none transition-shadow duration-200 hover:shadow-sm"
-      >
-        <div
-          class="rounded-default flex min-h-full flex-col justify-between text-center transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
-        >
-          <div class="flex flex-col justify-between">
-            <div class="flex items-center justify-between">
-              <div class="text-text-heading text-left text-base leading-5 font-medium">
-                {{ t("billing.aiCredits") }}
-              </div>
-              <div class="opacity-80">
-                <img :src="aiIcon" />
-              </div>
-            </div>
-            <OTag type="aiMode" :value="aiUsage.mode" class="mt-2" style="width: fit-content" />
-          </div>
-          <div class="mt-3 mb-2">
-            <OProgressBar :value="aiUsageRatio" size="sm" :variant="aiUsageVariant" />
-          </div>
-          <div class="text-text-body flex items-end text-left text-2xl leading-7 font-semibold">
-            {{ aiUsage.credits_used }} / {{ aiUsage.credits_limit }}
-            {{ t("billing.aiFreeUsedLabel") }}
-          </div>
-          <div class="text-text-secondary text-compact mt-1 text-left">
-            {{ t("billing.aiFreeOneTime") }}
-          </div>
-          <div
-            v-if="aiUsage.used_by_feature"
-            class="text-text-secondary text-compact text-left"
-            data-test="billing-ai-used-by-feature"
-          >
-            {{
-              t("billing.aiUsedByFeature", {
-                chat: aiUsage.used_by_feature.chat,
-                incident: aiUsage.used_by_feature.incident,
-                reanalysis: aiUsage.used_by_feature.incident_reanalysis,
-              })
-            }}
-          </div>
-          <div
-            v-if="aiUsage.mode === 'exhausted'"
-            class="text-status-error-text text-compact mt-2 text-left"
-          >
-            {{
-              aiUsage.requires_additional_credits
-                ? t("billing.aiContractExhaustedMessage")
-                : aiUsage.payer_org_id
-                  ? t("billing.aiPayerSubscribeMessage", { payer: aiUsage.payer_org_id })
-                  : t("billing.aiExhaustedMessage")
-            }}
-            <OButton
-              v-if="aiUsage.requires_additional_credits"
-              variant="ghost"
-              size="sm"
-              class="ms-1"
-              data-test="billing-ai-contact-sales"
-              @click="contactSales"
-            >
-              {{ t("billing.contactLabel") }}
-            </OButton>
-          </div>
-          <PaidAiUsageControl
-            :mode="aiUsage.mode"
-            class="border-border-default mt-3 border-t pt-3 text-left"
-            @change="fetchAiUsage"
-          />
+    <div
+      v-if="aiUsage"
+      class="bg-card-glass-bg border-card-glass-border rounded-default dark:bg-surface-base dark:border-border-default mb-3 flex w-full flex-col gap-2 border px-4 py-2.5 text-left shadow-none transition-shadow duration-200 hover:shadow-sm"
+    >
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <img alt="" :src="aiIcon" class="size-5 opacity-80" />
+        <div class="text-text-heading text-sm leading-5 font-semibold">
+          {{ t("billing.aiCredits") }}
+        </div>
+        <OTag type="aiMode" :value="aiUsage.mode" class="w-fit" />
+        <OProgressBar
+          :value="aiUsageRatio"
+          size="sm"
+          :variant="aiUsageVariant"
+          class="min-w-24 flex-1 max-md:order-last max-md:basis-full"
+        />
+        <div class="text-text-heading ms-auto text-sm leading-5 font-semibold">
+          {{ aiUsage.credits_used }} / {{ aiUsage.credits_limit }}
+          {{ t("billing.aiFreeUsedLabel") }}
         </div>
       </div>
+      <div class="text-text-secondary flex flex-wrap gap-x-3 text-xs">
+        <span>{{ t("billing.aiFreeOneTime") }}</span>
+        <span v-if="aiUsage.used_by_feature" data-test="billing-ai-used-by-feature">
+          {{
+            t("billing.aiUsedByFeature", {
+              chat: aiUsage.used_by_feature.chat,
+              incident: aiUsage.used_by_feature.incident,
+              reanalysis: aiUsage.used_by_feature.incident_reanalysis,
+            })
+          }}
+        </span>
+      </div>
+      <div v-if="aiUsage.mode === 'exhausted'" class="text-status-error-text text-compact">
+        {{
+          aiUsage.requires_additional_credits
+            ? t("billing.aiContractExhaustedMessage")
+            : aiUsage.payer_org_id
+              ? t("billing.aiPayerSubscribeMessage", { payer: aiUsage.payer_org_id })
+              : t("billing.aiExhaustedMessage")
+        }}
+        <OButton
+          v-if="aiUsage.requires_additional_credits"
+          variant="ghost"
+          size="sm"
+          class="ms-1"
+          data-test="billing-ai-contact-sales"
+          @click="contactSales"
+        >
+          {{ t("billing.contactLabel") }}
+        </OButton>
+      </div>
+      <PaidAiUsageControl
+        :mode="aiUsage.mode"
+        class="border-border-default border-t pt-2"
+        @change="fetchAiUsage"
+      />
     </div>
     <!-- Managed billing empty state for child orgs -->
     <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
@@ -159,27 +146,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           store.state.selectedOrganization.hasOwnProperty('note') &&
           store.state.selectedOrganization.note
         "
-        class="text-status-error-text flex items-center justify-start gap-2 ps-6 pb-4 text-xl font-semibold"
+        class="text-status-error-text flex items-center justify-start gap-2 pb-3 text-sm font-semibold"
       >
-        <OIcon name="warning" size="sm" class="pt-2" />
+        <OIcon name="warning" size="sm" />
         >{{ store.state.selectedOrganization.note }}
       </div>
       <div v-if="loading" class="text-center text-xl font-medium font-semibold">
         <OSpinner size="md" class="mx-auto mt-3 block text-center" />
       </div>
-      <div v-else class="mt-3 grid grid-cols-2 gap-3 max-lg:grid-cols-1">
+      <div v-else class="grid grid-cols-2 gap-x-3 max-lg:grid-cols-1 max-lg:gap-y-3">
         <ProPlan
           :planType="planType"
           :billingProvider="billingProvider"
           :subscriptionType="subscriptionType"
           :features="proPlanFeatures"
+          :pricingOptions="proPlanPricingOptions"
+          :additionalInfo="proPlanAdditionalInfo"
           :pricingError="pricingError"
           @retry-pricing="fetchPricingData"
+          @contact-sales="contactSalesForAnnual"
           @update:proSubscription="onLoadSubscription(config.paidPlan)"
           @update:cancelSubscription="onUnsubscribe"
         ></ProPlan>
         <EnterprisePlan
           :features="enterprisePlanFeatures"
+          :price="enterprisePlanPrice"
           :pricingError="pricingError"
           @retry-pricing="fetchPricingData"
         ></EnterprisePlan>
@@ -274,6 +265,10 @@ export default defineComponent({
     contactSales() {
       window.open(siteURL.contactSales, "_blank");
     },
+    contactSalesForAnnual() {
+      analytics.track("billing_contact_sales_clicked", { plan: "annual-contract" });
+      this.contactSales();
+    },
     async fetchPricingData() {
       this.pricingError = false;
       try {
@@ -295,24 +290,31 @@ export default defineComponent({
           cloudPlans.find((p: any) => p.title?.toLowerCase().includes("enterprise")) ??
           cloudPlans[1];
 
-        const proFeatures = payAsYouGo?.features ? mapFeatures(payAsYouGo.features) : [];
-        const entFeatures = enterprise?.features ? mapFeatures(enterprise.features) : [];
+        const pricingOptions = Array.isArray(payAsYouGo?.pricingOptions)
+          ? payAsYouGo.pricingOptions.map((o: any) => ({
+              label: o.label ?? "",
+              price: o.price ?? "",
+              period: o.period ?? "",
+              note: o.note ?? "",
+              badge: o.badge ?? "",
+            }))
+          : [];
+        // Production JSON already has a plan price, so only pricingOptions opts into the price block.
+        const hasPriceBlock = pricingOptions.length > 0;
+        const proFeatures = payAsYouGo?.features ?? [];
 
-        const diff = proFeatures.length - entFeatures.length + 3;
-        const paddedEntFeatures =
-          diff > 0
-            ? [
-                ...entFeatures,
-                ...Array.from({ length: diff }, () => ({
-                  name: "",
-                  price: "",
-                  is_parent: false,
-                })),
-              ]
-            : entFeatures;
-
-        this.proPlanFeatures = proFeatures;
-        this.enterprisePlanFeatures = paddedEntFeatures;
+        this.proPlanFeatures = mapFeatures(
+          hasPriceBlock ? proFeatures.filter((f: any) => !f.inPriceBlock) : proFeatures,
+        );
+        this.enterprisePlanFeatures = mapFeatures(enterprise?.features ?? []);
+        this.proPlanPricingOptions = pricingOptions;
+        // The footnote explains an asterisked feature price, which the tiles replace.
+        this.proPlanAdditionalInfo = hasPriceBlock ? "" : (payAsYouGo?.additionalInfo ?? "");
+        // Both cards show a price block or neither, so their feature lists stay aligned.
+        this.enterprisePlanPrice =
+          hasPriceBlock && enterprise?.price
+            ? { price: enterprise.price, note: enterprise.priceNote ?? "" }
+            : null;
       } catch {
         this.pricingError = true;
       }
@@ -442,6 +444,9 @@ export default defineComponent({
     });
     const proPlanFeatures: any = ref([]);
     const enterprisePlanFeatures: any = ref([]);
+    const proPlanPricingOptions: any = ref([]);
+    const proPlanAdditionalInfo = ref("");
+    const enterprisePlanPrice = ref<{ price: string; note: string } | null>(null);
     const pricingError = ref(false);
     const membership = ref<any>(null);
     const isChildOrg = computed(() => membership.value != null);
@@ -481,6 +486,9 @@ export default defineComponent({
       aiUsageVariant,
       proPlanFeatures,
       enterprisePlanFeatures,
+      proPlanPricingOptions,
+      proPlanAdditionalInfo,
+      enterprisePlanPrice,
       pricingError,
       membership,
       isChildOrg,

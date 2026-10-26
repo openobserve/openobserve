@@ -156,7 +156,8 @@ test.describe("Logs Visualization State Persistence testcases", () => {
 
     // 1. Verify stream is selected and results visible (done in beforeEach).
 
-    // 2. Reload the page.
+    // 2. Reload the page once the selection is in the URL; the logs page writes it there after the search settles.
+    await expect(page).toHaveURL(/[?&]stream=e2e_automate(&|$)/);
     await page.reload();
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 

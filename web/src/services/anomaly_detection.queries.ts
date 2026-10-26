@@ -25,6 +25,13 @@ export const anomalyConfigsQuery = (org: string) =>
     staleTime: LIVE_STALE_TIME,
   });
 
+export const anomalyConfigQuery = (org: string, id: string) =>
+  queryOptions({
+    queryKey: anomalyKeys.detail(org, id),
+    queryFn: async () => (await anomaly_detection.get(org, id)).data,
+    staleTime: LIVE_STALE_TIME,
+  });
+
 export const anomalyHistoryQuery = (org: string, limit: number) =>
   queryOptions({
     queryKey: anomalyKeys.history(org, limit),

@@ -16,6 +16,8 @@
 import { MutationCache, QueryClient } from "@tanstack/vue-query";
 import { purgeAllPersisted, purgePersistedExceptOrg, purgePersistedOrg } from "./persisters";
 import { GC_TIME, LIVE_STALE_TIME } from "./cachePolicy";
+// Static on purpose: the bump must be synchronous, and the module imports only vue, so the eager test load stays harmless.
+import { clearHeldTokenSecrets } from "@/components/fleet/fleetTokenSecrets";
 // Type-only: erased at build time. This module must not pull UI or i18n into its
 // runtime graph — the unit-test setup imports it eagerly, so a runtime edge here
 // evaluates that module before a spec's `vi.mock` can replace it.
@@ -137,7 +139,8 @@ export const queryClient = new QueryClient({
 // static edge to fieldValueStore would load its real dependency graph before
 // spec-level mocks can attach.
 const clearFieldValueReadCache = (): void => {
-  void import("@/composables/fieldValueStore").then((m) => m.clearReadCache());
+  // Best-effort: a chunk deleted by a deploy must not surface as an unhandled rejection.
+  void import("@/composables/fieldValueStore").then((m) => m.clearReadCache()).catch(() => {});
 };
 
 export const purgeOrgQueries = (org: string, nextOrg?: string): void => {
@@ -147,6 +150,7 @@ export const purgeOrgQueries = (org: string, nextOrg?: string): void => {
   // disk until the 24 h max age.
   if (nextOrg) void purgePersistedExceptOrg(nextOrg);
   clearFieldValueReadCache();
+  clearHeldTokenSecrets();
 };
 
 /** Called on logout: nothing from the previous session may survive. */
@@ -154,6 +158,7 @@ export const purgeAllQueries = (): void => {
   queryClient.clear();
   void purgeAllPersisted();
   clearFieldValueReadCache();
+  clearHeldTokenSecrets();
 };
 
 // ── Key helpers ─────────────────────────────────────────────────────────────

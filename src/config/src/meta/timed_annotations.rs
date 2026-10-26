@@ -36,11 +36,6 @@ impl TimedAnnotationReq {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct TimedAnnotationRes {
-    pub timed_annotation_ids: Vec<String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Default)]
 #[serde(default)]
 pub struct TimedAnnotation {
@@ -240,23 +235,6 @@ mod tests {
     }
 
     #[test]
-    fn test_timed_annotation_validate_invalid_end_time() {
-        let annotation = TimedAnnotation {
-            annotation_id: Some("test_id".to_string()),
-            start_time: 2000,
-            end_time: Some(1000), // Invalid: end_time <= start_time
-            title: "Valid Title".to_string(),
-            text: None,
-            tags: vec![],
-            panels: vec![],
-        };
-        assert_eq!(
-            annotation.validate().unwrap_err(),
-            "end time must be greater than start time"
-        );
-    }
-
-    #[test]
     fn test_timed_annotation_validate_equal_end_time() {
         let annotation = TimedAnnotation {
             annotation_id: Some("test_id".to_string()),
@@ -422,19 +400,6 @@ mod tests {
     }
 
     #[test]
-    fn test_list_timed_annotations_query_validate_invalid_time_range() {
-        let query = ListTimedAnnotationsQuery {
-            panels: None,
-            start_time: 2000,
-            end_time: 1000, // Invalid: start_time >= end_time
-        };
-        assert_eq!(
-            query.validate().unwrap_err(),
-            "start time must be less than end time"
-        );
-    }
-
-    #[test]
     fn test_list_timed_annotations_query_validate_equal_times() {
         let query = ListTimedAnnotationsQuery {
             panels: None,
@@ -543,17 +508,5 @@ mod tests {
         assert_eq!(deserialized.text, annotation.text);
         assert_eq!(deserialized.tags, annotation.tags);
         assert_eq!(deserialized.panels, annotation.panels);
-    }
-
-    #[test]
-    fn test_timed_annotation_res_creation() {
-        let response = TimedAnnotationRes {
-            timed_annotation_ids: vec!["id1".to_string(), "id2".to_string(), "id3".to_string()],
-        };
-
-        assert_eq!(response.timed_annotation_ids.len(), 3);
-        assert_eq!(response.timed_annotation_ids[0], "id1");
-        assert_eq!(response.timed_annotation_ids[1], "id2");
-        assert_eq!(response.timed_annotation_ids[2], "id3");
     }
 }

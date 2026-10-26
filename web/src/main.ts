@@ -32,7 +32,7 @@ import { openobserveRum } from "@openobserve/browser-rum";
 import { openobserveLogs } from "@openobserve/browser-logs";
 import { useReo } from "./services/reodotdev_analytics";
 import { contextRegistry, createDefaultContextProvider } from "./composables/contextProviders";
-import { buildVersionChecker } from "./utils/buildVersionChecker";
+import { buildVersionChecker, isChunkLoadError } from "./utils/buildVersionChecker";
 import { queryClient, setMutationNotifier } from "./composables/query/queryClient";
 import { shouldPropagateTracing } from "./utils/rum/tracingOrigin";
 import { isIgnoredNoise } from "./utils/rum/ignoredNoisePatterns";
@@ -94,6 +94,9 @@ interface ConfigResponse {
     };
   };
 }
+
+// Only the three dot-separated parts make a token, so a bare eyJ inside a word (surveyJsonBtn) is kept.
+const JWT_PATTERN = /eyJ[\w-]*\.[\w-]+\.[\w-]*/g;
 
 const getConfig = async () => {
   // Seeds the shared bootstrap `/config` query — Login and the version checker
@@ -161,6 +164,9 @@ const getConfig = async () => {
           event.view.url = scrubAuthParams(event.view.url) ?? event.view.url;
           event.view.referrer = scrubAuthParams(event.view.referrer);
           if (event.type === "error" && isExtensionOnlyError(event.error?.stack)) return false;
+          if (event.type === "action" && event.action.target?.name) {
+            event.action.target.name = event.action.target.name.replace(JWT_PATTERN, "");
+          }
           // Filter out specific errors before sending to RUM
           if (event.type === "error") {
             const errorMessage = event.error?.message || "";
@@ -298,16 +304,23 @@ window.addEventListener(
 
 // Handle dynamic import errors (for code splitting)
 router.onError(async (error) => {
-  const chunkFailedPattern =
-    /Loading chunk [\d]+ failed|Failed to fetch dynamically imported module/i;
-
-  if (chunkFailedPattern.test(error.message)) {
+  if (isChunkLoadError(error)) {
     // Smart detection: Check if it's stale build or network error
     const isStale = await buildVersionChecker.isStaleChunkError(error);
 
     if (isStale) {
       showNewVersionNotification();
     }
+  }
+});
+
+// router.onError only sees route chunks; lazy components (e.g. the alert dialog) fail through Vite's preload hook.
+window.addEventListener("vite:preloadError", async (event) => {
+  if (
+    isChunkLoadError(event.payload) &&
+    (await buildVersionChecker.isStaleChunkError(event.payload))
+  ) {
+    showNewVersionNotification();
   }
 });
 

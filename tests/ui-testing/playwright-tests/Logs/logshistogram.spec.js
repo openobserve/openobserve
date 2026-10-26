@@ -28,6 +28,9 @@ test.describe("Logs Histogram testcases", () => {
 
     await pm.logsPage.selectStream("e2e_automate");
 
+    // With Auto Run on (cloud default), a toggle, query edit or time pick starts a search that a later refresh click cancels.
+    await pm.logsPage.disableAutoRun();
+
     // Wait for initial search to complete
     const orgName = getOrgIdentifier();
     const allsearch = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
@@ -58,8 +61,6 @@ test.describe("Logs Histogram testcases", () => {
     if (!isHistogramOn) {
       await pm.logsPage.toggleHistogram();
     }
-
-    await pm.logsPage.disableAutoRun();
 
     // Step 1: FTS mode — match_all with no-results string
     await pm.logsPage.ensureFTSMode();
@@ -105,8 +106,6 @@ test.describe("Logs Histogram testcases", () => {
     if (isHistogramOn) {
       await pm.logsPage.toggleHistogram();
     }
-
-    await pm.logsPage.disableAutoRun();
 
     // Step 1: FTS mode — match_all with no-results string, histogram OFF
     await pm.logsPage.ensureFTSMode();

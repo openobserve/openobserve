@@ -27,6 +27,34 @@ export const dashboardsByFolderQuery = (org: string, folderId: string) =>
     staleTime: NORMAL_STALE_TIME,
   });
 
+export interface DashboardSearchHit {
+  dashboardId: string;
+  title: string;
+  folderId: string;
+  folderName: string;
+}
+
+export const toSearchHit = (row: any): DashboardSearchHit => {
+  const body = row?.[`v${row?.version}`] ?? {};
+  return {
+    dashboardId: String(row?.dashboard_id ?? body.dashboardId ?? ""),
+    title: String(row?.title ?? body.title ?? ""),
+    folderId: String(row?.folder_id ?? "default"),
+    folderName: String(row?.folder_name ?? row?.folder_id ?? ""),
+  };
+};
+
+/** Dashboards across every folder whose title matches; the backend searches all folders when none is given. */
+export const dashboardsSearchQuery = (org: string, title: string) =>
+  queryOptions({
+    queryKey: dashboardKeys.search(org, title),
+    queryFn: async (): Promise<DashboardSearchHit[]> =>
+      ((await dashboards.list(0, 100, "name", false, "", org, "", title)).data?.dashboards ?? [])
+        .map(toSearchHit)
+        .filter((hit: DashboardSearchHit) => hit.dashboardId),
+    staleTime: NORMAL_STALE_TIME,
+  });
+
 /**
  * Reactive sugar for `setup()` consumers: the same cache entry and policy, only
  * the consumption shape differs. A null folder disables the read rather than

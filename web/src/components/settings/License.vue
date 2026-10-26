@@ -76,6 +76,14 @@
         </div>
 
         <div v-else>
+          <LicenseStatusCard
+            v-if="licenseData.license && licenseData.decision"
+            :decision="licenseData.decision"
+            :base="licenseData.base"
+            :env-key-active="!!licenseData.env_key_active"
+            :env-key-in-use="licenseData.env_key_in_use"
+            :evaluated-at="licenseData.evaluated_at"
+          />
           <OCard class="border-card-glass-border border border-solid">
             <OCardSection role="body">
               <div class="mb-3 text-xl font-semibold">{{ t("about.license_info") }}</div>
@@ -147,6 +155,7 @@
                       <div class="flex items-center gap-2">
                         <span>{{ getMaskedLicenseKey() }}</span>
                         <OButton
+                          :aria-label="t('common.reveal')"
                           variant="ghost"
                           size="icon"
                           class="ms-2"
@@ -214,6 +223,7 @@
                   variant="primary"
                   size="sm-action"
                   v-if="licenseData.license != null"
+                  :loading="refreshing"
                   @click="triggerLimitRefresh"
                 >
                   {{ t("about.refresh_license_limits") }}
@@ -221,6 +231,8 @@
               </div>
             </OCardSection>
           </OCard>
+
+          <LicenseWaiversCard :waivers="licenseData.waivers" />
 
           <OCard v-show="showUpdateForm" class="border-card-glass-border mt-4 border border-solid">
             <OCardSection role="body">
@@ -326,10 +338,7 @@
                   <!-- Line 2: Exceeded Status -->
                   <div v-if="!isIngestionUnlimited" class="flex items-center gap-2">
                     <OIcon
-                      v-if="
-                        licenseData?.ingestion_exceeded &&
-                        licenseData?.ingestion_exceeded > limitBreachAllowedCount
-                      "
+                      v-if="licenseData?.ingestion_exceeded && pausedOverLimit"
                       name="warning"
                       size="sm"
                       class="text-status-error-text flex-shrink-0"
@@ -372,7 +381,7 @@
                           "
                         ></span
                         ><span
-                          v-if="licenseData?.ingestion_exceeded > limitBreachAllowedCount"
+                          v-if="pausedOverLimit"
                           class="inline-flex items-center font-semibold text-inherit"
                           v-html="
                             DOMPurify.sanitize(
@@ -392,11 +401,16 @@
                               t(
                                 'about.limit_exceeded_info',
                                 {
-                                  remaining:
+                                  remaining: Math.max(
+                                    0,
                                     limitBreachAllowedCount - licenseData?.ingestion_exceeded,
+                                  ),
                                   max: limitBreachAllowedCount,
                                 },
-                                limitBreachAllowedCount - licenseData?.ingestion_exceeded,
+                                Math.max(
+                                  0,
+                                  limitBreachAllowedCount - licenseData?.ingestion_exceeded,
+                                ),
                               ),
                             )
                           "
@@ -479,6 +493,8 @@ import licenseServer from "@/services/license_server";
 import { useStore } from "vuex";
 import DOMPurify from "dompurify";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
+import LicenseStatusCard from "./LicenseStatusCard.vue";
+import LicenseWaiversCard from "./LicenseWaiversCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -492,6 +508,7 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { copyToClipboard } from "@/utils/clipboard";
+import { useLicenseRefresh } from "@/composables/useLicenseRefresh";
 import { makeLicenseSchema, type LicenseForm } from "./License.schema";
 
 const RenderDashboardCharts = defineAsyncComponent(
@@ -502,6 +519,8 @@ export default defineComponent({
   name: "License",
   components: {
     LicensePeriod,
+    LicenseStatusCard,
+    LicenseWaiversCard,
     RenderDashboardCharts,
     OButton,
     ODialog,
@@ -518,12 +537,14 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const { confirm } = useConfirmDialog();
     const loading = ref(false);
+    const refreshing = ref(false);
     const licenseData = ref<any>({});
     const licenseKey = ref("");
     const showUpdateForm = ref(false);
     const showLicenseKeyModal = ref(false);
     const isLicenseKeyAutoFilled = ref(false);
     const store = useStore();
+    const { refreshLicenseLimits, scheduleReload } = useLicenseRefresh();
     const usageDashboardData = ref<any>(null);
     const dashboardRenderKey = ref(0);
 
@@ -548,11 +569,12 @@ export default defineComponent({
       updateLicenseForm.value?.form?.reset({ licenseKey: v ?? "" });
     });
 
-    const loadLicenseData = async () => {
+    // Only the first load may swap the page for the spinner; later reloads would unmount the form.
+    const loadLicenseData = async ({ background = false } = {}) => {
       try {
-        loading.value = true;
+        if (!background) loading.value = true;
         licenseData.value = await queryClient.fetchQuery(licenseQuery());
-        checkAndAutoFillLicenseFromUrl();
+        if (!background) checkAndAutoFillLicenseFromUrl();
       } catch (error) {
         console.error("Error loading license data:", error);
         toast({
@@ -560,8 +582,16 @@ export default defineComponent({
           message: t("about.failed_to_load_license_info"),
         });
       } finally {
-        loading.value = false;
+        if (!background) loading.value = false;
       }
+    };
+
+    const reloadLicenseData = () => loadLicenseData({ background: true });
+
+    // The settle reload already refetched the licence query, so reuse it instead of a second request.
+    const adoptRefetchedLicense = () => {
+      const data = queryClient.getQueryData(licenseQuery().queryKey);
+      if (data) licenseData.value = data as typeof licenseData.value;
     };
 
     // @submit handler — fires only once the schema passes (licenseKey required +
@@ -586,7 +616,8 @@ export default defineComponent({
         url.searchParams.delete("license_key");
         window.history.replaceState({}, document.title, url.toString());
 
-        await loadLicenseData();
+        await reloadLicenseData();
+        scheduleReload(adoptRefetchedLicense);
       } catch (error) {
         const e = error as { response?: { data?: { message?: string } } };
         console.error("Error updating license:", error);
@@ -618,23 +649,12 @@ export default defineComponent({
     };
 
     const triggerLimitRefresh = async () => {
+      if (refreshing.value) return;
+      refreshing.value = true;
       try {
-        await licenseServer.refresh_license_limits();
-        toast({
-          variant: "success",
-          message: t("about.license_refresh_success"),
-        });
-      } catch (error) {
-        const e = error as { response?: { data?: { message?: string } } };
-        console.error("Error refreshing license:", error);
-        toast({
-          variant: "error",
-          message: raw(
-            t("about.failed_to_refresh_license") +
-              " : " +
-              (e?.response?.data?.message || t("settings.licensePage.unexpectedError")),
-          ),
-        });
+        if (await refreshLicenseLimits(adoptRefetchedLicense)) await reloadLicenseData();
+      } finally {
+        refreshing.value = false;
       }
     };
 
@@ -718,11 +738,23 @@ export default defineComponent({
     // For license version >= 2, use limit_breach_allowed_count from the license data.
     // For version < 2 or when version is absent (v1), fall back to 3.
     const limitBreachAllowedCount = computed(() => {
+      const decided = licenseData.value.decision?.allowed_days;
+      if (decided != null && licenseData.value.evaluated_at !== 0) return decided;
       const version = licenseData.value.license?.version;
       if (version !== undefined && version !== null && version >= 2) {
         return licenseData.value.license?.limit_breach_allowed_count ?? 3;
       }
       return 3;
+    });
+
+    // Only an evaluated decision names its blocks; a synthesised one (evaluated_at 0) has the counters.
+    const pausedOverLimit = computed(() => {
+      const decision = licenseData.value.decision;
+      if (decision?.search_allowed) return false;
+      if (decision && licenseData.value.evaluated_at !== 0) {
+        return (decision.blocks ?? []).includes("usage_over_limit");
+      }
+      return licenseData.value.ingestion_exceeded > limitBreachAllowedCount.value;
     });
 
     const ingestionUsagePercent = computed(() => {
@@ -989,6 +1021,7 @@ export default defineComponent({
       raw,
       store,
       loading,
+      refreshing,
       licenseData,
       licenseKey,
       showUpdateForm,
@@ -1020,6 +1053,7 @@ export default defineComponent({
       ingestionLimitGB,
       generateUsageDashboard,
       limitBreachAllowedCount,
+      pausedOverLimit,
       DOMPurify,
     };
   },

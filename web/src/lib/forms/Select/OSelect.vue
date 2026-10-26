@@ -42,6 +42,7 @@ import {
   inject,
   nextTick,
   onBeforeUnmount,
+  onMounted,
   provide,
   ref,
   useAttrs,
@@ -51,6 +52,7 @@ import {
   watchEffect,
 } from "vue";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { mergeDescribedBy, splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
 import {
   O_DROPDOWN_NESTED_KEY,
   setActiveOverlay,
@@ -133,11 +135,19 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 
 // Forward tabindex to the real trigger; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
-const wrapperAttrs = computed(() => {
-  const { tabindex, ...rest } = $attrs;
-  void tabindex;
-  return rest;
-});
+const split = computed(() => splitControlAttrs($attrs));
+const wrapperAttrs = computed(() => split.value.wrapperAttrs);
+const controlAttrs = computed(() => split.value.controlAttrs);
+
+const insideLabelName = computed(() =>
+  props.labelPosition === "inside" && props.label ? props.label : undefined,
+);
+onMounted(() =>
+  warnIfUnlabelled(
+    "OSelect",
+    Boolean(props.label || $attrs["aria-label"] || $attrs["aria-labelledby"]),
+  ),
+);
 
 const emit = defineEmits<SelectEmits>();
 const slots = useSlots();
@@ -146,6 +156,17 @@ defineSlots<SelectSlots>();
 
 const _fallbackId = useId();
 const inputId = computed(() => props.id ?? _fallbackId);
+const errorId = computed(() => `${inputId.value}-error`);
+const labelId = computed(() => `${inputId.value}-label`);
+// The popover trigger keeps Reka's own id, so `<label for>` cannot reach it.
+const outsideLabelId = computed(() =>
+  props.label &&
+  props.labelPosition !== "inside" &&
+  !$attrs["aria-label"] &&
+  !$attrs["aria-labelledby"]
+    ? labelId.value
+    : undefined,
+);
 
 // Dev-time warning: slot-based options with multiple/searchable require listbox
 // mode, but listboxModeEnabled requires options prop. Guide the developer early.
@@ -388,7 +409,11 @@ watch(popoverOpen, (open) => {
 const nestedFilteredOptions = computed(() => {
   const base = baseFilteredOptions.value;
   if (!hasNestedOptions.value) return base;
-  if (isSearching.value) return base.filter((o) => !o.expandable);
+  if (isSearching.value) {
+    const flat = base.filter((o) => !o.expandable);
+    // A header kept only for a matching expandable row has nothing left under it.
+    return flat.filter((o, i) => !o.header || (flat[i + 1] !== undefined && !flat[i + 1].header));
+  }
   return base.filter((o) => o.parentKey === undefined || expandedParents.value.has(o.parentKey));
 });
 
@@ -506,6 +531,7 @@ const effectiveError = computed(() => {
   return props.errorMessage || " ";
 });
 const hasError = computed(() => !!effectiveError.value);
+const errorDescribedBy = computed(() => (effectiveError.value?.trim() ? errorId.value : undefined));
 
 const stringValue = computed(() =>
   !Array.isArray(props.modelValue) && props.modelValue !== undefined
@@ -776,6 +802,10 @@ watch(popoverOpen, (open) => {
 watch(filteredOptions, () => {
   highlightedIndex.value = -1;
 });
+// The list opens scrolled to the current value; a search keeping that offset hides its best matches above the fold.
+watch(searchTerm, () => {
+  if (listboxScrollEl.value) listboxScrollEl.value.scrollTop = 0;
+});
 
 function scrollHighlightedIntoView() {
   if (highlightedIndex.value < 0 || !listboxScrollEl.value) return;
@@ -894,6 +924,7 @@ function getPaletteGradient(colors: string[]): string {
 
 // Aligned with OInput and OButton sm: h-[2.125rem] ≈ 30px at the 14px html base.
 const heightClasses: Record<NonNullable<SelectProps["size"]>, string> = {
+  xs: "h-7 text-xs",
   sm: "h-[2.125rem] text-sm",
   md: "h-[2.125rem] text-sm",
 };
@@ -1206,6 +1237,7 @@ const fieldWidthClass = computed(() => {
     <!-- Label -->
     <label
       v-if="(label || $slots.tooltip) && labelPosition !== 'inside'"
+      :id="labelId"
       :for="inputId"
       :class="[
         'o-input-label text-compact flex items-center gap-1 leading-tight',
@@ -1238,6 +1270,10 @@ const fieldWidthClass = computed(() => {
             role="combobox"
             :aria-expanded="popoverOpen"
             :aria-invalid="hasError || undefined"
+            :aria-label="insideLabelName"
+            :aria-labelledby="outsideLabelId"
+            v-bind="controlAttrs"
+            :aria-describedby="mergeDescribedBy(errorDescribedBy, controlAttrs)"
             @keydown="handleTriggerKeydown"
             :data-test="parentDataTest ? `${parentDataTest}-trigger` : undefined"
             :data-test-selected-value="
@@ -1466,16 +1502,10 @@ const fieldWidthClass = computed(() => {
                   @keydown="handleDropdownKeydown"
                 />
 
-                <!--
-                Select-all master row. Indeterminate (dash) when only some
-                options are checked, full check when all are. Toggles the
-                whole selection. Rendered as a plain button so it sits
-                outside the listbox's keyboard navigation while remaining
-                focusable.
-              -->
+                <!-- Select-all row: outside the listbox keyboard navigation but still focusable. -->
                 <div
                   v-if="selectAll && multiple && selectableOptions.length > 0"
-                  role="button"
+                  role="checkbox"
                   tabindex="0"
                   :aria-label="t('components.select.toggleAllOptions')"
                   :aria-checked="allSelected ? 'true' : partiallySelected ? 'mixed' : 'false'"
@@ -1885,6 +1915,10 @@ const fieldWidthClass = computed(() => {
         <SelectTrigger
           :id="inputId"
           :tabindex="inputTabindex"
+          :aria-invalid="hasError || undefined"
+          :aria-label="insideLabelName"
+          v-bind="controlAttrs"
+          :aria-describedby="mergeDescribedBy(errorDescribedBy, controlAttrs)"
           :data-test="parentDataTest ? `${parentDataTest}-trigger` : undefined"
           :class="
             isInlineAppearance
@@ -2090,6 +2124,7 @@ const fieldWidthClass = computed(() => {
     <!-- Error message -->
     <span
       v-if="effectiveError && effectiveError.trim()"
+      :id="errorId"
       :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
       class="text-select-error-text text-xs leading-none"
       role="alert"

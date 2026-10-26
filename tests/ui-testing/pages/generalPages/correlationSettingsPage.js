@@ -83,9 +83,7 @@ export class CorrelationSettingsPage {
 
     /**
      * Ensure semantic groups exist in the backend for testing fingerprint checkboxes
-     * Uses PUT /api/{org}/alerts/deduplication/semantic-groups to set semantic groups
-     * AND POST /api/{org}/alerts/deduplication/config to include them in the config
-     * The frontend reads semantic groups from the config endpoint first
+     * Adds any missing test groups to the org's semantic groups (GET, merge, PUT), keeping every existing group
      * @param {string} orgId - Organization identifier
      * @returns {Promise<boolean>} - True if successful
      */
@@ -128,17 +126,32 @@ export class CorrelationSettingsPage {
         testLogger.info('Setting up test semantic groups via API', { orgId, groupCount: testSemanticGroups.length });
 
         try {
-            // Step 1: PUT semantic groups to the semantic-groups endpoint
-            const putUrl = `${baseUrl}/api/${orgId}/alerts/deduplication/semantic-groups`;
-            testLogger.info('PUT semantic groups', { url: putUrl });
+            const url = `${baseUrl}/api/${orgId}/alerts/deduplication/semantic-groups`;
+            const headers = {
+                'Authorization': authHeader,
+                'Content-Type': 'application/json'
+            };
 
-            const putResponse = await fetch(putUrl, {
+            // PUT replaces the whole list, so writing only the test groups would delete the org's defaults (e.g. `host`) for every other spec on the server.
+            const getResponse = await fetch(url, { headers });
+            if (!getResponse.ok) {
+                testLogger.error('GET semantic-groups failed', { status: getResponse.status });
+                return false;
+            }
+            const current = await getResponse.json();
+            const currentGroups = Array.isArray(current) ? current : current.groups || [];
+            const currentIds = new Set(currentGroups.map((g) => g.id));
+            const missing = testSemanticGroups.filter((g) => !currentIds.has(g.id));
+            if (missing.length === 0) {
+                testLogger.info('Test semantic groups already present', { orgId, total: currentGroups.length });
+                return true;
+            }
+
+            testLogger.info('PUT semantic groups', { url, adding: missing.map((g) => g.id) });
+            const putResponse = await fetch(url, {
                 method: 'PUT',
-                headers: {
-                    'Authorization': authHeader,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(testSemanticGroups)
+                headers,
+                body: JSON.stringify([...currentGroups, ...missing])
             });
 
             const putText = await putResponse.text();

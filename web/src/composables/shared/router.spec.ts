@@ -16,6 +16,7 @@
 import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
 import { createMemoryHistory, createRouter } from "vue-router";
 import useRoutes from "./router";
+import Login from "@/views/Login.vue";
 import store from "@/stores";
 import { routeGuard } from "@/utils/zincutils";
 import { isPaywalledDestination, shouldPaywallRoute } from "@/utils/auth";
@@ -162,15 +163,21 @@ vi.mock("@/components/pipelines/BackfillJobsList.vue", () => ({
 // Sub-composable mocks — return empty arrays so counts are deterministic
 // ---------------------------------------------------------------------------
 vi.mock("./useIngestionRoutes", () => ({
-  default: vi.fn(() => [{ path: "ingestion", name: "ingestion", component: {} }]),
+  default: vi.fn(() => [
+    { path: "ingestion", name: "ingestion", component: () => Promise.resolve({}) },
+  ]),
 }));
 
 vi.mock("./useEnterpriseRoutes", () => ({
-  default: vi.fn(() => [{ path: "iam", name: "iam", component: {}, children: [] }]),
+  default: vi.fn(() => [
+    { path: "iam", name: "iam", component: () => Promise.resolve({}), children: [] },
+  ]),
 }));
 
 vi.mock("./useManagementRoutes", () => ({
-  default: vi.fn(() => [{ path: "settings", name: "settings", component: {}, children: [] }]),
+  default: vi.fn(() => [
+    { path: "settings", name: "settings", component: () => Promise.resolve({}), children: [] },
+  ]),
 }));
 
 // ---------------------------------------------------------------------------
@@ -309,6 +316,29 @@ describe("useRoutes (router.ts)", () => {
       });
     });
 
+    it("W-S12 forgets a kept Slack link request in /logout beforeEnter", async () => {
+      const { rememberLinkRequest, recallLinkRequest } = await import("@/utils/slackLink");
+      rememberLinkRequest("req-1.sig", null);
+      const { parentRoutes } = useRoutes();
+      const logoutRoute = parentRoutes.find((r: any) => r.path === "/logout");
+
+      const originalLocation = window.location;
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        writable: true,
+        value: { href: "" },
+      });
+
+      logoutRoute.beforeEnter({}, {}, vi.fn());
+      expect(recallLinkRequest()).toBeNull();
+
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        writable: true,
+        value: originalLocation,
+      });
+    });
+
     it("should call useLocalCurrentUser in /logout beforeEnter", async () => {
       const { useLocalCurrentUser } = await import("@/utils/zincutils");
       const { parentRoutes } = useRoutes();
@@ -429,6 +459,25 @@ describe("useRoutes (router.ts)", () => {
       expect(callbackRoute.name).toBe("slackOAuthCallback");
       expect(callbackRoute.component).toBeDefined();
       expect(enTitle(callbackRoute.meta.titleKey)).toBe("Connecting Slack");
+    });
+  });
+
+  describe("parentRoutes — Slack link pages", () => {
+    it.each([
+      ["/slack/link", "slackLink", "Link Slack account"],
+      ["/slack/link/callback", "slackLinkCallback", "Linking Slack account"],
+      ["/slack/connect/callback", "slackConnectCallback", "Signing in with Slack"],
+    ])("AC-9.6 %s is a titled route that needs a session", async (path, name, title) => {
+      const { parentRoutes } = useRoutes();
+      const route = parentRoutes.find((r: any) => r.path === path);
+
+      expect(route).toBeDefined();
+      expect(route.name).toBe(name);
+      expect(enTitle(route.meta.titleKey)).toBe(title);
+      expect(route.meta.public).toBeUndefined();
+      expect(route.beforeEnter).toBeUndefined();
+      const view = await route.component();
+      expect(view.default).toBeDefined();
     });
   });
 
@@ -2114,6 +2163,48 @@ describe("useRoutes (router.ts)", () => {
       expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
     });
 
+    it("sends a playlist link on the dashboard view to the TV player", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      vi.mocked(routeGuard).mockClear();
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "viewDashboard");
+      const next = vi.fn();
+
+      route.beforeEnter(
+        { query: { org_identifier: "acme", playlist: "d1:f1,d2", interval: "2m", slide: "2" } },
+        {},
+        next,
+      );
+
+      expect(next).toHaveBeenCalledWith({
+        path: "/dashboards/tv",
+        query: { org_identifier: "acme", playlist: "d1:f1,d2:default", interval: "2m", slide: "2" },
+        replace: true,
+      });
+      expect(routeGuard).not.toHaveBeenCalled();
+    });
+
+    it("keeps the TV player's own page fallback on the dashboard view", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "viewDashboard");
+      const to = { query: { dashboard: "d1", playlist: "d1,d2", tvpage: "1", kiosk: "true" } };
+      const next = vi.fn();
+      route.beforeEnter(to, {}, next);
+      expect(routeGuard).toHaveBeenCalledWith(to, {}, next);
+    });
+
+    it("registers the TV playlist route behind the route guard", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "dashboardTvPlaylist");
+      expect(route.path).toBe("/dashboards/tv");
+      expect(route.meta.titleKey).toBe("routeTitles.dashboardTvPlaylist");
+      const next = vi.fn();
+      route.beforeEnter({}, {}, next);
+      expect(routeGuard).toHaveBeenCalledWith({}, {}, next);
+    });
+
     it("should call routeGuard for functionList route beforeEnter", async () => {
       const { routeGuard } = await import("@/utils/zincutils");
       const { homeChildRoutes } = useRoutes();
@@ -2227,9 +2318,9 @@ describe("useRoutes (router.ts)", () => {
   // 23. Edge cases
   // =========================================================================
   describe("Edge Cases", () => {
-    it("should have exactly 6 parentRoutes", () => {
+    it("should have exactly 9 parentRoutes", () => {
       const { parentRoutes } = useRoutes();
-      expect(parentRoutes).toHaveLength(6);
+      expect(parentRoutes).toHaveLength(9);
     });
 
     it("should have unique paths in parentRoutes", () => {
@@ -2491,5 +2582,20 @@ describe("useRoutes (router.ts)", () => {
         expect(findRoute(homeChildRoutes, name).meta?.allowOnEmptyData).toBeUndefined();
       },
     );
+  });
+});
+
+describe("useRoutes lazy loading", () => {
+  // An eager route component lands in the entry bundle the login page downloads.
+  it("lazy-loads every route component except Login", () => {
+    const { parentRoutes, homeChildRoutes } = useRoutes();
+    const walk = (routes: any[]): void =>
+      routes.forEach((route) => {
+        if (route.component && route.component !== Login) {
+          expect(typeof route.component, route.path).toBe("function");
+        }
+        if (route.children) walk(route.children);
+      });
+    walk([...parentRoutes, ...homeChildRoutes]);
   });
 });

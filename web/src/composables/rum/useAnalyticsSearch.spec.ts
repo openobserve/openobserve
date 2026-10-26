@@ -86,6 +86,20 @@ describe("useAnalyticsSearch", () => {
     expect(searchService.search).not.toHaveBeenCalled();
   });
 
+  it("P5-R1: refuses a joined SQL in a production build too", async () => {
+    vi.stubEnv("DEV", false);
+    vi.stubEnv("MODE", "production");
+    try {
+      const runner = useAnalyticsSearch();
+      await expect(
+        runner.run("p", spec('SELECT 1 FROM "_rumdata" a JOIN b ON 1=1'), "k"),
+      ).rejects.toThrow();
+      expect(searchService.search).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("maps 403 to forbidden and other failures to an error with Retry (AC-9)", async () => {
     vi.mocked(searchService.search)
       .mockRejectedValueOnce({ response: { status: 403, data: { message: "nope" } } })
