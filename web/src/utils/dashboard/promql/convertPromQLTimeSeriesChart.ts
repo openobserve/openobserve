@@ -19,6 +19,8 @@ import { buildXAxis, buildYAxis, buildTooltip } from "./shared/axisBuilder";
 import { buildDynamicGrid } from "./shared/gridBuilder";
 import { getSeriesColor } from "../colorPalette";
 import { buildSeriesMarkLine } from "./shared/markLines";
+import { lineThicknessOf } from "../promqlChartSeriesProps";
+import { chartColor } from "@/utils/chartTheme";
 
 /**
  * Converter for time-series charts (line, area, bar, scatter, area-stacked)
@@ -159,7 +161,7 @@ export class TimeSeriesConverter implements PromQLChartConverter {
             focus: "series",
           },
           lineStyle: {
-            width: config.line_thickness ?? 1.5,
+            width: lineThicknessOf(config),
           },
         };
 
@@ -171,7 +173,7 @@ export class TimeSeriesConverter implements PromQLChartConverter {
             focus: "series",
           },
           lineStyle: {
-            width: config.line_thickness ?? 1.5,
+            width: lineThicknessOf(config),
           },
         };
 
@@ -198,7 +200,7 @@ export class TimeSeriesConverter implements PromQLChartConverter {
             focus: "series",
           },
           lineStyle: {
-            width: config.line_thickness ?? 1.5,
+            width: lineThicknessOf(config),
           },
         };
     }

@@ -136,6 +136,21 @@ describe("TimeSeriesConverter", () => {
       expect(result.series[0].lineStyle.width).toBe(1.5);
     });
 
+    it.each([0, -2])("draws a line thickness of %s at the default width", (lineThickness) => {
+      const processedData: ProcessedPromQLData[] = [
+        {
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
+          timestamps: [[1, "00:00:00"]],
+          queryIndex: 0,
+        },
+      ];
+      for (const type of ["line", "area", "area-stacked"]) {
+        const panelSchema = { type, config: { line_thickness: lineThickness } };
+        const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+        expect(result.series[0].lineStyle.width).toBe(1.5);
+      }
+    });
+
     it("should apply smooth interpolation by default", () => {
       const processedData: ProcessedPromQLData[] = [
         {

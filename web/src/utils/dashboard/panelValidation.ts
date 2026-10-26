@@ -2,7 +2,16 @@ import type { TranslateFn } from "@/types/i18n";
 import { CURRENT_DASHBOARD_SCHEMA_VERSION } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import { isFormulaQuery } from "@/utils/dashboard/promql/formula";
+import { HEATMAP_MAX_ROWS, isHeatmapColorRangeInverted } from "@/utils/dashboard/heatmapDefaults";
+import {
+  heatmapYBucketError,
+  isHeatmapYRangeInverted,
+  isNumericYField,
+} from "@/utils/dashboard/heatmapYAxis";
+import { addCommasToNumber } from "@/utils/formatters";
+import { validateAnnotationSources } from "@/utils/dashboard/validateAnnotationSources";
 import { isGaugeFixedRangeValid, type GaugeQueryConfig } from "@/utils/dashboard/gaugeDial";
+import { MAX_LINE_THICKNESS, isValidLineThickness } from "@/utils/dashboard/promqlChartSeriesProps";
 
 /**
  * Validates a single condition item
@@ -907,6 +916,34 @@ const validatePanelContent = (t: TranslateFn, panel: any): string[] => {
   return errors;
 };
 
+/** Heatmap settings the renderer would silently ignore, or under which the builder generates an empty query. */
+const validateHeatmapConfig = (
+  t: TranslateFn,
+  panelData: any,
+  errors: string[],
+  isPromQLMode: boolean,
+) => {
+  if (panelData?.data?.type !== "heatmap") return;
+  const config = panelData.data.config;
+  if (isHeatmapColorRangeInverted(config)) {
+    errors.push(t("dashboard.utils.heatmapColorRangeInverted"));
+  }
+  if (isPromQLMode || !config?.heatmap_y_bucket?.mode) return;
+  // Only a builder query over a numeric y column is bucketed; elsewhere the setting is hidden and unused.
+  const bucketed = (panelData.data.queries ?? []).some(
+    (query: any) => !query?.customQuery && isNumericYField(query?.fields?.y?.[0], panelData),
+  );
+  if (!bucketed) return;
+  const bucketError = heatmapYBucketError(config);
+  if (bucketError === "invalidSize") errors.push(t("dashboard.utils.heatmapYBucketSizeInvalid"));
+  if (bucketError === "tooManyBuckets") {
+    errors.push(
+      t("dashboard.utils.heatmapYBucketTooMany", { max: addCommasToNumber(HEATMAP_MAX_ROWS) }),
+    );
+  }
+  if (isHeatmapYRangeInverted(config)) errors.push(t("dashboard.utils.heatmapYRangeInverted"));
+};
+
 /**
  * Validates a dashboard panel's configuration
  * @param {object} panelData - The panel data object to validate
@@ -933,6 +970,14 @@ export const validatePanel = (
 
   // Validate panel content based on type
   validatePanelContentByType(t, panelData?.data, errors);
+  validateHeatmapConfig(t, panelData, errors, isPromQLMode);
+
+  if (
+    ["area", "area-stacked", "line"].includes(panelData?.data?.type) &&
+    !isValidLineThickness(panelData?.data?.config?.line_thickness)
+  ) {
+    errors.push(t("dashboard.lineThicknessRange", { max: MAX_LINE_THICKNESS }));
+  }
 
   // Validate timestamp alias for SQL queries with custom query mode
   if (panelData?.data?.queryType === "sql") {
@@ -1078,6 +1123,8 @@ export const validateDashboardJson = (t: TranslateFn, dashboardJson: any): strin
       }),
     );
   }
+
+  errors.push(...validateAnnotationSources(t, dashboardJson?.annotationSources));
 
   // Check tabs
   if (!Array.isArray(dashboardJson?.tabs) || dashboardJson?.tabs?.length === 0) {

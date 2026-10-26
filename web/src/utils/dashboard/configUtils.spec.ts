@@ -31,7 +31,6 @@ import {
   shouldShowAxisConfig,
   shouldShowCartesianAxisConfig,
   shouldShowAxisLabelConfig,
-  shouldShowLineThickness,
   shouldShowDrilldown,
   shouldShowTimeShift,
   shouldShowPromQLQueryType,
@@ -1364,44 +1363,6 @@ describe("configUtils", () => {
       it(`should return false for ${type} chart`, () => {
         expect(shouldShowAxisLabelConfig({ data: { type } })).toBe(false);
       });
-    });
-  });
-
-  describe("shouldShowLineThickness", () => {
-    const makeData = (type: string, customQuery = false) => ({
-      data: {
-        type,
-        queries: [{ customQuery }],
-      },
-      layout: { currentQueryIndex: 0 },
-    });
-
-    it("should return true for area chart in non-promql mode without customQuery", () => {
-      expect(shouldShowLineThickness(makeData("area"), false)).toBe(true);
-    });
-
-    it("should return true for area-stacked chart in non-promql mode without customQuery", () => {
-      expect(shouldShowLineThickness(makeData("area-stacked"), false)).toBe(true);
-    });
-
-    it("should return true for line chart in non-promql mode without customQuery", () => {
-      expect(shouldShowLineThickness(makeData("line"), false)).toBe(true);
-    });
-
-    it("should return false when promqlMode is true", () => {
-      expect(shouldShowLineThickness(makeData("area"), true)).toBe(false);
-    });
-
-    it("should return false when customQuery is true", () => {
-      expect(shouldShowLineThickness(makeData("area", true), false)).toBe(false);
-    });
-
-    it("should return false for bar chart", () => {
-      expect(shouldShowLineThickness(makeData("bar"), false)).toBe(false);
-    });
-
-    it("should return false for scatter chart", () => {
-      expect(shouldShowLineThickness(makeData("scatter"), false)).toBe(false);
     });
   });
 

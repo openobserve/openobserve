@@ -558,6 +558,47 @@ describe("ConfigPanel", () => {
     });
   });
 
+  describe("Line thickness", () => {
+    const panelOf = (line_thickness: unknown) =>
+      reactive({
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          type: "line",
+          config: { ...mockDashboardPanelData.data.config, line_thickness },
+        },
+      });
+    const thicknessInput = () =>
+      wrapper.findComponent('[data-test="dashboard-config-line_thickness"]');
+
+    it("stores the typed number as is and flags one outside (0, 10]", async () => {
+      const panel = panelOf(1.5);
+      wrapper = createWrapper({ dashboardPanelData: panel });
+
+      await thicknessInput().vm.$emit("update:modelValue", "3");
+      expect(panel.data.config.line_thickness).toBe(3);
+      expect(thicknessInput().props("errorMessage")).toBeUndefined();
+
+      await thicknessInput().vm.$emit("update:modelValue", "0");
+      expect(panel.data.config.line_thickness).toBe(0);
+      expect(thicknessInput().props("modelValue")).toBe(0);
+      expect(thicknessInput().props("errorMessage")).toBeTruthy();
+
+      await thicknessInput().vm.$emit("update:modelValue", "11");
+      expect(thicknessInput().props("errorMessage")).toBeTruthy();
+    });
+
+    it("clears an emptied field and restores the default on blur", async () => {
+      const panel = panelOf(2);
+      wrapper = createWrapper({ dashboardPanelData: panel });
+
+      await thicknessInput().vm.$emit("update:modelValue", "");
+      expect(panel.data.config.line_thickness).toBeNull();
+      await thicknessInput().vm.$emit("blur");
+      expect(panel.data.config.line_thickness).toBe(1.5);
+    });
+  });
+
   describe("Axis labels mode", () => {
     const panelOf = (type: string, config: Record<string, unknown> = {}) => ({
       ...mockDashboardPanelData,

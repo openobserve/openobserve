@@ -280,21 +280,6 @@ export const shouldShowAxisLabelConfig = (dashboardPanelData: any): boolean => {
 };
 
 /**
- * Check if line thickness input should be displayed
- * Used by: line_thickness input
- * @param dashboardPanelData - The dashboard panel data
- * @param promqlMode - Whether promql mode is active
- * @returns boolean indicating if line thickness input should be displayed
- */
-export const shouldShowLineThickness = (dashboardPanelData: any, promqlMode: boolean): boolean => {
-  return (
-    !promqlMode &&
-    !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery &&
-    ["area", "area-stacked", "line"].includes(dashboardPanelData.data.type)
-  );
-};
-
-/**
  * Check if Drilldown component should be displayed
  * Used by: Drilldown component
  * @param dashboardPanelData - The dashboard panel data

@@ -363,6 +363,18 @@ describe("convertPromQLData with time-shifted results", () => {
       }
     });
 
+    it("keeps the panel line thickness on the dashed twin", async () => {
+      const result = await convert(
+        { ...panel("line"), config: { line_thickness: 3 } },
+        [twoPods(), twoPods(DAY_S)],
+        oneDay,
+        stepMeta(2, 60),
+      );
+      const [primary, shifted] = pair(result, "api-1");
+      expect(primary.lineStyle.width).toBe(3);
+      expect(shifted.lineStyle).toMatchObject({ width: 3, type: "dashed" });
+    });
+
     it("in the Explorer, draws it dotted so it reads apart from a dashed forecast", async () => {
       const result = await convert(
         explorer(),

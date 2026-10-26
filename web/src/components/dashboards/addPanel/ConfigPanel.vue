@@ -1200,20 +1200,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <OInput
-          v-if="shouldShowLineThickness(dashboardPanelData, promqlMode)"
+          v-if="shouldShowAreaLineStyleConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('lineStyle', 'line-thickness')"
-          v-model.number="dashboardPanelDataModel.data.config.line_thickness"
+          :model-value="dashboardPanelData.data.config.line_thickness ?? ''"
           type="number"
           :min="0"
-          @update:model-value="
-            (value: any) =>
-              (dashboardPanelDataModel.data.config.line_thickness =
-                typeof value == 'number' && value >= 0 ? value : null)
-          "
+          :max="MAX_LINE_THICKNESS"
+          :error-message="lineThicknessError"
+          @update:model-value="setLineThickness"
           @blur="
             () => {
-              if (dashboardPanelData.data.config.line_thickness == null)
-                dashboardPanelDataModel.data.config.line_thickness = 1.5;
+              if (dashboardPanelData.data.config.line_thickness === null)
+                dashboardPanelDataModel.data.config.line_thickness = DEFAULT_LINE_THICKNESS;
             }
           "
           :label="t('dashboard.lineThickness')"
@@ -2151,6 +2149,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
 import { LEGEND_VALUE_KEYS } from "@/utils/dashboard/legendConfiguration";
+import {
+  DEFAULT_LINE_THICKNESS,
+  MAX_LINE_THICKNESS,
+  isValidLineThickness,
+} from "@/utils/dashboard/promqlChartSeriesProps";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
@@ -2236,7 +2239,6 @@ import {
   shouldShowAxisConfig,
   shouldShowCartesianAxisConfig,
   shouldShowAxisLabelConfig,
-  shouldShowLineThickness,
   shouldShowDrilldown,
   shouldShowTimeShift,
 } from "@/utils/dashboard/configUtils";
@@ -2350,6 +2352,15 @@ export default defineComponent({
       { label: t("dashboard.legendValueValue"), value: "value" },
       { label: t("dashboard.legendValuePercent"), value: "percent" },
     ];
+    const setLineThickness = (value: string | number) => {
+      const parsed = value === "" ? NaN : Number(value);
+      dashboardPanelData.data.config.line_thickness = Number.isFinite(parsed) ? parsed : null;
+    };
+    const lineThicknessError = computed(() =>
+      isValidLineThickness(dashboardPanelData.data.config.line_thickness)
+        ? undefined
+        : t("dashboard.lineThicknessRange", { max: MAX_LINE_THICKNESS }),
+    );
     const toggleItemValue = (value: unknown) =>
       value === null || value === undefined ? TOGGLE_AUTO : value;
 
@@ -3162,6 +3173,10 @@ export default defineComponent({
       legendValuesModel,
       legendValuesOptions,
       toggleItemValue,
+      setLineThickness,
+      lineThicknessError,
+      DEFAULT_LINE_THICKNESS,
+      MAX_LINE_THICKNESS,
       t,
       dashboardPanelData,
       dashboardPanelDataModel,
@@ -3218,7 +3233,6 @@ export default defineComponent({
       shouldShowAxisConfig,
       shouldShowCartesianAxisConfig,
       shouldShowAxisLabelConfig,
-      shouldShowLineThickness,
       shouldShowDrilldown,
       shouldShowTimeShift,
       // Panel default time configuration (v4.0)

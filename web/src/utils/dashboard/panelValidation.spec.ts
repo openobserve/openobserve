@@ -21,6 +21,7 @@ import {
   validateSQLPanelFields,
 } from "@/utils/dashboard/panelValidation";
 import { gt } from "@/types/i18n";
+import { MAX_ANNOTATION_SOURCES } from "@/utils/dashboard/annotationSources";
 
 vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
   CURRENT_DASHBOARD_SCHEMA_VERSION: "v3",
@@ -68,6 +69,62 @@ describe("panelValidation", () => {
       ];
       const errors = validateDashboardJson(gt, { ...validDashboard, tabs });
       expect(errors).toEqual([]);
+    });
+
+    it("accepts valid annotationSources and reports broken ones", () => {
+      const source = {
+        id: "s1",
+        name: "Deploys",
+        enabled: true,
+        mode: "builder",
+        streamType: "logs",
+        stream: "k8s_events",
+        title: "{service}",
+      };
+      expect(validateDashboardJson(gt, { ...validDashboard, annotationSources: [source] })).toEqual(
+        [],
+      );
+      expect(
+        validateDashboardJson(gt, {
+          ...validDashboard,
+          annotationSources: [{ ...source, mode: "sql", query: "" }],
+        }),
+      ).toEqual(["Annotation source 1: Enter a query"]);
+      expect(validateDashboardJson(gt, { ...validDashboard, annotationSources: "x" })).toEqual([
+        "annotationSources must be an array",
+      ]);
+    });
+
+    it("rejects annotationSources over the cap and a duplicate id", () => {
+      const source = {
+        id: "s1",
+        name: "Deploys",
+        enabled: true,
+        mode: "builder",
+        streamType: "logs",
+        stream: "k8s_events",
+        title: "{service}",
+      };
+      const atCap = Array.from({ length: MAX_ANNOTATION_SOURCES }, (_, i) => ({
+        ...source,
+        id: `s${i}`,
+        name: `Source ${i}`,
+      }));
+      expect(validateDashboardJson(gt, { ...validDashboard, annotationSources: atCap })).toEqual(
+        [],
+      );
+
+      const overCap = [...atCap, { ...source, id: "over", name: "Over" }];
+      expect(validateDashboardJson(gt, { ...validDashboard, annotationSources: overCap })).toEqual([
+        `A dashboard can have at most ${MAX_ANNOTATION_SOURCES} annotation sources.`,
+      ]);
+
+      expect(
+        validateDashboardJson(gt, {
+          ...validDashboard,
+          annotationSources: [source, { ...source, name: "Deploys again" }],
+        }),
+      ).toEqual(["Annotation source 2: ID s1 is used more than once"]);
     });
 
     it("returns error for null dashboard", () => {
@@ -315,6 +372,96 @@ describe("validatePanel on a PromQL formula", () => {
   });
 });
 
+describe("validatePanel on heatmap settings", () => {
+  const numericY = { alias: "y", args: [{ type: "field", value: { field: "took" } }] };
+  const run = (config: any, { queryType = "sql", customQuery = false } = {}) => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type: "heatmap",
+          queryType,
+          config,
+          queries: [{ customQuery, query: "", fields: { y: [numericY] } }],
+        },
+        layout: { currentQueryIndex: 0 },
+        meta: {
+          streamFields: { groupedFields: [{ schema: [{ name: "took", type: "Int64" }] }] },
+        },
+      },
+      errors,
+      false,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+
+  it("blocks a bucket size that would leave the builder query empty", () => {
+    expect(run({ heatmap_y_bucket: { mode: "size", size: 0 } })).toEqual([
+      gt("dashboard.utils.heatmapYBucketSizeInvalid"),
+    ]);
+    expect(
+      run({ heatmap_y_bucket: { mode: "size", size: 1 }, heatmap_y_min: 0, heatmap_y_max: 1e6 }),
+    ).toHaveLength(1);
+  });
+
+  it("blocks inverted y and colour ranges, which the renderer would silently ignore", () => {
+    expect(
+      run({ heatmap_y_bucket: { mode: "log", base: 10 }, heatmap_y_min: 9, heatmap_y_max: 1 }),
+    ).toEqual([gt("dashboard.utils.heatmapYRangeInverted")]);
+    expect(run({ heatmap_color_min: 50, heatmap_color_max: 5 }, { queryType: "promql" })).toContain(
+      gt("dashboard.utils.heatmapColorRangeInverted"),
+    );
+  });
+
+  it("ignores bucket settings that do not apply to custom SQL", () => {
+    expect(run({ heatmap_y_bucket: { mode: "size", size: 0 } }, { customQuery: true })).toEqual([]);
+    expect(run({ heatmap_color_min: 1, heatmap_color_max: 5 })).toEqual([]);
+  });
+});
+
+describe("validateConditions", () => {
+  const t = gt as any;
+
+  it("flags a filter added without a value, including inside groups", () => {
+    const errors: string[] = [];
+    validateConditions(
+      t,
+      [
+        {
+          filterType: "group",
+          conditions: [
+            {
+              filterType: "condition",
+              type: "condition",
+              column: "level",
+              operator: "=",
+              value: "",
+            },
+            { filterType: "condition", type: "list", column: "job", values: [] },
+          ],
+        },
+      ],
+      errors,
+    );
+    expect(errors).toHaveLength(2);
+  });
+
+  it("accepts complete conditions", () => {
+    const errors: string[] = [];
+    validateConditions(
+      t,
+      [{ filterType: "condition", type: "condition", column: "a", operator: "Is Null" }],
+      errors,
+    );
+    expect(errors).toHaveLength(0);
+  });
+});
+
 describe("validatePanel on a gauge range", () => {
   const run = (configs: any[]) => {
     const errors: string[] = [];
@@ -359,40 +506,34 @@ describe("validatePanel on a gauge range", () => {
   });
 });
 
-describe("validateConditions", () => {
-  const t = gt as any;
-
-  it("flags a filter added without a value, including inside groups", () => {
+describe("validatePanel line thickness", () => {
+  const run = (type: string, line_thickness: unknown) => {
     const errors: string[] = [];
-    validateConditions(
-      t,
-      [
-        {
-          filterType: "group",
-          conditions: [
-            {
-              filterType: "condition",
-              type: "condition",
-              column: "level",
-              operator: "=",
-              value: "",
-            },
-            { filterType: "condition", type: "list", column: "job", values: [] },
-          ],
-        },
-      ],
+    validatePanel(
+      gt,
+      {
+        data: { type, queryType: "promql", queries: [{ query: "up" }], config: { line_thickness } },
+        layout: { currentQueryIndex: 0 },
+      },
       errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
     );
-    expect(errors).toHaveLength(2);
+    return errors.filter((e) => e === gt("dashboard.lineThicknessRange", { max: 10 }));
+  };
+
+  it.each([0, -1, 10.5, 500])("blocks saving a %s thickness on a line or area panel", (value) => {
+    for (const type of ["line", "area", "area-stacked"]) expect(run(type, value)).toHaveLength(1);
   });
 
-  it("accepts complete conditions", () => {
-    const errors: string[] = [];
-    validateConditions(
-      t,
-      [{ filterType: "condition", type: "condition", column: "a", operator: "Is Null" }],
-      errors,
-    );
-    expect(errors).toHaveLength(0);
+  it.each([null, undefined, 0.5, 1.5, 10])("accepts a %s thickness", (value) => {
+    expect(run("line", value)).toEqual([]);
+  });
+
+  it("ignores the thickness of a chart that does not draw lines", () => {
+    expect(run("bar", 0)).toEqual([]);
   });
 });

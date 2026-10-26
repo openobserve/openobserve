@@ -6796,6 +6796,7 @@
     "showGridlines": "Show Gridlines",
     "lineThickness": "Line Thickness",
     "lineThicknessDefault": "Default: 1.5",
+    "lineThicknessRange": "Line thickness must be above 0 and at most {max}",
     "comparisonAgainst": "Comparison Against",
     "comparisonAgainstTooltip": "This feature allows you to compare data points from multiple queries over a selected time range. By adjusting the date or time, the system will retrieve corresponding data from different queries, enabling you to observe changes or differences between the selected time periods.",
     "panelTimeEnabled": "Panel-Specific Time Range",

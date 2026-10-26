@@ -44,7 +44,6 @@ vi.mock("@/utils/dashboard/configUtils", () => ({
   shouldShowCartesianAxisConfig: vi.fn(() => false),
   shouldShowGridlines: vi.fn(() => false),
   shouldShowAxisLabelConfig: vi.fn(() => false),
-  shouldShowLineThickness: vi.fn(() => false),
   shouldShowDrilldown: vi.fn(() => false),
   shouldShowTimeShift: vi.fn(() => false),
 }));
@@ -750,11 +749,12 @@ describe("useConfigPanel – lineStyle section", () => {
     vi.mocked(shouldShowAreaLineStyleConfig).mockReturnValue(false);
   });
 
-  it("line-thickness visibility delegates to shouldShowLineThickness", async () => {
-    const { shouldShowLineThickness } = await import("@/utils/dashboard/configUtils");
-    vi.mocked(shouldShowLineThickness).mockReturnValueOnce(true);
+  it("line-thickness visibility delegates to shouldShowAreaLineStyleConfig", async () => {
+    const { shouldShowAreaLineStyleConfig } = await import("@/utils/dashboard/configUtils");
+    vi.mocked(shouldShowAreaLineStyleConfig).mockReturnValue(true);
     const c = makeComposable();
     expect(c.isConfigOptionVisible("lineStyle", "line-thickness")).toBe(true);
+    vi.mocked(shouldShowAreaLineStyleConfig).mockReturnValue(false);
   });
 });
 
