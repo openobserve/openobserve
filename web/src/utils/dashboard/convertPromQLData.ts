@@ -29,6 +29,7 @@ import {
   getGridLineStyle,
 } from "./colorPalette";
 import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
+import { ANNOTATION_MARK_AREA_Z } from "@/utils/dashboard/constants";
 import { escapeHtml } from "@/utils/html";
 import { addCommasToNumber } from "@/utils/formatters";
 import {
@@ -41,6 +42,18 @@ import { calculateBottomLegendHeight, calculateRightLegendWidth } from "./legend
 import { convertPromQLChartData } from "./promql/convertPromQLChartData";
 import { calculateMetricFontSize, buildMetricSparkline } from "./sql/charts/convertSQLMetricChart";
 import { resolveMetricValueStyle } from "./tableConfigUtils";
+import {
+  applyGaugeThresholds,
+  applyLineAreaThresholds,
+  gaugeDialRange,
+  echartsPaletteColor,
+  getSeriesThresholds,
+} from "./thresholds";
+import {
+  applySeriesOverrides,
+  createSeriesOverrideLookup,
+  gaugeOverrideTooltip,
+} from "./seriesOverrides";
 import { buildPromqlSeriesNames, getLegendPosition } from "./promql/shared/legendBuilder";
 import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
 import { getPropsByChartTypeForSeries } from "./promqlChartSeriesProps";
@@ -271,6 +284,9 @@ export const convertPromQLData = async (
         nameSuffixes,
       });
 
+      if (result.options) applySeriesOverrides(result.options, panelSchema, store.state.theme);
+      if (result.options) applyLineAreaThresholds(result.options, panelSchema);
+
       // Apply annotations if present (only for ECharts-based charts)
       if (annotations && annotations.length > 0 && panelSchema.type !== "table") {
         const annotationResults = getAnnotationsData(annotations, store.state.timezone);
@@ -481,11 +497,15 @@ export const convertPromQLData = async (
 
   const { markLines, markAreas } = getAnnotationsData(annotations, store.state.timezone);
 
+  const seriesOverrides = createSeriesOverrideLookup(panelSchema?.config);
+
   const getSeriesMarkArea = () => {
     return {
       itemStyle: {
         color: CHART_SELECTION_FILL,
       },
+      // ECharts draws markArea at z 1, under bars (z 2) and line/area fills (z 3); bands must sit on top.
+      z: ANNOTATION_MARK_AREA_Z,
       data: markAreas,
     };
   };
@@ -608,15 +628,8 @@ export const convertPromQLData = async (
               options.series?.[it.seriesIndex]?._seriesRole === "forecast"
                 ? ` (${gt("dashboard.utils.fitted")})`
                 : "";
-            const row = `${it.marker} ${escapeHtml(it.seriesName)} : ${escapeHtml(
-              formatUnitValue(
-                getUnitValue(
-                  it.data[1],
-                  panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom,
-                  panelSchema.config?.decimals,
-                ),
-              ),
+            const row = `${it.marker} ${escapeHtml(seriesOverrides.displayName(it.seriesName))} : ${escapeHtml(
+              seriesOverrides.formatValue(it.data[1], it.seriesName),
             )}${escapeHtml(fitted)}`;
             hoverText.push(
               it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
@@ -1063,10 +1076,13 @@ export const convertPromQLData = async (
 
           const seriesName = nameOf(seriesNames, metric.metric, index);
 
-          return {
+          const gauge: any = {
             ...getPropsByChartTypeForSeries(panelSchema.type),
-            min: panelSchema?.queries[parentQueryIndex[index]]?.config?.min || 0,
-            max: panelSchema?.queries[parentQueryIndex[index]]?.config?.max || 100,
+            ...gaugeDialRange(
+              panelSchema?.queries[parentQueryIndex[index]]?.config?.min,
+              panelSchema?.queries[parentQueryIndex[index]]?.config?.max,
+              seriesOverrides.unitArgs(seriesName).unit,
+            ),
             //which grid will be used
             gridIndex: gaugeIndex - 1,
             // radius, progress and axisline width will be calculated based on grid width and height
@@ -1096,11 +1112,12 @@ export const convertPromQLData = async (
                 value: latestValue ?? 0,
                 detail: {
                   formatter: function (value: any) {
+                    const unit = seriesOverrides.unitArgs(seriesName);
                     const unitValue = getUnitValue(
                       value,
-                      panelSchema.config?.unit,
-                      panelSchema.config?.unit_custom,
-                      panelSchema.config?.decimals,
+                      unit.unit,
+                      unit.unitCustom,
+                      unit.decimals,
                     );
                     return unitValue.value + unitValue.unit;
                   },
@@ -1108,6 +1125,8 @@ export const convertPromQLData = async (
                 itemStyle: {
                   color: (() => {
                     const defaultColor = null;
+                    const overrideColor = seriesOverrides.get(seriesName)?.color;
+                    if (overrideColor) return overrideColor;
                     if (!latestValue) return defaultColor;
                     return (
                       getSeriesColor(
@@ -1129,7 +1148,12 @@ export const convertPromQLData = async (
               offsetCenter: [0, 0],
               fontSize: 12,
             },
+            ...gaugeOverrideTooltip(seriesOverrides, seriesName),
           };
+          const thresholds = getSeriesThresholds(panelSchema?.config, seriesName);
+          if (thresholds)
+            applyGaugeThresholds(gauge, thresholds, echartsPaletteColor(gaugeIndex - 1));
+          return gauge;
         });
 
         options.dataset = { source: [[]] };
@@ -1189,13 +1213,20 @@ export const convertPromQLData = async (
               (a: any, b: any) => a[0] - b[0],
             );
             const latestValue = values[values.length - 1]?.[1] ?? 0;
+            const metricName = metric ? nameOf(seriesNames, metric.metric, index) : "";
+            const metricUnit = seriesOverrides.unitArgs(metricName);
 
             const metricStyle = resolveMetricValueStyle(latestValue, {
               mappings: panelSchema.config?.mappings,
-              unit: panelSchema.config?.unit,
-              customUnit: panelSchema.config?.unit_custom,
-              decimals: panelSchema.config?.decimals,
-              panelBackground: panelSchema.config?.background?.value?.color ?? "",
+              unit: metricUnit.unit,
+              customUnit: metricUnit.unitCustom,
+              decimals: metricUnit.decimals,
+              // An override colour stands in for the panel Background of this value; mappings and steps still win.
+              panelBackground:
+                seriesOverrides.get(metricName)?.color ??
+                panelSchema.config?.background?.value?.color ??
+                "",
+              thresholds: getSeriesThresholds(panelSchema?.config, metricName),
             });
             options.backgroundColor = metricStyle.bgColor;
             const metricText = metricStyle.text;
@@ -1548,6 +1579,9 @@ export const convertPromQLData = async (
 
   // promql query will be always timeseries except gauge and metric text chart.
   // console.timeEnd("convertPromQLData");
+  // Override colours first: a threshold step outranks them and recolours on top.
+  applySeriesOverrides(options, panelSchema, store.state.theme);
+  applyLineAreaThresholds(options, panelSchema);
   // Reserve measured left space so wide y-axis labels don't clip.
   applyMeasuredYAxisLeftInset(options);
   return {

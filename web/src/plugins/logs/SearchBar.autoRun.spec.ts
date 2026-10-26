@@ -23,6 +23,7 @@ import config from "@/aws-exports";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
 import { resetLogsAutoRunForTests } from "@/composables/useLogs/logsAutoRun";
 import searchService from "@/services/search";
+import analytics from "@/services/product_analytics";
 
 const { scheduleSearch, toastMock, getViewDetail } = vi.hoisted(() => ({
   scheduleSearch: vi.fn(),
@@ -552,6 +553,24 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       await vi.advanceTimersByTimeAsync(10);
       expect(logs).toHaveBeenCalledTimes(1);
       expect(logs.mock.calls[0][0]).toMatchObject({ reason: "time" });
+    });
+
+    it("tracks a user time change as logs_time_range_changed without the raw value", async () => {
+      await setup({ liveMode: false });
+      const track = vi.spyOn(analytics, "track");
+      await wrapper!.vm.updateDateTime({
+        valueType: "relative",
+        relativeTimePeriod: "1h",
+        startTime: 1,
+        endTime: 2,
+        userChangedValue: true,
+      });
+      expect(track).toHaveBeenCalledWith("logs_time_range_changed", {
+        stream_name: "app_logs",
+        value_type: "relative",
+        relative_period: "1h",
+      });
+      expect(track).not.toHaveBeenCalledWith("Button Click", expect.anything());
     });
 
     it("runs a histogram zoom as explicit even with Auto Run off (J4, #4295)", async () => {

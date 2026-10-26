@@ -39,7 +39,7 @@ const pod = (name: string, node: string) => ({
   node,
 });
 
-const build = (observed: boolean): Inventory => {
+const build = (observed: boolean, extra: Partial<Record<QueryId, Series[]>> = {}): Inventory => {
   const inventory = buildInventory(
     results({
       N1: [
@@ -69,6 +69,7 @@ const build = (observed: boolean): Inventory => {
         ksm({ ...pod("web-3", "n2"), phase: "Running" }),
       ],
       P6: [ksm(pod("web-1", "n1")), ksm(pod("web-2", "n1")), ksm(pod("web-3", "n2"))],
+      ...extra,
     }),
   );
   if (observed) {
@@ -98,8 +99,8 @@ const build = (observed: boolean): Inventory => {
   return inventory;
 };
 
-const mountNode = (observed: boolean) => {
-  const inventory = build(observed);
+const mountNode = (observed: boolean, extra: Partial<Record<QueryId, Series[]>> = {}) => {
+  const inventory = build(observed, extra);
   return mount(NodeDetails, {
     props: { row: inventory.nodes[0], inventory, end: 0 },
     global: { plugins: [i18n], stubs: { RelatedPodsTable: true } },
@@ -154,5 +155,36 @@ describe("NodeDetails", () => {
     const table = mountNode(false).findComponent(RelatedPodsTable);
     expect((table.props("pods") as any[]).map((p) => p.name).sort()).toEqual(["web-1", "web-2"]);
     expect(table.props("allocatable")).toMatchObject({ cpu: 4, memory: 16 * GI });
+  });
+});
+
+describe("NodeDetails capacity bars", () => {
+  const container = (name: string) => ({ ...pod(name, "n1"), container: "app" });
+  const sized = {
+    P10: [ksm(container("web-1")), ksm(container("web-2"))],
+    P8: ["web-1", "web-2"].flatMap((n) => [
+      ksm({ ...container(n), resource: "cpu" }, 0.5),
+      ksm({ ...container(n), resource: "memory" }, 2 * GI),
+    ]),
+    P9: ["web-1", "web-2"].flatMap((n) => [ksm({ ...container(n), resource: "cpu" }, 1)]),
+  };
+
+  it("sums the node's container requests and limits against allocatable", () => {
+    const wrapper = mountNode(false, sized);
+    const bar = (id: string) => wrapper.find(`[data-test="k8s2-node-capacity-${id}"]`);
+    expect(bar("cpu-requests").text()).toContain("1.00 of 4.00");
+    expect(bar("cpu-limits").text()).toContain("2.00 of 4.00");
+    expect(bar("memory-requests").text()).toBe("4.0GB of 16.0GB · 25%");
+  });
+
+  it("omits a bar that has no usage data", () => {
+    const wrapper = mountNode(false, sized);
+    expect(wrapper.find('[data-test="k8s2-node-capacity-memory-limits"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="k8s2-node-capacity-cpu-usage"]').exists()).toBe(false);
+  });
+
+  it("shows no capacity section when no container reports a size", () => {
+    const wrapper = mountNode(false);
+    expect(wrapper.find('[data-test="k8s2-node-capacity-bars"]').exists()).toBe(false);
   });
 });

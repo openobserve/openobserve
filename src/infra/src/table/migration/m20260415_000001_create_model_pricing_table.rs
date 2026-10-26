@@ -121,8 +121,6 @@ enum ModelPricing {
 
 #[cfg(test)]
 mod tests {
-    use sea_orm_migration::prelude::*;
-
     use super::*;
 
     #[test]

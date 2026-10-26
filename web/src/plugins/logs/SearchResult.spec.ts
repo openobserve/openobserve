@@ -684,6 +684,71 @@ describe("SearchResult Component", () => {
       expect(wrapper.vm.searchObj.meta.isFtsDefaultColumn).toBe(true);
     });
 
+    it("resolves the FTS default once the fields land after the search finished", async () => {
+      // A search finishing inside the window where extractFields() has emptied the list leaves the table on _source for good.
+      wrapper.vm.searchObj.data.stream.selectedFields = [];
+      wrapper.vm.searchObj.meta.isFtsDefaultColumn = false;
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [];
+      wrapper.vm.searchObj.data.queryResults = {
+        hits: [{ message: "hello", kubernetes_pod_id: "pod-1" }],
+      };
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.meta.searchApplied = true;
+
+      wrapper.vm.searchObj.loading = true;
+      await wrapper.vm.$nextTick();
+      wrapper.vm.searchObj.loading = false;
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([]);
+      expect(wrapper.vm.searchObj.meta.isFtsDefaultColumn).toBe(false);
+
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+        { name: "message", ftsKey: true },
+        { name: "kubernetes_pod_id", ftsKey: false },
+      ];
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual(["message"]);
+      expect(wrapper.vm.searchObj.meta.isFtsDefaultColumn).toBe(true);
+    });
+
+    it("does not resolve on late fields when the user chose the columns", async () => {
+      wrapper.vm.searchObj.data.stream.selectedFields = ["kubernetes_pod_id"];
+      wrapper.vm.searchObj.meta.isFtsDefaultColumn = false;
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [];
+      wrapper.vm.searchObj.data.queryResults = { hits: [{ message: "hello" }] };
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.meta.searchApplied = true;
+      wrapper.vm.searchObj.loading = false;
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+        { name: "message", ftsKey: true },
+        { name: "kubernetes_pod_id", ftsKey: false },
+      ];
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual(["kubernetes_pod_id"]);
+      expect(wrapper.vm.searchObj.meta.isFtsDefaultColumn).toBe(false);
+    });
+
+    it("does not resolve on late fields in SQL mode", async () => {
+      wrapper.vm.searchObj.data.stream.selectedFields = [];
+      wrapper.vm.searchObj.meta.isFtsDefaultColumn = false;
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [];
+      wrapper.vm.searchObj.data.queryResults = { hits: [{ message: "hello" }] };
+      wrapper.vm.searchObj.meta.sqlMode = true;
+      wrapper.vm.searchObj.meta.searchApplied = true;
+      wrapper.vm.searchObj.loading = false;
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [{ name: "message", ftsKey: true }];
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([]);
+    });
+
     it("loading watcher leaves columns alone in SQL mode (custom queries are authoritative)", async () => {
       // A hand-written SQL query (CTE / aggregate) with no pinned fields renders
       // the generic "source" column. The FTS feature must not override a custom

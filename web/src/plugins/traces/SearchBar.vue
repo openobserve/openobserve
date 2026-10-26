@@ -802,7 +802,12 @@ export default defineComponent({
       _sqlOnQueryChange();
       updateAutoComplete(value);
       if (searchObj.meta.sqlMode == true) {
-        searchObj.data.parsedQuery = tracesParser.value?.astify(value);
+        try {
+          searchObj.data.parsedQuery = tracesParser.value?.astify(value);
+        } catch {
+          // Half-typed SQL does not parse; keep the last good parse until it does.
+          return;
+        }
         if (searchObj.data.parsedQuery?.from?.length > 0) {
           if (
             searchObj.data.parsedQuery.from[0].table !==
@@ -842,12 +847,10 @@ export default defineComponent({
     // Gives the user 2.5s to finish typing start/end time before firing.
     const triggerAbsoluteQueryDebounced = debounce((value: object) => {
       if (value.userChangedValue) {
-        analytics.track("Button Click", {
-          button: "Date Change",
-          tab: value.tab,
-          value: value,
+        analytics.track("traces_time_range_changed", {
           stream_name: searchObj.data.stream.selectedStream.value,
-          page: "Search Logs",
+          value_type: value.valueType,
+          relative_period: value.relativeTimePeriod,
         });
       }
 
@@ -940,14 +943,10 @@ export default defineComponent({
       }
 
       if (value.userChangedValue) {
-        analytics.track("Button Click", {
-          button: "Date Change",
-          tab: value.tab,
-          value: value,
-          //user_org: this.store.state.selectedOrganization.identifier,
-          //user_id: this.store.state.userInfo.email,
+        analytics.track("traces_time_range_changed", {
           stream_name: searchObj.data.stream.selectedStream.value,
-          page: "Search Logs",
+          value_type: value.valueType,
+          relative_period: value.relativeTimePeriod,
         });
       }
     };

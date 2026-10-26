@@ -43,14 +43,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="tableRendererData"
           :config="panelSchema.config"
           :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
-          @row-click="onChartClick"
+          @row-click="
+            (params: any, ...rest: any[]) => !store.state.kioskMode && onChartClick(params, ...rest)
+          "
         />
         <TableRenderer
           v-else-if="panelSchema.type == 'table'"
           :data="tableRendererData"
           :value-mapping="panelSchema?.config?.mappings ?? []"
-          @row-click="onChartClick"
-          @explore-cell="(params) => exploreCellInLogs(params.columnId, params.value, params.row)"
+          @row-click="
+            (params: any, ...rest: any[]) => !store.state.kioskMode && onChartClick(params, ...rest)
+          "
+          @explore-cell="
+            (params) =>
+              !store.state.kioskMode && exploreCellInLogs(params.columnId, params.value, params.row)
+          "
           @format-column="onFormatColumn"
           ref="tableRendererRef"
           :wrap-cells="panelSchema.config?.wrap_table_cells"
@@ -58,8 +65,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rows-per-page="panelSchema.config?.table_pagination_rows_per_page"
           :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
           :enable-column-format="enableColumnFormat"
-          :drilldown-columns="store.state.printMode ? [] : drilldownColumnAliases"
-          :drilldown-all-columns="!store.state.printMode && drilldownAllColumns"
+          :drilldown-columns="
+            store.state.printMode || store.state.kioskMode ? [] : drilldownColumnAliases
+          "
+          :drilldown-all-columns="
+            !store.state.printMode && !store.state.kioskMode && drilldownAllColumns
+          "
         />
         <div
           v-else-if="panelSchema.type == 'html'"
@@ -99,14 +110,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :height="chartPanelHeight"
           :label="raw(panelSchema?.title)"
           :render-type="panelSchema?.type === 'metric' ? 'svg' : 'canvas'"
-          @updated:data-zoom="onDataZoom"
+          @updated:data-zoom="(event) => !store.state.kioskMode && onDataZoom(event)"
           @error="errorDetail = $event"
-          @click="onChartClick"
-          @contextmenu="onChartContextMenu"
-          @domcontextmenu="onChartDomContextMenu"
+          @click="
+            (params: any, ...rest: any[]) => !store.state.kioskMode && onChartClick(params, ...rest)
+          "
+          @contextmenu="(event) => !store.state.kioskMode && onChartContextMenu(event)"
+          @domcontextmenu="(event) => !store.state.kioskMode && onChartDomContextMenu(event)"
           :find-line-on-context-menu="findsLineOnContextMenu"
-          @mouseover="exemplarInteraction.onMouseOver"
-          @mouseout="exemplarInteraction.onMouseOut"
+          @mouseover="onChartMouseOver"
+          @mouseout="onChartMouseOut"
           @finished="onChartFinished"
         />
         <ExemplarMarkerList
@@ -131,6 +144,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @enter="exemplarInteraction.onCardEnter"
           @leave="exemplarInteraction.onCardLeave"
           @open-trace="exemplarInteraction.openTrace"
+        />
+        <QueryAnnotationTooltip
+          v-if="hoveredQueryAnnotation"
+          :marker="hoveredQueryAnnotation.marker"
+          :timezone="store.state.timezone"
+          :x="hoveredQueryAnnotation.x"
+          :y="hoveredQueryAnnotation.y"
         />
       </div>
       <div
@@ -320,6 +340,9 @@ import { useRoute, useRouter } from "vue-router";
 import useNotifications from "@/composables/useNotifications";
 import { validateSQLPanelFields } from "@/utils/dashboard/panelValidation";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
+import { usePanelAnnotationSources } from "@/composables/dashboard/usePanelAnnotationSources";
+import QueryAnnotationTooltip from "./QueryAnnotationTooltip.vue";
+import type { QueryAnnotationMarker } from "@/ts/interfaces/dashboard";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import {
   forecastPointOf,
@@ -408,6 +431,7 @@ export default defineComponent({
   name: "PanelSchemaRenderer",
   components: {
     OSeparator,
+    QueryAnnotationTooltip,
     ChartRenderer,
     AlertContextMenu,
     TableRenderer,
@@ -824,6 +848,20 @@ export default defineComponent({
         !["html", "markdown"].includes(panelSchema.value?.type),
     );
 
+    // Dashboard-level annotation sources are queried once by the dashboard and merged after the panel's own.
+    const {
+      markers: sourceAnnotationMarkers,
+      failedSources: failedAnnotationSources,
+      truncatedSources: truncatedAnnotationSources,
+    } = usePanelAnnotationSources(
+      () => panelSchema.value?.id,
+      () => panelSchema.value?.type,
+    );
+    const panelAnnotations = computed(() => [
+      ...(annotations.value ?? []),
+      ...sourceAnnotationMarkers.value,
+    ]);
+
     const {
       isAddAnnotationMode,
       isAddAnnotationDialogVisible,
@@ -1069,6 +1107,46 @@ export default defineComponent({
       navigate: navigateToExemplarTrace,
       placeY: placeExemplarY,
     });
+    const hoveredQueryAnnotation = ref<{
+      marker: QueryAnnotationMarker;
+      x: number;
+      y: number;
+    } | null>(null);
+
+    type ChartPointerEvent = Parameters<typeof exemplarInteraction.onMouseOver>[0] & {
+      componentType?: string;
+      data?: { annotationDetails?: Partial<QueryAnnotationMarker> };
+      event?: { event?: { clientX?: number; clientY?: number } };
+    };
+
+    // One tooltip at a time: the axis tooltip pauses while a query marker shows its own.
+    const setAxisTooltipPaused = (paused: boolean) => {
+      const chart = chartRendererRef.value?.chart;
+      if (paused) chart?.dispatchAction?.({ type: "hideTip" });
+      chart?.setOption?.({ tooltip: { triggerOn: paused ? "none" : "mousemove|click" } });
+    };
+
+    const onChartMouseOver = (params: ChartPointerEvent) => {
+      exemplarInteraction.onMouseOver(params);
+      const isMarker = params?.componentType === "markLine" || params?.componentType === "markArea";
+      const marker = params?.data?.annotationDetails;
+      if (!isMarker || !marker?.source) return;
+      if (!hoveredQueryAnnotation.value) setAxisTooltipPaused(true);
+      hoveredQueryAnnotation.value = {
+        marker: marker as QueryAnnotationMarker,
+        x: params?.event?.event?.clientX ?? 0,
+        y: params?.event?.event?.clientY ?? 0,
+      };
+    };
+
+    const onChartMouseOut = (params: ChartPointerEvent) => {
+      exemplarInteraction.onMouseOut(params);
+      if (!hoveredQueryAnnotation.value) return;
+      hoveredQueryAnnotation.value = null;
+      // An open exemplar card keeps the axis tooltip paused for itself.
+      if (!exemplarActiveMarker.value) setAxisTooltipPaused(false);
+    };
+
     const {
       points: exemplarPoints,
       activeMarker: exemplarActiveMarker,
@@ -1349,7 +1427,7 @@ export default defineComponent({
             filteredResultMetaData,
             filteredMetadata.value,
             chartPanelStyle.value,
-            annotations,
+            panelAnnotations,
             loading.value,
             filteredSparklineData.value,
           );
@@ -1549,7 +1627,13 @@ export default defineComponent({
     );
 
     watch(
-      [data, () => store?.state?.theme, () => store?.state?.timezone, annotations, sparklineData],
+      [
+        data,
+        () => store?.state?.theme,
+        () => store?.state?.timezone,
+        panelAnnotations,
+        sparklineData,
+      ],
       async () => {
         // emit vrl function field list per query index
         if (data.value?.length) {
@@ -2224,6 +2308,11 @@ export default defineComponent({
     }
 
     return {
+      hoveredQueryAnnotation,
+      onChartMouseOver,
+      onChartMouseOut,
+      failedAnnotationSources,
+      truncatedAnnotationSources,
       t,
       raw,
       store,

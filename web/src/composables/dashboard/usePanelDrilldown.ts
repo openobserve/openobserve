@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref, computed, watch, nextTick, onBeforeMount, onUnmounted } from "vue";
+import { toZonedTime } from "date-fns-tz";
 import type { TranslateFn } from "@/types/i18n";
 import { getAllDashboardsByFolderId, getDashboard, getFoldersList } from "@/utils/commons";
 import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
@@ -33,6 +34,11 @@ import {
   stripWherePredicate,
 } from "@/utils/query/sqlComplexity";
 import { EXEMPLAR_SERIES_ID } from "@/utils/dashboard/exemplars/applyExemplarSeries";
+import {
+  stateTimelineBreakdownColumn,
+  stateTimelineDrilldownSeries,
+  stateTimelineSourceRecord,
+} from "@/utils/dashboard/convertStateTimelineData";
 
 export function usePanelDrilldown({
   panelSchema,
@@ -515,35 +521,55 @@ export function usePanelDrilldown({
     isCursorOverPanel.value = false;
   };
 
+  // Mirrors getAnnotationsData's own xAxis computation, so the manual annotation lands exactly on the band.
+  const queryMarkerStart = (marker: { start_time?: number } | null | undefined) =>
+    marker?.start_time
+      ? toZonedTime(new Date(marker.start_time / 1000), store.state.timezone)
+      : null;
+
   const onChartClick = async (params: any, ...args: any) => {
     // An exemplar marker opens its trace, never the drilldown menu or an annotation.
     if (params?.seriesId === EXEMPLAR_SERIES_ID) {
       await onExemplarClick?.(params);
       return;
     }
-    // Check if we have both drilldown and annotation at the same point
-    const hasAnnotation =
-      params?.componentType === "markLine" || params?.componentType === "markArea";
+    const isMarker = params?.componentType === "markLine" || params?.componentType === "markArea";
+    // Query-source markers are read-only and explain themselves on hover.
+    const isQueryMarker = isMarker && !!params?.data?.annotationDetails?.source;
+    const hasAnnotation = isMarker && !isQueryMarker;
     const hasDrilldown = panelSchema.value.config.drilldown?.length > 0;
 
-    // If in annotation add mode, handle that first
+    // Checked before the query-band early return below, so add-mode still places an annotation on a band.
     if (allowAnnotationsAdd.value) {
       if (isAddAnnotationMode.value) {
         if (hasAnnotation) {
           editAnnotation(params?.data?.annotationDetails);
+        } else if (isQueryMarker) {
+          handleAddAnnotation(queryMarkerStart(params?.data?.annotationDetails), null);
         } else {
-          handleAddAnnotation(params?.data?.[0] || params?.data?.time || params?.data?.name, null);
+          // A segment's start is its zoned x value, the same unit the other charts pass.
+          const segmentStart =
+            panelSchema.value.type === "state-timeline" ? params?.value?.[0] : undefined;
+          handleAddAnnotation(
+            segmentStart ?? (params?.data?.[0] || params?.data?.time || params?.data?.name),
+            null,
+          );
         }
         return;
       }
     }
+
+    // A query band lies over the bars, so its click must not drill down with the band's data.
+    if (isQueryMarker) return;
 
     // Cross-links are fetched lazily (not on panel render) — resolve them now, before use.
     await ensureDrilldownSchema();
 
     // Store click parameters for drilldown (including cross-links)
     const crossLinkItems = getCrossLinkDrilldownItems();
-    const shouldShowDrilldown = hasDrilldown || crossLinkItems.length > 0;
+    // A state timeline's drilldown reads a segment, so an annotation click only opens the annotation.
+    const annotationOnly = hasAnnotation && panelSchema.value.type === "state-timeline";
+    const shouldShowDrilldown = !annotationOnly && (hasDrilldown || crossLinkItems.length > 0);
 
     if (shouldShowDrilldown) {
       drilldownParams = [params, args];
@@ -656,7 +682,12 @@ export function usePanelDrilldown({
             ? drilldownParams[0]?.name
             : drilldownParams[0]?.seriesName;
 
-          if (queryResult?.length > 0) {
+          if (chartType === "state-timeline") {
+            Object.assign(
+              record,
+              stateTimelineSourceRecord(panelSchema.value, data.value, drilldownParams[0]),
+            );
+          } else if (queryResult?.length > 0) {
             for (const row of queryResult) {
               let matches = true;
               if (xFields.length > 0 && xAxisValue !== undefined) {
@@ -749,7 +780,11 @@ export function usePanelDrilldown({
           : null;
         const breakdown = queryDetails.queries[0].fields?.breakdown || [];
 
-        const calculatedTimeRange = calculateTimeRange(hoveredTimestamp, intervalMicro.value);
+        const isStateTimeline = queryDetails.type === "state-timeline";
+        const segment = isStateTimeline ? stateTimelineDrilldownSeries(drilldownParams[0]) : null;
+        const calculatedTimeRange = segment
+          ? { startTime: segment.__start * 1000, endTime: segment.__end * 1000 }
+          : calculateTimeRange(hoveredTimestamp, intervalMicro.value);
 
         let modifiedQuery = originalQuery;
 
@@ -770,14 +805,19 @@ export function usePanelDrilldown({
 
           const aliasClause = tableAliases?.length ? ` AS ${tableAliases.join(", ")}` : "";
 
-          const breakdownColumn = breakdown[0]?.column;
+          const breakdownColumn =
+            segment && breakdown[0]
+              ? stateTimelineBreakdownColumn(breakdown[0])
+              : breakdown[0]?.column;
 
           const seriesIndex = drilldownParams[0]?.seriesIndex;
           const breakdownSeriesName =
             seriesIndex !== undefined ? panelData.value.options.series[seriesIndex] : undefined;
-          const uniqueSeriesName = breakdownSeriesName
-            ? breakdownSeriesName.originalSeriesName
-            : drilldownParams[0]?.seriesName;
+          const uniqueSeriesName = segment
+            ? segment.__name
+            : breakdownSeriesName
+              ? breakdownSeriesName.originalSeriesName
+              : drilldownParams[0]?.seriesName;
           const breakdownValue = uniqueSeriesName;
 
           const whereClause = buildWhereClause(ast, breakdownColumn, breakdownValue);
@@ -846,6 +886,8 @@ export function usePanelDrilldown({
                 __value: drilldownParams[0]?.data?.value ?? "",
               };
             }
+          } else if (isStateTimeline) {
+            drilldownVariables.series = segment;
           } else {
             drilldownVariables.series = {
               __name: ["pie", "donut", "heatmap"].includes(panelSchema.value.type)
@@ -975,6 +1017,8 @@ export function usePanelDrilldown({
             __value: drilldownParams[0]?.data?.value ?? "",
           };
         }
+      } else if (panelSchema.value.type == "state-timeline") {
+        drilldownVariables.series = stateTimelineDrilldownSeries(drilldownParams[0]);
       } else {
         // we have an series object
         drilldownVariables.series = {

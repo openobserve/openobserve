@@ -194,7 +194,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await setupTablePanelWithConfig(page, pm, dashboardName);
 
     // Open popup, pick first column, select Bytes unit, save
-    await pm.dashboardPanelConfigs.configureOverrideWithUnit({ unitName: "Bytes" });
+    await pm.dashboardPanelConfigs.configureOverrideWithUnit({ unitName: "Bytes (1024)" });
     testLogger.info("Override config: field + Bytes unit saved");
 
     // Wait for the query to finish before asserting on the table: the pre-existing

@@ -163,6 +163,8 @@ fn map_otlp_handler_error(
 }
 
 const EXTRACTOR_VERSION: &str = "v1";
+/// OTel semconv default `service.name`, suffixed with `:<process.executable.name>` when known.
+const UNKNOWN_SERVICE: &str = "unknown_service";
 /// Resource attributes promoted to fixed columns (hot query dimensions).
 const HOT_RESOURCE_ATTRS: &[(&str, &str)] = &[
     ("service.name", "service_name"),
@@ -667,6 +669,17 @@ fn build_sample_records(
                 base.insert(field_name, json::Value::String(string_value));
             }
         }
+    }
+    // A NULL service_name is never listed by meta, so the UI cannot select those rows.
+    if !base.contains_key("service_name") {
+        let service_name = match base.get("process_executable_name").and_then(|v| v.as_str()) {
+            Some(exe) => format!("{UNKNOWN_SERVICE}:{exe}"),
+            None => UNKNOWN_SERVICE.to_string(),
+        };
+        base.insert(
+            "service_name".to_string(),
+            json::Value::String(service_name),
+        );
     }
 
     base.insert(
@@ -2401,6 +2414,82 @@ mod tests {
         assert_eq!(
             records[0].get(TIMESTAMP_COL_NAME).and_then(|v| v.as_i64()),
             Some((ok_ts_nano / 1000) as i64)
+        );
+    }
+
+    fn service_name_for(resource_attrs: &[(&str, &str)]) -> Option<String> {
+        let resource = ResourceProfiles {
+            resource: Some(opentelemetry_proto::tonic::resource::v1::Resource {
+                attributes: resource_attrs
+                    .iter()
+                    .map(
+                        |(key, value)| opentelemetry_proto::tonic::common::v1::KeyValue {
+                            key: key.to_string(),
+                            value: Some(AnyValue {
+                                value: Some(any_value::Value::StringValue(value.to_string())),
+                            }),
+                            ..Default::default()
+                        },
+                    )
+                    .collect(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let now = now_micros();
+        let profile = Profile {
+            time_unix_nano: (now as u64).saturating_mul(1000),
+            samples: vec![Sample {
+                values: vec![1],
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let (records, _) = build_sample_records(
+            &resource,
+            &ScopeProfiles::default(),
+            &profile,
+            Some(&ProfilesDictionary::default()),
+            now - 3600 * 1_000_000,
+            now + 3600 * 1_000_000,
+        );
+        assert_eq!(records.len(), 1);
+        records[0]
+            .get("service_name")
+            .and_then(|v| v.as_str())
+            .map(str::to_string)
+    }
+
+    #[test]
+    fn build_sample_records_keeps_the_sent_service_name() {
+        assert_eq!(
+            service_name_for(&[
+                ("service.name", "checkout"),
+                ("process.executable.name", "checkout-bin"),
+            ])
+            .as_deref(),
+            Some("checkout")
+        );
+    }
+
+    #[test]
+    fn build_sample_records_names_a_process_without_service_name_by_its_executable() {
+        assert_eq!(
+            service_name_for(&[("process.executable.name", "dockerd")]).as_deref(),
+            Some("unknown_service:dockerd")
+        );
+        assert_eq!(
+            service_name_for(&[("service.name", ""), ("process.executable.name", "dockerd")])
+                .as_deref(),
+            Some("unknown_service:dockerd")
+        );
+    }
+
+    #[test]
+    fn build_sample_records_falls_back_to_unknown_service_without_executable_name() {
+        assert_eq!(
+            service_name_for(&[("process.pid", "42")]).as_deref(),
+            Some("unknown_service")
         );
     }
 

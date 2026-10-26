@@ -23,6 +23,7 @@ import {
   type MapGroup,
   type View,
 } from "./kubernetesQueries";
+import { hasStatusChip, type StatusChipId } from "./kubernetesStatusChips";
 
 export type MapFill =
   "cpuReq" | "cpuLim" | "memReq" | "memLim" | "restarts" | "cpu" | "memory" | "status";
@@ -41,6 +42,7 @@ export interface K8sUrlState {
   search: string;
   sort: string | null;
   desc: boolean;
+  status: StatusChipId;
   entity: MapEntity;
   fill: MapFill;
   group: MapGroup;
@@ -58,6 +60,7 @@ const PAGE_PARAMS = [
   "search",
   "sort",
   "desc",
+  "status",
   "entity",
   "fill",
   "group",
@@ -138,6 +141,9 @@ const parseGroup = (entity: MapEntity, value: string | null): MapGroup => {
     : DEFAULT_GROUP[entity];
 };
 
+const parseStatus = (view: View, value: string | null): StatusChipId =>
+  value && hasStatusChip(view, value as StatusChipId) ? (value as StatusChipId) : "all";
+
 export const parseUrlState = (query: Query): K8sUrlState => {
   const viewParam = first(query.view);
   const view: View = VIEWS.includes(viewParam as View) ? (viewParam as View) : "cluster";
@@ -153,6 +159,7 @@ export const parseUrlState = (query: Query): K8sUrlState => {
     search: first(query.search) ?? "",
     sort: first(query.sort),
     desc: first(query.sort) != null && first(query.desc) === "true",
+    status: parseStatus(view, first(query.status)),
     entity,
     fill:
       fillParam && ENTITY_FILLS[entity].includes(fillParam) ? fillParam : ENTITY_FILLS[entity][0],
@@ -178,6 +185,7 @@ export const toQuery = (state: K8sUrlState, base: Query): LocationQueryRaw => {
     out.sort = state.sort;
     if (state.desc) out.desc = "true";
   }
+  if (state.status !== "all" && hasStatusChip(state.view, state.status)) out.status = state.status;
   if (state.view === "map") {
     if (state.entity !== "pods") out.entity = state.entity;
     if (state.fill !== ENTITY_FILLS[state.entity][0]) out.fill = state.fill;
@@ -200,6 +208,7 @@ export const withView = (state: K8sUrlState, view: View): K8sUrlState => ({
   search: "",
   sort: null,
   desc: false,
+  status: "all",
   entity: "pods",
   fill: ENTITY_FILLS.pods[0],
   group: DEFAULT_GROUP.pods,

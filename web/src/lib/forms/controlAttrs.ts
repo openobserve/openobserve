@@ -2,13 +2,17 @@
 
 const ARIA_ATTR = /^aria[-A-Z]/;
 
-/** Splits fallthrough attrs so `aria-*` reach the focusable control while the rest stay on the wrapper. */
-export function splitControlAttrs(attrs: Record<string, unknown>) {
+/** Splits fallthrough attrs so `aria-*` (and `role` when `forwardRole` is set) reach the focusable control while the rest stay on the wrapper. */
+export function splitControlAttrs(
+  attrs: Record<string, unknown>,
+  { forwardRole = false }: { forwardRole?: boolean } = {},
+) {
   const controlAttrs: Record<string, unknown> = {};
   const wrapperAttrs: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(attrs)) {
     if (key === "tabindex") continue;
-    (ARIA_ATTR.test(key) ? controlAttrs : wrapperAttrs)[key] = value;
+    (ARIA_ATTR.test(key) || (forwardRole && key === "role") ? controlAttrs : wrapperAttrs)[key] =
+      value;
   }
   return { controlAttrs, wrapperAttrs };
 }

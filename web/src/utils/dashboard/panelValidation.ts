@@ -2,6 +2,7 @@ import type { TranslateFn } from "@/types/i18n";
 import { CURRENT_DASHBOARD_SCHEMA_VERSION } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import { isFormulaQuery } from "@/utils/dashboard/promql/formula";
+import { validateAnnotationSources } from "@/utils/dashboard/validateAnnotationSources";
 
 /**
  * Validates a single condition item
@@ -476,6 +477,23 @@ const validateChartFieldsConfiguration = (
       }
       break;
     }
+    case "state-timeline": {
+      if (fields?.y?.length !== 1) {
+        const errorMsg =
+          pageKey === "logs"
+            ? t("dashboard.utils.unableToExtractValueField")
+            : t("dashboard.utils.addOneFieldFor", { label: yAxisLabel });
+        errors.push(errorMsg);
+      }
+      if (fields?.x?.length !== 1) {
+        const errorMsg =
+          pageKey === "logs"
+            ? t("dashboard.utils.unableToExtractGroupingField")
+            : t("dashboard.utils.addOneFieldFor", { label: xAxisLabel });
+        errors.push(errorMsg);
+      }
+      break;
+    }
     case "stacked":
     case "h-stacked": {
       if (fields?.y?.length === 0) {
@@ -836,6 +854,7 @@ const validatePanelContent = (t: TranslateFn, panel: any): string[] => {
     "stacked",
     "h-stacked",
     "heatmap",
+    "state-timeline",
     "metric",
     "gauge",
     "geomap",
@@ -930,6 +949,7 @@ export const validatePanel = (
       "table",
       "maps",
       "heatmap",
+      "state-timeline",
       "geomap",
       "donut",
       "pie",
@@ -1042,6 +1062,8 @@ export const validateDashboardJson = (t: TranslateFn, dashboardJson: any): strin
       }),
     );
   }
+
+  errors.push(...validateAnnotationSources(t, dashboardJson?.annotationSources));
 
   // Check tabs
   if (!Array.isArray(dashboardJson?.tabs) || dashboardJson?.tabs?.length === 0) {
