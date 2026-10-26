@@ -39,11 +39,12 @@ const LEGEND_VALUES_TEXT_WIDTH = 180;
 
 // eslint-disable-next-line local/no-hardcoded-px -- the fixed size ECharts paints legend text at; canvas measurement has no rem
 const LEGEND_TEXT_FONT = "12px";
-const LEGEND_VALUES_MIN_NAME_WIDTH = 30;
 // Legend padding (30) plus the default icon (25) and its gap (5) beside each entry's text.
 const LEGEND_ITEM_CHROME_WIDTH = 60;
 // ECharts' largest-remainder percent loops forever once 100 * 10^precision passes 2^53.
-const MAX_SEATS_PRECISION = 13;
+export const MAX_SEATS_PRECISION = 13;
+// Shared so the sizing pass and the first formatter call hit the same cached legend entries.
+const ALL_SLICES_SELECTED: Readonly<Record<string, boolean>> = Object.freeze({});
 
 interface PieLegendEntry {
   name: string;
@@ -59,6 +60,8 @@ interface PieSlice {
   name?: unknown;
   value?: unknown;
 }
+
+type PieLength = string | number;
 
 /**
  * Utility function to get chart dimensions safely
@@ -503,30 +506,31 @@ const pieLegendValueKeys = (panelSchema: PieLegendPanelSchema | null | undefined
   return LEGEND_VALUE_KEYS.filter((key) => selected.includes(key));
 };
 
-// The panel decimals as the SQL slice label's percentPrecision reads them; toFixed throws above 100.
-const pieLegendPercentDecimals = (decimals: unknown): number => {
+// The panel decimals for a pie percent, defaulting like the slice label; toFixed throws above 100.
+export const pieLegendPercentDecimals = (decimals: unknown): number => {
   if (decimals === null || decimals === undefined || decimals === "") return 2;
   const parsed = Math.floor(Number(decimals));
   return Number.isFinite(parsed) && parsed >= 0 ? Math.min(parsed, 100) : 2;
 };
 
+// Returns "" when not even one letter and the ellipsis fit, since anything wider pushes the values out.
 const truncateLegendName = (text: string, maxWidth: number): string => {
   if (calculateWidthText(text, LEGEND_TEXT_FONT) <= maxWidth) return text;
   let low = 0;
-  let high = text.length;
+  let high = text.length - 1;
   while (low < high) {
     const mid = Math.ceil((low + high) / 2);
     if (calculateWidthText(`${text.slice(0, mid)}...`, LEGEND_TEXT_FONT) <= maxWidth) low = mid;
     else high = mid - 1;
   }
-  return `${text.slice(0, low)}...`;
+  return low > 0 ? `${text.slice(0, low)}...` : "";
 };
 
 // Mirrors applyPieOverrides: a slice with its own decimals gets a plain share of the positive total.
 const overridePercentText = (value: number, positiveTotal: number, decimals: number): string =>
   `${(positiveTotal > 0 ? (Math.max(value, 0) / positiveTotal) * 100 : 0).toFixed(decimals)}%`;
 
-// ECharts' largest-remainder percent rounding (number.getPercentSeats, not exported), run once for every slice.
+// ECharts' largest-remainder percent rounding (number.getPercentSeats, not exported), in units of 10^-precision %.
 const percentSeats = (values: number[], precision: number): number[] => {
   const sum = values.reduce((acc, value) => acc + (isNaN(value) ? 0 : value), 0);
   if (sum === 0) return [];
@@ -544,7 +548,7 @@ const percentSeats = (values: number[], precision: number): number[] => {
   for (let next = 0; currentSum < targetSeats; next++, currentSum++) {
     seats[next < order.length ? order[next] : 0]++;
   }
-  return seats.map((seat) => seat / digits);
+  return seats;
 };
 
 // Keyed by name like the legend itself, so slices that share a name (merged queries) show their sum.
@@ -553,38 +557,52 @@ const buildPieLegendEntries = (
   data: PieSlice[],
   keys: string[],
   textWidth: number,
+  selected: Readonly<Record<string, boolean>>,
 ): Map<string, PieLegendEntry> => {
   const lookup = createSeriesOverrideLookup(panelSchema?.config);
-  const panelDecimals = pieLegendPercentDecimals(panelSchema?.config?.decimals);
+  // The slice labels cap their precision here too, so the legend never prints digits they do not.
+  const panelDecimals = Math.min(
+    pieLegendPercentDecimals(panelSchema?.config?.decimals),
+    MAX_SEATS_PRECISION,
+  );
   const sums = new Map<string, number>();
   const measured = new Set<string>();
-  let positiveTotal = 0;
-  for (const item of data) {
+  const shares = new Map<string, number>();
+  // ECharts drops negative and legend-hidden slices, then rounds each drawn slice's percent on its own.
+  const itemShares = data.map((item) => {
     const numeric = Number(item?.value);
     const value = Number.isFinite(numeric) ? numeric : 0;
     const name = String(item?.name ?? "");
     sums.set(name, (sums.get(name) ?? 0) + value);
     if (Number.isFinite(numeric)) measured.add(name);
-    if (value > 0) positiveTotal += value;
-  }
+    const share = value > 0 && selected[name] !== false ? value : 0;
+    shares.set(name, (shares.get(name) ?? 0) + share);
+    return share;
+  });
   const names = [...sums.keys()];
   const values = [...sums.values()];
-  // Negatives can cancel the sum and spin ECharts' rounding loop; without them it ends within n steps.
-  const seatValues = values.map((value) => Math.max(value, 0));
-  let seats: number[] | undefined;
+  const seatValues = [...shares.values()];
+  const positiveTotal = seatValues.reduce((acc, value) => acc + value, 0);
+  let seatSums: Map<string, number> | undefined;
+  const sumSeatsByName = () => {
+    const seats = percentSeats(itemShares, panelDecimals);
+    const byName = new Map<string, number>();
+    data.forEach((item, index) => {
+      const name = String(item?.name ?? "");
+      if (itemShares[index] > 0) byName.set(name, (byName.get(name) ?? 0) + (seats[index] ?? 0));
+    });
+    return byName;
+  };
   const entries = new Map<string, PieLegendEntry>();
   names.forEach((name, index) => {
     const overrideDecimals = lookup.get(name)?.decimals;
     const percentText = () => {
       if (overrideDecimals !== undefined) {
         const decimals = pieLegendPercentDecimals(overrideDecimals);
-        return overridePercentText(values[index], positiveTotal, decimals);
+        return overridePercentText(seatValues[index], positiveTotal, decimals);
       }
-      if (panelDecimals > MAX_SEATS_PRECISION) {
-        return overridePercentText(values[index], positiveTotal, panelDecimals);
-      }
-      seats ??= percentSeats(seatValues, panelDecimals);
-      const percent = seatValues[index] ? (seats[index] ?? 0) : 0;
+      seatSums ??= sumSeatsByName();
+      const percent = (seatSums.get(name) ?? 0) / Math.pow(10, panelDecimals);
       return `${percent.toFixed(panelDecimals)}%`;
     };
     // A slice with no finite sample has no value or share to show; "0" would read as a real zero.
@@ -594,13 +612,10 @@ const buildPieLegendEntries = (
         return key === "value" ? lookup.formatValue(values[index], name) : percentText();
       })
       .join("  ");
-    // The name gives way to the values, and drops out when too little room is left for it.
+    // The values win the room; the name keeps as many letters as still fit beside them.
     const nameWidth = textWidth - calculateWidthText(`  ${valueText}`, LEGEND_TEXT_FONT);
     entries.set(name, {
-      name:
-        nameWidth < LEGEND_VALUES_MIN_NAME_WIDTH
-          ? ""
-          : truncateLegendName(String(lookup.displayName(name)), nameWidth),
+      name: truncateLegendName(String(lookup.displayName(name)), nameWidth),
       valueText,
     });
   });
@@ -610,7 +625,12 @@ const buildPieLegendEntries = (
 // One render sizes the legend several times over the same data array; build its entries once.
 const pieLegendEntriesCache = new WeakMap<
   PieSlice[],
-  { panelSchema: PieLegendPanelSchema; textWidth: number; entries: Map<string, PieLegendEntry> }
+  {
+    panelSchema: PieLegendPanelSchema;
+    textWidth: number;
+    selected: Readonly<Record<string, boolean>>;
+    entries: Map<string, PieLegendEntry>;
+  }
 >();
 
 const getPieLegendEntries = (
@@ -618,13 +638,19 @@ const getPieLegendEntries = (
   data: PieSlice[],
   keys: string[],
   textWidth: number = LEGEND_VALUES_TEXT_WIDTH,
+  selected: Readonly<Record<string, boolean>> = ALL_SLICES_SELECTED,
 ): Map<string, PieLegendEntry> => {
   const cached = pieLegendEntriesCache.get(data);
-  if (cached && cached.panelSchema === panelSchema && cached.textWidth === textWidth) {
+  if (
+    cached &&
+    cached.panelSchema === panelSchema &&
+    cached.textWidth === textWidth &&
+    cached.selected === selected
+  ) {
     return cached.entries;
   }
-  const entries = buildPieLegendEntries(panelSchema, data, keys, textWidth);
-  pieLegendEntriesCache.set(data, { panelSchema, textWidth, entries });
+  const entries = buildPieLegendEntries(panelSchema, data, keys, textWidth, selected);
+  pieLegendEntriesCache.set(data, { panelSchema, textWidth, selected, entries });
   return entries;
 };
 
@@ -655,8 +681,9 @@ const applyPieLegendValues = (
     const data = options.series?.[0]?.data;
     // A narrow right scroll legend shrinks textStyle.width after this point; fit the entries to it.
     const width = Math.min(LEGEND_VALUES_TEXT_WIDTH, options.legend.textStyle?.width ?? Infinity);
+    // ChartRenderer replaces legend.selected on every toggle, so the percents follow the visible slices.
     const entries = Array.isArray(data)
-      ? getPieLegendEntries(panelSchema, data, keys, width)
+      ? getPieLegendEntries(panelSchema, data, keys, width, options.legend.selected)
       : null;
     const style = name === hoveredSeriesState?.value?.hoveredSeriesName ? "a" : "b";
     const entry = entries?.get(String(name));
@@ -664,6 +691,8 @@ const applyPieLegendValues = (
     return entry.name ? `{${style}|${entry.name}}  ${entry.valueText}` : entry.valueText;
   };
   options.legend.textStyle = { ...options.legend.textStyle, width: LEGEND_VALUES_TEXT_WIDTH };
+  // An empty map selects every slice; its presence tells ChartRenderer to keep it in step with clicks.
+  options.legend.selected = ALL_SLICES_SELECTED;
 };
 
 /**
@@ -1262,6 +1291,36 @@ export const applyPieDonutChartAlignment = (
   }
 };
 
+// ECharts fits outside labels into the series box, so ending the box at a right legend keeps them off it.
+const fitPieBoxBesideRightLegend = (
+  panelSchema: PieLegendPanelSchema,
+  options: any,
+  chartWidth: number,
+  chartHeight: number,
+) => {
+  const series = options.series?.[0];
+  const legend = options.legend;
+  if (series?.type !== "pie" || !legend?.show || typeof legend.left !== "number") return;
+  if (panelSchema.config?.legends_position !== "right") return;
+  if (series.label?.show === false || series.label?.position === "inside") return;
+  const legendWidth = chartWidth - legend.left;
+  if (legendWidth <= 0 || legendWidth >= chartWidth) return;
+  const boxWidth = chartWidth - legendWidth;
+  // Center x is a share of the box width and radius of half its shorter side; rescale to keep the pie in place.
+  const rescale = (value: PieLength, from: number, to: number): PieLength =>
+    typeof value === "string" && value.endsWith("%")
+      ? `${(parseFloat(value) * from) / to}%`
+      : value;
+  const center: PieLength[] = series.center ?? ["50%", "50%"];
+  series.center = [rescale(center[0], chartWidth, boxWidth), center[1]];
+  const fromSize = Math.min(chartWidth, chartHeight);
+  const toSize = Math.min(boxWidth, chartHeight);
+  series.radius = Array.isArray(series.radius)
+    ? series.radius.map((radius: PieLength) => rescale(radius, fromSize, toSize))
+    : rescale(series.radius, fromSize, toSize);
+  series.right = legendWidth;
+};
+
 /**
  * Helper function to calculate scroll legend width for pie/donut charts
  * This ensures consistency between legend positioning and center adjustment
@@ -1448,6 +1507,7 @@ export const applyLegendConfiguration = (
     // Adjust center positioning for pie/donut charts with chart alignment support
     const { chartWidth, chartHeight } = getChartDimensions(chartPanelRef);
     applyPieDonutChartAlignment(panelSchema, options, chartWidth, chartHeight);
+    fitPieBoxBesideRightLegend(panelSchema, options, chartWidth, chartHeight);
   }
 
   // truncate the rotated y-axis name to the final plot height so it never spills past the plot
