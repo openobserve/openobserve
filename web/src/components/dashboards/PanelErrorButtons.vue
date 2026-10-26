@@ -259,6 +259,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import PanelNoticeContent from "@/components/dashboards/PanelNoticeContent.vue";
 import type { SeriesLimitInfo } from "@/utils/dashboard/panelDiagnostics";
+import type { RegionJoinInfo } from "@/utils/dashboard/convertMapsData";
 import {
   buildPanelNotices,
   seriesTotalBoundOf,
@@ -302,6 +303,10 @@ export default defineComponent({
     },
     seriesLimit: {
       type: Object as PropType<SeriesLimitInfo | null>,
+      default: null,
+    },
+    regionJoin: {
+      type: Object as PropType<RegionJoinInfo | null>,
       default: null,
     },
     serverPartial: {
@@ -390,6 +395,7 @@ export default defineComponent({
           partialReasons: props.serverPartialReasons,
           interrupted: props.isPartialData && !props.isPanelLoading,
           functionErrors: props.functionErrors,
+          regionJoin: props.regionJoin,
           canEdit: props.canEdit && !props.viewOnly,
           canRefresh: props.canRefresh,
         },

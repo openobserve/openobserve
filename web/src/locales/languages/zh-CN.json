@@ -6489,6 +6489,8 @@
     "totalLegends": "总计：{count}",
     "noLegendsAvailable": "无可用图例",
     "tableFiltering": "列过滤",
+    "tableExpandableRows": "可展开行",
+    "tableExpandableRowsTooltip": "每行都有一个展开按钮，用于显示该行的所有字段。",
     "columnFormattingTitle": "列格式",
     "columnFormattingSubtitle": "左侧为控制项，右侧为该列的实时示例，便于在上下文中查看。",
     "columnFormattingPick": "选择列",

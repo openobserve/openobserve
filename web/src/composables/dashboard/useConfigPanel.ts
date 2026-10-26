@@ -7,6 +7,7 @@ import {
   shouldShowLegendWidth,
   shouldShowLegendHeight,
   shouldApplyChartAlign,
+  shouldShowLegendValues,
   shouldShowTopResultsConfig,
   shouldShowAreaLineStyleConfig,
   shouldShowNoValueReplacement,
@@ -14,10 +15,10 @@ import {
   shouldShowCartesianAxisConfig,
   shouldShowGridlines,
   shouldShowAxisLabelConfig,
-  shouldShowLineThickness,
   shouldShowAreaFillConfig,
   shouldShowDrilldown,
   shouldShowTimeShift,
+  allVisibleQueriesInstant,
 } from "@/utils/dashboard/configUtils";
 import {
   SectionId,
@@ -26,6 +27,7 @@ import {
 } from "@/utils/dashboard/searchLabelsConfig";
 import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
 import { PROMQL_MODULAR_CHART_TYPES } from "@/utils/dashboard/promql/shared/types";
+import { isGaugeAutoRange } from "@/utils/dashboard/gaugeDial";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -246,6 +248,10 @@ export function useConfigPanel(
         label: t("dashboard.chartAlign"),
         visible: shouldApplyChartAlign(dashboardPanelData),
       },
+      "legend-values": {
+        label: t("dashboard.legendValues"),
+        visible: shouldShowLegendValues(dashboardPanelData),
+      },
       "promql-legend": {
         label: t("dashboard.query"),
         visible:
@@ -369,7 +375,7 @@ export function useConfigPanel(
       },
       "line-thickness": {
         label: t("dashboard.lineThickness"),
-        visible: shouldShowLineThickness(dashboardPanelData, promqlMode.value),
+        visible: shouldShowAreaLineStyleConfig(dashboardPanelData),
       },
       "fill-opacity": {
         label: t("dashboard.fillOpacity"),
@@ -396,6 +402,10 @@ export function useConfigPanel(
       filtering: {
         label: t("dashboard.tableFiltering"),
         visible: dashboardPanelData.data.type === "table",
+      },
+      "expandable-rows": {
+        label: t("dashboard.tableExpandableRows"),
+        visible: dashboardPanelData.data.type === "table" && !isPivotMode.value,
       },
       pagination: {
         label: t("dashboard.pagination"),
@@ -468,14 +478,34 @@ export function useConfigPanel(
         visible:
           dashboardPanelData.data.type === "geomap" || dashboardPanelData.data.type === "maps",
       },
+      "map-roam": {
+        label: t("dashboard.mapsEnableRoam"),
+        visible: dashboardPanelData.data.type === "maps",
+      },
     },
     gauge: {
+      "gauge-range-mode": {
+        label: t("dashboard.gaugeRangeMode"),
+        visible: dashboardPanelData.data.type === "gauge",
+      },
       "gauge-min": {
         label: t("dashboard.gaugeMinValue"),
-        visible: dashboardPanelData.data.type === "gauge",
+        visible:
+          dashboardPanelData.data.type === "gauge" &&
+          !isGaugeAutoRange(
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.config,
+          ),
       },
       "gauge-max": {
         label: t("dashboard.gaugeMaxValue"),
+        visible:
+          dashboardPanelData.data.type === "gauge" &&
+          !isGaugeAutoRange(
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.config,
+          ),
+      },
+      "gauge-end-labels": {
+        label: t("dashboard.showGaugeEndLabels"),
         visible: dashboardPanelData.data.type === "gauge",
       },
     },
@@ -541,7 +571,13 @@ export function useConfigPanel(
     sparkline: {
       sparkline: {
         label: t("dashboard.configSectionSparkline"),
-        visible: dashboardPanelData.data.type === "metric",
+        // Matches ConfigPanel, which drops the section for an all-instant PromQL metric.
+        visible:
+          dashboardPanelData.data.type === "metric" &&
+          !(
+            dashboardPanelData.data.queryType === "promql" &&
+            allVisibleQueriesInstant(dashboardPanelData)
+          ),
       },
     },
   }));

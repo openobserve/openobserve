@@ -195,19 +195,24 @@ export function createSeriesBuilders(deps: SeriesDeps) {
       panelSchema?.config,
     );
 
+    const label = getSeriesLabel();
+
     return {
       //only append if yaxiskeys length is more than 1
       name: yAxisName?.toString(),
       ...defaultSeriesProps,
       ...areaStyle,
-      label: getSeriesLabel(),
+      label,
+      // Without large mode every label draws, so a dense series would print one unreadable band.
+      ...(label.show && { labelLayout: { hideOverlap: true } }),
       originalSeriesName: seriesName,
       // markLine if exist
       markLine: getSeriesMarkLine(),
       // markArea: getSeriesMarkArea(),
       // config to connect null values
       connectNulls: panelSchema.config?.connect_nulls ?? false,
-      large: true,
+      // Large mode draws a bar or scatter series as one path, which drops value labels past its threshold.
+      large: !label.show,
       color: seriesColor,
       data: seriesData,
       ...seriesConfig,

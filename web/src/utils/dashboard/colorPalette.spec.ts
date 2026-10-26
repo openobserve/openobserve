@@ -16,10 +16,39 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { getAreaFillOpacity, getAreaGradientColor, getAreaStyleOverride } from "./colorPalette";
+import {
+  colorToRgba,
+  getAreaFillOpacity,
+  getAreaGradientColor,
+  getAreaStyleOverride,
+} from "./colorPalette";
 
 const COLOR = "#5b8ef0";
 const stops = (style: any) => style.areaStyle.color.colorStops.map((s: any) => s.color);
+
+describe("colorToRgba", () => {
+  it.each([
+    ["#5b8ef0", "rgba(91, 142, 240, 0.4)"],
+    ["#f00", "rgba(255, 0, 0, 0.4)"],
+    ["#ff000080", "rgba(255, 0, 0, 0.4)"],
+    ["rgb(1, 2, 3)", "rgba(1, 2, 3, 0.4)"],
+    ["rgba(1, 2, 3, 0.9)", "rgba(1, 2, 3, 0.4)"],
+    ["red", "rgba(255, 0, 0, 0.4)"],
+    ["hsl(120, 100%, 50%)", "rgba(0, 255, 0, 0.4)"],
+  ])("sets the alpha of %s", (color, expected) => {
+    expect(colorToRgba(color, 0.4)).toBe(expected);
+  });
+
+  it.each(["", "not-a-color"])("returns %o unchanged when it cannot be parsed", (color) => {
+    expect(colorToRgba(color, 0.4)).toBe(color);
+  });
+
+  it("gives a named colour's gradient two different stops", () => {
+    const style = getAreaStyleOverride("area", {}, "orange", "s", "light", { fill_opacity: 50 });
+    const [top, bottom] = stops(style);
+    expect(top).not.toBe(bottom);
+  });
+});
 
 describe("getAreaFillOpacity", () => {
   it("is null when unset or not a number, so the theme alphas apply", () => {

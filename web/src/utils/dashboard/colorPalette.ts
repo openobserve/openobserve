@@ -15,6 +15,7 @@
 
 import { scaleLinear } from "d3-scale";
 import { isNumber } from "lodash-es";
+import { color as echartsColor } from "echarts/core";
 import { chartColor, chartNumber } from "../chartTheme";
 
 export enum ColorModeWithoutMinMax {
@@ -245,6 +246,12 @@ const getSeriesValueBasedOnSeriesBy = (values: any, seriesBy: SeriesBy): number 
   }
 };
 
+/** The panel config keys an area fill reads. */
+export interface AreaFillConfig {
+  fill_opacity?: unknown;
+  fill_gradient?: boolean | null;
+}
+
 interface ColorConfig {
   mode:
     | "fixed"
@@ -356,35 +363,15 @@ export const getColorForTable = (_theme?: string): string[] => [
 ];
 
 /**
- * Converts a color string (hex, rgb, or rgba) into an rgba string with the
- * given alpha. Returns the input unchanged if it can't be parsed.
+ * Converts any CSS color ECharts can parse (hex with or without alpha, rgb, hsl, named) into an
+ * rgba string with the given alpha. Returns the input unchanged if it can't be parsed.
  */
 export const colorToRgba = (color: string, alpha: number): string => {
   if (!color) return color;
-  // hex: #rgb or #rrggbb
-  if (color[0] === "#") {
-    let hex = color.slice(1);
-    if (hex.length === 3) {
-      hex = hex
-        .split("")
-        .map((c) => c + c)
-        .join("");
-    }
-    const num = parseInt(hex, 16);
-    if (Number.isNaN(num)) return color;
-    const r = (num >> 16) & 255;
-    const g = (num >> 8) & 255;
-    const b = num & 255;
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  }
-  // rgb()/rgba()
-  const match = color.match(/rgba?\(([^)]+)\)/);
-  if (match) {
-    const parts = match[1].split(",").map((p) => p.trim());
-    const [r, g, b] = parts;
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  }
-  return color;
+  const parsed = echartsColor.parse(color);
+  if (!parsed) return color;
+  const [r, g, b] = parsed;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
 /**
@@ -412,6 +399,7 @@ const verticalGradient = (topColor: string, bottomColor: string) => ({
   global: false,
 });
 
+/** The theme's top-to-bottom area fill fade; `stacked` reads the area-stacked tokens, which stay opaque in dark. */
 export const getAreaGradientColor = (color: string, stacked = false) => {
   // Dark keeps a stack's layers opaque since they tile; unstacked areas overlap, so they stay translucent.
   const topAlpha = stacked
@@ -424,7 +412,10 @@ export const getAreaGradientColor = (color: string, stacked = false) => {
 };
 
 /** The `area` panel's `fill_opacity` as a 0-1 alpha, or null when unset so the theme tokens apply. */
-export const getAreaFillOpacity = (panelType: string, config: any): number | null => {
+export const getAreaFillOpacity = (
+  panelType: string,
+  config?: AreaFillConfig | null,
+): number | null => {
   const value = config?.fill_opacity;
   if (panelType !== "area" || value === null || value === undefined || value === "") return null;
   const percent = Number(value);
@@ -439,7 +430,7 @@ export const getAreaStyleOverride = (
   resolvedColor: any,
   seriesName: any,
   theme: string,
-  config?: any,
+  config?: AreaFillConfig | null,
 ) => {
   const isAreaChart = panelType === "area" || panelType === "area-stacked";
   if (!isAreaChart || !baseAreaStyle) return {};

@@ -6489,6 +6489,8 @@
     "totalLegends": "Total: {count}",
     "noLegendsAvailable": "Nenhuma legenda disponível",
     "tableFiltering": "Filtragem de colunas",
+    "tableExpandableRows": "Linhas expansíveis",
+    "tableExpandableRowsTooltip": "Cada linha tem um botão de expansão que mostra todos os seus campos.",
     "columnFormattingTitle": "Formatação de coluna",
     "columnFormattingSubtitle": "Adicione os campos que pretende formatar e, depois, defina o estilo de cada um com uma pré-visualização em tempo real.",
     "columnFormattingPick": "Escolher uma coluna",

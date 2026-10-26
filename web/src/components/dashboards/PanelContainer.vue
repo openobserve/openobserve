@@ -147,11 +147,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'area',
               'area-stacked',
               'bar',
-              'h-bar',
               'line',
               'scatter',
               'stacked',
-              'h-stacked',
               'state-timeline',
             ].includes(props.data.type) &&
             PanleSchemaRendererRef?.checkIfPanelIsTimeSeries === true
@@ -426,6 +424,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         @sparkline-warning-update="handleSparklineWarningUpdate"
         @series-limit-update="handleSeriesLimitUpdate"
+        @region-join-update="handleRegionJoinUpdate"
         @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
         @result-metadata-update="handleResultMetadataUpdate"
         @last-triggered-at-update="handleLastTriggeredAtUpdate"
@@ -760,6 +759,7 @@ export default defineComponent({
       handleResultMetadataUpdate,
       handlePanelDiagnosticsUpdate,
       handleSeriesLimitUpdate,
+      handleRegionJoinUpdate,
     } = usePanelNotices(() => store.state.timezone);
 
     // to store and show when the panel was last loaded
@@ -834,6 +834,7 @@ export default defineComponent({
       () =>
         !!limitNumberOfSeriesWarningMessage.value ||
         !!seriesLimit.value ||
+        !!noticeProps.value.regionJoin ||
         !!panelDiagnostics.value?.serverPartial ||
         !!panelDiagnostics.value?.functionErrors?.length ||
         (isPartialData.value && !isPanelLoading.value),
@@ -1293,6 +1294,7 @@ export default defineComponent({
       seriesLimit,
       noticeProps,
       handleSeriesLimitUpdate,
+      handleRegionJoinUpdate,
       canEditFromNotice,
       canRefreshFromNotice,
       canInspectFromNotice,

@@ -242,7 +242,7 @@ export function fillMissingTimestamps(
  *
  * @param values - Array of [timestamp, value] tuples
  * @param aggregation - Aggregation function to apply
- * @returns Aggregated single value
+ * @returns Aggregated value of the finite samples, NaN when none is finite
  */
 // Unknown aggregation strings from panel config fall through to the `last` default case
 export function applyAggregation(
@@ -250,8 +250,11 @@ export function applyAggregation(
   aggregation: AggregationFunction | (string & {}) = "last",
 ): number {
   if (!values || values.length === 0) return 0;
+  if (aggregation === "count") return values.length;
 
-  const numericValues = values.map(([, val]) => parseFloat(val));
+  // Prometheus sends "NaN"/"+Inf" for empty or unbounded steps; one of them would poison every reducer.
+  const numericValues = values.map(([, val]) => parseFloat(val)).filter(Number.isFinite);
+  if (numericValues.length === 0) return NaN;
 
   switch (aggregation) {
     case "last":
@@ -266,8 +269,6 @@ export function applyAggregation(
       return numericValues.reduce((a, b) => a + b, 0) / numericValues.length;
     case "sum":
       return numericValues.reduce((a, b) => a + b, 0);
-    case "count":
-      return numericValues.length;
     case "range":
       return Math.max(...numericValues) - Math.min(...numericValues);
     case "diff":
