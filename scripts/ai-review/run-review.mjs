@@ -108,8 +108,8 @@ const CATEGORY_GLYPH = {
   qa: "🧪", test: "🧪",
 };
 const MAX_DIFF_TOKENS = 150_000;
-const AGENT_TIMEOUT_MS = 10 * 60 * 1000;
-const OVERALL_TIMEOUT_MS = 25 * 60 * 1000;
+const AGENT_TIMEOUT_MS = 20 * 60 * 1000;
+const OVERALL_TIMEOUT_MS = 40 * 60 * 1000;
 // Kept free at the end of the run for rendering and posting the comment.
 const POST_RESERVE_MS = 2 * 60 * 1000;
 const MIN_COORDINATOR_MS = 60 * 1000;

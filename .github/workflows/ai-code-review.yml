@@ -43,7 +43,7 @@ jobs:
     # Explicit name: without it GitHub serializes the whole matrix object (api_key_env, marker) into the public check name.
     name: review (${{ matrix.provider.name }})
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     environment:
       name: ai-review
       deployment: false
