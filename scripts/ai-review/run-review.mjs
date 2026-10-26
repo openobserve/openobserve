@@ -1,4 +1,4 @@
-import { execSync, spawn } from "node:child_process";
+import { execSync } from "node:child_process";
 import { readFileSync, existsSync, writeFileSync, unlinkSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,8 +15,26 @@ import {
   genAiResponseAttributes,
   sha256,
 } from "./telemetry.mjs";
+import { selectOwnReviewComment } from "./src/comments.mjs";
+import { OpencodeServer, selfCheck, shouldRetry } from "./src/opencode.mjs";
+import { fetchDiff, prefixDiffPaths } from "./src/pr-diff.mjs";
+import { sanitizePrTree } from "./src/sanitize.mjs";
+import { scrubReviewBody } from "./src/scrub.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// ENGINE_DIR is the trusted base-branch checkout; PR_DIR is the PR head, which is data only and never executed.
+const ENGINE_DIR = resolve(process.env.ENGINE_DIR || resolve(__dirname, "../.."));
+const PR_DIR = process.env.PR_DIR ? resolve(process.env.PR_DIR) : "";
+const OPENCODE_CONFIG_PATH = resolve(ENGINE_DIR, "opencode.jsonc");
+// A same-named PR in another repo reviewed together with this one (the OSS side of an ENT pair).
+const PAIRED = {
+  repo: process.env.PAIRED_REPO || "",
+  prNumber: process.env.PAIRED_PR_NUMBER || "",
+  dir: process.env.PAIRED_DIR || "",
+  mergeBase: process.env.PAIRED_MERGE_BASE_SHA || "",
+  head: process.env.PAIRED_HEAD_SHA || "",
+};
 
 // ─── Model provider selection ──────────────────────────────────────────────
 // The review runs against a single provider per invocation, chosen via env so the same script
@@ -62,6 +80,12 @@ const REVIEW_MARKER = process.env.REVIEW_MARKER || "<!-- ai-code-review -->";
 // findExistingReviewComment matches the same pattern. Keep in sync with the `marker` values in
 // .github/workflows/ai-code-review.yml.
 const ANY_REVIEW_MARKER = "<!--\\s*ai-code-review[a-z0-9-]*\\s*-->";
+// Tags the "reviewed with the paired o2-enterprise PR" note (post-paired-pointer.sh); it is replaced in place but is not a previous review.
+const PAIRED_POINTER_TAG = "<!-- o2-paired-pointer -->";
+// Tags the "not reviewed: key not set" notice, which is likewise replaced but never fed back as a previous review.
+const NOTICE_TAG = "<!-- o2-review-notice -->";
+// Login of the token that posts the review; anyone else's comment carrying the marker must never become <previous_review>.
+const REVIEW_BOT_LOGIN = process.env.REVIEW_BOT_LOGIN || "";
 
 // ─── Branding (presentation only) ───────────────────────────────────────────
 // The posted comment is branded "OpenObserve Code Review". These strings change ONLY how the
@@ -86,6 +110,9 @@ const CATEGORY_GLYPH = {
 const MAX_DIFF_TOKENS = 150_000;
 const AGENT_TIMEOUT_MS = 10 * 60 * 1000;
 const OVERALL_TIMEOUT_MS = 25 * 60 * 1000;
+// Kept free at the end of the run for rendering and posting the comment.
+const POST_RESERVE_MS = 2 * 60 * 1000;
+const MIN_COORDINATOR_MS = 60 * 1000;
 const TRACE_SERVICE_NAME = "github-actions.ai-code-review";
 const TRACE_SCOPE_NAME = "scripts/ai-review/run-review.mjs";
 const DEFAULT_TRACE_STREAM = "github_ai_code_review";
@@ -196,7 +223,12 @@ function gh(args) {
     encoding: "utf-8",
     maxBuffer: 50 * 1024 * 1024,
     stdio: ["pipe", "pipe", "pipe"],
-    env: { ...process.env, NO_COLOR: "1", GH_NO_UPDATE_NOTIFIER: "1" },
+    env: {
+      ...process.env,
+      GH_REPO: process.env.GH_REPO || process.env.GITHUB_REPOSITORY,
+      NO_COLOR: "1",
+      GH_NO_UPDATE_NOTIFIER: "1",
+    },
   });
   return result.trim();
 }
@@ -213,35 +245,55 @@ function ghSilent(args) {
   }
 }
 
-function git(args) {
-  return execSync(`git ${args}`, {
-    encoding: "utf-8",
-    maxBuffer: 50 * 1024 * 1024,
-    stdio: ["pipe", "pipe", "pipe"],
-  }).trim();
-}
-
 function execErrorText(err) {
   return [err?.message, err?.stderr?.toString(), err?.stdout?.toString()].filter(Boolean).join(" ");
 }
 
-// The API refuses to render a diff over 20k lines (HTTP 406). GitHub still publishes the
-// merge commit for the PR, and its first parent is the merge base, so diffing the two
-// reproduces the same three-dot diff with no size ceiling.
-function diffFromMergeRef(prNumber) {
-  git(`fetch --no-tags --depth=2 origin "refs/pull/${prNumber}/merge"`);
-  return git("diff FETCH_HEAD^1 FETCH_HEAD");
+// The API refuses diffs over 20k lines; the workflow fetches the merge base into PR_DIR so the same three-dot diff can be built locally.
+function fetchPrDiff(prNumber) {
+  const log = message => console.log(`[${isoNow()}] ${message}`);
+  const own = fetchDiff({
+    repo: process.env.GITHUB_REPOSITORY,
+    prNumber,
+    prDir: PR_DIR,
+    mergeBase: process.env.MERGE_BASE_SHA,
+    head: process.env.HEAD_SHA,
+    log,
+  });
+  if (!PAIRED.repo || !PAIRED.prNumber) return own;
+  const paired = fetchDiff({
+    repo: PAIRED.repo,
+    prNumber: PAIRED.prNumber,
+    prDir: PR_DIR && PAIRED.dir ? resolve(PR_DIR, PAIRED.dir) : "",
+    mergeBase: PAIRED.mergeBase,
+    head: PAIRED.head,
+    log,
+  });
+  log(`Reviewing together with paired PR ${PAIRED.repo}#${PAIRED.prNumber} (paths prefixed with ${PAIRED.dir}/)`);
+  return `${own.replace(/\n?$/, "\n")}${prefixDiffPaths(paired, PAIRED.dir)}`;
 }
 
-function fetchPrDiff(prNumber) {
+function pairedPrContext() {
+  if (!PAIRED.repo || !PAIRED.prNumber) return "";
   try {
-    return gh(`pr diff "${prNumber}"`);
-  } catch (err) {
-    const detail = execErrorText(err);
-    if (!/exceeded the maximum number of lines|HTTP 406/i.test(detail)) throw err;
-    console.log(`[${isoNow()}] PR diff is too large for the GitHub API; rebuilding it from the merge ref`);
-    return diffFromMergeRef(prNumber);
+    const data = ghJson(`pr view "${PAIRED.prNumber}" --repo "${PAIRED.repo}" --json title,body,author`);
+    return [
+      ``,
+      `Paired PR (same branch, reviewed together; its files are under ${PAIRED.dir}/): ${PAIRED.repo}#${PAIRED.prNumber}`,
+      `Paired title: ${data.title}`,
+      `Paired description: ${data.body || "N/A"}`,
+    ].join("\n");
+  } catch {
+    return `\nPaired PR (reviewed together; its files are under ${PAIRED.dir}/): ${PAIRED.repo}#${PAIRED.prNumber}`;
   }
+}
+
+// Trusted repo rules (base-branch AGENTS.md files) that sanitize removed from the PR tree; opencode used to attach them itself.
+function readRepoRules() {
+  const files = (process.env.REVIEW_RULES_FILES ?? resolve(ENGINE_DIR, "AGENTS.md")).split("\n").map(f => f.trim()).filter(Boolean);
+  const sections = files.filter(f => existsSync(f)).map(f => readFileSync(f, "utf-8").trim()).filter(Boolean);
+  if (sections.length === 0) return "";
+  return `## Repository rules (from the base branch)\n\nThese are the repository's contributor rules. Flag changed code that breaks them.\n\n${sections.join("\n\n---\n\n")}`;
 }
 
 function readPrompt(name) {
@@ -558,6 +610,12 @@ function isGeneratedFile(diff, filePath) {
   return NOISE_GENERATED_MARKERS.some(m => firstLines.includes(m));
 }
 
+// Paired-repo files carry a directory prefix in the diff; path rules are written for repo-relative paths.
+function logicalPath(filePath) {
+  const prefix = PAIRED.dir ? `${PAIRED.dir.replace(/\/+$/, "")}/` : "";
+  return prefix && filePath.startsWith(prefix) ? filePath.slice(prefix.length) : filePath;
+}
+
 function isSecuritySensitiveFile(filePath) {
   return /auth|token|secret|crypto|password|oauth|unsafe|acme|cert/i.test(filePath);
 }
@@ -636,7 +694,7 @@ function selectAgents(tierConfig, filteredDiff) {
   const agents = [...tierConfig.agents];
   for (const { agent, matches } of CONDITIONAL_AGENTS) {
     if (agents.includes(agent)) continue;
-    if (filteredDiff.files.some(f => matches(f.newPath))) agents.push(agent);
+    if (filteredDiff.files.some(f => matches(logicalPath(f.newPath)))) agents.push(agent);
   }
   return agents;
 }
@@ -649,94 +707,34 @@ function selectAgents(tierConfig, filteredDiff) {
 // the diff, not just the diff text — that repo context is the main quality lever over the
 // old DeepSeek-only approach.
 
-class OpencodeServer {
-  constructor() {
-    this.proc = null;
-    this.baseUrl = "";
-    this.starting = null;
-  }
+const OPENCODE = new OpencodeServer({
+  cwd: PR_DIR || ENGINE_DIR,
+  configPath: OPENCODE_CONFIG_PATH,
+  providerKeyVars: [API_KEY_VAR_NAME],
+});
+const MAX_TRANSIENT_RETRIES = 2;
+const selfChecks = new WeakMap();
 
-  async ensureStarted() {
-    if (this.baseUrl) return this.baseUrl;
-    if (this.starting) return this.starting;
-
-    this.starting = (async () => {
-      if (!apiKey()) throw new Error(`${API_KEY_VAR_NAME} not set`);
-
-      const proc = spawn("opencode", ["serve", "--hostname", "127.0.0.1", "--port", "0"], {
-        cwd: resolve(__dirname, "../.."),
-        env: { ...process.env },
-        stdio: ["ignore", "pipe", "pipe"],
-      });
-      this.proc = proc;
-
-      let stderrTail = "";
-      proc.stderr.on("data", chunk => {
-        stderrTail = (stderrTail + chunk.toString()).slice(-4000);
-      });
-
-      const urlPattern = /opencode server listening on (http:\/\/[^\s]+)/;
-      const url = await new Promise((resolvePromise, rejectPromise) => {
-        let buf = "";
-        const onData = chunk => {
-          buf += chunk.toString();
-          const match = urlPattern.exec(buf) || urlPattern.exec(stderrTail);
-          if (match) {
-            cleanup();
-            resolvePromise(match[1]);
-          }
-        };
-        const onExit = code => {
-          cleanup();
-          rejectPromise(new Error(`opencode serve exited early (code ${code}): ${stderrTail}`));
-        };
-        const cleanup = () => {
-          proc.stdout.off("data", onData);
-          proc.stderr.off("data", onData);
-          proc.off("exit", onExit);
-        };
-        proc.stdout.on("data", onData);
-        proc.stderr.on("data", onData);
-        proc.on("exit", onExit);
-        setTimeout(() => {
-          cleanup();
-          rejectPromise(new Error(`opencode serve did not start within 30s: ${stderrTail}`));
-        }, 30_000);
-      });
-
-      proc.on("exit", () => {
-        this.baseUrl = "";
-        this.proc = null;
-      });
-
-      this.baseUrl = url;
-      return url;
-    })();
-
-    try {
-      return await this.starting;
-    } finally {
-      this.starting = null;
-    }
-  }
-
-  stop() {
-    if (this.proc && !this.proc.killed) {
-      this.proc.kill("SIGTERM");
-    }
-    this.proc = null;
-    this.baseUrl = "";
-  }
+function reviewOpencodeAgents() {
+  return [...new Set([...Object.values(AGENTS).map(a => a.opencodeAgent), COORDINATOR_AGENT])];
 }
 
-const OPENCODE = new OpencodeServer();
+async function opencodeClient() {
+  if (!apiKey()) throw new Error(`${API_KEY_VAR_NAME} not set`);
+  const client = await OPENCODE.ensureStarted();
+  if (!selfChecks.has(client)) {
+    const check = selfCheck(client, reviewOpencodeAgents()).then(result => {
+      console.log(`[${isoNow()}] opencode self-check passed: ${result.toolIds.length} tools known, only read/glob/grep allowed for ${result.agents} agents`);
+      return result;
+    });
+    selfChecks.set(client, check);
+  }
+  await selfChecks.get(client);
+  return client;
+}
 
-function extractText(parts) {
-  return (parts || [])
-    .filter(p => p.type === "text")
-    .map(p => p.text || "")
-    .join("\n")
-    .trim();
+function remainingRunMs() {
+  return OVERALL_TIMEOUT_MS - (Date.now() - startTime);
 }
 
 async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGENT_TIMEOUT_MS, traceOptions = {}) {
@@ -759,75 +757,51 @@ async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGE
 
   TRACE.setSpanAttributes(llmSpan, genAiRequestAttributes(truncatedSystem, truncatedUser));
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-
+  let attempt = 0;
   try {
-    const baseUrl = await OPENCODE.ensureStarted();
-
-    const sessionResp = await fetch(`${baseUrl}/session`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: `ai-review:${traceOptions.agentKey || agentName}` }),
-      signal: controller.signal,
-    });
-    if (!sessionResp.ok) {
-      throw new Error(`opencode session.create failed ${sessionResp.status}: ${(await sessionResp.text()).slice(0, 500)}`);
-    }
-    const session = await sessionResp.json();
-
-    try {
-      const messageResp = await fetch(`${baseUrl}/session/${session.id}/message`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+    for (;;) {
+      attempt += 1;
+      try {
+        const client = await opencodeClient();
+        const result = await client.prompt({
           agent: agentName,
           model: { providerID: PROVIDER_ID, modelID: MODEL_ID },
-          ...(MODEL_VARIANT ? { variant: MODEL_VARIANT } : {}),
+          variant: MODEL_VARIANT,
           system: truncatedSystem,
-          parts: [{ type: "text", text: truncatedUser }],
-        }),
-        signal: controller.signal,
-      });
-      TRACE.setSpanAttributes(llmSpan, { "http.response.status_code": messageResp.status });
-
-      if (!messageResp.ok) {
-        const err = await messageResp.text();
-        throw new Error(`opencode session.prompt failed ${messageResp.status}: ${err.slice(0, 500)}`);
+          text: truncatedUser,
+          title: `ai-review:${traceOptions.agentKey || agentName}`,
+          timeoutMs,
+        });
+        if (result.rejectedPermissions > 0) {
+          console.warn(`[${isoNow()}] ${agentName}: rejected ${result.rejectedPermissions} permission request(s)`);
+        }
+        const responseAttributes = genAiResponseAttributes({ info: result.info }, result.text, MODEL_ID);
+        TRACE.setSpanAttributes(llmSpan, responseAttributes);
+        TRACE.endSpan(llmSpan, {
+          "gen_ai.response.id": result.responseId,
+          "gen_ai.response.model": responseAttributes["gen_ai.response.model"],
+          "ai.review.output.chars": result.text.length,
+          "ai.review.attempts": attempt,
+          "opencode.permission_rejections": result.rejectedPermissions,
+        });
+        return { text: result.text, responseId: result.responseId };
+      } catch (err) {
+        const retry = shouldRetry({
+          err,
+          attempt,
+          maxRetries: MAX_TRANSIENT_RETRIES,
+          remainingMs: remainingRunMs(),
+          timeoutMs,
+          reserveMs: traceOptions.agentKey === "coordinator" ? POST_RESERVE_MS : MIN_COORDINATOR_MS + POST_RESERVE_MS,
+        });
+        if (!retry) throw err;
+        console.warn(`[${isoNow()}] ${agentName}: transient failure (${err.message}); retrying in a fresh session (attempt ${attempt + 1})`);
       }
-
-      const data = await messageResp.json();
-      if (data.info?.error) {
-        const errInfo = data.info.error;
-        const message = errInfo.data?.message || errInfo.name || JSON.stringify(errInfo).slice(0, 500);
-        throw new Error(`opencode agent error (${errInfo.name || "unknown"}): ${message}`);
-      }
-
-      const text = extractText(data.parts);
-      const responseId = data.info?.id || "";
-
-      const responseAttributes = genAiResponseAttributes(data, text, MODEL_ID);
-      TRACE.setSpanAttributes(llmSpan, responseAttributes);
-      TRACE.endSpan(llmSpan, {
-        "gen_ai.response.id": responseId,
-        "gen_ai.response.model": responseAttributes["gen_ai.response.model"],
-        "ai.review.output.chars": text.length,
-      });
-      return { text, responseId };
-    } finally {
-      fetch(`${baseUrl}/session/${session.id}`, { method: "DELETE" }).catch(() => {});
     }
   } catch (err) {
-    const timedOut = controller.signal.aborted && err?.name === "AbortError";
-    const traceError = timedOut
-      ? Object.assign(new Error("Opencode request timed out after " + timeoutMs + "ms", { cause: err }), {
-          name: "TimeoutError",
-        })
-      : err;
-    TRACE.endSpan(llmSpan, { "error.timeout": timedOut, "timeout.ms": timeoutMs }, traceError);
-    throw traceError;
-  } finally {
-    clearTimeout(timer);
+    const timedOut = err?.name === "TimeoutError";
+    TRACE.endSpan(llmSpan, { "error.timeout": timedOut, "timeout.ms": timeoutMs, "ai.review.attempts": attempt }, err);
+    throw err;
   }
 }
 
@@ -882,7 +856,7 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
     return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: `${API_KEY_VAR_NAME} not set`, genAIResponseId: "" };
   }
 
-  const systemPrompt = readPrompt("shared-rules.md");
+  const systemPrompt = [readPrompt("shared-rules.md"), readRepoRules()].filter(Boolean).join("\n\n");
   const agentPrompt = readPrompt(agentDef.promptFile);
   if (!agentPrompt) {
     const err = new Error(`Missing agent prompt: ${agentDef.promptFile}`);
@@ -895,7 +869,7 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
     const sections = diff.split(/^diff --git /gm).filter(Boolean);
     const relevant = sections.filter(s => {
       const m = s.match(/^a\/(.*?) b\/(.*?)\n/);
-      return m && agentDef.fileFocus(m[2]);
+      return m && agentDef.fileFocus(logicalPath(m[2]));
     });
     if (relevant.length > 0) {
       relevantDiff = relevant.map(s => "diff --git " + s).join("");
@@ -1031,14 +1005,19 @@ function sanitizeReviewBody(body) {
     REVIEW_HEADING,
   );
 
-  return redactProviderIdentity(cleaned.trim());
+  const scrubbed = scrubReviewBody(redactProviderIdentity(cleaned.trim()), process.env);
+  if (scrubbed.secretHits > 0) {
+    console.warn(`[${isoNow()}] Redacted ${scrubbed.secretHits} secret-shaped value(s) from the review before posting`);
+    TRACE.setSpanAttributes(activeRootSpan, { "security.output_scrub.hits": scrubbed.secretHits });
+  }
+  return scrubbed.text;
 }
 
 // ─── Coordinator pass ─────────────────────────────────────────────────────
 
 async function runCoordinator(agentResults, prContext, tier, existingReview, parentSpan) {
   const coordinatorPrompt = readPrompt("agents/coordinator.md");
-  const sharedRules = readPrompt("shared-rules.md");
+  const sharedRules = [readPrompt("shared-rules.md"), readRepoRules()].filter(Boolean).join("\n\n");
 
   const findingsSections = agentResults
     .filter(r => r.findings.length > 0)
@@ -1095,7 +1074,10 @@ async function runCoordinator(agentResults, prContext, tier, existingReview, par
   console.log(`[${isoNow()}] Running coordinator (${MODEL_SLUG}, ${coordinatorAgent})`);
 
   try {
-    const completion = await callOpencode(coordinatorAgent, `${sharedRules}\n\n${coordinatorPrompt}`, userPrompt, AGENT_TIMEOUT_MS, {
+    // Reviewer retries can eat into the run, so the coordinator gets what is left rather than a fixed slot past the watchdog.
+    const timeoutMs = Math.min(AGENT_TIMEOUT_MS, remainingRunMs() - POST_RESERVE_MS);
+    if (timeoutMs < MIN_COORDINATOR_MS) throw new Error(`only ${Math.round(remainingRunMs() / 1000)}s left in the run`);
+    const completion = await callOpencode(coordinatorAgent, `${sharedRules}\n\n${coordinatorPrompt}`, userPrompt, timeoutMs, {
       parentSpan: coordinatorSpan,
       agentKey: "coordinator",
       agentName: "Coordinator",
@@ -1236,12 +1218,15 @@ ${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agent
 // ─── GitHub integration ────────────────────────────────────────────────────
 
 function findExistingReviewComment(prNumber) {
+  if (!REVIEW_BOT_LOGIN) {
+    console.log(`[${isoNow()}] REVIEW_BOT_LOGIN is not set; not looking for a previous review`);
+    return null;
+  }
   try {
-    const comments = ghJson(`api "repos/${process.env.GITHUB_REPOSITORY}/issues/${prNumber}/comments"`);
-    const markerRe = new RegExp(ANY_REVIEW_MARKER, "i");
-    const ourComments = comments.filter(c => markerRe.test(c.body || ""));
-    return ourComments.length > 0 ? ourComments[ourComments.length - 1] : null;
-  } catch {
+    const pages = JSON.parse(gh(`api --paginate --slurp "repos/${process.env.GITHUB_REPOSITORY}/issues/${prNumber}/comments"`));
+    return selectOwnReviewComment(pages.flat(), REVIEW_BOT_LOGIN, ANY_REVIEW_MARKER);
+  } catch (err) {
+    console.warn(`[${isoNow()}] Could not list PR comments, so no previous review is used: ${execErrorText(err).slice(0, 300)}`);
     return null;
   }
 }
@@ -1281,6 +1266,22 @@ function updateReviewComment(prNumber, commentId, body) {
 
 // ─── Main ──────────────────────────────────────────────────────────────────
 
+function prepareReviewTree(rootSpan) {
+  if (!PR_DIR) {
+    if (process.env.GITHUB_ACTIONS === "true") throw new Error("PR_DIR is required in CI: the PR must be reviewed from its own sanitized checkout");
+    console.warn(`[${isoNow()}] PR_DIR not set; local run reviews ${ENGINE_DIR} without sanitizing it`);
+    return;
+  }
+  const result = sanitizePrTree(PR_DIR, ENGINE_DIR);
+  for (const item of result.removed) console.log(`[${isoNow()}] sanitize: removed ${item.path} (${item.reason})`);
+  console.log(`[${isoNow()}] sanitize: ${result.removed.length} item(s) removed, review context: ${result.contextFiles.join(", ") || "none"}`);
+  TRACE.setSpanAttributes(rootSpan, {
+    "review.sanitize.removed": result.removed.length,
+    "review.sanitize.symlinks": result.removed.filter(r => r.reason === "symlink").length,
+    "review.engine_dir": ENGINE_DIR,
+  });
+}
+
 async function main() {
   const prNumber = process.env.PR_NUMBER;
   const rootSpan = TRACE.startSpan("github.workflow.ai_code_review", {
@@ -1301,6 +1302,7 @@ async function main() {
 
     console.log(`[${isoNow()}] AI Code Review started for PR #${prNumber}`);
     console.log(`[${isoNow()}] Repository: ${process.env.GITHUB_REPOSITORY}`);
+    prepareReviewTree(rootSpan);
 
     if (!apiKey()) {
       outcome = "misconfigured";
@@ -1317,7 +1319,10 @@ async function main() {
       try {
         // The key's env var name is named in the log but not in the comment: it carries the
         // provider name, and the posted comment must not.
-        postReviewComment(prNumber, `${REVIEW_MARKER}\n${REVIEW_HEADING}\n\n> [!CAUTION]\n> ### ⛔ Not reviewed\n> The review API key is not set. OpenObserve Code Review did not run for this PR — this is a CI misconfiguration, not a skip. Please confirm the review secrets are provisioned.`);
+        const notice = `${REVIEW_MARKER}\n${NOTICE_TAG}\n${REVIEW_HEADING}\n\n> [!CAUTION]\n> ### ⛔ Not reviewed\n> The review API key is not set. OpenObserve Code Review did not run for this PR — this is a CI misconfiguration, not a skip. Please confirm the review secrets are provisioned.`;
+        const existing = findExistingReviewComment(prNumber);
+        if (existing) updateReviewComment(prNumber, existing.id, notice);
+        else postReviewComment(prNumber, notice);
       } catch (postErr) {
         console.error(`[${isoNow()}] Also failed to post the misconfiguration notice: ${postErr.message}`);
       }
@@ -1400,7 +1405,7 @@ async function main() {
         `Author: ${prData.author?.login || "unknown"}`,
         `Files changed: ${prData.files?.length || filtered.files.length}`,
         `Description: ${prData.body || "N/A"}`,
-      ].join("\n");
+      ].join("\n") + pairedPrContext();
       TRACE.endSpan(contextSpan, {
         "github.pr.author": prData.author?.login || "unknown",
         "github.pr.file_count": prData.files?.length || filtered.files.length,
@@ -1427,8 +1432,12 @@ async function main() {
     });
     if (existingComment) {
       existingCommentId = existingComment.id;
-      existingReview = existingComment.body;
-      console.log(`[${isoNow()}] Re-review mode: found existing review comment #${existingCommentId}`);
+      if (existingComment.body.includes(PAIRED_POINTER_TAG) || existingComment.body.includes(NOTICE_TAG)) {
+        console.log(`[${isoNow()}] Replacing pointer/notice comment #${existingCommentId} with a review`);
+      } else {
+        existingReview = existingComment.body;
+        console.log(`[${isoNow()}] Re-review mode: found existing review comment #${existingCommentId}`);
+      }
     }
 
     // 6. Run reviewers in parallel
