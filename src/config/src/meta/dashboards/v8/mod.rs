@@ -529,6 +529,21 @@ pub struct PanelConfig {
     heatmap_y_max: Option<OrdF64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     thresholds: Option<Thresholds>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    merge_gaps: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    row_height: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    row_gap: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    show_state_text: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    row_sort: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tooltip_mode: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -688,6 +703,10 @@ pub enum Config {
     Thresholds {
         #[serde(skip_serializing_if = "Option::is_none")]
         value: Option<Thresholds>,
+    },
+    ValueMappings {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<Vec<Mapping>>,
     },
 }
 
@@ -2189,6 +2208,65 @@ mod tests {
     }
 
     #[test]
+    fn test_panel_config_state_timeline_round_trip() {
+        let input = serde_json::json!({
+            "show_legends": true,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null,
+            "merge_gaps": 90.0,
+            "row_height": 24.0,
+            "row_gap": 4.0,
+            "show_state_text": false,
+            "row_sort": "non_ok_time",
+            "tooltip_mode": "all_rows"
+        });
+        let cfg: PanelConfig = serde_json::from_value(input.clone()).unwrap();
+        assert_eq!(cfg.merge_gaps, Some(OrdF64::from(90.0)));
+        assert_eq!(cfg.row_height, Some(OrdF64::from(24.0)));
+        assert_eq!(cfg.row_gap, Some(OrdF64::from(4.0)));
+        assert_eq!(cfg.show_state_text, Some(false));
+        assert_eq!(cfg.row_sort.as_deref(), Some("non_ok_time"));
+        assert_eq!(cfg.tooltip_mode.as_deref(), Some("all_rows"));
+
+        let json = serde_json::to_value(&cfg).unwrap();
+        for key in [
+            "merge_gaps",
+            "row_height",
+            "row_gap",
+            "show_state_text",
+            "row_sort",
+            "tooltip_mode",
+        ] {
+            assert_eq!(json[key], input[key], "{key}");
+        }
+        let back: PanelConfig = serde_json::from_value(json).unwrap();
+        assert_eq!(back, cfg);
+    }
+
+    #[test]
+    fn test_panel_config_state_timeline_absent_when_none() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": false,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null
+        }))
+        .unwrap();
+        let json = serde_json::to_value(&cfg).unwrap();
+        for key in [
+            "merge_gaps",
+            "row_height",
+            "row_gap",
+            "show_state_text",
+            "row_sort",
+            "tooltip_mode",
+        ] {
+            assert!(json.get(key).is_none(), "{key}");
+        }
+    }
+
+    #[test]
     fn test_override_config_series_entry_round_trip() {
         let entry: OverrideConfig = serde_json::from_value(serde_json::json!({
             "field": {"matchBy": "series_regex", "value": "/^checkout/i"},
@@ -2260,11 +2338,30 @@ mod tests {
             (Config::DisplayName { value: None }, "display_name"),
             (Config::SeriesColor { value: None }, "series_color"),
             (Config::Thresholds { value: None }, "thresholds"),
+            (Config::ValueMappings { value: None }, "value_mappings"),
         ];
         for (cfg, typ) in cases {
             let json = serde_json::to_value(&cfg).unwrap();
             assert_eq!(json, serde_json::json!({"type": typ}));
         }
+    }
+
+    #[test]
+    fn test_override_config_value_mappings_round_trip() {
+        let input = serde_json::json!({
+            "field": {"matchBy": "series_regex", "value": "/^gpu/"},
+            "config": [
+                {"type": "display_name", "value": "GPU"},
+                {"type": "value_mappings", "value": [
+                    {"type": "value", "value": "thermal", "text": "Hot", "color": "#ff0000"},
+                    {"type": "regex", "pattern": "^power", "color": "#ffaa00"}
+                ]}
+            ]
+        });
+        let entry: OverrideConfig = serde_json::from_value(input.clone()).unwrap();
+        let config = entry.config.as_ref().unwrap();
+        assert!(matches!(&config[1], Config::ValueMappings { value: Some(m) } if m.len() == 2));
+        assert_eq!(serde_json::to_value(&entry).unwrap(), input);
     }
 
     #[test]

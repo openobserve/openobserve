@@ -547,6 +547,27 @@ describe("dashboardAutoQueryBuilder", () => {
       expect(result).toBe("");
     });
 
+    it("reads a string state column with max, grouped by time and entity", () => {
+      const field = (alias: string, column: string, functionName: string | null) => ({
+        alias,
+        column,
+        isDerived: false,
+        functionName,
+        args: [{ type: "field", value: { field: column } }],
+      });
+      mockQueryData.fields.x = [field("x_axis_1", "_timestamp", null)];
+      mockQueryData.fields.breakdown = [field("breakdown_1", "port", null)];
+      mockQueryData.fields.y = [field("y_axis_1", "link_state", "max")];
+
+      const result = buildSQLChartQuery({
+        queryData: mockQueryData,
+        chartType: "state-timeline",
+        dashboardPanelData: mockDashboardPanelData,
+      });
+      expect(result).toContain('max(link_state) as "y_axis_1"');
+      expect(result).toContain("GROUP BY x_axis_1, breakdown_1");
+    });
+
     it("should build query with x-axis fields only", () => {
       mockQueryData.fields.x = [
         {

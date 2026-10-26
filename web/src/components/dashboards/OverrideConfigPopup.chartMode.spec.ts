@@ -341,6 +341,55 @@ describe("OverrideConfigPopup in chart mode", () => {
     },
   );
 
+  it("shows display name, thresholds and value mappings on a state timeline, and saves the mappings", async () => {
+    const mapping = { type: "value", value: "thermal", text: "Hot", color: null };
+    await mountChart({
+      chartType: "state-timeline",
+      entries: [series("cart", [{ type: "value_mappings", value: [mapping] }])],
+    });
+    expect($('[data-test="dashboard-series-format-display-name"]')).not.toBeNull();
+    expect($('[data-test="dashboard-series-format-thresholds"]')).not.toBeNull();
+    expect($('[data-test="dashboard-series-format-value-mappings"]')).not.toBeNull();
+    expect($('[data-test="dashboard-series-format-unit"]')).toBeNull();
+    expect($('[data-test="dashboard-series-format-decimals"]')).toBeNull();
+    expect($('[data-test="dashboard-series-format-color"]')).toBeNull();
+
+    await setInput("dashboard-series-override-value-mapping-text-input-0", "Throttled");
+    $('[data-test="dashboard-series-format-value-mapping-add"]')!.click();
+    await flushPromises();
+    await save();
+    const [entry] = wrapper.emitted("save")[0][0];
+    const saved = entry.config.find((item: any) => item.type === "value_mappings").value;
+    expect(saved).toHaveLength(2);
+    expect(saved[0]).toMatchObject({ value: "thermal", text: "Throttled" });
+  });
+
+  it("blocks Save while a value mapping regex can never match", async () => {
+    await mountChart({
+      chartType: "state-timeline",
+      entries: [
+        series("cart", [
+          { type: "value_mappings", value: [{ type: "regex", pattern: "(", text: "x" }] },
+        ]),
+      ],
+    });
+    expect(
+      $('[data-test="dashboard-series-override-value-mapping-pattern-input-0"]')!.textContent,
+    ).toContain("This pattern is invalid");
+    await save();
+    expect(wrapper.emitted("save")).toBeUndefined();
+
+    await setInput("dashboard-series-override-value-mapping-pattern-input-0", "^power");
+    await save();
+    expect(wrapper.emitted("save")).toHaveLength(1);
+  });
+
+  it("keeps unit, decimals and colour and has no value mappings on a line panel", async () => {
+    await mountChart({ entries: [series("cart")] });
+    expect($('[data-test="dashboard-series-format-value-mappings"]')).toBeNull();
+    expect($('[data-test="dashboard-series-format-color"]')).not.toBeNull();
+  });
+
   it("saves override thresholds once a step exists", async () => {
     await mountChart({ entries: [series("^c", [], "series_regex")] });
     $('[data-test="dashboard-config-thresholds-add-step"]')!.click();

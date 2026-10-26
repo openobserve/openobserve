@@ -121,6 +121,13 @@ import {
   heatmapZoomRange,
 } from "@/utils/dashboard/heatmapTimeAxis";
 import {
+  STATE_TIMELINE_ROW_ZOOM_IDS,
+  readRowWindow,
+  rowWindowFromEvent,
+  withRowWindow,
+  type RowWindow,
+} from "@/utils/dashboard/convertStateTimelineData";
+import {
   indexesNearX,
   isLineStrokeEvent,
   lineSeriesAtPoint,
@@ -251,6 +258,7 @@ export default defineComponent({
       chart?.off("click");
       chart?.off("mouseover");
       chart?.off("contextmenu");
+      chart?.getZr().off("mousemove", reportPointerTime);
 
       //dispose
       if (chart) {
@@ -381,10 +389,37 @@ export default defineComponent({
       });
     };
 
+    // Rows a panel scrolled to, kept across re-renders; only panels whose extras flag rowScroll set it.
+    let lastRowWindow: RowWindow | null = null;
+    const isRowScrollZoom = (ids: unknown[]) =>
+      !!props.data?.extras?.rowScroll &&
+      ids.length > 0 &&
+      ids.every((id) => STATE_TIMELINE_ROW_ZOOM_IDS.includes(id as string));
+    const noteRowWindow = (window: RowWindow | null) => {
+      if (!window) return;
+      lastRowWindow = window;
+      props.data?.extras?.setRowWindow?.(window.start, window.end);
+    };
+    const keepRowWindow = (options: Record<string, unknown>) => {
+      if (!props.data?.extras?.rowScroll) return options;
+      const kept = withRowWindow(options, lastRowWindow);
+      noteRowWindow(readRowWindow(kept));
+      return kept;
+    };
+
+    const reportPointerTime = (event: { offsetX: number }) => {
+      const report = props.data?.extras?.setPointerTime;
+      if (!report || !chart) return;
+      report(Number(chart.convertFromPixel({ xAxisIndex: 0 }, event.offsetX)));
+    };
+
+    // Registered before setOption, so it runs ahead of the tooltip's own zr handler and the tooltip reads this move's time.
+    const trackPointer = () => chart?.getZr().on("mousemove", reportPointerTime);
+
     const chartOptions = (options: Record<string, unknown>) =>
       withChartFont(
         withLineStrokeEvents(
-          { aria: { enabled: !props.label }, ...options },
+          { aria: { enabled: !props.label }, ...keepRowWindow(options) },
           props.findLineOnContextMenu,
         ),
       );
@@ -683,6 +718,14 @@ export default defineComponent({
 
       //on dataZoom emit an event of start x and end x
       chart?.on("dataZoom", function (params: any) {
+        const zoomIds = params?.batch
+          ? params.batch.map((item: any) => item?.dataZoomId)
+          : [params?.dataZoomId];
+        // Scrolling rows moves the y axis only; it must never become a dashboard time range.
+        if (isRowScrollZoom(zoomIds)) {
+          noteRowWindow(rowWindowFromEvent(props.data?.options, params?.batch?.[0] ?? params));
+          return;
+        }
         //if batch then emit dataZoom event
         if (params?.batch) {
           // A heatmap zooms by category index, which only its columns can turn into times.
@@ -700,7 +743,21 @@ export default defineComponent({
               end1: params?.batch[1]?.endValue || 0,
             },
           );
+          const rows = lastRowWindow;
           restoreChart();
+          // Restore also rewinds the rows, so the scrolled window is put back.
+          if (rows && props.data?.extras?.rowScroll) {
+            chart?.dispatchAction({
+              type: "dataZoom",
+              batch: STATE_TIMELINE_ROW_ZOOM_IDS.filter((id) =>
+                props.data.options?.dataZoom?.some((zoom: any) => zoom?.id === id),
+              ).map((dataZoomId: string) => ({
+                dataZoomId,
+                startValue: rows.start,
+                endValue: rows.end,
+              })),
+            });
+          }
         }
         //else if daatazoom then emit dataZoom event
         else if (chart?.getOption()?.dataZoom) {
@@ -778,21 +835,27 @@ export default defineComponent({
         } else if (followsHoveredPanel) {
           // need to check index should not be greater than series length
           const hoveredSeriesIndex =
-            chart?.getOption()?.series.length > hoveredSeriesState?.value?.seriesIndex
+            props.data.extras?.crosshairSeriesIndex ??
+            (chart?.getOption()?.series.length > hoveredSeriesState?.value?.seriesIndex
               ? hoveredSeriesState?.value?.seriesIndex
-              : 0;
+              : 0);
           let hoveredSeriesDataIndex = hoveredSeriesState?.value?.dataIndex;
+          // Panels publish a Date or, in UTC, a zone-less string; a crosshair series compares them as one instant.
+          const hoveredTime =
+            props.data.extras?.crosshairSeriesIndex != null
+              ? new Date(hoveredSeriesState.value?.hoveredTime)
+              : hoveredSeriesState.value?.hoveredTime;
 
           // if hovered series dataindex is not there
           // or check hovered time is not at the same index in the current chart (ie if at same index then not need to find nearest index)
           if (
             !chart?.getOption()?.series[hoveredSeriesIndex]?.data[hoveredSeriesDataIndex] ||
             chart?.getOption()?.series[hoveredSeriesIndex]?.data[hoveredSeriesDataIndex][0] !=
-              hoveredSeriesState.value?.hoveredTime
+              hoveredTime
           ) {
             hoveredSeriesDataIndex = findNearestIndex(
               chart?.getOption()?.series[hoveredSeriesIndex]?.data ?? [],
-              hoveredSeriesState?.value?.hoveredTime,
+              hoveredTime,
             );
           }
 
@@ -810,9 +873,14 @@ export default defineComponent({
           hoveredSeriesState.value?.panelId == -1 &&
           hoveredSeriesState.value?.hoveredTime == null
         ) {
-          restoreChart();
-          if (props.data?.extras?.heatmapTimeAxis) {
+          // A restore would also reset the scrolled rows, so only the crosshair is cleared.
+          if (props.data.extras?.crosshairSeriesIndex != null) {
             chart?.dispatchAction({ type: "updateAxisPointer", currTrigger: "leave" });
+          } else {
+            restoreChart();
+            if (props.data?.extras?.heatmapTimeAxis) {
+              chart?.dispatchAction({ type: "updateAxisPointer", currTrigger: "leave" });
+            }
           }
         }
       },
@@ -837,6 +905,7 @@ export default defineComponent({
           renderer: props.renderType,
           devicePixelRatio: window.devicePixelRatio || 1,
         });
+        trackPointer();
         const options = props.data.options || {};
 
         // change color and background color of tooltip
@@ -889,6 +958,7 @@ export default defineComponent({
           chart = echarts.init(chartRef.value, theme, {
             renderer: props.renderType,
           });
+          trackPointer();
           chart?.setOption(chartOptions(props?.data?.options || {}), {
             lazyUpdate: true,
             notMerge: true,
@@ -943,6 +1013,7 @@ export default defineComponent({
           chart = echarts.init(chartRef.value, theme, {
             renderer: props.renderType,
           });
+          trackPointer();
           if (chartRef.value.clientWidth === 0 || chartRef.value.clientHeight === 0) {
             reinitWhenSized();
           }
@@ -978,6 +1049,7 @@ export default defineComponent({
       throttledSetHoveredSeriesIndex.cancel();
 
       // Clean up chart instance
+      chart?.getZr().off("mousemove", reportPointerTime);
       chart?.dispose();
       chart = null;
 
@@ -1037,6 +1109,7 @@ export default defineComponent({
           chart = echarts.init(chartRef.value, theme, {
             renderer: props.renderType,
           });
+          trackPointer();
         }
         chart?.setOption(chartOptions(props?.data?.options || {}), {
           lazyUpdate: true,
@@ -1131,6 +1204,7 @@ export default defineComponent({
       hoveredSeriesState,
       handleNativeContextMenu,
       onChartMouseLeave,
+      reportPointerTime,
       get chart() {
         return chart;
       },
