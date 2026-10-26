@@ -177,3 +177,20 @@ If you already have 2 open PRs, wait for one to be merged or close one before op
 1. refactor: A code change that neither fixes a bug nor adds a feature
 1. style: Changes that do not affect the meaning of the code (white-space, formatting, missing semi-colons, etc)
 1. test: Adding missing tests or correcting existing tests
+
+## Using AI tools
+
+AI-assisted pull requests are welcome. Unreviewed AI output is not: a PR whose code and
+description the author has not read and understood, even if it happens to be correct. Reviewer
+time is the scarce resource, so we may leave such PRs unreviewed and close them.
+
+- **Understand the whole change.** You should be able to explain the design and why the code is
+  right. Use the PR template, and list anything you are unsure about under "Please look at" —
+  that is where reviewers look first.
+- **Reply to review comments in your own words**, whether they come from a person or from the
+  review bot. AI can help you understand a comment or translate your reply. Pasting model output
+  that restates the diff or lists commands that passed is not a reply.
+- **Quality over volume.** One PR worked through with a maintainer helps more than ten raw ones.
+  Many PRs in a short time that show no engagement with feedback may be treated as spam.
+- **No undisclosed third-party code.** Do not include code copied from other projects, or
+  generated code that reproduces it, without saying where it came from and under which license.
