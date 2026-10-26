@@ -704,4 +704,18 @@ export default class DashboardPanelTime {
     await queryDone;
     await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
   }
+
+  /**
+   * Pick a relative time in the view panel WITHOUT applying it.
+   * With Auto Run off the pick is deferred (view refresh turns pending) until Refresh is clicked.
+   * @param {string} timeRange - e.g., "6-d", "1-w"
+   */
+  async selectViewPanelTimeWithoutApply(timeRange) {
+    await this.clickViewPanelDateTimePicker();
+    await this.dateTimeMenu.waitFor({ state: "visible", timeout: 5000 });
+    const timeOptionBtn = this.timeRangeBtn(timeRange);
+    await timeOptionBtn.waitFor({ state: "visible", timeout: 5000 });
+    await timeOptionBtn.click();
+    await this.dismissDateTimePicker();
+  }
 }

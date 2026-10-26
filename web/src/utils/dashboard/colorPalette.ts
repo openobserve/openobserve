@@ -199,7 +199,7 @@ export const getSQLMinMaxValue = (
 };
 
 // need one function which will take some series name and will return hash which will be between 1 to 1000
-const getSeriesHash = (seriesName: string, colorPalette: string[]) => {
+export const getSeriesHash = (seriesName: string, colorPalette: string[]) => {
   // Initialize a hash variable
   let hash = 0;
   const classicColorPaletteLength = colorPalette.length;

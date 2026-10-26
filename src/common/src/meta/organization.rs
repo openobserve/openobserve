@@ -30,6 +30,7 @@ pub enum OrgStatus {
     Active,
     PendingDeletion,
     Deleting,
+    Deleted,
 }
 
 use config::meta::{cluster::Node, self_reporting::usage};
@@ -177,6 +178,9 @@ pub struct OrgDetails {
     /// to the local part of `owner_email` when this is empty.
     #[serde(default)]
     pub owner_first_name: String,
+    /// When the organization was created, as a Unix timestamp in microseconds; 0 when unknown.
+    #[serde(default)]
+    pub created_at: i64,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -907,6 +911,7 @@ mod tests {
             plan: 0,
             owner_email: "admin1@example.com".to_string(),
             owner_first_name: "Admin".to_string(),
+            created_at: 1_700_000_000_000_000,
         };
 
         let response = OrganizationResponse {
@@ -916,6 +921,8 @@ mod tests {
         assert_eq!(response.data.len(), 1);
         assert_eq!(response.data[0].identifier, "org-1");
         assert_eq!(response.data[0].ingest_threshold, THRESHOLD);
+        let json = serde_json::to_value(&response).unwrap();
+        assert_eq!(json["data"][0]["created_at"], 1_700_000_000_000_000_i64);
     }
 
     #[test]

@@ -847,7 +847,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: "Refresh Streams",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         page: "Streams",
       });
     };
@@ -1023,7 +1022,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: "Actions",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         stream_name: props.row.name,
         page: "Streams",
       });
@@ -1264,18 +1262,6 @@ export default defineComponent({
     };
 
     const exploreStream = async (props: any) => {
-      // Profiles have their own explorer; Logs cannot read a profiles stream.
-      if (props.row.stream_type === "profiles") {
-        router.push({
-          name: "profiles",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-            stream: props.row.name,
-            period: "15m",
-          },
-        });
-        return;
-      }
       store.dispatch("logs/setIsInitialized", false);
 
       // We need to check if stream is present in store, if not then we need to fetch the stream

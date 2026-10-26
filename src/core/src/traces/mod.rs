@@ -47,6 +47,7 @@ use opentelemetry_proto::tonic::{
     collector::trace::v1::{
         ExportTracePartialSuccess, ExportTraceServiceRequest, ExportTraceServiceResponse,
     },
+    resource::v1::Resource,
     trace::v1::{Status, status::StatusCode},
 };
 use prost::Message;
@@ -171,6 +172,72 @@ struct CanonicalAgentFields {
     agent_id: Option<String>,
     env: Option<String>,
     version: Option<String>,
+}
+
+struct SpanServiceScope<'a> {
+    fallback: &'a str,
+    name: String,
+    attrs: HashMap<String, json::Value>,
+    explicit: bool,
+}
+
+impl<'a> SpanServiceScope<'a> {
+    fn new(fallback: &'a str) -> Self {
+        Self {
+            fallback,
+            name: fallback.to_string(),
+            attrs: HashMap::new(),
+            explicit: false,
+        }
+    }
+
+    fn enter_resource(&mut self, resource: Option<Resource>) {
+        // one export request carries many resources; none may inherit another's service name
+        self.name = self.fallback.to_string();
+        self.attrs = HashMap::new();
+        self.explicit = false;
+        let Some(resource) = resource else {
+            return;
+        };
+        for res_attr in resource.attributes {
+            if res_attr.key.eq(SERVICE_NAME) {
+                let loc_service_name = get_val(&res_attr.value.as_ref());
+                if let Some(name) = loc_service_name.as_str() {
+                    self.name = name.to_string();
+                    self.attrs
+                        .insert(SERVICE_NAME.to_string(), loc_service_name);
+                    if self.name.to_lowercase().replace("_", " ") != "unknown service" {
+                        self.explicit = true;
+                    }
+                }
+            } else {
+                let key = resource_attribute_key(res_attr.key);
+                self.attrs.insert(key, get_val(&res_attr.value.as_ref()));
+            }
+        }
+    }
+
+    fn attrs(&self) -> &HashMap<String, json::Value> {
+        &self.attrs
+    }
+
+    /// An LLM span's own service name applies to that span only.
+    fn for_span(
+        &self,
+        is_llm_span: bool,
+        span_att_map: &HashMap<String, json::Value>,
+        otel_processor: &OtelIngestionProcessor,
+    ) -> (String, std::borrow::Cow<'_, HashMap<String, json::Value>>) {
+        if is_llm_span
+            && !self.explicit
+            && let Some(val) = otel_processor.extract_service_name_from_span(span_att_map)
+        {
+            let mut attrs = self.attrs.clone();
+            attrs.insert(SERVICE_NAME.to_string(), json::json!(val));
+            return (val, std::borrow::Cow::Owned(attrs));
+        }
+        (self.name.clone(), std::borrow::Cow::Borrowed(&self.attrs))
+    }
 }
 
 fn normalize_llm_field_types(record_val: &mut Map<String, json::Value>) {
@@ -766,7 +833,7 @@ pub async fn handle_otlp_request(
     .await;
     // End get user defined schema
 
-    let mut service_name: String = traces_stream_name.to_string();
+    let mut service_scope = SpanServiceScope::new(&traces_stream_name);
     let res_spans = request.resource_spans;
     let mut json_data_by_stream = HashMap::new();
     let mut partial_success = ExportTracePartialSuccess::default();
@@ -790,26 +857,8 @@ pub async fn handle_otlp_request(
     let mut agent_observations = AgentObservationBuffer::default();
 
     for res_span in res_spans {
-        let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
-        let mut service_name_explicitly_set = false;
-        if let Some(resource) = res_span.resource {
-            for res_attr in resource.attributes {
-                if res_attr.key.eq(SERVICE_NAME) {
-                    let loc_service_name = get_val(&res_attr.value.as_ref());
-                    if let Some(name) = loc_service_name.as_str() {
-                        service_name = name.to_string();
-                        service_att_map.insert(SERVICE_NAME.to_string(), loc_service_name);
-                        if service_name.to_lowercase().replace("_", " ") != "unknown service" {
-                            service_name_explicitly_set = true;
-                        }
-                    }
-                } else {
-                    let key = resource_attribute_key(res_attr.key);
-                    service_att_map.insert(key, get_val(&res_attr.value.as_ref()));
-                }
-            }
-        }
-        let mut resource_keys = normalized_resource_keys(&service_att_map);
+        service_scope.enter_resource(res_span.resource);
+        let resource_keys = normalized_resource_keys(service_scope.attrs());
         let inst_resources = res_span.scope_spans;
         for inst_span in inst_resources {
             let spans = inst_span.spans;
@@ -851,20 +900,10 @@ pub async fn handle_otlp_request(
                     span_att_map.insert(key, get_val(&span_att.value.as_ref()));
                 }
 
-                // Use span attributes as service_name fallback if service_name is not explicitly
-                // set This handles the case where service.name is not present in
-                // resource attributes
                 let scope_name = inst_span.scope.as_ref().map(|s| s.name.as_str());
                 let is_llm_span = is_llm_trace(&span_att_map, scope_name);
-                if is_llm_span
-                    && !service_name_explicitly_set
-                    && let Some(val) = otel_processor.extract_service_name_from_span(&span_att_map)
-                {
-                    service_name = val.clone();
-                    service_att_map.insert(SERVICE_NAME.to_string(), json::json!(val));
-                    resource_keys.insert(SERVICE_NAME.to_string());
-                    service_name_explicitly_set = true;
-                }
+                let (service_name, service_att_map) =
+                    service_scope.for_span(is_llm_span, &span_att_map, &otel_processor);
 
                 // special addition for https://github.com/openobserve/openobserve/issues/4851
                 // we set the status (error/non-error) properly, but skip the message
@@ -978,9 +1017,9 @@ pub async fn handle_otlp_request(
                     end_time,
                     duration: span_duration_micros(start_time, end_time),
                     reference: span_ref,
-                    service_name: service_name.clone(),
+                    service_name,
                     attributes: span_att_map,
-                    service: service_att_map.clone(),
+                    service: service_att_map.into_owned(),
                     flags: 1, // TODO add appropriate value
                     events: if events.is_empty() {
                         "[]".to_string()
@@ -3431,6 +3470,177 @@ mod tests {
             trace_write_error_status(&fault),
             http::StatusCode::INTERNAL_SERVER_ERROR
         );
+    }
+
+    fn string_kv(key: &str, val: &str) -> opentelemetry_proto::tonic::common::v1::KeyValue {
+        use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value::Value};
+        KeyValue {
+            key: key.to_string(),
+            value: Some(AnyValue {
+                value: Some(Value::StringValue(val.to_string())),
+            }),
+            ..Default::default()
+        }
+    }
+
+    fn llm_span_attrs(source: &str) -> Vec<opentelemetry_proto::tonic::common::v1::KeyValue> {
+        use super::otel::attributes::{GenAiAttributes, LangfuseAttributes};
+        vec![
+            string_kv(GenAiAttributes::OPERATION_NAME, "chat"),
+            string_kv(LangfuseAttributes::METADATA_SOURCE, source),
+        ]
+    }
+
+    type ResourceInput<'a> = (
+        Option<&'a str>,
+        Vec<Vec<opentelemetry_proto::tonic::common::v1::KeyValue>>,
+    );
+
+    fn export_request(
+        resources: Vec<ResourceInput<'_>>,
+    ) -> opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest {
+        use opentelemetry_proto::tonic::{
+            collector::trace::v1::ExportTraceServiceRequest,
+            resource::v1::Resource,
+            trace::v1::{ResourceSpans, ScopeSpans, Span},
+        };
+        let now = chrono::Utc::now().timestamp_nanos_opt().unwrap() as u64;
+        let mut next_span_id = 0u8;
+        let resource_spans = resources
+            .into_iter()
+            .map(|(service_name, spans)| {
+                let mut attributes = vec![string_kv("host.name", "node-1")];
+                if let Some(name) = service_name {
+                    attributes.push(string_kv(super::SERVICE_NAME, name));
+                }
+                let spans = spans
+                    .into_iter()
+                    .map(|attributes| {
+                        next_span_id += 1;
+                        Span {
+                            trace_id: vec![9; 16],
+                            span_id: vec![next_span_id; 8],
+                            name: "op".to_string(),
+                            start_time_unix_nano: now,
+                            end_time_unix_nano: now + 1000,
+                            attributes,
+                            ..Default::default()
+                        }
+                    })
+                    .collect();
+                ResourceSpans {
+                    resource: Some(Resource {
+                        attributes,
+                        ..Default::default()
+                    }),
+                    scope_spans: vec![ScopeSpans {
+                        spans,
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }
+            })
+            .collect();
+        ExportTraceServiceRequest { resource_spans }
+    }
+
+    async fn ingest_and_read_service_names(
+        stream: &str,
+        resources: Vec<ResourceInput<'_>>,
+    ) -> Vec<String> {
+        use arrow::{array::StringArray, compute::cast, datatypes::DataType};
+
+        let org_id = "test_service_name_scope_org";
+        let resp = super::handle_otlp_request(
+            org_id,
+            export_request(resources),
+            config::meta::otlp::OtlpRequestType::HttpProtobuf,
+            Some(stream),
+            ingestion_common::IngestUser::from_user_email("a@a.com"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(resp.status(), axum::http::StatusCode::OK);
+
+        let (_, batches) = ingester::read_from_memtable(
+            org_id,
+            config::meta::stream::StreamType::Traces.as_str(),
+            stream,
+            None,
+            &[],
+        )
+        .await
+        .unwrap();
+        let mut by_span_id = std::collections::BTreeMap::new();
+        for entry in batches.into_iter().flat_map(|(_, entries)| entries) {
+            let column = |name: &str| {
+                cast(entry.data.column_by_name(name).unwrap(), &DataType::Utf8).unwrap()
+            };
+            let span_ids = column("span_id");
+            let names = column("service_name");
+            let span_ids = span_ids.as_any().downcast_ref::<StringArray>().unwrap();
+            let names = names.as_any().downcast_ref::<StringArray>().unwrap();
+            for row in 0..entry.data.num_rows() {
+                by_span_id.insert(
+                    span_ids.value(row).to_string(),
+                    names.value(row).to_string(),
+                );
+            }
+        }
+        by_span_id.into_values().collect()
+    }
+
+    // cloud builds reject the unknown test org at the trial check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_handle_otlp_request_resource_without_service_name_gets_stream_fallback() {
+        let stream = "test_svc_scope_resource";
+        let names = ingest_and_read_service_names(
+            stream,
+            vec![(Some("svc-a"), vec![vec![]]), (None, vec![vec![], vec![]])],
+        )
+        .await;
+        assert_eq!(names, ["svc-a", stream, stream]);
+    }
+
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_handle_otlp_request_llm_span_service_name_stays_on_its_span() {
+        let stream = "test_svc_scope_llm";
+        let names = ingest_and_read_service_names(
+            stream,
+            vec![
+                (
+                    None,
+                    vec![
+                        vec![],
+                        llm_span_attrs("llm-svc"),
+                        vec![],
+                        llm_span_attrs("other-svc"),
+                    ],
+                ),
+                (None, vec![vec![]]),
+            ],
+        )
+        .await;
+        assert_eq!(names, [stream, "llm-svc", stream, "other-svc", stream]);
+    }
+
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_handle_otlp_request_llm_span_service_name_only_replaces_placeholder() {
+        let names = ingest_and_read_service_names(
+            "test_svc_scope_placeholder",
+            vec![
+                (Some("svc-a"), vec![llm_span_attrs("llm-svc")]),
+                (
+                    Some("unknown_service"),
+                    vec![llm_span_attrs("llm-svc"), vec![]],
+                ),
+            ],
+        )
+        .await;
+        assert_eq!(names, ["svc-a", "llm-svc", "unknown_service"]);
     }
 
     // cloud builds reject the unknown test org at the trial check before the columns check

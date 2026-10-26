@@ -127,6 +127,11 @@ vi.mock("@/services/common", async (importOriginal) => {
     },
   });
 });
+vi.mock("@/services/fleet", () => ({
+  default: {
+    listFleets: vi.fn(async () => ({ data: { items: [{ id: "f9", name: "F9" }] } })),
+  },
+}));
 vi.mock("@/services/synthetics", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock((await importOriginal()) as any, {
@@ -179,6 +184,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import alertService from "@/services/alerts";
 import cipherKeysService from "@/services/cipher_keys";
 import commonService from "@/services/common";
+import fleetService from "@/services/fleet";
 import dashboardService from "@/services/dashboards";
 import destinationService from "@/services/alert_destination";
 import jsTransformService from "@/services/jstransform";
@@ -492,6 +498,28 @@ describe("useRoleEntityLoaders - folder loaders", () => {
       { folderId: "default", name: "default" },
       { folderId: "f9", name: "F9" },
     ]);
+  });
+});
+
+describe("useRoleEntityLoaders - fleets", () => {
+  it("loads fleets entities from the fleet list, with default added and no children", async () => {
+    const { getResourceEntities, updateResourceEntities } = setup();
+    const resource = row({ resourceName: "fleets" });
+
+    await getResourceEntities(resource as any);
+
+    expect(fleetService.listFleets).toHaveBeenCalledWith(ORG);
+    expect(commonService.list_Folders).not.toHaveBeenCalledWith(ORG, "fleets");
+    expect(updateResourceEntities).toHaveBeenCalledWith(
+      "fleets",
+      ["id"],
+      [
+        { id: "default", name: "default" },
+        { id: "f9", name: "F9" },
+      ],
+      false,
+      "name",
+    );
   });
 });
 

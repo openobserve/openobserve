@@ -88,7 +88,11 @@ fn create_domains_stmt() -> TableCreateStatement {
                 .integer()
                 .null(),
         )
-        .col(ColumnDef::new(StatusPageCustomDomains::VerifiedAt).big_integer().null())
+        .col(
+            ColumnDef::new(StatusPageCustomDomains::VerifiedAt)
+                .big_integer()
+                .null(),
+        )
         // Released (deleted) domains are tombstoned, not row-deleted, so a
         // different org re-claiming the same string is distinguishable from
         // the original owner returning; the live-uniqueness index below
@@ -98,8 +102,16 @@ fn create_domains_stmt() -> TableCreateStatement {
         // (insert-then-check) rather than a DB-level partial index, since
         // sea-orm's cross-backend index builder does not support WHERE
         // clauses portably across Postgres/MySQL/SQLite.
-        .col(ColumnDef::new(StatusPageCustomDomains::ReleasedAt).big_integer().null())
-        .col(ColumnDef::new(StatusPageCustomDomains::LastCheckedAt).big_integer().null())
+        .col(
+            ColumnDef::new(StatusPageCustomDomains::ReleasedAt)
+                .big_integer()
+                .null(),
+        )
+        .col(
+            ColumnDef::new(StatusPageCustomDomains::LastCheckedAt)
+                .big_integer()
+                .null(),
+        )
         .col(
             ColumnDef::new(StatusPageCustomDomains::CreatedAt)
                 .big_integer()

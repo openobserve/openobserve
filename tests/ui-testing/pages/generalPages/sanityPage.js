@@ -4,6 +4,7 @@ const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
 import { openNavFlyoutChild, gotoStreamsViaNav } from '../commonActions.js';
+import { ingestBase } from '../../playwright-tests/utils/ingest-url.js';
 
 export class SanityPage {
     constructor(page) {
@@ -333,7 +334,7 @@ export class SanityPage {
     async _clickSqlModeToggle() {
         await expect(this.queryEditor).toBeVisible({ timeout: 10000 });
         const monacoHelper = new MonacoEditorHelper(this.page);
-        await monacoHelper.setContent(this.queryEditor, 'SELECT * FROM "e2e_automate"');
+        await monacoHelper.setContentVerified(this.queryEditor, 'SELECT * FROM "e2e_automate"');
         await this.page.waitForTimeout(200);
     }
 
@@ -353,7 +354,7 @@ export class SanityPage {
         // .fill() on Monaco's .inputarea appends instead of replacing, producing an
         // invalid concatenated query that causes the server to abort the stream.
         const monacoHelper = new MonacoEditorHelper(this.page);
-        await monacoHelper.setContent(this.queryEditor, 'SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
+        await monacoHelper.setContentVerified(this.queryEditor, 'SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
 
         const limitSearchPromise = this.page.waitForResponse(resp => resp.url().includes('/_search'), { timeout: 30000 });
         await this.refreshButton.click({ force: true });
@@ -595,6 +596,8 @@ export class SanityPage {
         await this.folderAddNameField.waitFor({ state: 'visible', timeout: 10000 });
         await this.folderAddNameField.fill(folderName);
         await this.folderAddSave.click();
+        // The dialog closes only once the folder is created; its overlay would otherwise swallow the tab click below.
+        await expect(this.page.locator('[data-test="dashboard-folder-dialog"]')).toBeHidden({ timeout: 30000 });
 
         // Confirm the folder tab appears with the given name.
         const folderTabName = this.getDashboardFolderTabByName(folderName);
@@ -774,7 +777,7 @@ export class SanityPage {
         };
 
         const response = await fetch(
-            `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+            `${ingestBase(process.env.INGESTION_URL)}/api/${orgId}/${streamName}/_json`,
             {
                 method: "POST",
                 headers: headers,
@@ -1073,7 +1076,7 @@ export class SanityPage {
         // Wait for query editor to be ready, then drive content via MonacoEditorHelper.
         await expect(this.queryEditor).toBeVisible({ timeout: 15000 });
         const monacoHelper = new MonacoEditorHelper(this.page);
-        await monacoHelper.setContent(this.queryEditor, 'SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
+        await monacoHelper.setContentVerified(this.queryEditor, 'SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
         await this.page.waitForLoadState('domcontentloaded');
 
         // Click refresh button with robust waits

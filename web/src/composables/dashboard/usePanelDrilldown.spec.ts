@@ -257,6 +257,190 @@ describe("usePanelDrilldown", () => {
     );
   });
 
+  describe("state timeline segment", () => {
+    const segmentClick = {
+      componentType: "series",
+      seriesIndex: 0,
+      event: { offsetX: 40, offsetY: 50 },
+      value: [1000, 61000, 0, 0],
+      data: {
+        name: "gpu0",
+        state: "thermal",
+        start: 1000,
+        end: 61000,
+        labels: { gpu: "0" },
+      },
+    };
+
+    it("adds an annotation at the clicked segment's start in add-annotation mode", async () => {
+      const deps = makeDeps();
+      deps.panelSchema.value.type = "state-timeline";
+      deps.allowAnnotationsAdd.value = true;
+      deps.isAddAnnotationMode.value = true;
+      const api = usePanelDrilldown(deps as any);
+
+      // A zoned x (Los Angeles wall clock) that differs from the segment's UTC start.
+      const zonedStart = 1000 - 8 * 3_600_000;
+      await api.onChartClick({
+        ...segmentClick,
+        value: [zonedStart, zonedStart + 60000, 0, 0],
+      });
+
+      // The zoned x value, the unit every chart hands handleAddAnnotation.
+      expect(deps.handleAddAnnotation).toHaveBeenCalledWith(zonedStart, null);
+    });
+
+    it("opens a clicked annotation, never the segment drilldown", async () => {
+      const deps = makeDeps();
+      deps.panelSchema.value.type = "state-timeline";
+      const api = usePanelDrilldown(deps as any);
+
+      await api.onChartClick({
+        componentType: "markLine",
+        event: { offsetX: 10, offsetY: 10 },
+        data: { annotationDetails: { id: "a1", text: "Deploy v2.3" } },
+      });
+
+      expect(deps.drilldownPopUpRef.value.style.display).not.toBe("block");
+      expect(deps.annotationPopupRef.value.style.display).toBe("block");
+      expect(deps.selectedAnnotationData.value).toEqual({ id: "a1", text: "Deploy v2.3" });
+    });
+
+    it("passes the entity, its labels and the segment bounds to a URL drilldown", async () => {
+      const deps = makeDeps();
+      deps.panelSchema.value.type = "state-timeline";
+      deps.panelSchema.value.config.drilldown = [
+        {
+          name: "Open",
+          type: "byUrl",
+          targetBlank: true,
+          data: {
+            url: "https://example.com/?e=${series.__name}&v=${series.__value}&gpu=${series.labels.gpu}&from=${series.__start}&to=${series.__end}",
+          },
+        },
+      ] as any;
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+      const api = usePanelDrilldown(deps as any);
+
+      await api.onChartClick(segmentClick);
+      await api.openDrilldown(0);
+
+      expect(open).toHaveBeenCalledWith(
+        "https://example.com/?e=gpu0&v=thermal&gpu=0&from=1000&to=61000",
+        "_blank",
+        "noopener,noreferrer",
+      );
+    });
+
+    it("opens a configured cross-link from a segment click without throwing", async () => {
+      const deps = makeDeps();
+      deps.panelSchema.value.type = "state-timeline";
+      deps.panelSchema.value.config.drilldown = [];
+      deps.panelData.value = {
+        options: { xAxis: { type: "time" }, series: [{ type: "custom" }] },
+      } as any;
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+      const api = usePanelDrilldown(deps as any);
+
+      await api.onChartClick(segmentClick);
+      await expect(api.openDrilldown(0)).resolves.toBeUndefined();
+      expect(api.drilldownArray.value[0]._isCrossLink).toBe(true);
+      expect(open).toHaveBeenCalledTimes(1);
+    });
+
+    it("opens a clicked annotation range, never the segment drilldown", async () => {
+      const deps = makeDeps();
+      deps.panelSchema.value.type = "state-timeline";
+      const api = usePanelDrilldown(deps as any);
+
+      await api.onChartClick({
+        componentType: "markArea",
+        event: { offsetX: 10, offsetY: 10 },
+        data: { annotationDetails: { id: "r1", text: "Maintenance" } },
+      });
+
+      expect(deps.drilldownPopUpRef.value.style.display).not.toBe("block");
+      expect(deps.selectedAnnotationData.value).toEqual({ id: "r1", text: "Maintenance" });
+    });
+
+    it.each([
+      ["gpu0", "8080"],
+      ["gpu1", "9090"],
+    ])("fills a cross-link with the SQL row of the clicked entity %s", async (entity, port) => {
+      resultSchemaMock.mockResolvedValue({
+        data: {
+          cross_links: {
+            stream_links: [
+              {
+                name: "Port",
+                url: "https://example.com/p/${field.__value}",
+                fields: [{ name: "port", alias: "port" }],
+              },
+            ],
+            org_links: [],
+          },
+        },
+      });
+      const deps = makeDeps();
+      deps.panelSchema.value.type = "state-timeline";
+      deps.panelSchema.value.config.drilldown = [];
+      deps.panelSchema.value.queries[0].fields.x = [{ alias: "x_axis_1" }] as any;
+      deps.panelSchema.value.queries[0].fields.breakdown = [
+        { alias: "breakdown_1", args: [{ type: "field", value: { field: "gpu" } }] },
+      ] as any;
+      deps.data.value = [
+        [
+          { x_axis_1: "1970-01-01T00:00:00", breakdown_1: "gpu0", port: "7070" },
+          { x_axis_1: "1970-01-01T00:00:01", breakdown_1: "gpu0", port: "8080" },
+          { x_axis_1: "1970-01-01T00:00:02", breakdown_1: "gpu0", port: "1111" },
+          { x_axis_1: "1970-01-01T00:00:01", breakdown_1: "gpu1", port: "9090" },
+        ],
+      ] as any;
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+      const api = usePanelDrilldown(deps as any);
+
+      await api.onChartClick({
+        ...segmentClick,
+        data: { ...segmentClick.data, name: entity, entity, labels: { gpu: entity } },
+      });
+      await api.openDrilldown(0);
+
+      expect(open).toHaveBeenCalledWith(
+        `https://example.com/p/${port}`,
+        "_blank",
+        "noopener,noreferrer",
+      );
+      open.mockRestore();
+    });
+
+    it("scopes an auto Logs drilldown to the entity and the segment's time range", async () => {
+      const deps = makeDeps();
+      deps.panelSchema.value.type = "state-timeline";
+      deps.panelSchema.value.queries[0].fields.breakdown = [
+        { alias: "breakdown_1", args: [{ type: "field", value: { field: "gpu" } }] },
+      ] as any;
+      deps.panelSchema.value.config.drilldown = [
+        { name: "Logs", type: "logs", targetBlank: false, data: { logsMode: "auto" } },
+      ] as any;
+      const api = usePanelDrilldown(deps as any);
+
+      await api.onChartClick(segmentClick);
+      await api.openDrilldown(0);
+
+      await vi.waitFor(() =>
+        expect(deps.router.push).toHaveBeenCalledWith(
+          expect.objectContaining({
+            query: expect.objectContaining({
+              from: "1000000",
+              to: "61000000",
+              query: expect.stringContaining("gpu = 'gpu0'"),
+            }),
+          }),
+        ),
+      );
+    });
+  });
+
   it("fetches cross-links lazily on the first drilldown interaction, not on panel render", async () => {
     const deps = makeDeps();
     const api = usePanelDrilldown(deps as any);

@@ -1,6 +1,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { ingestBase } = require('../utils/ingest-url.js');
 
 const baseUrl = () => process.env.ZO_BASE_URL.replace(/\/$/, '');
 const ingestionBase = () => (process.env.INGESTION_URL || process.env.ZO_BASE_URL).replace(/\/$/, '');
@@ -69,7 +70,7 @@ test.describe('Web server guides', () => {
         const bar = page.locator('[data-test="first-event-status"]');
         await expect(bar).toHaveAttribute('data-state', 'waiting', { timeout: 20000 });
 
-        const res = await request.post(`${ingestionBase()}/api/${orgId}/nginx/_json`, {
+        const res = await request.post(`${ingestBase(ingestionBase())}/api/${orgId}/nginx/_json`, {
             headers: getAuthHeaders(),
             data: [{ log: `GET /health 200 e2e-${Date.now()}` }],
         });

@@ -1491,6 +1491,103 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     expect(cloneDialog.props("primaryButtonDisabled")).toBe(true);
   });
 
+  it("keeps clone Save disabled until the alert being cloned has loaded", async () => {
+    const loadAlert = (alertsSvc.get_by_alert_id as any).getMockImplementation();
+    let releaseAlert = () => {};
+    (alertsSvc.get_by_alert_id as any).mockImplementation(
+      (org: any, id: string) =>
+        new Promise((resolve) => {
+          releaseAlert = () => resolve(loadAlert(org, id));
+        }),
+    );
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const row = wrapper.vm.filteredResults.find(
+      (r: any) => r.alert_type !== "Composite" && r.type !== "anomaly",
+    );
+    const key = alertKeys.detail(store.state.selectedOrganization.identifier, row.alert_id);
+    queryClient.removeQueries({ queryKey: key, exact: true });
+
+    try {
+      const cloning = wrapper.vm.duplicateAlert(row);
+      await flushPromises();
+      const cloneDialog = wrapper.findComponent({ name: "ODialog" });
+      expect(wrapper.vm.toBeCloneAlertName.trim()).not.toBe("");
+      expect(cloneDialog.props("primaryButtonDisabled")).toBe(true);
+
+      releaseAlert();
+      await cloning;
+      await flushPromises();
+      expect(cloneDialog.props("primaryButtonDisabled")).toBe(false);
+    } finally {
+      queryClient.removeQueries({ queryKey: key, exact: true });
+    }
+  });
+
+  it("a slow load from an earlier clone does not replace the alert being cloned now", async () => {
+    const loadAlert = (alertsSvc.get_by_alert_id as any).getMockImplementation();
+    const pending: Record<string, () => void> = {};
+    (alertsSvc.get_by_alert_id as any).mockImplementation(
+      (org: any, id: string) =>
+        new Promise((resolve) => {
+          pending[id] = () => resolve(loadAlert(org, id));
+        }),
+    );
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const [first, second] = wrapper.vm.filteredResults.filter(
+      (r: any) => r.alert_type !== "Composite" && r.type !== "anomaly",
+    );
+    const org = store.state.selectedOrganization.identifier;
+    const keys = [first, second].map((r: any) => alertKeys.detail(org, r.alert_id));
+    keys.forEach((key) => queryClient.removeQueries({ queryKey: key, exact: true }));
+
+    try {
+      const firstClone = wrapper.vm.duplicateAlert(first);
+      await flushPromises();
+      const secondClone = wrapper.vm.duplicateAlert(second);
+      await flushPromises();
+      pending[second.alert_id]();
+      await secondClone;
+      pending[first.alert_id]();
+      await firstClone;
+      await flushPromises();
+
+      expect(wrapper.vm.toBeClonedAlert.id).toBe(second.alert_id);
+      expect(wrapper.vm.isCloneSourceLoading).toBe(false);
+    } finally {
+      keys.forEach((key) => queryClient.removeQueries({ queryKey: key, exact: true }));
+    }
+  });
+
+  it("saving a clone leaves the original alert's cached detail untouched", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const row = wrapper.vm.filteredResults.find(
+      (r: any) => r.alert_type !== "Composite" && r.type !== "anomaly",
+    );
+    const key = alertKeys.detail(store.state.selectedOrganization.identifier, row.alert_id);
+    queryClient.removeQueries({ queryKey: key, exact: true });
+
+    try {
+      await wrapper.vm.duplicateAlert(row);
+      await flushPromises();
+      wrapper.vm.toBeCloneAlertName = `${row.name}_copy`;
+      wrapper.vm.toBeClonestreamType = "logs";
+      wrapper.vm.toBeClonestreamName = "default";
+      wrapper.vm.folderIdToBeCloned = "default";
+      await wrapper.vm.submitForm();
+      await flushPromises();
+
+      expect(alertsSvc.create_by_alert_id).toHaveBeenCalled();
+      const cached: any = queryClient.getQueryData(key);
+      expect(cached.name).toBe(row.name);
+      expect(cached.id).toBe(row.alert_id);
+    } finally {
+      queryClient.removeQueries({ queryKey: key, exact: true });
+    }
+  });
+
   it("clone dialog emits click:secondary -> closes showForm", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);

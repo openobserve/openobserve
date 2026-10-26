@@ -476,6 +476,23 @@ const validateChartFieldsConfiguration = (
       }
       break;
     }
+    case "state-timeline": {
+      if (fields?.y?.length !== 1) {
+        const errorMsg =
+          pageKey === "logs"
+            ? t("dashboard.utils.unableToExtractValueField")
+            : t("dashboard.utils.addOneFieldFor", { label: yAxisLabel });
+        errors.push(errorMsg);
+      }
+      if (fields?.x?.length !== 1) {
+        const errorMsg =
+          pageKey === "logs"
+            ? t("dashboard.utils.unableToExtractGroupingField")
+            : t("dashboard.utils.addOneFieldFor", { label: xAxisLabel });
+        errors.push(errorMsg);
+      }
+      break;
+    }
     case "stacked":
     case "h-stacked": {
       if (fields?.y?.length === 0) {
@@ -836,6 +853,7 @@ const validatePanelContent = (t: TranslateFn, panel: any): string[] => {
     "stacked",
     "h-stacked",
     "heatmap",
+    "state-timeline",
     "metric",
     "gauge",
     "geomap",
@@ -930,6 +948,7 @@ export const validatePanel = (
       "table",
       "maps",
       "heatmap",
+      "state-timeline",
       "geomap",
       "donut",
       "pie",
