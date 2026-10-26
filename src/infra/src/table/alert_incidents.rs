@@ -715,41 +715,25 @@ pub async fn resolved_incidents_for_alert_with<C: ConnectionTrait>(
     Ok(ids.into_iter().filter(|id| resolved.contains(id)).collect())
 }
 
-/// One incident's links in the junction table.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct AlertCounts {
-    /// Every firing.
-    pub total: i32,
-    /// Distinct `alert_id`s among them.
-    pub unique: i32,
-}
-
 /// Get actual alert counts for multiple incidents (source of truth)
 ///
-/// Returns incident_id -> counts from the junction table; an incident without links is absent.
+/// Returns a HashMap of incident_id -> actual_count from junction table.
 /// Use this to fix denormalized alert_count fields that may be out of sync.
 pub async fn get_alert_counts(
     incident_ids: &[String],
-) -> Result<std::collections::HashMap<String, AlertCounts>, errors::Error> {
-    get_alert_counts_with(get_orm_client_ro().await, incident_ids).await
-}
-
-/// [`get_alert_counts`] on a given connection.
-pub async fn get_alert_counts_with<C: ConnectionTrait>(
-    conn: &C,
-    incident_ids: &[String],
-) -> Result<std::collections::HashMap<String, AlertCounts>, errors::Error> {
+) -> Result<std::collections::HashMap<String, i32>, errors::Error> {
     use sea_orm::FromQueryResult;
 
     if incident_ids.is_empty() {
         return Ok(std::collections::HashMap::new());
     }
 
+    let client = get_orm_client_ro().await;
+
     #[derive(Debug, FromQueryResult)]
     struct CountResult {
         incident_id: String,
         count: i64,
-        unique_count: i64,
     }
 
     let results = alert_incident_alerts::Entity::find()
@@ -760,27 +744,15 @@ pub async fn get_alert_counts_with<C: ConnectionTrait>(
         .select_only()
         .column(alert_incident_alerts::Column::IncidentId)
         .column_as(alert_incident_alerts::Column::IncidentId.count(), "count")
-        .column_as(
-            Expr::col(alert_incident_alerts::Column::AlertId).count_distinct(),
-            "unique_count",
-        )
         .group_by(alert_incident_alerts::Column::IncidentId)
         .into_model::<CountResult>()
-        .all(conn)
+        .all(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
     Ok(results
         .into_iter()
-        .map(|r| {
-            (
-                r.incident_id,
-                AlertCounts {
-                    total: r.count as i32,
-                    unique: r.unique_count as i32,
-                },
-            )
-        })
+        .map(|r| (r.incident_id, r.count as i32))
         .collect())
 }
 
@@ -1235,55 +1207,6 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
-    }
-
-    // A repeat firing of one alert counts toward the total but not toward the distinct alerts.
-    #[tokio::test]
-    async fn alert_counts_separate_firings_from_distinct_alerts() {
-        let db = incidents_db().await;
-        let backend = db.get_database_backend();
-        let stmt = Schema::new(backend).create_table_from_entity(alert_incident_alerts::Entity);
-        db.execute(backend.build(&stmt)).await.unwrap();
-        let storm = fired_into(&db, "open", 1).await;
-        for (alert_id, fired_at) in [("a1", 2), ("a1", 3), ("a2", 4)] {
-            alert_incident_alerts::ActiveModel {
-                incident_id: Set(storm.clone()),
-                alert_id: Set(alert_id.to_string()),
-                alert_fired_at: Set(fired_at),
-                alert_name: Set(alert_id.to_string()),
-                alert_kind: Set("alert".to_string()),
-                correlation_reason: Set(None),
-                created_at: Set(fired_at),
-                resolved_at: Set(None),
-            }
-            .insert(&db)
-            .await
-            .unwrap();
-        }
-        let single = fired_into(&db, "open", 5).await;
-
-        let counts = get_alert_counts_with(
-            &db,
-            &[storm.clone(), single.clone(), "unlinked".to_string()],
-        )
-        .await
-        .unwrap();
-
-        assert_eq!(
-            counts[&storm],
-            AlertCounts {
-                total: 4,
-                unique: 2
-            }
-        );
-        assert_eq!(
-            counts[&single],
-            AlertCounts {
-                total: 1,
-                unique: 1
-            }
-        );
-        assert!(!counts.contains_key("unlinked"));
     }
 
     async fn muted_incident(db: &DatabaseConnection, downtime_id: &str) -> alert_incidents::Model {

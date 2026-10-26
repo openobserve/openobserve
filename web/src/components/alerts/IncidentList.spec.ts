@@ -95,7 +95,6 @@ const OTableStub = {
           <slot name="cell-title" :row="row" />
           <slot name="cell-dimensions" :row="row" />
           <slot name="cell-actions" :row="row" />
-          <div data-test="cell-alert_count"><slot name="cell-alert_count" :row="row" /></div>
         </div>
       </template>
     </div>
@@ -111,7 +110,6 @@ const createIncident = (overrides: Partial<Incident> = {}): Incident => ({
   title: "Test Incident",
   group_values: { service: "test-service" },
   alert_count: 5,
-  unique_alert_count: 2,
   last_alert_at: 1700000000000000,
   created_at: 1700000000000000,
   updated_at: 1700000000000000,
@@ -600,24 +598,6 @@ describe("IncidentList.vue", () => {
       // Default status filter is now "active"; select "all" to see every row.
       (wrapper.vm as any).statusFilter = "all";
       expect((wrapper.vm as any).visibleIncidents).toHaveLength(3);
-    });
-
-    it("counts distinct alerts, not firings, in the Alerts column", async () => {
-      vi.mocked(incidentsService.list).mockResolvedValue({
-        data: {
-          incidents: [createIncident({ id: "1", alert_count: 5, unique_alert_count: 2 })],
-          total: 1,
-        },
-      });
-      wrapper = createWrapper();
-      await flushPromises();
-      const cell = wrapper.find('[data-test="row-1"] [data-test="cell-alert_count"]');
-      expect(cell.text()).toBe("2");
-      const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as {
-        id: string;
-        accessorKey?: string;
-      }[];
-      expect(columns.find((c) => c.id === "alert_count")?.accessorKey).toBe("unique_alert_count");
     });
 
     it("shows NoData in empty slot when no incidents", async () => {

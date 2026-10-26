@@ -2079,11 +2079,7 @@ async fn incident_with_alerts(
         );
         incident_data.alert_count = actual_count;
     }
-    let unique_alert_ids: std::collections::HashSet<&str> = incident_alerts
-        .iter()
-        .map(|a| a.alert_id.as_str())
-        .collect();
-    incident_data.unique_alert_count = Some(unique_alert_ids.len() as i32);
+
 
     // Convert incident_alerts to triggers
     let mut triggers: Vec<IncidentAlert> = incident_alerts
@@ -2226,22 +2222,19 @@ pub async fn list_incidents(
     let incidents_list: Vec<Incident> = incidents
         .into_iter()
         .map(|i| {
-            let counts = actual_counts.get(&i.id).copied();
-            let mut incident = model_to_incident_with_topology(i, None);
-            // No junction rows: the stored total stands, and no alert is linked.
-            incident.unique_alert_count = Some(counts.map_or(0, |c| c.unique));
+            let mut incident = model_to_incident_with_topology(i.clone(), None);
 
             // Fix alert_count from actual triggers (self-healing for corrupted data)
-            if let Some(counts) = counts
-                && incident.alert_count != counts.total
+            if let Some(&actual_count) = actual_counts.get(&i.id)
+                && incident.alert_count != actual_count
             {
                 log::debug!(
                     "[incidents] List: Incident {} alert_count mismatch: stored={}, actual={}",
-                    incident.id,
+                    i.id,
                     incident.alert_count,
-                    counts.total
+                    actual_count
                 );
-                incident.alert_count = counts.total;
+                incident.alert_count = actual_count;
             }
 
             incident
@@ -3010,7 +3003,6 @@ fn model_to_incident_with_topology(
         last_alert_at: db_model.last_alert_at,
         resolved_at: db_model.resolved_at,
         alert_count: db_model.alert_count,
-        unique_alert_count: None,
         title: db_model.title,
         assigned_to: db_model.assigned_to,
         acknowledged_by: db_model.acknowledged_by,
@@ -4163,14 +4155,6 @@ mod tests {
         infra::table::rca_runs::backfill_v1_pointers_for_tests()
             .await
             .unwrap();
-        // A repeat firing counts toward the total, not toward the distinct alerts.
-        for (alert_id, fired_at) in [("a1", 1), ("a1", 2), ("a2", 3)] {
-            infra::table::alert_incidents::add_alert_to_incident(
-                &analyzed, alert_id, alert_id, "alert", fired_at, "test",
-            )
-            .await
-            .unwrap();
-        }
 
         let (incidents, total) = list_incidents(&org, None, 50, 0).await.unwrap();
 
@@ -4182,12 +4166,6 @@ mod tests {
         assert!(!rca.stale);
         assert!(rca.detail.is_none(), "the list adds no join");
         assert!(by_id(&never).rca.is_none());
-        let analyzed_row = by_id(&analyzed);
-        assert_eq!(
-            (analyzed_row.alert_count, analyzed_row.unique_alert_count),
-            (3, Some(2))
-        );
-        assert_eq!(by_id(&never).unique_alert_count, Some(0), "no linked alert");
         let v1 = |id: &str| {
             let rca = by_id(id).rca.as_ref().expect("a pre-run report shows");
             (
