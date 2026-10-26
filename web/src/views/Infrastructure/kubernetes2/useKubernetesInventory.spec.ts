@@ -159,13 +159,13 @@ describe("useKubernetesInventory", () => {
   describe("per-view sets (§7.2) plus CL and NS1", () => {
     const CL_IDS = [...CLUSTER_QUERIES];
     it.each([
-      ["pods", 17 + 6, ["W:Pod", "O:pod"]],
-      ["cluster", 10 + 6, ["W:*"]],
-      ["workloads", 16 + 6, ["E"]],
-      ["hpas", 5 + 6, ["W:HorizontalPodAutoscaler"]],
-      ["replicasets", 5 + 6, ["W:ReplicaSet"]],
-      ["nodes", 9 + 6, ["W:Node", "O:node"]],
-      ["events", 0 + 6, ["E"]],
+      ["pods", 17 + 7, ["EC", "W:Pod", "O:pod"]],
+      ["cluster", 10 + 7, ["EC", "W:*", "O:pod", "O:node"]],
+      ["workloads", 16 + 7, ["EC", "E"]],
+      ["hpas", 5 + 7, ["EC", "W:HorizontalPodAutoscaler"]],
+      ["replicasets", 5 + 7, ["EC", "W:ReplicaSet"]],
+      ["nodes", 9 + 7, ["EC", "W:Node", "O:node"]],
+      ["events", 0 + 7, ["EC", "E"]],
     ] as const)("%s sends %i PromQL and %j", async (view, count, sqlNames) => {
       const { inv } = await setup({ view });
       await inv.load();
@@ -283,7 +283,12 @@ describe("useKubernetesInventory", () => {
       await inv.load();
       const sent = sentQueries();
       expect(
-        sent.find((q) => q.includes("kube_pod_status_phase") && !q.startsWith("count")),
+        sent.find(
+          (q) =>
+            q.includes("kube_pod_status_phase") &&
+            !q.startsWith("count") &&
+            !q.startsWith("label_replace"),
+        ),
       ).toContain('kube_pod_status_phase{k8s_cluster="prod"}');
       expect(sent.find((q) => q.includes("k8s_pod_cpu_usage") && !q.startsWith("count"))).toContain(
         'k8s_pod_cpu_usage{k8s_cluster_name="prod"}',
@@ -317,7 +322,7 @@ describe("useKubernetesInventory", () => {
       await inv.load();
       expect(inv.pageError.value).toContain("boom");
       expect(inv.inventory.value.pods).toEqual([]);
-      expect(sentIds().filter((id) => !id.startsWith("CL"))).toEqual([]);
+      expect(sentIds().filter((id) => !id.startsWith("CL") && id !== "CST")).toEqual([]);
     });
 
     it("shows the page error when CL succeeds but every sent view request fails, despite sparse empties", async () => {
@@ -447,6 +452,35 @@ describe("useKubernetesInventory", () => {
       await label.inv.load();
       expect([sentIds().sort(), sentSql().map((q: any) => q.sql)]).toEqual(sent);
       expect(sentIds()).not.toContain("N1");
+    });
+  });
+
+  describe("event counts", () => {
+    it("sends one cluster-scoped count over the picker range and parses it", async () => {
+      sqlHits = (sql) => (sql.includes("count(*) AS total") ? [{ total: 14, warnings: "8" }] : []);
+      const { inv } = await setup({ view: "pods" });
+      expect(inv.eventCounts.value).toBeNull();
+      await inv.load();
+      const counts = sentSql().filter((q: any) => q.sql.includes("count(*) AS total"));
+      expect(counts).toHaveLength(1);
+      expect(counts[0].sql).toContain("k8s_cluster = 'prod'");
+      expect(counts[0].start_time).toBe(START);
+      expect(inv.eventCounts.value).toEqual({ total: 14, warnings: 8 });
+    });
+
+    it("stays null when the count returns no row, and is not sent for unscoped events", async () => {
+      const scoped = await setup({ view: "cluster" });
+      await scoped.inv.load();
+      expect(scoped.inv.eventCounts.value).toBeNull();
+      vi.clearAllMocks();
+      queryClient.clear();
+      const { inv } = await setup(
+        { view: "events" },
+        { eventFields: ["body_object_note"], metrics: [] },
+      );
+      await inv.load();
+      expect(sentSql().some((q: any) => q.sql.includes("count(*) AS total"))).toBe(false);
+      expect(inv.eventCounts.value).toBeNull();
     });
   });
 

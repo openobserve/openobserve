@@ -620,15 +620,16 @@ const useRoutes = () => {
     {
       path: "infra/kubernetes",
       name: "infraKubernetes",
-      component: () => import("@/views/Infrastructure/curated/CuratedPageView.vue"),
-      props: { workload: "kubernetes" },
+      component: () => import("@/views/Infrastructure/kubernetes2/KubernetesPage.vue"),
       meta: { titleKey: "menu.kubernetes" },
       beforeEnter: routeGuard,
     },
     {
+      // Not in the nav; the previous curated Kubernetes page stays reachable by URL only.
       path: "infra/kubernetes-2",
       name: "infraKubernetes2",
-      component: () => import("@/views/Infrastructure/kubernetes2/KubernetesPage.vue"),
+      component: () => import("@/views/Infrastructure/curated/CuratedPageView.vue"),
+      props: { workload: "kubernetes" },
       meta: { titleKey: "menu.kubernetes2" },
       beforeEnter: routeGuard,
     },
