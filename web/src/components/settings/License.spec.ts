@@ -7,7 +7,7 @@ import { createStore } from "vuex";
 import i18n from "@/locales";
 import type { AxiosResponse } from "axios";
 import zo_config from "@/services/config";
-import { LICENSE_REFRESH_SETTLE_MS } from "@/utils/licenseWaivers";
+import { LICENSE_BOUNDARY_RETRY_MS, LICENSE_REFRESH_SETTLE_MS } from "@/utils/licenseWaivers";
 
 // Helper to create mock Axios responses
 const createAxiosResponse = <T = any>(data: T): AxiosResponse<T> => ({
@@ -1542,6 +1542,110 @@ describe("License.vue", () => {
       await flushPromises();
 
       expect(wrapper.find("[data-test=license-waivers-card]").exists()).toBe(true);
+    });
+  });
+
+  describe("Waiver boundary refetch", () => {
+    const now = Date.UTC(2026, 9, 20, 12);
+    const unblockEndUs = (now + 1000) * 1000;
+    const graceEndUs = (now + 1300) * 1000;
+    const decision = {
+      search_allowed: true,
+      blocks: [],
+      exceeded_days: 4,
+      allowed_days: 3,
+      limit_today_gb: 50,
+      used_today_gb: 10,
+      waiver_ids_applied: ["unblock"],
+    };
+    const base = { ...decision, search_allowed: false, waiver_ids_applied: [] };
+    const waivers = [
+      {
+        id: "unblock",
+        type: "search_unblock",
+        starts_at: (now - 86400000) * 1000,
+        ends_at: unblockEndUs,
+        note: "Unblock",
+      },
+      {
+        id: "grace",
+        type: "report_grace",
+        starts_at: (now - 86400000) * 1000,
+        ends_at: graceEndUs,
+        note: "Grace",
+      },
+    ];
+    const response = (over: Record<string, unknown>) =>
+      createAxiosResponse({
+        ...mockLicenseData,
+        license: { ...mockLicenseData.license, version: 2, limit_breach_allowed_count: 3 },
+        decision,
+        base,
+        waivers,
+        evaluated_at: now * 1000,
+        ...over,
+      });
+    const paused = {
+      decision: { ...base, blocks: ["usage_over_limit"] },
+      evaluated_at: graceEndUs + 1000,
+    };
+    const search = () => wrapper.find("[data-test=license-status-search]").text();
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+      vi.setSystemTime(now);
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it("refetches the licence once after a burst of boundaries and shows the new decision", async () => {
+      vi.mocked(licenseServer.get_license)
+        .mockResolvedValueOnce(response({}))
+        .mockResolvedValue(response(paused));
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(licenseServer.get_license).toHaveBeenCalledTimes(1);
+      expect(search()).toContain("Restored by a waiver");
+
+      await vi.advanceTimersByTimeAsync(1500);
+      expect(licenseServer.get_license).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1000);
+      await flushPromises();
+      expect(licenseServer.get_license).toHaveBeenCalledTimes(2);
+      expect(search()).toContain("Paused");
+      expect(search()).not.toContain("Restored by a waiver");
+
+      await vi.advanceTimersByTimeAsync(LICENSE_BOUNDARY_RETRY_MS * 3);
+      expect(licenseServer.get_license).toHaveBeenCalledTimes(2);
+    });
+
+    it("fetches again while the server decision predates the boundary", async () => {
+      vi.mocked(licenseServer.get_license)
+        .mockResolvedValueOnce(response({}))
+        .mockResolvedValueOnce(response({}))
+        .mockResolvedValue(response(paused));
+      wrapper = createWrapper();
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(2500);
+      await flushPromises();
+      expect(licenseServer.get_license).toHaveBeenCalledTimes(2);
+      expect(search()).toContain("Restored by a waiver");
+
+      await vi.advanceTimersByTimeAsync(LICENSE_BOUNDARY_RETRY_MS);
+      await flushPromises();
+      expect(licenseServer.get_license).toHaveBeenCalledTimes(3);
+      expect(search()).toContain("Paused");
+      await vi.advanceTimersByTimeAsync(LICENSE_BOUNDARY_RETRY_MS * 3);
+      expect(licenseServer.get_license).toHaveBeenCalledTimes(3);
+    });
+
+    it("drops a pending refetch on unmount", async () => {
+      vi.mocked(licenseServer.get_license).mockResolvedValue(response({}));
+      wrapper = createWrapper();
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(1500);
+      wrapper.unmount();
+      await vi.advanceTimersByTimeAsync(LICENSE_BOUNDARY_RETRY_MS * 3);
+      expect(licenseServer.get_license).toHaveBeenCalledTimes(1);
     });
   });
 

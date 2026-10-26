@@ -287,3 +287,30 @@ describe("status rows from waiver data", () => {
     w.unmount();
   });
 });
+
+describe("LicenseStatusCard boundary events", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("reports the report-grace end so the page can refetch the decision", async () => {
+    const now = Date.UTC(2026, 9, 20, 12);
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    vi.setSystemTime(now);
+    const endsUs = (now + 1000) * 1000;
+    const w = mountCard({
+      waivers: [
+        {
+          id: "grace",
+          type: "report_grace",
+          starts_at: (now - 1000) * 1000,
+          ends_at: endsUs,
+          note: "",
+        },
+      ],
+    });
+    await vi.advanceTimersByTimeAsync(999);
+    expect(w.emitted("boundary")).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.emitted("boundary")).toEqual([[endsUs]]);
+    w.unmount();
+  });
+});

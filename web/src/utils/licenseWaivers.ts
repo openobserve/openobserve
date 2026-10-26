@@ -88,6 +88,10 @@ export type LicenseBannerState =
 export const DAY_US = 86_400_000_000;
 export const LICENSE_REFRESH_SETTLE_MS = 15_000;
 export const LICENSE_BANNER_POLL_MS = 300_000;
+export const LICENSE_BOUNDARY_DEBOUNCE_MS = 1_000;
+/** The server re-evaluates every O2_LICENSE_CHECK_INTERVAL (at most an hour), so a stale decision is polled that long. */
+export const LICENSE_BOUNDARY_RETRY_MS = 60_000;
+export const LICENSE_BOUNDARY_RETRIES = 60;
 /** Longer delays overflow setTimeout and fire at once, so far boundaries are re-armed in steps. */
 export const MAX_TIMEOUT_MS = 2 ** 31 - 1;
 

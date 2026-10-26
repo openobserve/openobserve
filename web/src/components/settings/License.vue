@@ -102,6 +102,7 @@
             :rev-hwm-warning="licenseData.rev_hwm_warning"
             :can-update-license="licenseData.can_update_license === true"
             @add-license-key="showUpdateFormAndFocus"
+            @boundary="refetchAtBoundary"
           />
           <LicenseOnlineRefreshCard
             v-if="licenseData.refresh"
@@ -254,6 +255,7 @@
           <LicenseWaiversCard
             :waivers="licenseData.waivers"
             :can-update="licenseData.can_update_license === true"
+            @boundary="refetchAtBoundary"
           />
 
           <OCard v-show="showUpdateForm" class="border-card-glass-border mt-4 border border-solid">
@@ -524,6 +526,9 @@
 import { useMutation } from "@tanstack/vue-query";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import {
+  LICENSE_BOUNDARY_DEBOUNCE_MS,
+  LICENSE_BOUNDARY_RETRIES,
+  LICENSE_BOUNDARY_RETRY_MS,
   isRevRefusal,
   isKeyCheckResult,
   type KeyCheckResult,
@@ -537,7 +542,15 @@ import {
   updateLicenseMutation,
 } from "@/services/license_server.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import { defineComponent, ref, onMounted, computed, watch, defineAsyncComponent } from "vue";
+import {
+  defineComponent,
+  ref,
+  onMounted,
+  onBeforeUnmount,
+  computed,
+  watch,
+  defineAsyncComponent,
+} from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import DOMPurify from "dompurify";
@@ -698,6 +711,35 @@ export default defineComponent({
     };
 
     const reloadLicenseData = () => loadLicenseData({ background: true });
+
+    let boundaryRefetch: ReturnType<typeof setTimeout> | undefined;
+    let boundaryUs = 0;
+    let boundaryRetries = 0;
+    let unmounted = false;
+    const clearBoundaryRefetch = () => {
+      if (boundaryRefetch !== undefined) clearTimeout(boundaryRefetch);
+      boundaryRefetch = undefined;
+    };
+    // the server re-evaluates on its own tick, so a decision from before the boundary is fetched again
+    const refetchAfterBoundary = async () => {
+      boundaryRefetch = undefined;
+      await reloadLicenseData();
+      const evaluatedAt = Number(licenseData.value?.evaluated_at ?? 0);
+      if (unmounted || !(evaluatedAt > 0 && evaluatedAt < boundaryUs)) return;
+      if (boundaryRetries >= LICENSE_BOUNDARY_RETRIES) return;
+      boundaryRetries++;
+      boundaryRefetch = setTimeout(refetchAfterBoundary, LICENSE_BOUNDARY_RETRY_MS);
+    };
+    const refetchAtBoundary = (atUs: number) => {
+      boundaryUs = Math.max(boundaryUs, atUs);
+      boundaryRetries = 0;
+      clearBoundaryRefetch();
+      boundaryRefetch = setTimeout(refetchAfterBoundary, LICENSE_BOUNDARY_DEBOUNCE_MS);
+    };
+    onBeforeUnmount(() => {
+      unmounted = true;
+      clearBoundaryRefetch();
+    });
 
     // The settle reload already refetched the licence query, so reuse it instead of a second request.
     const adoptRefetchedLicense = () => {
@@ -1130,6 +1172,7 @@ export default defineComponent({
       store,
       loading,
       reloadLicenseData,
+      refetchAtBoundary,
       licenseData,
       licenseKey,
       showUpdateForm,
