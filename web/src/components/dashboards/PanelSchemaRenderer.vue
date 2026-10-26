@@ -1959,7 +1959,7 @@ export default defineComponent({
       emit("series-data-update", panelData.value);
     });
 
-    // when we get the new limitNumberOfSeriesWarningMessage from the convertPanelData, emit the limitNumberOfSeriesWarningMessage
+    // Immediate, so a renderer remounted for a new chart type clears the previous type's series warning.
     watch(
       limitNumberOfSeriesWarningMessage,
       () => {
@@ -1968,7 +1968,7 @@ export default defineComponent({
           limitNumberOfSeriesWarningMessage.value,
         );
       },
-      { deep: true },
+      { immediate: true },
     );
 
     // Immediate, so a renderer remounted for a new chart type clears the previous type's series chip.

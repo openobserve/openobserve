@@ -15,7 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach, onTestFinished } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { nextTick, ref } from "vue";
+import { computed, defineComponent, nextTick, ref } from "vue";
 
 // Mock all the heavy dependencies
 vi.mock("@/composables/dashboard/usePanelDataLoader", () => ({
@@ -158,6 +158,7 @@ global.console = {
 };
 
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
+import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
@@ -3879,6 +3880,95 @@ describe("PanelSchemaRenderer", () => {
     it("emits an empty series limit on mount, clearing a previous chart's series chip", async () => {
       await mountRacing();
       expect(wrapper.emitted("series-limit-update")?.[0]).toEqual([null]);
+    });
+
+    it("clears a line chart's series chip in the editor preview when the panel turns into a host map", async () => {
+      const data = ref<any[]>([]);
+      vi.mocked(usePanelDataLoader).mockReturnValue({
+        data,
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({ queries: [{ panelQueryIndex: 0 }] }),
+        resultMetaData: ref([]),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+      const schemaOf = (type: string) => ({
+        id: "panel-preview",
+        type,
+        queryType: "promql",
+        queries: [{ query: "gpu_power_watts", fields: {}, config: {} }],
+        config: {},
+      });
+      // The editor keys its preview renderer by chart type and feeds its notices to PanelErrorButtons.
+      const Preview = defineComponent({
+        components: { PanelSchemaRenderer, PanelErrorButtons },
+        props: { type: { type: String, required: true } },
+        setup(props) {
+          const limit = ref<any>(null);
+          const message = ref("");
+          const schema = computed(() => schemaOf(props.type));
+          return { limit, message, schema, defaultProps };
+        },
+        template: `
+          <div>
+            <PanelErrorButtons :seriesLimit="limit" :limitNumberOfSeriesWarningMessage="message" />
+            <PanelSchemaRenderer
+              :key="type"
+              v-bind="defaultProps"
+              :panelSchema="schema"
+              @series-limit-update="limit = $event"
+              @limit-number-of-series-warning-message-update="message = $event"
+            />
+          </div>`,
+      });
+      vi.mocked(convertPanelData).mockResolvedValueOnce({
+        ...optionsWith("gpu"),
+        extras: {
+          limitNumberOfSeriesWarningMessage: "Showing 100 of 512 series to keep the chart fast",
+        },
+      });
+      const host = mount(Preview, {
+        props: { type: "line" },
+        global: {
+          plugins: [i18n, store],
+          provide: {
+            hoveredSeriesState: { value: null },
+            dashboardPanelDataPageKey: PAGE_KEY,
+            variablesAndPanelsDataLoadingState: {
+              panels: {},
+              variablesData: {},
+              searchRequestTraceIds: {},
+            },
+          },
+          mocks: { $t: (key: string) => key },
+          stubs: {
+            ChartRenderer: { template: '<div data-test="chart-renderer"></div>' },
+            AddAnnotation: { template: '<div data-test="add-annotation"></div>' },
+            LoadingProgress: { template: '<div data-test="loading-progress"></div>' },
+          },
+        },
+      });
+      onTestFinished(() => host.unmount());
+      await flushPromises();
+      data.value = [primary];
+      await flushPromises();
+      expect(host.find('[data-test="panel-notice-chip-series-cap"]').exists()).toBe(true);
+
+      vi.mocked(convertPanelData).mockResolvedValueOnce({
+        ...optionsWith("gpu"),
+        chartType: "hostmap",
+        extras: { panelId: "panel-preview" },
+      });
+      await host.setProps({ type: "hostmap" });
+      await flushPromises();
+      data.value = [{ ...primary }];
+      await flushPromises();
+      expect(host.find('[data-test="panel-notice-chip-series-cap"]').exists()).toBe(false);
     });
 
     it("emits an empty map notice on mount, clearing a previous chart's chip", async () => {
