@@ -91,6 +91,11 @@ describe("promqlGaugeValue", () => {
     expect(promqlGaugeValue(metric, "first")).toBe(10);
   });
 
+  it("shows an instant sample as is, whatever reducer was saved", () => {
+    expect(promqlGaugeValue({ value: [1, "42"] }, "count")).toBe(42);
+    expect(promqlGaugeValue({ value: [1, "42"] }, "diff")).toBe(42);
+  });
+
   it("skips non-numeric samples before reducing", () => {
     const metric = {
       values: [

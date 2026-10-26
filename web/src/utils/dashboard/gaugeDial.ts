@@ -74,7 +74,9 @@ export const promqlGaugeValue = (metric: any, aggregation: unknown): number | nu
     .filter((point: any) => Number.isFinite(parseFloat(point?.[1])))
     .sort((a: any, b: any) => a[0] - b[0]);
   if (!sorted.length) return null;
-  const value = applyAggregation(sorted, (aggregation as string) || "last");
+  // An instant sample has nothing to reduce; count, range and diff would read it as 1 or 0.
+  const reducer = metric?.values ? (aggregation as string) || "last" : "last";
+  const value = applyAggregation(sorted, reducer);
   return Number.isFinite(value) ? value : null;
 };
 
