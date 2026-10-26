@@ -19,9 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <DashboardHeader :title="t('dashboard.generalSettingsTitle')" />
     <OForm
       ref="formRef"
-      :schema="generalSettingsSchema"
-      :default-values="generalSettingsDefaults()"
-      @submit="onSubmit"
+      :form="form"
       v-slot="{ isSubmitting }"
       class="flex min-h-0 flex-1 flex-col"
     >
@@ -57,6 +55,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :auto-apply-dashboard="true"
             menu-align="start"
           />
+        </div>
+
+        <div class="flex flex-col gap-1">
+          <OFormSelect
+            name="defaultRefreshInterval"
+            :label="t('dashboard.generalSettingsPage.defaultAutoRefresh')"
+            :options="refreshOptions"
+            :searchable="false"
+            :help-text="refreshHelpText"
+            data-test="dashboard-general-setting-default-refresh"
+          />
+          <p
+            v-if="showAbsoluteRangeHint"
+            class="text-text-secondary text-xs"
+            data-test="dashboard-general-setting-default-refresh-absolute-hint"
+          >
+            {{ t("dashboard.generalSettingsPage.defaultAutoRefreshAbsoluteHint") }}
+          </p>
         </div>
 
         <div class="flex flex-col gap-1">
@@ -104,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, onMounted, ref, nextTick, type Ref } from "vue";
+import { computed, defineComponent, onMounted, ref, nextTick, type Ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { getDashboard, updateDashboard } from "@/utils/commons";
@@ -118,6 +134,14 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import {
+  autoRefreshLabel,
+  defaultRefreshOptions,
+  effectiveDefaultRefresh,
+  minAutoRefreshSeconds,
+} from "@/utils/dashboard/autoRefresh";
 import {
   makeGeneralSettingsSchema,
   generalSettingsDefaults,
@@ -134,6 +158,7 @@ export default defineComponent({
     OFormInput,
     OFormTextarea,
     OFormSwitch,
+    OFormSelect,
   },
   emits: ["save", "close"],
   setup(props, { emit }) {
@@ -145,11 +170,40 @@ export default defineComponent({
     const saveConflict = useDashboardSaveConflict();
 
     const formRef = ref<any>(null);
+    const dateTimeValue: any = ref(null);
+    const form = useOForm<GeneralSettingsForm>({
+      defaultValues: generalSettingsDefaults(),
+      schema: generalSettingsSchema,
+      onSubmit: (value) => onSubmit(value),
+    });
+
+    const minRefreshSeconds = computed(() =>
+      minAutoRefreshSeconds(store.state?.zoConfig?.min_auto_refresh_interval),
+    );
+    // What the dashboard has stored, kept apart from the form so a below-minimum value can be explained.
+    const savedRefresh = ref(0);
+    const effectiveRefresh = computed(() =>
+      effectiveDefaultRefresh(savedRefresh.value, minRefreshSeconds.value),
+    );
+    const selectedRefresh = form.useStore((s: any) => s.values.defaultRefreshInterval as number);
+    const refreshOptions = computed(() =>
+      defaultRefreshOptions(minRefreshSeconds.value, t, effectiveRefresh.value),
+    );
+    const refreshHelpText = computed(() =>
+      savedRefresh.value > 0 && savedRefresh.value < minRefreshSeconds.value
+        ? t("dashboard.generalSettingsPage.defaultAutoRefreshRaised", {
+            saved: autoRefreshLabel(savedRefresh.value, t),
+            effective: autoRefreshLabel(effectiveRefresh.value, t),
+          })
+        : t("dashboard.generalSettingsPage.defaultAutoRefreshHelp"),
+    );
+    const showAbsoluteRangeHint = computed(
+      () => selectedRefresh.value > 0 && dateTimeValue.value?.valueType === "absolute",
+    );
     const closeBtn: Ref<any> = ref(null);
     // initial timezone, which will come from the route query
     const initialTimezone: any = ref(store.state.timezone ?? null);
 
-    let dateTimeValue: any = ref(null);
     const getDashboardData = async () => {
       const data = await getDashboard(
         store,
@@ -163,10 +217,12 @@ export default defineComponent({
       // The form owns `name`, `description`, and `showDynamicFilters`; there is
       // no local mirror of any of them.
       await nextTick();
-      formRef.value?.form.reset({
+      savedRefresh.value = Number(data?.defaultRefreshInterval) || 0;
+      form.reset({
         name: data.title,
         description: data.description ?? "",
         showDynamicFilters: data.variables?.showDynamicFilters ?? false,
+        defaultRefreshInterval: effectiveRefresh.value,
       });
 
       dateTimeValue.value = {
@@ -202,6 +258,12 @@ export default defineComponent({
           };
         } else {
           data.variables.showDynamicFilters = value.showDynamicFilters;
+        }
+
+        if (value.defaultRefreshInterval > 0) {
+          data.defaultRefreshInterval = value.defaultRefreshInterval;
+        } else {
+          delete data.defaultRefreshInterval;
         }
 
         data.defaultDatetimeDuration = {
@@ -253,8 +315,10 @@ export default defineComponent({
 
     return {
       t,
-      generalSettingsSchema,
-      generalSettingsDefaults,
+      form,
+      refreshOptions,
+      refreshHelpText,
+      showAbsoluteRangeHint,
       store,
       onSubmit,
       closeBtn,
