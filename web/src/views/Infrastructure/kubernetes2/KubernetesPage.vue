@@ -463,7 +463,7 @@ k8s.loadStreams();
 </script>
 
 <template>
-  <OPageLayout :title="t('menu.kubernetes2')" :subtitle="t('infra.k8s2.subtitle')" icon="hub" bleed>
+  <OPageLayout :title="t('menu.kubernetes')" :subtitle="t('infra.k8s2.subtitle')" icon="hub" bleed>
     <template v-if="ready && crumbs" #subtitle>
       <OText class="flex min-w-0 items-center gap-1.5 text-sm" data-test="k8s2-breadcrumb">
         <span class="max-md:hidden">{{ raw(k8s.effectiveCluster.value ?? "") }}</span>
