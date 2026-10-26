@@ -112,7 +112,7 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const chartRef: Ref<HTMLElement | null> = ref(null);
     let chart: echarts.EChartsType | null = null;
-    let chartTheme: "light" | "dark" | null = null;
+    let chartDark: boolean | null = null;
     const { isDark } = useTheme();
 
     const hoveredSeriesState = inject<HoveredSeriesState | null>("hoveredSeriesState", null);
@@ -136,17 +136,17 @@ export default defineComponent({
       // The component can unmount while echarts-gl loads, nulling the ref.
       if (!chartRef.value) return;
 
-      const theme = isDark.value ? "dark" : "light";
+      const dark = isDark.value;
       // ECharts fixes the theme at init, so a theme change needs a fresh instance.
-      if (chart && chartTheme !== theme) {
+      if (chart && chartDark !== dark) {
         chart.dispose();
         chart = null;
       }
       if (!chart) {
-        chart = echarts.init(chartRef.value, theme === "dark" ? "dark" : undefined, {
+        chart = echarts.init(chartRef.value, dark ? "dark" : undefined, {
           renderer: "canvas",
         });
-        chartTheme = theme;
+        chartDark = dark;
         if (chartRef.value.clientWidth === 0 || chartRef.value.clientHeight === 0) {
           reinitWhenSized();
         }
@@ -159,7 +159,7 @@ export default defineComponent({
         const safeChartOptions = deepSanitize(props.data) as CustomChartData;
         // The dark theme paints an opaque background; keep the panel surface unless the code sets one.
         const themedOptions =
-          theme === "dark" && safeChartOptions.backgroundColor == null
+          dark && safeChartOptions.backgroundColor == null
             ? { ...safeChartOptions, backgroundColor: "transparent" }
             : safeChartOptions;
         chart.setOption(withChartFont(themedOptions));
