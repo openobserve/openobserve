@@ -6059,7 +6059,6 @@ name = "ingestion-common"
 version = "0.1.0"
 dependencies = [
  "bytes",
- "common",
  "config",
  "serde",
  "serde_json",
@@ -7911,7 +7910,6 @@ dependencies = [
  "ingester",
  "ingestion-common",
  "itertools 0.14.0",
- "jsonwebtoken",
  "lettre",
  "log",
  "maxminddb",
@@ -7992,11 +7990,9 @@ dependencies = [
  "usage_reporting",
  "utoipa",
  "utoipa-swagger-ui",
- "version-compare",
  "wal",
  "web",
  "webpki-roots 1.0.9",
- "x509-parser",
  "zip 9.0.3",
  "zstd 0.13.3",
 ]

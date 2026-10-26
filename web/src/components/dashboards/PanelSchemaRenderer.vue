@@ -59,9 +59,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
           :enable-column-format="enableColumnFormat"
           :drilldown-columns="
-            store.state.printMode || !allowDrilldown ? [] : drilldownColumnAliases
+            store.state.printMode || store.state.kioskMode || !allowDrilldown
+              ? []
+              : drilldownColumnAliases
           "
-          :drilldown-all-columns="!store.state.printMode && allowDrilldown && drilldownAllColumns"
+          :drilldown-all-columns="
+            !store.state.printMode &&
+            !store.state.kioskMode &&
+            allowDrilldown &&
+            drilldownAllColumns
+          "
         />
         <div
           v-else-if="panelSchema.type == 'html'"
@@ -101,11 +108,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :height="chartPanelHeight"
           :label="raw(panelSchema?.title)"
           :render-type="panelSchema?.type === 'metric' ? 'svg' : 'canvas'"
-          @updated:data-zoom="onDataZoom"
+          @updated:data-zoom="(event) => !store.state.kioskMode && onDataZoom(event)"
           @error="errorDetail = $event"
           @click="onPanelClick"
-          @contextmenu="onChartContextMenu"
-          @domcontextmenu="onChartDomContextMenu"
+          @contextmenu="(event) => !store.state.kioskMode && onChartContextMenu(event)"
+          @domcontextmenu="(event) => !store.state.kioskMode && onChartDomContextMenu(event)"
           :find-line-on-context-menu="findsLineOnContextMenu"
           @mouseover="exemplarInteraction.onMouseOver"
           @mouseout="exemplarInteraction.onMouseOut"
@@ -2014,7 +2021,7 @@ export default defineComponent({
 
     // A chart or table click opens the drilldown menu, so it does nothing where drilldowns are off.
     const onPanelClick = (...args: Parameters<typeof onChartClick>) =>
-      allowDrilldown.value ? onChartClick(...args) : undefined;
+      allowDrilldown.value && !store.state.kioskMode ? onChartClick(...args) : undefined;
 
     const { downloadDataAsCSV, downloadDataAsJSON, getPanelCsvString } = usePanelDownload({
       panelSchema,
@@ -2204,7 +2211,7 @@ export default defineComponent({
     // Called directly by the search icon so it works even with a panel drilldown config.
     // Off with drilldowns, so the anonymous public page never opens the logs drawer.
     async function exploreCellInLogs(alias: string, value: unknown, row: any) {
-      if (!allowDrilldown.value) return;
+      if (!allowDrilldown.value || store.state.kioskMode) return;
       const queries = props.panelSchema.queries ?? [];
       const qi = Number.isInteger(row?.__q) && queries[row.__q] ? row.__q : 0;
       const query = queries[qi];

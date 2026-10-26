@@ -23,7 +23,7 @@ const CIRCUMFERENCE = 2 * Math.PI * 11;
 
 const mountRing = (props: Record<string, unknown>) =>
   mount(KioskCountdownRing, {
-    props: { tooltip: raw("Next refresh in 18s"), ...props },
+    props: { tooltip: raw("Next refresh at 23:16:30"), ...props },
     slots: { default: "<i data-test='inner' />" },
   });
 
@@ -65,8 +65,8 @@ describe("KioskCountdownRing", () => {
   it("is focusable and names itself with its tooltip", () => {
     const wrapper = mountRing({});
     expect(wrapper.attributes("tabindex")).toBe("0");
-    expect(wrapper.attributes("aria-label")).toBe("Next refresh in 18s");
-    expect(wrapper.findComponent(OTooltip).props("content")).toBe("Next refresh in 18s");
+    expect(wrapper.attributes("aria-label")).toBe("Next refresh at 23:16:30");
+    expect(wrapper.findComponent(OTooltip).props("content")).toBe("Next refresh at 23:16:30");
   });
 
   it("draws a smaller ring at the sm size", () => {

@@ -56,6 +56,8 @@ const store = createStore({
     organizations: [] as unknown[],
     searchCollapsibleSection: 20,
     printMode: false,
+    kioskMode: false,
+    themeOverride: null as string | null,
     savedViewFlag: false,
     savedFunctionDialog: false,
     hiddenMenus: [] as unknown[],
@@ -327,6 +329,12 @@ const store = createStore({
     setPrintMode(state, payload) {
       state.printMode = payload;
     },
+    setKioskMode(state, payload) {
+      state.kioskMode = payload;
+    },
+    setThemeOverride(state, payload) {
+      state.themeOverride = payload;
+    },
     setTimezone(state, payload) {
       state.timezone = payload;
     },
@@ -572,6 +580,9 @@ const store = createStore({
     },
     setPrintMode(context, payload) {
       context.commit("setPrintMode", payload);
+    },
+    setKioskMode(context, payload) {
+      context.commit("setKioskMode", payload);
     },
     setTimezone(context, payload) {
       context.commit("setTimezone", payload);

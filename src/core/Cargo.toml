@@ -13,10 +13,12 @@ default = []
 enterprise = [
     "db/enterprise",
     "audit/enterprise",
+    "dep:jsonwebtoken",
     "dep:o2_dex",
     "dep:o2_enterprise",
     "dep:o2_openfga",
     "dep:o2_ratelimit",
+    "dep:version-compare",
     "common/enterprise",
     "config/enterprise",
     "enrichment-data/enterprise",
@@ -54,7 +56,7 @@ profiling = [
 
 [dependencies]
 db.workspace = true
-audit.workspace = true
+audit = { workspace = true, optional = true }
 common.workspace = true
 enrichment-data.workspace = true
 openobserve-node.workspace = true
@@ -91,7 +93,7 @@ itoa = "1.0"
 hmac.workspace = true
 image.workspace = true
 itertools.workspace = true
-jsonwebtoken.workspace = true
+jsonwebtoken = { workspace = true, optional = true }
 log.workspace = true
 # Direct (non-workspace) dep on purpose: already in Cargo.lock transitively, and
 # keeping it out of the root [workspace.dependencies] avoids the enterprise-CI
@@ -132,7 +134,7 @@ tracing.workspace = true
 tracing-opentelemetry.workspace = true
 url.workspace = true
 utoipa.workspace = true
-version-compare.workspace = true
+version-compare = { workspace = true, optional = true }
 config.workspace = true
 infra.workspace = true
 ingester.workspace = true

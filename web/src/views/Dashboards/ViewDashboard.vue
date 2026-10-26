@@ -27,16 +27,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         },
         isFullscreen ? 'bg-surface-base!' : '',
         store.state.printMode === true ? 'pb-6' : '',
+        kioskMode && !kioskPointerActive ? 'cursor-none [&_*]:cursor-none!' : '',
       ]"
       class="h-full"
+      :data-kiosk="kioskMode ? 'true' : undefined"
     >
       <OPageLayout
         bleed
         :main-panel="false"
         :header-class="
-          isFullscreen || store.state.printMode === true
-            ? 'stickyHeader fullscreenHeader bg-surface-panel'
-            : 'shrink-0'
+          kioskMode
+            ? 'hidden'
+            : isFullscreen || store.state.printMode === true
+              ? 'stickyHeader fullscreenHeader bg-surface-panel'
+              : 'shrink-0'
         "
         :subtitle="folderNameFromFolderId"
         :icon="!isFullscreen && store.state.printMode !== true ? undefined : 'dashboard'"
@@ -108,12 +112,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @timezone-change="timeGate.flush"
             data-test="dashboard-global-date-time-picker"
           />
+          <!-- Kiosk keeps this mounted on every width: it owns the refresh value and its URL sync. -->
           <AutoRefreshInterval
-            v-if="!isMobile"
+            v-if="!isMobile || kioskMode"
             v-model="refreshInterval"
             trigger
             :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
-            @trigger="refreshData"
+            @trigger="onAutoRefreshTick"
             class="dashboard-icons hideOnPrintMode h-7.5 [transition:all_0.2s_ease]"
             size="sm"
           />
@@ -291,11 +296,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #actions-overflow>
           <AutoRefreshInterval
-            v-if="isMobile"
+            v-if="isMobile && !kioskMode"
             v-model="refreshInterval"
             trigger
             :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
-            @trigger="refreshData"
+            @trigger="onAutoRefreshTick"
             class="dashboard-icons hideOnPrintMode h-7.5 [transition:all_0.2s_ease]"
             size="sm"
           />
@@ -386,6 +391,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 shortcut-id="dashboardFullscreen"
               />
             </OButton>
+            <KioskSetupPopover
+              v-if="!isFullscreen"
+              v-show="store.state.printMode !== true"
+              :current-refresh-seconds="refreshInterval"
+              :min-refresh-seconds="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+              @open="enterKiosk"
+            />
             <OButton
               v-if="!isFullscreen"
               v-show="store.state.printMode !== true"
@@ -464,6 +476,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </template>
 
+        <KioskStrip
+          v-if="kioskMode && !playlistEmbed"
+          :title="currentDashboardData.data?.title"
+          :position="playlistPosition"
+          :time-range-label="kioskTimeRange"
+          :refresh-seconds="refreshInterval"
+          :health="kioskHealth"
+          :last-success-at="kioskLastSuccessAt"
+          :timezone="store.state.timezone"
+          :loading="arePanelsLoading"
+          :countdown="kioskCountdown"
+          @exit="exitKiosk"
+        />
+        <div v-if="playlistHolding" class="fixed inset-0 z-50">
+          <PlaylistHoldingCard
+            :label="playlistHolding.label"
+            :title="playlistHolding.title"
+            :note="playlistHolding.note"
+          />
+        </div>
         <OBanner
           v-if="hasUnsavedConflict"
           variant="warning"
@@ -500,7 +532,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @refreshedVariablesDataUpdated="refreshedVariablesDataUpdated"
           @variablesManagerReady="onVariablesManagerReady"
           :initialVariableValues="initialVariableValues"
-          :viewOnly="store.state.printMode"
+          :viewOnly="store.state.printMode || kioskMode"
+          :kiosk="kioskMode"
+          :readOnlySelectors="playlistEmbed || playlistPageActive"
+          :fitToScreen="kioskMode && kioskFit"
           :layoutMode="layoutMode"
           @layoutChange="onLayoutChange"
           :dashboardData="currentDashboardData.data"
@@ -689,6 +724,38 @@ import { isInputFocused, isMacOS } from "@/utils/keyboardShortcuts";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { queryClient } from "@/composables/query/queryClient";
 import { annotationKeys } from "@/services/dashboard_annotations.querykeys";
+import KioskStrip from "@/components/dashboards/kiosk/KioskStrip.vue";
+import KioskSetupPopover from "@/components/dashboards/kiosk/KioskSetupPopover.vue";
+import { KIOSK_PANEL_HEALTH_KEY, useKioskRefresh } from "@/composables/dashboard/useKioskRefresh";
+import {
+  applyKioskTheme,
+  clearKioskTheme,
+  useIdleReveal,
+} from "@/composables/dashboard/useKioskDisplay";
+import {
+  buildKioskQuery,
+  formatRelativePeriod,
+  isFitEnabled,
+  isKioskEnabled,
+  parseKioskTheme,
+  pickKioskParams,
+  resolveKioskRefresh,
+  stripKioskParams,
+} from "@/utils/dashboard/kiosk";
+import {
+  PLAYLIST_VIEW_PATH,
+  isPlaylistEmbed,
+  isPlaylistPage,
+  missingReasonFor,
+  parsePlaylistMisses,
+  parsePlaylistQuery,
+  pickPlaylistParams,
+  stripPlaylistParams,
+} from "@/utils/dashboard/playlist";
+import { usePlaylistFrame, usePlaylistPage } from "@/composables/dashboard/usePlaylistFrame";
+import PlaylistHoldingCard from "@/components/dashboards/kiosk/PlaylistHoldingCard.vue";
+import { pingBackend } from "@/services/health";
+import { raw } from "@/types/i18n";
 
 const DashboardJsonEditor = defineAsyncComponent(() => {
   return import("./DashboardJsonEditor.vue");
@@ -728,6 +795,9 @@ export default defineComponent({
     OBadge,
     OSeparator,
     ODialog,
+    KioskStrip,
+    KioskSetupPopover,
+    PlaylistHoldingCard,
   },
   setup() {
     const { t } = useI18nTyped();
@@ -739,6 +809,31 @@ export default defineComponent({
       data: {},
     });
     const showScheduledReportsDialog = ref(false);
+
+    // Set before the first render so a reloaded TV never flashes the app chrome.
+    if (isKioskEnabled(route.query.kiosk) && !store.state.kioskMode) {
+      store.dispatch("setKioskMode", true);
+    }
+    const kioskMode = computed(() => store.state.kioskMode === true);
+    const kioskFit = computed(() => isFitEnabled(route.query.fit));
+    const { active: kioskPointerActive } = useIdleReveal(kioskMode);
+
+    // One slide of a TV playlist: inside the player's frame, or a full page when framing is blocked.
+    const playlistEmbed =
+      isKioskEnabled(route.query.kiosk) &&
+      isPlaylistEmbed(route.query) &&
+      typeof window !== "undefined" &&
+      window.parent !== window;
+    const playlistPageConfig =
+      isKioskEnabled(route.query.kiosk) && !playlistEmbed && isPlaylistPage(route.query)
+        ? parsePlaylistQuery(route.query)
+        : null;
+    // Filled in once the kiosk health exists; a playlist slide never falls back to the dashboard list.
+    const playlistReporters = {
+      missing: (_reason: "notFound" | "forbidden") => false,
+      error: () => false,
+    };
+
     const { showPositiveNotification, showErrorNotification } = useNotifications();
     const saveConflict = useDashboardSaveConflict();
 
@@ -885,7 +980,9 @@ export default defineComponent({
     provide("selectedTabId", selectedTabId);
 
     const { isAutoRunAvailable, isAutoRunOn, toggleAutoRun } = useAutoRunToggle();
-    provide("dashboardAutoRun", isAutoRunOn);
+    // A wall screen has no Refresh button to apply a variable change, so kiosk applies it live.
+    const applyVariablesLive = computed(() => isAutoRunOn.value || kioskMode.value);
+    provide("dashboardAutoRun", applyVariablesLive);
 
     const showRangeInPicker = (value: any) =>
       dateTimePicker.value?.setSavedDate(toPickerSavedDate(value, store.state.timezone));
@@ -967,7 +1064,7 @@ export default defineComponent({
       // Explicitly dereference to ensure Vue tracks the dependency
       const manager = variablesManager.value;
 
-      if (isAutoRunOn.value) return false;
+      if (applyVariablesLive.value) return false;
 
       if (manager && "hasUncommittedChanges" in manager) {
         // Access the value (Vue auto-unwraps computed refs in composable returns)
@@ -1119,11 +1216,16 @@ export default defineComponent({
         );
 
         if (!dashboard || typeof dashboard !== "object" || !Object.keys(dashboard).length) {
+          if (playlistReporters.missing("notFound")) return;
           showErrorNotification(t("dashboard.viewDashboard.dashboardNotFound"));
           goBackToDashboardList();
           return;
         }
       } catch (error: any) {
+        const missingReason = missingReasonFor(error?.response?.status);
+        if (missingReason ? playlistReporters.missing(missingReason) : playlistReporters.error()) {
+          return;
+        }
         showErrorNotification(error?.message || t("dashboard.viewDashboard.failedToLoadDashboard"));
         goBackToDashboardList();
         return;
@@ -1239,7 +1341,7 @@ export default defineComponent({
     const isSavingLayout = ref(false);
 
     const enterLayoutEdit = () => {
-      if (store.state.printMode) return;
+      if (store.state.printMode || kioskMode.value) return;
       layoutDraft.start();
     };
 
@@ -1411,7 +1513,7 @@ export default defineComponent({
     };
 
     provide(DASHBOARD_FRESH_PANEL_TIME, (panelId) => {
-      if (!isAutoRunOn.value) return undefined;
+      if (!applyVariablesLive.value) return undefined;
       const panel = currentDashboardData.data?.tabs
         ?.flatMap((tab: any) => tab.panels ?? [])
         .find((p: any) => p.id === panelId);
@@ -1720,42 +1822,119 @@ export default defineComponent({
     });
 
     const refreshData = async (withoutCache = false) => {
-      if (!arePanelsLoading.value) {
-        // CRITICAL FIX: Clear panelIdToBeRefreshed for global refresh
-        // This allows all panels to refresh, not just the one previously refreshed
-        panelIdToBeRefreshed.value = null;
-
-        // A global refresh overrides every per-panel choice; panels read the flag when their query fires.
-        shouldRefreshWithoutCachePerPanel.value = { __global: withoutCache === true };
-
-        // Annotations added elsewhere never expire this tab's cache, and a fixed range keeps the same key.
-        if (dashboardId.value) {
-          void queryClient.invalidateQueries({
-            queryKey: annotationKeys.dashboard(
-              store.state.selectedOrganization.identifier,
-              String(dashboardId.value),
-            ),
-            refetchType: "none",
-          });
-        }
-
-        // Generate new run ID for whole dashboard refresh
-        generateNewDashboardRunId();
-
-        // Sync panel-level datetime pickers FIRST (updates URL)
-        await renderDashboardChartsRef.value?.syncAllPanelDateTimePickers();
-
-        // Applied before the recompute below, which reads the applied range and not the picker.
-        timeGate.refresh();
-
-        // Recompute all panel times after syncing
-        // Pass forceRefresh=true to ensure ALL panels refresh (create new time objects)
-        computeAllPanelTimes(true);
-
-        // Commit all live variable changes to committed state
-        renderDashboardChartsRef.value?.commitAllVariables();
-      }
+      if (!arePanelsLoading.value) await runRefresh(withoutCache);
     };
+
+    const runRefresh = async (withoutCache = false) => {
+      // CRITICAL FIX: Clear panelIdToBeRefreshed for global refresh
+      // This allows all panels to refresh, not just the one previously refreshed
+      panelIdToBeRefreshed.value = null;
+
+      // A global refresh overrides every per-panel choice; panels read the flag when their query fires.
+      shouldRefreshWithoutCachePerPanel.value = { __global: withoutCache === true };
+
+      // Annotations added elsewhere never expire this tab's cache, and a fixed range keeps the same key.
+      if (dashboardId.value) {
+        void queryClient.invalidateQueries({
+          queryKey: annotationKeys.dashboard(
+            store.state.selectedOrganization.identifier,
+            String(dashboardId.value),
+          ),
+          refetchType: "none",
+        });
+      }
+
+      // Generate new run ID for whole dashboard refresh
+      generateNewDashboardRunId();
+
+      // Sync panel-level datetime pickers FIRST (updates URL)
+      await renderDashboardChartsRef.value?.syncAllPanelDateTimePickers();
+
+      // Applied before the recompute below, which reads the applied range and not the picker.
+      timeGate.refresh();
+
+      // Recompute all panel times after syncing
+      // Pass forceRefresh=true to ensure ALL panels refresh (create new time objects)
+      computeAllPanelTimes(true);
+
+      // Commit all live variable changes to committed state
+      renderDashboardChartsRef.value?.commitAllVariables();
+    };
+
+    // Kiosk runs its own watchdog ticker, so the toolbar timer only drives the normal view.
+    const onAutoRefreshTick = () => {
+      if (!kioskMode.value) refreshData();
+    };
+
+    const kioskRefresh = useKioskRefresh({
+      enabled: kioskMode,
+      intervalSeconds: refreshInterval,
+      isLoading: arePanelsLoading,
+      // The first cycle can fire before the picker exists, while the dashboard definition still loads.
+      refresh: () => (dateTimePicker.value ? runRefresh() : undefined),
+      cancel: () => cancelQuery(),
+      probe: pingBackend,
+    });
+    provide(KIOSK_PANEL_HEALTH_KEY, kioskRefresh.registry);
+
+    const playlistFrame = usePlaylistFrame(playlistEmbed, {
+      title: computed(() => currentDashboardData.data?.title),
+      health: kioskRefresh.health,
+      failingCount: kioskRefresh.failingCount,
+      lastSuccessAt: kioskRefresh.lastSuccessAt,
+    });
+    const playlistPage = usePlaylistPage({
+      enabled: !!playlistPageConfig,
+      config: playlistPageConfig,
+      misses: parsePlaylistMisses(route.query),
+      ready: computed(
+        () =>
+          kioskRefresh.lastSuccessAt.value !== null || kioskRefresh.health.value.level === "bad",
+      ),
+      outage: computed(() => kioskRefresh.health.value.level === "bad"),
+      resolveHref: (query) =>
+        window.location.origin + router.resolve({ path: PLAYLIST_VIEW_PATH, query }).href,
+    });
+    playlistReporters.missing = (reason) => {
+      if (!playlistEmbed) return playlistPage.reportMissing(reason);
+      playlistFrame.reportMissing(reason);
+      return true;
+    };
+    playlistReporters.error = () => {
+      if (!playlistEmbed) return playlistPage.reportError();
+      playlistFrame.reportError();
+      return true;
+    };
+    const playlistPosition = computed(() =>
+      playlistPage.active
+        ? t("dashboard.playlist.position", {
+            current: playlistPage.position.value.index + 1,
+            total: playlistPage.position.value.count,
+          })
+        : null,
+    );
+    const playlistHolding = computed(() => {
+      if (!playlistPage.active) return null;
+      const { index, count } = playlistPage.position.value;
+      const waiting =
+        playlistPage.missing.value !== null ||
+        playlistPage.leaving.value ||
+        (kioskRefresh.lastSuccessAt.value === null && kioskRefresh.health.value.level !== "bad");
+      if (!waiting) return null;
+      const name = currentDashboardData.data?.title
+        ? raw(currentDashboardData.data.title)
+        : t("dashboard.playlist.slideName", { number: index + 1 });
+      const missing = playlistPage.missing.value;
+      return {
+        label: t("dashboard.playlist.loadingSlide", { current: index + 1, total: count }),
+        title: currentDashboardData.data?.title ?? null,
+        note: missing
+          ? missing === "forbidden"
+            ? t("dashboard.playlist.skippedForbidden", { name })
+            : t("dashboard.playlist.skippedNotFound", { name })
+          : null,
+      };
+    });
 
     const onDataZoom = (event: any) => {
       const selectedDateObj = {
@@ -1784,7 +1963,13 @@ export default defineComponent({
     onMounted(async () => {
       const params = route.query;
 
-      if (params.refresh) {
+      if (params.refresh && kioskMode.value) {
+        // A TV must keep refreshing: a too-low value is raised to the server minimum, not turned off.
+        refreshInterval.value = resolveKioskRefresh(
+          params.refresh,
+          store.state?.zoConfig?.min_auto_refresh_interval,
+        );
+      } else if (params.refresh) {
         const refreshInSecs = parseDuration(params.refresh);
         if (store.state?.zoConfig?.min_auto_refresh_interval) {
           if (refreshInSecs < store.state?.zoConfig?.min_auto_refresh_interval) {
@@ -1797,7 +1982,7 @@ export default defineComponent({
 
       // check if timezone query params exist
       // will be used for initial time zone only, so remove it from query
-      if (params.timezone) {
+      if (params.timezone && !kioskMode.value) {
         // get the query params
         const query = {
           ...route.query,
@@ -1812,8 +1997,10 @@ export default defineComponent({
         });
       }
 
-      // check if print query params exist
-      if (params.print !== undefined) {
+      if (kioskMode.value) {
+        setPrint(false);
+        applyKioskTheme(store, parseKioskTheme(route.query.theme));
+      } else if (params.print !== undefined) {
         // set print mode
         setPrint(params.print == "true" ? true : false);
       } else {
@@ -1961,6 +2148,14 @@ export default defineComponent({
 
         // Get global time params - ensure we always have time params
         const timeParams = getQueryParamsForDuration(selectedDate.value);
+        // Before the dashboard loads there is no picker value yet, so keep the range the link arrived with.
+        if (!selectedDate.value) {
+          if (route.query.period) timeParams.period = route.query.period;
+          else if (route.query.from && route.query.to) {
+            timeParams.from = route.query.from;
+            timeParams.to = route.query.to;
+          }
+        }
 
         // Preserve the cell-explorer deep-link params so a shared "Copy link" reopens the drawer.
         const cellParams: Record<string, any> = {};
@@ -1991,6 +2186,9 @@ export default defineComponent({
           print: store.state.printMode,
           searchtype: route.query.searchtype,
           ...cellParams, // Keep cell-explorer deep link intact
+          ...(kioskMode.value
+            ? { ...pickKioskParams(route.query), ...pickPlaylistParams(route.query) }
+            : {}),
         };
 
         // CRITICAL: Only update URL if query has actually changed
@@ -2154,6 +2352,120 @@ export default defineComponent({
       }
     };
 
+    // ===== Kiosk / TV mode =====
+    const minRefreshSeconds = computed(() => store.state?.zoConfig?.min_auto_refresh_interval || 5);
+
+    const kioskTimeRange = computed(() => {
+      const relative =
+        selectedDate.value?.valueType === "relative"
+          ? formatRelativePeriod(selectedDate.value?.relativeTimePeriod, t)
+          : null;
+      if (relative) return relative;
+      // Until the picker resolves the range, moment formats it as "Invalid date".
+      const start = currentTimeObj.value?.start_time?.getTime?.();
+      const end = currentTimeObj.value?.end_time?.getTime?.();
+      if (
+        !Number.isFinite(start) ||
+        !Number.isFinite(end) ||
+        timeString.value.includes("Invalid")
+      ) {
+        return raw("");
+      }
+      return raw(timeString.value.replace(/\s+/g, " ").trim());
+    });
+
+    const leaveKioskState = () => {
+      if (store.state.kioskMode) store.dispatch("setKioskMode", false);
+      clearKioskTheme(store);
+    };
+
+    // Set only when TV mode was entered from the toolbar; a TV link opened directly has no prior view to restore.
+    let refreshBeforeKiosk: number | null = null;
+    const restoreRefreshBeforeKiosk = () => {
+      if (refreshBeforeKiosk === null) return;
+      refreshInterval.value = refreshBeforeKiosk;
+      refreshBeforeKiosk = null;
+    };
+
+    const enterKiosk = async (options) => {
+      if (isEditingLayout.value) return;
+      const query = buildKioskQuery(route.query, options);
+      setPrint(false);
+      store.dispatch("setKioskMode", true);
+      applyKioskTheme(store, parseKioskTheme(query.theme));
+      refreshBeforeKiosk = refreshInterval.value;
+      // Pushed, not replaced, so browser Back also leaves TV mode.
+      await router.push({ query });
+      // Only after the push: the interval watcher rewrites the URL and would otherwise cancel it.
+      refreshInterval.value =
+        options.refreshSeconds > 0 ? Math.max(options.refreshSeconds, minRefreshSeconds.value) : 0;
+    };
+
+    const exitKiosk = async () => {
+      if (!kioskMode.value) return;
+      leaveKioskState();
+      const query = stripPlaylistParams(stripKioskParams(route.query));
+      if (refreshBeforeKiosk !== null) query.refresh = generateDurationLabel(refreshBeforeKiosk);
+      await router.replace({ query });
+      // Only after the replace: the interval watcher rewrites the URL and would otherwise race it.
+      restoreRefreshBeforeKiosk();
+    };
+
+    // Back/Forward across the kiosk entry flips the URL without going through enter/exit.
+    watch(
+      () => isKioskEnabled(route.query.kiosk),
+      (enabled) => {
+        if (enabled === kioskMode.value) return;
+        if (enabled) {
+          store.dispatch("setKioskMode", true);
+          applyKioskTheme(store, parseKioskTheme(route.query.theme));
+        } else {
+          leaveKioskState();
+          restoreRefreshBeforeKiosk();
+        }
+      },
+    );
+
+    const KIOSK_OPEN_POPUP = '[role="dialog"][data-state="open"], [role="menu"], [role="listbox"]';
+    // Read before the popup's own Esc handler closes it, so that Esc only closes the variable dropdown.
+    let escapeHitPopup = false;
+    const onKioskEscapeCapture = (event: KeyboardEvent) => {
+      if (event.key === "Escape") escapeHitPopup = !!document.querySelector(KIOSK_OPEN_POPUP);
+    };
+
+    const isTextEntry = (el: Element | null) =>
+      !!el && (el.matches("input, textarea") || (el as HTMLElement).isContentEditable);
+
+    const onKioskEscape = () => {
+      if (!kioskMode.value) return;
+      const hitPopup = escapeHitPopup || !!document.querySelector(KIOSK_OPEN_POPUP);
+      escapeHitPopup = false;
+      if (hitPopup || isTextEntry(document.activeElement)) return;
+      exitKiosk();
+    };
+
+    // Registered only while in kiosk so it never shadows the global Esc that closes the AI chat.
+    let kioskEscapeId: string | undefined;
+    const toggleKioskEscape = (enabled: boolean) => {
+      const manager = getManager();
+      if (kioskEscapeId) manager?.unregisterById(kioskEscapeId);
+      kioskEscapeId = undefined;
+      window.removeEventListener("keydown", onKioskEscapeCapture, true);
+      const def = getShortcutDef("dashboardKioskExit");
+      const key = def && resolveShortcutKeys(def, isMacOS())[0];
+      if (!enabled || !manager || !def || !key) return;
+      window.addEventListener("keydown", onKioskEscapeCapture, true);
+      kioskEscapeId = manager.register({
+        id: def.id,
+        key,
+        scope: def.scope,
+        // A focused select trigger counts as an input to the manager; onKioskEscape does its own text-entry check.
+        allowInInput: true,
+        handler: onKioskEscape,
+      });
+    };
+    watch(kioskMode, toggleKioskEscape, { immediate: true, flush: "sync" });
+
     const openScheduledReports = () => {
       if (isLoadingReports.value) return;
 
@@ -2224,6 +2536,8 @@ export default defineComponent({
       document.removeEventListener("fullscreenchange", onFullscreenChange);
       window.removeEventListener("beforeunload", onBeforeUnload);
       toggleLayoutEscape(false);
+      toggleKioskEscape(false);
+      leaveKioskState();
 
       // Clean up AI dashboard event listener
       offDashboardEvent(handleAiDashboardEvent);
@@ -2243,6 +2557,7 @@ export default defineComponent({
     // printMode hides the app shell globally, so leaving by browser Back (not ✕) must still clear it.
     const clearPrintModeOnLeave = () => {
       if (store.state.printMode) setPrint(false);
+      leaveKioskState();
     };
 
     // Unsaved layout edits are the store's cached dashboard object, so a confirmed leave must roll them back.
@@ -2344,7 +2659,7 @@ export default defineComponent({
       {
         id: "dashboardAddPanel",
         handler: () => {
-          if (isInputFocused() || isEditingLayout.value) return;
+          if (isInputFocused() || isEditingLayout.value || kioskMode.value) return;
           addPanelData();
         },
       },
@@ -2370,14 +2685,14 @@ export default defineComponent({
       {
         id: "dashboardFullscreen",
         handler: () => {
-          if (isInputFocused() || isEditingLayout.value) return;
+          if (isInputFocused() || isEditingLayout.value || kioskMode.value) return;
           toggleFullscreen();
         },
       },
       {
         id: "dashboardExport",
         handler: () => {
-          if (isInputFocused()) return;
+          if (isInputFocused() || kioskMode.value) return;
           // Trigger the whole-dashboard export (ExportDashboard button).
           (document.querySelector('[data-test="export-dashboard"]') as HTMLElement | null)?.click();
         },
@@ -2484,6 +2799,20 @@ export default defineComponent({
       setTimeForVariables,
       runId,
       onVariablesManagerReady,
+      kioskMode,
+      kioskFit,
+      kioskPointerActive,
+      playlistEmbed,
+      playlistPosition,
+      playlistHolding,
+      playlistPageActive: playlistPage.active,
+      kioskHealth: kioskRefresh.health,
+      kioskLastSuccessAt: kioskRefresh.lastSuccessAt,
+      kioskCountdown: kioskRefresh.countdown,
+      onAutoRefreshTick,
+      kioskTimeRange,
+      enterKiosk,
+      exitKiosk,
     };
   },
 });
