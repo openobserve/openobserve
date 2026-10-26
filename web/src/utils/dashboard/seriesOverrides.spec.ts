@@ -223,3 +223,26 @@ describe("override_config entries", () => {
     expect(toSeriesOverrideEntry(byName("a"))).toBeNull();
   });
 });
+
+describe("value mapping overrides", () => {
+  const mappings = [{ type: "value", value: "thermal", text: "Hot", color: "#ff0000" }];
+
+  it("parses and writes back per-series value mappings, and the last match wins", () => {
+    const entry = toSeriesOverrideEntry(byName("gpu0", { valueMappings: mappings }));
+    expect(entry).toEqual({
+      field: { matchBy: "series", value: "gpu0" },
+      config: [{ type: "value_mappings", value: mappings }],
+    });
+    expect(parseSeriesOverrideEntry(entry)).toEqual(byName("gpu0", { valueMappings: mappings }));
+
+    const later = [{ type: "value", value: "thermal", color: "#00ff00" }];
+    const config = {
+      override_config: [entry, toSeriesOverrideEntry(byName("gpu0", { valueMappings: later }))],
+    };
+    expect(resolveSeriesOverride(config, "gpu0")?.valueMappings).toEqual(later);
+  });
+
+  it("writes nothing for an empty mapping list", () => {
+    expect(toSeriesOverrideEntry(byName("gpu0", { valueMappings: [] }))).toBeNull();
+  });
+});

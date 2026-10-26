@@ -1235,7 +1235,7 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockSearchObj.data.editorValue).toBe("(service_name = 'a') and http_method = 'GET'");
       const runs = vi
         .mocked(analytics.track)
-        .mock.calls.filter(([, props]: any[]) => props?.button === "Search Data");
+        .mock.calls.filter(([event]: any[]) => event === "traces_search_run");
       expect(runs).toHaveLength(1);
       expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
     });
@@ -1807,9 +1807,25 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
       vi.mocked(analytics.track).mockClear();
 
+      const { data, complete } = lastCallbacks();
+      data(null, meta([]));
+      data(null, chunk(spans("a", 7)));
+      complete(null);
+
+      expect(analytics.track).toHaveBeenCalledWith("traces_search_completed", { hits: 7 });
+    });
+
+    it("reports zero hits when the search writes no rows", async () => {
+      await mountPage();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      await wrapper.vm.getQueryData(false);
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+      mockSearchObj.data.queryResults.hits = spans("old", 5);
+
       lastCallbacks().complete(null);
 
-      expect(analytics.track).toHaveBeenCalledWith("traces_search_completed");
+      expect(analytics.track).toHaveBeenCalledWith("traces_search_completed", { hits: 0 });
     });
 
     it("does not track traces_search_completed when a page completes", async () => {
@@ -1821,7 +1837,8 @@ describe("Index.vue (Main Traces Page)", () => {
 
       lastCallbacks().complete(null);
 
-      expect(analytics.track).not.toHaveBeenCalledWith("traces_search_completed");
+      const events = vi.mocked(analytics.track).mock.calls.map((c) => c[0]);
+      expect(events).not.toContain("traces_search_completed");
     });
   });
 
@@ -1898,9 +1915,7 @@ describe("Index.vue (Main Traces Page)", () => {
       const searchDataRuns = () =>
         vi
           .mocked(analytics.track)
-          .mock.calls.filter(
-            ([event, props]: any[]) => event === "Button Click" && props?.button === "Search Data",
-          ).length;
+          .mock.calls.filter(([event]: any[]) => event === "traces_search_run").length;
 
       beforeEach(() => {
         mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
@@ -2197,6 +2212,49 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
+    });
+
+    it("tracks traces_search_run and traces_more_rows_loaded without user or page fields", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+      mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      mockSearchObj.meta.showQuery = true;
+      mockSearchObj.meta.showHistogram = false;
+      mockSearchObj.meta.sqlMode = false;
+      mockSearchObj.meta.showFields = true;
+      vi.mocked(analytics.track).mockClear();
+
+      wrapper.vm.searchData();
+      await wrapper.vm.getMoreData();
+      await flushPromises();
+
+      expect(analytics.track).toHaveBeenCalledWith("traces_search_run", {
+        stream_name: "default",
+        show_query: true,
+        show_histogram: false,
+        sql_mode: false,
+        show_fields: true,
+      });
+      expect(analytics.track).toHaveBeenCalledWith("traces_more_rows_loaded", {
+        stream_name: "default",
+      });
+      expect(analytics.track).not.toHaveBeenCalledWith("Button Click", expect.anything());
     });
   });
 
@@ -3956,6 +4014,70 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       mockFetchQueryDataWithHttpStream.mockReset();
+    });
+  });
+
+  describe("restoreFilters with unparsable SQL", () => {
+    it("returns without touching filters when the saved filter does not parse", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      const parser = createdTracesParsers.at(-1) as { astify: ReturnType<typeof vi.fn> };
+      parser.astify.mockImplementationOnce(() => {
+        throw new Error("Expected end of input");
+      });
+
+      expect(() => wrapper.vm.restoreFilters("service_name = ")).not.toThrow();
+    });
+  });
+
+  describe("traces count failure logging", () => {
+    it("warns with the error instead of logging a bare console error", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      mockSearchObj.data.queryPayload = { query: { start_time: 1, end_time: 2 } };
+      mockFetchQueryDataWithHttpStream.mockClear();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const err = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      wrapper.vm.fetchTracesCount();
+      const [, handlers] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+      const failure = { content: { message: "network error" } };
+      handlers.error({}, failure);
+
+      expect(warn).toHaveBeenCalledWith("Failed to fetch traces count", failure);
+      expect(err).not.toHaveBeenCalledWith("Failed to fetch traces count");
+      warn.mockRestore();
+      err.mockRestore();
+      mockSearchObj.data.queryPayload = null;
     });
   });
 });

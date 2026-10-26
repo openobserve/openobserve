@@ -18,6 +18,9 @@ import type { RowRailTone } from "@/lib/core/Table/OTable.types";
 import type { ReportRunHit } from "@/services/reports";
 import type { I18nKey } from "@/types/i18n";
 
+/** date-fns pattern for a run time; `EEE` is the short weekday (`ddd` is a padded day of month). */
+export const RUN_TIME_FORMAT = "EEE d MMM, HH:mm";
+
 /** How long past its due time a run may start before the list calls it overdue. */
 export const OVERDUE_GRACE_MS = 15 * 60_000;
 

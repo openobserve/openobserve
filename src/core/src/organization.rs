@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    DEFAULT_ORG, ider,
+    DEFAULT_ORG, META_ORG_ID, ider,
     meta::{
         alerts::alert::ListAlertsParams,
         dashboards::ListDashboardsParams,
@@ -61,6 +61,8 @@ use crate::{
 };
 
 const MASKED_TOKEN: &str = "NOT_AVAILABLE";
+// API version prefixes: an org with one of these ids makes `/api/v2/...` paths ambiguous.
+const RESERVED_ORG_IDS: [&str; 3] = ["v1", "v2", "v3"];
 
 /// Checks if a service account token should be masked
 /// Returns true if:
@@ -389,15 +391,36 @@ pub async fn list_all_orgs(limit: Option<i64>) -> Result<Vec<Organization>, anyh
     db::organization::list(limit).await
 }
 
+/// Same as [`list_all_orgs`], paired with each org's creation time in microseconds.
+pub async fn list_all_orgs_with_created_at(
+    limit: Option<i64>,
+) -> Result<Vec<(Organization, i64)>, anyhow::Error> {
+    db::organization::list_with_created_at(limit).await
+}
+
 pub async fn list_orgs_by_user(user_email: &str) -> Result<Vec<Organization>, anyhow::Error> {
+    Ok(list_orgs_by_user_with_created_at(user_email)
+        .await?
+        .into_iter()
+        .map(|(org, _)| org)
+        .collect())
+}
+
+/// Same as [`list_orgs_by_user`], paired with each org's (not the membership's) creation time.
+pub async fn list_orgs_by_user_with_created_at(
+    user_email: &str,
+) -> Result<Vec<(Organization, i64)>, anyhow::Error> {
     let records = db::org_users::list_orgs_by_user(user_email).await?;
     Ok(records
         .into_iter()
-        .map(|record| Organization {
-            identifier: record.org_id.clone(),
-            name: record.org_name.clone(),
-            org_type: record.org_type.to_string(),
-            service_account: None,
+        .map(|record| {
+            let org = Organization {
+                identifier: record.org_id,
+                name: record.org_name,
+                org_type: record.org_type.to_string(),
+                service_account: None,
+            };
+            (org, record.org_created_at)
         })
         .collect())
 }
@@ -755,6 +778,36 @@ fn validate_auto_created_org_id(org_id: &str) -> Result<(), anyhow::Error> {
             "Organization identifier can only contain alphanumeric characters (A-Z, a-z, 0-9), hyphens, and underscores"
         ));
     }
+    if RESERVED_ORG_IDS
+        .iter()
+        .any(|reserved| org_id.eq_ignore_ascii_case(reserved))
+    {
+        return Err(anyhow::anyhow!(
+            "Organization identifier {org_id} is reserved"
+        ));
+    }
+    Ok(())
+}
+
+/// Refuses blocked or tombstoned ids, so auto-provisioning never revives a deleted org.
+async fn refuse_deleted_org(org_id: &str) -> Result<(), anyhow::Error> {
+    let tombstoned = || async {
+        table::organizations::get(org_id)
+            .await
+            .is_ok_and(|org| org.status == "deleted")
+    };
+    if db::org_status::is_blocked(org_id) || tombstoned().await {
+        return Err(anyhow::anyhow!("Organization {org_id} is deleted"));
+    }
+    Ok(())
+}
+
+/// Refuses an invite into a missing org or one that is being deleted or deleted.
+#[cfg(any(feature = "cloud", test))]
+async fn refuse_inactive_invite_org(org_id: &str) -> Result<(), anyhow::Error> {
+    if !db::org_status::is_active(org_id).await {
+        return Err(anyhow::anyhow!("Organization is not active"));
+    }
     Ok(())
 }
 
@@ -762,6 +815,7 @@ fn validate_auto_created_org_id(org_id: &str) -> Result<(), anyhow::Error> {
 /// with the org, only saves the org in the meta and creates org tuples.
 pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::Error> {
     let org_id = org_id.trim();
+    refuse_deleted_org(org_id).await?;
     if let Some(org) = get_org(org_id).await {
         return Ok(org);
     }
@@ -822,6 +876,7 @@ pub async fn check_and_create_org_without_ofga(
     org_id: &str,
 ) -> Result<Organization, anyhow::Error> {
     let org_id = org_id.trim();
+    refuse_deleted_org(org_id).await?;
     if let Some(org) = get_org(org_id).await {
         return Ok(org);
     }
@@ -908,6 +963,9 @@ pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
     if org_id.eq(DEFAULT_ORG) {
         return Err(anyhow::anyhow!("Cannot delete default organization"));
     }
+    if org_id.eq(META_ORG_ID) {
+        return Err(anyhow::anyhow!("Cannot delete meta organization"));
+    }
 
     // Snapshot the org BEFORE deleting — the cloud OrgDeleted event needs its
     // name/type, and after delete_org the record is gone. (Previously this was
@@ -918,7 +976,8 @@ pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
 
     match db::organization::delete_org(org_id).await {
         Ok(_) => {
-            delete_org_tuples(org_id).await;
+            // Returned after the event: a retry finds no row, so it would never emit it.
+            let tuples = delete_org_tuples(org_id).await;
             crate::ingestion::rejections::clear_rejections(org_id).await;
             #[cfg(feature = "cloud")]
             if let Some(org) = org_snapshot {
@@ -933,13 +992,43 @@ pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
                 })
                 .await;
             }
-            Ok(())
+            tuples
         }
         Err(e) => {
             log::error!("Error deleting org: {e}");
             Err(anyhow::anyhow!("Error deleting org: {}", e))
         }
     }
+}
+
+/// Final org-delete step: keeps the row as a `deleted` tombstone; true only on the flipping call.
+pub async fn tombstone_org(org_id: &str) -> Result<bool, anyhow::Error> {
+    if org_id.eq(DEFAULT_ORG) || org_id.eq(META_ORG_ID) {
+        return Err(anyhow::anyhow!("Cannot delete this organization"));
+    }
+
+    #[cfg(feature = "cloud")]
+    let org_snapshot = get_org(org_id).await;
+
+    delete_org_tuples(org_id).await?;
+    // Only the call that flips the row emits OrgDeleted, so a step 900 retry does not repeat it.
+    let flipped = db::organization::tombstone_org(org_id).await?;
+    #[cfg(feature = "cloud")]
+    if flipped && let Some(org) = org_snapshot {
+        enqueue_cloud_event(CloudEvent {
+            org_id: org.identifier.clone(),
+            org_name: org.name.clone(),
+            org_type: org.org_type.clone(),
+            user: None,
+            subscription_type: None,
+            event: EventType::OrgDeleted,
+            stream_name: None,
+        })
+        .await;
+    }
+    db::organization::evict_org(org_id).await?;
+    crate::ingestion::rejections::clear_rejections(org_id).await;
+    Ok(flipped)
 }
 
 #[cfg(feature = "cloud")]
@@ -1103,6 +1192,7 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
         return Err(anyhow::anyhow!("Invalid token"));
     }
     let org_id = invite.org_id.clone();
+    refuse_inactive_invite_org(&org_id).await?;
 
     let org = match get_org(&org_id).await {
         Some(org) => org,
@@ -1523,12 +1613,56 @@ mod tests {
 
     #[test]
     fn test_validate_auto_created_org_id_accepts_identifiers() {
-        for org_id in ["default", "_meta", "acme-corp", "team_1", "Org2"] {
+        for org_id in [
+            "default",
+            "_meta",
+            "acme-corp",
+            "team_1",
+            "Org2",
+            "v4",
+            "v2org",
+            "api_v2",
+        ] {
             assert!(
                 validate_auto_created_org_id(org_id).is_ok(),
                 "expected {org_id} to be accepted"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn test_remove_org_refuses_meta_org() {
+        let err = remove_org(META_ORG_ID).await.unwrap_err();
+        assert_eq!(err.to_string(), "Cannot delete meta organization");
+    }
+
+    #[tokio::test]
+    async fn test_accept_invitation_rejects_non_active_org() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+
+        let org = "invitegateorg";
+        let _ = infra_db::create_table().await;
+        let _ = infra_table::create_user_tables().await;
+        check_and_create_org_without_ofga(org).await.unwrap();
+        refuse_inactive_invite_org(org).await.unwrap();
+        for status in [
+            OrgStatus::PendingDeletion,
+            OrgStatus::Deleting,
+            OrgStatus::Deleted,
+        ] {
+            ORG_STATUS_CACHE.insert(org.to_string(), status.clone());
+            let refused = refuse_inactive_invite_org(org).await;
+            ORG_STATUS_CACHE.remove(org);
+            assert!(
+                refused.is_err(),
+                "an invite into a {status:?} org was accepted"
+            );
+        }
+        assert!(
+            refuse_inactive_invite_org("invitegate-never-created")
+                .await
+                .is_err()
+        );
     }
 
     #[test]
@@ -1540,6 +1674,14 @@ mod tests {
                 validate_auto_created_org_id(org_id).is_err(),
                 "expected {org_id:?} to be rejected"
             );
+        }
+    }
+
+    #[test]
+    fn test_validate_auto_created_org_id_rejects_api_version_prefixes() {
+        for org_id in ["v1", "v2", "v3", "V2"] {
+            let err = validate_auto_created_org_id(org_id).unwrap_err();
+            assert!(err.to_string().contains("reserved"), "{org_id}: {err}");
         }
     }
 }

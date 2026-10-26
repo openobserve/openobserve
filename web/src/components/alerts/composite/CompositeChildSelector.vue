@@ -8,6 +8,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { type CompositeChildOption, letterFor } from "./expression";
 
@@ -33,6 +34,15 @@ const { t } = useI18nTyped();
 const byId = computed(() => new Map(props.options.map((option) => [option.alert_id, option])));
 const count = computed(() => props.modelValue.length);
 const atCap = computed(() => count.value >= props.max);
+// No free candidate (not loaded yet, or all picked) makes add() a no-op, so the button must not look clickable.
+const hasFreeOption = computed(() =>
+  props.options.some((option) => !props.modelValue.includes(option.alert_id)),
+);
+const addUnavailableReason = computed(() => {
+  if (atCap.value) return t("alerts.composite.addUnavailableCap", { max: props.max });
+  if (!hasFreeOption.value) return t("alerts.composite.addUnavailableNone");
+  return "";
+});
 
 const optionsFor = (currentId: string) =>
   props.options
@@ -71,16 +81,21 @@ const childLink = (child: CompositeChildOption): string =>
 <template>
   <section class="flex flex-col gap-2" data-test="alerts-composite-child-selector">
     <div class="flex items-center justify-between gap-3">
-      <OButton
-        variant="outline"
-        size="xs"
-        icon-left="add"
-        :disabled="atCap"
-        data-test="alerts-composite-child-add"
-        @click="add"
-      >
-        {{ t("alerts.composite.addAlert") }}
-      </OButton>
+      <div class="flex">
+        <OTooltip v-if="addUnavailableReason" :content="addUnavailableReason" />
+        <OButton
+          variant="outline"
+          size="xs"
+          icon-left="add"
+          :disabled="!!addUnavailableReason"
+          focusable-unavailable
+          data-test="alerts-composite-child-add"
+          @click="add"
+        >
+          {{ t("alerts.composite.addAlert") }}
+          <template #unavailable-reason>{{ addUnavailableReason }}</template>
+        </OButton>
+      </div>
       <OTag
         data-test="alerts-composite-child-cap"
         :variant="atCap ? 'warning-soft' : 'default-soft'"

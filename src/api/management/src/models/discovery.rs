@@ -50,7 +50,7 @@ impl TryFrom<ListDiscoveryItemsQuery> for ListDiscoveryItems {
             queue_status: value
                 .queue_status
                 .as_deref()
-                .map(DiscoveryQueueStatusFilter::try_from)
+                .map(str::parse::<DiscoveryQueueStatusFilter>)
                 .transpose()?
                 .unwrap_or_default(),
             start_time: value.start_time,

@@ -63,11 +63,7 @@ fn create_datasets_statement() -> TableCreateStatement {
                 .string_len(256)
                 .not_null(),
         )
-        .col(
-            ColumnDef::new(LlmDatasets::Name)
-                .string_len(255)
-                .not_null(),
-        )
+        .col(ColumnDef::new(LlmDatasets::Name).string_len(255).not_null())
         .col(ColumnDef::new(LlmDatasets::Description).text().null())
         .col(ColumnDef::new(LlmDatasets::Tags).json().null())
         // Allocated transactionally for every Dataset Item insert, edit, or

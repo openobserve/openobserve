@@ -753,6 +753,125 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </OCollapsible>
 
+    <!-- Section: State timeline -->
+    <OCollapsible
+      variant="config"
+      v-if="dashboardPanelData.data.type === 'state-timeline'"
+      v-show="isSectionVisible('stateTimeline')"
+      :model-value="isExpanded('stateTimeline')"
+      :icon="SECTION_ICONS.stateTimeline"
+      @update:modelValue="
+        (v) => {
+          expandedSections.stateTimeline = v;
+        }
+      "
+      :label="t('dashboard.configSectionStateTimeline')"
+      class="border-card-glass-border border-t border-solid"
+    >
+      <div class="o2-input box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
+        <OInput
+          v-show="isConfigOptionVisible('stateTimeline', 'merge-gaps')"
+          v-model.number="dashboardPanelDataModel.data.config.merge_gaps"
+          type="number"
+          :min="0"
+          :label="t('dashboard.stateTimelineMergeGaps')"
+          :placeholder="t('dashboard.auto')"
+          @update:model-value="
+            (value: any) =>
+              (dashboardPanelDataModel.data.config.merge_gaps =
+                typeof value === 'number' ? value : null)
+          "
+          data-test="dashboard-config-state-timeline-merge-gaps"
+        >
+          <template #tooltip>
+            <OTooltip
+              :content="t('dashboard.stateTimelineMergeGapsTooltip')"
+              max-width="15.625rem"
+            />
+          </template>
+        </OInput>
+
+        <div class="flex gap-2" v-show="isConfigOptionVisible('stateTimeline', 'row-size')">
+          <OInput
+            class="min-w-0 flex-1"
+            v-model.number="dashboardPanelDataModel.data.config.row_height"
+            type="number"
+            :min="1"
+            :label="t('dashboard.stateTimelineRowHeight')"
+            :placeholder="t('dashboard.auto')"
+            @update:model-value="
+              (value: any) =>
+                (dashboardPanelDataModel.data.config.row_height =
+                  typeof value === 'number' ? value : null)
+            "
+            data-test="dashboard-config-state-timeline-row-height"
+          />
+          <OInput
+            class="min-w-0 flex-1"
+            v-model.number="dashboardPanelDataModel.data.config.row_gap"
+            type="number"
+            :min="0"
+            :label="t('dashboard.stateTimelineRowGap')"
+            :placeholder="t('dashboard.auto')"
+            @update:model-value="
+              (value: any) =>
+                (dashboardPanelDataModel.data.config.row_gap =
+                  typeof value === 'number' ? value : null)
+            "
+            data-test="dashboard-config-state-timeline-row-gap"
+          />
+        </div>
+
+        <OSwitch
+          v-show="isConfigOptionVisible('stateTimeline', 'show-state-text')"
+          v-model="showStateTextModel"
+          :label="t('dashboard.stateTimelineShowStateText')"
+          data-test="dashboard-config-state-timeline-show-state-text"
+          size="lg"
+        />
+
+        <OToggleGroup
+          v-show="isConfigOptionVisible('stateTimeline', 'row-sort')"
+          type="single"
+          label-position="top"
+          :label="t('dashboard.stateTimelineRowSort')"
+          v-model="rowSortModel"
+          data-test="dashboard-config-state-timeline-row-sort"
+          :data-test-selected-value="rowSortModel"
+        >
+          <OToggleGroupItem
+            v-for="opt in rowSortOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+            data-test="dashboard-config-state-timeline-row-sort-option"
+            :data-test-label="opt.label"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
+
+        <OToggleGroup
+          v-show="isConfigOptionVisible('stateTimeline', 'tooltip-mode')"
+          type="single"
+          label-position="top"
+          :label="t('dashboard.stateTimelineTooltipMode')"
+          v-model="tooltipModeModel"
+          data-test="dashboard-config-state-timeline-tooltip-mode"
+          :data-test-selected-value="tooltipModeModel"
+        >
+          <OToggleGroupItem
+            v-for="opt in tooltipModeOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+            data-test="dashboard-config-state-timeline-tooltip-mode-option"
+            :data-test-label="opt.label"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
+      </div>
+    </OCollapsible>
+
     <!-- Section: Axis -->
     <OCollapsible
       variant="config"
@@ -1227,7 +1346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Section: Value Transformations -->
     <OCollapsible
       variant="config"
-      v-if="dashboardPanelData.data.type == 'table' || dashboardPanelData.data.type == 'metric'"
+      v-if="['table', 'metric', 'state-timeline'].includes(dashboardPanelData.data.type)"
       v-show="isSectionVisible('valueTransformations')"
       :model-value="isExpanded('valueTransformations')"
       :icon="SECTION_ICONS.valueTransformations"
@@ -2086,6 +2205,32 @@ export default defineComponent({
       { label: t("common.show"), value: "show" },
       { label: t("common.hide"), value: "hide" },
     ];
+    const showStateTextModel = computed({
+      get: () => dashboardPanelData.data.config.show_state_text !== false,
+      set: (v: boolean) => {
+        dashboardPanelData.data.config.show_state_text = v;
+      },
+    });
+    const rowSortModel = computed({
+      get: (): string => dashboardPanelData.data.config.row_sort ?? "name",
+      set: (v: string) => {
+        dashboardPanelData.data.config.row_sort = v;
+      },
+    });
+    const tooltipModeModel = computed({
+      get: (): string => dashboardPanelData.data.config.tooltip_mode ?? "segment",
+      set: (v: string) => {
+        dashboardPanelData.data.config.tooltip_mode = v;
+      },
+    });
+    const tooltipModeOptions: { label: I18nText; value: string }[] = [
+      { label: t("dashboard.stateTimelineTooltipSegment"), value: "segment" },
+      { label: t("dashboard.stateTimelineTooltipAllRows"), value: "all_rows" },
+    ];
+    const rowSortOptions: { label: I18nText; value: string }[] = [
+      { label: t("dashboard.stateTimelineSortName"), value: "name" },
+      { label: t("dashboard.stateTimelineSortNonOkTime"), value: "non_ok_time" },
+    ];
     const legendsPositionModel = toggleModel("legends_position");
     const legendsTypeModel = toggleModel("legends_type");
     const chartAlignModel = toggleModel("chart_align");
@@ -2882,6 +3027,11 @@ export default defineComponent({
       legendsPositionOptions,
       legendTypeOptions,
       chartAlignOptions,
+      showStateTextModel,
+      rowSortModel,
+      rowSortOptions,
+      tooltipModeModel,
+      tooltipModeOptions,
       unitOptions,
       labelPositionOptions,
       showSymbol,

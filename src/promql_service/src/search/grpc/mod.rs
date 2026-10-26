@@ -423,7 +423,7 @@ pub async fn search_inner(
         need_wal: req.need_wal,
         use_cache: req.use_cache,
         timeout,
-        search_event_type: SearchEventType::try_from(req.search_event_type.as_str()).ok(),
+        search_event_type: req.search_event_type.parse::<SearchEventType>().ok(),
         regions: req.regions.clone(),
         clusters: req.clusters.clone(),
         is_super_cluster: req.is_super_cluster,

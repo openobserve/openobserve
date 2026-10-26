@@ -42,7 +42,7 @@ fn create_table_stmt() -> TableCreateStatement {
         .col(
             ColumnDef::new(TimedAnnotations::DashboardId)
                 .char_len(27)
-                .not_null()
+                .not_null(),
         )
         .col(
             ColumnDef::new(TimedAnnotations::StartTime)
@@ -60,11 +60,7 @@ fn create_table_stmt() -> TableCreateStatement {
                 .not_null(),
         )
         .col(ColumnDef::new(TimedAnnotations::Text).text().null())
-        .col(
-            ColumnDef::new(TimedAnnotations::Tags)
-                .json()
-                .not_null()
-        )
+        .col(ColumnDef::new(TimedAnnotations::Tags).json().not_null())
         .col(
             ColumnDef::new(TimedAnnotations::CreatedAt)
                 .big_integer()
@@ -72,10 +68,10 @@ fn create_table_stmt() -> TableCreateStatement {
         )
         .foreign_key(
             sea_query::ForeignKey::create()
-                    .name(TIMED_ANNOTATIONS_DASHBOARDS_FK)
-                    .from(TimedAnnotations::Table, TimedAnnotations::DashboardId)
-                    .to(Dashboards::Table, Dashboards::Id)
-                    .on_delete(ForeignKeyAction::Cascade)
+                .name(TIMED_ANNOTATIONS_DASHBOARDS_FK)
+                .from(TimedAnnotations::Table, TimedAnnotations::DashboardId)
+                .to(Dashboards::Table, Dashboards::Id)
+                .on_delete(ForeignKeyAction::Cascade),
         )
         .to_owned()
 }

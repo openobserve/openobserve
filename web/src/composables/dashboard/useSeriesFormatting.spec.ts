@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { convertStateTimelineData } from "@/utils/dashboard/convertStateTimelineData";
 import { describe, expect, it } from "vitest";
 import {
   emptySeriesOverrideDraft,
@@ -217,5 +218,55 @@ describe("withoutHiddenQueries", () => {
     expect(visible.metadata.queries).toEqual([{ panelQueryIndex: 0 }, { panelQueryIndex: 0 }]);
     expect(visible.resultMetaData).toEqual(["mA", "mA2"]);
     expect(visible.panelSchema.queries).toHaveLength(2);
+  });
+});
+
+describe("value mappings in a series override draft", () => {
+  it("round-trips the stored value_mappings through a draft", () => {
+    const stored = {
+      field: { matchBy: "series_regex", value: "^gpu" },
+      config: [
+        { type: "display_name", value: "GPU" },
+        { type: "value_mappings", value: [{ type: "regex", pattern: "^power", color: "#ffaa00" }] },
+      ],
+    };
+    const draft = toSeriesOverrideDraft(stored);
+    expect(draft.valueMappings).toEqual(stored.config[1].value);
+    expect(serializeSeriesOverride(draft)).toEqual(stored);
+  });
+
+  it("lists every rendered state timeline row by its raw entity, even one with only no data", () => {
+    const converted = convertStateTimelineData(
+      {
+        id: "p",
+        type: "state-timeline",
+        queryType: "sql",
+        config: {},
+        queries: [
+          {
+            fields: {
+              x: [{ alias: "x" }],
+              y: [{ alias: "y", label: "state" }],
+              breakdown: [{ alias: "b" }],
+            },
+          },
+        ],
+      },
+      [
+        [
+          { x: "1970-01-01T00:00:00", b: "host-1", y: "up" },
+          { x: "1970-01-01T00:00:00", b: "host-2", y: null },
+        ],
+      ],
+      { state: { timezone: "UTC", theme: "light", selectedOrganization: { identifier: "o" } } },
+      null,
+      [[{ histogram_interval: 10 }]],
+      null,
+    );
+    expect(getLegendSeriesNames(converted.options, "state-timeline", converted.extras)).toEqual([
+      "host-1",
+      "host-2",
+    ]);
+    expect(getLegendSeriesNames(converted.options, "state-timeline")).toEqual([]);
   });
 });

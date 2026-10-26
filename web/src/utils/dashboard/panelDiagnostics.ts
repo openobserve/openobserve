@@ -18,6 +18,8 @@ export interface SeriesLimitInfo {
   shown: number;
   total: number;
   cap: number;
+  /** Set when the chart capped what it draws itself; shown as written, and Top N cannot lift it. */
+  displayCapMessage?: string;
 }
 
 /** One query's server-side stats and notices, merged over its partitions. */
@@ -147,7 +149,8 @@ export const summarizePanelDiagnostics = (options: {
 }): PanelDiagnostics => {
   const entries = Array.isArray(options.resultMetaData) ? options.resultMetaData : [];
   const rows = Array.isArray(options.data) ? options.data : [];
-  const queries = entries.map((entry, index) =>
+  // PromQL fills resultMetaData by query index out of order; map() would keep the holes.
+  const queries = Array.from(entries, (entry, index) =>
     summarizeQueryDiagnostics(entry, {
       rows: rows[index],
       queryType: options.queryType,

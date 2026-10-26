@@ -1,6 +1,7 @@
 // Exemplar E2E fixtures, independent of the shared metric seed so request-count assertions see only this suite.
 const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
 const testLogger = require('./test-logger.js');
+const { ingestBase } = require('./ingest-url.js');
 
 const BASE = (process.env.INGESTION_URL || process.env.ZO_BASE_URL || 'http://localhost:5080').replace(/\/$/, '');
 const ORG = () => getOrgIdentifier() || 'default';
@@ -93,8 +94,8 @@ function tracesPayload(ids, nowNs) {
   };
 }
 
-async function post(path, body) {
-  const res = await fetch(`${BASE}/api/${ORG()}${path}`, {
+async function post(path, body, base = BASE) {
+  const res = await fetch(`${base}/api/${ORG()}${path}`, {
     method: 'POST',
     headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -108,8 +109,8 @@ async function post(path, body) {
 async function ingestExemplarFixtures(run, points = 32) {
   const ids = buildFixtureIds(points);
   const nowNs = BigInt(Date.now()) * 1_000_000n;
-  await post('/v1/traces', tracesPayload(ids, nowNs));
-  await post('/v1/metrics', histogramPayload(run, ids, nowNs));
+  await post('/v1/traces', tracesPayload(ids, nowNs), ingestBase(BASE));
+  await post('/v1/metrics', histogramPayload(run, ids, nowNs), ingestBase(BASE));
   testLogger.info('Exemplar fixtures ingested', { points, traces: ids.filter((i) => i.ingestTrace).length });
   return { ids, found: ids.filter((i) => i.ingestTrace), missing: ids.filter((i) => !i.ingestTrace) };
 }
