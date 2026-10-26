@@ -244,7 +244,7 @@ const resolveVariablesWithPrecedence = (
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const formatVariableValue = (value: any, format?: VariableFormat): string => {
+export const formatVariableValue = (value: any, format?: VariableFormat): string => {
   if (value === null || value === undefined || (Array.isArray(value) && value.length === 0)) {
     return SELECT_ALL_VALUE;
   }
@@ -362,6 +362,7 @@ export const processVariableContent = (
   variablesData: any,
   context?: { tabId?: string; panelId?: string },
   escapeValue: (value: string) => string = (value) => value,
+  formatValue: (value: any, format?: VariableFormat) => string = formatVariableValue,
 ) => {
   const processedContent: string = normalizeVariableSyntax(content);
 
@@ -384,6 +385,6 @@ export const processVariableContent = (
   });
 
   return replaceVariablePlaceholders(processedContent, valuesByName.keys(), (placeholder) =>
-    escapeValue(formatVariableValue(valuesByName.get(placeholder.name), placeholder.format)),
+    escapeValue(formatValue(valuesByName.get(placeholder.name), placeholder.format)),
   );
 };
