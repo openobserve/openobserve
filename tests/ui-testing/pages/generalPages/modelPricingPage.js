@@ -498,6 +498,8 @@ export class ModelPricingPage {
             `[data-test="model-pricing-tier-rule-op-select-${tierIndex}-${ruleIndex}-trigger"]`
         );
         await trigger.waitFor({ state: 'visible', timeout: 5000 });
+        // OSelect closes on any ancestor scroll, so the click itself must not scroll the editor.
+        await trigger.scrollIntoViewIfNeeded();
         await trigger.click();
         const option = this.page.locator(
             `[data-test="model-pricing-tier-rule-op-select-${tierIndex}-${ruleIndex}-option"][data-test-value="${opValue}"]`
