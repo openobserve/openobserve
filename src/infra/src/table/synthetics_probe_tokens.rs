@@ -333,3 +333,14 @@ pub async fn create_for_org(
     add(&record).await?;
     Ok(record)
 }
+
+/// Deletes every probe token of an org and drops both token caches on every node.
+pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(get_orm_client_rw().await)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    invalidate_and_publish(org_id).await;
+    Ok(())
+}

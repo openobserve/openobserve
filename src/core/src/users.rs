@@ -714,7 +714,9 @@ pub async fn add_user_to_org(
         let initiating_user = if is_root_user(initiator_id) {
             let local_org = org_id.replace(' ', "_");
             // If the org does not exist, create it
-            let _ = organization::check_and_create_org(&local_org).await;
+            if let Err(error) = organization::check_and_create_org(&local_org).await {
+                log::warn!("Failed to auto-create organization '{local_org}': {error}");
+            }
             root_user.get("root").unwrap().clone()
         } else {
             match db::user::get(Some(org_id), initiator_id).await {
@@ -728,6 +730,21 @@ pub async fn add_user_to_org(
                 }
             }
         };
+        // Checked after the root branch above may have created a missing org.
+        match db::org_status::read_active(org_id).await {
+            Ok(true) => {}
+            Ok(false) => {
+                return Err(Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    "organization is not active",
+                ));
+            }
+            Err(e) => {
+                return Err(Error::other(format!(
+                    "cannot read the status of organization {org_id}: {e}"
+                )));
+            }
+        }
         let base_role = get_role(&role);
         let is_allowed =
             initiating_user.role.eq(&UserRole::Root) || initiating_user.role.eq(&UserRole::Admin);
@@ -1393,12 +1410,19 @@ async fn remove_user_with_last_membership(user: &DBUser, membership: &UserOrg) -
     if get_openfga_config().enabled {
         let fga_role = fga_member_role(&membership.role);
         log::debug!("delete user single org, role: {fga_role}");
-        o2_openfga::authorizer::authz::delete_user_from_org(
+        if let Err(e) = o2_openfga::authorizer::authz::delete_user_from_org(
             &membership.name,
             &user.email,
             &fga_role,
         )
-        .await;
+        .await
+        {
+            log::error!(
+                "error deleting openfga tuples of {} in {} : {e}",
+                user.email,
+                membership.name
+            );
+        }
         if membership.role.eq(&UserRole::ServiceAccount) {
             delete_service_account_from_org(&membership.name, &user.email).await;
         }
@@ -1428,12 +1452,19 @@ async fn remove_one_membership(user: &DBUser, membership: &UserOrg) -> Option<Re
     if get_openfga_config().enabled {
         let fga_role = fga_member_role(&membership.role);
         log::debug!("user_fga_role, multi org: {fga_role}");
-        o2_openfga::authorizer::authz::delete_user_from_org(
+        if let Err(e) = o2_openfga::authorizer::authz::delete_user_from_org(
             &membership.name,
             &user.email,
             &fga_role,
         )
-        .await;
+        .await
+        {
+            log::error!(
+                "error deleting openfga tuples of {} in {} : {e}",
+                user.email,
+                membership.name
+            );
+        }
         if membership.role.eq(&UserRole::ServiceAccount) {
             delete_service_account_from_org(&membership.name, &user.email).await;
         }
@@ -2536,6 +2567,55 @@ mod tests {
         assert!(resp.is_ok());
         let response = resp.unwrap();
         assert_eq!(response.status(), 422);
+    }
+
+    #[tokio::test]
+    async fn test_add_user_to_org_refuses_blocked_org() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+
+        let _guard = set_up().await;
+        let org = "blockedaddorg";
+        organization::check_and_create_org_without_ofga(org)
+            .await
+            .unwrap();
+        create_new_user(DBUser {
+            email: "joiner@example.com".to_string(),
+            password: String::new(),
+            salt: String::new(),
+            first_name: "Joiner".to_string(),
+            last_name: String::new(),
+            password_ext: None,
+            is_external: false,
+            organizations: vec![UserOrg {
+                name: "dummy".to_string(),
+                org_name: "dummy".to_string(),
+                token: String::new(),
+                rum_token: None,
+                role: UserRole::User,
+            }],
+        })
+        .await
+        .unwrap();
+        let mut admin = ORG_USERS.get("dummy/admin@zo.dev").unwrap().clone();
+        admin.org_id = org.to_string();
+        ORG_USERS.insert(format!("{org}/admin@zo.dev"), admin);
+        let role = || UserOrgRole {
+            base_role: UserRole::User,
+            custom_role: None,
+        };
+
+        ORG_STATUS_CACHE.insert(org.to_string(), OrgStatus::Deleting);
+        let blocked = add_user_to_org(org, "joiner@example.com", role(), "admin@zo.dev").await;
+        ORG_STATUS_CACHE.remove(org);
+        assert_eq!(
+            blocked.map(|r| r.status()).unwrap_err().kind(),
+            std::io::ErrorKind::PermissionDenied,
+            "a deleting org must refuse new members as a client error"
+        );
+        let active = add_user_to_org(org, "joiner@example.com", role(), "admin@zo.dev")
+            .await
+            .unwrap();
+        assert_eq!(active.status(), 200);
     }
 
     #[cfg(feature = "enterprise")]

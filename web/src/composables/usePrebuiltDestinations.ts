@@ -693,7 +693,8 @@ export function usePrebuiltDestinations() {
         variant: "success",
         message: t("alert_destinations.saved"),
       });
-    } catch (error: unknown) {
+    } catch (error: any) {
+      if (error?.response?.status == 403) throw error;
       toast({
         variant: "error",
         message: requestErrorMessage(error, t("alerts.prebuilt.testFailedUnknownError")),
@@ -800,7 +801,8 @@ export function usePrebuiltDestinations() {
         variant: "success",
         message: t("alert_destinations.saved"),
       });
-    } catch (error: unknown) {
+    } catch (error: any) {
+      if (error?.response?.status == 403) throw error;
       toast({
         variant: "error",
         message: requestErrorMessage(error, t("alerts.prebuilt.testFailedUnknownError")),
@@ -861,6 +863,7 @@ export function usePrebuiltDestinations() {
         message: t("alerts.prebuilt.conversionSuccess"),
       });
     } catch (error: any) {
+      if (error?.response?.status == 403) throw error;
       console.error("Failed to convert destination:", error);
       toast({
         variant: "error",

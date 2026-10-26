@@ -17,6 +17,7 @@ import { onScopeDispose, ref, shallowRef, watch, type Ref } from "vue";
 import {
   EXEMPLAR_SERIES_ID,
   exemplarY,
+  isExemplarSeriesId,
   type ExemplarPlaceY,
 } from "@/utils/dashboard/exemplars/applyExemplarSeries";
 import type { useExemplarTraceLookup } from "@/composables/dashboard/useExemplarTraceLookup";
@@ -46,6 +47,10 @@ interface ExemplarEventParams {
   event?: { event?: { pointerType?: string; type?: string } };
 }
 
+export type ExemplarGridPlacer = (
+  marker: ExemplarMarker,
+) => { seriesId: string; value: number[] } | null;
+
 interface InteractionArgs {
   chartRendererRef: Ref<{ chart?: EChartsLike | null } | null>;
   markers: Ref<ExemplarMarker[]>;
@@ -55,13 +60,15 @@ interface InteractionArgs {
   toChartX: (tsMs: number) => number;
   navigate: (marker: ExemplarMarker, verdict: TraceVerdict) => void;
   placeY?: ExemplarPlaceY;
+  /** Set while markers sit on category cells instead of the hidden time and value axes. */
+  gridPlacer?: Ref<ExemplarGridPlacer | null>;
 }
 
 const sameExtent = (a: [number, number], b: number[] | undefined): boolean =>
   !!b && a[0] === b[0] && a[1] === b[1];
 
 const isExemplarEvent = (params: ExemplarEventParams | undefined): boolean =>
-  params?.seriesId === EXEMPLAR_SERIES_ID;
+  isExemplarSeriesId(params?.seriesId);
 
 const isTouch = (params: ExemplarEventParams): boolean => {
   const event = params?.event?.event;
@@ -70,8 +77,17 @@ const isTouch = (params: ExemplarEventParams): boolean => {
 
 /** Owns marker extents, pixel positions, the hover card and the click-to-trace flow. */
 export function usePanelExemplarInteraction(args: InteractionArgs) {
-  const { chartRendererRef, markers, seriesExtent, windowMs, lookup, toChartX, navigate, placeY } =
-    args;
+  const {
+    chartRendererRef,
+    markers,
+    seriesExtent,
+    windowMs,
+    lookup,
+    toChartX,
+    navigate,
+    placeY,
+    gridPlacer,
+  } = args;
 
   const yExtent = ref<[number, number]>([...seriesExtent.value]);
   const xExtent = ref<[number, number]>([...windowMs.value]);
@@ -95,20 +111,60 @@ export function usePanelExemplarInteraction(args: InteractionArgs) {
 
   const chart = (): EChartsLike | null | undefined => chartRendererRef.value?.chart;
 
+  const pixelOf = (
+    c: EChartsLike | null | undefined,
+    seriesId: string,
+    value: number[],
+  ): number[] | null => {
+    let pixel: number[] | undefined;
+    try {
+      pixel = c?.convertToPixel?.({ seriesId }, value);
+    } catch {
+      pixel = undefined;
+    }
+    return pixel && Number.isFinite(pixel[0]) && Number.isFinite(pixel[1]) ? pixel : null;
+  };
+
+  const cellPointOf = (
+    marker: ExemplarMarker,
+    cell: { seriesId: string; value: number[] },
+    c: EChartsLike | null | undefined,
+    pixelAt: (seriesId: string, value: number[]) => number[] | null = (seriesId, value) =>
+      pixelOf(c, seriesId, value),
+  ): ExemplarPoint | null => {
+    const pixel = pixelAt(cell.seriesId, cell.value);
+    return pixel && { marker, xPx: pixel[0], yPx: pixel[1], clamped: false, placement: "value" };
+  };
+
+  // Category cells lie on an affine grid, so two probes per grid place every marker on it.
+  const cellPixels = (c: EChartsLike | null | undefined) => {
+    const probes = new Map<string, number[][] | null>();
+    return (seriesId: string, value: number[]): number[] | null => {
+      if (!probes.has(seriesId)) {
+        const origin = pixelOf(c, seriesId, [0, 0]);
+        const unit = pixelOf(c, seriesId, [1, 1]);
+        probes.set(seriesId, origin && unit ? [origin, unit] : null);
+      }
+      const probe = probes.get(seriesId);
+      if (!probe) return null;
+      const [[x0, y0], [x1, y1]] = probe;
+      return [x0 + value[0] * (x1 - x0), y0 + value[1] * (y1 - y0)];
+    };
+  };
+
   // Null while the painted option has no exemplar series yet, so no marker is published at 0,0.
   const pointOf = (
     marker: ExemplarMarker,
     c: EChartsLike | null | undefined,
   ): ExemplarPoint | null => {
-    const { y, clamped, placement } = exemplarY(marker, yExtent.value, placeY);
-    let pixel: number[] | undefined;
-    try {
-      pixel = c?.convertToPixel?.({ seriesId: EXEMPLAR_SERIES_ID }, [toChartX(marker.tsMs), y]);
-    } catch {
-      pixel = undefined;
+    const placer = gridPlacer?.value;
+    if (placer) {
+      const cell = placer(marker);
+      return cell ? cellPointOf(marker, cell, c) : null;
     }
-    if (!pixel || !Number.isFinite(pixel[0]) || !Number.isFinite(pixel[1])) return null;
-    return { marker, xPx: pixel[0], yPx: pixel[1], clamped, placement };
+    const { y, clamped, placement } = exemplarY(marker, yExtent.value, placeY);
+    const pixel = pixelOf(c, EXEMPLAR_SERIES_ID, [toChartX(marker.tsMs), y]);
+    return pixel && { marker, xPx: pixel[0], yPx: pixel[1], clamped, placement };
   };
 
   const samePoints = (next: ExemplarPoint[]): boolean =>
@@ -124,9 +180,28 @@ export function usePanelExemplarInteraction(args: InteractionArgs) {
       );
     });
 
+  // Publishes only once every drawn marker has a pixel, so a half-painted chart lists none.
+  const publishPoints = (next: (ExemplarPoint | null)[]) => {
+    if (next.some((p) => p === null)) return;
+    const resolved = next as ExemplarPoint[];
+    if (!samePoints(resolved)) points.value = resolved;
+  };
+
   /** Pins the hidden axes to the primary axes' rendered extents; updates only on change to avoid a render loop. */
   const onFinished = () => {
     const c = chart();
+    const placer = gridPlacer?.value;
+    if (placer) {
+      // Each marker is placed once per paint; markers on no drawn cell are not listed.
+      const next: (ExemplarPoint | null)[] = [];
+      const pixelAt = cellPixels(c);
+      for (const marker of markers.value) {
+        const cell = placer(marker);
+        if (cell) next.push(cellPointOf(marker, cell, c, pixelAt));
+      }
+      publishPoints(next);
+      return;
+    }
     const model = c?.getModel?.();
     const x = model?.getComponent("xAxis", 0)?.axis?.scale?.getExtent();
     const y = model?.getComponent("yAxis", 0)?.axis?.scale?.getExtent();
@@ -141,10 +216,7 @@ export function usePanelExemplarInteraction(args: InteractionArgs) {
     }
     // A pinned extent repaints the markers, so pixels read now would be stale; the next paint publishes them.
     if (moved && markers.value.length) return;
-    const next = markers.value.map((m) => pointOf(m, c));
-    if (next.some((p) => p === null)) return;
-    const resolved = next as ExemplarPoint[];
-    if (!samePoints(resolved)) points.value = resolved;
+    publishPoints(markers.value.map((m) => pointOf(m, c)));
   };
 
   const clearTimers = () => {
@@ -157,6 +229,8 @@ export function usePanelExemplarInteraction(args: InteractionArgs) {
   const suppressAxisTooltip = (on: boolean) => {
     const c = chart();
     if (on) c?.dispatchAction?.({ type: "hideTip" });
+    // A heatmap's item tooltip never shows for a marker, and a setOption there repaints every cell on each marker crossed.
+    if (gridPlacer?.value) return;
     c?.setOption?.({ tooltip: { triggerOn: on ? "none" : "mousemove|click" } });
   };
 

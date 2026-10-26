@@ -29,15 +29,26 @@ import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ContainerSquares from "./ContainerSquares.vue";
 import K8sListHeader from "./K8sListHeader.vue";
+import K8sRowMenu from "./K8sRowMenu.vue";
+import { TONE_PILL } from "./k8sTone";
+import type { K8sAction } from "./k8sActions";
+import {
+  hasStatusChip,
+  matchesStatusChip,
+  statusChipsFor,
+  type StatusChipId,
+} from "./kubernetesStatusChips";
 import type { View } from "./kubernetesQueries";
 import {
   TONE_TEXT_CLASS,
   filterRows,
   formatAge,
+  formatPct,
   severityOf,
   usageBarVariant,
   warningLabel,
   type AnyRow,
+  type PodRow,
   type Warning,
 } from "./kubernetesModel";
 import type { EventRow } from "./kubernetesEvents";
@@ -53,26 +64,31 @@ import type { DetailsRef, K8sUrlState } from "./kubernetesUrlState";
 
 type ListView = Exclude<View, "cluster" | "map" | "workloads">;
 
-const props = defineProps<{
-  view: ListView;
-  rows: any[];
-  state: K8sUrlState;
-  endUs: number;
-  cluster: string | null;
-  eventLinks: boolean;
-  namespaceOptions: string[];
-  loading: boolean;
-  forbidden: boolean;
-  anchorMissing: string | null;
-  capped: boolean;
-  chip?: I18nText;
-  lastUpdatedAt: number | null;
-}>();
+const props = withDefaults(
+  defineProps<{
+    view: ListView;
+    rows: any[];
+    pods?: PodRow[];
+    state: K8sUrlState;
+    endUs: number;
+    cluster: string | null;
+    eventLinks: boolean;
+    namespaceOptions: string[];
+    loading: boolean;
+    forbidden: boolean;
+    anchorMissing: string | null;
+    capped: boolean;
+    chip?: I18nText;
+    lastUpdatedAt: number | null;
+  }>(),
+  { chip: undefined, pods: () => [] },
+);
 
 const emit = defineEmits<{
   open: [details: DetailsRef];
   update: [patch: Partial<K8sUrlState>];
   refresh: [];
+  action: [type: K8sAction, ref: DetailsRef];
 }>();
 
 const VIEW_TITLE: Record<ListView, I18nKey> = {
@@ -101,14 +117,28 @@ const tableId = computed(() => `k8s2-${props.view}`);
 // Namespaces and nodes have no namespace; Lens hides the select there.
 const namespaced = computed(() => props.view !== "nodes" && props.view !== "namespaces");
 
-const columns = computed<K8sColumn[]>(() =>
-  columnsFor(props.view, {
+const actionsColumn: K8sColumn = {
+  id: "actions",
+  header: raw(""),
+  sortable: false,
+  hideable: false,
+  pinned: "right",
+  size: 48,
+  accessorFn: () => undefined,
+  meta: { render: "actions", cellClass: "" },
+};
+
+const columns = computed<K8sColumn[]>(() => [
+  ...columnsFor(props.view, {
     t,
     endUs: props.endUs,
     eventLinks: props.eventLinks,
     cluster: props.cluster,
   }),
-);
+  actionsColumn,
+]);
+
+const hasSub = computed(() => props.view === "nodes");
 
 const defaultVisibility = computed(() =>
   Object.fromEntries((HIDDEN_BY_DEFAULT[props.view] ?? []).map((id) => [id, false])),
@@ -117,19 +147,43 @@ const defaultVisibility = computed(() =>
 const eventMatches = (e: EventRow, needle: string) =>
   [e.note, e.reason, e.object.name].some((v) => v.toLowerCase().includes(needle));
 
+const statusFilter = computed<StatusChipId>(() =>
+  hasStatusChip(props.view, props.state.status) ? props.state.status : "all",
+);
+
+const inNamespaces = computed<any[]>(() =>
+  props.view === "events" || !activeNamespaces.value.length
+    ? props.rows
+    : filterRows(props.rows as AnyRow[], { cluster: null, namespaces: activeNamespaces.value }, ""),
+);
+
+const statusChips = computed(() => statusChipsFor(props.view, inNamespaces.value, props.pods));
+
 const filtered = computed<any[]>(() => {
   const needle = props.state.search.trim().toLowerCase();
+  const byStatus = (rows: any[]) =>
+    statusFilter.value === "all"
+      ? rows
+      : rows.filter((r) => matchesStatusChip(props.view, r, statusFilter.value, props.pods));
   if (props.view === "events") {
-    return needle ? props.rows.filter((e: EventRow) => eventMatches(e, needle)) : props.rows;
+    const rows = byStatus(props.rows);
+    return needle ? rows.filter((e: EventRow) => eventMatches(e, needle)) : rows;
   }
-  const namespaces = activeNamespaces.value;
-  return filterRows(props.rows as AnyRow[], { cluster: null, namespaces }, props.state.search);
+  return byStatus(
+    filterRows(
+      props.rows as AnyRow[],
+      { cluster: null, namespaces: activeNamespaces.value },
+      props.state.search,
+    ),
+  );
 });
 
 // Nodes and Namespaces ignore the namespace selection, so it neither narrows nor gets cleared there.
 const activeNamespaces = computed(() => (namespaced.value ? props.state.namespaces : []));
 
-const narrowed = computed(() => !!props.state.search || activeNamespaces.value.length > 0);
+const narrowed = computed(
+  () => !!props.state.search || activeNamespaces.value.length > 0 || statusFilter.value !== "all",
+);
 
 // A hand-edited or stale sort id names no column, and TanStack would warn and sort nothing.
 const urlSort = computed(() =>
@@ -161,8 +215,14 @@ const onRow = (row: any) => {
   if (target) emit("open", target);
 };
 
-const clear = () =>
-  emit("update", namespaced.value ? { search: "", namespaces: [] } : { search: "" });
+const clear = () => {
+  emit(
+    "update",
+    namespaced.value
+      ? { search: "", namespaces: [], status: "all" }
+      : { search: "", status: "all" },
+  );
+};
 
 const setNamespace = (namespace: string) => {
   if (namespace) emit("update", { namespaces: [namespace] });
@@ -201,6 +261,12 @@ const searchPlaceholder = computed<I18nText>(() =>
   t("infra.k8s2.searchKind", { kind: kindLabel.value }),
 );
 
+const onAction = (type: K8sAction, ref: DetailsRef) => {
+  emit("action", type, ref);
+};
+
+const toneOfCell = (c: K8sColumn, row: any) => c.meta.tone?.(row) ?? null;
+
 const namespaceOf = (row: any): string =>
   props.view === "events" ? (row as EventRow).object.namespace : (row as AnyRow).namespace;
 </script>
@@ -214,7 +280,7 @@ const namespaceOf = (row: any): string =>
     :columns="columns"
     row-key="key"
     dense
-    :row-height="32"
+    :row-height="hasSub ? 44 : 32"
     sticky-header
     virtual-scroll
     :overscan="10"
@@ -247,6 +313,10 @@ const namespaceOf = (row: any): string =>
         :namespaces="activeNamespaces"
         :search="state.search"
         :search-placeholder="searchPlaceholder"
+        :filtered="statusFilter !== 'all'"
+        :status-chips="statusChips"
+        :status-filter="statusFilter"
+        @update:status-filter="(status: StatusChipId) => emit('update', { status })"
         @update:namespaces="(namespaces: string[]) => emit('update', { namespaces })"
         @update:search="(search: string) => emit('update', { search })"
         @clear="clear"
@@ -262,12 +332,35 @@ const namespaceOf = (row: any): string =>
     </template>
 
     <template v-for="c in columns" :key="c.id" #[`cell-${c.id}`]="{ row }">
-      <span
-        v-if="c.meta.render === 'name'"
-        class="truncate font-medium"
-        :data-test="`k8s2-name-${row.key}`"
-        >{{ c.meta.text?.(row) }}</span
-      >
+      <span v-if="c.meta.render === 'name'" class="flex min-w-0 flex-col leading-tight">
+        <span class="truncate font-medium" :data-test="`k8s2-name-${row.key}`">{{
+          c.meta.text?.(row)
+        }}</span>
+        <span
+          v-if="c.meta.sub?.(row)"
+          class="text-text-secondary truncate font-mono text-xs"
+          :data-test="`k8s2-name-sub-${row.key}`"
+          >{{ c.meta.sub?.(row) }}</span
+        >
+      </span>
+      <template v-else-if="c.meta.render === 'actions'">
+        <K8sRowMenu v-if="view !== 'events'" :target="detailsOf(row)" @action="onAction" />
+      </template>
+      <span v-else-if="c.meta.render === 'status'" class="inline-flex">
+        <OTag
+          v-if="toneOfCell(c, row)"
+          size="xs"
+          :variant="TONE_PILL[toneOfCell(c, row) ?? 'neutral'].variant"
+          :icon="TONE_PILL[toneOfCell(c, row) ?? 'neutral'].icon"
+          :data-test="`k8s2-cell-${c.id}-${row.key}`"
+          >{{ c.meta.text?.(row)
+          }}<OTooltip
+            v-if="c.meta.tip?.(row)"
+            :content="c.meta.tip?.(row) ?? undefined"
+            content-class="whitespace-pre-line"
+        /></OTag>
+        <span v-else :data-test="`k8s2-cell-${c.id}-${row.key}`">{{ c.meta.text?.(row) }}</span>
+      </span>
       <span
         v-else-if="c.meta.render === 'warn'"
         class="inline-flex"
@@ -315,16 +408,36 @@ const namespaceOf = (row: any): string =>
       <span v-else-if="c.meta.render === 'age'" class="tabular-nums">{{
         raw(formatAge(c.meta.at?.(row) == null ? null : endUs - (c.meta.at?.(row) as number)))
       }}</span>
-      <span v-else-if="c.meta.render === 'bar'" class="flex w-full min-w-0 items-center">
-        <template v-if="c.meta.bar?.(row).pct != null">
-          <OProgressBar
-            size="xs"
-            class="min-w-0 flex-1"
-            :value="Math.min(c.meta.bar?.(row).pct ?? 0, 100) / 100"
-            :variant="usageBarVariant(c.meta.bar?.(row).pct ?? null)"
-            :data-test="`k8s2-bar-${c.id}-${row.key}`"
-          />
-          <OTooltip :content="c.meta.bar?.(row).tip" />
+      <span
+        v-else-if="c.meta.render === 'bar'"
+        class="flex w-full min-w-0 flex-col gap-0.5"
+        :data-test="`k8s2-usage-${c.id}-${row.key}`"
+      >
+        <template v-if="c.meta.bar?.(row).pct != null || c.meta.bar?.(row).label">
+          <span class="flex items-baseline justify-between gap-2 leading-none">
+            <span class="truncate tabular-nums">{{ c.meta.bar?.(row).label }}</span>
+            <span
+              v-if="c.meta.bar?.(row).pct != null"
+              class="text-text-secondary text-xs tabular-nums"
+              >{{ raw(formatPct(c.meta.bar?.(row).pct ?? null)) }}</span
+            >
+            <span
+              v-else-if="c.meta.bar?.(row).none"
+              class="text-text-secondary text-xs"
+              :data-test="`k8s2-usage-none-${c.id}-${row.key}`"
+              >{{ c.meta.bar?.(row).none }}</span
+            >
+          </span>
+          <template v-if="c.meta.bar?.(row).pct != null">
+            <OProgressBar
+              size="xs"
+              class="min-w-0"
+              :value="Math.min(c.meta.bar?.(row).pct ?? 0, 100) / 100"
+              :variant="usageBarVariant(c.meta.bar?.(row).pct ?? null)"
+              :data-test="`k8s2-bar-${c.id}-${row.key}`"
+            />
+            <OTooltip v-if="c.meta.bar?.(row).tip" :content="c.meta.bar?.(row).tip" />
+          </template>
         </template>
         <span v-else>{{ raw("—") }}</span>
       </span>
@@ -364,7 +477,11 @@ const namespaceOf = (row: any): string =>
       <span
         v-else
         class="truncate"
-        :class="c.meta.tone?.(row) ? TONE_TEXT_CLASS[c.meta.tone?.(row) ?? 'neutral'] : ''"
+        :class="[
+          c.meta.tone?.(row) ? TONE_TEXT_CLASS[c.meta.tone?.(row) ?? 'neutral'] : '',
+          c.meta.render === 'mono' ? 'font-mono text-xs' : '',
+          c.meta.render === 'muted' ? 'text-text-secondary' : '',
+        ]"
         :data-test="`k8s2-cell-${c.id}-${row.key}`"
         >{{ c.meta.text?.(row)
         }}<OTooltip

@@ -526,6 +526,17 @@ pub async fn delete<C: ConnectionTrait>(
     Ok(res.rows_affected > 0)
 }
 
+/// Deletes every check of an org and drops each from the definition cache on every node.
+pub async fn delete_by_org(org_id: &str) -> Result<u64, errors::Error> {
+    let conn = crate::db::get_orm_client_rw().await;
+    let delete = Entity::delete_many().filter(Column::OrgId.eq(org_id));
+    let ids: Vec<String> = super::delete_returning(conn, delete, &[Column::Id]).await?;
+    for id in &ids {
+        invalidate_and_publish_delete(org_id, id).await;
+    }
+    Ok(ids.len() as u64)
+}
+
 /// Moves a batch of checks to a different folder.
 pub async fn move_to_folder<C: ConnectionTrait>(
     conn: &C,
@@ -598,6 +609,8 @@ pub struct DueCheck {
     /// Child ids the journey references, with multiplicity; empty for every non-composed check.
     pub subtest_refs: Vec<String>,
     pub tags: Vec<String>,
+    /// The row's `last_triggered_at` before this claim, so a released claim can put it back.
+    pub last_triggered_at: i64,
 }
 
 /// Returns up to `limit` enabled checks whose `next_run_at` is at or before `now_us`.
@@ -659,6 +672,7 @@ impl TryFrom<synthetics_checks::Model> for DueCheck {
             steps_configured,
             subtest_refs,
             tags,
+            last_triggered_at: m.last_triggered_at,
         })
     }
 }
@@ -850,6 +864,23 @@ where
 
     txn.commit().await?;
     Ok(due)
+}
+
+/// Undoes a claim made at `claimed_at` unless a later claim or edit moved the check.
+pub async fn release_claim<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    claimed_at: i64,
+    (slot, triggered_at): (i64, i64),
+) -> Result<bool, errors::Error> {
+    let result = Entity::update_many()
+        .col_expr(Column::NextRunAt, Expr::value(slot))
+        .col_expr(Column::LastTriggeredAt, Expr::value(triggered_at))
+        .filter(Column::Id.eq(id))
+        .filter(Column::LastTriggeredAt.eq(claimed_at))
+        .exec(conn)
+        .await?;
+    Ok(result.rows_affected > 0)
 }
 
 /// Unconditionally sets a check's schedule. For user-initiated changes (edit,
@@ -1410,6 +1441,27 @@ pub(crate) mod tests {
             ids,
             vec!["mon-1", "mon-2"],
             "the readable checks must still be claimed"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_release_claim_puts_back_only_its_own_claim() {
+        use sea_orm::{DatabaseBackend, MockDatabase, MockExecResult, Transaction};
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_exec_results(vec![MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 1,
+            }])
+            .into_connection();
+        assert!(release_claim(&db, "mon-1", 500, (100, 40)).await.unwrap());
+        assert_eq!(
+            db.into_transaction_log(),
+            vec![Transaction::from_sql_and_values(
+                DatabaseBackend::Postgres,
+                r#"UPDATE "synthetics" SET "next_run_at" = $1, "last_triggered_at" = $2 WHERE "synthetics"."id" = $3 AND "synthetics"."last_triggered_at" = $4"#,
+                [100i64.into(), 40i64.into(), "mon-1".into(), 500i64.into()],
+            )]
         );
     }
 

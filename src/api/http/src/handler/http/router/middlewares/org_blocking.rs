@@ -13,7 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use axum::{extract::Request, middleware::Next, response::Response};
+use std::collections::HashMap;
+
+use axum::{
+    extract::{Path, Request},
+    http::{Method, StatusCode},
+    middleware::Next,
+    response::{IntoResponse, Response},
+};
 use openobserve_core::auth::{org_from_path, routed_path};
 
 fn extract_org_id(path: &str) -> &str {
@@ -27,6 +34,16 @@ fn extract_org_id(path: &str) -> &str {
     org_from_path(&path_columns[..len])
 }
 
+/// The cleanup retry of the path's own org, which its Admins call while it is blocked.
+fn is_own_cleanup_retry(method: &Method, path: &str) -> bool {
+    let segments: Vec<&str> = path.split('/').collect();
+    *method == Method::POST
+        && matches!(
+            segments.as_slice(),
+            [org, "org_cleanup_tasks", target, "retry"] if !org.is_empty() && org == target
+        )
+}
+
 pub async fn blocked_orgs_middleware(request: Request, next: Next) -> Response {
     let path = routed_path(request.uri().path());
 
@@ -37,8 +54,8 @@ pub async fn blocked_orgs_middleware(request: Request, next: Next) -> Response {
     if !org_id.is_empty()
         && !SYSTEM_PREFIXES.contains(&org_id)
         && db::org_status::is_blocked(org_id)
+        && !is_own_cleanup_retry(request.method(), path)
     {
-        use axum::{http::StatusCode, response::IntoResponse};
         // "deleted", not "being deleted": this gate also covers the soft-delete
         // (pending_deletion) grace window, during which the org is invisible and
         // inaccessible to the end user — to them it is simply deleted, even though
@@ -48,7 +65,6 @@ pub async fn blocked_orgs_middleware(request: Request, next: Next) -> Response {
 
     #[cfg(feature = "cloud")]
     {
-        use axum::{http::StatusCode, response::IntoResponse};
         use config::cluster::LOCAL_NODE;
         use openobserve_core::organization;
 
@@ -75,6 +91,21 @@ pub async fn blocked_orgs_middleware(request: Request, next: Next) -> Response {
         }
     }
 
+    next.run(request).await
+}
+
+/// Gate for routes outside the `/api` tree, which `blocked_orgs_middleware` never sees.
+pub async fn blocked_org_param(
+    Path(params): Path<HashMap<String, String>>,
+    request: Request,
+    next: Next,
+) -> Response {
+    if params
+        .get("org_id")
+        .is_some_and(|org_id| db::org_status::is_blocked(org_id))
+    {
+        return (StatusCode::FORBIDDEN, "Organization is deleted").into_response();
+    }
     next.run(request).await
 }
 
@@ -112,6 +143,28 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_only_the_own_org_cleanup_retry_is_exempt() {
+        use axum::http::Method;
+
+        use super::is_own_cleanup_retry;
+        assert!(is_own_cleanup_retry(
+            &Method::POST,
+            "o1/org_cleanup_tasks/o1/retry"
+        ));
+        for (method, path) in [
+            (Method::GET, "o1/org_cleanup_tasks/o1/retry"),
+            (Method::POST, "o1/org_cleanup_tasks/o2/retry"),
+            (Method::POST, "o1/org_cleanup_tasks/o1"),
+            (Method::POST, "o1/org_cleanup_tasks/o1/retry/x"),
+            (Method::POST, "o1/streams/o1/retry"),
+            (Method::POST, "v2/o1/org_cleanup_tasks/o1/retry"),
+            (Method::POST, "/org_cleanup_tasks//retry"),
+        ] {
+            assert!(!is_own_cleanup_retry(&method, path), "{method} {path}");
+        }
+    }
+
     #[tokio::test]
     async fn test_blocked_org_is_refused_on_a_v2_route() {
         use axum::{
@@ -135,6 +188,37 @@ mod tests {
         let status = app.oneshot(request).await.unwrap().status();
         ORG_STATUS_CACHE.remove(org);
         assert_eq!(status, StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn test_blocked_org_reaches_only_its_own_cleanup_retry() {
+        use axum::{Router, body::Body, http::Request, middleware, routing::any};
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+        use tower::ServiceExt;
+
+        let app = Router::new()
+            .route("/{*rest}", any(|| async { "handler" }))
+            .layer(middleware::from_fn(super::blocked_orgs_middleware));
+        let org = "gate-retry-blocked-org";
+        ORG_STATUS_CACHE.insert(org.to_string(), OrgStatus::Deleting);
+        let mut statuses = vec![];
+        for (method, uri) in [
+            ("POST", format!("/{org}/org_cleanup_tasks/{org}/retry")),
+            ("POST", format!("/{org}/org_cleanup_tasks/other/retry")),
+            ("GET", format!("/{org}/org_cleanup_tasks/{org}")),
+            ("POST", format!("/{org}/streams")),
+        ] {
+            let request = Request::builder()
+                .method(method)
+                .uri(&uri)
+                .body(Body::empty())
+                .unwrap();
+            let status = app.clone().oneshot(request).await.unwrap().status();
+            statuses.push((uri, status.as_u16()));
+        }
+        ORG_STATUS_CACHE.remove(org);
+        let codes: Vec<u16> = statuses.iter().map(|(_, s)| *s).collect();
+        assert_eq!(codes, [200, 403, 403, 403], "{statuses:?}");
     }
 
     #[test]

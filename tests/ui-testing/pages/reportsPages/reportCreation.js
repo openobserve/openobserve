@@ -162,6 +162,7 @@ export async function createDashboardReportViaApi(api, opts) {
         dashboardFolderId = 'default',
         reportFolderId = 'default',
         cached = true,
+        start,
     } = opts;
 
     testLogger.info('Creating dashboard-bound report via API', {
@@ -185,6 +186,8 @@ export async function createDashboardReportViaApi(api, opts) {
             // drawer (isCached: !report.destinations?.length) and is accepted by
             // the backend even when SMTP is disabled.
             destinations: cached ? [] : [{ email: api.email }],
+            // First scheduled run (µs); unset = epoch, so the scheduler fires a "once" report immediately — pass a future value for a clean report.
+            start,
             enabled: true,
             imagePreview: false,
             title: `Test Report ${reportName}`,

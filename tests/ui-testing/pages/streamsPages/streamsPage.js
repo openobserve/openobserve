@@ -581,51 +581,54 @@ export class StreamsPage {
             }
         };
 
+        const postStream = async () => {
+            try {
+                if (process.env.IS_CLOUD === 'true') {
+                    // On cloud, management APIs require OIDC session cookies — use browser context
+                    return await this.page.evaluate(async ({ orgId, streamName, streamType, payload }) => {
+                        const r = await fetch(`/api/${orgId}/streams/${streamName}?type=${streamType}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload),
+                        });
+                        const text = await r.text();
+                        try { return { status: r.status, data: JSON.parse(text) }; }
+                        catch { return { status: r.status, data: text }; }
+                    }, { orgId, streamName, streamType, payload });
+                }
+
+                // Self-hosted: use node-fetch with Basic Auth
+                const response = await _nodeFetchSafe(`${process.env.INGESTION_URL}/api/${orgId}/streams/${streamName}?type=${streamType}`, {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify(payload)
+                });
+                return { status: response.status, data: await response.json() };
+            } catch (error) {
+                return { status: 500, error: error.message };
+            }
+        };
+        const failureMessage = (result) => result.data?.message || result.error || '';
+
         testLogger.info('Creating stream via API', { streamName, streamType });
 
-        try {
-            if (process.env.IS_CLOUD === 'true') {
-                // On cloud, management APIs require OIDC session cookies — use browser context
-                const result = await this.page.evaluate(async ({ orgId, streamName, streamType, payload }) => {
-                    const r = await fetch(`/api/${orgId}/streams/${streamName}?type=${streamType}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload),
-                    });
-                    const text = await r.text();
-                    try { return { status: r.status, data: JSON.parse(text) }; }
-                    catch { return { status: r.status, data: text }; }
-                }, { orgId, streamName, streamType, payload });
-
-                if (result.status === 200) {
-                    testLogger.info('Stream created successfully (cloud)', { streamName });
-                } else {
-                    testLogger.warn('Stream creation returned non-200 (cloud)', { streamName, status: result.status });
-                }
-                return result;
-            }
-
-            // Self-hosted: use node-fetch with Basic Auth
-            const headers = getHeaders();
-            const response = await _nodeFetchSafe(`${process.env.INGESTION_URL}/api/${orgId}/streams/${streamName}?type=${streamType}`, {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify(payload)
-            });
-
-            const data = await response.json();
-
-            if (response.status === 200 && data.code === 200) {
-                testLogger.info('Stream created successfully', { streamName });
-            } else {
-                testLogger.warn('Stream creation returned non-200 or already exists', { streamName, status: response.status });
-            }
-
-            return { status: response.status, data };
-        } catch (error) {
-            testLogger.error('Failed to create stream', { streamName, error: error.message });
-            return { status: 500, error: error.message };
+        // Alpha's NATS fails some stream creates with a 500 that clears seconds later; carrying on leaves a stream pipelines can't write to.
+        let result = await postStream();
+        for (let attempt = 2; attempt <= 3 && result.status >= 500; attempt++) {
+            testLogger.warn('Stream creation failed, retrying', { streamName, status: result.status, message: failureMessage(result), attempt });
+            await this.page.waitForTimeout(5000);
+            result = await postStream();
         }
+        if (result.status >= 500) {
+            throw new Error(`Stream ${streamName} was not created: ${result.status} ${failureMessage(result)}`);
+        }
+
+        if (result.status === 200) {
+            testLogger.info('Stream created successfully', { streamName });
+        } else {
+            testLogger.warn('Stream creation returned non-200 or already exists', { streamName, status: result.status });
+        }
+        return result;
     }
 
     /**

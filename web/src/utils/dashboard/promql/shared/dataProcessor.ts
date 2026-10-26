@@ -18,6 +18,7 @@ import { PromQLResponse, ProcessedPromQLData, AggregationFunction } from "./type
 import { buildPromqlSeriesNames } from "./legendBuilder";
 import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
 import { legendFallbackOf } from "@/utils/dashboard/promql/formula";
+import { PROMETHEUS_HISTOGRAM_MODE, limitWholeHistograms } from "./histogramBuckets";
 
 /**
  * Preprocess PromQL responses into a common format for chart converters
@@ -39,11 +40,23 @@ export async function processPromQLData(
 
   // Apply series limit
   const seriesLimit = panelSchema.config?.promql_series_limit || 100;
+  const histogramMode =
+    panelSchema.type === "heatmap" &&
+    panelSchema.config?.heatmap_mode === PROMETHEUS_HISTOGRAM_MODE;
+  const histogramsLimited: Array<{ shown: number; total: number } | undefined> = [];
   const limitedData = applySeriesLimit(
     searchQueryData,
     seriesLimit,
     queryIndexOf,
     shift.nameSuffixes,
+    histogramMode
+      ? (result, limit, index) => {
+          const cut = limitWholeHistograms(result, limit);
+          if (cut.shown < cut.total)
+            histogramsLimited[index] = { shown: cut.shown, total: cut.total };
+          return cut.kept;
+        }
+      : undefined,
   );
 
   // Named through the same builder the line/bar path uses, so a panel flipped
@@ -102,6 +115,8 @@ export async function processPromQLData(
       series,
       queryIndex: queryIndexOf(index),
       seriesRole: shift.nameSuffixes?.[index] ? "shifted" : "primary",
+      ...(shift.nameSuffixes?.[index] ? { nameSuffix: shift.nameSuffixes[index] } : {}),
+      ...(histogramsLimited[index] ? { histogramsLimited: histogramsLimited[index] } : {}),
       queryConfig: panelSchema.queries[queryIndexOf(index)]?.config || {},
     });
   });
@@ -141,7 +156,7 @@ function collectAllTimestamps(data: PromQLResponse[]): Set<number> {
  * @param timezone - Timezone string (e.g., "America/New_York" or "UTC")
  * @returns Array of [unix_ts, formatted_date] tuples
  */
-function formatTimestamps(
+export function formatTimestamps(
   timestamps: Set<number>,
   timezone: string,
 ): Array<[number, Date | string]> {
@@ -164,6 +179,7 @@ function formatTimestamps(
  * @param limit - Maximum number of series to keep per query
  * @param queryIndexOf - panel query index of each expanded result
  * @param nameSuffixes - shift suffix of each expanded result ("" for a primary)
+ * @param sliceResult - keeps at most `limit` series of one result
  * @returns Limited data array
  */
 function applySeriesLimit(
@@ -171,6 +187,8 @@ function applySeriesLimit(
   limit: number,
   queryIndexOf: (index: number) => number = (index) => index,
   nameSuffixes: string[] = [],
+  sliceResult: (result: any[], limit: number, index: number) => any[] = (result, max) =>
+    result.slice(0, max),
 ): PromQLResponse[] {
   const resultOf = (queryData: PromQLResponse) => queryData?.data?.result || queryData?.result;
   const withResult = (queryData: PromQLResponse, result: any[]): PromQLResponse => {
@@ -183,7 +201,7 @@ function applySeriesLimit(
     const result = resultOf(queryData);
     return !result || nameSuffixes[index]
       ? queryData
-      : withResult(queryData, result.slice(0, limit));
+      : withResult(queryData, sliceResult(result, limit, index));
   });
 
   const kept = new Map<number, Set<any>>();
@@ -198,7 +216,7 @@ function applySeriesLimit(
     if (!result || !nameSuffixes[index]) return queryData;
     const primaries = kept.get(queryIndexOf(index));
     const survivors = primaries ? result.filter((m: any) => primaries.has(m?.metric)) : result;
-    return withResult(queryData, survivors.slice(0, limit));
+    return withResult(queryData, sliceResult(survivors, limit, index));
   });
 }
 

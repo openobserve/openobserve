@@ -114,7 +114,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 114: add RCA stage, context, continuation and on-call subject columns.
 // 115: create rca_steering and add the input columns to rca_runs.
 // 116: add favicon_img to status_pages.
-pub const DB_SCHEMA_VERSION: u64 = 116;
+// 117: create the fleet tables.
+pub const DB_SCHEMA_VERSION: u64 = 118;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1497,7 +1498,11 @@ pub struct ReportServer {
     pub addr: String,
     #[env_config(name = "ZO_REPORT_SERVER_HTTP_IPV6_ENABLED", default = false)]
     pub ipv6_enabled: bool,
-    #[env_config(name = "ZO_REPORT_SERVER_SECRET", default = "")]
+    #[env_config(
+        name = "ZO_REPORT_SERVER_SECRET",
+        default = "",
+        help = "Shared secret for the report server. The report server refuses to start without it; the main app and every installation that uses the same report server must set the same value."
+    )]
     pub secret: String,
 }
 
@@ -2443,6 +2448,12 @@ pub struct Common {
     )]
     pub create_org_through_ingestion: bool,
     #[env_config(
+        name = "ZO_ORG_CLEANUP_POLL_INTERVAL_SECS",
+        default = 3600,
+        help = "How often (seconds, default 3600) the compactor drains org deletion tasks and promotes orgs whose grace period ended. 0 pauses both jobs."
+    )]
+    pub org_cleanup_poll_interval_secs: u64,
+    #[env_config(
         name = "ZO_ORG_INVITE_EXPIRY",
         default = 7,
         help = "The number of days (default 7) an invitation token will be valid for. This can be changed in the runtime."
@@ -3065,6 +3076,12 @@ pub struct Limit {
     )]
     pub max_dashboard_series: usize,
     #[env_config(
+        name = "ZO_MAX_DASHBOARD_STATE_TIMELINE_SERIES",
+        default = 2000,
+        help = "maximum PromQL series a state timeline panel loads; restarts split one entity into several series"
+    )]
+    pub max_dashboard_state_timeline_series: usize,
+    #[env_config(
         name = "ZO_SEARCH_MINI_PARTITION_DURATION_SECS",
         default = 60,
         help = "Duration of each mini search partition in seconds"
@@ -3560,8 +3577,6 @@ pub struct RUM {
     pub service: String,
     #[env_config(name = "ZO_RUM_ENV", default = "")]
     pub env: String,
-    #[env_config(name = "ZO_RUM_VERSION", default = "")]
-    pub version: String,
     #[env_config(name = "ZO_RUM_ORGANIZATION_IDENTIFIER", default = "")]
     pub organization_identifier: String,
     #[env_config(name = "ZO_RUM_API_VERSION", default = "")]
@@ -4005,6 +4020,9 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // reset to default if given zero
     if cfg.limit.max_dashboard_series < 1 {
         cfg.limit.max_dashboard_series = 100;
+    }
+    if cfg.limit.max_dashboard_state_timeline_series < 1 {
+        cfg.limit.max_dashboard_state_timeline_series = 2000;
     }
 
     // check query timeout
@@ -6342,6 +6360,19 @@ mod tests {
         cfg.limit.batch_size = 4096; // within range
         check_limit_config(&mut cfg).unwrap();
         assert_eq!(cfg.limit.batch_size, 4096);
+    }
+
+    #[test]
+    fn test_check_limit_config_dashboard_state_timeline_series() {
+        let mut cfg = Config::init().unwrap();
+        assert_eq!(cfg.limit.max_dashboard_state_timeline_series, 2000);
+        cfg.limit.max_dashboard_state_timeline_series = 0;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.max_dashboard_state_timeline_series, 2000);
+
+        cfg.limit.max_dashboard_state_timeline_series = 50;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.max_dashboard_state_timeline_series, 50);
     }
 
     #[test]
