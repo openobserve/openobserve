@@ -418,6 +418,92 @@ describe("DateTime rail", () => {
     });
   });
 
+  describe("single clicked day", () => {
+    const calendar = () => wrapper!.findComponent({ name: "ODateRangeCalendar" });
+
+    it("applies the clicked day, not the old dates, when Apply is pressed", async () => {
+      createWrapper({ autoApply: false });
+      await flushPromises();
+      await openMenu();
+      el("date-time-absolute-tab")!.click();
+      await flushPromises();
+
+      calendar().vm.$emit("update:pendingDate", "2026/10/03");
+      wrapper!.vm.selectedTime.startTime = "09:15:00";
+      wrapper!.vm.selectedTime.endTime = "10:30:00";
+      await flushPromises();
+      el("date-time-apply-btn")!.click();
+      await flushPromises();
+
+      expect(lastEmit()).toMatchObject({
+        valueType: "absolute",
+        startTime: micros("2026-10-03T03:45:00Z"),
+        endTime: micros("2026-10-03T05:00:00Z"),
+      });
+    });
+
+    it("holds auto-apply while the day is pending and applies that day on close", async () => {
+      createWrapper({ autoApply: true });
+      await flushPromises();
+      await openMenu();
+      el("date-time-absolute-tab")!.click();
+      await flushPromises();
+      const emitsBefore = (wrapper!.emitted("on:date-change") ?? []).length;
+
+      calendar().vm.$emit("update:pendingDate", "2026/10/03");
+      wrapper!.vm.selectedTime.startTime = "09:15:00";
+      wrapper!.vm.selectedTime.endTime = "10:30:00";
+      await flushPromises();
+      expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(emitsBefore);
+
+      wrapper!.vm.onMenuOpenChange(false);
+      wrapper!.vm.menuOpen = false;
+      await flushPromises();
+      expect(lastEmit()).toMatchObject({
+        valueType: "absolute",
+        startTime: micros("2026-10-03T03:45:00Z"),
+        endTime: micros("2026-10-03T05:00:00Z"),
+      });
+      expect(wrapper!.vm.selectedType).toBe("absolute");
+    });
+
+    it("applies a range completed by the second click as before", async () => {
+      createWrapper({ autoApply: true });
+      await flushPromises();
+      await openMenu();
+      el("date-time-absolute-tab")!.click();
+      await flushPromises();
+
+      calendar().vm.$emit("update:pendingDate", "2026/10/03");
+      await flushPromises();
+      calendar().vm.$emit("update:startDate", "2026/10/03");
+      calendar().vm.$emit("update:endDate", "2026/10/05");
+      calendar().vm.$emit("update:pendingDate", null);
+      await flushPromises();
+
+      expect(lastEmit()).toMatchObject({ valueType: "absolute" });
+      expect(wrapper!.vm.selectedDate).toEqual({ from: "2026/10/03", to: "2026/10/05" });
+    });
+  });
+
+  describe("semantics", () => {
+    it("labels the Recent and Calendar sections as groups of lists", async () => {
+      seedHistory([hourRange(1), hourRange(2)]);
+      createWrapper();
+      await openMenu();
+
+      const groups = Array.from(
+        document.querySelectorAll('[data-test="date-time-rail"] [role="group"]'),
+      );
+      const names = groups.map((g) =>
+        document.getElementById(g.getAttribute("aria-labelledby") ?? "")?.textContent?.trim(),
+      );
+      expect(names).toEqual(["Recent", "Calendar"]);
+      expect(groups[0].querySelectorAll('[role="list"] > [role="listitem"]')).toHaveLength(2);
+      expect(groups[1].querySelectorAll('[role="list"] > [role="listitem"]')).toHaveLength(10);
+    });
+  });
+
   describe("tabs", () => {
     it("seeds the Absolute tab with the applied calendar range and applies nothing", async () => {
       createWrapper({ autoApply: true, defaultRelativeTime: "calendar:day:0" });
@@ -687,6 +773,24 @@ describe("DateTime rail", () => {
       await flushPromises();
       expect(el("date-time-rail-recent-3")).toBeNull();
       expect(el("date-time-rail-recent-toggle")?.textContent?.trim()).toBe("Show more");
+    });
+
+    it("keeps at most 15 ranges in the rail after 20 applies", async () => {
+      vi.useRealTimers();
+      createWrapper({ autoApply: true });
+      await flushPromises();
+      for (let n = 1; n <= 20; n++) {
+        wrapper!.vm.setCustomDate("absolute", {
+          start: Date.parse("2026-10-01T00:00:00Z") + n * 3_600_000,
+          end: Date.parse("2026-10-01T00:30:00Z") + n * 3_600_000,
+        });
+      }
+      await openMenu();
+      el("date-time-rail-recent-toggle")!.click();
+      await flushPromises();
+
+      expect(storedHistory()).toHaveLength(15);
+      expect(document.querySelectorAll("[data-date-time-rail-recent]")).toHaveLength(15);
     });
 
     it("has no Show more link for three ranges or fewer", async () => {

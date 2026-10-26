@@ -16,119 +16,143 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="date-time-rail flex flex-col py-1" data-test="date-time-rail">
-    <div class="text-text-secondary px-2 pt-1 pb-1 text-xs font-semibold">
-      {{ t("common.timeRangeRecent") }}
-    </div>
     <div
-      v-if="recent.length === 0"
-      class="text-text-muted px-2 pb-1 text-xs"
-      data-test="date-time-rail-recent-empty"
+      role="group"
+      :aria-labelledby="recentHeadingId"
+      class="flex flex-col"
+      data-test="date-time-rail-recent-group"
     >
-      {{ t("common.timeRangeRecentEmpty") }}
-    </div>
-    <div data-test="date-time-rail-recent-list">
-      <div v-for="item in visibleRecent" :key="item.id" class="group relative px-1">
-        <OTooltip
-          side="right"
-          align="center"
-          :side-offset="8"
-          max-width="18.75rem"
-          :content="item.disabled ? restrictionMsg : item.tooltip"
-        />
-        <OButton
-          variant="ghost"
-          size="xs"
-          data-date-time-rail-item
-          data-date-time-rail-recent
-          :tabindex="tabindexFor(`recent-${item.id}`)"
-          :data-test="`date-time-rail-recent-${item.id}`"
-          class="w-full justify-start! pe-7! font-normal tabular-nums disabled:opacity-35"
-          :class="item.selected ? 'bg-button-primary! text-button-primary-foreground!' : ''"
-          :disabled="item.disabled"
-          :aria-pressed="item.selected"
-          :aria-keyshortcuts="raw('Delete')"
-          @mouseenter="emit('hover')"
-          @focus="onItemFocus(`recent-${item.id}`)"
-          @click="emit('select-recent', item.id)"
-          @keydown.delete.prevent="removeFocusedRecent(item.id, $event)"
-        >
-          <OTruncatedText :tooltip="false" class="min-w-0">{{ item.label }}</OTruncatedText>
-          <span
-            v-if="item.suffix"
-            class="text-2xs shrink-0"
-            :class="item.selected ? '' : 'text-text-secondary'"
-            >{{ item.suffix }}</span
-          >
-        </OButton>
-        <OButton
-          variant="ghost"
-          size="icon-chip"
-          icon-left="close"
-          :data-test="`date-time-rail-recent-${item.id}-remove`"
-          tabindex="-1"
-          :aria-label="t('common.timeRangeRemoveRecent')"
-          class="absolute! end-1.5 top-1/2 -translate-y-1/2 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 max-md:opacity-100"
-          @click.stop="emit('remove-recent', item.id)"
-        />
+      <div :id="recentHeadingId" class="text-text-secondary px-2 pt-1 pb-1 text-xs font-semibold">
+        {{ t("common.timeRangeRecent") }}
       </div>
+      <div
+        v-if="recent.length === 0"
+        class="text-text-muted px-2 pb-1 text-xs"
+        data-test="date-time-rail-recent-empty"
+      >
+        {{ t("common.timeRangeRecentEmpty") }}
+      </div>
+      <div v-if="recent.length > 0" role="list" data-test="date-time-rail-recent-list">
+        <div
+          v-for="item in visibleRecent"
+          :key="item.id"
+          role="listitem"
+          class="group relative px-1"
+        >
+          <OTooltip
+            side="right"
+            align="center"
+            :side-offset="8"
+            max-width="18.75rem"
+            :content="item.disabled ? restrictionMsg : item.tooltip"
+          />
+          <OButton
+            variant="ghost"
+            size="xs"
+            data-date-time-rail-item
+            data-date-time-rail-recent
+            :tabindex="tabindexFor(`recent-${item.id}`)"
+            :data-test="`date-time-rail-recent-${item.id}`"
+            class="w-full justify-start! pe-7! font-normal tabular-nums disabled:opacity-35"
+            :class="item.selected ? 'bg-button-primary! text-button-primary-foreground!' : ''"
+            :disabled="item.disabled"
+            :aria-pressed="item.selected"
+            :aria-keyshortcuts="raw('Delete')"
+            @mouseenter="emit('hover')"
+            @focus="onItemFocus(`recent-${item.id}`)"
+            @click="emit('select-recent', item.id)"
+            @keydown.delete.prevent="removeFocusedRecent(item.id, $event)"
+          >
+            <OTruncatedText :tooltip="false" class="min-w-0">{{ item.label }}</OTruncatedText>
+            <span
+              v-if="item.suffix"
+              class="text-2xs shrink-0"
+              :class="item.selected ? '' : 'text-text-secondary'"
+              >{{ item.suffix }}</span
+            >
+          </OButton>
+          <OButton
+            variant="ghost"
+            size="icon-chip"
+            icon-left="close"
+            :data-test="`date-time-rail-recent-${item.id}-remove`"
+            tabindex="-1"
+            :aria-label="t('common.timeRangeRemoveRecent')"
+            class="absolute! end-1.5 top-1/2 -translate-y-1/2 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 max-md:opacity-100"
+            @click.stop="emit('remove-recent', item.id)"
+          />
+        </div>
+      </div>
+      <OButton
+        v-if="recent.length > COLLAPSED_COUNT"
+        variant="ghost-primary"
+        size="chip"
+        class="ms-1 self-start"
+        data-date-time-rail-item
+        data-test="date-time-rail-recent-toggle"
+        :tabindex="tabindexFor('toggle')"
+        :aria-expanded="expanded"
+        @focus="onItemFocus('toggle')"
+        @keydown.enter.prevent="expanded = !expanded"
+        @click="expanded = !expanded"
+      >
+        {{ expanded ? t("common.timeRangeShowLess") : t("common.timeRangeShowMore") }}
+      </OButton>
     </div>
-    <OButton
-      v-if="recent.length > COLLAPSED_COUNT"
-      variant="ghost-primary"
-      size="chip"
-      class="ms-1 self-start"
-      data-date-time-rail-item
-      data-test="date-time-rail-recent-toggle"
-      :tabindex="tabindexFor('toggle')"
-      :aria-expanded="expanded"
-      @focus="onItemFocus('toggle')"
-      @keydown.enter.prevent="expanded = !expanded"
-      @click="expanded = !expanded"
-    >
-      {{ expanded ? t("common.timeRangeShowLess") : t("common.timeRangeShowMore") }}
-    </OButton>
 
-    <template v-if="calendar !== null && calendar.length > 0">
-      <div class="text-text-secondary px-2 pt-3 pb-1 text-xs font-semibold">
+    <div
+      v-if="calendar !== null && calendar.length > 0"
+      role="group"
+      :aria-labelledby="calendarHeadingId"
+      class="flex flex-col"
+      data-test="date-time-rail-calendar-group"
+    >
+      <div :id="calendarHeadingId" class="text-text-secondary px-2 pt-3 pb-1 text-xs font-semibold">
         {{ t("common.timeRangeCalendar") }}
       </div>
-      <div v-for="item in calendar" :key="item.id" class="px-1">
-        <OTooltip
-          side="right"
-          align="center"
-          :side-offset="8"
-          max-width="18.75rem"
-          :content="item.disabled ? restrictionMsg : item.tooltip"
-        />
-        <OButton
-          variant="ghost"
-          size="xs"
-          data-date-time-rail-item
-          :tabindex="tabindexFor(`calendar-${item.id}`)"
-          :data-test="`date-time-rail-calendar-${item.id}`"
-          class="w-full justify-start! font-normal disabled:opacity-35"
-          :class="item.selected ? 'bg-button-primary! text-button-primary-foreground!' : ''"
-          :disabled="item.disabled"
-          :aria-pressed="item.selected"
-          @mouseenter="emit('hover')"
-          @focus="onItemFocus(`calendar-${item.id}`)"
-          @click="emit('select-calendar', item.id)"
-        >
-          <OTruncatedText :tooltip="false" class="min-w-0">{{ item.label }}</OTruncatedText>
-          <span
-            v-if="item.suffix"
-            class="text-2xs ms-auto shrink-0"
-            :class="item.selected ? '' : 'text-text-secondary'"
-            >{{ item.suffix }}</span
+      <div
+        role="list"
+        class="max-sm:grid max-sm:grid-cols-2"
+        data-test="date-time-rail-calendar-list"
+      >
+        <div v-for="item in calendar" :key="item.id" role="listitem" class="px-1">
+          <OTooltip
+            side="right"
+            align="center"
+            :side-offset="8"
+            max-width="18.75rem"
+            :content="item.disabled ? restrictionMsg : item.tooltip"
+          />
+          <OButton
+            variant="ghost"
+            size="xs"
+            data-date-time-rail-item
+            :tabindex="tabindexFor(`calendar-${item.id}`)"
+            :data-test="`date-time-rail-calendar-${item.id}`"
+            class="w-full justify-start! font-normal disabled:opacity-35"
+            :class="item.selected ? 'bg-button-primary! text-button-primary-foreground!' : ''"
+            :disabled="item.disabled"
+            :aria-pressed="item.selected"
+            @mouseenter="emit('hover')"
+            @focus="onItemFocus(`calendar-${item.id}`)"
+            @click="emit('select-calendar', item.id)"
           >
-        </OButton>
+            <OTruncatedText :tooltip="false" class="min-w-0">{{ item.label }}</OTruncatedText>
+            <span
+              v-if="item.suffix"
+              class="text-2xs ms-auto shrink-0"
+              :class="item.selected ? '' : 'text-text-secondary'"
+              >{{ item.suffix }}</span
+            >
+          </OButton>
+        </div>
       </div>
-    </template>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref } from "vue";
+import { computed, nextTick, ref, useId } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -154,6 +178,8 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const recentHeadingId = useId();
+const calendarHeadingId = useId();
 
 // Starts collapsed on every open because the popover unmounts this rail when it closes.
 const expanded = ref(false);

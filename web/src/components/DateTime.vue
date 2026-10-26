@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :recent="recentRailItems"
             :calendar="calendarRailItems"
             :restriction-msg="raw(queryRangeRestrictionMsg)"
-            class="absolute inset-0 min-h-0 overflow-y-auto max-sm:static max-sm:max-h-36"
+            class="absolute inset-0 min-h-0 overflow-y-auto max-sm:static max-sm:overflow-visible"
             @hover="refreshTooltipNow"
             @select-recent="applyRecentRange"
             @remove-recent="removeRecentRange"
@@ -277,6 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :max-date="calendarMaxDate"
                       @update:start-date="selectedDate.from = $event"
                       @update:end-date="selectedDate.to = $event"
+                      @update:pending-date="pendingDay = $event"
                     />
                   </div>
                   <div class="text-3xs ps-6 pe-6">{{ t("common.datetimeMessage") }}</div>
@@ -582,6 +583,8 @@ export default defineComponent({
     // Offset-0 tooltips end at now, so they read a clock refreshed on hover rather than a stale render time.
     const tooltipNow = ref(Date.now());
     const timeRangeHistory = useTimeRangeHistory();
+    // A single clicked day the range calendar is still waiting to pair with an end date.
+    const pendingDay = ref<string | null>(null);
     // Fields written by the picker itself (seeding the Absolute tab, a Recent pick) are not user edits for auto-apply.
     let isSeedingAbsolute = false;
     // Date-only pickers cannot show the times a recent range carries.
@@ -894,12 +897,14 @@ export default defineComponent({
         selectedTime.value.endTime;
         selectedDate.value?.from;
         selectedDate.value?.to;
+        pendingDay.value;
       },
       () => {
         if (
           props.autoApply &&
           selectedType.value === "absolute" &&
           !isSeedingAbsolute &&
+          pendingDay.value === null &&
           store.state.savedViewFlag == false
         ) {
           saveDate("absolute");
@@ -1852,10 +1857,12 @@ export default defineComponent({
     const onMenuOpenChange = (open: boolean) => {
       if (open) {
         refreshTooltipNow();
+        pendingDay.value = null;
         rangeKeyAtOpen = absoluteRangeKey();
         onBeforeShow();
         onShow();
       } else {
+        if (props.autoApply && commitPendingDay()) saveDate("absolute");
         if (!props.autoApply || selectedType.value !== appliedSelection.selectedType) {
           restoreAppliedSelection();
         } else if (absoluteRangeKey() !== rangeKeyAtOpen) {
@@ -1873,7 +1880,22 @@ export default defineComponent({
       onMenuOpenChange(false);
     };
 
+    // One clicked day means that day; without this the calendar's unfinished range left the old dates in place.
+    const commitPendingDay = (): boolean => {
+      const day = pendingDay.value;
+      pendingDay.value = null;
+      if (!day || selectedType.value !== "absolute") return false;
+      isSeedingAbsolute = true;
+      selectedDate.value.from = day;
+      selectedDate.value.to = day;
+      nextTick(() => {
+        isSeedingAbsolute = false;
+      });
+      return true;
+    };
+
     const applyAndClose = () => {
+      commitPendingDay();
       saveDate(null);
       recordAbsoluteRange();
       menuOpen.value = false;
@@ -1938,6 +1960,7 @@ export default defineComponent({
       applyRecentRange,
       removeRecentRange,
       applyAndClose,
+      pendingDay,
       calendarToken,
       setCalendarPeriod,
       calendarTooltip,
