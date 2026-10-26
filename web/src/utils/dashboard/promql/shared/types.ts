@@ -168,4 +168,7 @@ export interface MapsConfig {
   aggregation?: string;
   emphasis_area_color?: string;
   select_area_color?: string;
+  unit?: string;
+  unit_custom?: string;
+  decimals?: number;
 }

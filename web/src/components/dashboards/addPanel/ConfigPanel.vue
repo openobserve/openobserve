@@ -1549,6 +1549,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OSelect>
         </div>
 
+        <OSwitch
+          v-if="dashboardPanelData.data.type === 'maps'"
+          v-show="isConfigOptionVisible('map', 'map-roam')"
+          v-model="mapsEnableRoam"
+          :label="t('dashboard.mapsEnableRoam')"
+          data-test="dashboard-config-map-roam"
+          size="lg"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.mapsEnableRoamTooltip')" max-width="15.625rem" />
+          </template>
+        </OSwitch>
+
         <OSelect
           v-if="dashboardPanelData.data.type == 'geomap'"
           v-model="dashboardPanelDataModel.data.config.base_map.type"
@@ -2355,6 +2368,16 @@ export default defineComponent({
         value: "world",
       },
     ];
+
+    // Unset keeps each path's old default: PromQL maps pan and zoom, SQL maps do not.
+    const mapsEnableRoam = computed({
+      get: () =>
+        dashboardPanelData.data.config.enable_roam ??
+        dashboardPanelData.data.queryType === "promql",
+      set: (value: boolean) => {
+        dashboardPanelData.data.config.enable_roam = value;
+      },
+    });
     onBeforeMount(() => {
       // Normalize config fields that default to null but may arrive as undefined
       // when loaded from older panels (backend omits null fields in JSON response).
@@ -3145,6 +3168,7 @@ export default defineComponent({
       promqlMode,
       basemapTypeOptions,
       mapTypeOptions,
+      mapsEnableRoam,
       layerTypeOptions,
       symbolOptions,
       legendsPositionOptions,

@@ -36,14 +36,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="tableRendererData"
           :config="panelSchema.config"
           :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
-          @row-click="onChartClick"
+          @row-click="
+            (params: any, ...rest: any[]) => !store.state.kioskMode && onChartClick(params, ...rest)
+          "
         />
         <TableRenderer
           v-else-if="panelSchema.type == 'table'"
           :data="tableRendererData"
           :value-mapping="panelSchema?.config?.mappings ?? []"
-          @row-click="onChartClick"
-          @explore-cell="(params) => exploreCellInLogs(params.columnId, params.value, params.row)"
+          @row-click="
+            (params: any, ...rest: any[]) => !store.state.kioskMode && onChartClick(params, ...rest)
+          "
+          @explore-cell="
+            (params) =>
+              !store.state.kioskMode && exploreCellInLogs(params.columnId, params.value, params.row)
+          "
           @format-column="onFormatColumn"
           ref="tableRendererRef"
           :wrap-cells="panelSchema.config?.wrap_table_cells"
@@ -53,8 +60,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :expandable-rows="!!panelSchema.config?.table_expandable_rows"
           :row-key-fields="tableRowKeyFields"
           :enable-column-format="enableColumnFormat"
-          :drilldown-columns="store.state.printMode ? [] : drilldownColumnAliases"
-          :drilldown-all-columns="!store.state.printMode && drilldownAllColumns"
+          :drilldown-columns="
+            store.state.printMode || store.state.kioskMode ? [] : drilldownColumnAliases
+          "
+          :drilldown-all-columns="
+            !store.state.printMode && !store.state.kioskMode && drilldownAllColumns
+          "
         />
         <div
           v-else-if="panelSchema.type == 'html'"
@@ -94,14 +105,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :height="chartPanelHeight"
           :label="raw(panelSchema?.title)"
           :render-type="panelSchema?.type === 'metric' ? 'svg' : 'canvas'"
-          @updated:data-zoom="onDataZoom"
+          @updated:data-zoom="(event) => !store.state.kioskMode && onDataZoom(event)"
           @error="errorDetail = $event"
-          @click="onChartClick"
-          @contextmenu="onChartContextMenu"
-          @domcontextmenu="onChartDomContextMenu"
+          @click="
+            (params: any, ...rest: any[]) => !store.state.kioskMode && onChartClick(params, ...rest)
+          "
+          @contextmenu="(event) => !store.state.kioskMode && onChartContextMenu(event)"
+          @domcontextmenu="(event) => !store.state.kioskMode && onChartDomContextMenu(event)"
           :find-line-on-context-menu="findsLineOnContextMenu"
-          @mouseover="exemplarInteraction.onMouseOver"
-          @mouseout="exemplarInteraction.onMouseOut"
+          @mouseover="onChartMouseOver"
+          @mouseout="onChartMouseOut"
           @finished="onChartFinished"
         />
         <ExemplarMarkerList
@@ -126,6 +139,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @enter="exemplarInteraction.onCardEnter"
           @leave="exemplarInteraction.onCardLeave"
           @open-trace="exemplarInteraction.openTrace"
+        />
+        <QueryAnnotationTooltip
+          v-if="hoveredQueryAnnotation"
+          :marker="hoveredQueryAnnotation.marker"
+          :timezone="store.state.timezone"
+          :x="hoveredQueryAnnotation.x"
+          :y="hoveredQueryAnnotation.y"
         />
       </div>
       <div
@@ -310,6 +330,7 @@ import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import {
   CustomChartSkippedError,
+  panelRefreshEpoch,
   type CustomChartContext,
 } from "@/utils/dashboard/convertCustomChartData";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
@@ -319,7 +340,13 @@ import { useRoute, useRouter } from "vue-router";
 import useNotifications from "@/composables/useNotifications";
 import { validateSQLPanelFields } from "@/utils/dashboard/panelValidation";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
-import { withTimeRangeVariables } from "@/utils/dashboard/variables/variablesUtils";
+import { usePanelAnnotationSources } from "@/composables/dashboard/usePanelAnnotationSources";
+import QueryAnnotationTooltip from "./QueryAnnotationTooltip.vue";
+import type { QueryAnnotationMarker } from "@/ts/interfaces/dashboard";
+import {
+  getVariablesReferencedInQueries,
+  withTimeRangeVariables,
+} from "@/utils/dashboard/variables/variablesUtils";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import {
   forecastPointOf,
@@ -338,6 +365,10 @@ import {
   toChartTimeMs,
 } from "@/utils/dashboard/exemplars/applyExemplarSeries";
 import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
+import {
+  applyHeatmapExemplarSeries,
+  cachedHeatmapExemplarPlacement,
+} from "@/utils/dashboard/exemplars/heatmapExemplars";
 import { buildExemplarTraceRoute } from "@/utils/dashboard/exemplars/exemplarTraceRoute";
 import {
   exemplarBaseUnit,
@@ -351,6 +382,13 @@ import ExemplarMarkerList from "@/components/dashboards/exemplars/ExemplarMarker
 import type { ExemplarMarker, InjectedExemplars, TraceVerdict } from "@/ts/interfaces/exemplars";
 import { detectChunkingDirection } from "@/utils/dashboard/chunkingDirection";
 import type { SeriesLimitInfo } from "@/utils/dashboard/panelDiagnostics";
+import type { RegionJoinInfo } from "@/utils/dashboard/convertMapsData";
+
+interface CustomChartVariable {
+  name: string;
+  value?: unknown;
+  type?: string;
+}
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -408,6 +446,7 @@ export default defineComponent({
   name: "PanelSchemaRenderer",
   components: {
     OSeparator,
+    QueryAnnotationTooltip,
     ChartRenderer,
     AlertContextMenu,
     TableRenderer,
@@ -581,6 +620,7 @@ export default defineComponent({
     "loading-state-change",
     "limit-number-of-series-warning-message-update",
     "series-limit-update",
+    "region-join-update",
     "panel-diagnostics-update",
     "sparkline-warning-update",
     "is-partial-data-update",
@@ -647,6 +687,7 @@ export default defineComponent({
 
     const limitNumberOfSeriesWarningMessage: any = ref("");
     const seriesLimit = ref<SeriesLimitInfo | null>(null);
+    const regionJoin = shallowRef<RegionJoinInfo | null>(null);
 
     const chartPanelStyle = ref({
       height: "100%",
@@ -830,6 +871,20 @@ export default defineComponent({
         isFirstLoadSettled?.value === false &&
         !["html", "markdown"].includes(panelSchema.value?.type),
     );
+
+    // Dashboard-level annotation sources are queried once by the dashboard and merged after the panel's own.
+    const {
+      markers: sourceAnnotationMarkers,
+      failedSources: failedAnnotationSources,
+      truncatedSources: truncatedAnnotationSources,
+    } = usePanelAnnotationSources(
+      () => panelSchema.value?.id,
+      () => panelSchema.value?.type,
+    );
+    const panelAnnotations = computed(() => [
+      ...(annotations.value ?? []),
+      ...sourceAnnotationMarkers.value,
+    ]);
 
     const {
       isAddAnnotationMode,
@@ -1066,6 +1121,18 @@ export default defineComponent({
       );
     };
 
+    // A heatmap's markers sit on its cells, so they follow the converter's columns and rows.
+    const placeHeatmapCells = cachedHeatmapExemplarPlacement(toExemplarChartX);
+    const heatmapExemplarPlace = computed(() => {
+      const extras = panelData.value?.extras;
+      if (panelSchema.value?.type !== "heatmap" || !extras?.heatmapExemplarLayout) return null;
+      if (!extras.heatmapTimeAxis) return null;
+      return placeHeatmapCells(
+        extras.heatmapExemplarLayout,
+        extras.heatmapTimeAxis,
+        exemplarMarkers.value,
+      );
+    });
     const exemplarInteraction = usePanelExemplarInteraction({
       chartRendererRef,
       markers: exemplarMarkers,
@@ -1075,7 +1142,48 @@ export default defineComponent({
       toChartX: toExemplarChartX,
       navigate: navigateToExemplarTrace,
       placeY: placeExemplarY,
+      gridPlacer: heatmapExemplarPlace,
     });
+    const hoveredQueryAnnotation = ref<{
+      marker: QueryAnnotationMarker;
+      x: number;
+      y: number;
+    } | null>(null);
+
+    type ChartPointerEvent = Parameters<typeof exemplarInteraction.onMouseOver>[0] & {
+      componentType?: string;
+      data?: { annotationDetails?: Partial<QueryAnnotationMarker> };
+      event?: { event?: { clientX?: number; clientY?: number } };
+    };
+
+    // One tooltip at a time: the axis tooltip pauses while a query marker shows its own.
+    const setAxisTooltipPaused = (paused: boolean) => {
+      const chart = chartRendererRef.value?.chart;
+      if (paused) chart?.dispatchAction?.({ type: "hideTip" });
+      chart?.setOption?.({ tooltip: { triggerOn: paused ? "none" : "mousemove|click" } });
+    };
+
+    const onChartMouseOver = (params: ChartPointerEvent) => {
+      exemplarInteraction.onMouseOver(params);
+      const isMarker = params?.componentType === "markLine" || params?.componentType === "markArea";
+      const marker = params?.data?.annotationDetails;
+      if (!isMarker || !marker?.source) return;
+      if (!hoveredQueryAnnotation.value) setAxisTooltipPaused(true);
+      hoveredQueryAnnotation.value = {
+        marker: marker as QueryAnnotationMarker,
+        x: params?.event?.event?.clientX ?? 0,
+        y: params?.event?.event?.clientY ?? 0,
+      };
+    };
+
+    const onChartMouseOut = (params: ChartPointerEvent) => {
+      exemplarInteraction.onMouseOut(params);
+      if (!hoveredQueryAnnotation.value) return;
+      hoveredQueryAnnotation.value = null;
+      // An open exemplar card keeps the axis tooltip paused for itself.
+      if (!exemplarActiveMarker.value) setAxisTooltipPaused(false);
+    };
+
     const {
       points: exemplarPoints,
       activeMarker: exemplarActiveMarker,
@@ -1323,6 +1431,7 @@ export default defineComponent({
     });
     // Conversions can resolve out of order; only the most recently started may land.
     let conversionGeneration = 0;
+    let customChartRunSkipped = false;
     const convertPanelDataCommon = async (applyOverlay = false) => {
       // Converting the empty pre-load buffer would publish an empty result to the header and curated tiles.
       if (isAwaitingFirstLoad.value) return;
@@ -1356,7 +1465,7 @@ export default defineComponent({
             filteredResultMetaData,
             filteredMetadata.value,
             chartPanelStyle.value,
-            annotations,
+            panelAnnotations,
             loading.value,
             filteredSparklineData.value,
             panelSchema.value?.type === "custom_chart" ? buildCustomChartContext() : undefined,
@@ -1466,23 +1575,31 @@ export default defineComponent({
           }
 
           panelData.value = result;
+          customChartRunSkipped = false;
 
           limitNumberOfSeriesWarningMessage.value =
             panelData.value?.extras?.limitNumberOfSeriesWarningMessage ?? "";
           seriesLimit.value = panelData.value?.extras?.seriesLimit ?? null;
+          regionJoin.value = panelData.value?.extras?.regionJoin ?? null;
 
           errorDetail.value = {
             message: "",
             code: "",
           };
         } catch (error: any) {
-          if (superseded() || error instanceof CustomChartSkippedError) return;
+          if (superseded()) return;
+          if (error instanceof CustomChartSkippedError) {
+            customChartRunSkipped = true;
+            return;
+          }
+          regionJoin.value = null;
           errorDetail.value = {
             message: error?.message,
             code: error?.code || "",
           };
         }
       } else {
+        regionJoin.value = null;
         // if no data is available, then show the default data
         // if there is an error config in the panel schema, then show the default data on error
         // if no default data on error is set, then show the custom error message
@@ -1544,17 +1661,26 @@ export default defineComponent({
       { deep: true },
     );
 
-    // The loader reloads only for query-referenced variables, but chart code may read any of them.
+    const rerunCustomChart = () => {
+      if (panelSchema.value?.type === "custom_chart" && data.value?.length && !loading.value) {
+        convertPanelDataCommon();
+      }
+    };
+
+    // Query-referenced and ad hoc variables reload the panel, which re-runs the code on the new data.
     // Keyed on values only: option lists and loading flags change often and chart code cannot see them.
     watch(
       () =>
-        panelSchema.value?.type === "custom_chart" ? JSON.stringify(customChartVariables()) : "",
-      () => {
-        if (panelSchema.value?.type === "custom_chart" && data.value?.length && !loading.value) {
-          convertPanelDataCommon();
-        }
-      },
+        panelSchema.value?.type === "custom_chart"
+          ? JSON.stringify(customChartVariables(unreferencedVariables()))
+          : "",
+      rerunCustomChart,
     );
+
+    // A run skipped during another panel's refresh would otherwise keep its stale render.
+    watch(panelRefreshEpoch, () => {
+      if (customChartRunSkipped) rerunCustomChart();
+    });
 
     // Watch for hiddenQueries changes to re-render the chart
     watch(
@@ -1569,7 +1695,13 @@ export default defineComponent({
     );
 
     watch(
-      [data, () => store?.state?.theme, () => store?.state?.timezone, annotations, sparklineData],
+      [
+        data,
+        () => store?.state?.theme,
+        () => store?.state?.timezone,
+        panelAnnotations,
+        sparklineData,
+      ],
       async () => {
         // emit vrl function field list per query index
         if (data.value?.length) {
@@ -1831,6 +1963,15 @@ export default defineComponent({
       emit("series-limit-update", value);
     });
 
+    // Immediate, so a renderer remounted for a new chart type clears the previous type's chips.
+    watch(
+      regionJoin,
+      (value) => {
+        emit("region-join-update", value);
+      },
+      { immediate: true },
+    );
+
     watch(
       () => panelDiagnostics?.value,
       (value) => {
@@ -1954,9 +2095,40 @@ export default defineComponent({
     // Determines what data to pass to ChartRenderer.
     // noData check is evaluated first so promql panels with no results
     // also get the transparent background instead of showing a skeleton.
+    // Reused until the data, markers or colours change, since a new object makes the chart redraw every cell.
+    const heatmapExemplarData = computed(
+      (previous?: { source: unknown; place: unknown; colors: string; data: unknown }) => {
+        const source = panelData.value;
+        const place = heatmapExemplarPlace.value;
+        const queryColors = exemplarQueryColors.value;
+        const haloColor = (void isDark.value, chartColor("--color-surface-base"));
+        const edgeColor = (void isDark.value, chartColor("--color-text-heading"));
+        const colors = [...queryColors, haloColor, edgeColor].join("|");
+        if (
+          previous &&
+          previous.source === source &&
+          previous.place === place &&
+          previous.colors === colors
+        ) {
+          return previous;
+        }
+        const data = place
+          ? {
+              ...source,
+              options: applyHeatmapExemplarSeries(source.options, exemplarMarkers.value, place, {
+                queryColors,
+                haloColor,
+                edgeColor,
+              }),
+            }
+          : source;
+        return { source, place, colors, data };
+      },
+    );
     const withExemplars = (value: any) => {
       if (!exemplarMarkers.value.length || !value?.options) return value;
       if (!exemplarsEligible.value && !injectedExemplars.value) return value;
+      if (panelSchema.value?.type === "heatmap") return heatmapExemplarData.value.data;
       return {
         ...value,
         options: applyExemplarSeries(value.options, exemplarMarkers.value, {
@@ -2183,13 +2355,26 @@ export default defineComponent({
       return Number.isFinite(n) && n > 0 ? n : 0;
     }
 
+    function unreferencedVariables(): CustomChartVariable[] {
+      const values: CustomChartVariable[] = props.variablesData?.values ?? [];
+      const referenced = new Set(
+        (getVariablesReferencedInQueries(values, panelSchema.value?.queries) ?? []).map(
+          (v: CustomChartVariable) => v.name,
+        ),
+      );
+      return values.filter((v) => v?.type !== "dynamic_filters" && !referenced.has(v?.name));
+    }
+
     // Uses the committed variables the query ran with, so context matches the data.
-    function customChartVariables(): Record<string, unknown> {
+    function customChartVariables(
+      values: CustomChartVariable[] = props.variablesData?.values ?? [],
+    ): Record<string, unknown> {
       const variables: Record<string, unknown> = {};
-      for (const v of props.variablesData?.values ?? []) {
+      for (const v of values) {
         if (!v?.name) continue;
         const isAll =
-          v.value == null ||
+          v.value === null ||
+          v.value === undefined ||
           v.value === SELECT_ALL_VALUE ||
           (Array.isArray(v.value) && (!v.value.length || v.value.includes(SELECT_ALL_VALUE)));
         // Queries run an empty value or the All sentinel as All, so chart code gets null for both.
@@ -2199,11 +2384,12 @@ export default defineComponent({
     }
 
     function buildCustomChartContext(): CustomChartContext {
+      const time: { start_time?: unknown; end_time?: unknown } | undefined = props.selectedTimeObj;
       return {
         variables: customChartVariables(),
         timeRange: {
-          start: toMicros((props.selectedTimeObj as any)?.start_time),
-          end: toMicros((props.selectedTimeObj as any)?.end_time),
+          start: toMicros(time?.start_time),
+          end: toMicros(time?.end_time),
         },
         timezone: store.state.timezone,
         theme: isDark.value ? "dark" : "light",
@@ -2302,6 +2488,11 @@ export default defineComponent({
     }
 
     return {
+      hoveredQueryAnnotation,
+      onChartMouseOver,
+      onChartMouseOut,
+      failedAnnotationSources,
+      truncatedAnnotationSources,
       t,
       raw,
       store,
