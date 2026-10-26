@@ -68,6 +68,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="fleet-install-command-code"
     />
     <OText variant="meta" data-test="fleet-install-command-note">{{ note }}</OText>
+    <OCollapsible :label="t('fleet.uninstall.howTo')" data-test="fleet-install-command-uninstall">
+      <FleetUninstallCommand :platform="platform" :role="role" />
+    </OCollapsible>
   </div>
 </template>
 
@@ -77,6 +80,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { getIngestionURL } from "@/utils/queryUtils";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -93,6 +97,7 @@ import {
   type KubernetesRole,
 } from "./fleetInstall";
 import { useFleetSettings } from "./useFleetApi";
+import FleetUninstallCommand from "./FleetUninstallCommand.vue";
 
 const props = defineProps<{ token: string }>();
 

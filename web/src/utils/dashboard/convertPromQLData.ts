@@ -29,6 +29,7 @@ import {
   getGridLineStyle,
 } from "./colorPalette";
 import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
+import { ANNOTATION_MARK_AREA_Z } from "@/utils/dashboard/constants";
 import { escapeHtml } from "@/utils/html";
 import { addCommasToNumber } from "@/utils/formatters";
 import {
@@ -503,6 +504,8 @@ export const convertPromQLData = async (
       itemStyle: {
         color: CHART_SELECTION_FILL,
       },
+      // ECharts draws markArea at z 1, under bars (z 2) and line/area fills (z 3); bands must sit on top.
+      z: ANNOTATION_MARK_AREA_Z,
       data: markAreas,
     };
   };
