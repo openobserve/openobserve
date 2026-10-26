@@ -39,6 +39,8 @@ import { createTrellisHelpers } from "./trellisConfig";
 import { type SQLContext } from "./types";
 import { escapeHtml } from "@/utils/html";
 import { createSeriesOverrideLookup } from "../../seriesOverrides";
+import { sortTooltipParams } from "../../tooltipSort";
+import { tooltipPointValue } from "../../cartesianOptions";
 
 /**
  * Finds the largest label in the given data array.
@@ -548,10 +550,11 @@ export function buildSQLContext(
             return "";
           if (name?.length == 0) return "";
 
-          // sort tooltip array based on value
-          name?.sort((a: any, b: any) => {
-            return (b.value ?? 0) - (a.value ?? 0);
-          });
+          sortTooltipParams(
+            name,
+            panelSchema?.config,
+            (it: any) => tooltipPointValue(it.value) ?? 0,
+          );
 
           // if hovered series name is not null then move it to first position
           if (hoveredSeriesState?.value?.hoveredSeriesName) {
@@ -580,14 +583,14 @@ export function buildSQLContext(
               if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
                 hoverText.push(
                   `<strong>${it.marker} ${escapeHtml(seriesOverrides.displayName(it.seriesName))} : ${escapeHtml(
-                    seriesOverrides.formatValue(it.value, it.seriesName),
+                    seriesOverrides.formatValue(tooltipPointValue(it.value), it.seriesName),
                   )} </strong>`,
                 );
               // else normal text
               else
                 hoverText.push(
                   `${it.marker} ${escapeHtml(seriesOverrides.displayName(it.seriesName))} : ${escapeHtml(
-                    seriesOverrides.formatValue(it.value, it.seriesName),
+                    seriesOverrides.formatValue(tooltipPointValue(it.value), it.seriesName),
                   )}`,
                 );
             }

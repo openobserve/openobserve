@@ -167,6 +167,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
+    <template v-if="isAxisChart">
+      <div
+        v-for="row in styleRows"
+        :key="row.key"
+        class="flex items-start gap-2 px-3 py-2"
+        :data-test="`dashboard-series-format-${row.test}-row`"
+      >
+        <span :class="[LABEL_CLASS, 'min-h-8']">{{ row.label }}</span>
+        <div class="min-w-0 flex-1">
+          <OSelect
+            :model-value="override[row.key] ?? null"
+            :options="row.options"
+            :data-test="`dashboard-config-series-override-${row.test}`"
+            @update:model-value="patch({ [row.key]: ($event as string | null) ?? null })"
+          />
+        </div>
+      </div>
+      <div class="flex items-start gap-2 px-3 py-2">
+        <span :class="[LABEL_CLASS, 'min-h-5']">{{ t("dashboard.seriesOverrideTransform") }}</span>
+        <div class="min-w-0 flex-1">
+          <OSwitch
+            :model-value="override.transform === 'negative_y'"
+            :label="t('dashboard.seriesOverrideNegativeY')"
+            data-test="dashboard-config-series-override-transform"
+            @update:model-value="patch({ transform: $event ? 'negative_y' : null })"
+          />
+        </div>
+      </div>
+    </template>
+
     <div
       v-if="showThresholds"
       class="flex items-start gap-2 px-3 py-2"
@@ -244,6 +274,7 @@ import ColorSwatchPicker from "./ColorSwatchPicker.vue";
 import ThresholdsConfig from "./addPanel/ThresholdsConfig.vue";
 import ValueMappingList from "./addPanel/ValueMappingList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import { valueMappingPatternErrors } from "./addPanel/valueMappingErrors";
 import { getColorPalette } from "@/utils/dashboard/colorPalette";
 import { matchesSeriesOverride } from "@/utils/dashboard/seriesOverrides";
@@ -381,6 +412,52 @@ const colorSwatches = computed(() => {
 });
 
 const showThresholds = computed(() => THRESHOLD_CHART_TYPES.includes(props.chartType));
+const isAxisChart = computed(() => AXIS_CHART_TYPES.includes(props.chartType));
+
+type StyleKey = "axisPlacement" | "drawStyle" | "lineStyle";
+const styleOptions = (choices: { value: string; label: I18nText }[]) => [
+  { value: null, label: t("dashboard.seriesOverrideStyleInherit") },
+  ...choices,
+];
+const styleRows = computed<
+  {
+    key: StyleKey;
+    test: string;
+    label: I18nText;
+    options: { value: string | null; label: I18nText }[];
+  }[]
+>(() => [
+  {
+    key: "axisPlacement",
+    test: "axis-placement",
+    label: t("dashboard.seriesOverrideAxisPlacement"),
+    options: styleOptions([
+      { value: "left", label: t("dashboard.seriesOverrideAxisLeft") },
+      { value: "right", label: t("dashboard.seriesOverrideAxisRight") },
+      { value: "hidden", label: t("dashboard.seriesOverrideAxisHidden") },
+    ]),
+  },
+  {
+    key: "drawStyle",
+    test: "draw-style",
+    label: t("dashboard.seriesOverrideDrawStyle"),
+    options: styleOptions([
+      { value: "line", label: t("dashboard.seriesOverrideDrawLine") },
+      { value: "bars", label: t("dashboard.seriesOverrideDrawBars") },
+      { value: "points", label: t("dashboard.seriesOverrideDrawPoints") },
+    ]),
+  },
+  {
+    key: "lineStyle",
+    test: "line-style",
+    label: t("dashboard.lineStyle"),
+    options: styleOptions([
+      { value: "solid", label: t("dashboard.lineStyleSolid") },
+      { value: "dashed", label: t("dashboard.lineStyleDashed") },
+      { value: "dotted", label: t("dashboard.lineStyleDotted") },
+    ]),
+  },
+]);
 // A state timeline shows raw states coloured per state, so unit, decimals and a row colour do not apply.
 const isStateTimeline = computed(() => props.chartType === "state-timeline");
 

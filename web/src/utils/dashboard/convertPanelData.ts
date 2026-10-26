@@ -23,6 +23,7 @@ import { convertMapsData } from "@/utils/dashboard/convertMapsData";
 import { convertSankeyData } from "./convertSankeyData";
 import { convertStateTimelineData } from "./convertStateTimelineData";
 import { runJavaScriptCode, validateUserCode } from "./convertCustomChartData";
+import { applyCartesianOptions } from "./cartesianOptions";
 /**
  * Converts panel data based on the panel schema and data.
  *
@@ -81,39 +82,37 @@ export const convertPanelData = async (
         panelSchema?.queryType == "promql"
       ) {
         // chartpanelref will be used to get width and height of the chart element from DOM
-        return {
-          chartType: panelSchema.type,
-          ...(await convertPromQLData(
+        const result: any = await convertPromQLData(
+          panelSchema,
+          data,
+          store,
+          chartPanelRef,
+          hoveredSeriesState,
+          annotations,
+          metadata,
+          resultMetaData?.value,
+          loading,
+        );
+        applyCartesianOptions(result?.options, panelSchema);
+        return { chartType: panelSchema.type, ...result };
+      } else {
+        // chartpanelref will be used to get width and height of the chart element from DOM
+        try {
+          const result: any = await convertMultiSQLData(
             panelSchema,
             data,
             store,
             chartPanelRef,
             hoveredSeriesState,
-            annotations,
+            resultMetaData,
             metadata,
-            resultMetaData?.value,
+            chartPanelStyle,
+            annotations,
             loading,
-          )),
-        };
-      } else {
-        // chartpanelref will be used to get width and height of the chart element from DOM
-        try {
-          return {
-            chartType: panelSchema.type,
-            ...(await convertMultiSQLData(
-              panelSchema,
-              data,
-              store,
-              chartPanelRef,
-              hoveredSeriesState,
-              resultMetaData,
-              metadata,
-              chartPanelStyle,
-              annotations,
-              loading,
-              sparklineData,
-            )),
-          };
+            sparklineData,
+          );
+          applyCartesianOptions(result?.options, panelSchema);
+          return { chartType: panelSchema.type, ...result };
         } catch (error) {
           console.error(error);
           return {};

@@ -42,6 +42,12 @@ vi.mock("@/utils/dashboard/configUtils", () => ({
   shouldShowAxisConfig: vi.fn(() => false),
   shouldShowAxisBorderConfig: vi.fn(() => false),
   shouldShowCartesianAxisConfig: vi.fn(() => false),
+  shouldShowCartesianSeriesConfig: vi.fn(() => false),
+  shouldShowStackMode: vi.fn(() => false),
+  shouldShowSortOrder: vi.fn(() => false),
+  shouldShowBarRadius: vi.fn(() => false),
+  shouldShowScatterEncoding: vi.fn(() => false),
+  shouldShowConnectNullsThreshold: vi.fn(() => false),
   shouldShowGridlines: vi.fn(() => false),
   shouldShowAxisLabelConfig: vi.fn(() => false),
   shouldShowLineThickness: vi.fn(() => false),
@@ -1339,5 +1345,28 @@ describe("useConfigPanel – heatmap y axis", () => {
         "heatmap-y-range",
       ),
     ).toBe(true);
+  });
+});
+
+describe("cartesian series options", () => {
+  it.each([
+    ["shouldShowCartesianSeriesConfig", "legend", "chart-tooltip-mode"],
+    ["shouldShowCartesianSeriesConfig", "legend", "tooltip-sort"],
+    ["shouldShowCartesianSeriesConfig", "axis", "y-axis-scale"],
+    ["shouldShowCartesianSeriesConfig", "axis", "y-axis-label"],
+    ["shouldShowCartesianSeriesConfig", "axis", "y-axis-soft-range"],
+    ["shouldShowCartesianSeriesConfig", "markLines", "mark-areas"],
+    ["shouldShowStackMode", "axis", "stack-mode"],
+    ["shouldShowSortOrder", "axis", "sort-order"],
+    ["shouldShowBarRadius", "lineStyle", "bar-radius"],
+    ["shouldShowAreaLineStyleConfig", "lineStyle", "line-style"],
+    ["shouldShowScatterEncoding", "data", "scatter-encoding"],
+    ["shouldShowConnectNullsThreshold", "data", "connect-nulls-threshold"],
+  ] as const)("%s drives %s/%s", async (helper, section, option) => {
+    const utils: any = await import("@/utils/dashboard/configUtils");
+    expect(makeComposable().isConfigOptionVisible(section, option)).toBe(false);
+    vi.mocked(utils[helper]).mockReturnValue(true);
+    expect(makeComposable().isConfigOptionVisible(section, option)).toBe(true);
+    vi.mocked(utils[helper]).mockReturnValue(false);
   });
 });

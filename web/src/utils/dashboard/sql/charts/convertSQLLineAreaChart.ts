@@ -18,6 +18,8 @@ import { type SQLContext } from "../shared/types";
 import { chartColor } from "../../../chartTheme";
 import { escapeHtml } from "@/utils/html";
 import { createSeriesOverrideLookup } from "../../seriesOverrides";
+import { sortTooltipParams } from "../../tooltipSort";
+import { tooltipPointValue } from "../../cartesianOptions";
 
 /**
  * Applies chart-specific options for:
@@ -99,10 +101,7 @@ export function applyLineAreaScatterBarChart(ctx: SQLContext): void {
           return "";
         if (name?.length == 0) return "";
 
-        // sort tooltip array based on value
-        name?.sort((a: any, b: any) => {
-          return (b.value ?? 0) - (a.value ?? 0);
-        });
+        sortTooltipParams(name, panelSchema?.config, (it: any) => tooltipPointValue(it.value) ?? 0);
 
         // if hovered series name is not null then move it to first position
         if (ctx.hoveredSeriesState?.value?.hoveredSeriesName) {
@@ -130,14 +129,14 @@ export function applyLineAreaScatterBarChart(ctx: SQLContext): void {
             if (it?.seriesName == ctx.hoveredSeriesState?.value?.hoveredSeriesName)
               hoverText.push(
                 `<strong>${it.marker} ${escapeHtml(seriesOverrides.displayName(it.seriesName))} : ${escapeHtml(
-                  seriesOverrides.formatValue(it.data, it.seriesName),
+                  seriesOverrides.formatValue(tooltipPointValue(it.data), it.seriesName),
                 )} </strong>`,
               );
             // else normal text
             else
               hoverText.push(
                 `${it.marker} ${escapeHtml(seriesOverrides.displayName(it.seriesName))} : ${escapeHtml(
-                  seriesOverrides.formatValue(it.data, it.seriesName),
+                  seriesOverrides.formatValue(tooltipPointValue(it.data), it.seriesName),
                 )}`,
               );
           }

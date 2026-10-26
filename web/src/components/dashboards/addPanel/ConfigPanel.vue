@@ -438,6 +438,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </OToggleGroup>
 
+        <OToggleGroup
+          v-if="shouldShowCartesianSeriesConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('legend', 'chart-tooltip-mode')"
+          type="single"
+          label-position="top"
+          :label="t('dashboard.chartTooltipMode')"
+          v-model="chartTooltipModeModel"
+          data-test="dashboard-config-tooltip_mode"
+          :data-test-selected-value="chartTooltipModeModel"
+        >
+          <OToggleGroupItem
+            v-for="opt in chartTooltipModeOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+            data-test="dashboard-config-tooltip_mode-option"
+            :data-test-label="opt.label"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
+
+        <OToggleGroup
+          v-if="shouldShowCartesianSeriesConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('legend', 'tooltip-sort')"
+          type="single"
+          label-position="top"
+          :label="t('dashboard.tooltipSort')"
+          v-model="tooltipSortModel"
+          data-test="dashboard-config-tooltip_sort"
+          :data-test-selected-value="tooltipSortModel"
+        >
+          <OToggleGroupItem
+            v-for="opt in tooltipSortOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+            data-test="dashboard-config-tooltip_sort-option"
+            :data-test-label="opt.label"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
+
         <div
           v-if="
             promqlMode &&
@@ -876,6 +918,72 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OSwitch>
 
         <OInput
+          v-if="shouldShowConnectNullsThreshold(dashboardPanelData)"
+          v-show="isConfigOptionVisible('data', 'connect-nulls-threshold')"
+          :model-value="dashboardPanelData.data.config.connect_nulls_threshold ?? null"
+          type="number"
+          :min="0"
+          :label="t('dashboard.connectNullsThreshold')"
+          :placeholder="t('dashboard.connectNullsThresholdPlaceholder')"
+          data-test="dashboard-config-connect_nulls_threshold"
+          @update:model-value="(value: any) => setNumberConfig('connect_nulls_threshold', value)"
+        >
+          <template #tooltip>
+            <OTooltip
+              :content="t('dashboard.connectNullsThresholdTooltip')"
+              max-width="15.625rem"
+            />
+          </template>
+        </OInput>
+
+        <template v-if="shouldShowScatterEncoding(dashboardPanelData, promqlMode)">
+          <div v-show="isConfigOptionVisible('data', 'scatter-encoding')" class="flex gap-2">
+            <OSelect
+              class="min-w-0 flex-1"
+              :model-value="dashboardPanelData.data.config.scatter_size_field ?? null"
+              :options="scatterFieldOptions"
+              :label="t('dashboard.scatterSizeField')"
+              data-test="dashboard-config-scatter_size_field"
+              @update:model-value="(value: any) => setTextConfig('scatter_size_field', value)"
+            />
+            <OSelect
+              class="min-w-0 flex-1"
+              :model-value="dashboardPanelData.data.config.scatter_color_field ?? null"
+              :options="scatterFieldOptions"
+              :label="t('dashboard.scatterColorField')"
+              data-test="dashboard-config-scatter_color_field"
+              @update:model-value="(value: any) => setTextConfig('scatter_color_field', value)"
+            />
+          </div>
+          <div
+            v-if="dashboardPanelData.data.config.scatter_size_field"
+            v-show="isConfigOptionVisible('data', 'scatter-encoding')"
+            class="flex gap-2"
+          >
+            <OInput
+              class="min-w-0 flex-1"
+              :model-value="dashboardPanelData.data.config.scatter_size_min ?? null"
+              type="number"
+              :min="1"
+              :label="t('dashboard.scatterSizeMin')"
+              :placeholder="raw('4')"
+              data-test="dashboard-config-scatter_size_min"
+              @update:model-value="(value: any) => setNumberConfig('scatter_size_min', value)"
+            />
+            <OInput
+              class="min-w-0 flex-1"
+              :model-value="dashboardPanelData.data.config.scatter_size_max ?? null"
+              type="number"
+              :min="1"
+              :label="t('dashboard.scatterSizeMax')"
+              :placeholder="raw('24')"
+              data-test="dashboard-config-scatter_size_max"
+              @update:model-value="(value: any) => setNumberConfig('scatter_size_max', value)"
+            />
+          </div>
+        </template>
+
+        <OInput
           v-if="shouldShowNoValueReplacement(dashboardPanelData, promqlMode)"
           v-show="isConfigOptionVisible('data', 'no-value-replacement')"
           v-model="dashboardPanelDataModel.data.config.no_value_replacement"
@@ -1265,6 +1373,135 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OInput>
         </div>
 
+        <div
+          class="flex gap-2"
+          v-if="shouldShowCartesianSeriesConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('axis', 'y-axis-soft-range')"
+        >
+          <OInput
+            class="min-w-0 flex-1"
+            :model-value="dashboardPanelData.data.config.y_axis_soft_min ?? null"
+            type="number"
+            :placeholder="t('dashboard.auto')"
+            :label="t('dashboard.yAxisSoftMin')"
+            data-test="dashboard-config-y_axis_soft_min"
+            @update:model-value="(value: any) => setNumberConfig('y_axis_soft_min', value)"
+          >
+            <template #tooltip>
+              <OTooltip :content="t('dashboard.yAxisSoftRangeTooltip')" max-width="15.625rem" />
+            </template>
+          </OInput>
+          <OInput
+            class="min-w-0 flex-1"
+            :model-value="dashboardPanelData.data.config.y_axis_soft_max ?? null"
+            type="number"
+            :placeholder="t('dashboard.auto')"
+            :label="t('dashboard.yAxisSoftMax')"
+            data-test="dashboard-config-y_axis_soft_max"
+            @update:model-value="(value: any) => setNumberConfig('y_axis_soft_max', value)"
+          >
+            <template #tooltip>
+              <OTooltip :content="t('dashboard.yAxisSoftRangeTooltip')" max-width="15.625rem" />
+            </template>
+          </OInput>
+        </div>
+
+        <OToggleGroup
+          v-if="shouldShowCartesianSeriesConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('axis', 'y-axis-scale')"
+          type="single"
+          label-position="top"
+          :label="t('dashboard.yAxisScale')"
+          v-model="yAxisScaleModel"
+          data-test="dashboard-config-y_axis_scale"
+          :data-test-selected-value="yAxisScaleModel"
+        >
+          <OToggleGroupItem
+            v-for="opt in yAxisScaleOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+            data-test="dashboard-config-y_axis_scale-option"
+            :data-test-label="opt.label"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
+
+        <OSelect
+          v-if="
+            shouldShowCartesianSeriesConfig(dashboardPanelData) &&
+            dashboardPanelData.data.config.y_axis_scale === 'log'
+          "
+          v-show="isConfigOptionVisible('axis', 'y-axis-scale')"
+          v-model="yAxisLogBaseModel"
+          :options="yAxisLogBaseOptions"
+          :label="t('dashboard.yAxisLogBase')"
+          data-test="dashboard-config-y_axis_log_base"
+        />
+
+        <OInput
+          v-if="shouldShowCartesianSeriesConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('axis', 'y-axis-label')"
+          :model-value="dashboardPanelData.data.config.y_axis_label ?? ''"
+          :label="t('dashboard.yAxisLabel')"
+          :placeholder="t('dashboard.auto')"
+          data-test="dashboard-config-y_axis_label"
+          @update:model-value="(value: any) => setTextConfig('y_axis_label', value)"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.yAxisLabelTooltip')" max-width="15.625rem" />
+          </template>
+        </OInput>
+
+        <OToggleGroup
+          v-if="shouldShowStackMode(dashboardPanelData)"
+          v-show="isConfigOptionVisible('axis', 'stack-mode')"
+          type="single"
+          label-position="top"
+          v-model="stackModeModel"
+          data-test="dashboard-config-stack_mode"
+          :data-test-selected-value="stackModeModel"
+        >
+          <template #label>
+            <span class="flex items-center gap-1">
+              {{ t("dashboard.stackMode") }}
+              <OIcon name="info-outline" size="sm" class="cursor-help">
+                <OTooltip :content="t('dashboard.stackModeTooltip')" max-width="15.625rem" />
+              </OIcon>
+            </span>
+          </template>
+          <OToggleGroupItem
+            v-for="opt in stackModeOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+            data-test="dashboard-config-stack_mode-option"
+            :data-test-label="opt.label"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
+
+        <OToggleGroup
+          v-if="shouldShowSortOrder(dashboardPanelData)"
+          v-show="isConfigOptionVisible('axis', 'sort-order')"
+          type="single"
+          label-position="top"
+          :label="t('dashboard.barSortOrder')"
+          v-model="sortOrderModel"
+          data-test="dashboard-config-sort_order"
+          :data-test-selected-value="sortOrderModel"
+        >
+          <OToggleGroupItem
+            v-for="opt in sortOrderOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+            data-test="dashboard-config-sort_order-option"
+            :data-test-label="opt.label"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
+
         <OSwitch
           v-if="shouldShowGridlines(dashboardPanelData)"
           v-show="isConfigOptionVisible('axis', 'gridlines')"
@@ -1447,6 +1684,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :placeholder="t('dashboard.lineThicknessDefault')"
           data-test="dashboard-config-line_thickness"
         />
+
+        <OToggleGroup
+          v-if="shouldShowAreaLineStyleConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('lineStyle', 'line-style')"
+          type="single"
+          label-position="top"
+          :label="t('dashboard.lineStyle')"
+          v-model="lineStyleModel"
+          data-test="dashboard-config-line_style"
+          :data-test-selected-value="lineStyleModel"
+        >
+          <OToggleGroupItem
+            v-for="opt in lineStyleOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+            data-test="dashboard-config-line_style-option"
+            :data-test-label="opt.label"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
+
+        <OInput
+          v-if="shouldShowBarRadius(dashboardPanelData)"
+          v-show="isConfigOptionVisible('lineStyle', 'bar-radius')"
+          :model-value="dashboardPanelData.data.config.bar_radius ?? null"
+          type="number"
+          :min="0"
+          :label="t('dashboard.barRadius')"
+          :placeholder="t('dashboard.zeroPlaceholder')"
+          data-test="dashboard-config-bar_radius"
+          @update:model-value="(value: any) => setNumberConfig('bar_radius', value)"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.barRadiusTooltip')" max-width="15.625rem" />
+          </template>
+        </OInput>
       </div>
     </OCollapsible>
 
@@ -2209,7 +2483,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip :content="t('dashboard.markLinesTooltip')" max-width="15.625rem" />
       </template>
       <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
-        <MarkLineConfig />
+        <MarkLineConfig v-show="isConfigOptionVisible('markLines', 'mark-lines')" />
+        <MarkAreaConfig v-show="isConfigOptionVisible('markLines', 'mark-areas')" />
       </div>
     </OCollapsible>
 
@@ -2368,6 +2643,7 @@ import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
 import ColorBySeries from "./ColorBySeries.vue";
 import MarkLineConfig from "./MarkLineConfig.vue";
+import MarkAreaConfig from "./MarkAreaConfig.vue";
 import ThresholdsConfig from "./ThresholdsConfig.vue";
 import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
 import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
@@ -2428,8 +2704,16 @@ import {
   shouldShowLineThickness,
   shouldShowDrilldown,
   shouldShowTimeShift,
+  shouldShowStackMode,
+  shouldShowSortOrder,
+  shouldShowBarRadius,
+  shouldShowScatterEncoding,
+  shouldShowConnectNullsThreshold,
+  shouldShowCartesianSeriesConfig,
 } from "@/utils/dashboard/configUtils";
 import { SECTION_ICONS } from "@/utils/dashboard/searchLabelsConfig";
+import { resolveTooltipSort } from "@/utils/dashboard/tooltipSort";
+import { getFieldLabel } from "@/utils/dashboard/fieldLabel";
 
 export default defineComponent({
   components: {
@@ -2447,6 +2731,7 @@ export default defineComponent({
     ColorBySeries,
     OCombobox,
     MarkLineConfig,
+    MarkAreaConfig,
     ThresholdsConfig,
     CustomDateTimePicker,
     DateTimePickerDashboard,
@@ -2523,6 +2808,81 @@ export default defineComponent({
       { label: t("dashboard.stateTimelineSortName"), value: "name" },
       { label: t("dashboard.stateTimelineSortNonOkTime"), value: "non_ok_time" },
     ];
+    const config = () => dashboardPanelData.data.config as Record<string, any>;
+    // An empty or cleared field drops the key, so the panel renders as if it was never set.
+    const setNumberConfig = (key: string, value: unknown) => {
+      const numeric = typeof value === "string" && value.trim() !== "" ? Number(value) : value;
+      if (typeof numeric === "number" && Number.isFinite(numeric)) config()[key] = numeric;
+      else delete config()[key];
+    };
+    const setTextConfig = (key: string, value: unknown) => {
+      const text = typeof value === "string" ? value.trim() : "";
+      if (text) config()[key] = text;
+      else delete config()[key];
+    };
+    const choiceModel = <T extends string>(key: string, allowed: readonly T[], fallback: T) =>
+      computed({
+        get: (): T => (allowed.includes(config()[key]) ? config()[key] : fallback),
+        set: (v: T) => {
+          if (allowed.includes(v)) config()[key] = v;
+        },
+      });
+    const chartTooltipModeModel = choiceModel("tooltip_mode", ["single", "all", "hidden"], "all");
+    const chartTooltipModeOptions: { label: I18nText; value: string }[] = [
+      { label: t("dashboard.chartTooltipSingle"), value: "single" },
+      { label: t("dashboard.chartTooltipAll"), value: "all" },
+      { label: t("common.hide"), value: "hidden" },
+    ];
+    const tooltipSortModel = computed({
+      get: () => resolveTooltipSort(config()),
+      set: (v: string) => {
+        if (["none", "asc", "desc"].includes(v)) config().tooltip_sort = v;
+      },
+    });
+    const sortChoiceOptions: { label: I18nText; value: string }[] = [
+      { label: t("dashboard.sortNone"), value: "none" },
+      { label: t("dashboard.heatmapYSortAsc"), value: "asc" },
+      { label: t("dashboard.heatmapYSortDesc"), value: "desc" },
+    ];
+    const tooltipSortOptions = sortChoiceOptions;
+    const sortOrderModel = choiceModel("sort_order", ["none", "asc", "desc"], "none");
+    const sortOrderOptions = sortChoiceOptions;
+    const yAxisScaleModel = choiceModel("y_axis_scale", ["linear", "log"], "linear");
+    const yAxisScaleOptions: { label: I18nText; value: string }[] = [
+      { label: t("dashboard.yAxisScaleLinear"), value: "linear" },
+      { label: t("dashboard.yAxisScaleLog"), value: "log" },
+    ];
+    const yAxisLogBaseModel = computed({
+      get: () => (Number(config().y_axis_log_base) === 2 ? 2 : 10),
+      set: (v: number) => {
+        config().y_axis_log_base = Number(v) === 2 ? 2 : 10;
+      },
+    });
+    const yAxisLogBaseOptions = [
+      { label: raw("2"), value: 2 },
+      { label: raw("10"), value: 10 },
+    ];
+    const stackModeModel = choiceModel("stack_mode", ["normal", "percent"], "normal");
+    const stackModeOptions: { label: I18nText; value: string }[] = [
+      { label: t("dashboard.stackModeNormal"), value: "normal" },
+      { label: t("dashboard.stackModePercent"), value: "percent" },
+    ];
+    const lineStyleModel = choiceModel("line_style", ["solid", "dashed", "dotted"], "solid");
+    const lineStyleOptions: { label: I18nText; value: string }[] = [
+      { label: t("dashboard.lineStyleSolid"), value: "solid" },
+      { label: t("dashboard.lineStyleDashed"), value: "dashed" },
+      { label: t("dashboard.lineStyleDotted"), value: "dotted" },
+    ];
+    const scatterFieldOptions = computed(() => [
+      { label: t("dashboard.sortNone"), value: null },
+      ...(
+        dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex]?.fields?.y ??
+        []
+      ).map((field: any) => ({
+        label: raw(getFieldLabel(field, dashboardPanelData.data.config) || field?.alias || ""),
+        value: field?.alias ?? null,
+      })),
+    ]);
     const legendsPositionModel = toggleModel("legends_position");
     const legendsTypeModel = toggleModel("legends_type");
     const chartAlignModel = toggleModel("chart_align");
@@ -3458,6 +3818,29 @@ export default defineComponent({
       rowSortModel,
       rowSortOptions,
       tooltipModeModel,
+      setNumberConfig,
+      setTextConfig,
+      chartTooltipModeModel,
+      chartTooltipModeOptions,
+      tooltipSortModel,
+      tooltipSortOptions,
+      sortOrderModel,
+      sortOrderOptions,
+      yAxisScaleModel,
+      yAxisScaleOptions,
+      yAxisLogBaseModel,
+      yAxisLogBaseOptions,
+      stackModeModel,
+      stackModeOptions,
+      lineStyleModel,
+      lineStyleOptions,
+      scatterFieldOptions,
+      shouldShowStackMode,
+      shouldShowSortOrder,
+      shouldShowBarRadius,
+      shouldShowScatterEncoding,
+      shouldShowConnectNullsThreshold,
+      shouldShowCartesianSeriesConfig,
       tooltipModeOptions,
       unitOptions,
       bucketUnitOptions,

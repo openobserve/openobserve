@@ -10,6 +10,16 @@ import {
 } from "@/utils/dashboard/heatmapYAxis";
 import { addCommasToNumber } from "@/utils/formatters";
 import { validateAnnotationSources } from "@/utils/dashboard/validateAnnotationSources";
+import {
+  CARTESIAN_CHART_TYPES,
+  CARTESIAN_TOOLTIP_MODES,
+  LINE_STYLES,
+  SORT_ORDERS,
+  STACK_MODES,
+  Y_AXIS_LOG_BASES,
+  Y_AXIS_SCALES,
+} from "@/utils/dashboard/cartesianOptions";
+import { TOOLTIP_SORT_VALUES } from "@/utils/dashboard/tooltipSort";
 
 /**
  * Validates a single condition item
@@ -928,6 +938,119 @@ const validateHeatmapConfig = (
   if (isHeatmapYRangeInverted(config)) errors.push(t("dashboard.utils.heatmapYRangeInverted"));
 };
 
+// The state timeline stores its own tooltip modes in the same key.
+const TOOLTIP_MODE_VALUES: readonly unknown[] = [...CARTESIAN_TOOLTIP_MODES, "segment", "all_rows"];
+
+const CARTESIAN_CHOICE_KEYS: ReadonlyArray<[string, readonly unknown[]]> = [
+  ["tooltip_mode", TOOLTIP_MODE_VALUES],
+  ["tooltip_sort", TOOLTIP_SORT_VALUES],
+  ["y_axis_scale", Y_AXIS_SCALES],
+  ["y_axis_log_base", Y_AXIS_LOG_BASES],
+  ["line_style", LINE_STYLES],
+  ["stack_mode", STACK_MODES],
+  ["sort_order", SORT_ORDERS],
+];
+
+const NON_NEGATIVE_KEYS = ["connect_nulls_threshold", "bar_radius"];
+
+const isSetValue = (value: unknown) => value !== null && value !== undefined && value !== "";
+
+const asFiniteNumber = (value: unknown): number | null => {
+  if (!isSetValue(value)) return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+};
+
+const validateCartesianChoices = (t: TranslateFn, config: any, errors: string[]) => {
+  for (const [key, allowed] of CARTESIAN_CHOICE_KEYS) {
+    const value = key === "y_axis_log_base" ? Number(config[key]) : config[key];
+    if (isSetValue(config[key]) && !allowed.includes(value)) {
+      errors.push(
+        t("dashboard.utils.unsupportedConfigValue", {
+          setting: key,
+          value: String(config[key]),
+        }),
+      );
+    }
+  }
+  for (const key of NON_NEGATIVE_KEYS) {
+    const value = asFiniteNumber(config[key]);
+    if (isSetValue(config[key]) && (value === null || value < 0)) {
+      errors.push(t("dashboard.utils.configValueNotNegative", { setting: key }));
+    }
+  }
+};
+
+const validateCartesianRanges = (t: TranslateFn, config: any, errors: string[]) => {
+  const softMin = asFiniteNumber(config.y_axis_soft_min);
+  const softMax = asFiniteNumber(config.y_axis_soft_max);
+  if (softMin !== null && softMax !== null && softMin >= softMax) {
+    errors.push(t("dashboard.utils.yAxisSoftRangeInverted"));
+  }
+  const hardMin = asFiniteNumber(config.y_axis_min);
+  if (config.y_axis_scale === "log" && hardMin !== null && hardMin <= 0) {
+    errors.push(t("dashboard.utils.yAxisLogMinInvalid"));
+  }
+};
+
+const validateMarkAreas = (t: TranslateFn, panel: any, errors: string[]) => {
+  const areas = panel?.config?.mark_area;
+  if (!Array.isArray(areas)) return;
+  const verticalValueAxis = !["h-bar", "h-stacked"].includes(panel?.type);
+  areas.forEach((area: any, index: number) => {
+    const position = index + 1;
+    if (
+      !area ||
+      (area.axis !== "x" && area.axis !== "y") ||
+      !isSetValue(area.from) ||
+      !isSetValue(area.to)
+    ) {
+      errors.push(t("dashboard.utils.markAreaIncomplete", { index: position }));
+      return;
+    }
+    const numericAxis = area.axis === "y" ? verticalValueAxis : !verticalValueAxis;
+    if (numericAxis && (asFiniteNumber(area.from) === null || asFiniteNumber(area.to) === null)) {
+      errors.push(t("dashboard.utils.markAreaNotNumeric", { index: position }));
+    }
+  });
+};
+
+const validateScatterEncoding = (
+  t: TranslateFn,
+  panel: any,
+  errors: string[],
+  isPromQLMode: boolean,
+) => {
+  const config = panel?.config ?? {};
+  if (panel?.type !== "scatter" || isPromQLMode) return;
+  const aliases = (panel?.queries?.[0]?.fields?.y ?? []).map((field: any) => field?.alias);
+  for (const key of ["scatter_size_field", "scatter_color_field"]) {
+    if (isSetValue(config[key]) && !aliases.includes(config[key])) {
+      errors.push(t("dashboard.utils.scatterFieldUnknown", { setting: key }));
+    }
+  }
+  const minSize = asFiniteNumber(config.scatter_size_min);
+  const maxSize = asFiniteNumber(config.scatter_size_max);
+  if (minSize !== null && maxSize !== null && minSize > maxSize) {
+    errors.push(t("dashboard.utils.scatterSizeRangeInverted"));
+  }
+};
+
+/** Cartesian settings the renderer would silently ignore or misread. */
+const validateCartesianConfig = (
+  t: TranslateFn,
+  panelData: any,
+  errors: string[],
+  isPromQLMode: boolean,
+) => {
+  const panel = panelData?.data;
+  if (!CARTESIAN_CHART_TYPES.has(panel?.type) || !panel?.config) return;
+  validateCartesianChoices(t, panel.config, errors);
+  validateCartesianRanges(t, panel.config, errors);
+  validateMarkAreas(t, panel, errors);
+  validateScatterEncoding(t, panel, errors, isPromQLMode);
+};
+
 /**
  * Validates a dashboard panel's configuration
  * @param {object} panelData - The panel data object to validate
@@ -955,6 +1078,7 @@ export const validatePanel = (
   // Validate panel content based on type
   validatePanelContentByType(t, panelData?.data, errors);
   validateHeatmapConfig(t, panelData, errors, isPromQLMode);
+  validateCartesianConfig(t, panelData, errors, isPromQLMode);
 
   // Validate timestamp alias for SQL queries with custom query mode
   if (panelData?.data?.queryType === "sql") {

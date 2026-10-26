@@ -270,3 +270,43 @@ describe("value mappings in a series override draft", () => {
     expect(getLegendSeriesNames(converted.options, "state-timeline")).toEqual([]);
   });
 });
+
+describe("series style drafts", () => {
+  it("reads and writes axis placement, transform, draw style and line style", () => {
+    const stored = {
+      field: { matchBy: "series", value: "api" },
+      config: [
+        { type: "axis_placement", value: "hidden" },
+        { type: "transform", value: "negative_y" },
+        { type: "draw_style", value: "points" },
+        { type: "line_style", value: "dotted" },
+      ],
+    };
+    const draft = toSeriesOverrideDraft(stored);
+    expect(draft).toMatchObject({
+      axisPlacement: "hidden",
+      transform: "negative_y",
+      drawStyle: "points",
+      lineStyle: "dotted",
+    });
+    expect(serializeSeriesOverride(draft)).toEqual(stored);
+  });
+
+  it("a draft with no style keeps today's entry shape", () => {
+    const draft = { ...emptySeriesOverrideDraft("name", "api"), displayName: "API" };
+    expect(serializeSeriesOverride(draft)).toEqual({
+      field: { matchBy: "series", value: "api" },
+      config: [{ type: "display_name", value: "API" }],
+    });
+    expect(serializeSeriesOverride({ ...draft, displayName: "", drawStyle: null })).toBeNull();
+  });
+
+  it("drops an unknown stored style", () => {
+    const draft = toSeriesOverrideDraft({
+      field: { matchBy: "series", value: "api" },
+      config: [{ type: "draw_style", value: "area" }],
+    });
+    expect(draft.drawStyle).toBeNull();
+    expect(serializeSeriesOverride(draft)).toBeNull();
+  });
+});

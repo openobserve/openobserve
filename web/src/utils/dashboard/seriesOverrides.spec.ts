@@ -15,6 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  createSeriesOverrideLookup,
   getSeriesOverrides,
   isSeriesOverrideEntry,
   matchesSeriesOverride,
@@ -244,5 +245,48 @@ describe("value mapping overrides", () => {
 
   it("writes nothing for an empty mapping list", () => {
     expect(toSeriesOverrideEntry(byName("gpu0", { valueMappings: [] }))).toBeNull();
+  });
+});
+
+describe("series style overrides", () => {
+  const styled = entry("series", "api", [
+    { type: "axis_placement", value: "right" },
+    { type: "transform", value: "negative_y" },
+    { type: "draw_style", value: "bars" },
+    { type: "line_style", value: "dashed" },
+  ]);
+
+  it("parses and resolves the four style variants", () => {
+    expect(parseSeriesOverrideEntry(styled)).toMatchObject({
+      axisPlacement: "right",
+      transform: "negative_y",
+      drawStyle: "bars",
+      lineStyle: "dashed",
+    });
+    expect(resolveSeriesOverride({ override_config: [styled] }, "api")).toEqual({
+      axisPlacement: "right",
+      transform: "negative_y",
+      drawStyle: "bars",
+      lineStyle: "dashed",
+    });
+  });
+
+  it("drops unknown style values", () => {
+    const bad = entry("series", "api", [
+      { type: "axis_placement", value: "top" },
+      { type: "draw_style", value: "area" },
+    ]);
+    expect(resolveSeriesOverride({ override_config: [bad] }, "api")).toBeNull();
+  });
+
+  it("round-trips through toSeriesOverrideEntry", () => {
+    const parsed = parseSeriesOverrideEntry(styled)!;
+    expect(toSeriesOverrideEntry(parsed)).toEqual(styled);
+  });
+
+  it("formatValue shows the magnitude of a negated series", () => {
+    const lookup = createSeriesOverrideLookup({ override_config: [styled] });
+    expect(lookup.formatValue(-42, "api")).toBe(lookup.formatValue(42, "api"));
+    expect(lookup.formatValue(-42, "web")).not.toBe(lookup.formatValue(42, "web"));
   });
 });

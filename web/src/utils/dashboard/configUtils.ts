@@ -321,3 +321,29 @@ export const shouldShowTimeShift = (
 export const shouldShowPromQLQueryType = (dashboardPanelData: any): boolean => {
   return dashboardPanelData.data.type !== "state-timeline";
 };
+
+/** Whether Stack mode applies; percent stacking needs stacked series. */
+export const shouldShowStackMode = (dashboardPanelData: any): boolean =>
+  ["area-stacked", "stacked", "h-stacked"].includes(dashboardPanelData?.data?.type);
+
+/** Whether category Sort order applies; only plain bars have one value per category. */
+export const shouldShowSortOrder = (dashboardPanelData: any): boolean =>
+  ["bar", "h-bar"].includes(dashboardPanelData?.data?.type);
+
+export const shouldShowBarRadius = (dashboardPanelData: any): boolean =>
+  ["bar", "h-bar", "stacked", "h-stacked"].includes(dashboardPanelData?.data?.type);
+
+/** Whether the scatter size/color fields apply; they pick other y fields, which PromQL has none of. */
+export const shouldShowScatterEncoding = (dashboardPanelData: any, promqlMode: boolean): boolean =>
+  !promqlMode && dashboardPanelData?.data?.type === "scatter";
+
+/** Whether the gap threshold applies; it only splits lines that connect nulls. */
+export const shouldShowConnectNullsThreshold = (dashboardPanelData: any): boolean =>
+  shouldShowAreaLineStyleConfig(dashboardPanelData) &&
+  !!dashboardPanelData?.data?.config?.connect_nulls;
+
+/** Whether the panel-level cartesian series settings (tooltip, scale, soft range, mark areas) apply. */
+export const shouldShowCartesianSeriesConfig = (dashboardPanelData: any): boolean =>
+  ["area", "area-stacked", "bar", "h-bar", "line", "scatter", "stacked", "h-stacked"].includes(
+    dashboardPanelData?.data?.type,
+  );

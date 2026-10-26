@@ -22,6 +22,16 @@ import type { ThresholdMode, ThresholdShowAs } from "./thresholds";
 
 export type SeriesOverrideMatchBy = "name" | "regex";
 
+export type SeriesAxisPlacement = "left" | "right" | "hidden";
+export type SeriesTransform = "negative_y";
+export type SeriesDrawStyle = "line" | "bars" | "points";
+export type SeriesLineStyle = "solid" | "dashed" | "dotted";
+
+export const SERIES_AXIS_PLACEMENTS: readonly SeriesAxisPlacement[] = ["left", "right", "hidden"];
+export const SERIES_TRANSFORMS: readonly SeriesTransform[] = ["negative_y"];
+export const SERIES_DRAW_STYLES: readonly SeriesDrawStyle[] = ["line", "bars", "points"];
+export const SERIES_LINE_STYLES: readonly SeriesLineStyle[] = ["solid", "dashed", "dotted"];
+
 /** Thresholds as stored inside an override; every field may be missing. */
 export interface SeriesOverrideThresholds {
   mode?: ThresholdMode;
@@ -42,6 +52,10 @@ export interface SeriesOverride {
   thresholds?: SeriesOverrideThresholds;
   /** Value mappings for this series only, in `config.mappings` form; the state timeline reads them per row. */
   valueMappings?: any[];
+  axisPlacement?: SeriesAxisPlacement;
+  transform?: SeriesTransform;
+  drawStyle?: SeriesDrawStyle;
+  lineStyle?: SeriesLineStyle;
 }
 
 /** The settings of every override matching one series, merged in list order. */
@@ -53,6 +67,10 @@ export interface ResolvedSeriesOverride {
   color?: string;
   thresholds?: SeriesOverrideThresholds;
   valueMappings?: any[];
+  axisPlacement?: SeriesAxisPlacement;
+  transform?: SeriesTransform;
+  drawStyle?: SeriesDrawStyle;
+  lineStyle?: SeriesLineStyle;
 }
 
 /** Arguments for `getUnitValue`, the override's unit settings merged over the panel's. */
@@ -128,6 +146,15 @@ const hasThresholdSteps = (thresholds: unknown): thresholds is SeriesOverrideThr
 const hasValueMappings = (mappings: unknown): mappings is any[] =>
   Array.isArray(mappings) && mappings.length > 0;
 
+const oneOf = <T extends string>(allowed: readonly T[], value: unknown): T | undefined =>
+  allowed.includes(value as T) ? (value as T) : undefined;
+
+const ECHARTS_SERIES_TYPE: Record<SeriesDrawStyle, string> = {
+  line: "line",
+  bars: "bar",
+  points: "scatter",
+};
+
 const hasUnitSetting = (resolved: ResolvedSeriesOverride): boolean =>
   resolved.unit !== undefined ||
   resolved.unitCustom !== undefined ||
@@ -138,6 +165,21 @@ const isNamedSeries = (series: any): boolean =>
 
 // Time-series points are [time, value]; category points are the value itself.
 const pointValue = (value: unknown): unknown => (Array.isArray(value) ? value[1] : value);
+
+const negatePoint = (point: any): any => {
+  if (Array.isArray(point)) return [point[0], negatePoint(point[1]), ...point.slice(2)];
+  if (point && typeof point === "object") return { ...point, value: negatePoint(point.value) };
+  const numeric = typeof point === "number" ? point : Number(point);
+  return point === null || point === "" || point === "-" || !Number.isFinite(numeric)
+    ? point
+    : -numeric;
+};
+
+const applyDrawStyle = (series: any, drawStyle: SeriesDrawStyle) => {
+  series.type = ECHARTS_SERIES_TYPE[drawStyle];
+  // A fill only belongs to a line; bars and points would otherwise carry a stray area style.
+  if (drawStyle !== "line") delete series.areaStyle;
+};
 
 const recolourSeries = (series: any, color: string, panelType: string, theme: string) => {
   if (series.itemStyle) series.itemStyle = { ...series.itemStyle, color };
@@ -160,8 +202,13 @@ const applyAxisSeriesOverride = (
 ) => {
   const resolved = lookup.get(series.name);
   if (!resolved) return;
+  if (resolved.drawStyle) applyDrawStyle(series, resolved.drawStyle);
+  if (resolved.lineStyle) series.lineStyle = { ...series.lineStyle, type: resolved.lineStyle };
+  if (resolved.transform === "negative_y" && Array.isArray(series.data)) {
+    series.data = series.data.map(negatePoint);
+  }
   if (resolved.color) recolourSeries(series, resolved.color, panelType, theme);
-  if (hasUnitSetting(resolved)) {
+  if (hasUnitSetting(resolved) || resolved.transform) {
     const name = series.name;
     series.label = {
       ...series.label,
@@ -274,6 +321,14 @@ const relabelTitles = (title: any, displayNames: Map<string, string>) => {
   }
 };
 
+/** The magnitude of a numeric value; a negated series reads as its original values. */
+export const absValue = (value: unknown): unknown => {
+  const numeric = typeof value === "number" ? value : Number(value);
+  return value === null || value === undefined || value === "" || !Number.isFinite(numeric)
+    ? value
+    : Math.abs(numeric);
+};
+
 /** True for an `override_config` entry that targets chart series; tables skip these. */
 export const isSeriesOverrideEntry = (entry: any): boolean =>
   entry?.field?.matchBy === SERIES_OVERRIDE_MATCH_BY.EXACT ||
@@ -296,6 +351,11 @@ export const parseSeriesOverrideEntry = (entry: any): SeriesOverride | null => {
     else if (item?.type === "series_color") override.color = value;
     else if (item?.type === "thresholds") override.thresholds = value;
     else if (item?.type === "value_mappings") override.valueMappings = value;
+    else if (item?.type === "axis_placement") {
+      override.axisPlacement = oneOf(SERIES_AXIS_PLACEMENTS, value);
+    } else if (item?.type === "transform") override.transform = oneOf(SERIES_TRANSFORMS, value);
+    else if (item?.type === "draw_style") override.drawStyle = oneOf(SERIES_DRAW_STYLES, value);
+    else if (item?.type === "line_style") override.lineStyle = oneOf(SERIES_LINE_STYLES, value);
   }
   return override;
 };
@@ -321,6 +381,13 @@ export const toSeriesOverrideEntry = (override: SeriesOverride): Record<string, 
   if (hasValueMappings(override.valueMappings)) {
     config.push({ type: "value_mappings", value: override.valueMappings });
   }
+  const styles = [
+    ["axis_placement", oneOf(SERIES_AXIS_PLACEMENTS, override.axisPlacement)],
+    ["transform", oneOf(SERIES_TRANSFORMS, override.transform)],
+    ["draw_style", oneOf(SERIES_DRAW_STYLES, override.drawStyle)],
+    ["line_style", oneOf(SERIES_LINE_STYLES, override.lineStyle)],
+  ] as const;
+  for (const [type, value] of styles) if (value) config.push({ type, value });
   if (config.length === 0) return null;
   const matchBy =
     override.matchBy === "regex" ? SERIES_OVERRIDE_MATCH_BY.REGEX : SERIES_OVERRIDE_MATCH_BY.EXACT;
@@ -369,6 +436,10 @@ export const resolveSeriesOverride = (
     if (isSetText(override.color)) resolved.color = override.color.trim();
     if (hasThresholdSteps(override.thresholds)) resolved.thresholds = override.thresholds;
     if (hasValueMappings(override.valueMappings)) resolved.valueMappings = override.valueMappings;
+    if (override.axisPlacement) resolved.axisPlacement = override.axisPlacement;
+    if (override.transform) resolved.transform = override.transform;
+    if (override.drawStyle) resolved.drawStyle = override.drawStyle;
+    if (override.lineStyle) resolved.lineStyle = override.lineStyle;
   }
   return Object.keys(resolved).length > 0 ? resolved : null;
 };
@@ -408,7 +479,8 @@ export const createSeriesOverrideLookup = (config: any): SeriesOverrideLookup =>
     unitArgs,
     formatValue: (value: unknown, seriesName: unknown): string => {
       const args = unitArgs(seriesName);
-      return formatUnitValue(getUnitValue(value, args.unit, args.unitCustom, args.decimals));
+      const shown = get(seriesName)?.transform === "negative_y" ? absValue(value) : value;
+      return formatUnitValue(getUnitValue(shown, args.unit, args.unitCustom, args.decimals));
     },
   };
 };

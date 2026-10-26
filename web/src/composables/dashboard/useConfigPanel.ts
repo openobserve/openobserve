@@ -18,6 +18,12 @@ import {
   shouldShowLineThickness,
   shouldShowDrilldown,
   shouldShowTimeShift,
+  shouldShowStackMode,
+  shouldShowSortOrder,
+  shouldShowBarRadius,
+  shouldShowScatterEncoding,
+  shouldShowConnectNullsThreshold,
+  shouldShowCartesianSeriesConfig,
 } from "@/utils/dashboard/configUtils";
 import {
   SectionId,
@@ -256,6 +262,14 @@ export function useConfigPanel(
         label: t("dashboard.chartAlign"),
         visible: shouldApplyChartAlign(dashboardPanelData),
       },
+      "chart-tooltip-mode": {
+        label: t("dashboard.chartTooltipMode"),
+        visible: shouldShowCartesianSeriesConfig(dashboardPanelData),
+      },
+      "tooltip-sort": {
+        label: t("dashboard.tooltipSort"),
+        visible: shouldShowCartesianSeriesConfig(dashboardPanelData),
+      },
       "promql-legend": {
         label: t("dashboard.query"),
         visible:
@@ -332,6 +346,19 @@ export function useConfigPanel(
         label: t("dashboard.connectNullValues"),
         visible: shouldShowAreaLineStyleConfig(dashboardPanelData),
       },
+      "connect-nulls-threshold": {
+        label: t("dashboard.connectNullsThreshold"),
+        visible: shouldShowConnectNullsThreshold(dashboardPanelData),
+      },
+      "scatter-encoding": {
+        label: [
+          t("dashboard.scatterSizeField"),
+          t("dashboard.scatterColorField"),
+          t("dashboard.scatterSizeMin"),
+          t("dashboard.scatterSizeMax"),
+        ],
+        visible: shouldShowScatterEncoding(dashboardPanelData, !!promqlMode.value),
+      },
       "no-value-replacement": {
         label: t("dashboard.noValueReplacement"),
         visible: shouldShowNoValueReplacement(dashboardPanelData, promqlMode.value),
@@ -398,6 +425,26 @@ export function useConfigPanel(
         label: [t("common.yAxisMin"), t("common.yAxisMax")],
         visible: shouldShowCartesianAxisConfig(dashboardPanelData),
       },
+      "y-axis-soft-range": {
+        label: [t("dashboard.yAxisSoftMin"), t("dashboard.yAxisSoftMax")],
+        visible: shouldShowCartesianSeriesConfig(dashboardPanelData),
+      },
+      "y-axis-scale": {
+        label: [t("dashboard.yAxisScale"), t("dashboard.yAxisLogBase")],
+        visible: shouldShowCartesianSeriesConfig(dashboardPanelData),
+      },
+      "y-axis-label": {
+        label: t("dashboard.yAxisLabel"),
+        visible: shouldShowCartesianSeriesConfig(dashboardPanelData),
+      },
+      "stack-mode": {
+        label: t("dashboard.stackMode"),
+        visible: shouldShowStackMode(dashboardPanelData),
+      },
+      "sort-order": {
+        label: t("dashboard.barSortOrder"),
+        visible: shouldShowSortOrder(dashboardPanelData),
+      },
       "axis-label-mode": {
         label: t("dashboard.axisLabelMode"),
         visible: !promqlMode.value && shouldShowCartesianAxisConfig(dashboardPanelData),
@@ -433,6 +480,14 @@ export function useConfigPanel(
       "line-thickness": {
         label: t("dashboard.lineThickness"),
         visible: shouldShowLineThickness(dashboardPanelData, promqlMode.value),
+      },
+      "line-style": {
+        label: t("dashboard.lineStyle"),
+        visible: shouldShowAreaLineStyleConfig(dashboardPanelData),
+      },
+      "bar-radius": {
+        label: t("dashboard.barRadius"),
+        visible: shouldShowBarRadius(dashboardPanelData),
       },
     },
     table: {
@@ -575,6 +630,10 @@ export function useConfigPanel(
       "mark-lines": {
         label: t("dashboard.markLines"),
         visible: shouldShowCartesianAxisConfig(dashboardPanelData),
+      },
+      "mark-areas": {
+        label: t("dashboard.markAreas"),
+        visible: shouldShowCartesianSeriesConfig(dashboardPanelData),
       },
     },
     thresholds: {

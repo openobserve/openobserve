@@ -19,6 +19,16 @@ import {
   valueMappingPatternError,
   type ValueMappingPatternError,
 } from "@/utils/dashboard/tableConfigUtils";
+import {
+  SERIES_AXIS_PLACEMENTS,
+  SERIES_DRAW_STYLES,
+  SERIES_LINE_STYLES,
+  SERIES_TRANSFORMS,
+  type SeriesAxisPlacement,
+  type SeriesDrawStyle,
+  type SeriesLineStyle,
+  type SeriesTransform,
+} from "@/utils/dashboard/seriesOverrides";
 
 /** How the dialog matches a series: an exact legend name or a pattern. */
 export type SeriesDraftMatch = "name" | "regex";
@@ -50,6 +60,11 @@ export interface SeriesOverrideDraft {
   thresholds: SeriesOverrideThresholds | undefined;
   /** Per-series value mappings; only the state timeline reads them. */
   valueMappings?: any[];
+  /** Cartesian series style; unset inherits the panel's. */
+  axisPlacement?: SeriesAxisPlacement | null;
+  transform?: SeriesTransform | null;
+  drawStyle?: SeriesDrawStyle | null;
+  lineStyle?: SeriesLineStyle | null;
 }
 
 /** The applied panel schema plus the data the editor already fetched for it. */
@@ -66,6 +81,9 @@ const PREVIEW_DEBOUNCE_MS = 120;
 const STORED_MATCH = { name: "series", regex: "series_regex" } as const;
 
 let nextDraftId = 0;
+
+const pick = <T extends string>(allowed: readonly T[], value: unknown): T | undefined =>
+  allowed.includes(value as T) ? (value as T) : undefined;
 
 const cloneThresholds = (thresholds: unknown): SeriesOverrideThresholds | undefined => {
   const steps = (thresholds as SeriesOverrideThresholds | undefined)?.steps;
@@ -129,6 +147,14 @@ export const toSeriesOverrideDraft = (stored: any): SeriesOverrideDraft => {
       draft.thresholds = cloneThresholds(value);
     } else if (item?.type === "value_mappings" && Array.isArray(value)) {
       draft.valueMappings = JSON.parse(JSON.stringify(value));
+    } else if (item?.type === "axis_placement") {
+      draft.axisPlacement = pick(SERIES_AXIS_PLACEMENTS, value) ?? null;
+    } else if (item?.type === "transform") {
+      draft.transform = pick(SERIES_TRANSFORMS, value) ?? null;
+    } else if (item?.type === "draw_style") {
+      draft.drawStyle = pick(SERIES_DRAW_STYLES, value) ?? null;
+    } else if (item?.type === "line_style") {
+      draft.lineStyle = pick(SERIES_LINE_STYLES, value) ?? null;
     }
   }
   return draft;
@@ -163,6 +189,13 @@ export const serializeSeriesOverride = (draft: SeriesOverrideDraft): SeriesOverr
   if (draft.valueMappings?.length) {
     config.push({ type: "value_mappings", value: JSON.parse(JSON.stringify(draft.valueMappings)) });
   }
+  const styles = [
+    ["axis_placement", pick(SERIES_AXIS_PLACEMENTS, draft.axisPlacement)],
+    ["transform", pick(SERIES_TRANSFORMS, draft.transform)],
+    ["draw_style", pick(SERIES_DRAW_STYLES, draft.drawStyle)],
+    ["line_style", pick(SERIES_LINE_STYLES, draft.lineStyle)],
+  ] as const;
+  for (const [type, value] of styles) if (value) config.push({ type, value });
   if (!config.length) return null;
   return { field: { matchBy: STORED_MATCH[draft.matchBy], value: draft.value }, config };
 };

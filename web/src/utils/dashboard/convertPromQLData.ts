@@ -59,6 +59,7 @@ import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
 import { getPropsByChartTypeForSeries } from "./promqlChartSeriesProps";
 import { applyMeasuredYAxisLeftInset } from "./chartDimensionUtils";
 import { legendFallbackOf } from "@/utils/dashboard/promql/formula";
+import { sortTooltipParams } from "./tooltipSort";
 
 /** Rows a tooltip will list before it collapses the rest into a "+N more". */
 const TOOLTIP_MAX_SERIES = 10;
@@ -591,10 +592,7 @@ export const convertPromQLData = async (
 
         const date = new Date(name[0].data[0]);
 
-        // sort tooltip array based on value
-        name.sort((a: any, b: any) => {
-          return (b.value[1] || 0) - (a.value[1] || 0);
-        });
+        sortTooltipParams(name, panelSchema?.config, (it: any) => it.value[1] || 0);
 
         // if hovered series name is not null then move it to first position
         if (hoveredSeriesState?.value?.hoveredSeriesName) {
