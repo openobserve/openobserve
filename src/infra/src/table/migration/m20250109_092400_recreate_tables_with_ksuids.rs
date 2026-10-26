@@ -357,27 +357,27 @@ mod new_folders {
     /// Statement to create the new folders table.
     pub fn create_folders_table_statement() -> TableCreateStatement {
         Table::create()
-        .table(Folders::Table)
-        // The ID is 27-character human readable KSUID.
-        .col(
-            ColumnDef::new(Folders::Id)
-                .char_len(27)
-                .not_null()
-                .primary_key(),
-        )
-        .col(ColumnDef::new(Folders::Org).string_len(100).not_null())
-        // A user-facing ID for the folder. This value can be a 64-bit signed
-        // integer "snowflake" or the string "default" to indicate the
-        // organization's special default folder.
-        .col(ColumnDef::new(Folders::FolderId).string_len(256).not_null())
-        .col(ColumnDef::new(Folders::Name).string_len(256).not_null())
-        .col(ColumnDef::new(Folders::Description).text())
-        // Folder type where...
-        // - 0 is a dashboards folder
-        // - 1 is an alerts folder
-        // - 2 is a reports folder
-        .col(ColumnDef::new(Folders::Type).small_integer().not_null())
-        .to_owned()
+            .table(Folders::Table)
+            // The ID is 27-character human readable KSUID.
+            .col(
+                ColumnDef::new(Folders::Id)
+                    .char_len(27)
+                    .not_null()
+                    .primary_key(),
+            )
+            .col(ColumnDef::new(Folders::Org).string_len(100).not_null())
+            // A user-facing ID for the folder. This value can be a 64-bit signed
+            // integer "snowflake" or the string "default" to indicate the
+            // organization's special default folder.
+            .col(ColumnDef::new(Folders::FolderId).string_len(256).not_null())
+            .col(ColumnDef::new(Folders::Name).string_len(256).not_null())
+            .col(ColumnDef::new(Folders::Description).text())
+            // Folder type where...
+            // - 0 is a dashboards folder
+            // - 1 is an alerts folder
+            // - 2 is a reports folder
+            .col(ColumnDef::new(Folders::Type).small_integer().not_null())
+            .to_owned()
     }
 
     /// Statement to create index on org.
@@ -453,39 +453,43 @@ mod new_dashboards {
     /// Statement to create the new dashboards table.
     pub fn create_dashboards_table_statement() -> TableCreateStatement {
         Table::create()
-        .table(Dashboards::Table)
-        // The ID is a 27-character human readable KSUID.
-        .col(
-            ColumnDef::new(Dashboards::Id)
-                .char_len(27)
-                .not_null()
-                .primary_key(),
-        )
-        // A user-facing ID for the folder. This value can be a 64-bit signed
-        // integer "snowflake".
-        .col(ColumnDef::new(Dashboards::DashboardId).string_len(256).not_null())
-        // Foreign key to the folders table. This is a 27-character human readable
-        // KSUID.
-        .col(ColumnDef::new(Dashboards::FolderId).char_len(27).not_null())
-        // Identifier of the user that owns the dashboard.
-        .col(ColumnDef::new(Dashboards::Owner).string_len(256).not_null())
-        .col(ColumnDef::new(Dashboards::Role).string_len(256).null())
-        .col(ColumnDef::new(Dashboards::Title).string_len(256).not_null())
-        .col(ColumnDef::new(Dashboards::Description).text().null())
-        .col(ColumnDef::new(Dashboards::Data).json().not_null())
-        .col(ColumnDef::new(Dashboards::Version).integer().not_null())
-        .col(
-            ColumnDef::new(Dashboards::CreatedAt)
-                .big_integer()
-                .not_null(),
-        )
-        .foreign_key(
-            sea_query::ForeignKey::create()
+            .table(Dashboards::Table)
+            // The ID is a 27-character human readable KSUID.
+            .col(
+                ColumnDef::new(Dashboards::Id)
+                    .char_len(27)
+                    .not_null()
+                    .primary_key(),
+            )
+            // A user-facing ID for the folder. This value can be a 64-bit signed
+            // integer "snowflake".
+            .col(
+                ColumnDef::new(Dashboards::DashboardId)
+                    .string_len(256)
+                    .not_null(),
+            )
+            // Foreign key to the folders table. This is a 27-character human readable
+            // KSUID.
+            .col(ColumnDef::new(Dashboards::FolderId).char_len(27).not_null())
+            // Identifier of the user that owns the dashboard.
+            .col(ColumnDef::new(Dashboards::Owner).string_len(256).not_null())
+            .col(ColumnDef::new(Dashboards::Role).string_len(256).null())
+            .col(ColumnDef::new(Dashboards::Title).string_len(256).not_null())
+            .col(ColumnDef::new(Dashboards::Description).text().null())
+            .col(ColumnDef::new(Dashboards::Data).json().not_null())
+            .col(ColumnDef::new(Dashboards::Version).integer().not_null())
+            .col(
+                ColumnDef::new(Dashboards::CreatedAt)
+                    .big_integer()
+                    .not_null(),
+            )
+            .foreign_key(
+                sea_query::ForeignKey::create()
                     .name(DASHBOARDS_FOLDERS_FK)
                     .from(Dashboards::Table, Dashboards::FolderId)
-                    .to(new_folders::Folders::Table, new_folders::Folders::Id)
-        )
-        .to_owned()
+                    .to(new_folders::Folders::Table, new_folders::Folders::Id),
+            )
+            .to_owned()
     }
 
     /// Statement to create unique index on dashboard_id.
@@ -583,108 +587,122 @@ mod new_alerts {
     pub fn create_alerts_table_statement() -> TableCreateStatement {
         let text_type = get_text_type();
         Table::create()
-        .table(Alerts::Table)
-        .if_not_exists()
-        // The ID is a 27-character human readable KSUID.
-        .col(
-            ColumnDef::new(Alerts::Id)
-                .char_len(27)
-                .not_null()
-                .primary_key(),
-        )
-        // The org field is redundant and should always match the org of the
-        // associated folder. However we need the org column on this table in
-        // order to enforce a uniqueness constraint that includeds org but not
-        // folder_id.
-        .col(ColumnDef::new(Alerts::Org).string_len(100).not_null())
-        // Foreign key to the folders table. This is a 27-character human
-        // readable KSUID.
-        .col(ColumnDef::new(Alerts::FolderId).char_len(27).not_null())
-        .col(ColumnDef::new(Alerts::Name).string_len(256).not_null())
-        .col(ColumnDef::new(Alerts::StreamType).string_len(50).not_null())
-        .col(ColumnDef::new(Alerts::StreamName).string_len(256).not_null())
-        .col(ColumnDef::new(Alerts::IsRealTime).boolean().not_null())
-        .col(ColumnDef::new(Alerts::Destinations).json().not_null())
-        .col(ColumnDef::new(Alerts::ContextAttributes).json().null())
-        .col(ColumnDef::new(Alerts::RowTemplate).custom(Alias::new(text_type)).null())
-        .col(ColumnDef::new(Alerts::Description).text().null())
-        .col(ColumnDef::new(Alerts::Enabled).boolean().not_null())
-        .col(ColumnDef::new(Alerts::TzOffset).integer().not_null())
-        .col(ColumnDef::new(Alerts::LastTriggeredAt).big_integer().null())
-        .col(ColumnDef::new(Alerts::LastSatisfiedAt).big_integer().null())
-        // Query condition
-        .col(
-            ColumnDef::new(Alerts::QueryType).small_integer().not_null(),
-        )
-        .col(ColumnDef::new(Alerts::QueryConditions).json().null())
-        .col(ColumnDef::new(Alerts::QuerySql).custom(Alias::new(text_type)).null())
-        .col(ColumnDef::new(Alerts::QueryPromql).custom(Alias::new(text_type)) .null())
-        .col(
-            ColumnDef::new(Alerts::QueryPromqlCondition)
-                .json()
-                .null(),
-        )
-        .col(ColumnDef::new(Alerts::QueryAggregation).json().null())
-        .col(ColumnDef::new(Alerts::QueryVrlFunction).custom(Alias::new(text_type)).null())
-        .col(
-            ColumnDef::new(Alerts::QuerySearchEventType).small_integer().null(),
-        )
-        .col(
-            ColumnDef::new(Alerts::QueryMultiTimeRange)
-                .json()
-                .null(),
-        )
-        // Trigger condition
-        .col(
-            ColumnDef::new(Alerts::TriggerThresholdOperator)
-                .string_len(50)
-                .not_null(),
-        )
-        .col(
-            ColumnDef::new(Alerts::TriggerPeriodSeconds)
-                .big_integer()
-                .not_null(),
-        )
-        .col(
-            ColumnDef::new(Alerts::TriggerThresholdCount)
-                .big_integer()
-                .not_null(),
-        )
-        .col(
-            ColumnDef::new(Alerts::TriggerFrequencyType).small_integer().not_null(),
-        )
-        .col(
-            ColumnDef::new(Alerts::TriggerFrequencySeconds)
-                .big_integer()
-                .not_null(),
-        )
-        .col(ColumnDef::new(Alerts::TriggerFrequencyCron).text().null())
-        .col(
-            ColumnDef::new(Alerts::TriggerFrequencyCronTimezone)
-                .string_len(256)
-                .null(),
-        )
-        .col(
-            ColumnDef::new(Alerts::TriggerSilenceSeconds)
-                .big_integer()
-                .not_null(),
-        )
-        .col(
-            ColumnDef::new(Alerts::TriggerToleranceSeconds)
-                .big_integer()
-                .null(),
-        )
-        // Ownership and update information.
-        .col(ColumnDef::new(Alerts::Owner).string_len(256).null())
-        .col(ColumnDef::new(Alerts::LastEditedBy).string_len(256).null())
-        .col(ColumnDef::new(Alerts::UpdatedAt).big_integer().null())
-        .foreign_key(
-            sea_query::ForeignKey::create()
+            .table(Alerts::Table)
+            .if_not_exists()
+            // The ID is a 27-character human readable KSUID.
+            .col(
+                ColumnDef::new(Alerts::Id)
+                    .char_len(27)
+                    .not_null()
+                    .primary_key(),
+            )
+            // The org field is redundant and should always match the org of the
+            // associated folder. However we need the org column on this table in
+            // order to enforce a uniqueness constraint that includeds org but not
+            // folder_id.
+            .col(ColumnDef::new(Alerts::Org).string_len(100).not_null())
+            // Foreign key to the folders table. This is a 27-character human
+            // readable KSUID.
+            .col(ColumnDef::new(Alerts::FolderId).char_len(27).not_null())
+            .col(ColumnDef::new(Alerts::Name).string_len(256).not_null())
+            .col(ColumnDef::new(Alerts::StreamType).string_len(50).not_null())
+            .col(
+                ColumnDef::new(Alerts::StreamName)
+                    .string_len(256)
+                    .not_null(),
+            )
+            .col(ColumnDef::new(Alerts::IsRealTime).boolean().not_null())
+            .col(ColumnDef::new(Alerts::Destinations).json().not_null())
+            .col(ColumnDef::new(Alerts::ContextAttributes).json().null())
+            .col(
+                ColumnDef::new(Alerts::RowTemplate)
+                    .custom(Alias::new(text_type))
+                    .null(),
+            )
+            .col(ColumnDef::new(Alerts::Description).text().null())
+            .col(ColumnDef::new(Alerts::Enabled).boolean().not_null())
+            .col(ColumnDef::new(Alerts::TzOffset).integer().not_null())
+            .col(ColumnDef::new(Alerts::LastTriggeredAt).big_integer().null())
+            .col(ColumnDef::new(Alerts::LastSatisfiedAt).big_integer().null())
+            // Query condition
+            .col(ColumnDef::new(Alerts::QueryType).small_integer().not_null())
+            .col(ColumnDef::new(Alerts::QueryConditions).json().null())
+            .col(
+                ColumnDef::new(Alerts::QuerySql)
+                    .custom(Alias::new(text_type))
+                    .null(),
+            )
+            .col(
+                ColumnDef::new(Alerts::QueryPromql)
+                    .custom(Alias::new(text_type))
+                    .null(),
+            )
+            .col(ColumnDef::new(Alerts::QueryPromqlCondition).json().null())
+            .col(ColumnDef::new(Alerts::QueryAggregation).json().null())
+            .col(
+                ColumnDef::new(Alerts::QueryVrlFunction)
+                    .custom(Alias::new(text_type))
+                    .null(),
+            )
+            .col(
+                ColumnDef::new(Alerts::QuerySearchEventType)
+                    .small_integer()
+                    .null(),
+            )
+            .col(ColumnDef::new(Alerts::QueryMultiTimeRange).json().null())
+            // Trigger condition
+            .col(
+                ColumnDef::new(Alerts::TriggerThresholdOperator)
+                    .string_len(50)
+                    .not_null(),
+            )
+            .col(
+                ColumnDef::new(Alerts::TriggerPeriodSeconds)
+                    .big_integer()
+                    .not_null(),
+            )
+            .col(
+                ColumnDef::new(Alerts::TriggerThresholdCount)
+                    .big_integer()
+                    .not_null(),
+            )
+            .col(
+                ColumnDef::new(Alerts::TriggerFrequencyType)
+                    .small_integer()
+                    .not_null(),
+            )
+            .col(
+                ColumnDef::new(Alerts::TriggerFrequencySeconds)
+                    .big_integer()
+                    .not_null(),
+            )
+            .col(ColumnDef::new(Alerts::TriggerFrequencyCron).text().null())
+            .col(
+                ColumnDef::new(Alerts::TriggerFrequencyCronTimezone)
+                    .string_len(256)
+                    .null(),
+            )
+            .col(
+                ColumnDef::new(Alerts::TriggerSilenceSeconds)
+                    .big_integer()
+                    .not_null(),
+            )
+            .col(
+                ColumnDef::new(Alerts::TriggerToleranceSeconds)
+                    .big_integer()
+                    .null(),
+            )
+            // Ownership and update information.
+            .col(ColumnDef::new(Alerts::Owner).string_len(256).null())
+            .col(ColumnDef::new(Alerts::LastEditedBy).string_len(256).null())
+            .col(ColumnDef::new(Alerts::UpdatedAt).big_integer().null())
+            .foreign_key(
+                sea_query::ForeignKey::create()
                     .name(ALERTS_FOLDERS_FK)
                     .from(Alerts::Table, Alerts::FolderId)
-                    .to(new_folders::Folders::Table, new_folders::Folders::Id)
-        )
-        .to_owned()
+                    .to(new_folders::Folders::Table, new_folders::Folders::Id),
+            )
+            .to_owned()
     }
 
     /// Statement to create unique index on the org, stream_type, stream_name, and

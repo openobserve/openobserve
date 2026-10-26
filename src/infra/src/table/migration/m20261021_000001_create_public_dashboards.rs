@@ -218,7 +218,11 @@ fn create_links_stmt() -> TableCreateStatement {
                 .null(),
         )
         // JSON map of variable key to the value captured at publish.
-        .col(ColumnDef::new(PublicDashboards::FrozenVariables).text().null())
+        .col(
+            ColumnDef::new(PublicDashboards::FrozenVariables)
+                .text()
+                .null(),
+        )
         .col(
             ColumnDef::new(PublicDashboards::RefreshSecs)
                 .integer()
@@ -242,7 +246,11 @@ fn create_links_stmt() -> TableCreateStatement {
                 .not_null()
                 .default(true),
         )
-        .col(ColumnDef::new(PublicDashboards::ExpiresAt).big_integer().null())
+        .col(
+            ColumnDef::new(PublicDashboards::ExpiresAt)
+                .big_integer()
+                .null(),
+        )
         .col(
             ColumnDef::new(PublicDashboards::CreatedBy)
                 .string_len(256)
@@ -265,7 +273,11 @@ fn create_links_stmt() -> TableCreateStatement {
         )
         .col(rev_col())
         .col(deleted_at_col())
-        .col(ColumnDef::new(PublicDashboards::LastAccessedAt).big_integer().null())
+        .col(
+            ColumnDef::new(PublicDashboards::LastAccessedAt)
+                .big_integer()
+                .null(),
+        )
         .col(
             ColumnDef::new(PublicDashboards::AccessCount)
                 .big_integer()

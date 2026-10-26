@@ -302,6 +302,7 @@ vi.mock("@/composables/useTraces", () => ({
 // Import the component AFTER all vi.mock declarations.
 // ---------------------------------------------------------------------------
 import SearchBar from "@/plugins/traces/SearchBar.vue";
+import analytics from "@/services/product_analytics";
 import SavedViewsListDialog from "@/components/savedViews/SavedViewsListDialog.vue";
 import { useToolbarPins } from "@/composables/useToolbarPins";
 
@@ -1501,6 +1502,55 @@ describe("SearchBar", () => {
       });
 
       expect(wrapper.emitted("searchdata")).toBeFalsy();
+    });
+
+    it("tracks a user relative change as traces_time_range_changed without the raw value", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+
+      await (wrapper.vm as any).updateDateTime({
+        startTime: 0,
+        endTime: 0,
+        relativeTimePeriod: "1h",
+        valueType: "relative",
+        userChangedValue: true,
+      });
+
+      expect(analytics.track).toHaveBeenCalledWith("traces_time_range_changed", {
+        stream_name: "default",
+        value_type: "relative",
+        relative_period: "1h",
+      });
+      expect(analytics.track).not.toHaveBeenCalledWith("Button Click", expect.anything());
+    });
+
+    it("tracks a debounced user absolute change in live mode as traces_time_range_changed", async () => {
+      store.state.zoConfig = { auto_query_enabled: true };
+      searchObjInstance.meta.liveMode = true;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+      vi.useFakeTimers();
+      try {
+        await (wrapper.vm as any).updateDateTime({
+          startTime: 1_000,
+          endTime: 2_000,
+          relativeTimePeriod: null,
+          valueType: "absolute",
+          userChangedValue: true,
+        });
+        await vi.advanceTimersByTimeAsync(2600);
+      } finally {
+        vi.useRealTimers();
+      }
+
+      expect(analytics.track).toHaveBeenCalledWith("traces_time_range_changed", {
+        stream_name: "default",
+        value_type: "absolute",
+        relative_period: null,
+      });
+      expect(analytics.track).not.toHaveBeenCalledWith("Button Click", expect.anything());
     });
   });
 

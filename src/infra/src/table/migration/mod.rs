@@ -234,6 +234,7 @@ mod m20261020_000001_create_eval_job_states_tables;
 mod m20261021_000001_create_public_dashboards;
 mod m20261021_000001_status_pages_add_favicon_img;
 mod m20261021_000002_add_search_type_to_search_queue;
+mod m20261024_000001_add_lease_to_org_cleanup_tasks;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -650,6 +651,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261018_000001_create_rca_steering::Migration),
             Box::new(m20261021_000001_status_pages_add_favicon_img::Migration),
             Box::new(m20261005_000001_create_fleet::Migration),
+            Box::new(m20261024_000001_add_lease_to_org_cleanup_tasks::Migration),
             Box::new(m20261021_000001_create_public_dashboards::Migration),
             Box::new(m20261021_000002_add_search_type_to_search_queue::Migration),
         ]
@@ -728,8 +730,9 @@ mod tests {
         (115, "m20261018_000001_create_rca_steering"),
         (116, "m20261021_000001_status_pages_add_favicon_img"),
         (117, "m20261005_000001_create_fleet"),
-        (118, "m20261021_000001_create_public_dashboards"),
-        (119, "m20261021_000002_add_search_type_to_search_queue"),
+        (118, "m20261024_000001_add_lease_to_org_cleanup_tasks"),
+        (119, "m20261021_000001_create_public_dashboards"),
+        (120, "m20261021_000002_add_search_type_to_search_queue"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

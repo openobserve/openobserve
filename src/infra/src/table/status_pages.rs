@@ -24,13 +24,14 @@ use std::collections::HashSet;
 
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
-    QueryFilter, QueryOrder, QuerySelect, prelude::Expr,
+    QueryFilter, QueryOrder, QuerySelect, TransactionTrait, prelude::Expr,
 };
 
 use super::entity::{
-    status_page_check_snoozes, status_page_component_checks, status_page_components,
-    status_page_custom_domains, status_page_notice_components, status_page_notice_updates,
-    status_page_notices, status_page_snapshots, status_pages, synthetics_checks,
+    status_page_audit_log, status_page_check_snoozes, status_page_component_checks,
+    status_page_components, status_page_custom_domains, status_page_notice_components,
+    status_page_notice_updates, status_page_notices, status_page_snapshots, status_pages,
+    synthetics_checks,
 };
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
@@ -511,6 +512,53 @@ pub async fn delete_page(org_id: &str, id: &str) -> Result<bool, errors::Error> 
     Ok(res.rows_affected > 0)
 }
 
+/// Hard-deletes an org's status-page rows, children first; deleting its domains frees their claims.
+pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    let txn = get_orm_client_rw().await.begin().await?;
+    status_page_audit_log::Entity::delete_many()
+        .filter(status_page_audit_log::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    status_page_check_snoozes::Entity::delete_many()
+        .filter(status_page_check_snoozes::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    status_page_component_checks::Entity::delete_many()
+        .filter(status_page_component_checks::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    status_page_notice_components::Entity::delete_many()
+        .filter(status_page_notice_components::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    status_page_notice_updates::Entity::delete_many()
+        .filter(status_page_notice_updates::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    status_page_notices::Entity::delete_many()
+        .filter(status_page_notices::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    status_page_components::Entity::delete_many()
+        .filter(status_page_components::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    status_page_custom_domains::Entity::delete_many()
+        .filter(status_page_custom_domains::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    status_page_snapshots::Entity::delete_many()
+        .filter(status_page_snapshots::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    status_pages::Entity::delete_many()
+        .filter(status_pages::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    txn.commit().await?;
+    Ok(())
+}
+
 /// A page's components with each one's mapped check ids, for the admin detail
 /// GET (so the edit UI can render the existing mapping).
 pub async fn list_components_with_checks(
@@ -696,7 +744,7 @@ pub async fn get_snapshot_overall(
         .map(|o| o.overall))
 }
 
-/// Append-only audit row (R-4). No update/delete op exists by design.
+/// Append-only audit row (R-4); only an org deletion removes rows.
 pub async fn insert_audit(
     org_id: &str,
     actor: &str,
@@ -704,7 +752,6 @@ pub async fn insert_audit(
     notice_id: Option<&str>,
     at: i64,
 ) -> Result<(), errors::Error> {
-    use super::entity::status_page_audit_log;
     let conn = get_orm_client_rw().await;
     status_page_audit_log::Model {
         id: config::ider::generate(),

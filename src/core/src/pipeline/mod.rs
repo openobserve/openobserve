@@ -445,7 +445,12 @@ pub async fn delete_pipeline(pipeline_id: &str) -> Result<(), PipelineError> {
     let Ok(existing_pipeline) = pipeline::get_by_id(pipeline_id).await else {
         return Err(PipelineError::NotFound(pipeline_id.to_string()));
     };
+    delete_listed_pipeline(existing_pipeline).await
+}
 
+/// `delete_pipeline` for a pipeline the caller already read, such as from a primary listing.
+pub async fn delete_listed_pipeline(existing_pipeline: Pipeline) -> Result<(), PipelineError> {
+    let pipeline_id = existing_pipeline.id.as_str();
     // delete DerivedStream details if there's any
     if let PipelineSource::Scheduled(derived_stream) = existing_pipeline.source
         && let Err(error) = super::alerts::derived_streams::delete(

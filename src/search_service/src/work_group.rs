@@ -335,7 +335,7 @@ pub async fn acquire_work_group_lock(
     let search_type = req
         .search_event_type
         .as_ref()
-        .and_then(|st| SearchEventType::try_from(st.as_str()).ok());
+        .and_then(|st| st.parse::<SearchEventType>().ok());
     let is_background_task = search_type.is_some_and(|st| st.is_background());
 
     let work_group = o2_enterprise::enterprise::search::work_group::predict(

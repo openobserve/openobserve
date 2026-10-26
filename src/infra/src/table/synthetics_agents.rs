@@ -276,3 +276,16 @@ pub async fn get(agent_id: &str) -> Result<Option<SyntheticsAgentRecord>, errors
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
     Ok(row.map(Into::into))
 }
+
+/// Deletes every agent of an org and drops each from the agent cache on every node.
+pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    let client = get_orm_client_rw().await;
+    let delete = Entity::delete_many().filter(Column::OrgId.eq(org_id));
+    let ids: Vec<String> = super::delete_returning(client, delete, &[Column::Id])
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    for id in &ids {
+        invalidate_and_publish(id).await;
+    }
+    Ok(())
+}

@@ -86,7 +86,11 @@ fn create_annotation_queues_statement() -> TableCreateStatement {
                 .string_len(255)
                 .not_null(),
         )
-        .col(ColumnDef::new(LlmAnnotationQueues::Description).text().null())
+        .col(
+            ColumnDef::new(LlmAnnotationQueues::Description)
+                .text()
+                .null(),
+        )
         .col(
             ColumnDef::new(LlmAnnotationQueues::TargetDatasetId)
                 .string_len(27)

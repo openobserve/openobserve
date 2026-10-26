@@ -539,7 +539,6 @@ export default defineComponent({
       analytics.track("Button Click", {
         button: "Save Function",
         user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
         function_name: value.name,
         page: "Add/Update Function",
       });
