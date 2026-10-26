@@ -357,7 +357,7 @@ pub async fn acquire_work_group_lock(
     let is_background_task = req
         .search_event_type
         .as_ref()
-        .and_then(|st| SearchEventType::try_from(st.as_str()).ok())
+        .and_then(|st| st.parse::<SearchEventType>().ok())
         .map(|st| st.is_background())
         .unwrap_or(false);
 

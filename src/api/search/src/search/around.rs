@@ -210,10 +210,7 @@ pub(crate) async fn around(
         resp.hits
             .push(resp_backward.hits[hits_num - 1 - i].to_owned());
     }
-    let hits_num = resp_forward.hits.len();
-    for i in 0..hits_num {
-        resp.hits.push(resp_forward.hits[i].to_owned());
-    }
+    resp.hits.extend(resp_forward.hits.iter().cloned());
     resp.total = resp.hits.len();
     resp.size = around_size;
     resp.scan_size = resp_forward.scan_size + resp_backward.scan_size;

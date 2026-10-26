@@ -1216,7 +1216,6 @@ pub async fn redirect(
 
     match exchange_code(code).await {
         Ok(login_data) => {
-            let login_url;
             let access_token = login_data.access_token;
             let keys = get_dex_jwks().await;
             let token_ver = verify_decode_token(
@@ -1227,7 +1226,7 @@ pub async fn redirect(
                 true,
             );
             let id_token;
-            match token_ver {
+            let login_url = match token_ver {
                 Ok(res) => {
                     // check for service accounts , do not to allow login
                     if let Some(db_user) = db::user::get_user_by_email(&res.0.user_email).await
@@ -1289,13 +1288,13 @@ pub async fn redirect(
                                 .unwrap();
                         }
                     };
-                    login_url = format!(
+                    format!(
                         "{}#id_token={}.{}{}",
                         login_data.url,
                         ID_TOKEN_HEADER,
                         base64::encode(&id_token),
                         url_params.unwrap_or_default()
-                    );
+                    )
                 }
                 Err(e) => {
                     audit_message.response_meta.http_response_code = 400;
@@ -1307,7 +1306,7 @@ pub async fn redirect(
                         .body(Body::from(format!("\"{e}\"")))
                         .unwrap();
                 }
-            }
+            };
 
             // generate new UUID for access token & store token in DB
             let session_id = ider::uuid();
