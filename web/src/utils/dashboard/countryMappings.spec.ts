@@ -18,9 +18,9 @@ import worldMap from "@/assets/dashboard/maps/map.json";
 import { COUNTRY_ALIASES, countries, resolveCountryName } from "./countryMappings";
 
 describe("resolveCountryName", () => {
-  it("resolves ISO codes and map names in any case", () => {
+  it("resolves upper-case ISO codes and map names in any case", () => {
     expect(resolveCountryName("US")).toBe("United States");
-    expect(resolveCountryName("us")).toBe("United States");
+    expect(resolveCountryName("USA")).toBe("United States");
     expect(resolveCountryName("usa")).toBe("United States");
     expect(resolveCountryName(" united states ")).toBe("United States");
     expect(resolveCountryName("CZECH REP.")).toBe("Czech Rep.");
@@ -33,6 +33,21 @@ describe("resolveCountryName", () => {
     expect(resolveCountryName("Bosnia and Herzegovina")).toBe("Bosnia and Herz.");
     expect(resolveCountryName("Russian Federation")).toBe("Russia");
     expect(resolveCountryName("UK")).toBe("United Kingdom");
+  });
+
+  it("does not read lower-case words as country codes", () => {
+    for (const word of ["us", "na", "no", "in", "it", "and", "per"]) {
+      expect(resolveCountryName(word)).toBeNull();
+    }
+    expect(resolveCountryName("NO")).toBe("Norway");
+  });
+
+  it("ignores accents and typographic apostrophes and knows the UN long forms", () => {
+    expect(resolveCountryName("C\u00f4te d\u2019Ivoire")).toBe("C\u00f4te d'Ivoire");
+    expect(resolveCountryName("cote d'ivoire")).toBe("C\u00f4te d'Ivoire");
+    expect(resolveCountryName("United Republic of Tanzania")).toBe("Tanzania");
+    expect(resolveCountryName("Bolivia (Plurinational State of)")).toBe("Bolivia");
+    expect(resolveCountryName("Virgin Islands, U.S.")).toBe("U.S. Virgin Is.");
   });
 
   it("returns null for values that name no country", () => {

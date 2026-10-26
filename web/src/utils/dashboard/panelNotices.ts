@@ -136,18 +136,30 @@ const unmatchedRegionsNotice = (join: RegionJoinInfo, t: TranslateFn): PanelNoti
       ),
     );
   }
-  const count = join.unmatchedTotal + (join.missingLabel?.count ?? 0);
+  // Unmatched names and unlabeled series are different units, so the chip counts only one.
+  const missingOnly = join.unmatchedTotal ? undefined : join.missingLabel;
+  const count = missingOnly ? missingOnly.count : join.unmatchedTotal;
   return {
     id: "unmatched-regions",
     tone: "warning",
     icon: "public",
-    chipLabel: t(
-      "dashboard.panelErrorButtons.unmatchedRegionsChip",
-      { count: addCommasToNumber(count) },
-      count,
-    ),
-    title: t("dashboard.panelErrorButtons.unmatchedRegionsTitle"),
-    body: t("dashboard.panelErrorButtons.unmatchedRegionsBody"),
+    chipLabel: missingOnly
+      ? t(
+          "dashboard.panelErrorButtons.unlabeledSeriesChip",
+          { count: addCommasToNumber(count) },
+          count,
+        )
+      : t(
+          "dashboard.panelErrorButtons.unmatchedRegionsChip",
+          { count: addCommasToNumber(count) },
+          count,
+        ),
+    title: missingOnly
+      ? t("dashboard.panelErrorButtons.unlabeledSeriesTitle")
+      : t("dashboard.panelErrorButtons.unmatchedRegionsTitle"),
+    body: missingOnly
+      ? t("dashboard.panelErrorButtons.unlabeledSeriesBody")
+      : t("dashboard.panelErrorButtons.unmatchedRegionsBody"),
     details,
   };
 };

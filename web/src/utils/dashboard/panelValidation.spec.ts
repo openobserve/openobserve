@@ -315,6 +315,50 @@ describe("validatePanel on a PromQL formula", () => {
   });
 });
 
+describe("validatePanel on a gauge range", () => {
+  const run = (configs: any[]) => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type: "gauge",
+          queryType: "promql",
+          queries: configs.map((config) => ({ query: "up", config })),
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+  const message = gt("dashboard.utils.gaugeMinBelowMax");
+
+  it("blocks a fixed range whose min is not below its max", () => {
+    expect(run([{ min: 20, max: 10 }])).toEqual([message]);
+    expect(run([{ min: 0, max: 0 }])).toEqual([message]);
+  });
+
+  it("accepts a valid fixed range and any auto range", () => {
+    expect(run([{ min: -50, max: 0 }])).toEqual([]);
+    expect(run([{ range_mode: "auto", min: 20, max: 10 }])).toEqual([]);
+  });
+
+  it("names the query when the panel has several", () => {
+    expect(
+      run([
+        { min: 0, max: 100 },
+        { min: 5, max: 1 },
+      ]),
+    ).toEqual([gt("dashboard.utils.queryErrorPrefix", { index: 2, error: message })]);
+  });
+});
+
 describe("validateConditions", () => {
   const t = gt as any;
 

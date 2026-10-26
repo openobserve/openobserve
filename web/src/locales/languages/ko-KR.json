@@ -6489,6 +6489,8 @@
     "totalLegends": "합계: {count}",
     "noLegendsAvailable": "범례 없음",
     "tableFiltering": "컬럼 필터링",
+    "tableExpandableRows": "확장 가능한 행",
+    "tableExpandableRowsTooltip": "각 행에 모든 필드를 보여 주는 펼치기 버튼이 표시됩니다.",
     "columnFormattingTitle": "열 형식 지정",
     "columnFormattingSubtitle": "서식을 지정할 필드를 추가한 다음 실시간 미리보기로 각 필드의 스타일을 지정하세요.",
     "columnFormattingPick": "열 선택",

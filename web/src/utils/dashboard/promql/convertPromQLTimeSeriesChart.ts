@@ -18,7 +18,7 @@ import { fillMissingTimestamps } from "./shared/dataProcessor";
 import { buildXAxis, buildYAxis, buildTooltip } from "./shared/axisBuilder";
 import { buildDynamicGrid } from "./shared/gridBuilder";
 import { getSeriesColor } from "../colorPalette";
-import { chartColor } from "@/utils/chartTheme";
+import { buildSeriesMarkLine } from "./shared/markLines";
 
 /**
  * Converter for time-series charts (line, area, bar, scatter, area-stacked)
@@ -110,18 +110,7 @@ export class TimeSeriesConverter implements PromQLChartConverter {
           // Connect null values
           connectNulls: config?.connect_nulls ?? false,
 
-          // Mark lines (annotations)
-          markLine: {
-            silent: true,
-            animation: false,
-            data: this.getMarkLineData(panelSchema),
-            zlevel: 2,
-            lineStyle: {
-              shadowColor: chartColor("--color-chart-markline-shadow"),
-              shadowBlur: 2,
-              width: 2,
-            },
-          },
+          markLine: { ...buildSeriesMarkLine(panelSchema), zlevel: 2 },
         });
 
         // Track for legend
@@ -213,38 +202,5 @@ export class TimeSeriesConverter implements PromQLChartConverter {
           },
         };
     }
-  }
-
-  /**
-   * Extract mark line data from panel schema for annotations
-   */
-  private getMarkLineData(panelSchema: any): any[] {
-    const markLines: any[] = [];
-
-    if (panelSchema.config?.mark_lines) {
-      panelSchema.config.mark_lines.forEach((markLine: any) => {
-        if (markLine.show !== false) {
-          markLines.push({
-            name: markLine.name,
-            xAxis: markLine.type === "xAxis" ? markLine.value : null,
-            yAxis: markLine.type === "yAxis" ? markLine.value : null,
-            label: {
-              // The alert preview passes show_label:false — its lines are
-              // colour-coded, and a text label clips at the chart top.
-              show: markLine.show_label !== false,
-              formatter: markLine.name ? "{b}:{c}" : "{c}",
-              position: "insideEndTop",
-            },
-            lineStyle: {
-              color: markLine.color || "#FF0000",
-              type: markLine.lineStyle || "solid",
-              width: markLine.width || 2,
-            },
-          });
-        }
-      });
-    }
-
-    return markLines;
   }
 }

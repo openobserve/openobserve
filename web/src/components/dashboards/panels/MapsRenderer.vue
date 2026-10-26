@@ -26,6 +26,23 @@ import { chartColor } from "@/utils/chartTheme";
 import useTheme from "@/composables/useTheme";
 
 echarts.use([MapChart]);
+// Registering once per app keeps panels and theme switches from re-parsing the GeoJSON.
+echarts.registerMap("world", worldMap as unknown as Parameters<typeof echarts.registerMap>[1]);
+
+interface MapsSeriesOption {
+  roam?: boolean;
+  zoom?: number;
+  center?: unknown;
+  [key: string]: unknown;
+}
+
+interface MapsChartOptions {
+  tooltip?: { textStyle?: Record<string, unknown>; [key: string]: unknown };
+  series?: MapsSeriesOption[];
+  [key: string]: unknown;
+}
+
+type MapView = Pick<MapsSeriesOption, "zoom" | "center">;
 
 export default defineComponent({
   name: "MapsRenderer",
@@ -54,7 +71,7 @@ export default defineComponent({
     };
 
     // Options can outlive a theme switch, so tooltip colours resolve at render time.
-    const withThemedTooltip = (options: any) =>
+    const withThemedTooltip = (options: MapsChartOptions): MapsChartOptions =>
       options.tooltip
         ? {
             ...options,
@@ -70,10 +87,24 @@ export default defineComponent({
           }
         : options;
 
-    const currentOptions = () => {
-      const options = props.data.options;
+    // Roam changes live only in the chart instance, so a rebuild must carry them over.
+    const currentView = (): MapView[] =>
+      ((chart?.getOption()?.series ?? []) as MapsSeriesOption[]).map(({ zoom, center }) => ({
+        zoom,
+        center,
+      }));
+
+    const withView = (options: MapsChartOptions, view: MapView[]): MapsChartOptions => ({
+      ...options,
+      series: options.series?.map((series, index) =>
+        series.roam && view[index]?.zoom !== undefined ? { ...series, ...view[index] } : series,
+      ),
+    });
+
+    const currentOptions = (view: MapView[] = []) => {
+      const options: MapsChartOptions | undefined = props.data.options;
       return withThemedTooltip(
-        options && options.series && options.series.length > 0 ? options : DEFAULT_MAP_OPTIONS,
+        withView(options?.series?.length ? options : DEFAULT_MAP_OPTIONS, view),
       );
     };
 
@@ -81,10 +112,10 @@ export default defineComponent({
 
     const initChart = () => {
       if (!chartRef.value) return;
+      const view = currentView();
       chart?.dispose();
       chart = echarts.init(chartRef.value, isDark.value ? "dark" : "light");
-      echarts.registerMap("world", worldMap as any);
-      chart.setOption(withChartFont(currentOptions()), true);
+      chart.setOption(withChartFont(currentOptions(view)), true);
     };
 
     watch(isDark, () => {
@@ -112,7 +143,7 @@ export default defineComponent({
       async () => {
         if (chart) {
           await nextTick();
-          chart?.setOption(withChartFont(currentOptions()), true);
+          chart?.setOption(withChartFont(currentOptions(currentView())), true);
         }
       },
       { deep: true },

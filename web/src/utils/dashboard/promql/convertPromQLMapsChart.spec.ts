@@ -966,8 +966,8 @@ describe("MapsConverter", () => {
 
       it("joins names case-insensitively and through common aliases, summing per region", () => {
         const result = convert([
-          series({ name: "us" }, "10"),
-          series({ name: "United States of America" }, "5"),
+          series({ name: "US" }, "10"),
+          series({ name: "united states of america" }, "5"),
           series({ name: "south korea" }, "7"),
         ]);
 

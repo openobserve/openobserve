@@ -52,11 +52,11 @@ describe("convertMapsData", () => {
     expect(result.options.tooltip.backgroundColor).toBeUndefined();
   });
 
-  it("joins case-insensitively and through aliases, summing rows that land on one region", () => {
+  it("joins names case-insensitively and through aliases, summing rows that land on one region", () => {
     const result: any = convertMapsData(schema(), [
       [
-        { country: "us", value: 2 },
-        { country: "United States", value: "3" },
+        { country: "US", value: 2 },
+        { country: "united states", value: "3" },
         { country: "South Korea", value: 4 },
       ],
     ]);

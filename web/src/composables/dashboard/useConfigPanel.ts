@@ -7,6 +7,7 @@ import {
   shouldShowLegendWidth,
   shouldShowLegendHeight,
   shouldApplyChartAlign,
+  shouldShowLegendValues,
   shouldShowTopResultsConfig,
   shouldShowAreaLineStyleConfig,
   shouldShowNoValueReplacement,
@@ -25,6 +26,7 @@ import {
 } from "@/utils/dashboard/searchLabelsConfig";
 import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
 import { PROMQL_MODULAR_CHART_TYPES } from "@/utils/dashboard/promql/shared/types";
+import { isGaugeAutoRange } from "@/utils/dashboard/gaugeDial";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -245,6 +247,10 @@ export function useConfigPanel(
         label: t("dashboard.chartAlign"),
         visible: shouldApplyChartAlign(dashboardPanelData),
       },
+      "legend-values": {
+        label: t("dashboard.legendValues"),
+        visible: shouldShowLegendValues(dashboardPanelData),
+      },
       "promql-legend": {
         label: t("dashboard.query"),
         visible:
@@ -388,6 +394,10 @@ export function useConfigPanel(
         label: t("dashboard.tableFiltering"),
         visible: dashboardPanelData.data.type === "table",
       },
+      "expandable-rows": {
+        label: t("dashboard.tableExpandableRows"),
+        visible: dashboardPanelData.data.type === "table" && !isPivotMode.value,
+      },
       pagination: {
         label: t("dashboard.pagination"),
         visible: dashboardPanelData.data.type === "table",
@@ -465,12 +475,28 @@ export function useConfigPanel(
       },
     },
     gauge: {
+      "gauge-range-mode": {
+        label: t("dashboard.gaugeRangeMode"),
+        visible: dashboardPanelData.data.type === "gauge",
+      },
       "gauge-min": {
         label: t("dashboard.gaugeMinValue"),
-        visible: dashboardPanelData.data.type === "gauge",
+        visible:
+          dashboardPanelData.data.type === "gauge" &&
+          !isGaugeAutoRange(
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.config,
+          ),
       },
       "gauge-max": {
         label: t("dashboard.gaugeMaxValue"),
+        visible:
+          dashboardPanelData.data.type === "gauge" &&
+          !isGaugeAutoRange(
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.config,
+          ),
+      },
+      "gauge-end-labels": {
+        label: t("dashboard.showGaugeEndLabels"),
         visible: dashboardPanelData.data.type === "gauge",
       },
     },

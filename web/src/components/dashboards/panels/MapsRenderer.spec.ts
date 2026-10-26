@@ -22,6 +22,7 @@ import { chartColor } from "@/utils/chartTheme";
 // Create mock chart instance
 const mockChart = {
   setOption: vi.fn(),
+  getOption: vi.fn((): any => ({ series: [] })),
   resize: vi.fn(),
   dispose: vi.fn(),
   on: vi.fn(),
@@ -86,6 +87,8 @@ Object.defineProperty(window, "removeEventListener", {
     }
   }),
 });
+
+const registerMapCallsAtImport = vi.mocked(echarts.registerMap).mock.calls.slice();
 
 describe("MapsRenderer", () => {
   let wrapper: VueWrapper<any>;
@@ -187,7 +190,7 @@ describe("MapsRenderer", () => {
       await waitForChartInit(wrapper);
 
       expect(echarts.init).toHaveBeenCalled();
-      expect(echarts.registerMap).toHaveBeenCalledWith("world", expect.any(Object));
+      expect(echarts.registerMap).not.toHaveBeenCalled();
     });
 
     it("should set chart options", async () => {
@@ -450,13 +453,8 @@ describe("MapsRenderer", () => {
       expect(mapData.default.type).toBe("FeatureCollection");
     });
 
-    it("should register map with ECharts", async () => {
-      const echarts = await import("echarts/core");
-
-      wrapper = createWrapper();
-      await waitForChartInit(wrapper);
-
-      expect(echarts.registerMap).toHaveBeenCalledWith("world", expect.any(Object));
+    it("registers the world map once at import, not per chart", () => {
+      expect(registerMapCallsAtImport).toEqual([["world", expect.any(Object)]]);
     });
   });
 
@@ -539,6 +537,56 @@ describe("MapsRenderer", () => {
       expect(options.tooltip.backgroundColor).toBe(chartColor("--color-tooltip-bg"));
       expect(options.tooltip.textStyle.color).toBe(chartColor("--color-tooltip-text"));
       expect(options.tooltip.formatter).toBe("{b}: {c}");
+    });
+  });
+
+  describe("Pan and zoom across rebuilds", () => {
+    const roamData = (roam: boolean) => ({
+      options: {
+        tooltip: {},
+        series: [{ type: "map", map: "world", roam, data: [{ name: "Canada", value: 1 }] }],
+      },
+    });
+
+    afterEach(() => {
+      theme.isDark.value = false;
+      mockChart.getOption.mockReturnValue({ series: [] });
+    });
+
+    it("keeps the user's zoom and center when new data arrives", async () => {
+      wrapper = createWrapper({ data: roamData(true) });
+      await waitForChartInit(wrapper);
+      mockChart.getOption.mockReturnValue({ series: [{ zoom: 3, center: [10, 20] }] });
+
+      await wrapper.setProps({ data: roamData(true) });
+      await wrapper.vm.$nextTick();
+
+      const [options] = mockChart.setOption.mock.calls.at(-1)!;
+      expect(options.series[0]).toMatchObject({ zoom: 3, center: [10, 20] });
+    });
+
+    it("keeps the user's zoom and center across a theme switch", async () => {
+      wrapper = createWrapper({ data: roamData(true) });
+      await waitForChartInit(wrapper);
+      mockChart.getOption.mockReturnValue({ series: [{ zoom: 2, center: [1, 2] }] });
+
+      theme.isDark.value = true;
+      await wrapper.vm.$nextTick();
+
+      const [options] = mockChart.setOption.mock.calls.at(-1)!;
+      expect(options.series[0]).toMatchObject({ zoom: 2, center: [1, 2] });
+    });
+
+    it("does not carry a view over when panning is off", async () => {
+      wrapper = createWrapper({ data: roamData(false) });
+      await waitForChartInit(wrapper);
+      mockChart.getOption.mockReturnValue({ series: [{ zoom: 3, center: [10, 20] }] });
+
+      await wrapper.setProps({ data: roamData(false) });
+      await wrapper.vm.$nextTick();
+
+      const [options] = mockChart.setOption.mock.calls.at(-1)!;
+      expect(options.series[0].zoom).toBeUndefined();
     });
   });
 });

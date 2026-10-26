@@ -435,7 +435,7 @@ describe("PanelErrorButtons", () => {
         },
       });
       const chip = wrapper.find('[data-test="panel-notice-chip-unmatched-regions"]');
-      expect(chip.text()).toBe("27 not on the map");
+      expect(chip.text()).toBe("25 not on the map");
       await openTooltip(chip.element);
       const details = [
         ...(bubble()?.querySelectorAll('[data-test="panel-notice-detail-unmatched-regions"]') ??
@@ -445,6 +445,16 @@ describe("PanelErrorButtons", () => {
         "us-east-1, eu-west-1 and 23 more",
         "2 series have no country label",
       ]);
+      wrapper.unmount();
+    });
+
+    it("names unlabeled series in the chip when every name joined", () => {
+      const wrapper = mountAttached({
+        regionJoin: { unmatched: [], unmatchedTotal: 0, missingLabel: { label: "name", count: 3 } },
+      });
+      expect(wrapper.find('[data-test="panel-notice-chip-unmatched-regions"]').text()).toBe(
+        "3 unlabeled series",
+      );
       wrapper.unmount();
     });
 

@@ -36,6 +36,7 @@ vi.mock("@/utils/dashboard/configUtils", () => ({
   shouldShowLegendWidth: vi.fn(() => false),
   shouldShowLegendHeight: vi.fn(() => false),
   shouldApplyChartAlign: vi.fn(() => false),
+  shouldShowLegendValues: vi.fn(() => false),
   shouldShowTopResultsConfig: vi.fn(() => false),
   shouldShowAreaLineStyleConfig: vi.fn(() => false),
   shouldShowNoValueReplacement: vi.fn(() => false),
@@ -792,6 +793,32 @@ describe("useConfigPanel – table section", () => {
     expect(c.isConfigOptionVisible("table", "dynamic-columns")).toBe(false);
   });
 
+  it("expandable-rows is visible for table type in sql and promql mode", () => {
+    expect(
+      makeComposable(makePanelData("table"), ref(false)).isConfigOptionVisible(
+        "table",
+        "expandable-rows",
+      ),
+    ).toBe(true);
+    expect(
+      makeComposable(makePanelData("table"), ref(true)).isConfigOptionVisible(
+        "table",
+        "expandable-rows",
+      ),
+    ).toBe(true);
+  });
+
+  it("expandable-rows is hidden in pivot mode", () => {
+    const c = makeComposable(
+      makePanelData("table"),
+      ref(false),
+      undefined,
+      undefined,
+      computed(() => true),
+    );
+    expect(c.isConfigOptionVisible("table", "expandable-rows")).toBe(false);
+  });
+
   it("pagination is visible for table type", () => {
     const c = makeComposable(makePanelData("table"));
     expect(c.isConfigOptionVisible("table", "pagination")).toBe(true);
@@ -921,6 +948,21 @@ describe("useConfigPanel – gauge section", () => {
     const c = makeComposable(makePanelData("bar"));
     expect(c.isConfigOptionVisible("gauge", "gauge-min")).toBe(false);
     expect(c.isConfigOptionVisible("gauge", "gauge-max")).toBe(false);
+    expect(c.isConfigOptionVisible("gauge", "gauge-range-mode")).toBe(false);
+    expect(c.isConfigOptionVisible("gauge", "gauge-end-labels")).toBe(false);
+  });
+
+  it("range mode and end labels are visible for gauge type", () => {
+    const c = makeComposable(makePanelData("gauge"));
+    expect(c.isConfigOptionVisible("gauge", "gauge-range-mode")).toBe(true);
+    expect(c.isConfigOptionVisible("gauge", "gauge-end-labels")).toBe(true);
+  });
+
+  it("auto range mode hides the fixed min and max", () => {
+    const c = makeComposable(makePanelData("gauge", {}, { config: { range_mode: "auto" } }));
+    expect(c.isConfigOptionVisible("gauge", "gauge-min")).toBe(false);
+    expect(c.isConfigOptionVisible("gauge", "gauge-max")).toBe(false);
+    expect(c.isConfigOptionVisible("gauge", "gauge-range-mode")).toBe(true);
   });
 });
 

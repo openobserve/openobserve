@@ -27,6 +27,22 @@ export interface RegionJoinInfo {
   missingLabel?: { label: string; count: number };
 }
 
+/** The panel config keys that format map values. */
+export interface MapsUnitConfig {
+  unit?: string;
+  unit_custom?: string;
+  decimals?: number;
+}
+
+interface MapsQuery {
+  fields: { name: { alias: string }; value_for_maps: { alias: string } };
+}
+
+interface MapsTooltipParams {
+  name: string;
+  value: unknown;
+}
+
 const MAX_LISTED_UNMATCHED = 20;
 
 const MAP_COLOR_RAMP = [
@@ -54,8 +70,8 @@ const toFiniteNumber = (value: unknown): number | null => {
 
 /** Sums one query's rows per map region; a name that joins no region is collected, not drawn. */
 const joinQueryRows = (
-  rows: any[],
-  query: any,
+  rows: Record<string, unknown>[],
+  query: MapsQuery,
   totals: Map<string, number>,
   unmatched: Set<string>,
 ) => {
@@ -78,28 +94,31 @@ const joinQueryRows = (
   return [...perRegion].map(([name, value]) => ({ name, value }));
 };
 
-const formatMapValue = (value: unknown, config: any): string => {
+const formatMapValue = (value: unknown, config: MapsUnitConfig): string => {
   if (value === "-" || value === null || value === undefined || Number.isNaN(value)) return "-";
-  return formatUnitValue(getUnitValue(value, config?.unit, config?.unit_custom, config?.decimals));
+  return formatUnitValue(
+    getUnitValue(value, config.unit as string, config.unit_custom as string, config.decimals),
+  );
 };
 
-export const buildMapsTooltip = (config: any) => ({
+/** Item tooltip showing the region name and its unit-formatted value, both HTML-escaped. */
+export const buildMapsTooltip = (config: MapsUnitConfig) => ({
   trigger: "item",
   showDelay: 0,
   transitionDuration: 0.2,
-  formatter: (params: any) =>
+  formatter: (params: MapsTooltipParams) =>
     `${escapeHtml(params.name)}: ${escapeHtml(formatMapValue(params.value, config))}`,
 });
 
 /** Continuous colour legend over the per-region totals; a lone region scales from 0. */
-export const buildMapsVisualMap = (regionTotals: number[], config: any) => {
+export const buildMapsVisualMap = (regionTotals: number[], config: MapsUnitConfig) => {
   let min = Infinity;
   let max = -Infinity;
   for (const value of regionTotals) {
     if (value < min) min = value;
     if (value > max) max = value;
   }
-  const hasUnit = !!config?.unit && config.unit !== "default";
+  const hasUnit = !!config.unit && config.unit !== "default";
   return {
     left: "right",
     min: regionTotals.length === 1 ? 0 : min,
@@ -112,6 +131,7 @@ export const buildMapsVisualMap = (regionTotals: number[], config: any) => {
   };
 };
 
+/** The join summary for the panel notice, listing at most 20 names; null when everything joined. */
 export const regionJoinInfoOf = (
   unmatched: Set<string>,
   missingLabel?: RegionJoinInfo["missingLabel"],
@@ -124,6 +144,7 @@ export const regionJoinInfoOf = (
   };
 };
 
+/** Converts SQL map rows into ECharts map options, with the region-join summary in `extras`. */
 export const convertMapsData = (panelSchema: any, mapData: any) => {
   const hasValidQuery = panelSchema.queries?.some(
     (query: any) => query.fields?.name && query.fields?.value_for_maps,

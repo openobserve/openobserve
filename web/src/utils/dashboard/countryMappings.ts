@@ -254,6 +254,7 @@ export const COUNTRY_ALIASES: Record<string, string> = {
   "aland islands": "Aland",
   "åland islands": "Aland",
   "antigua and barbuda": "Antigua and Barb.",
+  "bolivia (plurinational state of)": "Bolivia",
   "bolivia, plurinational state of": "Bolivia",
   "bosnia and herzegovina": "Bosnia and Herz.",
   "british indian ocean territory": "Br. Indian Ocean Ter.",
@@ -314,24 +315,43 @@ export const COUNTRY_ALIASES: Record<string, string> = {
   "turks and caicos islands": "Turks and Caicos Is.",
   uae: "United Arab Emirates",
   uk: "United Kingdom",
+  usa: "United States",
   "united states of america": "United States",
+  "united republic of tanzania": "Tanzania",
   "united states virgin islands": "U.S. Virgin Is.",
   "us virgin islands": "U.S. Virgin Is.",
+  "venezuela (bolivarian republic of)": "Venezuela",
   "venezuela, bolivarian republic of": "Venezuela",
+  "virgin islands, u.s.": "U.S. Virgin Is.",
   "viet nam": "Vietnam",
   "western sahara": "W. Sahara",
 };
 
-const countryLookup = new Map<string, string>();
-for (const country of countries) {
-  countryLookup.set(country.alpha2.toLowerCase(), country.name);
-  countryLookup.set(country.alpha3.toLowerCase(), country.name);
-  countryLookup.set(country.name.toLowerCase(), country.name);
-}
-for (const [alias, name] of Object.entries(COUNTRY_ALIASES)) countryLookup.set(alias, name);
+// Folds case, accents and typographic punctuation so "Côte d’Ivoire" finds "cote d'ivoire".
+const normalizeCountryKey = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\u2018\u2019\u02bc`\u00b4]/g, "'")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
 
-/** The world-map region name for an ISO alpha-2/alpha-3 code or a country name, ignoring case; null when nothing matches. */
+// Codes match exactly so ordinary words such as "no", "in" or "per" do not colour a country.
+const codeLookup = new Map<string, string>();
+const nameLookup = new Map<string, string>();
+for (const country of countries) {
+  codeLookup.set(country.alpha2, country.name);
+  codeLookup.set(country.alpha3, country.name);
+  nameLookup.set(normalizeCountryKey(country.name), country.name);
+}
+for (const [alias, name] of Object.entries(COUNTRY_ALIASES)) {
+  nameLookup.set(normalizeCountryKey(alias), name);
+}
+
+/** The world-map region name for an upper-case ISO alpha-2/alpha-3 code or a country name (any case); null when nothing matches. */
 export const resolveCountryName = (value: unknown): string | null => {
   if (value === null || value === undefined) return null;
-  return countryLookup.get(String(value).trim().toLowerCase()) ?? null;
+  const text = String(value).trim();
+  return codeLookup.get(text) ?? nameLookup.get(normalizeCountryKey(text)) ?? null;
 };
