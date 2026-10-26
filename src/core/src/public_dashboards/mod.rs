@@ -672,7 +672,13 @@ pub async fn views(
     links: Vec<PublicDashboard>,
 ) -> Result<Vec<PublicLinkView>, anyhow::Error> {
     // One settings read per list: the org switch decides every link's status.
-    let org_enabled = org_settings(org).await?.enabled;
+    let org_enabled = match org_settings(org).await {
+        Ok(settings) => settings.enabled,
+        Err(e) => {
+            log::warn!("[public_dashboards] settings of {org} unreadable, listing as enabled: {e}");
+            true
+        }
+    };
     let ids: Vec<String> = links
         .iter()
         .map(|l| l.dashboard_id.clone())

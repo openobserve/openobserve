@@ -5192,8 +5192,14 @@ fn validate_synthetics_ceilings(cfg: &Synthetics) -> Result<(), String> {
 /// killed mid-run".
 /// Clamps the public dashboard keys into their valid ranges; runs after the query timeout is set.
 fn check_public_dashboards_config(cfg: &mut Config) {
-    // A build writes its files to the disk cache, so without one every link would answer 503.
-    if !cfg.disk_cache.enabled && cfg.public_dashboards.enabled {
+    // A querier builds into the disk cache, so without one every link would answer 503.
+    let serves_reads = cfg.common.node_role.split(',').any(|r| {
+        matches!(
+            r.trim().parse::<cluster::Role>(),
+            Ok(cluster::Role::All | cluster::Role::Querier)
+        )
+    });
+    if serves_reads && !cfg.disk_cache.enabled && cfg.public_dashboards.enabled {
         log::warn!(
             "ZO_DISK_CACHE_ENABLED is off, so public dashboards are turned off \
              (ZO_PUBLIC_DASHBOARD_ENABLED=false)"
@@ -6803,7 +6809,13 @@ mod tests {
         check_public_dashboards_config(&mut cfg);
         assert!(cfg.public_dashboards.enabled);
 
+        // Only a node that serves public reads needs the disk cache.
         cfg.disk_cache.enabled = false;
+        cfg.common.node_role = "ingester".to_string();
+        check_public_dashboards_config(&mut cfg);
+        assert!(cfg.public_dashboards.enabled);
+
+        cfg.common.node_role = "ingester,querier".to_string();
         check_public_dashboards_config(&mut cfg);
         assert!(!cfg.public_dashboards.enabled);
     }
