@@ -90,8 +90,9 @@ const TOKEN_PLACEHOLDER = "Basic <base64 of service-account-email:token>";
 const MASKED_AUTH = "Basic ••••••••••••••••";
 
 const SKILLS_REPO_URL = "https://www.npmjs.com/package/@openobserve/skills";
-// No -a flag: the CLI then asks which agents to install to, so one command serves every client.
-const SKILLS_INSTALL_CMD = "npx skills add openobserve/skills --skill openobserve";
+// The skills ship as the npm package @openobserve/skills; github.com/openobserve/skills does not
+// exist. --all installs every skill into each AI tool the CLI finds on the machine.
+const SKILLS_INSTALL_CMD = "npx @openobserve/skills add --all";
 
 // The Authorization header VALUE injected into token-mode snippets. OAuth mode
 // passes null so build() omits the header entirely.

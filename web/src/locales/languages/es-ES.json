@@ -5824,7 +5824,7 @@
       },
       "installOneClick": "Agregar a {client}",
       "skillsLabel": "Añade la habilidad de {brand} (opcional)",
-      "skillsHint": "Enseña a tu Asistente de IA a consultar, alertar y crear dashboards en {brand}, para que aproveche mejor las herramientas MCP. Ejecútala en tu proyecto y luego elige los agentes en los que instalarla.",
+      "skillsHint": "Enseña a tu Asistente de IA a consultar, alertar y crear dashboards en {brand}, para que aproveche mejor las herramientas MCP. Ejecútala en tu proyecto; las instala en cada herramienta de IA que encuentre en tu equipo.",
       "skillsRepo": "Ver las habilidades en {host}"
     },
     "manageTokensBtnLabel": "Administrar los tokens",

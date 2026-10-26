@@ -5824,7 +5824,7 @@
       },
       "installOneClick": "添加到{client}",
       "skillsLabel": "添加 {brand} 技能（可选）",
-      "skillsHint": "教您的人工智能助手如何在 {brand} 中进行查询、告警和构建仪表盘，从而更充分地利用 MCP 工具。在您的项目中运行它，然后选择要安装到的智能体。",
+      "skillsHint": "教您的人工智能助手如何在 {brand} 中进行查询、告警和构建仪表盘，从而更充分地利用 MCP 工具。在您的项目中运行它，它会安装到您机器上找到的每个 AI 工具中。",
       "skillsRepo": "在 {host} 上查看技能"
     },
     "manageTokensBtnLabel": "管理令牌",

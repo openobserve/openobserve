@@ -5824,7 +5824,7 @@
       },
       "installOneClick": "{client} öğesine ekle",
       "skillsLabel": "{brand} becerisini ekleyin (isteğe bağlı)",
-      "skillsHint": "Yapay Zeka Asistanınıza {brand} içinde nasıl sorgu yapacağını, uyarı oluşturacağını ve gösterge panoları oluşturacağını öğretir, böylece MCP araçlarından daha fazla yararlanır. Projenizde çalıştırın, ardından hangi aracılara yükleyeceğinizi seçin.",
+      "skillsHint": "Yapay Zeka Asistanınıza {brand} içinde nasıl sorgu yapacağını, uyarı oluşturacağını ve gösterge panoları oluşturacağını öğretir, böylece MCP araçlarından daha fazla yararlanır. Projenizde çalıştırın; makinenizde bulduğu her yapay zeka aracına yükler.",
       "skillsRepo": "{host} üzerindeki becerileri görüntüleyin"
     },
     "manageTokensBtnLabel": "Token'ları Yönet",

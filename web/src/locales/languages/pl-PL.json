@@ -5824,7 +5824,7 @@
       },
       "installOneClick": "Dodaj do {client}",
       "skillsLabel": "Dodaj umiejętność {brand} (opcjonalnie)",
-      "skillsHint": "Uczy Twojego asystenta AI, jak odpytywać dane, konfigurować alerty i tworzyć pulpity w {brand}, dzięki czemu lepiej wykorzysta narzędzia MCP. Uruchom ją w swoim projekcie, a następnie wybierz agentów, u których chcesz ją zainstalować.",
+      "skillsHint": "Uczy Twojego asystenta AI, jak odpytywać dane, konfigurować alerty i tworzyć pulpity w {brand}, dzięki czemu lepiej wykorzysta narzędzia MCP. Uruchom ją w swoim projekcie; zainstaluje je w każdym narzędziu AI, które znajdzie na Twoim komputerze.",
       "skillsRepo": "Zobacz umiejętności na {host}"
     },
     "manageTokensBtnLabel": "Zarządzaj tokenami",
