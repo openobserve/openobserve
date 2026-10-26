@@ -20,8 +20,8 @@ export const EXEMPLAR_SERIES_ID = "__exemplars__";
 export const EXEMPLAR_SYMBOL_SIZE = 10;
 export const EXEMPLAR_HALO_WIDTH = 1.5;
 export const EXEMPLAR_EDGE_BLUR = 2;
-const EXEMPLAR_Z = 20;
-const EMPHASIS_SCALE = 1.4;
+export const EXEMPLAR_Z = 20;
+export const EXEMPLAR_EMPHASIS_SCALE = 1.4;
 
 export type ExemplarClamp = "top" | "bottom" | false;
 
@@ -101,6 +101,18 @@ export function toChartTimeMs(tsMs: number, timezone: string | undefined): numbe
     return new Date(new Date(tsMs).toISOString().slice(0, -1)).getTime();
   }
   return toZonedTime(tsMs, timezone).getTime();
+}
+
+/** The marker series of heatmap grid `grid`; grid 0 keeps the plain id, so single-grid panels match every existing check. */
+export function heatmapExemplarSeriesId(grid: number): string {
+  return grid === 0 ? EXEMPLAR_SERIES_ID : `${EXEMPLAR_SERIES_ID}:${grid}`;
+}
+
+/** True for any exemplar marker series, including a stacked heatmap's per-grid ones. */
+export function isExemplarSeriesId(id: unknown): boolean {
+  return (
+    typeof id === "string" && (id === EXEMPLAR_SERIES_ID || id.startsWith(`${EXEMPLAR_SERIES_ID}:`))
+  );
 }
 
 const asArray = (axis: unknown): AnyOptions[] => {
@@ -201,7 +213,7 @@ export function applyExemplarSeries(
     yAxisIndex: yAxes.length,
     z: EXEMPLAR_Z,
     symbolSize: EXEMPLAR_SYMBOL_SIZE,
-    emphasis: { scale: EMPHASIS_SCALE },
+    emphasis: { scale: EXEMPLAR_EMPHASIS_SCALE },
     itemStyle: {
       borderColor: ctx.haloColor,
       borderWidth: EXEMPLAR_HALO_WIDTH,

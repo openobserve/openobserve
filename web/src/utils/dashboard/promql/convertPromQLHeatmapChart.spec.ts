@@ -16,8 +16,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { HeatmapConverter, PROMETHEUS_HISTOGRAM_MODE } from "./convertPromQLHeatmapChart";
 import type { ProcessedPromQLData } from "./shared/types";
-import { SPECTRAL_HEATMAP_STOP_COUNT } from "./shared/spectral";
+import { HEATMAP_STOP_COUNT } from "../heatmapPalettes";
 import { chartColor } from "@/utils/chartTheme";
+import * as echarts from "echarts";
 
 // Mock dependencies
 vi.mock("../convertDataIntoUnitValue", () => ({
@@ -65,6 +66,65 @@ describe("HeatmapConverter", () => {
     mockExtras = {
       legends: [],
     };
+  });
+
+  describe("heatmap_y_sort in generic mode", () => {
+    const processedData = (): ProcessedPromQLData[] => [
+      {
+        series: [
+          { name: "10", values: [], data: { "1": "1" } },
+          { name: "9", values: [], data: { "1": "2" } },
+          { name: "100", values: [], data: { "1": "3" } },
+        ],
+        timestamps: [[1, "00:00:01"]],
+        queryIndex: 0,
+      },
+    ];
+    const convert = (config: Record<string, unknown>) =>
+      converter.convert(processedData(), { type: "heatmap", config }, mockStore, mockExtras);
+
+    it("keeps series order when unset", () => {
+      expect(convert({}).yAxis.data).toEqual(["10", "9", "100"]);
+    });
+
+    it("sorts numeric names numerically, smallest at index 0 (the bottom) for ascending", () => {
+      const options = convert({ heatmap_y_sort: "asc" });
+      expect(options.yAxis.data).toEqual(["9", "10", "100"]);
+      expect(options.series[0].data).toEqual([
+        [0, 0, 2],
+        [0, 1, 1],
+        [0, 2, 3],
+      ]);
+    });
+
+    it("sorts descending and keeps each row's values with its name", () => {
+      const options = convert({ heatmap_y_sort: "desc" });
+      expect(options.yAxis.data).toEqual(["100", "10", "9"]);
+      expect(options.series[0].data.map((cell: any[]) => cell[2])).toEqual([3, 1, 2]);
+    });
+
+    it("does not reorder histogram buckets, which always follow le", () => {
+      const histogram: ProcessedPromQLData[] = [
+        {
+          series: [
+            { name: "b", metric: { le: "+Inf" }, values: [], data: { "1": "5" } },
+            { name: "a", metric: { le: "1" }, values: [], data: { "1": "2" } },
+          ],
+          timestamps: [[1, "00:00:01"]],
+          queryIndex: 0,
+        } as any,
+      ];
+      const options = converter.convert(
+        histogram,
+        {
+          type: "heatmap",
+          config: { heatmap_mode: PROMETHEUS_HISTOGRAM_MODE, heatmap_y_sort: "desc" },
+        },
+        mockStore,
+        mockExtras,
+      );
+      expect(options.yAxis.data[options.yAxis.data.length - 1]).toBe("+Inf");
+    });
   });
 
   describe("the time axis spans every query, not just the first", () => {
@@ -134,6 +194,8 @@ describe("HeatmapConverter", () => {
       expect(result.series[0].data).toEqual([
         [0, 0, 1],
         [1, 0, 2],
+        [2, 0, "-"],
+        [0, 1, "-"],
         [1, 1, 5],
         [2, 1, 6],
       ]);
@@ -160,9 +222,10 @@ describe("HeatmapConverter", () => {
       const result = converter.convert(processedData, histogramSchema, mockStore, mockExtras);
 
       expect(result.xAxis[0].data).toEqual(["00:00:00", "00:00:01"]);
+      expect(result.xAxis[1].data).toEqual(["00:00:00", "00:00:01"]);
       // The second histogram's 8 must survive — it used to be read as 0.
       expect(result.visualMap.max).toBe(8);
-      expect(result.series[0].data).toContainEqual([1, 1, 8]);
+      expect(result.series[1].data).toContainEqual([1, 0, 8]);
     });
   });
 
@@ -287,7 +350,7 @@ describe("HeatmapConverter", () => {
       ]);
     });
 
-    it("should handle missing data values as 0", () => {
+    it("leaves a missing sample as an empty cell, not 0", () => {
       const processedData: ProcessedPromQLData[] = [
         {
           series: [
@@ -315,7 +378,10 @@ describe("HeatmapConverter", () => {
 
       const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
-      expect(result.series[0].data).toContainEqual([1, 0, 0]); // Missing value defaults to 0
+      expect(result.series[0].data).toEqual([
+        [0, 0, 10],
+        [1, 0, "-"],
+      ]);
     });
 
     it("should calculate min and max values correctly", () => {
@@ -530,6 +596,8 @@ describe("HeatmapConverter", () => {
 
       expect(result.tooltip.textStyle.color).toBe(chartColor("--color-tooltip-text"));
       expect(result.tooltip.backgroundColor).toBe(chartColor("--color-tooltip-bg"));
+      // Without it, entering the enterable tooltip counts as leaving the chart and restores every panel.
+      expect(result.tooltip.className).toBe("o2-echarts-tooltip");
     });
 
     it("should configure tooltip for dark theme", () => {
@@ -1239,7 +1307,7 @@ describe("HeatmapConverter", () => {
       expect(result.visualMap.min).toBe(0);
       expect(result.visualMap.max).toBe(6);
       expect(result.visualMap.calculable).toBe(true);
-      expect(result.visualMap.inRange.color).toHaveLength(SPECTRAL_HEATMAP_STOP_COUNT);
+      expect(result.visualMap.inRange.color).toHaveLength(HEATMAP_STOP_COUNT);
       // Cool at the LOW end, hot at the high end. Reversed from ColorBrewer's
       // published (warm-first) Spectral order: the eye reads hot as "more", so
       // red-at-low made a histogram's near-empty high-`le` rows the loudest
@@ -1261,6 +1329,18 @@ describe("HeatmapConverter", () => {
 
       expect(result.visualMap.min).toBe(0);
       expect(result.visualMap.max).toBe(40);
+    });
+
+    it("marks the histogram tooltip so entering it does not restore every panel", () => {
+      const result: any = converter.convert(
+        histogramData(),
+        histogramSchema(),
+        mockStore,
+        mockExtras,
+      );
+
+      expect(result.tooltip.enterable).toBe(true);
+      expect(result.tooltip.className).toBe("o2-echarts-tooltip");
     });
 
     it("keeps config.unit as the cell-intensity unit in the tooltip", () => {
@@ -1331,7 +1411,7 @@ describe("HeatmapConverter", () => {
       // heatmap gets the same Spectral ramp and cell borders as every other
       // heatmap in the app. Styling is not what corrupts a heatmap; the
       // de-accumulation is, and that is still gated on heatmap_mode.
-      expect(generic.visualMap.inRange.color).toHaveLength(SPECTRAL_HEATMAP_STOP_COUNT);
+      expect(generic.visualMap.inRange.color).toHaveLength(HEATMAP_STOP_COUNT);
       expect(generic.visualMap.inRange.color).toEqual(histogram.visualMap.inRange.color);
       expect(generic.series[0].itemStyle.borderWidth).toBe(1);
       expect(generic.xAxis[0].splitArea.show).toBe(false);
@@ -1353,7 +1433,7 @@ describe("HeatmapConverter", () => {
       expect(result.yAxis.data).toEqual(['{le="1"}', '{le="0.1"}', '{le="inf"}', '{le="0.5"}']);
       expect(result.series[0].data[0]).toEqual([0, 0, 9]);
       // The shared look still applies — it is presentation, not a transform.
-      expect(result.visualMap.inRange.color).toHaveLength(SPECTRAL_HEATMAP_STOP_COUNT);
+      expect(result.visualMap.inRange.color).toHaveLength(HEATMAP_STOP_COUNT);
     });
   });
 });
@@ -1456,16 +1536,17 @@ describe("prometheus_histogram mode with more than one query", () => {
       { legends: [] },
     );
 
-    // Both histograms survive: 2 buckets each, 4 rows — not 2.
-    expect(result.yAxis.data).toHaveLength(4);
-    expect(result.series[0].data).toHaveLength(4); // 4 buckets x 1 timestamp
+    // Both histograms survive as their own grid of 2 buckets.
+    expect(result.yAxis.map((axis: any) => axis.data.length)).toEqual([2, 2]);
+    expect(result.title.map((title: any) => title.text)).toEqual(["Query 1", "Query 2"]);
 
     // Query 1: 10 in the first bucket, 30-10=20 in +Inf.
     // Query 2: 100 and 300-100=200. Nothing merged, nothing subtracted across.
-    const values = result.series[0].data
-      .map((cell: any) => cell[2])
-      .sort((a: number, b: number) => a - b);
-    expect(values).toEqual([10, 20, 100, 200]);
+    const values = result.series.map((series: any) => series.data.map((cell: any) => cell[2]));
+    expect(values).toEqual([
+      [10, 20],
+      [100, 200],
+    ]);
   });
 });
 
@@ -1494,9 +1575,11 @@ describe("bucket labels must be unique — ECharts category axes require it", ()
       { legends: [] },
     );
 
-    const labels: string[] = result.yAxis.data;
-    expect(labels).toHaveLength(6); // 3 histograms x 2 buckets
-    expect(new Set(labels).size).toBe(labels.length); // ...all distinct
+    expect(result.yAxis).toHaveLength(3);
+    for (const axis of result.yAxis) {
+      expect(axis.data).toHaveLength(2);
+      expect(new Set(axis.data).size).toBe(axis.data.length);
+    }
   });
 });
 
@@ -1571,5 +1654,625 @@ describe("compact_preview shrinks the heatmap for the metrics explorer cards", (
     // overflow-hidden clips its tooltip too, so this is not gated on the card.
     expect(convertWith({}).tooltip.appendToBody).toBe(true);
     expect(convertWith({ compact_preview: true }).tooltip.appendToBody).toBe(true);
+  });
+});
+
+describe("pinned colour range (heatmap_color_min / heatmap_color_max)", () => {
+  const store = { state: { timezone: "UTC", theme: "light" } };
+  const timestamps: Array<[number, string]> = [
+    [1, "2024-01-01T00:00:00"],
+    [2, "2024-01-01T00:01:00"],
+  ];
+  const genericData = (): ProcessedPromQLData[] => [
+    {
+      timestamps: [...timestamps],
+      series: [
+        { name: "a", values: [], data: { 1: "10", 2: "20" } },
+        { name: "b", values: [], data: { 1: "30", 2: "40" } },
+      ],
+      queryIndex: 0,
+      queryConfig: {},
+    } as any,
+  ];
+  const histogramData = (): ProcessedPromQLData[] => [
+    {
+      timestamps: [...timestamps],
+      series: [
+        { name: '{le="1"}', metric: { le: "1" }, values: [], data: { 1: "2", 2: "4" } },
+        { name: '{le="+Inf"}', metric: { le: "+Inf" }, values: [], data: { 1: "10", 2: "10" } },
+      ],
+      queryIndex: 0,
+      queryConfig: {},
+    } as any,
+  ];
+
+  const convert = (data: ProcessedPromQLData[], config: Record<string, any>) =>
+    new HeatmapConverter().convert(data, { type: "heatmap", config }, store, {
+      legends: [],
+    }) as any;
+  const generic = (config: Record<string, any>) => convert(genericData(), config);
+  const histogram = (config: Record<string, any>) =>
+    convert(histogramData(), { heatmap_mode: PROMETHEUS_HISTOGRAM_MODE, ...config });
+  const rangeOf = (result: any) => [result.visualMap.min, result.visualMap.max];
+
+  describe.each([
+    ["generic", generic, 40],
+    ["prometheus_histogram", histogram, 8],
+  ])("%s mode", (_mode, run, autoMax) => {
+    it("keeps the automatic range when nothing is pinned", () => {
+      const result = run({ heatmap_color_min: null, heatmap_color_max: null });
+      expect(rangeOf(result)).toEqual([0, autoMax]);
+    });
+
+    it("pins only the min", () => {
+      const result = run({ heatmap_color_min: 3 });
+      expect(rangeOf(result)).toEqual([3, autoMax]);
+    });
+
+    it("pins only the max", () => {
+      const result = run({ heatmap_color_max: 5 });
+      expect(rangeOf(result)).toEqual([0, 5]);
+    });
+
+    it("pins both ends", () => {
+      expect(rangeOf(run({ heatmap_color_min: 3, heatmap_color_max: 5 }))).toEqual([3, 5]);
+    });
+
+    it("ignores an inverted pair and uses the automatic range", () => {
+      const result = run({ heatmap_color_min: 5, heatmap_color_max: 3 });
+      expect(rangeOf(result)).toEqual([0, autoMax]);
+    });
+
+    it("keeps the real value in the cell and tooltip above the pinned max", () => {
+      const result = run({ heatmap_color_max: 5 });
+      const top = result.series[0].data.find((cell: any) => cell[2] === autoMax);
+      expect(top).toHaveLength(3);
+      const params = { value: top, name: "t", marker: "", seriesName: "s" };
+      expect(result.tooltip.formatter(params)).toContain(`: ${autoMax}.00`);
+    });
+
+    it("keeps the pin through the compact preview", () => {
+      const result = run({ heatmap_color_max: 5, compact_preview: true });
+      expect(rangeOf(result)).toEqual([0, 5]);
+    });
+  });
+
+  it("shows the real value in the generic cell label above the pinned max", () => {
+    const result = generic({ heatmap_color_max: 5 });
+    expect(result.series[0].label.formatter({ value: [1, 1, 40] })).toBe("40.00");
+  });
+
+  it("takes the user's pin over the explorer's shared visual_map_range", () => {
+    const result = histogram({
+      visual_map_range: { min: 0, max: 100 },
+      heatmap_color_max: 50,
+    });
+    expect(rangeOf(result)).toEqual([0, 50]);
+  });
+
+  it("keeps the explorer's shared range for the end the user did not pin", () => {
+    const result = histogram({ visual_map_range: { min: 1, max: 100 }, heatmap_color_min: 2 });
+    expect(rangeOf(result)).toEqual([2, 100]);
+  });
+
+  it("falls back to the explorer's shared range, not the data's, for an inverted pair", () => {
+    const result = histogram({
+      visual_map_range: { min: 0, max: 100 },
+      heatmap_color_min: 50,
+      heatmap_color_max: 10,
+    });
+    expect(rangeOf(result)).toEqual([0, 100]);
+  });
+});
+
+describe("HeatmapConverter time grid, empty cells and cell budget", () => {
+  const store = { state: { timezone: "UTC", theme: "light" } };
+  const iso = (ts: number) => new Date(ts * 1000).toISOString().slice(0, -1);
+  const query = (series: Array<{ name: string; data: Record<number, string> }>, ts: number[]) =>
+    ({
+      series: series.map((it) => ({ ...it, metric: {}, values: [] })),
+      timestamps: ts.map((t) => [t, iso(t)]),
+      queryIndex: 0,
+    }) as any;
+  const context = (startSec: number, endSec: number, stepSeconds: number) =>
+    ({
+      metadata: { queries: [{ startTime: startSec * 1e6, endTime: endSec * 1e6 }] },
+      stepSeconds,
+    }) as any;
+  const convert = (processed: any[], config: any = {}, ctx?: any, extras: any = { legends: [] }) =>
+    new HeatmapConverter().convert(processed, { config }, store, extras, undefined, ctx);
+
+  it("gives every step of the query range a column, empty where no series has a sample", () => {
+    const result = convert(
+      [query([{ name: "a", data: { 60: "1", 180: "3" } }], [60, 180])],
+      {},
+      context(0, 270, 60),
+    );
+    expect(result.xAxis[0].data).toEqual([
+      "00:00:00",
+      "00:01:00",
+      "00:02:00",
+      "00:03:00",
+      "00:04:00",
+    ]);
+    expect(result.series[0].data.map((cell: any) => cell[2])).toEqual(["-", 1, "-", 3, "-"]);
+  });
+
+  it("keeps only the reported instants without a server step", () => {
+    const result = convert([query([{ name: "a", data: { 60: "1", 180: "3" } }], [60, 180])]);
+    expect(result.xAxis[0].data).toEqual(["00:01:00", "00:03:00"]);
+  });
+
+  it("caps the generated columns to the cell budget", () => {
+    const end = 200_000;
+    const result = convert(
+      [query([{ name: "a", data: { [end]: "1" } }], [end])],
+      {},
+      context(0, end, 1),
+    );
+    expect(result.xAxis[0].data).toHaveLength(50_000);
+  });
+
+  it("leaves histogram buckets empty where a bound has no sample, not 0", () => {
+    const processed = query(
+      [
+        { name: "le1", data: { 60: "1" } },
+        { name: "inf", data: { 60: "3", 120: "5" } },
+      ],
+      [60, 120],
+    );
+    processed.series[0].metric = { le: "1" };
+    processed.series[1].metric = { le: "+Inf" };
+
+    const result = convert([processed], { heatmap_mode: PROMETHEUS_HISTOGRAM_MODE });
+
+    expect(result.series[0].data).toEqual([
+      [0, 0, 1],
+      [1, 0, "-"],
+      [0, 1, 2],
+      [1, 1, "-"],
+    ]);
+  });
+
+  it("keeps the largest series and warns once the grid exceeds the cell budget", () => {
+    const series = Array.from({ length: 50_001 }, (_unused, i) => ({
+      name: `s${i}`,
+      data: { 60: String(i) },
+    }));
+    const extras: any = { legends: [] };
+    const result = convert([query(series, [60])], {}, undefined, extras);
+
+    expect(result.yAxis.data).toHaveLength(50_000);
+    expect(result.yAxis.data[0]).toBe("s1");
+    expect(extras.legends).toHaveLength(50_000);
+    expect(extras.limitNumberOfSeriesWarningMessage).toBe(
+      "Showing 50,000 of 50,001 rows to stay within the heatmap cell limit",
+    );
+  });
+
+  it("keeps every histogram bucket and cuts the oldest columns to fit the cell budget", () => {
+    const columns = Array.from({ length: 120 }, (_unused, i) => 60 * (i + 1));
+    const series = Array.from({ length: 500 }, (_unused, i) => ({
+      name: `b${i}`,
+      // Bucket 250 is the quietest, which a row cut would drop from the middle of the ladder.
+      metric: { le: String(i + 1) },
+      values: [],
+      data: Object.fromEntries(columns.map((ts) => [ts, String(i === 250 ? i : i + 1)])),
+    }));
+    const extras: any = { legends: [] };
+    const result = new HeatmapConverter().convert(
+      [{ series, timestamps: columns.map((ts) => [ts, iso(ts)]), queryIndex: 0 } as any],
+      { config: { heatmap_mode: PROMETHEUS_HISTOGRAM_MODE } },
+      store,
+      extras,
+    );
+
+    expect(result.yAxis.data).toHaveLength(500);
+    expect(result.xAxis[0].data).toHaveLength(100);
+    expect(result.xAxis[0].data[0]).toBe("00:21:00");
+    expect(result.series[0].data).toHaveLength(50_000);
+    expect(extras.limitNumberOfSeriesWarningMessage).toBe(
+      "Showing the last 100 of 120 columns to stay within the heatmap cell limit",
+    );
+  });
+
+  it("adds the date to the labels when the range crosses a calendar day", () => {
+    const day = 86_400;
+    const result = convert([
+      query([{ name: "a", data: { [day - 60]: "1", [day + 60]: "2" } }], [day - 60, day + 60]),
+    ]);
+    expect(result.xAxis[0].data).toEqual(["1970-01-01 23:59:00", "1970-01-02 00:01:00"]);
+  });
+
+  it("formats zoned Date labels with the date when they cross a calendar day", () => {
+    const processed = [
+      {
+        series: [{ name: "a", metric: {}, values: [], data: { 1: "1", 2: "2" } }],
+        timestamps: [
+          [1, new Date(2024, 0, 1, 23, 0, 0)],
+          [2, new Date(2024, 0, 2, 1, 0, 0)],
+        ],
+        queryIndex: 0,
+      } as any,
+    ];
+    expect(convert(processed).xAxis[0].data).toEqual([
+      "2024-01-01 23:00:00",
+      "2024-01-02 01:00:00",
+    ]);
+  });
+
+  it("keeps time-only labels within one day", () => {
+    const processed = [
+      {
+        series: [{ name: "a", metric: {}, values: [], data: { 1: "1", 2: "2" } }],
+        timestamps: [
+          [1, new Date(2024, 0, 1, 9, 0, 0)],
+          [2, new Date(2024, 0, 1, 10, 0, 0)],
+        ],
+        queryIndex: 0,
+      } as any,
+    ];
+    expect(convert(processed).xAxis[0].data).toEqual(["09:00:00", "10:00:00"]);
+  });
+});
+
+describe("prometheus_histogram mode with several histograms in one query", () => {
+  const store = { state: { timezone: "UTC", theme: "light" } };
+  const histogramConfig = { heatmap_mode: PROMETHEUS_HISTOGRAM_MODE };
+  const columns = [60, 120];
+  /** One pod's cumulative buckets, `cumulative[i]` at le = i + 1 and the last at +Inf, the same at every column. */
+  const pod = (name: string, cumulative: number[], timestamps: number[] = columns) =>
+    cumulative.map((value, index) => ({
+      name: `${name}-${index}`,
+      metric: {
+        __name__: "x_bucket",
+        pod: name,
+        le: index === cumulative.length - 1 ? "+Inf" : String(index + 1),
+      },
+      values: [],
+      data: Object.fromEntries(timestamps.map((ts) => [ts, String(value)])),
+    }));
+  const query = (series: any[], timestamps: number[] = columns) =>
+    ({
+      series,
+      timestamps: timestamps.map((ts) => [ts, new Date(ts * 1000).toISOString().slice(0, -1)]),
+      queryIndex: 0,
+    }) as any;
+  const convert = (
+    processed: any[],
+    config: any = histogramConfig,
+    extras: any = { legends: [] },
+  ) =>
+    new HeatmapConverter().convert(processed, { config }, store, extras, {
+      value: { offsetHeight: 500 },
+    });
+
+  it("honours the axis border toggle on every stacked grid's axes", () => {
+    const processed = [query([...pod("a", [2, 5]), ...pod("b", [1, 1, 7])])];
+    const lines = (axisBorderShow: boolean) => {
+      const result = convert(processed, { ...histogramConfig, axis_border_show: axisBorderShow });
+      return [...result.xAxis, ...result.yAxis].map((axis: any) => axis.axisLine?.show);
+    };
+    expect(lines(true)).toEqual([true, true, true, true]);
+    expect(lines(false)).toEqual([false, false, false, false]);
+  });
+
+  it("leaves stacked grids out of the legend, whose entries would cover the colour bar", () => {
+    const result = convert([query([...pod("a", [2, 5]), ...pod("b", [1, 1, 7])])]);
+    expect(result.series.map((series: any) => series.name)).toEqual([undefined, undefined]);
+  });
+
+  it("shrinks the labels of every stacked grid on a compact card, not just the first", () => {
+    const result = convert([query([...pod("a", [2, 5]), ...pod("b", [1, 1, 7])])], {
+      ...histogramConfig,
+      compact_preview: true,
+    });
+    expect(result.yAxis.map((axis: any) => axis.axisLabel.fontSize)).toEqual([9, 9]);
+    expect(result.xAxis.map((axis: any) => axis.axisLabel.fontSize)).toEqual([9, 9]);
+    expect(result.xAxis.map((axis: any) => axis.axisLabel.show)).toEqual([false, true]);
+  });
+
+  it("names a time-shifted query's histogram by its period, so the two titles differ", () => {
+    const result = convert([
+      query(pod("a", [2, 5])),
+      { ...query(pod("a", [1, 3])), seriesRole: "shifted", nameSuffix: "1 day ago" },
+    ]);
+    expect(result.title.map((title: any) => title.text)).toEqual([
+      'Query 1, pod="a"',
+      'Query 1, pod="a" (1 day ago)',
+    ]);
+  });
+
+  it("draws one titled grid per label set, stacked, each with its own le ladder", () => {
+    const result = convert([query([...pod("a", [2, 5]), ...pod("b", [1, 1, 7])])]);
+
+    expect(result.title.map((title: any) => title.text)).toEqual(['pod="a"', 'pod="b"']);
+    expect(result.grid).toHaveLength(2);
+    expect(result.yAxis.map((axis: any) => axis.data)).toEqual([
+      ["1.00", "+Inf"],
+      ["1.00", "2.00", "+Inf"],
+    ]);
+    expect(result.yAxis.map((axis: any) => axis.gridIndex)).toEqual([0, 1]);
+    expect(result.xAxis.map((axis: any) => axis.gridIndex)).toEqual([0, 1]);
+    expect(result.series.map((series: any) => [series.xAxisIndex, series.yAxisIndex])).toEqual([
+      [0, 0],
+      [1, 1],
+    ]);
+    // Pod a: 2 then 5-2=3. Pod b: 1, 0, 6. De-accumulated per pod, never across.
+    expect(result.series[0].data).toEqual([
+      [0, 0, 2],
+      [1, 0, 2],
+      [0, 1, 3],
+      [1, 1, 3],
+    ]);
+    expect(result.series[1].data.map((cell: any) => cell[2])).toEqual([1, 1, 0, 0, 6, 6]);
+  });
+
+  it("stacks the grids top to bottom without overlap, above the colour bar", () => {
+    const result = convert([
+      query([...pod("a", [1, 2]), ...pod("b", [1, 2]), ...pod("c", [1, 2])]),
+    ]);
+    const pct = (value: string) => parseFloat(value);
+    const grids = result.grid.map((grid: any) => ({
+      top: pct(grid.top),
+      bottom: pct(grid.top) + pct(grid.height),
+    }));
+    for (let i = 1; i < grids.length; i++) {
+      expect(grids[i].top).toBeGreaterThan(grids[i - 1].bottom);
+      expect(pct(result.title[i].top)).toBeGreaterThanOrEqual(grids[i - 1].bottom);
+      expect(pct(result.title[i].top)).toBeLessThan(grids[i].top);
+    }
+    // 60px of a 500px panel is left for the colour bar.
+    expect(grids.at(-1).bottom).toBeLessThanOrEqual(88);
+    expect(result.xAxis.map((axis: any) => axis.axisLabel.show)).toEqual([false, false, true]);
+  });
+
+  it("shares one colour range across the grids, with pins applied to it", () => {
+    const processed = [query([...pod("a", [2, 5]), ...pod("b", [1, 1, 7])])];
+    const shared = convert(processed);
+    expect([shared.visualMap.min, shared.visualMap.max]).toEqual([0, 6]);
+    expect(shared.visualMap.seriesIndex).toBeUndefined();
+
+    const pinned = convert(processed, { ...histogramConfig, heatmap_color_max: 4 });
+    expect([pinned.visualMap.min, pinned.visualMap.max]).toEqual([0, 4]);
+  });
+
+  it("renders in ECharts with one colour bar driving every grid", () => {
+    const options: any = convert([query([...pod("a", [2, 5]), ...pod("b", [1, 1, 7])])]);
+    const chart = echarts.init(null as any, null, {
+      renderer: "svg",
+      ssr: true,
+      width: 400,
+      height: 500,
+    });
+    chart.setOption({ animation: false, ...options, tooltip: undefined });
+    const fill = (seriesIndex: number, cell: number) =>
+      (chart as any).getModel().getSeriesByIndex(seriesIndex).getData().getItemVisual(cell, "style")
+        .fill;
+    // Pod b's top bucket holds 6, the shared max, so it takes the colour bar's last stop.
+    const top = fill(1, 4);
+    const low = fill(0, 0);
+    chart.dispose();
+    expect(top).toBe("rgba(158,1,66,1)");
+    expect(low).not.toBe(top);
+  });
+
+  it("names the histogram in the tooltip", () => {
+    const result = convert([query([...pod("a", [2, 5]), ...pod("b<i>", [1, 7])])]);
+    const html = result.tooltip.formatter({
+      seriesIndex: 1,
+      value: [0, 1, 6],
+      marker: "*",
+      name: "00:01:00",
+    });
+    expect(html).toContain("pod=&quot;b&lt;i&gt;&quot;");
+    expect(html).toContain("le +Inf");
+  });
+
+  it("names the query in each title once the panel has several", () => {
+    const result = convert([
+      query(pod("a", [1, 2])),
+      { ...query([...pod("a", [1, 2]), ...pod("b", [1, 2])]), queryIndex: 1 },
+    ]);
+    expect(result.title.map((title: any) => title.text)).toEqual([
+      'Query 1, pod="a"',
+      'Query 2, pod="a"',
+      'Query 2, pod="b"',
+    ]);
+  });
+
+  it("keeps a single histogram on the single-grid layout", () => {
+    const result = convert([query(pod("a", [2, 5]))]);
+    expect(result.title).toBeUndefined();
+    expect(Array.isArray(result.grid)).toBe(false);
+    expect(result.yAxis.data).toEqual(["1.00", "+Inf"]);
+    expect(result.grid).toEqual({ left: "3%", right: "4%", bottom: 60, containLabel: true });
+  });
+
+  it("drops the quietest histograms first once the stack exceeds the cell budget", () => {
+    const ts = Array.from({ length: 100 }, (_unused, i) => 60 * (i + 1));
+    const ladder = (scale: number) => Array.from({ length: 300 }, (_unused, i) => (i + 1) * scale);
+    const extras: any = { legends: [] };
+    const result = convert(
+      [
+        query(
+          [...pod("a", ladder(1), ts), ...pod("b", ladder(3), ts), ...pod("c", ladder(2), ts)],
+          ts,
+        ),
+      ],
+      histogramConfig,
+      extras,
+    );
+
+    // 300 buckets x 100 columns is 30,000 cells, so one grid fits the 50,000 budget and two do not.
+    expect(result.title).toBeUndefined();
+    expect(Array.isArray(result.yAxis)).toBe(false);
+    expect(result.yAxis.data).toHaveLength(300);
+    expect(result.xAxis[0].data).toHaveLength(100);
+    expect(extras.limitNumberOfSeriesWarningMessage).toBe(
+      "Showing the 1 busiest of 3 histograms to stay within the heatmap cell limit",
+    );
+    expect(result.series[0].data.find((cell: any) => cell[1] === 0)[2]).toBe(3);
+  });
+
+  it("keeps the busiest histograms in their original order", () => {
+    const ts = Array.from({ length: 60 }, (_unused, i) => 60 * (i + 1));
+    const ladder = (scale: number) => Array.from({ length: 300 }, (_unused, i) => (i + 1) * scale);
+    const extras: any = { legends: [] };
+    const result = convert(
+      [
+        query(
+          [...pod("a", ladder(3), ts), ...pod("b", ladder(1), ts), ...pod("c", ladder(2), ts)],
+          ts,
+        ),
+      ],
+      histogramConfig,
+      extras,
+    );
+
+    expect(result.title.map((title: any) => title.text)).toEqual(['pod="a"', 'pod="c"']);
+    expect(result.yAxis.map((axis: any) => axis.data.length)).toEqual([300, 300]);
+    expect(extras.limitNumberOfSeriesWarningMessage).toBe(
+      "Showing the 2 busiest of 3 histograms to stay within the heatmap cell limit",
+    );
+  });
+});
+
+describe("PromQL heatmap time interaction and exemplar layout", () => {
+  const store = { state: { timezone: "UTC", theme: "light" } };
+  const iso = (ts: number) => new Date(ts * 1000).toISOString().slice(0, -1);
+  const series = (name: string, metric: Record<string, string>, data: Record<number, string>) => ({
+    name,
+    metric,
+    values: [],
+    data,
+  });
+  const query = (list: any[], ts: number[], extra: Record<string, unknown> = {}) =>
+    ({ series: list, timestamps: ts.map((t) => [t, iso(t)]), queryIndex: 0, ...extra }) as any;
+  const context = {
+    metadata: { queries: [{ startTime: 0, endTime: 180 * 1e6 }] },
+    stepSeconds: 60,
+  };
+  const convert = (processed: any[], config: any = {}, extras: any = { legends: [] }) => ({
+    options: new HeatmapConverter().convert(
+      processed,
+      { id: "p1", config },
+      store,
+      extras,
+      { value: { offsetHeight: 500 } },
+      context as any,
+    ),
+    extras,
+  });
+
+  it("arms drag-to-zoom and cursor sync over the step-wide columns", () => {
+    const { options, extras } = convert([
+      query([series("a", { pod: "a" }, { 60: "1", 120: "2" })], [60, 120]),
+    ]);
+    expect(extras.panelId).toBe("p1");
+    expect(extras.isTimeSeries).toBe(true);
+    expect(extras.heatmapTimeAxis.endInclusive).toBe(true);
+    expect(extras.heatmapTimeAxis.columns.map((c: any) => c.x)).toEqual([0, 60, 120, 180].map(iso));
+    expect(options.toolbox.feature.dataZoom.yAxisIndex).toBe("none");
+    expect(options.tooltip.axisPointer).toBeUndefined();
+    expect(options.xAxis[0].axisPointer).toMatchObject({ show: true, triggerTooltip: false });
+  });
+
+  it("does the same for a histogram heatmap", () => {
+    const { options, extras } = convert(
+      [
+        query(
+          [series("1", { le: "1" }, { 60: "1" }), series("inf", { le: "+Inf" }, { 60: "3" })],
+          [60],
+        ),
+      ],
+      { heatmap_mode: PROMETHEUS_HISTOGRAM_MODE },
+    );
+    expect(extras.heatmapTimeAxis.columns).toHaveLength(4);
+    expect(options.toolbox).toBeDefined();
+  });
+
+  it("blanks the tooltip while another panel is hovered, so only the synced axis pointer shows", () => {
+    const hovered = { value: { panelId: "other" } };
+    const { options } = convert(
+      [query([series("a", {}, { 60: "1" })], [60])],
+      {},
+      { legends: [], hoveredSeriesState: hovered },
+    );
+    const params = { value: [1, 0, 1], name: "00:01:00", marker: "" };
+    expect(options.tooltip.formatter(params)).toBe("");
+    hovered.value.panelId = "p1";
+    expect(options.tooltip.formatter(params)).toContain("a");
+  });
+
+  it("records each drawn row's query and labels in row order, without __name__, and no source for a shifted row", () => {
+    const { extras } = convert(
+      [
+        query([series("b", { __name__: "up", pod: "b" }, { 60: "1" })], [60]),
+        query([series("a", { pod: "a" }, { 60: "1" })], [60], { queryIndex: 1 }),
+        query([series("a (1d ago)", { pod: "a" }, { 60: "1" })], [60], {
+          queryIndex: 1,
+          seriesRole: "shifted",
+        }),
+      ],
+      { heatmap_y_sort: "asc" },
+    );
+    expect(extras.heatmapExemplarLayout).toEqual({
+      mode: "series",
+      rows: [
+        { queryIndex: 1, labels: { pod: "a" } },
+        null,
+        { queryIndex: 0, labels: { pod: "b" } },
+      ],
+    });
+  });
+
+  it("records each drawn histogram's labels and ascending le bounds", () => {
+    const bucket = (pod: string, le: string, value: string) =>
+      series(`${pod}-${le}`, { __name__: "x_bucket", pod, le }, { 60: value });
+    const { extras } = convert(
+      [query([bucket("a", "+Inf", "4"), bucket("a", "0.5", "1"), bucket("b", "1", "2")], [60])],
+      { heatmap_mode: PROMETHEUS_HISTOGRAM_MODE },
+    );
+    expect(extras.heatmapExemplarLayout).toEqual({
+      mode: "histogram",
+      groups: [
+        { queryIndex: 0, labels: { pod: "a" }, bounds: [0.5, Infinity] },
+        { queryIndex: 0, labels: { pod: "b" }, bounds: [1] },
+      ],
+    });
+  });
+});
+
+describe("heatmap axis border", () => {
+  const store = { state: { timezone: "UTC", theme: "light" } };
+  const processed = [
+    {
+      series: [
+        { name: "1", metric: { le: "1" }, values: [], data: { 60: "2" } },
+        { name: "+Inf", metric: { le: "+Inf" }, values: [], data: { 60: "5" } },
+      ],
+      timestamps: [[60, "1970-01-01T00:01:00"]],
+      queryIndex: 0,
+    } as any,
+  ];
+  const axisLines = (config: any) => {
+    const result = new HeatmapConverter().convert(processed, { config }, store, { legends: [] });
+    return [result.xAxis[0].axisLine, result.yAxis.axisLine];
+  };
+
+  it.each([
+    ["a generic heatmap", {}],
+    ["a single histogram", { heatmap_mode: PROMETHEUS_HISTOGRAM_MODE }],
+  ])("draws the axis lines of %s only when the axis border toggle is on", (_name, config) => {
+    expect(axisLines({ ...config, axis_border_show: true })).toEqual([
+      { show: true },
+      { show: true },
+    ]);
+    expect(axisLines({ ...config, axis_border_show: false })).toEqual([
+      { show: false },
+      { show: false },
+    ]);
+    expect(axisLines(config)).toEqual([undefined, undefined]);
   });
 });

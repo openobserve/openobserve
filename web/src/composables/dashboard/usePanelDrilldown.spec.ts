@@ -186,6 +186,18 @@ describe("usePanelDrilldown", () => {
     expect(deps.router.push).not.toHaveBeenCalled();
   });
 
+  it("hands a stacked heatmap grid's exemplar marker click to the exemplar handler", async () => {
+    const deps = makeDeps();
+    const onExemplarClick = vi.fn();
+    const api = usePanelDrilldown({ ...deps, onExemplarClick } as any);
+    const params = { seriesId: "__exemplars__:2", data: { exemplar: { id: "e1" } } };
+
+    await api.onChartClick(params);
+
+    expect(onExemplarClick).toHaveBeenCalledWith(params);
+    expect(api.drilldownArray.value).toEqual([]);
+  });
+
   it("does not treat an exemplar click as an annotation in add-annotation mode", async () => {
     const deps = makeDeps();
     deps.allowAnnotationsAdd.value = true;
@@ -255,6 +267,159 @@ describe("usePanelDrilldown", () => {
         }),
       ),
     );
+  });
+
+  describe("heatmap drilldown", () => {
+    const heatmapDeps = (options: any, extras: any = {}) => {
+      const deps = makeDeps();
+      deps.panelSchema.value.type = "heatmap";
+      deps.panelSchema.value.config.drilldown = [
+        {
+          name: "Cell",
+          type: "byUrl",
+          data: {
+            url: "https://example.com/?row=${series.__name}&col=${series.__axisValue}&v=${series.__value}",
+          },
+        },
+      ];
+      (deps.panelData as any).value = { options, extras };
+      return deps;
+    };
+
+    const clickAndOpen = async (deps: any, params: any) => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      const api = usePanelDrilldown(deps as any);
+      await api.onChartClick({
+        componentType: "series",
+        event: { offsetX: 1, offsetY: 1 },
+        ...params,
+      });
+      await api.openDrilldown(0);
+      const url = openSpy.mock.calls[0]?.[0];
+      openSpy.mockRestore();
+      return url;
+    };
+
+    it("passes the clicked row as the series name and the clicked column as the axis value", async () => {
+      const deps = heatmapDeps({
+        xAxis: [{ data: ["10:00:00", "10:01:00"] }],
+        yAxis: { data: ["svc-a", "svc-b"] },
+        series: [{ type: "heatmap" }],
+      });
+
+      const url = await clickAndOpen(deps, { seriesIndex: 0, name: "10:01:00", value: [1, 0, 7] });
+
+      expect(url).toBe("https://example.com/?row=svc-a&col=10:01:00&v=7");
+    });
+
+    it("reads the row from the clicked grid of a stacked histogram heatmap", async () => {
+      const deps = heatmapDeps({
+        xAxis: [{ data: ["10:00:00"] }, { gridIndex: 1, data: ["10:00:00"] }],
+        yAxis: [{ data: ["0.1", "+Inf"] }, { gridIndex: 1, data: ["1", "5", "+Inf"] }],
+        series: [
+          { type: "heatmap", xAxisIndex: 0, yAxisIndex: 0 },
+          { type: "heatmap", xAxisIndex: 1, yAxisIndex: 1 },
+        ],
+      });
+
+      const url = await clickAndOpen(deps, { seriesIndex: 1, name: "10:00:00", value: [0, 1, 3] });
+
+      expect(url).toBe("https://example.com/?row=5&col=10:00:00&v=3");
+    });
+
+    it.each([
+      ["a SQL histogram column", 60_000, [[{ histogram_interval: 1 }]]],
+      ["a PromQL step, which has no histogram interval", 30_000, []],
+      ["a column clipped by the query range", 12_000, [[{ histogram_interval: 60 }]]],
+    ])("opens Logs over exactly the clicked column for %s", async (_name, width, meta) => {
+      const start = Date.UTC(2026, 2, 18, 0, 30);
+      const deps = heatmapDeps(
+        {
+          xAxis: [{ data: ["00:29:00", "00:30:00"] }],
+          yAxis: { data: ["svc-a"] },
+          series: [{ type: "heatmap" }],
+        },
+        {
+          heatmapTimeAxis: {
+            endInclusive: false,
+            columns: [
+              { start: start - 60_000, end: start, x: null },
+              { start, end: start + width, x: null },
+            ],
+          },
+        },
+      );
+      deps.resultMetaData.value = meta as any;
+      deps.panelSchema.value.config.drilldown = [
+        {
+          name: "Logs",
+          type: "logs",
+          targetBlank: false,
+          data: {
+            logsMode: "custom",
+            logsQuery: 'SELECT * FROM "default" WHERE svc = ${series.__name}',
+          },
+        } as any,
+      ];
+      const api = usePanelDrilldown(deps as any);
+
+      await api.onChartClick({
+        componentType: "series",
+        event: { offsetX: 1, offsetY: 1 },
+        seriesIndex: 0,
+        name: "00:30:00",
+        value: [1, 0, 4],
+      });
+      await api.openDrilldown(0);
+
+      await vi.waitFor(() =>
+        expect(deps.router.push).toHaveBeenCalledWith(
+          expect.objectContaining({
+            query: expect.objectContaining({
+              from: String(start * 1000),
+              to: String((start + width) * 1000),
+              query: `b64(SELECT * FROM "default" WHERE svc = 'svc-a')`,
+            }),
+          }),
+        ),
+      );
+    });
+
+    it("opens Logs over the dashboard range for a heatmap without a time axis", async () => {
+      const deps = heatmapDeps({
+        xAxis: [{ data: ["GET", "POST"] }],
+        yAxis: { data: ["svc-a"] },
+        series: [{ type: "heatmap" }],
+      });
+      deps.panelSchema.value.config.drilldown = [
+        {
+          name: "Logs",
+          type: "logs",
+          targetBlank: false,
+          data: { logsMode: "custom", logsQuery: 'SELECT * FROM "default"' },
+        } as any,
+      ];
+      const api = usePanelDrilldown(deps as any);
+
+      await api.onChartClick({
+        componentType: "series",
+        event: {},
+        seriesIndex: 0,
+        value: [1, 0, 4],
+      });
+      await api.openDrilldown(0);
+
+      await vi.waitFor(() =>
+        expect(deps.router.push).toHaveBeenCalledWith(
+          expect.objectContaining({
+            query: expect.objectContaining({
+              from: String(Date.UTC(2026, 2, 18)),
+              to: String(Date.UTC(2026, 2, 18, 1)),
+            }),
+          }),
+        ),
+      );
+    });
   });
 
   it("fetches cross-links lazily on the first drilldown interaction, not on panel render", async () => {

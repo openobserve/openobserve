@@ -4823,4 +4823,43 @@ describe("Convert PromQL Data Utils", () => {
       expect(result.extras.limitNumberOfSeriesWarningMessage).toBeUndefined();
     });
   });
+
+  describe("heatmap time axis", () => {
+    it("hands the server step to the heatmap so steps without samples still get a column", async () => {
+      const panelSchema = { id: "panel1", type: "heatmap", config: {}, queries: [{ config: {} }] };
+      const searchQueryData = [
+        {
+          result: [
+            {
+              metric: { job: "api" },
+              values: [
+                [60, "1"],
+                [180, "3"],
+              ],
+            },
+          ],
+        },
+      ];
+
+      const result: any = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        [],
+        { queries: [{ startTime: 0, endTime: 240_000_000 }] },
+        [[{ step: 60_000_000 }]],
+      );
+
+      expect(result.options.xAxis[0].data).toHaveLength(5);
+      expect(result.options.series[0].data.map((cell: any) => cell[2])).toEqual([
+        "-",
+        1,
+        "-",
+        3,
+        "-",
+      ]);
+    });
+  });
 });

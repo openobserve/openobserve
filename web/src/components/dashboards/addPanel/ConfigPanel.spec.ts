@@ -331,21 +331,24 @@ describe("ConfigPanel", () => {
       },
     });
 
-    it("appears off by default for an eligible PromQL panel and binds config.show_exemplars", async () => {
-      const panel = promqlPanel("line");
-      wrapper = createWrapper({ dashboardPanelData: panel }, { promqlMode: true });
-      const toggle = wrapper.findComponent('[data-test="dashboard-config-show-exemplars"]');
-      expect(toggle.exists()).toBe(true);
-      expect(toggle.props("modelValue")).toBeFalsy();
-      await toggle.vm.$emit("update:modelValue", true);
-      expect(panel.data.config.show_exemplars).toBe(true);
-    });
+    it.each(["line", "heatmap"])(
+      "appears off by default for an eligible PromQL %s panel and binds config.show_exemplars",
+      async (type) => {
+        const panel = promqlPanel(type);
+        wrapper = createWrapper({ dashboardPanelData: panel }, { promqlMode: true });
+        const toggle = wrapper.findComponent('[data-test="dashboard-config-show-exemplars"]');
+        expect(toggle.exists()).toBe(true);
+        expect(toggle.props("modelValue")).toBeFalsy();
+        await toggle.vm.$emit("update:modelValue", true);
+        expect(panel.data.config.show_exemplars).toBe(true);
+      },
+    );
 
     it.each([
       ["h-bar", "range"],
       ["stacked", "range"],
       ["table", "range"],
-      ["heatmap", "range"],
+      ["heatmap", "instant"],
       ["line", "instant"],
     ])("is absent for %s (%s)", (type, queryType) => {
       wrapper = createWrapper(
@@ -397,6 +400,349 @@ describe("ConfigPanel", () => {
     it("is absent in PromQL mode", () => {
       wrapper = createWrapper({ dashboardPanelData: panelOf("line") }, { promqlMode: true });
       expect(toggleOf()).toBeUndefined();
+    });
+  });
+
+  describe("Heatmap colour scale min / max", () => {
+    const panelOf = (type: string, config: Record<string, unknown> = {}) =>
+      reactive({
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          type,
+          config: { ...mockDashboardPanelData.data.config, ...config },
+        },
+      });
+    const inputOf = (end: "min" | "max") =>
+      wrapper.findComponent(`[data-test="dashboard-config-heatmap_color_${end}"]`);
+
+    it("shows both inputs with an Auto placeholder for a heatmap", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("heatmap") });
+      for (const end of ["min", "max"] as const) {
+        expect(inputOf(end).exists()).toBe(true);
+        expect(inputOf(end).props("placeholder")).toBe("Auto");
+      }
+      expect(wrapper.text()).toContain("Color scale min");
+      expect(wrapper.text()).toContain("Color scale max");
+    });
+
+    it.each(["line", "bar", "table"])("is absent for %s", (type) => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf(type) });
+      expect(inputOf("min").exists()).toBe(false);
+      expect(inputOf("max").exists()).toBe(false);
+    });
+
+    it("writes the numbers to config and clears an emptied input to null", async () => {
+      const panel = panelOf("heatmap");
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      await inputOf("min").vm.$emit("update:modelValue", 5);
+      await inputOf("max").vm.$emit("update:modelValue", 50);
+      expect(panel.data.config.heatmap_color_min).toBe(5);
+      expect(panel.data.config.heatmap_color_max).toBe(50);
+      await inputOf("max").vm.$emit("update:modelValue", "");
+      expect(panel.data.config.heatmap_color_max).toBeNull();
+    });
+
+    it("stores typed text as a number, and an emptied input as null", async () => {
+      const panel = panelOf("heatmap");
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      const field = inputOf("min").find("input");
+      await field.setValue("12.5");
+      expect(panel.data.config.heatmap_color_min).toBe(12.5);
+      await field.setValue("");
+      expect(panel.data.config.heatmap_color_min).toBeNull();
+    });
+
+    it("flags an inverted pair on both inputs and explains it once", async () => {
+      const panel = panelOf("heatmap", { heatmap_color_min: 50, heatmap_color_max: 10 });
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      expect(inputOf("min").props("error")).toBe(true);
+      expect(inputOf("max").props("error")).toBe(true);
+      expect(wrapper.text()).toContain("Min must be less than max");
+
+      panel.data.config.heatmap_color_max = 100;
+      await flushPromises();
+      expect(inputOf("min").props("error")).toBe(false);
+      expect(inputOf("max").props("error")).toBe(false);
+    });
+
+    it.each([
+      [null, 10],
+      [10, null],
+      [10, 10.5],
+    ])("does not flag min %s with max %s", (min, max) => {
+      wrapper = createWrapper({
+        dashboardPanelData: panelOf("heatmap", { heatmap_color_min: min, heatmap_color_max: max }),
+      });
+      expect(inputOf("min").props("error")).toBe(false);
+    });
+  });
+
+  describe("Heatmap palette, reverse and colour scale", () => {
+    const panelOf = (type: string, config: Record<string, unknown> = {}) =>
+      reactive({
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          type,
+          config: { ...mockDashboardPanelData.data.config, ...config },
+        },
+      });
+    // By the attribute the control receives, as OToggleGroup does not render it on its root.
+    const control = (field: string) =>
+      ["OSelect", "OSwitch", "OToggleGroup", "OInput"]
+        .flatMap((name) => wrapper.findAllComponents({ name }))
+        .find((found: any) => found.vm.$attrs["data-test"] === `dashboard-config-${field}`) ?? {
+        exists: () => false,
+      };
+
+    it.each([false, true])("shows all three for a heatmap (PromQL %s)", (promqlMode) => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("heatmap") }, { promqlMode });
+      for (const field of ["heatmap_palette", "heatmap_palette_reverse", "heatmap_color_scale"]) {
+        expect(control(field).exists()).toBe(true);
+      }
+    });
+
+    it.each(["line", "bar", "table"])("is absent for %s", (type) => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf(type) });
+      for (const field of ["heatmap_palette", "heatmap_palette_reverse", "heatmap_color_scale"]) {
+        expect(control(field).exists()).toBe(false);
+      }
+    });
+
+    it("reads Spectral and square root for a panel that never set them", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("heatmap") });
+      expect(control("heatmap_palette").props("modelValue")).toBe("spectral");
+      expect(control("heatmap_color_scale").props("modelValue")).toBe("sqrt");
+      expect(
+        control("heatmap_palette")
+          .props("options")
+          .map((o: any) => o.label),
+      ).toEqual([
+        "Spectral",
+        "Viridis",
+        "Magma",
+        "Inferno",
+        "Blues",
+        "Greens",
+        "Reds",
+        "Red-yellow-blue",
+      ]);
+      expect(control("heatmap_color_scale").text()).toContain("LinearSquare rootLog");
+    });
+
+    it("writes the palette, reverse flag and scale to config", async () => {
+      const panel = panelOf("heatmap");
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      await control("heatmap_palette").vm.$emit("update:modelValue", "viridis");
+      await control("heatmap_palette_reverse").vm.$emit("update:modelValue", true);
+      await control("heatmap_color_scale").vm.$emit("update:modelValue", "log");
+      expect(panel.data.config.heatmap_palette).toBe("viridis");
+      expect(panel.data.config.heatmap_palette_reverse).toBe(true);
+      expect(panel.data.config.heatmap_color_scale).toBe("log");
+    });
+  });
+
+  describe("Heatmap Prometheus histogram mode and bucket unit", () => {
+    const panelOf = (type: string, config: Record<string, unknown> = {}) =>
+      reactive({
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          type,
+          queryType: "promql",
+          config: { ...mockDashboardPanelData.data.config, ...config },
+        },
+      });
+    // By the attribute the control receives, as OToggleGroup does not render it on its root.
+    const control = (field: string) =>
+      ["OSelect", "OSwitch", "OToggleGroup", "OInput"]
+        .flatMap((name) => wrapper.findAllComponents({ name }))
+        .find((found: any) => found.vm.$attrs["data-test"] === `dashboard-config-${field}`) ?? {
+        exists: () => false,
+      };
+
+    it("offers the mode switch only for a PromQL heatmap", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("heatmap") }, { promqlMode: true });
+      expect(control("heatmap_mode").exists()).toBe(true);
+      wrapper.unmount();
+      wrapper = createWrapper({ dashboardPanelData: panelOf("heatmap") }, { promqlMode: false });
+      expect(control("heatmap_mode").exists()).toBe(false);
+      wrapper.unmount();
+      wrapper = createWrapper({ dashboardPanelData: panelOf("line") }, { promqlMode: true });
+      expect(control("heatmap_mode").exists()).toBe(false);
+    });
+
+    it("toggles heatmap_mode between prometheus_histogram and unset", async () => {
+      const panel = panelOf("heatmap");
+      wrapper = createWrapper({ dashboardPanelData: panel }, { promqlMode: true });
+      expect(control("heatmap_mode").props("modelValue")).toBe(false);
+      await control("heatmap_mode").vm.$emit("update:modelValue", true);
+      expect(panel.data.config.heatmap_mode).toBe("prometheus_histogram");
+      await control("heatmap_mode").vm.$emit("update:modelValue", false);
+      expect(panel.data.config.heatmap_mode).toBeNull();
+    });
+
+    it("shows the bucket unit only while histogram mode is on", async () => {
+      const panel = panelOf("heatmap");
+      wrapper = createWrapper({ dashboardPanelData: panel }, { promqlMode: true });
+      expect(control("bucket_unit").exists()).toBe(false);
+      panel.data.config.heatmap_mode = "prometheus_histogram";
+      await flushPromises();
+      expect(control("bucket_unit").exists()).toBe(true);
+      expect(control("bucket_unit").props("options")).toEqual(
+        expect.arrayContaining([expect.objectContaining({ value: "seconds" })]),
+      );
+    });
+
+    it("writes bucket_unit and asks for bucket_unit_custom only for a custom unit", async () => {
+      const panel = panelOf("heatmap", { heatmap_mode: "prometheus_histogram" });
+      wrapper = createWrapper({ dashboardPanelData: panel }, { promqlMode: true });
+      await control("bucket_unit").vm.$emit("update:modelValue", "seconds");
+      expect(panel.data.config.bucket_unit).toBe("seconds");
+      expect(control("bucket_unit_custom").exists()).toBe(false);
+
+      await control("bucket_unit").vm.$emit("update:modelValue", "custom");
+      await flushPromises();
+      await control("bucket_unit_custom").vm.$emit("update:modelValue", "req");
+      expect(panel.data.config.bucket_unit_custom).toBe("req");
+    });
+  });
+
+  describe("Heatmap y-axis order, buckets and range", () => {
+    const panelOf = (config: Record<string, unknown> = {}, yType = "Int64", customQuery = false) =>
+      reactive({
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          type: "heatmap",
+          queries: [
+            {
+              ...mockDashboardPanelData.data.queries[0],
+              customQuery,
+              fields: {
+                breakdown: [],
+                y: [
+                  {
+                    alias: "y_axis_1",
+                    functionName: null,
+                    args: [{ type: "field", value: { field: "age" } }],
+                  },
+                ],
+              },
+            },
+          ],
+          config: { ...mockDashboardPanelData.data.config, ...config },
+        },
+        meta: {
+          ...mockDashboardPanelData.meta,
+          streamFields: {
+            groupedFields: [{ stream_alias: null, schema: [{ name: "age", type: yType }] }],
+          },
+        },
+      });
+    // By the attribute the control receives, as OToggleGroup does not render it on its root.
+    const control = (field: string) =>
+      ["OSelect", "OSwitch", "OToggleGroup", "OInput"]
+        .flatMap((name) => wrapper.findAllComponents({ name }))
+        .find((found: any) => found.vm.$attrs["data-test"] === `dashboard-config-${field}`) ?? {
+        exists: () => false,
+      };
+
+    it("offers data order, ascending and descending, defaulting to data order", async () => {
+      const panel = panelOf();
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      expect(control("heatmap_y_sort").props("modelValue")).toBe("data");
+      expect(control("heatmap_y_sort").text()).toContain("Data orderAscendingDescending");
+      await control("heatmap_y_sort").vm.$emit("update:modelValue", "asc");
+      expect(panel.data.config.heatmap_y_sort).toBe("asc");
+      await control("heatmap_y_sort").vm.$emit("update:modelValue", "data");
+      expect(panel.data.config.heatmap_y_sort).toBeNull();
+    });
+
+    it("shows the ascending order bucketed rows always take, and no data order, while bucketing is on", async () => {
+      const panel = panelOf({ heatmap_y_bucket: { mode: "size", size: 10 } });
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      expect(control("heatmap_y_sort").props("modelValue")).toBe("asc");
+      expect(control("heatmap_y_sort").text()).toContain("AscendingDescending");
+      expect(control("heatmap_y_sort").text()).not.toContain("Data order");
+      panel.data.config.heatmap_y_sort = "desc";
+      await flushPromises();
+      expect(control("heatmap_y_sort").props("modelValue")).toBe("desc");
+    });
+
+    it("offers bucketing only for a numeric builder y", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf({}, "Utf8") });
+      expect(control("heatmap_y_bucket").exists()).toBe(false);
+      wrapper.unmount();
+      wrapper = createWrapper({ dashboardPanelData: panelOf({}, "Int64", true) });
+      expect(control("heatmap_y_bucket").exists()).toBe(false);
+      wrapper.unmount();
+      wrapper = createWrapper({ dashboardPanelData: panelOf() });
+      expect(control("heatmap_y_bucket").props("modelValue")).toBe("none");
+      expect(control("heatmap_y_bucket_size").exists()).toBe(false);
+      expect(control("heatmap_y_min").exists()).toBe(false);
+    });
+
+    it("asks for a size > 0 in size mode and writes it to config", async () => {
+      const panel = panelOf();
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      await control("heatmap_y_bucket").vm.$emit("update:modelValue", "size");
+      await flushPromises();
+      expect(panel.data.config.heatmap_y_bucket).toEqual({ mode: "size" });
+      expect(control("heatmap_y_bucket_size").props("error")).toBe(true);
+      expect(wrapper.text()).toContain("Enter a bucket size greater than 0");
+
+      await control("heatmap_y_bucket_size").vm.$emit("update:modelValue", 10);
+      await flushPromises();
+      expect(panel.data.config.heatmap_y_bucket).toEqual({ mode: "size", size: 10 });
+      expect(control("heatmap_y_bucket_size").props("error")).toBe(false);
+    });
+
+    it("explains a size that makes more buckets than the heatmap can draw", () => {
+      wrapper = createWrapper({
+        dashboardPanelData: panelOf({
+          heatmap_y_bucket: { mode: "size", size: 0.001 },
+          heatmap_y_min: 0,
+          heatmap_y_max: 1000,
+        }),
+      });
+      expect(control("heatmap_y_bucket_size").props("error")).toBe(true);
+      expect(wrapper.text()).toContain("This makes 1,000,001 buckets, more than the 50,000");
+    });
+
+    it("defaults log to base 10, switches base, and clears everything for none", async () => {
+      const panel = panelOf({ heatmap_y_min: 1, heatmap_y_max: 10 });
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      await control("heatmap_y_bucket").vm.$emit("update:modelValue", "log");
+      await flushPromises();
+      expect(panel.data.config.heatmap_y_bucket).toEqual({ mode: "log", base: 10 });
+      expect(control("heatmap_y_bucket_base").props("modelValue")).toBe("10");
+      await control("heatmap_y_bucket_base").vm.$emit("update:modelValue", "2");
+      expect(panel.data.config.heatmap_y_bucket).toEqual({ mode: "log", base: 2 });
+
+      await control("heatmap_y_bucket").vm.$emit("update:modelValue", "none");
+      expect(panel.data.config.heatmap_y_bucket).toBeNull();
+      expect(panel.data.config.heatmap_y_min).toBeNull();
+      expect(panel.data.config.heatmap_y_max).toBeNull();
+    });
+
+    it("writes the y range and flags an inverted pair", async () => {
+      const panel = panelOf({ heatmap_y_bucket: { mode: "size", size: 10 } });
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      await control("heatmap_y_min").vm.$emit("update:modelValue", 50);
+      await control("heatmap_y_max").vm.$emit("update:modelValue", 10);
+      await flushPromises();
+      expect(panel.data.config.heatmap_y_min).toBe(50);
+      expect(panel.data.config.heatmap_y_max).toBe(10);
+      expect(control("heatmap_y_min").props("error")).toBe(true);
+      expect(control("heatmap_y_max").props("error")).toBe(true);
+      expect(wrapper.text()).toContain("Min must be less than max; the full range is used instead");
+
+      await control("heatmap_y_max").vm.$emit("update:modelValue", "");
+      await flushPromises();
+      expect(panel.data.config.heatmap_y_max).toBeNull();
+      expect(control("heatmap_y_min").props("error")).toBe(false);
     });
   });
 

@@ -1352,6 +1352,10 @@ watch(
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.config?.limit,
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.joins,
     dashboardPanelData.data.type,
+    // The builder generates the heatmap y bucketing and range into the SQL itself.
+    dashboardPanelData.data.config?.heatmap_y_bucket,
+    dashboardPanelData.data.config?.heatmap_y_min,
+    dashboardPanelData.data.config?.heatmap_y_max,
   ],
   async () => {
     // Only auto-generate SQL if in builder mode (customQuery = false)

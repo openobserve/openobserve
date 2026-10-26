@@ -261,6 +261,7 @@ describe("dataProcessor", () => {
 
       expect(processed[0].series.map((s: any) => s.metric.job)).toEqual(["a", "b", "c", "d", "e"]);
       expect(processed[1].series.map((s: any) => s.metric.job)).toEqual(["e", "d", "c", "b"]);
+      expect(processed.map((q: any) => q.nameSuffix)).toEqual([undefined, "1 day ago"]);
     });
 
     it("should use default series limit when not specified", async () => {

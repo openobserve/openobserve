@@ -506,7 +506,42 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     bucket_unit_custom: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    heatmap_color_min: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    heatmap_color_max: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    heatmap_palette: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    heatmap_palette_reverse: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    heatmap_color_scale: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    heatmap_y_sort: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    heatmap_y_bucket: Option<HeatmapYBucket>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    heatmap_y_min: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    heatmap_y_max: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     thresholds: Option<Thresholds>,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(default)]
+pub struct HeatmapYBucket {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    size: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    base: Option<OrdF64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -1951,6 +1986,145 @@ mod tests {
         assert!(json.get("heatmap_mode").is_none());
         assert!(json.get("bucket_unit").is_none());
         assert!(json.get("bucket_unit_custom").is_none());
+    }
+
+    #[test]
+    fn test_panel_config_heatmap_color_range_round_trip() {
+        for (min, max) in [
+            (Some(-2.5), Some(40.0)),
+            (Some(0.0), None),
+            (None, Some(1e9)),
+        ] {
+            let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+                "show_legends": true,
+                "legends_position": null,
+                "base_map": null,
+                "map_view": null,
+                "heatmap_color_min": min,
+                "heatmap_color_max": max
+            }))
+            .unwrap();
+            assert_eq!(cfg.heatmap_color_min, min.map(OrdF64::from));
+            assert_eq!(cfg.heatmap_color_max, max.map(OrdF64::from));
+            let json = serde_json::to_value(&cfg).unwrap();
+            assert_eq!(json.get("heatmap_color_min").and_then(|v| v.as_f64()), min);
+            assert_eq!(json.get("heatmap_color_max").and_then(|v| v.as_f64()), max);
+            let back: PanelConfig = serde_json::from_value(json).unwrap();
+            assert_eq!(back, cfg);
+        }
+    }
+
+    #[test]
+    fn test_panel_config_heatmap_color_range_absent_when_none() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": false,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null,
+            "heatmap_color_min": null
+        }))
+        .unwrap();
+        assert_eq!(cfg.heatmap_color_min, None);
+        assert_eq!(cfg.heatmap_color_max, None);
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert!(json.get("heatmap_color_min").is_none());
+        assert!(json.get("heatmap_color_max").is_none());
+    }
+
+    #[test]
+    fn test_panel_config_heatmap_palette_and_scale_round_trip() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": true,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null,
+            "heatmap_palette": "viridis",
+            "heatmap_palette_reverse": true,
+            "heatmap_color_scale": "log"
+        }))
+        .unwrap();
+        assert_eq!(cfg.heatmap_palette.as_deref(), Some("viridis"));
+        assert_eq!(cfg.heatmap_palette_reverse, Some(true));
+        assert_eq!(cfg.heatmap_color_scale.as_deref(), Some("log"));
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert_eq!(json["heatmap_palette"], serde_json::json!("viridis"));
+        assert_eq!(json["heatmap_palette_reverse"], serde_json::json!(true));
+        assert_eq!(json["heatmap_color_scale"], serde_json::json!("log"));
+        let back: PanelConfig = serde_json::from_value(json).unwrap();
+        assert_eq!(back, cfg);
+    }
+
+    #[test]
+    fn test_panel_config_heatmap_palette_and_scale_absent_when_none() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": false,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null
+        }))
+        .unwrap();
+        assert_eq!(cfg.heatmap_palette, None);
+        assert_eq!(cfg.heatmap_palette_reverse, None);
+        assert_eq!(cfg.heatmap_color_scale, None);
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert!(json.get("heatmap_palette").is_none());
+        assert!(json.get("heatmap_palette_reverse").is_none());
+        assert!(json.get("heatmap_color_scale").is_none());
+    }
+
+    #[test]
+    fn test_panel_config_heatmap_y_axis_round_trip() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": true,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null,
+            "heatmap_y_sort": "desc",
+            "heatmap_y_bucket": { "mode": "size", "size": 2.5, "base": 10 },
+            "heatmap_y_min": -10.0,
+            "heatmap_y_max": 500.0
+        }))
+        .unwrap();
+        assert_eq!(cfg.heatmap_y_sort.as_deref(), Some("desc"));
+        let bucket = cfg.heatmap_y_bucket.as_ref().unwrap();
+        assert_eq!(bucket.mode.as_deref(), Some("size"));
+        assert_eq!(bucket.size, Some(OrdF64::from(2.5)));
+        assert_eq!(bucket.base, Some(OrdF64::from(10.0)));
+        assert_eq!(cfg.heatmap_y_min, Some(OrdF64::from(-10.0)));
+        assert_eq!(cfg.heatmap_y_max, Some(OrdF64::from(500.0)));
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert_eq!(json["heatmap_y_sort"], serde_json::json!("desc"));
+        assert_eq!(
+            json["heatmap_y_bucket"],
+            serde_json::json!({ "mode": "size", "size": 2.5, "base": 10.0 })
+        );
+        assert_eq!(json["heatmap_y_min"], serde_json::json!(-10.0));
+        assert_eq!(json["heatmap_y_max"], serde_json::json!(500.0));
+        let back: PanelConfig = serde_json::from_value(json).unwrap();
+        assert_eq!(back, cfg);
+    }
+
+    #[test]
+    fn test_panel_config_heatmap_y_axis_absent_when_none() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": false,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null,
+            "heatmap_y_bucket": { "mode": "log" }
+        }))
+        .unwrap();
+        assert_eq!(cfg.heatmap_y_sort, None);
+        assert_eq!(cfg.heatmap_y_min, None);
+        assert_eq!(cfg.heatmap_y_max, None);
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert_eq!(
+            json["heatmap_y_bucket"],
+            serde_json::json!({ "mode": "log" })
+        );
+        for key in ["heatmap_y_sort", "heatmap_y_min", "heatmap_y_max"] {
+            assert!(json.get(key).is_none(), "{key} should be omitted");
+        }
     }
 
     #[test]

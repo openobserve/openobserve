@@ -79,9 +79,12 @@ const mockDashboardPanelData = reactive({
   },
 });
 
+const mockMakeAutoSQLQuery = vi.fn(async () => undefined);
+
 vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: () => ({
     dashboardPanelData: mockDashboardPanelData,
+    makeAutoSQLQuery: mockMakeAutoSQLQuery,
     resetAggregationFunction: vi.fn(),
     resetDashboardPanelData: vi.fn(),
     updateGroupedFields: vi.fn(),
@@ -912,6 +915,46 @@ describe("PanelEditor.vue", () => {
       expect(selectorDialog!.attributes("data-show-close")).toBe("false");
       // Closed by default
       expect(selectorDialog!.attributes("data-open")).toBe("false");
+    });
+  });
+
+  describe("builder SQL regeneration on heatmap y settings", () => {
+    it.each([
+      ["heatmap_y_bucket", { mode: "size", size: 10 }],
+      ["heatmap_y_min", 5],
+      ["heatmap_y_max", 50],
+    ])("rebuilds the query when %s changes", async (key, value) => {
+      const config = mockDashboardPanelData.data.config as Record<string, unknown>;
+      mockDashboardPanelData.data.type = "heatmap";
+      wrapper = shallowMount(PanelEditor, {
+        props: { pageType: "dashboard", editMode: false },
+        global: mountGlobal,
+      });
+      await nextTick();
+      mockMakeAutoSQLQuery.mockClear();
+
+      config[key] = value;
+      await nextTick();
+      expect(mockMakeAutoSQLQuery).toHaveBeenCalledTimes(1);
+      delete config[key];
+      wrapper.unmount();
+    });
+
+    it("rebuilds the query when the bucket size is edited in place", async () => {
+      const config = mockDashboardPanelData.data.config as Record<string, any>;
+      config.heatmap_y_bucket = { mode: "size", size: 10 };
+      wrapper = shallowMount(PanelEditor, {
+        props: { pageType: "dashboard", editMode: false },
+        global: mountGlobal,
+      });
+      await nextTick();
+      mockMakeAutoSQLQuery.mockClear();
+
+      config.heatmap_y_bucket.size = 20;
+      await nextTick();
+      expect(mockMakeAutoSQLQuery).toHaveBeenCalledTimes(1);
+      delete config.heatmap_y_bucket;
+      wrapper.unmount();
     });
   });
 });

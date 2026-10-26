@@ -435,7 +435,16 @@ mod tests {
         let fields = serde_json::json!({
             "heatmap_mode": "prometheus_histogram",
             "bucket_unit": "seconds",
-            "bucket_unit_custom": "req"
+            "bucket_unit_custom": "req",
+            "heatmap_color_min": 1.5,
+            "heatmap_color_max": 40.0,
+            "heatmap_palette": "magma",
+            "heatmap_palette_reverse": true,
+            "heatmap_color_scale": "linear",
+            "heatmap_y_sort": "asc",
+            "heatmap_y_bucket": { "mode": "log", "base": 2.0 },
+            "heatmap_y_min": 1.0,
+            "heatmap_y_max": 4096.0
         });
         let config = value["tabs"][0]["panels"][0]["config"]
             .as_object_mut()

@@ -32,7 +32,7 @@ import {
   SQL_PARSE_MAX_DEPTH,
   stripWherePredicate,
 } from "@/utils/query/sqlComplexity";
-import { EXEMPLAR_SERIES_ID } from "@/utils/dashboard/exemplars/applyExemplarSeries";
+import { isExemplarSeriesId } from "@/utils/dashboard/exemplars/applyExemplarSeries";
 
 export function usePanelDrilldown({
   panelSchema,
@@ -193,6 +193,42 @@ export function usePanelDrilldown({
         return typeof value === "string" ? `'${escapeSingleQuotes(value)}'` : value;
       },
     );
+  };
+
+  // A heatmap cell's value is [column index, row index, z]; its labels live on the axes of the grid its series is drawn in.
+  const heatmapCellLabels = (params: any): { column: any; row: any } => {
+    const options = panelData?.value?.options;
+    const series = options?.series?.[params?.seriesIndex];
+    const axisOf = (axes: any, index: number) => (Array.isArray(axes) ? axes[index] : axes);
+    const [column, row] = Array.isArray(params?.value) ? params.value : [];
+    return {
+      column: axisOf(options?.xAxis, series?.xAxisIndex ?? 0)?.data?.[column] ?? params?.name,
+      row: axisOf(options?.yAxis, series?.yAxisIndex ?? 0)?.data?.[row],
+    };
+  };
+
+  const seriesDrilldownVariables = (params: any) => {
+    const value = Array.isArray(params?.value)
+      ? params.value[params.value.length - 1]
+      : params?.value;
+    if (panelSchema.value.type === "heatmap") {
+      const { column, row } = heatmapCellLabels(params);
+      return { __name: row ?? params?.name, __value: value, __axisValue: column };
+    }
+    return {
+      __name: ["pie", "donut"].includes(panelSchema.value.type) ? params?.name : params?.seriesName,
+      __value: value,
+      __axisValue: params?.value?.[0] ?? params?.name,
+    };
+  };
+
+  // A heatmap's value[0] is a column index, so its time range is that column's bounds on the heatmap time axis.
+  const heatmapColumnRange = (params: any) => {
+    const column = panelData?.value?.extras?.heatmapTimeAxis?.columns?.[params?.value?.[0]];
+    if (!column) return null;
+    const startTime = getUTCTimestampFromZonedTimestamp(column.start, store.state.timezone);
+    const endTime = getUTCTimestampFromZonedTimestamp(column.end, store.state.timezone);
+    return startTime && endTime ? { startTime, endTime } : null;
   };
 
   // get offset from parent
@@ -517,7 +553,7 @@ export function usePanelDrilldown({
 
   const onChartClick = async (params: any, ...args: any) => {
     // An exemplar marker opens its trace, never the drilldown menu or an annotation.
-    if (params?.seriesId === EXEMPLAR_SERIES_ID) {
+    if (isExemplarSeriesId(params?.seriesId)) {
       await onExemplarClick?.(params);
       return;
     }
@@ -743,13 +779,16 @@ export function usePanelDrilldown({
           getOriginalQueryAndStream(queryDetails, metadata) || {};
         if (!originalQuery || !streamName) return;
 
-        const hoveredTime = drilldownParams[0]?.value?.[0];
+        const isHeatmap = panelSchema.value.type === "heatmap";
+        const hoveredTime = isHeatmap ? null : drilldownParams[0]?.value?.[0];
         const hoveredTimestamp = hoveredTime
           ? getUTCTimestampFromZonedTimestamp(hoveredTime, store.state.timezone)
           : null;
         const breakdown = queryDetails.queries[0].fields?.breakdown || [];
 
-        const calculatedTimeRange = calculateTimeRange(hoveredTimestamp, intervalMicro.value);
+        const calculatedTimeRange =
+          (isHeatmap ? heatmapColumnRange(drilldownParams[0]) : null) ??
+          calculateTimeRange(hoveredTimestamp, intervalMicro.value);
 
         let modifiedQuery = originalQuery;
 
@@ -847,15 +886,7 @@ export function usePanelDrilldown({
               };
             }
           } else {
-            drilldownVariables.series = {
-              __name: ["pie", "donut", "heatmap"].includes(panelSchema.value.type)
-                ? drilldownParams[0].name
-                : drilldownParams[0].seriesName,
-              __value: Array.isArray(drilldownParams[0].value)
-                ? drilldownParams[0].value[drilldownParams[0].value.length - 1]
-                : drilldownParams[0].value,
-              __axisValue: drilldownParams?.[0]?.value?.[0] ?? drilldownParams?.[0]?.name,
-            };
+            drilldownVariables.series = seriesDrilldownVariables(drilldownParams[0]);
           }
 
           variablesData?.value?.values?.forEach((variable: any) => {
@@ -976,16 +1007,7 @@ export function usePanelDrilldown({
           };
         }
       } else {
-        // we have an series object
-        drilldownVariables.series = {
-          __name: ["pie", "donut", "heatmap"].includes(panelSchema.value.type)
-            ? drilldownParams[0].name
-            : drilldownParams[0].seriesName,
-          __value: Array.isArray(drilldownParams[0].value)
-            ? drilldownParams[0].value[drilldownParams[0].value.length - 1]
-            : drilldownParams[0].value,
-          __axisValue: drilldownParams?.[0]?.value?.[0] ?? drilldownParams?.[0]?.name,
-        };
+        drilldownVariables.series = seriesDrilldownVariables(drilldownParams[0]);
       }
 
       variablesData?.value?.values?.forEach((variable: any) => {
