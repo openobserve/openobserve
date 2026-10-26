@@ -84,6 +84,9 @@ import TemplateService from "@/services/alert_templates";
 import DestinationService from "@/services/alert_destination";
 import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 
+// Every test mounts the full list; on a loaded CI runner one mount can exceed the 5s default.
+vi.setConfig({ testTimeout: 20000 });
+
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);

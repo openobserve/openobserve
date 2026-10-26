@@ -11,8 +11,8 @@
  * OrganizationDeduplicationSettings selectors are unchanged).
  *
  * Distinct feature from service discovery — kept in its own file. Runs on the
- * shared org; ensureSemanticGroupsExist() PUTs idempotent semantic groups so the
- * fingerprint checkboxes have something to render.
+ * shared org; ensureSemanticGroupsExist() adds any missing test semantic groups
+ * (never replacing the org's list) so the fingerprint checkboxes have something to render.
  *
  * Coverage: elements visible, checkbox/time-window interaction, cross-alert
  * conditional visibility, fingerprint groups display + toggle, save+persist
@@ -27,7 +27,7 @@ test.describe(
   "Correlation Settings — Alert Grouping (deduplication)",
   { tag: ["@correlation", "@correlationSettings", "@settings", "@alertGrouping", "@P1"] },
   () => {
-    // Parallel-safe: ensureSemanticGroupsExist() only PUTs semantic groups
+    // Parallel-safe: ensureSemanticGroupsExist() only adds missing semantic groups
     // (idempotent) and each test has its own page.
     test.describe.configure({ mode: "parallel" });
 
@@ -37,7 +37,10 @@ test.describe(
       testLogger.testStart(testInfo.title, testInfo.file);
       await navigateToBase(page);
       pm = new PageManager(page);
-      await pm.correlationSettingsPage.ensureSemanticGroupsExist(process.env["ORGNAME"]);
+      expect(
+        await pm.correlationSettingsPage.ensureSemanticGroupsExist(process.env["ORGNAME"]),
+        "semantic groups setup must succeed",
+      ).toBe(true);
       await page.waitForLoadState("domcontentloaded");
     });
 

@@ -133,9 +133,11 @@ test.describe('nav rail on short screens', () => {
     const box = await rail.tile('/streams').boundingBox();
     expect(await rail.isClearOfFade(rail.tile('/streams'))).toBe(false);
     await page.mouse.click(box.x + box.width / 2, box.y + 10);
-    await page.waitForTimeout(800);
+    // Poll for the activation: a fixed 800ms races the SPA route change on a loaded env.
+    await expect
+      .poll(async () => (await rail.railState()).active, { timeout: 15000 })
+      .toBe('menu-link-/streams-item');
     const after = await rail.railState();
-    expect(after.active).toBe('menu-link-/streams-item');
     expect(after.scrollTop).toBe(0);
   });
 });

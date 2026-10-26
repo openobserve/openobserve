@@ -369,6 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :collector-id="activeId"
       :initial-tab="initialTab"
     />
+    <FleetRemoveDialog />
   </div>
 </template>
 
@@ -403,6 +404,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import FleetCollectorDrawer from "./FleetCollectorDrawer.vue";
 import FleetMoveDialog from "./FleetMoveDialog.vue";
 import FleetNameDialog from "./FleetNameDialog.vue";
+import FleetRemoveDialog from "./FleetRemoveDialog.vue";
 import { useCollectorActions } from "./useCollectorActions";
 import { OS_LABEL, type FleetOs } from "./fleetFormat";
 import { isForbidden, osLabel, useFleetCollectors, type CollectorRow } from "./useFleetApi";

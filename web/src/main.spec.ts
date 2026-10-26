@@ -4,6 +4,7 @@ const rumInit = vi.hoisted(() => vi.fn());
 const routerOnError = vi.hoisted(() => vi.fn());
 const isStaleChunkError = vi.hoisted(() => vi.fn());
 const toast = vi.hoisted(() => vi.fn());
+const logsInit = vi.hoisted(() => vi.fn());
 
 vi.mock("@/services/config.queries", () => ({ configQuery: () => ({}) }));
 vi.mock("vue", async (importOriginal) => {
@@ -25,7 +26,7 @@ vi.mock("./locales", () => ({
 }));
 vi.mock("./aws-exports", () => ({ default: {} }));
 vi.mock("@openobserve/browser-rum", () => ({ openobserveRum: { init: rumInit } }));
-vi.mock("@openobserve/browser-logs", () => ({ openobserveLogs: { init: vi.fn() } }));
+vi.mock("@openobserve/browser-logs", () => ({ openobserveLogs: { init: logsInit } }));
 vi.mock("./services/reodotdev_analytics", () => ({ useReo: () => ({ reoInit: vi.fn() }) }));
 vi.mock("./composables/contextProviders", () => ({
   contextRegistry: { register: vi.fn() },
@@ -47,6 +48,7 @@ vi.mock("./composables/query/queryClient", () => ({
           site: "s",
           service: "web",
           env: "test",
+          version: "v0.70.0",
           organization_identifier: "o",
         },
       }),
@@ -71,6 +73,13 @@ const errorEvent = (stack: string) => ({
   type: "error",
   view: { url: "https://cloud.openobserve.ai/web/logs", referrer: "" },
   error: { message: "boom", stack },
+});
+
+describe("main.ts RUM version", () => {
+  it("sends the server's build version to both the RUM and logs SDKs", () => {
+    expect(rumInit.mock.calls[0][0].version).toBe("v0.70.0");
+    expect(logsInit.mock.calls[0][0].version).toBe("v0.70.0");
+  });
 });
 
 describe("main.ts RUM beforeSend", () => {

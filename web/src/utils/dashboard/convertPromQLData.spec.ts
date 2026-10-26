@@ -3869,6 +3869,31 @@ describe("Convert PromQL Data Utils", () => {
     });
 
     describe("Additional comprehensive coverage tests", () => {
+      it("draws annotation bands above the series, so bars and area fills cannot hide them", async () => {
+        const result = await convertPromQLData(
+          {
+            id: "panel1",
+            type: "line",
+            config: {},
+            queries: [{ config: { promql_legend: "" } }],
+          },
+          [
+            {
+              resultType: "matrix",
+              result: [{ metric: { __name__: "m" }, values: [[1640435200, "100"]] }],
+            },
+          ],
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        const helper = result.options.series.find((s) => s.markArea);
+        expect(helper.markArea.z).toBe(4);
+        expect(helper.markArea.z).toBeGreaterThan(3);
+      });
+
       it("should handle chart with trellis layout enabled", async () => {
         const panelSchema = {
           id: "panel1",
@@ -4821,6 +4846,45 @@ describe("Convert PromQL Data Utils", () => {
       const result = await convert(streamThroughProcessor(40, 6, 100));
 
       expect(result.extras.limitNumberOfSeriesWarningMessage).toBeUndefined();
+    });
+  });
+
+  describe("heatmap time axis", () => {
+    it("hands the server step to the heatmap so steps without samples still get a column", async () => {
+      const panelSchema = { id: "panel1", type: "heatmap", config: {}, queries: [{ config: {} }] };
+      const searchQueryData = [
+        {
+          result: [
+            {
+              metric: { job: "api" },
+              values: [
+                [60, "1"],
+                [180, "3"],
+              ],
+            },
+          ],
+        },
+      ];
+
+      const result: any = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        [],
+        { queries: [{ startTime: 0, endTime: 240_000_000 }] },
+        [[{ step: 60_000_000 }]],
+      );
+
+      expect(result.options.xAxis[0].data).toHaveLength(5);
+      expect(result.options.series[0].data.map((cell: any) => cell[2])).toEqual([
+        "-",
+        1,
+        "-",
+        3,
+        "-",
+      ]);
     });
   });
 });

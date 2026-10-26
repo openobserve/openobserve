@@ -960,7 +960,8 @@ pub async fn get_incident_rca_thread(
     };
     let show_tool_io = match &session {
         RunSession::Present(_) => {
-            match db::organization::get_org_setting_ai_rca_thread_tool_output(&org_id).await {
+            match db::organization::read_org_setting(&org_id, |s| s.ai_rca_thread_tool_output).await
+            {
                 Ok(show) => show,
                 Err(e) => return MetaHttpResponse::internal_error(e),
             }
@@ -1566,7 +1567,9 @@ pub async fn get_incident_rca_live_stream(
                 return response;
             }
             let show_tool_io =
-                match db::organization::get_org_setting_ai_rca_thread_tool_output(&org_id).await {
+                match db::organization::read_org_setting(&org_id, |s| s.ai_rca_thread_tool_output)
+                    .await
+                {
                     Ok(show) => show,
                     Err(e) => return MetaHttpResponse::internal_error(e),
                 };

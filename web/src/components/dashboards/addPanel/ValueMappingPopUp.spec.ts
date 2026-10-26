@@ -101,7 +101,7 @@ describe("ValueMappingPopUp", () => {
         plugins: [i18n],
         stubs: {
           ODialog: ODialogStub,
-          draggable: {
+          VueDraggableNext: {
             name: "draggable",
             template: "<div><slot></slot></div>",
             props: ["modelValue", "options"],
@@ -269,7 +269,8 @@ describe("ValueMappingPopUp", () => {
 
     it("should configure dragOptions with animation 200", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.dragOptions).toEqual({ animation: 200 });
+      const draggable = wrapper.findComponent({ name: "draggable" });
+      expect(draggable.props("options")).toEqual({ animation: 200 });
     });
 
     it('should render "cancel" icon in the page', () => {
@@ -285,7 +286,8 @@ describe("ValueMappingPopUp", () => {
   describe("Mapping Types", () => {
     it("should have the value/range/regex mapping types defined", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.mappingTypes).toEqual([
+      const select = wrapper.findAllComponents({ name: "OSelect" })[0];
+      expect(select.props("options")).toEqual([
         { label: "Equals", value: "value" },
         { label: "Between", value: "range" },
         { label: "Matches regex", value: "regex" },
