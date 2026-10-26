@@ -670,6 +670,135 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_vortex_numeric_file_columns_under_utf8_schema() {
+        for string_type in [DataType::Utf8View, DataType::Utf8] {
+            assert_vortex_numeric_file_columns_under_string_type(string_type).await;
+        }
+    }
+
+    async fn assert_vortex_numeric_file_columns_under_string_type(string_type: DataType) {
+        use arrow::array::{Array, BooleanArray, Float64Array, StringArray};
+
+        let dir = tempfile::tempdir().unwrap();
+        let file_schema = Arc::new(Schema::new(vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("code", DataType::Int64, true),
+            Field::new("ratio", DataType::Float64, true),
+            Field::new("ok", DataType::Boolean, true),
+        ]));
+        // 9 and 100 order differently as numbers and as strings, so stats cast to strings would
+        // mis-prune
+        let batch = RecordBatch::try_new(
+            file_schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![1i64, 2, 3])),
+                Arc::new(Int64Array::from(vec![Some(9i64), None, Some(100)])),
+                Arc::new(Float64Array::from(vec![Some(1.5), Some(2.0), None])),
+                Arc::new(BooleanArray::from(vec![Some(true), None, Some(false)])),
+            ],
+        )
+        .unwrap();
+        let session = VortexSession::default().with_tokio();
+        let mut buf = Vec::new();
+        let mut writer = VortexWriteOptions::new(session.clone()).writer(
+            &mut buf,
+            session
+                .arrow()
+                .from_arrow_schema(file_schema.as_ref())
+                .unwrap(),
+        );
+        writer
+            .push(
+                session
+                    .arrow()
+                    .from_arrow_record_batch(batch, file_schema.as_ref())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        writer.finish().await.unwrap();
+        std::fs::write(dir.path().join("a.vortex"), buf).unwrap();
+
+        let table_schema = Arc::new(Schema::new(vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("code", string_type.clone(), true),
+            Field::new("ratio", string_type.clone(), true),
+            Field::new("ok", string_type.clone(), true),
+        ]));
+        let ctx = DataFusionContextBuilder::new()
+            .trace_id("test_vortex_numeric_utf8")
+            .build(2)
+            .await
+            .unwrap();
+        let format: Arc<dyn DataFusionFileFormat> =
+            Arc::new(VortexFormat::new(VortexSession::default().with_tokio()));
+        let url = ListingTableUrl::parse(format!("file://{}/", dir.path().display())).unwrap();
+        let config = ListingTableConfig::new(url)
+            .with_listing_options(ListingOptions::new(format))
+            .with_schema(table_schema);
+        let table = ListingTableAdapter::try_new(
+            config,
+            "test_vortex_numeric_utf8".to_string(),
+            FileSortOrder::None,
+            None,
+            vec![],
+            None,
+            2,
+        )
+        .unwrap();
+        ctx.register_table("t", Arc::new(table)).unwrap();
+
+        let s = |v: &str| Some(v.to_string());
+        for (sql, expected) in [
+            (
+                "SELECT code, ratio, ok FROM t ORDER BY _timestamp",
+                vec![
+                    vec![s("9"), s("1.5"), s("true")],
+                    vec![None, s("2.0"), None],
+                    vec![s("100"), None, s("false")],
+                ],
+            ),
+            (
+                "SELECT code FROM t WHERE code = '100'",
+                vec![vec![s("100")]],
+            ),
+            ("SELECT code FROM t WHERE code = '9'", vec![vec![s("9")]]),
+            (
+                "SELECT ok FROM t WHERE ok = 'false'",
+                vec![vec![s("false")]],
+            ),
+        ] {
+            let df = ctx.sql(sql).await.unwrap();
+            let batches = df
+                .collect()
+                .await
+                .unwrap_or_else(|e| panic!("{string_type} {sql}: {e}"));
+            let rows: Vec<Vec<Option<String>>> = batches
+                .iter()
+                .flat_map(|b| {
+                    let columns: Vec<_> = b
+                        .columns()
+                        .iter()
+                        .map(|c| arrow::compute::cast(c, &DataType::Utf8).unwrap())
+                        .collect();
+                    (0..b.num_rows())
+                        .map(|i| {
+                            columns
+                                .iter()
+                                .map(|c| {
+                                    let c = c.as_any().downcast_ref::<StringArray>().unwrap();
+                                    c.is_valid(i).then(|| c.value(i).to_string())
+                                })
+                                .collect()
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect();
+            assert_eq!(rows, expected, "{string_type} {sql}");
+        }
+    }
+
+    #[tokio::test]
     async fn test_table_scan_partitions_are_independent_of_session() {
         use datafusion::{
             physical_plan::ExecutionPlanProperties,
