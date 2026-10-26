@@ -1075,6 +1075,12 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     why: "a filled button's label sits on the button",
   },
   {
+    fg: "--color-button-pending-text",
+    bg: "--color-button-pending-bg",
+    category: "text",
+    why: "a filled button's label sits on the button",
+  },
+  {
     fg: "--color-checkbox-checked-fg",
     bg: "--color-checkbox-checked-bg",
     category: "text",

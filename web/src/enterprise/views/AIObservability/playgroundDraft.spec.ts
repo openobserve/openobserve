@@ -21,6 +21,7 @@ import {
   variantLabel,
   withFieldInserted,
   withRole,
+  withSampledVars,
   type PlaygroundMessage,
   type PlaygroundResults,
   type PlaygroundVariant,
@@ -75,6 +76,23 @@ describe("renderTemplate", () => {
 
   it("substitutes every occurrence, not just the first", () => {
     expect(renderTemplate("{{a}}-{{a}}", { a: "x" })).toBe("x-x");
+  });
+});
+
+describe("withSampledVars", () => {
+  it("drops the previous row's fields, keeps the user's own variables, and binds the new row", () => {
+    expect(
+      withSampledVars(
+        { tone: "curt", question: "old", context: "old" },
+        ["question", "context"],
+        { question: "new" },
+        "{…}",
+      ),
+    ).toEqual({ tone: "curt", question: "new", input: "{…}" });
+  });
+
+  it("never lets a field named input shadow the whole value", () => {
+    expect(withSampledVars({}, [], { input: "field" }, "whole")).toEqual({ input: "whole" });
   });
 });
 

@@ -15,7 +15,12 @@
 
 //! The `_o2_ai_chat_events` store behind persisted chat turns, and its verified reader.
 
+pub mod admission;
+pub mod cancel;
+pub mod fork;
 pub mod projection;
+pub mod rca_ledger;
+pub mod rca_thread;
 
 use std::{
     collections::{BTreeMap, HashSet},
@@ -38,9 +43,12 @@ use infra::table::{
     ai_chat_sessions::{self, NO_SEQ, STATUS_ACTIVE},
     ai_chat_shares, ai_chat_turns,
 };
-use o2_enterprise::enterprise::ai::chat::{
-    AiChatEventRecord, Binding, CancelReason, ChatStore, batcher::DurableEvent,
-    record::assemble_event, registry,
+use o2_enterprise::enterprise::ai::{
+    chat::{
+        AiChatEventRecord, Binding, CancelReason, ChatStore, batcher::DurableEvent,
+        record::assemble_event, registry,
+    },
+    client::{AiAgentClient, get_agent_client},
 };
 use tokio::sync::OnceCell;
 
@@ -325,6 +333,44 @@ pub async fn read_committed_events(
         .collect())
 }
 
+/// The verified, contiguous committed events a read could get, and where they stop.
+#[derive(Debug, Default)]
+pub struct CommittedPrefix {
+    pub events: Vec<DurableEvent>,
+    /// The first committed seq that is not stored; every later one is missing too. `None` when
+    /// the history is whole.
+    pub lost_from: Option<i64>,
+}
+
+/// [`read_committed_events`], but a lost tail (events missing from some seq up to the
+/// watermark, as after a kill before the store flushed) returns the prefix before it.
+/// A hole with stored events after it, divergence and corruption stay errors.
+pub async fn read_committed_prefix(
+    row: &ai_chat_sessions::Model,
+    after_seq: i64,
+) -> std::result::Result<CommittedPrefix, ReadError> {
+    let (events, lost_from) = logged(
+        row,
+        after_seq,
+        read_committed_inner(row, after_seq, true).await,
+    )?;
+    if let Some(seq) = lost_from {
+        metrics::AI_CHAT_READ_INTEGRITY_ERRORS_TOTAL
+            .with_label_values(&[&row.org_id, "tail"])
+            .inc();
+        log::warn!(
+            "[AI-CHAT] committed history of {}/{} lost its tail: seq {seq} to {} are not stored",
+            row.org_id,
+            row.session_id,
+            row.last_committed_seq
+        );
+    }
+    Ok(CommittedPrefix {
+        events: events.into_iter().map(|(_, event)| event).collect(),
+        lost_from,
+    })
+}
+
 /// Rewrites committed rows with fresh timestamps (caller holds the lease); returns how many.
 pub async fn refresh_chat_history(
     org_id: &str,
@@ -398,6 +444,93 @@ pub async fn delete_all_for_user(org_id: &str, user_id: &str) -> Result<Vec<Stri
     Ok(session_ids)
 }
 
+/// Tombstone the org's chats and drop each from every o2-ai replica; `Err` while a copy may stay.
+pub async fn purge_org_replicas(org_id: &str) -> Result<()> {
+    // The update names the chats it tombstones, so none waits on a lagging listing.
+    let mut session_ids = ai_chat_sessions::mark_org_deleted(org_id, now_micros())
+        .await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    for session_id in ai_chat_sessions::list_unpurged_ids_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("{e}"))?
+    {
+        if !session_ids.contains(&session_id) {
+            session_ids.push(session_id);
+        }
+    }
+    if session_ids.is_empty() {
+        return Ok(());
+    }
+    for session_id in &session_ids {
+        registry::cancel(org_id, session_id, CancelReason::Deleted);
+    }
+    // No client reaches no replica, as the retention sweep also assumes.
+    let Some(client) = get_agent_client() else {
+        return Ok(());
+    };
+    let auth = replica_purge_auth(org_id).await;
+    let failed = purge_each(
+        &session_ids,
+        |session_id| {
+            let (client, auth) = (client.clone(), auth.clone());
+            async move { purge_replica_copy(&client, org_id, &auth, &session_id).await }
+        },
+        |session_id| async move {
+            ai_chat_sessions::mark_replica_purged(org_id, &session_id, now_micros())
+                .await
+                .map_err(|e| anyhow::anyhow!("{e}"))
+        },
+    )
+    .await?;
+    if failed > 0 {
+        anyhow::bail!(
+            "{failed} of {} chats of {org_id} may still be held by an o2-ai replica",
+            session_ids.len()
+        );
+    }
+    Ok(())
+}
+
+/// Forget that the org's chat-events stream was set up, so a reused org id sets it up again.
+pub fn forget_org(org_id: &str) {
+    INITIALIZED_ORGS.remove(org_id);
+}
+
+/// Header a replica purge sends: the SRE agent's, else only the internal secret.
+pub async fn replica_purge_auth(org_id: &str) -> String {
+    match crate::organization::get_sre_agent_credentials(org_id).await {
+        Ok((email, token)) => crate::auth::build_basic_auth_header(&email, &token),
+        // o2-ai still accepts the internal secret the client attaches.
+        Err(_) => String::new(),
+    }
+}
+
+/// `replica_purge_auth` for the retention sweep, which keeps re-purging a deleted org's chats.
+pub async fn sweep_purge_auth(org_id: &str) -> String {
+    // Minting the SRE account would re-create users and tuples the org's teardown removed.
+    if crate::db::org_status::is_gone(org_id) {
+        return String::new();
+    }
+    replica_purge_auth(org_id).await
+}
+
+/// Ask every live o2-ai replica to drop one deleted chat, counted in the replica purge metric.
+pub async fn purge_replica_copy(
+    client: &AiAgentClient,
+    org_id: &str,
+    auth: &str,
+    session_id: &str,
+) -> Result<()> {
+    let result = client
+        .delete_session_everywhere(session_id, org_id, auth)
+        .await;
+    let label = if result.is_ok() { "ok" } else { "failed" };
+    metrics::AI_CHAT_REPLICA_PURGES_TOTAL
+        .with_label_values(&[label])
+        .inc();
+    result
+}
+
 /// Split a chat's events into chunks of whole turns of at most `max_events` (a longer turn alone).
 pub fn turn_chunks(events: &[DurableEvent], max_events: usize) -> Vec<&[DurableEvent]> {
     let mut starts = vec![0usize];
@@ -462,7 +595,15 @@ async fn read_verified(
     row: &ai_chat_sessions::Model,
     after_seq: i64,
 ) -> std::result::Result<Vec<StoredEvent>, ReadError> {
-    let result = read_committed_inner(row, after_seq).await;
+    let result = read_committed_inner(row, after_seq, false).await;
+    Ok(logged(row, after_seq, result)?.0)
+}
+
+fn logged<T>(
+    row: &ai_chat_sessions::Model,
+    after_seq: i64,
+    result: std::result::Result<T, ReadError>,
+) -> std::result::Result<T, ReadError> {
     if let Err(e) = &result {
         metrics::AI_CHAT_READ_INTEGRITY_ERRORS_TOTAL
             .with_label_values(&[&row.org_id, e.reason()])
@@ -478,13 +619,15 @@ async fn read_verified(
     result
 }
 
+/// The events past `after_seq` and, with `allow_lost_tail`, the first seq of a lost tail.
 async fn read_committed_inner(
     row: &ai_chat_sessions::Model,
     after_seq: i64,
-) -> std::result::Result<Vec<StoredEvent>, ReadError> {
+    allow_lost_tail: bool,
+) -> std::result::Result<(Vec<StoredEvent>, Option<i64>), ReadError> {
     let last = row.last_committed_seq;
     if last <= after_seq.max(NO_SEQ) {
-        return Ok(Vec::new());
+        return Ok((Vec::new(), None));
     }
     let (Some(first_at), Some(last_at)) = (row.first_event_at, row.last_event_at) else {
         return Err(ReadError::NoTimeRange);
@@ -499,21 +642,44 @@ async fn read_committed_inner(
     while lo < last {
         let hi = (lo + READ_WINDOW).min(last);
         let mut attempt = 0;
-        let window = loop {
+        let (window, next) = loop {
             let rows = search_window(row, lo, hi, first_at, last_at).await?;
-            match verify_window(rows, lo, hi, &resolver) {
-                // Visibility lag: what was acknowledged may not be searchable yet.
-                Err(ReadError::Gap { .. }) if attempt < READ_RETRIES => {
-                    attempt += 1;
-                    tokio::time::sleep(Duration::from_millis(100 << attempt)).await;
-                }
-                other => break other?,
+            let result = verify_window_prefix(rows, lo, hi, &resolver);
+            let short = match &result {
+                Ok((_, next)) => *next <= hi,
+                Err(e) => matches!(e, ReadError::Gap { .. }),
+            };
+            // Visibility lag: what was acknowledged may not be searchable yet.
+            if short && attempt < READ_RETRIES {
+                attempt += 1;
+                tokio::time::sleep(Duration::from_millis(100 << attempt)).await;
+                continue;
             }
+            break result?;
         };
         events.extend(window);
+        if next <= hi {
+            if !allow_lost_tail {
+                return Err(ReadError::Gap {
+                    expected: next,
+                    found: None,
+                });
+            }
+            // Only a lost tail is served: anything stored past the hole makes it a gap.
+            if hi < last {
+                let rows = search_window(row, hi, last, first_at, last_at).await?;
+                if let Some(found) = first_stored_seq(rows, hi, last, &resolver)? {
+                    return Err(ReadError::Gap {
+                        expected: next,
+                        found: Some(found),
+                    });
+                }
+            }
+            return Ok((events, Some(next)));
+        }
         lo = hi;
     }
-    Ok(events)
+    Ok((events, None))
 }
 
 async fn search_window(
@@ -592,19 +758,32 @@ fn decode_row(mut hit: json::Value) -> std::result::Result<AiChatEventRecord, Re
 }
 
 /// Resolve one window's rows to the committed event of each seq and check `(lo, hi]` is covered.
+#[cfg(test)]
 fn verify_window(
     rows: Vec<AiChatEventRecord>,
     lo: i64,
     hi: i64,
     resolver: &Resolver,
 ) -> std::result::Result<Vec<StoredEvent>, ReadError> {
-    let mut by_seq: BTreeMap<i64, Vec<Version>> = BTreeMap::new();
-    for row in rows {
-        if row.seq <= lo || row.seq > hi || !resolver.admits(&row) {
-            continue;
-        }
-        add_part(by_seq.entry(row.seq).or_default(), row)?;
+    let (events, expected) = verify_window_prefix(rows, lo, hi, resolver)?;
+    if expected <= hi {
+        return Err(ReadError::Gap {
+            expected,
+            found: None,
+        });
     }
+    Ok(events)
+}
+
+/// [`verify_window`] that accepts a short tail: the contiguous events from `lo + 1` and the
+/// first seq they do not reach. A hole followed by a stored event is still a gap.
+fn verify_window_prefix(
+    rows: Vec<AiChatEventRecord>,
+    lo: i64,
+    hi: i64,
+    resolver: &Resolver,
+) -> std::result::Result<(Vec<StoredEvent>, i64), ReadError> {
+    let by_seq = group_window(rows, lo, hi, resolver)?;
     let mut events = Vec::with_capacity(by_seq.len());
     let mut expected = lo + 1;
     for (seq, mut versions) in by_seq {
@@ -623,13 +802,39 @@ fn verify_window(
         events.push((rows, event));
         expected += 1;
     }
-    if expected <= hi {
-        return Err(ReadError::Gap {
-            expected,
-            found: None,
-        });
+    Ok((events, expected))
+}
+
+/// The first seq in `(lo, hi]` with a committed version stored, if any.
+fn first_stored_seq(
+    rows: Vec<AiChatEventRecord>,
+    lo: i64,
+    hi: i64,
+    resolver: &Resolver,
+) -> std::result::Result<Option<i64>, ReadError> {
+    for (seq, mut versions) in group_window(rows, lo, hi, resolver)? {
+        versions.retain(Version::is_complete);
+        if resolver.pick(seq, &versions)?.is_some() {
+            return Ok(Some(seq));
+        }
     }
-    Ok(events)
+    Ok(None)
+}
+
+fn group_window(
+    rows: Vec<AiChatEventRecord>,
+    lo: i64,
+    hi: i64,
+    resolver: &Resolver,
+) -> std::result::Result<BTreeMap<i64, Vec<Version>>, ReadError> {
+    let mut by_seq: BTreeMap<i64, Vec<Version>> = BTreeMap::new();
+    for row in rows {
+        if row.seq <= lo || row.seq > hi || !resolver.admits(&row) {
+            continue;
+        }
+        add_part(by_seq.entry(row.seq).or_default(), row)?;
+    }
+    Ok(by_seq)
 }
 
 /// File `row` under its version of the event; a retried write repeats parts byte for byte.
@@ -700,6 +905,27 @@ fn divergence<'a>(seq: i64, mut versions: impl Iterator<Item = &'a Version>) -> 
         .map(|v| v.hash.clone())
         .unwrap_or_default();
     ReadError::Divergence { seq, a, b }
+}
+
+/// Runs `purge` per chat and `confirm` per purged one; returns how many purges failed.
+async fn purge_each<P, PF, C, CF>(session_ids: &[String], purge: P, confirm: C) -> Result<usize>
+where
+    P: Fn(String) -> PF,
+    PF: Future<Output = Result<()>>,
+    C: Fn(String) -> CF,
+    CF: Future<Output = Result<()>>,
+{
+    let mut failed = 0;
+    for session_id in session_ids {
+        match purge(session_id.clone()).await {
+            Ok(()) => confirm(session_id.clone()).await?,
+            Err(e) => {
+                failed += 1;
+                log::warn!("[AI-CHAT] replica purge of deleted chat {session_id} failed: {e:#}");
+            }
+        }
+    }
+    Ok(failed)
 }
 
 /// Realtime alerts on the protected stream would hand every chat to the alert's destination.
@@ -799,6 +1025,61 @@ mod tests {
     use o2_enterprise::enterprise::ai::chat::{RecordContext, record};
 
     use super::*;
+
+    #[tokio::test]
+    async fn a_failed_replica_purge_is_counted_and_never_confirmed() {
+        let ids: Vec<String> = ["a", "b", "c"].iter().map(|s| s.to_string()).collect();
+        let confirmed = std::sync::Mutex::new(Vec::new());
+        let failed = purge_each(
+            &ids,
+            |id| async move {
+                if id == "b" {
+                    anyhow::bail!("replica down")
+                }
+                Ok(())
+            },
+            |id| {
+                confirmed.lock().unwrap().push(id);
+                async { Ok(()) }
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(failed, 1);
+        assert_eq!(confirmed.into_inner().unwrap(), vec!["a", "c"]);
+    }
+
+    #[tokio::test]
+    async fn a_failed_confirmation_fails_the_purge() {
+        let ids = vec!["a".to_string()];
+        let result = purge_each(
+            &ids,
+            |_| async { Ok(()) },
+            |_| async { anyhow::bail!("db down") },
+        )
+        .await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn a_gone_orgs_sweep_never_mints_the_sre_account() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+        for (org, status) in [
+            ("sweep-auth-deleting", OrgStatus::Deleting),
+            ("sweep-auth-deleted", OrgStatus::Deleted),
+        ] {
+            ORG_STATUS_CACHE.insert(org.to_string(), status);
+            assert_eq!(sweep_purge_auth(org).await, "");
+            ORG_STATUS_CACHE.remove(org);
+        }
+    }
+
+    #[test]
+    fn forgetting_an_org_drops_its_stream_setup_mark() {
+        INITIALIZED_ORGS.insert("forget-org".to_string(), Arc::new(OnceCell::new()));
+        forget_org("forget-org");
+        assert!(!INITIALIZED_ORGS.contains_key("forget-org"));
+    }
 
     #[test]
     fn expected_schema_has_a_text_payload_and_every_column() {
@@ -933,6 +1214,28 @@ mod tests {
                 found: None
             })
         ));
+    }
+
+    #[test]
+    fn a_lost_tail_keeps_its_prefix_but_a_hole_does_not() {
+        let resolver = resolver(1, &[]);
+        let (events, next) =
+            verify_window_prefix(vec![stored(1, "a"), stored(2, "b")], 0, 5, &resolver).unwrap();
+        assert_eq!(data_of(&events), vec!["a", "b"]);
+        assert_eq!(next, 3);
+        assert!(matches!(
+            verify_window_prefix(vec![stored(1, "a"), stored(3, "c")], 0, 5, &resolver),
+            Err(ReadError::Gap {
+                expected: 2,
+                found: Some(3)
+            })
+        ));
+        // Past the window that ends short, any stored event turns the tail into a hole.
+        assert_eq!(first_stored_seq(vec![], 5, 9, &resolver).unwrap(), None);
+        assert_eq!(
+            first_stored_seq(vec![stored(8, "h")], 5, 9, &resolver).unwrap(),
+            Some(8)
+        );
     }
 
     #[test]

@@ -51,9 +51,9 @@ describe("OnCallReportCard", () => {
   it("renders the report's markdown as html", () => {
     const wrapper = render(report("## Subject Summary\n\nThe pool was **exhausted**."));
 
-    const html = wrapper.find('[data-test="oncall-report-card"]').html();
-    expect(html).toContain("<h2");
-    expect(html).toContain("<strong>exhausted</strong>");
+    const card = wrapper.find('[data-test="oncall-report-card"]');
+    expect(card.find("h2").text()).toBe("Subject Summary");
+    expect(card.find("strong").text()).toBe("exhausted");
   });
 
   it("drops the verdict block the card above already renders as a sentence", () => {
@@ -66,15 +66,16 @@ describe("OnCallReportCard", () => {
     expect(text).not.toContain("probable_cause");
   });
 
-  it("strips anything the sanitizer does not allow", () => {
+  it("shows model-written HTML as text, never as elements", () => {
     const wrapper = render(
       report("Fine.\n\n<img src=x onerror=alert(1)>\n\n<script>bad()</script>"),
     );
 
-    const html = wrapper.find('[data-test="oncall-report-card"]').html();
-    expect(html).not.toContain("onerror");
-    expect(html).not.toContain("<script");
-    expect(html).not.toContain("<img");
+    const card = wrapper.find('[data-test="oncall-report-card"]').element;
+    expect(card.querySelector("img")).toBeNull();
+    expect(card.querySelector("script")).toBeNull();
+    expect(card.querySelector("[onerror]")).toBeNull();
+    expect(card.textContent).toContain("<img src=x onerror=alert(1)>");
   });
 
   it("skeletons while loading rather than reading as an empty report", () => {

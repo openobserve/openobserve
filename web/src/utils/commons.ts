@@ -27,7 +27,9 @@ import { subtractRelativeTime } from "@/utils/date";
 import { convertDashboardSchemaVersion } from "./dashboard/convertDashboardSchemaVersion";
 import { normalizeReservedTimestampAlias } from "./dashboard/timestampAliasRewrite";
 import commonService from "../services/common";
-import type { TranslateFn } from "@/types/i18n";
+import { gt, type TranslateFn } from "@/types/i18n";
+import { findPanelById } from "./dashboard/findPanel";
+import { deletePanelDraftsFor } from "@/composables/dashboard/usePanelDraft";
 import { toRaw, type Ref } from "vue";
 import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
 
@@ -475,6 +477,11 @@ export const deletePanel = async (
   // The panel is gone, so its cached results are unreachable — without this they
   // sit in IndexedDB until the 24 h TTL or the record cap reclaims them.
   await dropPanelCache(store.state.selectedOrganization.identifier, folderId, dashboardId, panelId);
+  deletePanelDraftsFor({
+    org: store.state.selectedOrganization.identifier,
+    dashboardId: String(dashboardId),
+    panelId: String(panelId),
+  });
 };
 
 export const updateVariable = async (
@@ -528,12 +535,10 @@ export const updatePanel = async (
   // call the update dashboard function
   const currentDashboard = await getDashboard(store, dashboardId, folderId);
 
-  // find tab from tabId
-  const tab = getTabDataFromTabId(currentDashboard, tabId);
-
-  const panelIndex = tab?.panels?.findIndex((panel: any) => panel.id == panelData.id) ?? -1;
-  if (panelIndex === -1) return;
-  tab.panels[panelIndex] = panelData;
+  // A teammate may have moved the panel to another tab since the editor opened.
+  const found = findPanelById(currentDashboard, panelData.id, tabId);
+  if (!found) throw new Error(gt("dashboard.panelDraft.panelMissingOnSave"));
+  found.tab.panels[found.index] = panelData;
   return await updateDashboard(
     store,
     store.state.selectedOrganization.identifier,
@@ -887,6 +892,10 @@ export const deleteDashboardById = async (store: any, dashboardId: any, folderId
   pruneDashboardQueryCache(store, folderId, [dashboardId]);
 
   await dropDashboardPanelCache(store.state.selectedOrganization.identifier, folderId, dashboardId);
+  deletePanelDraftsFor({
+    org: store.state.selectedOrganization.identifier,
+    dashboardId: String(dashboardId),
+  });
 
   const allDashboardData = store.state.organizationData.allDashboardData;
 
@@ -926,6 +935,7 @@ export const evictDashboardsFromCache = (store: any, idsByFolder: Map<string, st
     pruneDashboardQueryCache(store, folderId, ids);
     for (const id of ids) {
       void dropDashboardPanelCache(store.state.selectedOrganization.identifier, folderId, id);
+      deletePanelDraftsFor({ org: store.state.selectedOrganization.identifier, dashboardId: id });
     }
 
     const cached = next[folderId];
@@ -949,12 +959,7 @@ export const getPanel = async (
 ) => {
   const currentDashboard = await getDashboard(store, dashboardId, folderId);
 
-  // find tab from tabId
-  const tab = getTabDataFromTabId(currentDashboard, tabId);
-
-  const paneldata = tab?.panels?.find((it: any) => it?.id == panelId);
-
-  return paneldata;
+  return findPanelById(currentDashboard, panelId, tabId)?.panel;
 };
 
 export const getPanelId = () => {
@@ -1004,13 +1009,24 @@ export const deleteTab = async (
   // delete the tab
   currentDashboard.tabs = currentDashboard.tabs.filter((tab: any) => tab.tabId != deleteTabId);
 
-  return await updateDashboard(
+  const result = await updateDashboard(
     store,
     store.state.selectedOrganization.identifier,
     dashboardId,
     currentDashboard,
     folderId ?? "default",
   );
+  // Moved panels live on in the other tab, so only panels deleted with the tab lose their drafts.
+  if (!moveToTabId) {
+    (deleteTabData.panels ?? []).forEach((panel: any) =>
+      deletePanelDraftsFor({
+        org: store.state.selectedOrganization.identifier,
+        dashboardId: String(dashboardId),
+        panelId: String(panel.id),
+      }),
+    );
+  }
+  return result;
 };
 
 export const editTab = async (

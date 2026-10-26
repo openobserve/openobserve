@@ -409,7 +409,11 @@ watch(popoverOpen, (open) => {
 const nestedFilteredOptions = computed(() => {
   const base = baseFilteredOptions.value;
   if (!hasNestedOptions.value) return base;
-  if (isSearching.value) return base.filter((o) => !o.expandable);
+  if (isSearching.value) {
+    const flat = base.filter((o) => !o.expandable);
+    // A header kept only for a matching expandable row has nothing left under it.
+    return flat.filter((o, i) => !o.header || (flat[i + 1] !== undefined && !flat[i + 1].header));
+  }
   return base.filter((o) => o.parentKey === undefined || expandedParents.value.has(o.parentKey));
 });
 
@@ -797,6 +801,10 @@ watch(popoverOpen, (open) => {
 });
 watch(filteredOptions, () => {
   highlightedIndex.value = -1;
+});
+// The list opens scrolled to the current value; a search keeping that offset hides its best matches above the fold.
+watch(searchTerm, () => {
+  if (listboxScrollEl.value) listboxScrollEl.value.scrollTop = 0;
 });
 
 function scrollHighlightedIntoView() {

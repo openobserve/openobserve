@@ -686,7 +686,7 @@ export default defineComponent({
     );
 
     const { isMobile } = useBreakpoint();
-    const refreshVariant = computed(() => (showApplyHint.value ? "warning" : "primary"));
+    const refreshVariant = computed(() => (showApplyHint.value ? "pending" : "primary"));
 
     const refreshTooltip = computed(() => {
       if (isAutoRunOn.value) return t("dashboard.viewDashboard.autoRunDescription");

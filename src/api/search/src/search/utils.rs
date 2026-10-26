@@ -76,71 +76,67 @@ pub async fn validate_query_fields(
     stream_type: StreamType,
     sql: &str,
 ) -> Result<(), Error> {
-    // Step 1: Parse SQL to get columns (lightweight parsing)
     let search_query = proto::cluster_rpc::SearchQuery {
         sql: sql.to_string(),
         ..Default::default()
     };
-
     let sql = Sql::new_with_options(&search_query, org_id, stream_type, None, false).await?;
 
-    // Step 2: Resolve which stream and fields to validate.
-    //
-    // For multi-stream CTE queries sql.stream_names lists every real stream referenced
-    // (e.g. ["default", "k8s_events"]). Each stream has its own set of fields in
-    // sql.columns. Look up the entry matching stream_name so that fields belonging to
-    // a different stream are not incorrectly checked against stream_name's schema.
-    let (target_stream, target_fields) = sql
+    // A bare stream name can refer to multiple types within the same query.
+    let mut targets: Vec<_> = sql
         .stream_names
         .iter()
-        .find(|r| r.stream_name() == stream_name)
+        .filter(|r| r.stream_name() == stream_name)
         .map(|r| {
-            let fields = sql.columns.get(r).cloned().unwrap_or_default();
-            (stream_name.to_string(), fields)
+            (
+                r.get_stream_type(stream_type),
+                sql.columns.get(r).cloned().unwrap_or_default(),
+            )
         })
-        .unwrap_or_else(|| {
-            // stream_name not found in sql.stream_names (aliased or unresolved table).
-            // Fall back to original behaviour: all tracked columns against stream_name.
-            let fields = sql.columns.values().flatten().cloned().collect();
-            (stream_name.to_string(), fields)
-        });
+        .collect();
+    if targets.is_empty() {
+        targets.push((
+            stream_type,
+            sql.columns.values().flatten().cloned().collect(),
+        ));
+    }
 
-    // Step 3: Validate target stream's fields against its own schema and UDS.
-    let schema = infra::schema::get(org_id, &target_stream, stream_type)
-        .await
-        .map_err(|_| Error::ErrorCode(ErrorCodes::SearchStreamNotFound(target_stream.clone())))?;
+    for (target_stream_type, target_fields) in targets {
+        let schema = infra::schema::get(org_id, stream_name, target_stream_type)
+            .await
+            .map_err(|_| {
+                Error::ErrorCode(ErrorCodes::SearchStreamNotFound(stream_name.to_string()))
+            })?;
+        let settings = infra::schema::get_settings(org_id, stream_name, target_stream_type).await;
+        let uds_fields = infra::schema::get_stream_setting_defined_schema_fields(&settings);
 
-    let settings = infra::schema::get_settings(org_id, &target_stream, stream_type).await;
-    let uds_fields = infra::schema::get_stream_setting_defined_schema_fields(&settings);
+        for field in target_fields {
+            if is_system_field(&field) {
+                continue;
+            }
 
-    for field in target_fields {
-        if is_system_field(&field) {
-            continue;
-        }
+            if schema.field_with_name(&field).is_err() {
+                let valid = schema
+                    .fields()
+                    .iter()
+                    .map(|f| f.name().to_owned())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                return Err(Error::ErrorCode(ErrorCodes::SearchFieldNotFound(format!(
+                    "No field named {field}. Valid fields are {valid}.",
+                ))));
+            }
 
-        if schema.field_with_name(&field).is_err() {
-            // Same textual shape as the DataFusion FieldNotFound mapping so the
-            // HTTP layer can extract candidates for did-you-mean suggestions.
-            let valid = schema
-                .fields()
-                .iter()
-                .map(|f| f.name().to_owned())
-                .collect::<Vec<_>>()
-                .join(", ");
-            return Err(Error::ErrorCode(ErrorCodes::SearchFieldNotFound(format!(
-                "No field named {field}. Valid fields are {valid}.",
-            ))));
-        }
-
-        if !uds_fields.is_empty() && !uds_fields.contains(&field) {
-            let valid = uds_fields
-                .iter()
-                .map(|f| f.to_owned())
-                .collect::<Vec<_>>()
-                .join(", ");
-            return Err(Error::ErrorCode(ErrorCodes::SearchFieldNotFound(format!(
-                "No field named {field}. Field exists in the stream but not in its User-Defined Schema (UDS). Valid fields are {valid}.",
-            ))));
+            if !uds_fields.is_empty() && !uds_fields.contains(&field) {
+                let valid = uds_fields
+                    .iter()
+                    .map(|f| f.to_owned())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                return Err(Error::ErrorCode(ErrorCodes::SearchFieldNotFound(format!(
+                    "No field named {field}. Field exists in the stream but not in its User-Defined Schema (UDS). Valid fields are {valid}.",
+                ))));
+            }
         }
     }
 
@@ -373,6 +369,131 @@ JOIN "test1" AS b"#;
             "Expected error about field not in UDS, got: {}",
             err_msg
         );
+    }
+
+    #[tokio::test]
+    async fn test_validate_query_fields_join_enrichment_table() {
+        use arrow_schema::{DataType, Field, Schema};
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = "test_org_join_enrich";
+        let logs_key = format!("{org_id}/{}/app", StreamType::Logs);
+        let enrich_key = format!("{org_id}/{}/geo", StreamType::EnrichmentTables);
+        {
+            let mut w = STREAM_SCHEMAS_LATEST.write().await;
+            w.insert(
+                logs_key.clone(),
+                SchemaCache::new(Schema::new(vec![
+                    Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
+                    Field::new("ip", DataType::Utf8, true),
+                ])),
+            );
+            w.insert(
+                enrich_key.clone(),
+                SchemaCache::new(Schema::new(vec![
+                    Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
+                    Field::new("addr", DataType::Utf8, true),
+                    Field::new("country", DataType::Utf8, true),
+                ])),
+            );
+        }
+
+        let sql = r#"SELECT a.ip, b.country FROM "app" AS a JOIN "enrichment_tables"."geo" AS b ON a.ip = b.addr"#;
+        let logs_res = validate_query_fields(org_id, "app", StreamType::Logs, sql).await;
+        let enrich_res = validate_query_fields(org_id, "geo", StreamType::Logs, sql).await;
+
+        {
+            let mut w = STREAM_SCHEMAS_LATEST.write().await;
+            w.remove(&logs_key);
+            w.remove(&enrich_key);
+        }
+
+        assert!(logs_res.is_ok(), "logs side failed: {logs_res:?}");
+        assert!(enrich_res.is_ok(), "enrichment side failed: {enrich_res:?}");
+    }
+
+    #[tokio::test]
+    async fn test_validate_query_fields_same_name_logs_uds() {
+        check_same_name_join_uds(
+            StreamType::Logs,
+            r#"SELECT l.secret FROM "logs"."app" l JOIN "enrichment_tables"."app" e ON l.id = e.id"#,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn test_validate_query_fields_same_name_enrichment_uds() {
+        check_same_name_join_uds(
+            StreamType::EnrichmentTables,
+            r#"SELECT e.secret FROM "app" l JOIN "enrichment_tables"."app" e ON l.id = e.id"#,
+        )
+        .await;
+    }
+
+    async fn check_same_name_join_uds(restricted_type: StreamType, sql: &str) {
+        use arrow_schema::{DataType, Field, Schema};
+        use config::meta::stream::StreamSettings;
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = format!("test_org_same_name_{restricted_type}_uds");
+        let logs_key = format!("{org_id}/{}/app", StreamType::Logs);
+        let enrich_key = format!("{org_id}/{}/app", StreamType::EnrichmentTables);
+        let schema = Schema::new(vec![
+            Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("id", DataType::Utf8, true),
+            Field::new("secret", DataType::Utf8, true),
+        ]);
+        {
+            let mut cache = STREAM_SCHEMAS_LATEST.write().await;
+            for (stream_type, key) in [
+                (StreamType::Logs, &logs_key),
+                (StreamType::EnrichmentTables, &enrich_key),
+            ] {
+                let settings = StreamSettings {
+                    defined_schema_fields: if stream_type == restricted_type {
+                        vec!["id".to_string()]
+                    } else {
+                        Vec::new()
+                    },
+                    ..Default::default()
+                };
+                let metadata = std::collections::HashMap::from([(
+                    "settings".to_string(),
+                    serde_json::to_string(&settings).unwrap(),
+                )]);
+                cache.insert(
+                    key.clone(),
+                    SchemaCache::new(schema.clone().with_metadata(metadata)),
+                );
+            }
+        }
+
+        let invalid = validate_query_fields(&org_id, "app", StreamType::Logs, sql).await;
+        let valid = validate_query_fields(
+            &org_id,
+            "app",
+            StreamType::Logs,
+            &sql.replace("secret", "id"),
+        )
+        .await;
+
+        {
+            let mut cache = STREAM_SCHEMAS_LATEST.write().await;
+            cache.remove(&logs_key);
+            cache.remove(&enrich_key);
+        }
+        infra::schema::remove_stream_settings(&logs_key).await;
+        infra::schema::remove_stream_settings(&enrich_key).await;
+
+        assert!(
+            matches!(
+                &invalid,
+                Err(Error::ErrorCode(ErrorCodes::SearchFieldNotFound(message)))
+                    if message.contains("secret") && message.contains("User-Defined Schema")
+            ),
+            "{invalid:?}"
+        );
+        assert!(valid.is_ok(), "{valid:?}");
     }
 }
 

@@ -2,6 +2,7 @@
 // Methods : AddPanelName, SavePanel, ApplyDashboardBtn, AddNextPanel, GetTableRowCount, VerifyChartRenders
 
 import { SELECTORS, visibleOnly } from "./dashboard-selectors.js";
+import { settlePanelLeave } from "./panel-leave-dialog.js";
 
 export default class DashboardactionPage {
   constructor(page) {
@@ -212,8 +213,8 @@ export default class DashboardactionPage {
     return this.panelSaveBtn;
   }
 
-  // Raw discard-button locator for callers that must own the confirm dialog
-  // themselves (discardPanel() installs its own auto-accepting handler).
+  // Raw discard-button locator for callers that answer the in-app leave dialog
+  // themselves (discardPanel() answers it with Discard).
   getPanelDiscardBtn() {
     return this.discardPanelBtn;
   }
@@ -248,6 +249,22 @@ export default class DashboardactionPage {
     ]).catch(() => {});
   }
 
+  /**
+   * Save from the Save split button's menu and stay in the editor. A new panel's
+   * URL switches to its panelId; the "Panel saved" toast confirms the save.
+   */
+  async saveAndKeepEditing() {
+    await this.page.locator('[data-test="dashboard-panel-save-options-btn"]').click();
+    await this.page.locator('[data-test="dashboard-panel-save-and-stay"]').click();
+    await this.page.waitForURL((url) => url.searchParams.has("panelId"), { timeout: 20000 });
+  }
+
+  /** Ctrl/Cmd+S in the panel editor is Save and keep editing. */
+  async saveAndKeepEditingWithShortcut() {
+    await this.page.keyboard.press("ControlOrMeta+s");
+    await this.page.waitForURL((url) => url.searchParams.has("panelId"), { timeout: 20000 });
+  }
+
   async getErrorToastText() {
     await this.errorToast.first().waitFor({ state: "visible", timeout: 20000 });
     return (await this.errorToast.first().innerText()).replace(/\s+/g, " ").trim();
@@ -257,10 +274,9 @@ export default class DashboardactionPage {
    * Discard the current panel and return to the dashboard view page.
    * Use this for teardown when the panel intentionally holds an
    * incomplete/invalid config (which cannot pass save validation) or when the
-   * test does not need to persist the panel. Discarding an edited panel fires
-   * a native window.confirm — Playwright auto-dismisses dialogs by default,
-   * which would cancel the navigation and leave the page on add_panel — so
-   * accept it for the duration of the discard.
+   * test does not need to persist the panel. Discarding a panel with edits
+   * opens the in-app "Leave with unsaved changes?" dialog, answered with
+   * Discard so no browser draft lingers.
    * (Same handling as dashboard-multi-sql.js discardPanel; this is the
    * generic home for it since discard is not a multi-SQL-specific action.)
    */
@@ -271,10 +287,7 @@ export default class DashboardactionPage {
     try {
       await discardBtn.waitFor({ state: "visible", timeout: 15000 });
       await discardBtn.click();
-      // Discard navigates to the dashboard view page (/dashboards/view).
-      await this.page.waitForURL((url) => !url.pathname.includes("add_panel"), {
-        timeout: 30000,
-      });
+      return await settlePanelLeave(this.page);
     } finally {
       this.page.off("dialog", dialogHandler);
     }
@@ -338,7 +351,11 @@ export default class DashboardactionPage {
       { timeout: 30000 }
     );
     await this.applyDashboardBtn();
-    await (await promqlResponse).finished();
+    const response = await promqlResponse;
+    // A streamed (text/event-stream) response never reports finished; waitForChartToRender covers completion.
+    if (!(await response.headerValue("content-type"))?.includes("text/event-stream")) {
+      await response.finished();
+    }
     await this.waitForChartToRender();
   }
 

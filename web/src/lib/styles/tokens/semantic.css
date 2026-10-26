@@ -106,6 +106,12 @@
      sync with the dashboard chart palette. */
   --color-series-b: var(--color-chart-series-6);
 
+  /* One hue per telemetry signal; aliases the chart palette so dark mode follows dark.css. */
+  --color-signal-logs: var(--color-chart-series-1);
+  --color-signal-metrics: var(--color-chart-series-5);
+  --color-signal-traces: var(--color-chart-series-9);
+  --color-status-outdated-text: var(--color-text-secondary);
+
   /* Favorite (filled star) — a warm yellow, deliberately distinct from the
      destructive error red so "starred" and "danger" never read as the same hue
      on a row that carries both. Only the FILLED star uses this; unfavorited
@@ -246,6 +252,12 @@
 
   /* Series B (paired secondary series identity, see :root above) */
   --color-series-b: var(--color-series-b);
+
+  /* Telemetry signals (see :root above) */
+  --color-signal-logs: var(--color-signal-logs);
+  --color-signal-metrics: var(--color-signal-metrics);
+  --color-signal-traces: var(--color-signal-traces);
+  --color-status-outdated-text: var(--color-status-outdated-text);
 
   /* White / black / transparent / current / inherit — Tailwind ships these as
      --color-* theme keys, so the `--color-*: initial` reset (palette-reset.css) wipes

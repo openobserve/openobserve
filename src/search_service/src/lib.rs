@@ -756,7 +756,8 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
         };
         let work_group = result.work_group.clone().unwrap_or_default();
         let search_type: Option<search::SearchEventType> = result.search_type.map(|s_event_type| {
-            search::SearchEventType::try_from(s_event_type.as_str())
+            s_event_type
+                .parse::<search::SearchEventType>()
                 .unwrap_or(search::SearchEventType::UI)
         });
         status.push(search::QueryStatus {
@@ -1057,9 +1058,9 @@ pub fn check_search_allowed(_org_id: &str, _stream: Option<&str>) -> Result<(), 
         }
         // this is installation level limit for all orgs combined
         if !o2_enterprise::enterprise::license::search_allowed() {
-            Err(Error::Message(
-                "Search is temporarily disabled due to exceeding allotted ingestion limit. Please contact your administrator.".to_string(),
-            ))
+            Err(Error::Message(search_blocked_message(
+                o2_enterprise::enterprise::license::current_license_id().as_deref(),
+            )))
         } else {
             Ok(())
         }
@@ -1100,6 +1101,16 @@ fn merge_cancel_outcomes(outcomes: Vec<Result<bool, Error>>) -> Result<bool, Err
 #[inline]
 fn is_license_exempt_stream(org_id: &str, stream: Option<&str>) -> bool {
     org_id == META_ORG_ID && (stream == Some(USAGE_STREAM) || stream == Some(AUDIT_STREAM))
+}
+
+#[cfg(any(feature = "enterprise", test))]
+fn search_blocked_message(license_id: Option<&str>) -> String {
+    match license_id.filter(|id| !id.is_empty()) {
+        Some(id) => format!(
+            "Search is temporarily disabled due to exceeding allotted ingestion limit. License ID: {id}. Please contact your administrator."
+        ),
+        None => "Search is temporarily disabled due to exceeding allotted ingestion limit. Please contact your administrator.".to_string(),
+    }
 }
 
 fn flatten_vrl_result(value: json::Value) -> Option<json::Value> {
@@ -1229,6 +1240,21 @@ mod tests {
     fn test_check_search_allowed_non_enterprise_always_ok() {
         assert!(check_search_allowed("myorg", None).is_ok());
         assert!(check_search_allowed("myorg", Some("logs")).is_ok());
+    }
+
+    #[test]
+    fn test_search_blocked_message_names_the_license() {
+        assert_eq!(
+            search_blocked_message(Some("2HbQ7f3aZk")),
+            "Search is temporarily disabled due to exceeding allotted ingestion limit. License ID: 2HbQ7f3aZk. Please contact your administrator."
+        );
+    }
+
+    #[test]
+    fn test_search_blocked_message_without_a_license_keeps_the_old_text() {
+        let old = "Search is temporarily disabled due to exceeding allotted ingestion limit. Please contact your administrator.";
+        assert_eq!(search_blocked_message(None), old);
+        assert_eq!(search_blocked_message(Some("")), old);
     }
 
     #[test]

@@ -20,6 +20,7 @@ import { resetListViewState, useListViewState } from "@/composables/useListViewS
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import FunctionList from "./FunctionList.vue";
+import analytics from "@/services/product_analytics";
 import i18n from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
 import { createStore } from "vuex";
@@ -372,6 +373,13 @@ describe("FunctionList", () => {
 
       await flushPromises();
       expect(mockJsTransformDelete).toHaveBeenCalledWith("test-org", "func1");
+      expect(analytics.track).toHaveBeenCalledWith("Button Click", {
+        button: "Delete Function",
+        user_org: "test-org",
+        function_name: "func1",
+        is_ingest_func: false,
+        page: "Functions",
+      });
     });
 
     it("should refresh list after successful delete", async () => {

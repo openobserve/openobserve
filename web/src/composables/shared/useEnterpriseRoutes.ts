@@ -396,6 +396,27 @@ const useEnterpriseRoutes = () => {
       path: "auto-observe-2",
       redirect: (to: any) => ({ name: "autoobserve", query: to.query }),
     });
+    // Every Fleet API answers 403 on OSS, so the routes (and with them the nav entry) exist only here.
+    routes.push(
+      {
+        path: "fleet/configurations/:id",
+        name: "fleetConfigEditor",
+        component: () => import("@/views/FleetConfigEditor.vue"),
+        meta: { titleKey: "fleet.editor.pageTitle" },
+        beforeEnter(to: any, from: any, next: any) {
+          routeGuard(to, from, next);
+        },
+      },
+      {
+        path: "fleet",
+        name: "fleet",
+        component: () => import("@/views/FleetManager.vue"),
+        meta: { titleKey: "menu.fleet" },
+        beforeEnter(to: any, from: any, next: any) {
+          routeGuard(to, from, next);
+        },
+      },
+    );
   }
 
   // Workflows — enterprise/cloud only (FD3). List is the parent; the editor

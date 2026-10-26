@@ -20,14 +20,26 @@ import { createMemoryHistory, createRouter } from "vue-router";
 import { defineComponent, h } from "vue";
 import i18n from "@/locales";
 import searchService from "@/services/search";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import { queryClient } from "@/composables/query/queryClient";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import K8sClusterHotbar from "./K8sClusterHotbar.vue";
+import K8sCommandPalette from "./K8sCommandPalette.vue";
 import KubernetesPage from "./KubernetesPage.vue";
 import { QUERY_STREAM, VIEWS, queryText, type QueryId } from "./kubernetesQueries";
 
+const shortcuts = vi.hoisted(() => ({ defs: [] as { id: string; handler: () => unknown }[] }));
 const getStreams = vi.fn();
 const getStream = vi.fn();
 
+vi.mock("@/lib/vue-shortcut-manager", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/vue-shortcut-manager")>()),
+  useShortcuts: (defs: { id: string; handler: () => unknown }[]) => {
+    shortcuts.defs = defs;
+  },
+}));
 vi.mock("@/services/search", () => ({ default: { metrics_query: vi.fn(), search: vi.fn() } }));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 vi.mock("@/composables/useStreams", () => ({ default: () => ({ getStreams, getStream }) }));
 
 const metricsQuery = vi.mocked(searchService.metrics_query);
@@ -72,11 +84,26 @@ const recorder = (name: string, emits: string[] = []) =>
     },
   });
 
-const ListStub = recorder("K8sListView", ["open", "update", "refresh"]);
+const ListStub = recorder("K8sListView", ["open", "update", "refresh", "action"]);
 const MapStub = recorder("MapView", ["open", "update", "navigate", "refresh"]);
-const ClusterStub = recorder("ClusterOverview", ["open", "refresh"]);
+const ClusterStub = recorder("ClusterOverview", ["open", "refresh", "navigate"]);
 const WorkloadsStub = recorder("WorkloadsOverview", ["open", "update", "view", "refresh"]);
 const DrawerStub = recorder("K8sDetailsDrawer", ["close", "open"]);
+
+const LogsPanelStub = defineComponent({
+  name: "K8sLogsPanel",
+  props: { target: Object },
+  setup() {
+    return () => h("div", { "data-test": "stub-K8sLogsPanel" });
+  },
+});
+const YamlPanelStub = defineComponent({
+  name: "K8sYamlPanel",
+  props: { row: Object },
+  setup() {
+    return () => h("div", { "data-test": "stub-K8sYamlPanel" });
+  },
+});
 
 const layoutStub = defineComponent({
   name: "OPageLayout",
@@ -90,11 +117,26 @@ const layoutStub = defineComponent({
   },
 });
 
+const setRelativeDate = vi.fn();
+const DAY_US = 24 * 3_600_000_000;
+
 const dateTimeStub = defineComponent({
   name: "DateTime",
   emits: ["on:date-change"],
-  setup(_p, { expose }) {
-    expose({ refresh: () => {} });
+  setup(_p, { expose, emit }) {
+    expose({
+      refresh: () => {},
+      setRelativeDate: (period: string, value: number) => {
+        setRelativeDate(period, value);
+        const end = Date.now() * 1000;
+        emit("on:date-change", {
+          startTime: end - DAY_US,
+          endTime: end,
+          valueType: "relative",
+          userChangedValue: true,
+        });
+      },
+    });
     return () => h("div");
   },
 });
@@ -113,10 +155,17 @@ describe("KubernetesPage", () => {
 
   const mountPage = async (
     query: Record<string, string> = {},
-    { metrics = ALL_STREAMS, logs = ["k8s_events"], eventFields = ["k8s_cluster"] } = {},
+    {
+      metrics = ALL_STREAMS,
+      logs = ["k8s_events"],
+      traces = ["default"],
+      eventFields = ["k8s_cluster"],
+    } = {},
   ) => {
     getStreams.mockImplementation(async (type: string) => ({
-      list: (type === "metrics" ? metrics : logs).map((name) => ({ name })),
+      list: (type === "metrics" ? metrics : type === "traces" ? traces : logs).map((name) => ({
+        name,
+      })),
     }));
     getStream.mockResolvedValue({ schema: eventFields.map((name) => ({ name })) });
     store = createStore({
@@ -151,6 +200,8 @@ describe("KubernetesPage", () => {
           ClusterOverview: ClusterStub,
           WorkloadsOverview: WorkloadsStub,
           K8sDetailsDrawer: DrawerStub,
+          K8sLogsPanel: LogsPanelStub,
+          K8sYamlPanel: YamlPanelStub,
         },
       },
     });
@@ -160,12 +211,30 @@ describe("KubernetesPage", () => {
 
   const query = () => router.currentRoute.value.query;
 
+  const clickRail = async (view: string) => {
+    const rail = wrapper.find(`[data-test="k8s2-rail-${view}"]`);
+    await rail.trigger("mousedown", { button: 0 });
+    await rail.trigger("click");
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     queryClient.clear();
     fixture = {
       CL1N: [{ metric: { k8s_cluster: "beta" }, value: 1 }],
       CL1P: [{ metric: { k8s_cluster: "alpha" }, value: 1 }],
+      N1: [
+        {
+          metric: { k8s_cluster: "alpha", node: "n1", condition: "Ready", status: "true" },
+          value: 1,
+        },
+      ],
+      P1: [
+        {
+          metric: { k8s_cluster: "alpha", namespace: "a", pod: "p", uid: "u", phase: "Running" },
+          value: 1,
+        },
+      ],
     };
     metricsQuery.mockImplementation((async ({ query: q }: { query: string }) => ({
       data: {
@@ -204,6 +273,34 @@ describe("KubernetesPage", () => {
       expect(wrapper.findComponent(WorkloadsStub).exists()).toBe(true);
     });
 
+    it("shows the offline state when a cluster reports no nodes or pods", async () => {
+      fixture = {
+        CL1N: [{ metric: { k8s_cluster: "alpha" }, value: 1 }],
+      };
+      await mountPage();
+      expect(wrapper.find('[data-test="k8s2-offline"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="stub-ClusterOverview"]').exists()).toBe(false);
+    });
+
+    it("does not call the cluster offline when one of its queries failed", async () => {
+      fixture = {
+        CL1N: [{ metric: { k8s_cluster: "alpha" }, value: 1 }],
+      };
+      const ok = metricsQuery.getMockImplementation()!;
+      metricsQuery.mockImplementation(((args: { query: string }) =>
+        idOf(args.query) === "N1" ? Promise.reject(new Error("boom")) : ok(args as any)) as any);
+      await mountPage();
+      expect(wrapper.find('[data-test="k8s2-offline"]').exists()).toBe(false);
+    });
+
+    it("keeps list views out of the offline state, since an empty filter is not a silent cluster", async () => {
+      fixture = {
+        CL1N: [{ metric: { k8s_cluster: "alpha" }, value: 1 }],
+      };
+      await mountPage({ view: "pods" });
+      expect(wrapper.find('[data-test="k8s2-offline"]').exists()).toBe(false);
+    });
+
     it("rewrites an unknown view to the Cluster overview", async () => {
       await mountPage({ view: "secrets" });
       expect(query().view).toBeUndefined();
@@ -223,6 +320,8 @@ describe("KubernetesPage", () => {
         "cluster",
         "map",
         "nodes",
+        "namespaces",
+        "events",
         "workloads",
         "pods",
         "deployments",
@@ -233,10 +332,8 @@ describe("KubernetesPage", () => {
         "cronjobs",
         "pvcs",
         "hpas",
-        "namespaces",
-        "events",
       ]);
-      const text = wrapper.find('[data-test="layout-sidebar"]').text();
+      const text = wrapper.find('[data-test="k8s2-tree"]').text();
       for (const label of ["Cluster", "Workloads", "Storage", "Autoscaling"])
         expect(text).toContain(label);
       for (const absent of [
@@ -262,7 +359,7 @@ describe("KubernetesPage", () => {
         details: "pod/alpha/shop/web",
       });
       expect(wrapper.findComponent(DrawerStub).exists()).toBe(true);
-      await wrapper.find('[data-test="k8s2-rail-nodes"]').trigger("click");
+      await clickRail("nodes");
       await flushPromises();
       expect(query()).toEqual({ view: "nodes", cluster: "alpha", namespace: "shop" });
       expect(wrapper.findComponent(DrawerStub).exists()).toBe(false);
@@ -292,7 +389,7 @@ describe("KubernetesPage", () => {
 
     it("keeps the namespace selection across views", async () => {
       await mountPage({ view: "pods", namespace: "a,b" });
-      await wrapper.find('[data-test="k8s2-rail-deployments"]').trigger("click");
+      await clickRail("deployments");
       await flushPromises();
       expect(query().namespace).toBe("a,b");
     });
@@ -375,6 +472,7 @@ describe("KubernetesPage", () => {
       ["unscoped", { eventFields: [] }],
       ["anchor", { metrics: ALL_STREAMS.filter((s) => s !== "kube_pod_status_phase") }],
     ])("is skipped with reason %s", async (reason, streams) => {
+      fixture = { ...fixture, CL1N: [{ metric: { k8s_cluster: "alpha" }, value: 1 }] };
       await mountPage({ view: "map", cluster: "alpha" }, streams);
       expect(objects()).toEqual({ state: "skipped", reason });
     });
@@ -478,6 +576,18 @@ describe("KubernetesPage", () => {
     });
   });
 
+  describe("overview navigation", () => {
+    it("opens the failing pods filter from a KPI tile without carrying the old search", async () => {
+      await mountPage({ view: "cluster", cluster: "alpha", search: "stale" });
+      wrapper
+        .findComponent({ name: "ClusterOverview" })
+        .vm.$emit("navigate", { view: "pods", status: "failing" });
+      await flushPromises();
+      expect(query()).toMatchObject({ view: "pods", status: "failing" });
+      expect(query().search).toBeUndefined();
+    });
+  });
+
   describe("cluster", () => {
     it("lists CL1 ∪ CL2 clusters on the Events view and defaults to the first alphabetically", async () => {
       await mountPage({ view: "events" });
@@ -524,10 +634,169 @@ describe("KubernetesPage", () => {
     await mountPage({ view: "pods" });
     expect(wrapper.findComponent(ListStub).props("loading")).toBe(false);
     metricsQuery.mockImplementation((() => new Promise(() => {})) as any);
-    await wrapper.find('[data-test="k8s2-rail-nodes"]').trigger("click");
+    await clickRail("nodes");
     await flushPromises();
     expect(wrapper.findComponent(ListStub).props("view")).toBe("nodes");
     expect(wrapper.findComponent(ListStub).props("loading")).toBe(true);
+  });
+
+  describe("phone chrome", () => {
+    it("offers an icon-only palette button for narrow screens", async () => {
+      await mountPage();
+      const compact = wrapper.find('[data-test="k8s2-palette-open-compact"]');
+      expect(compact.exists()).toBe(true);
+      expect(compact.classes()).toContain("md:hidden");
+      expect(compact.attributes("aria-label")).toBeTruthy();
+      expect(wrapper.find('[data-test="k8s2-palette-open"]').classes()).toContain("max-md:hidden");
+    });
+
+    it("opens the palette from the compact button", async () => {
+      await mountPage();
+      await wrapper.find('[data-test="k8s2-palette-open-compact"]').trigger("click");
+      expect(wrapper.findComponent({ name: "K8sCommandPalette" }).props("open")).toBe(true);
+    });
+
+    it("shows totals in the view select options", async () => {
+      await mountPage();
+      const options = wrapper
+        .findComponent('[data-test="k8s2-view-select"]')
+        .props("options") as any[];
+      expect(options.some((o) => typeof o.label === "string" && /\(\d+\)$/.test(o.label))).toBe(
+        true,
+      );
+    });
+  });
+
+  describe("row actions", () => {
+    const pod = { kind: "pod", cluster: "alpha", namespace: "shop", name: "web-1" };
+
+    const act = async (type: string, options?: Parameters<typeof mountPage>[1]) => {
+      await mountPage({ view: "pods", cluster: "alpha" }, options);
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      wrapper.findComponent(ListStub).vm.$emit("action", type, pod);
+      await flushPromises();
+      return push;
+    };
+
+    it("opens Traces on the org's trace stream, preferring default", async () => {
+      const push = await act("traces", { traces: ["zeta", "default"] });
+      expect(push).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "traces",
+          query: expect.objectContaining({ stream: "default", org_identifier: "org1" }),
+        }),
+      );
+    });
+
+    it("falls back to the first trace stream when there is no default", async () => {
+      const push = await act("traces", { traces: ["zeta", "alpha-traces"] });
+      expect(push.mock.calls[0][0]).toMatchObject({ query: { stream: "alpha-traces" } });
+    });
+
+    it("says which trace stream it opened when the org has several", async () => {
+      await act("traces", { traces: ["zeta", "default"] });
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "info", message: expect.stringContaining("default") }),
+      );
+    });
+
+    it("stays quiet when the org has a single trace stream", async () => {
+      vi.mocked(toast).mockClear();
+      await act("traces", { traces: ["default"] });
+      expect(toast).not.toHaveBeenCalled();
+    });
+
+    it("does not navigate when the org has no trace stream", async () => {
+      const push = await act("traces", { traces: [] });
+      expect(push).not.toHaveBeenCalled();
+    });
+
+    it("opens Metrics with the pod's query", async () => {
+      const push = await act("metrics");
+      expect(push.mock.calls[0][0]).toMatchObject({
+        name: "metrics",
+        query: { query_type: "promql", stream_name: "k8s_pod_cpu_usage" },
+      });
+    });
+  });
+
+  describe("wiring", () => {
+    const ref = { kind: "pod", cluster: "alpha", namespace: "a", name: "p" };
+    const palette = () => wrapper.findComponent(K8sCommandPalette);
+    const item = (target: unknown) => ({ target });
+
+    it.each(["logs", "yaml"])("opens a %s dock tab from a list row action", async (kind) => {
+      await mountPage({ view: "pods", cluster: "alpha" });
+      expect(wrapper.find('[data-test="k8s2-dock"]').exists()).toBe(false);
+      wrapper.findComponent(ListStub).vm.$emit("action", kind, ref);
+      await flushPromises();
+      expect(wrapper.find('[data-test="k8s2-dock"]').exists()).toBe(true);
+      expect(wrapper.find(`[data-test="k8s2-dock-close-${kind}"]`).exists()).toBe(true);
+    });
+
+    it("keeps the YAML manifest after the row leaves the inventory", async () => {
+      await mountPage({ view: "pods", cluster: "alpha" });
+      wrapper.findComponent(ListStub).vm.$emit("action", "yaml", ref);
+      await flushPromises();
+      expect(wrapper.findComponent(YamlPanelStub).props("row")).toMatchObject({ name: "p" });
+      fixture = { ...fixture, P1: [] };
+      queryClient.clear();
+      wrapper.findComponent(ListStub).vm.$emit("refresh");
+      await flushPromises();
+      expect(wrapper.findComponent(ListStub).props("rows")).toEqual([]);
+      expect(wrapper.findComponent(YamlPanelStub).props("row")).toMatchObject({ name: "p" });
+    });
+
+    it("switches the cluster in the URL from the hot-bar", async () => {
+      await mountPage({ view: "pods", cluster: "alpha" });
+      wrapper.findComponent(K8sClusterHotbar).vm.$emit("select", "beta");
+      await flushPromises();
+      expect(query().cluster).toBe("beta");
+    });
+
+    it("opens the palette on its clusters group from the hot-bar", async () => {
+      await mountPage();
+      wrapper.findComponent(K8sClusterHotbar).vm.$emit("all");
+      await flushPromises();
+      expect(palette().props("open")).toBe(true);
+      expect(palette().props("group")).toBe("clusters");
+    });
+
+    it("toggles the palette from the k8sPalette shortcut", async () => {
+      await mountPage();
+      const toggle = () => shortcuts.defs.find((d) => d.id === "k8sPalette")!.handler();
+      toggle();
+      await flushPromises();
+      expect(palette().props("open")).toBe(true);
+      toggle();
+      await flushPromises();
+      expect(palette().props("open")).toBe(false);
+    });
+
+    it("routes a palette view, cluster and details choice", async () => {
+      await mountPage({ view: "nodes", cluster: "alpha" });
+      palette().vm.$emit("select", item({ type: "view", view: "pods" }));
+      await flushPromises();
+      expect(query().view).toBe("pods");
+      palette().vm.$emit("select", item({ type: "cluster", cluster: "beta" }));
+      await flushPromises();
+      expect(query().cluster).toBe("beta");
+      palette().vm.$emit("select", item({ type: "details", details: { ...ref, cluster: "beta" } }));
+      await flushPromises();
+      expect(query().details).toBe("pod/beta/a/p");
+    });
+
+    it("explains an empty last-known range instead of repeating the offline copy", async () => {
+      fixture = { CL1N: [{ metric: { k8s_cluster: "alpha" }, value: 1 }] };
+      await mountPage();
+      const description = () => wrapper.findComponent(OEmptyState).props("description");
+      expect(description()).toContain("No nodes or pods were reported");
+      queryClient.clear();
+      wrapper.findComponent(OEmptyState).vm.$emit("action");
+      await flushPromises();
+      expect(wrapper.find('[data-test="k8s2-offline"]').exists()).toBe(true);
+      expect(description()).toBe("Nothing was reported in the last 24 hours either.");
+    });
   });
 
   describe("drawer", () => {
@@ -599,7 +868,7 @@ describe("KubernetesPage", () => {
       await mountPage({}, { metrics: [] });
       expect(query().view).toBe("events");
       expect(wrapper.find('[data-test="setup-card-stub"]').exists()).toBe(false);
-      await wrapper.find('[data-test="k8s2-rail-pods"]').trigger("click");
+      await clickRail("pods");
       await flushPromises();
       expect(wrapper.findComponent(ListStub).props("anchorMissing")).toBe("kube_pod_status_phase");
     });
@@ -608,7 +877,7 @@ describe("KubernetesPage", () => {
       fixture = {};
       await mountPage({}, { metrics: [] });
       expect(query().view).toBe("events");
-      await wrapper.find('[data-test="k8s2-rail-cluster"]').trigger("click");
+      await clickRail("cluster");
       await flushPromises();
       expect(query().view).toBeUndefined();
       expect(wrapper.findComponent(ClusterStub).exists()).toBe(true);
@@ -658,5 +927,58 @@ describe("KubernetesPage", () => {
     await flushPromises();
     expect(query()).toEqual({});
     expect(getStreams).toHaveBeenLastCalledWith("logs", false, false, true);
+  });
+
+  it("builds palette items only while the palette is open", async () => {
+    await mountPage();
+    const palette = () => wrapper.findComponent(K8sCommandPalette);
+    expect(palette().props("items")).toEqual([]);
+    await wrapper.find('[data-test="k8s2-palette-open"]').trigger("click");
+    await flushPromises();
+    expect(palette().props("items").length).toBeGreaterThan(0);
+  });
+
+  it("clears the last-known banner once the user picks another range", async () => {
+    fixture = { CL1N: [{ metric: { k8s_cluster: "alpha" }, value: 1 }] };
+    await mountPage();
+    expect(wrapper.find('[data-test="k8s2-offline"]').exists()).toBe(true);
+    fixture = {
+      CL1N: [{ metric: { k8s_cluster: "alpha" }, value: 1 }],
+      N1: [
+        {
+          metric: { k8s_cluster: "alpha", node: "n1", condition: "Ready", status: "true" },
+          value: 1,
+        },
+      ],
+    };
+    // The relative range rounds to the same cache key, so drop it to force a real reload.
+    queryClient.clear();
+    wrapper.findComponent(OEmptyState).vm.$emit("action");
+    await flushPromises();
+    expect(setRelativeDate).toHaveBeenCalledWith("d", 1);
+    expect(wrapper.find('[data-test="k8s2-banner-last-known"]').exists()).toBe(true);
+
+    wrapper.findComponent(dateTimeStub).vm.$emit("on:date-change", {
+      startTime: 1,
+      endTime: 2,
+      valueType: "relative",
+      userChangedValue: true,
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="k8s2-banner-last-known"]').exists()).toBe(false);
+  });
+
+  it("renders the view select and routes the choice to the URL", async () => {
+    await mountPage();
+    const select = wrapper.findComponent('[data-test="k8s2-view-select"]');
+    expect(select.exists()).toBe(true);
+    expect(select.classes()).toContain("md:hidden");
+    const values = (select.props("options") as { value?: string }[])
+      .map((option) => option.value)
+      .filter(Boolean);
+    expect(values).toEqual(expect.arrayContaining(["cluster", "pods", "nodes"]));
+    select.vm.$emit("update:modelValue", "pods");
+    await flushPromises();
+    expect(query().view).toBe("pods");
   });
 });

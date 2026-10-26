@@ -353,6 +353,16 @@ SELECT * FROM pipeline
         }
     }
 
+    async fn delete_by_org(&self, org: &str) -> Result<Vec<String>> {
+        let client = CLIENT_RW.clone();
+        Ok(
+            sqlx::query_scalar("DELETE FROM pipeline WHERE org = $1 RETURNING id;")
+                .bind(org)
+                .fetch_all(&client)
+                .await?,
+        )
+    }
+
     async fn list_streams_with_pipeline(&self, org: &str) -> Result<Vec<Pipeline>> {
         let client = CLIENT_RO.clone();
         let query = r#"

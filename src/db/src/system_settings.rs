@@ -40,6 +40,12 @@ fn cache_key(
     format!("{}:{}:{}:{}", scope.as_str(), org, user, key)
 }
 
+/// The cache key of a stored row; an unknown scope reads as `System`, as `model_to_setting` does.
+fn row_cache_key((scope, org_id, user_id, key): &db::SettingRowKey) -> String {
+    let scope = scope.parse().unwrap_or(SettingScope::System);
+    cache_key(&scope, org_id.as_deref(), user_id.as_deref(), key)
+}
+
 /// Get a single setting from the populated in-memory cache, without a database lookup.
 pub async fn get_cached(
     scope: &SettingScope,
@@ -171,7 +177,7 @@ pub async fn set(setting: &SystemSetting) -> Result<SystemSetting> {
 
     // Emit event to update cache on other cluster nodes
     let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, cache_k);
-    if let Err(e) = infra::coordinator::system_settings::emit_put_event(&event_key).await {
+    if let Err(e) = infra::coordinator::emit_put(&event_key).await {
         log::error!("Failed to emit system settings put event: {}", e);
     }
 
@@ -214,7 +220,7 @@ pub async fn delete(
 
     // Emit event to update cache on other cluster nodes
     let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, cache_k);
-    if let Err(e) = infra::coordinator::system_settings::emit_delete_event(&event_key).await {
+    if let Err(e) = infra::coordinator::emit_delete(&event_key).await {
         log::error!("Failed to emit system settings delete event: {}", e);
     }
 
@@ -223,37 +229,37 @@ pub async fn delete(
 
 /// Delete all settings for an organization
 pub async fn delete_org_settings(org_id: &str) -> Result<u64> {
-    let result = db::delete_org_settings(org_id)
+    // Read before the delete: other nodes may cache rows this node never loaded.
+    let stored = db::list_keys_by_org(org_id)
         .await
         .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
-
-    // Clear org settings from cache, then emit events after releasing lock
-    let keys_to_remove: Vec<String> = {
-        let mut cache = SYSTEM_SETTINGS.write().await;
-        let keys: Vec<String> = cache
-            .iter()
-            .filter(|(k, _)| k.split(':').nth(1) == Some(org_id))
-            .map(|(k, _)| k.clone())
-            .collect();
-        for key in &keys {
-            cache.remove(key);
-        }
-        keys
-    }; // Lock released here
-
-    // Emit events without holding lock
-    for key in &keys_to_remove {
-        let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, key);
-        if let Err(e) = infra::coordinator::system_settings::emit_delete_event(&event_key).await {
-            log::error!(
-                "Failed to emit system settings delete event for {}: {}",
-                key,
-                e
-            );
-        }
+    let mut keys: Vec<String> = SYSTEM_SETTINGS
+        .read()
+        .await
+        .keys()
+        .filter(|k| k.split(':').nth(1) == Some(org_id))
+        .cloned()
+        .collect();
+    keys.extend(stored.iter().map(row_cache_key));
+    keys.sort();
+    keys.dedup();
+    // Events before the row delete, so a failed one leaves the rows for the retry to list.
+    evict_settings(&keys).await?;
+    let deleted = db::delete_org_settings(org_id)
+        .await
+        .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+    // The delete names any row the listing missed; that row is evicted only after it.
+    let missed: Vec<String> = deleted
+        .iter()
+        .map(row_cache_key)
+        .filter(|key| keys.binary_search(key).is_err())
+        .collect();
+    evict_settings(&missed).await?;
+    // A read miss before the delete can refill the caches, and no retry lists a deleted row.
+    if let Err(e) = evict_settings(&keys).await {
+        log::warn!("[SYSTEM_SETTINGS] eviction after the org {org_id} row delete failed: {e}");
     }
-
-    Ok(result)
+    Ok(deleted.len() as u64)
 }
 
 /// Delete all settings for a user in an organization
@@ -282,7 +288,7 @@ pub async fn delete_user_settings(org_id: &str, user_id: &str) -> Result<u64> {
     // Emit events without holding lock
     for key in &keys_to_remove {
         let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, key);
-        if let Err(e) = infra::coordinator::system_settings::emit_delete_event(&event_key).await {
+        if let Err(e) = infra::coordinator::emit_delete(&event_key).await {
             log::error!(
                 "Failed to emit system settings delete event for {}: {}",
                 key,
@@ -646,6 +652,23 @@ pub async fn get_semantic_field_groups_updated_at(org_id: &str) -> i64 {
         // No org-level setting found - using defaults (return 0 = epoch)
         0
     }
+}
+
+async fn evict_settings(keys: &[String]) -> Result<()> {
+    let local = async {
+        let mut cache = SYSTEM_SETTINGS.write().await;
+        for key in keys {
+            cache.remove(key);
+        }
+    };
+    let broadcast = async {
+        for key in keys {
+            let event_key = format!("{SYSTEM_SETTINGS_WATCHER_PREFIX}{key}");
+            infra::coordinator::emit_delete(&event_key).await?;
+        }
+        Ok(())
+    };
+    crate::teardown::evict(local, broadcast).await
 }
 
 async fn watch_events(mut events: Arc<tokio::sync::mpsc::Receiver<super::Event>>) -> Result<()> {

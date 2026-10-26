@@ -10,6 +10,8 @@
  * may need updates when Monaco version changes.
  */
 
+const { expect } = require('@playwright/test');
+
 class MonacoEditorHelper {
     /**
      * @param {import('@playwright/test').Page} page - Playwright page object
@@ -93,6 +95,32 @@ class MonacoEditorHelper {
     async setContent(container, content) {
         await this.clear(container);
         await this.page.keyboard.type(content);
+    }
+
+    /**
+     * Set content and confirm the editor model holds exactly it, retyping if the text did not replace what was there.
+     * @param {import('@playwright/test').Locator} container - Container locator
+     * @param {string} content - Content to set
+     * @param {number} timeout - Timeout in milliseconds (default 15000)
+     */
+    async setContentVerified(container, content, timeout = 15000) {
+        const editorCall = (action) => container.evaluate((node, act) => {
+            const editor = window.monaco?.editor?.getEditors?.().find((e) => node.contains(e.getDomNode()));
+            if (!editor) return null;
+            if (act === 'select-all') {
+                editor.focus();
+                editor.setSelection(editor.getModel().getFullModelRange());
+            }
+            return editor.getValue();
+        }, action);
+        // The keyboard select-all can miss the editor's input, so the selection goes through the editor; the text is still typed.
+        await expect.poll(async () => {
+            if ((await editorCall('read')) === content) return true;
+            await editorCall('select-all');
+            await this.page.keyboard.press('Backspace');
+            await this.page.keyboard.type(content);
+            return (await editorCall('read')) === content;
+        }, { timeout, intervals: [500, 1000, 2000] }).toBe(true);
     }
 
     /**

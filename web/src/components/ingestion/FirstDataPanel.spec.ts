@@ -48,6 +48,8 @@ vi.mock("@/composables/firstEvent/useFirstEventWatch", () => ({
       ...fake,
       scope: computed(() => "new-data"),
       sinceUs: computed(() => undefined),
+      targetExists: computed(() => true),
+      deciding: computed(() => false),
     };
   },
 }));

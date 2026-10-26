@@ -20,6 +20,7 @@ const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtu
 const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../../utils/cloud-auth.js');
+const { ingestBase } = require('../../utils/ingest-url.js');
 
 /**
  * How far back the seeded history goes. It has to sit OUTSIDE the window the
@@ -52,7 +53,7 @@ async function seedGauge(page, metric, { minutesAgo, points, stepSeconds, firstV
     value: firstValue + i,
   }));
 
-  const res = await page.request.post(`${baseUrl()}/api/${org()}/ingest/metrics/_json`, {
+  const res = await page.request.post(`${ingestBase(baseUrl())}/api/${org()}/ingest/metrics/_json`, {
     headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
     data: rows,
   });

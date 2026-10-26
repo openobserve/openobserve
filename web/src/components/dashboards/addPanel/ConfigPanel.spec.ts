@@ -182,6 +182,53 @@ describe("ConfigPanel", () => {
     });
   };
 
+  describe("state timeline options", () => {
+    it("shows the defaults for a fresh panel that has none of its keys, and writes on change", async () => {
+      const panelData = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          type: "state-timeline",
+          config: { ...mockDashboardPanelData.data.config },
+        },
+      };
+      wrapper = createWrapper({ dashboardPanelData: panelData });
+      await wrapper.vm.$nextTick();
+
+      const sort = wrapper.find('[data-test="dashboard-config-state-timeline-row-sort"]');
+      expect(sort.exists()).toBe(true);
+      expect(sort.attributes("data-test-selected-value")).toBe("name");
+      expect(wrapper.vm.showStateTextModel).toBe(true);
+      expect("show_state_text" in panelData.data.config).toBe(false);
+
+      wrapper.vm.showStateTextModel = false;
+      wrapper.vm.rowSortModel = "non_ok_time";
+      expect(panelData.data.config.show_state_text).toBe(false);
+      expect(panelData.data.config.row_sort).toBe("non_ok_time");
+    });
+
+    it("offers the tooltip mode, defaulting to this segment", async () => {
+      const panelData = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          type: "state-timeline",
+          config: { ...mockDashboardPanelData.data.config },
+        },
+      };
+      wrapper = createWrapper({ dashboardPanelData: panelData });
+      await wrapper.vm.$nextTick();
+
+      const mode = wrapper.find('[data-test="dashboard-config-state-timeline-tooltip-mode"]');
+      expect(mode.exists()).toBe(true);
+      expect(mode.attributes("data-test-selected-value")).toBe("segment");
+      expect("tooltip_mode" in panelData.data.config).toBe(false);
+
+      wrapper.vm.tooltipModeModel = "all_rows";
+      expect(panelData.data.config.tooltip_mode).toBe("all_rows");
+    });
+  });
+
   describe("focus=top-n deep link", () => {
     it("consumes the request, opens the Data section and focuses the Top N input", async () => {
       const panelData = {
@@ -1090,7 +1137,7 @@ describe("ConfigPanel", () => {
           parentValue: "other-locale",
         }),
       );
-      expect(options.some((o: any) => o.header)).toBe(false);
+      expect(options[0]).toEqual({ label: "Number", header: true });
     });
 
     it("saves a picked locale in the unit and leaves unit_custom alone", async () => {

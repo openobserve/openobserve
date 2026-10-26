@@ -208,6 +208,23 @@ pub async fn purge_orphans_with<C: ConnectionTrait>(
     Ok(result.rows_affected)
 }
 
+/// Remove every turn record of `org_id`, for the org's deletion; returns how many.
+pub async fn delete_by_org(org_id: &str) -> Result<u64, errors::Error> {
+    delete_by_org_with(get_orm_client_rw().await, org_id).await
+}
+
+pub async fn delete_by_org_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<u64, errors::Error> {
+    let result = Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(result.rows_affected)
+}
+
 /// Marked running and started after `stale_before` (older ones died without finishing).
 pub fn is_running(record: &Model, stale_before: i64) -> bool {
     record.status == TURN_RUNNING && record.started_at >= stale_before
@@ -519,6 +536,30 @@ mod tests {
         assert_eq!(list_for_session_with(&db, ORG, SID).await.unwrap().len(), 1);
         assert_eq!(
             list_for_session_with(&db, "other", "gone")
+                .await
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn org_delete_removes_every_turn_of_the_org_only() {
+        let db = db().await;
+        admit_with(&db, ORG, SID, "t1", 0, 10).await.unwrap();
+        admit_with(&db, ORG, SID, "t2", 5, 20).await.unwrap();
+        admit_with(&db, "other-org", SID, "t1", 0, 10)
+            .await
+            .unwrap();
+        assert_eq!(delete_by_org_with(&db, ORG).await.unwrap(), 2);
+        assert!(
+            list_for_session_with(&db, ORG, SID)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            list_for_session_with(&db, "other-org", SID)
                 .await
                 .unwrap()
                 .len(),

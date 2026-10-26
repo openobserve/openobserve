@@ -827,16 +827,12 @@ export default defineComponent({
     searchData() {
       this.autoRun.engine.requestRun("run");
 
-      analytics.track("Button Click", {
-        button: "Search Data",
-        user_org: this.store.state.selectedOrganization.identifier,
-        user_id: this.store.state.userInfo.email,
+      analytics.track("logs_search_run", {
         stream_name: this.searchObj.data.stream.selectedStream.join(","),
         show_query: this.searchObj.meta.showQuery,
         show_histogram: this.searchObj.meta.showHistogram,
-        sqlMode: this.searchObj.meta.sqlMode,
-        showFields: this.searchObj.meta.showFields,
-        page: "Search Logs",
+        sql_mode: this.searchObj.meta.sqlMode,
+        show_fields: this.searchObj.meta.showFields,
       });
     },
     async getMoreDataRecordsPerPage() {
@@ -857,14 +853,6 @@ export default defineComponent({
           this.searchObj.data.queryResults.aggs = null;
           await this.getJobData(false);
         }
-
-        analytics.track("Button Click", {
-          button: "Get More Data",
-          user_org: this.store.state.selectedOrganization.identifier,
-          user_id: this.store.state.userInfo.email,
-          stream_name: this.searchObj.data.stream.selectedStream.join(","),
-          page: "Search Logs",
-        });
       }
     },
     async getMoreData() {
@@ -890,12 +878,8 @@ export default defineComponent({
           }
         }
 
-        analytics.track("Button Click", {
-          button: "Get More Data",
-          user_org: this.store.state.selectedOrganization.identifier,
-          user_id: this.store.state.userInfo.email,
+        analytics.track("logs_more_rows_loaded", {
           stream_name: this.searchObj.data.stream.selectedStream.join(","),
-          page: "Search Logs",
         });
       }
     },
@@ -920,7 +904,6 @@ export default defineComponent({
         analytics.track("Button Click", {
           button: "Get Less Data",
           user_org: this.store.state.selectedOrganization.identifier,
-          user_id: this.store.state.userInfo.email,
           stream_name: this.searchObj.data.stream.selectedStream.join(","),
           page: "Search Logs",
         });
@@ -1162,7 +1145,11 @@ export default defineComponent({
     // Logs has no beforeunload guard; the URL is what restoreUrlQueryParams reads back after the language reload.
     const persistQueryForReload = async (): Promise<void> => {
       const query = generateURLQuery(false);
-      if (query.type === "search_history_re_apply" || query.type === "search_scheduler") {
+      if (
+        query.type === "search_history_re_apply" ||
+        query.type === "search_scheduler" ||
+        query.type === "rca_evidence_query"
+      ) {
         delete query.type;
       }
       await router.replace({ query });
@@ -1490,9 +1477,14 @@ export default defineComponent({
       return searchObj.meta.logsVisualizeToggle === "logs";
     }
 
-    // Search History and the AI chat only re-apply the query; the scheduler also runs it.
+    // Search History and the AI chat only re-apply the query; the scheduler and RCA
+    // evidence links also run it.
     const RE_APPLY_QUERY_TYPES = ["search_history_re_apply", "ai_chat_query"];
-    const URL_DRIVEN_QUERY_TYPES = [...RE_APPLY_QUERY_TYPES, "search_scheduler"];
+    const URL_DRIVEN_QUERY_TYPES = [
+      ...RE_APPLY_QUERY_TYPES,
+      "search_scheduler",
+      "rca_evidence_query",
+    ];
 
     const isRouteChanged = () => {
       // Not kept alive: this fresh mount never fires the type watchers, so the cached searchObj would bury the URL query (#14283).

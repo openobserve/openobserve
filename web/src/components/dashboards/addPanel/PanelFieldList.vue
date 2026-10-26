@@ -138,7 +138,8 @@
                   dashboardPanelData.data.type == 'h-stacked' ||
                   dashboardPanelData.data.type == 'scatter' ||
                   dashboardPanelData.data.type == 'area-stacked' ||
-                  dashboardPanelData.data.type == 'stacked'
+                  dashboardPanelData.data.type == 'stacked' ||
+                  dashboardPanelData.data.type == 'state-timeline'
                 "
                 variant="ghost-neutral"
                 size="chip"

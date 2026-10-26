@@ -603,6 +603,10 @@ fn admission_status(e: &infra::errors::Error) -> HecCollectorStatus {
         // Not an ingester, and a cloud trial that has run out, are both conditions
         // of the receiving side rather than of the batch.
         infra::errors::Error::TrialPeriodExpired => HecCollectorStatus::ServerBusy,
+        // Same answer the auth middleware gives a blocked org, for a block that lands mid-request.
+        infra::errors::Error::Ingestion(infra::errors::IngestionError::OrgBlocked(_)) => {
+            HecCollectorStatus::TokenDisabled
+        }
         infra::errors::Error::IngestionError(msg) if is_retryable_admission(msg) => {
             HecCollectorStatus::ServerBusy
         }
@@ -1004,6 +1008,14 @@ mod tests {
                 "{e:?}"
             );
         }
+    }
+
+    #[test]
+    fn a_blocked_org_admission_is_token_disabled() {
+        let e = infra::errors::Error::from(infra::errors::IngestionError::OrgBlocked(
+            "acme".to_string(),
+        ));
+        assert_eq!(admission_status(&e), HecCollectorStatus::TokenDisabled);
     }
 
     #[test]

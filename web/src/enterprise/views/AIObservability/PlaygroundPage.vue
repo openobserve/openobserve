@@ -328,6 +328,7 @@ import type { PromptConfig } from "@/services/llm-prompts.service";
 import onlineEvalsService, { type Provider, type Scorer } from "@/services/online-evals.service";
 import { entityId } from "@/enterprise/components/onlineEvals/utils/evalEntity";
 import llmDatasetsService, {
+  inputFieldVariables,
   type LlmDataset,
   type LlmDatasetItem,
 } from "@/services/llm-datasets.service";
@@ -359,6 +360,7 @@ import {
   snapshotPayload,
   starterDraft,
   variantLabel,
+  withSampledVars,
   type PlaygroundCell,
   type PlaygroundDraft,
   type PlaygroundResults,
@@ -1006,8 +1008,15 @@ async function resetVariant(variantId: string) {
 }
 
 function applySample(sample: PlaygroundSample, item: LlmDatasetItem, notify = true) {
-  draft.sample = sample;
-  draft.vars = { ...draft.vars, input: item.inputPreview || item.input };
+  // Object inputs also bind each top-level field, as the experiment runner does.
+  const fields = inputFieldVariables(item.rawInput);
+  draft.vars = withSampledVars(
+    draft.vars,
+    draft.sample?.fields ?? [],
+    fields,
+    item.inputPreview || item.input,
+  );
+  draft.sample = { ...sample, fields: Object.keys(fields) };
   draft.expectedSingle = item.expectedOutput;
   // New question ⇒ the answers on screen are answers to the old one.
   for (const key of Object.keys(results)) delete results[key];
@@ -1022,7 +1031,7 @@ function applySample(sample: PlaygroundSample, item: LlmDatasetItem, notify = tr
       message: t("aiObservability.playground.sampleApplied", {
         index: sample.index + 1,
         total: sample.total,
-        token: "{{input}}",
+        token: ["input", ...Object.keys(fields)].map((name) => `{{${name}}}`).join(", "),
       }),
     });
     // The toast fades; the flash on the two fields the values actually landed
@@ -1058,7 +1067,9 @@ async function stepSample(delta: number) {
   }
 }
 
+/** The row's field variables go with it: no later sample would know to drop them. */
 function clearSample() {
+  for (const name of draft.sample?.fields ?? []) delete draft.vars[name];
   draft.sample = null;
 }
 

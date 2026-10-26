@@ -83,15 +83,17 @@ fn create_org_users_table_statement() -> TableCreateStatement {
         .col(ColumnDef::new(OrgUsers::RumToken).string_len(256))
         .col(ColumnDef::new(OrgUsers::CreatedAt).big_integer().not_null())
         .col(ColumnDef::new(OrgUsers::UpdatedAt).big_integer().not_null())
-        .foreign_key(ForeignKey::create()
-            .name(ORG_USER_ORGANIZATION_FOREIGN_KEY)
-            .from(OrgUsers::Table, OrgUsers::OrgId)
-            .to(Organizations::Table, Organizations::Identifier)
+        .foreign_key(
+            ForeignKey::create()
+                .name(ORG_USER_ORGANIZATION_FOREIGN_KEY)
+                .from(OrgUsers::Table, OrgUsers::OrgId)
+                .to(Organizations::Table, Organizations::Identifier),
         )
-        .foreign_key(ForeignKey::create()
-            .name(ORG_USER_USER_FOREIGN_KEY)
-            .from(OrgUsers::Table, OrgUsers::Email)
-            .to(Users::Table, Users::Email)
+        .foreign_key(
+            ForeignKey::create()
+                .name(ORG_USER_USER_FOREIGN_KEY)
+                .from(OrgUsers::Table, OrgUsers::Email)
+                .to(Users::Table, Users::Email),
         )
         .to_owned()
 }

@@ -80,8 +80,13 @@ impl TryFrom<alerts::Model> for MetaAlert {
         let destinations: Vec<String> = serde_json::from_value(value.destinations)?;
         let recovery_destinations: Vec<String> = value
             .recovery_destinations
-            .map(serde_json::from_value)
-            .transpose()?
+            .map(|raw| serde_json::from_str(&raw))
+            .transpose()
+            .map_err(|e| {
+                errors::Error::Message(format!(
+                    "alert {id} has an invalid recovery_destinations value: {e}"
+                ))
+            })?
             .unwrap_or_default();
         let context_attributes: Option<HashMap<String, String>> = value
             .context_attributes
@@ -961,7 +966,7 @@ fn update_mutable_fields(
     let recovery_destinations = if alert.recovery_destinations.is_empty() {
         None
     } else {
-        Some(serde_json::to_value(alert.recovery_destinations)?)
+        Some(serde_json::to_string(&alert.recovery_destinations)?)
     };
     let keep_firing_for_seconds = alert.keep_firing_for;
 
@@ -1043,14 +1048,11 @@ fn update_mutable_fields(
     Ok(())
 }
 
-/// Deletes all alerts belonging to the given org.
-pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+/// Deletes all alerts of the org and returns their ids.
+pub async fn delete_by_org(org_id: &str) -> Result<Vec<String>, errors::Error> {
     let client = get_orm_client_rw().await;
-    alerts::Entity::delete_many()
-        .filter(alerts::Column::Org.eq(org_id))
-        .exec(client)
-        .await?;
-    Ok(())
+    let delete = alerts::Entity::delete_many().filter(alerts::Column::Org.eq(org_id));
+    Ok(super::delete_returning(client, delete, &[alerts::Column::Id]).await?)
 }
 
 #[derive(DeriveIden)]
@@ -1061,8 +1063,6 @@ enum Alerts {
 
 #[cfg(test)]
 pub(super) mod tests {
-    use svix_ksuid::KsuidLike as _;
-
     use super::*;
     use crate::table::entity::alerts::Model;
 

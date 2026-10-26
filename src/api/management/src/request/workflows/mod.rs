@@ -178,6 +178,14 @@ fn workflow_delete_outcome(published_exists: bool, draft_exists: bool) -> Workfl
     }
 }
 
+fn lookup_error(e: anyhow::Error) -> Response {
+    if e.downcast_ref::<db::workflows::NotFound>().is_some() {
+        MetaHttpResponse::not_found(e)
+    } else {
+        MetaHttpResponse::internal_error(e)
+    }
+}
+
 /// CreateWorkflow
 
 #[utoipa::path(
@@ -304,6 +312,7 @@ pub async fn save_workflow(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Vec<Object>),
         (status = 403, description = "The caller's workflow listing was refused", content_type = "application/json", body = ()),
+        (status = 404, description = "The folder does not exist", content_type = "application/json", body = ()),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -360,7 +369,7 @@ pub async fn list_workflows(
         match workflows::list_workflows(&org_id, permitted.clone(), folder, search_substring).await
         {
             Ok(workflows) => workflows,
-            Err(e) => return MetaHttpResponse::internal_error(e),
+            Err(e) => return lookup_error(e),
         };
 
     let mut ret = Vec::with_capacity(workflows.len());
@@ -392,7 +401,7 @@ pub async fn list_workflows(
 
     let drafts = match workflows::list_drafts(&org_id, permitted, folder).await {
         Ok(workflows) => workflows,
-        Err(e) => return MetaHttpResponse::internal_error(e),
+        Err(e) => return lookup_error(e),
     };
 
     // The draft rows come straight from the table rather than through the same
@@ -450,6 +459,7 @@ pub struct MoveWorkflowsRequestBody {
         (status = 200, description = "Moved"),
         (status = 400, description = "No workflow ids, too many ids, or an empty destination folder", content_type = "application/json", body = ()),
         (status = 403, description = "Forbidden"),
+        (status = 404, description = "A workflow or the destination folder does not exist", content_type = "application/json", body = ()),
         (status = 500, description = "Error", content_type = "application/json", body = Object),
     ),
     extensions(
@@ -514,7 +524,7 @@ pub async fn move_workflows(
         Ok(()) => MetaHttpResponse::ok("workflows moved"),
         Err(e) => {
             log::error!("[workflows] move_workflows: {e}");
-            MetaHttpResponse::internal_error(e)
+            lookup_error(e)
         }
     }
 }
@@ -611,6 +621,16 @@ pub async fn delete_workflows(
             }
         }
     } else {
+        let draft_exists = match workflows::get_draft_by_id(&org_id, &id).await {
+            Ok(v) => v.is_some(),
+            Err(e) => {
+                log::error!("error getting draft {org_id}/{id} before delete : {e}");
+                return MetaHttpResponse::internal_error(e);
+            }
+        };
+        if !draft_exists {
+            return MetaHttpResponse::bad_request("draft workflow with given id not found");
+        }
         match workflows::delete_draft(&org_id, &id).await {
             Ok(_) => MetaHttpResponse::ok("deleted successfully"),
             Err(e) => {
@@ -1085,8 +1105,8 @@ pub async fn get_workflow_history(
     }
 
     // Validate time range
-    if start_time >= end_time {
-        return MetaHttpResponse::bad_request("start_time must be before end_time");
+    if let Err(msg) = openobserve_api_common::request::validate_time_range(start_time, end_time) {
+        return MetaHttpResponse::bad_request(msg);
     }
 
     let trace_id = get_or_create_trace_id(req.headers(), &tracing::Span::current());
@@ -1314,6 +1334,14 @@ fn parse_workflow_history_key(key: &str) -> Option<(WorkflowTriggerType, String,
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn missing_folder_or_workflow_is_404_and_other_errors_stay_500() {
+        let missing = lookup_error(db::workflows::NotFound("folder not found: x".into()).into());
+        assert_eq!(missing.status(), StatusCode::NOT_FOUND);
+        let failed = lookup_error(anyhow::anyhow!("db down"));
+        assert_eq!(failed.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     #[test]
     fn history_key_parses_into_trigger_type_source_id_and_run_id() {

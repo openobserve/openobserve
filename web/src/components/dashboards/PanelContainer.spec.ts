@@ -15,6 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+import { ref } from "vue";
 import PanelContainer from "@/components/dashboards/PanelContainer.vue";
 import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
 import i18n from "@/locales";
@@ -23,6 +24,13 @@ import router from "@/test/unit/helpers/router";
 import config from "@/aws-exports";
 import { needsConfirmation, normalizePrefill } from "@/utils/alerts/alertPrefill";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
+import {
+  deletePanelDraft,
+  panelDraftKey,
+  panelDraftRevision,
+  writePanelDraft,
+} from "@/composables/dashboard/usePanelDraft";
+import { KIOSK_PANEL_HEALTH_KEY } from "@/composables/dashboard/useKioskRefresh";
 
 // Mock shortURL service
 vi.mock("@/services/short_url", () => ({
@@ -197,7 +205,7 @@ describe("PanelContainer", () => {
     }
   });
 
-  const createWrapper = (props = {}, extraStubs = {}) => {
+  const createWrapper = (props = {}, extraStubs = {}, provide = {}) => {
     return mount(PanelContainer, {
       props: {
         ...defaultProps,
@@ -205,6 +213,7 @@ describe("PanelContainer", () => {
       },
       global: {
         plugins: [i18n, store, router],
+        provide,
         stubs: {
           ODialog: ODialogStub,
           ChartRenderer: { template: '<div data-test="chart-renderer"></div>' },
@@ -447,6 +456,144 @@ describe("PanelContainer", () => {
         // Check if error message is in errorData ref
         expect(wrapper.vm.errorData).toBe(errorMessage);
       }
+    });
+  });
+
+  describe("Kiosk mode", () => {
+    const emitRendererError = async (error: unknown) => {
+      wrapper.findComponent({ name: "PanelSchemaRenderer" }).vm.$emit("error", error);
+      await wrapper.vm.$nextTick();
+    };
+
+    it("shows a failed panel loudly, with the error text inside the panel", async () => {
+      wrapper = createWrapper({ kiosk: true });
+      await emitRendererError({ message: "stream k8s_events not found", code: 404 });
+
+      const overlay = wrapper.find('[data-test="dashboard-panel-kiosk-error"]');
+      expect(overlay.exists()).toBe(true);
+      expect(overlay.text()).toContain("Panel failed to load");
+      expect(overlay.text()).toContain("stream k8s_events not found");
+      expect(wrapper.attributes("data-kiosk-failed")).toBe("true");
+    });
+
+    it("reduces a raw SQL parser error to one readable line", async () => {
+      wrapper = createWrapper({ kiosk: true });
+      await emitRendererError(
+        'Error# SQL error: ParserError("Expected: an SQL statement, found: SELEKT at Line: 1, Column: 1")\nstack line',
+      );
+
+      const summary = wrapper.find('[data-test="dashboard-panel-kiosk-error-summary"]');
+      expect(summary.text()).toBe(
+        "Query error: Expected: an SQL statement, found: SELEKT at Line: 1, Column: 1",
+      );
+      expect(summary.text()).not.toContain("ParserError");
+      expect(summary.text()).not.toContain("stack line");
+      // Wraps up to three lines in a narrow panel instead of cutting one line mid-word.
+      expect(summary.find(".line-clamp-3").exists()).toBe(true);
+      expect(summary.classes()).toContain("break-words");
+    });
+
+    it("keeps today's tooltip-only error outside kiosk", async () => {
+      wrapper = createWrapper();
+      await emitRendererError({ message: "stream k8s_events not found", code: 404 });
+
+      expect(wrapper.find('[data-test="dashboard-panel-kiosk-error"]').exists()).toBe(false);
+      expect(wrapper.attributes("data-kiosk-failed")).toBeUndefined();
+    });
+
+    it("reports its error and its recovery to the dashboard's health registry", async () => {
+      const registry = {
+        register: vi.fn(),
+        unregister: vi.fn(),
+        report: vi.fn(),
+        outage: ref(false),
+      };
+      wrapper = createWrapper(
+        { kiosk: true },
+        {},
+        { [KIOSK_PANEL_HEALTH_KEY as symbol]: registry },
+      );
+      const id = defaultProps.data.id;
+      expect(registry.register).toHaveBeenCalledWith(id);
+
+      await emitRendererError({ message: "502 Bad Gateway", code: 502 });
+      expect(registry.report).toHaveBeenLastCalledWith(id, {
+        message: "502 Bad Gateway",
+        code: 502,
+      });
+
+      await emitRendererError({ message: "", code: "" });
+      expect(registry.report).toHaveBeenLastCalledWith(id, { message: "", code: "" });
+      expect(wrapper.find('[data-test="dashboard-panel-kiosk-error"]').exists()).toBe(false);
+
+      wrapper.unmount();
+      expect(registry.unregister).toHaveBeenCalledWith(id);
+      wrapper = null;
+    });
+
+    it("hides the routine warning icons so only a failure draws the eye", async () => {
+      wrapper = createWrapper({ kiosk: true });
+      await emitRendererError({ message: "boom", code: 500 });
+      expect(wrapper.find('[data-test="panel-error-data"]').exists()).toBe(false);
+    });
+
+    it("dims the last render and marks it stale while the backend is unreachable", async () => {
+      const registry = {
+        register: vi.fn(),
+        unregister: vi.fn(),
+        report: vi.fn(),
+        outage: ref(false),
+      };
+      wrapper = createWrapper(
+        { kiosk: true },
+        {},
+        { [KIOSK_PANEL_HEALTH_KEY as symbol]: registry },
+      );
+      const body = () => wrapper.find('[data-test="dashboard-panel-body"]');
+      expect(wrapper.find('[data-test="dashboard-panel-kiosk-stale"]').exists()).toBe(false);
+      expect(body().classes()).not.toContain("opacity-60");
+
+      registry.outage.value = true;
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="dashboard-panel-kiosk-stale"]').text()).toBe("Stale");
+      expect(body().classes()).toContain("opacity-60");
+      expect(wrapper.find('[data-test="panel-schema-renderer"]').exists()).toBe(true);
+    });
+
+    it("shows a loading skeleton instead of an empty body until the first result or error", async () => {
+      wrapper = createWrapper({ kiosk: true });
+      wrapper.findComponent({ name: "PanelSchemaRenderer" }).vm.setNoData("No Data");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="dashboard-panel-kiosk-loading"]').exists()).toBe(true);
+
+      await emitRendererError({ message: "bad query", code: 400 });
+      expect(wrapper.find('[data-test="dashboard-panel-kiosk-loading"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-panel-kiosk-error"]').exists()).toBe(true);
+    });
+
+    it("keeps the skeleton through the first load only, never on later refreshes", async () => {
+      wrapper = createWrapper({ kiosk: true });
+      wrapper.findComponent({ name: "PanelSchemaRenderer" }).vm.setNoData("No Data");
+      const skeleton = () => wrapper.find('[data-test="dashboard-panel-kiosk-loading"]').exists();
+
+      wrapper.vm.handleLoadingStateChange(true);
+      await wrapper.vm.$nextTick();
+      expect(skeleton()).toBe(true);
+
+      wrapper.vm.handleLoadingStateChange(false);
+      await wrapper.vm.$nextTick();
+      expect(skeleton()).toBe(false);
+
+      wrapper.vm.handleLoadingStateChange(true);
+      await wrapper.vm.$nextTick();
+      expect(skeleton()).toBe(false);
+    });
+
+    it("never shows the skeleton outside kiosk", async () => {
+      wrapper = createWrapper();
+      wrapper.findComponent({ name: "PanelSchemaRenderer" }).vm.setNoData("No Data");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="dashboard-panel-kiosk-loading"]').exists()).toBe(false);
     });
   });
 
@@ -1391,6 +1538,24 @@ describe("PanelContainer", () => {
         await wrapper.vm.$nextTick();
 
         expect(wrapper.vm.confirmDeletePanelDialog).toBe(opens);
+      });
+
+      it.each([["kiosk"], ["viewOnly"]])("ignores every hover shortcut in %s", async (prop) => {
+        const routerPushSpy = vi.spyOn(router, "push");
+        wrapper = createWrapper({ [prop]: true });
+        wrapper.vm.isCurrentlyHoveredPanel = true;
+
+        for (const key of ["Delete", "Backspace", "d", "e", "v", "i"]) {
+          window.dispatchEvent(new KeyboardEvent("keydown", { key }));
+        }
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.vm.confirmDeletePanelDialog).toBe(false);
+        expect(wrapper.vm.showViewPanel).toBe(false);
+        expect(wrapper.emitted("onViewPanel")).toBeUndefined();
+        expect(toastMock).not.toHaveBeenCalled();
+        expect(routerPushSpy).not.toHaveBeenCalled();
+        routerPushSpy.mockRestore();
       });
     });
   });
@@ -2661,6 +2826,180 @@ describe("PanelContainer", () => {
       );
       await flushPromises();
       expect(wrapper.find('[data-test="errors-stub"]').text()).toBe("scan failed");
+    });
+  });
+
+  describe("Unsaved draft dot", () => {
+    const draftScope = {
+      userEmail: "me@x.io",
+      org: "test-org",
+      dashboardId: "test-dashboard-id",
+      panelId: "panel-1",
+    };
+    const seed = () =>
+      writePanelDraft(draftScope, {
+        tabId: "default-tab",
+        data: { ...mockPanelData, title: "Draft" },
+        layout: { currentQueryIndex: 0, vrlFunctionToggle: false },
+        sessionVariables: [],
+        variablesWithCurrentPanel: [],
+      });
+    // The menu renders open so the Edit Panel item and its dot are in the DOM.
+    const menuStubs = {
+      ODropdown: {
+        name: "ODropdown",
+        template: '<div class="o-dropdown-stub"><slot name="trigger" /><slot /></div>',
+      },
+      ODropdownItem: {
+        name: "ODropdownItem",
+        template:
+          '<div role="menuitem" v-bind="$attrs" @click="$emit(\'select\')"><slot name="icon-left" /><slot /><slot name="icon-right" /></div>',
+        emits: ["select"],
+      },
+      OTooltip: { template: "<slot />" },
+    };
+    const mountPanel = (props = {}) => createWrapper({ layoutMode: "view", ...props }, menuStubs);
+    const trigger = () => wrapper.find('[data-test="dashboard-edit-panel-Test Panel-dropdown"]');
+    const triggerDot = () => wrapper.find('[data-test="dashboard-panel-draft-dot"]');
+    const itemDot = () => wrapper.find('[data-test="dashboard-panel-edit-draft-dot"]');
+    const editItem = () => wrapper.find('[data-test="dashboard-edit-panel"]');
+
+    beforeEach(() => {
+      localStorage.clear();
+      (store.state as any).userInfo = { email: "me@x.io" };
+      store.state.printMode = false;
+    });
+
+    afterEach(() => {
+      store.state.printMode = false;
+    });
+
+    it("badges the panel menu trigger and names the draft in its accessible name", async () => {
+      seed();
+      wrapper = mountPanel();
+      await flushPromises();
+
+      expect(triggerDot().exists()).toBe(true);
+      expect(trigger().element.contains(triggerDot().element)).toBe(true);
+      expect(triggerDot().attributes("aria-hidden")).toBe("true");
+      expect(trigger().element.tagName).toBe("BUTTON");
+      expect(trigger().attributes("aria-label")).toBe("Panel actions · unsaved draft");
+    });
+
+    it("keeps the plain trigger name and no dots without a draft", async () => {
+      wrapper = mountPanel();
+      await flushPromises();
+
+      expect(triggerDot().exists()).toBe(false);
+      expect(itemDot().exists()).toBe(false);
+      expect(trigger().attributes("aria-label")).toBe("More actions");
+    });
+
+    it("marks Edit Panel with a labelled dot after its label", async () => {
+      seed();
+      wrapper = mountPanel();
+      await flushPromises();
+
+      expect(itemDot().exists()).toBe(true);
+      expect(itemDot().attributes("role")).toBe("img");
+      expect(itemDot().attributes("aria-label")).toBe("Unsaved changes in this browser");
+      const item = editItem().element;
+      expect(item.contains(itemDot().element)).toBe(true);
+      expect(item.textContent?.trim().startsWith("Edit Panel")).toBe(true);
+      expect(item.lastElementChild).toBe(itemDot().element);
+    });
+
+    it("Edit Panel keeps its normal behaviour and does not skip the restore dialog", async () => {
+      const routerPushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      seed();
+      wrapper = mountPanel();
+      await flushPromises();
+
+      await editItem().trigger("click");
+      await flushPromises();
+
+      expect(routerPushSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: "/dashboards/add_panel",
+          query: expect.objectContaining({ panelId: "panel-1" }),
+        }),
+      );
+      expect(routerPushSpy.mock.lastCall?.[0]).not.toHaveProperty("query.draft");
+      routerPushSpy.mockRestore();
+    });
+
+    it("follows drafts as they are written and deleted, including from another tab", async () => {
+      wrapper = mountPanel();
+      await flushPromises();
+      expect(triggerDot().exists()).toBe(false);
+
+      seed();
+      await flushPromises();
+      expect(triggerDot().exists()).toBe(true);
+      expect(itemDot().exists()).toBe(true);
+
+      deletePanelDraft(draftScope);
+      await flushPromises();
+      expect(triggerDot().exists()).toBe(false);
+      expect(itemDot().exists()).toBe(false);
+
+      // Another tab writes straight to storage; only its storage event reaches this one.
+      localStorage.setItem(
+        panelDraftKey(draftScope),
+        JSON.stringify({ v: 1, savedAt: Date.now(), data: {} }),
+      );
+      const before = panelDraftRevision.value;
+      window.dispatchEvent(new StorageEvent("storage", { key: panelDraftKey(draftScope) }));
+      expect(panelDraftRevision.value).toBe(before + 1);
+      await flushPromises();
+      expect(triggerDot().exists()).toBe(true);
+    });
+
+    it.each([
+      ["view only", { viewOnly: true }],
+      ["simplified panel view", { simplifiedPanelView: true }],
+      ["layout editing", { layoutMode: "edit" }],
+    ])("is hidden in %s", async (_label, props) => {
+      seed();
+      wrapper = mountPanel(props);
+      await flushPromises();
+
+      expect(triggerDot().exists()).toBe(false);
+      expect(itemDot().exists()).toBe(false);
+    });
+
+    it("is hidden in print mode", async () => {
+      seed();
+      store.state.printMode = true;
+      wrapper = mountPanel();
+      await flushPromises();
+
+      expect(triggerDot().exists()).toBe(false);
+      expect(trigger().attributes("aria-label")).toBe("More actions");
+    });
+
+    it("hides the trigger badge in full screen", async () => {
+      seed();
+      wrapper = mountPanel();
+      await flushPromises();
+
+      expect(triggerDot().classes()).toContain("in-[.fullscreen]:hidden");
+    });
+
+    it("paints both dots with the Refresh pending token and a soft halo of the same colour", async () => {
+      seed();
+      wrapper = mountPanel();
+      await flushPromises();
+
+      expect(triggerDot().classes()).toEqual(
+        expect.arrayContaining(["bg-button-pending-bg", "ring-3", "ring-button-pending-bg/30"]),
+      );
+      expect(itemDot().classes()).toEqual(
+        expect.arrayContaining(["bg-button-pending-bg", "ring-2", "ring-button-pending-bg/30"]),
+      );
+      for (const dot of [triggerDot(), itemDot()]) {
+        expect(dot.classes()).not.toContain("ring-badge-amber-ol-text");
+      }
     });
   });
 });

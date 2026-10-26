@@ -51,6 +51,15 @@ export const MAP_COLUMNS: Record<"pod" | "node", Record<string, string>> = {
   node: { ...LIST_COLUMNS.node },
 };
 
+// The overview variant reads only what "for 2h" on Needs attention is derived from.
+export const OVERVIEW_COLUMNS: Record<"pod" | "node", Record<string, string>> = {
+  pod: {
+    conditions: "json_get_json(body_object_status,'conditions')",
+    container_statuses: "json_get_json(body_object_status,'containerStatuses')",
+  },
+  node: { conditions: "json_get_json(body_object_status,'conditions')" },
+};
+
 const CREATED = "json_get_str(body_object_metadata,'creationTimestamp')";
 
 const OBJECT_LIST_LIMIT = 5000;
@@ -103,8 +112,13 @@ export function parseObjects(hits: any[]): ObjectRecord[] {
     const labels = h.labels == null ? undefined : json(h.labels);
     const conditions = h.conditions == null ? undefined : json(h.conditions);
     const nodeSelector = h.node_selector == null ? undefined : json(h.node_selector);
+    const containerStatuses = h.container_statuses == null ? undefined : json(h.container_statuses);
     // Malformed JSON means the object was not observed, never a crash.
-    if ([metadata, spec, status, labels, conditions, nodeSelector].includes(null)) continue;
+    if (
+      [metadata, spec, status, labels, conditions, nodeSelector, containerStatuses].includes(null)
+    ) {
+      continue;
+    }
     const object: K8sObject = {
       uid: h.uid || null,
       metadata: { ...metadata },
@@ -117,6 +131,7 @@ export function parseObjects(hits: any[]): ObjectRecord[] {
       object.spec.unschedulable = h.unschedulable === true || h.unschedulable === "true";
     if (nodeSelector !== undefined) object.spec.template = { spec: { nodeSelector } };
     if (conditions !== undefined) object.status.conditions = conditions;
+    if (containerStatuses !== undefined) object.status.containerStatuses = containerStatuses;
     if (h.last_schedule) object.status.lastScheduleTime = h.last_schedule;
     if (h.qos_class) object.status.qosClass = h.qos_class;
     out.push({

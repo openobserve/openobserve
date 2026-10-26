@@ -71,7 +71,7 @@ async fn tick(now: i64) -> Result<(), anyhow::Error> {
     let from = tick_from(load_last_tick(&key).await, now);
     let mut failed = false;
     for rows in cached {
-        for row in rows.iter().filter(|row| notify::sends_here(row, &region)) {
+        for row in rows.iter().filter(|row| sends_from_here(row, &region)) {
             failed |= !deliver_all(row, &due_in_org(&rows, row, from, now)).await;
         }
     }
@@ -79,6 +79,11 @@ async fn tick(now: i64) -> Result<(), anyhow::Error> {
         anyhow::bail!("some notifications could not be recorded; retrying from the same tick");
     }
     openobserve_core::kv::set(MIGRATION_ORG, &key, Bytes::from(now.to_string())).await
+}
+
+/// Blocked orgs send nothing; events due while blocked are dropped, not sent after a restore.
+fn sends_from_here(row: &Downtime, region: &str) -> bool {
+    notify::sends_here(row, region) && !db::org_status::is_blocked(&row.org)
 }
 
 async fn deliver_all(row: &Downtime, dues: &[DueEvent]) -> bool {
@@ -573,5 +578,24 @@ mod tests {
             ],
             "a follow-up cancelled before the end lets the parent end"
         );
+    }
+
+    #[test]
+    fn a_blocked_org_sends_nothing_until_it_is_restored() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+
+        let mut row = nightly();
+        row.org = "downtimes-notifier-blocked-org".to_string();
+        assert!(sends_from_here(&row, ""));
+        for status in [
+            OrgStatus::PendingDeletion,
+            OrgStatus::Deleting,
+            OrgStatus::Deleted,
+        ] {
+            ORG_STATUS_CACHE.insert(row.org.clone(), status.clone());
+            assert!(!sends_from_here(&row, ""), "{status:?}");
+        }
+        ORG_STATUS_CACHE.remove(&row.org);
+        assert!(sends_from_here(&row, ""), "a restored org sends again");
     }
 }

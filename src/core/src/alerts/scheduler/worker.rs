@@ -656,6 +656,12 @@ fn resolve_module_configs(
             lease_timeout_secs: None,
         },
         ModuleSchedulerConfig {
+            module: TriggerModule::FleetRollout,
+            concurrency: default_concurrency,
+            poll_interval_secs: default_interval,
+            lease_timeout_secs: None,
+        },
+        ModuleSchedulerConfig {
             module: TriggerModule::Report,
             concurrency: pick_concurrency(cfg.limit.scheduler_report_concurrency),
             poll_interval_secs: pick_interval(cfg.limit.scheduler_report_interval),
@@ -944,6 +950,13 @@ mod tests {
     }
 
     #[test]
+    fn claim_fenced_modules_keep_alive_only_their_own_claim() {
+        assert!(TriggerModule::FleetRollout.completes_by_claim());
+        assert!(TriggerModule::CompositeAlert.completes_by_claim());
+        assert!(!TriggerModule::Alert.completes_by_claim());
+    }
+
+    #[test]
     fn test_resolve_module_configs_covers_every_module_once() {
         // Every TriggerModule variant must get exactly one lane config, else its rows would
         // never be pulled once per-module pullers are enabled.
@@ -961,6 +974,7 @@ mod tests {
             TriggerModule::SloBackfill,
             TriggerModule::OncallEscalation,
             TriggerModule::AlertCalibration,
+            TriggerModule::FleetRollout,
         ];
         assert_eq!(configs.len(), all.len());
         let modules: std::collections::HashSet<_> =
