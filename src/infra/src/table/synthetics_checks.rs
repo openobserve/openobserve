@@ -13,17 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    sync::LazyLock,
-    time::{Duration, Instant},
-};
+use std::time::Duration;
 
-use config::{
-    RwHashMap,
-    meta::synthetics::{
-        BrowserConfig, ListSyntheticsParams, Synthetic, SyntheticAuth, SyntheticCookie,
-        SyntheticFrequency, SyntheticSettings, SyntheticStatus, SyntheticType, SyntheticVariable,
-    },
+use config::meta::synthetics::{
+    BrowserConfig, ListSyntheticsParams, Synthetic, SyntheticAuth, SyntheticCookie,
+    SyntheticFrequency, SyntheticSettings, SyntheticStatus, SyntheticType, SyntheticVariable,
 };
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter,
@@ -31,7 +25,10 @@ use sea_orm::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::entity::synthetics_checks::{self, ActiveModel, Column, Entity};
+use super::{
+    entity::synthetics_checks::{self, ActiveModel, Column, Entity},
+    ttl_cache::TtlCache,
+};
 use crate::errors;
 
 /// `org_id/synthetics_id` → the synthetic check **definition**, with load time.
@@ -48,8 +45,7 @@ use crate::errors;
 /// make the cache useless (they fire at the same rate as the reads it serves),
 /// so instead they deliberately do **not** invalidate — and callers that need
 /// scheduling or status state must use [`get`], `fetch_due` or `get_alert_state`.
-static SYNTHETIC_CACHE: LazyLock<RwHashMap<String, (Synthetic, Instant)>> =
-    LazyLock::new(Default::default);
+static SYNTHETIC_CACHE: TtlCache<Synthetic> = TtlCache::new(SYNTHETIC_CACHE_TTL);
 
 const SYNTHETIC_CACHE_TTL: Duration = Duration::from_secs(15);
 
@@ -207,15 +203,13 @@ pub async fn get_cached<C: ConnectionTrait>(
     id: &str,
 ) -> Result<Option<Synthetic>, errors::Error> {
     let key = synthetic_cache_key(org_id, id);
-    if let Some(entry) = SYNTHETIC_CACHE.get(&key)
-        && entry.1.elapsed() < SYNTHETIC_CACHE_TTL
-    {
-        return Ok(Some(entry.0.clone()));
+    if let Some(cached) = SYNTHETIC_CACHE.get(&key) {
+        return Ok(Some(cached));
     }
 
     let found = get(conn, org_id, id).await?;
     if let Some(synthetic) = &found {
-        SYNTHETIC_CACHE.insert(key, (synthetic.clone(), Instant::now()));
+        SYNTHETIC_CACHE.insert(key, synthetic.clone());
     }
     Ok(found)
 }

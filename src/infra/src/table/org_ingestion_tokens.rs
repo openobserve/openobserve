@@ -13,19 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    sync::LazyLock,
-    time::{Duration, Instant},
-};
+use std::time::Duration;
 
-use config::RwHashMap;
 use sea_orm::{
     ColumnTrait, EntityTrait, FromQueryResult, NotSet, Order, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect, Set, entity::prelude::*, sea_query::OnConflict,
 };
 use serde::{Deserialize, Deserializer, Serialize};
 
-use super::entity::org_ingestion_tokens::{ActiveModel, Column, Entity, Model};
+use super::{
+    entity::org_ingestion_tokens::{ActiveModel, Column, Entity, Model},
+    ttl_cache::TtlCache,
+};
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
@@ -48,9 +47,8 @@ pub const ORG_INGESTION_TOKEN_PREFIX: &str = "o2oi_";
 ///
 /// `None` is cached too, so an org with no enabled token does not re-query on
 /// every job.
-static DEFAULT_TOKEN_CACHE: LazyLock<
-    RwHashMap<String, (Option<OrgIngestionTokenRecord>, Instant)>,
-> = LazyLock::new(Default::default);
+static DEFAULT_TOKEN_CACHE: TtlCache<Option<OrgIngestionTokenRecord>> =
+    TtlCache::new(DEFAULT_TOKEN_CACHE_TTL);
 
 /// Backstop only. Cross-node invalidation arrives through the existing
 /// `/org_ingestion_tokens/` coordinator watch (see `db::org_ingestion_tokens::watch`),
@@ -73,10 +71,8 @@ pub fn invalidate_default_cache(org_id: &str) {
 pub async fn find_default_enabled(
     org_id: &str,
 ) -> Result<Option<OrgIngestionTokenRecord>, errors::Error> {
-    if let Some(entry) = DEFAULT_TOKEN_CACHE.get(org_id)
-        && entry.1.elapsed() < DEFAULT_TOKEN_CACHE_TTL
-    {
-        return Ok(entry.0.clone());
+    if let Some(cached) = DEFAULT_TOKEN_CACHE.get(org_id) {
+        return Ok(cached);
     }
 
     let client = get_orm_client_rw().await;
@@ -90,7 +86,7 @@ pub async fn find_default_enabled(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
         .map(OrgIngestionTokenRecord::from);
 
-    DEFAULT_TOKEN_CACHE.insert(org_id.to_string(), (record.clone(), Instant::now()));
+    DEFAULT_TOKEN_CACHE.insert(org_id.to_string(), record.clone());
     Ok(record)
 }
 
