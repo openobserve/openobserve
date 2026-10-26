@@ -150,6 +150,12 @@ describe("defaultFields", () => {
       expect(y[0].functionName).toBe("count");
     });
 
+    it("state-timeline: seeds the time x only, since a count is not a state", () => {
+      const { x, y } = buildDefaultBuilderFields("state-timeline", "logs", logsSchema, "logs");
+      expect(x).toHaveLength(1);
+      expect(y).toHaveLength(0);
+    });
+
     it("metric: seeds y only (no x-axis)", () => {
       const { x, y } = buildDefaultBuilderFields("metric", "logs", logsSchema, "logs");
       expect(x).toHaveLength(0);

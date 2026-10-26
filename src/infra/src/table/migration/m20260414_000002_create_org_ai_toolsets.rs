@@ -64,7 +64,11 @@ fn create_org_ai_toolsets_table_stmt() -> TableCreateStatement {
                 .not_null()
                 .primary_key(),
         )
-        .col(ColumnDef::new(OrgAiToolsets::Org).string_len(100).not_null())
+        .col(
+            ColumnDef::new(OrgAiToolsets::Org)
+                .string_len(100)
+                .not_null(),
+        )
         .col(
             ColumnDef::new(OrgAiToolsets::Name)
                 .string_len(256)

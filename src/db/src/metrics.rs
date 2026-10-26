@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use bytes::Bytes;
-use common::infra::config::METRIC_CLUSTER_LEADER;
+use common::infra::config::{METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP};
 use config::{cluster::LOCAL_NODE, meta::promql::ClusterLeader, utils::json};
 
 use crate as db;
@@ -51,6 +51,27 @@ pub async fn set_prom_cluster_leader(
             return Err(anyhow::anyhow!("Error updating cluster_leader: {}", e));
         }
     }
+    Ok(())
+}
+
+/// Drops the org's HA clusters from this node's maps first, so the leader job cannot rewrite them.
+pub async fn delete_by_org(org_id: &str) -> Result<(), anyhow::Error> {
+    let owned = format!("{org_id}/");
+    METRIC_CLUSTER_LEADER
+        .write()
+        .await
+        .retain(|cluster, _| !cluster.starts_with(&owned));
+    METRIC_CLUSTER_MAP
+        .write()
+        .await
+        .retain(|cluster, _| !cluster.starts_with(&owned));
+    db::delete_if_exists(
+        &format!("/metrics_members/{owned}"),
+        true,
+        db::NO_NEED_WATCH,
+    )
+    .await?;
+    db::delete_if_exists(&format!("/metrics_leader/{owned}"), true, db::NEED_WATCH).await?;
     Ok(())
 }
 

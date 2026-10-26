@@ -131,6 +131,14 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "focus-visible:ring-3 focus-visible:ring-button-warning-focus-ring",
     "disabled:opacity-60",
   ].join(" "),
+  // A stale result awaiting a re-run is not an alert, so it stays off the solid warning fill.
+  pending: [
+    "bg-button-pending-bg text-button-pending-text border border-button-pending-bg",
+    "enabled:hover:bg-button-pending-hover-bg enabled:hover:border-button-pending-hover-bg",
+    "enabled:active:bg-button-pending-active-bg enabled:active:border-button-pending-active-bg",
+    "focus-visible:ring-3 focus-visible:ring-button-pending-focus-ring",
+    "disabled:opacity-60",
+  ].join(" "),
   // Neutral ghost: inherits parent text color — used for compact inline action buttons
   // where no color accent is desired (e.g. field adder buttons +X +Y +B +F)
   "ghost-neutral": [
@@ -284,6 +292,31 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "enabled:hover:border-accent enabled:hover:text-accent enabled:hover:bg-button-ghost-hover-bg",
     "disabled:opacity-60",
   ].join(" "),
+  // tint-*: soft categorical badge fill for tiles that identify an entity by colour, e.g. a cluster code.
+  "tint-teal": [
+    "bg-badge-teal-soft-bg text-badge-teal-soft-text border-0",
+    "enabled:hover:brightness-95",
+    "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
+    "disabled:opacity-60",
+  ].join(" "),
+  "tint-purple": [
+    "bg-badge-purple-soft-bg text-badge-purple-soft-text border-0",
+    "enabled:hover:brightness-95",
+    "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
+    "disabled:opacity-60",
+  ].join(" "),
+  "tint-blue": [
+    "bg-badge-blue-soft-bg text-badge-blue-soft-text border-0",
+    "enabled:hover:brightness-95",
+    "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
+    "disabled:opacity-60",
+  ].join(" "),
+  "tint-orange": [
+    "bg-badge-orange-soft-bg text-badge-orange-soft-text border-0",
+    "enabled:hover:brightness-95",
+    "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
+    "disabled:opacity-60",
+  ].join(" "),
 };
 
 const disabledVariantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
@@ -300,6 +333,7 @@ const disabledVariantClasses: Record<NonNullable<ButtonProps["variant"]>, string
   "filter-exclude": "opacity-60",
   "ghost-warning": "opacity-60",
   warning: "opacity-60",
+  pending: "opacity-60",
   "ghost-neutral": "opacity-50",
   "outline-destructive": "opacity-50",
   "cancel-query": "opacity-60",
@@ -319,6 +353,10 @@ const disabledVariantClasses: Record<NonNullable<ButtonProps["variant"]>, string
   "outline-primary": "opacity-50",
   dashed: "opacity-50",
   "pricing-chip": "opacity-60",
+  "tint-teal": "opacity-60",
+  "tint-purple": "opacity-60",
+  "tint-blue": "opacity-60",
+  "tint-orange": "opacity-60",
 };
 
 const unavailableClasses = computed(() => {

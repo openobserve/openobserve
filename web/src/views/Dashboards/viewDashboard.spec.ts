@@ -14,8 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { writePanelDraft } from "@/composables/dashboard/usePanelDraft";
 import { shallowMount, flushPromises } from "@vue/test-utils";
-import { inject } from "vue";
+import { inject, type Ref } from "vue";
 import { DASHBOARD_FRESH_ON_OPEN } from "@/composables/dashboard/dashboardFreshOnOpen";
 // Comprehensive service mocks - these prevent real API calls
 vi.mock("@/services/dashboards", async (importOriginal) => {
@@ -59,6 +60,11 @@ vi.mock("@/services/reports", async (importOriginal) => {
     },
   });
 });
+
+vi.mock("@/services/health", () => ({
+  pingBackend: vi.fn().mockResolvedValue(true),
+  default: { pingBackend: vi.fn().mockResolvedValue(true) },
+}));
 
 vi.mock("@/services/short_url", () => ({
   default: {
@@ -115,6 +121,8 @@ const routeUpdateGuards: Array<(to: RouteLike, from: RouteLike) => unknown> = []
 // Mutable so a test can say what the previous history entry was; the back
 // button prefers real history over rebuilding the folder-scoped list route.
 const mockHistoryState: { back: string | null } = { back: null };
+// Extra query params a test wants on the route it mounts with (cleared before every test).
+const mockExtraRouteQuery: Record<string, string> = {};
 
 // Comprehensive Vue composable mocks
 vi.mock("vue-router", () => ({
@@ -145,7 +153,12 @@ vi.mock("vue-router", () => ({
   },
   useRoute: () => ({
     params: { dashboardId: "test-dashboard-1", folderId: "default" },
-    query: { dashboard: "test-dashboard-1", folder: "default", tab: "tab-1" },
+    query: {
+      dashboard: "test-dashboard-1",
+      folder: "default",
+      tab: "tab-1",
+      ...mockExtraRouteQuery,
+    },
     path: "/dashboard/test-dashboard-1",
   }),
 }));
@@ -292,6 +305,7 @@ describe("ViewDashboard", () => {
     global.mockRouterReplace.mockClear();
     global.mockRouterBack.mockClear();
     global.mockHistoryState.back = null;
+    Object.keys(mockExtraRouteQuery).forEach((key) => delete mockExtraRouteQuery[key]);
     global.mockStoreCommit.mockClear();
     global.mockStoreDispatch.mockClear();
     global.mockShowPositiveNotification.mockClear();
@@ -1921,6 +1935,38 @@ describe("ViewDashboard", () => {
       expect(has("dashboard-edit-badge")).toBe(false);
     });
 
+    it("marks Add panel with a dot while this dashboard has a new-panel draft", async () => {
+      localStorage.clear();
+      await mountDashboard();
+      expect(wrapper.vm.hasNewPanelDraft).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-panel-add"]').attributes("aria-label")).toBe(
+        "panel.add",
+      );
+
+      writePanelDraft(
+        { userEmail: "", org: "test-org", dashboardId: "test-dashboard-1" },
+        {
+          tabId: "tab-1",
+          data: {},
+          layout: { currentQueryIndex: 0, vrlFunctionToggle: false },
+          sessionVariables: [],
+          variablesWithCurrentPanel: [],
+        },
+      );
+      await flushPromises();
+      expect(wrapper.vm.hasNewPanelDraft).toBe(true);
+      // A button's children are presentational, so the draft state must be in the button's own name.
+      expect(wrapper.find('[data-test="dashboard-panel-add"]').attributes("aria-label")).toBe(
+        "dashboard.panelDraft.addPanelDot",
+      );
+
+      // The dot lives inside the Add panel button, which layout editing removes.
+      wrapper.vm.enterLayoutEdit();
+      await flushPromises();
+      expect(has("dashboard-panel-add")).toBe(false);
+      localStorage.clear();
+    });
+
     it("swaps the header actions when entering edit mode", async () => {
       await mountDashboard();
 
@@ -2322,6 +2368,383 @@ describe("ViewDashboard", () => {
         expect(mockSaveExecute).toHaveBeenCalledTimes(1);
         expect(wrapper.vm.isEditingLayout).toBe(true);
         expect(panelLayout().x).toBe(20);
+      });
+    });
+  });
+
+  describe("time range carried by a link", () => {
+    // A link with ?refresh= rewrites the URL on mount, before the dashboard (and its picker value) has loaded.
+    it.each(["1w", "15m", "2h", "7d", "1M"])(
+      "keeps period=%s when the link also sets a refresh interval",
+      async (period) => {
+        Object.assign(mockExtraRouteQuery, { period, refresh: "1m" });
+        let resolveDashboard: (value: unknown) => void = () => {};
+        vi.mocked(getDashboard).mockImplementationOnce(
+          () => new Promise((resolve) => (resolveDashboard = resolve)),
+        );
+        wrapper = createWrapper();
+        await flushPromises();
+
+        const rewrites = global.mockRouterReplace.mock.calls.map((call) => call[0]?.query);
+        expect(rewrites.length).toBeGreaterThan(0);
+        rewrites.forEach((query) => expect(query?.period).toBe(period));
+
+        resolveDashboard({
+          dashboardId: "test-dashboard-1",
+          title: "Test Dashboard",
+          variables: { list: [] },
+          defaultDatetimeDuration: { type: "relative", relativeTimePeriod: "15m" },
+          tabs: [{ tabId: "tab-1", name: "Tab 1", panels: [] }],
+        });
+        await flushPromises();
+        expect(wrapper.vm.selectedDate).toMatchObject({
+          valueType: "relative",
+          relativeTimePeriod: period,
+        });
+      },
+    );
+
+    it("keeps an absolute from/to when the link also sets a refresh interval", async () => {
+      Object.assign(mockExtraRouteQuery, {
+        from: "1700000000000",
+        to: "1700003600000",
+        refresh: "1m",
+      });
+      vi.mocked(getDashboard).mockImplementationOnce(() => new Promise(() => {}));
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const rewrites = global.mockRouterReplace.mock.calls.map((call) => call[0]?.query);
+      expect(rewrites.length).toBeGreaterThan(0);
+      rewrites.forEach((query) => {
+        expect(query?.from).toBe("1700000000000");
+        expect(query?.to).toBe("1700003600000");
+      });
+    });
+  });
+
+  describe("Kiosk / TV mode", () => {
+    const mountKiosk = async () => {
+      wrapper = createWrapper({
+        global: {
+          plugins: [i18n, store],
+          stubs: {
+            OPageLayout: {
+              name: "OPageLayout",
+              props: ["headerClass"],
+              template:
+                '<div><slot name="title" /><slot name="actions" /><slot name="actions-overflow" /><slot /></div>',
+            },
+            RenderDashboardCharts: {
+              name: "RenderDashboardCharts",
+              props: ["viewOnly", "kiosk", "fitToScreen", "showTabs", "readOnlySelectors"],
+              setup() {
+                return { applyLive: inject<Ref<boolean> | null>("dashboardAutoRun", null) };
+              },
+              template: '<div :data-apply-live="String(applyLive)" />',
+            },
+          },
+        },
+      });
+      await flushPromises();
+    };
+
+    afterEach(() => {
+      global.mockStoreState.kioskMode = false;
+    });
+
+    it("keeps the normal view unchanged: no strip, header shown, panels editable", async () => {
+      await mountKiosk();
+
+      expect(wrapper.vm.kioskMode).toBe(false);
+      expect(wrapper.findComponent({ name: "KioskStrip" }).exists()).toBe(false);
+      const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
+      expect(charts.props("viewOnly")).toBe(false);
+      expect(charts.props("kiosk")).toBe(false);
+      expect(charts.props("readOnlySelectors")).toBe(false);
+      expect(wrapper.findComponent({ name: "OPageLayout" }).props("headerClass")).toBe("shrink-0");
+    });
+
+    it("opens TV mode with a link that keeps the relative range and adds the chosen options", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      global.mockRouterPush.mockClear();
+
+      await wrapper.vm.enterKiosk({ refreshSeconds: 300, theme: "dark", fit: true });
+
+      expect(global.mockStoreDispatch).toHaveBeenCalledWith("setKioskMode", true);
+      expect(global.mockStoreCommit).toHaveBeenCalledWith("setThemeOverride", "dark");
+      expect(wrapper.vm.refreshInterval).toBe(300);
+      const { query } = global.mockRouterPush.mock.calls.at(-1)[0];
+      expect(query).toMatchObject({
+        dashboard: "test-dashboard-1",
+        tab: "tab-1",
+        kiosk: "true",
+        theme: "dark",
+        fit: "true",
+        refresh: "5m",
+      });
+      expect(query.print).toBeUndefined();
+      expect(query.from).toBeUndefined();
+    });
+
+    it("renders the read-only strip and view-only panels without the toolbar", async () => {
+      global.mockStoreState.kioskMode = true;
+      await mountKiosk();
+
+      expect(wrapper.findComponent({ name: "KioskStrip" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OPageLayout" }).props("headerClass")).toBe("hidden");
+      const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
+      expect(charts.props("viewOnly")).toBe(true);
+      expect(charts.props("kiosk")).toBe(true);
+      expect(charts.props("readOnlySelectors")).toBe(false);
+    });
+
+    it("passes the strip its countdown and loading state and exits when it asks to", async () => {
+      global.mockStoreState.kioskMode = true;
+      await mountKiosk();
+      global.mockRouterReplace.mockClear();
+
+      const strip = wrapper.findComponent({ name: "KioskStrip" });
+      expect(strip.props("loading")).toBe(wrapper.vm.arePanelsLoading);
+      expect(strip.props()).toHaveProperty("countdown");
+      expect(strip.props()).not.toHaveProperty("exitVisible");
+      strip.vm.$emit("exit");
+      await flushPromises();
+
+      expect(global.mockStoreDispatch).toHaveBeenCalledWith("setKioskMode", false);
+      expect(global.mockRouterReplace.mock.calls.at(-1)[0].query.kiosk).toBeUndefined();
+    });
+
+    it("keeps the tab bar on and applies variable changes live, since a wall has no Refresh button", async () => {
+      global.mockStoreState.kioskMode = true;
+      await mountKiosk();
+      const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
+      expect(charts.props("showTabs")).toBe(true);
+      expect(charts.attributes("data-apply-live")).toBe("true");
+      expect(wrapper.vm.isVariablesChanged).toBe(false);
+    });
+
+    it("lets Esc close an open variable dropdown without leaving TV mode", async () => {
+      global.mockStoreState.kioskMode = true;
+      wrapper = createWrapper();
+      await flushPromises();
+      global.mockStoreDispatch.mockClear();
+
+      const listbox = document.createElement("div");
+      listbox.setAttribute("role", "listbox");
+      document.body.appendChild(listbox);
+      // The dropdown closes itself on the same keypress, before the shortcut runs.
+      const closeFirst = () => listbox.remove();
+      document.addEventListener("keydown", closeFirst, { once: true });
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      await flushPromises();
+
+      expect(listbox.isConnected).toBe(false);
+      expect(global.mockStoreDispatch).not.toHaveBeenCalledWith("setKioskMode", false);
+    });
+
+    it("exits on the next Esc while a closed dropdown's trigger still has focus", async () => {
+      global.mockStoreState.kioskMode = true;
+      wrapper = createWrapper();
+      await flushPromises();
+      global.mockStoreDispatch.mockClear();
+
+      const trigger = document.createElement("button");
+      trigger.setAttribute("role", "combobox");
+      document.body.appendChild(trigger);
+      trigger.focus();
+      trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      await flushPromises();
+      trigger.remove();
+
+      expect(global.mockStoreDispatch).toHaveBeenCalledWith("setKioskMode", false);
+    });
+
+    it("keeps TV mode on Esc while typing in a text field", async () => {
+      global.mockStoreState.kioskMode = true;
+      wrapper = createWrapper();
+      await flushPromises();
+      global.mockStoreDispatch.mockClear();
+
+      const input = document.createElement("input");
+      document.body.appendChild(input);
+      input.focus();
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      await flushPromises();
+      input.remove();
+
+      expect(global.mockStoreDispatch).not.toHaveBeenCalledWith("setKioskMode", false);
+    });
+
+    it("restores the normal view's refresh on exit when TV mode was opened from the toolbar", async () => {
+      // The mock store is not reactive, so kiosk state is set up front.
+      global.mockStoreState.kioskMode = true;
+      wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.refreshInterval = 300;
+      await flushPromises();
+      await wrapper.vm.enterKiosk({ refreshSeconds: 30, theme: "current", fit: false });
+      expect(wrapper.vm.refreshInterval).toBe(30);
+      await flushPromises();
+      global.mockRouterReplace.mockClear();
+
+      await wrapper.vm.exitKiosk();
+      await flushPromises();
+
+      expect(wrapper.vm.refreshInterval).toBe(300);
+      const { query } = global.mockRouterReplace.mock.calls[0][0];
+      expect(query.kiosk).toBeUndefined();
+      expect(query.refresh).toBe("5m");
+    });
+
+    it("keeps the TV link's refresh on exit when the link was opened directly", async () => {
+      global.mockStoreState.kioskMode = true;
+      wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.refreshInterval = 30;
+      await flushPromises();
+      global.mockRouterReplace.mockClear();
+
+      await wrapper.vm.exitKiosk();
+      await flushPromises();
+
+      expect(wrapper.vm.refreshInterval).toBe(30);
+    });
+
+    it("exits on Esc back to the normal view with kiosk params removed", async () => {
+      global.mockStoreState.kioskMode = true;
+      wrapper = createWrapper();
+      await flushPromises();
+      global.mockRouterReplace.mockClear();
+
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      await flushPromises();
+
+      expect(global.mockStoreDispatch).toHaveBeenCalledWith("setKioskMode", false);
+      const { query } = global.mockRouterReplace.mock.calls.at(-1)[0];
+      expect(query.kiosk).toBeUndefined();
+      expect(query.theme).toBeUndefined();
+    });
+
+    it("never shows an invalid range in the strip before the picker resolves", async () => {
+      await mountKiosk();
+      wrapper.vm.selectedDate = { valueType: "absolute", startTime: null, endTime: null };
+      // The selectedDate watcher fills the range from the mocked picker, so the unresolved state is set after it.
+      await flushPromises();
+      wrapper.vm.currentTimeObj = {};
+      wrapper.vm.timeString = " Invalid date - Invalid date ";
+      expect(wrapper.vm.kioskTimeRange).toBe("");
+    });
+
+    it("leaves kiosk when the page is left", async () => {
+      global.mockStoreState.kioskMode = true;
+      wrapper = createWrapper();
+      await flushPromises();
+      global.mockStoreDispatch.mockClear();
+
+      routeLeaveGuards.at(-1)?.();
+
+      expect(global.mockStoreDispatch).toHaveBeenCalledWith("setKioskMode", false);
+    });
+
+    describe("TV playlist slide", () => {
+      const realParent = window.parent;
+      const postMessage = vi.fn();
+
+      beforeEach(() => {
+        postMessage.mockClear();
+        global.mockShowErrorNotification.mockClear();
+        global.mockRouterPush.mockClear();
+        global.mockRouterBack.mockClear();
+        global.mockStoreState.kioskMode = true;
+      });
+
+      afterEach(() => {
+        Object.defineProperty(window, "parent", { value: realParent, configurable: true });
+      });
+
+      const insideFrame = () =>
+        Object.defineProperty(window, "parent", { value: { postMessage }, configurable: true });
+
+      it("inside the player frame hides the strip and reports a deleted dashboard instead of leaving for the list", async () => {
+        insideFrame();
+        Object.assign(mockExtraRouteQuery, { kiosk: "true", embed: "true" });
+        vi.mocked(getDashboard).mockRejectedValueOnce({ response: { status: 404 }, message: "x" });
+        await mountKiosk();
+
+        expect(wrapper.findComponent({ name: "KioskStrip" }).exists()).toBe(false);
+        expect(postMessage).toHaveBeenCalledWith(
+          { source: "o2-tv-playlist", type: "missing", reason: "notFound" },
+          window.location.origin,
+        );
+        expect(global.mockShowErrorNotification).not.toHaveBeenCalled();
+        expect(global.mockRouterPush).not.toHaveBeenCalled();
+        expect(global.mockRouterBack).not.toHaveBeenCalled();
+      });
+
+      it("inside the player frame shows the tabs and pickers read-only", async () => {
+        insideFrame();
+        Object.assign(mockExtraRouteQuery, { kiosk: "true", embed: "true" });
+        await mountKiosk();
+
+        const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
+        expect(charts.props("readOnlySelectors")).toBe(true);
+        expect(charts.props("kiosk")).toBe(true);
+      });
+
+      it("reports a server error as a load failure so the player retries it", async () => {
+        insideFrame();
+        Object.assign(mockExtraRouteQuery, { kiosk: "true", embed: "true" });
+        vi.mocked(getDashboard).mockRejectedValueOnce({ response: { status: 502 }, message: "x" });
+        await mountKiosk();
+
+        expect(postMessage).toHaveBeenCalledWith(
+          { source: "o2-tv-playlist", type: "error" },
+          window.location.origin,
+        );
+        expect(global.mockShowErrorNotification).not.toHaveBeenCalled();
+      });
+
+      it("a normal kiosk link still shows the error and goes back to the list", async () => {
+        Object.assign(mockExtraRouteQuery, { kiosk: "true", embed: "true" });
+        vi.mocked(getDashboard).mockRejectedValueOnce({
+          response: { status: 404 },
+          message: "gone",
+        });
+        await mountKiosk();
+
+        expect(wrapper.findComponent({ name: "KioskStrip" }).exists()).toBe(true);
+        expect(global.mockShowErrorNotification).toHaveBeenCalled();
+      });
+
+      it("the page fallback keeps the playlist in the URL rewrite and shows the slide position", async () => {
+        Object.assign(mockExtraRouteQuery, {
+          kiosk: "true",
+          refresh: "5m",
+          playlist: "test-dashboard-1:default,d2:ops",
+          interval: "1m",
+          slide: "1",
+          tvpage: "1",
+        });
+        await mountKiosk();
+
+        const rewrites = global.mockRouterReplace.mock.calls.map((call) => call[0]?.query);
+        expect(rewrites.length).toBeGreaterThan(0);
+        rewrites.forEach((query) =>
+          expect(query).toMatchObject({
+            playlist: "test-dashboard-1:default,d2:ops",
+            interval: "1m",
+            slide: "1",
+            tvpage: "1",
+          }),
+        );
+        expect(wrapper.findComponent({ name: "KioskStrip" }).props("position")).toBe(
+          "dashboard.playlist.position",
+        );
+        expect(
+          wrapper.findComponent({ name: "RenderDashboardCharts" }).props("readOnlySelectors"),
+        ).toBe(true);
       });
     });
   });

@@ -24,7 +24,7 @@ use axum::{
     routing::{delete, get, patch, post, put},
 };
 use config::get_config;
-use openobserve_api_common::X_O2_ASSISTANT_SESSION_ID;
+use openobserve_api_common::{X_O2_ASSISTANT_SESSION_ID, X_O2_ASSISTANT_TURN_ID};
 use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
 #[cfg(feature = "profiling")]
 use openobserve_api_management::request::profiling;
@@ -51,14 +51,17 @@ use {
     audit::audit,
     axum::body::{Body, to_bytes},
     config::utils::time::now_micros,
-    o2_enterprise::enterprise::common::{
-        auditor::{AuditMessage, DelegatedAudit, Protocol, ResponseMeta},
-        config::get_config as get_o2_config,
+    o2_enterprise::enterprise::{
+        common::{
+            auditor::{AuditMessage, DelegatedAudit, Protocol, ResponseMeta},
+            config::get_config as get_o2_config,
+        },
+        fleet::opamp,
     },
     openobserve_api_common::auth::delegation::DelegatedCaller,
     openobserve_api_management::request::{
         ai, alert_calibration, annotation_queues, annotations, anomaly_detection, datasets,
-        discovery, domain_management, eval_jobs, experiments, gen_ai, keys, license, oncall,
+        discovery, domain_management, eval_jobs, experiments, fleet, gen_ai, keys, license, oncall,
         playground, prompts, providers, remote_tasks, score_configs, scorers, service_streams,
         workflows,
     },
@@ -77,8 +80,8 @@ use crate::{
             validator_proxy_url, validator_rum,
         },
         router::middlewares::{
-            blocked_orgs_middleware, ingest_rejections_middleware, password_policy_middleware,
-            root_only_middleware,
+            blocked_org_param, blocked_orgs_middleware, ingest_rejections_middleware,
+            password_policy_middleware, root_only_middleware,
         },
     },
 };
@@ -88,6 +91,10 @@ pub mod middlewares;
 pub mod openapi;
 
 use common::meta::http::ERROR_HEADER;
+
+/// How long a refused agent waits before reconnecting while fleet management is off.
+#[cfg(feature = "enterprise")]
+const FLEET_RETRY_AFTER_SECS: &str = "60";
 
 /// Create CORS layer for axum
 pub fn cors_layer() -> CorsLayer {
@@ -120,6 +127,7 @@ pub fn cors_layer() -> CorsLayer {
             header::HeaderName::from_static("x-openobserve-parent-id"),
             header::HeaderName::from_static("x-openobserve-sampling-priority"),
             X_O2_ASSISTANT_SESSION_ID,
+            X_O2_ASSISTANT_TURN_ID,
         ])
         // Restrict CORS to the configured web_url origin, plus any extra origins in
         // ZO_CORS_ALLOWED_ORIGINS (comma-separated).  mirror_request() + allow_credentials(true)
@@ -257,21 +265,24 @@ fn attach_mcp_www_authenticate(_org_id: &str, resp: Response) -> Response {
     resp
 }
 
-/// Whether the router bound `{org_id}` to a segment other than the one the auth layers check.
-async fn routed_org_differs(parts: &mut Parts) -> bool {
+/// Rejects missing organizations and disagreements between routing and auth.
+async fn validate_routed_org(parts: &mut Parts) -> Result<(), AuthError> {
     let Ok(params) = RawPathParams::from_request_parts(parts, &()).await else {
-        return false;
+        return Ok(());
     };
     let Some((_, routed_org)) = params.iter().find(|(name, _)| *name == "org_id") else {
-        return false;
+        return Ok(());
     };
-    // The nest strip drops an empty `{org_id}` segment from the URI: nothing to compare.
+    // The nest strip drops an empty `{org_id}` segment from the URI, so auth checks the next one.
     if routed_org.is_empty() {
-        return false;
+        return Err(AuthError::NotFound("Organization not found".to_string()));
     }
     let path_columns: Vec<&str> = routed_path(parts.uri.path()).split('/').collect();
     // The router hands over the decoded param, so compare it with the decoded segment.
-    !urlencoding::decode(org_from_path(&path_columns)).is_ok_and(|org| org == routed_org)
+    if !urlencoding::decode(org_from_path(&path_columns)).is_ok_and(|org| org == routed_org) {
+        return Err(AuthError::Forbidden("Unauthorized Access".to_string()));
+    }
+    Ok(())
 }
 
 /// Authentication middleware for API routes.
@@ -291,8 +302,8 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
     let (mut parts, body) = request.into_parts();
     let uri = req_data.uri.clone();
     // The auth layers check one org, so the handler must serve that same org.
-    if routed_org_differs(&mut parts).await {
-        return AuthError::Forbidden("Unauthorized Access".to_string()).into_response();
+    if let Err(error) = validate_routed_org(&mut parts).await {
+        return error.into_response();
     }
     let auth_info = match AuthExtractor::from_request_parts(&mut parts, &()).await {
         Ok(info) => info,
@@ -486,6 +497,19 @@ fn audited_path(uri: &Uri) -> String {
     path.strip_prefix('/').unwrap_or(path).to_string()
 }
 
+#[cfg(any(feature = "enterprise", test))]
+fn audit_org_and_next<'a>(path_columns: &[&'a str]) -> (&'a str, &'a str) {
+    let org = org_from_path(path_columns);
+    // Pointer equality finds the org's own slot even when an earlier segment has the same text.
+    let next = path_columns
+        .iter()
+        .position(|column| std::ptr::eq(*column, org))
+        .and_then(|at| path_columns.get(at + 1))
+        .copied()
+        .unwrap_or("");
+    (org, next)
+}
+
 /// A delegated `/ai/chat` is audited like a Slack `chat_stream` turn: no question text.
 #[cfg(feature = "enterprise")]
 fn delegated_chat_audit_body(
@@ -510,6 +534,12 @@ fn audit_body(method: &Method, path: &str, content_type: Option<&str>, body: Vec
     use base64::Engine as _;
     if is_secret_write(method, path) {
         return "[REDACTED: secret write]".to_string();
+    }
+    #[cfg(feature = "enterprise")]
+    if let Some(body) =
+        o2_enterprise::enterprise::fleet::audit::redact_config_write(method, path, &body)
+    {
+        return body;
     }
     if path.ends_with("/settings/logo") {
         return base64::engine::general_purpose::STANDARD.encode(&body);
@@ -606,23 +636,18 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
         &path
     };
 
+    let (audit_org, after_org) = audit_org_and_next(&path_columns);
+
     if get_o2_config().common.audit_enabled
-        && !(path_columns
-            .get(1)
-            .unwrap_or(&"")
-            .to_string()
-            .ends_with("_stream")
+        && !(after_org.ends_with("_stream")
             || path.ends_with("ai/chat_stream")
             || common::meta::ingestion_routes::is_ingestion_write(&http_method, ingestion_path))
     {
         let query_params = request.uri().query().unwrap_or("").to_string();
-        let org_id = {
-            let org = path_columns.first().unwrap_or(&"");
-            if org.eq(&"organizations") {
-                "".to_string()
-            } else {
-                org.to_string()
-            }
+        let org_id = if audit_org == "organizations" {
+            String::new()
+        } else {
+            audit_org.to_string()
         };
 
         let user_email = request
@@ -1057,6 +1082,7 @@ fn alert_calibration_routes(router: Router) -> Router {
         .route("/v2/{org_id}/alert_calibration/digests/run", post(alert_calibration::digests::run_alert_calibration))
 }
 
+#[rustfmt::skip]
 pub fn service_routes() -> Router {
     let cfg = get_config();
 
@@ -1108,6 +1134,7 @@ pub fn service_routes() -> Router {
         .route("/organizations", get(organization::org::organizations).post(organization::org::create_org))
         .route("/{org_id}/organizations/assume_service_account", post(organization::assume_service_account::assume_service_account))
         .route("/{org_id}/org_cleanup_tasks/{target_org_id}", get(organization::org::list_org_cleanup_tasks))
+        .route("/{org_id}/org_cleanup_tasks/{target_org_id}/retry", post(organization::org::retry_org_cleanup))
         .route(
             "/{org_id}/organizations/{target_org_id}/resurrect",
             post(organization::org::resurrect_org_deletion),
@@ -1183,6 +1210,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/{stream_name}/profiles/tag_values", get(profiles_query::get_profiles_tag_values))
         .route("/{org_id}/{stream_name}/profiles/series", get(profiles_query::profiles_series_get).post(profiles_query::profiles_series))
         .route("/{org_id}/{stream_name}/profiles/merge", get(profiles_query::merge_profiles_get).post(profiles_query::merge_profiles))
+        .route("/{org_id}/{stream_name}/profiles/diff", post(profiles_query::diff_profiles))
 
         // Database Monitoring — its own top-level module, not under /traces.
         // The path segment must stay `db_monitoring` to match the OFGA resource
@@ -1346,7 +1374,14 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/incidents/external-alerts/{external_alert_id}/payload", get(alerts::incidents::get_external_alert_payload))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}", get(alerts::incidents::get_incident))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca", post(alerts::incidents::trigger_incident_rca).delete(alerts::incidents::cancel_incident_rca))
-        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/history", get(alerts::incidents::get_incident_rca_history))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs", get(alerts::incidents::list_incident_rca_runs))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/live_stream", get(alerts::incidents::get_incident_rca_live_stream))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}", get(alerts::incidents::get_incident_rca_run))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/thread", get(alerts::incidents::get_incident_rca_thread))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/steer", post(alerts::incidents::steer_incident_rca_run))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/steering", get(alerts::incidents::get_incident_rca_steering))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/resume", post(alerts::incidents::resume_incident_rca_run))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/summary", get(alerts::incidents::get_incident_rca_summary))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/update", patch(alerts::incidents::update_incident))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events", get(alerts::incidents::get_incident_events))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events/comment", post(alerts::incidents::post_incident_comment))
@@ -1677,7 +1712,7 @@ pub fn service_routes() -> Router {
 
     #[cfg(feature = "enterprise")]
     {
-        router = router
+        router = fleet_routes(router)
             // Search jobs
             .route("/{org_id}/search_jobs", get(search::search_job::list_status).post(search::search_job::submit_job))
             .route("/{org_id}/search_jobs/{job_id}", get(search::search_job::get_status).delete(search::search_job::delete_job))
@@ -2165,6 +2200,10 @@ fn oncall_routes(router: Router) -> Router {
             get(oncall::get_resolved_schedule),
         )
         .route(
+            "/{org_id}/oncall/teams/{team_id}/resolved-schedule/preview",
+            post(oncall::preview_resolved_schedule),
+        )
+        .route(
             "/{org_id}/oncall/teams/{team_id}/policy",
             get(oncall::get_policy).put(oncall::set_policy),
         )
@@ -2329,6 +2368,141 @@ fn oncall_routes(router: Router) -> Router {
         )
 }
 
+// Private and before the next `pub fn`, so the ROUTE_PERMISSIONS router scrape still reads it.
+#[cfg(feature = "enterprise")]
+fn fleet_routes(router: Router) -> Router {
+    router.merge(fleet_router())
+}
+
+// Its own router, so the gate layer covers exactly the fleet routes.
+#[cfg(feature = "enterprise")]
+fn fleet_router() -> Router {
+    Router::new()
+        .route("/{org_id}/v1/opamp", get(opamp::serve).post(opamp::serve))
+        .route("/{org_id}/fleet/collectors", get(fleet::list_collectors))
+        .route(
+            "/{org_id}/fleet/collectors/{id}",
+            get(fleet::get_collector)
+                .patch(fleet::rename_collector)
+                .delete(fleet::delete_collector),
+        )
+        .route(
+            "/{org_id}/fleet/collectors/{id}/restart",
+            post(fleet::restart_collector),
+        )
+        .route(
+            "/{org_id}/fleet/collectors/{id}/redeliver",
+            post(fleet::redeliver_collector),
+        )
+        .route(
+            "/{org_id}/fleet/fleets",
+            get(fleet::list_fleets).post(fleet::create_fleet),
+        )
+        .route("/{org_id}/fleet/fleets/move", post(fleet::move_collectors))
+        .route(
+            "/{org_id}/fleet/fleets/{fleet_id}",
+            get(fleet::get_fleet)
+                .patch(fleet::rename_fleet)
+                .delete(fleet::delete_fleet),
+        )
+        .route(
+            "/{org_id}/fleet/fleets/{fleet_id}/settings",
+            get(fleet::get_fleet_settings).put(fleet::put_fleet_settings),
+        )
+        .route(
+            "/{org_id}/fleet/fleets/{fleet_id}/desired",
+            put(fleet::set_desired),
+        )
+        .route(
+            "/{org_id}/fleet/fleets/{fleet_id}/desired/preview",
+            post(fleet::preview_desired),
+        )
+        .route(
+            "/{org_id}/fleet/tokens",
+            get(fleet::list_tokens).post(fleet::create_token),
+        )
+        .route(
+            "/{org_id}/fleet/tokens/{id}/revoke",
+            post(fleet::revoke_token),
+        )
+        .route(
+            "/{org_id}/fleet/configs",
+            get(fleet::list_configs).post(fleet::create_config),
+        )
+        .route(
+            "/{org_id}/fleet/configs/validate",
+            post(fleet::validate_config),
+        )
+        .route(
+            "/{org_id}/fleet/configs/{id}",
+            get(fleet::get_config).delete(fleet::delete_config),
+        )
+        .route(
+            "/{org_id}/fleet/configs/{id}/draft",
+            put(fleet::save_config_draft),
+        )
+        .route(
+            "/{org_id}/fleet/configs/{id}/versions",
+            post(fleet::publish_config_version),
+        )
+        .route(
+            "/{org_id}/fleet/configs/{id}/versions/{version}",
+            get(fleet::get_config_version),
+        )
+        .route("/{org_id}/fleet/rollouts", get(fleet::list_rollouts))
+        .route("/{org_id}/fleet/rollouts/{id}", get(fleet::get_rollout))
+        .route(
+            "/{org_id}/fleet/rollouts/{id}/resume",
+            post(fleet::resume_rollout),
+        )
+        .route(
+            "/{org_id}/fleet/rollouts/{id}/skip",
+            post(fleet::skip_rollout),
+        )
+        .route(
+            "/{org_id}/fleet/rollouts/{id}/rollback",
+            post(fleet::rollback_rollout),
+        )
+        .route("/{org_id}/fleet/summary", get(fleet::summary))
+        .route("/{org_id}/fleet/pipelines", get(fleet::get_pipelines))
+        .route("/{org_id}/fleet/audit", get(fleet::list_audit))
+        .route(
+            "/{org_id}/fleet/settings",
+            get(fleet::get_settings).put(fleet::update_settings),
+        )
+        .route_layer(middleware::from_fn(fleet_gate))
+}
+
+/// §17: with `O2_FLEET_ENABLED` off, OpAMP answers 503 and management reads work but writes do not.
+#[cfg(feature = "enterprise")]
+async fn fleet_gate(request: Request, next: Next) -> Response {
+    if openobserve_core::fleet::enabled() || request.method() == Method::GET && !is_opamp(&request)
+    {
+        return next.run(request).await;
+    }
+    let mut response = (
+        StatusCode::SERVICE_UNAVAILABLE,
+        "fleet management is disabled",
+    )
+        .into_response();
+    if is_opamp(&request) {
+        response.headers_mut().insert(
+            header::RETRY_AFTER,
+            header::HeaderValue::from_static(FLEET_RETRY_AFTER_SECS),
+        );
+    }
+    response
+}
+
+#[cfg(feature = "enterprise")]
+fn is_opamp(request: &Request) -> bool {
+    request
+        .uri()
+        .path()
+        .trim_end_matches('/')
+        .ends_with("/v1/opamp")
+}
+
 /// Slack install and settings routes (section 7.2); the paths match the ENT `SLACK_ROUTE_ROWS`.
 #[rustfmt::skip]
 pub fn slack_routes() -> Router {
@@ -2370,6 +2544,7 @@ pub fn other_service_routes() -> Router {
             "/{org_id}/{stream_name}/_kinesis_firehose",
             post(logs::ingest::handle_kinesis_request),
         )
+        .route_layer(middleware::from_fn(blocked_org_param))
         .layer(middleware::from_fn(aws_auth_middleware))
         .layer(RequestDecompressionLayer::new());
 
@@ -2378,6 +2553,7 @@ pub fn other_service_routes() -> Router {
             "/{org_id}/{stream_name}/_sub",
             post(logs::ingest::handle_gcp_request),
         )
+        .route_layer(middleware::from_fn(blocked_org_param))
         .layer(middleware::from_fn(gcp_auth_middleware))
         .layer(RequestDecompressionLayer::new());
 
@@ -2385,6 +2561,7 @@ pub fn other_service_routes() -> Router {
         .route("/v1/{org_id}/logs", post(rum::ingest::log))
         .route("/v1/{org_id}/replay", post(rum::ingest::sessionreplay))
         .route("/v1/{org_id}/rum", post(rum::ingest::data))
+        .route_layer(middleware::from_fn(blocked_org_param))
         .layer(middleware::from_fn(RumExtraData::extractor_middleware))
         .layer(middleware::from_fn(rum_auth_middleware))
         .layer(RequestDecompressionLayer::new());
@@ -2430,7 +2607,9 @@ pub fn splunk_collector_routes() -> Router {
         .layer(RequestDecompressionLayer::new())
         // Outermost, so the 10 MiB cap is measured on the wire before any
         // decompression can amplify an unauthenticated body.
-        .layer(middleware::from_fn(hec_collector::wire_body_limit_middleware))
+        .layer(middleware::from_fn(
+            hec_collector::wire_body_limit_middleware,
+        ))
         .layer(middleware::from_fn(ingest_rejections_middleware))
 }
 
@@ -3059,8 +3238,8 @@ mod tests {
     async fn the_routed_org_must_be_the_org_the_auth_layers_check() {
         async fn guard(request: axum::extract::Request, next: Next) -> Response {
             let (mut parts, body) = request.into_parts();
-            if routed_org_differs(&mut parts).await {
-                return StatusCode::FORBIDDEN.into_response();
+            if let Err(error) = validate_routed_org(&mut parts).await {
+                return error.into_response();
             }
             next.run(Request::from_parts(parts, body)).await
         }
@@ -3088,12 +3267,27 @@ mod tests {
                 .layer(middleware::from_fn(guard)),
         );
         for (uri, expected) in [
-            ("/api//kv/note", StatusCode::OK),
+            ("/api//kv/note", StatusCode::NOT_FOUND),
             ("/api/acme/kv/note", StatusCode::OK),
         ] {
             let request = Request::get(uri).body(Body::empty()).unwrap();
             let status = nested.clone().oneshot(request).await.unwrap().status();
             assert_eq!(status, expected, "{uri}");
+        }
+    }
+
+    #[test]
+    fn a_v2_request_is_audited_under_the_org_it_serves() {
+        for (path, org, next) in [
+            ("v2/acme/alerts/a1", "acme", "alerts"),
+            ("v2/v2/folders/alerts", "v2", "folders"),
+            ("v2/acme/_search_stream", "v2", "acme"),
+            ("acme/_search_stream", "acme", "_search_stream"),
+            ("organizations", "organizations", ""),
+            ("", "", ""),
+        ] {
+            let columns: Vec<&str> = path.split('/').collect();
+            assert_eq!(audit_org_and_next(&columns), (org, next), "{path}");
         }
     }
 
@@ -4185,6 +4379,47 @@ mod tests {
         assert!(is_origin_allowed(b"https://any.origin.com", ""));
     }
 
+    #[tokio::test]
+    async fn test_cors_preflight_allows_assistant_chat_headers() {
+        // One header missing from the allow-list fails the preflight and the POST is never sent.
+        let app = Router::new()
+            .route(
+                "/default/ai/chat_stream",
+                axum::routing::post(|| async { "ok" }),
+            )
+            .layer(cors_layer());
+        let req = Request::builder()
+            .method(Method::OPTIONS)
+            .uri("/default/ai/chat_stream")
+            .header(header::ORIGIN, "http://localhost:8081")
+            .header(header::ACCESS_CONTROL_REQUEST_METHOD, "POST")
+            .header(
+                header::ACCESS_CONTROL_REQUEST_HEADERS,
+                "content-type,traceparent,x-o2-assistant-session-id,x-o2-assistant-turn-id",
+            )
+            .body(Body::empty())
+            .unwrap();
+
+        let response = app.oneshot(req).await.unwrap();
+        let allowed = response
+            .headers()
+            .get(header::ACCESS_CONTROL_ALLOW_HEADERS)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        for name in [
+            "content-type",
+            "traceparent",
+            X_O2_ASSISTANT_SESSION_ID.as_str(),
+            X_O2_ASSISTANT_TURN_ID.as_str(),
+        ] {
+            assert!(
+                allowed.split(',').any(|h| h.trim() == name),
+                "{name} missing from access-control-allow-headers: {allowed}"
+            );
+        }
+    }
+
     #[test]
     fn mcp_www_authenticate_skips_non_401() {
         let uri: Uri = "/default/mcp".parse().unwrap();
@@ -4398,6 +4633,86 @@ mod tests {
         assert_eq!(post.status(), StatusCode::METHOD_NOT_ALLOWED);
     }
 
+    #[tokio::test]
+    async fn rca_steer_route_refuses_put_and_delete() {
+        const STEER_PATH: &str =
+            "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/steer";
+        assert!(
+            service_routes_registrations().contains(&format!(
+                r#".route("{STEER_PATH}",post(alerts::incidents::steer_incident_rca_run))"#
+            )),
+            "the steer path must be registered in service_routes() for POST only"
+        );
+        let app = Router::new().route(STEER_PATH, post(alerts::incidents::steer_incident_rca_run));
+        for method in ["PUT", "DELETE"] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method(method)
+                        .uri("/v2/myorg/alerts/incidents/inc1/rca/runs/run1/steer")
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                response.status(),
+                StatusCode::METHOD_NOT_ALLOWED,
+                "{method}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn rca_resume_route_takes_only_post() {
+        const RESUME_PATH: &str =
+            "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/resume";
+        let registrations = service_routes_registrations();
+        assert!(
+            registrations.contains(&format!(
+                r#".route("{RESUME_PATH}",post(alerts::incidents::resume_incident_rca_run))"#
+            )),
+            "the resume path must be registered in service_routes() for POST only"
+        );
+
+        let app = Router::new().route(
+            RESUME_PATH,
+            post(alerts::incidents::resume_incident_rca_run),
+        );
+        for (method, uri) in [
+            (
+                "GET",
+                "/v2/myorg/alerts/incidents/inc1/rca/runs/run1/resume",
+            ),
+            (
+                "PUT",
+                "/v2/myorg/alerts/incidents/inc1/rca/runs/run1/resume",
+            ),
+            (
+                "DELETE",
+                "/v2/myorg/alerts/incidents/inc1/rca/runs/run1/resume",
+            ),
+        ] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method(method)
+                        .uri(uri)
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                response.status(),
+                StatusCode::METHOD_NOT_ALLOWED,
+                "{method} {uri}"
+            );
+        }
+    }
+
     fn node_request(user_id: &str) -> Request<Body> {
         Request::builder()
             .uri("/metrics")
@@ -4530,7 +4845,8 @@ mod tests {
             "GET /v2/{org_id}/alerts/incidents/stats",
             "GET /v2/{org_id}/alerts/incidents/{incident_id}",
             "GET /v2/{org_id}/alerts/incidents/{incident_id}/events",
-            "GET /v2/{org_id}/alerts/incidents/{incident_id}/rca/history",
+            "GET /v2/{org_id}/alerts/incidents/{incident_id}/rca/runs",
+            "GET /v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}",
             "GET /v2/{org_id}/alerts/tags",
             "GET /v2/{org_id}/alerts/{alert_id}",
             "GET /v2/{org_id}/alerts/{alert_id}/groups",

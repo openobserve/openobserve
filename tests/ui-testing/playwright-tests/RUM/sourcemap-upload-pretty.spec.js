@@ -50,6 +50,7 @@ const AUTH_HEADER = basicAuthHeader(email, password);
 
 const FIXTURE_DIR = path.resolve(__dirname, '../../fixtures/sourcemaps');
 const manifest = require(path.join(FIXTURE_DIR, 'manifest.json'));
+const { ingestBase } = require('../utils/ingest-url.js');
 
 const RUN_ID = Date.now();
 // Unique per run: duplicate uploads are rejected by the backend, so a stable
@@ -124,7 +125,7 @@ async function uploadFixtureGroup(page, service, buffer = zipBuffer) {
 
 /** Ingest events into _rumdata and wait until they are searchable. */
 async function ingestFixtureErrors(page, events, service) {
-  const res = await page.request.post(`${BASE}/api/${ORG}/_rumdata/_json`, {
+  const res = await page.request.post(`${ingestBase(BASE)}/api/${ORG}/_rumdata/_json`, {
     headers: { Authorization: AUTH_HEADER, 'Content-Type': 'application/json' },
     data: events,
   });

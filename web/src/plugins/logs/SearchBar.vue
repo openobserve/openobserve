@@ -1140,15 +1140,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-cy="search-bar-refresh-button"
                 :data-run-pending="showRunQueryPending ? 'true' : undefined"
                 :aria-label="showRunQueryPending ? t('search.runQueryPendingLabel') : undefined"
-                :variant="showRunQueryPending ? 'warning' : 'primary'"
+                :variant="showRunQueryPending ? 'pending' : 'primary'"
                 :title="t('search.runQuery')"
                 size="sm-toolbar"
                 class="element-box-shadow rounded-s-default! relative h-[1.875rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
-                :class="
+                :class="[
                   showRunQueryPending
                     ? ''
-                    : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md'
-                "
+                    : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
+                  showRunQueryPending ? 'border-e-button-pending-hover-bg!' : '',
+                ]"
                 @click="handleRunQueryFn()"
                 :loading="searchObj.loading || searchObj.loadingHistogram"
                 :disabled="
@@ -1174,11 +1175,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 {{ t("search.runQuery") }}
               </OButton>
-              <OSeparator class="h-[1.875rem]! w-px" vertical />
+              <OSeparator
+                v-if="!showRunQueryPending || isRunQueryCancelShown"
+                class="h-[1.875rem]! w-px"
+                vertical
+              />
               <ODropdown align="end" side="bottom">
                 <template #trigger>
                   <OButton
-                    :variant="showRunQueryPending && !isRunQueryCancelShown ? 'warning' : 'ghost'"
+                    :variant="showRunQueryPending && !isRunQueryCancelShown ? 'pending' : 'ghost'"
                     size="icon-xs"
                     :aria-label="t('search.refreshCacheAndRunQuery')"
                     data-test="logs-search-bar-refresh-cache-dropdown-trigger"
@@ -1187,7 +1192,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ? 'bg-cancel-query-bg! text-button-primary-foreground!'
                         : !showRunQueryPending
                           ? 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md'
-                          : '',
+                          : showRunQueryPending
+                            ? 'border-s-0'
+                            : '',
                       'rounded-e-default! rounded-s-none!',
                     ]"
                   >
@@ -2724,7 +2731,7 @@ export default defineComponent({
       },
     };
 
-    const updateQueryValue = (value: string) => {
+    const updateQueryValue = (value: string, origin?: { fromUser?: boolean }) => {
       // During stream changes, the editor's debounced onDidChangeModelContent
       // callback can re-emit a stale value after onStreamChange has cleared the
       // query. Reject these stale re-emissions to prevent the old filter from
@@ -2756,10 +2763,13 @@ export default defineComponent({
 
       _sqlOnQueryChange();
 
-      // Turn off SQL mode when query is completely cleared
       if (value.trim() === "" && searchObj.meta.sqlMode === true) {
-        searchObj.meta.sqlMode = false;
+        // An emptied query names no stream, so its stream-not-found error goes however it was emptied.
         searchObj.data.filterErrMsg = "";
+        // A write the user did not make must not change their mode: the Build tab's panel reset arrives as an empty value, and off SQL mode it syncs the generated SQL back as a WHERE clause an aggregate query does not have.
+        if (origin?.fromUser !== false) {
+          searchObj.meta.sqlMode = false;
+        }
       }
 
       // Turn off SQL mode when the query is no longer a SQL statement (user
@@ -3095,14 +3105,10 @@ export default defineComponent({
       }
 
       if (value.userChangedValue) {
-        analytics.track("Button Click", {
-          button: "Date Change",
-          tab: value.tab,
-          value: value,
-          //user_org: this.store.state.selectedOrganization.identifier,
-          //user_id: this.store.state.userInfo.email,
+        analytics.track("logs_time_range_changed", {
           stream_name: searchObj.data.stream.selectedStream.join(","),
-          page: "Search Logs",
+          value_type: value.valueType,
+          relative_period: value.relativeTimePeriod,
         });
       }
 

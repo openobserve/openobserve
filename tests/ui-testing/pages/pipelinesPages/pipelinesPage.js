@@ -6,6 +6,7 @@ const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const fetch = require('node-fetch');
 const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 import { openNavFlyoutChild } from '../commonActions.js';
+import { ingestBase } from '../../playwright-tests/utils/ingest-url.js';
 
 const randomNodeName = `remote-node-${Math.floor(Math.random() * 1000)}`;
 
@@ -1418,7 +1419,7 @@ export class PipelinesPage {
         const headers = getAuthHeaders();
 
         const baseUrl = (process.env.INGESTION_URL || '').replace(/\/$/, '');
-        const url = `${baseUrl}/api/${orgId}/${streamName}/_json`;
+        const url = `${ingestBase(baseUrl)}/api/${orgId}/${streamName}/_json`;
         const fetchResponse = await fetch(url, {
             method: 'POST',
             headers: headers,
@@ -2261,7 +2262,7 @@ export class PipelinesPage {
         const baseUrl = (process.env.INGESTION_URL || '').replace(/\/$/, '');
 
         for (const streamName of streamNames) {
-            const url = `${baseUrl}/api/${orgId}/${streamName}/_json`;
+            const url = `${ingestBase(baseUrl)}/api/${orgId}/${streamName}/_json`;
             const fetchResponse = await fetchWithRetry(url, {
                 method: 'POST',
                 headers: headers,
@@ -2304,7 +2305,7 @@ export class PipelinesPage {
         }
 
         const baseUrl = (process.env.INGESTION_URL || '').replace(/\/$/, '');
-        const url = `${baseUrl}/api/${orgId}/ingest/metrics/_json`;
+        const url = `${ingestBase(baseUrl)}/api/${orgId}/ingest/metrics/_json`;
         const fetchResponse = await fetchWithRetry(url, {
             method: 'POST',
             headers: headers,
@@ -2421,7 +2422,7 @@ export class PipelinesPage {
         if (streamName) {
             requestHeaders["stream-name"] = streamName;
         }
-        const fetchResponse = await fetchWithRetry(`${baseUrl}/api/${orgId}/v1/traces`, {
+        const fetchResponse = await fetchWithRetry(`${ingestBase(baseUrl)}/api/${orgId}/v1/traces`, {
             method: 'POST',
             headers: requestHeaders,
             body: JSON.stringify(tracesData)

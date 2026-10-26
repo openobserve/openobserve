@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex flex-wrap items-center gap-1.5" :data-test="dataTest">
     <!-- None — checkerboard tint with a diagonal strike -->
     <button
+      v-if="allowNone"
       type="button"
       class="rounded-default border-border-default relative inline-flex h-5 w-5 cursor-pointer items-center justify-center border bg-[repeating-linear-gradient(45deg,color-mix(in_srgb,var(--color-grey-500)_12%,transparent),color-mix(in_srgb,var(--color-grey-500)_12%,transparent)_0.125rem,transparent_0.125rem,transparent_0.375rem)] p-0 transition-[transform,box-shadow,border-color] duration-100 hover:scale-[1.12]"
       :class="!modelValue ? 'border-accent ring-focus-ring ring-2' : ''"
@@ -94,6 +95,8 @@ export default defineComponent({
     modelValue: { type: String as PropType<string | null>, default: null },
     swatches: { type: Array as PropType<string[]>, required: true },
     dataTest: { type: String, default: "" },
+    // Off where a colour is required, so the row can never be cleared.
+    allowNone: { type: Boolean, default: true },
   },
   emits: ["update:modelValue"],
   setup(props, { emit }) {

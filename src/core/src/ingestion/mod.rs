@@ -662,6 +662,26 @@ pub async fn write_entries(
     entries: Vec<ingester::Entry>,
     fsync: bool,
 ) -> Result<RequestStats> {
+    write_entries_inner(writer, stream_name, entries, fsync, false).await
+}
+
+/// [write_entries] that returns only once the WAL bytes reached the OS, so a process kill
+/// after it cannot lose them; it never waits in the write queue.
+pub async fn write_entries_synced(
+    writer: &Arc<ingester::Writer>,
+    stream_name: &str,
+    entries: Vec<ingester::Entry>,
+) -> Result<RequestStats> {
+    write_entries_inner(writer, stream_name, entries, true, true).await
+}
+
+async fn write_entries_inner(
+    writer: &Arc<ingester::Writer>,
+    stream_name: &str,
+    entries: Vec<ingester::Entry>,
+    fsync: bool,
+    synced: bool,
+) -> Result<RequestStats> {
     let mut req_stats = RequestStats::default();
     let (entries_records, entries_size) = entries
         .iter()
@@ -675,7 +695,12 @@ pub async fn write_entries(
         .fold((0, 0), |(acc_records, acc_size), (records, size)| {
             (acc_records + records, acc_size + size)
         });
-    if let Err(e) = writer.write_batch(entries, fsync).await {
+    let written = if synced {
+        writer.write_batch_synced(entries).await
+    } else {
+        writer.write_batch(entries, fsync).await
+    };
+    if let Err(e) = written {
         log::error!(
             "ingestion write file for stream {}/{} error: {}",
             writer.get_key_str(),
@@ -699,6 +724,10 @@ pub async fn check_ingestion_allowed(
     stream_type: StreamType,
     stream_name: Option<&str>,
 ) -> Result<()> {
+    if db::org_status::is_blocked(org_id) {
+        return Err(infra::errors::IngestionError::OrgBlocked(org_id.to_string()).into());
+    }
+
     if !LOCAL_NODE.is_ingester() {
         return Err(Error::IngestionError("not an ingester".to_string()));
     }
@@ -1860,5 +1889,28 @@ mod tests {
             row.error.as_deref(),
             Some("error sending notification for alert: http 500")
         );
+    }
+
+    #[tokio::test]
+    async fn test_check_ingestion_allowed_rejects_blocked_org() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+
+        let org = "ingest-blocked-org";
+        for status in [
+            OrgStatus::PendingDeletion,
+            OrgStatus::Deleting,
+            OrgStatus::Deleted,
+        ] {
+            ORG_STATUS_CACHE.insert(org.to_string(), status.clone());
+            let res = check_ingestion_allowed(org, StreamType::Logs, Some("default")).await;
+            ORG_STATUS_CACHE.remove(org);
+            assert!(
+                matches!(
+                    res,
+                    Err(Error::Ingestion(infra::errors::IngestionError::OrgBlocked(ref o))) if o == org
+                ),
+                "{status:?}: {res:?}"
+            );
+        }
     }
 }

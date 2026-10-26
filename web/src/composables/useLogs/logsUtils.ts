@@ -586,7 +586,11 @@ export const logsUtils = () => {
   const isLogsRoute = () => router?.currentRoute.value?.name === "logs";
 
   const dropTransientType = (query: any) => {
-    if (query.type === "search_history_re_apply" || query.type === "search_scheduler") {
+    if (
+      query.type === "search_history_re_apply" ||
+      query.type === "search_scheduler" ||
+      query.type === "rca_evidence_query"
+    ) {
       delete query.type;
     }
   };

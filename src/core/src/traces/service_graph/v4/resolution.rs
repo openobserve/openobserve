@@ -480,12 +480,7 @@ pub fn snapshot_path(org: &str) -> PathBuf {
 pub fn write_snapshot_file(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let dir = path.parent().unwrap_or(Path::new("."));
     std::fs::create_dir_all(dir)?;
-    let tmp = dir.join(format!(
-        ".{}.tmp",
-        path.file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("snapshot")
-    ));
+    let tmp = snapshot_tmp_path(path);
     std::fs::write(&tmp, bytes)?;
     std::fs::rename(&tmp, path)
 }
@@ -506,6 +501,30 @@ pub fn read_snapshot_file(path: &Path, now: i64) -> Option<ResolutionTable> {
             None
         }
     }
+}
+
+/// Removes the snapshot and the temp file a crashed write may have left; absent files are fine.
+pub fn remove_snapshot_file(path: &Path) {
+    for file in [path.to_path_buf(), snapshot_tmp_path(path)] {
+        match std::fs::remove_file(&file) {
+            Ok(()) => log::info!("[ServiceGraph] removed snapshot {}", file.display()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => log::warn!(
+                "[ServiceGraph] snapshot {} not removed: {e}",
+                file.display()
+            ),
+        }
+    }
+}
+
+fn snapshot_tmp_path(path: &Path) -> PathBuf {
+    let dir = path.parent().unwrap_or(Path::new("."));
+    dir.join(format!(
+        ".{}.tmp",
+        path.file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("snapshot")
+    ))
 }
 
 #[cfg(test)]
@@ -817,6 +836,19 @@ mod tests {
         assert!(read_snapshot_file(&path, NOW).is_none());
         write_snapshot_file(&path, &bytes).unwrap();
         assert_eq!(read_snapshot_file(&path, NOW).unwrap().key_count(), 2);
+        assert!(!dir.join(".org.json.tmp").exists());
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_remove_snapshot_file_removes_the_file_and_a_torn_temp() {
+        let dir = std::env::temp_dir().join(format!("sg_snapshot_rm_{}", std::process::id()));
+        let path = dir.join("org.json");
+        remove_snapshot_file(&path);
+        write_snapshot_file(&path, b"{}").unwrap();
+        std::fs::write(dir.join(".org.json.tmp"), b"{").unwrap();
+        remove_snapshot_file(&path);
+        assert!(!path.exists());
         assert!(!dir.join(".org.json.tmp").exists());
         let _ = std::fs::remove_dir_all(dir);
     }

@@ -15,12 +15,12 @@
 
 use std::sync::Arc;
 
-use common::infra::config::DESTINATIONS;
+use common::{infra::config::DESTINATIONS, meta::authz::Authz};
 use config::meta::destinations::Destination;
 use infra::table;
 use itertools::Itertools;
 
-use crate as db;
+use crate::{self as db, authz::remove_ownership};
 
 // db cache watcher prefix
 const DESTINATION_WATCHER_PREFIX: &str = "/destinations/";
@@ -89,7 +89,7 @@ pub async fn set(destination: Destination) -> Result<Destination, DestinationErr
         "{DESTINATION_WATCHER_PREFIX}{}/{}",
         saved.org_id, saved.name
     );
-    infra::coordinator::destinations::emit_put_event(&event_key).await?;
+    infra::coordinator::emit_put(&event_key).await?;
     // super cluster
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
@@ -119,7 +119,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
     // trigger watch event to update in-memory cache
     let event_key = format!("{DESTINATION_WATCHER_PREFIX}{org_id}/{name}");
     // in-cluster
-    infra::coordinator::destinations::emit_delete_event(&event_key).await?;
+    infra::coordinator::emit_delete(&event_key).await?;
     // super cluster
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
@@ -135,6 +135,44 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
         );
     }
 
+    Ok(())
+}
+
+/// Org teardown: eviction and ownership go before each row, so a failure leaves the row to retry.
+pub async fn delete_by_org(org_id: &str) -> Result<(), DestinationError> {
+    let names = table::destinations::list_names_by_org(org_id).await?;
+    let local = |name: String| async move {
+        DESTINATIONS.remove(&format!("{org_id}/{name}"));
+    };
+    let broadcast = |name: String| async move {
+        let event_key = format!("{DESTINATION_WATCHER_PREFIX}{org_id}/{name}");
+        infra::coordinator::emit_delete(&event_key).await?;
+        #[cfg(feature = "enterprise")]
+        if o2_enterprise::enterprise::common::config::get_config()
+            .super_cluster
+            .enabled
+            && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::destinations_delete(
+                &event_key, org_id, &name,
+            )
+            .await
+        {
+            log::error!(
+                "[Destination] error triggering super cluster event to remove destination from cache: org_id: {org_id}, error: {e}"
+            );
+        }
+        Ok::<(), DestinationError>(())
+    };
+    db::teardown::evict_then_delete(names, &local, &broadcast, |name: String| async move {
+        remove_ownership(org_id, "destinations", Authz::new(&name)).await;
+        table::destinations::delete(org_id, &name).await?;
+        Ok(())
+    })
+    .await?;
+    // The org-wide delete names any row the listing missed, so it still loses its copies.
+    for name in table::destinations::delete_by_org(org_id).await? {
+        remove_ownership(org_id, "destinations", Authz::new(&name)).await;
+        db::teardown::evict(local(name.clone()), broadcast(name)).await?;
+    }
     Ok(())
 }
 

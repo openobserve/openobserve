@@ -16,10 +16,12 @@
 //! On-call shared types — in `config` because `infra` and `o2_enterprise` both name them.
 
 pub mod agent;
+pub mod confidence;
 pub mod contact;
 pub mod policy;
 pub mod preset;
 pub mod rca;
+pub mod rca_run;
 pub mod response;
 pub mod rotation;
 pub mod routing;
@@ -28,16 +30,21 @@ pub mod target;
 pub mod team;
 
 pub use agent::{
-    AnalysisState, AnalysisStatus, AnalysisVerdict, Confidence, GatePlan, L0Error, L0Metric,
-    L0Mode, L0Modes, L0Policy, PageAction, PageRecommendation, ParsedReport, ProposedAction,
-    SeverityDecision, VerdictOutcome, analysis_status_for_start, apply_verdict, gate_plan,
-    metrics_for, parse_report, promotion_note, quieter_channels, ratchet, severity_pages,
+    AnalysisState, AnalysisStatus, AnalysisVerdict, Confidence, ConfidenceRefusal, GatePlan,
+    L0Error, L0Metric, L0Mode, L0Modes, L0Policy, PageAction, PageRecommendation, ProposedAction,
+    SeverityDecision, VerdictOutcome, analysis_status_for_start, apply_verdict, confidence_refusal,
+    gate_plan, metrics_for, promotion_note, quieter_channels, ratchet, severity_pages,
     update_channels, verdict_lines,
 };
+pub use confidence::{
+    CauseGrade, ConfidenceGrade, GradeReason, SignalClass, ToolCallRecord, UnverifiedCitation,
+    UnverifiedReason, apply_outcome, grade_confidence, match_citation, min_band, normalize_key_arg,
+    signal_class, stream_type,
+};
 pub use contact::{
-    CODE_MAX_ATTEMPTS, CODE_TTL_MICROS, CodeCheck, CodeRow, Contact, ContactError, DAY_MICROS,
-    SEND_GAP_MICROS, SENDS_PER_NUMBER_PER_DAY, SENDS_PER_USER_PER_DAY, SendDecision, WaitLimit,
-    code_check, code_send_decision, next_counts, to_e164, wait_message,
+    CODE_MAX_ATTEMPTS, CODE_TTL_MICROS, CodeCheck, CodeRow, Contact, ContactError, SEND_GAP_MICROS,
+    SEND_WINDOW_MICROS, SENDS_PER_NUMBER_PER_WINDOW, SENDS_PER_USER_PER_WINDOW, SendDecision,
+    WaitLimit, code_check, code_send_decision, next_counts, to_e164, wait_message,
 };
 pub use policy::{
     Admission, AfterRung, BREAKER_OPEN_MICROS, BREAKER_WINDOW_MICROS, CHANNEL_ORDER, Channel,

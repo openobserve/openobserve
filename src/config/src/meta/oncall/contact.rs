@@ -24,12 +24,12 @@ pub const CODE_TTL_MICROS: i64 = 10 * 60 * 1_000_000;
 pub const CODE_MAX_ATTEMPTS: u32 = 5;
 /// Minimum wait between two codes from one user to one number.
 pub const SEND_GAP_MICROS: i64 = 60 * 1_000_000;
-/// Codes one user may send in 24 h across all numbers; caps the org's SMS bill.
-pub const SENDS_PER_USER_PER_DAY: u32 = 5;
-/// Codes one number may receive in 24 h from all users; protects the phone's owner.
-pub const SENDS_PER_NUMBER_PER_DAY: u32 = 10;
-/// The rolling 24 h window the daily caps count over.
-pub const DAY_MICROS: i64 = 24 * 60 * 60 * 1_000_000;
+/// Codes one user may send per window across all numbers; caps the org's SMS bill.
+pub const SENDS_PER_USER_PER_WINDOW: u32 = 5;
+/// Codes one number may receive per window from all users; protects the phone's owner.
+pub const SENDS_PER_NUMBER_PER_WINDOW: u32 = 10;
+/// The rolling hour the send caps count over; short so a locked-out user is not stuck for a day.
+pub const SEND_WINDOW_MICROS: i64 = 60 * 60 * 1_000_000;
 
 /// The contact methods a person has volunteered, and whether each is proven.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -183,13 +183,13 @@ pub fn code_send_decision(
     let waits = [
         (gap, WaitLimit::Gap),
         (
-            daily_wait(mine(), SENDS_PER_USER_PER_DAY, now),
+            window_wait(mine(), SENDS_PER_USER_PER_WINDOW, now),
             WaitLimit::User,
         ),
         (
-            daily_wait(
+            window_wait(
                 number_rows.iter().filter(|r| r.target == target),
-                SENDS_PER_NUMBER_PER_DAY,
+                SENDS_PER_NUMBER_PER_WINDOW,
                 now,
             ),
             WaitLimit::Number,
@@ -205,10 +205,12 @@ pub fn code_send_decision(
     }
 }
 
-/// The rolling-window counts to store after a send, so the daily caps see it. [pure]
+/// The rolling-window counts to store after a send, so the send caps see it. [pure]
 pub fn next_counts(row: Option<&CodeRow>, now: i64) -> (u32, i64) {
     match row {
-        Some(r) if now - r.day_started_at < DAY_MICROS => (r.sends_today + 1, r.day_started_at),
+        Some(r) if now - r.day_started_at < SEND_WINDOW_MICROS => {
+            (r.sends_today + 1, r.day_started_at)
+        }
         _ => (1, now),
     }
 }
@@ -248,17 +250,17 @@ pub fn wait_message(micros: i64) -> (String, i64) {
     )
 }
 
-/// How long until a daily cap frees a send, or `None` while `rows` are under `cap`.
-fn daily_wait<'a>(rows: impl Iterator<Item = &'a CodeRow>, cap: u32, now: i64) -> Option<i64> {
+/// How long until a send cap frees a send, or `None` while `rows` are under `cap`.
+fn window_wait<'a>(rows: impl Iterator<Item = &'a CodeRow>, cap: u32, now: i64) -> Option<i64> {
     let live: Vec<&CodeRow> = rows
-        .filter(|r| now - r.day_started_at < DAY_MICROS)
+        .filter(|r| now - r.day_started_at < SEND_WINDOW_MICROS)
         .collect();
     let sent: u32 = live.iter().map(|r| r.sends_today).sum();
     if sent < cap {
         return None;
     }
     live.iter()
-        .map(|r| r.day_started_at + DAY_MICROS - now)
+        .map(|r| r.day_started_at + SEND_WINDOW_MICROS - now)
         .min()
 }
 
@@ -281,7 +283,7 @@ impl std::error::Error for ContactError {}
 mod tests {
     use super::*;
 
-    const NOW: i64 = 100 * DAY_MICROS;
+    const NOW: i64 = 100 * SEND_WINDOW_MICROS;
     const SEC: i64 = 1_000_000;
 
     fn row(email: &str, target: &str, sent_ago: i64, sends: u32, day_ago: i64) -> CodeRow {
@@ -371,27 +373,27 @@ mod tests {
         let a = "ana@o2.ai";
         let n = "+15550100199";
         let wait = |micros, limit| SendDecision::Wait { micros, limit };
-        let hour = 3600 * SEC;
-        let shared = row(a, n, hour, 3, hour);
+        let tick = SEND_WINDOW_MICROS / 24;
+        let shared = row(a, n, tick, 3, tick);
         let cases: Vec<(&str, Vec<CodeRow>, Vec<CodeRow>, SendDecision)> = vec![
             ("no rows", vec![], vec![], SendDecision::Send),
             (
                 "pair 59s ago",
-                vec![row(a, n, 59 * SEC, 1, hour)],
+                vec![row(a, n, 59 * SEC, 1, tick)],
                 vec![],
                 wait(SEC, WaitLimit::Gap),
             ),
             (
                 "pair 60s ago",
-                vec![row(a, n, 60 * SEC, 1, hour)],
+                vec![row(a, n, 60 * SEC, 1, tick)],
                 vec![],
                 SendDecision::Send,
             ),
             (
                 "user 4 of 5",
                 vec![
-                    row(a, "+1111111", hour, 2, hour),
-                    row(a, "+2222222", hour, 2, 2 * hour),
+                    row(a, "+1111111", tick, 2, tick),
+                    row(a, "+2222222", tick, 2, 2 * tick),
                 ],
                 vec![],
                 SendDecision::Send,
@@ -399,17 +401,29 @@ mod tests {
             (
                 "user 5 of 5 waits for earliest live window",
                 vec![
-                    row(a, "+1111111", hour, 2, hour),
-                    row(a, "+2222222", hour, 3, 2 * hour),
+                    row(a, "+1111111", tick, 2, tick),
+                    row(a, "+2222222", tick, 3, 2 * tick),
                 ],
                 vec![],
-                wait(DAY_MICROS - 2 * hour, WaitLimit::User),
+                wait(SEND_WINDOW_MICROS - 2 * tick, WaitLimit::User),
             ),
             (
-                "user window that ended 24h ago is not counted",
+                "a user cap reached 61 minutes ago has lapsed",
+                vec![row(a, "+1111111", 61 * 60 * SEC, 5, 61 * 60 * SEC)],
+                vec![],
+                SendDecision::Send,
+            ),
+            (
+                "a user cap reached 59 minutes ago still holds",
+                vec![row(a, "+1111111", 59 * 60 * SEC, 5, 59 * 60 * SEC)],
+                vec![],
+                wait(60 * SEC, WaitLimit::User),
+            ),
+            (
+                "a user window that has ended is not counted",
                 vec![
-                    row(a, "+1111111", hour, 2, hour),
-                    row(a, "+2222222", hour, 3, DAY_MICROS),
+                    row(a, "+1111111", tick, 2, tick),
+                    row(a, "+2222222", tick, 3, SEND_WINDOW_MICROS),
                 ],
                 vec![],
                 SendDecision::Send,
@@ -417,18 +431,18 @@ mod tests {
             (
                 "user emails differing in case are one user",
                 vec![
-                    row(a, "+1111111", hour, 2, hour),
-                    row("ANA@O2.ai", "+2222222", hour, 3, hour),
+                    row(a, "+1111111", tick, 2, tick),
+                    row("ANA@O2.ai", "+2222222", tick, 3, tick),
                 ],
                 vec![],
-                wait(DAY_MICROS - hour, WaitLimit::User),
+                wait(SEND_WINDOW_MICROS - tick, WaitLimit::User),
             ),
             (
                 "number 9 of 10",
                 vec![],
                 vec![
-                    row("b@o2.ai", n, hour, 4, hour),
-                    row("c@o2.ai", n, hour, 5, hour),
+                    row("b@o2.ai", n, tick, 4, tick),
+                    row("c@o2.ai", n, tick, 5, tick),
                 ],
                 SendDecision::Send,
             ),
@@ -436,36 +450,36 @@ mod tests {
                 "number 10 of 10",
                 vec![],
                 vec![
-                    row("b@o2.ai", n, hour, 4, 3 * hour),
-                    row("c@o2.ai", n, hour, 6, hour),
+                    row("b@o2.ai", n, tick, 4, 3 * tick),
+                    row("c@o2.ai", n, tick, 6, tick),
                 ],
-                wait(DAY_MICROS - 3 * hour, WaitLimit::Number),
+                wait(SEND_WINDOW_MICROS - 3 * tick, WaitLimit::Number),
             ),
             (
                 "pair gap and number limit: longest wait wins",
-                vec![row(a, n, 10 * SEC, 1, hour)],
+                vec![row(a, n, 10 * SEC, 1, tick)],
                 vec![
-                    row(a, n, 10 * SEC, 1, hour),
-                    row("c@o2.ai", n, hour, 9, hour),
+                    row(a, n, 10 * SEC, 1, tick),
+                    row("c@o2.ai", n, tick, 9, tick),
                 ],
-                wait(DAY_MICROS - hour, WaitLimit::Number),
+                wait(SEND_WINDOW_MICROS - tick, WaitLimit::Number),
             ),
             (
                 "user and number limits: longest wait wins",
-                vec![row(a, "+1111111", hour, 5, 20 * hour)],
-                vec![row("c@o2.ai", n, hour, 10, hour)],
-                wait(DAY_MICROS - hour, WaitLimit::Number),
+                vec![row(a, "+1111111", tick, 5, 20 * tick)],
+                vec![row("c@o2.ai", n, tick, 10, tick)],
+                wait(SEND_WINDOW_MICROS - tick, WaitLimit::Number),
             ),
             (
                 "user limit outlasts number limit: user wins",
-                vec![row(a, "+1111111", hour, 5, hour)],
-                vec![row("c@o2.ai", n, hour, 10, 20 * hour)],
-                wait(DAY_MICROS - hour, WaitLimit::User),
+                vec![row(a, "+1111111", tick, 5, tick)],
+                vec![row("c@o2.ai", n, tick, 10, 20 * tick)],
+                wait(SEND_WINDOW_MICROS - tick, WaitLimit::User),
             ),
             (
                 "the pair row in both lists counts once per limit",
-                vec![shared.clone(), row(a, "+1111111", hour, 1, hour)],
-                vec![shared, row("c@o2.ai", n, hour, 6, hour)],
+                vec![shared.clone(), row(a, "+1111111", tick, 1, tick)],
+                vec![shared, row("c@o2.ai", n, tick, 6, tick)],
                 SendDecision::Send,
             ),
         ];
@@ -481,11 +495,15 @@ mod tests {
     /// V8: a send opens a new window unless the stored one is still live.
     #[test]
     fn test_next_counts() {
-        let live = row("ana@o2.ai", "+15550100199", SEC, 3, DAY_MICROS - 1);
-        let ended = row("ana@o2.ai", "+15550100199", SEC, 3, DAY_MICROS);
+        let live = row("ana@o2.ai", "+15550100199", SEC, 3, SEND_WINDOW_MICROS - 1);
+        let ended = row("ana@o2.ai", "+15550100199", SEC, 3, SEND_WINDOW_MICROS);
         let cases = [
             ("no row", None, (1, NOW)),
-            ("live window", Some(&live), (4, NOW - DAY_MICROS + 1)),
+            (
+                "live window",
+                Some(&live),
+                (4, NOW - SEND_WINDOW_MICROS + 1),
+            ),
             ("ended window", Some(&ended), (1, NOW)),
         ];
         for (name, r, want) in cases {

@@ -21,6 +21,7 @@ const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtu
 const testLogger = require('../../utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../../utils/cloud-auth.js');
 const crypto = require('crypto');
+const { ingestBase } = require('../../utils/ingest-url.js');
 
 // The tab reads the RUM internal namespace, which is mid-migration from `_oo_` to
 // `_o2_`; `_o2_` is the preferred spelling, so the fixture writes that one.
@@ -119,13 +120,13 @@ test.describe('RUM session trace correlation (#11749)', () => {
       const headers = getAuthHeaders();
       const base = (process.env['INGESTION_URL'] || process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
 
-      const rum = await page.request.post(`${base}/api/${org}/_rumdata/_json`, {
+      const rum = await page.request.post(`${ingestBase(base)}/api/${org}/_rumdata/_json`, {
         headers,
         data: rumRows(fixture),
       });
       expect(rum.status(), 'RUM events must ingest').toBe(200);
 
-      const traces = await page.request.post(`${base}/api/${org}/v1/traces`, {
+      const traces = await page.request.post(`${ingestBase(base)}/api/${org}/v1/traces`, {
         headers,
         data: tracePayload(fixture),
       });

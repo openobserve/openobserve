@@ -204,6 +204,7 @@ message GetLicenseUsageResponse {
     uint32                  days_since_last_report = 6;
     string                  last_usage_response = 7;
     repeated UsageResult    ingestion_history = 8;
+    string                  license_status_json = 9;
 
 }
 
