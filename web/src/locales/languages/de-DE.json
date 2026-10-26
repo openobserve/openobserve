@@ -26693,8 +26693,8 @@
       "remoteStatus": "Remote-Status",
       "remove": "Entfernen",
       "removeManyTitle": "{count} Collector entfernen?",
-      "removeMessage": "Dadurch wird nur die Zeile entfernt. Ein aktiver Host erscheint mit seinem nächsten Heartbeat erneut; beenden Sie den Supervisor auf dem Host, um die Verwaltung zu beenden.",
-      "removeOnlineMessage": "Dadurch wird nur die Zeile entfernt. {count} dieser Collector ist online und erscheint mit seinem nächsten Heartbeat erneut; beenden Sie den Supervisor auf dem Host, um die Verwaltung zu beenden. | Dadurch werden nur die Zeilen entfernt. {count} dieser Collector sind online und erscheinen mit ihrem nächsten Heartbeat erneut; beenden Sie den Supervisor auf diesen Hosts, um die Verwaltung zu beenden.",
+      "removeMessage": "Dadurch wird nur die Zeile entfernt. Ein Host, auf dem der Collector noch läuft, erscheint beim nächsten Heartbeat wieder; deinstallieren Sie ihn daher zuerst dort.",
+      "removeOnlineMessage": "Dadurch wird nur die Zeile entfernt. {count} dieser Collectors ist online und erscheint beim nächsten Heartbeat wieder; deinstallieren Sie ihn zuerst auf seinem Host. | Dadurch werden nur die Zeilen entfernt. {count} dieser Collectors sind online und erscheinen beim nächsten Heartbeat wieder; deinstallieren Sie sie zuerst auf ihren Hosts.",
       "removeTitle": "{name} entfernen?",
       "removedCount": "{count} Collector entfernt | {count} Collector entfernt",
       "rename": "Umbenennen",
@@ -26966,6 +26966,13 @@
       "versionLine": "Installiert die Collector-Version {version}",
       "revealToken": "Token anzeigen",
       "hideToken": "Token ausblenden"
+    },
+    "uninstall": {
+      "howTo": "Deinstallation",
+      "scriptNote": "Stoppt und entfernt den Dienst, die Binärdateien und die Konfiguration. Der Zustand des Collectors bleibt in {state} und seine Logs in {logs}; löschen Sie sie manuell, wenn Sie sie nicht mehr benötigen.",
+      "windowsNote": "Führen Sie den Befehl in einer PowerShell mit Administratorrechten aus. Stoppt und entfernt den Dienst, die Binärdateien und die Konfiguration. Der Zustand des Collectors bleibt in {state}; löschen Sie ihn manuell, wenn Sie ihn nicht mehr benötigen.",
+      "dockerNote": "Führen Sie den Befehl in dem Verzeichnis aus, in dem Sie installiert haben. Entfernt den Container, sein Zustands-Volume und das Verzeichnis mit der Supervisor-Konfiguration.",
+      "kubernetesNote": "Entfernt das Release und die vom Chart erstellten Ressourcen. Der Namespace bleibt erhalten; löschen Sie ihn, falls dort nichts anderes ausgeführt wird."
     },
     "settings": {
       "governance": "Governance",

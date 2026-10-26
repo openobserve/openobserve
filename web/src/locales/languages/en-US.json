@@ -26691,8 +26691,8 @@
       "remoteStatus": "Remote status",
       "remove": "Remove",
       "removeManyTitle": "Remove {count} collectors?",
-      "removeMessage": "This removes the row only. A live host reappears on its next heartbeat; stop the supervisor on the host to stop managing it.",
-      "removeOnlineMessage": "This removes the row only. {count} of these collectors is online and reappears on its next heartbeat; stop the supervisor on the host to stop managing it. | This removes the rows only. {count} of these collectors are online and reappear on their next heartbeat; stop the supervisor on those hosts to stop managing them.",
+      "removeMessage": "This removes the row only. A host that still runs the collector reappears on its next heartbeat, so uninstall it there first.",
+      "removeOnlineMessage": "This removes the row only. {count} of these collectors is online and reappears on its next heartbeat; uninstall it on its host first. | This removes the rows only. {count} of these collectors are online and reappear on their next heartbeat; uninstall them on their hosts first.",
       "removeTitle": "Remove {name}?",
       "removedCount": "Removed {count} collector | Removed {count} collectors",
       "rename": "Rename",
@@ -26964,6 +26964,13 @@
       "versionLine": "Installs collector version {version}",
       "revealToken": "Reveal token",
       "hideToken": "Hide token"
+    },
+    "uninstall": {
+      "howTo": "How to uninstall",
+      "scriptNote": "Stops and removes the service, the binaries and the configuration. The collector's state stays in {state} and its logs in {logs}; delete them by hand if you no longer need them.",
+      "windowsNote": "Run it from an elevated PowerShell. Stops and removes the service, the binaries and the configuration. The collector's state stays in {state}; delete it by hand if you no longer need it.",
+      "dockerNote": "Run it in the directory you installed from. Removes the container, its state volume and the directory that holds the supervisor configuration.",
+      "kubernetesNote": "Removes the release and the resources the chart created. The namespace stays; delete it if nothing else runs there."
     },
     "settings": {
       "governance": "Governance",

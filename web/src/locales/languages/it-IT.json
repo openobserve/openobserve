@@ -26693,8 +26693,8 @@
       "remoteStatus": "Stato remoto",
       "remove": "Rimuovi",
       "removeManyTitle": "Rimuovere {count} collector?",
-      "removeMessage": "Viene rimossa solo la riga. Un host attivo ricompare al suo prossimo heartbeat; ferma il supervisor sull'host per smettere di gestirlo.",
-      "removeOnlineMessage": "Viene rimossa solo la riga. {count} di questi collector è online e ricompare al suo prossimo heartbeat; ferma il supervisor su quell'host per smettere di gestirlo. | Vengono rimosse solo le righe. {count} di questi collector sono online e ricompaiono al loro prossimo heartbeat; ferma il supervisor su quegli host per smettere di gestirli.",
+      "removeMessage": "Questa operazione rimuove solo la riga. Un host che esegue ancora il collector ricompare al suo prossimo heartbeat, quindi disinstallalo prima da lì.",
+      "removeOnlineMessage": "Questa operazione rimuove solo la riga. {count} di questi collector è online e ricompare al suo prossimo heartbeat; disinstallalo prima sul suo host. | Questa operazione rimuove solo le righe. {count} di questi collector sono online e ricompaiono al loro prossimo heartbeat; disinstallali prima sui loro host.",
       "removeTitle": "Rimuovere {name}?",
       "removedCount": "Rimosso {count} collector | Rimossi {count} collector",
       "rename": "Rinomina",
@@ -26966,6 +26966,13 @@
       "versionLine": "Installa la versione {version} del collector",
       "revealToken": "Mostra token",
       "hideToken": "Nascondi token"
+    },
+    "uninstall": {
+      "howTo": "Come disinstallare",
+      "scriptNote": "Arresta e rimuove il servizio, i binari e la configurazione. Lo stato del collector resta in {state} e i suoi log in {logs}; eliminali a mano se non ti servono più.",
+      "windowsNote": "Eseguilo da un PowerShell con privilegi di amministratore. Arresta e rimuove il servizio, i binari e la configurazione. Lo stato del collector resta in {state}; eliminalo a mano se non ti serve più.",
+      "dockerNote": "Eseguilo nella directory da cui hai installato. Rimuove il container, il suo volume di stato e la directory con la configurazione del supervisor.",
+      "kubernetesNote": "Rimuove la release e le risorse create dal chart. Il namespace resta; eliminalo se non esegue nient'altro."
     },
     "settings": {
       "governance": "Governance",

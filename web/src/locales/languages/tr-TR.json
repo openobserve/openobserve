@@ -26693,8 +26693,8 @@
       "remoteStatus": "Uzak durum",
       "remove": "Kaldır",
       "removeManyTitle": "{count} toplayıcı kaldırılsın mı?",
-      "removeMessage": "Bu yalnızca satırı kaldırır. Çalışan bir ana bilgisayar bir sonraki kalp atışında yeniden görünür; yönetimi durdurmak için ana bilgisayardaki supervisor'ı durdurun.",
-      "removeOnlineMessage": "Bu yalnızca satırı kaldırır. Bu toplayıcılardan {count} tanesi çevrimiçidir ve bir sonraki kalp atışında yeniden görünür; yönetimi durdurmak için ilgili ana bilgisayardaki supervisor'ı durdurun. | Bu yalnızca satırları kaldırır. Bu toplayıcılardan {count} tanesi çevrimiçidir ve bir sonraki kalp atışlarında yeniden görünür; yönetimi durdurmak için ilgili ana bilgisayarlardaki supervisor'ı durdurun.",
+      "removeMessage": "Bu yalnızca satırı kaldırır. Toplayıcıyı hâlâ çalıştıran bir ana bilgisayar, bir sonraki kalp atışında yeniden görünür; bu yüzden önce orada kaldırın.",
+      "removeOnlineMessage": "Bu yalnızca satırı kaldırır. Bu toplayıcılardan {count} tanesi çevrimiçi ve bir sonraki kalp atışında yeniden görünür; önce ana bilgisayarında kaldırın. | Bu yalnızca satırları kaldırır. Bu toplayıcılardan {count} tanesi çevrimiçi ve bir sonraki kalp atışında yeniden görünür; önce ana bilgisayarlarında kaldırın.",
       "removeTitle": "{name} kaldırılsın mı?",
       "removedCount": "{count} toplayıcı kaldırıldı | {count} toplayıcı kaldırıldı",
       "rename": "Yeniden adlandır",
@@ -26966,6 +26966,13 @@
       "versionLine": "Toplayıcı sürümü {version} kurar",
       "revealToken": "Token'ı göster",
       "hideToken": "Token'ı gizle"
+    },
+    "uninstall": {
+      "howTo": "Nasıl kaldırılır",
+      "scriptNote": "Hizmeti, ikili dosyaları ve yapılandırmayı durdurur ve kaldırır. Collector'ın durumu {state} içinde, günlükleri {logs} içinde kalır; artık gerekmiyorsa bunları elle silin.",
+      "windowsNote": "Yönetici olarak açılmış bir PowerShell'de çalıştırın. Hizmeti, ikili dosyaları ve yapılandırmayı durdurur ve kaldırır. Collector'ın durumu {state} içinde kalır; artık gerekmiyorsa elle silin.",
+      "dockerNote": "Kurulumu yaptığınız dizinde çalıştırın. Konteyneri, durum birimini ve supervisor yapılandırmasının bulunduğu dizini kaldırır.",
+      "kubernetesNote": "Sürümü ve chart tarafından oluşturulan kaynakları kaldırır. Ad alanı kalır; orada başka bir şey çalışmıyorsa silin."
     },
     "settings": {
       "governance": "Yönetişim",

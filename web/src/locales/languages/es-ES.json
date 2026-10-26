@@ -26693,8 +26693,8 @@
       "remoteStatus": "Estado remoto",
       "remove": "Quitar",
       "removeManyTitle": "¿Quitar {count} colectores?",
-      "removeMessage": "Esto solo quita la fila. Un host activo reaparece en su siguiente latido; detén el supervisor en el host para dejar de gestionarlo.",
-      "removeOnlineMessage": "Esto solo quita la fila. {count} de estos colectores está en línea y reaparece en su siguiente latido; detén el supervisor en ese host para dejar de gestionarlo. | Esto solo quita las filas. {count} de estos colectores están en línea y reaparecen en su siguiente latido; detén el supervisor en esos hosts para dejar de gestionarlos.",
+      "removeMessage": "Esto elimina solo la fila. Un host que siga ejecutando el colector volverá a aparecer en su próximo latido, así que desinstálalo allí primero.",
+      "removeOnlineMessage": "Esto elimina solo la fila. {count} de estos colectores está en línea y volverá a aparecer en su próximo latido; desinstálalo en su host primero. | Esto elimina solo las filas. {count} de estos colectores están en línea y volverán a aparecer en su próximo latido; desinstálalos en sus hosts primero.",
       "removeTitle": "¿Quitar {name}?",
       "removedCount": "Se quitó {count} colector | Se quitaron {count} colectores",
       "rename": "Renombrar",
@@ -26966,6 +26966,13 @@
       "versionLine": "Instala la versión {version} del colector",
       "revealToken": "Mostrar token",
       "hideToken": "Ocultar token"
+    },
+    "uninstall": {
+      "howTo": "Cómo desinstalar",
+      "scriptNote": "Detiene y quita el servicio, los binarios y la configuración. El estado del recolector se conserva en {state} y sus registros en {logs}; bórralos a mano si ya no los necesitas.",
+      "windowsNote": "Ejecútalo desde un PowerShell con privilegios de administrador. Detiene y quita el servicio, los binarios y la configuración. El estado del recolector se conserva en {state}; bórralo a mano si ya no lo necesitas.",
+      "dockerNote": "Ejecútalo en el directorio desde el que instalaste. Quita el contenedor, su volumen de estado y el directorio con la configuración del supervisor.",
+      "kubernetesNote": "Elimina la versión desplegada y los recursos que creó el chart. El espacio de nombres se conserva; elimínalo si no se ejecuta nada más en él."
     },
     "settings": {
       "governance": "Gobernanza",

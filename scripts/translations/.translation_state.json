@@ -12213,8 +12213,8 @@
       "remoteStatus": "9bf08462ca0164bf",
       "remove": "c3812fc4acb861d5",
       "removeManyTitle": "dd8570212a038ad5",
-      "removeMessage": "b6c2d9c1a6b57e4a",
-      "removeOnlineMessage": "198f0e683c128247",
+      "removeMessage": "6c56329591483d78",
+      "removeOnlineMessage": "348378f9ab3956ea",
       "removeTitle": "01c1f0250884f593",
       "removedCount": "1f78b62d9f67b101",
       "rename": "3064d79a295cefe4",
@@ -12738,6 +12738,13 @@
       "more": "ecccea94c62457a7",
       "title": "edb7c266bd64ada3",
       "usedBy": "e259286453868957"
+    },
+    "uninstall": {
+      "dockerNote": "069bec9bc5a28a4a",
+      "howTo": "ee9e8e18d9faf8c2",
+      "kubernetesNote": "1f72984932232d58",
+      "scriptNote": "c1dab82c9ea3453b",
+      "windowsNote": "1fe990ae091fb478"
     },
     "upgrades": {
       "distribution": "a04f48bcdad82eb4",

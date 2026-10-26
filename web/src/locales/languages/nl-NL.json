@@ -26693,8 +26693,8 @@
       "remoteStatus": "Externe status",
       "remove": "Verwijderen",
       "removeManyTitle": "{count} collectors verwijderen?",
-      "removeMessage": "Hiermee wordt alleen de rij verwijderd. Een actieve host verschijnt opnieuw bij zijn volgende heartbeat; stop de supervisor op de host om het beheer te stoppen.",
-      "removeOnlineMessage": "Hiermee wordt alleen de rij verwijderd. {count} van deze collectors is online en verschijnt opnieuw bij zijn volgende heartbeat; stop de supervisor op de host om het beheer te stoppen. | Hiermee worden alleen de rijen verwijderd. {count} van deze collectors zijn online en verschijnen opnieuw bij hun volgende heartbeat; stop de supervisor op die hosts om het beheer te stoppen.",
+      "removeMessage": "Dit verwijdert alleen de rij. Een host waarop de collector nog draait, verschijnt bij de volgende heartbeat weer, dus verwijder hem daar eerst.",
+      "removeOnlineMessage": "Dit verwijdert alleen de rij. {count} van deze collectors is online en verschijnt bij de volgende heartbeat weer; verwijder hem eerst op de host. | Dit verwijdert alleen de rijen. {count} van deze collectors zijn online en verschijnen bij de volgende heartbeat weer; verwijder ze eerst op hun hosts.",
       "removeTitle": "{name} verwijderen?",
       "removedCount": "{count} collector verwijderd | {count} collectors verwijderd",
       "rename": "Naam wijzigen",
@@ -26966,6 +26966,13 @@
       "versionLine": "Installeert collectorversie {version}",
       "revealToken": "Token tonen",
       "hideToken": "Token verbergen"
+    },
+    "uninstall": {
+      "howTo": "Verwijderen",
+      "scriptNote": "Stopt en verwijdert de service, de binaire bestanden en de configuratie. De status van de collector blijft in {state} en de logs in {logs}; verwijder ze handmatig als je ze niet meer nodig hebt.",
+      "windowsNote": "Voer het uit vanuit een PowerShell met beheerdersrechten. Stopt en verwijdert de service, de binaire bestanden en de configuratie. De status van de collector blijft in {state}; verwijder deze handmatig als je hem niet meer nodig hebt.",
+      "dockerNote": "Voer het uit in de map waaruit je hebt geïnstalleerd. Verwijdert de container, het statusvolume en de map met de supervisorconfiguratie.",
+      "kubernetesNote": "Verwijdert de release en de resources die de chart heeft aangemaakt. De namespace blijft bestaan; verwijder deze als er niets anders draait."
     },
     "settings": {
       "governance": "Governance",

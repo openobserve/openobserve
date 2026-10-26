@@ -26693,8 +26693,8 @@
       "remoteStatus": "Trạng thái từ xa",
       "remove": "Xóa",
       "removeManyTitle": "Xóa {count} collector?",
-      "removeMessage": "Thao tác này chỉ xóa dòng. Máy chủ còn hoạt động sẽ xuất hiện lại ở heartbeat kế tiếp; hãy dừng supervisor trên máy chủ để ngừng quản lý nó.",
-      "removeOnlineMessage": "Thao tác này chỉ xóa dòng. {count} trong số các collector này đang trực tuyến và sẽ xuất hiện lại ở heartbeat kế tiếp; hãy dừng supervisor trên các máy chủ đó để ngừng quản lý chúng. | Thao tác này chỉ xóa các dòng. {count} trong số các collector này đang trực tuyến và sẽ xuất hiện lại ở heartbeat kế tiếp; hãy dừng supervisor trên các máy chủ đó để ngừng quản lý chúng.",
+      "removeMessage": "Thao tác này chỉ xóa dòng. Máy chủ vẫn đang chạy collector sẽ xuất hiện lại ở lần gửi tín hiệu nhịp tim tiếp theo, vì vậy hãy gỡ cài đặt trên máy chủ đó trước.",
+      "removeOnlineMessage": "Thao tác này chỉ xóa dòng. {count} trong số các collector này đang trực tuyến và sẽ xuất hiện lại ở lần gửi tín hiệu nhịp tim tiếp theo; hãy gỡ cài đặt trên máy chủ của nó trước. | Thao tác này chỉ xóa các dòng. {count} trong số các collector này đang trực tuyến và sẽ xuất hiện lại ở lần gửi tín hiệu nhịp tim tiếp theo; hãy gỡ cài đặt trên các máy chủ của chúng trước.",
       "removeTitle": "Xóa {name}?",
       "removedCount": "Đã xóa {count} collector | Đã xóa {count} collector",
       "rename": "Đổi tên",
@@ -26966,6 +26966,13 @@
       "versionLine": "Cài đặt collector phiên bản {version}",
       "revealToken": "Hiện token",
       "hideToken": "Ẩn token"
+    },
+    "uninstall": {
+      "howTo": "Cách gỡ cài đặt",
+      "scriptNote": "Dừng và gỡ dịch vụ, các tệp nhị phân và cấu hình. Trạng thái của collector được giữ ở {state} và nhật ký ở {logs}; hãy xóa thủ công nếu không còn cần.",
+      "windowsNote": "Chạy trong PowerShell với quyền quản trị viên. Dừng và gỡ dịch vụ, các tệp nhị phân và cấu hình. Trạng thái của collector được giữ ở {state}; hãy xóa thủ công nếu không còn cần.",
+      "dockerNote": "Chạy trong thư mục bạn đã cài đặt. Gỡ container, volume trạng thái của nó và thư mục chứa cấu hình supervisor.",
+      "kubernetesNote": "Xóa bản phát hành và các tài nguyên do chart tạo ra. Namespace vẫn được giữ lại; hãy xóa nó nếu không còn gì khác chạy ở đó."
     },
     "settings": {
       "governance": "Quản trị",
