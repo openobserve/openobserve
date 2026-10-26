@@ -30,11 +30,7 @@ pub const SERVICE_STREAMS_WATCH_PREFIX: &str = "/service_streams/";
 /// Watchers receive this event and reload the org's services from DB.
 pub async fn emit_put_event(org_id: &str) -> Result<(), Error> {
     let key = format!("{}{}", SERVICE_STREAMS_WATCH_PREFIX, org_id);
-    let cluster_coordinator = super::get_coordinator().await;
-    cluster_coordinator
-        .put(&key, bytes::Bytes::from(""), true, None)
-        .await?;
-    Ok(())
+    super::emit_put(&key).await
 }
 
 /// Sends event to the cluster coordinator indicating that a specific service
@@ -43,8 +39,7 @@ pub async fn emit_put_event(org_id: &str) -> Result<(), Error> {
 /// The event key format is: /service_streams/{org_id}/{service_key}
 pub async fn emit_delete_event(org_id: &str, service_key: &str) -> Result<(), Error> {
     let key = format!("{}{}/{}", SERVICE_STREAMS_WATCH_PREFIX, org_id, service_key);
-    let cluster_coordinator = super::get_coordinator().await;
-    cluster_coordinator.delete(&key, false, true, None).await
+    super::emit_delete(&key).await
 }
 
 /// Sends event to indicate that all services for an org should be reloaded.

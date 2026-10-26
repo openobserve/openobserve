@@ -284,7 +284,7 @@ async fn build_partition_inputs(
                         .and(col(HASH_LABEL).lt_eq(lit(hi))),
                 )?
                 .select_columns(&columns)?
-                // Planning-only: proves the input chains hash-ordered; the series stream merges them.
+                // Planning-only: proves inputs are hash-ordered; the series stream merges them
                 .sort(vec![col(HASH_LABEL).sort(true, false)])?;
             let task_ctx = Arc::new(partition_df.task_ctx());
             let plan = partition_df.create_physical_plan().await?;

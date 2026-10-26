@@ -837,9 +837,9 @@ impl std::fmt::Display for AggFunction {
     }
 }
 
-impl TryFrom<&str> for AggFunction {
-    type Error = &'static str;
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
+impl FromStr for AggFunction {
+    type Err = &'static str;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s.to_lowercase().as_str() {
             "avg" => AggFunction::Avg,
             "min" => AggFunction::Min,
@@ -2456,22 +2456,22 @@ mod test {
 
     #[test]
     fn test_agg_function_try_from_str() {
-        assert_eq!(AggFunction::try_from("avg").unwrap(), AggFunction::Avg);
-        assert_eq!(AggFunction::try_from("AVG").unwrap(), AggFunction::Avg);
-        assert_eq!(AggFunction::try_from("min").unwrap(), AggFunction::Min);
-        assert_eq!(AggFunction::try_from("max").unwrap(), AggFunction::Max);
-        assert_eq!(AggFunction::try_from("sum").unwrap(), AggFunction::Sum);
-        assert_eq!(AggFunction::try_from("count").unwrap(), AggFunction::Count);
+        assert_eq!("avg".parse::<AggFunction>().unwrap(), AggFunction::Avg);
+        assert_eq!("AVG".parse::<AggFunction>().unwrap(), AggFunction::Avg);
+        assert_eq!("min".parse::<AggFunction>().unwrap(), AggFunction::Min);
+        assert_eq!("max".parse::<AggFunction>().unwrap(), AggFunction::Max);
+        assert_eq!("sum".parse::<AggFunction>().unwrap(), AggFunction::Sum);
+        assert_eq!("count".parse::<AggFunction>().unwrap(), AggFunction::Count);
         assert_eq!(
-            AggFunction::try_from("median").unwrap(),
+            "median".parse::<AggFunction>().unwrap(),
             AggFunction::Median
         );
-        assert_eq!(AggFunction::try_from("p50").unwrap(), AggFunction::P50);
-        assert_eq!(AggFunction::try_from("p75").unwrap(), AggFunction::P75);
-        assert_eq!(AggFunction::try_from("p90").unwrap(), AggFunction::P90);
-        assert_eq!(AggFunction::try_from("p95").unwrap(), AggFunction::P95);
-        assert_eq!(AggFunction::try_from("p99").unwrap(), AggFunction::P99);
-        assert!(AggFunction::try_from("unknown").is_err());
+        assert_eq!("p50".parse::<AggFunction>().unwrap(), AggFunction::P50);
+        assert_eq!("p75".parse::<AggFunction>().unwrap(), AggFunction::P75);
+        assert_eq!("p90".parse::<AggFunction>().unwrap(), AggFunction::P90);
+        assert_eq!("p95".parse::<AggFunction>().unwrap(), AggFunction::P95);
+        assert_eq!("p99".parse::<AggFunction>().unwrap(), AggFunction::P99);
+        assert!("unknown".parse::<AggFunction>().is_err());
     }
 
     // ── multi_alert_enabled: one question, two storage locations ────────────

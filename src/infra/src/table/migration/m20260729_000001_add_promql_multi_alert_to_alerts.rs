@@ -85,8 +85,6 @@ enum Alerts {
 
 #[cfg(test)]
 mod tests {
-    use sea_orm_migration::prelude::*;
-
     use super::*;
 
     /// The column must be NULLABLE. A `NOT NULL` add would need a default, and

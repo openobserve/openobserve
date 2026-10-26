@@ -111,6 +111,7 @@
 
           <!-- Query Type Select (Range/Instant) -->
           <div
+            v-if="shouldShowPromQLQueryType(dashboardPanelData)"
             data-test="promql-builder-options-field-wrapper"
             class="ms-2.5 flex flex-row items-center gap-2 max-md:ms-0"
           >
@@ -162,6 +163,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import { shouldShowPromQLQueryType } from "@/utils/dashboard/configUtils";
 
 export default defineComponent({
   name: "PromQLBuilderOptions",
@@ -256,6 +258,7 @@ export default defineComponent({
       queryTypeOptions,
       dashboardSelectfieldPromQlList,
       selectPromQlNameOption,
+      shouldShowPromQLQueryType,
     };
   },
 });

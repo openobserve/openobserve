@@ -27,6 +27,12 @@ import store from "@/stores";
 import { hasMetricsEditorParams } from "@/utils/metrics/metricsEditorParams";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import { forgetLinkRequest } from "@/utils/slackLink";
+import {
+  PLAYLIST_TV_PATH,
+  buildPlaylistQuery,
+  isPlaylistPage,
+  parsePlaylistQuery,
+} from "@/utils/dashboard/playlist";
 
 const Search = () => import("@/plugins/logs/Index.vue");
 const SearchJobInspector = () => import("@/plugins/logs/SearchJobInspector.vue");
@@ -164,6 +170,7 @@ const profilesRouteGuard = (to: any, from: any, next: any) => {
 };
 
 const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
+const TvPlaylist = () => import("@/views/Dashboards/TvPlaylist.vue");
 const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
 const StreamExplorer = () => import("@/views/StreamExplorer.vue");
 const LogStream = () => import("@/views/LogStream.vue");
@@ -704,6 +711,24 @@ const useRoutes = () => {
       props: true,
       meta: {
         titleKey: "routeTitles.viewDashboard",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        // A playlist link to the dashboard view is played by the TV player, except its own page fallback.
+        const query = to.query ?? {};
+        const playlist = isPlaylistPage(query) ? null : parsePlaylistQuery(query);
+        if (playlist) {
+          next({ path: PLAYLIST_TV_PATH, query: buildPlaylistQuery(playlist), replace: true });
+          return;
+        }
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "/dashboards/tv",
+      name: "dashboardTvPlaylist",
+      component: TvPlaylist,
+      meta: {
+        titleKey: "routeTitles.dashboardTvPlaylist",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

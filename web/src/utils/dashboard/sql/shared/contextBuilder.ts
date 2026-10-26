@@ -38,6 +38,7 @@ import { buildDataLookupMap, createSeriesBuilders } from "./seriesBuilder";
 import { createTrellisHelpers } from "./trellisConfig";
 import { type SQLContext } from "./types";
 import { escapeHtml } from "@/utils/html";
+import { createSeriesOverrideLookup } from "../../seriesOverrides";
 
 /**
  * Finds the largest label in the given data array.
@@ -231,6 +232,8 @@ export function buildSQLContext(
   };
 
   const legendConfig = createBaseLegendConfig(panelSchema, hoveredSeriesState);
+
+  const seriesOverrides = createSeriesOverrideLookup(panelSchema?.config);
 
   const isHorizontalChart = panelSchema.type === "h-bar" || panelSchema.type === "h-stacked";
 
@@ -576,29 +579,15 @@ export function buildSQLContext(
               // if have than bold it
               if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
                 hoverText.push(
-                  `<strong>${it.marker} ${escapeHtml(it.seriesName)} : ${escapeHtml(
-                    formatUnitValue(
-                      getUnitValue(
-                        it.value,
-                        panelSchema.config?.unit,
-                        panelSchema.config?.unit_custom,
-                        panelSchema.config?.decimals,
-                      ),
-                    ),
+                  `<strong>${it.marker} ${escapeHtml(seriesOverrides.displayName(it.seriesName))} : ${escapeHtml(
+                    seriesOverrides.formatValue(it.value, it.seriesName),
                   )} </strong>`,
                 );
               // else normal text
               else
                 hoverText.push(
-                  `${it.marker} ${escapeHtml(it.seriesName)} : ${escapeHtml(
-                    formatUnitValue(
-                      getUnitValue(
-                        it.value,
-                        panelSchema.config?.unit,
-                        panelSchema.config?.unit_custom,
-                        panelSchema.config?.decimals,
-                      ),
-                    ),
+                  `${it.marker} ${escapeHtml(seriesOverrides.displayName(it.seriesName))} : ${escapeHtml(
+                    seriesOverrides.formatValue(it.value, it.seriesName),
                   )}`,
                 );
             }

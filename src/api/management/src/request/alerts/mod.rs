@@ -2880,24 +2880,24 @@ pub async fn list_alerts(
         };
 
         folders_and_alerts
-                .into_iter()
-                // Apply is_real_time filter when a specific type is requested.
-                .filter(|(_, a)| match alert_type {
-                    AlertTypeFilter::Scheduled => {
-                        !a.is_real_time && a.query_condition.slo_condition.is_none()
-                    }
-                    AlertTypeFilter::Realtime => {
-                        a.is_real_time && a.query_condition.slo_condition.is_none()
-                    }
-                    AlertTypeFilter::Slo => a.query_condition.slo_condition.is_some(),
-                    _ => true,
-                })
-                .map(|(folder, alert)| {
-                    let key = alert.get_unique_key();
-                    (folder, alert, scheduled_jobs.remove(&key))
-                })
-                .filter_map(|item| ListAlertsResponseBodyItem::try_from(item).ok())
-                .collect()
+            .into_iter()
+            // Apply is_real_time filter when a specific type is requested.
+            .filter(|(_, a)| match alert_type {
+                AlertTypeFilter::Scheduled => {
+                    !a.is_real_time && a.query_condition.slo_condition.is_none()
+                }
+                AlertTypeFilter::Realtime => {
+                    a.is_real_time && a.query_condition.slo_condition.is_none()
+                }
+                AlertTypeFilter::Slo => a.query_condition.slo_condition.is_some(),
+                _ => true,
+            })
+            .map(|(folder, alert)| {
+                let key = alert.get_unique_key();
+                (folder, alert, scheduled_jobs.remove(&key))
+            })
+            .filter_map(|item| ListAlertsResponseBodyItem::try_from(item).ok())
+            .collect()
     } else {
         vec![]
     };

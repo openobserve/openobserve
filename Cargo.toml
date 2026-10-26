@@ -39,7 +39,7 @@ vectorscan = [
     "openobserve-api-grpc/vectorscan",
     "openobserve-core/vectorscan",
     "openobserve-jobs/vectorscan",
-    "super_cluster_queue/vectorscan",
+    "super_cluster_queue?/vectorscan",
     "search_service/vectorscan",
     "enrichment-data/vectorscan",
 ]
@@ -137,7 +137,6 @@ hashlink.workspace = true
 hex.workspace = true
 http-auth-basic.workspace = true
 itertools.workspace = true
-jsonwebtoken.workspace = true
 log.workspace = true
 maxminddb.workspace = true
 md5.workspace = true
@@ -193,8 +192,6 @@ uaparser.workspace = true
 url.workspace = true
 utoipa.workspace = true
 utoipa-swagger-ui.workspace = true
-version-compare.workspace = true
-x509-parser.workspace = true
 zstd.workspace = true
 config.workspace = true
 infra.workspace = true
@@ -214,7 +211,7 @@ pin-project-lite.workspace = true
 flight.workspace = true
 async-stream.workspace = true
 sourcemap.workspace = true
-audit.workspace = true
+audit = { workspace = true, optional = true }
 openobserve-api-http.workspace = true
 openobserve-api-grpc.workspace = true
 openobserve-api-management.workspace = true
@@ -229,7 +226,7 @@ common.workspace = true
 db.workspace = true
 search.workspace = true
 search_service.workspace = true
-super_cluster_queue.workspace = true
+super_cluster_queue = { workspace = true, optional = true }
 usage_reporting.workspace = true
 openobserve-jobs.workspace = true
 openobserve-mcp.workspace = true
@@ -405,13 +402,6 @@ tower-http = { version = "0.6", features = [
 http = "1.4"
 http-body = "1.0"
 http-body-util = "0.1"
-hyper = { version = "1.8", features = ["full"] }
-hyper-util = { version = "0.1", features = [
-    "tokio",
-    "server",
-    "http1",
-    "http2",
-] }
 anyhow = "1.0"
 arc-swap = "1.8"
 argon2 = { version = "0.5", features = ["alloc", "password-hash"] }
@@ -447,7 +437,6 @@ dashmap = { version = "6.1", features = ["serde"] }
 # DataFusion and related storage dependencies
 datafusion = "55.1.0"
 datafusion-proto = "55.1.0"
-datafusion-functions-aggregate-common = "55.1.0"
 datafusion-functions-json = "0.55.1"
 arrow = { version = "59.3.0", features = ["ipc_compression", "prettyprint"] }
 arrow-flight = "59.3.0"
@@ -477,7 +466,6 @@ local-ip-address = "0.6"
 hashlink = "0.11"
 hex = "0.4"
 hkdf = "0.12"
-hickory-resolver = "0.25"
 hmac = "0.12"
 image = { version = "0.24", default-features = false, features = ["png"] }
 indexmap = { version = "2.8", features = ["serde"] }
@@ -591,11 +579,6 @@ thiserror = "2.0"
 tiktoken-rs = "0.9.1"
 time = "0.3"
 tokio = { version = "1", features = ["full"] }
-tokio-rustls = { version = "0.26", default-features = false, features = [
-    "logging",
-    "tls12",
-] }
-tokio-util = { version = "0.7", features = ["compat"] }
 tokio-stream = "0.1"
 tonic = { version = "0.14", features = [
     "gzip",
@@ -617,7 +600,6 @@ tracing-subscriber = { version = "0.3.22", features = [
 url = "2.5"
 urlencoding = "2.1"
 utoipa = { version = "5.4", features = ["axum_extras", "openapi_extensions"] }
-utoipa-axum = "0.2"
 utoipa-swagger-ui = { version = "9", features = ["axum", "vendored"] }
 uuid = { version = "1.20", features = ["v7"] }
 vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", branch = "branch-v0.54" }
@@ -627,7 +609,6 @@ vrl = { version = "0.31", features = [
     "compiler",
     "test",
 ] }
-x509-parser = "0.18.0"
 zip = "9.0"
 zstd = "0.13"
 

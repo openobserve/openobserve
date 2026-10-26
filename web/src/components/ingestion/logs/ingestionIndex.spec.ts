@@ -195,7 +195,6 @@ describe("IngestLogs Index Component", () => {
         button: "Copy to Clipboard",
         ingestion: wrapper.vm.router.currentRoute.value.name,
         user_org: "default",
-        user_id: "example@gmail.com",
         page: "Ingestion",
       });
     });

@@ -205,6 +205,31 @@ function objectOrNull(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
+/** Names a `{{token}}` can carry; the playground renderer substitutes exactly these. */
+export const TEMPLATE_VARIABLE_NAME_SOURCE = "[a-zA-Z_][a-zA-Z0-9_]*";
+const TEMPLATE_VARIABLE_NAME = new RegExp(`^${TEMPLATE_VARIABLE_NAME_SOURCE}$`);
+/** `input` is bound to the whole value separately; `expected_output` only ever feeds scorers. */
+const NON_FIELD_VARIABLES: Record<string, true> = { input: true, expected_output: true };
+
+/** Top-level object-input fields as the runner renders them (non-strings as JSON); `{}` otherwise. */
+export function inputFieldVariables(rawInput: unknown): Record<string, string> {
+  const fields: Record<string, string> = {};
+  for (const [name, value] of Object.entries(objectOrNull(rawInput) ?? {})) {
+    if (!TEMPLATE_VARIABLE_NAME.test(name) || Object.hasOwn(NON_FIELD_VARIABLES, name)) continue;
+    fields[name] = typeof value === "string" ? value : JSON.stringify(value);
+  }
+  return fields;
+}
+
+/** Fields in every row's object input (the backend rejects partial keys); else `[]`. */
+export function commonInputFields(items: Pick<LlmDatasetItem, "rawInput">[]): string[] {
+  const objects = items.map((item) => objectOrNull(item.rawInput));
+  if (!objects.length || objects.some((object) => !object)) return [];
+  return Object.keys(inputFieldVariables(objects[0])).filter((name) =>
+    objects.every((object) => Object.hasOwn(object!, name)),
+  );
+}
+
 /** Fold an API item row into the normalized shape. The row's `id` is the LOGICAL
  *  id — `rowId` identifies this one immutable version and is never sent back. */
 function normalizeItem(d: any): LlmDatasetItem {

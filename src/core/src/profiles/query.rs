@@ -28,7 +28,7 @@ pub const DEFAULT_MAX_NODES: usize = 2048;
 pub const MAX_MAX_NODES: usize = 16_384;
 /// Max frames kept per stack at ingest and when folding into a call tree.
 /// Bounds recursion / stack use independently of the response `max_nodes` cap.
-pub const MAX_STACK_DEPTH: usize = 128;
+pub const MAX_STACK_DEPTH: usize = 1000;
 pub const OTHER_NODE_NAME: &str = "other";
 pub const ROOT_NODE_NAME: &str = "total";
 /// Synthetic frame for ancestors dropped when a stack exceeds [`MAX_STACK_DEPTH`].
@@ -1096,5 +1096,24 @@ mod tests {
         assert!(!is_meta_dimension_column("k8s_pod_name"));
         assert!(!is_profiles_tag_column("service_name"));
         assert!(is_profiles_tag_column("k8s_pod_name"));
+    }
+
+    #[test]
+    fn merge_result_at_max_stack_depth_serializes() {
+        // serde_json's 128-level recursion limit applies to deserializing only, not serializing.
+        let stack = (0..MAX_STACK_DEPTH)
+            .map(|i| format!("f{i}"))
+            .collect::<Vec<_>>()
+            .join(";");
+        let result = build_merge_result(&[(stack, 1)], DEFAULT_MAX_NODES);
+        let mut depth = 0usize;
+        let mut node = &result.root;
+        while let Some(child) = node.children.first() {
+            depth += 1;
+            node = child;
+        }
+        assert_eq!(depth, MAX_STACK_DEPTH);
+        let json = serde_json::to_string(&result).unwrap();
+        assert!(json.contains("\"name\":\"f0\""));
     }
 }

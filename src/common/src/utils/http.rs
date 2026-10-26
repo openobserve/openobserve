@@ -58,7 +58,7 @@ pub fn get_search_type_from_request(
 ) -> Result<Option<SearchEventType>, Error> {
     query
         .get("search_type")
-        .map(|s| SearchEventType::try_from(s.as_str()))
+        .map(|s| s.parse::<SearchEventType>())
         .transpose()
         .map_err(Error::other)
 }

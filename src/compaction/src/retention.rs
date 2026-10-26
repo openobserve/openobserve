@@ -169,10 +169,7 @@ fn generate_time_ranges_for_deletion(
             if range.start > original_time_range.end {
                 None
             } else if range.end > original_time_range.end {
-                Some(TimeRange::new(
-                    range.start,
-                    original_time_range.end,
-                ))
+                Some(TimeRange::new(range.start, original_time_range.end))
             } else {
                 Some(range)
             }
@@ -182,10 +179,7 @@ fn generate_time_ranges_for_deletion(
             if range.end < last_retained_time {
                 None
             } else if range.start < last_retained_time {
-                Some(TimeRange::new(
-                    last_retained_time,
-                    range.end,
-                ))
+                Some(TimeRange::new(last_retained_time, range.end))
             } else {
                 Some(range)
             }
