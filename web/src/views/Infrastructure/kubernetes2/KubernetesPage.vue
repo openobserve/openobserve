@@ -18,22 +18,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
-import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
+import { gt, raw, useI18nTyped } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import DateTime from "@/components/DateTime.vue";
-import SectionRail from "@/components/common/SectionRail.vue";
-import type { SectionHubGroup } from "@/components/common/SectionHub.vue";
 import DataSourceSetupCard from "@/components/ingestion/setupCard/DataSourceSetupCard.vue";
 import K8sListView from "./K8sListView.vue";
 import MapView from "./MapView.vue";
 import ClusterOverview from "./ClusterOverview.vue";
 import WorkloadsOverview from "./WorkloadsOverview.vue";
 import K8sDetailsDrawer from "./K8sDetailsDrawer.vue";
+import K8sCommandPalette from "./K8sCommandPalette.vue";
+import K8sDock from "./K8sDock.vue";
+import { metricsRoute, pickTracesStream, tracesRoute } from "./k8sNavigation";
+import useStreams from "@/composables/useStreams";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import type { K8sAction } from "./k8sActions";
+import {
+  closeTab,
+  emptyDock,
+  openTab,
+  selectTab,
+  toggleMaximized,
+  toggleMinimized,
+} from "./dockState";
+import K8sClusterHotbar from "./K8sClusterHotbar.vue";
+import K8sResourceTree from "./K8sResourceTree.vue";
+import {
+  buildTree,
+  clusterCodes,
+  clusterSeen,
+  clusterStatsOf,
+  clusterTone,
+  nodeSummary,
+} from "./k8sTree";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { buildPaletteItems, mergePaletteItems, type PaletteItem } from "./k8sPalette";
+import { usePaletteIndex } from "./usePaletteIndex";
 import { useKubernetesInventory, type K8sTime } from "./useKubernetesInventory";
 import { KIND_INFO, MAP_ANCHOR, groupsPodsByNode, type View } from "./kubernetesQueries";
 import {
@@ -62,9 +89,11 @@ type ListView = Exclude<View, "cluster" | "map" | "workloads">;
 
 const DEFAULT_RELATIVE_PERIOD = "1h";
 const DEFAULT_WINDOW_US = 60 * 60 * 1000 * 1000;
-const BODY_ANCHOR = "[data-k8s2-body]";
+const BODY_ANCHOR = "[data-k8s2-views]";
 
 const store = useStore();
+// useStreams injects the store, which only works during setup, never inside a handler.
+const streamsApi = useStreams(gt);
 const route = useRoute();
 const router = useRouter();
 const { t } = useI18nTyped();
@@ -73,7 +102,10 @@ const state = computed(() => parseUrlState(route.query));
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
 const nowUs = () => Date.now() * 1000;
 const range = ref<K8sTime>({ start: nowUs() - DEFAULT_WINDOW_US, end: nowUs(), relative: true });
-const dateTimePickerRef = ref<{ refresh?: () => void } | null>(null);
+const dateTimePickerRef = ref<{
+  refresh?: () => void;
+  setRelativeDate?: (period: string, value: number) => void;
+} | null>(null);
 
 const k8s = useKubernetesInventory(
   () => state.value,
@@ -85,46 +117,74 @@ const { detection, pageError } = k8s;
 const replace = (next: K8sUrlState) => router.replace({ query: toQuery(next, route.query) as any });
 const push = (next: K8sUrlState) => router.push({ query: toQuery(next, route.query) as any });
 
-const viewItem = (view: View, label: I18nKey) => ({
-  key: view,
-  label: t(label),
-  to: { query: toQuery(withView(state.value, view), route.query) as any },
-  dataTest: `k8s2-rail-${view}`,
-});
-
-const railGroups = computed<SectionHubGroup[]>(() => [
-  {
-    label: t("infra.k8s2.groupCluster"),
-    items: [viewItem("cluster", "infra.k8s2.viewCluster"), viewItem("map", "infra.k8s2.viewMap")],
-  },
-  { label: raw(""), items: [viewItem("nodes", "infra.k8s2.viewNodes")] },
-  {
-    label: t("infra.k8s2.groupWorkloads"),
-    items: [
-      viewItem("workloads", "infra.k8s2.viewWorkloads"),
-      viewItem("pods", "infra.k8s2.viewPods"),
-      viewItem("deployments", "infra.k8s2.viewDeployments"),
-      viewItem("daemonsets", "infra.k8s2.viewDaemonSets"),
-      viewItem("statefulsets", "infra.k8s2.viewStatefulSets"),
-      viewItem("replicasets", "infra.k8s2.viewReplicaSets"),
-      viewItem("jobs", "infra.k8s2.viewJobs"),
-      viewItem("cronjobs", "infra.k8s2.viewCronJobs"),
-    ],
-  },
-  { label: t("infra.k8s2.groupStorage"), items: [viewItem("pvcs", "infra.k8s2.viewPvcs")] },
-  { label: t("infra.k8s2.groupAutoscaling"), items: [viewItem("hpas", "infra.k8s2.viewHpas")] },
-  {
-    label: raw(""),
-    items: [
-      viewItem("namespaces", "infra.k8s2.viewNamespaces"),
-      viewItem("events", "infra.k8s2.viewEvents"),
-    ],
-  },
-]);
-
 const ready = computed(() => detection.value === "detected" && !pageError.value);
 
 const clusterOptions = computed(() => k8s.clusters.value.map((c) => ({ label: raw(c), value: c })));
+
+const stats = computed(() => clusterStatsOf(k8s.clusterResults.value, k8s.effectiveCluster.value));
+
+const hotbarClusters = computed(() => {
+  const codes = clusterCodes(k8s.clusters.value);
+  return k8s.clusters.value.map((name) => {
+    const own = clusterStatsOf(k8s.clusterResults.value, name);
+    const total = own?.nodes ?? 0;
+    return {
+      name,
+      code: codes[name],
+      tone: clusterTone(own),
+      nodes: total ? { total, ready: Math.max(total - (own?.nodesBad ?? 0), 0) } : null,
+    };
+  });
+});
+
+const treeGroups = computed(() =>
+  buildTree({
+    inventory: k8s.inventory.value,
+    cluster: k8s.effectiveCluster.value,
+    events: {
+      total:
+        k8s.eventCounts.value?.total ??
+        (k8s.hasEvents.value && state.value.view === "events" ? k8s.events.value.length : null),
+      warnings: k8s.eventCounts.value?.warnings ?? 0,
+    },
+    stats: stats.value,
+  }),
+);
+
+const treeNodes = computed(() =>
+  nodeSummary(k8s.inventory.value, k8s.effectiveCluster.value, stats.value),
+);
+
+const crumbs = computed(() => {
+  const group = treeGroups.value.find((g) => g.items.some((i) => i.view === state.value.view));
+  const item = group?.items.find((i) => i.view === state.value.view);
+  return group && item
+    ? {
+        group: t(group.label),
+        view:
+          group.id === "workloads" && item.view === "workloads"
+            ? t("infra.k8s2.treeOverview")
+            : t(item.label),
+      }
+    : null;
+});
+
+// Below md the hot-bar and tree are hidden, so views stay reachable through a select.
+const viewOptions = computed(() =>
+  treeGroups.value.flatMap((group) => [
+    { label: t(group.label), header: true },
+    ...group.items.map((item) => ({
+      label:
+        item.count == null
+          ? t(item.label)
+          : t("infra.k8s2.viewOptionCount", { label: t(item.label), count: item.count }),
+      value: item.view,
+    })),
+  ]),
+);
+
+const onAddCluster = () =>
+  router.push({ name: "ingestFromKubernetes", query: { org_identifier: orgId.value } });
 
 const onCluster = (value: unknown) =>
   replace({ ...state.value, cluster: value ? String(value) : null, details: null });
@@ -160,6 +220,9 @@ const closeDetails = () => replace({ ...state.value, details: null });
 const onNavigate = (next: K8sUrlState) => push(next);
 
 const onView = (view: View) => push(withView(state.value, view));
+
+const onPatch = (patch: Partial<K8sUrlState>) =>
+  push({ ...withView(state.value, patch.view ?? state.value.view), ...patch });
 
 const scopedRows = (rows: AnyRow[]) => {
   const cluster = k8s.effectiveCluster.value;
@@ -239,6 +302,9 @@ const onDateChange = (date: {
     relative: date.valueType !== "absolute",
   };
   if (date.userChangedValue === false) return;
+  const oneDay =
+    date.valueType === "relative" && Math.abs(date.endTime - date.startTime - DAY_US) < 60_000_000;
+  lastKnown.value = lastKnown.value && oneDay;
   load();
 };
 
@@ -270,6 +336,125 @@ watch(
   { immediate: true },
 );
 
+const paletteOpen = ref(false);
+const paletteGroup = ref<"clusters" | null>(null);
+
+const openPalette = () => {
+  paletteGroup.value = null;
+  paletteOpen.value = true;
+};
+
+const openClusterSwitcher = () => {
+  paletteGroup.value = "clusters";
+  paletteOpen.value = true;
+};
+
+const paletteIndex = usePaletteIndex({
+  open: paletteOpen,
+  cluster: computed(() => k8s.effectiveCluster.value),
+  orgId,
+  refreshNonce: k8s.refreshNonce,
+  has: k8s.has,
+});
+
+// Built only while open: every pod becomes an item, which a large cluster should not pay for idly.
+const paletteItems = computed(() =>
+  paletteOpen.value
+    ? mergePaletteItems(
+        buildPaletteItems({
+          inventory: k8s.inventory.value,
+          clusters: k8s.clusters.value,
+          activeCluster: k8s.effectiveCluster.value,
+          t,
+        }),
+        paletteIndex.items.value,
+      )
+    : [],
+);
+
+const onPaletteSelect = ({ target }: PaletteItem) => {
+  if (target.type === "view") onView(target.view);
+  else if (target.type === "cluster") onCluster(target.cluster);
+  else onDrawerLink(target.details);
+};
+
+useShortcuts([
+  {
+    id: "k8sPalette",
+    handler: () => ready.value && (paletteOpen.value ? (paletteOpen.value = false) : openPalette()),
+  },
+]);
+
+const dock = ref(emptyDock());
+
+const DAY_US = 24 * 3_600_000_000;
+const lastKnown = ref(false);
+
+// Silent on every view when no cross-cluster query saw the cluster; on Overview and Nodes also when it has no rows.
+const offline = computed(() => {
+  const cluster = k8s.effectiveCluster.value;
+  if (!ready.value || !k8s.loaded.value || k8s.loading.value || k8s.failed.value.size) return false;
+  if (cluster == null) return false;
+  if (!clusterSeen(k8s.clusterResults.value, cluster)) return true;
+  return (
+    ["cluster", "nodes"].includes(state.value.view) &&
+    !mapNodes.value.length &&
+    !mapPods.value.length
+  );
+});
+
+const showLastKnown = () => {
+  lastKnown.value = true;
+  dateTimePickerRef.value?.setRelativeDate?.("d", 1);
+};
+
+watch(
+  () => k8s.effectiveCluster.value,
+  () => {
+    lastKnown.value = false;
+  },
+);
+
+const openTraces = async (ref: DetailsRef) => {
+  const list: any = await streamsApi.getStreams("traces", false, false).catch(() => null);
+  const stream = pickTracesStream(
+    ((list?.list ?? []) as Array<{ name: string }>).map((s) => s.name),
+  );
+  if (!stream) {
+    toast({ variant: "warning", message: t("infra.k8s2.tracesNoStream") });
+    return;
+  }
+  const names = ((list?.list ?? []) as Array<{ name: string }>).length;
+  if (names > 1) {
+    toast({
+      variant: "info",
+      message: t("infra.k8s2.tracesStreamPicked", { stream: raw(stream) }),
+    });
+  }
+  router.push(
+    tracesRoute(ref, {
+      orgId: orgId.value,
+      start: range.value.start,
+      end: range.value.end,
+      stream,
+    }),
+  );
+};
+
+const onAction = (type: K8sAction, ref: DetailsRef) => {
+  if (type === "details") onDrawerLink(ref);
+  else if (type === "logs") dock.value = openTab(dock.value, type, ref);
+  else if (type === "yaml") dock.value = openTab(dock.value, type, ref, dockRowOf(ref));
+  else if (type === "metrics") {
+    router.push(
+      metricsRoute(ref, { orgId: orgId.value, start: range.value.start, end: range.value.end }),
+    );
+  } else if (type === "traces") void openTraces(ref);
+};
+
+const dockRowOf = (ref: DetailsRef) =>
+  findRow(k8s.inventory.value, ref.kind, rowKey(ref.kind, ref.cluster, ref.namespace, ref.name));
+
 const retryStreams = () => k8s.loadStreams({ force: true });
 
 const retryPage = () => k8s.load({ force: true });
@@ -278,12 +463,53 @@ k8s.loadStreams();
 </script>
 
 <template>
-  <OPageLayout :title="t('menu.kubernetes2')" icon="hub" bleed>
+  <OPageLayout :title="t('menu.kubernetes')" :subtitle="t('infra.k8s2.subtitle')" icon="hub" bleed>
+    <template v-if="ready && crumbs" #subtitle>
+      <OText class="flex min-w-0 items-center gap-1.5 text-sm" data-test="k8s2-breadcrumb">
+        <span class="max-md:hidden">{{ raw(k8s.effectiveCluster.value ?? "") }}</span>
+        <span class="max-md:hidden">/</span>
+        <span>{{ crumbs.group }}</span>
+        <span>/</span>
+        <span class="text-text-heading font-semibold">{{ crumbs.view }}</span>
+      </OText>
+    </template>
     <template #actions>
       <div class="flex items-center gap-2">
+        <OButton
+          v-if="ready"
+          class="max-md:hidden"
+          variant="outline"
+          size="sm"
+          icon-left="search"
+          data-test="k8s2-palette-open"
+          @click="openPalette"
+        >
+          {{ t("infra.k8s2.paletteButton") }}
+        </OButton>
+        <OButton
+          v-if="ready"
+          class="md:hidden"
+          variant="outline"
+          size="icon-sm"
+          :aria-label="t('infra.k8s2.paletteButton')"
+          data-test="k8s2-palette-open-compact"
+          @click="openPalette"
+        >
+          <OIcon name="search" size="sm" />
+        </OButton>
+        <OSelect
+          v-if="ready"
+          class="w-40 md:hidden"
+          size="sm"
+          :model-value="state.view"
+          :options="viewOptions"
+          :aria-label="t('infra.k8s2.viewSelect')"
+          data-test="k8s2-view-select"
+          @update:model-value="(view: unknown) => onView(view as View)"
+        />
         <OSelect
           v-if="detection === 'detected' && clusterOptions.length"
-          class="w-48 max-md:w-32"
+          class="w-48 max-md:w-32 md:hidden"
           size="sm"
           searchable
           :model-value="k8s.effectiveCluster.value"
@@ -303,12 +529,142 @@ k8s.loadStreams();
       </div>
     </template>
 
-    <template v-if="ready" #sidebar>
-      <SectionRail :groups="railGroups" :active-key="state.view" />
-    </template>
+    <div v-if="ready" class="flex h-full min-h-0" data-test="k8s2-shell">
+      <K8sClusterHotbar
+        :clusters="hotbarClusters"
+        :active="k8s.effectiveCluster.value"
+        @select="onCluster"
+        @all="openClusterSwitcher"
+      />
+      <K8sResourceTree
+        class="max-md:hidden"
+        :groups="treeGroups"
+        :active="state.view"
+        :nodes="treeNodes"
+        @select="onView"
+      />
+      <div class="flex h-full min-h-0 min-w-0 flex-1 flex-col" data-k8s2-body data-test="k8s2-body">
+        <OBanner
+          v-if="lastKnown && !offline"
+          variant="info"
+          dense
+          :content="t('infra.k8s2.offlineLastKnown')"
+          data-test="k8s2-banner-last-known"
+        />
+        <OBanner
+          v-for="banner in offline ? [] : k8s.banners.value"
+          :key="banner.id"
+          :variant="banner.variant"
+          dense
+          :content="t(banner.key, banner.params ?? {})"
+          :data-test="`k8s2-banner-${banner.id}`"
+        />
+        <div class="flex min-h-0 min-w-0 flex-1 flex-col" data-k8s2-views>
+          <OEmptyState
+            v-if="offline"
+            preset="no-data"
+            :title="
+              t('infra.k8s2.offlineTitle', { cluster: raw(k8s.effectiveCluster.value ?? '') })
+            "
+            :description="
+              t(lastKnown ? 'infra.k8s2.offlineLastKnownEmpty' : 'infra.k8s2.offlineDescription')
+            "
+            :action-label="lastKnown ? undefined : t('infra.k8s2.offlineShowLast')"
+            :secondary-action-label="t('infra.k8s2.offlineGuide')"
+            data-test="k8s2-offline"
+            @action="showLastKnown"
+            @secondary-action="onAddCluster"
+          />
+          <ClusterOverview
+            v-else-if="state.view === 'cluster'"
+            :inventory="k8s.inventory.value"
+            :results="k8s.results.value"
+            :warnings="k8s.warnings.value.rows"
+            :cluster="k8s.effectiveCluster.value"
+            :range="range"
+            :refresh-nonce="k8s.refreshNonce.value"
+            :has-stream="k8s.has"
+            :loading="k8s.loading.value"
+            :forbidden="k8s.forbidden.value"
+            :last-updated-at="k8s.lastUpdatedAt.value"
+            @open="onOpen"
+            @navigate="onPatch"
+            @action="onAction"
+            @refresh="onRefresh"
+          />
+          <WorkloadsOverview
+            v-else-if="state.view === 'workloads'"
+            :inventory="k8s.inventory.value"
+            :cluster="k8s.effectiveCluster.value"
+            :namespaces="state.namespaces"
+            :namespace-options="k8s.namespaceOptions.value"
+            :events="k8s.events.value"
+            :event-links-enabled="k8s.eventLinksEnabled.value"
+            :end-us="range.end"
+            :loading="k8s.loading.value"
+            :last-updated-at="k8s.lastUpdatedAt.value"
+            @update="onUpdate"
+            @view="onView"
+            @action="(a) => onAction(a.type, a.ref)"
+            @open="onOpen"
+            @refresh="onRefresh"
+          />
+          <MapView
+            v-else-if="state.view === 'map'"
+            :state="state"
+            :pods="mapPods"
+            :nodes="mapNodes"
+            :namespace-options="k8s.namespaceOptions.value"
+            :anchor-missing="mapAnchor"
+            :objects="mapObjects"
+            :failed-queries="[...k8s.failed.value.keys()]"
+            :forbidden="k8s.forbidden.value"
+            :loading="k8s.loading.value"
+            :last-updated-at="k8s.lastUpdatedAt.value"
+            @update="onUpdate"
+            @open="onOpen"
+            @navigate="onNavigate"
+            @refresh="onRefresh"
+          />
+          <K8sListView
+            v-else-if="isList"
+            :view="state.view as ListView"
+            :rows="listRows"
+            :pods="k8s.inventory.value.pods"
+            :state="state"
+            :end-us="range.end"
+            :cluster="k8s.effectiveCluster.value"
+            :event-links="k8s.eventLinksEnabled.value"
+            :namespace-options="k8s.namespaceOptions.value"
+            :loading="k8s.loading.value && k8s.viewStale.value"
+            :forbidden="k8s.forbidden.value"
+            :anchor-missing="k8s.anchorMissing(state.view)"
+            :capped="state.view === 'events' && k8s.eventsCapped.value"
+            :chip="unscopedChip"
+            :last-updated-at="k8s.lastUpdatedAt.value"
+            @open="onOpen"
+            @update="onUpdate"
+            @refresh="onRefresh"
+            @action="onAction"
+          />
+        </div>
+        <K8sDock
+          :dock="dock"
+          :reserve-drawer="!!state.details"
+          :org-id="orgId"
+          :range="range"
+          :row-of="dockRowOf"
+          @select="(id) => (dock = selectTab(dock, id))"
+          @close="(id) => (dock = closeTab(dock, id))"
+          @minimize="dock = toggleMinimized(dock)"
+          @maximize="dock = toggleMaximized(dock)"
+          @dismiss="dock = emptyDock()"
+        />
+      </div>
+    </div>
 
     <div
-      v-if="detection === 'unknown'"
+      v-else-if="detection === 'unknown'"
       class="flex min-h-60 items-center justify-center"
       data-test="k8s2-spinner"
     >
@@ -342,83 +698,16 @@ k8s.loadStreams();
       @action="retryPage"
     />
 
-    <div v-else class="flex h-full min-h-0 flex-col" data-k8s2-body data-test="k8s2-body">
-      <OBanner
-        v-for="banner in k8s.banners.value"
-        :key="banner.id"
-        :variant="banner.variant"
-        dense
-        :content="t(banner.key, banner.params ?? {})"
-        :data-test="`k8s2-banner-${banner.id}`"
-      />
-      <div class="flex min-h-0 min-w-0 flex-1 flex-col">
-        <ClusterOverview
-          v-if="state.view === 'cluster'"
-          :inventory="k8s.inventory.value"
-          :results="k8s.results.value"
-          :warnings="k8s.warnings.value.rows"
-          :cluster="k8s.effectiveCluster.value"
-          :range="range"
-          :refresh-nonce="k8s.refreshNonce.value"
-          :has-stream="k8s.has"
-          :loading="k8s.loading.value"
-          :last-updated-at="k8s.lastUpdatedAt.value"
-          @open="onOpen"
-          @refresh="onRefresh"
-        />
-        <WorkloadsOverview
-          v-else-if="state.view === 'workloads'"
-          :inventory="k8s.inventory.value"
-          :cluster="k8s.effectiveCluster.value"
-          :namespaces="state.namespaces"
-          :namespace-options="k8s.namespaceOptions.value"
-          :events="k8s.events.value"
-          :event-links-enabled="k8s.eventLinksEnabled.value"
-          :end-us="range.end"
-          :loading="k8s.loading.value"
-          :last-updated-at="k8s.lastUpdatedAt.value"
-          @update="onUpdate"
-          @view="onView"
-          @open="onOpen"
-          @refresh="onRefresh"
-        />
-        <MapView
-          v-else-if="state.view === 'map'"
-          :state="state"
-          :pods="mapPods"
-          :nodes="mapNodes"
-          :namespace-options="k8s.namespaceOptions.value"
-          :anchor-missing="mapAnchor"
-          :objects="mapObjects"
-          :forbidden="k8s.forbidden.value"
-          :loading="k8s.loading.value"
-          :last-updated-at="k8s.lastUpdatedAt.value"
-          @update="onUpdate"
-          @open="onOpen"
-          @navigate="onNavigate"
-          @refresh="onRefresh"
-        />
-        <K8sListView
-          v-else-if="isList"
-          :view="state.view as ListView"
-          :rows="listRows"
-          :state="state"
-          :end-us="range.end"
-          :cluster="k8s.effectiveCluster.value"
-          :event-links="k8s.eventLinksEnabled.value"
-          :namespace-options="k8s.namespaceOptions.value"
-          :loading="k8s.loading.value && k8s.viewStale.value"
-          :forbidden="k8s.forbidden.value"
-          :anchor-missing="k8s.anchorMissing(state.view)"
-          :capped="state.view === 'events' && k8s.eventsCapped.value"
-          :chip="unscopedChip"
-          :last-updated-at="k8s.lastUpdatedAt.value"
-          @open="onOpen"
-          @update="onUpdate"
-          @refresh="onRefresh"
-        />
-      </div>
-    </div>
+    <K8sCommandPalette
+      v-if="ready"
+      v-model:open="paletteOpen"
+      :group="paletteGroup"
+      :items="paletteItems"
+      :loading="paletteIndex.loading.value"
+      :index-failed="paletteIndex.failed.value"
+      :truncated="paletteIndex.truncated.value"
+      @select="onPaletteSelect"
+    />
 
     <K8sDetailsDrawer
       v-if="ready && state.details"
@@ -438,6 +727,8 @@ k8s.loadStreams();
       :anchor="BODY_ANCHOR"
       @close="closeDetails"
       @open="onDrawerLink"
+      @navigate="onPatch"
+      @action="onAction"
     />
   </OPageLayout>
 </template>
