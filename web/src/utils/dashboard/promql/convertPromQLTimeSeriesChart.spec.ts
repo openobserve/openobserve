@@ -516,14 +516,12 @@ describe("TimeSeriesConverter", () => {
       const panelSchema = {
         type: "line",
         config: {
-          mark_lines: [
+          mark_line: [
             {
               name: "Threshold",
               type: "yAxis",
               value: 50,
               color: "#00FF00",
-              lineStyle: "dashed",
-              width: 2,
             },
           ],
         },
@@ -548,7 +546,7 @@ describe("TimeSeriesConverter", () => {
       const panelSchema = {
         type: "line",
         config: {
-          mark_lines: [
+          mark_line: [
             {
               type: "xAxis",
               value: 1609459200000,
@@ -563,7 +561,7 @@ describe("TimeSeriesConverter", () => {
       expect(result.series[0].markLine.data[0].yAxis).toBeNull();
     });
 
-    it("should skip mark lines with show=false", () => {
+    it("should ignore the legacy mark_lines key", () => {
       const processedData: ProcessedPromQLData[] = [
         {
           series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
@@ -574,20 +572,34 @@ describe("TimeSeriesConverter", () => {
 
       const panelSchema = {
         type: "line",
-        config: {
-          mark_lines: [
-            { type: "yAxis", value: 50, show: true },
-            { type: "yAxis", value: 75, show: false },
-          ],
-        },
+        config: { mark_lines: [{ type: "yAxis", value: 50 }] },
       };
 
       const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
-      expect(result.series[0].markLine.data).toHaveLength(1);
+      expect(result.series[0].markLine.data).toEqual([]);
     });
 
-    it("should use default mark line styling", () => {
+    it("should hide the label when show_label is false", () => {
+      const processedData: ProcessedPromQLData[] = [
+        {
+          series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
+          timestamps: [[1, "00:00:00"]],
+          queryIndex: 0,
+        },
+      ];
+
+      const panelSchema = {
+        type: "line",
+        config: { mark_line: [{ type: "yAxis", value: 75, show_label: false }] },
+      };
+
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+
+      expect(result.series[0].markLine.data[0].label.show).toBe(false);
+    });
+
+    it("should use the shared mark line styling", () => {
       const processedData: ProcessedPromQLData[] = [
         {
           series: [{ name: "series1", values: [[1, "10"]], data: { "1": "10" } }],
@@ -599,15 +611,18 @@ describe("TimeSeriesConverter", () => {
       const panelSchema = {
         type: "line",
         config: {
-          mark_lines: [{ type: "yAxis", value: 50 }],
+          mark_line: [{ type: "yAxis", value: 50 }],
         },
       };
 
       const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
-      expect(result.series[0].markLine.data[0].lineStyle.color).toBe("#FF0000");
-      expect(result.series[0].markLine.data[0].lineStyle.type).toBe("solid");
-      expect(result.series[0].markLine.data[0].lineStyle.width).toBe(2);
+      expect(result.series[0].markLine).toMatchObject({
+        silent: true,
+        zlevel: 2,
+        lineStyle: { color: "#8B5A2B", type: [8, 4], width: 2 },
+      });
+      expect(result.series[0].markLine.data[0].lineStyle).toBeUndefined();
     });
   });
 

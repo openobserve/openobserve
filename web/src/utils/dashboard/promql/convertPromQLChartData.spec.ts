@@ -453,8 +453,9 @@ describe("convertPromQLChartData", () => {
         queryConfig: {},
       },
     ];
+    // Stacked data series carry the panel's mark lines too, so the annotation series is the unnamed one.
     const annotationSeries = (options: any) =>
-      options.series.find((s: any) => s.markLine || s.markArea);
+      options.series.find((s: any) => !s.name && (s.markLine || s.markArea));
 
     beforeEach(() => {
       mockContext.panelSchema = { type: "stacked", config: {}, queries: [{ config: {} }] };
