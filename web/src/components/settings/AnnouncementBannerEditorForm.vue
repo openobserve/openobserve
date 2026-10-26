@@ -504,7 +504,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     v-model:open="deleteStyleOpen"
     size="sm"
-    :title="t('announcements.styles.deleteTitle', { name: selectedStyle?.name ?? '' })"
+    :title="t('announcements.styles.deleteTitle')"
     :sub-title="t('announcements.styles.deleteHint')"
     :primary-button-label="t('common.delete')"
     primary-button-variant="destructive"
@@ -513,7 +513,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="announcement-editor-delete-style-dialog"
     @click:secondary="deleteStyleOpen = false"
     @click:primary="deleteStyle"
-  />
+  >
+    <i18n-t
+      keypath="announcements.styles.deleteMessage"
+      tag="p"
+      class="text-text-body text-sm"
+      data-test="announcement-editor-delete-style-message"
+    >
+      <template #name
+        ><span class="text-text-heading font-semibold break-all">{{
+          selectedStyle?.name
+        }}</span></template
+      >
+    </i18n-t>
+  </ODialog>
 
   <ODialog
     v-model:open="leaveOpen"

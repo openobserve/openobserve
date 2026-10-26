@@ -509,7 +509,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('dashboard.deleteDashboardConfirmTitle')"
       data-test="dashboard-confirm-dialog"
-      :message="t('dashboard.deleteDashboardConfirmMsg')"
+      message-keypath="dashboard.deleteDashboardConfirmMsg"
+      :message-name="selectedDelete?.name"
+      ok-variant="destructive"
       @update:ok="deleteDashboard"
       @update:cancel="confirmDeleteDialog = false"
       v-model="confirmDeleteDialog"
@@ -530,6 +532,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('dashboard.deleteDashboardsConfirmTitle')"
       data-test="dashboard-confirm-bulk-delete-dialog"
       :message="t('dashboard.deleteDashboardsConfirmMsg', { count: selectedIds.length })"
+      ok-variant="destructive"
       @update:ok="bulkDeleteDashboards"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -1923,6 +1926,7 @@ export default defineComponent({
     return {
       t,
       oTableRef,
+      selectedDelete,
       store,
       orgData,
       router,

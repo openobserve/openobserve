@@ -300,7 +300,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ConfirmDialog
     v-model="confirm.visible"
     :title="t('alert_dependencies.deleteTitle', { name: confirm.node?.name || '' })"
-    :message="t('alert_dependencies.deleteMessage')"
+    :message-keypath="deleteMessageKey"
+    :message-name="confirm.node?.name"
+    ok-variant="destructive"
     @update:ok="performDelete"
     @update:cancel="cancelDelete"
   />
@@ -314,7 +316,7 @@ import { templateKeys } from "@/services/alert_templates.querykeys";
 import { computed, nextTick, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18nTyped, raw } from "@/types/i18n";
+import { useI18nTyped, raw, type I18nKey } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -362,6 +364,12 @@ const hoveredDest = ref<string | null>(null);
 const hoveredAlert = ref<string | null>(null);
 const confirm = ref<{ visible: boolean; node: DepNode | null }>({ visible: false, node: null });
 const deletingIds = ref(new Set<string>());
+const deleteMessageKey = computed<I18nKey>(() => {
+  const kind = confirm.value.node?.kind;
+  if (kind === "destination") return "alert_dependencies.deleteDestinationMessage";
+  if (kind === "template") return "alert_dependencies.deleteTemplateMessage";
+  return "alert_dependencies.deleteAlertMessage";
+});
 
 const org = () => store.state.selectedOrganization.identifier;
 
@@ -540,12 +548,13 @@ const openInNewTab = (n: DepNode) => {
 const requestDelete = (node: DepNode) => {
   confirm.value = { visible: true, node };
 };
+// The node is kept on close so title, name and message stay put while the dialog fades out.
 const cancelDelete = () => {
-  confirm.value = { visible: false, node: null };
+  confirm.value.visible = false;
 };
 const performDelete = async () => {
   const n = confirm.value.node;
-  confirm.value = { visible: false, node: null };
+  confirm.value.visible = false;
   if (!n) return;
   const org_identifier = org();
   // Read before the prune below: focusNode re-derives from the graph, so once the

@@ -321,7 +321,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ConfirmDialog
       :title="t('alert_destinations.deleteDestinationTitle')"
-      :message="t('alert_destinations.deleteDestinationMessage')"
+      message-keypath="alert_destinations.deleteDestinationMessage"
+      :message-name="deleteName"
+      ok-variant="destructive"
       @update:ok="deleteDestination"
       @update:cancel="cancelDeleteDestination"
       v-model="confirmDelete.visible"
@@ -330,6 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('alert_destinations.deleteDestinationsTitle')"
       :message="t('alerts.confirmDeleteDestinations', { count: selectedDestinations.length })"
+      ok-variant="destructive"
       @update:ok="bulkDeleteDestinations"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -505,6 +508,8 @@ export default defineComponent({
       visible: false,
       data: null,
     });
+    // Not cleared on close, so the name stays visible while the dialog fades out.
+    const deleteName = ref("");
     const confirmBulkDelete = ref<boolean>(false);
     const bulkDeleteLoading = ref(false);
     const selectedDestinations = ref<any[]>([]);
@@ -782,6 +787,7 @@ export default defineComponent({
     const conformDeleteDestination = (destination: any) => {
       confirmDelete.value.visible = true;
       confirmDelete.value.data = destination;
+      deleteName.value = destination?.name ?? "";
     };
     const cancelDeleteDestination = () => {
       confirmDelete.value.visible = false;
@@ -1047,6 +1053,7 @@ export default defineComponent({
       deleteDestination,
       cancelDeleteDestination,
       confirmDelete,
+      deleteName,
       routeTo,
       exportDestination,
       showImportDestination,

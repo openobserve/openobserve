@@ -159,7 +159,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
   <ConfirmDialog
     :title="t('settings.cipherKeysPage.deleteCipherKeyTitle')"
-    :message="t('settings.cipherKeysPage.deleteCipherKeyMessage')"
+    message-keypath="settings.cipherKeysPage.deleteCipherKeyMessage"
+    :message-name="deleteName"
+    ok-variant="destructive"
     @update:ok="deleteCipherKey"
     @update:cancel="cancelDeleteCipherKey"
     v-model="confirmDelete.visible"
@@ -168,6 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ConfirmDialog
     :title="t('settings.cipherKeysPage.deleteCipherKeysTitle')"
     :message="t('settings.cipherKeysPage.deleteCipherKeysMessage', { count: selectedKeys.length })"
+    ok-variant="destructive"
     @update:ok="bulkDeleteCipherKeys"
     @update:cancel="confirmBulkDelete = false"
     v-model="confirmBulkDelete"
@@ -317,6 +320,8 @@ export default defineComponent({
       visible: boolean;
       data: any;
     }> = ref({ visible: false, data: null });
+    // Not cleared on close, so the name stays visible while the dialog fades out.
+    const deleteName = ref("");
     const selectedKeys: Ref<any[]> = ref([]);
     const confirmBulkDelete = ref(false);
     const bulkDeleteLoading = ref(false);
@@ -505,6 +510,7 @@ export default defineComponent({
     const confirmDeleteCipherKey = (destination: any) => {
       confirmDelete.value.visible = true;
       confirmDelete.value.data = destination;
+      deleteName.value = destination?.name ?? "";
     };
     const cancelDeleteCipherKey = () => {
       confirmDelete.value.visible = false;
@@ -613,6 +619,7 @@ export default defineComponent({
       cancelDeleteCipherKey,
       confirmDeleteCipherKey,
       confirmDelete,
+      deleteName,
       editCipherKey,
       deleteCipherKey,
       visibleRows,

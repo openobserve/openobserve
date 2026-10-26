@@ -343,6 +343,17 @@ describe("User Component", () => {
       expect(dialog!.props("open")).toBe(true);
     });
 
+    it("names the user in bold and uses a destructive OK button", async () => {
+      wrapper.vm.confirmDeleteAction({ email: "to-delete@example.com" });
+      await flushPromises();
+      const dialog = wrapper
+        .findAllComponents(ODialogStub)
+        .find((d: any) => d.props("title") === "Delete User")!;
+      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+      const name = dialog.find('[data-test="user-delete-dialog-message"] span.font-semibold');
+      expect(name.text()).toBe("to-delete@example.com");
+    });
+
     it("closes the dialog when secondary button is clicked", async () => {
       wrapper.vm.confirmDelete = true;
       await flushPromises();
@@ -393,6 +404,17 @@ describe("User Component", () => {
       expect(dialog!.props("open")).toBe(true);
     });
 
+    it("names the invited email in bold and uses a destructive OK button", async () => {
+      wrapper.vm.confirmRevokeAction({ email: "pending@example.com", token: "tok-123" });
+      await flushPromises();
+      const dialog = wrapper
+        .findAllComponents(ODialogStub)
+        .find((d: any) => d.props("title") === "Revoke Invitation")!;
+      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+      const name = dialog.find('[data-test="user-revoke-dialog-message"] span.font-semibold');
+      expect(name.text()).toBe("pending@example.com");
+    });
+
     it("closes when secondary button is clicked", async () => {
       wrapper.vm.confirmRevoke = true;
       await flushPromises();
@@ -438,6 +460,7 @@ describe("User Component", () => {
       expect(dialog).toBeTruthy();
       expect(dialog!.props("size")).toBe("sm");
       expect(dialog!.props("primaryButtonLabel")).toBe("OK");
+      expect(dialog!.props("primaryButtonVariant")).toBe("destructive");
       expect(dialog!.props("secondaryButtonLabel")).toBe("Cancel");
       expect(dialog!.props("open")).toBe(true);
     });

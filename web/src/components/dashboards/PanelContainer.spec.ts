@@ -941,6 +941,24 @@ describe("PanelContainer", () => {
       expect(wrapper.vm.confirmDeletePanelDialog).toBe(true);
     });
 
+    it("names the panel in bold in the real confirm dialog with a destructive button", async () => {
+      wrapper = createWrapper();
+
+      await wrapper.vm.onPanelModifyClick("DeletePanel");
+      await wrapper.vm.$nextTick();
+
+      const dialog = wrapper.findComponent({ name: "ConfirmDialog" });
+      expect(dialog.props("okVariant")).toBe("destructive");
+      // e2e page objects locate the panel delete dialog by this id.
+      expect(dialog.findComponent({ name: "ODialog" }).vm.$attrs["data-test"]).toBe(
+        "confirm-dialog",
+      );
+      const name = dialog.find('[data-test="confirm-dialog-name"]');
+      expect(name.text()).toBe("Test Panel");
+      expect(name.classes()).toContain("font-semibold");
+      expect(dialog.text()).toContain("Are you sure you want to delete the Test Panel panel?");
+    });
+
     it("should emit onDeletePanel when confirmed", async () => {
       wrapper = createWrapper();
 

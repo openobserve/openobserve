@@ -40,7 +40,7 @@ const stubs = {
   },
   ODialog: {
     name: "ODialog",
-    props: ["open"],
+    props: ["open", "primaryButtonVariant"],
     emits: ["click:primary", "click:secondary", "update:open"],
     template: `<div v-if="open">
       <slot />
@@ -243,6 +243,23 @@ describe("OnCallCoverList", () => {
       await flushPromises();
 
       expect(service.deleteOverride).not.toHaveBeenCalled();
+    });
+
+    it("names the covering member in bold, with a destructive button", async () => {
+      service.listOverrides.mockResolvedValue({ data: [cover()] } as any);
+      const wrapper = render();
+      await flushPromises();
+
+      await wrapper.find('[data-test="oncall-cover-remove-ovr_1"]').trigger("click");
+      await flushPromises();
+
+      const name = wrapper.find('[data-test="oncall-cover-remove-name"]');
+      expect(name.text()).toBe(cover().user_email);
+      expect(name.classes()).toContain("font-semibold");
+      const dialog = wrapper
+        .findAllComponents({ name: "ODialog" })
+        .find((c) => c.attributes("data-test") === "oncall-cover-remove-dialog");
+      expect(dialog!.props("primaryButtonVariant")).toBe("destructive");
     });
   });
 

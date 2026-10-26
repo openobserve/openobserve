@@ -112,11 +112,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       v-model="confirmRemoveOpen"
       :title="t('settings.domainOrgMappings.deleteTitle')"
-      :message="
-        t('settings.domainOrgMappings.confirmRemove', {
-          domain: pendingRemoveIndex !== null ? mappings[pendingRemoveIndex]?.domain : '',
-        })
-      "
+      message-keypath="settings.domainOrgMappings.confirmRemove"
+      :message-name="pendingRemoveDomain"
+      ok-variant="destructive"
       @update:ok="doRemove"
       @update:cancel="pendingRemoveIndex = null"
     />
@@ -165,6 +163,8 @@ const takenDomains = computed(() =>
 
 const confirmRemoveOpen = ref(false);
 const pendingRemoveIndex = ref<number | null>(null);
+// Set on open only: the index is cleared and the list shifts while the dialog fades out.
+const pendingRemoveDomain = ref("");
 
 function openAdd() {
   editingIndex.value = null;
@@ -197,6 +197,7 @@ function onSaveMapping(mapping: DomainOrgMapping) {
 
 function confirmRemove(index: number) {
   pendingRemoveIndex.value = index;
+  pendingRemoveDomain.value = mappings.value[index]?.domain ?? "";
   confirmRemoveOpen.value = true;
 }
 

@@ -399,9 +399,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:primary="deleteLocation"
       @click:secondary="showDeleteLocation = false"
     >
-      <p class="py-2">
-        {{ t("synthetics.privateLocations.deleteBody", { name: locationToDelete?.label ?? "" }) }}
-      </p>
+      <i18n-t keypath="synthetics.privateLocations.deleteBody" tag="p" class="py-2">
+        <template #name>
+          <span
+            data-test="synthetic-monitoring-delete-location-name"
+            class="text-text-heading font-semibold break-all"
+            >{{ locationToDelete?.label }}</span
+          >
+        </template>
+      </i18n-t>
     </ODialog>
 
     <!-- Move checks dialog -->
@@ -1183,7 +1189,9 @@ const openDomains = (page: StatusPageListItem) => {
 const confirmDeleteStatusPage = async (page: StatusPageListItem) => {
   const ok = await confirm({
     title: t("statusPages.dialog.deleteTitle"),
-    message: t("statusPages.dialog.deleteBody", { name: page.name }),
+    messageKeypath: "statusPages.dialog.deleteBody",
+    messageName: page.name,
+    confirmVariant: "destructive",
   });
   if (!ok) return;
   const dismiss = toast({
@@ -1711,7 +1719,9 @@ async function runMonitor(m: any) {
 async function deleteMonitor(m: any) {
   const ok = await confirm({
     title: t("synthetics.dialog.deleteSingleTitle"),
-    message: t("synthetics.dialog.deleteSingleBody", { name: m.name }),
+    messageKeypath: "synthetics.dialog.deleteSingleBody",
+    messageName: m.name,
+    confirmVariant: "destructive",
   });
   if (!ok) return;
 

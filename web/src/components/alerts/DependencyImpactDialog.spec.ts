@@ -285,6 +285,57 @@ describe("DependencyImpactDialog", () => {
     await flushPromises();
   };
 
+  const openDeleteConfirm = async (name: string) => {
+    (
+      document.querySelector(`[data-test="dependency-impact-delete-${name}"]`) as HTMLElement
+    ).click();
+    await flushPromises();
+    return wrapper!.findComponent({ name: "ConfirmDialog" });
+  };
+
+  it("names the alert and its kind in the delete confirm, with a destructive button", async () => {
+    mountDialog({ kind: "destination", name: "slack" });
+    await flushPromises();
+    const confirm = await openDeleteConfirm("cpu");
+    expect(confirm.props("messageKeypath")).toBe("alert_dependencies.deleteAlertMessage");
+    expect(confirm.props("messageName")).toBe("cpu");
+    expect(confirm.props("okVariant")).toBe("destructive");
+  });
+
+  it("names a destination as a destination in the delete confirm", async () => {
+    mountDialog({ kind: "template", name: "tpl-http" });
+    await flushPromises();
+    const confirm = await openDeleteConfirm("slack");
+    expect(confirm.props("messageKeypath")).toBe("alert_dependencies.deleteDestinationMessage");
+    expect(confirm.props("messageName")).toBe("slack");
+  });
+
+  it("names a template as a template in the delete confirm", async () => {
+    const w = mountDialog({ kind: "alert", alertId: "a1" });
+    await flushPromises();
+    // No lane lists templates today, so the request goes straight to the handler.
+    (w.vm as any).$.setupState.requestDelete({
+      id: "t:tpl-http",
+      kind: "template",
+      name: "tpl-http",
+    });
+    await flushPromises();
+    const confirm = w.findComponent({ name: "ConfirmDialog" });
+    expect(confirm.props("messageKeypath")).toBe("alert_dependencies.deleteTemplateMessage");
+    expect(confirm.props("messageName")).toBe("tpl-http");
+  });
+
+  it("keeps the name and kind in the confirm after cancel, while it fades out", async () => {
+    mountDialog({ kind: "template", name: "tpl-http" });
+    await flushPromises();
+    const confirm = await openDeleteConfirm("slack");
+    confirm.vm.$emit("update:cancel");
+    await flushPromises();
+    expect(confirm.props("modelValue")).toBe(false);
+    expect(confirm.props("messageKeypath")).toBe("alert_dependencies.deleteDestinationMessage");
+    expect(confirm.props("messageName")).toBe("slack");
+  });
+
   it("closes when the row deleted IS the entity the dialog is focused on", async () => {
     const w = mountDialog({ kind: "alert", alertId: "a1" });
     await flushPromises();

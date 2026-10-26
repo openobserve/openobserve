@@ -158,7 +158,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Delete confirmation -->
   <ConfirmDialog
     :title="t('aiToolset.deleteTitle')"
-    :message="t('aiToolset.deleteMessage', { name: confirmDelete.data?.name ?? '' })"
+    message-keypath="aiToolset.deleteMessage"
+    :message-name="deleteName"
+    ok-variant="destructive"
     @update:ok="deleteToolset"
     @update:cancel="cancelDelete"
     v-model="confirmDelete.visible"
@@ -319,6 +321,8 @@ export default defineComponent({
       visible: false,
       data: null,
     });
+    // Not cleared on close, so the name stays visible while the dialog fades out.
+    const deleteName = ref("");
 
     // -----------------------------------------------------------------------
     // Route-driven show/hide form
@@ -446,6 +450,7 @@ export default defineComponent({
     // -----------------------------------------------------------------------
     const confirmDeleteToolset = (row: any) => {
       confirmDelete.value = { visible: true, data: row };
+      deleteName.value = row?.name ?? "";
     };
 
     const cancelDelete = () => {
@@ -511,6 +516,7 @@ export default defineComponent({
       oTableRef,
       visibleRows,
       confirmDelete,
+      deleteName,
       addToolset,
       editToolset,
       hideAddDialog,

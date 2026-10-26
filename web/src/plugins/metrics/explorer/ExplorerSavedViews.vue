@@ -97,7 +97,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ConfirmDialog
     v-model="deleteDialogOpen"
     :title="t('metrics.explorer.views.deleteTitle')"
-    :message="t('metrics.explorer.views.deleteMessage', { name: activeView?.view_name ?? '' })"
+    message-keypath="metrics.explorer.views.deleteMessage"
+    :message-name="activeView?.view_name"
+    ok-variant="destructive"
     @update:ok="deleteActive"
     @update:cancel="deleteDialogOpen = false"
   />

@@ -236,7 +236,21 @@ onMounted(() => {
       data-test="template-replace-confirm"
       @update:open="(open: boolean) => !open && declineReplace()"
     >
-      <OText>{{ t("dashboard.templates.replaceMessage") }}</OText>
+      <OText>
+        <i18n-t
+          keypath="dashboard.templates.replaceMessage"
+          tag="span"
+          data-test="template-replace-confirm-message"
+        >
+          <template #name
+            ><span
+              data-test="template-replace-confirm-name"
+              class="text-text-heading font-semibold break-all"
+              >{{ raw("Host Metrics") }}</span
+            ></template
+          >
+        </i18n-t>
+      </OText>
       <template #footer>
         <div class="flex w-full justify-end gap-2">
           <OButton

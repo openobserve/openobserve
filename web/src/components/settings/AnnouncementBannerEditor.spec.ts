@@ -557,6 +557,10 @@ describe("AnnouncementBannerEditorForm", () => {
     });
     document.querySelector<HTMLElement>('[data-test="announcement-editor-delete-style"]')!.click();
     await flushPromises();
+    const named = document.querySelector(
+      '[data-test="announcement-editor-delete-style-message"] span.font-semibold',
+    );
+    expect(named?.textContent).toBe("Release");
     document
       .querySelector<HTMLElement>(
         '[data-test="announcement-editor-delete-style-dialog"] [data-test="o-dialog-primary-btn"]',

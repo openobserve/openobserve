@@ -91,8 +91,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <AddRole v-model:open="showAddGroup" @added:role="onRoleAdded" />
   <ConfirmDialog
     :title="t('iam.appRoles.deleteRole')"
-    :message="t('iam.appRoles.deleteConfirm', { roleName: deleteConformDialog?.data?.role_name })"
+    message-keypath="iam.appRoles.deleteConfirm"
+    :message-name="deleteConformDialog.name"
     :warning-message="deleteImpactMessage"
+    ok-variant="destructive"
     @update:ok="_deleteRole"
     @update:cancel="deleteConformDialog.show = false"
     v-model="deleteConformDialog.show"
@@ -100,6 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ConfirmDialog
     :title="t('iam.appRoles.bulkDeleteRoles')"
     :message="t('iam.appRoles.bulkDeleteConfirm', { count: selectedRoleNames.length })"
+    ok-variant="destructive"
     :warning-message="bulkDeleteImpactMessage"
     @update:ok="bulkDeleteUserRoles"
     @update:cancel="confirmBulkDelete = false"
@@ -236,6 +239,8 @@ const assignMemberToRole = async (role: any) => {
 const deleteConformDialog = ref({
   show: false,
   data: null as any,
+  // Not cleared with `data`, so the name stays visible while the dialog fades out.
+  name: "",
 });
 
 const selectedRoleNames = ref<string[]>([]);
@@ -446,6 +451,7 @@ const deleteImpactMessage = ref(raw(""));
 const showConfirmDialog = async (row: any) => {
   deleteConformDialog.value.show = true;
   deleteConformDialog.value.data = row;
+  deleteConformDialog.value.name = row?.role_name ?? "";
   deleteImpactMessage.value = t("iam.rolesPage.delete.impact", { count: 0 });
 
   try {

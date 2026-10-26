@@ -30,7 +30,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="onConfirm"
   >
     <div data-test="dialog-box" class="text-left">
-      <div class="para">{{ message }}</div>
+      <i18n-t v-if="messageKeypath" :keypath="messageKeypath" tag="div" class="para">
+        <template #name>
+          <span data-test="confirm-dialog-name" class="text-text-heading font-semibold break-all">{{
+            messageName
+          }}</span>
+        </template>
+      </i18n-t>
+      <div v-else class="para">{{ message }}</div>
       <div v-if="warningMessage && warningMessage.length > 0" class="mt-4 text-left">
         <OBanner variant="warning" icon="warning" :content="warningMessage" />
       </div>
@@ -51,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, computed, ref, watch, type PropType } from "vue";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -64,6 +71,9 @@ export default defineComponent({
   props: {
     title: { type: String as unknown as PropType<I18nText> },
     message: { type: String as unknown as PropType<I18nText> },
+    // Takes precedence over `message`; the key must contain a {name} placeholder.
+    messageKeypath: { type: String as PropType<I18nKey> },
+    messageName: { type: String },
     warningMessage: { type: String as unknown as PropType<I18nText> },
     modelValue: { type: Boolean, default: false },
     // No `default: ""` — an empty-string default would need a cast to I18nText,

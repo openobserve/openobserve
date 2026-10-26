@@ -279,7 +279,9 @@
     <ConfirmDialog
       :model-value="!!memberToRemove"
       :title="t('oncall.removeMemberTitle')"
-      :message="t('oncall.removeMemberMessage')"
+      message-keypath="oncall.removeMemberMessage"
+      :message-name="removeName"
+      ok-variant="destructive"
       @update:ok="confirmRemoveMember"
       @update:cancel="memberToRemove = null"
     />
@@ -796,6 +798,11 @@ async function commitMembers(emails: string[]) {
 }
 
 const memberToRemove = ref<OnCallTeamMember | null>(null);
+// Set on open only, so the name stays visible while the dialog fades out.
+const removeName = ref("");
+watch(memberToRemove, (m) => {
+  if (m) removeName.value = m.user_email;
+});
 
 async function confirmRemoveMember() {
   const member = memberToRemove.value;

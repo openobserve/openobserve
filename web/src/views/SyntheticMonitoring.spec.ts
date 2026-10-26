@@ -108,8 +108,9 @@ vi.mock("@/services/status_pages", async (importOriginal) => {
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 import analytics from "@/services/product_analytics";
 
+const { confirmMock } = vi.hoisted(() => ({ confirmMock: vi.fn() }));
 vi.mock("@/composables/useConfirmDialog", () => ({
-  useConfirmDialog: () => ({ confirm: vi.fn().mockResolvedValue(true) }),
+  useConfirmDialog: () => ({ confirm: confirmMock }),
 }));
 
 vi.mock("@/utils/commons", () => ({
@@ -276,6 +277,7 @@ describe("SyntheticMonitoring", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    confirmMock.mockResolvedValue(true);
     resetListViewState();
     mockServiceList.mockResolvedValue({ data: { monitors: [] } });
     // Both are process-global and mutated by individual tests, so they are
@@ -1185,6 +1187,58 @@ describe("SyntheticMonitoring", () => {
       await (wrapper.vm as any).bulkDeleteMonitors();
 
       expect(analytics.track).not.toHaveBeenCalledWith("synthetic_test_deleted", expect.anything());
+    });
+  });
+
+  describe("delete dialogs name the item", () => {
+    it("asks to delete a check by name with a destructive confirm", async () => {
+      confirmMock.mockResolvedValueOnce(false);
+      wrapper = mountPage();
+      await flushPromises();
+      wrapper
+        .findComponent('[data-test="synthetic-monitoring-monitors-table"]')
+        .vm.$emit("delete", { id: "m1", name: "checkout-flow" });
+      await flushPromises();
+
+      expect(confirmMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messageKeypath: "synthetics.dialog.deleteSingleBody",
+          messageName: "checkout-flow",
+          confirmVariant: "destructive",
+        }),
+      );
+      expect(mockServiceDelete).not.toHaveBeenCalled();
+    });
+
+    it("asks to delete a status page by name with a destructive confirm", async () => {
+      confirmMock.mockResolvedValueOnce(false);
+      wrapper = mountPage();
+      await flushPromises();
+      await (wrapper.vm as any).confirmDeleteStatusPage({ id: "sp1", name: "Public status" });
+
+      expect(confirmMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messageKeypath: "statusPages.dialog.deleteBody",
+          messageName: "Public status",
+          confirmVariant: "destructive",
+        }),
+      );
+    });
+
+    it("names the private location in bold in its delete dialog", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+      (wrapper.vm as any).confirmDeleteLocation({ id: "loc1", label: "eu-west-agents" });
+      await flushPromises();
+
+      const dialog = wrapper.find('[data-test="synthetic-monitoring-delete-location-dialog"]');
+      const name = dialog.find('[data-test="synthetic-monitoring-delete-location-name"]');
+      expect(name.text()).toBe("eu-west-agents");
+      expect(name.classes()).toContain("font-semibold");
+      const stub = wrapper
+        .findAllComponents(baseStubs.ODialog)
+        .find((d) => d.attributes("data-test") === "synthetic-monitoring-delete-location-dialog");
+      expect(stub?.props("primaryButtonVariant")).toBe("destructive");
     });
   });
 });

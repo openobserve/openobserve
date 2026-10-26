@@ -287,9 +287,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="service-accounts-list-delete-dialog"
       v-model="confirmDelete"
       :title="t('serviceAccounts.confirmDeleteHead')"
-      :message="t('serviceAccounts.confirmDeleteMsg', { identifier: deleteUserEmailIdentifier })"
+      message-keypath="serviceAccounts.confirmDeleteMsg"
+      :message-name="deleteUserEmailIdentifier"
       :ok-label="t('serviceAccounts.confirmDeleteBtn')"
-      ok-color="destructive"
+      ok-variant="destructive"
       @update:ok="deleteUser"
       @update:cancel="confirmDelete = false"
     />
@@ -300,7 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('serviceAccounts.confirmBulkDeleteHead')"
       :message="t('serviceAccounts.confirmBulkDeleteMsg', { count: selectedAccounts.length })"
       :ok-label="t('serviceAccounts.confirmBulkDeleteBtn', { count: selectedAccounts.length })"
-      ok-color="destructive"
+      ok-variant="destructive"
       @update:ok="bulkDeleteServiceAccounts"
       @update:cancel="confirmBulkDelete = false"
     />

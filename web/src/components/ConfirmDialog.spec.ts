@@ -19,6 +19,10 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
+i18n.global.mergeLocaleMessage("en-us", {
+  confirmDialogSpec: { deleteNamed: "Are you sure you want to delete the {name} alert?" },
+});
+
 // Stub ODialog so tests are deterministic (no Portal/Reka teleport)
 // and so we can assert on the props the component forwards + emit
 // the click events the component listens to.
@@ -327,6 +331,45 @@ describe("ConfirmDialog", () => {
       await wrapper.setProps({ modelValue: true });
       expect((input().element as HTMLInputElement).value).toBe("");
       expect(primary().props("primaryButtonDisabled")).toBe(true);
+    });
+  });
+
+  describe("named message", () => {
+    const keypath = "confirmDialogSpec.deleteNamed";
+
+    it("renders the keypath sentence with the name in a bold span", () => {
+      wrapper.unmount();
+      wrapper = buildWrapper({
+        message: undefined,
+        messageKeypath: keypath,
+        messageName: "cpu-high",
+      });
+      const body = wrapper.find('[data-test="dialog-box"]');
+      expect(body.text()).toContain("Are you sure you want to delete the cpu-high alert?");
+      const name = wrapper.find('[data-test="confirm-dialog-name"]');
+      expect(name.text()).toBe("cpu-high");
+      expect(name.classes()).toContain("font-semibold");
+    });
+
+    it("prefers the keypath over a plain message", () => {
+      wrapper.unmount();
+      wrapper = buildWrapper({ messageKeypath: keypath, messageName: "cpu-high" });
+      expect(wrapper.text()).not.toContain("Dialog Message");
+    });
+
+    it("keeps the plain message when no keypath is given", () => {
+      expect(wrapper.find('[data-test="confirm-dialog-name"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="dialog-box"]').text()).toContain("Dialog Message");
+    });
+
+    it("passes the destructive variant through with a named message", () => {
+      wrapper.unmount();
+      wrapper = buildWrapper({
+        messageKeypath: keypath,
+        messageName: "cpu-high",
+        okVariant: "destructive",
+      });
+      expect(wrapper.findComponent(ODialogStub).props("primaryButtonVariant")).toBe("destructive");
     });
   });
 });

@@ -630,6 +630,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmDialogMeta.show"
       :title="confirmDialogMeta.title"
       :message="confirmDialogMeta.message"
+      :message-keypath="confirmDialogMeta.messageKeypath"
+      :message-name="confirmDialogMeta.messageName"
+      ok-variant="destructive"
       @update:ok="confirmDialogMeta.onConfirm()"
       @update:cancel="resetConfirmDialog"
     />
@@ -642,7 +645,7 @@ import { modelPricingQuery } from "@/services/model_pricing.queries";
 import { modelPricingKeys } from "@/services/model_pricing.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { ref, computed, onBeforeMount, onActivated, watch } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useRouter } from "vue-router";
@@ -732,6 +735,8 @@ const confirmDialogMeta = ref({
   // raw("") is only the empty placeholder — the real values are assigned from t().
   title: raw(""),
   message: raw(""),
+  messageKeypath: undefined as I18nKey | undefined,
+  messageName: "",
   onConfirm: async () => {},
 });
 
@@ -1056,7 +1061,9 @@ function confirmDelete(model: any) {
   confirmDialogMeta.value = {
     show: true,
     title: t("modelPricing.confirmDeleteTitle"),
-    message: t("modelPricing.confirmDeleteMessage", { name: model.name }),
+    message: raw(""),
+    messageKeypath: "modelPricing.confirmDeleteMessage",
+    messageName: model.name,
     onConfirm: async () => {
       try {
         await modelPricingService.delete(orgIdentifier.value, model.id);
@@ -1139,6 +1146,8 @@ function confirmDeleteSelected() {
     show: true,
     title: t("modelPricing.confirmDeleteSelectedTitle"),
     message: t("modelPricing.confirmDeleteSelectedMessage", { count }),
+    messageKeypath: undefined,
+    messageName: "",
     onConfirm: async () => {
       bulkDeleteLoading.value = true;
       try {

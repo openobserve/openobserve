@@ -452,12 +452,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('common.confirm')"
     :secondary-button-label="t('confirmDialog.cancel')"
     :primary-button-label="t('confirmDialog.ok')"
+    primary-button-variant="destructive"
     @click:secondary="confirmRemoveDomainOpen = false"
     @click:primary="doRemoveDomain"
   >
-    <p v-if="pendingRemoveDomainIndex !== null">
-      {{ t("settings.confirmRemoveDomain", { domain: domains[pendingRemoveDomainIndex]?.name }) }}
-    </p>
+    <i18n-t
+      v-if="pendingRemoveDomainIndex !== null"
+      keypath="settings.confirmRemoveDomain"
+      tag="p"
+      data-test="domain-management-remove-domain-message"
+    >
+      <template #domain
+        ><span class="text-text-heading font-semibold break-all">{{
+          domains[pendingRemoveDomainIndex]?.name
+        }}</span></template
+      >
+    </i18n-t>
   </ODialog>
 
   <!-- Confirm remove email dialog -->
@@ -467,16 +477,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('common.confirm')"
     :secondary-button-label="t('confirmDialog.cancel')"
     :primary-button-label="t('confirmDialog.ok')"
+    :primary-button-variant="pendingRemoveEmail?.blocked ? 'primary' : 'destructive'"
     @click:secondary="confirmRemoveEmailOpen = false"
     @click:primary="doRemoveEmail"
   >
-    <p v-if="pendingRemoveEmail !== null">
-      {{
+    <i18n-t
+      v-if="pendingRemoveEmail !== null"
+      :keypath="
         pendingRemoveEmail.blocked
-          ? t("settings.confirmRemoveBlockedEmail", { email: pendingRemoveEmail.email })
-          : t("settings.confirmRemoveEmail", { email: pendingRemoveEmail.email })
-      }}
-    </p>
+          ? 'settings.confirmRemoveBlockedEmail'
+          : 'settings.confirmRemoveEmail'
+      "
+      tag="p"
+      data-test="domain-management-remove-email-message"
+    >
+      <template #email
+        ><span class="text-text-heading font-semibold break-all">{{
+          pendingRemoveEmail.email
+        }}</span></template
+      >
+    </i18n-t>
   </ODialog>
 </template>
 
@@ -820,7 +840,7 @@ const doRemoveEmail = () => {
   if (!pending) return;
   const list = pending.blocked ? pending.domain.blockedEmails : pending.domain.allowedEmails;
   list.splice(pending.emailIndex, 1);
-  pendingRemoveEmail.value = null;
+  // Kept until the next open so the button colour and text hold while the dialog fades out.
   confirmRemoveEmailOpen.value = false;
 };
 

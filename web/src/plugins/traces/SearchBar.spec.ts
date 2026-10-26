@@ -2275,7 +2275,9 @@ describe("SearchBar", () => {
         expect(dialog().props("open")).toBe(false);
         expect(mockConfirm).toHaveBeenCalledWith({
           title: "search.deleteSavedView",
-          message: "search.deleteSavedViewConfirm",
+          messageKeypath: "search.deleteSavedViewConfirm",
+          messageName: tracesView.view_name,
+          confirmVariant: "destructive",
         });
         expect(mockSavedViewsDelete).toHaveBeenCalledWith(expect.any(String), "t1");
         expect(dialog().props("favoriteIds")).toEqual([]);
