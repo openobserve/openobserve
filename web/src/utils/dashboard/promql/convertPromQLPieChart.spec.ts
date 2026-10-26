@@ -143,6 +143,60 @@ describe("PieConverter", () => {
       expect(result.tooltip).toBeDefined();
     });
 
+    it("reduces an instant query's slices with last and a range query's with the saved reducer", async () => {
+      const { applyAggregation } = await import("./shared/dataProcessor");
+      const slice = (queryIndex: number, query_type: string) =>
+        ({
+          series: [{ name: `q${queryIndex}`, values: [[1, "50"]] }],
+          timestamps: [1],
+          queryIndex,
+          queryConfig: { query_type },
+        }) as any;
+      vi.mocked(applyAggregation).mockClear();
+      converter.convert(
+        [slice(0, "instant"), slice(1, "range"), { ...slice(2, "range"), queryConfig: undefined }],
+        { type: "donut", config: { aggregation: "count" } },
+        mockStore,
+        { legends: [] },
+      );
+      expect(vi.mocked(applyAggregation).mock.calls.map((call) => call[1])).toEqual([
+        "last",
+        "count",
+        "count",
+      ]);
+    });
+
+    it("keeps the saved reducer for an instant range-vector selector with many samples", async () => {
+      const { applyAggregation } = await import("./shared/dataProcessor");
+      vi.mocked(applyAggregation).mockClear();
+      converter.convert(
+        [
+          {
+            series: [
+              { name: "single", values: [[1, "50"]] },
+              {
+                name: "window",
+                values: [
+                  [1, "10"],
+                  [2, "20"],
+                ],
+              },
+            ],
+            timestamps: [1, 2],
+            queryIndex: 0,
+            queryConfig: { query_type: "instant" },
+          } as any,
+        ],
+        { type: "pie", config: { aggregation: "count" } },
+        mockStore,
+        { legends: [] },
+      );
+      expect(vi.mocked(applyAggregation).mock.calls.map((call) => call[1])).toEqual([
+        "last",
+        "count",
+      ]);
+    });
+
     it("should populate extras.legends with series names", () => {
       const processedData: ProcessedPromQLData[] = [
         {

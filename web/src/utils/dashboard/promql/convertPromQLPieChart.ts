@@ -40,9 +40,6 @@ export class PieConverter implements PromQLChartConverter {
     const seriesOverrides = createSeriesOverrideLookup(config);
     const data: any[] = [];
 
-    // Get aggregation function (default: last)
-    const aggregation = config.aggregation || "last";
-
     // Calculate min/max for color scaling
     let chartMin = Infinity;
     let chartMax = -Infinity;
@@ -55,7 +52,11 @@ export class PieConverter implements PromQLChartConverter {
     }> = [];
 
     processedData.forEach((queryData) => {
+      const instant = queryData.queryConfig?.query_type === "instant";
       queryData.series.forEach((seriesData) => {
+        // A single instant sample would read 1 or 0 under count, range or diff; a range-vector selector still has many.
+        const aggregation =
+          instant && seriesData.values.length <= 1 ? "last" : config.aggregation || "last";
         const value = applyAggregation(seriesData.values, aggregation);
 
         if (value < chartMin) chartMin = value;

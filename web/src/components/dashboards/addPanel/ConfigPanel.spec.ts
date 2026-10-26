@@ -480,6 +480,43 @@ describe("ConfigPanel", () => {
     });
   });
 
+  describe("Legend values", () => {
+    const panelOf = (type: string, config: Record<string, unknown> = {}) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type,
+        config: { ...mockDashboardPanelData.data.config, show_legends: true, ...config },
+      },
+    });
+    const toggleOf = () =>
+      wrapper
+        .findAllComponents({ name: "OToggleGroup" })
+        .find((group: any) => group.text().includes("Legend values"));
+
+    it.each(["pie", "donut"])(
+      "reads unset as none and writes value and percent for %s",
+      async (type) => {
+        const panel: any = panelOf(type);
+        wrapper = createWrapper({ dashboardPanelData: panel });
+        expect(toggleOf()?.props("modelValue")).toEqual([]);
+        expect(toggleOf()?.text()).toContain("ValuePercent");
+        await toggleOf()?.vm.$emit("update:modelValue", ["percent", "value"]);
+        expect(panel.data.config.legend_values).toEqual(["value", "percent"]);
+        await toggleOf()?.vm.$emit("update:modelValue", []);
+        expect(panel.data.config.legend_values).toEqual([]);
+      },
+    );
+
+    it("is absent when the legend is hidden or the chart is not a pie", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("pie", { show_legends: false }) });
+      expect(toggleOf()).toBeUndefined();
+      wrapper.unmount();
+      wrapper = createWrapper({ dashboardPanelData: panelOf("bar") });
+      expect(toggleOf()).toBeUndefined();
+    });
+  });
+
   describe("Time shift (Comparison against)", () => {
     const shiftedPanel = (queryType: string) => ({
       ...mockDashboardPanelData,

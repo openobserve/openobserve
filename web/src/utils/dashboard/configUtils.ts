@@ -2,6 +2,15 @@
  * Utility functions for dashboard panel configuration conditions
  */
 
+interface PanelQueriesState {
+  data: { queries?: Array<{ config?: { query_type?: string } } | null> };
+  layout?: { hiddenQueries?: number[] };
+}
+
+interface PanelLegendState {
+  data: { type?: string; config: { show_legends?: boolean } };
+}
+
 /**
  * Check that chart align option should be applied
  * @param dashboardPanelData - The dashboard panel data
@@ -18,6 +27,23 @@ export const shouldApplyChartAlign = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.config.trellis?.layout === null
   );
 };
+
+/** True when every visible query of the panel is a PromQL instant query, which has one sample per series. */
+export const allVisibleQueriesInstant = (dashboardPanelData: PanelQueriesState): boolean => {
+  const queries = dashboardPanelData.data.queries ?? [];
+  const hidden = dashboardPanelData.layout?.hiddenQueries ?? [];
+  return (
+    queries.length > 0 &&
+    queries.every(
+      (query, index) => query?.config?.query_type === "instant" || hidden.includes(index),
+    )
+  );
+};
+
+/** Pie and donut legends can append each slice's value and percent. */
+export const shouldShowLegendValues = (dashboardPanelData: PanelLegendState): boolean =>
+  (dashboardPanelData.data.type === "pie" || dashboardPanelData.data.type === "donut") &&
+  !!dashboardPanelData.data.config.show_legends;
 
 /**
  * Check that show Gridlines option should be applied

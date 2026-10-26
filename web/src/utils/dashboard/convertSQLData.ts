@@ -30,6 +30,11 @@ import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { escapeHtml } from "@/utils/html";
 import { applyGaugeSeriesThresholds, applyLineAreaThresholds } from "./thresholds";
 import { applySeriesOverrides } from "./seriesOverrides";
+import {
+  applyPieDonutChartAlignment,
+  applyPieDonutLegendPositioning,
+  getChartDimensions,
+} from "./legendConfiguration";
 import { isTimeSeries, isTimeStamp } from "./dateTimeUtils";
 import { fitAxisBoundsToStacks } from "./stackTotals";
 
@@ -304,8 +309,15 @@ export const convertMultiSQLData = async (
       });
     });
 
-    if (options[0]?.options?.series?.[0]) {
-      options[0].options.series[0].data = mergedData;
+    const merged = options[0]?.options;
+    if (merged?.series?.[0]) {
+      merged.series[0].data = mergedData;
+      // Query 0 sized the legend and placed the pie from its own slices; size them for every query's.
+      if (merged.legend?.show) {
+        applyPieDonutLegendPositioning(panelSchema, merged, chartPanelRef);
+        const { chartWidth, chartHeight } = getChartDimensions(chartPanelRef);
+        applyPieDonutChartAlignment(panelSchema, merged, chartWidth, chartHeight);
+      }
     }
 
     applySeriesColorMappings(
