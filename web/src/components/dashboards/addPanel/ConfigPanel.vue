@@ -1402,7 +1402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Section: Value Transformations -->
     <OCollapsible
       variant="config"
-      v-if="['table', 'metric', 'state-timeline'].includes(dashboardPanelData.data.type)"
+      v-if="['table', 'metric', 'gauge', 'state-timeline'].includes(dashboardPanelData.data.type)"
       v-show="isSectionVisible('valueTransformations')"
       :model-value="isExpanded('valueTransformations')"
       :icon="SECTION_ICONS.valueTransformations"
@@ -1689,6 +1689,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-card-glass-border border-t border-solid"
     >
       <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
+        <OSelect
+          v-show="isConfigOptionVisible('gauge', 'gauge-range-mode')"
+          :model-value="
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config
+              .range_mode ?? 'fixed'
+          "
+          :options="gaugeRangeModeOptions"
+          :label="t('dashboard.gaugeRangeMode')"
+          :valueKey="'value'"
+          :labelKey="'label'"
+          @update:model-value="
+            (value: unknown) =>
+              (dashboardPanelDataModel.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].config.range_mode = value === 'auto' ? 'auto' : 'fixed')
+          "
+          data-test="dashboard-config-gauge-range-mode"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.gaugeRangeModeTooltip')" max-width="15.625rem" />
+          </template>
+        </OSelect>
         <OInput
           v-show="isConfigOptionVisible('gauge', 'gauge-min')"
           v-model.number="
@@ -1725,6 +1747,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="number"
           :label="t('dashboard.gaugeMaxValue')"
           :placeholder="t('dashboard.hundredPlaceholder')"
+          :error-message="gaugeRangeError"
           @update:model-value="
             (value: any) =>
               (dashboardPanelDataModel.data.queries[
@@ -1743,6 +1766,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }
           "
           data-test="dashboard-config-gauge-max"
+        />
+        <OSwitch
+          v-show="isConfigOptionVisible('gauge', 'gauge-end-labels')"
+          v-model="dashboardPanelDataModel.data.config.show_gauge_end_labels"
+          :label="t('dashboard.showGaugeEndLabels')"
+          data-test="dashboard-config-gauge-end-labels"
+          size="lg"
         />
       </div>
     </OCollapsible>
@@ -2132,6 +2162,7 @@ import {
 } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { AxisLabelMode } from "@/utils/dashboard/fieldLabel";
+import { isGaugeFixedRangeValid } from "@/utils/dashboard/gaugeDial";
 import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
 import ColorBySeries from "./ColorBySeries.vue";
@@ -2691,6 +2722,20 @@ export default defineComponent({
       },
     ];
 
+    const gaugeRangeModeOptions = [
+      { label: t("dashboard.gaugeRangeModeFixed"), value: "fixed" },
+      { label: t("dashboard.gaugeRangeModeAuto"), value: "auto" },
+    ];
+    // Save is blocked on the same rule; this says why beside the field.
+    const gaugeRangeError = computed(() =>
+      dashboardPanelData.data.type === "gauge" &&
+      !isGaugeFixedRangeValid(
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.config,
+      )
+        ? t("dashboard.utils.gaugeMinBelowMax")
+        : undefined,
+    );
+
     const showSymbol = [
       {
         label: t("dashboard.no"),
@@ -3113,6 +3158,8 @@ export default defineComponent({
       unitOptions,
       labelPositionOptions,
       showSymbol,
+      gaugeRangeModeOptions,
+      gaugeRangeError,
       lineInterpolationOptions,
       isWeightFieldPresent,
       setUnit,

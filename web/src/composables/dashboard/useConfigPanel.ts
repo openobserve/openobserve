@@ -26,6 +26,7 @@ import {
 } from "@/utils/dashboard/searchLabelsConfig";
 import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
 import { PROMQL_MODULAR_CHART_TYPES } from "@/utils/dashboard/promql/shared/types";
+import { isGaugeAutoRange } from "@/utils/dashboard/gaugeDial";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -470,12 +471,28 @@ export function useConfigPanel(
       },
     },
     gauge: {
+      "gauge-range-mode": {
+        label: t("dashboard.gaugeRangeMode"),
+        visible: dashboardPanelData.data.type === "gauge",
+      },
       "gauge-min": {
         label: t("dashboard.gaugeMinValue"),
-        visible: dashboardPanelData.data.type === "gauge",
+        visible:
+          dashboardPanelData.data.type === "gauge" &&
+          !isGaugeAutoRange(
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.config,
+          ),
       },
       "gauge-max": {
         label: t("dashboard.gaugeMaxValue"),
+        visible:
+          dashboardPanelData.data.type === "gauge" &&
+          !isGaugeAutoRange(
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.config,
+          ),
+      },
+      "gauge-end-labels": {
+        label: t("dashboard.showGaugeEndLabels"),
         visible: dashboardPanelData.data.type === "gauge",
       },
     },

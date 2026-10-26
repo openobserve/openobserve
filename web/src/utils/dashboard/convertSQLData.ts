@@ -29,6 +29,12 @@ import { calculateGridPositions, getTrellisGrid } from "./calculateGridForSubPlo
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { escapeHtml } from "@/utils/html";
 import { applyGaugeSeriesThresholds, applyLineAreaThresholds } from "./thresholds";
+import {
+  alignGaugeValueFonts,
+  gaugeAutoRange,
+  sizeGaugeDial,
+  type GaugeDialSeries,
+} from "./gaugeDial";
 import { applySeriesOverrides } from "./seriesOverrides";
 import {
   applyPieDonutChartAlignment,
@@ -554,6 +560,7 @@ export const convertMultiSQLData = async (
       allSeries.length,
     );
     const minDim = Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight);
+    const autoRange = gaugeAutoRange(allSeries.map((s: GaugeDialSeries) => s?.data?.[0]?.value));
 
     allSeries.forEach((s: any, idx: number) => {
       const cell = gridDataForGauge.gridArray[idx];
@@ -562,17 +569,10 @@ export const convertMultiSQLData = async (
         `${parseFloat(cell.left) + parseFloat(cell.width) / 2}%`,
         `${parseFloat(cell.top) + parseFloat(cell.height) / 2}%`,
       ];
-      s.radius = `${minDim / 2 - 5}px`;
-      if (s.progress) {
-        s.progress.width = `${minDim / 6}`;
-      }
-      if (s.axisLine?.lineStyle) {
-        s.axisLine.lineStyle.width = `${minDim / 6}`;
-      }
-      if (s.title) {
-        s.title.width = `${gridDataForGauge.gridWidth}`;
-      }
+      if (s._autoRange && autoRange) Object.assign(s, autoRange);
+      sizeGaugeDial(s, minDim, gridDataForGauge.gridWidth);
     });
+    alignGaugeValueFonts(allSeries, minDim);
     options[0].options.series = allSeries;
     applySeriesColorMappings(
       options[0].options.series,

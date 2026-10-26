@@ -259,7 +259,13 @@ export const gaugeDialRange = (min: any, max: any, unit: unknown): { min: any; m
   const unset = (value: any, fallback: number) =>
     value === null || value === undefined || value === "" || Number(value) === fallback;
   if (unit === "percent-1" && unset(min, 0) && unset(max, 100)) return { min: 0, max: 1 };
-  return { min: min || 0, max: max || 100 };
+  const blank = (value: any) => value === null || value === undefined || value === "";
+  const low = blank(min) ? 0 : min;
+  const high = blank(max) ? 100 : max;
+  // An empty or inverted span cannot be drawn; keep the 100-wide dial such panels always showed.
+  return Number(high) > Number(low)
+    ? { min: low, max: high }
+    : { min: low, max: Number(low) + 100 };
 };
 
 /** Recolours one gauge series: arc bands from the steps, progress and pointer in the value's step colour. */
@@ -274,8 +280,10 @@ export const applyGaugeThresholds = (
   const max = toNumber(gauge.max) ?? 100;
   const resolved = resolveStepValues(thresholds, { min, max });
   if (!resolved) return;
-  const current: string = item.itemStyle?.color ?? fallbackColor;
-  item.itemStyle = { ...item.itemStyle, color: stepColorFor(item.value, resolved, current) };
+  const current: string = (gauge._mappedColor ? null : item.itemStyle?.color) ?? fallbackColor;
+  // A value-mapping colour outranks the step colour, as on the metric chart.
+  const color = gauge._mappedColor ?? stepColorFor(item.value, resolved, current);
+  item.itemStyle = { ...item.itemStyle, color };
   gauge.axisLine = {
     ...gauge.axisLine,
     lineStyle: {
