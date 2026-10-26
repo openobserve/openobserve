@@ -439,6 +439,17 @@ pub async fn evict_org(org_id: &str) -> Result<(), anyhow::Error> {
 
 /// Lists live orgs; tombstones stay out so caches, jobs and the org list never see them.
 pub async fn list(limit: Option<i64>) -> Result<Vec<Organization>, anyhow::Error> {
+    Ok(list_with_created_at(limit)
+        .await?
+        .into_iter()
+        .map(|(org, _)| org)
+        .collect())
+}
+
+/// Same as [`list`], paired with each org's creation time in microseconds.
+pub async fn list_with_created_at(
+    limit: Option<i64>,
+) -> Result<Vec<(Organization, i64)>, anyhow::Error> {
     let filter = organizations::ListFilter {
         exclude_deleted: true,
         ..organizations::ListFilter::with_limit(limit)
@@ -446,7 +457,13 @@ pub async fn list(limit: Option<i64>) -> Result<Vec<Organization>, anyhow::Error
     let orgs = organizations::list(filter)
         .await
         .map_err(|e| anyhow::anyhow!("Error listing orgs: {}", e))?;
-    Ok(orgs.into_iter().map(to_organization).collect())
+    Ok(orgs
+        .into_iter()
+        .map(|org| {
+            let created_at = org.created_at;
+            (to_organization(org), created_at)
+        })
+        .collect())
 }
 
 /// Orgs whose row and this node's status cache are both clear of pending, deleting and deleted.

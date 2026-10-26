@@ -95,11 +95,7 @@ pub async fn search(
     let role_group = req
         .search_event_type
         .as_ref()
-        .map(|v| {
-            SearchEventType::try_from(v.as_str())
-                .ok()
-                .map(RoleGroup::from)
-        })
+        .map(|v| v.parse::<SearchEventType>().ok().map(RoleGroup::from))
         .unwrap_or(Some(RoleGroup::Interactive));
     let clusters = get_cluster_nodes(trace_id, req_regions, req_clusters, role_group).await?;
     let clusters_num = clusters.len();

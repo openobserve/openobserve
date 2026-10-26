@@ -174,7 +174,11 @@ export default defineComponent({
 
     const legendSeriesNames = computed(() =>
       isChartMode.value
-        ? getLegendSeriesNames(props.panelData?.options, dashboardPanelData.data.type)
+        ? getLegendSeriesNames(
+            props.panelData?.options,
+            dashboardPanelData.data.type,
+            props.panelData?.extras,
+          )
         : [],
     );
 

@@ -3076,6 +3076,12 @@ pub struct Limit {
     )]
     pub max_dashboard_series: usize,
     #[env_config(
+        name = "ZO_MAX_DASHBOARD_STATE_TIMELINE_SERIES",
+        default = 2000,
+        help = "maximum PromQL series a state timeline panel loads; restarts split one entity into several series"
+    )]
+    pub max_dashboard_state_timeline_series: usize,
+    #[env_config(
         name = "ZO_SEARCH_MINI_PARTITION_DURATION_SECS",
         default = 60,
         help = "Duration of each mini search partition in seconds"
@@ -3571,8 +3577,6 @@ pub struct RUM {
     pub service: String,
     #[env_config(name = "ZO_RUM_ENV", default = "")]
     pub env: String,
-    #[env_config(name = "ZO_RUM_VERSION", default = "")]
-    pub version: String,
     #[env_config(name = "ZO_RUM_ORGANIZATION_IDENTIFIER", default = "")]
     pub organization_identifier: String,
     #[env_config(name = "ZO_RUM_API_VERSION", default = "")]
@@ -4016,6 +4020,9 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // reset to default if given zero
     if cfg.limit.max_dashboard_series < 1 {
         cfg.limit.max_dashboard_series = 100;
+    }
+    if cfg.limit.max_dashboard_state_timeline_series < 1 {
+        cfg.limit.max_dashboard_state_timeline_series = 2000;
     }
 
     // check query timeout
@@ -6353,6 +6360,19 @@ mod tests {
         cfg.limit.batch_size = 4096; // within range
         check_limit_config(&mut cfg).unwrap();
         assert_eq!(cfg.limit.batch_size, 4096);
+    }
+
+    #[test]
+    fn test_check_limit_config_dashboard_state_timeline_series() {
+        let mut cfg = Config::init().unwrap();
+        assert_eq!(cfg.limit.max_dashboard_state_timeline_series, 2000);
+        cfg.limit.max_dashboard_state_timeline_series = 0;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.max_dashboard_state_timeline_series, 2000);
+
+        cfg.limit.max_dashboard_state_timeline_series = 50;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.max_dashboard_state_timeline_series, 50);
     }
 
     #[test]

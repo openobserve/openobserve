@@ -15,6 +15,8 @@
 
 //! gRPC transport frontend for OpenObserve.
 
+#![recursion_limit = "256"]
+
 use openobserve_core as service;
 
 pub mod handler;

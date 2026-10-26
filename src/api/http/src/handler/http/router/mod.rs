@@ -1082,6 +1082,7 @@ fn alert_calibration_routes(router: Router) -> Router {
         .route("/v2/{org_id}/alert_calibration/digests/run", post(alert_calibration::digests::run_alert_calibration))
 }
 
+#[rustfmt::skip]
 pub fn service_routes() -> Router {
     let cfg = get_config();
 
@@ -2606,7 +2607,9 @@ pub fn splunk_collector_routes() -> Router {
         .layer(RequestDecompressionLayer::new())
         // Outermost, so the 10 MiB cap is measured on the wire before any
         // decompression can amplify an unauthenticated body.
-        .layer(middleware::from_fn(hec_collector::wire_body_limit_middleware))
+        .layer(middleware::from_fn(
+            hec_collector::wire_body_limit_middleware,
+        ))
         .layer(middleware::from_fn(ingest_rejections_middleware))
 }
 

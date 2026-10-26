@@ -165,7 +165,7 @@ pub async fn page(Path(slug): Path<String>, ip: Option<Extension<RealIp>>) -> Re
         .header("X-Frame-Options", "DENY")
         .header("X-Content-Type-Options", "nosniff")
         .header("Referrer-Policy", "no-referrer")
-        // The page has no external assets or inline handlers, so a strict CSP is free defense-in-depth.
+        // No external assets or inline handlers, so a strict CSP is free defense-in-depth.
         .header(
             "Content-Security-Policy",
             "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; \

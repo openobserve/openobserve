@@ -112,6 +112,8 @@ pub struct UserOrgExpandedRecord {
     pub org_name: String,
     pub org_type: OrganizationType,
     pub allow_static_token: bool,
+    /// The org's own creation time; `created_at` is the membership time.
+    pub org_created_at: i64,
 }
 
 impl FromQueryResult for UserOrgExpandedRecord {
@@ -125,6 +127,7 @@ impl FromQueryResult for UserOrgExpandedRecord {
         let org_name = result.try_get(pre, "org_name")?;
         let org_type: i16 = result.try_get(pre, "org_type")?;
         let allow_static_token: bool = result.try_get(pre, "allow_static_token").unwrap_or(true);
+        let org_created_at = result.try_get(pre, "org_created_at")?;
 
         Ok(Self {
             email,
@@ -136,6 +139,7 @@ impl FromQueryResult for UserOrgExpandedRecord {
             org_name,
             org_type: org_type.into(),
             allow_static_token,
+            org_created_at,
         })
     }
 }
@@ -545,6 +549,7 @@ pub async fn list_orgs_by_user(email: &str) -> Result<Vec<UserOrgExpandedRecord>
         .column(organizations::Column::OrgName)
         .column(organizations::Column::OrgType)
         .column(Column::AllowStaticToken)
+        .column_as(organizations::Column::CreatedAt, "org_created_at")
         .into_model::<UserOrgExpandedRecord>()
         .all(client)
         .await
