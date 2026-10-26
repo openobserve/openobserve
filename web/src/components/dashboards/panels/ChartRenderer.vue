@@ -96,6 +96,8 @@ import {
   SankeyChart,
   TreeChart,
   GraphChart,
+  TreemapChart,
+  PictorialBarChart,
 } from "echarts/charts";
 import {
   TitleComponent,
@@ -163,6 +165,8 @@ echarts.use([
   SankeyChart,
   TreeChart,
   GraphChart,
+  TreemapChart,
+  PictorialBarChart,
   LabelLayout,
   UniversalTransition,
   CanvasRenderer,
@@ -311,8 +315,8 @@ export default defineComponent({
         params.seriesIndex = params?.dataIndex;
       }
 
-      // Sankey and heatmap series are not lines to single out, and unnamed heatmaps share ECharts' default name.
-      if (params?.componentSubType === "sankey" || params?.componentSubType === "heatmap") {
+      // Sankey, heatmap and treemap series are not lines to single out, and unnamed heatmaps share ECharts' default name.
+      if (["sankey", "heatmap", "treemap"].includes(params?.componentSubType)) {
         params.seriesName = "";
         params.seriesIndex = -1;
       }

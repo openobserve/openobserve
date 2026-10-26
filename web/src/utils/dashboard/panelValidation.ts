@@ -32,6 +32,8 @@ import {
 } from "@/utils/dashboard/panelTypeOptions";
 import { TABLE_DENSITIES, TABLE_FOOTER_CALCS } from "@/utils/dashboard/tableOptions";
 import { SPECIAL_VALUE_MATCHES } from "@/utils/dashboard/tableConfigUtils";
+import { BAR_GAUGE_MODES, BAR_GAUGE_ORIENTATIONS } from "@/utils/dashboard/convertBarGaugeData";
+import { DISTRIBUTION_MAX_BUCKETS } from "@/utils/dashboard/convertDistributionData";
 
 /**
  * Validates a single condition item
@@ -427,7 +429,8 @@ const validateChartFieldsConfiguration = (
       }
       break;
     }
-    case "gauge": {
+    case "gauge":
+    case "bar-gauge": {
       if (fields?.y?.length !== 1) {
         const errorMsg =
           pageKey === "logs"
@@ -506,7 +509,38 @@ const validateChartFieldsConfiguration = (
       }
       break;
     }
-    case "state-timeline": {
+    case "state-timeline":
+    case "status-history": {
+      if (fields?.y?.length !== 1) {
+        const errorMsg =
+          pageKey === "logs"
+            ? t("dashboard.utils.unableToExtractValueField")
+            : t("dashboard.utils.addOneFieldFor", { label: yAxisLabel });
+        errors.push(errorMsg);
+      }
+      if (fields?.x?.length !== 1) {
+        const errorMsg =
+          pageKey === "logs"
+            ? t("dashboard.utils.unableToExtractGroupingField")
+            : t("dashboard.utils.addOneFieldFor", { label: xAxisLabel });
+        errors.push(errorMsg);
+      }
+      break;
+    }
+    case "distribution": {
+      if (!fields?.y?.length) {
+        const errorMsg =
+          pageKey === "logs"
+            ? t("dashboard.utils.unableToExtractValueField")
+            : t("dashboard.utils.addAtLeastOneFieldFor", { label: yAxisLabel });
+        errors.push(errorMsg);
+      }
+      if (fields?.x?.length) {
+        errors.push(t("dashboard.utils.fieldNotAllowedForDistribution", { label: xAxisLabel }));
+      }
+      break;
+    }
+    case "treemap": {
       if (fields?.y?.length !== 1) {
         const errorMsg =
           pageKey === "logs"
@@ -884,8 +918,12 @@ const validatePanelContent = (t: TranslateFn, panel: any): string[] => {
     "h-stacked",
     "heatmap",
     "state-timeline",
+    "status-history",
+    "distribution",
+    "treemap",
     "metric",
     "gauge",
+    "bar-gauge",
     "geomap",
     "maps",
     "table",
@@ -1069,7 +1107,9 @@ const PANEL_TYPE_CHOICE_KEYS: ReadonlyArray<[string, string[], readonly unknown[
   ["stat_text_mode", ["metric"], STAT_TEXT_MODES],
   ["gauge_style", ["gauge"], GAUGE_STYLES],
   ["table_density", ["table"], TABLE_DENSITIES],
-  ["state_value_align", ["state-timeline"], STATE_VALUE_ALIGNS],
+  ["state_value_align", ["state-timeline", "status-history"], STATE_VALUE_ALIGNS],
+  ["bar_gauge_mode", ["bar-gauge"], BAR_GAUGE_MODES],
+  ["bar_gauge_orientation", ["bar-gauge"], BAR_GAUGE_ORIENTATIONS],
   ["sort_order", ["pie", "donut"], SORT_ORDERS],
 ];
 
@@ -1086,6 +1126,8 @@ const PANEL_TYPE_RANGE_KEYS: ReadonlyArray<[string, string[], number, number, bo
   ["donut_inner_radius", ["donut"], 0, 95, false],
   ["heatmap_cell_gap", ["heatmap"], 0, Infinity, false],
   ["map_cluster_radius", ["geomap"], 0, Infinity, true],
+  ["distribution_bucket_count", ["distribution"], 1, DISTRIBUTION_MAX_BUCKETS, false],
+  ["distribution_bucket_size", ["distribution"], 0, Infinity, true],
 ];
 
 const validatePanelTypeChoices = (t: TranslateFn, panel: any, errors: string[]) => {
@@ -1129,6 +1171,13 @@ const validatePanelTypeRanges = (t: TranslateFn, panel: any, errors: string[]) =
       errors.push(t("dashboard.utils.configValueNotNumeric", { setting: "gauge_neutral" }));
     }
   }
+  if (panel.type === "distribution" && isSetValue(config.distribution_bucket_offset)) {
+    if (asFiniteNumber(config.distribution_bucket_offset) === null) {
+      errors.push(
+        t("dashboard.utils.configValueNotNumeric", { setting: "distribution_bucket_offset" }),
+      );
+    }
+  }
   if (panel.type === "heatmap" && isSetValue(config.heatmap_hide_below)) {
     if (asFiniteNumber(config.heatmap_hide_below) === null) {
       errors.push(t("dashboard.utils.configValueNotNumeric", { setting: "heatmap_hide_below" }));
@@ -1147,7 +1196,7 @@ const validateSpecialMappings = (t: TranslateFn, panel: any, errors: string[]) =
   });
 };
 
-/** Metric, gauge, pie, table, heatmap, state timeline and geomap settings the renderer would silently ignore or misread. */
+/** Chart-specific settings the renderer would silently ignore or misread. */
 const validatePanelTypeConfig = (t: TranslateFn, panelData: any, errors: string[]) => {
   const panel = panelData?.data;
   if (!panel?.config) return;
@@ -1216,6 +1265,8 @@ export const validatePanel = (
       "maps",
       "heatmap",
       "state-timeline",
+      "status-history",
+      "bar-gauge",
       "geomap",
       "donut",
       "pie",

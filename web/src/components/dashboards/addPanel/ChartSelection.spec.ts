@@ -166,4 +166,31 @@ describe("ChartSelection", () => {
 
     filteredWrapper.unmount();
   });
+
+  it("lists bar gauge, distribution, status history and treemap, each with its own icon", async () => {
+    for (const id of ["bar-gauge", "distribution", "status-history", "treemap"]) {
+      const item = wrapper.find(`[data-test='selected-chart-${id}-item']`);
+      expect(item.exists(), id).toBe(true);
+      expect(item.find("img").attributes("src"), id).toContain(`charts/${id}.svg`);
+    }
+    await wrapper.find("[data-test='selected-chart-treemap-item']").trigger("click");
+    expect(wrapper.emitted()["update:selectedChartType"].at(-1)).toEqual(["treemap"]);
+  });
+
+  it("in PromQL mode keeps bar gauge and status history, and disables distribution and treemap", async () => {
+    const { dashboardPanelData } = wrapper.vm;
+    const previous = dashboardPanelData.data.queryType;
+    dashboardPanelData.data.queryType = "promql";
+    await flushPromises();
+    const disabled = (id: string) =>
+      wrapper
+        .find(`[data-test='selected-chart-${id}-item']`)
+        .element.closest("li")
+        .className.includes("cursor-not-allowed");
+    expect(disabled("bar-gauge")).toBe(false);
+    expect(disabled("status-history")).toBe(false);
+    expect(disabled("distribution")).toBe(true);
+    expect(disabled("treemap")).toBe(true);
+    dashboardPanelData.data.queryType = previous;
+  });
 });

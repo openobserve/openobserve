@@ -478,5 +478,61 @@ describe("usePanelAggregation", () => {
         expect(panelData.data.queries[0].fields.filter.conditions).toHaveLength(0);
       });
     });
+
+    describe("new chart types", () => {
+      const yField = (functionName: string | null) => ({
+        functionName,
+        args: [{ type: "field" }, { type: "extra" }],
+      });
+
+      it("distribution drops aggregation, the x fields and extra breakdowns", () => {
+        const panelData = makePanelData("distribution");
+        const fields = panelData.data.queries[0].fields;
+        fields.x = [{ alias: "x" }];
+        fields.y = [yField("count"), yField("avg")];
+        fields.breakdown = [{ alias: "b1" }, { alias: "b2" }];
+        panelData.data.queries[0].config.time_shift = [{ offSet: "1h" }] as any;
+        makeAggregation(panelData).resetAggregationFunction();
+        expect(fields.x).toEqual([]);
+        expect(fields.y.map((item: any) => item.functionName)).toEqual([null, null]);
+        expect(fields.y[0].args).toHaveLength(1);
+        expect(fields.breakdown).toEqual([{ alias: "b1" }]);
+        expect(panelData.data.queries[0].config.time_shift).toEqual([]);
+      });
+
+      it("treemap keeps one x, one y counted and one breakdown", () => {
+        const panelData = makePanelData("treemap");
+        const fields = panelData.data.queries[0].fields;
+        fields.x = [{ alias: "x1" }, { alias: "x2" }];
+        fields.y = [yField(null), yField("sum")];
+        fields.breakdown = [{ alias: "b1" }, { alias: "b2" }];
+        makeAggregation(panelData).resetAggregationFunction();
+        expect(fields.x).toEqual([{ alias: "x1" }]);
+        expect(fields.y.map((item: any) => item.functionName)).toEqual(["count"]);
+        expect(fields.breakdown).toEqual([{ alias: "b1" }]);
+      });
+
+      it("status history keeps one y, counts a raw one and clears time shifts", () => {
+        const panelData = makePanelData("status-history");
+        const fields = panelData.data.queries[0].fields;
+        fields.y = [yField(null), yField("avg")];
+        panelData.data.queries[0].config.time_shift = [{ offSet: "1h" }] as any;
+        makeAggregation(panelData).resetAggregationFunction();
+        expect(fields.y.map((item: any) => item.functionName)).toEqual(["count"]);
+        expect(panelData.data.queries[0].config.time_shift).toEqual([]);
+      });
+
+      it("bar gauge resets like a gauge", () => {
+        const panelData = makePanelData("bar-gauge");
+        const fields = panelData.data.queries[0].fields;
+        fields.x = [{ alias: "x1" }, { alias: "x2" }];
+        fields.y = [yField("avg"), yField("sum")];
+        fields.breakdown = [{ alias: "b1" }];
+        makeAggregation(panelData).resetAggregationFunction();
+        expect(fields.x).toHaveLength(1);
+        expect(fields.y).toHaveLength(1);
+        expect(fields.breakdown).toEqual([]);
+      });
+    });
   });
 });

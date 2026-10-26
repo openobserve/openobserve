@@ -29,7 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex w-full flex-row ps-3 max-md:flex-col"
       v-if="dashboardPanelData.data.type != 'metric'"
     >
-      <div class="flex-1">
+      <!-- A distribution buckets the y values, so it has no x field. -->
+      <div class="flex-1" v-if="dashboardPanelData.data.type != 'distribution'">
         <div class="flex flex-row">
           <div class="layout-name flex items-center whitespace-nowrap" :class="labelWidthClass">
             <span
@@ -177,14 +178,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type == 'scatter' ||
           dashboardPanelData.data.type == 'area-stacked' ||
           dashboardPanelData.data.type == 'stacked' ||
-          dashboardPanelData.data.type == 'state-timeline'
+          dashboardPanelData.data.type == 'state-timeline' ||
+          dashboardPanelData.data.type == 'status-history' ||
+          dashboardPanelData.data.type == 'distribution' ||
+          dashboardPanelData.data.type == 'treemap'
         "
       >
         <div
           class="max-md:border-border-default flex h-full flex-row ps-3 max-md:border-t max-md:ps-0"
         >
           <!-- Separator between X and Breakdown/Pivot -->
-          <OSeparator vertical class="me-4 max-md:hidden" />
+          <OSeparator
+            v-if="dashboardPanelData.data.type != 'distribution'"
+            vertical
+            class="me-4 max-md:hidden"
+          />
           <!-- shrink-0, not min-w-0: the nowrap label would overflow onto the drop-zone hint if it shrank. -->
           <div class="layout-name flex min-w-0 items-center whitespace-nowrap max-lg:shrink-0">
             <span
@@ -207,8 +215,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   >{{ t("panel.breakdownTooltipHBar") }}</span
                 >
-                <span v-else-if="dashboardPanelData.data.type == 'state-timeline'">{{
-                  t("panel.breakdownTooltipStateTimeline")
+                <span
+                  v-else-if="
+                    dashboardPanelData.data.type == 'state-timeline' ||
+                    dashboardPanelData.data.type == 'status-history'
+                  "
+                  >{{ t("panel.breakdownTooltipStateTimeline") }}</span
+                >
+                <span v-else-if="dashboardPanelData.data.type == 'distribution'">{{
+                  t("panel.breakdownTooltipDistribution")
+                }}</span>
+                <span v-else-if="dashboardPanelData.data.type == 'treemap'">{{
+                  t("panel.breakdownTooltipTreemap")
                 }}</span>
                 <span v-else>{{ t("panel.breakdownTooltipDefault") }}</span>
               </template>
@@ -442,7 +460,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                       .fields.y[index]
                   "
-                  :allowAggregation="dashboardPanelData.data.type == 'heatmap' ? false : true"
+                  :allowAggregation="
+                    !['heatmap', 'distribution'].includes(dashboardPanelData.data.type)
+                  "
                   :customQuery="
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                       .customQuery
@@ -1133,8 +1153,10 @@ export default defineComponent({
       switch (dashboardPanelData.data.type) {
         case "pie":
         case "donut":
+        case "treemap":
           return t("dashboard.oneLabelFieldMessage");
         case "metric":
+        case "distribution":
           return t("dashboard.xaxisFieldNAMessage");
         case "table":
           return t("dashboard.oneOrMoreFieldsMessage");
@@ -1149,8 +1171,10 @@ export default defineComponent({
           return t("dashboard.twoFieldsMessage");
         case "heatmap":
         case "state-timeline":
+        case "status-history":
           return t("dashboard.oneFieldMessage");
         case "gauge":
+        case "bar-gauge":
           return t("dashboard.dashboardQueryBuilder.addZeroOrOneLabelField");
         default:
           return t("dashboard.maxtwofieldMessage");
@@ -1173,11 +1197,14 @@ export default defineComponent({
         case "pie":
         case "donut":
         case "gauge":
+        case "bar-gauge":
+        case "treemap":
           return t("dashboard.oneValueFieldMessage");
         case "metric":
           return t("dashboard.oneValueFieldMessage");
         case "heatmap":
         case "state-timeline":
+        case "status-history":
           return t("dashboard.oneFieldMessage");
         default:
           return t("dashboard.oneOrMoreFieldsMessage");

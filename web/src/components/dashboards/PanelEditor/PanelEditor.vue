@@ -190,9 +190,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       v-if="
                         !panelSchemaRendererRef?.noData &&
-                        !['table', 'heatmap', 'metric', 'gauge', 'geomap', 'maps'].includes(
-                          dashboardPanelData.data.type,
-                        )
+                        ![
+                          'table',
+                          'heatmap',
+                          'metric',
+                          'gauge',
+                          'bar-gauge',
+                          'treemap',
+                          'geomap',
+                          'maps',
+                        ].includes(dashboardPanelData.data.type)
                       "
                       variant="ghost"
                       size="icon"
@@ -222,6 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'stacked',
                           'h-stacked',
                           'state-timeline',
+                          'status-history',
                         ].includes(dashboardPanelData.data.type) &&
                         panelSchemaRendererRef?.checkIfPanelIsTimeSeries === true
                       "

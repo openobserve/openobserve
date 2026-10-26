@@ -1519,4 +1519,43 @@ describe("configUtils", () => {
       expect(shouldShowCartesianAxisConfig(panel)).toBe(false);
     });
   });
+
+  describe("bar gauge, distribution, status history and treemap", () => {
+    const panel = (type: string) => ({
+      data: {
+        type,
+        queries: [{ config: {} }],
+        config: {
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "plain",
+          trellis: { layout: null },
+        },
+      },
+    });
+
+    it.each(["bar-gauge", "treemap"])("%s has no axes, gridlines or legend", (type) => {
+      expect(shouldShowGridlines(panel(type))).toBe(false);
+      expect(shouldShowLegendsToggle(panel(type))).toBe(false);
+      expect(shouldShowAxisConfig(panel(type))).toBe(false);
+    });
+
+    it.each(["distribution", "status-history"])(
+      "%s keeps the legend toggle and gridlines but not legend placement or axis width",
+      (type) => {
+        expect(shouldShowGridlines(panel(type))).toBe(true);
+        expect(shouldShowLegendsToggle(panel(type))).toBe(true);
+        expect(shouldShowLegendPosition(panel(type))).toBe(false);
+        expect(shouldShowLegendType(panel(type))).toBe(false);
+        expect(shouldShowLegendWidth(panel(type))).toBe(false);
+        expect(shouldShowAxisConfig(panel(type))).toBe(false);
+      },
+    );
+
+    it("status history always runs a range query and bar gauge shows the no-value text", () => {
+      expect(shouldShowPromQLQueryType(panel("status-history"))).toBe(false);
+      expect(shouldShowPromQLQueryType(panel("bar-gauge"))).toBe(true);
+      expect(shouldShowNoValueReplacement(panel("bar-gauge"), true)).toBe(true);
+    });
+  });
 });

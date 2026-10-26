@@ -105,6 +105,7 @@ export const useAnnotationsData = (
     "stacked",
     "h-stacked",
     "state-timeline",
+    "status-history",
   ];
   const processTabPanels = (dashboardData: any): any[] => {
     if (!dashboardData?.tabs || !Array.isArray(dashboardData.tabs)) {

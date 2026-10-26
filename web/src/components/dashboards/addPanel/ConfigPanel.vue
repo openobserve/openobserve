@@ -738,6 +738,74 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OInput>
         </div>
 
+        <div
+          v-if="dashboardPanelData.data.type === 'distribution'"
+          v-show="isConfigOptionVisible('data', 'distribution-buckets')"
+          class="flex flex-col gap-2.5"
+        >
+          <div class="flex gap-2">
+            <OInput
+              class="min-w-0 flex-1"
+              :model-value="dashboardPanelData.data.config.distribution_bucket_count ?? null"
+              type="number"
+              :min="1"
+              :label="t('dashboard.distributionBucketCount')"
+              :placeholder="t('dashboard.distributionBucketCountPlaceholder')"
+              :disabled="dashboardPanelData.data.config.distribution_bucket_size != null"
+              data-test="dashboard-config-distribution_bucket_count"
+              @update:model-value="
+                (value: any) => setNumberConfig('distribution_bucket_count', value)
+              "
+            />
+            <OInput
+              class="min-w-0 flex-1"
+              :model-value="dashboardPanelData.data.config.distribution_bucket_size ?? null"
+              type="number"
+              :min="0"
+              :label="t('dashboard.distributionBucketSize')"
+              :placeholder="t('dashboard.auto')"
+              data-test="dashboard-config-distribution_bucket_size"
+              @update:model-value="
+                (value: any) => setNumberConfig('distribution_bucket_size', value)
+              "
+            >
+              <template #tooltip>
+                <OTooltip
+                  :content="t('dashboard.distributionBucketSizeTooltip')"
+                  max-width="15.625rem"
+                />
+              </template>
+            </OInput>
+          </div>
+          <OInput
+            :model-value="dashboardPanelData.data.config.distribution_bucket_offset ?? null"
+            type="number"
+            :label="t('dashboard.distributionBucketOffset')"
+            :placeholder="t('dashboard.zeroPlaceholder')"
+            data-test="dashboard-config-distribution_bucket_offset"
+            @update:model-value="
+              (value: any) => setNumberConfig('distribution_bucket_offset', value)
+            "
+          >
+            <template #tooltip>
+              <OTooltip
+                :content="t('dashboard.distributionBucketOffsetTooltip')"
+                max-width="15.625rem"
+              />
+            </template>
+          </OInput>
+        </div>
+
+        <OSwitch
+          v-if="dashboardPanelData.data.type === 'treemap'"
+          v-show="isConfigOptionVisible('data', 'treemap-breadcrumb')"
+          :model-value="dashboardPanelData.data.config.treemap_show_breadcrumb !== false"
+          :label="t('dashboard.treemapShowBreadcrumb')"
+          data-test="dashboard-config-treemap_show_breadcrumb"
+          size="lg"
+          @update:model-value="(value: any) => setDefaultOnFlag('treemap_show_breadcrumb', value)"
+        />
+
         <OSwitch
           v-if="promqlMode && dashboardPanelData.data.type === 'heatmap'"
           v-show="isConfigOptionVisible('data', 'heatmap-histogram-mode')"
@@ -1024,7 +1092,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #tooltip>
             <OTooltip
               :content="
-                ['metric', 'gauge', 'table'].includes(dashboardPanelData.data.type)
+                ['metric', 'gauge', 'bar-gauge', 'table'].includes(dashboardPanelData.data.type)
                   ? t('dashboard.noValueReplacementTooltipValue')
                   : t('dashboard.noValueReplacementTooltip')
               "
@@ -1037,7 +1105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Section: State timeline -->
     <OCollapsible
       variant="config"
-      v-if="dashboardPanelData.data.type === 'state-timeline'"
+      v-if="isRowTimeline(dashboardPanelData.data.type)"
       v-show="isSectionVisible('stateTimeline')"
       :model-value="isExpanded('stateTimeline')"
       :icon="SECTION_ICONS.stateTimeline"
@@ -1046,7 +1114,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.stateTimeline = v;
         }
       "
-      :label="t('dashboard.configSectionStateTimeline')"
+      :label="
+        dashboardPanelData.data.type === 'status-history'
+          ? t('dashboard.configSectionStatusHistory')
+          : t('dashboard.configSectionStateTimeline')
+      "
       class="border-card-glass-border border-t border-solid"
     >
       <div class="o2-input box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
@@ -1109,6 +1181,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('dashboard.stateTimelineShowStateText')"
           data-test="dashboard-config-state-timeline-show-state-text"
           size="lg"
+        />
+
+        <OSwitch
+          v-show="isConfigOptionVisible('stateTimeline', 'status-history-show-values')"
+          :model-value="dashboardPanelData.data.config.status_history_show_values !== false"
+          :label="t('dashboard.statusHistoryShowValues')"
+          data-test="dashboard-config-status_history_show_values"
+          size="lg"
+          @update:model-value="
+            (value: any) => setDefaultOnFlag('status_history_show_values', value)
+          "
         />
 
         <OToggleGroup
@@ -1979,7 +2062,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Section: Value Transformations -->
     <OCollapsible
       variant="config"
-      v-if="['table', 'metric', 'state-timeline'].includes(dashboardPanelData.data.type)"
+      v-if="
+        ['table', 'metric', 'state-timeline', 'status-history'].includes(
+          dashboardPanelData.data.type,
+        )
+      "
       v-show="isSectionVisible('valueTransformations')"
       :model-value="isExpanded('valueTransformations')"
       :icon="SECTION_ICONS.valueTransformations"
@@ -2277,7 +2364,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Section: Gauge -->
     <OCollapsible
       variant="config"
-      v-if="dashboardPanelData.data.type === 'gauge'"
+      v-if="['gauge', 'bar-gauge'].includes(dashboardPanelData.data.type)"
       v-show="isSectionVisible('gauge')"
       :model-value="isExpanded('gauge')"
       :icon="SECTION_ICONS.gauge"
@@ -2395,6 +2482,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-gauge_round_cap"
           size="lg"
           @update:model-value="(value: any) => setFlagConfig('gauge_round_cap', value)"
+        />
+        <OToggleGroup
+          v-show="isConfigOptionVisible('gauge', 'bar-gauge-mode')"
+          type="single"
+          label-position="top"
+          :label="t('dashboard.barGaugeMode')"
+          v-model="barGaugeModeModel"
+          data-test="dashboard-config-bar_gauge_mode"
+          :data-test-selected-value="barGaugeModeModel"
+        >
+          <OToggleGroupItem
+            v-for="opt in barGaugeModeOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+            data-test="dashboard-config-bar_gauge_mode-option"
+            :data-test-label="opt.label"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
+        <OToggleGroup
+          v-show="isConfigOptionVisible('gauge', 'bar-gauge-orientation')"
+          type="single"
+          label-position="top"
+          :label="t('dashboard.barGaugeOrientation')"
+          v-model="barGaugeOrientationModel"
+          data-test="dashboard-config-bar_gauge_orientation"
+          :data-test-selected-value="barGaugeOrientationModel"
+        >
+          <OToggleGroupItem
+            v-for="opt in barGaugeOrientationOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+            data-test="dashboard-config-bar_gauge_orientation-option"
+            :data-test-label="opt.label"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
+        <OSwitch
+          v-show="isConfigOptionVisible('gauge', 'bar-gauge-show-unfilled')"
+          :model-value="dashboardPanelData.data.config.bar_gauge_show_unfilled !== false"
+          :label="t('dashboard.barGaugeShowUnfilled')"
+          data-test="dashboard-config-bar_gauge_show_unfilled"
+          size="lg"
+          @update:model-value="(value: any) => setDefaultOnFlag('bar_gauge_show_unfilled', value)"
         />
       </div>
     </OCollapsible>
@@ -2941,6 +3074,8 @@ import {
   STAT_TEXT_MODES,
 } from "@/utils/dashboard/metricOptions";
 import { GAUGE_STYLES, STATE_VALUE_ALIGNS } from "@/utils/dashboard/panelTypeOptions";
+import { BAR_GAUGE_MODES, BAR_GAUGE_ORIENTATIONS } from "@/utils/dashboard/convertBarGaugeData";
+import { isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
 import { TABLE_DENSITIES } from "@/utils/dashboard/tableOptions";
 import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -3223,6 +3358,11 @@ export default defineComponent({
       if (value === true) config()[key] = true;
       else delete config()[key];
     };
+    // For a flag that is on by default: only turning it off is stored.
+    const setDefaultOnFlag = (key: string, value: unknown) => {
+      if (value === false) config()[key] = false;
+      else delete config()[key];
+    };
     const setListConfig = (key: string, value: unknown) => {
       const list = Array.isArray(value)
         ? value.filter((item): item is string => typeof item === "string")
@@ -3255,6 +3395,21 @@ export default defineComponent({
       { label: t("dashboard.gaugeStyleSemi"), value: "semi" },
       { label: t("dashboard.gaugeStyleArc"), value: "arc" },
       { label: t("dashboard.gaugeStyleCircle"), value: "circle" },
+    ];
+    const barGaugeModeModel = choiceModel("bar_gauge_mode", BAR_GAUGE_MODES, "gradient");
+    const barGaugeModeOptions: { label: I18nText; value: string }[] = [
+      { label: t("dashboard.barGaugeModeGradient"), value: "gradient" },
+      { label: t("dashboard.barGaugeModeLcd"), value: "lcd" },
+      { label: t("dashboard.barGaugeModeBasic"), value: "basic" },
+    ];
+    const barGaugeOrientationModel = choiceModel(
+      "bar_gauge_orientation",
+      BAR_GAUGE_ORIENTATIONS,
+      "horizontal",
+    );
+    const barGaugeOrientationOptions: { label: I18nText; value: string }[] = [
+      { label: t("dashboard.barGaugeOrientationHorizontal"), value: "horizontal" },
+      { label: t("dashboard.barGaugeOrientationVertical"), value: "vertical" },
     ];
     const pieLabelContentModel = listModel("pie_label_content");
     const pieLabelContentOptions: { label: I18nText; value: string }[] = [
@@ -3945,6 +4100,9 @@ export default defineComponent({
         "pie",
         "donut",
         "gauge",
+        "bar-gauge",
+        "distribution",
+        "treemap",
       ].includes(dashboardPanelData.data.type);
     });
 
@@ -4234,6 +4392,8 @@ export default defineComponent({
       tooltipModeModel,
       setNumberConfig,
       setFlagConfig,
+      setDefaultOnFlag,
+      isRowTimeline,
       setListConfig,
       statChangeModel,
       statChangeOptions,
@@ -4243,6 +4403,10 @@ export default defineComponent({
       statTextModeOptions,
       gaugeStyleModel,
       gaugeStyleOptions,
+      barGaugeModeModel,
+      barGaugeModeOptions,
+      barGaugeOrientationModel,
+      barGaugeOrientationOptions,
       pieLabelContentModel,
       pieLabelContentOptions,
       tableDensityModel,

@@ -28,6 +28,9 @@ import { applyPanelTypeOptions } from "./panelTypeOptions";
 import { applyMetricOptions, isStatChangeOn, splitStatChangeResults } from "./metricOptions";
 import { applyGeoMapClusters, mapClusterRadius } from "./geoMapCluster";
 import { applyTableOptions } from "./tableOptions";
+import { convertBarGaugeData } from "./convertBarGaugeData";
+import { convertDistributionData } from "./convertDistributionData";
+import { convertTreemapData } from "./convertTreemapData";
 /**
  * Converts panel data based on the panel schema and data.
  *
@@ -153,6 +156,62 @@ export const convertPanelData = async (
         return {};
       }
     }
+    case "bar-gauge": {
+      const query = panelSchema?.queries?.[0];
+      if (panelSchema?.queryType !== "promql" && !query?.customQuery && !query?.fields?.y?.length) {
+        throw new Error(gt("dashboard.utils.selectRequiredFields"));
+      }
+      // The gauge converters already reduce each series and resolve its colour and unit text.
+      const gaugeSchema = { ...panelSchema, type: "gauge" };
+      try {
+        const gauges: any =
+          panelSchema?.queryType == "promql"
+            ? await convertPromQLData(
+                gaugeSchema,
+                data,
+                store,
+                chartPanelRef,
+                hoveredSeriesState,
+                annotations,
+                metadata,
+                resultMetaData?.value,
+                loading,
+              )
+            : await convertMultiSQLData(
+                gaugeSchema,
+                data,
+                store,
+                chartPanelRef,
+                hoveredSeriesState,
+                resultMetaData,
+                metadata,
+                chartPanelStyle,
+                annotations,
+                loading,
+              );
+        return {
+          chartType: panelSchema.type,
+          ...gauges,
+          options: convertBarGaugeData(gauges?.options, panelSchema),
+        };
+      } catch (error) {
+        if (panelSchema?.queryType == "promql") throw error;
+        console.error(error);
+        return {};
+      }
+    }
+    case "distribution": {
+      return {
+        chartType: panelSchema.type,
+        ...convertDistributionData(panelSchema, data, store),
+      };
+    }
+    case "treemap": {
+      return {
+        chartType: panelSchema.type,
+        ...convertTreemapData(panelSchema, data, store),
+      };
+    }
     case "table": {
       // Check if PromQL query type
       if (panelSchema?.queryType == "promql") {
@@ -247,7 +306,8 @@ export const convertPanelData = async (
         ...convertSankeyData(panelSchema, data),
       };
     }
-    case "state-timeline": {
+    case "state-timeline":
+    case "status-history": {
       return {
         chartType: panelSchema.type,
         ...convertStateTimelineData(

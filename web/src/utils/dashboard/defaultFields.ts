@@ -121,5 +121,9 @@ export const buildDefaultBuilderFields = (
   if (chartType === "metric") return { x: [], y };
   // A count is not a state; the user picks the state column.
   if (chartType === "state-timeline") return { x, y: [] };
+  // A histogram needs a numeric field the user picks; a count of rows has nothing to bucket.
+  if (chartType === "distribution") return { x: [], y: [] };
+  // One bar or tile per label, so a time bucket is not a useful default label.
+  if (chartType === "bar-gauge" || chartType === "treemap") return { x: [], y };
   return { x, y };
 };

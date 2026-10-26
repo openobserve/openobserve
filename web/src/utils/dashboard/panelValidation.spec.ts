@@ -668,3 +668,115 @@ describe("validatePanel on metric, gauge, pie, table, heatmap, state timeline an
     );
   });
 });
+
+describe("validatePanel on bar gauge, distribution, status history and treemap", () => {
+  const field = (alias: string) => ({
+    alias,
+    column: alias,
+    label: alias,
+    type: "raw",
+    rawQuery: alias,
+  });
+  const run = (type: string, fields: any, config: any = {}, queryType = "sql") => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type,
+          queryType,
+          config,
+          queries: [
+            {
+              customQuery: queryType === "promql",
+              query: "SELECT 1",
+              fields: { x: [], y: [], breakdown: [], z: [], ...fields },
+            },
+          ],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+
+  it("accepts the builder slots each chart reads", () => {
+    expect(run("bar-gauge", { y: [field("count")] })).toEqual([]);
+    expect(run("bar-gauge", { x: [field("service")], y: [field("count")] })).toEqual([]);
+    expect(run("status-history", { x: [field("ts")], y: [field("v")] })).toEqual([]);
+    expect(run("distribution", { y: [field("a"), field("b")], breakdown: [field("s")] })).toEqual(
+      [],
+    );
+    expect(
+      run("treemap", { x: [field("service")], y: [field("count")], breakdown: [field("r")] }),
+    ).toEqual([]);
+  });
+
+  it("rejects the slots each chart cannot use", () => {
+    expect(run("bar-gauge", { y: [] })).toHaveLength(1);
+    expect(run("status-history", { x: [], y: [field("v")] })).toHaveLength(1);
+    expect(run("distribution", { y: [] })).toHaveLength(1);
+    expect(run("distribution", { x: [field("ts")], y: [field("v")] })[0]).toMatch(
+      /not allowed for the distribution chart/,
+    );
+    expect(run("treemap", { x: [], y: [field("c"), field("d")] })).toHaveLength(2);
+  });
+
+  it("allows bar gauge and status history on PromQL, not distribution or treemap", () => {
+    const unsupported = gt("dashboard.utils.promqlChartTypeUnsupported");
+    expect(run("bar-gauge", {}, {}, "promql")).not.toContain(unsupported);
+    expect(run("status-history", {}, {}, "promql")).not.toContain(unsupported);
+    expect(run("distribution", {}, {}, "promql")).toContain(unsupported);
+    expect(run("treemap", {}, {}, "promql")).toContain(unsupported);
+  });
+
+  it("checks the allowed values and ranges of the new keys", () => {
+    const y = { y: [field("v")] };
+    expect(
+      run("bar-gauge", y, { bar_gauge_mode: "lcd", bar_gauge_orientation: "vertical" }),
+    ).toEqual([]);
+    expect(run("bar-gauge", y, { bar_gauge_mode: "neon" })).toHaveLength(1);
+    expect(run("bar-gauge", y, { bar_gauge_orientation: "diagonal" })).toHaveLength(1);
+    expect(
+      run("distribution", y, {
+        distribution_bucket_count: 20,
+        distribution_bucket_size: 0.5,
+        distribution_bucket_offset: -1,
+      }),
+    ).toEqual([]);
+    expect(run("distribution", y, { distribution_bucket_count: 0 })).toHaveLength(1);
+    expect(run("distribution", y, { distribution_bucket_count: 5000 })).toHaveLength(1);
+    expect(run("distribution", y, { distribution_bucket_size: 0 })).toHaveLength(1);
+    expect(run("distribution", y, { distribution_bucket_offset: "x" })).toHaveLength(1);
+    expect(
+      run("status-history", { x: [field("ts")], ...y }, { state_value_align: "justify" }),
+    ).toHaveLength(1);
+  });
+
+  it("lists the new types as importable panel types", () => {
+    const panel = (type: string) => ({
+      type,
+      id: "p",
+      title: "t",
+      layout: { x: 0, y: 0, w: 1, h: 1 },
+    });
+    const errors = validateDashboardJson(gt, {
+      dashboardId: "d",
+      title: "t",
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default",
+          panels: ["bar-gauge", "distribution", "status-history", "treemap"].map(panel),
+        },
+      ],
+    });
+    expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
+  });
+});

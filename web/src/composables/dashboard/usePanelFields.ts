@@ -60,7 +60,10 @@ export const usePanelFields = ({
       case "donut":
       case "heatmap":
       case "gauge":
+      case "bar-gauge":
       case "state-timeline":
+      case "status-history":
+      case "treemap":
       case "area":
       case "bar":
       case "h-bar":
@@ -74,6 +77,7 @@ export const usePanelFields = ({
             .length >= 1
         );
       case "metric":
+      case "distribution":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x
             .length >= 0
@@ -99,6 +103,9 @@ export const usePanelFields = ({
       case "stacked":
       case "h-stacked":
       case "state-timeline":
+      case "status-history":
+      case "distribution":
+      case "treemap":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
             .breakdown?.length >= 1
@@ -119,6 +126,8 @@ export const usePanelFields = ({
       case "pie":
       case "donut":
       case "gauge":
+      case "bar-gauge":
+      case "treemap":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y
             .length >= 1
@@ -131,6 +140,7 @@ export const usePanelFields = ({
       case "area-stacked":
       case "heatmap":
       case "state-timeline":
+      case "status-history":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y
             .length >= 1
@@ -331,7 +341,9 @@ export const usePanelFields = ({
       color: getNewColorValue(),
       type: "build",
       functionName:
-        dashboardPanelData.data.type == "heatmap" || isDerived
+        dashboardPanelData.data.type == "heatmap" ||
+        dashboardPanelData.data.type == "distribution" ||
+        isDerived
           ? null
           : dashboardPanelData.data.type == "state-timeline"
             ? STATE_TIMELINE_Y_FUNCTION

@@ -131,14 +131,29 @@ export default defineComponent({
         id: "donut",
       },
       {
+        image: "img:" + getImageURL("images/dashboard/charts/treemap.svg"),
+        title: t("dashboard.chartSelection.treemap"),
+        id: "treemap",
+      },
+      {
         image: "img:" + getImageURL("images/dashboard/charts/heatmap.svg"),
         title: t("dashboard.heatmapLabel"),
         id: "heatmap",
       },
       {
+        image: "img:" + getImageURL("images/dashboard/charts/distribution.svg"),
+        title: t("dashboard.chartSelection.distribution"),
+        id: "distribution",
+      },
+      {
         image: "img:" + getImageURL("images/dashboard/charts/state-timeline.svg"),
         title: t("dashboard.stateTimelineLabel"),
         id: "state-timeline",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/status-history.svg"),
+        title: t("dashboard.chartSelection.statusHistory"),
+        id: "status-history",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/table.svg"),
@@ -154,6 +169,11 @@ export default defineComponent({
         image: "img:" + getImageURL("images/dashboard/charts/Gauge.svg"),
         title: t("dashboard.chartSelection.gauge"),
         id: "gauge",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/bar-gauge.svg"),
+        title: t("dashboard.chartSelection.barGauge"),
+        id: "bar-gauge",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/HTML.svg"),
@@ -188,11 +208,13 @@ export default defineComponent({
       "area-stacked",
       "metric",
       "gauge",
+      "bar-gauge",
       "pie",
       "donut",
       "table",
       "heatmap",
       "state-timeline",
+      "status-history",
       "h-bar",
       "stacked",
       "h-stacked",

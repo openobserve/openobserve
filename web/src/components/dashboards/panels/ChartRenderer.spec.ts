@@ -19,6 +19,8 @@ import ChartRenderer from "./ChartRenderer.vue";
 import i18n from "@/locales";
 import { raw } from "@/types/i18n";
 import store from "@/test/unit/helpers/store";
+import { use as echartsUse } from "echarts/core";
+import { PictorialBarChart, TreemapChart } from "echarts/charts";
 
 // Mock ECharts with comprehensive functionality
 vi.mock("echarts/core", () => ({
@@ -62,6 +64,8 @@ vi.mock("echarts/charts", () => ({
   SankeyChart: vi.fn(),
   TreeChart: vi.fn(),
   GraphChart: vi.fn(),
+  TreemapChart: vi.fn(),
+  PictorialBarChart: vi.fn(),
 }));
 
 vi.mock("echarts/features", () => ({
@@ -109,6 +113,16 @@ vi.mock("lodash-es", () => ({
   }),
   cloneDeep: vi.fn((obj) => JSON.parse(JSON.stringify(obj))),
 }));
+
+// ChartRenderer registers its series at import, before any beforeEach clears the mock.
+const registeredAtImport = vi.mocked(echartsUse).mock.calls.flat(2);
+
+describe("ChartRenderer series registration", () => {
+  it("registers the treemap and pictorial bar series the new chart types draw", () => {
+    expect(registeredAtImport).toContain(TreemapChart);
+    expect(registeredAtImport).toContain(PictorialBarChart);
+  });
+});
 
 describe("ChartRenderer", () => {
   let wrapper: any;

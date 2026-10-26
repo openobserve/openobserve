@@ -139,7 +139,10 @@
                   dashboardPanelData.data.type == 'scatter' ||
                   dashboardPanelData.data.type == 'area-stacked' ||
                   dashboardPanelData.data.type == 'stacked' ||
-                  dashboardPanelData.data.type == 'state-timeline'
+                  dashboardPanelData.data.type == 'state-timeline' ||
+                  dashboardPanelData.data.type == 'status-history' ||
+                  dashboardPanelData.data.type == 'distribution' ||
+                  dashboardPanelData.data.type == 'treemap'
                 "
                 variant="ghost-neutral"
                 size="chip"

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { STATE_TIMELINE_Y_FUNCTION } from "@/utils/dashboard/defaultFields";
+import { isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
 
 export const usePanelAggregation = ({
   dashboardPanelData,
@@ -28,13 +29,39 @@ export const usePanelAggregation = ({
     // Skip resetting fields for PromQL mode to preserve the query
     if (dashboardPanelData.data.queryType === "promql") {
       // A state timeline has no comparison window; a shift left over from another type must not run.
-      if (dashboardPanelData.data.type === "state-timeline") {
+      if (isRowTimeline(dashboardPanelData.data.type)) {
         dashboardPanelData.data.queries?.forEach((query: any) => (query.config.time_shift = []));
       }
       return;
     }
 
     switch (dashboardPanelData.data.type) {
+      case "distribution":
+        // A histogram buckets raw values, so every y field drops its aggregation and nothing is grouped by x.
+        dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.y.forEach((itemY: any) => {
+            if (itemY.isDerived) return;
+            itemY.functionName = null;
+            itemY.args = itemY?.args?.length ? [itemY?.args?.[0]] : [];
+          });
+          query.fields.x = [];
+          query.fields.z = [];
+          query.fields.breakdown = query.fields.breakdown.slice(0, 1);
+          query.fields.latitude = null;
+          query.fields.longitude = null;
+          query.fields.weight = null;
+          query.fields.name = null;
+          query.fields.value_for_maps = null;
+          query.fields.source = null;
+          query.fields.target = null;
+          query.fields.value = null;
+          query.config.time_shift = [];
+        });
+        dashboardPanelData.data.htmlContent = "";
+        dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
+        break;
+
       case "heatmap":
         dashboardPanelData.data.queries?.forEach((query: any) => {
           query.fields.y.forEach((itemY: any) => {
@@ -79,15 +106,20 @@ export const usePanelAggregation = ({
       case "stacked":
       case "h-stacked":
       case "state-timeline":
+      case "status-history":
         // we have multiple queries for geomap, so if we are moving away, we need to reset
         // the values of lat, lng and weight in all the queries
         dashboardPanelData.data.queries?.forEach((query: any) => {
           const isStateTimeline = dashboardPanelData.data.type === "state-timeline";
+          const isRowChart = isRowTimeline(dashboardPanelData.data.type);
           // A count is never a state and the timeline reads one field, so only the first other y stays.
           if (isStateTimeline) {
             query.fields.y = query.fields.y
               .filter((itemY: any) => itemY.functionName !== "count")
               .slice(0, 1);
+          }
+          if (dashboardPanelData.data.type === "status-history") {
+            query.fields.y = query.fields.y.slice(0, 1);
           }
           query.fields.y.forEach((itemY: any) => {
             if (itemY.functionName === null && !itemY.isDerived) {
@@ -117,7 +149,7 @@ export const usePanelAggregation = ({
             }
           }
           // A state timeline has no comparison window; a shift left over from another type must not run.
-          if (isStateTimeline) query.config.time_shift = [];
+          if (isRowChart) query.config.time_shift = [];
         });
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
@@ -156,6 +188,7 @@ export const usePanelAggregation = ({
       case "pie":
       case "donut":
       case "gauge":
+      case "bar-gauge":
         // we have multiple queries for geomap, so if we are moving away, we need to reset
         // the values of lat, lng and weight in all the queries
         dashboardPanelData.data.queries?.forEach((query: any) => {
@@ -194,6 +227,32 @@ export const usePanelAggregation = ({
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].config.time_shift = [];
+        break;
+      case "treemap":
+        dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.y.forEach((itemY: any) => {
+            if (itemY.functionName === null && !itemY.isDerived) {
+              itemY.functionName = "count";
+              itemY.args = itemY.args.length ? [itemY?.args?.[0]] : [];
+            }
+          });
+          query.fields.x = query.fields.x.slice(0, 1);
+          query.fields.y = query.fields.y.slice(0, 1);
+          query.fields.z = [];
+          query.fields.breakdown = query.fields.breakdown.slice(0, 1);
+          query.fields.latitude = null;
+          query.fields.longitude = null;
+          query.fields.weight = null;
+          query.fields.name = null;
+          query.fields.value_for_maps = null;
+          query.fields.source = null;
+          query.fields.target = null;
+          query.fields.value = null;
+          query.config.time_shift = [];
+        });
+        dashboardPanelData.data.htmlContent = "";
+        dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
         break;
       case "metric":
         // we have multiple queries for geomap, so if we are moving away, we need to reset

@@ -34,6 +34,7 @@ import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibil
 import { PROMETHEUS_HISTOGRAM_MODE } from "@/utils/dashboard/promql/convertPromQLHeatmapChart";
 import { isNumericYField } from "@/utils/dashboard/heatmapYAxis";
 import { isStatChangeOn } from "@/utils/dashboard/metricOptions";
+import { isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -60,6 +61,8 @@ export const THRESHOLD_CHART_TYPES: readonly string[] = [
   "gauge",
   "metric",
   "state-timeline",
+  "status-history",
+  "bar-gauge",
 ];
 
 const hasBarGaugeColumn = (panel: any): boolean =>
@@ -90,8 +93,10 @@ export const SERIES_OVERRIDE_CHART_TYPES: readonly string[] = [
   "pie",
   "donut",
   "gauge",
+  "bar-gauge",
   "metric",
   "state-timeline",
+  "status-history",
 ];
 
 export const shouldShowSeriesOverrides = (dashboardPanelData: any): boolean =>
@@ -168,6 +173,12 @@ export function useConfigPanel(
   const { t, tm } = useI18nTyped();
 
   const isStateTimeline = computed(() => dashboardPanelData.data.type === "state-timeline");
+  const isStatusHistory = computed(() => dashboardPanelData.data.type === "status-history");
+  const isRowChart = computed(() => isRowTimeline(dashboardPanelData.data.type));
+  const isGaugeFamily = computed(
+    () => dashboardPanelData.data.type === "gauge" || dashboardPanelData.data.type === "bar-gauge",
+  );
+  const isBarGauge = computed(() => dashboardPanelData.data.type === "bar-gauge");
   const isPieOrDonut = computed(
     () => dashboardPanelData.data.type === "pie" || dashboardPanelData.data.type === "donut",
   );
@@ -328,6 +339,18 @@ export function useConfigPanel(
         label: [t("dashboard.heatmapCellGap"), t("dashboard.heatmapHideBelow")],
         visible: dashboardPanelData.data.type === "heatmap",
       },
+      "distribution-buckets": {
+        label: [
+          t("dashboard.distributionBucketCount"),
+          t("dashboard.distributionBucketSize"),
+          t("dashboard.distributionBucketOffset"),
+        ],
+        visible: dashboardPanelData.data.type === "distribution",
+      },
+      "treemap-breadcrumb": {
+        label: t("dashboard.treemapShowBreadcrumb"),
+        visible: dashboardPanelData.data.type === "treemap",
+      },
       "heatmap-histogram-mode": {
         label: t("dashboard.heatmapHistogramMode"),
         visible: !!promqlMode.value && dashboardPanelData.data.type === "heatmap",
@@ -399,23 +422,27 @@ export function useConfigPanel(
       },
       "row-size": {
         label: [t("dashboard.stateTimelineRowHeight"), t("dashboard.stateTimelineRowGap")],
-        visible: isStateTimeline.value,
+        visible: isRowChart.value,
       },
       "show-state-text": {
         label: t("dashboard.stateTimelineShowStateText"),
         visible: isStateTimeline.value,
       },
+      "status-history-show-values": {
+        label: t("dashboard.statusHistoryShowValues"),
+        visible: isStatusHistory.value,
+      },
       "row-sort": {
         label: t("dashboard.stateTimelineRowSort"),
-        visible: isStateTimeline.value,
+        visible: isRowChart.value,
       },
       "tooltip-mode": {
         label: t("dashboard.stateTimelineTooltipMode"),
-        visible: isStateTimeline.value,
+        visible: isRowChart.value,
       },
       "state-value-align": {
         label: t("dashboard.stateValueAlign"),
-        visible: isStateTimeline.value,
+        visible: isRowChart.value,
       },
     },
     axis: {
@@ -619,11 +646,23 @@ export function useConfigPanel(
     gauge: {
       "gauge-min": {
         label: t("dashboard.gaugeMinValue"),
-        visible: dashboardPanelData.data.type === "gauge",
+        visible: isGaugeFamily.value,
       },
       "gauge-max": {
         label: t("dashboard.gaugeMaxValue"),
-        visible: dashboardPanelData.data.type === "gauge",
+        visible: isGaugeFamily.value,
+      },
+      "bar-gauge-mode": {
+        label: t("dashboard.barGaugeMode"),
+        visible: isBarGauge.value,
+      },
+      "bar-gauge-orientation": {
+        label: t("dashboard.barGaugeOrientation"),
+        visible: isBarGauge.value,
+      },
+      "bar-gauge-show-unfilled": {
+        label: t("dashboard.barGaugeShowUnfilled"),
+        visible: isBarGauge.value,
       },
       "gauge-style": {
         label: t("dashboard.gaugeStyle"),

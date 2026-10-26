@@ -19,6 +19,7 @@ import {
   filterOption,
   filterSection,
   shouldShowThresholds,
+  shouldShowSeriesOverrides,
 } from "./useConfigPanel";
 import type { ConfigOption } from "./useConfigPanel";
 import {
@@ -1418,5 +1419,32 @@ describe("useConfigPanel – metric, gauge, pie, table, heatmap, state timeline 
     expect(shouldShowThresholds(table([]))).toBe(false);
     expect(shouldShowThresholds(table([barGauge]))).toBe(true);
     expect(shouldShowThresholds(table([barGauge], "promql"))).toBe(false);
+  });
+});
+
+describe("useConfigPanel – bar gauge, distribution, status history and treemap options", () => {
+  const visible = (type: string, section: any, option: string) =>
+    makeComposable(makePanelData(type, {}), ref(false)).isConfigOptionVisible(section, option);
+
+  it("shows each option on its own chart type only", () => {
+    expect(visible("bar-gauge", "gauge", "gauge-min")).toBe(true);
+    expect(visible("bar-gauge", "gauge", "bar-gauge-mode")).toBe(true);
+    expect(visible("bar-gauge", "gauge", "gauge-style")).toBe(false);
+    expect(visible("gauge", "gauge", "bar-gauge-orientation")).toBe(false);
+    expect(visible("distribution", "data", "distribution-buckets")).toBe(true);
+    expect(visible("heatmap", "data", "distribution-buckets")).toBe(false);
+    expect(visible("treemap", "data", "treemap-breadcrumb")).toBe(true);
+    expect(visible("status-history", "stateTimeline", "status-history-show-values")).toBe(true);
+    expect(visible("status-history", "stateTimeline", "row-sort")).toBe(true);
+    expect(visible("status-history", "stateTimeline", "merge-gaps")).toBe(false);
+    expect(visible("state-timeline", "stateTimeline", "status-history-show-values")).toBe(false);
+  });
+
+  it("shows thresholds and series overrides on bar gauge and status history", () => {
+    for (const type of ["bar-gauge", "status-history"]) {
+      expect(shouldShowThresholds({ data: { type, config: {} } }), type).toBe(true);
+      expect(shouldShowSeriesOverrides({ data: { type } }), type).toBe(true);
+    }
+    expect(shouldShowThresholds({ data: { type: "treemap", config: {} } })).toBe(false);
   });
 });

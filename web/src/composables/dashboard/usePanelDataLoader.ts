@@ -122,6 +122,7 @@ export const usePanelDataLoader = (
       "stacked",
       "h-stacked",
       "state-timeline",
+      "status-history",
     ].includes(panelSchema.value.type);
   };
 

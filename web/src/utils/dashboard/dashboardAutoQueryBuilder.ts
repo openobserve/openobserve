@@ -1,6 +1,7 @@
 import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import { DEFAULT_CAST_TARGET_TYPE, isCastTargetType } from "@/utils/dashboard/castSuggestion";
+import { DISTRIBUTION_ROW_LIMIT } from "@/utils/dashboard/chartTypeGroups";
 import {
   heatmapYBucketError,
   heatmapYBucketing,
@@ -494,7 +495,8 @@ export function buildSQLChartQuery(config: {
   }
 
   // LIMIT clause
-  const queryLimit = queryData.config.limit ?? 0;
+  const queryLimit =
+    queryData.config.limit || (chartType === "distribution" ? DISTRIBUTION_ROW_LIMIT : 0);
   if (queryLimit > 0) {
     query += ` LIMIT ${queryLimit}`;
   }

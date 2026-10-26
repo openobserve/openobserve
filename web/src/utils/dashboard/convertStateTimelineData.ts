@@ -32,6 +32,9 @@ import { getAnnotationsData } from "./getAnnotationsData";
 import { getAllSpanColors } from "@/utils/traces/traceColors";
 import { resolveSeriesOverride } from "./seriesOverrides";
 import { STATE_VALUE_ALIGNS } from "./panelTypeOptions";
+import { HEATMAP_PALETTES, samplePalette } from "./heatmapPalettes";
+import { isRowTimeline } from "./chartTypeGroups";
+import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 
 export const STATE_TIMELINE_MAX_ROWS = 500;
 export const STATE_TIMELINE_MAX_STATES = 20;
@@ -58,6 +61,11 @@ const MIN_TEXT_WIDTH = 24;
 const TEXT_PADDING = 4;
 const CONTRAST_THRESHOLD = 0.5;
 const NO_DATA_STYLE = -1;
+
+// Numeric cells without a mapping or threshold shade along one sequential scale, light to dark.
+const STATUS_HISTORY_SCALE = HEATMAP_PALETTES.blues;
+// The gap between status history cells, in pixels on each side.
+const STATUS_CELL_GAP = 1;
 
 export type StateTimelineSort = "name" | "non_ok_time";
 
@@ -410,19 +418,13 @@ const numericRange = (states: string[]) => {
 
 const byText = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true });
 
-/** Styles per state; states sharing display text and colour share one style, and only unmapped ones count toward the cap. */
-const buildStateStyles = (
-  durations: Map<string, number>,
-  scopes: Map<string, StyleScope>,
-  config: any,
-  theme: string,
-) => {
-  const panelCache = buildValueMappingCache(config?.mappings);
-  const keys = [...durations.keys()].sort(byText);
-  const stateOf = (key: string) => key.slice(key.indexOf(SCOPE_SEPARATOR) + 1);
-  const scopeOf = (key: string) => key.slice(0, key.indexOf(SCOPE_SEPARATOR));
+const stateOf = (key: string) => key.slice(key.indexOf(SCOPE_SEPARATOR) + 1);
+const scopeOf = (key: string) => key.slice(0, key.indexOf(SCOPE_SEPARATOR));
+
+/** Per style scope, its own mapping cache and its thresholds resolved against the states it colours. */
+const scopeLookup = (keys: string[], scopes: Map<string, StyleScope>, config: any) => {
   const lookups = new Map<string, { cache: any; thresholds: any }>();
-  const lookupOf = (scope: string) => {
+  return (scope: string) => {
     if (!lookups.has(scope)) {
       const own = scopes.get(scope);
       const normalized = normalizeThresholds(own?.thresholds ?? config?.thresholds);
@@ -437,6 +439,18 @@ const buildStateStyles = (
     }
     return lookups.get(scope)!;
   };
+};
+
+/** Styles per state; states sharing display text and colour share one style, and only unmapped ones count toward the cap. */
+const buildStateStyles = (
+  durations: Map<string, number>,
+  scopes: Map<string, StyleScope>,
+  config: any,
+  theme: string,
+) => {
+  const panelCache = buildValueMappingCache(config?.mappings);
+  const keys = [...durations.keys()].sort(byText);
+  const lookupOf = scopeLookup(keys, scopes, config);
 
   const groups = new Map<string, StateGroup>();
   keys.forEach((styleKey) => {
@@ -534,6 +548,90 @@ const buildStateStyles = (
   if (capped.size)
     legend.push({ name: uniqueName(gt("dashboard.utils.stateTimelineOther")), color: otherColor });
   return { styles, legend, unmappedCount: unmappedStates.size, shownStates: kept.size };
+};
+
+const isNumericState = (state: string) => state.trim() !== "" && Number.isFinite(Number(state));
+
+/** Status history styles: a mapping wins, then a threshold step, then a sequential shade for numbers or a palette colour for text. */
+const buildStatusHistoryStyles = (
+  durations: Map<string, number>,
+  scopes: Map<string, StyleScope>,
+  config: any,
+  theme: string,
+  formatValue: (state: string) => string,
+) => {
+  const panelCache = buildValueMappingCache(config?.mappings);
+  const keys = [...durations.keys()].sort(byText);
+  const lookupOf = scopeLookup(keys, scopes, config);
+  const range = numericRange(keys.map(stateOf));
+  const palette = getColorPalette(theme);
+  const styles = new Map<string, StateStyle>();
+  const legend = new Map<string, { color: string; duration: number }>();
+  const addLegend = (name: string, color: string, duration: number) => {
+    const entry = legend.get(name) ?? { color, duration: 0 };
+    entry.duration += duration;
+    legend.set(name, entry);
+  };
+  keys.forEach((styleKey) => {
+    const state = stateOf(styleKey);
+    const { cache, thresholds } = lookupOf(scopeOf(styleKey));
+    const mapping =
+      lookupValueMappingFull(state, cache) ?? lookupValueMappingFull(state, panelCache);
+    const numeric = isNumericState(state);
+    const text = mapping?.text ? String(mapping.text) : numeric ? formatValue(state) : state;
+    const thresholdColor =
+      !mapping?.color && numeric && thresholds ? stepColorFor(state, thresholds, null) : null;
+    const shade =
+      numeric && range
+        ? samplePalette(
+            STATUS_HISTORY_SCALE,
+            range.max > range.min ? (Number(state) - range.min) / (range.max - range.min) : 1,
+          )
+        : null;
+    const color =
+      mapping?.color || thresholdColor || shade || palette[getSeriesHash(text, palette)];
+    styles.set(styleKey, {
+      text,
+      color,
+      textColor:
+        mapping?.textColor ||
+        getContrastColor(color, chartColor("--color-text-heading"), CONTRAST_THRESHOLD),
+    });
+    if (mapping?.color || (!numeric && !thresholdColor)) {
+      addLegend(text, color, durations.get(styleKey) ?? 0);
+    }
+  });
+  const entries = [...legend.entries()]
+    .sort((a, b) => b[1].duration - a[1].duration || byText(a[0], b[0]))
+    .slice(0, STATE_TIMELINE_MAX_STATES)
+    .map(([name, { color }]) => ({ name, color }));
+  const normalized = normalizeThresholds(config?.thresholds);
+  const steps = normalized ? resolveStepValues(normalized, range) : null;
+  if (steps) {
+    if (steps.baseColor) {
+      entries.push({
+        name: `< ${formatValue(String(steps.steps[0].value))}`,
+        color: steps.baseColor,
+      });
+    }
+    steps.steps.forEach((step) =>
+      entries.push({ name: `≥ ${formatValue(String(step.value))}`, color: step.color }),
+    );
+  }
+  return { styles, legend: entries, unmappedCount: 0, shownStates: 0 };
+};
+
+/** One cell per sample, a step wide and cut at the next sample; a sample with no value leaves its cell empty. */
+export const buildStatusCells = (samples: StateSample[], stepMs: number): StateSegment[] => {
+  const byTime = new Map<number, string | null>();
+  samples.forEach((sample) => byTime.set(sample.t, sample.state));
+  const times = [...byTime.keys()].sort((a, b) => a - b);
+  return times.flatMap((t, index) => {
+    const state = byTime.get(t) ?? null;
+    if (state === null) return [];
+    const next = times[index + 1];
+    return [{ start: t, end: next !== undefined ? Math.min(t + stepMs, next) : t + stepMs, state }];
+  });
 };
 
 const capNotice = (
@@ -674,7 +772,7 @@ const rowWheelZoom = (visibleRows: number) => ({
 
 /** The series cap the PromQL loader applies to a panel; a state timeline merges series into rows, so it has its own. */
 export const promqlSeriesCap = (panelType: string | undefined, zoConfig: any): number =>
-  panelType === "state-timeline"
+  isRowTimeline(panelType)
     ? (zoConfig?.max_dashboard_state_timeline_series ?? STATE_TIMELINE_MAX_SERIES)
     : (zoConfig?.max_dashboard_series ?? 100);
 
@@ -734,6 +832,7 @@ export const convertStateTimelineData = (
   if (!Array.isArray(data) || !panelSchema) return { options: null };
   const config = panelSchema.config ?? {};
   const isPromQL = panelSchema.queryType === "promql";
+  const isStatusHistory = panelSchema.type === "status-history";
   const timezone = store?.state?.timezone ?? "UTC";
   const extracted = isPromQL
     ? promqlRows(panelSchema, data, metadata, resultMetaData, store)
@@ -764,7 +863,10 @@ export const convertStateTimelineData = (
     const stepMs = stepOf(row.query);
     const mergeGapMs =
       mergeGapSeconds >= 0 ? mergeGapSeconds * 1000 : stepMs * AUTO_MERGE_GAP_FACTOR;
-    return { ...row, segments: buildStateSegments(row.samples, stepMs, mergeGapMs, range) };
+    const segments = isStatusHistory
+      ? buildStatusCells(row.samples, stepMs)
+      : buildStateSegments(row.samples, stepMs, mergeGapMs, range);
+    return { ...row, segments };
   });
   const sorted = sortStateRows(allRows, config.row_sort === "non_ok_time" ? "non_ok_time" : "name");
   const rows = sorted.slice(0, STATE_TIMELINE_MAX_ROWS);
@@ -778,21 +880,31 @@ export const convertStateTimelineData = (
     row.scope = JSON.stringify(scope);
     scopes.set(row.scope, scope);
   });
-  const { styles, legend, unmappedCount, shownStates } = buildStateStyles(
-    scopedDurations(rows),
-    scopes,
-    config,
-    store?.state?.theme,
-  );
+  const formatValue = (state: string) =>
+    formatUnitValue(getUnitValue(Number(state), config.unit, config.unit_custom, config.decimals));
+  const { styles, legend, unmappedCount, shownStates } = isStatusHistory
+    ? buildStatusHistoryStyles(
+        scopedDurations(rows),
+        scopes,
+        config,
+        store?.state?.theme,
+        formatValue,
+      )
+    : buildStateStyles(scopedDurations(rows), scopes, config, store?.state?.theme);
   const stateList = [...styles.keys()];
   const styleIndex = new Map(stateList.map((state, index) => [state, index]));
 
   const rowHeight = positiveOr(config.row_height, DEFAULT_ROW_HEIGHT) || DEFAULT_ROW_HEIGHT;
   const rowGap = positiveOr(config.row_gap, DEFAULT_ROW_GAP);
-  const showText = config.show_state_text !== false;
+  const showText = isStatusHistory
+    ? config.status_history_show_values !== false
+    : config.show_state_text !== false;
   const textAlign = STATE_VALUE_ALIGNS.includes(config.state_value_align)
     ? config.state_value_align
-    : "left";
+    : isStatusHistory
+      ? "center"
+      : "left";
+  const cellGap = isStatusHistory ? STATUS_CELL_GAP : 0;
   const showLegend = config.show_legends !== false;
   const noDataFill = chartColor("--color-surface-subtle");
   const noDataBorder = chartColor("--color-border-strong");
@@ -889,8 +1001,11 @@ export const convertStateTimelineData = (
     const height = Math.max(1, api.size([0, 1])[1] - rowGap);
     const box = params.coordSys;
     // Wall-clock x runs backwards across a DST fall-back, so a segment's end can sit left of its start.
-    const x1 = Math.max(Math.min(from[0], to[0]), box.x);
-    const x2 = Math.min(Math.max(from[0], to[0]), box.x + box.width);
+    const left = Math.max(Math.min(from[0], to[0]), box.x);
+    const right = Math.min(Math.max(from[0], to[0]), box.x + box.width);
+    const gap = right - left > cellGap * 2 + 1 ? cellGap : 0;
+    const x1 = left + gap;
+    const x2 = right - gap;
     if (x2 <= x1) return null;
     const styleId = api.value(3);
     const styleKey = styleId === NO_DATA_STYLE ? null : stateList[styleId];

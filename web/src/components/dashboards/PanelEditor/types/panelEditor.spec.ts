@@ -322,8 +322,8 @@ describe("panelEditor types and utilities", () => {
         expect(ALL_CHART_TYPES).toContain("state-timeline");
       });
 
-      it("should have 20 chart types", () => {
-        expect(ALL_CHART_TYPES.length).toBe(20);
+      it("should have 24 chart types", () => {
+        expect(ALL_CHART_TYPES.length).toBe(24);
       });
     });
 
@@ -366,8 +366,8 @@ describe("panelEditor types and utilities", () => {
         expect(AGGREGATION_REQUIRED_CHART_TYPES).not.toContain("custom_chart");
       });
 
-      it("should have 16 chart types", () => {
-        expect(AGGREGATION_REQUIRED_CHART_TYPES.length).toBe(16);
+      it("should have 19 chart types", () => {
+        expect(AGGREGATION_REQUIRED_CHART_TYPES.length).toBe(19);
       });
     });
 
@@ -380,8 +380,9 @@ describe("panelEditor types and utilities", () => {
       });
 
       it("all chart types should be accounted for", () => {
+        // A distribution buckets raw values, so it neither aggregates nor reads SELECT *.
         const regularChartTypes = ALL_CHART_TYPES.filter(
-          (type) => !["html", "markdown", "custom_chart"].includes(type),
+          (type) => !["html", "markdown", "custom_chart", "distribution"].includes(type),
         );
 
         regularChartTypes.forEach((type) => {

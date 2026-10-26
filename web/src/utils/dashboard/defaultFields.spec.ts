@@ -175,4 +175,22 @@ describe("defaultFields", () => {
       expect(y[0].functionName).toBe("avg");
     });
   });
+
+  describe("buildDefaultBuilderFields for the new chart types", () => {
+    const logsSchema = [{ name: "logs", schema: [{ name: "_timestamp" }] }];
+    const seed = (type: string) => buildDefaultBuilderFields(type, "logs", logsSchema, "logs");
+
+    it("bar gauge and treemap seed a count with no time label", () => {
+      for (const type of ["bar-gauge", "treemap"]) {
+        expect(seed(type).x, type).toEqual([]);
+        expect(seed(type).y[0].functionName, type).toBe("count");
+      }
+    });
+
+    it("distribution seeds nothing; status history seeds the time x and a count", () => {
+      expect(seed("distribution")).toEqual({ x: [], y: [] });
+      expect(seed("status-history").x[0].functionName).toBe("histogram");
+      expect(seed("status-history").y[0].functionName).toBe("count");
+    });
+  });
 });

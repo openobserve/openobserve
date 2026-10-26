@@ -130,6 +130,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'heatmap',
               'metric',
               'gauge',
+              'bar-gauge',
+              'treemap',
             ].includes(props.data.type)
           "
           variant="ghost"
@@ -161,6 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'stacked',
               'h-stacked',
               'state-timeline',
+              'status-history',
             ].includes(props.data.type) &&
             PanleSchemaRendererRef?.checkIfPanelIsTimeSeries === true
           "

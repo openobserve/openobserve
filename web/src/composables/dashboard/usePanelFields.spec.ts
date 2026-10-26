@@ -562,4 +562,42 @@ describe("usePanelFields", () => {
       expect(fields.promqlMode.value).toBe(true);
     });
   });
+
+  describe("bar gauge, distribution, status history and treemap slots", () => {
+    const addMany = (axis: "x" | "y" | "breakdown", count: number) => {
+      for (let i = 0; i < count; i++) {
+        const row = { name: `field_${axis}_${i}` };
+        if (axis === "x") fields.addXAxisItem(row);
+        else if (axis === "y") fields.addYAxisItem(row);
+        else fields.addBreakDownAxisItem(row);
+      }
+      return panelData.data.queries[0].fields[axis].length;
+    };
+
+    it.each([
+      ["bar-gauge", 1, 1],
+      ["status-history", 1, 1],
+      ["treemap", 1, 1],
+      ["distribution", 0, 3],
+    ])("%s takes %i x and %i y fields", (type, maxX, maxY) => {
+      panelData.data.type = type;
+      expect(addMany("x", 3)).toBe(maxX);
+      expect(addMany("y", 3)).toBe(maxY);
+    });
+
+    it.each(["status-history", "treemap", "distribution"])("%s takes one breakdown", (type) => {
+      panelData.data.type = type;
+      expect(addMany("breakdown", 3)).toBe(1);
+    });
+
+    it("a distribution y field keeps raw values, a status history y field counts", () => {
+      panelData.data.type = "distribution";
+      fields.addYAxisItem({ name: "latency_ms" });
+      expect(panelData.data.queries[0].fields.y[0].functionName).toBeNull();
+      panelData.data.queries[0].fields.y = [];
+      panelData.data.type = "status-history";
+      fields.addYAxisItem({ name: "latency_ms" });
+      expect(panelData.data.queries[0].fields.y[0].functionName).toBe("count");
+    });
+  });
 });

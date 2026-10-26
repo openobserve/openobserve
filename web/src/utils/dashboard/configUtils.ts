@@ -2,6 +2,13 @@
  * Utility functions for dashboard panel configuration conditions
  */
 
+import { isRowTimeline } from "./chartTypeGroups";
+
+// These draw no axes and no legend.
+const NO_AXIS_TYPES = ["bar-gauge", "treemap"];
+// These lay out their own legend and axes, so the shared legend layout and axis width do not apply.
+const OWN_LAYOUT_TYPES = ["status-history", "distribution", "bar-gauge", "treemap"];
+
 /**
  * Check that chart align option should be applied
  * @param dashboardPanelData - The dashboard panel data
@@ -34,7 +41,8 @@ export const shouldShowGridlines = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.type != "pie" &&
     dashboardPanelData.data.type != "donut" &&
     dashboardPanelData.data.type != "sankey" &&
-    dashboardPanelData.data.type != "maps"
+    dashboardPanelData.data.type != "maps" &&
+    !NO_AXIS_TYPES.includes(dashboardPanelData.data.type)
   );
 };
 
@@ -52,6 +60,7 @@ export const shouldShowLegendsToggle = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.type !== "geomap" &&
     dashboardPanelData.data.type !== "sankey" &&
     dashboardPanelData.data.type !== "maps" &&
+    !NO_AXIS_TYPES.includes(dashboardPanelData.data.type) &&
     dashboardPanelData.data.config.trellis?.layout === null
   );
 };
@@ -72,6 +81,7 @@ export const shouldShowLegendPosition = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.type !== "sankey" &&
     dashboardPanelData.data.type !== "maps" &&
     dashboardPanelData.data.type !== "state-timeline" &&
+    !OWN_LAYOUT_TYPES.includes(dashboardPanelData.data.type) &&
     dashboardPanelData.data.config.trellis?.layout === null
   );
 };
@@ -92,6 +102,7 @@ export const shouldShowLegendType = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.type !== "sankey" &&
     dashboardPanelData.data.type !== "maps" &&
     dashboardPanelData.data.type !== "state-timeline" &&
+    !OWN_LAYOUT_TYPES.includes(dashboardPanelData.data.type) &&
     dashboardPanelData.data.config.trellis?.layout === null
   );
 };
@@ -113,6 +124,7 @@ export const shouldShowLegendWidth = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.type !== "sankey" &&
     dashboardPanelData.data.type !== "maps" &&
     dashboardPanelData.data.type !== "state-timeline" &&
+    !OWN_LAYOUT_TYPES.includes(dashboardPanelData.data.type) &&
     dashboardPanelData.data.config.trellis?.layout === null
   );
 };
@@ -136,6 +148,7 @@ export const shouldShowLegendHeight = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.type !== "sankey" &&
     dashboardPanelData.data.type !== "maps" &&
     dashboardPanelData.data.type !== "state-timeline" &&
+    !OWN_LAYOUT_TYPES.includes(dashboardPanelData.data.type) &&
     dashboardPanelData.data.config.trellis?.layout === null
   );
 };
@@ -169,7 +182,7 @@ export const shouldShowNoValueReplacement = (
   promqlMode: boolean,
 ): boolean => {
   const type = dashboardPanelData.data.type;
-  if (["metric", "gauge", "table"].includes(type)) return true;
+  if (["metric", "gauge", "bar-gauge", "table"].includes(type)) return true;
   return ["area", "line", "area-stacked", "bar", "stacked"].includes(type) && !promqlMode;
 };
 
@@ -217,7 +230,8 @@ export const shouldShowAxisConfig = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.type != "donut" &&
     dashboardPanelData.data.type != "sankey" &&
     dashboardPanelData.data.type != "maps" &&
-    dashboardPanelData.data.type != "state-timeline"
+    dashboardPanelData.data.type != "state-timeline" &&
+    !OWN_LAYOUT_TYPES.includes(dashboardPanelData.data.type)
   );
 };
 
@@ -318,7 +332,7 @@ export const shouldShowTimeShift = (
 
 /** Whether the PromQL range/instant selector applies; a state timeline always runs a range query. */
 export const shouldShowPromQLQueryType = (dashboardPanelData: any): boolean => {
-  return dashboardPanelData.data.type !== "state-timeline";
+  return !isRowTimeline(dashboardPanelData.data.type);
 };
 
 /** Whether Stack mode applies; percent stacking needs stacked series. */
