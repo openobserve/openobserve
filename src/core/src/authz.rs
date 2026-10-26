@@ -1138,7 +1138,10 @@ mod tests {
         let written = resolve_query_sources(&[promql("o1", "DCGM_FI_DEV_GPU_TEMP")]);
         assert_eq!(
             names(&written),
-            vec!["metrics/DCGM_FI_DEV_GPU_TEMP", "metrics/dcgm_fi_dev_gpu_temp"]
+            vec![
+                "metrics/DCGM_FI_DEV_GPU_TEMP",
+                "metrics/dcgm_fi_dev_gpu_temp"
+            ]
         );
     }
 
