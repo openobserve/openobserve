@@ -1009,6 +1009,161 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </OCollapsible>
 
+    <!-- Section: Host map -->
+    <OCollapsible
+      variant="config"
+      v-if="dashboardPanelData.data.type === 'hostmap'"
+      v-show="isSectionVisible('hostmap')"
+      :model-value="isExpanded('hostmap')"
+      :icon="SECTION_ICONS.hostmap"
+      @update:modelValue="
+        (v) => {
+          expandedSections.hostmap = v;
+        }
+      "
+      :label="t('dashboard.configSectionHostmap')"
+      class="border-card-glass-border border-t border-solid"
+    >
+      <div class="o2-input box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
+        <OInput
+          v-if="promqlMode"
+          v-show="isConfigOptionVisible('hostmap', 'entity-label')"
+          v-model="hostmapEntityLabelModel"
+          :label="t('dashboard.hostmapEntityLabel')"
+          :placeholder="t('dashboard.hostmapEntityLabelPlaceholder')"
+          data-test="dashboard-config-hostmap-entity-label"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.hostmapEntityLabelTooltip')" max-width="15.625rem" />
+          </template>
+        </OInput>
+
+        <div
+          v-if="promqlMode"
+          v-show="isConfigOptionVisible('hostmap', 'group-by')"
+          class="flex gap-2"
+        >
+          <OInput
+            class="min-w-0 flex-1"
+            v-model="hostmapGroupByFirstModel"
+            :label="t('dashboard.hostmapGroupBy')"
+            :placeholder="t('dashboard.hostmapLabelPlaceholder')"
+            data-test="dashboard-config-hostmap-group-by-1"
+          />
+          <OInput
+            class="min-w-0 flex-1"
+            v-model="hostmapGroupBySecondModel"
+            :label="t('dashboard.hostmapThenBy')"
+            :placeholder="t('dashboard.hostmapLabelPlaceholder')"
+            data-test="dashboard-config-hostmap-group-by-2"
+          />
+        </div>
+
+        <OToggleGroup
+          v-show="isConfigOptionVisible('hostmap', 'reduction')"
+          type="single"
+          label-position="top"
+          :label="t('dashboard.hostmapReduction')"
+          v-model="hostmapReduction"
+          data-test="dashboard-config-hostmap-reduction"
+          :data-test-selected-value="hostmapReduction"
+        >
+          <OToggleGroupItem
+            v-for="opt in hostmapReductionOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+            data-test="dashboard-config-hostmap-reduction-option"
+            :data-test-label="opt.label"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
+        <OToggleGroup
+          v-show="isConfigOptionVisible('hostmap', 'group-sort')"
+          type="single"
+          label-position="top"
+          :label="t('dashboard.hostmapGroupSort')"
+          v-model="hostmapGroupSort"
+          data-test="dashboard-config-hostmap-group-sort"
+          :data-test-selected-value="hostmapGroupSort"
+        >
+          <OToggleGroupItem
+            v-for="opt in hostmapGroupSortOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+            data-test="dashboard-config-hostmap-group-sort-option"
+            :data-test-label="opt.label"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
+        <OToggleGroup
+          v-show="isConfigOptionVisible('hostmap', 'cell-sort')"
+          type="single"
+          label-position="top"
+          :label="t('dashboard.hostmapCellSort')"
+          v-model="hostmapCellSort"
+          data-test="dashboard-config-hostmap-cell-sort"
+          :data-test-selected-value="hostmapCellSort"
+        >
+          <OToggleGroupItem
+            v-for="opt in hostmapCellSortOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+            data-test="dashboard-config-hostmap-cell-sort-option"
+            :data-test-label="opt.label"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
+        <OToggleGroup
+          v-show="isConfigOptionVisible('hostmap', 'cell-shape')"
+          type="single"
+          label-position="top"
+          :label="t('dashboard.hostmapCellShape')"
+          v-model="hostmapCellShape"
+          data-test="dashboard-config-hostmap-cell-shape"
+          :data-test-selected-value="hostmapCellShape"
+        >
+          <OToggleGroupItem
+            v-for="opt in hostmapCellShapeOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+            data-test="dashboard-config-hostmap-cell-shape-option"
+            :data-test-label="opt.label"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
+        <OToggleGroup
+          v-show="isConfigOptionVisible('hostmap', 'cell-label')"
+          type="single"
+          label-position="top"
+          :label="t('dashboard.hostmapCellLabel')"
+          v-model="hostmapCellLabel"
+          data-test="dashboard-config-hostmap-cell-label"
+          :data-test-selected-value="hostmapCellLabel"
+        >
+          <OToggleGroupItem
+            v-for="opt in hostmapCellLabelOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+            data-test="dashboard-config-hostmap-cell-label-option"
+            :data-test-label="opt.label"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
+        <div
+          v-show="isConfigOptionVisible('hostmap', 'cell-label')"
+          class="text-text-secondary -mt-1.5 text-xs"
+          data-test="dashboard-config-hostmap-cell-label-hint"
+        >
+          {{ t("dashboard.hostmapCellLabelHint") }}
+        </div>
+      </div>
+    </OCollapsible>
+
     <!-- Section: Axis -->
     <OCollapsible
       variant="config"
@@ -1617,7 +1772,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Section: Value Transformations -->
     <OCollapsible
       variant="config"
-      v-if="['table', 'metric', 'state-timeline'].includes(dashboardPanelData.data.type)"
+      v-if="['table', 'metric', 'state-timeline', 'hostmap'].includes(dashboardPanelData.data.type)"
       v-show="isSectionVisible('valueTransformations')"
       :model-value="isExpanded('valueTransformations')"
       :icon="SECTION_ICONS.valueTransformations"
@@ -2093,7 +2248,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
         <ColorPaletteDropDown />
-        <ColorBySeries :colorBySeriesData="panelData" />
+        <ColorBySeries
+          v-if="dashboardPanelData.data.type !== 'hostmap'"
+          :colorBySeriesData="panelData"
+        />
       </div>
     </OCollapsible>
 
@@ -2496,6 +2654,59 @@ export default defineComponent({
       { label: t("dashboard.auto"), value: "auto" },
       { label: t("common.show"), value: "show" },
       { label: t("common.hide"), value: "hide" },
+    ];
+    const hostmapConfigModel = <T extends string>(key: string, fallback: T) =>
+      computed({
+        get: (): T => dashboardPanelData.data.config[key] ?? fallback,
+        set: (v: T) => {
+          dashboardPanelData.data.config[key] = v;
+        },
+      });
+    const hostmapReduction = hostmapConfigModel("hostmap_reduction", "last");
+    const hostmapGroupSort = hostmapConfigModel("hostmap_group_sort", "name");
+    const hostmapCellSort = hostmapConfigModel("hostmap_cell_sort", "name");
+    const hostmapCellShape = hostmapConfigModel("hostmap_cell_shape", "square");
+    const hostmapCellLabel = hostmapConfigModel("hostmap_cell_label", "none");
+    const hostmapEntityLabelModel = computed({
+      get: (): string => dashboardPanelData.data.config.hostmap_entity_label ?? "",
+      set: (v: string | number | null) => {
+        const label = String(v ?? "").trim();
+        dashboardPanelData.data.config.hostmap_entity_label = label || null;
+      },
+    });
+    // The converter drops an empty level, so a second label alone acts as the first.
+    const hostmapGroupByLevel = (level: number) =>
+      computed({
+        get: (): string => dashboardPanelData.data.config.hostmap_group_by?.[level] ?? "",
+        set: (v: string | number | null) => {
+          const levels = [...(dashboardPanelData.data.config.hostmap_group_by ?? ["", ""])];
+          levels[level] = String(v ?? "").trim();
+          const kept = [levels[0] ?? "", levels[1] ?? ""];
+          dashboardPanelData.data.config.hostmap_group_by = kept.some(Boolean) ? kept : null;
+        },
+      });
+    const hostmapGroupByFirstModel = hostmapGroupByLevel(0);
+    const hostmapGroupBySecondModel = hostmapGroupByLevel(1);
+    const hostmapReductionOptions: { label: I18nText; value: string }[] = [
+      { label: t("dashboard.hostmapReductionLast"), value: "last" },
+      { label: t("dashboard.hostmapReductionAvg"), value: "avg" },
+      { label: t("dashboard.hostmapReductionMin"), value: "min" },
+      { label: t("dashboard.hostmapReductionMax"), value: "max" },
+    ];
+    const hostmapSortOptions: { label: I18nText; value: string }[] = [
+      { label: t("dashboard.hostmapSortName"), value: "name" },
+      { label: t("dashboard.hostmapSortValue"), value: "value" },
+    ];
+    const hostmapGroupSortOptions = hostmapSortOptions;
+    const hostmapCellSortOptions = hostmapSortOptions;
+    const hostmapCellShapeOptions: { label: I18nText; value: string }[] = [
+      { label: t("dashboard.hostmapShapeSquare"), value: "square" },
+      { label: t("dashboard.hostmapShapeHexagon"), value: "hexagon" },
+    ];
+    const hostmapCellLabelOptions: { label: I18nText; value: string }[] = [
+      { label: t("dashboard.hostmapCellLabelNone"), value: "none" },
+      { label: t("dashboard.hostmapCellLabelName"), value: "name" },
+      { label: t("dashboard.hostmapCellLabelValue"), value: "value" },
     ];
     const showStateTextModel = computed({
       get: () => dashboardPanelData.data.config.show_state_text !== false,
@@ -3171,6 +3382,7 @@ export default defineComponent({
         "pie",
         "donut",
         "gauge",
+        "hostmap",
       ].includes(dashboardPanelData.data.type);
     });
 
@@ -3455,6 +3667,19 @@ export default defineComponent({
       legendTypeOptions,
       chartAlignOptions,
       showStateTextModel,
+      hostmapReduction,
+      hostmapGroupSort,
+      hostmapCellSort,
+      hostmapCellShape,
+      hostmapCellLabel,
+      hostmapEntityLabelModel,
+      hostmapGroupByFirstModel,
+      hostmapGroupBySecondModel,
+      hostmapReductionOptions,
+      hostmapGroupSortOptions,
+      hostmapCellSortOptions,
+      hostmapCellShapeOptions,
+      hostmapCellLabelOptions,
       rowSortModel,
       rowSortOptions,
       tooltipModeModel,

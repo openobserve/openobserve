@@ -148,6 +148,7 @@ import OSelectItem from "@/lib/forms/Select/OSelectItem.vue";
 import OSelectGroup from "@/lib/forms/Select/OSelectGroup.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
+import { HOSTMAP_DEFAULT_COLOR } from "@/utils/dashboard/convertHostmapData";
 
 interface ColorOption {
   label: I18nText;
@@ -176,7 +177,12 @@ export default defineComponent({
     const { dashboardPanelData, promqlMode } = useDashboardPanelData(dashboardPanelDataPageKey, t);
     onBeforeMount(() => {
       // on before mount need to check whether color object is there or not else use palette-classic-by-series as a default
-      if (!dashboardPanelData?.data?.config?.color) {
+      if (!dashboardPanelData?.data?.config?.color && dashboardPanelData.data.type === "hostmap") {
+        dashboardPanelData.data.config.color = {
+          ...HOSTMAP_DEFAULT_COLOR,
+          fixedColor: [...HOSTMAP_DEFAULT_COLOR.fixedColor],
+        };
+      } else if (!dashboardPanelData?.data?.config?.color) {
         dashboardPanelData.data.config.color = {
           mode: "palette-classic-by-series",
           fixedColor: [],
@@ -273,8 +279,10 @@ export default defineComponent({
     });
 
     const colorOptionsByGroup = computed(() => ({
+      // A host map has one value per cell and no series to colour by.
       bySeries: colorOptions.filter(
         (o): o is SelectableColorOption =>
+          dashboardPanelData.data.type !== "hostmap" &&
           !o.header &&
           !!o.value &&
           !o.value.startsWith("continuous") &&
