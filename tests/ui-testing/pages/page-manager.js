@@ -43,6 +43,7 @@ import { AlertSaveQueryModePage } from "./alertsPages/alertSaveQueryModePage.js"
 import { AlertNoDestinationPage } from "./alertsPages/alertNoDestinationPage.js";
 import { CompositeAlertsPage } from "./alertsPages/compositeAlertsPage.js";
 import { IncidentsPage } from "./alertsPages/incidentsPage.js";
+import { AlertCalibrationPage } from "./alertsPages/alertCalibrationPage.js";
 import { SloListPage } from "./sloPages/sloListPage.js";
 import { SloFormPage } from "./sloPages/sloFormPage.js";
 import { SloDetailPage } from "./sloPages/sloDetailPage.js";
@@ -226,6 +227,7 @@ class PageManager {
     this.alertNoDestinationPage = new AlertNoDestinationPage(page);
     this.compositeAlertsPage = new CompositeAlertsPage(page);
     this.incidentsPage = new IncidentsPage(page);
+    this.alertCalibrationPage = new AlertCalibrationPage(page);
 
     // ===== SLO PAGE OBJECTS =====
     this.sloListPage = new SloListPage(page);
