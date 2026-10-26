@@ -17,6 +17,7 @@ import {
   shouldShowLineThickness,
   shouldShowDrilldown,
   shouldShowTimeShift,
+  allVisibleQueriesInstant,
 } from "@/utils/dashboard/configUtils";
 import {
   SectionId,
@@ -532,7 +533,13 @@ export function useConfigPanel(
     sparkline: {
       sparkline: {
         label: t("dashboard.configSectionSparkline"),
-        visible: dashboardPanelData.data.type === "metric",
+        // Matches ConfigPanel, which drops the section for an all-instant PromQL metric.
+        visible:
+          dashboardPanelData.data.type === "metric" &&
+          !(
+            dashboardPanelData.data.queryType === "promql" &&
+            allVisibleQueriesInstant(dashboardPanelData)
+          ),
       },
     },
   }));

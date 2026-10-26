@@ -46,6 +46,7 @@ vi.mock("@/utils/dashboard/configUtils", () => ({
   shouldShowLineThickness: vi.fn(() => false),
   shouldShowDrilldown: vi.fn(() => false),
   shouldShowTimeShift: vi.fn(() => false),
+  allVisibleQueriesInstant: vi.fn(() => false),
 }));
 
 // ---------------------------------------------------------------------------
@@ -1223,5 +1224,26 @@ describe("filterOption – plural queries", () => {
     ["gas", "Ga"],
   ])("%j does not widen to %j", (query, label) => {
     expect(filterOption({ label }, query)).toBe(false);
+  });
+});
+
+describe("useConfigPanel – sparkline search visibility", () => {
+  it("drops the sparkline option for an all-instant PromQL metric only", async () => {
+    const { allVisibleQueriesInstant } = await import("@/utils/dashboard/configUtils");
+    const metric = (queryType: string) => ({
+      ...makePanelData("metric"),
+      data: { ...makePanelData("metric").data, queryType },
+    });
+    vi.mocked(allVisibleQueriesInstant).mockReturnValue(true);
+    expect(makeComposable(metric("promql")).isConfigOptionVisible("sparkline", "sparkline")).toBe(
+      false,
+    );
+    expect(makeComposable(metric("sql")).isConfigOptionVisible("sparkline", "sparkline")).toBe(
+      true,
+    );
+    vi.mocked(allVisibleQueriesInstant).mockReturnValue(false);
+    expect(makeComposable(metric("promql")).isConfigOptionVisible("sparkline", "sparkline")).toBe(
+      true,
+    );
   });
 });
