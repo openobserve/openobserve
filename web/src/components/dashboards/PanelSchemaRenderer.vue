@@ -1824,9 +1824,14 @@ export default defineComponent({
       emit("series-limit-update", value);
     });
 
-    watch(returnLinks, (value) => {
-      emit("return-links-update", value);
-    });
+    // Immediate, so a renderer remounted for a new chart type clears the previous type's chips.
+    watch(
+      returnLinks,
+      (value) => {
+        emit("return-links-update", value);
+      },
+      { immediate: true },
+    );
 
     watch(
       () => panelDiagnostics?.value,
